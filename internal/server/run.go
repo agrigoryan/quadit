@@ -21,16 +21,27 @@ func (s *Server) Run(ctx context.Context) {
 	for _, r := range runners {
 		go r(s, ctx)
 	}
-	tick := time.NewTicker(time.Hour)
-	defer tick.Stop()
+	hourly := time.NewTicker(time.Hour)
+	defer hourly.Stop()
+	minutely := time.NewTicker(time.Minute)
+	defer minutely.Stop()
 	for {
 		if err := s.eng.RollCycles(ctx); err != nil && ctx.Err() == nil {
 			s.log.Error("rolling cycles", "err", err)
 		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
+	wait:
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hourly.C:
+				break wait
+			case <-minutely.C:
+				// A shared resource whose holder went quiet goes to the next in line.
+				if err := s.eng.ExpireHolds(ctx); err != nil && ctx.Err() == nil {
+					s.log.Error("expiring holds", "err", err)
+				}
+			}
 		}
 	}
 }

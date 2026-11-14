@@ -160,13 +160,17 @@ func sessionUpdate(c *cx) error {
 			p.put("ended_at", int64(0), c.at)
 		}
 	}
+	// The event carries the whole new list, so a reader's copy stays right
+	// without asking again.
 	if len(a.AddSteps) > 0 {
-		p.set["steps"] = appendJSON(s.Steps, a.AddSteps)
-		p.changes["steps_added"] = core.FieldChange{To: a.AddSteps}
+		all := appendJSON(s.Steps, a.AddSteps)
+		p.set["steps"] = all
+		p.changes["steps"] = core.FieldChange{To: all}
 	}
 	if len(a.AddLinks) > 0 {
-		p.set["links"] = appendJSON(s.Links, a.AddLinks)
-		p.changes["links_added"] = core.FieldChange{To: a.AddLinks}
+		all := appendJSON(s.Links, a.AddLinks)
+		p.set["links"] = all
+		p.changes["links"] = core.FieldChange{To: all}
 	}
 	before := s.CostMicros
 	total := func(col string, o Opt[int], cur *int64) {
@@ -319,11 +323,8 @@ func (c *cx) promote(r core.Resource, live []core.ResourceClaim) error {
 		return nil
 	}
 	next := live[0]
-	minutes := int64(30)
-	if next.LeaseUntil > 0 {
-		minutes = next.LeaseUntil // a waiting claim keeps its asked-for length here
-	}
-	if err := c.setClaim(next, map[string]any{"state": "holding", "acquired_at": c.at, "lease_until": c.at + minutes*60_000}, "acquired"); err != nil {
+	// The one who was waiting gets half an hour to notice and renew.
+	if err := c.setClaim(next, map[string]any{"state": "holding", "acquired_at": c.at, "lease_until": c.at + 30*60_000}, "acquired"); err != nil {
 		return err
 	}
 	return c.notify(next.UserID, core.NoteWaitingOn, core.Notification{EntityType: "resource", EntityID: r.ID, TaskID: next.TaskID,
@@ -365,8 +366,7 @@ func resourceAcquire(c *cx) error {
 	if err != nil {
 		return err
 	}
-	cl := core.ResourceClaim{ID: cid, WorkspaceID: c.ws, ResourceID: r.ID, UserID: c.actor.UserID, Note: a.Note, State: "waiting",
-		RequestedAt: c.at, LeaseUntil: int64(a.Minutes)}
+	cl := core.ResourceClaim{ID: cid, WorkspaceID: c.ws, ResourceID: r.ID, UserID: c.actor.UserID, Note: a.Note, State: "waiting", RequestedAt: c.at}
 	if a.Task != "" {
 		t, err := c.task("task", a.Task)
 		if err != nil {
@@ -892,4 +892,36 @@ func notifyMember(c *cx) error {
 		return c.notify(m.UserID, core.NoteWaitingOn, n)
 	}
 	return c.notify(m.UserID, core.NoteMentioned, n)
+}
+
+// ExpireHolds frees shared resources whose holder let the hold run out, and
+// gives each to the next in its queue. It is safe to run as often as wanted.
+func (e *Engine) ExpireHolds(ctx context.Context) error {
+	now := e.now().UnixMilli()
+	var stale []core.ResourceClaim
+	if err := e.st.List(ctx, &stale, store.Where(store.Eq("state", "holding"), store.Lt("lease_until", now))); err != nil {
+		return err
+	}
+	seen := map[string]bool{}
+	for _, cl := range stale {
+		if seen[cl.ResourceID] || cl.LeaseUntil == 0 {
+			continue
+		}
+		seen[cl.ResourceID] = true
+		err := e.System(ctx, cl.WorkspaceID, cl.UserID, func(s *Sys) error {
+			var r core.Resource
+			if err := s.c.tx.Get(ctx, &r, store.Eq("id", cl.ResourceID), store.Live); err != nil {
+				return nil
+			}
+			live, err := s.c.activeClaims(r)
+			if err != nil {
+				return err
+			}
+			return s.c.promote(r, live)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

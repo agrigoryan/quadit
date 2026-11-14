@@ -326,7 +326,7 @@ type Decision struct {
 	Rank                string   `json:"rank" db:"rank"`
 	CreatedBy           string   `json:"created_by" db:"created_by"`
 	CreatedAt           int64    `json:"created_at" db:"created_at"`
-	UpdatedAt           int64    `json:"-" db:"updated_at"`
+	UpdatedAt           int64    `json:"updated_at" db:"updated_at"`
 	CreatedSeq          int64    `json:"-" db:"created_seq"`
 	UpdatedSeq          int64    `json:"updated_seq" db:"updated_seq"`
 	DeletedAt           int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`

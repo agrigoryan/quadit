@@ -691,6 +691,11 @@ func decisionOpen(c *cx) error {
 	if err := c.notifyTask(asked, core.NoteAsked, t, "decision", d.ID, d.Question); err != nil {
 		return err
 	}
+	// A closed task waits on nobody; the question still reaches its inbox.
+	var st core.Status
+	if err := c.tx.Get(c.ctx, &st, store.Eq("id", t.StatusID)); err == nil && !core.OpenCategory(st.Category) {
+		return nil
+	}
 	return c.setWaitingOn(t, asked, "answer: "+snippet(d.Question, 80))
 }
 

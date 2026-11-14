@@ -35,6 +35,8 @@ type epicProgress struct {
 	// AtRisk: the target date is close or past and work is left, or nothing
 	// has moved in two weeks.
 	AtRisk string `json:"at_risk,omitempty"`
+	// AtRiskCode names the reason for programs: past_target, due_soon, stalled.
+	AtRiskCode string `json:"at_risk_code,omitempty"`
 }
 
 type agentState struct {
@@ -79,6 +81,12 @@ func (x *c) agentStates(tasks []core.Task, nm *names) ([]agentState, error) {
 	for _, t := range tasks {
 		keyOf[t.ID] = t
 	}
+	// Open questions asked of someone wait on them too, even when the task
+	// itself names another.
+	var asked []core.Decision
+	if err := x.db.List(ctx, &asked, store.Where(store.Eq("state", core.StateOpen), store.NotNull("asked_id"), store.Live)); err != nil {
+		return nil, err
+	}
 	var out []agentState
 	for _, m := range nm.members {
 		if m.Kind != core.KindAgent || m.RemovedAt != 0 {
@@ -107,6 +115,11 @@ func (x *c) agentStates(tasks []core.Task, nm *names) ([]agentState, error) {
 			}
 		}
 		a.Open = mine
+		for _, d := range asked {
+			if t, ok := keyOf[d.TaskID]; ok && d.AskedID == m.UserID && t.WaitingOnID != m.UserID {
+				a.Queue++
+			}
+		}
 		for _, se := range sessions {
 			if se.AgentID == m.UserID {
 				a.State, a.Doing, a.Since = "working", orText(se.Title, a.Doing), when(se.StartedAt)
@@ -282,11 +295,11 @@ func (s *Server) hDashboard(x *c) error {
 		switch {
 		case ep.State == core.EpicDone || left == 0:
 		case ep.TargetOn != "" && ep.TargetOn < today:
-			ep.AtRisk = "past its target date"
+			ep.AtRisk, ep.AtRiskCode = "past its target date", "past_target"
 		case ep.TargetOn != "" && ep.TargetOn <= soon && ep.Done*2 < ep.Total:
-			ep.AtRisk = "due within a week and less than half done"
+			ep.AtRisk, ep.AtRiskCode = "due within a week and less than half done", "due_soon"
 		case ep.State == core.EpicActive && lastMove[id] != 0 && now.UnixMilli()-lastMove[id] > 14*24*3600_000:
-			ep.AtRisk = "nothing has moved in two weeks"
+			ep.AtRisk, ep.AtRiskCode = "nothing has moved in two weeks", "stalled"
 		}
 		epics = append(epics, *ep)
 	}
@@ -371,7 +384,12 @@ func (s *Server) hDashboard(x *c) error {
 		wt.Oldest = float64(int(wt.Oldest*10)) / 10
 		wl = append(wl, *wt)
 	}
-	sort.Slice(wl, func(i, j int) bool { return wl[i].Oldest > wl[j].Oldest })
+	sort.Slice(wl, func(i, j int) bool {
+		if wl[i].Oldest != wl[j].Oldest {
+			return wl[i].Oldest > wl[j].Oldest
+		}
+		return wl[i].Member < wl[j].Member
+	})
 	out["flow"] = map[string]any{"by_status": sc, "weekly": wk, "waiting": wl}
 
 	var open []core.Task
