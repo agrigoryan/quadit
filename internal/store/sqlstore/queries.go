@@ -235,7 +235,22 @@ func (c conn) Events(ctx context.Context, f store.EventFilter) ([]core.Event, er
 		}
 	}
 	if len(f.ProjectIDs) > 0 {
-		w.in(`e.project_id`, f.ProjectIDs, true)
+		if f.AllowNoProject {
+			var keep []string
+			for _, p := range f.ProjectIDs {
+				if looksUUID(p) {
+					keep = append(keep, p)
+				}
+			}
+			if len(keep) == 0 {
+				w.add(`e.project_id IS NULL`)
+			} else {
+				m, a := marks(keep)
+				w.add(`(e.project_id IS NULL OR e.project_id IN (`+m+`))`, a...)
+			}
+		} else {
+			w.in(`e.project_id`, f.ProjectIDs, true)
+		}
 	}
 	if len(f.Types) > 0 {
 		w.in(`e.type`, f.Types, false)

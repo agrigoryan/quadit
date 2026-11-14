@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"regexp"
@@ -18,11 +19,39 @@ import (
 // The functions here turn such a reference into the row, and when it matches
 // nothing they say what would have.
 
+// Resolver turns references into rows for one member, over a transaction
+// or a plain read.
+type Resolver struct {
+	ctx   context.Context
+	db    store.DB
+	actor core.Member
+	at    int64
+}
+
+// NewResolver returns a Resolver for reads outside a change.
+func NewResolver(ctx context.Context, db store.DB, actor core.Member, at int64) *Resolver {
+	return &Resolver{ctx: ctx, db: db, actor: actor, at: at}
+}
+
+func (c *Resolver) Project(ref string) (core.Project, error)      { return c.project(ref) }
+func (c *Resolver) Task(ref string) (core.Task, error)            { return c.anyTask("task", ref) }
+func (c *Resolver) Member(field, ref string) (core.Member, error) { return c.memberRef(field, ref) }
+func (c *Resolver) Status(p core.Project, ref string) (core.Status, error) {
+	return c.status(p, "status", ref)
+}
+func (c *Resolver) Label(p core.Project, ref string) (core.Label, error) {
+	return c.label(p, "label", ref)
+}
+func (c *Resolver) Epic(p core.Project, ref string) (core.Epic, error) { return c.epic(p, "epic", ref) }
+func (c *Resolver) Cycle(p core.Project, ref string) (core.Cycle, error) {
+	return c.cycle(p, "cycle", ref)
+}
+
 var taskKeyRE = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{1,9}-\d+$`)
 
 func isID(s string) bool { return len(s) == 36 && id.Valid(s) }
 
-func (c *cx) project(ref string) (core.Project, error) {
+func (c *Resolver) project(ref string) (core.Project, error) {
 	var p core.Project
 	if ref == "" {
 		return p, invalid("project", "a project is required: give its key (SVA) or id")
@@ -31,10 +60,10 @@ func (c *cx) project(ref string) (core.Project, error) {
 	if isID(ref) {
 		cond = store.Eq("id", ref)
 	}
-	err := c.tx.Get(c.ctx, &p, cond, store.Live)
+	err := c.db.Get(c.ctx, &p, cond, store.Live)
 	if errors.Is(err, store.ErrNotFound) {
 		var all []core.Project
-		if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "key"}); err != nil {
+		if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "key"}); err != nil {
 			return p, err
 		}
 		keys := make([]string, len(all))
@@ -49,7 +78,7 @@ func (c *cx) project(ref string) (core.Project, error) {
 }
 
 // anyTask loads a task by id or key, in the trash or not.
-func (c *cx) anyTask(field, ref string) (core.Task, error) {
+func (c *Resolver) anyTask(field, ref string) (core.Task, error) {
 	var t core.Task
 	if ref == "" {
 		return t, invalid(field, "a task is required: give its key (SVA-12) or id")
@@ -63,7 +92,7 @@ func (c *cx) anyTask(field, ref string) (core.Task, error) {
 	default:
 		return t, invalid(field, "%q is not a task: use its key (SVA-12) or id", ref)
 	}
-	err := c.tx.Get(c.ctx, &t, cond)
+	err := c.db.Get(c.ctx, &t, cond)
 	if errors.Is(err, store.ErrNotFound) {
 		e := notFound("task", ref)
 		e.Field = field
@@ -73,7 +102,7 @@ func (c *cx) anyTask(field, ref string) (core.Task, error) {
 }
 
 // task loads a task that is not in the trash.
-func (c *cx) task(field, ref string) (core.Task, error) {
+func (c *Resolver) task(field, ref string) (core.Task, error) {
 	t, err := c.anyTask(field, ref)
 	if err != nil {
 		return t, err
@@ -85,7 +114,7 @@ func (c *cx) task(field, ref string) (core.Task, error) {
 }
 
 // memberRef finds a member by id, @handle, or "me".
-func (c *cx) memberRef(field, ref string) (core.Member, error) {
+func (c *Resolver) memberRef(field, ref string) (core.Member, error) {
 	if ref == "me" {
 		return c.actor, nil
 	}
@@ -94,10 +123,10 @@ func (c *cx) memberRef(field, ref string) (core.Member, error) {
 	if isID(ref) {
 		cond = store.Eq("user_id", ref)
 	}
-	err := c.tx.Get(c.ctx, &m, cond, store.Null("removed_at"))
+	err := c.db.Get(c.ctx, &m, cond, store.Null("removed_at"))
 	if errors.Is(err, store.ErrNotFound) {
 		var all []core.Member
-		if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Null("removed_at")}, Order: "handle"}); err != nil {
+		if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Null("removed_at")}, Order: "handle"}); err != nil {
 			return m, err
 		}
 		handles := make([]string, len(all))
@@ -112,7 +141,7 @@ func (c *cx) memberRef(field, ref string) (core.Member, error) {
 }
 
 // optMember resolves an optional member reference to a user id; "" stays "".
-func (c *cx) optMember(field, ref string) (string, error) {
+func (c *Resolver) optMember(field, ref string) (string, error) {
 	if ref == "" {
 		return "", nil
 	}
@@ -120,15 +149,15 @@ func (c *cx) optMember(field, ref string) (string, error) {
 	return m.UserID, err
 }
 
-func (c *cx) statuses(projectID string) ([]core.Status, error) {
+func (c *Resolver) statuses(projectID string) ([]core.Status, error) {
 	var all []core.Status
-	err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", projectID), store.Live}, Order: "rank"})
+	err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", projectID), store.Live}, Order: "rank"})
 	return all, err
 }
 
 // status finds a status of project p by id, by name, or by category (the
 // first status of that category).
-func (c *cx) status(p core.Project, field, ref string) (core.Status, error) {
+func (c *Resolver) status(p core.Project, field, ref string) (core.Status, error) {
 	all, err := c.statuses(p.ID)
 	if err != nil {
 		return core.Status{}, err
@@ -152,7 +181,7 @@ func (c *cx) status(p core.Project, field, ref string) (core.Status, error) {
 		Allowed: names, Nearest: nearest(ref, names)}
 }
 
-func (c *cx) defaultStatus(p core.Project) (core.Status, error) {
+func (c *Resolver) defaultStatus(p core.Project) (core.Status, error) {
 	all, err := c.statuses(p.ID)
 	if err != nil {
 		return core.Status{}, err
@@ -175,9 +204,9 @@ func (c *cx) defaultStatus(p core.Project) (core.Status, error) {
 
 // label finds a label usable in project p (its own, or one shared by the
 // workspace) by id or name.
-func (c *cx) label(p core.Project, field, ref string) (core.Label, error) {
+func (c *Resolver) label(p core.Project, field, ref string) (core.Label, error) {
 	var all []core.Label
-	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "name"}); err != nil {
+	if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "name"}); err != nil {
 		return core.Label{}, err
 	}
 	low := strings.ToLower(strings.TrimSpace(ref))
@@ -195,7 +224,7 @@ func (c *cx) label(p core.Project, field, ref string) (core.Label, error) {
 		Allowed: names, Nearest: nearest(ref, names)}
 }
 
-func (c *cx) labelIDs(p core.Project, field string, refs []string) ([]string, error) {
+func (c *Resolver) labelIDs(p core.Project, field string, refs []string) ([]string, error) {
 	var out []string
 	for _, r := range refs {
 		l, err := c.label(p, field, r)
@@ -210,9 +239,9 @@ func (c *cx) labelIDs(p core.Project, field string, refs []string) ([]string, er
 }
 
 // epic finds an epic of project p by id or name.
-func (c *cx) epic(p core.Project, field, ref string) (core.Epic, error) {
+func (c *Resolver) epic(p core.Project, field, ref string) (core.Epic, error) {
 	var all []core.Epic
-	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "rank"}); err != nil {
+	if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "rank"}); err != nil {
 		return core.Epic{}, err
 	}
 	low := strings.ToLower(strings.TrimSpace(ref))
@@ -228,9 +257,9 @@ func (c *cx) epic(p core.Project, field, ref string) (core.Epic, error) {
 }
 
 // cycle finds a cycle of project p by id, number, "current" or "next".
-func (c *cx) cycle(p core.Project, field, ref string) (core.Cycle, error) {
+func (c *Resolver) cycle(p core.Project, field, ref string) (core.Cycle, error) {
 	var all []core.Cycle
-	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "starts_on"}); err != nil {
+	if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "starts_on"}); err != nil {
 		return core.Cycle{}, err
 	}
 	today := time.UnixMilli(c.at).UTC().Format("2006-01-02")

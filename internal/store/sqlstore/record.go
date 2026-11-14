@@ -387,7 +387,7 @@ func (c conn) List(ctx context.Context, dst any, q store.Q) error {
 // scanAll appends every row to the slice sv and closes rows.
 func scanAll(rows *sql.Rows, m *meta, sv reflect.Value) error {
 	defer rows.Close()
-	sv.Set(sv.Slice(0, 0))
+	sv.Set(reflect.MakeSlice(sv.Type(), 0, 0)) // never nil: an empty list is [] in JSON
 	for rows.Next() {
 		el := reflect.New(sv.Type().Elem()).Elem()
 		if err := rows.Scan(m.dests(el)...); err != nil {

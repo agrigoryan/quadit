@@ -194,7 +194,7 @@ func (c *cx) afterTaskText(t core.Task, textChanged bool, newAssignee, newWaitin
 		if err := c.watch(newAssignee, "task", t.ID); err != nil {
 			return err
 		}
-		if err := c.notifyTask(newAssignee, core.NoteAssigned, t, "task", t.ID, t.Title); err != nil {
+		if err := c.notifyTask(newAssignee, core.NoteAssigned, t, "task", t.ID, ""); err != nil {
 			return err
 		}
 	}

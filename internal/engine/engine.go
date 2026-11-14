@@ -180,17 +180,15 @@ func MinRole(changeType string) (core.Role, bool) {
 
 // cx is what a handler works with: one change, one actor, one transaction.
 type cx struct {
-	e        *Engine
-	ctx      context.Context
-	tx       store.Tx
-	ws       string
-	actor    core.Member
-	scope    core.Scope
-	at       int64
-	change   Change
-	events   []core.Event
-	ref, key string
-	notified map[string]bool
+	*Resolver // ctx, actor, at, and finding things by name
+	e         *Engine
+	tx        store.Tx
+	ws        string
+	scope     core.Scope
+	change    Change
+	events    []core.Event
+	ref, key  string
+	notified  map[string]bool
 	// system is set while the engine itself acts (rules, roll-overs): role
 	// and scope checks are skipped.
 	system bool
@@ -402,7 +400,8 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 	if scope.ReadOnly {
 		return nil, forbidden("this credential is read-only")
 	}
-	c := &cx{e: e, ctx: ctx, tx: tx, ws: tx.WorkspaceID(), actor: m, scope: scope, at: now, change: ch, notified: map[string]bool{}}
+	c := &cx{Resolver: &Resolver{ctx: ctx, db: tx, actor: m, at: now}, e: e, tx: tx, ws: tx.WorkspaceID(), scope: scope,
+		change: ch, notified: map[string]bool{}}
 	if contains(scope.NeedsApproval, ch.Type) {
 		if err := c.checkApproval(); err != nil {
 			return nil, err
@@ -474,7 +473,7 @@ func (e *Engine) System(ctx context.Context, workspaceID, actorID string, fn fun
 		if err := tx.Get(ctx, &m, store.Eq("user_id", actorID)); err != nil {
 			return fmt.Errorf("system actor %s: %w", actorID, err)
 		}
-		c := &cx{e: e, ctx: ctx, tx: tx, ws: workspaceID, actor: m, at: e.now().UnixMilli(), system: true,
+		c := &cx{Resolver: &Resolver{ctx: ctx, db: tx, actor: m, at: e.now().UnixMilli()}, e: e, tx: tx, ws: workspaceID, system: true,
 			change: Change{ID: id.New(), Type: "system"}, notified: map[string]bool{}}
 		if err := fn(&Sys{c: c}); err != nil {
 			return err

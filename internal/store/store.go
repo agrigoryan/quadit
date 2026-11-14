@@ -175,9 +175,12 @@ type EventFilter struct {
 	ScopeType  string // with ScopeID: one object's timeline
 	ScopeID    string
 	ProjectIDs []string
-	Types      []string
-	ActorID    string
-	NotActorID string
+	// AllowNoProject also keeps events that belong to no project (members,
+	// shared labels) when ProjectIDs is set.
+	AllowNoProject bool
+	Types          []string
+	ActorID        string
+	NotActorID     string
 	// Viewer hides events addressed to someone else. Empty shows all.
 	Viewer string
 	// OnlyAudience keeps only events addressed to this member.
