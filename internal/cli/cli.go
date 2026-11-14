@@ -20,64 +20,67 @@ import (
 
 const help = `quadit: tasks, decisions and docs for people and agents
 
-  quadit serve                 run the server (see: quadit serve -h)
-  quadit login URL TOKEN       remember a server and token
+orient    me                         who am I: role, scope, budget, cursors
+          work                       what waits on me, what is assigned, unread inbox
+          layout PROJECT             statuses, labels, members, epics
+          dashboard | agents         where everything stands; what each agent is doing
+find      tasks [filter=value ...]   assignee=me status=todo label=art open=1 q=text sort=priority
+                                     count=1 for a number, view=SLUG for a saved view
+          show KEY [since=SEQ]       one task with decisions and comments
+          context KEY                everything needed to work on a task
+          search TEXT | decisions [state=open] | inbox [all=1]
+follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=KEY]
+          ack SEQ [NAME]             mark the feed handled up to SEQ
+          listen --exec CMD          wait for inbox items and run CMD for each
+act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
+          update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
+          status KEY NAME | assign KEY @WHO | take KEY | release KEY
+          comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID]
+          result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
+          ask KEY QUESTION option=A option=B [recommended=2] [why=...] [ask=@WHO]
+          approval KEY QUESTION [action=task.delete] [ask=@WHO]
+          pick DECISION OPTION|approved|declined|none [note=...]
+          unclear DECISION NOTE
+          attach KEY PATH ... [option=ID] | upload PATH | read [all | ID ...]
+          do TYPE JSON               send any change; "changes" lists them all
+more      quadit help docs           pages, databases, memory
+          quadit help code           git links, pictures of pages
+          quadit help import         bring work in from other tools
+          quadit help server         serve, admin, backup, restore
 
-orient
-  me                           who am I: role, scope, budget, cursors
-  work                         what waits on me, what is assigned, unread inbox
-  layout PROJECT               a project's statuses, labels, members, epics
-  changes                      every change type and its arguments
+Every command takes --json for full data and --dry-run to check a write.
+Connect with QUADIT_URL and QUADIT_TOKEN, or: quadit login URL TOKEN
+`
 
-find
-  tasks [filter=value ...]     assignee=me status=todo label=art open=1 q=text sort=priority
-                               count=1 for a number, view=SLUG for a saved view
-  show KEY [since=SEQ]         one task with decisions and comments
-  context KEY                  everything needed to work on a task
-  search TEXT                  tasks, decisions, comments, docs
-  decisions [state=open]       the decision log
-  inbox [all=1]                mentions, assignments, picks, replies
+var helpTopics = map[string]string{
+	"docs": `pages, databases and memory
   docs                         the page tree with ids
   doc ID                       one page as Markdown
+  write ID|new TITLE [parent=ID] [mode=append] < markdown     write a page from stdin
   rows DATABASE [filter=Prop:is:Value] [sort=-Prop] [view=NAME]
+  row DATABASE TITLE [Prop=value ...]                         add a row to a database
   memory                       my notes from earlier sessions (agents)
-
-follow
-  events [after=SEQ] [wait=30] [cursor=NAME] [mine=1] [others=1] [task=KEY]
-  ack SEQ [NAME]               mark the feed handled up to SEQ
-  listen --exec CMD            wait for inbox items and run CMD for each
-
-act
-  new PROJECT TITLE [field=value ...]     description=- reads it from stdin
-  update KEY field=value ...   status=done assignee=@ann priority=high add_labels=a,b
-  status KEY NAME | assign KEY @WHO | take KEY | release KEY
-  comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID]
-  result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
-  ask KEY QUESTION option=A option=B [recommended=2] [why=...] [ask=@WHO]
-  approval KEY QUESTION [action=task.delete] [ask=@WHO]
-  pick DECISION OPTION|approved|declined|none [note=...]
-  unclear DECISION NOTE
-  attach KEY PATH ... [option=ID | decision=ID]
-  upload PATH                  store a file, print its address
-  link [KEY]                   link the current git branch (and its commits) to a task;
+  remember TITLE [mode=append] < markdown                     save a note to my memory
+`,
+	"code": `code and pictures
+  link [KEY]                   link the current git branch and its commits to a task;
                                the key is read from the branch name when left out
   link KEY URL                 link a URL to a task
   render KEY|doc=ID [width=390] [out=FILE]   a picture of how it looks to a person
-  write ID|new TITLE [parent=ID] [mode=append] < markdown     write a page from stdin
-  remember TITLE [mode=append] < markdown                     save a note to my memory
-  row DATABASE TITLE [Prop=value ...]                         add a row to a database
-  read [all | ID ...]          mark inbox items read
-  do TYPE JSON                 send any change
-
-bring work in (safe to run twice: nothing is added a second time)
+`,
+	"import": `bring work in (safe to run twice: nothing is added a second time)
   import linear FILE.csv project=KEY       import trello BOARD.json project=KEY
   import asana FILE.csv project=KEY        import github OWNER/REPO project=KEY [token=…]
   import notion EXPORT.zip                 import obsidian FOLDER     import markdown FOLDER
   import orbit https://orbit.example workspace=ID token=ORBIT_TOKEN
-
-every command takes --json for full data and --dry-run to check a write.
-connection: QUADIT_URL and QUADIT_TOKEN, or quadit login.
-`
+`,
+	"server": `on the server's machine
+  quadit serve [--listen :4780] [--data DIR] [--db PATH|postgres://…] [--url https://…]
+  quadit admin                 setup, reset-password, token, make-admin
+  quadit backup [--out FILE] | quadit backup verify FILE
+  quadit restore FILE [--workspace SLUG --task KEY | --doc ID]
+`,
+}
 
 var priorities = map[string]int{"none": 0, "urgent": 1, "high": 2, "medium": 3, "low": 4}
 var listKeys = map[string]bool{"labels": true, "add_labels": true, "remove_labels": true, "event_types": true}
@@ -165,6 +168,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if len(rest) == 0 || rest[0] == "help" || rest[0] == "-h" || rest[0] == "--help" {
+		if len(rest) > 1 {
+			if topic, ok := helpTopics[rest[1]]; ok {
+				fmt.Fprint(stdout, topic)
+				return 0
+			}
+		}
 		fmt.Fprint(stdout, help)
 		return 0
 	}
@@ -290,6 +299,10 @@ func (r *runner) run(cmd string, rest []string) error {
 		return r.get("/projects/"+url.PathEscape(pos[0])+"/layout", nil)
 	case "changes":
 		return r.get("/api/v1/changes", nil)
+	case "dashboard":
+		return r.get("/dashboard", query(f))
+	case "agents":
+		return r.get("/agents", nil)
 	case "tasks", "ls":
 		return r.get("/tasks", query(f))
 	case "show":
