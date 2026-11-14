@@ -49,8 +49,8 @@ change project.create '{"key":"SVA","name":"Samurai vs Alien","description":"A s
 change project.create '{"key":"OPS","name":"Operations"}'
 for a in '"name":"Coordinator","handle":"coordinator","role":"admin","description":"Plans the work and hands it out"' '"name":"Artist","handle":"artist","description":"Sprites and effects"' '"name":"Coder","handle":"coder","description":"Gameplay code"'; do change agent.create "{$a}"; done
 for l in art:#ec4899 code:#3b82f6 audio:#10b981 bug:#ef4444; do change label.create "{\"name\":\"${l%%:*}\",\"color\":\"${l##*:}\",\"project\":\"SVA\"}"; done
-change epic.create '{"project":"SVA","name":"Boss fight","description":"The first boss: an alien mothership pilot.","state":"active","lead":"@coordinator","target_on":"2027-01-15"}'
-change epic.create '{"project":"SVA","name":"Level 2: the docks","state":"planned","target_on":"2027-02-20"}'
+change epic.create '{"project":"SVA","name":"Boss fight","description":"The first boss: an alien mothership pilot.","state":"active","lead":"@coordinator","start_on":"'$(date -v-10d +%F 2>/dev/null || date -d "-10 days" +%F)'","target_on":"'$(date -v+30d +%F 2>/dev/null || date -d "+30 days" +%F)'"}'
+change epic.create '{"project":"SVA","name":"Level 2: the docks","state":"planned","start_on":"'$(date -v+20d +%F 2>/dev/null || date -d "+20 days" +%F)'","target_on":"'$(date -v+70d +%F 2>/dev/null || date -d "+70 days" +%F)'"}'
 change template.create '{"name":"Review","project":"SVA","title":"Review: ","preset":{"priority":2,"labels":["art"]}}'
 change preference.create '{"body":"No rings as the main shape of an explosion.","project":"SVA","labels":["art"]}'
 
@@ -62,7 +62,7 @@ change task.create '{"project":"SVA","title":"Boss explosion effect","assignee":
 change task.create '{"project":"SVA","title":"Boss attack patterns","assignee":"@coder","labels":["code"],"epic":"Boss fight","priority":1,"estimate":5,"status":"In Progress"}'
 change task.create '{"project":"SVA","title":"Hit flash is too subtle","labels":["art","bug"],"priority":3}'
 change task.create '{"project":"SVA","title":"Dock crane sprites","labels":["art"],"epic":"Level 2: the docks","status":"Backlog"}'
-change task.create '{"project":"SVA","title":"Jump feels floaty","assignee":"@coder","labels":["code","bug"],"priority":2,"due_on":"2026-12-01"}'
+change task.create '{"project":"SVA","title":"Jump feels floaty","assignee":"@coder","labels":["code","bug"],"priority":2,"due_on":"'$(date -v+9d +%F 2>/dev/null || date -d "+9 days" +%F)'"}'
 change task.create '{"project":"SVA","title":"Boss music loop","labels":["audio"],"epic":"Boss fight","status":"Backlog","estimate":2}'
 change task.create '{"project":"SVA","parent":"SVA-2","title":"Phase 2: laser sweep","assignee":"@coder","labels":["code"]}'
 change task.create '{"project":"SVA","parent":"SVA-2","title":"Phase 3: summon drones","labels":["code"],"status":"Done"}'

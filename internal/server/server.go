@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"reflect"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -169,7 +170,27 @@ func (x *c) ctx() context.Context { return x.r.Context() }
 func (x *c) json(status int, v any) error {
 	x.w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	x.w.WriteHeader(status)
-	return json.NewEncoder(x.w).Encode(v)
+	return json.NewEncoder(x.w).Encode(noNulls(v))
+}
+
+// noNulls turns the empty lists in an answer into [] instead of null, so a
+// client can count on a list being a list. It looks inside the maps answers
+// are built from.
+func noNulls(v any) any {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return v
+	}
+	for k, val := range m {
+		if inner, ok := val.(map[string]any); ok {
+			m[k] = noNulls(inner)
+			continue
+		}
+		if rv := reflect.ValueOf(val); rv.Kind() == reflect.Slice && rv.IsNil() {
+			m[k] = reflect.MakeSlice(rv.Type(), 0, 0).Interface()
+		}
+	}
+	return m
 }
 
 func (x *c) ok(v any) error { return x.json(200, v) }

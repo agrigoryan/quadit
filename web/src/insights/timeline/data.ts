@@ -85,7 +85,12 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
         .sort((a, b) => a.day - b.day);
       const line: EpicLine = {
         epic,
-        start: epic.start_on ? dayNumber(epic.start_on) : undefined,
+        // An epic with a target but no start is drawn from the day it was made.
+        start: epic.start_on
+          ? dayNumber(epic.start_on)
+          : epic.target_on && epic.created_at
+            ? Math.min(dayNumber(dayOfMs(epic.created_at)), dayNumber(epic.target_on))
+            : undefined,
         target: epic.target_on ? dayNumber(epic.target_on) : undefined,
         tasks: own,
         done: counted.filter((l) => l.category === "done").length,

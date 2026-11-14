@@ -13,6 +13,7 @@ import { InboxPage } from "@/pages/inbox";
 import { MyWorkPage } from "@/pages/my-work";
 import { TrashPage } from "@/pages/trash";
 import { insightPaths } from "@/insights/paths";
+import { PageBoundary } from "@/shell/error-boundary";
 import { NotFoundPage } from "@/shell/placeholders";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
@@ -85,6 +86,7 @@ export function Shell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onNewTask={openNewTask} />
         <main className="relative min-h-0 flex-1 overflow-hidden bg-surface">
+          <PageBoundary resetKey={pagePath}>
           <Routes location={page}>
             <Route index element={<Navigate to="my-work" replace />} />
             <Route path="my-work" element={<MyWorkPage />} />
@@ -102,6 +104,7 @@ export function Shell() {
             <Route path="trash" element={<TrashPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          </PageBoundary>
         </main>
       </div>
       {taskKey && <TaskPanel key={taskKey.toUpperCase()} taskKey={taskKey.toUpperCase()} onClose={closePanel} />}

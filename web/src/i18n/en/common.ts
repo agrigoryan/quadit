@@ -2,6 +2,8 @@
 // A value written "one | other" is a plural chosen by the {n} parameter.
 
 export const common = {
+  "common.pageFailed": "This page hit a problem",
+  "common.reload": "Reload",
   "common.loading": "Loading",
   "common.close": "Close",
   "common.dismiss": "Dismiss",
