@@ -38,6 +38,7 @@ func (c *cx) sub(changeType string, args any) error {
 	saved, ref, key := c.change, c.ref, c.key
 	c.change = Change{ID: saved.ID, Type: changeType, Args: raw}
 	err = handlers[changeType].fn(c)
+	c.subRef = c.ref
 	c.change, c.ref, c.key = saved, ref, key
 	return err
 }

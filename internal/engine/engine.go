@@ -188,6 +188,7 @@ type cx struct {
 	change    Change
 	events    []core.Event
 	ref, key  string
+	subRef    string // the ref of the last change run with sub
 	notified  map[string]bool
 	// system is set while the engine itself acts (rules, roll-overs): role
 	// and scope checks are skipped.

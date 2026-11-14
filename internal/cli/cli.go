@@ -34,6 +34,10 @@ find
   search TEXT                  tasks, decisions, comments, docs
   decisions [state=open]       the decision log
   inbox [all=1]                mentions, assignments, picks, replies
+  docs                         the page tree with ids
+  doc ID                       one page as Markdown
+  rows DATABASE [filter=Prop:is:Value] [sort=-Prop] [view=NAME]
+  memory                       my notes from earlier sessions (agents)
 
 follow
   events [after=SEQ] [wait=30] [cursor=NAME] [mine=1] [others=1] [task=KEY]
@@ -52,6 +56,9 @@ act
   unclear DECISION NOTE
   attach KEY PATH ... [option=ID | decision=ID]
   upload PATH                  store a file, print its address
+  write ID|new TITLE [parent=ID] [mode=append] < markdown     write a page from stdin
+  remember TITLE [mode=append] < markdown                     save a note to my memory
+  row DATABASE TITLE [Prop=value ...]                         add a row to a database
   read [all | ID ...]          mark inbox items read
   do TYPE JSON                 send any change
 
@@ -291,6 +298,70 @@ func (r *runner) run(cmd string, rest []string) error {
 		return r.get("/search", q)
 	case "decisions":
 		return r.get("/decisions", query(f))
+	case "docs":
+		return r.get("/docs", query(f))
+	case "doc":
+		if err := need(pos, 1, "doc ID"); err != nil {
+			return err
+		}
+		return r.get("/docs/"+url.PathEscape(pos[0]), query(f))
+	case "rows":
+		if err := need(pos, 1, "rows DATABASE"); err != nil {
+			return err
+		}
+		return r.get("/docs/"+url.PathEscape(pos[0])+"/rows", query(f))
+	case "memory":
+		return r.get("/memory", query(f))
+	case "write":
+		if err := need(pos, 1, "write ID|new [TITLE] < markdown"); err != nil {
+			return err
+		}
+		raw, _ := io.ReadAll(os.Stdin)
+		if pos[0] == "new" {
+			a := argsFrom(f)
+			a["title"], a["markdown"] = strings.Join(pos[1:], " "), string(raw)
+			_, err := r.change("doc.create", a, approval)
+			return err
+		}
+		a := argsFrom(f)
+		a["doc"], a["markdown"] = pos[0], string(raw)
+		_, err := r.change("doc.write", a, approval)
+		return err
+	case "remember":
+		if err := need(pos, 1, "remember TITLE < markdown"); err != nil {
+			return err
+		}
+		raw, _ := io.ReadAll(os.Stdin)
+		body := map[string]any{"title": strings.Join(pos, " "), "markdown": string(raw)}
+		if m := f["mode"]; len(m) > 0 {
+			body["mode"] = m[0]
+		}
+		js, _ := json.Marshal(body)
+		out, err := r.c.do("POST", "/memory", nil, bytes.NewReader(js), "application/json", "")
+		if err == nil {
+			fmt.Fprintln(r.out, "ok remembered", strings.TrimSpace(string(out)))
+		}
+		return err
+	case "row":
+		if err := need(pos, 2, "row DATABASE TITLE [Prop=value ...]"); err != nil {
+			return err
+		}
+		props := map[string]any{}
+		for k, vs := range f {
+			v := vs[len(vs)-1]
+			switch {
+			case v == "true" || v == "false":
+				props[k] = v == "true"
+			default:
+				if n, err := strconv.ParseFloat(v, 64); err == nil {
+					props[k] = n
+				} else {
+					props[k] = v
+				}
+			}
+		}
+		_, err := r.change("doc.create", map[string]any{"parent": pos[0], "title": strings.Join(pos[1:], " "), "props": props}, approval)
+		return err
 	case "events":
 		return r.get("/events", query(f))
 	case "ack":
