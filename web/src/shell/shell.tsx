@@ -1,9 +1,9 @@
+import { lazy, type ReactNode, Suspense } from "react";
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { CommandPalette } from "@/palette/palette";
 import { ShortcutsSheet } from "@/palette/shortcuts";
 import { TaskPanel } from "@/detail/task-panel";
 import { useHotkeys } from "@/lib/hotkeys";
-import { t } from "@/lib/i18n";
 import { findTaskByKey } from "@/lib/selectors";
 import { getState, useStore } from "@/lib/store";
 import { ui, useUi } from "@/lib/ui-state";
@@ -12,11 +12,22 @@ import { EpicsPage } from "@/pages/epics";
 import { InboxPage } from "@/pages/inbox";
 import { MyWorkPage } from "@/pages/my-work";
 import { TrashPage } from "@/pages/trash";
-import { ComingPage, NotFoundPage } from "@/shell/placeholders";
+import { insightPaths } from "@/insights/paths";
+import { NotFoundPage } from "@/shell/placeholders";
+import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
 import { CreateTaskDialog } from "@/tasks/create-task";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
+
+// The larger parts of the app are fetched when first opened.
+const DocsRoutes = lazy(() => import("@/docs/routes"));
+const SettingsRoutes = lazy(() => import("@/settings/routes"));
+const InsightRoutes = lazy(() => import("@/insights/routes"));
+
+function Later({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<Loading />}>{children}</Suspense>;
+}
 
 /** The project a new task should default to, given what is on screen. */
 function projectInView(pagePath: string, taskKey: string | undefined): string | undefined {
@@ -83,9 +94,11 @@ export function Shell() {
             <Route path="p/:key/epics" element={<EpicsPage />} />
             <Route path="p/:key/cycles" element={<CyclesPage />} />
             <Route path="view/:slug" element={<ViewPage />} />
-            <Route path="docs" element={<ComingPage name={t("nav.docs")} />} />
-            <Route path="dashboard" element={<ComingPage name={t("nav.dashboard")} />} />
-            <Route path="settings" element={<ComingPage name={t("nav.settings")} />} />
+            <Route path="docs/*" element={<Later><DocsRoutes /></Later>} />
+            <Route path="settings/*" element={<Later><SettingsRoutes /></Later>} />
+            {insightPaths.map((path) => (
+              <Route key={path} path={path} element={<Later><InsightRoutes /></Later>} />
+            ))}
             <Route path="trash" element={<TrashPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

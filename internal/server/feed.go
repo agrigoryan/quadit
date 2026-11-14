@@ -222,6 +222,9 @@ func (s *Server) hStream(x *c) error {
 	beat := time.NewTicker(25 * time.Second)
 	defer beat.Stop()
 	for {
+		// Note where the feed stands before reading it: whatever commits
+		// after this moment has a higher number, and wakes the wait below.
+		mark := s.hub.Seq(x.ws.ID)
 		f.After = after
 		evs, err := x.db.Events(ctx, f)
 		if err != nil {
@@ -249,7 +252,7 @@ func (s *Server) hStream(x *c) error {
 		}
 		woke := make(chan bool, 1)
 		wctx, cancel := context.WithCancel(ctx)
-		go func() { woke <- s.hub.Wait(wctx, x.ws.ID, max(after, s.hub.Seq(x.ws.ID))) }()
+		go func() { woke <- s.hub.Wait(wctx, x.ws.ID, max(after, mark)) }()
 		select {
 		case <-woke:
 		case <-beat.C:

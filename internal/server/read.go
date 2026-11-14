@@ -181,6 +181,37 @@ func (s *Server) hBootstrap(x *c) error {
 	out["views"] = keep(views, func(v core.View) bool { return (v.Shared || v.OwnerID == x.member.UserID) && inScope(v.ProjectID) })
 	out["templates"] = keep(templates, func(v core.Template) bool { return inScope(v.ProjectID) })
 	out["preferences"] = keep(prefs, func(v core.Preference) bool { return inScope(v.ProjectID) })
+	// The files shown on decisions and their options, so a list can show a
+	// decision's pictures without opening its task.
+	var atts []core.Attachment
+	if err := x.db.List(ctx, &atts, store.Q{Where: []store.Cond{store.In("subject_type", []string{"decision", "decision_option"}), store.Live}, Order: "rank"}); err != nil {
+		return err
+	}
+	atts = keep(atts, func(a core.Attachment) bool { return taskIDs[a.TaskID] })
+	if len(atts) > 0 {
+		ids := make([]string, len(atts))
+		for i, a := range atts {
+			ids[i] = a.FileID
+		}
+		var files []core.File
+		if err := x.db.List(ctx, &files, store.Where(store.In("id", ids))); err != nil {
+			return err
+		}
+		byID := map[string]core.File{}
+		for _, f := range files {
+			f.URL = "/f/" + f.ID + "/" + url.PathEscape(f.Name)
+			if f.PreviewKey != "" {
+				f.PreviewURL = "/f/" + f.ID + "/preview"
+			}
+			byID[f.ID] = f
+		}
+		for i := range atts {
+			if f, ok := byID[atts[i].FileID]; ok {
+				atts[i].File = &f
+			}
+		}
+	}
+	out["attachments"] = atts
 	out["tasks"] = tasks
 	out["decisions"] = decisions
 	out["relations"] = keep(relations, func(r core.Relation) bool { return taskIDs[r.TaskID] || taskIDs[r.RelatedTaskID] })

@@ -75,8 +75,12 @@ func (c *cx) watch(userID, subjectType, subjectID string) error {
 		"subject_id", "user_id")
 }
 
+var markup = strings.NewReplacer("**", "", "__", "", "`", "", "~~", "", "# ", "", "> ", "", "- [ ] ", "", "- [x] ", "")
+
+// snippet is the start of some text on one line, with its Markdown marks
+// taken out, for showing in an inbox row or a notification.
 func snippet(s string, n int) string {
-	s = strings.Join(strings.Fields(s), " ")
+	s = strings.Join(strings.Fields(markup.Replace(s)), " ")
 	if len(s) <= n {
 		return s
 	}

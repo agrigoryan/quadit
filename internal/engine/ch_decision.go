@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -64,6 +65,12 @@ func (c *cx) attach(a attachArgs, subjectType, subjectID string, t core.Task) (c
 		Role: a.Role, Caption: a.Caption, Rank: rk, CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, at); err != nil {
 		return at, taken(err, "id", aid)
+	}
+	// The event carries the file with where to fetch it, so a client can
+	// show it without asking.
+	f.URL = "/f/" + f.ID + "/" + url.PathEscape(f.Name)
+	if f.PreviewKey != "" {
+		f.PreviewURL = "/f/" + f.ID + "/preview"
 	}
 	at.File = &f
 	return at, nil
@@ -905,11 +912,11 @@ func decisionUnclear(c *cx) error {
 	answerer := d.DecidedBy
 	seq := c.tx.NextSeq()
 	if _, err := c.tx.Update(c.ctx, "decisions", map[string]any{"state": core.StateOpen, "unclear_note": a.Note, "asked_id": answerer,
-		"picked_option_id": "", "outcome": "", "decided_by": "", "decided_at": 0, "updated_at": c.at, "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {
+		"picked_option_id": "", "outcome": "", "outcome_note": "", "decided_by": "", "decided_at": 0, "updated_at": c.at, "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {
 		return err
 	}
 	prev := map[string]any{"picked_option_id": d.PickedOptionID, "outcome": d.Outcome, "outcome_note": d.OutcomeNote, "decided_by": d.DecidedBy}
-	d.State, d.UnclearNote, d.AskedID, d.PickedOptionID, d.Outcome, d.DecidedBy, d.DecidedAt, d.UpdatedSeq = core.StateOpen, a.Note, answerer, "", "", "", 0, seq
+	d.State, d.UnclearNote, d.AskedID, d.PickedOptionID, d.Outcome, d.OutcomeNote, d.DecidedBy, d.DecidedAt, d.UpdatedSeq = core.StateOpen, a.Note, answerer, "", "", "", "", 0, seq
 	if err := c.touch(t.ID, seq); err != nil {
 		return err
 	}

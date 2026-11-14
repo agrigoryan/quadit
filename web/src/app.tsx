@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { lazy, type ReactNode, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import { LoginPage } from "@/auth/login";
 import { loadSession, useSession } from "@/auth/session";
@@ -9,6 +9,8 @@ import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 import { Toaster } from "@/ui/toast";
 import { TooltipProvider } from "@/ui/tooltip";
+
+const AdminRoutes = lazy(() => import("@/admin/routes"));
 
 /** Shows its children only to someone signed in; everyone else goes to /login. */
 function RequireSession({ children }: { children: ReactNode }) {
@@ -40,6 +42,16 @@ export function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/setup" element={<SetupPage />} />
+          <Route
+            path="/admin/*"
+            element={
+              <RequireSession>
+                <Suspense fallback={<Loading />}>
+                  <AdminRoutes />
+                </Suspense>
+              </RequireSession>
+            }
+          />
           <Route
             path="/"
             element={
