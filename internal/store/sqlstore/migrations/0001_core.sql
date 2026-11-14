@@ -14,7 +14,11 @@ CREATE TABLE workspaces (
     id          {{ID}} PRIMARY KEY,
     slug        TEXT NOT NULL,
     name        TEXT NOT NULL,
+    icon        TEXT NOT NULL DEFAULT '',
     seq         {{BIGINT}} NOT NULL DEFAULT 0,
+    -- How far the background dispatcher (webhooks, push, mail) has read.
+    dispatched_seq {{BIGINT}} NOT NULL DEFAULT 0,
+    settings    {{JSON}},
     created_at  {{TS}} NOT NULL,
     updated_at  {{TS}} NOT NULL,
     deleted_at  {{TS}}
@@ -28,11 +32,23 @@ CREATE TABLE users (
     kind            TEXT NOT NULL CHECK (kind IN ('person', 'agent')),
     name            TEXT NOT NULL,
     email           TEXT,
+    avatar          TEXT NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    timezone        TEXT NOT NULL DEFAULT '',
+    theme           TEXT NOT NULL DEFAULT '',
+    locale          TEXT NOT NULL DEFAULT '',
+    password_hash   TEXT,
+    totp_secret     TEXT,
+    totp_at         {{TS}},
+    -- Runs the install: sign-in methods, mail, storage, backups.
+    is_admin        {{BOOL}} NOT NULL DEFAULT FALSE,
+    notify          {{JSON}},
     workspace_id    {{ID}} REFERENCES workspaces (id),
     responsible_id  {{ID}} REFERENCES users (id),
     created_by      {{ID}} REFERENCES users (id),
     created_at      {{TS}} NOT NULL,
     updated_at      {{TS}} NOT NULL,
+    last_seen_at    {{TS}},
     disabled_at     {{TS}},
     deleted_at      {{TS}},
     -- An agent belongs to one workspace and has a person who answers for it.
@@ -46,8 +62,20 @@ CREATE TABLE members (
     user_id       {{ID}} NOT NULL REFERENCES users (id),
     role          TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
     handle        TEXT NOT NULL,
+    -- Copied from the user, so a member list is one read.
+    kind          TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    avatar        TEXT NOT NULL DEFAULT '',
+    title         TEXT NOT NULL DEFAULT '',
+    -- Agents: what it may touch, what needs approval, and its limits.
+    scope         {{JSON}},
+    budget        {{JSON}},
+    last_seen_at  {{TS}},
+    last_action   TEXT NOT NULL DEFAULT '',
+    listening_until {{TS}},
     created_at    {{TS}} NOT NULL,
     updated_seq   {{BIGINT}} NOT NULL,
+    suspended_at  {{TS}},
     removed_at    {{TS}},
     PRIMARY KEY (workspace_id, user_id)
 );
@@ -63,6 +91,10 @@ CREATE TABLE api_tokens (
     token_hash    TEXT NOT NULL,
     prefix        TEXT NOT NULL,
     scopes        TEXT NOT NULL DEFAULT '',
+    -- token: issued by an admin. oauth: issued to an MCP client.
+    kind          TEXT NOT NULL DEFAULT 'token',
+    client_id     TEXT NOT NULL DEFAULT '',
+    refresh_hash  TEXT,
     created_by    {{ID}} NOT NULL REFERENCES users (id),
     created_at    {{TS}} NOT NULL,
     expires_at    {{TS}},
@@ -79,7 +111,13 @@ CREATE TABLE projects (
     key           TEXT NOT NULL,
     name          TEXT NOT NULL,
     description   TEXT NOT NULL DEFAULT '',
+    icon          TEXT NOT NULL DEFAULT '',
+    color         TEXT NOT NULL DEFAULT '',
+    lead_id       {{ID}} REFERENCES users (id),
+    rank          TEXT NOT NULL DEFAULT '',
+    settings      {{JSON}},
     task_counter  {{INT}} NOT NULL DEFAULT 0,
+    cycle_counter {{INT}} NOT NULL DEFAULT 0,
     created_by    {{ID}} NOT NULL REFERENCES users (id),
     created_at    {{TS}} NOT NULL,
     updated_at    {{TS}} NOT NULL,
@@ -115,6 +153,7 @@ CREATE TABLE labels (
     project_id    {{ID}} REFERENCES projects (id),
     name          TEXT NOT NULL,
     color         TEXT NOT NULL DEFAULT '',
+    description   TEXT NOT NULL DEFAULT '',
     created_at    {{TS}} NOT NULL,
     updated_seq   {{BIGINT}} NOT NULL,
     deleted_at    {{TS}}
@@ -126,6 +165,8 @@ CREATE TABLE tasks (
     workspace_id     {{ID}} NOT NULL REFERENCES workspaces (id),
     project_id       {{ID}} NOT NULL REFERENCES projects (id),
     number           {{INT}} NOT NULL,
+    -- Project key + number (SVA-12), kept on the row so it is one lookup.
+    key              TEXT NOT NULL,
     title            TEXT NOT NULL,
     description      TEXT NOT NULL DEFAULT '',
     status_id        {{ID}} NOT NULL REFERENCES statuses (id),
@@ -136,6 +177,16 @@ CREATE TABLE tasks (
     waiting_on_id    {{ID}} REFERENCES users (id),
     waiting_on_note  TEXT NOT NULL DEFAULT '',
     parent_id        {{ID}} REFERENCES tasks (id),
+    epic_id          {{ID}},
+    milestone_id     {{ID}},
+    cycle_id         {{ID}},
+    estimate         {{INT}},
+    -- A copy of task_labels, so reading a task is one row.
+    label_ids        {{JSON}},
+    -- Taking a task is a lease: it frees itself if the holder stops.
+    lease_holder_id  {{ID}} REFERENCES users (id),
+    lease_until      {{TS}},
+    budget           {{JSON}},
     rank             TEXT NOT NULL,
     due_on           TEXT,
     created_by       {{ID}} NOT NULL REFERENCES users (id),
@@ -160,6 +211,9 @@ CREATE INDEX tasks_status ON tasks (project_id, status_id, rank);
 CREATE INDEX tasks_assignee ON tasks (workspace_id, assignee_id);
 CREATE INDEX tasks_waiting_on ON tasks (workspace_id, waiting_on_id);
 CREATE INDEX tasks_parent ON tasks (parent_id);
+CREATE UNIQUE INDEX tasks_key ON tasks (workspace_id, key);
+CREATE INDEX tasks_epic ON tasks (epic_id);
+CREATE INDEX tasks_cycle ON tasks (cycle_id);
 
 CREATE TABLE task_labels (
     task_id       {{ID}} NOT NULL REFERENCES tasks (id),
@@ -191,7 +245,13 @@ CREATE TABLE decisions (
     -- choice: pick among options. approval: a plain yes or no.
     kind                   TEXT NOT NULL CHECK (kind IN ('choice', 'approval')),
     question               TEXT NOT NULL,
+    details                TEXT NOT NULL DEFAULT '',
+    -- approval requests: the action being asked for, e.g. "task.delete".
+    action                 TEXT NOT NULL DEFAULT '',
     state                  TEXT NOT NULL CHECK (state IN ('open', 'picked', 'sent_back')),
+    asked_id               {{ID}} REFERENCES users (id),
+    -- Set when the asker found the answer unclear and asked again.
+    unclear_note           TEXT NOT NULL DEFAULT '',
     recommended_option_id  {{ID}},
     recommendation         TEXT NOT NULL DEFAULT '',
     picked_option_id       {{ID}},
@@ -224,14 +284,20 @@ CREATE TABLE decision_options (
 );
 CREATE INDEX decision_options_decision ON decision_options (decision_id, rank);
 
--- A comment hangs on one subject: a task, a decision, or one option of a
--- decision. task_id names the task whose timeline it shows in.
+-- A comment hangs on one subject: a task, a decision, one option of a
+-- decision, a doc or one block of a doc. task_id or doc_id names the object
+-- whose timeline it shows in.
 CREATE TABLE comments (
     id            {{ID}} PRIMARY KEY,
     workspace_id  {{ID}} NOT NULL REFERENCES workspaces (id),
-    task_id       {{ID}} NOT NULL REFERENCES tasks (id),
-    subject_type  TEXT NOT NULL CHECK (subject_type IN ('task', 'decision', 'decision_option')),
+    task_id       {{ID}} REFERENCES tasks (id),
+    doc_id        {{ID}},
+    subject_type  TEXT NOT NULL CHECK (subject_type IN ('task', 'decision', 'decision_option', 'doc', 'doc_block')),
     subject_id    {{ID}} NOT NULL,
+    -- comment, or result: what an agent delivers, with its evidence.
+    kind          TEXT NOT NULL DEFAULT 'comment',
+    evidence      {{JSON}},
+    resolved_at   {{TS}},
     parent_id     {{ID}} REFERENCES comments (id),
     author_id     {{ID}} NOT NULL REFERENCES users (id),
     body          TEXT NOT NULL,
@@ -262,7 +328,9 @@ CREATE TABLE events (
     scope_type    TEXT NOT NULL,
     scope_id      {{ID}} NOT NULL,
     project_id    {{ID}},
-    data          {{JSON}} NOT NULL,
+    -- Set = only this member may see the event (inbox items, private pages).
+    audience_id   {{ID}},
+    data          {{JSON}},
     PRIMARY KEY (workspace_id, seq)
 );
 CREATE INDEX events_scope ON events (workspace_id, scope_type, scope_id, seq);

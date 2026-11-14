@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"sync"
 	"testing"
 
@@ -15,7 +17,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
 
-// world is one fresh workspace with an owner, for one test.
+// world is a workspace with an owner, for tests.
 type world struct {
 	t     *testing.T
 	e     *engine.Engine
@@ -24,229 +26,195 @@ type world struct {
 	owner core.User
 }
 
+var slugN int
+
 func newWorld(t *testing.T, st store.Store) *world {
 	t.Helper()
 	e := engine.New(st)
-	tag := id.New()[24:] // unique per test, so tests share one Postgres database
+	slugN++
 	ws, owner, err := e.Bootstrap(context.Background(), engine.BootstrapArgs{
-		OwnerName: "Aram", OwnerEmail: "owner-" + tag + "@example.com", OwnerHandle: "aram",
-		WorkspaceSlug: "ws-" + tag, WorkspaceName: "Test",
-	})
+		OwnerName: "Aram", OwnerEmail: fmt.Sprintf("aram%d@example.com", slugN), OwnerHandle: "aram",
+		WorkspaceSlug: fmt.Sprintf("games-%d", slugN), WorkspaceName: "Games"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return &world{t: t, e: e, st: st, ws: ws, owner: owner}
 }
 
-// do applies a change and fails the test if it is refused.
-func (w *world) do(actor, typ string, args any) *engine.Result {
+// do applies one change as userID and fails the test if it is refused.
+func (w *world) do(userID, typ string, args any) *engine.Result {
 	w.t.Helper()
-	res, err := w.try(actor, typ, args)
+	res, err := w.try(userID, typ, args)
 	if err != nil {
 		w.t.Fatalf("%s: %v", typ, err)
 	}
 	return res
 }
 
-func (w *world) try(actor, typ string, args any) (*engine.Result, error) {
-	w.t.Helper()
-	raw, err := json.Marshal(args)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	return w.e.Apply(context.Background(), w.ws.ID, actor, engine.Change{ID: id.New(), Type: typ, Args: raw})
+func (w *world) try(userID, typ string, args any) (*engine.Result, error) {
+	raw, _ := json.Marshal(args)
+	return w.e.Apply(context.Background(), w.ws.ID, engine.Actor{UserID: userID}, engine.Change{ID: id.New(), Type: typ, Args: raw})
 }
 
 // refused checks that a change is refused with the given code.
-func (w *world) refused(code, actor, typ string, args any) *engine.Error {
+func (w *world) refused(code, userID, typ string, args any) *engine.Error {
 	w.t.Helper()
-	_, err := w.try(actor, typ, args)
+	_, err := w.try(userID, typ, args)
 	var ee *engine.Error
 	if !errors.As(err, &ee) {
 		w.t.Fatalf("%s: want refusal %q, got %v", typ, code, err)
 	}
 	if ee.Code != code {
-		w.t.Fatalf("%s: want refusal %q, got %q: %s", typ, code, ee.Code, ee.Message)
+		w.t.Fatalf("%s: want refusal %q, got %v", typ, code, ee)
 	}
 	return ee
 }
 
-func (w *world) agent(by, name, handle, role string) string {
+func (w *world) db() store.DB { return w.st.In(w.ws.ID) }
+
+func (w *world) task(ref string) core.Task {
 	w.t.Helper()
-	uid := id.New()
-	w.do(by, "agent.create", map[string]any{"id": uid, "name": name, "handle": handle, "role": role})
-	return uid
+	var t core.Task
+	cond := store.Eq("key", ref)
+	if len(ref) == 36 {
+		cond = store.Eq("id", ref)
+	}
+	if err := w.db().Get(context.Background(), &t, cond); err != nil {
+		w.t.Fatalf("task %s: %v", ref, err)
+	}
+	return t
 }
 
-func (w *world) project(key string) core.Project {
+func (w *world) inbox(userID string) []core.Notification {
 	w.t.Helper()
-	pid := id.New()
-	w.do(w.owner.ID, "project.create", map[string]any{"id": pid, "key": key, "name": key + " project"})
-	p, err := w.st.Project(context.Background(), w.ws.ID, pid)
-	if err != nil {
+	var ns []core.Notification
+	if err := w.db().List(context.Background(), &ns, store.Q{Where: []store.Cond{store.Eq("user_id", userID)}, Order: "seq"}); err != nil {
 		w.t.Fatal(err)
 	}
-	return p
+	return ns
 }
 
-func (w *world) task(actor, projectKey, title string, extra map[string]any) core.Task {
+type M = map[string]any
+
+// agent makes an agent and returns its user id.
+func (w *world) agent(handle string) string {
 	w.t.Helper()
-	tid := id.New()
-	args := map[string]any{"id": tid, "project": projectKey, "title": title}
-	for k, v := range extra {
-		args[k] = v
-	}
-	w.do(actor, "task.create", args)
-	return w.getTask(tid)
+	return w.do(w.owner.ID, "agent.create", M{"name": strings.ToUpper(handle[:1]) + handle[1:], "handle": handle}).Ref
 }
 
-func (w *world) getTask(taskID string) core.Task {
-	w.t.Helper()
-	tk, err := w.st.Task(context.Background(), w.ws.ID, taskID)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	return tk
-}
-
-func (w *world) statusByCategory(projectID, category string) core.Status {
-	w.t.Helper()
-	sts, err := w.st.Statuses(context.Background(), w.ws.ID, projectID)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	for _, s := range sts {
-		if s.Category == category {
-			return s
-		}
-	}
-	w.t.Fatalf("no %s status", category)
-	return core.Status{}
-}
-
-func (w *world) feed(f store.EventFilter) []core.Event {
-	w.t.Helper()
-	evs, err := w.st.Events(context.Background(), w.ws.ID, f)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	return evs
-}
-
-// The loop the product exists for: an agent asks, the owner answers on an
-// option, the agent sees it and the task comes back to it.
+// TestReviewLoop is the loop the product exists for: an agent asks, the
+// owner comments on an option and picks with changes, and the task moves
+// between them by itself, with nothing missed.
 func TestReviewLoop(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
-		claude := w.agent(w.owner.ID, "Claude", "claude", "admin")
-		p := w.project("SVA")
+		artist := w.agent("artist")
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(w.owner.ID, "label.create", M{"name": "art", "project": "SVA"})
 
-		if sts, _ := st.Statuses(ctx, w.ws.ID, p.ID); len(sts) != 6 {
-			t.Fatalf("new project has %d statuses, want 6", len(sts))
+		created := w.do(w.owner.ID, "task.create", M{"project": "sva", "title": "Explosion effect", "assignee": "@artist", "labels": []string{"art"}})
+		if created.Key != "SVA-1" {
+			t.Fatalf("key = %q", created.Key)
+		}
+		if n := w.inbox(artist); len(n) != 1 || n[0].Type != core.NoteAssigned {
+			t.Fatalf("artist inbox after assign = %+v", n)
 		}
 
-		tk := w.task(claude, "sva", "Core fight shield", map[string]any{"assignee_id": claude, "priority": 2})
-		if tk.Key != "SVA-1" || tk.Number != 1 || tk.AssigneeID != claude {
-			t.Fatalf("task = %+v", tk)
+		// The agent takes the task and asks; nobody named, so its
+		// responsible person is asked.
+		w.do(artist, "task.take", M{"id": "SVA-1"})
+		if got := w.task("SVA-1"); got.LeaseHolderID != artist || got.StartedAt == 0 {
+			t.Fatalf("take did not lease and start: %+v", got)
 		}
-		if tk2 := w.task(claude, "SVA", "Lane strike", nil); tk2.Key != "SVA-2" {
-			t.Fatalf("second task key = %s", tk2.Key)
+		opened := w.do(artist, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "recommended": 2,
+			"recommendation": "B reads best at small size",
+			"options":        []M{{"label": "A: ring"}, {"label": "B: burst"}, {"label": "C: smoke"}}})
+		task := w.task("SVA-1")
+		if task.WaitingOnID != w.owner.ID {
+			t.Fatalf("task should wait on the owner, waits on %q", task.WaitingOnID)
 		}
-
-		// The agent remembers where it is in the feed, on the server.
-		if err := st.SetCursor(ctx, w.ws.ID, claude, "inbox", tk.ActivitySeq+100); err != nil {
+		var d core.Decision
+		if err := w.db().Get(ctx, &d, store.Eq("id", opened.Ref)); err != nil {
 			t.Fatal(err)
 		}
-		ws, _ := st.Workspace(ctx, w.ws.ID)
-		if err := st.SetCursor(ctx, w.ws.ID, claude, "inbox", ws.Seq); err != nil {
+		var opts []core.Option
+		if err := w.db().List(ctx, &opts, store.Q{Where: []store.Cond{store.Eq("decision_id", d.ID)}, Order: "rank"}); err != nil {
 			t.Fatal(err)
 		}
-		if cur, _ := st.Cursor(ctx, w.ws.ID, claude, "inbox"); cur != tk.ActivitySeq+100 {
-			t.Fatalf("cursor moved backwards to %d", cur)
+		if len(opts) != 3 || d.RecommendedOptionID != opts[1].ID || d.AskedID != w.owner.ID {
+			t.Fatalf("decision = %+v, options = %+v", d, opts)
 		}
-		cursor := ws.Seq
-
-		// Ask, with three options and a recommendation.
-		did, optA, optB, optC := id.New(), id.New(), id.New(), id.New()
-		res := w.do(claude, "decision.open", map[string]any{
-			"id": did, "task_id": tk.ID, "question": "Which shield?",
-			"options": []map[string]any{
-				{"id": optA, "label": "A: flat seal"}, {"id": optB, "label": "C: full dome"}, {"id": optC, "label": "D: lighter dome"},
-			},
-			"recommended": 3, "recommendation": "Reads as a shield without hiding the Core", "ask": w.owner.ID,
-		})
-		if len(res.Events) != 2 || res.Events[0].Type != "decision.opened" || res.Events[1].Type != "task.updated" {
-			t.Fatalf("decision.open events = %v", types(res.Events))
-		}
-		if got := w.getTask(tk.ID); got.WaitingOnID != w.owner.ID {
-			t.Fatalf("task waits on %q, want the owner", got.WaitingOnID)
-		}
-		d, err := st.Decision(ctx, w.ws.ID, did)
-		if err != nil || len(d.Options) != 3 || d.RecommendedOptionID != optC || d.State != core.StateOpen {
-			t.Fatalf("decision = %+v, err %v", d, err)
-		}
-
-		// The owner's home screen: what waits on me, with an open decision.
-		mine, err := st.Tasks(ctx, w.ws.ID, store.TaskFilter{WaitingOnID: w.owner.ID, OpenDecision: true})
-		if err != nil || len(mine) != 1 || mine[0].ID != tk.ID {
-			t.Fatalf("waiting on owner = %v, err %v", keys(mine), err)
-		}
-
-		// The owner comments on one option. It must show up as activity on
-		// the task: this is the comment a tracker without a feed loses.
-		w.do(w.owner.ID, "comment.create", map[string]any{
-			"task_id": tk.ID, "subject_type": "decision_option", "subject_id": optB, "body": "Too heavy, hides the Core",
-		})
-		changed, err := st.Tasks(ctx, w.ws.ID, store.TaskFilter{AssigneeIDs: []string{claude}, ActivityAfter: cursor})
-		if err != nil || len(changed) != 1 || changed[0].ID != tk.ID {
-			t.Fatalf("tasks with new activity = %v, err %v", keys(changed), err)
+		if n := w.inbox(w.owner.ID); len(n) != 1 || n[0].Type != core.NoteAsked {
+			t.Fatalf("owner inbox = %+v", n)
 		}
 
 		// The asker cannot answer its own question.
-		w.refused(engine.CodeForbidden, claude, "decision.pick", map[string]any{"id": did, "option_id": optC})
-		// "With changes" must say which changes; an unknown option lists the real ones.
-		w.refused(engine.CodeInvalid, w.owner.ID, "decision.pick", map[string]any{"id": did, "option_id": optC, "outcome": "with_changes"})
-		if e := w.refused(engine.CodeInvalid, w.owner.ID, "decision.pick", map[string]any{"id": did, "option_id": id.New()}); len(e.Allowed) != 3 {
-			t.Fatalf("refusal should list the 3 options, got %v", e.Allowed)
+		w.refused(engine.CodeForbidden, artist, "decision.pick", M{"id": d.ID, "option": 2})
+
+		// The owner comments on one option; the agent is told, and the
+		// comment counts as activity on the task.
+		seqBefore := w.task("SVA-1").ActivitySeq
+		w.do(w.owner.ID, "comment.create", M{"option": opts[0].ID, "body": "No rings as the main shape."})
+		if got := w.task("SVA-1").ActivitySeq; got <= seqBefore {
+			t.Fatalf("comment did not move activity_seq: %d -> %d", seqBefore, got)
+		}
+		inbox := w.inbox(artist)
+		if last := inbox[len(inbox)-1]; last.Type != core.NoteComment {
+			t.Fatalf("artist was not told of the comment: %+v", inbox)
 		}
 
-		res = w.do(w.owner.ID, "decision.pick", map[string]any{"id": did, "option_id": optC, "outcome": "with_changes", "note": "smaller and darker"})
-		if got := types(res.Events); len(got) != 2 || got[0] != "decision.picked" || got[1] != "task.updated" {
-			t.Fatalf("decision.pick events = %v", got)
+		// "With changes" needs a note; picking by label works.
+		w.refused(engine.CodeInvalid, w.owner.ID, "decision.pick", M{"id": d.ID, "option": 2, "outcome": "with_changes"})
+		w.do(w.owner.ID, "decision.pick", M{"id": d.ID, "option": "b: burst", "note": "Make it 20% larger."})
+		task = w.task("SVA-1")
+		if task.WaitingOnID != artist {
+			t.Fatalf("after the pick the task should wait on the agent, waits on %q", task.WaitingOnID)
 		}
-		d, _ = st.Decision(ctx, w.ws.ID, did)
-		if d.State != core.StatePicked || d.PickedOptionID != optC || d.Outcome != core.OutcomeWithChanges || d.DecidedBy != w.owner.ID {
-			t.Fatalf("picked decision = %+v", d)
-		}
-		// The answer hands the task back to the one who asked.
-		if got := w.getTask(tk.ID); got.WaitingOnID != claude {
-			t.Fatalf("after the pick the task waits on %q, want the agent", got.WaitingOnID)
+		inbox = w.inbox(artist)
+		if last := inbox[len(inbox)-1]; last.Type != core.NotePicked || !strings.Contains(last.Snippet, "20% larger") {
+			t.Fatalf("artist was not told of the pick: %+v", last)
 		}
 		// The first answer stands.
-		w.refused(engine.CodeConflict, w.owner.ID, "decision.pick", map[string]any{"id": did, "option_id": optA})
+		w.refused(engine.CodeConflict, w.owner.ID, "decision.pick", M{"id": d.ID, "option": 1})
 
-		// The task's own timeline has all of it, in order.
-		timeline := types(w.feed(store.EventFilter{ScopeType: "task", ScopeID: tk.ID}))
-		want := []string{"task.created", "decision.opened", "task.updated", "comment.created", "decision.picked", "task.updated"}
-		if fmt.Sprint(timeline) != fmt.Sprint(want) {
-			t.Fatalf("timeline = %v\n      want %v", timeline, want)
+		// The agent posts its result with evidence; the task goes back.
+		w.do(artist, "comment.create", M{"task": "SVA-1", "body": "Burst is 20% larger.",
+			"evidence": M{"checked": "in game at 1x and 2x", "not_verified": "on a phone"}})
+		if got := w.task("SVA-1"); got.WaitingOnID != w.owner.ID {
+			t.Fatalf("after the result the task should wait on the owner, waits on %q", got.WaitingOnID)
 		}
 
-		// The whole feed has no gaps and is in order.
-		all := w.feed(store.EventFilter{Limit: 1000})
-		for i, ev := range all {
-			if ev.Seq != int64(i+1) {
-				t.Fatalf("feed position %d has seq %d", i, ev.Seq)
+		// "What is new on my tasks since X" sees all of it in one query.
+		evs, err := w.db().Events(ctx, store.EventFilter{After: created.Seq, Viewer: artist,
+			Tasks: &store.TaskFilter{AssigneeIDs: []string{artist}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var types []string
+		for _, ev := range evs {
+			types = append(types, ev.Type)
+		}
+		got := strings.Join(types, " ")
+		for _, want := range []string{"decision.opened", "comment.created", "decision.picked"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("feed misses %s: %s", want, got)
 			}
 		}
-		ws, _ = st.Workspace(ctx, w.ws.ID)
-		if ws.Seq != int64(len(all)) {
-			t.Fatalf("workspace seq %d, feed length %d", ws.Seq, len(all))
+		// The owner's private inbox events are not in the agent's feed.
+		for _, ev := range evs {
+			if ev.AudienceID != "" && ev.AudienceID != artist {
+				t.Errorf("agent saw an event addressed to someone else: %+v", ev)
+			}
 		}
-		// Reading from a cursor returns only what is newer.
-		if later := w.feed(store.EventFilter{After: cursor}); len(later) != len(all)-int(cursor) {
-			t.Fatalf("feed after %d has %d events, want %d", cursor, len(later), len(all)-int(cursor))
+
+		// Search finds the task, the decision and the comment.
+		hits, err := w.db().Search(ctx, store.SearchQuery{Text: "explos", Viewer: artist})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(hits) < 2 {
+			t.Fatalf("search hits = %+v", hits)
 		}
 	})
 }
@@ -254,161 +222,168 @@ func TestReviewLoop(t *testing.T) {
 func TestTaskUpdate(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
-		p := w.project("QD")
-		tk := w.task(w.owner.ID, "QD", "Write the schema", nil)
-		done := w.statusByCategory(p.ID, core.CatDone)
-		started := w.statusByCategory(p.ID, core.CatStarted)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		res := w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Jump"})
+		base := res.Seq
 
-		res := w.do(w.owner.ID, "task.update", map[string]any{"id": tk.ID, "status_id": started.ID, "title": "Write the schema v2", "due_on": "2026-12-01"})
-		var data struct {
-			Changes map[string]core.FieldChange `json:"changes"`
+		// Names instead of ids; a wrong name lists the right ones.
+		upd := w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "status": "in progress", "priority": 2})
+		if len(upd.Events) != 1 {
+			t.Fatalf("events = %d", len(upd.Events))
 		}
-		if err := json.Unmarshal(res.Events[0].Data, &data); err != nil {
-			t.Fatal(err)
+		e := w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": "SVA-1", "status": "Dne"})
+		if e.Nearest != "Done" || len(e.Allowed) != 6 {
+			t.Fatalf("refusal should suggest Done: %+v", e)
 		}
-		if len(data.Changes) != 3 || data.Changes["title"].From != "Write the schema" || data.Changes["title"].To != "Write the schema v2" {
-			t.Fatalf("changes = %+v", data.Changes)
+		e = w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": "SVA-1", "titel": "x"})
+		if e.Nearest != "title" {
+			t.Fatalf("misspelt field should suggest title: %+v", e)
 		}
-		got := w.getTask(tk.ID)
-		if got.StartedAt == 0 || got.CompletedAt != 0 || got.DueOn != "2026-12-01" || got.UpdatedSeq != res.Seq {
-			t.Fatalf("after start: %+v", got)
+		// An update on an old version is refused and says what changed.
+		e = w.refused(engine.CodeStale, w.owner.ID, "task.update", M{"id": "SVA-1", "base_seq": base, "title": "Double jump"})
+		sort.Strings(e.Allowed)
+		if !strings.Contains(strings.Join(e.Allowed, ","), "priority") {
+			t.Fatalf("stale refusal should list changed fields: %+v", e)
 		}
-
-		// Asking for what is already there writes nothing.
-		if res := w.do(w.owner.ID, "task.update", map[string]any{"id": tk.ID, "status_id": started.ID}); len(res.Events) != 0 {
-			t.Fatalf("no-op update produced %v", types(res.Events))
+		// Nothing to change: no event.
+		if same := w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "priority": 2}); len(same.Events) != 0 {
+			t.Fatalf("no-op update emitted %d events", len(same.Events))
 		}
-
-		w.do(w.owner.ID, "task.update", map[string]any{"id": tk.ID, "status_id": done.ID, "due_on": nil})
-		if got = w.getTask(tk.ID); got.CompletedAt == 0 || got.DueOn != "" {
-			t.Fatalf("after done: %+v", got)
+		// Done stamps the time and clears who it waits on.
+		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "waiting_on": "me"})
+		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "status": "done"})
+		if got := w.task("SVA-1"); got.CompletedAt == 0 || got.WaitingOnID != "" {
+			t.Fatalf("done task = %+v", got)
 		}
-
-		// An update based on an old version is refused, not applied over the new one.
-		w.refused(engine.CodeStale, w.owner.ID, "task.update", map[string]any{"id": tk.ID, "base_seq": tk.UpdatedSeq, "title": "x"})
-		// A misspelt field is an error, not a silent no-op.
-		w.refused(engine.CodeInvalid, w.owner.ID, "task.update", map[string]any{"id": tk.ID, "titel": "x"})
-		// A status from nowhere is refused.
-		w.refused(engine.CodeInvalid, w.owner.ID, "task.update", map[string]any{"id": tk.ID, "status_id": id.New()})
-		// An unknown change type lists the real ones.
-		if e := w.refused(engine.CodeInvalid, w.owner.ID, "task.frobnicate", map[string]any{}); len(e.Allowed) == 0 {
-			t.Fatal("unknown change type should list the allowed ones")
-		}
-
-		// Labels, sub-tasks and loops.
-		lid := id.New()
-		w.do(w.owner.ID, "label.create", map[string]any{"id": lid, "name": "visual"})
-		w.do(w.owner.ID, "task.update", map[string]any{"id": tk.ID, "add_label_ids": []string{lid}})
-		if got = w.getTask(tk.ID); len(got.LabelIDs) != 1 || got.LabelIDs[0] != lid {
-			t.Fatalf("labels = %v", got.LabelIDs)
-		}
-		byLabel, _ := st.Tasks(context.Background(), w.ws.ID, store.TaskFilter{LabelID: lid})
-		if len(byLabel) != 1 {
-			t.Fatalf("filter by label found %d", len(byLabel))
-		}
-		child := w.task(w.owner.ID, "QD", "Sub-task", map[string]any{"parent_id": tk.ID})
-		w.refused(engine.CodeInvalid, w.owner.ID, "task.update", map[string]any{"id": tk.ID, "parent_id": child.ID})
-
 		// Trash and restore.
-		w.do(w.owner.ID, "task.delete", map[string]any{"id": child.ID})
-		live, _ := st.Tasks(context.Background(), w.ws.ID, store.TaskFilter{})
-		trash, _ := st.Tasks(context.Background(), w.ws.ID, store.TaskFilter{InTrash: true})
-		if len(live) != 1 || len(trash) != 1 {
-			t.Fatalf("live %d, trash %d", len(live), len(trash))
+		w.do(w.owner.ID, "task.delete", M{"id": "SVA-1"})
+		w.refused(engine.CodeConflict, w.owner.ID, "task.update", M{"id": "SVA-1", "title": "x"})
+		w.do(w.owner.ID, "task.restore", M{"id": "SVA-1"})
+		if got := w.task("SVA-1"); got.DeletedAt != 0 {
+			t.Fatal("restore left the task in the trash")
 		}
-		w.refused(engine.CodeConflict, w.owner.ID, "task.update", map[string]any{"id": child.ID, "title": "x"})
-		w.do(w.owner.ID, "task.restore", map[string]any{"id": child.ID})
-		if live, _ = st.Tasks(context.Background(), w.ws.ID, store.TaskFilter{}); len(live) != 2 {
-			t.Fatalf("after restore live = %d", len(live))
-		}
+		// Sub-tasks cannot loop.
+		w.do(w.owner.ID, "task.create", M{"parent": "SVA-1", "title": "Child"})
+		w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": "SVA-1", "parent": "SVA-2"})
 	})
 }
 
-func TestSendingAChangeTwice(t *testing.T) {
+func TestBatchDryRunAndResend(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
-		w.project("QD")
 		ctx := context.Background()
-		ch := engine.Change{ID: id.New(), Type: "task.create", Args: json.RawMessage(`{"project":"QD","title":"Once"}`)}
-
-		first, err := w.e.Apply(ctx, w.ws.ID, w.owner.ID, ch)
-		if err != nil {
-			t.Fatal(err)
+		actor := engine.Actor{UserID: w.owner.ID}
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		mk := func(typ string, args any) engine.Change {
+			raw, _ := json.Marshal(args)
+			return engine.Change{ID: id.New(), Type: typ, Args: raw}
 		}
-		// The same change again, as a retry after a lost answer would send it.
-		ch.Args = json.RawMessage(`{ "project": "QD", "title": "Once" }`)
-		second, err := w.e.Apply(ctx, w.ws.ID, w.owner.ID, ch)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !second.Duplicate || second.Seq != first.Seq || len(second.Events) != 0 {
-			t.Fatalf("retry = %+v, first = %+v", second, first)
-		}
-		if all, _ := st.Tasks(ctx, w.ws.ID, store.TaskFilter{}); len(all) != 1 {
-			t.Fatalf("%d tasks after a retried create, want 1", len(all))
-		}
-		// The same id for something else is a mistake, and is refused.
-		ch.Args = json.RawMessage(`{"project":"QD","title":"Different"}`)
+		// A batch is all or nothing.
+		batch := []engine.Change{mk("task.create", M{"project": "SVA", "title": "One"}), mk("task.create", M{"project": "NOPE", "title": "Two"})}
+		_, err := w.e.Batch(ctx, w.ws.ID, actor, batch, false)
 		var ee *engine.Error
-		if _, err := w.e.Apply(ctx, w.ws.ID, w.owner.ID, ch); !errors.As(err, &ee) || ee.Code != engine.CodeConflict {
-			t.Fatalf("reused id: %v", err)
+		if !errors.As(err, &ee) || ee.Index != 1 || ee.Code != engine.CodeNotFound || ee.Nearest != "" && ee.Nearest != "SVA" {
+			t.Fatalf("batch refusal = %v", err)
+		}
+		if n, _ := w.db().CountTasks(ctx, store.TaskFilter{}); n != 0 {
+			t.Fatalf("failed batch left %d tasks", n)
+		}
+		// A dry run reports and keeps nothing.
+		res, err := w.e.Batch(ctx, w.ws.ID, actor, batch[:1], true)
+		if err != nil || len(res[0].Events) == 0 {
+			t.Fatalf("dry run = %+v, %v", res, err)
+		}
+		if n, _ := w.db().CountTasks(ctx, store.TaskFilter{}); n != 0 {
+			t.Fatalf("dry run left %d tasks", n)
+		}
+		// Sending a change twice applies it once.
+		first, err := w.e.Apply(ctx, w.ws.ID, actor, batch[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		again, err := w.e.Apply(ctx, w.ws.ID, actor, batch[0])
+		if err != nil || !again.Duplicate || again.Seq != first.Seq {
+			t.Fatalf("resend = %+v, %v", again, err)
+		}
+		if n, _ := w.db().CountTasks(ctx, store.TaskFilter{}); n != 1 {
+			t.Fatalf("resend made %d tasks", n)
+		}
+		// The same id for a different change is refused.
+		other := batch[0]
+		other.Args, _ = json.Marshal(M{"project": "SVA", "title": "Different"})
+		if _, err := w.e.Apply(ctx, w.ws.ID, actor, other); !errors.As(err, &ee) || ee.Code != engine.CodeConflict {
+			t.Fatalf("reused id = %v", err)
 		}
 	})
 }
 
-func TestRolesAndWorkspaceWalls(t *testing.T) {
+func TestRolesScopesAndWalls(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
-		worker := w.agent(w.owner.ID, "Worker", "worker", "")
-		admin := w.agent(w.owner.ID, "Coordinator", "coordinator", "admin")
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(w.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"})
+		coder := w.agent("coder")
 
-		// A member cannot do an admin's work, and no agent is an owner.
-		w.refused(engine.CodeForbidden, worker, "project.create", map[string]any{"key": "NO", "name": "no"})
-		w.refused(engine.CodeForbidden, worker, "agent.create", map[string]any{"name": "x", "handle": "xx"})
-		w.refused(engine.CodeInvalid, w.owner.ID, "agent.create", map[string]any{"name": "x", "handle": "xx", "role": "owner"})
-		// An agent cannot answer for another agent.
-		w.refused(engine.CodeInvalid, admin, "agent.create", map[string]any{"name": "x", "handle": "xx", "responsible_id": worker})
-		// Handles are unique in a workspace.
-		w.refused(engine.CodeConflict, w.owner.ID, "agent.create", map[string]any{"name": "x", "handle": "worker"})
-		// An admin agent can create a member agent. The person who answers
-		// for the admin agent answers for the new one too.
-		sub := w.agent(admin, "Sub", "sub", "member")
-		if u, err := st.User(ctx, sub); err != nil || u.Kind != core.KindAgent || u.ResponsibleID != w.owner.ID {
-			t.Fatalf("sub-agent = %+v, err %v", u, err)
+		// A member cannot manage; an agent cannot be an owner.
+		w.refused(engine.CodeForbidden, coder, "project.create", M{"key": "X1", "name": "x"})
+		w.refused(engine.CodeInvalid, w.owner.ID, "agent.create", M{"name": "Boss", "handle": "boss", "role": "owner"})
+
+		// An admin agent can make agents, which answer to the same person.
+		lead := w.do(w.owner.ID, "agent.create", M{"name": "Lead", "handle": "lead", "role": "admin"}).Ref
+		sub := w.do(lead, "agent.create", M{"name": "Sub", "handle": "sub"}).Ref
+		var u core.User
+		if err := st.Get(ctx, &u, store.Eq("id", sub)); err != nil || u.ResponsibleID != w.owner.ID {
+			t.Fatalf("sub-agent responsible = %q, %v", u.ResponsibleID, err)
 		}
 
-		w.project("AA")
-		tk := w.task(worker, "AA", "Mine", map[string]any{"assignee_id": worker})
+		// A scope narrows an agent to its projects.
+		w.do(w.owner.ID, "agent.update", M{"id": "@coder", "scope": M{"projects": []string{"SVA"}}})
+		w.do(coder, "task.create", M{"project": "SVA", "title": "ok"})
+		w.refused(engine.CodeForbidden, coder, "task.create", M{"project": "OPS", "title": "no"})
 
-		// Another workspace sees none of it and cannot touch it.
+		// A change that needs approval is refused until one is given.
+		w.do(w.owner.ID, "agent.update", M{"id": "@coder", "scope": M{"projects": []string{"SVA"}, "needs_approval": []string{"task.delete"}}})
+		w.refused(engine.CodeNeedsApproval, coder, "task.delete", M{"id": "SVA-1"})
+		ask := w.do(coder, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "task.delete", "question": "Delete the duplicate?"})
+		raw, _ := json.Marshal(M{"id": "SVA-1"})
+		del := engine.Change{ID: id.New(), Type: "task.delete", Args: raw, Approval: ask.Ref}
+		if _, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: coder}, del); err == nil {
+			t.Fatal("unanswered approval was accepted")
+		}
+		w.do(w.owner.ID, "decision.pick", M{"id": ask.Ref, "outcome": "approved"})
+		if _, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: coder}, del); err != nil {
+			t.Fatalf("approved delete refused: %v", err)
+		}
+
+		// A read-only credential cannot write.
+		raw, _ = json.Marshal(M{"project": "SVA", "title": "x"})
+		_, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: w.owner.ID, ReadOnly: true}, engine.Change{ID: id.New(), Type: "task.create", Args: raw})
+		var ee *engine.Error
+		if !errors.As(err, &ee) || ee.Code != engine.CodeForbidden {
+			t.Fatalf("read-only write = %v", err)
+		}
+
+		// Another workspace is a wall: its rows do not exist from here.
 		other := newWorld(t, st)
-		if _, err := st.Task(ctx, other.ws.ID, tk.ID); !errors.Is(err, store.ErrNotFound) {
-			t.Fatalf("task visible from another workspace: %v", err)
-		}
-		other.refused(engine.CodeNotFound, other.owner.ID, "task.update", map[string]any{"id": tk.ID, "title": "stolen"})
-		other.refused(engine.CodeNotFound, other.owner.ID, "comment.create", map[string]any{"task_id": tk.ID, "body": "hi"})
-		// A stranger cannot write to this workspace.
-		w.refused(engine.CodeForbidden, other.owner.ID, "task.create", map[string]any{"project": "AA", "title": "x"})
-		// And cannot be made an assignee here.
-		w.refused(engine.CodeNotFound, w.owner.ID, "task.update", map[string]any{"id": tk.ID, "assignee_id": other.owner.ID})
+		other.do(other.owner.ID, "project.create", M{"key": "SVA", "name": "Theirs"})
+		theirs := other.do(other.owner.ID, "task.create", M{"project": "SVA", "title": "Secret"})
+		w.refused(engine.CodeNotFound, w.owner.ID, "task.update", M{"id": theirs.Ref, "title": "mine now"})
+		w.refused(engine.CodeForbidden, other.owner.ID, "task.create", M{"project": "SVA", "title": "intruder"})
 
-		members, _ := st.Members(ctx, w.ws.ID)
-		if len(members) != 4 {
-			t.Fatalf("%d members, want 4", len(members))
-		}
+		// The last owner cannot leave; a removed member loses the room.
+		w.refused(engine.CodeConflict, w.owner.ID, "member.remove", M{"id": "@aram"})
+		w.do(w.owner.ID, "member.remove", M{"id": "@sub"})
+		w.refused(engine.CodeForbidden, sub, "task.create", M{"project": "SVA", "title": "ghost"})
 	})
 }
 
-// Many writers at once: task numbers and event numbers stay unique and
-// without gaps on every database.
 func TestConcurrentWrites(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
-		w.project("CC")
-		before, _ := st.Workspace(ctx, w.ws.ID)
-
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		start, _ := w.db().Events(ctx, store.EventFilter{Limit: 2000})
 		const n = 40
 		var wg sync.WaitGroup
 		errs := make(chan error, n)
@@ -416,8 +391,7 @@ func TestConcurrentWrites(t *testing.T) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				args, _ := json.Marshal(map[string]any{"project": "CC", "title": fmt.Sprintf("task %d", i)})
-				if _, err := w.e.Apply(ctx, w.ws.ID, w.owner.ID, engine.Change{ID: id.New(), Type: "task.create", Args: args}); err != nil {
+				if _, err := w.try(w.owner.ID, "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i)}); err != nil {
 					errs <- err
 				}
 			}(i)
@@ -427,42 +401,125 @@ func TestConcurrentWrites(t *testing.T) {
 		for err := range errs {
 			t.Fatal(err)
 		}
-
-		tasks, err := st.Tasks(ctx, w.ws.ID, store.TaskFilter{Limit: 500})
-		if err != nil || len(tasks) != n {
-			t.Fatalf("%d tasks, err %v", len(tasks), err)
+		tasks, err := w.db().Tasks(ctx, store.TaskFilter{Sort: "key", Limit: 500})
+		if err != nil {
+			t.Fatal(err)
 		}
-		seen := map[int]bool{}
-		for _, tk := range tasks {
-			if tk.Number < 1 || tk.Number > n || seen[tk.Number] {
-				t.Fatalf("bad or repeated task number %d", tk.Number)
+		if len(tasks) != n {
+			t.Fatalf("tasks = %d", len(tasks))
+		}
+		for i, tk := range tasks {
+			if tk.Number != i+1 {
+				t.Fatalf("task numbers have a gap or repeat at %d: %d", i, tk.Number)
 			}
-			seen[tk.Number] = true
 		}
-		evs := w.feed(store.EventFilter{After: before.Seq, Limit: 1000})
-		if len(evs) != n {
-			t.Fatalf("%d events, want %d", len(evs), n)
-		}
+		evs, _ := w.db().Events(ctx, store.EventFilter{Limit: 2000})
 		for i, ev := range evs {
-			if ev.Seq != before.Seq+int64(i)+1 {
-				t.Fatalf("gap in the feed at %d: seq %d", i, ev.Seq)
+			if ev.Seq != int64(i+1) {
+				t.Fatalf("event numbers have a gap at %d: %d", i, ev.Seq)
 			}
+		}
+		if len(evs)-len(start) != n {
+			t.Fatalf("events = %d", len(evs)-len(start))
 		}
 	})
 }
 
-func types(evs []core.Event) []string {
-	out := make([]string, len(evs))
-	for i, ev := range evs {
-		out[i] = ev.Type
-	}
-	return out
+func TestPlanning(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		ctx := context.Background()
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "settings": M{"cycles": true, "cycle_days": 7}})
+		epic := w.do(w.owner.ID, "epic.create", M{"project": "SVA", "name": "Boss fight", "target_on": "2027-01-15"})
+		ms := w.do(w.owner.ID, "milestone.create", M{"epic": epic.Ref, "name": "Art"})
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss sprite", "epic": "boss fight", "milestone": ms.Ref, "estimate": 3})
+		if got := w.task("SVA-1"); got.EpicID != epic.Ref || got.MilestoneID != ms.Ref || got.Estimate != 3 {
+			t.Fatalf("task = %+v", got)
+		}
+		// Cycles are made as needed, and a task goes in "current".
+		if err := w.e.RollCycles(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var cycles []core.Cycle
+		if err := w.db().List(ctx, &cycles, store.Q{Where: []store.Cond{store.Live}, Order: "starts_on"}); err != nil || len(cycles) < 2 {
+			t.Fatalf("cycles = %+v, %v", cycles, err)
+		}
+		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "cycle": "current"})
+		if got := w.task("SVA-1"); got.CycleID != cycles[0].ID {
+			t.Fatalf("cycle = %q, want %q", got.CycleID, cycles[0].ID)
+		}
+		// Overlapping cycles are refused.
+		w.refused(engine.CodeConflict, w.owner.ID, "cycle.create", M{"project": "SVA", "starts_on": cycles[0].StartsOn, "ends_on": cycles[0].EndsOn})
+
+		// A template fills a new task and opens its decision.
+		w.do(w.owner.ID, "template.create", M{"name": "Review", "project": "SVA", "title": "Review: ",
+			"preset": M{"priority": 2, "decision": M{"question": "Which one?", "options": []M{{"label": "A"}, {"label": "B"}}, "ask": "@aram"}}})
+		reviewer := w.agent("reviewer")
+		made := w.do(reviewer, "task.create", M{"project": "SVA", "title": "hit flash", "template": "review"})
+		got := w.task(made.Ref)
+		if got.Title != "Review: hit flash" || got.Priority != 2 || got.WaitingOnID != w.owner.ID {
+			t.Fatalf("templated task = %+v", got)
+		}
+		// A saved view gets a slug agents can query by.
+		v := w.do(w.owner.ID, "view.create", M{"name": "Waiting on me", "query": M{"waiting_on": "me"}})
+		if v.Key != "waiting-on-me" {
+			t.Fatalf("view slug = %q", v.Key)
+		}
+		// Deleting the epic leaves its tasks, without an epic.
+		w.do(w.owner.ID, "epic.delete", M{"id": epic.Ref})
+		if got := w.task("SVA-1"); got.EpicID != "" || got.MilestoneID != "" {
+			t.Fatalf("task kept a deleted epic: %+v", got)
+		}
+		// A status with tasks can only go if they have somewhere to go.
+		var sts []core.Status
+		w.db().List(ctx, &sts, store.Where(store.Eq("name", "Todo")))
+		w.refused(engine.CodeInvalid, w.owner.ID, "status.delete", M{"id": sts[0].ID})
+		w.do(w.owner.ID, "status.delete", M{"id": sts[0].ID, "move_to": "Backlog"})
+	})
 }
 
-func keys(ts []core.Task) []string {
-	out := make([]string, len(ts))
-	for i, tk := range ts {
-		out[i] = tk.Key
-	}
-	return out
+func TestLeasesResourcesAndInbox(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		a, b := w.agent("alpha"), w.agent("beta")
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Build"})
+		// Two agents cannot take one task.
+		w.do(a, "task.take", M{"id": "SVA-1"})
+		e := w.refused(engine.CodeConflict, b, "task.take", M{"id": "SVA-1"})
+		if !strings.Contains(e.Message, "@alpha") {
+			t.Fatalf("refusal should name the holder: %v", e)
+		}
+		w.do(a, "task.release", M{"id": "SVA-1"})
+		w.do(b, "task.take", M{"id": "SVA-1"})
+
+		// A shared machine has a queue.
+		w.do(w.owner.ID, "resource.create", M{"name": "minipc"})
+		if r := w.do(a, "resource.acquire", M{"resource": "minipc"}); r.Key != "holding" {
+			t.Fatalf("first claim = %q", r.Key)
+		}
+		if r := w.do(b, "resource.acquire", M{"resource": "minipc"}); r.Key != "waiting" {
+			t.Fatalf("second claim = %q", r.Key)
+		}
+		w.do(a, "resource.release", M{"resource": "minipc"})
+		var claims []core.ResourceClaim
+		w.db().List(context.Background(), &claims, store.Where(store.Eq("user_id", b), store.Eq("state", "holding")))
+		if len(claims) != 1 {
+			t.Fatal("the queue did not move to beta")
+		}
+
+		// Mentions reach the inbox once, and can be marked read.
+		w.do(w.owner.ID, "comment.create", M{"task": "SVA-1", "body": "@alpha can you look? cc @alpha"})
+		in := w.inbox(a)
+		last := in[len(in)-1]
+		if last.Type != core.NoteMentioned || last.ReadAt != 0 {
+			t.Fatalf("alpha inbox = %+v", in)
+		}
+		w.do(a, "notification.read", M{"all": true})
+		for _, n := range w.inbox(a) {
+			if n.ReadAt == 0 {
+				t.Fatalf("still unread: %+v", n)
+			}
+		}
+	})
 }

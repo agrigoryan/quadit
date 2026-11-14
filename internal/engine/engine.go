@@ -27,29 +27,39 @@ type Change struct {
 	ID   string          `json:"id"`   // made by the caller; reusing it makes the change safe to resend
 	Type string          `json:"type"` // for example "task.update"
 	Args json.RawMessage `json:"args"`
+	// Approval is the id of an approved decision, for a change the actor
+	// may only make with approval.
+	Approval string `json:"approval,omitempty"`
 }
 
 // Result says what a change produced.
 type Result struct {
 	ChangeID string `json:"change_id"`
+	Type     string `json:"type"`
 	// Seq is the feed position that includes this change. A reader that has
 	// reached Seq has seen everything the change did.
 	Seq      int64 `json:"seq"`
 	FirstSeq int64 `json:"first_seq"`
 	// Duplicate is true when this id was already applied; nothing was
 	// written this time.
-	Duplicate bool         `json:"duplicate,omitempty"`
-	Events    []core.Event `json:"events,omitempty"`
+	Duplicate bool `json:"duplicate,omitempty"`
+	// Ref is the id of the main thing the change made or touched, and Key
+	// its short name when it has one (SVA-12).
+	Ref    string       `json:"ref,omitempty"`
+	Key    string       `json:"key,omitempty"`
+	Events []core.Event `json:"events,omitempty"`
 }
 
 // Error codes. Every refusal has one, so a caller can branch without reading
 // the message.
 const (
-	CodeInvalid   = "invalid"   // the change itself is wrong; fix it and resend
-	CodeForbidden = "forbidden" // the actor may not do this
-	CodeNotFound  = "not_found" // something the change refers to does not exist
-	CodeConflict  = "conflict"  // it collides with what is there (a taken key, an answered decision)
-	CodeStale     = "stale"     // it was based on an older version than the current one
+	CodeInvalid       = "invalid"        // the change itself is wrong; fix it and resend
+	CodeForbidden     = "forbidden"      // the actor may not do this
+	CodeNotFound      = "not_found"      // something the change refers to does not exist
+	CodeConflict      = "conflict"       // it collides with what is there (a taken key, an answered decision)
+	CodeStale         = "stale"          // it was based on an older version than the current one
+	CodeNeedsApproval = "needs_approval" // allowed only with an approved decision
+	CodeBudget        = "budget_exceeded"
 )
 
 // Error is a refusal that tells the caller how to fix the change.
@@ -58,11 +68,16 @@ type Error struct {
 	Message string   `json:"message"`
 	Field   string   `json:"field,omitempty"`
 	Allowed []string `json:"allowed,omitempty"` // the values that would have been accepted
+	Nearest string   `json:"nearest,omitempty"` // the allowed value closest to what was sent
+	// Index is the position of the refused change in a batch.
+	Index int `json:"index,omitempty"`
 }
 
 func (e *Error) Error() string {
 	msg := e.Code + ": " + e.Message
-	if len(e.Allowed) > 0 {
+	if e.Nearest != "" {
+		msg += " (did you mean " + e.Nearest + "?)"
+	} else if len(e.Allowed) > 0 {
 		msg += " (allowed: " + strings.Join(e.Allowed, ", ") + ")"
 	}
 	return msg
@@ -80,18 +95,47 @@ func conflictErr(format string, a ...any) *Error {
 	return &Error{Code: CodeConflict, Message: fmt.Sprintf(format, a...)}
 }
 
+func notFound(what, ref string) *Error {
+	return &Error{Code: CodeNotFound, Message: fmt.Sprintf("%s %q does not exist in this workspace", what, ref)}
+}
+
+// oneOf refuses a value that is not in a fixed set, naming the set and the
+// nearest match.
+func oneOf(field, what, got string, allowed []string) *Error {
+	return &Error{Code: CodeInvalid, Field: field, Message: fmt.Sprintf("unknown %s %q", what, got),
+		Allowed: allowed, Nearest: nearest(got, allowed)}
+}
+
 // missing turns a store "not found" into a refusal naming what was missing.
 func missing(err error, what, ref string) error {
 	if errors.Is(err, store.ErrNotFound) {
-		return &Error{Code: CodeNotFound, Message: fmt.Sprintf("%s %q does not exist in this workspace", what, ref)}
+		return notFound(what, ref)
 	}
 	return err
+}
+
+func taken(err error, what, value string) error {
+	if errors.Is(err, store.ErrConflict) {
+		return conflictErr("%s %q is already in use", what, value)
+	}
+	return err
+}
+
+// Actor is who sends a change, and how the credential they used narrows
+// what their role allows.
+type Actor struct {
+	UserID   string
+	ReadOnly bool
+	Projects []string // project ids the credential is limited to; nil = no limit
 }
 
 // Engine applies changes to one store.
 type Engine struct {
 	st  store.Store
 	now func() time.Time
+	// OnCommit, when set, is called after a write commits with the
+	// workspace and its new position in the feed.
+	OnCommit func(workspaceID string, seq int64)
 }
 
 // New returns an engine over st.
@@ -102,10 +146,14 @@ func New(st store.Store) *Engine {
 // Store returns the store, for reads.
 func (e *Engine) Store() store.Store { return e.st }
 
+// Now returns the engine's clock in Unix milliseconds.
+func (e *Engine) Now() int64 { return e.now().UnixMilli() }
+
 // handler is one kind of change.
 type handler struct {
 	min core.Role // the least role that may send it
 	fn  func(*cx) error
+	doc string
 }
 
 var handlers = map[string]handler{}
@@ -124,15 +172,30 @@ func ChangeTypes() []string {
 	return out
 }
 
+// MinRole returns the least role that may send a change type.
+func MinRole(changeType string) (core.Role, bool) {
+	h, ok := handlers[changeType]
+	return h.min, ok
+}
+
 // cx is what a handler works with: one change, one actor, one transaction.
 type cx struct {
-	ctx    context.Context
-	tx     store.Tx
-	ws     string
-	actor  core.Member
-	at     int64
-	change Change
-	events []core.Event
+	e        *Engine
+	ctx      context.Context
+	tx       store.Tx
+	ws       string
+	actor    core.Member
+	scope    core.Scope
+	at       int64
+	change   Change
+	events   []core.Event
+	ref, key string
+	notified map[string]bool
+	// system is set while the engine itself acts (rules, roll-overs): role
+	// and scope checks are skipped.
+	system bool
+	// selfNotify lets a notification reach the actor, for rules.
+	selfNotify bool
 }
 
 // args decodes the change's arguments into v. Unknown fields are refused, so
@@ -145,6 +208,13 @@ func (c *cx) args(v any) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
+		msg := err.Error()
+		if strings.HasPrefix(msg, "json: unknown field ") {
+			name := strings.Trim(strings.TrimPrefix(msg, "json: unknown field "), `"`)
+			allowed := jsonFields(v)
+			return &Error{Code: CodeInvalid, Field: name, Message: fmt.Sprintf("%s has no field %q", c.change.Type, name),
+				Allowed: allowed, Nearest: nearest(name, allowed)}
+		}
 		return invalid("args", "%s: %v", c.change.Type, err)
 	}
 	return nil
@@ -152,6 +222,14 @@ func (c *cx) args(v any) error {
 
 // emit records an event under a sequence number from this transaction.
 func (c *cx) emit(seq int64, typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error {
+	return c.emitTo("", seq, typ, entityType, entityID, scopeType, scopeID, projectID, data)
+}
+
+// emitTo records an event only one member may see.
+func (c *cx) emitTo(audience string, seq int64, typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error {
+	if projectID != "" && !c.system && len(c.scope.Projects) > 0 && !contains(c.scope.Projects, projectID) {
+		return forbidden("your access does not include this project")
+	}
 	raw, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -159,13 +237,28 @@ func (c *cx) emit(seq int64, typ, entityType, entityID, scopeType, scopeID, proj
 	ev := core.Event{
 		WorkspaceID: c.ws, Seq: seq, At: c.at, ActorID: c.actor.UserID, ChangeID: c.change.ID,
 		Type: typ, EntityType: entityType, EntityID: entityID, ScopeType: scopeType, ScopeID: scopeID,
-		ProjectID: projectID, Data: raw,
+		ProjectID: projectID, AudienceID: audience, Data: raw,
 	}
 	if err := c.tx.Emit(c.ctx, ev); err != nil {
 		return err
 	}
 	c.events = append(c.events, ev)
 	return nil
+}
+
+// created emits "<entity>.created" carrying the whole new row.
+func (c *cx) created(seq int64, entity, entityID, scopeType, scopeID, projectID string, row any) error {
+	c.ref = entityID
+	return c.emit(seq, entity+".created", entity, entityID, scopeType, scopeID, projectID, map[string]any{"row": row})
+}
+
+func contains(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
 }
 
 // newID returns given if the caller made an id, else a fresh one.
@@ -179,69 +272,185 @@ func newID(field, given string) (string, error) {
 	return given, nil
 }
 
-// Apply runs one change as the given user.
-func (e *Engine) Apply(ctx context.Context, workspaceID, actorID string, ch Change) (*Result, error) {
-	if !id.Valid(ch.ID) {
-		return nil, invalid("id", "a change needs an id made by the caller (a lower-case UUID); resending the same id is then safe")
+// Apply runs one change.
+func (e *Engine) Apply(ctx context.Context, workspaceID string, actor Actor, ch Change) (*Result, error) {
+	res, err := e.Batch(ctx, workspaceID, actor, []Change{ch}, false)
+	if err != nil {
+		return nil, err
 	}
-	h, ok := handlers[ch.Type]
-	if !ok {
-		return nil, &Error{Code: CodeInvalid, Field: "type", Message: fmt.Sprintf("unknown change type %q", ch.Type), Allowed: ChangeTypes()}
-	}
-	hash := argsHash(ch)
-	res := &Result{ChangeID: ch.ID}
+	return res[0], nil
+}
 
+var errDryRun = errors.New("dry run")
+
+// Batch runs several changes in one transaction: all apply or none do. With
+// dryRun the changes are checked and their events returned, and nothing is
+// kept.
+func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, changes []Change, dryRun bool) ([]*Result, error) {
+	if len(changes) == 0 {
+		return nil, invalid("changes", "send at least one change")
+	}
+	if len(changes) > 500 {
+		return nil, invalid("changes", "a batch holds at most 500 changes; this one has %d", len(changes))
+	}
+	for i, ch := range changes {
+		if !id.Valid(ch.ID) {
+			return nil, at(i, invalid("id", "a change needs an id made by the caller (a lower-case UUID); resending the same id is then safe"))
+		}
+		if _, ok := handlers[ch.Type]; !ok {
+			return nil, at(i, oneOf("type", "change type", ch.Type, ChangeTypes()))
+		}
+	}
+	results := make([]*Result, len(changes))
+	var lastSeq int64
 	err := e.st.Write(ctx, workspaceID, func(tx store.Tx) error {
-		prev, found, err := tx.Change(ctx, ch.ID)
-		if err != nil {
-			return err
-		}
-		if found {
-			if prev.Type != ch.Type || prev.ArgsHash != hash || prev.ActorID != actorID {
-				return conflictErr("change id %s was already used for a different change; use a new id", ch.ID)
-			}
-			res.Duplicate, res.FirstSeq, res.Seq = true, prev.FirstSeq, prev.LastSeq
-			return nil
-		}
-
-		actor, err := tx.Member(ctx, workspaceID, actorID)
+		var m core.Member
+		err := tx.Get(ctx, &m, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
 		if errors.Is(err, store.ErrNotFound) {
 			return forbidden("you are not a member of this workspace")
 		}
 		if err != nil {
 			return err
 		}
-		if !actor.Role.AtLeast(h.min) {
-			return forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, actor.Role)
+		if m.SuspendedAt != 0 {
+			return forbidden("your membership is suspended")
 		}
-
-		c := &cx{ctx: ctx, tx: tx, ws: workspaceID, actor: actor, at: e.now().UnixMilli(), change: ch}
-		if err := h.fn(c); err != nil {
-			return err
+		scope := core.Scope{}
+		if m.Scope != nil {
+			scope = *m.Scope
 		}
-		res.Events = c.events
-		applied := store.AppliedChange{ID: ch.ID, ActorID: actorID, Type: ch.Type, ArgsHash: hash, At: c.at}
-		if len(c.events) > 0 {
-			applied.FirstSeq = c.events[0].Seq
-			applied.LastSeq = c.events[len(c.events)-1].Seq
-		} else {
-			// Nothing changed (an update to the values already there). The
-			// change is still remembered, at the position it was checked.
-			applied.FirstSeq, applied.LastSeq = tx.Seq(), tx.Seq()
+		if actor.ReadOnly {
+			scope.ReadOnly = true
 		}
-		res.FirstSeq, res.Seq = applied.FirstSeq, applied.LastSeq
-		return tx.SaveChange(ctx, applied)
-	})
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			var ee *Error
-			if !errors.As(err, &ee) {
-				return nil, &Error{Code: CodeNotFound, Message: err.Error()}
+		if len(actor.Projects) > 0 {
+			scope.Projects = narrow(scope.Projects, actor.Projects)
+		}
+		now := e.now().UnixMilli()
+		for i, ch := range changes {
+			res, err := e.applyOne(ctx, tx, m, scope, now, ch, dryRun)
+			if err != nil {
+				var ee *Error
+				if errors.As(err, &ee) {
+					return at(i, ee)
+				}
+				if errors.Is(err, store.ErrNotFound) {
+					return at(i, &Error{Code: CodeNotFound, Message: err.Error()})
+				}
+				return fmt.Errorf("change %d (%s): %w", i, ch.Type, err)
 			}
+			results[i] = res
 		}
+		lastSeq = tx.Seq()
+		if dryRun {
+			return errDryRun
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, errDryRun) {
 		return nil, err
 	}
-	return res, nil
+	if err == nil && e.OnCommit != nil {
+		e.OnCommit(workspaceID, lastSeq)
+	}
+	return results, nil
+}
+
+// narrow returns the project ids allowed by both lists; an empty list
+// allows everything.
+func narrow(a, b []string) []string {
+	if len(a) == 0 {
+		return b
+	}
+	var out []string
+	for _, x := range b {
+		if contains(a, x) {
+			out = append(out, x)
+		}
+	}
+	if len(out) == 0 {
+		out = []string{"none"} // both lists exist but share nothing
+	}
+	return out
+}
+
+func at(i int, e *Error) *Error {
+	cp := *e
+	cp.Index = i
+	return &cp
+}
+
+func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope core.Scope, now int64, ch Change, dryRun bool) (*Result, error) {
+	h := handlers[ch.Type]
+	hash := argsHash(ch)
+	res := &Result{ChangeID: ch.ID, Type: ch.Type}
+
+	var prev core.AppliedChange
+	err := tx.Get(ctx, &prev, store.Eq("id", ch.ID))
+	if err == nil {
+		if prev.Type != ch.Type || prev.ArgsHash != hash || prev.ActorID != m.UserID {
+			return nil, conflictErr("change id %s was already used for a different change; use a new id", ch.ID)
+		}
+		res.Duplicate, res.FirstSeq, res.Seq = true, prev.FirstSeq, prev.LastSeq
+		return res, nil
+	}
+	if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
+	if !m.Role.AtLeast(h.min) {
+		return nil, forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, m.Role)
+	}
+	if scope.ReadOnly {
+		return nil, forbidden("this credential is read-only")
+	}
+	c := &cx{e: e, ctx: ctx, tx: tx, ws: tx.WorkspaceID(), actor: m, scope: scope, at: now, change: ch, notified: map[string]bool{}}
+	if contains(scope.NeedsApproval, ch.Type) {
+		if err := c.checkApproval(); err != nil {
+			return nil, err
+		}
+	}
+	if err := h.fn(c); err != nil {
+		return nil, err
+	}
+	res.Events, res.Ref, res.Key = c.events, c.ref, c.key
+	applied := core.AppliedChange{WorkspaceID: c.ws, ID: ch.ID, ActorID: m.UserID, Type: ch.Type, ArgsHash: hash, CreatedAt: now}
+	if len(c.events) > 0 {
+		applied.FirstSeq = c.events[0].Seq
+		applied.LastSeq = c.events[len(c.events)-1].Seq
+	} else {
+		// Nothing changed (an update to the values already there). The
+		// change is still remembered, at the position it was checked.
+		applied.FirstSeq, applied.LastSeq = tx.Seq(), tx.Seq()
+	}
+	res.FirstSeq, res.Seq = applied.FirstSeq, applied.LastSeq
+	return res, tx.Insert(ctx, applied)
+}
+
+// checkApproval makes sure the change comes with an approved decision that
+// was opened for this kind of change by this actor.
+func (c *cx) checkApproval() error {
+	need := &Error{Code: CodeNeedsApproval, Message: fmt.Sprintf(
+		`%s needs approval. Open one with decision.open {"kind": "approval", "action": %q, "task": …, "question": …, "ask": …}, `+
+			`wait for the answer, then resend this change with "approval": "<decision id>"`, c.change.Type, c.change.Type)}
+	if c.change.Approval == "" {
+		return need
+	}
+	var d core.Decision
+	if err := c.tx.Get(c.ctx, &d, store.Eq("id", c.change.Approval), store.Live); err != nil {
+		return need
+	}
+	switch {
+	case d.Kind != core.DecisionApproval || d.Action != c.change.Type:
+		need.Message = fmt.Sprintf("decision %s is not an approval for %s", d.ID, c.change.Type)
+	case d.CreatedBy != c.actor.UserID:
+		need.Message = "that approval was asked for by someone else"
+	case d.State == core.StateOpen:
+		need.Message = "that approval has not been answered yet"
+	case d.Outcome != core.OutcomeApproved:
+		need.Code, need.Message = CodeForbidden, "that approval was declined"
+	default:
+		return nil
+	}
+	return need
 }
 
 func argsHash(ch Change) string {
@@ -255,51 +464,80 @@ func argsHash(ch Change) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Bootstrap makes a person, a workspace and that person's owner membership.
-// It is how a new install, or a new workspace on one, starts.
-type BootstrapArgs struct {
-	OwnerName     string
-	OwnerEmail    string
-	OwnerHandle   string
-	WorkspaceSlug string
-	WorkspaceName string
+// System runs fn as the engine itself inside one write to a workspace, on
+// behalf of actorID (whose name the events carry). Background jobs use it
+// for work no member asked for directly: rules, cycle roll-overs, imports.
+func (e *Engine) System(ctx context.Context, workspaceID, actorID string, fn func(*Sys) error) error {
+	var seq int64
+	err := e.st.Write(ctx, workspaceID, func(tx store.Tx) error {
+		var m core.Member
+		if err := tx.Get(ctx, &m, store.Eq("user_id", actorID)); err != nil {
+			return fmt.Errorf("system actor %s: %w", actorID, err)
+		}
+		c := &cx{e: e, ctx: ctx, tx: tx, ws: workspaceID, actor: m, at: e.now().UnixMilli(), system: true,
+			change: Change{ID: id.New(), Type: "system"}, notified: map[string]bool{}}
+		if err := fn(&Sys{c: c}); err != nil {
+			return err
+		}
+		seq = tx.Seq()
+		return nil
+	})
+	if err == nil && e.OnCommit != nil {
+		e.OnCommit(workspaceID, seq)
+	}
+	return err
 }
 
-func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace, core.User, error) {
-	at := e.now().UnixMilli()
-	email := strings.ToLower(strings.TrimSpace(a.OwnerEmail))
-	if email == "" || !strings.Contains(email, "@") {
-		return core.Workspace{}, core.User{}, invalid("owner_email", "an owner needs an email address")
+// Sys is what a system write may do.
+type Sys struct{ c *cx }
+
+// Do runs one change type with the given arguments, skipping role checks.
+func (s *Sys) Do(changeType string, args any) error {
+	h, ok := handlers[changeType]
+	if !ok {
+		return fmt.Errorf("unknown change type %q", changeType)
 	}
-	if err := checkHandle(a.OwnerHandle); err != nil {
-		return core.Workspace{}, core.User{}, err
-	}
-	if !slugOK(a.WorkspaceSlug) {
-		return core.Workspace{}, core.User{}, invalid("workspace_slug", "a slug is 2 to 40 lower-case letters, digits or dashes")
-	}
-	owner, err := e.st.UserByEmail(ctx, email)
-	if errors.Is(err, store.ErrNotFound) {
-		owner = core.User{ID: id.New(), Kind: core.KindPerson, Name: strings.TrimSpace(a.OwnerName), Email: email, CreatedAt: at}
-		if owner.Name == "" {
-			return core.Workspace{}, core.User{}, invalid("owner_name", "an owner needs a name")
-		}
-		err = e.st.CreateUser(ctx, owner)
-	}
+	raw, err := json.Marshal(args)
 	if err != nil {
-		return core.Workspace{}, core.User{}, err
+		return err
 	}
-	ws := core.Workspace{ID: id.New(), Slug: a.WorkspaceSlug, Name: strings.TrimSpace(a.WorkspaceName), CreatedAt: at}
-	if ws.Name == "" {
-		ws.Name = ws.Slug
+	s.c.change = Change{ID: id.New(), Type: changeType, Args: raw}
+	return h.fn(s.c)
+}
+
+// Tx gives a system write direct access to the transaction.
+func (s *Sys) Tx() store.Tx { return s.c.tx }
+
+// Emit records an event from a system write.
+func (s *Sys) Emit(typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error {
+	return s.c.emit(s.c.tx.NextSeq(), typ, entityType, entityID, scopeType, scopeID, projectID, data)
+}
+
+// Ref returns the id of the thing the last Do made.
+func (s *Sys) Ref() string { return s.c.ref }
+
+// Opt is an optional argument that tells "absent" from "null" from a value,
+// which a patch needs: absent leaves the field alone, null clears it.
+type Opt[T any] struct {
+	Set  bool
+	Null bool
+	V    T
+}
+
+func (o *Opt[T]) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(bytes.TrimSpace(b)) == "null" {
+		o.Null = true
+		return nil
 	}
-	m := core.Member{WorkspaceID: ws.ID, UserID: owner.ID, Role: core.RoleOwner, Handle: a.OwnerHandle, CreatedAt: at}
-	if err := e.st.CreateWorkspace(ctx, ws, m); err != nil {
-		if errors.Is(err, store.ErrConflict) {
-			return core.Workspace{}, core.User{}, conflictErr("a workspace with the slug %q already exists", ws.Slug)
-		}
-		return core.Workspace{}, core.User{}, err
+	return json.Unmarshal(b, &o.V)
+}
+
+func (o Opt[T]) MarshalJSON() ([]byte, error) {
+	if !o.Set || o.Null {
+		return []byte("null"), nil
 	}
-	return ws, owner, nil
+	return json.Marshal(o.V)
 }
 
 func slugOK(s string) bool {
@@ -325,21 +563,4 @@ func checkHandle(h string) error {
 		}
 	}
 	return nil
-}
-
-// Opt is an optional argument that tells "absent" from "null" from a value,
-// which a patch needs: absent leaves the field alone, null clears it.
-type Opt[T any] struct {
-	Set  bool
-	Null bool
-	V    T
-}
-
-func (o *Opt[T]) UnmarshalJSON(b []byte) error {
-	o.Set = true
-	if string(bytes.TrimSpace(b)) == "null" {
-		o.Null = true
-		return nil
-	}
-	return json.Unmarshal(b, &o.V)
 }

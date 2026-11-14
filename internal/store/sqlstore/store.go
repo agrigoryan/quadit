@@ -9,20 +9,27 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
+
+	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // Store is a database handle plus the dialect it speaks.
 type Store struct {
-	db *sql.DB
-	d  Dialect
+	conn // bound to no workspace
+	db   *sql.DB
+	d    Dialect
 	// writer queues write transactions on a single-writer database.
 	writer sync.Mutex
 }
 
-// New wraps an open database. The caller keeps ownership of nothing: Close
-// closes the database.
+var _ store.Store = (*Store)(nil)
+var _ store.Tx = (*tx)(nil)
+
+// New wraps an open database. Close closes it.
 func New(db *sql.DB, d Dialect) *Store {
-	return &Store{db: db, d: d}
+	return &Store{conn: conn{q: q{c: db, d: d}}, db: db, d: d}
 }
 
 // Dialect returns the name of the database kind, "sqlite" or "postgres".
@@ -33,6 +40,11 @@ func (s *Store) Close() error { return s.db.Close() }
 
 // Ping checks that the database answers.
 func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
+
+// In returns a DB bound to one workspace.
+func (s *Store) In(workspaceID string) store.DB {
+	return conn{q: q{c: s.db, d: s.d}, ws: workspaceID}
+}
 
 // querier is what both a database and a transaction can do.
 type querier interface {
@@ -59,34 +71,89 @@ func (x q) row(ctx context.Context, query string, args ...any) *sql.Row {
 	return x.c.QueryRowContext(ctx, x.d.Rebind(query), args...)
 }
 
-func (s *Store) read() q { return q{c: s.db, d: s.d} }
-
 // inTx runs fn in one transaction and commits when it returns nil.
 func (s *Store) inTx(ctx context.Context, fn func(q) error) (err error) {
 	if s.d.SingleWriter {
 		s.writer.Lock()
 		defer s.writer.Unlock()
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
+	t, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}
 	defer func() {
 		if p := recover(); p != nil {
-			_ = tx.Rollback()
+			_ = t.Rollback()
 			panic(p)
 		}
 		if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
+			if rbErr := t.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
 				err = errors.Join(err, rbErr)
 			}
 		}
 	}()
-	if err = fn(q{c: tx, d: s.d}); err != nil {
+	if err = fn(q{c: t, d: s.d}); err != nil {
 		return err
 	}
-	if err = tx.Commit(); err != nil {
+	if err = t.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
 	return nil
+}
+
+// Atomic runs fn in one transaction outside any workspace's sequence.
+func (s *Store) Atomic(ctx context.Context, fn func(store.DB) error) error {
+	return s.inTx(ctx, func(x q) error { return fn(conn{q: x}) })
+}
+
+// tx is one write to one workspace.
+type tx struct {
+	conn
+	seq int64 // last number handed out
+}
+
+// Write runs fn in a transaction that holds the workspace's row lock from
+// its first statement. On Postgres that lock is what makes writers to one
+// workspace queue; on SQLite the write transaction already does. Either way
+// event numbers are handed out in commit order, so a reader that has seen
+// number N has seen everything before it.
+func (s *Store) Write(ctx context.Context, workspaceID string, fn func(store.Tx) error) error {
+	if !looksUUID(workspaceID) {
+		return fmt.Errorf("workspace %q: %w", workspaceID, store.ErrNotFound)
+	}
+	return s.inTx(ctx, func(x q) error {
+		var seq int64
+		err := x.row(ctx, `UPDATE workspaces SET seq = seq WHERE id = ? AND deleted_at IS NULL RETURNING seq`, workspaceID).Scan(&seq)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("workspace %s: %w", workspaceID, store.ErrNotFound)
+		}
+		if err != nil {
+			return err
+		}
+		t := &tx{conn: conn{q: x, ws: workspaceID}, seq: seq}
+		if err := fn(t); err != nil {
+			return err
+		}
+		if t.seq == seq {
+			return nil
+		}
+		_, err = x.exec(ctx, `UPDATE workspaces SET seq = ?, updated_at = ? WHERE id = ?`, t.seq, time.Now().UnixMilli(), workspaceID)
+		return err
+	})
+}
+
+func (t *tx) WorkspaceID() string { return t.ws }
+func (t *tx) Seq() int64          { return t.seq }
+
+func (t *tx) NextSeq() int64 {
+	t.seq++
+	return t.seq
+}
+
+func (t *tx) Emit(ctx context.Context, ev core.Event) error {
+	if ev.Seq <= 0 || ev.Seq > t.seq {
+		return fmt.Errorf("emit %s: seq %d was not handed out by this write", ev.Type, ev.Seq)
+	}
+	ev.WorkspaceID = t.ws
+	return t.Insert(ctx, ev)
 }
