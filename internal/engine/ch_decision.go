@@ -145,6 +145,14 @@ func attachmentRemove(c *cx) error {
 	if at.CreatedBy != c.actor.UserID && !c.actor.Role.AtLeast(core.RoleAdmin) {
 		return forbidden("only the one who attached a file, or an admin, can remove it")
 	}
+	// A file nothing shows any more goes to the trash with its last use.
+	if n, err := c.tx.Count(c.ctx, "attachments", store.Eq("file_id", at.FileID), store.Live); err != nil {
+		return err
+	} else if n <= 1 {
+		if _, err := c.tx.Update(c.ctx, "files", map[string]any{"deleted_at": c.at}, store.Eq("id", at.FileID)); err != nil {
+			return err
+		}
+	}
 	if at.TaskID != "" {
 		var t core.Task
 		if err := c.tx.Get(c.ctx, &t, store.Eq("id", at.TaskID)); err != nil {

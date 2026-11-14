@@ -39,15 +39,17 @@ type Config struct {
 
 // Server holds everything a request needs.
 type Server struct {
-	cfg    Config
-	st     store.Store
-	eng    *engine.Engine
-	hub    *hub.Hub
-	files  blob.Store
-	sealer *auth.Sealer
-	log    *slog.Logger
-	mux    *http.ServeMux
-	web    http.Handler // the web app, when built in
+	cfg     Config
+	st      store.Store
+	eng     *engine.Engine
+	hub     *hub.Hub
+	filesMu sync.RWMutex
+	files   blob.Store // where files go now
+	disk    blob.Store // the local store, always there
+	sealer  *auth.Sealer
+	log     *slog.Logger
+	mux     *http.ServeMux
+	web     http.Handler // the web app, when built in
 
 	seenMu sync.Mutex
 	seen   map[string]int64 // user id -> last time presence was written
@@ -62,12 +64,44 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	s := &Server{cfg: cfg, st: st, eng: engine.New(st), hub: hub.New(), files: files, sealer: sealer, log: cfg.Log,
+	s := &Server{cfg: cfg, st: st, eng: engine.New(st), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
 		seen: map[string]int64{}, limits: newLimiter()}
 	s.eng.OnCommit = s.hub.Notify
 	engine.Seal = sealer.Seal
 	s.routes()
 	return s
+}
+
+// fileStore returns where files are kept right now.
+func (s *Server) fileStore() blob.Store {
+	s.filesMu.RLock()
+	defer s.filesMu.RUnlock()
+	return s.files
+}
+
+// useFiles switches file storage to what the "files" setting says. A cloud
+// store is layered over the local one, so files not yet copied over are
+// still found, and a background job copies them.
+func (s *Server) useFiles(ctx context.Context, c blob.Config) error {
+	next := s.disk
+	if c.Kind != "" && c.Kind != "disk" {
+		cloud, err := blob.Open(ctx, c, s.cfg.DataDir)
+		if err != nil {
+			return err
+		}
+		// Prove the store takes a write before trusting uploads to it.
+		probe := "probe/" + id.New()
+		if err := cloud.Put(ctx, probe, strings.NewReader("ok"), "text/plain"); err != nil {
+			return fmt.Errorf("file storage: the store refused a test write: %w", err)
+		}
+		cloud.Delete(ctx, probe)
+		next = blob.Layered{Primary: cloud, Old: s.disk}
+		s.enqueue(ctx, "files.move", "", "files.move", nil, time.Now().Add(5*time.Second))
+	}
+	s.filesMu.Lock()
+	s.files = next
+	s.filesMu.Unlock()
+	return nil
 }
 
 // Engine returns the change engine, for commands that run beside the server.

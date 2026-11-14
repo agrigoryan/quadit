@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/mail"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -168,6 +169,15 @@ func (s *Server) saveSetting(ctx context.Context, name string, value json.RawMes
 			}
 		}
 		value, _ = json.Marshal(obj)
+	}
+	if name == "files" {
+		// Open the store with the new values before keeping them, so a typo
+		// in a key does not leave the install unable to store files.
+		var fc blob.Config
+		json.Unmarshal(s.unsealFields(name, value), &fc)
+		if err := s.useFiles(ctx, fc); err != nil {
+			return errBad("%v", err)
+		}
 	}
 	err := s.st.Upsert(ctx, core.Setting{Name: name, Value: value, UpdatedAt: time.Now().UnixMilli(), UpdatedBy: by}, "name")
 	s.setMu.Lock()

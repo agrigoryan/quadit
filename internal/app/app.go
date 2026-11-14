@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -137,7 +138,7 @@ func Serve(args []string, version string) int {
 		o.BaseURL = "http://" + host
 	}
 	o.BaseURL = strings.TrimRight(o.BaseURL, "/")
-	files, err := OpenFiles(ctx, st, sealer, o.Data)
+	files, err := blob.NewDisk(filepath.Join(o.Data, "files"))
 	if err != nil {
 		log.Error("file storage", "err", err)
 		return 1
@@ -169,10 +170,36 @@ func Serve(args []string, version string) int {
 	return 0
 }
 
-// OpenFiles returns the file store the install is set to use. It is a
-// variable so cloud stores can be added without this file knowing them.
-var OpenFiles = func(ctx context.Context, st store.Store, sealer *auth.Sealer, dataDir string) (blob.Store, error) {
-	return blob.NewDisk(filepath.Join(dataDir, "files"))
+// OpenFiles returns the file store the install is set to use: what the
+// "files" setting says, read from the environment or the database, with the
+// local disk as the place old files may still be.
+func OpenFiles(ctx context.Context, st store.Store, sealer *auth.Sealer, dataDir string) (blob.Store, error) {
+	disk, err := blob.NewDisk(filepath.Join(dataDir, "files"))
+	if err != nil {
+		return nil, err
+	}
+	var cfg blob.Config
+	if v := os.Getenv("QUADIT_SETTING_FILES"); v != "" {
+		json.Unmarshal([]byte(v), &cfg)
+	} else {
+		var set core.Setting
+		if st.Get(ctx, &set, store.Eq("name", "files")) == nil {
+			json.Unmarshal(set.Value, &cfg)
+			for _, f := range []*string{&cfg.SecretKey, &cfg.Credentials, &cfg.AccountKey} {
+				if plain, err := sealer.Open(*f); err == nil {
+					*f = plain
+				}
+			}
+		}
+	}
+	if cfg.Kind == "" || cfg.Kind == "disk" {
+		return disk, nil
+	}
+	cloud, err := blob.Open(ctx, cfg, dataDir)
+	if err != nil {
+		return nil, err
+	}
+	return blob.Layered{Primary: cloud, Old: disk}, nil
 }
 
 // WebHandler returns the handler that serves the built-in web app, or nil

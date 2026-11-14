@@ -193,7 +193,7 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 		return err
 	}
 	h := sha256.New()
-	if err := s.files.Put(ctx, f.StorageKey, io.TeeReader(in, h), f.ContentType); err != nil {
+	if err := s.fileStore().Put(ctx, f.StorageKey, io.TeeReader(in, h), f.ContentType); err != nil {
 		return fmt.Errorf("file storage: %w", err)
 	}
 	f.SHA256, f.State = hex.EncodeToString(h.Sum(nil)), "ready"
@@ -205,7 +205,7 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 			set["width"], set["height"] = w, hgt
 			if prev != nil {
 				f.PreviewKey = f.StorageKey + ".preview"
-				if err := s.files.Put(ctx, f.PreviewKey, bytes.NewReader(prev), http.DetectContentType(prev)); err == nil {
+				if err := s.fileStore().Put(ctx, f.PreviewKey, bytes.NewReader(prev), http.DetectContentType(prev)); err == nil {
 					set["preview_key"] = f.PreviewKey
 				} else {
 					f.PreviewKey = ""
@@ -218,7 +218,7 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 			set["width"], set["height"], set["duration_ms"] = w, hgt, ms
 			if sheet != nil {
 				f.PreviewKey = f.StorageKey + ".preview"
-				if err := s.files.Put(ctx, f.PreviewKey, bytes.NewReader(sheet), "image/jpeg"); err == nil {
+				if err := s.fileStore().Put(ctx, f.PreviewKey, bytes.NewReader(sheet), "image/jpeg"); err == nil {
 					set["preview_key"] = f.PreviewKey
 				} else {
 					f.PreviewKey = ""
@@ -359,7 +359,7 @@ func (s *Server) hFileServe(x *c) error {
 			key, ctype, name = f.PreviewKey, "", "preview-"+f.Name
 		}
 	}
-	rd, mod, err := s.files.Open(ctx, key)
+	rd, mod, err := s.fileStore().Open(ctx, key)
 	if errors.Is(err, blob.ErrNotFound) {
 		return errNotFound("file contents")
 	}

@@ -105,7 +105,7 @@ func (s *Server) hMetrics(w http.ResponseWriter, r *http.Request) {
 	if n, err := s.st.Count(ctx, "webhook_deliveries", store.Eq("state", "dead")); err == nil {
 		fmt.Fprintf(w, "# TYPE quadit_webhook_deliveries_dead gauge\nquadit_webhook_deliveries_dead %d\n", n)
 	}
-	fmt.Fprintf(w, "# TYPE quadit_info gauge\nquadit_info{version=%q,database=%q,files=%q} 1\n", s.cfg.Version, s.st.Dialect(), s.files.Kind())
+	fmt.Fprintf(w, "# TYPE quadit_info gauge\nquadit_info{version=%q,database=%q,files=%q} 1\n", s.cfg.Version, s.st.Dialect(), s.fileStore().Kind())
 }
 
 // hCatalog lists every change type with its arguments.

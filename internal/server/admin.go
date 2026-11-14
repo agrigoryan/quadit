@@ -214,7 +214,7 @@ func (s *Server) hWorkspaces(x *c) error {
 // hHealth is the health panel: what is failing or waiting behind the scenes.
 func (s *Server) hHealth(x *c) error {
 	ctx := x.ctx()
-	out := map[string]any{"version": s.cfg.Version, "database": s.st.Dialect(), "files": s.files.Kind(), "mail": s.mailReady(ctx)}
+	out := map[string]any{"version": s.cfg.Version, "database": s.st.Dialect(), "files": s.fileStore().Kind(), "mail": s.mailReady(ctx)}
 	out["jobs_waiting"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"))
 	out["jobs_failing"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"), store.Gt("attempts", 2))
 	out["webhooks_failing"], _ = s.st.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0))
