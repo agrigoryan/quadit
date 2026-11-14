@@ -194,6 +194,9 @@ type cx struct {
 	system bool
 	// selfNotify lets a notification reach the actor, for rules.
 	selfNotify bool
+	// origin, when set, is stamped on every event the write emits, so the
+	// rule that caused a change is known and rules do not set each other off.
+	origin string
 }
 
 // args decodes the change's arguments into v. Unknown fields are refused, so
@@ -227,6 +230,9 @@ func (c *cx) emit(seq int64, typ, entityType, entityID, scopeType, scopeID, proj
 func (c *cx) emitTo(audience string, seq int64, typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error {
 	if projectID != "" && !c.system && len(c.scope.Projects) > 0 && !contains(c.scope.Projects, projectID) {
 		return forbidden("your access does not include this project")
+	}
+	if m, ok := data.(map[string]any); ok && c.origin != "" {
+		m["rule"] = c.origin
 	}
 	raw, err := json.Marshal(data)
 	if err != nil {
@@ -503,6 +509,25 @@ func (s *Sys) Do(changeType string, args any) error {
 	s.c.change = Change{ID: id.New(), Type: changeType, Args: raw}
 	return h.fn(s.c)
 }
+
+// Once reports whether this system write already ran under the given id,
+// and remembers it if not. With it a background job that is run twice does
+// its work once.
+func (s *Sys) Once(changeID, what string) (already bool, err error) {
+	var prev core.AppliedChange
+	err = s.c.tx.Get(s.c.ctx, &prev, store.Eq("id", changeID))
+	if err == nil {
+		return true, nil
+	}
+	if !errors.Is(err, store.ErrNotFound) {
+		return false, err
+	}
+	return false, s.c.tx.Insert(s.c.ctx, core.AppliedChange{WorkspaceID: s.c.ws, ID: changeID, ActorID: s.c.actor.UserID, Type: what,
+		ArgsHash: "-", FirstSeq: s.c.tx.Seq(), LastSeq: s.c.tx.Seq(), CreatedAt: s.c.at})
+}
+
+// From marks every event of this write as caused by a rule.
+func (s *Sys) From(ruleID string) { s.c.origin = ruleID }
 
 // Tx gives a system write direct access to the transaction.
 func (s *Sys) Tx() store.Tx { return s.c.tx }

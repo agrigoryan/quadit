@@ -37,6 +37,8 @@ CREATE TABLE webhook_deliveries (
     done_at       {{TS}}
 );
 CREATE INDEX webhook_deliveries_hook ON webhook_deliveries (webhook_id, created_at);
+-- One delivery per webhook and event, however often the dispatcher runs.
+CREATE UNIQUE INDEX webhook_deliveries_once ON webhook_deliveries (webhook_id, seq);
 CREATE INDEX webhook_deliveries_due ON webhook_deliveries (state, next_at);
 
 -- "When this happens, do that": the rules set in the interface.

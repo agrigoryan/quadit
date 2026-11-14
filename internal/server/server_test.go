@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,7 +44,9 @@ func newSite(t *testing.T, st store.Store) *site {
 	srv := server.New(server.Config{DataDir: dir, BaseURL: base, Version: "test"}, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()
-	t.Cleanup(hs.Close)
+	ctx, stop := context.WithCancel(context.Background())
+	go srv.Run(ctx)
+	t.Cleanup(func() { stop(); hs.Close() })
 	jar, _ := cookiejar.New(nil)
 	s := &site{t: t, url: base, owner: &http.Client{Jar: jar}, srv: srv}
 	s.call(s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",

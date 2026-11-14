@@ -8,6 +8,7 @@ package id
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"sync"
@@ -90,4 +91,19 @@ func Valid(s string) bool {
 		}
 	}
 	return true
+}
+
+// From returns the same id for the same parts every time. It is used where
+// doing something twice must be recognised as the same thing.
+func From(parts ...string) string {
+	h := sha256.New()
+	for _, p := range parts {
+		h.Write([]byte(p))
+		h.Write([]byte{0})
+	}
+	b := h.Sum(nil)[:16]
+	b[6] = (b[6] & 0x0f) | 0x70 // version 7 layout, so it passes as an id
+	b[8] = (b[8] & 0x3f) | 0x80
+	x := hex.EncodeToString(b)
+	return x[:8] + "-" + x[8:12] + "-" + x[12:16] + "-" + x[16:20] + "-" + x[20:]
 }
