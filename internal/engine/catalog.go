@@ -36,7 +36,9 @@ func Catalog() []ChangeInfo {
 	return out
 }
 
-func argsOf(t reflect.Type) []ArgInfo {
+func argsOf(t reflect.Type) []ArgInfo { return argsAt(t, 0) }
+
+func argsAt(t reflect.Type, depth int) []ArgInfo {
 	var out []ArgInfo
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -44,15 +46,16 @@ func argsOf(t reflect.Type) []ArgInfo {
 		if name == "" || name == "-" {
 			continue
 		}
-		out = append(out, ArgInfo{Name: name, Type: typeName(f.Type)})
+		out = append(out, ArgInfo{Name: name, Type: typeAt(f.Type, depth)})
 	}
 	return out
 }
 
-// typeName names a Go type the way a caller writes its JSON.
-func typeName(t reflect.Type) string {
+// typeAt names a Go type the way a caller writes its JSON. A type that
+// holds itself (a block with nested blocks) is named, not unfolded forever.
+func typeAt(t reflect.Type, depth int) string {
 	if strings.HasPrefix(t.Name(), "Opt[") {
-		return typeName(t.Field(2).Type) + "|null"
+		return typeAt(t.Field(2).Type, depth) + "|null"
 	}
 	switch t.Kind() {
 	case reflect.String:
@@ -64,15 +67,18 @@ func typeName(t reflect.Type) string {
 	case reflect.Float64:
 		return "number"
 	case reflect.Pointer:
-		return typeName(t.Elem())
+		return typeAt(t.Elem(), depth)
 	case reflect.Slice:
 		if t.Elem().Kind() == reflect.Uint8 {
 			return "json"
 		}
-		return "[" + typeName(t.Elem()) + "]"
+		return "[" + typeAt(t.Elem(), depth) + "]"
 	case reflect.Struct:
+		if depth >= 2 {
+			return "{" + strings.ToLower(t.Name()) + "}"
+		}
 		var parts []string
-		for _, a := range argsOf(t) {
+		for _, a := range argsAt(t, depth+1) {
 			parts = append(parts, a.Name+": "+a.Type)
 		}
 		return "{" + strings.Join(parts, ", ") + "}"

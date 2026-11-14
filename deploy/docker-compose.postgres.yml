@@ -1,0 +1,63 @@
+# A bigger install: Postgres for the database, and S3-compatible storage
+# (MinIO here) for files. File storage is set in the admin area, or with
+# QUADIT_SETTING_FILES as below.
+#
+#   docker compose -f deploy/docker-compose.postgres.yml up -d
+
+services:
+  quadit:
+    build: ..
+    image: quadit
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    ports:
+      - "4780:4780"
+    environment:
+      QUADIT_BASE_URL: http://localhost:4780
+      QUADIT_DB: postgres://quadit:change-me@postgres:5432/quadit?sslmode=disable
+      # Keep this the same across restarts and copies: it encrypts stored secrets.
+      QUADIT_SECRET: change-me-to-a-long-random-string
+      QUADIT_SETTING_FILES: >-
+        {"kind":"s3","bucket":"quadit","endpoint":"http://minio:9000","access_key":"quadit","secret_key":"change-me-too","region":"us-east-1"}
+    volumes:
+      - quadit-data:/data
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quadit
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: quadit
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quadit"]
+      interval: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: quadit
+      MINIO_ROOT_PASSWORD: change-me-too
+    volumes:
+      - minio-data:/data
+
+  # Makes the bucket once, then exits.
+  minio-setup:
+    image: minio/mc
+    depends_on: [minio]
+    entrypoint: >
+      sh -c "until mc alias set local http://minio:9000 quadit change-me-too; do sleep 1; done; mc mb --ignore-existing local/quadit"
+
+volumes:
+  quadit-data:
+  postgres-data:
+  minio-data:

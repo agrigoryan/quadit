@@ -523,3 +523,15 @@ func TestLeasesResourcesAndInbox(t *testing.T) {
 		}
 	})
 }
+
+func TestCatalog(t *testing.T) {
+	cat := engine.Catalog()
+	if len(cat) < 80 {
+		t.Fatalf("catalog has %d change types", len(cat))
+	}
+	for _, ci := range cat {
+		if len(ci.Args) == 0 {
+			t.Errorf("%s has no described arguments: run scripts/gen-catalog.py", ci.Type)
+		}
+	}
+}
