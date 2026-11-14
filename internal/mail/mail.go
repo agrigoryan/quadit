@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"mime"
@@ -36,6 +37,10 @@ type Message struct {
 	HTML    string
 }
 
+// testRoots lets a test trust a server's own certificate; nil means the
+// machine's trusted roots, as always outside tests.
+var testRoots *x509.CertPool
+
 // ErrNotConfigured is returned when no mail server is set.
 var ErrNotConfigured = errors.New("no mail server is set up")
 
@@ -55,7 +60,7 @@ func Send(ctx context.Context, c Config, m Message) error {
 	d := net.Dialer{Timeout: 15 * time.Second}
 	var conn net.Conn
 	var err error
-	tlsCfg := &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12}
+	tlsCfg := &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12, RootCAs: testRoots}
 	if c.TLS == "tls" {
 		conn, err = tls.DialWithDialer(&d, "tcp", addr, tlsCfg)
 	} else {

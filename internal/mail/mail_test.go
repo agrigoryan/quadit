@@ -3,7 +3,10 @@ package mail
 import (
 	"bufio"
 	"context"
+	"crypto/x509"
 	"net"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -83,5 +86,47 @@ func TestSend(t *testing.T) {
 	}
 	if err := Send(context.Background(), Config{}, Message{To: "a@b.c"}); err != ErrNotConfigured {
 		t.Fatalf("no server set: %v", err)
+	}
+}
+
+// TestRealSMTP sends through a real mail server that requires TLS and a
+// sign-in. It runs when told where one is:
+//
+//	QUADIT_TEST_SMTP=host:port,user,password,starttls|tls  QUADIT_TEST_SMTP_CA=ca.pem
+func TestRealSMTP(t *testing.T) {
+	spec := os.Getenv("QUADIT_TEST_SMTP")
+	if spec == "" {
+		t.Skip("QUADIT_TEST_SMTP is not set")
+	}
+	bits := strings.Split(spec, ",")
+	if len(bits) != 4 {
+		t.Fatal("QUADIT_TEST_SMTP = host:port,user,password,starttls|tls")
+	}
+	host, portText, _ := net.SplitHostPort(bits[0])
+	port, _ := strconv.Atoi(portText)
+	if ca := os.Getenv("QUADIT_TEST_SMTP_CA"); ca != "" {
+		pem, err := os.ReadFile(ca)
+		if err != nil {
+			t.Fatal(err)
+		}
+		testRoots = x509.NewCertPool()
+		testRoots.AppendCertsFromPEM(pem)
+		defer func() { testRoots = nil }()
+	}
+	c := Config{Host: host, Port: port, Username: bits[1], Password: bits[2], From: "Quadit <quadit@example.com>", TLS: bits[3]}
+	msg := Message{To: "owner@example.com", Subject: "Über TLS: ✓", Text: "Sent over " + bits[3] + ".\nhttps://example.com/x", HTML: "<p>Sent over " + bits[3] + ".</p>"}
+	if err := Send(context.Background(), c, msg); err != nil {
+		t.Fatal(err)
+	}
+	// A wrong password is refused, and said so.
+	c.Password = "wrong"
+	if err := Send(context.Background(), c, msg); err == nil || !strings.Contains(err.Error(), "sign-in refused") {
+		t.Fatalf("a wrong password: %v", err)
+	}
+	// Without the server's certificate being trusted, nothing is sent.
+	testRoots = x509.NewCertPool()
+	c.Password = bits[2]
+	if err := Send(context.Background(), c, msg); err == nil {
+		t.Fatal("mail went to a server whose certificate is not trusted")
 	}
 }
