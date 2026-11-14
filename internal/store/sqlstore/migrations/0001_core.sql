@@ -249,6 +249,10 @@ CREATE TABLE decisions (
     details                TEXT NOT NULL DEFAULT '',
     -- approval requests: the action being asked for, e.g. "task.delete".
     action                 TEXT NOT NULL DEFAULT '',
+    -- the arguments of that action, exactly as approved, and when it was run:
+    -- an approval covers one change and is used once.
+    action_args            {{JSON}},
+    action_used_at         {{TS}},
     state                  TEXT NOT NULL CHECK (state IN ('open', 'picked', 'sent_back')),
     asked_id               {{ID}} REFERENCES users (id),
     -- Set when the asker found the answer unclear and asked again.

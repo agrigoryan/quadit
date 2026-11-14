@@ -39,7 +39,7 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
           comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID]
           result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
           ask KEY QUESTION option=A option=B [recommended=2] [why=...] [ask=@WHO]
-          approval KEY QUESTION [action=task.delete] [ask=@WHO]
+          approval KEY QUESTION [action=task.delete [args=JSON]] [ask=@WHO]
           pick DECISION OPTION|approved|declined|none [note=...]
           unclear DECISION NOTE
           attach KEY PATH ... [option=ID] | upload PATH | read [all | ID ...]
@@ -542,6 +542,16 @@ func (r *runner) run(cmd string, rest []string) error {
 		a["task"], a["question"] = pos[0], strings.Join(pos[1:], " ")
 		if cmd == "approval" {
 			a["kind"] = "approval"
+			// args='{"id":"SVA-12"}': what exactly is to be approved.
+			if raw := first(f["args"]); raw != "" {
+				var args map[string]any
+				if err := json.Unmarshal([]byte(raw), &args); err != nil {
+					return fmt.Errorf("args must be a JSON object, the arguments the change will be sent with: %w", err)
+				}
+				a["args"] = args
+			} else if _, ok := a["action"]; ok {
+				a["args"] = map[string]any{"id": pos[0]} // the usual case: the action is on this task
+			}
 		}
 		var opts []map[string]any
 		for _, o := range f["option"] {

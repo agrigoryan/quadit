@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -171,6 +172,15 @@ func (s *Server) listening(x *c, seconds int) {
 func (s *Server) setCursor(x *c, name string, seq int64) error {
 	if len(name) == 0 || len(name) > 64 {
 		return errBad("a cursor name is 1 to 64 characters")
+	}
+	// Nothing can be handled that has not happened: a position past the end
+	// of the feed would hide everything until the feed caught up with it.
+	var ws core.Workspace
+	if err := s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err != nil {
+		return err
+	}
+	if seq > ws.Seq {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "seq", Message: fmt.Sprintf("the feed is at %d; %d has not happened yet", ws.Seq, seq)}
 	}
 	var cur core.Cursor
 	err := x.db.Get(x.ctx(), &cur, store.Eq("user_id", x.member.UserID), store.Eq("name", name))

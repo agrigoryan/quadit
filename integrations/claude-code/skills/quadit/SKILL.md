@@ -57,7 +57,7 @@ quadit attach SVA-12 ring.png option=OPTION_ID     # show each option; ids are i
 - The answer arrives as `decision.picked … -> 2) B: burst (with_changes): Make it 20% larger.` Follow the note exactly.
 - If the answer does not settle it, say what is unclear in one line: `quadit unclear DECISION_ID "Larger in radius, or in duration?"`. Do not guess.
 
-If a change is refused with `needs_approval`, ask with `quadit approval KEY "…" action=task.delete` and resend with `approval=DECISION_ID` once approved.
+If a change is refused with `needs_approval`, ask with `quadit approval KEY "…" action=task.delete` (for a change that is not on that task, add `args='{…}'` with the exact arguments you will send) and resend the same change with `approval=DECISION_ID` once approved. An approval covers that one change, once.
 
 ## Finding things
 

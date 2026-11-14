@@ -345,15 +345,30 @@ func TestRolesScopesAndWalls(t *testing.T) {
 		// A change that needs approval is refused until one is given.
 		w.do(w.owner.ID, "agent.update", M{"id": "@coder", "scope": M{"projects": []string{"SVA"}, "needs_approval": []string{"task.delete"}}})
 		w.refused(engine.CodeNeedsApproval, coder, "task.delete", M{"id": "SVA-1"})
-		ask := w.do(coder, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "task.delete", "question": "Delete the duplicate?"})
+		// An approval says exactly what is to be done.
+		w.refused(engine.CodeInvalid, coder, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "task.delete", "question": "Delete something?"})
+		ask := w.do(coder, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "task.delete", "args": M{"id": "SVA-1"}, "question": "Delete the duplicate?"})
 		raw, _ := json.Marshal(M{"id": "SVA-1"})
 		del := engine.Change{ID: id.New(), Type: "task.delete", Args: raw, Approval: ask.Ref}
 		if _, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: coder}, del); err == nil {
 			t.Fatal("unanswered approval was accepted")
 		}
 		w.do(w.owner.ID, "decision.pick", M{"id": ask.Ref, "outcome": "approved"})
+		// It covers that change and no other: not another task...
+		other2, _ := json.Marshal(M{"id": "SVA-2"})
+		if _, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: coder}, engine.Change{ID: id.New(), Type: "task.delete", Args: other2, Approval: ask.Ref}); err == nil || !strings.Contains(err.Error(), "different arguments") {
+			t.Fatalf("an approval for SVA-1 was taken for SVA-2: %v", err)
+		}
 		if _, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: coder}, del); err != nil {
 			t.Fatalf("approved delete refused: %v", err)
+		}
+		// ...and not a second time (sending the very same change again is still safe).
+		if res, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: coder}, del); err != nil || !res.Duplicate {
+			t.Fatalf("resending the approved change: %v", err)
+		}
+		w.do(w.owner.ID, "task.restore", M{"id": "SVA-1"})
+		if _, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: coder}, engine.Change{ID: id.New(), Type: "task.delete", Args: raw, Approval: ask.Ref}); err == nil || !strings.Contains(err.Error(), "already used") {
+			t.Fatalf("an approval was used twice: %v", err)
 		}
 
 		// A read-only credential cannot write.

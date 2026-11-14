@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"net/url"
 	"strings"
 
@@ -539,8 +540,11 @@ type decisionOpenArgs struct {
 	// Ask is who should answer. The task then waits on them. An agent that
 	// names nobody asks the person responsible for it.
 	Ask string `json:"ask"`
-	// Action, on an approval, is the change type the asker wants to make.
-	Action string `json:"action"`
+	// Action, on an approval, is the change type the asker wants to make,
+	// and Args the arguments it will be sent with. The approval then covers
+	// exactly that change, once.
+	Action string          `json:"action"`
+	Args   json.RawMessage `json:"args"`
 }
 
 func (c *cx) loadOptions(d *core.Decision) error {
@@ -583,6 +587,12 @@ func decisionOpen(c *cx) error {
 			if _, ok := handlers[a.Action]; !ok {
 				return oneOf("action", "change type", a.Action, ChangeTypes())
 			}
+			var args map[string]any
+			if len(a.Args) == 0 || json.Unmarshal(a.Args, &args) != nil || len(args) == 0 {
+				return invalid("args", "say what exactly is to be approved: args are the arguments %s will be sent with, e.g. {\"id\": \"SVA-12\"}. The approval covers that change and no other", a.Action)
+			}
+		} else if len(a.Args) > 0 {
+			return invalid("args", "args go with an action")
 		}
 	default:
 		return oneOf("kind", "kind", kind, []string{core.DecisionChoice, core.DecisionApproval})
@@ -604,7 +614,7 @@ func decisionOpen(c *cx) error {
 	}
 
 	d := core.Decision{ID: did, WorkspaceID: c.ws, TaskID: t.ID, Kind: kind, Question: strings.TrimSpace(a.Question), Details: a.Details,
-		Action: a.Action, State: core.StateOpen, AskedID: asked, Recommendation: a.Recommendation,
+		Action: a.Action, ActionArgs: a.Args, State: core.StateOpen, AskedID: asked, Recommendation: a.Recommendation,
 		CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 	seen := map[string]bool{}
 	for i, o := range a.Options {

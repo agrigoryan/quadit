@@ -475,12 +475,44 @@ func (s *Server) hTokenCreate(x *c) error {
 		if m.Kind != core.KindAgent {
 			return errForbidden("a person's tokens are made by that person")
 		}
+		// An agent hands out no more than it has itself: not a higher role,
+		// not projects beyond its own.
+		if x.member.Kind == core.KindAgent {
+			if m.Role != x.member.Role && m.Role.AtLeast(x.member.Role) {
+				return errForbidden("an agent cannot make a token for an agent with a higher role than its own")
+			}
+			if mine := x.member.Scope; mine != nil {
+				theirs := m.Scope
+				if theirs == nil {
+					theirs = &core.Scope{}
+				}
+				if mine.ReadOnly && !theirs.ReadOnly {
+					return errForbidden("an agent that may only read cannot make a token for one that may write")
+				}
+				if len(mine.Projects) > 0 {
+					if len(theirs.Projects) == 0 {
+						return errForbidden("@%s works in every project and you do not; you cannot make a token for it", m.Handle)
+					}
+					for _, p := range theirs.Projects {
+						if !has(mine.Projects, p) {
+							return errForbidden("@%s works in projects you do not; you cannot make a token for it", m.Handle)
+						}
+					}
+				}
+			}
+		}
 	} else if x.member.Kind == core.KindAgent && x.token != nil {
 		return errForbidden("an agent cannot issue itself more tokens; ask an admin")
 	}
 	var scopes []string
-	if b.ReadOnly {
+	if b.ReadOnly || x.actor.ReadOnly {
 		scopes = append(scopes, "read")
+	}
+	// A token made with a token limited to some projects keeps that limit.
+	if len(b.Projects) == 0 && x.token != nil {
+		for _, p := range x.actor.Projects {
+			scopes = append(scopes, "project:"+p)
+		}
 	}
 	if b.Secrets {
 		if err := x.admin(); err != nil {
@@ -495,6 +527,9 @@ func (s *Server) hTokenCreate(x *c) error {
 		p, err := rs.Project(ref)
 		if err != nil {
 			return err
+		}
+		if x.token != nil && len(x.actor.Projects) > 0 && !has(x.actor.Projects, p.ID) {
+			return errForbidden("this token does not reach project %s, so it cannot make one that does", p.Key)
 		}
 		scopes = append(scopes, "project:"+p.ID)
 	}

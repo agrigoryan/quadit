@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -470,7 +471,7 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 func (c *cx) checkApproval() error {
 	need := &Error{Code: CodeNeedsApproval, Message: fmt.Sprintf(
 		`%s needs approval. Open one with decision.open {"kind": "approval", "action": %q, "task": …, "question": …, "ask": …}, `+
-			`wait for the answer, then resend this change with "approval": "<decision id>"`, c.change.Type, c.change.Type)}
+			`with "args" set to this change's arguments, wait for the answer, then resend this same change with "approval": "<decision id>"`, c.change.Type, c.change.Type)}
 	if c.change.Approval == "" {
 		return need
 	}
@@ -487,10 +488,26 @@ func (c *cx) checkApproval() error {
 		need.Message = "that approval has not been answered yet"
 	case d.Outcome != core.OutcomeApproved:
 		need.Code, need.Message = CodeForbidden, "that approval was declined"
+	case d.ActionUsedAt != 0:
+		need.Message = "that approval was already used; an approval covers one change, once. Ask again for this one"
+	case !sameArgs(d.ActionArgs, c.change.Args):
+		need.Message = "that approval was given for different arguments (" + string(d.ActionArgs) + "); it covers that change and no other. Ask again for this one"
 	default:
-		return nil
+		// Used up, in the same write as the change it allows.
+		_, err := c.tx.Update(c.ctx, "decisions", map[string]any{"action_used_at": c.at}, store.Eq("id", d.ID))
+		return err
 	}
 	return need
+}
+
+// sameArgs reports whether two sets of change arguments say the same thing,
+// whatever their spacing or key order.
+func sameArgs(a, b json.RawMessage) bool {
+	var x, y any
+	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
+		return false
+	}
+	return reflect.DeepEqual(x, y)
 }
 
 func argsHash(ch Change) string {

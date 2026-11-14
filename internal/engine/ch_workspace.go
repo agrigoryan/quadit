@@ -227,6 +227,8 @@ type memberAddArgs struct {
 	Handle string `json:"handle"`
 	Role   string `json:"role"`
 	Title  string `json:"title"`
+	// Scope limits the person to some projects, or to reading.
+	Scope *scopeArgs `json:"scope"`
 }
 
 func (c *cx) roleArg(s string, agent bool) (core.Role, error) {
@@ -293,8 +295,15 @@ func memberAdd(c *cx) error {
 			return err
 		}
 	}
+	scope, err := c.scopeArg(a.Scope)
+	if err != nil {
+		return err
+	}
+	if scope != nil && len(scope.Projects) == 0 && !scope.ReadOnly {
+		scope = nil
+	}
 	return c.addMember(core.Member{WorkspaceID: c.ws, UserID: u.ID, Role: role, Handle: handle, Kind: u.Kind, Name: u.Name,
-		Avatar: u.Avatar, Title: a.Title, CreatedAt: c.at})
+		Avatar: u.Avatar, Title: a.Title, Scope: c.capScope(scope), CreatedAt: c.at})
 }
 
 func (c *cx) addMember(m core.Member) error {
@@ -315,6 +324,9 @@ type memberUpdateArgs struct {
 	Handle    Opt[string] `json:"handle"`
 	Title     Opt[string] `json:"title"`
 	Suspended Opt[bool]   `json:"suspended"`
+	// Scope limits a person to some projects, or to reading; null lifts
+	// it. (An agent's limits are set with agent.update.)
+	Scope Opt[scopeArgs] `json:"scope"`
 }
 
 // guardMember refuses changes to members the actor may not manage.
@@ -365,11 +377,40 @@ func memberUpdate(c *cx) error {
 	if err := c.guardMember(m); err != nil {
 		return err
 	}
+	if !c.system && c.actor.Kind == core.KindAgent && m.UserID == c.actor.UserID && (a.Role.Set || a.Suspended.Set || a.Scope.Set) {
+		return forbidden("an agent cannot change its own role or limits; the person responsible for it can")
+	}
 	p := newPatch()
+	if a.Scope.Set {
+		if m.Kind == core.KindAgent {
+			return invalid("scope", "an agent's limits are set with agent.update")
+		}
+		if m.Role == core.RoleOwner && !a.Scope.Null {
+			return invalid("scope", "an owner sees the whole workspace; change their role first")
+		}
+		var sc *core.Scope
+		if !a.Scope.Null {
+			if sc, err = c.scopeArg(&a.Scope.V); err != nil {
+				return err
+			}
+			if len(sc.NeedsApproval) > 0 {
+				return invalid("scope.needs_approval", "approvals are for agents; a person's scope is projects and read-only")
+			}
+			if len(sc.Projects) == 0 && !sc.ReadOnly {
+				sc = nil
+			}
+		}
+		sc = c.capScope(sc)
+		p.set["scope"] = sc
+		p.changes["scope"] = core.FieldChange{From: m.Scope, To: sc}
+	}
 	if a.Role.Set && core.Role(a.Role.V) != m.Role {
 		role, err := c.roleArg(a.Role.V, m.Kind == core.KindAgent)
 		if err != nil {
 			return err
+		}
+		if !c.system && c.actor.Kind == core.KindAgent && role.AtLeast(c.actor.Role) && role != c.actor.Role {
+			return forbidden("an agent cannot give a role above its own")
 		}
 		if last, err := c.lastOwner(m); err != nil {
 			return err
@@ -538,21 +579,7 @@ func agentCreate(c *cx) error {
 	if err != nil {
 		return err
 	}
-	// An agent made by an agent never reaches further than its maker.
-	if c.actor.Kind == core.KindAgent && c.actor.Scope != nil {
-		if scope == nil {
-			scope = &core.Scope{}
-		}
-		if len(c.actor.Scope.Projects) > 0 {
-			scope.Projects = narrow(c.actor.Scope.Projects, orAll(scope.Projects, c.actor.Scope.Projects))
-		}
-		scope.ReadOnly = scope.ReadOnly || c.actor.Scope.ReadOnly
-		for _, t := range c.actor.Scope.NeedsApproval {
-			if !contains(scope.NeedsApproval, t) {
-				scope.NeedsApproval = append(scope.NeedsApproval, t)
-			}
-		}
-	}
+	scope = c.capScope(scope)
 	u := core.User{ID: uid, Kind: core.KindAgent, Name: name, Description: a.Description, Avatar: a.Avatar, WorkspaceID: c.ws,
 		ResponsibleID: rm.UserID, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, u); err != nil {
@@ -560,6 +587,29 @@ func agentCreate(c *cx) error {
 	}
 	return c.addMember(core.Member{WorkspaceID: c.ws, UserID: uid, Role: role, Handle: handle, Kind: u.Kind, Name: u.Name,
 		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at, ResponsibleID: rm.UserID})
+}
+
+// capScope holds a scope an agent hands out to the agent's own: an agent
+// made or changed by an agent never reaches further than its maker. What a
+// person sets is taken as given.
+func (c *cx) capScope(scope *core.Scope) *core.Scope {
+	if c.system || c.actor.Kind != core.KindAgent || c.actor.Scope == nil {
+		return scope
+	}
+	if scope == nil {
+		scope = &core.Scope{}
+	}
+	mine := c.actor.Scope
+	if len(mine.Projects) > 0 {
+		scope.Projects = narrow(mine.Projects, orAll(scope.Projects, mine.Projects))
+	}
+	scope.ReadOnly = scope.ReadOnly || mine.ReadOnly
+	for _, t := range mine.NeedsApproval {
+		if !contains(scope.NeedsApproval, t) {
+			scope.NeedsApproval = append(scope.NeedsApproval, t)
+		}
+	}
+	return scope
 }
 
 func orAll(list, all []string) []string {
@@ -618,6 +668,9 @@ func agentUpdate(c *cx) error {
 		userSet["responsible_id"] = rm.UserID
 		p.changes["responsible_id"] = core.FieldChange{To: rm.UserID}
 	}
+	if !c.system && c.actor.Kind == core.KindAgent && m.UserID == c.actor.UserID && (a.Scope.Set || a.Budget.Set) {
+		return forbidden("an agent cannot change its own role, limits or budget; the person responsible for it can")
+	}
 	if a.Scope.Set {
 		var sc *core.Scope
 		if !a.Scope.Null {
@@ -625,6 +678,7 @@ func agentUpdate(c *cx) error {
 				return err
 			}
 		}
+		sc = c.capScope(sc)
 		p.set["scope"] = sc
 		p.changes["scope"] = core.FieldChange{From: m.Scope, To: sc}
 	}

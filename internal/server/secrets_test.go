@@ -132,3 +132,65 @@ func TestVault(t *testing.T) {
 		s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/deploy"}, 404, nil)
 	})
 }
+
+// TestAgentsCannotWidenThemselves checks that an agent with limits cannot
+// lift them, hand out more than it has, or point a cursor past the feed.
+func TestAgentsCannotWidenThemselves(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
+		s.change(s.owner, "", "agent.create", M{"name": "Lead", "handle": "lead", "role": "admin", "scope": M{"projects": []string{"SVA"}, "needs_approval": []string{"project.delete"}}})
+		s.change(s.owner, "", "agent.create", M{"name": "Wide", "handle": "wide", "role": "admin"})
+		s.change(s.owner, "", "agent.create", M{"name": "Narrow", "handle": "narrow", "scope": M{"projects": []string{"SVA"}}})
+		var lead struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@lead"}, 201, &lead)
+		try := func(typ string, args M, want int) string {
+			return s.call(nil, lead.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
+		}
+		// It cannot lift its own limits, by either door.
+		try("agent.update", M{"id": "@lead", "scope": nil}, 403)
+		try("agent.update", M{"id": "@lead", "scope": M{"projects": []string{"SVA", "OPS"}}}, 403)
+		try("agent.update", M{"id": "@lead", "budget": M{"cost_micros": 999_000_000}}, 403)
+		try("member.update", M{"id": "@lead", "role": "owner"}, 403)
+		s.call(nil, lead.Token, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
+		// What it gives another agent is held to its own: asking for every
+		// project gives its one project, with its approvals.
+		try("agent.update", M{"id": "@narrow", "scope": nil}, 200)
+		var list struct {
+			Members []struct {
+				Handle string
+				Scope  *struct {
+					Projects      []string
+					NeedsApproval []string `json:"needs_approval"`
+				}
+			}
+		}
+		s.call(s.owner, "", "GET", w+"/list/members", nil, 200, &list)
+		for _, m := range list.Members {
+			if m.Handle == "narrow" && (m.Scope == nil || len(m.Scope.Projects) != 1 || len(m.Scope.NeedsApproval) != 1) {
+				t.Fatalf("a limited agent lifted another agent's limits: %+v", m.Scope)
+			}
+		}
+		// It cannot borrow a wider agent's access with a token.
+		s.call(nil, lead.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@wide"}, 403, nil)
+		s.call(nil, lead.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@narrow"}, 201, nil)
+		// A cursor cannot be put past the end of the feed.
+		s.call(nil, lead.Token, "PUT", "/api/v1/w/-/cursors/main", M{"seq": 999999}, 400, nil)
+		s.call(nil, lead.Token, "PUT", "/api/v1/w/-/cursors/main", M{"seq": 3}, 200, nil)
+
+		// A person can be limited to some projects too.
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
+		mia := browser()
+		s.call(mia, "", "POST", "/api/v1/auth/register", M{"name": "Mia", "email": "mia@example.com", "password": "another-long-password"}, 201, nil)
+		s.change(s.owner, "", "member.add", M{"user": "mia@example.com", "scope": M{"projects": []string{"SVA"}}})
+		s.call(mia, "", "GET", w+"/tasks/OPS-1", nil, 404, nil)
+		if out := s.call(mia, "", "GET", w+"/bootstrap", nil, 200, nil); strings.Contains(out, "Rotate the keys") || strings.Contains(out, `"key":"OPS"`) {
+			t.Fatal("a person limited to one project was sent another's")
+		}
+		s.call(mia, "", "POST", w+"/changes", M{"id": id.New(), "type": "task.create", "args": M{"project": "OPS", "title": "no"}}, 403, nil)
+		s.change(s.owner, "", "member.update", M{"id": "@mia", "scope": nil})
+		s.call(mia, "", "GET", w+"/tasks/OPS-1", nil, 200, nil)
+	})
+}

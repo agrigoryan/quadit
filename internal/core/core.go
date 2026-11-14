@@ -312,31 +312,35 @@ const (
 
 // Decision is a question inside a task, its options and its answer.
 type Decision struct {
-	ID                  string   `json:"id" db:"id"`
-	WorkspaceID         string   `json:"-" db:"workspace_id"`
-	TaskID              string   `json:"task_id" db:"task_id"`
-	Kind                string   `json:"kind" db:"kind"`
-	Question            string   `json:"question" db:"question"`
-	Details             string   `json:"details,omitempty" db:"details"`
-	Action              string   `json:"action,omitempty" db:"action"`
-	State               string   `json:"state" db:"state"`
-	AskedID             string   `json:"asked_id,omitempty" db:"asked_id,null"`
-	UnclearNote         string   `json:"unclear_note,omitempty" db:"unclear_note"`
-	RecommendedOptionID string   `json:"recommended_option_id,omitempty" db:"recommended_option_id,null"`
-	Recommendation      string   `json:"recommendation,omitempty" db:"recommendation"`
-	PickedOptionID      string   `json:"picked_option_id,omitempty" db:"picked_option_id,null"`
-	Outcome             string   `json:"outcome,omitempty" db:"outcome,null"`
-	OutcomeNote         string   `json:"outcome_note,omitempty" db:"outcome_note"`
-	DecidedBy           string   `json:"decided_by,omitempty" db:"decided_by,null"`
-	DecidedAt           int64    `json:"decided_at,omitempty" db:"decided_at,null"`
-	Rank                string   `json:"rank" db:"rank"`
-	CreatedBy           string   `json:"created_by" db:"created_by"`
-	CreatedAt           int64    `json:"created_at" db:"created_at"`
-	UpdatedAt           int64    `json:"updated_at" db:"updated_at"`
-	CreatedSeq          int64    `json:"-" db:"created_seq"`
-	UpdatedSeq          int64    `json:"updated_seq" db:"updated_seq"`
-	DeletedAt           int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`
-	Options             []Option `json:"options,omitempty"`
+	ID          string `json:"id" db:"id"`
+	WorkspaceID string `json:"-" db:"workspace_id"`
+	TaskID      string `json:"task_id" db:"task_id"`
+	Kind        string `json:"kind" db:"kind"`
+	Question    string `json:"question" db:"question"`
+	Details     string `json:"details,omitempty" db:"details"`
+	Action      string `json:"action,omitempty" db:"action"`
+	// ActionArgs are the arguments of the change an approval is for; the
+	// approval covers that change and no other. ActionUsedAt is when it ran.
+	ActionArgs          json.RawMessage `json:"action_args,omitempty" db:"action_args,json"`
+	ActionUsedAt        int64           `json:"action_used_at,omitempty" db:"action_used_at,null"`
+	State               string          `json:"state" db:"state"`
+	AskedID             string          `json:"asked_id,omitempty" db:"asked_id,null"`
+	UnclearNote         string          `json:"unclear_note,omitempty" db:"unclear_note"`
+	RecommendedOptionID string          `json:"recommended_option_id,omitempty" db:"recommended_option_id,null"`
+	Recommendation      string          `json:"recommendation,omitempty" db:"recommendation"`
+	PickedOptionID      string          `json:"picked_option_id,omitempty" db:"picked_option_id,null"`
+	Outcome             string          `json:"outcome,omitempty" db:"outcome,null"`
+	OutcomeNote         string          `json:"outcome_note,omitempty" db:"outcome_note"`
+	DecidedBy           string          `json:"decided_by,omitempty" db:"decided_by,null"`
+	DecidedAt           int64           `json:"decided_at,omitempty" db:"decided_at,null"`
+	Rank                string          `json:"rank" db:"rank"`
+	CreatedBy           string          `json:"created_by" db:"created_by"`
+	CreatedAt           int64           `json:"created_at" db:"created_at"`
+	UpdatedAt           int64           `json:"updated_at" db:"updated_at"`
+	CreatedSeq          int64           `json:"-" db:"created_seq"`
+	UpdatedSeq          int64           `json:"updated_seq" db:"updated_seq"`
+	DeletedAt           int64           `json:"deleted_at,omitempty" db:"deleted_at,null"`
+	Options             []Option        `json:"options,omitempty"`
 }
 
 type Option struct {
