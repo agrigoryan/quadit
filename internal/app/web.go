@@ -26,6 +26,11 @@ func init() {
 			if _, err := fs.Stat(dist, name); err != nil || name == "index.html" {
 				// Not a file: a page of the app. The app's own router shows it.
 				w.Header().Set("Cache-Control", "no-cache")
+				// The app runs only its own code and talks only to its own
+				// server; pictures in Markdown may come from elsewhere.
+				w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
+					"img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self'; "+
+					"worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 				http.ServeFileFS(w, r, dist, "index.html")
 				return
 			}
