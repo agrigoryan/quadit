@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/agrigoryan/quadit/internal/importer"
 )
 
 const help = `quadit: tasks, decisions and docs for people and agents
@@ -66,6 +68,12 @@ act
   row DATABASE TITLE [Prop=value ...]                         add a row to a database
   read [all | ID ...]          mark inbox items read
   do TYPE JSON                 send any change
+
+bring work in (safe to run twice: nothing is added a second time)
+  import linear FILE.csv project=KEY       import trello BOARD.json project=KEY
+  import asana FILE.csv project=KEY        import github OWNER/REPO project=KEY [token=…]
+  import notion EXPORT.zip                 import obsidian FOLDER     import markdown FOLDER
+  import orbit https://orbit.example workspace=ID token=ORBIT_TOKEN
 
 every command takes --json for full data and --dry-run to check a write.
 connection: QUADIT_URL and QUADIT_TOKEN, or quadit login.
@@ -527,6 +535,25 @@ func (r *runner) run(cmd string, rest []string) error {
 			fmt.Fprintln(r.out, furl)
 		}
 		return nil
+	case "import":
+		if err := need(pos, 2, "import KIND SOURCE [project=KEY]"); err != nil {
+			return err
+		}
+		opts := map[string]string{}
+		for k, v := range f {
+			opts[k] = v[len(v)-1]
+		}
+		plan, err := importer.Read(pos[0], pos[1], opts)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(r.out, "read %d tasks, %d pages, %d databases from %s\n", len(plan.Tasks), len(plan.Docs), len(plan.Tables), pos[0])
+		if r.dry {
+			return nil
+		}
+		sum, err := importer.Apply(clientSink{r}, plan, opts["project"])
+		fmt.Fprintln(r.out, sum)
+		return err
 	case "link":
 		return r.link(pos, approval)
 	case "render":
@@ -727,3 +754,21 @@ func (r *runner) link(pos []string, approval string) error {
 		"data": map[string]any{"commits": commits, "ahead": len(commits), "base": base}}, approval)
 	return err
 }
+
+// clientSink lets an import write through the API as the caller.
+type clientSink struct{ r *runner }
+
+func (s clientSink) Change(changeID, typ string, args any) error {
+	raw, _ := json.Marshal(map[string]any{"id": changeID, "type": typ, "args": args})
+	_, err := s.r.c.do("POST", "/changes", nil, bytes.NewReader(raw), "application/json", "application/json")
+	return err
+}
+
+func (s clientSink) Get(path string, q url.Values) ([]byte, error) { return s.r.c.JSON(path, q) }
+
+func (s clientSink) Upload(path string) (string, error) {
+	_, u, err := s.r.c.Upload(path)
+	return u, err
+}
+
+func (s clientSink) Logf(format string, a ...any) { fmt.Fprintf(s.r.out, format+"\n", a...) }
