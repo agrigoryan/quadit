@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // Run does the server's background work until ctx ends: rolling cycles
@@ -61,5 +63,46 @@ func init() {
 			s.log.Info("moved files to the cloud store", "files", n)
 		}
 		return err
+	}
+}
+
+func init() {
+	runners = append(runners, (*Server).hearOtherServers, (*Server).shareRateCounts)
+}
+
+// hearOtherServers wakes this server's waiters when a write was made
+// through another server sharing the database. Live connections are fed
+// from the feed, not from the process that took the write.
+func (s *Server) hearOtherServers(ctx context.Context) {
+	l, ok := s.st.(store.Listener)
+	if !ok {
+		return
+	}
+	for ctx.Err() == nil {
+		err := l.Listen(ctx, s.hub.Notify)
+		if errors.Is(err, store.ErrNoListen) || ctx.Err() != nil {
+			return
+		}
+		s.log.Warn("lost the connection that hears other servers; connecting again", "err", err)
+		select {
+		case <-ctx.Done():
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+// shareRateCounts adds this server's request counts to the database every
+// couple of seconds and reads back the totals, so a caller's limit holds
+// across all the servers they reach.
+func (s *Server) shareRateCounts(ctx context.Context) {
+	tick := time.NewTicker(2 * time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			s.limits.share(ctx, s.st)
+		}
 	}
 }

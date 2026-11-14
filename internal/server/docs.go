@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -205,21 +204,6 @@ func (s *Server) hDocVersion(x *c) error {
 	return x.ok(map[string]any{"version": v, "blocks": tree, "markdown": md.Render(tree)})
 }
 
-// presence is who has a page open and which block they are in. It is kept
-// in memory: it is only worth knowing for a few seconds.
-type presence struct {
-	mu   sync.Mutex
-	docs map[string]map[string]presenceEntry // doc id -> user id
-}
-
-type presenceEntry struct {
-	UserID string `json:"user_id"`
-	Block  string `json:"block,omitempty"`
-	At     int64  `json:"at"`
-}
-
-var pagePresence = presence{docs: map[string]map[string]presenceEntry{}}
-
 // hDocPresence says "I am here, in this block" and returns who else is. A
 // client calls it every few seconds while a page is open.
 func (s *Server) hDocPresence(x *c) error {
@@ -234,29 +218,23 @@ func (s *Server) hDocPresence(x *c) error {
 	if err != nil {
 		return err
 	}
+	// Presence is kept in the database, so every server shows the same
+	// people. A row is worth knowing for a few seconds only.
 	now := time.Now().UnixMilli()
-	pagePresence.mu.Lock()
-	defer pagePresence.mu.Unlock()
-	here := pagePresence.docs[d.ID]
-	if here == nil {
-		here = map[string]presenceEntry{}
-		pagePresence.docs[d.ID] = here
-	}
+	ctx := x.ctx()
 	if b.Leave {
-		delete(here, x.member.UserID)
-	} else {
-		here[x.member.UserID] = presenceEntry{UserID: x.member.UserID, Block: b.Block, At: now}
+		x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Eq("user_id", x.member.UserID))
+	} else if err := x.db.Upsert(ctx, core.Presence{WorkspaceID: x.ws.ID, DocID: d.ID, UserID: x.member.UserID, Block: b.Block, At: now}, "doc_id", "user_id"); err != nil {
+		return err
 	}
-	others := []presenceEntry{}
-	for uid, e := range here {
-		if now-e.At > 15_000 {
-			delete(here, uid)
-		} else if uid != x.member.UserID {
-			others = append(others, e)
-		}
+	x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Lt("at", now-15_000))
+	var here []core.Presence
+	if err := x.db.List(ctx, &here, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Ne("user_id", x.member.UserID)}, Order: "user_id"}); err != nil {
+		return err
 	}
-	if len(here) == 0 {
-		delete(pagePresence.docs, d.ID)
+	others := here
+	if others == nil {
+		others = []core.Presence{}
 	}
 	return x.ok(map[string]any{"others": others})
 }

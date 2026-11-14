@@ -3,12 +3,19 @@ package server_test
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/auth"
+	"github.com/agrigoryan/quadit/internal/blob"
+	"github.com/agrigoryan/quadit/internal/server"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -198,4 +205,67 @@ func TestCompression(t *testing.T) {
 	if out := s.call(nil, tok.Token, "GET", "/api/v1/w/-/tasks?format=text", nil, 200, nil); !strings.Contains(out, "SVA-40") {
 		t.Fatalf("a normal client could not read a compressed answer: %.80s", out)
 	}
+}
+
+// TestTwoServersOneDatabase runs two servers on one Postgres database: a
+// write taken by one wakes a stream held by the other at once, people on a
+// page see each other across servers, an upload sent in parts to different
+// servers comes together, and a caller's request count is shared.
+func TestTwoServersOneDatabase(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		if st.Dialect() != "postgres" {
+			t.Skip("several servers need Postgres")
+		}
+		a := newSite(t, st)
+		// The second server: its own process state, the same database and files.
+		files, _ := blob.NewDisk(a.dir + "/files")
+		sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
+		hs := httptest.NewUnstartedServer(nil)
+		srvB := server.New(server.Config{DataDir: t.TempDir(), BaseURL: a.url, Version: "test"}, st, files, sealer)
+		hs.Config.Handler = srvB.Handler()
+		hs.Start()
+		ctx, stop := context.WithCancel(context.Background())
+		go srvB.Run(ctx)
+		t.Cleanup(func() { stop(); hs.Close() })
+		b := &site{t: t, url: hs.URL, owner: a.owner, srv: srvB}
+
+		a.change(a.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		a.change(a.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		a.change(a.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		var tok struct{ Token string }
+		a.call(a.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+		time.Sleep(500 * time.Millisecond) // let the second server start listening
+
+		// A stream held by B hears a write taken by A well inside the 25
+		// seconds its own heartbeat would take.
+		sm := b.stream(t, tok.Token)
+		time.Sleep(300 * time.Millisecond)
+		start := time.Now()
+		a.change(a.owner, "", "comment.create", M{"task": "SVA-1", "body": "said through the other server"})
+		eventually(t, "the other server's stream to carry the comment", func() bool { return strings.Contains(sm.all(), "said through the other server") })
+		if took := time.Since(start); took > 3*time.Second {
+			t.Fatalf("the other server heard of the write after %s", took)
+		}
+
+		// Presence: one on A, one on B, on the same page.
+		page := a.change(a.owner, "", "doc.create", M{"title": "Plan", "markdown": "one\n"})["ref"].(string)
+		a.call(a.owner, "", "POST", w+"/docs/"+page+"/presence", M{"block": "b1"}, 200, nil)
+		if out := b.call(nil, tok.Token, "POST", "/api/v1/w/-/docs/"+page+"/presence", M{"block": "b2"}, 200, nil); !strings.Contains(out, `"block":"b1"`) {
+			t.Fatalf("someone on the other server is not seen on the page: %s", out)
+		}
+
+		// An upload whose parts go to different servers.
+		data := []byte(strings.Repeat("0123456789", 800))
+		var f struct {
+			ID, State, SHA256 string
+			Received          int
+		}
+		a.call(nil, tok.Token, "POST", fmt.Sprintf("/api/v1/w/-/files?name=clip.bin&size=%d", len(data)), data[:3000], 201, &f)
+		b.call(nil, tok.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=3000", data[3000:6000], 200, &f)
+		a.call(nil, tok.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=6000", data[6000:], 200, &f)
+		sum := sha256.Sum256(data)
+		if f.State != "ready" || f.SHA256 != hex.EncodeToString(sum[:]) {
+			t.Fatalf("an upload sent to two servers: %+v", f)
+		}
+	})
 }

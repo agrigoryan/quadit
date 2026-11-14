@@ -122,3 +122,15 @@ CREATE TABLE doc_sources (
     updated_seq   {{BIGINT}} NOT NULL,
     deleted_at    {{TS}}
 );
+
+-- Who has a page open and which block they are in. Rows live for seconds:
+-- each is renewed while its page stays open, and dropped when it goes stale.
+-- It is a table, not memory, so several servers show the same people.
+CREATE TABLE doc_presence (
+    workspace_id  {{ID}} NOT NULL REFERENCES workspaces (id),
+    doc_id        {{ID}} NOT NULL,
+    user_id       {{ID}} NOT NULL,
+    block         TEXT NOT NULL DEFAULT '',
+    at            {{TS}} NOT NULL,
+    PRIMARY KEY (doc_id, user_id)
+);

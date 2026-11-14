@@ -26,6 +26,7 @@ import (
 type site struct {
 	t     *testing.T
 	url   string
+	dir   string
 	owner *http.Client
 	srv   *server.Server
 }
@@ -48,7 +49,7 @@ func newSite(t *testing.T, st store.Store) *site {
 	go srv.Run(ctx)
 	t.Cleanup(func() { stop(); hs.Close() })
 	jar, _ := cookiejar.New(nil)
-	s := &site{t: t, url: base, owner: &http.Client{Jar: jar}, srv: srv}
+	s := &site{t: t, url: base, dir: dir, owner: &http.Client{Jar: jar}, srv: srv}
 	s.call(s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
 		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
 	return s

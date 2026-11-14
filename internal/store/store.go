@@ -21,6 +21,15 @@ var ErrNotFound = errors.New("not found")
 // second project with the same key.
 var ErrConflict = errors.New("conflict")
 
+// ErrNoListen is returned by Listen on a database that only one server can
+// use at a time, where there is nobody else to hear from.
+var ErrNoListen = errors.New("this database does not carry news between servers")
+
+// Listener is a store that hears of writes made through other servers.
+type Listener interface {
+	Listen(ctx context.Context, each func(workspaceID string, seq int64)) error
+}
+
 // Cond is one condition on a column. Conditions combine with AND.
 type Cond struct {
 	Col string

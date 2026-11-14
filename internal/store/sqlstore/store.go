@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -22,6 +23,9 @@ type Store struct {
 	d    Dialect
 	// writer queues write transactions on a single-writer database.
 	writer sync.Mutex
+	// listen hears of writes made through other servers; nil when the
+	// database cannot tell.
+	listen func(ctx context.Context, each func(workspaceID string, seq int64)) error
 }
 
 var _ store.Store = (*Store)(nil)
@@ -51,6 +55,25 @@ type querier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// FeedChannel is the Postgres notification channel on which a write says
+// "this workspace's feed is now at N".
+const FeedChannel = "quadit_feed"
+
+// Listen calls each with every workspace whose feed moved, on whichever
+// server the write happened, until ctx ends. Only a database that can tell
+// other servers has one; the Postgres opener sets it.
+func (s *Store) Listen(ctx context.Context, each func(workspaceID string, seq int64)) error {
+	if s.listen == nil {
+		return store.ErrNoListen
+	}
+	return s.listen(ctx, each)
+}
+
+// SetListen gives the store its way to hear of other servers' writes.
+func (s *Store) SetListen(fn func(ctx context.Context, each func(workspaceID string, seq int64)) error) {
+	s.listen = fn
 }
 
 // q runs rebound queries against a database or a transaction.
@@ -137,7 +160,14 @@ func (s *Store) Write(ctx context.Context, workspaceID string, fn func(store.Tx)
 		if t.seq == seq {
 			return nil
 		}
-		_, err = x.exec(ctx, `UPDATE workspaces SET seq = ?, updated_at = ? WHERE id = ?`, t.seq, time.Now().UnixMilli(), workspaceID)
+		if _, err = x.exec(ctx, `UPDATE workspaces SET seq = ?, updated_at = ? WHERE id = ?`, t.seq, time.Now().UnixMilli(), workspaceID); err != nil {
+			return err
+		}
+		if s.d.Name == "postgres" {
+			// Tell every server sharing this database that the feed moved.
+			// The database delivers it when, and only if, this write commits.
+			_, err = x.exec(ctx, `SELECT pg_notify('`+FeedChannel+`', ?)`, workspaceID+":"+strconv.FormatInt(t.seq, 10))
+		}
 		return err
 	})
 }

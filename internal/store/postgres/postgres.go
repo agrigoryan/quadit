@@ -6,6 +6,10 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+
+	"github.com/jackc/pgx/v5"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 
@@ -32,5 +36,33 @@ func Open(ctx context.Context, url string) (*sqlstore.Store, error) {
 		db.Close()
 		return nil, err
 	}
+	s.SetListen(func(ctx context.Context, each func(workspaceID string, seq int64)) error {
+		return listen(ctx, url, each)
+	})
 	return s, nil
+}
+
+// listen holds one connection that hears every server's "the feed moved",
+// and passes each on. It returns when the connection breaks or ctx ends;
+// the caller connects again.
+func listen(ctx context.Context, url string, each func(workspaceID string, seq int64)) error {
+	c, err := pgx.Connect(ctx, url)
+	if err != nil {
+		return err
+	}
+	defer c.Close(context.Background())
+	if _, err := c.Exec(ctx, "LISTEN "+sqlstore.FeedChannel); err != nil {
+		return err
+	}
+	for {
+		n, err := c.WaitForNotification(ctx)
+		if err != nil {
+			return err
+		}
+		if ws, seq, ok := strings.Cut(n.Payload, ":"); ok {
+			if v, err := strconv.ParseInt(seq, 10, 64); err == nil {
+				each(ws, v)
+			}
+		}
+	}
 }

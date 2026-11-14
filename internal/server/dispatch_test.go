@@ -121,9 +121,7 @@ func TestWakeUps(t *testing.T) {
 	if strings.Contains(mine.types(), "task.") {
 		t.Fatalf("inbox webhook got public events: %s", mine.types())
 	}
-	mine.mu.Lock()
 	text := mine.last()["text"].(string)
-	mine.mu.Unlock()
 	if !strings.Contains(text, "picked") || !strings.Contains(text, "SVA-1") {
 		t.Fatalf("delivery text = %q", text)
 	}

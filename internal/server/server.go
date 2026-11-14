@@ -589,12 +589,53 @@ func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 type limiter struct {
 	mu     sync.Mutex
 	window int64
+	// hits are the requests counted here since the last time they were
+	// added to the database; shared are the totals read back from it, which
+	// include every server's.
 	hits   map[string]int
+	shared map[string]int
 	// PerMinute scales every limit; the admin area sets it.
 	factor float64
 }
 
-func newLimiter() *limiter { return &limiter{hits: map[string]int{}, factor: 1} }
+func newLimiter() *limiter {
+	return &limiter{hits: map[string]int{}, shared: map[string]int{}, factor: 1}
+}
+
+// share adds what was counted here to the database's counters and takes
+// the totals back.
+func (l *limiter) share(ctx context.Context, st store.Store) {
+	l.mu.Lock()
+	window, mine := l.window, l.hits
+	l.hits = map[string]int{}
+	l.mu.Unlock()
+	totals := map[string]int{}
+	for key, n := range mine {
+		name := "api:" + key
+		total, err := st.Incr(ctx, "rate_counters", "hits", int64(n), store.Eq("name", name), store.Eq("bucket", window))
+		if errors.Is(err, store.ErrNotFound) {
+			if err = st.Insert(ctx, core.RateCounter{Name: name, Bucket: window, Hits: n}); err == nil {
+				total = int64(n)
+			} else if errors.Is(err, store.ErrConflict) {
+				total, err = st.Incr(ctx, "rate_counters", "hits", int64(n), store.Eq("name", name), store.Eq("bucket", window))
+			}
+		}
+		if err != nil {
+			total = int64(n) // the database is unwell: count what is known here
+		}
+		totals[key] = int(total)
+	}
+	if len(mine) > 0 {
+		st.Delete(ctx, "rate_counters", store.Like("name", "api:%"), store.Lt("bucket", window-1))
+	}
+	l.mu.Lock()
+	if l.window == window {
+		for key, total := range totals {
+			l.shared[key] = total
+		}
+	}
+	l.mu.Unlock()
+}
 
 // check counts one request and refuses it when the caller is over max per
 // minute, saying how long to wait.
@@ -603,10 +644,10 @@ func (l *limiter) check(key string, max int) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if w := now / 60; w != l.window {
-		l.window, l.hits = w, map[string]int{}
+		l.window, l.hits, l.shared = w, map[string]int{}, map[string]int{}
 	}
 	l.hits[key]++
-	if float64(l.hits[key]) > float64(max)*l.factor {
+	if float64(l.hits[key]+l.shared[key]) > float64(max)*l.factor {
 		wait := int(60 - now%60)
 		return &httpError{Status: 429, Code: "rate_limited", RetryAfter: wait,
 			Message: fmt.Sprintf("too many requests; try again in %d seconds", wait)}

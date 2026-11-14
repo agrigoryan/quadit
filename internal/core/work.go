@@ -632,3 +632,12 @@ type Secret struct {
 	LastUsedAt int64  `json:"last_used_at,omitempty" db:"last_used_at,null"`
 	DeletedAt  int64  `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
+
+// Presence is one member with a page open, and the block they are in.
+type Presence struct {
+	WorkspaceID string `json:"-" db:"workspace_id"`
+	DocID       string `json:"-" db:"doc_id"`
+	UserID      string `json:"user_id" db:"user_id"`
+	Block       string `json:"block,omitempty" db:"block"`
+	At          int64  `json:"at" db:"at"`
+}

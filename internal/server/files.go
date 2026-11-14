@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,60 @@ func (s *Server) maxUpload(ctx context.Context) int64 {
 
 func (s *Server) partPath(fileID string) string {
 	return filepath.Join(s.cfg.DataDir, "uploads", fileID+".part")
+}
+
+// partKey is where one part of an upload that comes in several requests
+// waits, in file storage, so the next part can reach any server.
+func partKey(f core.File, offset int64) string {
+	return fmt.Sprintf("%s.parts/%020d", f.StorageKey, offset)
+}
+
+// counter counts what is read through it.
+type counter struct {
+	r io.Reader
+	n int64
+}
+
+func (c *counter) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// gather puts the parts of an upload together into one local file, in
+// order, and removes them from file storage.
+func (s *Server) gather(ctx context.Context, f core.File) error {
+	var keys []string
+	if err := s.fileStore().List(ctx, f.StorageKey+".parts/", func(key string, _ int64) error { keys = append(keys, key); return nil }); err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	sort.Strings(keys)
+	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
+		return err
+	}
+	out, err := os.Create(s.partPath(f.ID))
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	for _, key := range keys {
+		in, _, err := s.fileStore().Open(ctx, key)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(out, in)
+		in.Close()
+		if err != nil {
+			return err
+		}
+	}
+	for _, key := range keys {
+		s.fileStore().Delete(ctx, key)
+	}
+	return nil
 }
 
 // hUpload stores a file. The body is the file itself (name it with ?name=),
@@ -106,6 +161,20 @@ func (s *Server) hUpload(x *c) error {
 	if size == 0 {
 		f.Size = n
 	}
+	if f.Received < f.Size {
+		// More is to come, perhaps to another server: the first part waits
+		// in file storage, not on this machine.
+		in, err := os.Open(s.partPath(f.ID))
+		if err != nil {
+			return err
+		}
+		err = s.fileStore().Put(ctx, partKey(f, 0), in, "application/octet-stream")
+		in.Close()
+		os.Remove(s.partPath(f.ID))
+		if err != nil {
+			return fmt.Errorf("file storage: %w", err)
+		}
+	}
 	if err := x.db.Insert(ctx, f); err != nil {
 		return err
 	}
@@ -136,21 +205,22 @@ func (s *Server) hUploadPart(x *c) error {
 	if offset != f.Received {
 		return &httpError{Status: 409, Code: "conflict", Message: fmt.Sprintf("offset %d does not match the %d bytes received; continue from %d", offset, f.Received, f.Received)}
 	}
-	out, err := os.OpenFile(s.partPath(f.ID), os.O_WRONLY|os.O_APPEND, 0o640)
+	body := &counter{r: io.LimitReader(x.r.Body, f.Size-f.Received+1)}
+	err := s.fileStore().Put(ctx, partKey(f, offset), body, "application/octet-stream")
+	n := body.n
 	if err != nil {
-		return errBad("this upload is gone; start again")
+		// A part cut short is not kept: the caller sends it again from the
+		// same place, which is what the answer tells it.
+		s.fileStore().Delete(ctx, partKey(f, offset))
+		return errBad("upload interrupted after %d bytes; continue from %d: %v", f.Received, f.Received, err)
 	}
-	n, err := io.Copy(out, io.LimitReader(x.r.Body, f.Size-f.Received+1))
-	out.Close()
-	f.Received += n
-	if f.Received > f.Size {
+	if f.Received+n > f.Size {
+		s.fileStore().Delete(ctx, partKey(f, offset))
 		return errBad("more bytes than the size given when the upload started")
 	}
+	f.Received += n
 	if _, uerr := x.db.Update(ctx, "files", map[string]any{"received": f.Received}, store.Eq("id", f.ID)); uerr != nil {
 		return uerr
-	}
-	if err != nil {
-		return errBad("upload interrupted after %d bytes: %v", f.Received, err)
 	}
 	if f.Received == f.Size {
 		if err := s.finishUpload(ctx, x, &f); err != nil {
@@ -172,6 +242,9 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	path := s.partPath(f.ID)
 	defer os.Remove(path)
+	if err := s.gather(ctx, *f); err != nil {
+		return fmt.Errorf("file storage: %w", err)
+	}
 	in, err := os.Open(path)
 	if err != nil {
 		return err

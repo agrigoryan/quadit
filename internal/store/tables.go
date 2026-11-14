@@ -103,6 +103,7 @@ func init() {
 	reg[core.ResourceClaim]("resource_claims", ws)
 	reg[core.Integration]("integrations", ws)
 	reg[core.Secret]("secrets", ws)
+	reg[core.Presence]("doc_presence", ws)
 
 	// Load order for restores: parents before children.
 	for i, n := range []string{"workspaces", "users", "members", "api_tokens", "projects", "statuses", "labels",
@@ -111,7 +112,7 @@ func init() {
 		"changes", "cursors", "views", "watchers", "notifications", "task_links", "refs", "templates", "preferences",
 		"files", "attachments", "sessions", "identities", "passkeys", "recovery_codes", "invites", "one_time_tokens",
 		"settings", "audit_log", "rate_counters", "push_subscriptions", "oauth_clients", "backups", "webhooks",
-		"webhook_deliveries", "rules", "jobs", "agent_sessions", "resources", "resource_claims", "integrations", "secrets"} {
+		"webhook_deliveries", "rules", "jobs", "agent_sessions", "resources", "resource_claims", "integrations", "secrets", "doc_presence"} {
 		loadOrder[n] = i
 	}
 }
