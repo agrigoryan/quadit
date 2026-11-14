@@ -19,6 +19,8 @@ type Row = Record<string, unknown>;
 export interface ChangeSpec {
   type: string;
   args: Row;
+  /** The change id, when the caller needs to recognise its own events in the feed. Made here when left out. */
+  id?: string;
 }
 
 /** What an edit does to the local copy before the server answers. */
@@ -152,7 +154,7 @@ export function mutate(
   optimistic?.(optimisticTx(undos));
   return new Promise((resolve, reject) => {
     queue.push({
-      body: { changes: list.map((c) => ({ id: newId(), type: c.type, args: c.args })) },
+      body: { changes: list.map((c) => ({ id: c.id ?? newId(), type: c.type, args: c.args })) },
       undos,
       quiet: opts.quiet ?? false,
       resolve,

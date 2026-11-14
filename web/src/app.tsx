@@ -1,16 +1,19 @@
 import { lazy, type ReactNode, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
+import { NoWorkspacePage } from "@/auth/create-workspace";
+import { InvitePage } from "@/auth/invite";
 import { LoginPage } from "@/auth/login";
+import { RegisterPage } from "@/auth/register";
+import { ResetConfirmPage, ResetRequestPage } from "@/auth/reset";
 import { loadSession, useSession } from "@/auth/session";
 import { SetupPage } from "@/auth/setup";
-import { t } from "@/lib/i18n";
 import { WorkspaceRoute } from "@/shell/workspace";
-import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 import { Toaster } from "@/ui/toast";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const AdminRoutes = lazy(() => import("@/admin/routes"));
+const AccountSecurityPage = lazy(() => import("@/auth/account-security").then((m) => ({ default: m.AccountSecurityPage })));
 
 /** Shows its children only to someone signed in; everyone else goes to /login. */
 function RequireSession({ children }: { children: ReactNode }) {
@@ -27,7 +30,7 @@ function RequireSession({ children }: { children: ReactNode }) {
 /** "/" goes to the person's first workspace. */
 function Home() {
   const first = useSession((s) => s.workspaces[0]);
-  if (!first) return <EmptyState title={t("common.notFound")} hint={t("common.notFoundHint")} />;
+  if (!first) return <NoWorkspacePage />;
   return <Navigate to={`/${first.slug}`} replace />;
 }
 
@@ -42,12 +45,26 @@ export function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/setup" element={<SetupPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/reset" element={<ResetRequestPage />} />
+          <Route path="/reset/:token" element={<ResetConfirmPage />} />
+          <Route path="/invite/:token" element={<InvitePage />} />
           <Route
             path="/admin/*"
             element={
               <RequireSession>
                 <Suspense fallback={<Loading />}>
                   <AdminRoutes />
+                </Suspense>
+              </RequireSession>
+            }
+          />
+          <Route
+            path="/account/security"
+            element={
+              <RequireSession>
+                <Suspense fallback={<Loading />}>
+                  <AccountSecurityPage />
                 </Suspense>
               </RequireSession>
             }

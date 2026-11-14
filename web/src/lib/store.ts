@@ -124,8 +124,11 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
     last = Math.max(last, ev.seq);
   }
   const workspacePatch = workspaceChanges(fresh);
+  const next = d.done();
   useStore.setState((s) => ({
-    c: d.done(),
+    c: next,
+    // The signed-in member is a row like any other: follow its role, name and avatar.
+    me: (s.me && next.members[s.me.user_id]) || s.me,
     seq: fromStream ? last : s.seq,
     workspace: s.workspace && workspacePatch ? { ...s.workspace, ...workspacePatch } : s.workspace,
   }));

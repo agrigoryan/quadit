@@ -89,6 +89,8 @@ export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>("GET", path, { signal }),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>("POST", path, { ...opts, body }),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }),
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }),
+  del: <T>(path: string, body?: unknown) => request<T>("DELETE", path, { body }),
   upload: <T>(path: string, file: Blob, contentType?: string) =>
     request<T>("POST", path, { raw: file, contentType }),
 };

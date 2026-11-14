@@ -1,0 +1,21 @@
+// Sets the theme before the first paint so the page never flashes, and keeps
+// the browser's own chrome (the status bar of the installed app) in the same
+// colour. A file of its own, not inline, so a strict Content-Security-Policy
+// lets it run.
+(function () {
+  var root = document.documentElement;
+  var colors = { light: "#ffffff", dark: "#1b1d23" };
+  try {
+    var t = localStorage.getItem("quadit.theme");
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    root.dataset.theme = t;
+  } catch (e) {}
+  function paint() {
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", colors[root.dataset.theme] || colors.light);
+  }
+  paint();
+  try {
+    new MutationObserver(paint).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  } catch (e) {}
+})();

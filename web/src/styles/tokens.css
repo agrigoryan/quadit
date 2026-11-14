@@ -10,6 +10,9 @@
  * "system" itself), so there is one dark block and no media query.
  */
 
+/* The typeface: Inter, served by the app itself ("Inter Variable"; see --font-sans in index.css). */
+@import "@fontsource-variable/inter/wght.css";
+
 :root {
   color-scheme: light;
 

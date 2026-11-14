@@ -36,6 +36,8 @@ export interface Member {
   name: string;
   avatar?: string;
   title?: string;
+  budget?: { cost_micros?: number; minutes?: number };
+  last_action?: string;
   last_seen_at?: number;
   listening_until?: number;
   suspended_at?: number;
@@ -203,6 +205,13 @@ export interface AgentSession {
   title?: string;
   state: string;
   summary?: string;
+  instructions?: string;
+  /** What the run did, in order; each step is whatever the agent recorded. */
+  steps?: unknown[];
+  links?: unknown[];
+  cost_micros?: number;
+  tokens_in?: number;
+  tokens_out?: number;
   started_at: number;
   ended_at?: number;
 }

@@ -1,0 +1,145 @@
+import { type FormEvent, useState } from "react";
+import { t } from "@/lib/i18n";
+import { newId } from "@/lib/ids";
+import { useMembers, useProjects } from "@/lib/selectors";
+import { Button } from "@/ui/button";
+import { Dialog } from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { change, randomSecret, type Webhook } from "@/settings/automation/data";
+import { EventPicker } from "@/settings/automation/event-picker";
+
+type Scope = "all" | "project" | "member";
+
+interface Props {
+  /** The webhook to edit; none to create one. */
+  hook?: Webhook;
+  onClose: () => void;
+  /** Called after the server took it. A new webhook comes with the secret to show once. */
+  onSaved: (secret?: { name: string; value: string }) => void;
+}
+
+export function WebhookForm({ hook, onClose, onSaved }: Props) {
+  const projects = useProjects();
+  const members = useMembers();
+  const [name, setName] = useState(hook?.name ?? "");
+  const [url, setUrl] = useState(hook?.url ?? "");
+  const [events, setEvents] = useState<string[]>(hook?.event_types ?? []);
+  const [scope, setScope] = useState<Scope>(hook?.user_id ? "member" : hook?.project_id ? "project" : "all");
+  const [projectId, setProjectId] = useState(hook?.project_id ?? "");
+  const [memberId, setMemberId] = useState(hook?.user_id ?? "");
+  const [active, setActive] = useState(hook?.active ?? true);
+  const [busy, setBusy] = useState(false);
+  const errors = useFieldErrors(["name", "url", "project", "for", "event_types"]);
+
+  // Agents first: waking an agent is what "for" is for.
+  const inboxes = [...members].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "agent" ? -1 : 1));
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    errors.clear();
+    if (!/^https?:\/\/\S+$/i.test(url.trim())) return errors.set("url", t("auto.hook.urlInvalid"));
+    if (!hook && scope === "project" && !projectId) return errors.set("project", t("auto.hook.projectMissing"));
+    if (!hook && scope === "member" && !memberId) return errors.set("for", t("auto.hook.memberMissing"));
+    setBusy(true);
+    try {
+      if (hook) {
+        await change("webhook.update", { id: hook.id, name: name.trim() || null, url: url.trim(), event_types: events, active });
+        onSaved();
+      } else {
+        const secret = randomSecret();
+        const args: Record<string, unknown> = { id: newId(), name: name.trim(), url: url.trim(), secret, active };
+        if (scope === "member") args.for = memberId;
+        else {
+          args.event_types = events;
+          if (scope === "project") args.project = projectId;
+        }
+        await change("webhook.create", args);
+        onSaved({ name: name.trim() || new URL(url.trim()).host, value: secret });
+      }
+    } catch (err) {
+      errors.fail(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const scopeChoices = [
+    { value: "all", label: t("auto.hook.scope.all") },
+    { value: "project", label: t("auto.hook.scope.project") },
+    { value: "member", label: t("auto.hook.scope.member") },
+  ];
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={hook ? t("auto.hook.edit") : t("auto.hook.new")}
+      description={hook ? undefined : t("auto.hook.newLead")}
+      footer={
+        <>
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button variant="primary" type="submit" form="webhook-form" disabled={busy}>
+            {hook ? t("common.save") : t("auto.hook.create")}
+          </Button>
+        </>
+      }
+    >
+      <form id="webhook-form" onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
+        <FormField label={t("auto.hook.url")} htmlFor="wh-url" error={errors.fields.url} hint={t("auto.hook.urlHint")}>
+          <Input
+            id="wh-url"
+            type="url"
+            inputMode="url"
+            autoFocus
+            required
+            placeholder="https://example.com/hooks/quadit"
+            value={url}
+            onChange={(e) => (setUrl(e.target.value), errors.set("url", ""))}
+          />
+        </FormField>
+        <FormField label={t("s.name")} htmlFor="wh-name" error={errors.fields.name} hint={t("auto.hook.nameHint")}>
+          <Input id="wh-name" value={name} onChange={(e) => setName(e.target.value)} />
+        </FormField>
+
+        <FormField
+          label={t("auto.hook.scope")}
+          htmlFor="wh-scope"
+          hint={hook ? t("auto.hook.scopeFixed") : scope === "member" ? t("auto.hook.scope.memberHint") : undefined}
+        >
+          <NativeSelect id="wh-scope" value={scope} onChange={(v) => setScope(v as Scope)} options={scopeChoices} disabled={!!hook} />
+        </FormField>
+        {scope === "project" && (
+          <FormField label={t("auto.project")} htmlFor="wh-project" error={errors.fields.project}>
+            <NativeSelect
+              id="wh-project"
+              value={projectId}
+              onChange={(v) => (setProjectId(v), errors.set("project", ""))}
+              disabled={!!hook}
+              options={[{ value: "", label: t("auto.pickProject") }, ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` }))]}
+            />
+          </FormField>
+        )}
+        {scope === "member" && (
+          <FormField label={t("auto.hook.for")} htmlFor="wh-for" error={errors.fields.for}>
+            <NativeSelect
+              id="wh-for"
+              value={memberId}
+              onChange={(v) => (setMemberId(v), errors.set("for", ""))}
+              disabled={!!hook}
+              options={[{ value: "", label: t("auto.pickMember") }, ...inboxes.map((m) => ({ value: m.user_id, label: `${m.name} (@${m.handle})` }))]}
+            />
+          </FormField>
+        )}
+        {scope !== "member" && (
+          <FormField label={t("auto.events")} error={errors.fields.event_types}>
+            <EventPicker value={events} onChange={setEvents} />
+          </FormField>
+        )}
+
+        <SwitchRow title={t("auto.active")} hint={t("auto.hook.activeHint")} checked={active} onChange={setActive} />
+        <FormAlert>{errors.form}</FormAlert>
+      </form>
+    </Dialog>
+  );
+}

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router";
+import { FirstProjectNudge } from "@/auth/first-run";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useLiveTasks, useMe, useMember } from "@/lib/selectors";
@@ -75,6 +76,7 @@ export function MyWorkPage() {
 
   return (
     <div className="h-full overflow-y-auto pb-10">
+      <FirstProjectNudge />
       <section aria-labelledby="mywork-waiting">
         <header className="flex min-h-12 flex-wrap items-center gap-x-2.5 border-b border-line px-4 pt-3 pb-2">
           <h2 id="mywork-waiting" className="text-base font-semibold">

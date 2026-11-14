@@ -4,10 +4,13 @@ import { useParams } from "react-router";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
-import { useCycles, useProjectByKey } from "@/lib/selectors";
-import { formatDay, today } from "@/lib/time";
+import { useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
+import { daysUntil, formatDay, today } from "@/lib/time";
 import type { Cycle, Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
+import { addDays } from "@/insights/lib/format";
+import { cycleName, cyclePhase } from "@/insights/plan/cycle-page";
+import { type Tally, useTallies } from "@/insights/plan/stats";
 import { PlanRow, useTasksBy } from "@/pages/plan-parts";
 import { NotFoundPage } from "@/shell/placeholders";
 import { Badge } from "@/ui/badge";
@@ -15,32 +18,32 @@ import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Input } from "@/ui/input";
 
-/** A calendar day some days after another, as YYYY-MM-DD. */
-function addDays(day: string, days: number): string {
-  const [y, m, d] = day.split("-").map(Number);
-  return today(new Date(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + days));
-}
-
-/** The current cycle first, then the ones to come (soonest first), then the past (latest first). */
-function inOrder(cycles: Cycle[], now: string): Cycle[] {
-  const current = cycles.filter((c) => c.starts_on <= now && now <= c.ends_on);
-  const upcoming = cycles.filter((c) => c.starts_on > now).sort((a, b) => a.starts_on.localeCompare(b.starts_on));
-  const past = cycles.filter((c) => c.ends_on < now).sort((a, b) => b.ends_on.localeCompare(a.ends_on));
-  return [...current, ...upcoming, ...past];
-}
-
 /** A project's cycles: the stretches of days its work is planned into. */
 export function CyclesPage() {
   const project = useProjectByKey(useParams().key);
   return project ? <Cycles project={project} /> : <NotFoundPage />;
 }
 
+/** The current cycle, the ones to come (soonest first) and the past (latest first). */
+function inGroups(cycles: Cycle[], now: string) {
+  return [
+    { id: "current" as const, cycles: cycles.filter((c) => cyclePhase(c, now) === "current") },
+    {
+      id: "upcoming" as const,
+      cycles: cycles.filter((c) => cyclePhase(c, now) === "upcoming").sort((a, b) => a.starts_on.localeCompare(b.starts_on)),
+    },
+    { id: "past" as const, cycles: cycles.filter((c) => cyclePhase(c, now) === "past").sort((a, b) => b.ends_on.localeCompare(a.ends_on)) },
+  ].filter((g) => g.cycles.length > 0);
+}
+
 function Cycles({ project }: { project: Project }) {
   usePageTitle(t("cycles.pageTitle", { project: project.name }));
+  const slug = useSlug();
   const cycles = useCycles(project.id);
   const tasksBy = useTasksBy(project.id, "cycle_id");
+  const tallies = useTallies("cycle_id");
   const now = today();
-  const ordered = useMemo(() => inOrder(cycles, now), [cycles, now]);
+  const groups = useMemo(() => inGroups(cycles, now), [cycles, now]);
   const [openId, setOpenId] = useState<string | null>(null);
 
   return (
@@ -49,29 +52,60 @@ function Cycles({ project }: { project: Project }) {
         <p className="flex-1 text-xs text-ink-2 tnum max-sm:hidden">{t("cycles.count", { n: cycles.length })}</p>
         <NewCycle project={project} cycles={cycles} />
       </header>
-      {ordered.length === 0 ? (
+      {groups.length === 0 ? (
         <EmptyState icon={<RefreshCw />} title={t("cycles.empty")} hint={t("cycles.emptyHint")} />
       ) : (
-        <ul className="min-h-0 flex-1 overflow-y-auto pb-10">
-          {ordered.map((cycle) => (
-            <PlanRow
-              key={cycle.id}
-              name={cycle.name || t("prop.cycleName", { n: cycle.number })}
-              badge={cycle.starts_on <= now && now <= cycle.ends_on ? <Badge tone="accent">{t("cycles.current")}</Badge> : undefined}
-              meta={
-                <span className="shrink-0 text-xs text-ink-3 tnum">
-                  {t("cycles.range", { from: formatDay(cycle.starts_on), to: formatDay(cycle.ends_on) })}
-                </span>
-              }
-              tasks={tasksBy[cycle.id] ?? []}
-              open={openId === cycle.id}
-              onToggle={() => setOpenId(openId === cycle.id ? null : cycle.id)}
-              emptyText={t("cycles.noTasks")}
-            />
+        <div className="min-h-0 flex-1 overflow-y-auto pb-10">
+          {groups.map((group) => (
+            <section key={group.id} aria-labelledby={`cycles-${group.id}`}>
+              <h2
+                id={`cycles-${group.id}`}
+                className="flex h-8 items-center gap-2 border-b border-line bg-sunken px-4 text-xs font-medium text-ink-2"
+              >
+                {t(`cycle.phase.${group.id}`)}
+                <span className="font-normal text-ink-3 tnum">{group.cycles.length}</span>
+              </h2>
+              <ul>
+                {group.cycles.map((cycle) => (
+                  <PlanRow
+                    key={cycle.id}
+                    name={cycleName(cycle)}
+                    to={`/${slug}/p/${project.key}/cycles/${cycle.id}`}
+                    badge={
+                      group.id === "current" ? (
+                        <Badge tone="accent">{t("cycle.daysLeft", { n: daysUntil(cycle.ends_on) + 1 })}</Badge>
+                      ) : undefined
+                    }
+                    meta={<CycleMeta cycle={cycle} tally={tallies[cycle.id]} />}
+                    tally={tallies[cycle.id]}
+                    tasks={tasksBy[cycle.id] ?? []}
+                    open={openId === cycle.id}
+                    onToggle={() => setOpenId(openId === cycle.id ? null : cycle.id)}
+                    emptyText={t("cycles.noTasks")}
+                  />
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </div>
+  );
+}
+
+/** The cycle's dates and, when its tasks are estimated, its points. */
+function CycleMeta({ cycle, tally }: { cycle: Cycle; tally: Tally | undefined }) {
+  return (
+    <>
+      {!!tally?.points && (
+        <span className="shrink-0 text-xs text-ink-3 tnum max-md:hidden">
+          {t("ins.points", { done: tally.pointsDone, total: tally.points })}
+        </span>
+      )}
+      <span className="shrink-0 text-xs text-ink-3 tnum max-sm:hidden">
+        {t("cycles.range", { from: formatDay(cycle.starts_on), to: formatDay(cycle.ends_on) })}
+      </span>
+    </>
   );
 }
 

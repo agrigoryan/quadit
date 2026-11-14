@@ -1,0 +1,36 @@
+/*
+ * Colours for charts and meters. Each stands for one thing everywhere:
+ * green is done, blue is under way (or came in), orange waits, and the two
+ * greys are work not started. Stacks are drawn in that order, so neighbours
+ * stay apart for colour-blind readers; the greys are grey on purpose and are
+ * always labelled. Checked with the dataviz palette validator against the
+ * surface of each theme.
+ */
+:root {
+  --viz-done: #16874a;
+  --viz-started: #3451e0;
+  --viz-waiting: #c26a00;
+  --viz-todo: #6b7183;
+  --viz-backlog: #9aa0af;
+  --viz-grid: #e2e4ea;
+  --viz-axis: #cdd0d9;
+  --viz-warn: #b05a00;
+  --viz-over: #d1343b;
+  /* Text printed inside a fill. */
+  --viz-on: #ffffff;
+  --viz-on-backlog: #1b1d22;
+}
+
+:root[data-theme="dark"] {
+  --viz-done: #2fa873;
+  --viz-started: #6079f2;
+  --viz-waiting: #cf7f2c;
+  --viz-todo: #9499a8;
+  --viz-backlog: #5f6473;
+  --viz-grid: #2a2d36;
+  --viz-axis: #3a3e4a;
+  --viz-warn: #f0a04b;
+  --viz-over: #ff6b70;
+  --viz-on: #0f1014;
+  --viz-on-backlog: #ffffff;
+}

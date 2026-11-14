@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ListTodo, Plus, SearchX, SquareKanban } from "lucide-react";
+import { ChartGantt, ListTodo, Plus, SearchX, SquareKanban } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
@@ -109,6 +109,19 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
               <span className="max-sm:hidden">{label()}</span>
             </button>
           ))}
+          {/* A project's third layout is a page of its own (insights/timeline). */}
+          {routeLayout && project && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={false}
+              onClick={() => navigate(`/${slug}/p/${project.key}/timeline`)}
+              className="flex h-6 items-center gap-1.5 rounded-sm px-2 text-xs font-medium text-ink-2 hover:text-ink"
+            >
+              <ChartGantt className="size-3.5" aria-hidden />
+              <span className="max-sm:hidden">{t("nav.timeline")}</span>
+            </button>
+          )}
         </div>
         <FilterBar filters={state.filters} onChange={(filters) => setState({ filters })} project={project} />
         <div className="ml-auto flex shrink-0 items-center gap-1 pl-2">

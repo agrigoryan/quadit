@@ -1,5 +1,20 @@
-// Strings for the settings part of the app.
+// Strings for the settings part of the app. They are kept beside the pages
+// that use them (settings/strings/*.ts, auth/strings.ts) and gathered here.
+
+import { authStrings } from "@/auth/strings";
+import { agentStrings } from "@/settings/strings/agents";
+import { automationStrings } from "@/settings/strings/automation";
+import { meStrings } from "@/settings/strings/me";
+import { projectStrings } from "@/settings/strings/projects";
+import { sharedStrings } from "@/settings/strings/shared";
+import { workspaceStrings } from "@/settings/strings/workspace";
 
 export const settings = {
-  "settings.title": "Settings",
+  ...sharedStrings,
+  ...workspaceStrings,
+  ...projectStrings,
+  ...agentStrings,
+  ...automationStrings,
+  ...meStrings,
+  ...authStrings,
 };

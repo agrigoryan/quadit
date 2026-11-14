@@ -1,4 +1,4 @@
-import { Keyboard, LogOut, UserRound } from "lucide-react";
+import { Keyboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { useNavigate } from "react-router";
 import { saveTheme, signOut, useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
@@ -32,12 +32,17 @@ export function UserMenu() {
           <p className="truncate text-xs text-ink-3">{user?.email ?? `@${me.handle}`}</p>
         </div>
         <MenuSeparator />
-        <MenuItem icon={<UserRound />} onSelect={() => navigate(`/${slug}/settings`)}>
+        <MenuItem icon={<UserRound />} onSelect={() => navigate(`/${slug}/settings/me/profile`)}>
           {t("top.profile")}
         </MenuItem>
         <MenuItem icon={<Keyboard />} hint="?" onSelect={() => ui.setShortcuts(true)}>
           {t("top.shortcuts")}
         </MenuItem>
+        {user?.is_admin && (
+          <MenuItem icon={<ShieldCheck />} onSelect={() => navigate("/admin")}>
+            {t("auth.admin")}
+          </MenuItem>
+        )}
         <MenuSeparator />
         <MenuLabel>{t("top.theme")}</MenuLabel>
         <MenuRadioGroup value={toThemeChoice(user?.theme)} onValueChange={(v) => void saveTheme(v as ThemeChoice)}>

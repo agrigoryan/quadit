@@ -21,6 +21,7 @@ import { Subtasks } from "@/detail/subtasks";
 import { Timeline } from "@/detail/timeline";
 import { Description, EditableTitle } from "@/detail/title-description";
 import { attachToTask, carriesFiles, type PendingUpload, useUploads } from "@/detail/uploads";
+import { plainLinks, TaskWork } from "@/insights/task-work";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
@@ -93,7 +94,8 @@ export function TaskPanel({ taskKey, onClose }: Props) {
 function PanelBody({ task, status }: { task: Task; status: string }) {
   const subtasks = useSubtasks(task.id);
   const relations = useTaskRelations(task.id);
-  const links = useTaskLinks(task.id);
+  // Branches, commits and pull requests are drawn by TaskWork; Links keeps the plain addresses.
+  const links = plainLinks(useTaskLinks(task.id));
   const files = useTaskAttachments(task.id);
   const pending = useUploads((s) => s.pending[task.id]) ?? NO_UPLOADS;
   const chooser = useRef<HTMLInputElement>(null);
@@ -163,6 +165,7 @@ function PanelBody({ task, status }: { task: Task; status: string }) {
         <Relations task={task} relations={relations} startAdding={!!opened.relations} onEmptyClose={() => close("relations")} />
       )}
       {show.links && <Links task={task} links={links} startAdding={!!opened.links} onEmptyClose={() => close("links")} />}
+      <TaskWork task={task} />
       {show.files && <Attachments task={task} files={files} pending={pending} onAttach={attach} />}
 
       <Timeline task={task} loading={loading} />

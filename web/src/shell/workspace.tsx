@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
@@ -15,10 +15,13 @@ export function WorkspaceRoute() {
   const ready = useStore((s) => s.ready && s.slug === ws);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setError("");
     startSync(ws).catch((err: unknown) => {
+      // An install that requires a second step opens no workspace without one: go and set it up.
+      if (err instanceof ApiError && err.code === "second_step_required") return navigate("/account/security", { replace: true });
       // A 401 has already sent the person to sign in.
       if (!(err instanceof ApiError && err.status === 401)) setError(errorMessage(err));
     });

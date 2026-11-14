@@ -1,13 +1,17 @@
-// What the epics page and the cycles page share: a row that opens in place
-// to show its tasks, and a small meter of how many of them are done.
+// What the epics page and the cycles page share: a row that links to the
+// full page of an epic or cycle, shows how far along it is, and opens in
+// place to show its tasks.
 
 import { type ReactNode, useMemo } from "react";
 import { ChevronRight } from "lucide-react";
+import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useLiveTasks } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import { CATEGORIES, type Status, type Task } from "@/lib/types";
+import { CATEGORIES, type Task } from "@/lib/types";
+import { emptyTally, type Tally } from "@/insights/plan/stats";
+import { ProgressCount } from "@/insights/ui/progress";
 import { TaskRow } from "@/tasks/task-row";
 
 /** A project's live tasks by the epic or cycle they are in, in status order. */
@@ -26,32 +30,17 @@ export function useTasksBy(projectId: string, field: "epic_id" | "cycle_id"): Di
   }, [tasks, statuses, projectId, field]);
 }
 
-function countDone(tasks: Task[], statuses: Dict<Status>): number {
-  return tasks.filter((task) => statuses[task.status_id]?.category === "done").length;
-}
-
-function Meter({ tasks }: { tasks: Task[] }) {
-  const statuses = useCollection("statuses");
-  const done = countDone(tasks, statuses);
-  const total = tasks.length;
-  return (
-    <span className="flex shrink-0 items-center gap-2" role="img" aria-label={t("epics.progress", { done, total })}>
-      <span className="w-9 text-right text-xs text-ink-3 tnum">
-        {done}/{total}
-      </span>
-      <span className="h-1 w-20 overflow-hidden rounded-full bg-sunken max-sm:w-10">
-        <span className="block h-full rounded-full bg-ok" style={{ width: total ? `${(done / total) * 100}%` : 0 }} />
-      </span>
-    </span>
-  );
-}
-
 interface Props {
   name: string;
-  /** Shown right after the name: a state, "Current". */
+  /** Where the name leads: the epic's or cycle's own page. */
+  to: string;
+  /** Shown right after the name: a state, "Current", an at-risk mark. */
   badge?: ReactNode;
-  /** Shown at the right, before the meter: dates, the lead. */
+  /** Shown at the right, before the progress: dates, the lead. */
   meta?: ReactNode;
+  /** Shown last: a menu of what can be done with the row. */
+  menu?: ReactNode;
+  tally: Tally | undefined;
   tasks: Task[];
   open: boolean;
   onToggle: () => void;
@@ -60,25 +49,28 @@ interface Props {
   hide?: { epic?: boolean };
 }
 
-/** An epic or a cycle as one dense line; click it to see its tasks underneath. */
-export function PlanRow({ name, badge, meta, tasks, open, onToggle, emptyText, hide }: Props) {
+/** An epic or a cycle as one dense line; the arrow shows its tasks underneath. */
+export function PlanRow({ name, to, badge, meta, menu, tally = emptyTally(), tasks, open, onToggle, emptyText, hide }: Props) {
   return (
     <li>
-      <div className="relative flex h-9 items-center gap-2 border-b border-line/70 pr-3 pl-2 text-sm">
+      <div className="flex h-9 items-center gap-2 border-b border-line/70 pr-2 pl-2 text-sm hover:bg-hover">
         <button
           type="button"
           aria-expanded={open}
           aria-label={t(open ? "list.collapse" : "list.expand", { name })}
           onClick={onToggle}
-          className="flex min-w-0 items-center gap-1.5 text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent"
+          className="flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-press"
         >
-          <ChevronRight className={cx("size-4 shrink-0 text-ink-3", open && "rotate-90")} aria-hidden />
-          <span className="truncate font-medium">{name}</span>
+          <ChevronRight className={cx("size-4 text-ink-3 transition-transform duration-100", open && "rotate-90")} aria-hidden />
         </button>
+        <Link to={to} className="min-w-0 truncate font-medium underline-offset-2 hover:underline">
+          {name}
+        </Link>
         {badge}
         <span className="flex-1" />
         {meta}
-        <Meter tasks={tasks} />
+        <ProgressCount done={tally.done} started={tally.started} total={tally.total} />
+        {menu}
       </div>
       {open && (
         <div className="border-b border-line bg-surface pl-5">

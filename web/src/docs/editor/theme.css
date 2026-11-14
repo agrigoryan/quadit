@@ -1,0 +1,318 @@
+/*
+ * BlockNote in this product's clothes. Its colours are CSS variables; every
+ * one is pointed at a token (styles/tokens.css), so light and dark follow
+ * the app and nothing of the default theme shows through.
+ */
+
+.bn-root,
+.bn-container,
+.bn-container[data-color-scheme="light"],
+.bn-container[data-color-scheme="dark"] {
+  --bn-colors-editor-text: var(--ink);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--ink);
+  --bn-colors-menu-background: var(--surface);
+  --bn-colors-tooltip-text: var(--inverse-ink);
+  --bn-colors-tooltip-background: var(--inverse);
+  --bn-colors-hovered-text: var(--ink);
+  --bn-colors-hovered-background: var(--hover);
+  --bn-colors-selected-text: var(--accent-text);
+  --bn-colors-selected-background: var(--accent-soft);
+  --bn-colors-disabled-text: var(--ink-3);
+  --bn-colors-disabled-background: var(--sunken);
+  --bn-colors-shadow: transparent;
+  --bn-colors-border: var(--line);
+  --bn-colors-side-menu: var(--ink-3);
+  --bn-font-family: inherit;
+  --bn-border-radius: 7px;
+  --bn-border-radius-small: 5px;
+  --bn-border-radius-medium: 7px;
+  --bn-border-radius-large: 10px;
+  --bn-border: none;
+  --bn-shadow-medium: var(--shadow-pop);
+  --bn-shadow-light: var(--shadow-pop);
+  --bn-ui-base-z-index: 40;
+}
+
+/* Highlight colours: softer in the dark, so coloured text stays readable. */
+:root[data-theme="dark"] .bn-container {
+  --bn-colors-highlights-gray-text: #a3a8b6;
+  --bn-colors-highlights-gray-background: #2e313b;
+}
+
+.qd-editor .bn-container,
+.qd-editor .bn-default-styles {
+  font-family: inherit;
+}
+
+.qd-editor .bn-editor {
+  padding-inline: 3rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  background: transparent;
+}
+
+.qd-editor .bn-editor:focus-visible {
+  outline: none;
+}
+
+.qd-editor .bn-block-outer {
+  line-height: 1.6;
+}
+
+.qd-editor .bn-block-content {
+  padding-block: 2px;
+}
+
+/* Headings on the app's scale, not a poster's. */
+.qd-editor [data-content-type="heading"] {
+  --level: 1.6em;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  line-height: 1.3;
+  padding-top: 0.5em;
+}
+.qd-editor [data-content-type="heading"][data-level="2"] {
+  --level: 1.3em;
+}
+.qd-editor [data-content-type="heading"][data-level="3"] {
+  --level: 1.1em;
+}
+.qd-editor [data-content-type="heading"][data-level="4"],
+.qd-editor [data-content-type="heading"][data-level="5"],
+.qd-editor [data-content-type="heading"][data-level="6"] {
+  --level: 1em;
+}
+
+.qd-editor .bn-inline-content code {
+  border-radius: 4px;
+  background: var(--sunken);
+  padding: 0.1em 0.3em;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  color: var(--ink);
+}
+
+.qd-editor [data-content-type="codeBlock"] {
+  border-radius: 8px;
+  background: var(--sunken);
+  color: var(--ink);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+.qd-editor [data-content-type="codeBlock"] > pre {
+  color: var(--ink);
+}
+.qd-editor [data-content-type="codeBlock"] select {
+  color: var(--ink-3);
+}
+
+.qd-editor [data-content-type="quote"] blockquote {
+  border-left: 3px solid var(--line-strong);
+  color: var(--ink-2);
+}
+
+.qd-editor .bn-inline-content a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent-text) 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+.qd-editor [data-content-type="table"] th,
+.qd-editor [data-content-type="table"] td {
+  border-color: var(--line-strong);
+}
+.qd-editor [data-content-type="table"] th {
+  background: var(--sunken);
+}
+
+.qd-editor hr {
+  border-color: var(--line-strong);
+}
+
+.qd-editor .bn-file-block-content-wrapper img,
+.qd-editor .bn-file-block-content-wrapper video {
+  border-radius: 8px;
+}
+
+/* Placeholders and the "add file" box. */
+.qd-editor .bn-inline-content:has(> .ProseMirror-trailingBreak):before {
+  color: var(--ink-3);
+  font-style: normal;
+}
+.qd-editor .bn-add-file-button {
+  border-radius: 8px;
+  background: var(--sunken);
+  color: var(--ink-2);
+}
+
+/* Menus and toolbars: the same surface, radius and shadow as the app's own. */
+.bn-container .bn-toolbar,
+.bn-container .bn-suggestion-menu,
+.bn-container .bn-menu-dropdown,
+.bn-container .mantine-Menu-dropdown,
+.bn-container .bn-popover-content,
+.bn-container .bn-panel {
+  border: none;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  font-family: inherit;
+}
+.bn-container .bn-suggestion-menu {
+  padding: 4px;
+}
+.bn-container .bn-suggestion-menu-item,
+.bn-container .mantine-Menu-item {
+  border-radius: 5px;
+  font-size: 0.8125rem;
+}
+.bn-container .bn-suggestion-menu-label {
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.bn-container .bn-suggestion-menu-item .bn-mt-suggestion-menu-item-subtitle {
+  color: var(--ink-3);
+}
+.bn-container .bn-suggestion-menu-item .bn-mt-suggestion-menu-item-section[data-position="left"] {
+  background: var(--sunken);
+  color: var(--ink-2);
+}
+.bn-container .bn-side-menu .mantine-UnstyledButton-root,
+.bn-container .bn-side-menu button {
+  color: var(--ink-3);
+}
+.bn-container .bn-tooltip {
+  border-radius: 5px;
+  background: var(--inverse);
+  color: var(--inverse-ink);
+  box-shadow: var(--shadow-pop);
+  font-size: 0.75rem;
+}
+
+/* ---- inline chips: a person, a task, a page ---- */
+
+.qd-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.3em;
+  border-radius: 5px;
+  padding: 0 0.3em;
+  vertical-align: baseline;
+  line-height: 1.45;
+  white-space: nowrap;
+  font-size: 0.93em;
+}
+.qd-chip-icon {
+  width: 0.95em;
+  height: 0.95em;
+  flex: none;
+}
+.qd-mention {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+.qd-mention.is-me {
+  background: var(--move-soft);
+  color: var(--move-text);
+}
+.qd-task,
+.qd-page {
+  cursor: pointer;
+  background: var(--sunken);
+  color: var(--ink);
+}
+.qd-task:hover,
+.qd-page:hover {
+  background: var(--press);
+}
+.qd-task-key {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-2);
+  font-size: 0.9em;
+}
+.qd-task-title,
+.qd-page-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28em;
+}
+.qd-page-title {
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+}
+.qd-chip.is-missing {
+  cursor: default;
+  color: var(--ink-3);
+}
+
+/* ---- who else is here, and comment marks ---- */
+
+.qd-presence {
+  position: absolute;
+  left: 2.25rem;
+  width: 2px;
+  border-radius: 1px;
+  transition: top 120ms ease-out;
+}
+.qd-presence-name {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  border-radius: 4px 4px 4px 0;
+  padding: 0 5px;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+
+.qd-thread-mark {
+  position: absolute;
+  right: 0.5rem;
+  display: inline-flex;
+  height: 1.375rem;
+  align-items: center;
+  gap: 3px;
+  border-radius: 5px;
+  padding: 0 5px;
+  background: var(--move-soft);
+  color: var(--move-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.qd-thread-mark:hover {
+  filter: brightness(0.96);
+}
+
+@keyframes qd-flash {
+  from {
+    background: var(--move-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+.qd-flash > .bn-block > .bn-block-content {
+  border-radius: 4px;
+  animation: qd-flash 1.6s ease-out;
+}
+
+@media (max-width: 640px) {
+  .qd-editor .bn-editor {
+    padding-inline: 1rem;
+  }
+  .qd-presence {
+    left: 0.375rem;
+  }
+  .qd-thread-mark {
+    right: 0;
+  }
+}

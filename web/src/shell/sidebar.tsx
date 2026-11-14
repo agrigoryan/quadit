@@ -1,5 +1,6 @@
-import { Bookmark, FileText, Inbox, Layers, LayoutDashboard, ListTodo, PanelLeft, RefreshCw, Settings, SquareKanban, Trash2, UserRound } from "lucide-react";
+import { Bookmark, Bot, ChartGantt, FileText, Inbox, Layers, LayoutDashboard, ListTodo, MessageCircleQuestion, PanelLeft, RefreshCw, Settings, SquareKanban, Trash2, UserRound } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
+import { SidebarDocs } from "@/docs/tree/sidebar-docs";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useProjects, useSlug, useUnreadCount, useViews } from "@/lib/selectors";
@@ -23,6 +24,7 @@ function ProjectNav({ project, slug, collapsed }: { project: Project; slug: stri
       <div className="flex flex-col gap-px">
         <NavItem nested to={`${base}/tasks`} label={t("nav.tasks")} icon={<ListTodo />} />
         <NavItem nested to={`${base}/board`} label={t("nav.board")} icon={<SquareKanban />} />
+        <NavItem nested to={`${base}/timeline`} label={t("nav.timeline")} icon={<ChartGantt />} />
         <NavItem nested to={`${base}/epics`} label={t("nav.epics")} icon={<Layers />} />
         {project.settings?.cycles && <NavItem nested to={`${base}/cycles`} label={t("nav.cycles")} icon={<RefreshCw />} />}
       </div>
@@ -83,9 +85,13 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
           </NavSection>
         )}
 
+        <SidebarDocs collapsed={collapsed} />
+
         <NavSection title={t("common.more")} collapsed={collapsed}>
           <NavItem to={at("docs")} label={t("nav.docs")} icon={<FileText />} collapsed={collapsed} />
           <NavItem to={at("dashboard")} label={t("nav.dashboard")} icon={<LayoutDashboard />} collapsed={collapsed} />
+          <NavItem to={at("agents")} label={t("nav.agents")} icon={<Bot />} collapsed={collapsed} />
+          <NavItem to={at("decisions")} label={t("nav.decisions")} icon={<MessageCircleQuestion />} collapsed={collapsed} />
         </NavSection>
       </div>
 

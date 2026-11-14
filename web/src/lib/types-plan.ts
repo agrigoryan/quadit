@@ -9,8 +9,10 @@ export interface Epic {
   state: "planned" | "active" | "paused" | "done" | "canceled";
   lead_id?: string;
   color?: string;
+  start_on?: string;
   target_on?: string;
   rank: string;
+  created_at?: number;
   deleted_at?: number;
 }
 
@@ -18,6 +20,7 @@ export interface Milestone {
   id: string;
   epic_id: string;
   name: string;
+  description?: string;
   target_on?: string;
   rank: string;
   deleted_at?: number;
