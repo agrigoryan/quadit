@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, Bot, Building2, FolderGit2, FolderKanban, KeyRound, Lock, Plug, ScrollText, ShieldCheck, UserRound, Users, Webhook, Workflow } from "lucide-react";
+import { Bell, Bot, Building2, FolderGit2, FolderKanban, KeyRound, Lock, Plug, ScrollText, ShieldCheck, SquareAsterisk, UserRound, Users, Webhook, Workflow } from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
@@ -18,6 +18,7 @@ import { SecurityPage } from "@/settings/me/security";
 import { MyTokensPage } from "@/settings/me/tokens";
 import { ProjectPage } from "@/settings/projects/project";
 import { ProjectsPage } from "@/settings/projects/projects";
+import { SecretsPage } from "@/settings/secrets/secrets";
 import { type NavGroup, NavLayout } from "@/settings/ui/layout";
 import { GeneralPage } from "@/settings/workspace/general";
 import { MembersPage } from "@/settings/workspace/members";
@@ -45,6 +46,7 @@ function useGroups(admin: boolean): NavGroup[] {
               item("webhooks", "settings.nav.webhooks", <Webhook />),
               item("rules", "settings.nav.rules", <Workflow />),
               item("integrations", "settings.nav.integrations", <Plug />),
+              item("secrets", "settings.nav.secrets", <SquareAsterisk />),
               item("sources", "settings.nav.sources", <FolderGit2 />),
             ]
           : []),
@@ -112,6 +114,7 @@ export default function SettingsRoutes() {
         <Route path="webhooks" element={forAdmins(<WebhooksPage />)} />
         <Route path="rules" element={forAdmins(<RulesPage />)} />
         <Route path="integrations" element={forAdmins(<IntegrationsPage />)} />
+        <Route path="secrets" element={forAdmins(<SecretsPage />)} />
         <Route path="sources" element={forAdmins(<SourcesPage />)} />
         <Route path="me" element={<Navigate to="profile" replace />} />
         <Route path="me/profile" element={<ProfilePage />} />

@@ -140,6 +140,8 @@ export function WebhooksPage() {
     } catch (err) {
       setTests((s) => ({ ...s, [hook.id]: { busy: false, failed: errorMessage(err) } }));
     }
+    // A test is logged as a delivery: the row's "last delivery" and its list now have it.
+    void hooks.reload();
   }
 
   async function toggle(hook: Webhook, active: boolean) {

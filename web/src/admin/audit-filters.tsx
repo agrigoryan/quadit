@@ -31,7 +31,7 @@ function dayStart(day: string): number {
   return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1).getTime();
 }
 
-/** The query string for the filters; `before` (ms) pages further back than the "to" day. */
+/** The query string for the filters. `extra` adds the page size, the `cursor` of the next page, or the format. */
 export function auditQuery(f: AuditFilters, extra: Record<string, string | number> = {}): string {
   const q = new URLSearchParams();
   if (f.action.trim()) q.set("action", f.action.trim());
@@ -44,7 +44,7 @@ export function auditQuery(f: AuditFilters, extra: Record<string, string | numbe
 }
 
 // Patterns worth offering: the families of actions the server records.
-const SUGGESTED = ["signin*", "password.*", "second_step.*", "passkey.*", "identity.*", "token.*", "invite.*", "account.registered", "user.changed", "setting.changed", "backup.*", "workspace.*", "audit.exported"];
+const SUGGESTED = ["signin*", "password.*", "second_step.*", "passkey.*", "identity.*", "token.*", "invite.*", "account.registered", "user.changed", "setting.changed", "backup.*", "workspace.*", "secret.*", "audit.exported"];
 
 interface Props {
   value: AuditFilters;

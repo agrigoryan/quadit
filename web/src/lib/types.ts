@@ -99,6 +99,8 @@ export interface Task {
   label_ids?: string[];
   lease_holder_id?: string;
   lease_until?: number;
+  /** The person who gave the task to an agent; the agent works with no more access than they have. */
+  asked_by?: string;
   rank: string;
   due_on?: string;
   created_by: string;
@@ -216,6 +218,24 @@ export interface AgentSession {
   tokens_out?: number;
   started_at: number;
   ended_at?: number;
+}
+
+/** A key or password agents can use but never read. Its value is never sent to the browser. */
+export interface Secret {
+  id: string;
+  name: string;
+  description?: string;
+  /** Where a request with it may go: "api.example.com", "*.example.com", "http://host:port". */
+  hosts?: string[];
+  /** User ids of the members that may use it; none means every member. */
+  agents?: string[];
+  /** A companion may put the value in the environment of a command it runs. */
+  env: boolean;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  last_used_at?: number;
+  deleted_at?: number;
 }
 
 export * from "@/lib/types-feed";

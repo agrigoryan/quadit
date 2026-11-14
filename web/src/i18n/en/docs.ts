@@ -198,6 +198,7 @@ export const docs = {
   "db.option.add": "Add an option…",
   "db.option.color": "Colour of {name}",
   "db.option.rename": "Rename {name}",
+  "db.option.taken": "There is already an option named “{name}”.",
   "db.option.remove": "Remove {name}",
   "db.color.gray": "Grey",
   "db.color.blue": "Blue",

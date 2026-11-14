@@ -15,6 +15,7 @@ import { TaskPropertyPicker, type TaskProperty } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { LabelChip } from "@/ui/badge";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";
+import { Tooltip } from "@/ui/tooltip";
 
 type Keyed = "status" | "assignee" | "priority" | "labels";
 const KEYS: Record<string, Keyed> = { s: "status", a: "assignee", p: "priority", l: "labels" };
@@ -28,6 +29,7 @@ export function Properties({ task }: { task: Task }) {
   const milestone = useStore((s) => (task.milestone_id ? s.c.milestones[task.milestone_id] : undefined));
   const cycle = useStore((s) => (task.cycle_id ? s.c.cycles[task.cycle_id] : undefined));
   const assignee = useMember(task.assignee_id);
+  const askedBy = useMember(task.asked_by);
   const waitingOn = useMember(task.waiting_on_id);
   const holder = useMember(task.lease_holder_id);
   const readOnly = !!task.deleted_at;
@@ -87,6 +89,17 @@ export function Properties({ task }: { task: Task }) {
             </PropButton>
           </TaskPropertyPicker>
         </PropRow>
+
+        {askedBy && assignee?.kind === "agent" && (
+          <PropRow label={t("prop.workingFor")} wide>
+            <Tooltip label={t("prop.workingForHint", { name: askedBy.name })}>
+              <span tabIndex={0} className="flex h-7 min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-md text-sm text-ink-2 max-md:h-9">
+                <Avatar member={askedBy} size="xs" />
+                <span className="truncate">{askedBy.name}</span>
+              </span>
+            </Tooltip>
+          </PropRow>
+        )}
 
         <PropRow label={t("prop.waitingOn")} wide>
           <TaskPropertyPicker kind="waiting" tasks={[task]}>

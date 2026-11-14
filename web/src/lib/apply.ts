@@ -35,6 +35,7 @@ export const COLLECTION_OF: Record<string, CollectionName> = {
   webhook: "webhooks",
   rule: "rules",
   integration: "integrations",
+  secret: "secrets",
 };
 
 export const emptyCollections = (): Collections => {

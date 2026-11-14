@@ -19,6 +19,7 @@ import type {
   Notification,
   Project,
   Relation,
+  Secret,
   Status,
   Task,
   TaskLink,
@@ -58,6 +59,8 @@ export interface Collections {
   webhooks: Dict<AnyRow>;
   rules: Dict<AnyRow>;
   integrations: Dict<AnyRow>;
+  /** Not in the starting copy: the secrets page fetches them (settings/secrets/data.ts). */
+  secrets: Dict<Secret>;
 }
 
 export type CollectionName = keyof Collections;
@@ -171,10 +174,13 @@ export function loadBootstrap(slug: string, data: BootstrapData) {
     for (const name of ["comments", "attachments", "links"] as const) {
       Object.assign(c[name], keep.c[name]);
     }
-    // Watchers of opened tasks other than me, and deleted tasks shown in the trash.
+    // Watchers of opened tasks other than me, and deleted tasks and questions shown in the trash.
     c.watchers = { ...keep.c.watchers, ...c.watchers };
     for (const task of Object.values(keep.c.tasks)) {
       if (task.deleted_at && !c.tasks[task.id]) c.tasks[task.id] = task;
+    }
+    for (const decision of Object.values(keep.c.decisions)) {
+      if (decision.deleted_at && !c.decisions[decision.id]) c.decisions[decision.id] = decision;
     }
   }
   useStore.setState({

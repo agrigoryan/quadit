@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { X } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { toast } from "@/lib/toast";
 import { renameOption, updateProperty } from "@/docs/db/actions";
 import { ColorDot, optionsOf } from "@/docs/db/options";
 import { type DBProperty, OPTION_COLORS } from "@/docs/types";
@@ -55,8 +56,15 @@ export function OptionsEditor({ prop }: { prop: DBProperty }) {
             aria-label={t("db.option.rename", { name: o.name })}
             onBlur={(e) => {
               const name = e.target.value.trim();
-              if (name && name !== o.name) renameOption(prop, o.name, name);
-              else e.target.value = o.name;
+              if (!name || name === o.name) {
+                e.target.value = o.name;
+              } else if (options.some((x) => x.name === name)) {
+                // Two options cannot share a name; the server would refuse it too.
+                toast.error(t("db.option.taken", { name }));
+                e.target.value = o.name;
+              } else {
+                renameOption(prop, o.name, name);
+              }
             }}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
             className="h-6 min-w-0 flex-1 rounded-sm bg-transparent px-1 text-sm outline-none focus:bg-surface focus:ring-1 focus:ring-accent"

@@ -193,6 +193,8 @@ type decisionView struct {
 	N              int          `json:"n"`
 	ID             string       `json:"id"`
 	Task           string       `json:"task,omitempty"`
+	TaskID         string       `json:"task_id,omitempty"`
+	DeletedAt      int64        `json:"deleted_at,omitempty"`
 	Kind           string       `json:"kind"`
 	Question       string       `json:"question"`
 	Details        string       `json:"details,omitempty"`

@@ -92,25 +92,31 @@ export function deleteView(id: string) {
   mutate({ type: "dbview.delete", args: { id } }).catch(() => putRow("views", before as DBView));
 }
 
-/** Renames an option of a select, in the property and in every row that holds it. */
+/**
+ * Renames an option of a select. One change: the server renames it in the
+ * property, in every row that holds it (the trash included) and in the
+ * filters of views, and the feed brings all of that back. The property and
+ * the rows in the copy are changed at once; a refusal (the name is taken)
+ * puts them back and is shown.
+ */
 export function renameOption(prop: DBProperty, from: string, to: string) {
   const options = prop.config?.options ?? [];
   if (!to || from === to || options.some((o) => o.name === to)) return;
-  updateProperty(prop.id, { config: { ...prop.config, options: options.map((o) => (o.name === from ? { ...o, name: to } : o)) } });
-  const changes: { type: string; args: Fields }[] = [];
+  const before = patchRow("props", prop.id, { config: { ...prop.config, options: options.map((o) => (o.name === from ? { ...o, name: to } : o)) } });
   const patches: [string, Fields][] = [];
   for (const row of Object.values(getDocs())) {
-    if (row.parent_id !== prop.database_id || row.kind !== "row" || row.deleted_at) continue;
+    if (row.parent_id !== prop.database_id || row.kind !== "row") continue;
     const cur = row.props?.[prop.id];
     let next: unknown;
     if (cur === from) next = to;
     else if (Array.isArray(cur) && cur.includes(from)) next = cur.map((v) => (v === from ? to : v));
     else continue;
-    changes.push({ type: "doc.update", args: { id: row.id, props: { [prop.id]: next } } });
     patches.push([row.id, { props: { ...row.props, [prop.id]: next } }]);
   }
-  send(changes, (tx) => {
+  mutate({ type: "property.update", args: { id: prop.id, rename_option: { from, to } } }, (tx) => {
     for (const [id, fields] of patches) tx.patch("docs", id, fields);
+  }).catch(() => {
+    if (before) putRow("props", before as DBProperty);
   });
 }
 

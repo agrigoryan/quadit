@@ -182,7 +182,7 @@ func renamedOption(pr core.DBProperty, from, to string) ([]byte, error) {
 		om, _ := o.(map[string]any)
 		name, _ := om["name"].(string)
 		names = append(names, name)
-		if name == to && to != from {
+		if strings.EqualFold(name, to) && name != from {
 			return nil, conflictErr("%q already has an option named %q", pr.Name, to)
 		}
 		if name == from {

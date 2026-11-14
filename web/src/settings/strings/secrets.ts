@@ -1,0 +1,56 @@
+// Strings for the secrets page of workspace settings.
+
+export const secretStrings = {
+  "settings.nav.secrets": "Secrets",
+
+  "secrets.lead":
+    "Keys and passwords that agents can use but never read. The server makes the request for them with the value filled in, only to the hosts listed here, and every use is written to the audit log.",
+  "secrets.new": "New secret",
+  "secrets.newLead": "The value is stored encrypted. After it is saved nobody can read it back, here or through the API.",
+  "secrets.edit": "Edit {name}",
+  "secrets.create": "Create secret",
+  "secrets.empty": "No secrets yet. Add a key once, and agents can call the service it opens without ever holding it.",
+  "secrets.env": "Environment",
+  "secrets.envBadgeHint": "A companion may put this value in the environment of a command it runs.",
+  "secrets.noHosts": "No hosts",
+  "secrets.noHostsHint": "With no host listed, this secret cannot be sent in a request.",
+  "secrets.for": "For",
+  "secrets.everyMember": "Every member",
+  "secrets.lastUsed": "Last used",
+  "secrets.neverUsed": "Never used",
+
+  "secrets.name": "Name",
+  "secrets.nameHint": "Letters, digits and _, starting with a letter. Agents ask for the secret by this name.",
+  "secrets.nameFixed": "A secret keeps its name. To rename it, delete it and make a new one.",
+  "secrets.nameInvalid": "Use letters, digits and _, starting with a letter (like GITHUB_TOKEN).",
+  "secrets.nameTaken": "There is already a secret named {name}. Edit that one instead.",
+  "secrets.value": "Value",
+  "secrets.valueKeep": "Leave empty to keep the current value",
+  "secrets.valueKeepHint": "The value cannot be shown. Type a new one to replace it.",
+  "secrets.valueMissing": "A new secret needs its value.",
+  "secrets.show": "Show the value",
+  "secrets.hide": "Hide the value",
+  "secrets.description": "Description",
+  "secrets.descriptionPlaceholder": "What it opens, and whose account it is",
+  "secrets.hosts": "Hosts",
+  "secrets.hostsHint": "Where a request with this secret may go: api.example.com, *.example.com, or http://host:port for a host without TLS. Press Enter or comma after each.",
+  "secrets.hostsPlaceholder": "api.example.com",
+  "secrets.hostInvalid": "“{host}” is not a host. Write api.example.com, *.example.com, or http://host:port.",
+  "secrets.hostRemove": "Remove {host}",
+  "secrets.agents": "Who may use it",
+  "secrets.agentsAdd": "Add an agent",
+  "secrets.agentsHint": "With no agent picked, every member of the workspace may use it.",
+  "secrets.envSwitch": "Allow in a companion's environment",
+  "secrets.envHint":
+    "A process that has the secret in its environment can read it. Turn this on only for agents that run on machines you trust.",
+
+  "secrets.deleteTitle": "Delete {name}?",
+  "secrets.deleteBody": "The value is wiped at once and cannot be brought back. Agents that ask for this secret will be refused.",
+
+  "secrets.how": "How agents use it",
+  "secrets.howLead": "An agent names the secret and writes {{secret}} where the value belongs. It never sees the value itself.",
+  "secrets.how.request": "In a request the server makes",
+  "secrets.how.requestCmd": "quadit request NAME https://… header=\"Authorization:Bearer {{secret}}\"",
+  "secrets.how.run": "In the environment of a command (when allowed above)",
+  "secrets.how.runCmd": "quadit run --secret NAME -- command",
+};

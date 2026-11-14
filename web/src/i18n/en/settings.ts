@@ -6,6 +6,7 @@ import { agentStrings } from "@/settings/strings/agents";
 import { automationStrings } from "@/settings/strings/automation";
 import { meStrings } from "@/settings/strings/me";
 import { projectStrings } from "@/settings/strings/projects";
+import { secretStrings } from "@/settings/strings/secrets";
 import { sharedStrings } from "@/settings/strings/shared";
 import { workspaceStrings } from "@/settings/strings/workspace";
 
@@ -15,6 +16,7 @@ export const settings = {
   ...projectStrings,
   ...agentStrings,
   ...automationStrings,
+  ...secretStrings,
   ...meStrings,
   ...authStrings,
 };

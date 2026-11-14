@@ -223,7 +223,7 @@ func workspaceUpdate(c *cx) error {
 // ---- members and agents ----
 
 type memberAddArgs struct {
-	User   string `json:"user"` // the id of an existing person
+	User   string `json:"user"` // an existing person: their id or their email
 	Handle string `json:"handle"`
 	Role   string `json:"role"`
 	Title  string `json:"title"`
@@ -262,7 +262,13 @@ func memberAdd(c *cx) error {
 		return err
 	}
 	var u core.User
-	if err := c.tx.Get(c.ctx, &u, store.Eq("id", a.User), store.Live); err != nil {
+	if strings.Contains(a.User, "@") && !strings.HasPrefix(a.User, "@") {
+		if err := c.tx.Get(c.ctx, &u, store.Eq("email", strings.ToLower(strings.TrimSpace(a.User))), store.Live); err != nil {
+			e := notFound("account", a.User)
+			e.Field, e.Message = "user", "nobody has an account with "+a.User+"; send them an invitation instead"
+			return e
+		}
+	} else if err := c.tx.Get(c.ctx, &u, store.Eq("id", a.User), store.Live); err != nil {
 		return missing(err, "user", a.User)
 	}
 	if u.Kind != core.KindPerson {

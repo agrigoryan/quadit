@@ -104,8 +104,12 @@ export const adminMoreStrings = {
   "admin.workspaces.tasks": "{n} task | {n} tasks",
   "admin.workspaces.created": "Created",
   "admin.workspaces.open": "Open",
-  "admin.workspaces.notMember": "Not a member",
-  "admin.workspaces.notMemberHint": "Running the install does not let you into a workspace. Ask one of its owners for an invitation.",
+  "admin.workspaces.notMemberHint": "You are not a member of this workspace. Running the install lets you join it as an admin; its members will see that you did.",
+  "admin.workspaces.join": "Join as admin",
+  "admin.workspaces.joinTitle": "Join {name} as an admin?",
+  "admin.workspaces.joinBody":
+    "You will be able to see and change everything in this workspace. Joining is recorded in the audit log, and the workspace's members can see that you joined.",
+  "admin.workspaces.joined": "You are now an admin of {name}",
 
   "admin.health.title": "Health",
   "admin.health.lead": "What is failing or waiting behind the scenes.",

@@ -24,6 +24,6 @@ export const auditStrings = {
   "audit.none": "Nothing has been recorded yet.",
   "audit.noneMatching": "Nothing matches these filters.",
   "audit.shown": "{n} entry | {n} entries",
-  "audit.more": "Load older",
+  "audit.more": "Load more",
   "audit.end": "That is everything.",
 };

@@ -117,7 +117,8 @@ function EntryRow({ entry, names, showWorkspace }: { entry: AuditEntry; names: M
 export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Props) {
   const [filters, setFilters] = useState<AuditFilters>(noFilters);
   const [rows, setRows] = useState<AuditEntry[] | null>(null);
-  const [more, setMore] = useState(false);
+  /** Where the next page starts: the server's `next`, sent back as `cursor`. Empty when everything is shown. */
+  const [next, setNext] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const run = useRef(0);
@@ -125,18 +126,17 @@ export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Pr
   const names = new Map<string, string>();
   for (const n of [...(actors ?? []), ...(workspaces ?? [])]) names.set(n.id, n.name);
 
-  async function load(from: AuditEntry[] | null) {
+  /** Loads the first page, or with `from` and its cursor the page after what is shown. */
+  async function load(from: AuditEntry[] | null, cursor = "") {
     const mine = ++run.current;
     setBusy(true);
     try {
-      // Older than the last row shown; the "to" day still bounds the first page.
       const extra: Record<string, string | number> = { limit: PAGE };
-      const last = from?.[from.length - 1];
-      if (last) extra.before = last.at;
-      const out = await api.get<{ audit: AuditEntry[] }>(`${endpoint}?${auditQuery(filters, extra)}`);
+      if (from && cursor) extra.cursor = cursor;
+      const out = await api.get<{ audit: AuditEntry[]; next?: string }>(`${endpoint}?${auditQuery(filters, extra)}`);
       if (mine !== run.current) return;
-      setRows([...(from ?? []), ...out.audit]);
-      setMore(out.audit.length === PAGE);
+      setRows([...(from ?? []), ...(out.audit ?? [])]);
+      setNext(out.next ?? "");
       setError("");
     } catch (err) {
       if (mine !== run.current) return;
@@ -205,8 +205,8 @@ export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Pr
         {rows !== null && rows.length > 0 && (
           <div className="flex items-center justify-between gap-3 text-xs text-ink-3">
             <span>{t("audit.shown", { n: rows.length })}</span>
-            {more ? (
-              <Button onClick={() => void load(rows)} disabled={busy}>
+            {next ? (
+              <Button onClick={() => void load(rows, next)} disabled={busy}>
                 {busy && <Spinner className="size-3" />}
                 {t("audit.more")}
               </Button>

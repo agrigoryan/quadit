@@ -72,7 +72,7 @@ export const decisions = {
   "decision.edit.reason": "Why this one",
   "decision.delete": "Delete question",
   "decision.delete.title": "Delete this question?",
-  "decision.delete.description": "Its options and their comments go with it.",
+  "decision.delete.description": "It moves to the trash with its options and their comments, and can be restored from there.",
 
   "decision.changes.title": "Pick “{label}” with changes",
   "decision.changes.label": "What should change?",

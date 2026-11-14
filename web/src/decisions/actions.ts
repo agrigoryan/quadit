@@ -89,6 +89,14 @@ export function deleteDecision(decision: Decision) {
   send({ type: "decision.delete", args: { id: decision.id } }, (tx) => tx.patch("decisions", decision.id, { deleted_at: Date.now() }));
 }
 
+/**
+ * Brings a deleted question back from the trash. The server refuses while
+ * its task is in the trash; the refusal is shown, and the promise rejects.
+ */
+export function restoreDecision(id: string): Promise<unknown> {
+  return mutate({ type: "decision.restore", args: { id } }, (tx) => tx.patch("decisions", id, { deleted_at: null }));
+}
+
 /** A comment on one option, or on the decision as a whole. */
 export function addComment(decision: Decision, optionId: string | undefined, body: string) {
   const id = newId();

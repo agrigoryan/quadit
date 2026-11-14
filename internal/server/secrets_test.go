@@ -50,6 +50,17 @@ func TestVault(t *testing.T) {
 		s.call(nil, ct.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": "secret.set", "args": M{"name": "DEPLOY_KEY", "value": "x"}}, 403, nil)
 		s.change(s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": key, "description": "Deploys to staging", "hosts": []string{host}, "agents": []string{"@coder"}})
 
+		if out := s.call(s.owner, "", "GET", w+"/audit?action=secret.set", nil, 200, nil); !strings.Contains(out, "DEPLOY_KEY") || !strings.Contains(out, "•••") {
+			t.Fatalf("setting a secret is not on the record: %s", out)
+		}
+		// Other secrets given in a change are blanked on the record too.
+		s.change(s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_integration_secret", "config": M{"repo": "a/b"}})
+		s.change(s.owner, "", "webhook.create", M{"name": "hook", "url": api.URL + "/hook", "secret": "whsec_signing_secret"})
+		for _, path := range []string{w + "/audit", "/api/v1/admin/audit", "/api/v1/admin/audit?format=csv"} {
+			if out := s.call(s.owner, "", "GET", path, nil, 200, nil); strings.Contains(out, "ghp_integration_secret") || strings.Contains(out, "whsec_signing_secret") {
+				t.Fatalf("%s holds a secret in plain text", path)
+			}
+		}
 		// The value is nowhere: not in the list, the feed, the event, the bootstrap or the audit log.
 		for _, path := range []string{w + "/secrets", w + "/list/secrets", w + "/events?limit=500", w + "/bootstrap", w + "/audit", "/api/v1/admin/audit"} {
 			if out := s.call(s.owner, "", "GET", path, nil, 200, nil); strings.Contains(out, key) {

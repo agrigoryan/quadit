@@ -27,7 +27,22 @@ type changesBody struct {
 	For      string          `json:"for"`
 }
 
-var auditedPrefixes = []string{"member.", "agent.", "project.delete", "webhook.", "rule.", "integration.", "workspace.update"}
+var auditedPrefixes = []string{"member.", "agent.", "project.delete", "webhook.", "rule.", "integration.", "secret.", "workspace.update"}
+
+// auditArgs is a change's arguments as the audit log keeps them: what was
+// asked, with anything secret blanked out.
+func auditArgs(raw json.RawMessage) any {
+	var args map[string]json.RawMessage
+	if json.Unmarshal(raw, &args) != nil {
+		return nil
+	}
+	for _, k := range []string{"secret", "value", "password", "token", "credentials", "private_key"} {
+		if v, ok := args[k]; ok && string(v) != `""` && string(v) != "null" {
+			args[k] = json.RawMessage(`"•••"`)
+		}
+	}
+	return args
+}
 
 // hChanges applies one change or a batch. A batch is all or nothing.
 func (s *Server) hChanges(x *c) error {
@@ -54,7 +69,7 @@ func (s *Server) hChanges(x *c) error {
 		}
 		for _, p := range auditedPrefixes {
 			if strings.HasPrefix(r.Type, p) {
-				s.audit(x.r, x.ws.ID, x.user, r.Type, strings.SplitN(r.Type, ".", 2)[0], r.Ref, json.RawMessage(b.Changes[i].Args))
+				s.audit(x.r, x.ws.ID, x.user, r.Type, strings.SplitN(r.Type, ".", 2)[0], r.Ref, auditArgs(b.Changes[i].Args))
 			}
 		}
 		if b.Changes[i].Approval != "" {
@@ -623,7 +638,7 @@ func (x *c) decisionViews(ds []core.Decision, withFiles bool) ([]decisionView, e
 	out := make([]decisionView, len(ds))
 	for i, d := range ds {
 		ordinal[d.TaskID]++
-		v := decisionView{N: ordinal[d.TaskID], ID: d.ID, Task: keys[d.TaskID], Kind: d.Kind, Question: d.Question, Details: d.Details, Action: d.Action,
+		v := decisionView{N: ordinal[d.TaskID], ID: d.ID, Task: keys[d.TaskID], TaskID: d.TaskID, DeletedAt: d.DeletedAt, Kind: d.Kind, Question: d.Question, Details: d.Details, Action: d.Action,
 			State: d.State, By: nm.handle(d.CreatedBy), Asked: nm.handle(d.AskedID), Recommendation: d.Recommendation, Outcome: d.Outcome,
 			Note: d.OutcomeNote, DecidedBy: nm.handle(d.DecidedBy), DecidedAt: when(d.DecidedAt), UnclearNote: d.UnclearNote, AskedAt: when(d.CreatedAt)}
 		n := 0

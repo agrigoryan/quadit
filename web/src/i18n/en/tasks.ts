@@ -20,6 +20,8 @@ export const tasks = {
   "prop.status": "Status",
   "prop.assignee": "Assignee",
   "prop.waitingOn": "Waiting on",
+  "prop.workingFor": "Working for",
+  "prop.workingForHint": "Agents work on this task with no more access than {name} has.",
   "prop.priority": "Priority",
   "prop.labels": "Labels",
   "prop.epic": "Epic",

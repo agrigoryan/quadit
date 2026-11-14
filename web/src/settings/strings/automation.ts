@@ -94,6 +94,7 @@ export const automationStrings = {
   "auto.hook.neverSent": "Nothing sent yet",
   "auto.hook.deliveries": "Deliveries",
   "auto.hook.test": "Test",
+  "auto.hook.sendTest": "Send test",
   "auto.hook.testing": "Sending a sample event…",
   "auto.hook.test.ok": "The receiver answered {status} in {ms} ms.",
   "auto.hook.test.bad": "The receiver answered {status} in {ms} ms: {error}",
@@ -111,7 +112,7 @@ export const automationStrings = {
 
   "auto.delivery.title": "Deliveries to {name}",
   "auto.delivery.lead": "The last 100 events sent to this webhook. A delivery is tried again with longer and longer waits, then given up as dead.",
-  "auto.delivery.empty": "Nothing has been sent yet. A delivery appears here when an event matches; the Test button sends a sample without logging it.",
+  "auto.delivery.empty": "Nothing has been sent yet. A delivery appears here when an event matches, or when you send a test.",
   "auto.delivery.emptyInbox": "Nothing has been sent yet. A delivery appears here when something lands in this member's inbox.",
   "auto.delivery.state.pending": "Pending",
   "auto.delivery.state.ok": "Sent",
@@ -121,6 +122,9 @@ export const automationStrings = {
   "auto.delivery.willRetry": "Will try again. {error}",
   "auto.delivery.attempts": "{n} try | {n} tries",
   "auto.delivery.redeliver": "Redeliver",
+  "auto.delivery.test": "Test",
+  "auto.delivery.testHint": "A sample sent with the Test button, not an event from the feed. Send another with the Test button.",
+  "auto.delivery.seqHint": "The event's position in the workspace's feed",
   "auto.delivery.queued": "Queued to send again",
 
   ...automationMoreStrings,

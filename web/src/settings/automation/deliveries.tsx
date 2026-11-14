@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, RotateCw } from "lucide-react";
+import { RefreshCw, RotateCw, Send } from "lucide-react";
 import { api, errorMessage, ws } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
@@ -14,16 +14,31 @@ import { type Delivery, listRows, type Webhook } from "@/settings/automation/dat
 
 const tones = { pending: "wait", ok: "ok", dead: "danger" } as const;
 
+/** A sample sent with the Test button, not an event from the feed: it has no place in the feed. */
+const isTest = (d: Delivery) => d.seq < 0;
+
 function DeliveryRow({ d, onRedeliver }: { d: Delivery; onRedeliver: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const retrying = d.state === "pending" && d.attempts > 0;
+  const test = isTest(d);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
       <Badge tone={tones[d.state] ?? "neutral"} className="w-16 justify-center">
         {t(`auto.delivery.state.${d.state}`)}
       </Badge>
       <span className="min-w-0 flex-1 basis-40">
-        <span className="block truncate font-mono text-xs text-ink">{d.event_type}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-mono text-xs text-ink">{d.event_type}</span>
+          {test ? (
+            <Badge tone="accent" title={t("auto.delivery.testHint")}>
+              {t("auto.delivery.test")}
+            </Badge>
+          ) : (
+            <span className="shrink-0 text-xs text-ink-3 tnum" title={t("auto.delivery.seqHint")}>
+              #{d.seq}
+            </span>
+          )}
+        </span>
         <span className="block truncate text-xs text-ink-3" title={d.error || undefined}>
           {d.error
             ? retrying
@@ -37,17 +52,20 @@ function DeliveryRow({ d, onRedeliver }: { d: Delivery; onRedeliver: () => Promi
       <span className="flex shrink-0 items-center gap-3 text-xs text-ink-2">
         <span className="tnum">{t("auto.delivery.attempts", { n: d.attempts })}</span>
         <When ms={d.done_at || d.created_at} />
-        <Button
-          size="sm"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            void onRedeliver().finally(() => setBusy(false));
-          }}
-        >
-          <RotateCw className="size-3" aria-hidden />
-          {t("auto.delivery.redeliver")}
-        </Button>
+        {/* A test is sent again with the Test button; the server does not redeliver one. */}
+        {!test && (
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              void onRedeliver().finally(() => setBusy(false));
+            }}
+          >
+            <RotateCw className="size-3" aria-hidden />
+            {t("auto.delivery.redeliver")}
+          </Button>
+        )}
       </span>
     </div>
   );
@@ -57,6 +75,20 @@ function DeliveryRow({ d, onRedeliver }: { d: Delivery; onRedeliver: () => Promi
 export function DeliveriesDialog({ hook, onClose }: { hook: Webhook; onClose: () => void }) {
   const slug = useSlug();
   const log = useLoad(() => listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=100`), [slug, hook.id]);
+  const [testing, setTesting] = useState(false);
+
+  /** Sends a sample event; it is logged like any delivery, so the list shows how it went. */
+  async function sendTest() {
+    setTesting(true);
+    try {
+      await api.post(ws(slug, `/webhooks/${hook.id}/test`));
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setTesting(false);
+    }
+    await log.reload();
+  }
 
   async function redeliver(id: string) {
     try {
@@ -79,10 +111,16 @@ export function DeliveriesDialog({ hook, onClose }: { hook: Webhook; onClose: ()
       size="lg"
       footer={
         <>
-          <Button onClick={() => void log.reload()} disabled={log.loading} className="mr-auto">
-            <RefreshCw className="size-3.5" aria-hidden />
-            {t("s.refresh")}
-          </Button>
+          <span className="mr-auto flex items-center gap-2">
+            <Button onClick={() => void log.reload()} disabled={log.loading}>
+              <RefreshCw className="size-3.5" aria-hidden />
+              {t("s.refresh")}
+            </Button>
+            <Button onClick={() => void sendTest()} disabled={testing}>
+              <Send className="size-3.5" aria-hidden />
+              {t("auto.hook.sendTest")}
+            </Button>
+          </span>
           <Button variant="primary" onClick={onClose}>
             {t("s.done")}
           </Button>
