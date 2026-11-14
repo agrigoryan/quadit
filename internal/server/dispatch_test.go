@@ -142,3 +142,29 @@ func TestWakeUps(t *testing.T) {
 	}
 	_ = artist
 }
+
+func TestWatchedView(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
+	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	var tok struct{ Token string }
+	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+	// The agent saves a view of unassigned art tasks and watches it.
+	view := s.change(nil, tok.Token, "view.create", M{"name": "Art nobody has", "query": M{"label": []string{"art"}, "assignee": []string{"none"}, "open": true}})
+	s.change(nil, tok.Token, "watch.set", M{"type": "view", "subject": view["ref"]})
+	inbox := func() string { return s.call(nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil) }
+
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Not art"})
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane sprites", "labels": []string{"art"}})
+	eventually(t, "the view's watcher to hear of the new art task", func() bool {
+		return strings.Contains(inbox(), `SVA-2 Dock crane sprites — in your view "Art nobody has"`)
+	})
+	if strings.Contains(inbox(), "SVA-1") {
+		t.Fatalf("a task outside the view was announced:\n%s", inbox())
+	}
+	// The saved view can be run by its slug.
+	if out := s.call(nil, tok.Token, "GET", "/api/v1/w/-/tasks?view=art-nobody-has&format=text", nil, 200, nil); !strings.Contains(out, "SVA-2") || strings.Contains(out, "SVA-1") {
+		t.Fatalf("view query:\n%s", out)
+	}
+}

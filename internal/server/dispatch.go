@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -88,11 +89,26 @@ func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error)
 	if err := db.List(ctx, &rules, store.Where(store.Live, store.Eq("active", true))); err != nil {
 		return 0, err
 	}
+	// Saved views someone watches: a task that comes into one is news for them.
+	var viewWatchers []core.Watcher
+	if err := db.List(ctx, &viewWatchers, store.Where(store.Eq("subject_type", "view"))); err != nil {
+		return 0, err
+	}
 	for _, ev := range evs {
 		for _, h := range hooks {
 			if hookWants(h, ev) {
 				if err := s.queueDelivery(ctx, db, h, ev); err != nil {
 					return 0, err
+				}
+			}
+		}
+		if len(viewWatchers) > 0 && ev.AudienceID == "" && ev.ScopeType == "task" && (ev.Type == "task.created" || ev.Type == "task.updated") {
+			for _, vw := range viewWatchers {
+				if vw.UserID == ev.ActorID {
+					continue
+				}
+				if err := s.viewNews(ctx, ws, vw, ev); err != nil {
+					s.log.Error("watched view", "view", vw.SubjectID, "seq", ev.Seq, "err", err)
 				}
 			}
 		}
@@ -116,6 +132,46 @@ func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error)
 	last := evs[len(evs)-1].Seq
 	_, err = s.st.Update(ctx, "workspaces", map[string]any{"dispatched_seq": last}, store.Eq("id", ws.ID), store.Lt("dispatched_seq", last))
 	return last, err
+}
+
+// viewNews tells the watcher of a saved view when a change leaves a task in
+// that view. A task is announced once a day at most, however often it moves.
+func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watcher, ev core.Event) error {
+	db := s.st.In(ws.ID)
+	var view core.View
+	var m core.Member
+	if db.Get(ctx, &view, store.Eq("id", vw.SubjectID), store.Live) != nil || db.Get(ctx, &m, store.Eq("user_id", vw.UserID), store.Null("removed_at")) != nil {
+		return nil
+	}
+	// Run the view's query as the watcher, narrowed to this one task.
+	x := &c{s: s, r: (&http.Request{URL: &url.URL{}}).WithContext(ctx), ws: ws, db: db, member: m}
+	if m.Scope != nil {
+		x.projects = m.Scope.Projects
+	}
+	var q TaskQuery
+	if len(view.Query) > 0 {
+		if err := json.Unmarshal(view.Query, &q); err != nil {
+			return nil
+		}
+	}
+	if view.ProjectID != "" && len(q.Project) == 0 {
+		q.Project = []string{view.ProjectID}
+	}
+	f, err := x.filter(q)
+	if err != nil {
+		return nil // the view names something that is gone; nothing to watch
+	}
+	f.IDs, f.Limit, f.Offset, f.Sort = []string{ev.ScopeID}, 1, 0, ""
+	if n, err := db.CountTasks(ctx, f); err != nil || n == 0 {
+		return err
+	}
+	once := id.From("view-news", view.ID, vw.UserID, ev.ScopeID, time.UnixMilli(ev.At).UTC().Format("2006-01-02"))
+	return s.eng.System(ctx, ws.ID, ev.ActorID, func(sys *engine.Sys) error {
+		if done, err := sys.Once(once, "view-news"); err != nil || done {
+			return err
+		}
+		return sys.Do("notify", map[string]any{"user": vw.UserID, "task": ev.ScopeID, "message": "in your view \"" + view.Name + "\""})
+	})
 }
 
 // typeMatches checks an event type against a list where "task.*" covers a
