@@ -3,12 +3,18 @@ package blob
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"gocloud.dev/blob/memblob"
 )
 
@@ -106,5 +112,58 @@ func TestMoveAndLayers(t *testing.T) {
 	r.Close()
 	if string(got) != "old file" {
 		t.Fatalf("moved content = %q", got)
+	}
+}
+
+// TestRealBuckets runs the same checks against real services. Each is on
+// when its variable holds the store's settings as JSON, as the admin area
+// saves them:
+//
+//	QUADIT_TEST_FILES_S3='{"kind":"s3","bucket":"quadit","endpoint":"http://127.0.0.1:59000","access_key":"…","secret_key":"…"}'
+//	QUADIT_TEST_FILES_AZURE, QUADIT_TEST_FILES_GCS likewise.
+func TestRealBuckets(t *testing.T) {
+	for _, name := range []string{"S3", "AZURE", "GCS"} {
+		raw := os.Getenv("QUADIT_TEST_FILES_" + name)
+		if raw == "" {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			var c Config
+			if err := json.Unmarshal([]byte(raw), &c); err != nil {
+				t.Fatal(err)
+			}
+			// A folder of its own, so runs do not see each other's files.
+			c.Prefix = fmt.Sprintf("test-%d", time.Now().UnixNano())
+			if c.Kind == "azure" {
+				// Make the container if it is not there yet.
+				if cred, err := azblob.NewSharedKeyCredential(c.Account, c.AccountKey); err == nil {
+					if cl, err := container.NewClientWithSharedKeyCredential(strings.TrimRight(c.Endpoint, "/")+"/"+c.Bucket, cred, nil); err == nil {
+						cl.Create(context.Background(), nil)
+					}
+				}
+			}
+			s, err := Open(context.Background(), c, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			testStore(t, s)
+			// A file bigger than one part, as an upload of a video would be.
+			big := bytes.Repeat([]byte("quadit-"), 3<<20/7)
+			if err := s.Put(context.Background(), "ws/big", bytes.NewReader(big), "application/octet-stream"); err != nil {
+				t.Fatal(err)
+			}
+			r, _, err := s.Open(context.Background(), "ws/big")
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := io.ReadAll(r)
+			r.Close()
+			if err != nil || !bytes.Equal(got, big) {
+				t.Fatalf("a %d byte file came back as %d bytes, %v", len(big), len(got), err)
+			}
+			if err := s.Delete(context.Background(), "ws/big"); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

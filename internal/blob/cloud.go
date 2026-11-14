@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -97,19 +98,24 @@ func Open(ctx context.Context, c Config, dataDir string) (Store, error) {
 		if err := need("a bucket", c.Bucket); err != nil {
 			return nil, err
 		}
-		var creds *google.Credentials
-		var err error
-		if c.Credentials != "" {
-			creds, err = google.CredentialsFromJSON(ctx, []byte(c.Credentials), "https://www.googleapis.com/auth/devstorage.read_write")
+		var client *gcp.HTTPClient
+		if c.Credentials == "" && os.Getenv("STORAGE_EMULATOR_HOST") != "" {
+			// A local stand-in for Google Cloud Storage takes no sign-in.
+			client = gcp.NewAnonymousHTTPClient(gcp.DefaultTransport())
 		} else {
-			creds, err = gcp.DefaultCredentials(ctx)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("file storage: Google credentials: %w", err)
-		}
-		client, err := gcp.NewHTTPClient(gcp.DefaultTransport(), gcp.CredentialsTokenSource(creds))
-		if err != nil {
-			return nil, fmt.Errorf("file storage: %w", err)
+			var creds *google.Credentials
+			var err error
+			if c.Credentials != "" {
+				creds, err = google.CredentialsFromJSON(ctx, []byte(c.Credentials), "https://www.googleapis.com/auth/devstorage.read_write")
+			} else {
+				creds, err = gcp.DefaultCredentials(ctx)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("file storage: Google credentials: %w", err)
+			}
+			if client, err = gcp.NewHTTPClient(gcp.DefaultTransport(), gcp.CredentialsTokenSource(creds)); err != nil {
+				return nil, fmt.Errorf("file storage: %w", err)
+			}
 		}
 		b, err := gcsblob.OpenBucket(ctx, client, c.Bucket, nil)
 		if err != nil {

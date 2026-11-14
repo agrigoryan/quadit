@@ -113,3 +113,17 @@ Tests run on SQLite always, and on Postgres when `QUADIT_TEST_POSTGRES` holds a 
 docker run -d --name quadit-pg -e POSTGRES_PASSWORD=quadit -e POSTGRES_DB=quadit -p 127.0.0.1:54329:5432 postgres:17-alpine
 make test-all
 ```
+
+## Checking against real services
+
+The test suite runs without a network. Three of its checks also run against real services when told where they are:
+
+```
+# S3 (AWS, R2, MinIO), Azure Blob and Google Cloud Storage: the store's settings as JSON, as the admin area saves them
+QUADIT_TEST_FILES_S3='{"kind":"s3","bucket":"quadit","endpoint":"http://127.0.0.1:9000","region":"us-east-1","access_key":"…","secret_key":"…"}' \
+QUADIT_TEST_FILES_AZURE='{"kind":"azure","bucket":"quadit","account":"…","account_key":"…"}' \
+QUADIT_TEST_FILES_GCS='{"kind":"gcs","bucket":"quadit","credentials":"{…service account key…}"}' \
+  go test -run TestRealBuckets ./internal/blob
+```
+
+What has been run this way, and by hand against a live server: file storage on MinIO (uploads, ranges, and moving an install's files from disk to the bucket), Azurite and a Google Cloud Storage emulator; mail through an SMTP server (test message, invitation, password reset, following the links); OpenID Connect sign-in with Dex in a browser; GitHub pull request and check linking against github.com; browser push through Google's push service to Chrome. Sign-in with Google and with GitHub themselves need your own OAuth app, and are the same code as OpenID Connect and the GitHub tests: try them once after you set them up.
