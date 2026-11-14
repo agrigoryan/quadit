@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -56,6 +57,10 @@ act
   unclear DECISION NOTE
   attach KEY PATH ... [option=ID | decision=ID]
   upload PATH                  store a file, print its address
+  link [KEY]                   link the current git branch (and its commits) to a task;
+                               the key is read from the branch name when left out
+  link KEY URL                 link a URL to a task
+  render KEY|doc=ID [width=390] [out=FILE]   a picture of how it looks to a person
   write ID|new TITLE [parent=ID] [mode=append] < markdown     write a page from stdin
   remember TITLE [mode=append] < markdown                     save a note to my memory
   row DATABASE TITLE [Prop=value ...]                         add a row to a database
@@ -522,6 +527,27 @@ func (r *runner) run(cmd string, rest []string) error {
 			fmt.Fprintln(r.out, furl)
 		}
 		return nil
+	case "link":
+		return r.link(pos, approval)
+	case "render":
+		q := query(f)
+		out := "render.png"
+		if o := f["out"]; len(o) > 0 {
+			out = o[0]
+			q.Del("out")
+		}
+		if len(pos) > 0 {
+			q.Set("task", pos[0])
+		}
+		png, err := r.c.do("GET", "/render", q, nil, "", "image/png")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(out, png, 0o644); err != nil {
+			return err
+		}
+		fmt.Fprintln(r.out, out)
+		return nil
 	case "upload":
 		if err := need(pos, 1, "upload PATH"); err != nil {
 			return err
@@ -630,4 +656,74 @@ func (r *runner) listen(args []string) error {
 			fmt.Fprintln(r.out, "ack failed:", err)
 		}
 	}
+}
+
+var branchKey = regexp.MustCompile(`(?i)\b([a-z][a-z0-9]{1,9}-\d+)\b`)
+
+func gitOut(args ...string) (string, error) {
+	out, err := exec.Command("git", args...).Output()
+	return strings.TrimSpace(string(out)), err
+}
+
+// link ties the git branch in the current directory to a task: its name,
+// its commits ahead of the main branch, and whether it is merged. It needs
+// no hosting service, only a local repository.
+func (r *runner) link(pos []string, approval string) error {
+	if len(pos) == 2 && strings.Contains(pos[1], "://") {
+		_, err := r.change("link.set", map[string]any{"task": pos[0], "kind": "url", "url": pos[1]}, approval)
+		return err
+	}
+	branch, err := gitOut("rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return errors.New("this is not a git repository; run it inside one, or give a URL: quadit link KEY URL")
+	}
+	key := ""
+	if len(pos) > 0 {
+		key = pos[0]
+	} else if m := branchKey.FindString(branch); m != "" {
+		key = strings.ToUpper(m)
+	} else {
+		return fmt.Errorf("the branch %q does not name a task; give the key: quadit link KEY", branch)
+	}
+	repo, _ := gitOut("remote", "get-url", "origin")
+	repo = strings.TrimSuffix(repo, ".git")
+	if i := strings.LastIndexAny(repo, ":"); i >= 0 && !strings.Contains(repo, "://") {
+		repo = repo[i+1:] // git@host:owner/name
+	} else if u, perr := url.Parse(repo); perr == nil && u.Host != "" {
+		repo = strings.Trim(u.Path, "/")
+	}
+	if repo == "" {
+		top, _ := gitOut("rev-parse", "--show-toplevel")
+		repo = filepath.Base(top)
+	}
+	base := ""
+	for _, cand := range []string{"origin/HEAD", "origin/main", "origin/master", "main", "master"} {
+		if _, err := gitOut("rev-parse", "--verify", "--quiet", cand); err == nil {
+			base = cand
+			break
+		}
+	}
+	type commit struct {
+		SHA     string `json:"sha"`
+		Subject string `json:"subject"`
+	}
+	var commits []commit
+	state := "open"
+	if base != "" {
+		log, _ := gitOut("log", "--format=%h%x09%s", "-n", "50", base+"..HEAD")
+		for _, line := range strings.Split(log, "\n") {
+			if sha, subject, ok := strings.Cut(line, "\t"); ok {
+				commits = append(commits, commit{sha, subject})
+			}
+		}
+		if len(commits) == 0 && branch != strings.TrimPrefix(base, "origin/") {
+			if _, err := gitOut("merge-base", "--is-ancestor", "HEAD", base); err == nil {
+				state = "merged"
+			}
+		}
+	}
+	title, _ := gitOut("log", "-1", "--format=%s")
+	_, err = r.change("link.set", map[string]any{"task": key, "kind": "branch", "repo": repo, "ref": branch, "state": state, "title": title,
+		"data": map[string]any{"commits": commits, "ahead": len(commits), "base": base}}, approval)
+	return err
 }

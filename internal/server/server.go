@@ -30,8 +30,11 @@ import (
 type Config struct {
 	DataDir string // uploads in progress, the install secret, local files
 	BaseURL string // where people reach the server, e.g. https://quadit.example.com
-	Version string
-	Log     *slog.Logger
+	// LocalURL is where the server reaches itself, for taking pictures of
+	// its own pages. Empty means BaseURL.
+	LocalURL string
+	Version  string
+	Log      *slog.Logger
 }
 
 // Server holds everything a request needs.
@@ -304,7 +307,13 @@ func (s *Server) identify(x *c) error {
 	if err := s.st.Get(ctx, &sess, store.Eq("token_hash", auth.Hash(ck.Value)), store.Null("revoked_at")); err != nil || sess.ExpiresAt < now {
 		return errUnauthorized("your session has ended; sign in again")
 	}
-	if sess.Stage != "full" && !x.halfOK {
+	switch {
+	case sess.Stage == "render":
+		// A session made to take a picture of a page: it may only look.
+		if x.r.Method != http.MethodGet && x.r.Method != http.MethodHead {
+			return errForbidden("this session is read-only")
+		}
+	case sess.Stage != "full" && !x.halfOK:
 		return &httpError{Status: 401, Code: "second_step", Message: "finish signing in with your second step"}
 	}
 	// A cookie rides along on requests other sites make; refuse those.
