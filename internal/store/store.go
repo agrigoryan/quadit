@@ -153,6 +153,7 @@ type TaskFilter struct {
 	StatusIDs     []string
 	Categories    []string // status categories, e.g. started, waiting
 	Open          bool     // not done and not canceled
+	Closed        bool     // done, canceled or archived: everything Open with Archived off leaves out
 	LabelIDs      []string // has every one of these
 	ParentID      string
 	TopLevel      bool // no parent

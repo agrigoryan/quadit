@@ -837,8 +837,13 @@ func (r *runner) link(pos []string, approval string) error {
 		}
 	}
 	title, _ := gitOut("log", "-1", "--format=%s")
-	_, err = r.change("link.set", map[string]any{"task": key, "kind": "branch", "repo": repo, "ref": branch, "state": state, "title": title,
-		"data": map[string]any{"commits": commits, "ahead": len(commits), "base": base}}, approval)
+	args := map[string]any{"task": key, "kind": "branch", "repo": repo, "ref": branch, "state": state, "title": title}
+	if state != "merged" {
+		// Once merged nothing is ahead any more: the commits listed while
+		// the branch was open stay on the link as they were.
+		args["data"] = map[string]any{"commits": commits, "ahead": len(commits), "base": base}
+	}
+	_, err = r.change("link.set", args, approval)
 	return err
 }
 

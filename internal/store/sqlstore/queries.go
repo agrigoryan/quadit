@@ -102,6 +102,9 @@ func (c conn) taskWhere(f store.TaskFilter) *clause {
 	if f.Open {
 		w.add(`t.status_id IN (SELECT id FROM statuses WHERE workspace_id = t.workspace_id AND category NOT IN ('done', 'canceled'))`)
 	}
+	if f.Closed {
+		w.add(`(t.archived_at IS NOT NULL OR t.status_id IN (SELECT id FROM statuses WHERE workspace_id = t.workspace_id AND category IN ('done', 'canceled')))`)
+	}
 	for _, l := range f.LabelIDs {
 		w.add(`EXISTS (SELECT 1 FROM task_labels tl WHERE tl.task_id = t.id AND tl.label_id = ?)`, idOrNone(l))
 	}

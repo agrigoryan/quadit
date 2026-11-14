@@ -160,12 +160,27 @@ func (s *Server) hBootstrap(x *c) error {
 			return err
 		}
 	}
-	tasks, err := x.db.Tasks(ctx, store.TaskFilter{ProjectIDs: x.projects, Archived: true, Limit: 5000, Sort: "created"})
+	// part=open brings the open work, which is what the first screen needs;
+	// part=rest brings what is done, canceled or archived, to be asked for in
+	// the background. Without part, everything comes at once.
+	part := x.r.URL.Query().Get("part")
+	want := store.TaskFilter{ProjectIDs: x.projects, Archived: true, Limit: 5000, Sort: "created"}
+	switch part {
+	case "":
+	case "open":
+		want.Open, want.Archived = true, false
+	case "rest":
+		want.Closed = true
+	default:
+		return &engine.Error{Code: engine.CodeInvalid, Field: "part", Message: "unknown part " + part, Allowed: []string{"open", "rest"}}
+	}
+	tasks, err := x.db.Tasks(ctx, want)
 	if err != nil {
 		return err
 	}
 	for more := tasks; len(more) == 5000; {
-		if more, err = x.db.Tasks(ctx, store.TaskFilter{ProjectIDs: x.projects, Archived: true, Limit: 5000, Offset: len(tasks), Sort: "created"}); err != nil {
+		want.Offset = len(tasks)
+		if more, err = x.db.Tasks(ctx, want); err != nil {
 			return err
 		}
 		tasks = append(tasks, more...)
@@ -231,7 +246,16 @@ func (s *Server) hBootstrap(x *c) error {
 	out["attachments"] = atts
 	out["tasks"] = tasks
 	out["decisions"] = decisions
-	out["relations"] = keep(relations, func(r core.Relation) bool { return taskIDs[r.TaskID] || taskIDs[r.RelatedTaskID] })
+	relations = keep(relations, func(r core.Relation) bool { return taskIDs[r.TaskID] || taskIDs[r.RelatedTaskID] })
+	if part == "rest" {
+		// Only what part=open left out: the closed tasks and what hangs on them.
+		return x.ok(map[string]any{"seq": out["seq"], "part": part, "tasks": tasks, "decisions": decisions, "attachments": atts, "relations": relations})
+	}
+	if part == "open" {
+		out["part"] = part
+		out["rest"], _ = x.db.CountTasks(ctx, store.TaskFilter{ProjectIDs: x.projects, Archived: true, Closed: true})
+	}
+	out["relations"] = relations
 	out["notifications"] = notes
 	out["watchers"] = watchers
 	out["resources"] = resources
@@ -760,7 +784,7 @@ func (x *c) detail(t core.Task, maxChars int) (taskDetail, error) {
 		return d, err
 	}
 	for _, l := range links {
-		d.Links = append(d.Links, linkView{ID: l.ID, Kind: l.Kind, Ref: l.Ref, Repo: l.Repo, Title: l.Title, URL: l.URL, State: l.State, Checks: l.Checks})
+		d.Links = append(d.Links, linkView{ID: l.ID, Kind: l.Kind, Ref: l.Ref, Repo: l.Repo, Title: l.Title, URL: l.URL, State: l.State, Checks: l.Checks, Data: l.Data})
 	}
 	var ws2 []core.Watcher
 	if err := x.db.List(ctx, &ws2, store.Where(store.Eq("subject_id", t.ID))); err != nil {

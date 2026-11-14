@@ -322,6 +322,9 @@ type linkView struct {
 	URL    string `json:"url,omitempty"`
 	State  string `json:"state,omitempty"`
 	Checks string `json:"checks,omitempty"`
+	// Data is what the link carries besides: a branch's commits ahead of
+	// the main branch, a pull request's numbers.
+	Data json.RawMessage `json:"data,omitempty"`
 }
 
 type taskDetail struct {

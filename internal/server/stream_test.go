@@ -269,3 +269,44 @@ func TestTwoServersOneDatabase(t *testing.T) {
 		}
 	})
 }
+
+// TestBootstrapInParts checks that the open work and the rest add up to
+// everything, with nothing in both.
+func TestBootstrapInParts(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		for i := 0; i < 6; i++ {
+			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i+1)})
+		}
+		s.change(s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"})
+		s.change(s.owner, "", "task.update", M{"id": "SVA-3", "status": "canceled"})
+		s.change(s.owner, "", "task.update", M{"id": "SVA-4", "archived": true})
+		s.change(s.owner, "", "decision.open", M{"task": "SVA-2", "question": "Closed question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Open question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		type boot struct {
+			Rest      int
+			Tasks     []struct{ Key string }
+			Decisions []struct{ Question string }
+			Projects  []struct{ Key string }
+		}
+		var all, open, rest boot
+		s.call(s.owner, "", "GET", w+"/bootstrap", nil, 200, &all)
+		s.call(s.owner, "", "GET", w+"/bootstrap?part=open", nil, 200, &open)
+		s.call(s.owner, "", "GET", w+"/bootstrap?part=rest", nil, 200, &rest)
+		keys := func(b boot) string {
+			var out []string
+			for _, t := range b.Tasks {
+				out = append(out, t.Key)
+			}
+			return strings.Join(out, " ")
+		}
+		if keys(open) != "SVA-1 SVA-5 SVA-6" || keys(rest) != "SVA-2 SVA-3 SVA-4" || open.Rest != 3 || len(all.Tasks) != 6 {
+			t.Fatalf("open: %s (rest %d); rest: %s; all: %d", keys(open), open.Rest, keys(rest), len(all.Tasks))
+		}
+		if len(open.Decisions) != 1 || open.Decisions[0].Question != "Open question?" || len(rest.Decisions) != 1 || len(open.Projects) != 1 || len(rest.Projects) != 0 {
+			t.Fatalf("decisions and the rest of the copy: open %+v, rest %+v", open, rest)
+		}
+		s.call(s.owner, "", "GET", w+"/bootstrap?part=nope", nil, 400, nil)
+	})
+}
