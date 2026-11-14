@@ -29,7 +29,7 @@ function Field({ prop, value, onChange }: { prop: DBProperty; value: unknown; on
   } else if (prop.type === "number") {
     control = <Input id={id} type="number" step="any" value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} />;
   } else if (prop.type === "date") {
-    control = <Input id={id} type="date" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value || null)} className="w-44" />;
+    control = <Input id={id} type="date" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value || null)} />;
   } else {
     control = (
       <SelfCell prop={prop} stored={value} shown={(value ?? undefined) as Value | undefined} onChange={onChange} wrap placeholder={t("db.form.choose")} className={prop.type === "checkbox" ? "w-auto" : `min-h-8 ${boxed}`} />

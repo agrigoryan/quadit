@@ -15,8 +15,9 @@ interface Props {
   onPick: (viewId: string) => void;
 }
 
-const tab =
-  "-mb-px flex h-8 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-2 text-sm font-medium text-ink-2 transition-colors hover:text-ink [&>svg]:size-3.5";
+const tabBase = "flex h-8 shrink-0 items-center gap-1.5 border-b-2 px-2 text-sm font-medium transition-colors [&>svg]:size-3.5";
+const tab = `${tabBase} border-transparent text-ink-2 hover:text-ink`;
+const tabOn = `${tabBase} border-accent text-ink`;
 
 /**
  * A database's views as tabs. Click the open tab for its menu: rename,
@@ -77,7 +78,7 @@ export function ViewTabs({ databaseId, views, active, onPick }: Props) {
         }
         return (
           <Menu key={view.id}>
-            <MenuTrigger role="tab" aria-selected className={cx(tab, "border-accent text-ink")}>
+            <MenuTrigger role="tab" aria-selected className={tabOn}>
               <Icon aria-hidden />
               {view.name}
             </MenuTrigger>

@@ -95,7 +95,7 @@ export function toEditor(block: Pick<BlockRow, "id" | "type" | "props" | "conten
   }
   const out: Omit<EdBlock, "children"> = { id: block.id, type: block.type, props };
   if (spec.content === "table") out.content = tableIn(block.content);
-  else if (spec.content === "inline") out.content = inlineIn(block.content);
+  else if (spec.content !== "none") out.content = inlineIn(block.content);
   return out;
 }
 
@@ -191,7 +191,7 @@ export function toWire(block: Pick<EdBlock, "type" | "props" | "content">, schem
   const wire: Wire = { type: block.type };
   if (Object.keys(props).length) wire.props = props;
   if (spec?.content === "table") wire.content = tableOut(block.content);
-  else if (spec?.content === "inline") wire.content = inlineOut(block.content);
+  else if (spec && spec.content !== "none") wire.content = inlineOut(block.content);
   return wire;
 }
 

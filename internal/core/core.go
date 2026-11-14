@@ -130,6 +130,9 @@ type Member struct {
 	UpdatedSeq     int64   `json:"updated_seq" db:"updated_seq"`
 	SuspendedAt    int64   `json:"suspended_at,omitempty" db:"suspended_at,null"`
 	RemovedAt      int64   `json:"removed_at,omitempty" db:"removed_at,null"`
+	// ResponsibleID is the person who answers for an agent. It is kept on
+	// the user and filled in when members are read.
+	ResponsibleID string `json:"responsible_id,omitempty"`
 }
 
 type APIToken struct {

@@ -120,7 +120,7 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 		}
 		if err := db.Insert(ctx, ws); err != nil {
 			if errors.Is(err, store.ErrConflict) {
-				return conflictErr("a workspace with the slug %q already exists", ws.Slug)
+				return &Error{Code: CodeConflict, Field: "slug", Message: "a workspace with the address \"" + ws.Slug + "\" already exists; choose another"}
 			}
 			return err
 		}
@@ -553,7 +553,7 @@ func agentCreate(c *cx) error {
 		return taken(err, "id", uid)
 	}
 	return c.addMember(core.Member{WorkspaceID: c.ws, UserID: uid, Role: role, Handle: handle, Kind: u.Kind, Name: u.Name,
-		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at})
+		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at, ResponsibleID: rm.UserID})
 }
 
 func orAll(list, all []string) []string {

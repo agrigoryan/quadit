@@ -4,6 +4,7 @@ package app
 
 import (
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
@@ -12,6 +13,7 @@ import (
 )
 
 func init() {
+	mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	WebHandler = func() http.Handler {
 		dist, err := fs.Sub(web.Dist, "dist")
 		if err != nil {

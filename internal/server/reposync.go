@@ -69,6 +69,9 @@ func (s *Server) runSources(ctx context.Context) {
 }
 
 func (s *Server) hSourceSync(x *c) error {
+	if err := x.admin(); err != nil {
+		return err
+	}
 	var src core.DocSource
 	if err := x.db.Get(x.ctx(), &src, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return errNotFound("source")

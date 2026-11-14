@@ -3,8 +3,18 @@
 // chip and a link to a page.
 
 import { BlockNoteSchema, defaultInlineContentSpecs } from "@blocknote/core";
+import { UniqueID } from "@blocknote/core/extensions";
 import { createReactInlineContentSpec } from "@blocknote/react";
+import { newId } from "@/lib/ids";
 import { MentionChip, PageChip, TaskChip } from "@/docs/editor/chips";
+
+// New blocks get ids like every other row of the product (UUIDv7, made in the
+// browser). BlockNote has no option for this; its id extension reads its
+// defaults when an editor is made, so the default is replaced here, once.
+const defaults = UniqueID.config.addOptions;
+UniqueID.config.addOptions = function addOptions(this: never) {
+  return { ...(defaults?.call(this) as object), generateID: newId } as never;
+};
 
 const mention = createReactInlineContentSpec(
   { type: "mention", propSchema: { handle: { default: "" } }, content: "none" },

@@ -137,6 +137,10 @@ func (s *Server) hGitHubHook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad signature", http.StatusUnauthorized)
 		return
 	}
+	if !in.Active {
+		w.WriteHeader(http.StatusAccepted) // paused: taken, not acted on
+		return
+	}
 	go func() {
 		if _, err := s.syncGitHub(context.WithoutCancel(ctx), in); err != nil {
 			s.log.Warn("github sync", "integration", in.ID, "err", err)

@@ -501,6 +501,8 @@ type webhookUpdateArgs struct {
 	URL        Opt[string]   `json:"url"`
 	Secret     Opt[string]   `json:"secret"`
 	EventTypes Opt[[]string] `json:"event_types"`
+	Project    Opt[string]   `json:"project"`
+	For        Opt[string]   `json:"for"`
 	Active     Opt[bool]     `json:"active"`
 }
 
@@ -529,6 +531,26 @@ func webhookUpdate(c *cx) error {
 	}
 	if a.EventTypes.Set {
 		p.put("event_types", w.EventTypes, a.EventTypes.V)
+	}
+	if a.Project.Set {
+		pid := ""
+		if !a.Project.Null && a.Project.V != "" {
+			pr, err := c.project(a.Project.V)
+			if err != nil {
+				return err
+			}
+			pid = pr.ID
+		}
+		p.put("project_id", w.ProjectID, pid)
+	}
+	if a.For.Set {
+		uid := ""
+		if !a.For.Null {
+			if uid, err = c.optMember("for", a.For.V); err != nil {
+				return err
+			}
+		}
+		p.put("user_id", w.UserID, uid)
 	}
 	if a.Active.Set && a.Active.V != w.Active {
 		p.put("active", w.Active, a.Active.V)

@@ -12,6 +12,8 @@ import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 
 const DAY_W = 30;
+/** A bar of three days or fewer has no room for its title. */
+const short = (span: Span) => !!span.start && !!span.end && daysBetween(span.start, span.end) < 3;
 const MAX_DAYS = 550;
 
 interface Span {
@@ -70,6 +72,12 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
   }
 
   const days = Array.from({ length: total }, (_, i) => addDays(from, i));
+  const months: { day: string; days: number }[] = [];
+  for (const day of days) {
+    const last = months[months.length - 1];
+    if (last && last.day.slice(0, 7) === day.slice(0, 7)) last.days++;
+    else months.push({ day, days: 1 });
+  }
   const todayAt = daysBetween(from, now);
 
   function grab(e: ReactPointerEvent<HTMLButtonElement>, span: Span) {
@@ -103,16 +111,25 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
     <div ref={scroller} className="overflow-x-auto rounded-lg border border-line">
       <div className="w-max min-w-full">
         <div className="flex h-12 border-b border-line bg-sunken">
-          <div className={cx(label, "bg-sunken text-xs font-medium text-ink-3")}>{t("db.title")}</div>
-          <div className="relative flex">
-            {days.map((day, i) => (
-              <div key={day} style={{ width: DAY_W }} className={cx("flex shrink-0 flex-col justify-end pb-1 text-center", weekday(day) > 4 && "bg-hover/50")}>
-                {(i === 0 || day.endsWith("-01")) && <span className="absolute top-1 pl-1.5 text-xs font-medium whitespace-nowrap text-ink-2">{monthShortName(day)}</span>}
-                <span className={cx("mx-auto flex size-5 items-center justify-center rounded-full text-2xs tnum", day === now ? "bg-accent font-semibold text-accent-ink" : "text-ink-3")}>
-                  {Number(day.slice(8))}
-                </span>
-              </div>
-            ))}
+          <div className={cx(label, "z-20 bg-sunken text-xs font-medium text-ink-3")}>{t("db.title")}</div>
+          <div>
+            <div className="flex h-6">
+              {months.map((m) => (
+                <div key={m.day} style={{ width: m.days * DAY_W }} className="shrink-0 border-l border-line first:border-l-0">
+                  {/* The name follows the scroll until its month runs out. */}
+                  <span className="sticky left-44 inline-block px-1.5 pt-1 text-xs font-medium whitespace-nowrap text-ink-2 max-sm:left-28">{monthShortName(m.day)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex h-6">
+              {days.map((day) => (
+                <div key={day} style={{ width: DAY_W }} className={cx("flex shrink-0 items-center justify-center", weekday(day) > 4 && "bg-hover/50")}>
+                  <span className={cx("flex size-5 items-center justify-center rounded-full text-2xs tnum", day === now ? "bg-accent font-semibold text-accent-ink" : "text-ink-3")}>
+                    {Number(day.slice(8))}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
         {spans.map((span) => {
@@ -125,18 +142,27 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
               <div className="relative" style={{ width: total * DAY_W }}>
                 <span className="absolute inset-y-0 w-px bg-accent/50" style={{ left: todayAt * DAY_W + DAY_W / 2 }} aria-hidden />
                 {span.start && span.end ? (
-                  <button
-                    type="button"
-                    onPointerDown={(e) => grab(e, span)}
-                    onKeyDown={(e) => e.key === "Enter" && onOpen(span.row.id)}
-                    style={{ left: (daysBetween(from, span.start) + shift) * DAY_W + 2, width: (daysBetween(span.start, span.end) + 1) * DAY_W - 4 }}
-                    className={cx(
-                      "absolute top-1.5 flex h-6 cursor-grab touch-none items-center rounded-md border border-accent/30 bg-accent-soft px-1.5 text-xs font-medium text-accent-text hover:border-accent/60",
-                      shift !== 0 && "cursor-grabbing shadow-pop",
+                  <>
+                    <button
+                      type="button"
+                      aria-label={span.row.title || t("db.untitled")}
+                      onPointerDown={(e) => grab(e, span)}
+                      onKeyDown={(e) => e.key === "Enter" && onOpen(span.row.id)}
+                      style={{ left: (daysBetween(from, span.start) + shift) * DAY_W + 2, width: (daysBetween(span.start, span.end) + 1) * DAY_W - 4 }}
+                      className={cx(
+                        "absolute top-1.5 flex h-6 cursor-grab touch-none items-center rounded-md border border-accent/30 bg-accent-soft px-1.5 text-xs font-medium text-accent-text hover:border-accent/60",
+                        shift !== 0 && "cursor-grabbing shadow-pop",
+                      )}
+                    >
+                      {!short(span) && <span className="truncate">{span.row.title || t("db.untitled")}</span>}
+                    </button>
+                    {/* A bar too short for its name carries it alongside. */}
+                    {short(span) && (
+                      <span className="pointer-events-none absolute top-1.5 flex h-6 items-center pl-1.5 text-xs whitespace-nowrap text-ink-2" style={{ left: (daysBetween(from, span.end) + 1 + shift) * DAY_W }}>
+                        {span.row.title || t("db.untitled")}
+                      </span>
                     )}
-                  >
-                    <span className="truncate">{span.row.title || t("db.untitled")}</span>
-                  </button>
+                  </>
                 ) : (
                   <span className="sticky left-48 inline-flex h-9 items-center text-xs text-ink-3 max-sm:left-32">{t("db.timeline.noDates")}</span>
                 )}

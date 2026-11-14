@@ -81,10 +81,11 @@ function PropertyList({ view, props }: Props) {
 }
 
 /** A picker for the property a view is laid out by: the board's columns, the calendar's date. */
-function LayoutPick({ view, props, field, type, label }: Props & { field: keyof ViewConfig; type: string; label: string }) {
+function LayoutPick({ view, props, field, type, label, fallback = 0 }: Props & { field: keyof ViewConfig; type: string; label: string; fallback?: number }) {
   const options = props.filter((p) => p.type === type);
   if (options.length === 0) return null;
-  const current = options.find((p) => p.id === view.config?.[field]);
+  // Until one is chosen the view goes by the first that fits (the second, for a timeline's end).
+  const current = options.find((p) => p.id === view.config?.[field]) ?? options[fallback] ?? options[0];
   return (
     <Select
       label={label}
@@ -110,7 +111,7 @@ export function ViewToolbar({ view, props }: Props) {
       {view.type === "timeline" && (
         <>
           <LayoutPick view={view} props={props} field="date_prop" type="date" label={t("db.timeline.start")} />
-          <LayoutPick view={view} props={props} field="end_prop" type="date" label={t("db.timeline.end")} />
+          <LayoutPick view={view} props={props} field="end_prop" type="date" label={t("db.timeline.end")} fallback={1} />
         </>
       )}
       {view.type !== "form" && (

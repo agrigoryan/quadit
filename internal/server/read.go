@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -167,6 +168,7 @@ func (s *Server) hBootstrap(x *c) error {
 	for i := range decisions {
 		decisions[i].Options = byDecision[decisions[i].ID]
 	}
+	s.withResponsible(ctx, members)
 	out["members"] = members
 	out["projects"] = keep(projects, func(p core.Project) bool { return inScope(p.ID) })
 	out["statuses"] = keep(statuses, func(v core.Status) bool { return inScope(v.ProjectID) })
@@ -1201,4 +1203,28 @@ func (s *Server) hLayout(x *c) error {
 		return x.text(b.String())
 	}
 	return x.ok(map[string]any{"project": map[string]string{"key": p.Key, "name": p.Name, "description": p.Description}, "layout": out})
+}
+
+// withResponsible fills in, for each agent, the person who answers for it.
+func (s *Server) withResponsible(ctx context.Context, members []core.Member) {
+	var ids []string
+	for _, m := range members {
+		if m.Kind == core.KindAgent {
+			ids = append(ids, m.UserID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	var users []core.User
+	if err := s.st.List(ctx, &users, store.Where(store.In("id", ids))); err != nil {
+		return
+	}
+	by := map[string]string{}
+	for _, u := range users {
+		by[u.ID] = u.ResponsibleID
+	}
+	for i := range members {
+		members[i].ResponsibleID = by[members[i].UserID]
+	}
 }

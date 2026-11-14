@@ -177,7 +177,14 @@ func listOf[T any](order string, conds ...store.Cond) func(x *c) (any, error) {
 }
 
 var collections = map[string]collection{
-	"members":     {load: listOf[core.Member]("handle")},
+	"members": {load: func(x *c) (any, error) {
+		rows, err := listOf[core.Member]("handle")(x)
+		if err != nil {
+			return nil, err
+		}
+		x.s.withResponsible(x.ctx(), rows.([]core.Member))
+		return rows, nil
+	}},
 	"projects":    {load: listOf[core.Project]("rank")},
 	"statuses":    {load: listOf[core.Status]("rank")},
 	"labels":      {load: listOf[core.Label]("name")},

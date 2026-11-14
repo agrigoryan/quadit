@@ -68,12 +68,15 @@ func (s *Server) hAuthConfig(x *c) error {
 		return err
 	}
 	out := map[string]any{
-		"setup_needed": people == 0,
-		"password":     s.settingBool(ctx, "auth.password", true),
-		"passkeys":     s.settingBool(ctx, "auth.passkeys", true),
-		"registration": s.settingBool(ctx, "auth.registration", false),
-		"version":      s.cfg.Version,
-		"name":         s.settingStr(ctx, "install.name", "Quadit"),
+		"setup_needed":                 people == 0,
+		"password":                     s.settingBool(ctx, "auth.password", true),
+		"passkeys":                     s.settingBool(ctx, "auth.passkeys", true),
+		"registration":                 s.settingBool(ctx, "auth.registration", false),
+		"anyone_can_create_workspaces": s.settingBool(ctx, "workspaces.anyone_can_create", true),
+		"require_2fa":                  s.settingBool(ctx, "auth.require_2fa", false),
+		"mail":                         s.mailReady(ctx),
+		"version":                      s.cfg.Version,
+		"name":                         s.settingStr(ctx, "install.name", "Quadit"),
 	}
 	out["providers"] = s.providerList(ctx)
 	return x.ok(out)
@@ -247,6 +250,10 @@ type profileBody struct {
 	Theme    *string          `json:"theme"`
 	Locale   *string          `json:"locale"`
 	Notify   *json.RawMessage `json:"notify"`
+	// Email changes the sign-in address; Password must then be the current
+	// password, when the account has one.
+	Email    *string `json:"email"`
+	Password string  `json:"password"`
 }
 
 // hProfile changes the signed-in person's own profile.
@@ -288,6 +295,20 @@ func (s *Server) hProfile(x *c) error {
 	}
 	if b.Notify != nil {
 		set["notify"] = *b.Notify
+	}
+	if b.Email != nil && !strings.EqualFold(strings.TrimSpace(*b.Email), x.user.Email) {
+		email := strings.ToLower(strings.TrimSpace(*b.Email))
+		if !strings.Contains(email, "@") || strings.ContainsAny(email, " \t\n<>") {
+			return &engine.Error{Code: engine.CodeInvalid, Field: "email", Message: "that is not an email address"}
+		}
+		if x.user.PasswordHash != "" && !auth.CheckPassword(x.user.PasswordHash, b.Password) {
+			return &engine.Error{Code: engine.CodeForbidden, Field: "password", Message: "confirm with your current password"}
+		}
+		if n, _ := s.st.Count(ctx, "users", store.Eq("email", email), store.Live); n > 0 {
+			return &engine.Error{Code: engine.CodeConflict, Field: "email", Message: "another account uses this address"}
+		}
+		set["email"] = email
+		s.audit(x.r, "", x.user, "email.changed", "user", x.user.ID, map[string]string{"from": x.user.Email, "to": email})
 	}
 	if len(set) == 0 {
 		return s.hAuthMe(x)
@@ -339,7 +360,7 @@ func (s *Server) hPassword(x *c) error {
 		return errForbidden("a password is changed by its person, signed in")
 	}
 	if x.user.PasswordHash != "" && !auth.CheckPassword(x.user.PasswordHash, b.Current) {
-		return errForbidden("the current password is wrong")
+		return &engine.Error{Code: engine.CodeForbidden, Field: "current", Message: "the current password is wrong"}
 	}
 	if err := auth.CheckPasswordRules(b.New); err != nil {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "new", Message: err.Error()}

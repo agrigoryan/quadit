@@ -168,7 +168,10 @@ type dest struct {
 
 func (d dest) Scan(src any) error {
 	if src == nil {
-		return nil // leave the zero value
+		// NULL is the zero value. Set it, in case the struct held something:
+		// a row read again into the same variable must not keep old fields.
+		d.v.SetZero()
+		return nil
 	}
 	if d.f.json {
 		var b []byte

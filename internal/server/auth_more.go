@@ -166,7 +166,7 @@ func (s *Server) hTOTPEnable(x *c) error {
 		return err
 	}
 	if _, ok := auth.CheckTOTP(secret, b.Code, time.Now()); !ok {
-		return errBad("that code is not right; check the time on your phone and try the next code")
+		return &engine.Error{Code: engine.CodeInvalid, Field: "code", Message: "that code is not right; check the time on your phone and try the next code"}
 	}
 	if _, err := s.st.Update(ctx, "users", map[string]any{"totp_at": time.Now().UnixMilli()}, store.Eq("id", x.user.ID)); err != nil {
 		return err
@@ -189,7 +189,7 @@ func (s *Server) hTOTPDisable(x *c) error {
 		return errForbidden("two-step verification is changed by its person, signed in")
 	}
 	if !s.checkSecond(ctx, x.user, b.Code) && !(x.user.PasswordHash != "" && auth.CheckPassword(x.user.PasswordHash, b.Password)) {
-		return errForbidden("confirm with a current code or your password")
+		return &engine.Error{Code: engine.CodeForbidden, Field: "code", Message: "confirm with a current code or your password"}
 	}
 	if s.settingBool(ctx, "auth.require_2fa", false) {
 		if n, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); n == 0 {
@@ -214,7 +214,7 @@ func (s *Server) hRecoveryCodes(x *c) error {
 		return errBad("two-step verification is not on")
 	}
 	if !s.checkSecond(x.ctx(), x.user, b.Code) {
-		return errForbidden("confirm with a current code")
+		return &engine.Error{Code: engine.CodeForbidden, Field: "code", Message: "confirm with a current code"}
 	}
 	codes, err := s.newRecoveryCodes(x.ctx(), x.user.ID)
 	if err != nil {

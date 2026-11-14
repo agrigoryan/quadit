@@ -19,7 +19,6 @@ import {
 } from "@blocknote/react";
 import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { uploadFile } from "@/lib/files";
-import { newId } from "@/lib/ids";
 import { type BlockSchemaLike, type EdBlock, plainText, rowsToEditor } from "@/docs/editor/convert";
 import { Markers } from "@/docs/editor/markers";
 import { ActionsContext, BlockMenu, CommentButton, type EditorActions, extraSlashItems, mentionItems } from "@/docs/editor/menus";
@@ -78,12 +77,6 @@ export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState
     },
     [],
   );
-
-  // New blocks get ids like every other row of the product (UUIDv7), made here.
-  useMemo(() => {
-    const ids = editor._tiptapEditor.extensionManager.extensions.find((e) => e.name === "uniqueID");
-    if (ids) (ids.options as { generateID: () => string }).generateID = newId;
-  }, [editor]);
 
   // In development the editor is reachable from the console, for poking at sync by hand.
   if (import.meta.env.DEV) (window as unknown as { __qdEditor?: unknown }).__qdEditor = editor;

@@ -224,5 +224,7 @@ func (s *Server) hHealth(x *c) error {
 	if err := s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err == nil && len(backups) > 0 {
 		out["last_backup"] = backups[0]
 	}
+	out["sources_failing"], _ = s.st.Count(ctx, "doc_sources", store.Live, store.Ne("last_error", ""))
+	out["integrations_failing"], _ = s.st.Count(ctx, "integrations", store.Live, store.Ne("last_error", ""))
 	return x.ok(out)
 }
