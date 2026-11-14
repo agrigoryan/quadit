@@ -135,3 +135,47 @@ func TestAskedBy(t *testing.T) {
 		w.do(b, "task.update", M{"id": "SVA-2", "title": "Tidy up the sprites"})
 	})
 }
+
+// TestBatchSeesItsOwnWrites checks that what a batch remembers of statuses,
+// labels and members never hides what an earlier change of the same batch did.
+func TestBatchSeesItsOwnWrites(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.agent("alpha")
+		ch := func(typ string, args M) engine.Change {
+			raw, _ := json.Marshal(args)
+			return engine.Change{ID: id.New(), Type: typ, Args: raw}
+		}
+		polish := id.New()
+		batch := []engine.Change{
+			ch("task.create", M{"project": "SVA", "title": "One", "assignee": "@alpha"}),
+			// A label and a status made here are found by the next changes.
+			ch("label.create", M{"project": "SVA", "name": "fresh"}),
+			ch("status.create", M{"id": polish, "project": "SVA", "name": "Polish", "category": "started"}),
+			ch("task.create", M{"project": "SVA", "title": "Two", "assignee": "@alpha", "labels": []string{"fresh"}, "status": "Polish"}),
+			// A renamed status and a renamed member answer to the new name only.
+			ch("status.update", M{"id": polish, "name": "Final polish"}),
+			ch("member.update", M{"id": "@alpha", "handle": "omega"}),
+			ch("task.create", M{"project": "SVA", "title": "Three", "assignee": "@omega", "status": "Final polish"}),
+		}
+		if _, err := w.e.Batch(context.Background(), w.ws.ID, engine.Actor{UserID: w.owner.ID}, batch, false); err != nil {
+			t.Fatal(err)
+		}
+		two, three := w.task("SVA-2"), w.task("SVA-3")
+		if len(two.LabelIDs) != 1 || two.StatusID == "" || two.StatusID != three.StatusID || three.AssigneeID != two.AssigneeID || three.AssigneeID == "" {
+			t.Fatalf("tasks made after changes in the same batch: %+v / %+v", two, three)
+		}
+		// The old names are gone within the batch too.
+		for _, bad := range []engine.Change{
+			ch("task.create", M{"project": "SVA", "title": "Four", "assignee": "@alpha"}),
+			ch("task.create", M{"project": "SVA", "title": "Four", "status": "Polish"}),
+		} {
+			stale := []engine.Change{ch("task.create", M{"project": "SVA", "title": "Warm up", "assignee": "@omega", "status": "Final polish"}),
+				ch("member.update", M{"id": "@omega", "handle": "omega2"}), ch("status.update", M{"id": polish, "name": "Done-ish"}), bad}
+			if _, err := w.e.Batch(context.Background(), w.ws.ID, engine.Actor{UserID: w.owner.ID}, stale, false); err == nil {
+				t.Fatalf("a batch used a name an earlier change in it had taken away: %s", bad.Args)
+			}
+		}
+	})
+}

@@ -322,7 +322,8 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 	}
 	results := make([]*Result, len(changes))
 	var lastSeq int64
-	err := e.st.Write(ctx, workspaceID, func(tx store.Tx) error {
+	err := e.st.Write(ctx, workspaceID, func(raw store.Tx) error {
+		var tx store.Tx = newMemoTx(raw)
 		var m core.Member
 		err := tx.Get(ctx, &m, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
 		if errors.Is(err, store.ErrNotFound) {

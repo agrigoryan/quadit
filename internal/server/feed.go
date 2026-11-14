@@ -113,7 +113,17 @@ func (s *Server) hEvents(x *c) error {
 	if wait > 0 {
 		s.listening(x, wait+5)
 	}
-	for {
+	opened, _ := s.access(x)
+	for round := 0; ; round++ {
+		if round > 0 {
+			// The request has been held: before answering, check that the
+			// caller may still see what it was opened to see.
+			if now, ok := s.access(x); !ok {
+				return errUnauthorized("your access ended while this request was waiting")
+			} else if now != opened {
+				return &httpError{Status: 409, Code: "access_changed", Message: "what you may see changed while this request was waiting; ask again"}
+			}
+		}
 		var ws core.Workspace
 		if err := s.st.Get(ctx, &ws, store.Eq("id", x.ws.ID)); err != nil {
 			return err
@@ -221,7 +231,21 @@ func (s *Server) hStream(x *c) error {
 	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: x.projects, AllowNoProject: true, Limit: 500}
 	beat := time.NewTicker(25 * time.Second)
 	defer beat.Stop()
+	opened, _ := s.access(x)
 	for {
+		// Before anything more goes out: may they still have it? Someone
+		// removed, suspended or signed out is told to go; someone whose role
+		// or projects changed is told to start over with what they may see now.
+		switch now, ok := s.access(x); {
+		case !ok:
+			fmt.Fprintf(x.w, "event: gone\ndata: {}\n\n")
+			flusher.Flush()
+			return nil
+		case now != opened:
+			fmt.Fprintf(x.w, "event: reset\ndata: {}\n\n")
+			flusher.Flush()
+			return nil
+		}
 		// Note where the feed stands before reading it: whatever commits
 		// after this moment has a higher number, and wakes the wait below.
 		mark := s.hub.Seq(x.ws.ID)
@@ -264,4 +288,35 @@ func (s *Server) hStream(x *c) error {
 		}
 		cancel()
 	}
+}
+
+// access says whether the caller of a held connection may still be here,
+// and a fingerprint of what they may see. A connection that stays open for
+// minutes must not outlive the access it was opened with: it is asked again
+// before anything more is sent on it.
+func (s *Server) access(x *c) (fingerprint string, ok bool) {
+	ctx := context.WithoutCancel(x.ctx())
+	now := time.Now().UnixMilli()
+	if x.token != nil {
+		var t core.APIToken
+		if err := s.st.Get(ctx, &t, store.Eq("id", x.token.ID), store.Null("revoked_at")); err != nil || (t.ExpiresAt != 0 && t.ExpiresAt < now) {
+			return "", false
+		}
+	}
+	if x.sess != nil {
+		var se core.Session
+		if err := s.st.Get(ctx, &se, store.Eq("id", x.sess.ID), store.Null("revoked_at")); err != nil || se.ExpiresAt < now {
+			return "", false
+		}
+	}
+	var u core.User
+	if err := s.st.Get(ctx, &u, store.Eq("id", x.user.ID), store.Live); err != nil || u.DisabledAt != 0 {
+		return "", false
+	}
+	var m core.Member
+	if err := x.db.Get(ctx, &m, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil || m.SuspendedAt != 0 {
+		return "", false
+	}
+	scope, _ := json.Marshal(m.Scope)
+	return string(m.Role) + " " + string(scope), true
 }

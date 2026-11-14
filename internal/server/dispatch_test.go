@@ -47,6 +47,20 @@ func newReceiver(t *testing.T, secret string) *receiver {
 	return r
 }
 
+// signed is a copy of whether each delivery so far was signed correctly.
+func (r *receiver) signed() []bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]bool(nil), r.sigs...)
+}
+
+// last is the newest delivery.
+func (r *receiver) last() map[string]any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.got[len(r.got)-1]
+}
+
 func (r *receiver) types() string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -97,7 +111,7 @@ func TestWakeUps(t *testing.T) {
 	if got := all.types(); !strings.HasPrefix(got, "task.created") || strings.Contains(got, "notification") || strings.Contains(got, "project.created") {
 		t.Fatalf("task webhook got: %s", got)
 	}
-	for _, ok := range all.sigs {
+	for _, ok := range all.signed() {
 		if !ok {
 			t.Fatal("a delivery was not signed with the webhook's secret")
 		}
@@ -108,7 +122,7 @@ func TestWakeUps(t *testing.T) {
 		t.Fatalf("inbox webhook got public events: %s", mine.types())
 	}
 	mine.mu.Lock()
-	text := mine.got[len(mine.got)-1]["text"].(string)
+	text := mine.last()["text"].(string)
 	mine.mu.Unlock()
 	if !strings.Contains(text, "picked") || !strings.Contains(text, "SVA-1") {
 		t.Fatalf("delivery text = %q", text)
