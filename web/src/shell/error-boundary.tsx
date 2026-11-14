@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
+import { toast } from "@/lib/toast";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 
@@ -28,5 +29,31 @@ export class PageBoundary extends Component<{ resetKey: string; children: ReactN
         action={<Button onClick={() => window.location.reload()}>{t("common.reload")}</Button>}
       />
     );
+  }
+}
+
+/**
+ * For the parts drawn over the page (the task panel, the palette, a
+ * dialog), which are fetched when first opened: if one cannot be fetched or
+ * faults, the page under it stays. A toast says so and offers to reload,
+ * and the part is left out until it is asked for again.
+ */
+export class PartBoundary extends Component<{ resetKey: string; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    toast.error(t("common.partFailed"), { label: t("common.reload"), run: () => window.location.reload() });
+  }
+
+  componentDidUpdate(prev: { resetKey: string }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.failed) this.setState({ failed: false });
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
   }
 }

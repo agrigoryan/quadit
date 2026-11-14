@@ -20,11 +20,11 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
-import { saveTheme, signOut, useSession } from "@/auth/session";
+import { saveTheme, signOut } from "@/auth/session";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { useCollection, useProjects, useViews } from "@/lib/selectors";
-import { type ThemeChoice, toThemeChoice } from "@/lib/theme";
+import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import type { Project, SearchHit, Task } from "@/lib/types";
 import { ui } from "@/lib/ui-state";
@@ -75,7 +75,7 @@ export function RootPage({ query, slug, task, project, hits, searching, run, go,
   const views = useViews();
   const tasks = useCollection("tasks");
   const statuses = useCollection("statuses");
-  const theme = toThemeChoice(useSession((s) => s.user?.theme));
+  const theme = useThemeChoice();
   const q = query.trim();
   const at = (path: string) => () => go(`/${slug}/${path}`);
 

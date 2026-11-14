@@ -18,12 +18,13 @@ import {
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/lib/types";
 import { archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { DecisionMark } from "@/ui/icons";
+import { Ago } from "@/ui/ago";
 
 const icons: Record<NotificationType, LucideIcon | null> = {
   assigned: UserPlus,
@@ -101,7 +102,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
       </div>
 
       <time dateTime={new Date(item.created_at).toISOString()} title={exact(item.created_at)} className="shrink-0 text-xs text-ink-3 tnum md:w-12 md:text-right">
-        {ago(item.created_at)}
+        <Ago ms={item.created_at} />
       </time>
       <div
         className={cx(

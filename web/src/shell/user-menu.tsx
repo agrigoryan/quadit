@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { saveTheme, signOut, useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
 import { useMe, useSlug } from "@/lib/selectors";
-import { type ThemeChoice, toThemeChoice } from "@/lib/theme";
+import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { ui } from "@/lib/ui-state";
 import { Avatar } from "@/ui/avatar";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
@@ -15,6 +15,7 @@ export function UserMenu() {
   const slug = useSlug();
   const user = useSession((s) => s.user);
   const navigate = useNavigate();
+  const theme = useThemeChoice();
   return (
     <Menu>
       <MenuTrigger asChild>
@@ -45,10 +46,10 @@ export function UserMenu() {
         )}
         <MenuSeparator />
         <MenuLabel>{t("top.theme")}</MenuLabel>
-        <MenuRadioGroup value={toThemeChoice(user?.theme)} onValueChange={(v) => void saveTheme(v as ThemeChoice)}>
-          {themes.map((theme) => (
-            <MenuRadioItem key={theme} value={theme} onSelect={(e) => e.preventDefault()}>
-              {t(`top.theme.${theme}`)}
+        <MenuRadioGroup value={theme} onValueChange={(v) => void saveTheme(v as ThemeChoice)}>
+          {themes.map((choice) => (
+            <MenuRadioItem key={choice} value={choice} onSelect={(e) => e.preventDefault()}>
+              {t(`top.theme.${choice}`)}
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>

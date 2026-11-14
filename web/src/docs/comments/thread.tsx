@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMe, useMember } from "@/lib/selectors";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import { addComment, deleteComment, resolveComment } from "@/docs/actions";
 import { Composer } from "@/docs/comments/composer";
 import type { ThreadData } from "@/docs/comments/panel";
@@ -11,6 +11,7 @@ import type { DocComment } from "@/docs/types";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";
+import { Ago } from "@/ui/ago";
 
 interface Props {
   thread: ThreadData;
@@ -62,7 +63,7 @@ function CommentBody({ comment, reply }: { comment: DocComment; reply?: boolean 
         <div className="flex items-baseline gap-1.5">
           <span className="truncate text-sm font-medium">{author?.name ?? t("common.someone")}</span>
           <time className="shrink-0 text-xs text-ink-3" title={exact(comment.created_at)}>
-            {ago(comment.created_at)}
+            <Ago ms={comment.created_at} />
           </time>
           {comment.author_id === me.user_id && (
             <button

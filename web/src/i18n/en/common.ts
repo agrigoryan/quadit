@@ -3,6 +3,7 @@
 
 export const common = {
   "common.pageFailed": "This page hit a problem",
+  "common.partFailed": "That could not be opened. Check the connection, then reload.",
   "common.reload": "Reload",
   "common.loading": "Loading",
   "common.close": "Close",
@@ -44,9 +45,6 @@ export const common = {
   "auth.signIn.submit": "Sign in",
   "auth.signIn.busy": "Signing in…",
   "auth.secondStep.title": "One more step",
-  "auth.secondStep.lead":
-    "Your account asks for a second step when signing in. That screen is coming to the web app soon; until then, sign in with a passkey or ask an admin.",
-  "auth.secondStep.back": "Back to sign in",
   "auth.setup.title": "Set up Quadit",
   "auth.setup.lead": "This install is new. Make the first account and workspace; you can invite people and add agents after.",
   "auth.setup.name": "Your name",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Bell, Bot, Building2, FolderGit2, FolderKanban, KeyRound, Plug, ScrollText, ShieldCheck, UserRound, Users, Webhook, Workflow } from "lucide-react";
-import { Navigate, Route, Routes } from "react-router";
+import { Bell, Bot, Building2, FolderGit2, FolderKanban, KeyRound, Lock, Plug, ScrollText, ShieldCheck, UserRound, Users, Webhook, Workflow } from "lucide-react";
+import { Link, Navigate, Route, Routes } from "react-router";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
 import { NotFoundPage } from "@/shell/placeholders";
@@ -21,6 +21,7 @@ import { ProjectsPage } from "@/settings/projects/projects";
 import { type NavGroup, NavLayout } from "@/settings/ui/layout";
 import { GeneralPage } from "@/settings/workspace/general";
 import { MembersPage } from "@/settings/workspace/members";
+import { EmptyState } from "@/ui/empty";
 
 /** The pages of workspace settings. A member sees the ones that are not only for admins. */
 function useGroups(admin: boolean): NavGroup[] {
@@ -74,13 +75,29 @@ function Root({ first }: { first: string }) {
   return isWide ? <Navigate to={first} replace /> : null;
 }
 
+/** What a member sees at the address of a page only admins may use: why, and where their own settings are. */
+function AdminsOnly({ base }: { base: string }) {
+  return (
+    <EmptyState
+      icon={<Lock />}
+      title={t("settings.adminsOnly.title")}
+      hint={t("settings.adminsOnly.hint")}
+      action={
+        <Link to={`${base}/me/profile`} className="text-sm font-medium text-accent-text underline-offset-2 hover:underline">
+          {t("settings.adminsOnly.mine")}
+        </Link>
+      }
+    />
+  );
+}
+
 /** Everything under /:ws/settings. Loaded on demand. */
 export default function SettingsRoutes() {
   usePageTitle(t("settings.title"));
   const base = useSettingsBase();
   const admin = useIsAdmin();
   const groups = useGroups(admin);
-  const forAdmins = (page: React.ReactNode) => (admin ? page : <Navigate to={`${base}/me/profile`} replace />);
+  const forAdmins = (page: React.ReactNode) => (admin ? page : <AdminsOnly base={base} />);
   return (
     <NavLayout base={base} label={t("settings.title")} groups={groups}>
       <Routes>

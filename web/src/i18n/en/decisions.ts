@@ -63,6 +63,13 @@ export const decisions = {
   "decision.unclearEarlier": "The note with the earlier answer: “{note}”",
 
   "decision.menu": "Question actions",
+  "decision.edit": "Edit question",
+  "decision.edit.title": "Edit question",
+  "decision.edit.lead": "The question can be changed until it is answered. Its options stay as they are.",
+  "decision.edit.detailsHint": "Markdown works, and @ mentions someone. {mod} Enter saves.",
+  "decision.edit.recommended": "Recommended option",
+  "decision.edit.noRecommendation": "No recommendation",
+  "decision.edit.reason": "Why this one",
   "decision.delete": "Delete question",
   "decision.delete.title": "Delete this question?",
   "decision.delete.description": "Its options and their comments go with it.",

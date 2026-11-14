@@ -4,13 +4,14 @@ import { Pin } from "lucide-react";
 import { Link } from "react-router";
 import { t, tMaybe } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import { parseWhen } from "@/insights/lib/format";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { DecisionView, Preference } from "@/insights/lib/types";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { useTaskLink } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
+import { Ago } from "@/ui/ago";
 
 /** The answer in a few words: the option picked and how, or that it went back. */
 function answerOf(d: DecisionView): string {
@@ -35,7 +36,7 @@ function Row({ decision }: { decision: DecisionView }) {
       <div className="flex shrink-0 items-start gap-2 pt-0.5">
         <span className="flex gap-2 text-xs text-ink-3 tnum">
           <span>{decision.task}</span>
-          {at > 0 && <span title={exact(at)}>{ago(at)}</span>}
+          {at > 0 && <span title={exact(at)}><Ago ms={at} /></span>}
         </span>
         <Avatar member={by} size="sm" />
       </div>

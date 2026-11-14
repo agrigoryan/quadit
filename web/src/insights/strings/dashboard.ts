@@ -14,9 +14,9 @@ export const dashboardStrings = {
   "ins.chart.canceledMore": ", {n} canceled",
   "ins.chart.noTasks": "No tasks",
 
-  "ins.risk.past_its_target_date": "past its target date",
-  "ins.risk.due_within_a_week_and_less_than_half_done": "due within a week and less than half done",
-  "ins.risk.nothing_has_moved_in_two_weeks": "nothing has moved in two weeks",
+  "ins.risk.past_target": "past its target date",
+  "ins.risk.due_soon": "due within a week and less than half done",
+  "ins.risk.stalled": "nothing has moved in two weeks",
 
   "dash.waiting": "Waiting on me",
   "dash.waiting.hint": "Nobody can go on with these until you act.",

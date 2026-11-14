@@ -39,7 +39,6 @@ export const pages = {
 
   "epics.pageTitle": "{project} epics",
   "epics.count": "{n} epic | {n} epics",
-  "epics.namePlaceholder": "Name a new epic",
   "epics.create": "Create epic",
   "epics.state.planned": "Planned",
   "epics.state.active": "Active",
@@ -47,14 +46,11 @@ export const pages = {
   "epics.state.done": "Done",
   "epics.state.canceled": "Canceled",
   "epics.target": "Target {day}",
-  "epics.progress": "{done} of {total} tasks done",
   "epics.noTasks": "No tasks in this epic yet. Set a task's epic from its panel or the task list.",
   "epics.empty": "No epics yet",
-  "epics.emptyHint": "An epic gathers the tasks of one larger goal, so you can see how far along it is. Name the first one above.",
 
   "cycles.pageTitle": "{project} cycles",
   "cycles.count": "{n} cycle | {n} cycles",
-  "cycles.current": "Current",
   "cycles.starts": "Starts",
   "cycles.ends": "Ends",
   "cycles.create": "Create cycle",

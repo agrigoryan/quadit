@@ -188,6 +188,19 @@ func TestSharedPagesChipsAndUndo(t *testing.T) {
 		s.call(nil, wt.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 200, nil)
 		s.call(nil, ot.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 404, nil)
 
+		// Taking the page back tells that member, and only them, to let it go.
+		s.change(s.owner, "", "doc.update", M{"id": page, "shared_with": []string{}})
+		gone := func(token string) string {
+			return s.call(nil, token, "GET", "/api/v1/w/-/events?limit=2000&types=doc.unshared", nil, 200, nil)
+		}
+		if got := gone(wt.Token); !strings.Contains(got, page) || !strings.Contains(got, `"gone":true`) {
+			t.Fatalf("the member was not told the page is no longer shared: %s", got)
+		}
+		if strings.Contains(gone(ot.Token), page) {
+			t.Fatal("another member heard about a page that was never theirs")
+		}
+		s.call(nil, wt.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 404, nil)
+
 		// A block with a mention chip and a task chip, as the editor stores it.
 		chips := s.change(s.owner, "", "doc.create", M{"title": "Chips", "blocks": []M{
 			{"id": "0192f0c0-0000-7000-8000-00000000000a", "type": "paragraph", "content": []M{{"type": "text", "text": "Ask "},

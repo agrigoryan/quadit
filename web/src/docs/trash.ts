@@ -1,11 +1,12 @@
-// The trash for pages. The server has no list of deleted pages, so the
-// trash shows the ones this browser saw go: those deleted here (kept in
-// localStorage, so they survive a reload) and those the live feed reported.
+// The trash for pages. The server lists the deleted pages this person may
+// see; they are put into the workspace copy (marked deleted, so nothing
+// else shows them), and from then on the live feed keeps them current: a
+// page deleted or restored anywhere shows up or drops out here.
 
-import { useMemo } from "react";
-import { create } from "zustand";
+import { useEffect, useMemo } from "react";
+import { api, ws } from "@/lib/api";
 import { useMe } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getState, mergeRows, useStore } from "@/lib/store";
 import { canSee, useDocs } from "@/docs/data";
 import type { Doc } from "@/docs/types";
 
@@ -17,63 +18,46 @@ export interface Trashed {
   deleted_at: number;
 }
 
-const key = () => `quadit.docs.trash.${getState().slug}`;
+let loading: Promise<void> | null = null;
 
-function read(): Trashed[] {
-  try {
-    return JSON.parse(localStorage.getItem(key()) ?? "[]") as Trashed[];
-  } catch {
-    return [];
-  }
+/** Fetches the deleted pages into the workspace copy. A page the copy already has is left alone: the feed is newer. */
+export function loadTrash(): Promise<void> {
+  const slug = getState().slug;
+  if (!slug) return Promise.resolve();
+  loading ??= api
+    .get<{ docs: Doc[] }>(ws(slug, "/docs?trash=1"))
+    .then(({ docs }) => {
+      if (getState().slug !== slug) return;
+      const have = getState().c.docs;
+      mergeRows("docs", docs.filter((d) => !have[d.id]) as never[]);
+    })
+    .catch(() => {
+      // The trash then shows what the feed reported during this visit.
+    })
+    .finally(() => {
+      loading = null;
+    });
+  return loading;
 }
 
-const useRemembered = create<{ slug: string; items: Trashed[] }>(() => ({ slug: "", items: [] }));
-
-function save(items: Trashed[]) {
-  useRemembered.setState({ slug: getState().slug, items });
-  try {
-    localStorage.setItem(key(), JSON.stringify(items.slice(0, 200)));
-  } catch {
-    // Private mode: the list lasts for this visit.
-  }
-}
-
-function current(): Trashed[] {
-  const s = useRemembered.getState();
-  if (s.slug !== getState().slug) useRemembered.setState({ slug: getState().slug, items: read() });
-  return useRemembered.getState().items;
-}
-
-export function rememberTrashed(doc: Doc) {
-  if (doc.kind === "row") return;
-  const item: Trashed = { id: doc.id, title: doc.title, icon: doc.icon, kind: doc.kind, deleted_at: Date.now() };
-  save([item, ...current().filter((i) => i.id !== doc.id)]);
-}
-
-export function forgetTrashed(id: string) {
-  save(current().filter((i) => i.id !== id));
-}
-
-/** Deleted pages this browser knows of, newest first. A page restored elsewhere drops out. */
+/** Deleted pages, newest first. Only the top of what went together: the pages under it come back with it. */
 export function useTrashed(): Trashed[] {
   const docs = useDocs();
   const me = useMe();
-  const slug = getState().slug;
-  const remembered = useRemembered((s) => (s.slug === slug ? s.items : null)) ?? current();
+  const slug = useStore((s) => s.slug);
+  // Asked again when the stream comes back: a copy fetched afresh after a long gap starts without the trash.
+  const live = useStore((s) => s.stream === "live");
+  useEffect(() => {
+    void loadTrash();
+  }, [slug, live]);
   return useMemo(() => {
-    const out = new Map<string, Trashed>();
-    for (const item of remembered) {
-      const live = docs[item.id];
-      if (live && !live.deleted_at) continue; // restored since
-      out.set(item.id, item);
-    }
+    const out: Trashed[] = [];
     for (const doc of Object.values(docs)) {
-      if (!doc.deleted_at || doc.kind === "row" || !canSee(doc, me.user_id) || out.has(doc.id)) continue;
-      // Only the top of what went together: a page whose parent is also in the trash comes back with it.
+      if (!doc.deleted_at || doc.kind === "row" || !canSee(doc, me.user_id)) continue;
       const parent = doc.parent_id ? docs[doc.parent_id] : undefined;
       if (parent?.deleted_at === doc.deleted_at) continue;
-      out.set(doc.id, { id: doc.id, title: doc.title, icon: doc.icon, kind: doc.kind, deleted_at: doc.deleted_at });
+      out.push({ id: doc.id, title: doc.title, icon: doc.icon, kind: doc.kind, deleted_at: doc.deleted_at });
     }
-    return [...out.values()].sort((a, b) => b.deleted_at - a.deleted_at);
-  }, [docs, remembered, me.user_id]);
+    return out.sort((a, b) => b.deleted_at - a.deleted_at);
+  }, [docs, me.user_id]);
 }

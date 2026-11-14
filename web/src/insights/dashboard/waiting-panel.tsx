@@ -7,12 +7,13 @@ import { Hourglass } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { useCollection, useLiveTasks, useMe, useMember } from "@/lib/selectors";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import { type Decision, isOpenCategory, type Task } from "@/lib/types";
 import { MoveCount, Panel, PanelEmpty } from "@/insights/ui/panel";
 import { useTaskLink } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
+import { Ago } from "@/ui/ago";
 
 interface Item {
   id: string;
@@ -75,7 +76,7 @@ function Row({ item }: { item: Item }) {
         </p>
       </div>
       <span className="shrink-0 text-xs text-ink-3 tnum" title={exact(item.since)}>
-        {ago(item.since)}
+        <Ago ms={item.since} />
       </span>
       <Avatar member={other} size="sm" />
     </li>

@@ -4,7 +4,7 @@
 
 import { useEffect } from "react";
 import { create } from "zustand";
-import { type AuthConfig, authConfig } from "@/auth/session";
+import { type AuthConfig, authConfig, useSession } from "@/auth/session";
 
 const useConfig = create<{ config: AuthConfig | null }>(() => ({ config: null }));
 
@@ -27,6 +27,17 @@ export function useAuthConfig(): AuthConfig | null {
     void refresh();
   }, []);
   return config;
+}
+
+/**
+ * Whether the person signed in may make a workspace: an install admin
+ * always, anyone else unless the install keeps that to its admins. Until the
+ * server has said which, only admins are offered it.
+ */
+export function useCanCreateWorkspace(): boolean {
+  const config = useAuthConfig();
+  const isAdmin = useSession((s) => !!s.user?.is_admin);
+  return isAdmin || config?.anyone_can_create_workspaces === true;
 }
 
 /**

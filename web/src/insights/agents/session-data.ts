@@ -1,35 +1,14 @@
-// Agent sessions as these pages read them. The store keeps every session's
-// state, cost and times current from the feed, but the feed says only which
-// steps were added, not the whole list; so the full rows are fetched and
-// fetched again when a session changes, and the store's live fields are laid
-// over them so a card never lags behind.
+// Agent sessions as these pages read them. The store has the sessions of
+// the last days from the start, and the feed keeps each one whole: an update
+// carries the new list of steps and links. Older sessions a page asks for
+// are fetched once and put into the store, where the feed keeps them current
+// like the rest.
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api, ws } from "@/lib/api";
 import { useCollection } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { getState, mergeRows, useStore } from "@/lib/store";
 import type { AgentSession } from "@/lib/types";
-import { useLive } from "@/insights/lib/live";
-
-const LIVE_FIELDS = ["state", "ended_at", "title", "summary", "cost_micros", "tokens_in", "tokens_out"] as const;
-
-/** Fetched rows with the store's newer fields laid over, plus sessions only the store has yet. */
-export function mergeSessions(fetched: AgentSession[], store: AgentSession[]): AgentSession[] {
-  const live: Dict<AgentSession> = {};
-  for (const s of store) live[s.id] = s;
-  const seen = new Set<string>();
-  const out = fetched.map((row) => {
-    seen.add(row.id);
-    const now = live[row.id];
-    if (!now) return row;
-    const merged: AgentSession = { ...row };
-    for (const field of LIVE_FIELDS) {
-      if (now[field] !== undefined) (merged as unknown as Record<string, unknown>)[field] = now[field];
-    }
-    return merged;
-  });
-  for (const s of store) if (!seen.has(s.id)) out.push(s);
-  return out.sort((a, b) => b.started_at - a.started_at);
-}
 
 /**
  * Sessions matching a /list/sessions query ("agent=ID", "task=KEY",
@@ -37,15 +16,41 @@ export function mergeSessions(fetched: AgentSession[], store: AgentSession[]): A
  * that belong to the same set.
  */
 export function useSessions(query: string | null, keep: (s: AgentSession) => boolean): { sessions: AgentSession[]; loading: boolean } {
-  const live = useLive<{ sessions: AgentSession[] }>(query === null ? null : `/list/sessions?${query}`, { only: ["session"] });
+  const slug = useStore((s) => s.slug);
+  const live = useStore((s) => s.stream === "live");
+  const [loaded, setLoaded] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (query === null) return;
+    let current = true;
+    api
+      .get<{ sessions: AgentSession[] }>(ws(slug, `/list/sessions?${query}`))
+      .then((out) => {
+        if (getState().slug !== slug) return;
+        // A session the store already has is newer there: the feed has been at it.
+        const have = getState().c.sessions;
+        mergeRows("sessions", out.sessions.filter((s) => !have[s.id]));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (current) setLoaded(query);
+      });
+    return () => {
+      current = false;
+    };
+    // `live` is here so that a copy fetched afresh after a long gap gets its older sessions back.
+  }, [slug, query, live]);
+
   const stored = useCollection("sessions");
-  const fetched = live.data?.sessions;
   const sessions = useMemo(
-    () => mergeSessions(fetched ?? [], Object.values(stored).filter(keep)),
+    () =>
+      Object.values(stored)
+        .filter(keep)
+        .sort((a, b) => b.started_at - a.started_at),
     // `keep` is a new function each render; what it selects by is in `query`.
-    [fetched, stored, query],
+    [stored, query],
   );
-  return { sessions, loading: live.loading };
+  return { sessions, loading: query !== null && loaded !== query };
 }
 
 /** What one recorded step says: its text, and the tool it used when it names one. */

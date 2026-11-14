@@ -7,7 +7,7 @@ import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import type { Comment, Decision } from "@/lib/types";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
@@ -15,6 +15,7 @@ import { Markdown } from "@/ui/markdown";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { addComment } from "@/decisions/actions";
 import { nameOf, useThread } from "@/decisions/data";
+import { Ago } from "@/ui/ago";
 
 interface Subject {
   decision: Decision;
@@ -60,7 +61,7 @@ function Entry({ comment }: { comment: Comment }) {
         <p className="flex items-baseline gap-1.5 text-xs">
           <span className="truncate font-medium text-ink">{nameOf(author, t("common.someone"))}</span>
           <time className="shrink-0 text-ink-3" title={exact(comment.created_at)}>
-            {ago(comment.created_at)}
+            <Ago ms={comment.created_at} />
           </time>
         </p>
         <Markdown text={comment.body} tight />

@@ -11,9 +11,9 @@ import type { EpicProgress } from "@/insights/lib/types";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { Progress } from "@/insights/ui/progress";
 
-/** The server gives the reason in its own words; known ones are translated. */
-export function riskText(reason: string): string {
-  return tMaybe(`ins.risk.${reason.replace(/[^a-z]+/gi, "_").toLowerCase()}`, reason);
+/** Why an epic is at risk: the server names the reason by a code; a code this app does not know falls back to the server's own words. */
+function riskText(epic: EpicProgress): string {
+  return tMaybe(`ins.risk.${epic.at_risk_code ?? ""}`, epic.at_risk ?? "");
 }
 
 function Row({ epic, showProject }: { epic: EpicProgress; showProject: boolean }) {
@@ -51,7 +51,7 @@ function Row({ epic, showProject }: { epic: EpicProgress; showProject: boolean }
       {epic.at_risk && (
         <p className="mt-1 flex items-center gap-1 text-xs font-medium text-wait">
           <TriangleAlert className="size-3 shrink-0" aria-hidden />
-          {t("dash.epics.atRisk", { why: riskText(epic.at_risk) })}
+          {t("dash.epics.atRisk", { why: riskText(epic) })}
         </p>
       )}
     </li>

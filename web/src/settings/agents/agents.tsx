@@ -6,7 +6,7 @@ import { t, tMaybe } from "@/lib/i18n";
 import { useMembers } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { CreateAgentDialog } from "@/settings/agents/agent-create";
-import { type AgentMember, type AgentState, useAgentStates, useResponsible } from "@/settings/agents/data";
+import { type AgentMember, type AgentState, useAgentStates } from "@/settings/agents/data";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact, When } from "@/settings/ui/bits";
 import { EmptyRow, Page, Rows } from "@/settings/ui/layout";
@@ -46,7 +46,6 @@ export function AgentsPage() {
   const agents = useMembers().filter((m) => m.kind === "agent") as AgentMember[];
   const members = useStore((s) => s.c.members);
   const states = useAgentStates();
-  const responsible = useResponsible();
   const [creating, setCreating] = useState(false);
 
   return (
@@ -73,7 +72,7 @@ export function AgentsPage() {
         <Rows>
           {agents.map((a) => {
             const state = states.data?.[a.user_id];
-            const person = members[a.responsible_id ?? responsible.data?.[a.user_id] ?? ""];
+            const person = members[a.responsible_id ?? ""];
             return (
               <button
                 key={a.user_id}

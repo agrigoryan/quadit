@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AuthLayout, FormError, TextLink } from "@/auth/auth-layout";
+import { useAuthConfig } from "@/auth/config";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { FormField, Note } from "@/settings/ui/form";
@@ -15,6 +16,7 @@ const backToSignIn = () => (
 
 /** "Forgot password": asks for the address and has the server mail a link. */
 export function ResetRequestPage() {
+  const config = useAuthConfig();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -49,6 +51,21 @@ export function ResetRequestPage() {
             {t("auth.reset.another")}
           </Button>
         </div>
+      </AuthLayout>
+    );
+  }
+
+  // An install that cannot send mail says so before anyone types an address.
+  if (config?.mail === false) {
+    return (
+      <AuthLayout title={t("auth.reset.title")} footer={backToSignIn()}>
+        <Note tone="wait">
+          <span className="flex flex-col gap-1.5">
+            <span>{t("auth.reset.noMail")}</span>
+            <span>{t("auth.reset.noMailHow")}</span>
+            <code className="font-mono text-xs break-all text-ink">quadit admin reset-password &lt;email&gt;</code>
+          </span>
+        </Note>
       </AuthLayout>
     );
   }

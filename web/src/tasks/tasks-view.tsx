@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { ChartGantt, ListTodo, Plus, SearchX, SquareKanban } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
@@ -8,7 +8,6 @@ import { useStore } from "@/lib/store";
 import { today } from "@/lib/time";
 import type { Project, View } from "@/lib/types";
 import { type TaskDraft, ui, usePageTitle } from "@/lib/ui-state";
-import { Board } from "@/tasks/board";
 import { BulkBar } from "@/tasks/bulk-bar";
 import { FilterBar } from "@/tasks/filter-bar";
 import { comparer, countFilters, emptyFilters, fromQuery, groupTasks, matcher, sameFilters, sortFromQuery } from "@/tasks/filters";
@@ -17,6 +16,10 @@ import { DisplayControls, ViewControls } from "@/tasks/view-controls";
 import { defaultViewState, useViewState, type ViewState } from "@/tasks/view-state";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
+import { Loading } from "@/ui/spinner";
+
+// The board brings drag and drop with it; fetched when a board is first shown.
+const Board = lazy(() => import("@/tasks/board").then((m) => ({ default: m.Board })));
 
 interface Props {
   /** The project whose tasks are shown; for a view, the one project it is about, if it is about one. */
@@ -153,7 +156,9 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
             />
           )
         ) : state.layout === "board" ? (
-          <Board groups={groups} projectId={project?.id} />
+          <Suspense fallback={<Loading />}>
+            <Board groups={groups} projectId={project?.id} />
+          </Suspense>
         ) : (
           <div className="h-full overflow-y-auto">
             <TaskList groups={groups} selected={selected} onSelectedChange={setSelected} onAdd={add} />

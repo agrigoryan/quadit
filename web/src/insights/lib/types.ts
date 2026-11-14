@@ -49,6 +49,8 @@ export interface EpicProgress {
   points_done?: number;
   /** Why it is at risk, in the server's words; empty when it is not. */
   at_risk?: string;
+  /** The same reason as a code: past_target, due_soon, stalled. */
+  at_risk_code?: string;
 }
 
 export type AgentStateName = "working" | "waiting" | "has_work" | "idle";

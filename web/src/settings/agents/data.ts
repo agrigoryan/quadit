@@ -1,7 +1,6 @@
 // What the Agents pages read beyond the store: what each agent is doing
-// right now, who answers for it, and the tokens issued to it.
+// right now and the tokens issued to it.
 
-import { useSession } from "@/auth/session";
 import { api, ws } from "@/lib/api";
 import { useSlug } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
@@ -23,8 +22,6 @@ export interface AgentMember extends Member {
   scope?: Scope;
   budget?: Budget;
   last_action?: string;
-  /** Present only after a live update; see useResponsible. */
-  responsible_id?: string;
 }
 
 export interface AgentState {
@@ -67,23 +64,6 @@ export function useAgentStates() {
       }),
     [slug],
   );
-}
-
-/**
- * Who answers for each agent, by the agent's user id. The workspace API
- * does not carry this on the member row, so it is read from the install's
- * user list, which only install admins may see; for anyone else the map is
- * empty and the pages say "not shown".
- */
-export function useResponsible() {
-  const isInstallAdmin = useSession((s) => !!s.user?.is_admin);
-  return useLoad(async () => {
-    const out: Record<string, string> = {};
-    if (!isInstallAdmin) return out;
-    const r = await api.get<{ users: { id: string; responsible_id?: string }[] }>("/api/v1/admin/users?kind=agent");
-    for (const u of r.users) if (u.responsible_id) out[u.id] = u.responsible_id;
-    return out;
-  }, [isInstallAdmin]);
 }
 
 export const dollars = (micros: number | undefined) => (micros ? String(micros / 1_000_000) : "");

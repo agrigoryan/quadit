@@ -25,7 +25,6 @@ export const decisionsStrings = {
   "declog.asked.line": "{asker} asked {asked}",
   "declog.asked.anyone": "{asker} asked",
   "declog.answered.line": "{name} answered",
-  "declog.waitingOn": "Waiting for {name}",
   "declog.showMore": "Show {n} more",
   "declog.empty": "No decisions yet",
   "declog.emptyHint": "When someone asks a question on a task, with options to pick from or a yes or no, it is kept here with its answer.",

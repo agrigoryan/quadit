@@ -5,7 +5,7 @@
 
 import { create } from "zustand";
 import { api, ws } from "@/lib/api";
-import { type Dict, getState, mergeRows, onEvents, useStore } from "@/lib/store";
+import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
 import type { FeedEvent } from "@/lib/types";
 import type { DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/docs/types";
 
@@ -102,6 +102,17 @@ export async function loadPage(id: string, signal?: AbortSignal): Promise<PageDa
     };
   });
   return data;
+}
+
+/**
+ * Someone else's private page that the server no longer lets this person
+ * open was shared with them and is not any more. The feed does not tell the
+ * one who lost it, so the refusal does: take the page out of the copy.
+ */
+export function forgetIfUnshared(id: string) {
+  const { c, me } = getState();
+  const owner = (c.docs[id] as { owner_id?: string } | undefined)?.owner_id;
+  if (owner && owner !== me?.user_id) removeRow("docs", id);
 }
 
 if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());

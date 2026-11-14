@@ -36,7 +36,7 @@ export function FormField({ label, htmlFor, hint, error, children, className }: 
       )}
       {children}
       {error ? (
-        <p role="alert" className="text-xs text-danger">
+        <p role="alert" className="text-xs text-danger first-letter:uppercase">
           {error}
         </p>
       ) : (
@@ -50,7 +50,7 @@ export function FormField({ label, htmlFor, hint, error, children, className }: 
 export function FormAlert({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <p role="alert" className="rounded-md bg-danger-soft px-2.5 py-2 text-sm text-danger">
+    <p role="alert" className="rounded-md bg-danger-soft px-2.5 py-2 text-sm text-danger first-letter:uppercase">
       {children}
     </p>
   );

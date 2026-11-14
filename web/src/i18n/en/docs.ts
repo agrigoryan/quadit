@@ -42,6 +42,11 @@ export const docs = {
   "docs.new.openQuestions": "Open questions",
   "docs.new.inSection": "New page in {section}",
 
+  "docs.cover.add": "Add cover",
+  "docs.cover.change": "Change cover",
+  "docs.cover.remove": "Remove",
+  "docs.cover.uploading": "Uploading…",
+  "docs.cover.notImage": "Choose an image file: PNG, JPEG, WebP or GIF",
   "docs.icon.add": "Add icon",
   "docs.icon.change": "Change icon",
   "docs.icon.pick": "Pick an icon",
@@ -51,7 +56,7 @@ export const docs = {
   "docs.trash.title": "Trash",
   "docs.trash.empty": "Nothing in the trash.",
   "docs.trash.restore": "Restore",
-  "docs.trash.note": "Shows pages deleted in this browser or while it was open.",
+  "docs.trash.note": "Restoring a page brings back the pages that were inside it.",
   "docs.trash.inTrash": "“{title}” is in the trash",
   "docs.trash.inTrashHint": "Restore it to read or edit it again. The pages inside it come back with it.",
 

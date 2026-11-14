@@ -9,7 +9,6 @@ import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { byRank, getDoc, getDocs } from "@/docs/data";
 import { loadPage } from "@/docs/store";
-import { forgetTrashed, rememberTrashed } from "@/docs/trash";
 import type { Doc, DocComment, DocKind } from "@/docs/types";
 
 type Fields = Record<string, unknown>;
@@ -150,8 +149,7 @@ export function restoreDoc(id: string) {
     for (const each of ids) tx.patch("docs", each, { deleted_at: null });
   })
     .then(() => {
-      forgetTrashed(id);
-      // A page deleted in an earlier visit is not in the workspace copy: fetch it.
+      // A page the workspace copy never had (deleted before this visit) is fetched whole.
       if (!known) void loadPage(id).catch(() => {});
     })
     .catch(() => {});
@@ -163,7 +161,6 @@ export function trashDoc(id: string) {
   if (!doc) return;
   const all = subtree(id);
   const at = Date.now();
-  rememberTrashed(doc);
   send({ type: "doc.delete", args: { id } }, (tx) => {
     for (const d of all) tx.patch("docs", d.id, { deleted_at: at });
   });

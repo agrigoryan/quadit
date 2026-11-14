@@ -6,7 +6,7 @@ import { getPasskey } from "@/auth/webauthn";
 import { api, ApiError, onUnauthorized } from "@/lib/api";
 import { clearStore } from "@/lib/store";
 import { stopSync } from "@/lib/sync";
-import { applyTheme, type ThemeChoice, toThemeChoice } from "@/lib/theme";
+import { adoptAccountTheme, applyTheme, type ThemeChoice } from "@/lib/theme";
 import type { Role, User } from "@/lib/types";
 
 export interface Membership {
@@ -49,7 +49,7 @@ export async function loadSession(): Promise<void> {
   try {
     const me = await api.get<MeResponse>("/api/v1/auth/me");
     useSession.setState({ status: "in", user: me.user, workspaces: me.workspaces, half: false });
-    applyTheme(toThemeChoice(me.user.theme));
+    adoptAccountTheme(me.user.theme);
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) {
       // onUnauthorized has run. A session that still owes its second step says so.
@@ -67,6 +67,12 @@ export interface AuthConfig {
   registration: boolean;
   name: string;
   providers: { id: string; name: string }[];
+  /** False when only install admins may make workspaces. */
+  anyone_can_create_workspaces?: boolean;
+  /** Everyone must have a second step before their workspaces open. */
+  require_2fa?: boolean;
+  /** Whether the install can send mail (reset links, invitations, digests). */
+  mail?: boolean;
 }
 
 export const authConfig = () => api.get<AuthConfig>("/api/v1/auth/config");
@@ -141,7 +147,7 @@ export async function signOut() {
   }
 }
 
-/** Saves the theme to the profile, applying it at once. */
+/** Applies a theme picked by hand at once and saves it to the profile (see lib/theme.ts for how the two meet). */
 export async function saveTheme(theme: ThemeChoice) {
   applyTheme(theme);
   const user = useSession.getState().user;

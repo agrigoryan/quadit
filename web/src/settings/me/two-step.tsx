@@ -7,7 +7,7 @@ import { toast } from "@/lib/toast";
 import type { Account } from "@/settings/me/account";
 import { QrCode } from "@/settings/me/qr";
 import { CopyField, RevealDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormField } from "@/settings/ui/form";
+import { FormAlert, FormField, useFieldErrors } from "@/settings/ui/form";
 import { Card, Section } from "@/settings/ui/layout";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -102,14 +102,14 @@ function SetupDialog({ setup, onClose, onEnabled }: { setup: { secret: string; u
 function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; onClose: () => void; onDone: (codes?: string[]) => void }) {
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const errors = useFieldErrors(["code", "password"]);
   const [busy, setBusy] = useState(false);
   const off = mode === "off";
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setError("");
+    errors.clear();
     try {
       if (off) {
         await api.post(`${TOTP}/disable`, { code: code.trim(), password });
@@ -119,7 +119,7 @@ function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; o
         onDone(out.recovery_codes);
       }
     } catch (err) {
-      setError(errorMessage(err));
+      errors.fail(err);
     } finally {
       setBusy(false);
     }
@@ -142,13 +142,19 @@ function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; o
     >
       <form id="totp-confirm" onSubmit={submit} className="flex flex-col gap-3.5">
         <p className="text-sm text-ink-2">{off ? t("me.twoStep.offBody") : t("me.twoStep.renewBody")}</p>
-        <CodeField id="totp-confirm-code" label={off ? t("me.twoStep.codeOrRecovery") : t("me.twoStep.code")} value={code} onChange={setCode} />
+        <CodeField
+          id="totp-confirm-code"
+          label={off ? t("me.twoStep.codeOrRecovery") : t("me.twoStep.code")}
+          value={code}
+          onChange={setCode}
+          error={errors.fields.code}
+        />
         {off && (
-          <FormField label={t("me.twoStep.orPassword")} htmlFor="totp-confirm-pw">
+          <FormField label={t("me.twoStep.orPassword")} htmlFor="totp-confirm-pw" error={errors.fields.password}>
             <Input id="totp-confirm-pw" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </FormField>
         )}
-        <FormAlert>{error}</FormAlert>
+        <FormAlert>{errors.form}</FormAlert>
       </form>
     </Dialog>
   );

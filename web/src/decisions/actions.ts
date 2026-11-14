@@ -52,6 +52,39 @@ export function markUnclear(decision: Decision, note: string) {
   );
 }
 
+export interface DecisionEdit {
+  question: string;
+  details: string;
+  /** An option's id, or null for no recommendation. */
+  recommended: string | null;
+  recommendation: string;
+}
+
+/**
+ * Changes an open question's wording, details or recommendation; only what
+ * differs is sent. Only the asker may. Rejects with the server's reason if
+ * it is refused.
+ */
+export async function updateDecision(decision: Decision, edit: DecisionEdit): Promise<void> {
+  const args: Record<string, unknown> = { id: decision.id };
+  const local: Record<string, unknown> = {};
+  if (edit.question !== decision.question) args.question = local.question = edit.question;
+  if (edit.details !== (decision.details ?? "")) {
+    args.details = edit.details;
+    local.details = edit.details || null;
+  }
+  if (edit.recommended !== (decision.recommended_option_id ?? null)) {
+    args.recommended = edit.recommended;
+    local.recommended_option_id = edit.recommended;
+  }
+  if (edit.recommendation !== (decision.recommendation ?? "")) {
+    args.recommendation = edit.recommendation;
+    local.recommendation = edit.recommendation || null;
+  }
+  if (Object.keys(local).length === 0) return;
+  await mutate({ type: "decision.update", args }, (tx) => tx.patch("decisions", decision.id, local), { quiet: true });
+}
+
 export function deleteDecision(decision: Decision) {
   send({ type: "decision.delete", args: { id: decision.id } }, (tx) => tx.patch("decisions", decision.id, { deleted_at: Date.now() }));
 }

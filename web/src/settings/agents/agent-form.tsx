@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useMembers, useProjects } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 import { type AgentMember, dollars, toMicros, toMinutes } from "@/settings/agents/data";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { type FieldErrors, FormField, NativeSelect, SwitchRow } from "@/settings/ui/form";
@@ -79,8 +80,11 @@ interface Props {
 
 export function AgentProfileFields({ draft, set, errors, creating, disabled }: Props) {
   const people = useMembers().filter((m) => m.kind === "person" && !m.suspended_at);
+  // The one responsible now may no longer be among those who can be chosen (suspended, say): still name them.
+  const current = useStore((s) => (draft.responsible ? s.c.members[draft.responsible] : undefined));
+  const listed = people.some((p) => p.user_id === draft.responsible);
   const responsibleChoices = [
-    ...(draft.responsible && people.some((p) => p.user_id === draft.responsible) ? [] : [{ value: "", label: creating ? t("common.you") : t("agent.responsibleUnknown") }]),
+    ...(listed ? [] : [current ? { value: current.user_id, label: current.name } : { value: "", label: creating ? t("common.you") : t("agent.responsibleNone") }]),
     ...people.map((p) => ({ value: p.user_id, label: p.name })),
   ];
   return (

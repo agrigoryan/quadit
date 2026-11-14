@@ -69,9 +69,9 @@ export function riskOf(epic: Epic, tally: Tally | undefined, now = Date.now()): 
 }
 
 export function riskLabel(risk: Risk): string {
-  if (risk === "past") return t("ins.risk.past_its_target_date");
-  if (risk === "soon") return t("ins.risk.due_within_a_week_and_less_than_half_done");
-  if (risk === "stale") return t("ins.risk.nothing_has_moved_in_two_weeks");
+  if (risk === "past") return t("ins.risk.past_target");
+  if (risk === "soon") return t("ins.risk.due_soon");
+  if (risk === "stale") return t("ins.risk.stalled");
   return "";
 }
 

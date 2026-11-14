@@ -26,7 +26,6 @@ export const projectStrings = {
   "project.keyBad": "Use 2 to 10 letters or digits, starting with a letter",
   "project.name": "Name",
   "project.icon": "Icon",
-  "project.iconHint": "One emoji, optional.",
   "project.color": "Colour",
   "project.description": "Description",
   "project.create": "Create project",

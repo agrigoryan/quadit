@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { AuthLayout } from "@/auth/auth-layout";
-import { slugFrom } from "@/auth/config";
+import { slugFrom, useCanCreateWorkspace } from "@/auth/config";
 import { createWorkspace, signOut, useSession } from "@/auth/session";
 import { ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -22,7 +22,8 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
   /** Empty until the person types their own; the address then follows the name. */
   const [slug, setSlug] = useState("");
   const [busy, setBusy] = useState(false);
-  const errors = useFieldErrors(["workspace_slug", "workspace_name"]);
+  // The server names the address "slug" (or "workspace_slug") and the name "name" (or "workspace_name").
+  const errors = useFieldErrors(["slug", "workspace_slug", "name", "workspace_name"]);
   const address = slug || slugFrom(name);
 
   function change(next: boolean) {
@@ -37,7 +38,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      errors.set("workspace_name", t("auth.workspace.nameNeeded"));
+      errors.set("name", t("auth.workspace.nameNeeded"));
       return;
     }
     setBusy(true);
@@ -47,8 +48,8 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
       change(false);
       navigate(`/${made}`);
     } catch (err) {
-      // A taken address is refused without naming the field; it is the address that needs changing.
-      if (err instanceof ApiError && err.code === "conflict" && !err.field) errors.set("workspace_slug", err.message);
+      // An older server refuses a taken address without naming the field; it is the address that needs changing.
+      if (err instanceof ApiError && err.code === "conflict" && !err.field) errors.set("slug", err.message);
       else errors.fail(err);
     } finally {
       setBusy(false);
@@ -72,13 +73,13 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
       }
     >
       <form id="create-workspace" onSubmit={submit} className="flex flex-col gap-3.5">
-        <FormField label={t("auth.setup.workspace")} htmlFor="ws-name" error={errors.fields.workspace_name}>
+        <FormField label={t("auth.setup.workspace")} htmlFor="ws-name" error={errors.fields.name || errors.fields.workspace_name}>
           <Input id="ws-name" required autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
         </FormField>
         <FormField
           label={t("auth.workspace.address")}
           htmlFor="ws-slug"
-          error={errors.fields.workspace_slug}
+          error={errors.fields.slug || errors.fields.workspace_slug}
           hint={t("auth.workspace.addressHint", { address: `${window.location.host}/${address}` })}
         >
           <Input
@@ -100,6 +101,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
 /** What "/" shows to someone who is signed in but belongs to no workspace (a new registration, or removed from their last one). */
 export function NoWorkspacePage() {
   const user = useSession((s) => s.user);
+  const canCreate = useCanCreateWorkspace();
   const [open, setOpen] = useState(false);
   return (
     <AuthLayout
@@ -115,12 +117,14 @@ export function NoWorkspacePage() {
       }
     >
       <div className="flex flex-col gap-3">
-        <Button variant="primary" size="lg" className="w-full" onClick={() => setOpen(true)}>
-          {t("auth.workspace.create")}
-        </Button>
-        <p className="text-sm text-ink-2">{t("auth.noWorkspace.invite")}</p>
+        {canCreate && (
+          <Button variant="primary" size="lg" className="w-full" onClick={() => setOpen(true)}>
+            {t("auth.workspace.create")}
+          </Button>
+        )}
+        <p className="text-sm text-ink-2">{t(canCreate ? "auth.noWorkspace.invite" : "auth.noWorkspace.inviteOnly")}</p>
       </div>
-      <CreateWorkspaceDialog open={open} onOpenChange={setOpen} />
+      {canCreate && <CreateWorkspaceDialog open={open} onOpenChange={setOpen} />}
     </AuthLayout>
   );
 }

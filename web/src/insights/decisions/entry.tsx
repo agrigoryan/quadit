@@ -9,7 +9,7 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { isMedia } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import type { Decision, DecisionOption } from "@/lib/types";
 import { useMemberName } from "@/decisions/data";
 import { rich, Who } from "@/decisions/parts";
@@ -24,6 +24,7 @@ import type { Dict } from "@/lib/store";
 import { type Entry, optionsOf, outcomeOf, pickedOption } from "@/insights/decisions/data";
 import { revealDecision } from "@/insights/decisions/reveal";
 import type { Preference } from "@/insights/lib/types";
+import { Ago } from "@/ui/ago";
 
 const SHOWN_OPTIONS = 4;
 
@@ -153,14 +154,14 @@ export const DecisionEntry = memo(function DecisionEntry({ entry, meId, files, p
         <div className="flex items-baseline gap-3">
           <Link
             {...link}
-            onClick={() => revealDecision(decision.question)}
+            onClick={() => revealDecision(decision.id)}
             aria-label={t("declog.open", { key: task.key, question: decision.question })}
             className="min-w-0 flex-1 font-medium text-pretty outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent"
           >
             {decision.question}
           </Link>
           <time className="shrink-0 text-xs text-ink-3 tnum" title={exact(entry.at)}>
-            {ago(entry.at)}
+            <Ago ms={entry.at} />
           </time>
         </div>
 
@@ -202,7 +203,7 @@ export const DecisionEntry = memo(function DecisionEntry({ entry, meId, files, p
             })}
             {!open && (
               <time className="text-ink-3 tnum" title={exact(decision.created_at)}>
-                {ago(decision.created_at)}
+                <Ago ms={decision.created_at} />
               </time>
             )}
           </span>
@@ -211,7 +212,7 @@ export const DecisionEntry = memo(function DecisionEntry({ entry, meId, files, p
               {rich(t("declog.answered.line"), { name: <Who userId={decision.decided_by} capital /> })}
               {decision.decided_at && (
                 <time className="text-ink-3 tnum" title={exact(decision.decided_at)}>
-                  {ago(decision.decided_at)}
+                  <Ago ms={decision.decided_at} />
                 </time>
               )}
             </span>

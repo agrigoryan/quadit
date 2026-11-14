@@ -5,12 +5,13 @@ import { api } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { fileSize } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import { Button } from "@/ui/button";
 import type { Backup } from "@/admin/backups";
 import { LoadGate } from "@/settings/ui/bits";
 import { Page, Rows, Section } from "@/settings/ui/layout";
 import { useLoad } from "@/settings/ui/use-load";
+import { Ago } from "@/ui/ago";
 
 interface Health {
   version: string;
@@ -22,6 +23,9 @@ interface Health {
   webhooks_failing: number;
   deliveries_dead: number;
   deliveries_pending: number;
+  /** Repository syncs and integrations whose last run ended in an error. An older server leaves them out. */
+  sources_failing?: number;
+  integrations_failing?: number;
   last_backup?: Backup;
 }
 
@@ -70,7 +74,7 @@ function BackupLine({ backup }: { backup: Backup | undefined }) {
   if (!backup) {
     return <Line tone="warn" label={label} value={t("admin.health.backupNone")} note={<>{t("admin.health.backupNoneNote")} {link}</>} />;
   }
-  const when = <span title={exact(backup.started_at)}>{ago(backup.started_at)}</span>;
+  const when = <span title={exact(backup.started_at)}><Ago ms={backup.started_at} /></span>;
   if (backup.error) return <Line tone="bad" label={label} value={<>{t("admin.health.backupFailed")} · {when}</>} note={<>{backup.error} {link}</>} />;
   if (!backup.verified_at) return <Line tone="warn" label={label} value={<>{t("admin.health.backupUnverified")} · {when}</>} note={link} />;
   const old = Date.now() - backup.started_at > 3 * 24 * 3600_000;
@@ -122,6 +126,18 @@ export function HealthPage() {
                   label={t("admin.health.deliveriesDead")}
                   value={count(h.deliveries_dead)}
                   note={h.deliveries_dead > 0 ? t("admin.health.deliveriesDeadNote") : undefined}
+                />
+                <Line
+                  tone={(h.sources_failing ?? 0) > 0 ? "warn" : "ok"}
+                  label={t("admin.health.sourcesFailing")}
+                  value={count(h.sources_failing ?? 0)}
+                  note={(h.sources_failing ?? 0) > 0 ? t("admin.health.sourcesFailingNote") : undefined}
+                />
+                <Line
+                  tone={(h.integrations_failing ?? 0) > 0 ? "warn" : "ok"}
+                  label={t("admin.health.integrationsFailing")}
+                  value={count(h.integrations_failing ?? 0)}
+                  note={(h.integrations_failing ?? 0) > 0 ? t("admin.health.integrationsFailingNote") : undefined}
                 />
                 <Line
                   tone={h.jobs_failing > 0 ? "warn" : "ok"}

@@ -267,6 +267,7 @@ func docUpdate(c *cx) error {
 		return err
 	}
 	wasAudience := docAudience(d)
+	var unshared []string // those who could see the page and no longer can
 	p := newPatch()
 	p.str("title", a.Title, &d.Title)
 	p.str("icon", a.Icon, &d.Icon)
@@ -328,6 +329,11 @@ func docUpdate(c *cx) error {
 			ids = append(ids, m.UserID)
 		}
 		p.put("shared_with", d.SharedWith, ids)
+		for _, was := range d.SharedWith {
+			if !contains(ids, was) {
+				unshared = append(unshared, was)
+			}
+		}
 	}
 	if a.Archived.Set {
 		if a.Archived.V && d.ArchivedAt == 0 {
@@ -390,6 +396,16 @@ func docUpdate(c *cx) error {
 	}
 	if err := c.emitTo(audience, seq, "doc.updated", "doc", d.ID, "doc", d.ID, d.ProjectID, data); err != nil {
 		return err
+	}
+	if docAudience(d) != "" {
+		// Someone the page is no longer shared with stops getting its events:
+		// tell each of them, alone, to let go of their copy.
+		for _, uid := range unshared {
+			if err := c.emitTo(uid, c.tx.NextSeq(), "doc.unshared", "doc", d.ID, "user", uid, d.ProjectID,
+				map[string]any{"id": d.ID, "gone": true}); err != nil {
+				return err
+			}
+		}
 	}
 	if _, ok := p.set["title"]; ok {
 		rows, err := LoadBlocks(cxLister{c}, d.ID)

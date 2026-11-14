@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { t } from "@/lib/i18n";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
@@ -6,7 +6,7 @@ import { useMembers } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { AGENT_FIELDS, type AgentDraft, AgentLimitFields, AgentProfileFields, draftOf, limitsOf } from "@/settings/agents/agent-form";
 import { ListeningMark, StateBadge } from "@/settings/agents/agents";
-import { type AgentMember, useAgentStates, useResponsible } from "@/settings/agents/data";
+import { type AgentMember, useAgentStates } from "@/settings/agents/data";
 import { AgentTokens } from "@/settings/agents/tokens";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact, When } from "@/settings/ui/bits";
@@ -43,8 +43,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
   const admin = useIsAdmin();
   const navigate = useNavigate();
   const states = useAgentStates();
-  const responsible = useResponsible();
-  const knownResponsible = agent.responsible_id ?? responsible.data?.[agent.user_id] ?? "";
+  const knownResponsible = agent.responsible_id ?? "";
   const [draft, setDraft] = useState<AgentDraft>(() => draftOf(agent, knownResponsible));
   const [busy, setBusy] = useState(false);
   const [ask, setAsk] = useState<"suspend" | "remove" | null>(null);
@@ -52,10 +51,12 @@ function AgentBody({ agent }: { agent: AgentMember }) {
   const set = (patch: Partial<AgentDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const state = states.data?.[agent.user_id];
 
-  // Who is responsible arrives a moment after the page; fill it in unless the person already chose.
-  useEffect(() => {
-    if (knownResponsible) setDraft((d) => (d.responsible ? d : { ...d, responsible: knownResponsible }));
-  }, [knownResponsible]);
+  // Someone else changed who is responsible while this page was open: follow, unless the person already chose here.
+  const [seenResponsible, setSeenResponsible] = useState(knownResponsible);
+  if (seenResponsible !== knownResponsible) {
+    setSeenResponsible(knownResponsible);
+    if (draft.responsible === seenResponsible) setDraft((d) => ({ ...d, responsible: knownResponsible }));
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -77,7 +78,6 @@ function AgentBody({ agent }: { agent: AgentMember }) {
     try {
       await mutate(changes, undefined, { quiet: true });
       toast.info(t("s.saved"));
-      void responsible.reload();
     } catch (err) {
       errors.fail(err);
     } finally {

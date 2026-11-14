@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { CircleCheck, DatabaseBackup, TriangleAlert } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { useMinute } from "@/lib/tick";
 import { ago, exact } from "@/lib/time";
 import { parseWhen } from "@/insights/lib/format";
 import type { Health } from "@/insights/lib/types";
@@ -22,6 +23,7 @@ function Line({ tone, icon, children }: { tone: "bad" | "warn" | "ok" | "quiet";
 }
 
 export function HealthPanel({ health, className }: { health: Health; className?: string }) {
+  useMinute();
   const problems: { key: string; tone: "bad" | "warn"; text: string }[] = [];
   const n = (v: number | undefined) => v ?? 0;
   if (n(health.webhooks_failing) > 0)

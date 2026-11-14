@@ -39,12 +39,21 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
     e.preventDefault();
     errors.clear();
     if (!/^https?:\/\/\S+$/i.test(url.trim())) return errors.set("url", t("auto.hook.urlInvalid"));
-    if (!hook && scope === "project" && !projectId) return errors.set("project", t("auto.hook.projectMissing"));
-    if (!hook && scope === "member" && !memberId) return errors.set("for", t("auto.hook.memberMissing"));
+    if (scope === "project" && !projectId) return errors.set("project", t("auto.hook.projectMissing"));
+    if (scope === "member" && !memberId) return errors.set("for", t("auto.hook.memberMissing"));
     setBusy(true);
     try {
       if (hook) {
-        await change("webhook.update", { id: hook.id, name: name.trim() || null, url: url.trim(), event_types: events, active });
+        await change("webhook.update", {
+          id: hook.id,
+          name: name.trim() || null,
+          url: url.trim(),
+          // An inbox webhook gets what lands in the inbox, whatever its type.
+          event_types: scope === "member" ? [] : events,
+          project: scope === "project" ? projectId : null,
+          for: scope === "member" ? memberId : null,
+          active,
+        });
         onSaved();
       } else {
         const secret = randomSecret();
@@ -105,9 +114,9 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
         <FormField
           label={t("auto.hook.scope")}
           htmlFor="wh-scope"
-          hint={hook ? t("auto.hook.scopeFixed") : scope === "member" ? t("auto.hook.scope.memberHint") : undefined}
+          hint={scope === "member" ? t("auto.hook.scope.memberHint") : undefined}
         >
-          <NativeSelect id="wh-scope" value={scope} onChange={(v) => setScope(v as Scope)} options={scopeChoices} disabled={!!hook} />
+          <NativeSelect id="wh-scope" value={scope} onChange={(v) => setScope(v as Scope)} options={scopeChoices} />
         </FormField>
         {scope === "project" && (
           <FormField label={t("auto.project")} htmlFor="wh-project" error={errors.fields.project}>
@@ -115,7 +124,6 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
               id="wh-project"
               value={projectId}
               onChange={(v) => (setProjectId(v), errors.set("project", ""))}
-              disabled={!!hook}
               options={[{ value: "", label: t("auto.pickProject") }, ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` }))]}
             />
           </FormField>
@@ -126,7 +134,6 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
               id="wh-for"
               value={memberId}
               onChange={(v) => (setMemberId(v), errors.set("for", ""))}
-              disabled={!!hook}
               options={[{ value: "", label: t("auto.pickMember") }, ...inboxes.map((m) => ({ value: m.user_id, label: `${m.name} (@${m.handle})` }))]}
             />
           </FormField>

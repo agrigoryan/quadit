@@ -3,6 +3,7 @@ import { errorMessage } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
+import { useAuthConfig } from "@/auth/config";
 import { useSettingsBase } from "@/settings/base";
 import { type Account, type EmailChoice, type NotifyPrefs, saveAccount, useAccount } from "@/settings/me/account";
 import { type PushState, pushState, sendTestPush, turnPushOff, turnPushOn } from "@/settings/me/push";
@@ -38,9 +39,11 @@ function useSavePrefs(account: Account, onSaved: (a: Account) => void) {
 function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
   const { save, error } = useSavePrefs(account, onSaved);
   const value = prefsOf(account).email;
+  const noMail = useAuthConfig()?.mail === false;
   return (
     <Section title={t("me.notify.email")} lead={t("me.notify.emailLead", { email: account.user.email ?? "" })}>
       <div className="flex flex-col gap-2.5">
+        {noMail && <Note tone="wait">{t("me.notify.noMail")}</Note>}
         <Rows>
           <div role="radiogroup" aria-label={t("me.notify.email")} className="divide-y divide-line">
             {emailChoices.map((choice) => (

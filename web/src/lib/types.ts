@@ -36,6 +36,8 @@ export interface Member {
   name: string;
   avatar?: string;
   title?: string;
+  /** For an agent: the person who answers for it. */
+  responsible_id?: string;
   budget?: { cost_micros?: number; minutes?: number };
   last_action?: string;
   last_seen_at?: number;

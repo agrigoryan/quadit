@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ApiError, errorMessage } from "@/lib/api";
-import { loadPage } from "@/docs/store";
+import { forgetIfUnshared, loadPage } from "@/docs/store";
 import type { BlockRow } from "@/docs/types";
 
 export type PageState = { status: "loading" } | { status: "error"; error: string; missing: boolean } | { status: "ready"; blocks: BlockRow[]; seq: number };
@@ -20,7 +20,10 @@ export function usePage(docId: string): PageState {
           const missing = err instanceof ApiError && err.status === 404;
           // A page made a moment ago may be asked for before the server has it.
           if (missing && n < 4) timer = setTimeout(() => void attempt(n + 1), 250 * (n + 1));
-          else setState({ status: "error", error: errorMessage(err), missing });
+          else {
+            if (missing) forgetIfUnshared(docId);
+            setState({ status: "error", error: errorMessage(err), missing });
+          }
         },
       );
     void attempt(0);

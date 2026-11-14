@@ -7,7 +7,7 @@ import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMe, useMember } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import type { Comment, Task } from "@/lib/types";
 import { caretToEnd } from "@/detail/bits";
 import { createComment, deleteComment, updateComment } from "@/detail/comment-actions";
@@ -20,13 +20,14 @@ import { Markdown } from "@/ui/markdown";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Tooltip } from "@/ui/tooltip";
+import { Ago } from "@/ui/ago";
 
 /** A time as "5m", with the exact moment on hover. */
 export function When({ at }: { at: number }) {
   return (
     <Tooltip label={exact(at)} side="top">
       <time dateTime={new Date(at).toISOString()} className="shrink-0 text-xs whitespace-nowrap text-ink-3">
-        {ago(at)}
+        <Ago ms={at} />
       </time>
     </Tooltip>
   );

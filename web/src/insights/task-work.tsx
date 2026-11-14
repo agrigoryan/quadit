@@ -3,7 +3,7 @@
 // branches, commits and pull requests the work lives in, each with its state
 // and whether its checks pass.
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
   CircleCheck,
   CircleX,
@@ -16,11 +16,9 @@ import {
   GitPullRequestDraft,
   X,
 } from "lucide-react";
-import { api, ws } from "@/lib/api";
 import { t, tMaybe } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
 import { useCollection } from "@/lib/selectors";
-import { getState, mergeRows, onEvents } from "@/lib/store";
 import type { AgentSession, Task, TaskLink } from "@/lib/types";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
@@ -107,31 +105,6 @@ function CodeLink({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
   );
 }
 
-/**
- * The feed says which steps a session gained, not the whole list. When a
- * session of this task changes, fetch its sessions again, a moment later so
- * a burst of updates costs one request.
- */
-function useFreshSessions(task: Task) {
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const off = onEvents((events) => {
-      if (timer || !events.some((ev) => ev.entity_type === "session" && ev.scope_id === task.id)) return;
-      timer = setTimeout(() => {
-        timer = undefined;
-        api
-          .get<{ sessions: AgentSession[] }>(ws(getState().slug, `/list/sessions?task=${encodeURIComponent(task.key)}`))
-          .then((out) => mergeRows("sessions", out.sessions))
-          .catch(() => {});
-      }, 600);
-    });
-    return () => {
-      clearTimeout(timer);
-      off();
-    };
-  }, [task.id, task.key]);
-}
-
 function Sessions({ sessions }: { sessions: AgentSession[] }) {
   // The clock only has to run while something is running.
   const running = sessions.some((s) => s.state === "running");
@@ -168,7 +141,6 @@ export function TaskWork({ task }: { task: Task }) {
   );
   const links = useTaskLinks(task.id);
   const code = useMemo(() => links.filter((l) => l.kind !== "url"), [links]);
-  useFreshSessions(task);
 
   return (
     <>

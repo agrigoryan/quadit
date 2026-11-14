@@ -8,7 +8,7 @@ import { api, errorMessage, ws } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { keepVersion, revertTo } from "@/docs/actions";
 import type { BlockTree, Doc, DocVersion } from "@/docs/types";
@@ -17,6 +17,7 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { Loading } from "@/ui/spinner";
+import { Ago } from "@/ui/ago";
 
 const Preview = lazy(() => import("@/docs/editor/preview"));
 
@@ -138,7 +139,7 @@ export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{v.label || t("docs.versions.auto")}</span>
                       <span className="block text-xs text-ink-3" title={exact(v.created_at)}>
-                        {ago(v.created_at)} · {members[v.created_by]?.name ?? t("common.someone")}
+                        <Ago ms={v.created_at} /> · {members[v.created_by]?.name ?? t("common.someone")}
                       </span>
                     </span>
                   </button>

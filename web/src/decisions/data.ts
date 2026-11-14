@@ -64,6 +64,8 @@ export interface Viewer {
   /** The question is open and was asked of me: it is my move. */
   mine: boolean;
   canAnswer: boolean;
+  /** The question is open and I asked it: I may still reword it. */
+  canEdit: boolean;
   canDelete: boolean;
   /** I asked, an answer is in, and I may say it does not settle the question. */
   canReopen: boolean;
@@ -79,6 +81,7 @@ export function useViewer(decision: Decision): Viewer {
     isAsker,
     mine: open && decision.asked_id === me.user_id,
     canAnswer: open && !isAsker && !barred,
+    canEdit: open && isAsker,
     canDelete: open && (isAsker || me.role !== "member"),
     canReopen: !open && isAsker,
   };

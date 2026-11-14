@@ -27,6 +27,8 @@ export const authStrings = {
 
   "auth.reset.title": "Reset your password",
   "auth.reset.lead": "Enter the email of your account and we will send a link to choose a new password.",
+  "auth.reset.noMail": "This install has no mail server, so it cannot send a link to choose a new password.",
+  "auth.reset.noMailHow": "Ask whoever runs it to reset your password. They do it on the server with:",
   "auth.reset.submit": "Send the link",
   "auth.reset.busy": "Sending…",
   "auth.reset.sentTitle": "Check your mail",
@@ -73,6 +75,7 @@ export const authStrings = {
   "auth.noWorkspace.title": "You are not in a workspace yet",
   "auth.noWorkspace.lead": "Work happens in a workspace: a team's projects, people and agents.",
   "auth.noWorkspace.invite": "To join an existing workspace, ask someone in it for an invitation and open the link they send.",
+  "auth.noWorkspace.inviteOnly": "Workspaces on this install are made by its admins. To join one, ask someone in it for an invitation and open the link they send.",
   "auth.noWorkspace.signedInAs": "Signed in as {email}.",
 
   "auth.firstRun.title": "Create your first project",

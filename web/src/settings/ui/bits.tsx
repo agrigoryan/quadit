@@ -3,18 +3,19 @@
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 import type { Loaded } from "@/settings/ui/use-load";
+import { Ago } from "@/ui/ago";
 
 /** A moment as "3h" with the exact time on hover; a dash when there is none. */
 export function When({ ms, className }: { ms: number | undefined; className?: string }) {
   if (!ms) return <span className={cx("text-ink-3", className)}>{t("s.never")}</span>;
   return (
     <time dateTime={new Date(ms).toISOString()} title={exact(ms)} className={cx("tnum whitespace-nowrap", className)}>
-      {ago(ms)}
+      <Ago ms={ms} />
     </time>
   );
 }

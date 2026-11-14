@@ -152,10 +152,11 @@ export function randomSecret(): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// The event types offered by name. The server takes any "entity.verb" and
-// "entity.*"; these are the ones a receiver most often wants.
+// The event types offered first, by family. The server takes any
+// "entity.verb" and "entity.*"; these are the ones a receiver most often
+// wants. The whole list comes from the server (see useEventTypes).
 export const EVENT_GROUPS: { id: string; types: string[] }[] = [
-  { id: "task", types: ["task.created", "task.updated", "task.deleted"] },
+  { id: "task", types: ["task.created", "task.updated", "task.restored"] },
   { id: "decision", types: ["decision.opened", "decision.picked", "decision.unclear"] },
   { id: "comment", types: ["comment.created", "comment.updated"] },
   { id: "link", types: ["attachment.created", "link.created", "link.updated"] },
@@ -163,7 +164,22 @@ export const EVENT_GROUPS: { id: string; types: string[] }[] = [
   { id: "doc", types: ["doc.created", "doc.edited"] },
 ];
 
-export const KNOWN_EVENTS = EVENT_GROUPS.flatMap((g) => g.types);
+/** What is offered when the server's list cannot be had. */
+export const FALLBACK_EVENTS = EVENT_GROUPS.flatMap((g) => g.types);
+
+let eventTypes: Promise<string[]> | null = null;
+
+/** Every event type the server's feed carries. Asked for once; the fallback list if that fails. */
+export function loadEventTypes(): Promise<string[]> {
+  eventTypes ??= api
+    .get<{ types?: string[] }>("/api/v1/events/types")
+    .then((r) => (r.types?.length ? r.types : FALLBACK_EVENTS))
+    .catch(() => {
+      eventTypes = null; // ask again next time
+      return FALLBACK_EVENTS;
+    });
+  return eventTypes;
+}
 
 /** Whether a list of patterns lets an event type through, the way the server decides it. */
 export function typeMatches(patterns: string[] | undefined, type: string): boolean {

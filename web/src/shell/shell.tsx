@@ -1,33 +1,53 @@
-import { lazy, type ReactNode, Suspense } from "react";
+import { lazy, type ReactNode, Suspense, useEffect } from "react";
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
-import { CommandPalette } from "@/palette/palette";
 import { ShortcutsSheet } from "@/palette/shortcuts";
-import { TaskPanel } from "@/detail/task-panel";
 import { useHotkeys } from "@/lib/hotkeys";
 import { findTaskByKey } from "@/lib/selectors";
 import { getState, useStore } from "@/lib/store";
 import { ui, useUi } from "@/lib/ui-state";
-import { CyclesPage } from "@/pages/cycles";
-import { EpicsPage } from "@/pages/epics";
 import { InboxPage } from "@/pages/inbox";
 import { MyWorkPage } from "@/pages/my-work";
 import { TrashPage } from "@/pages/trash";
 import { insightPaths } from "@/insights/paths";
-import { PageBoundary } from "@/shell/error-boundary";
+import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
 import { NotFoundPage } from "@/shell/placeholders";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
-import { CreateTaskDialog } from "@/tasks/create-task";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
 
 // The larger parts of the app are fetched when first opened.
 const DocsRoutes = lazy(() => import("@/docs/routes"));
 const SettingsRoutes = lazy(() => import("@/settings/routes"));
 const InsightRoutes = lazy(() => import("@/insights/routes"));
+const EpicsPage = lazy(() => import("@/pages/epics").then((m) => ({ default: m.EpicsPage })));
+const CyclesPage = lazy(() => import("@/pages/cycles").then((m) => ({ default: m.CyclesPage })));
+
+// So are the parts drawn over the page. These three are also fetched ahead,
+// once the first page is up, so that opening a task, the palette or the
+// new-task dialog does not wait on the network.
+const loadTaskPanel = () => import("@/detail/task-panel");
+const loadPalette = () => import("@/palette/palette");
+const loadCreateTask = () => import("@/tasks/create-task");
+const TaskPanel = lazy(() => loadTaskPanel().then((m) => ({ default: m.TaskPanel })));
+const CommandPalette = lazy(() => loadPalette().then((m) => ({ default: m.CommandPalette })));
+const CreateTaskDialog = lazy(() => loadCreateTask().then((m) => ({ default: m.CreateTaskDialog })));
+
+function fetchAhead() {
+  for (const load of [loadTaskPanel, loadPalette, loadCreateTask]) load().catch(() => {});
+}
 
 function Later({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
+}
+
+/** One part drawn over the page. Each waits and fails by itself, so opening one never hides another. */
+function Part({ on, children }: { on: string | boolean; children: ReactNode }) {
+  return (
+    <PartBoundary resetKey={String(on)}>
+      <Suspense fallback={null}>{children}</Suspense>
+    </PartBoundary>
+  );
 }
 
 /** The project a new task should default to, given what is on screen. */
@@ -54,6 +74,12 @@ export function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
   const newTask = useUi((s) => s.newTask);
+  const paletteOpen = useUi((s) => s.paletteOpen);
+
+  useEffect(() => {
+    const timer = setTimeout(fetchAhead, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
   const background = (location.state as { background?: Location } | null)?.background;
@@ -93,8 +119,8 @@ export function Shell() {
             <Route path="inbox" element={<InboxPage />} />
             <Route path="p/:key/tasks" element={<ProjectTasksPage layout="list" />} />
             <Route path="p/:key/board" element={<ProjectTasksPage layout="board" />} />
-            <Route path="p/:key/epics" element={<EpicsPage />} />
-            <Route path="p/:key/cycles" element={<CyclesPage />} />
+            <Route path="p/:key/epics" element={<Later><EpicsPage /></Later>} />
+            <Route path="p/:key/cycles" element={<Later><CyclesPage /></Later>} />
             <Route path="view/:slug" element={<ViewPage />} />
             <Route path="docs/*" element={<Later><DocsRoutes /></Later>} />
             <Route path="settings/*" element={<Later><SettingsRoutes /></Later>} />
@@ -107,10 +133,10 @@ export function Shell() {
           </PageBoundary>
         </main>
       </div>
-      {taskKey && <TaskPanel key={taskKey.toUpperCase()} taskKey={taskKey.toUpperCase()} onClose={closePanel} />}
-      <CommandPalette />
+      <Part on={taskKey ?? ""}>{taskKey && <TaskPanel key={taskKey.toUpperCase()} taskKey={taskKey.toUpperCase()} onClose={closePanel} />}</Part>
+      <Part on={paletteOpen}>{paletteOpen && <CommandPalette />}</Part>
+      <Part on={!!newTask}>{newTask && <CreateTaskDialog draft={newTask} />}</Part>
       <ShortcutsSheet />
-      {newTask && <CreateTaskDialog draft={newTask} />}
     </div>
   );
 }

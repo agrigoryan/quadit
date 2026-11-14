@@ -11,12 +11,14 @@ import { restoreTasks } from "@/tasks/actions";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
+import { useMinute } from "@/lib/tick";
 
 /**
  * The trash: deleted tasks, newest deletion first, each with a way back.
  * The workspace's starting copy leaves them out, so they are fetched here.
  */
 export function TrashPage() {
+  useMinute();
   usePageTitle(t("nav.trash"));
   const slug = useSlug();
   const tasks = useCollection("tasks");

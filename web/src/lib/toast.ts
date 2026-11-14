@@ -20,6 +20,6 @@ function show(kind: ToastItem["kind"], text: string, action?: ToastItem["action"
 
 export const toast = {
   info: (text: string, action?: ToastItem["action"]) => show("info", text, action),
-  error: (text: string) => show("error", text),
+  error: (text: string, action?: ToastItem["action"]) => show("error", text, action),
   dismiss: (id: string) => useToasts.setState((s) => ({ items: s.items.filter((i) => i.id !== id) })),
 };

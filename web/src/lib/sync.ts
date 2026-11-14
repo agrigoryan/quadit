@@ -94,6 +94,31 @@ function openStream(slug: string, mine: number) {
   };
 }
 
+// A page the browser keeps for Back and Forward must not keep its stream:
+// each one holds a connection, and a browser allows only a few per site, so
+// a handful of kept pages would leave the page in front waiting for every
+// request. The stream is closed when the page is put away and reopened from
+// the same position if it is shown again.
+let parked = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => {
+    if (!source) return;
+    source.close();
+    source = null;
+    clearTimeout(retryTimer);
+    downSince ||= Date.now();
+    parked = true;
+  });
+  window.addEventListener("pageshow", (e) => {
+    if (!e.persisted || !parked) return;
+    parked = false;
+    const { slug, ready } = getState();
+    if (!slug || !ready) return;
+    useStore.setState({ stream: "connecting" });
+    void reopen(slug, generation);
+  });
+}
+
 /** Reopens a stream the browser gave up on, from where the store stands. */
 async function reopen(slug: string, mine: number) {
   if (mine !== generation) return;

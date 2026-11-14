@@ -4,7 +4,7 @@ import { FirstProjectNudge } from "@/auth/first-run";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useLiveTasks, useMe, useMember } from "@/lib/selectors";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { useListKeys } from "@/pages/list-keys";
@@ -12,6 +12,7 @@ import { useOpenTask } from "@/pages/open-task";
 import { TaskRow, useTaskLink } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
+import { Ago } from "@/ui/ago";
 
 /** What is being worked on comes first, then what is next, then the rest. */
 const CATEGORY_ORDER: Category[] = ["started", "waiting", "unstarted", "backlog"];
@@ -146,7 +147,7 @@ function QuestionRow({ decision, task, focused }: { decision: Decision; task: Ta
       </span>
       <span className="relative z-[1] flex shrink-0 items-center gap-2" title={asker ? t("mywork.askedBy", { name: asker.name }) : undefined}>
         <span className="text-xs text-ink-3 tnum" title={exact(decision.created_at)}>
-          {ago(decision.created_at)}
+          <Ago ms={decision.created_at} />
         </span>
         <span className="flex size-6 items-center justify-center">
           <Avatar member={asker} size="sm" />

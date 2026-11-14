@@ -8,6 +8,7 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useMember } from "@/lib/selectors";
+import { useMinute } from "@/lib/tick";
 import { ago, exact } from "@/lib/time";
 import { nameOf } from "@/detail/data";
 import { ProjectGlyph } from "@/shell/sidebar";
@@ -30,7 +31,7 @@ function Source({ decisionId }: { decisionId: string }) {
   return (
     <Link
       {...link}
-      onClick={() => revealDecision(decision.question)}
+      onClick={() => revealDecision(decision.id)}
       className="block truncate text-xs text-ink-2 underline-offset-2 hover:text-ink hover:underline"
     >
       {t("prefs.from", { question: decision.question })}
@@ -45,6 +46,7 @@ interface ItemProps {
 }
 
 function PreferenceItem({ pref, canEdit, onDelete }: ItemProps) {
+  useMinute();
   const project = useCollection("projects")[pref.project_id ?? ""];
   const labels = useCollection("labels");
   const author = useMember(pref.created_by);

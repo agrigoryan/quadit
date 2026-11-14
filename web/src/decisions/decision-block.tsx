@@ -12,6 +12,7 @@ import { Button, IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";
 import { deleteDecision, markUnclear, pick } from "@/decisions/actions";
 import { CompareView } from "@/decisions/compare-view";
+import { EditDecisionDialog } from "@/decisions/edit-decision-dialog";
 import { mediaAspect, type OptionFiles, optionsOf, useMemberName, useOptionFiles, useViewer } from "@/decisions/data";
 import { ApprovalAction, ApprovalControls, DecisionHeader, DecisionResult, UnclearNote } from "@/decisions/decision-meta";
 import { NoteDialog, type NotePrompt } from "@/decisions/note-dialog";
@@ -44,6 +45,7 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
   /** The option whose comments are open under the cards. */
   const [threadOf, setThreadOf] = useState<string | null>(null);
   const [talk, setTalk] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const open = decision.state === "open";
   const choice = decision.kind === "choice";
@@ -103,12 +105,12 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
   }
 
   return (
-    <article aria-label={decision.question} className="@container relative pl-4 max-sm:pl-3.5">
+    <article id={`decision-${decision.id}`} aria-label={decision.question} className="@container relative pl-4 max-sm:pl-3.5">
       <span
         aria-hidden
         className={cx("absolute inset-y-0 left-0 w-1 rounded-full", viewer.mine ? "bg-move" : open ? "bg-line-strong" : "bg-line")}
       />
-      <DecisionHeader decision={decision} viewer={viewer} onDelete={askDelete} />
+      <DecisionHeader decision={decision} viewer={viewer} onEdit={() => setEditing(true)} onDelete={askDelete} />
       <h3 className="mt-1.5 text-lg leading-snug font-semibold tracking-tight text-balance">{decision.question}</h3>
       {decision.details && <Markdown text={decision.details} className="mt-1.5 text-ink-2" />}
       {!choice && <ApprovalAction decision={decision} />}
@@ -189,6 +191,7 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
       {talk && <ThreadBody decision={decision} autoFocus placeholder={t("decision.commentOnQuestion")} className="mt-1.5" />}
 
       {prompt && <NoteDialog prompt={prompt} onClose={() => setPrompt(null)} />}
+      {editing && <EditDecisionDialog decision={decision} onClose={() => setEditing(false)} />}
       {compare && (
         <CompareView
           decision={decision}

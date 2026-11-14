@@ -1,10 +1,10 @@
 import { type FormEvent, useMemo, useRef, useState } from "react";
-import { saveTheme, useSession } from "@/auth/session";
+import { saveTheme } from "@/auth/session";
 import { errorMessage } from "@/lib/api";
 import { isImage, uploadFile } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { useMe } from "@/lib/selectors";
-import { type ThemeChoice, toThemeChoice } from "@/lib/theme";
+import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import { useSettingsBase } from "@/settings/base";
 import { type Account, saveAccount, useAccount } from "@/settings/me/account";
@@ -148,13 +148,10 @@ function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Acco
           <FormField label={t("me.profile.name")} htmlFor="me-name" error={errors.fields.name}>
             <Input id="me-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
           </FormField>
-          <FormField label={t("auth.email")} htmlFor="me-email" hint={t("me.profile.emailHint")}>
-            <Input id="me-email" value={account.user.email ?? ""} readOnly disabled />
+          <FormField label={t("me.profile.zone")} htmlFor="me-zone" hint={t("me.profile.zoneHint")} error={errors.fields.timezone}>
+            <NativeSelect id="me-zone" value={zone} onChange={setZone} options={zones} />
           </FormField>
         </div>
-        <FormField label={t("me.profile.zone")} htmlFor="me-zone" hint={t("me.profile.zoneHint")} error={errors.fields.timezone}>
-          <NativeSelect id="me-zone" value={zone} onChange={setZone} options={zones} className="sm:max-w-xs" />
-        </FormField>
         <FormAlert>{errors.form}</FormAlert>
         <FormFoot>
           <Button type="submit" variant="primary" disabled={busy || !dirty}>
@@ -166,10 +163,99 @@ function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Acco
   );
 }
 
+/** The sign-in address, and the way to change it: the new address, confirmed with the current password. */
+function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
+  const current = account.user.email ?? "";
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const errors = useFieldErrors(["email", "password"]);
+
+  function close() {
+    setOpen(false);
+    setEmail("");
+    setPassword("");
+    errors.clear();
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    errors.clear();
+    const next = email.trim();
+    if (!next) return errors.set("email", t("me.email.required"));
+    if (next.toLowerCase() === current.toLowerCase()) return errors.set("email", t("me.email.same"));
+    if (account.has_password && !password) return errors.set("password", t("me.email.passwordRequired"));
+    setBusy(true);
+    try {
+      onSaved(await saveAccount(account.has_password ? { email: next, password } : { email: next }));
+      toast.info(t("me.email.changed"));
+      close();
+    } catch (err) {
+      errors.fail(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section title={t("me.email.title")} lead={t("me.email.lead")}>
+      <Card>
+        {open ? (
+          <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label={t("me.email.new")} htmlFor="me-email" hint={t("me.email.now", { email: current })} error={errors.fields.email}>
+                <Input
+                  id="me-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  autoFocus
+                  aria-invalid={!!errors.fields.email}
+                  value={email}
+                  onChange={(e) => (setEmail(e.target.value), errors.set("email", ""))}
+                />
+              </FormField>
+              {account.has_password && (
+                <FormField label={t("me.email.password")} htmlFor="me-email-password" hint={t("me.email.passwordHint")} error={errors.fields.password}>
+                  <Input
+                    id="me-email-password"
+                    type="password"
+                    autoComplete="current-password"
+                    aria-invalid={!!errors.fields.password}
+                    value={password}
+                    onChange={(e) => (setPassword(e.target.value), errors.set("password", ""))}
+                  />
+                </FormField>
+              )}
+            </div>
+            <FormAlert>{errors.form}</FormAlert>
+            <FormFoot>
+              <Button onClick={close} disabled={busy}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" variant="primary" disabled={busy}>
+                {busy ? t("s.saving") : t("me.email.submit")}
+              </Button>
+            </FormFoot>
+          </form>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-sm font-medium">{current || t("me.email.none")}</p>
+            <Button onClick={() => setOpen(true)}>{t("me.email.change")}</Button>
+          </div>
+        )}
+      </Card>
+    </Section>
+  );
+}
+
 const themes: ThemeChoice[] = ["system", "light", "dark"];
 
 function ThemeSection() {
-  const theme = useSession((s) => toThemeChoice(s.user?.theme));
+  const theme = useThemeChoice();
   return (
     <Section title={t("top.theme")} lead={t("me.profile.themeLead")}>
       <Segmented
@@ -192,6 +278,7 @@ export function ProfilePage() {
         {(a) => (
           <>
             <ProfileForm account={a} onSaved={account.set} />
+            <EmailSection account={a} onSaved={account.set} />
             <ThemeSection />
           </>
         )}

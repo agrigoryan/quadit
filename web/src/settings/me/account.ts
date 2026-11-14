@@ -36,7 +36,12 @@ const ME = "/api/v1/auth/me";
 export const useAccount = (): Loaded<Account> => useLoad(() => api.get<Account>(ME), []);
 
 /** Changes the profile and brings the session (name, avatar, theme in the shell) up to date. */
-export async function saveAccount(fields: Partial<Pick<AccountUser, "name" | "avatar" | "timezone" | "notify">>): Promise<Account> {
+export async function saveAccount(
+  fields: Partial<Pick<AccountUser, "name" | "avatar" | "timezone" | "notify" | "email">> & {
+    /** The current password, which a change of the sign-in address asks for. */
+    password?: string;
+  },
+): Promise<Account> {
   const out = await api.patch<Account>(ME, fields);
   await loadSession();
   // The feed updates the member row; the store's own copy of "me" (the top bar's avatar) is not fed, so set it here.

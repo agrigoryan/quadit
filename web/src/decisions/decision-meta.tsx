@@ -2,10 +2,10 @@
 // answer once there is one, and the controls of a plain approval.
 
 import { useState } from "react";
-import { Check, MoreHorizontal, Trash2, Undo2 } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Trash2, Undo2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
-import { ago, exact } from "@/lib/time";
+import { exact } from "@/lib/time";
 import type { Decision, Outcome } from "@/lib/types";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
@@ -15,6 +15,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { pick } from "@/decisions/actions";
 import { optionsOf, useMemberName, type Viewer } from "@/decisions/data";
 import { rich, Who } from "@/decisions/parts";
+import { Ago } from "@/ui/ago";
 
 function StateBadge({ decision, viewer }: { decision: Decision; viewer: Viewer }) {
   const approval = decision.kind === "approval";
@@ -28,11 +29,12 @@ function StateBadge({ decision, viewer }: { decision: Decision; viewer: Viewer }
 interface HeaderProps {
   decision: Decision;
   viewer: Viewer;
+  onEdit: () => void;
   onDelete: () => void;
 }
 
 /** State, "who asked whom", when, and the small menu. On a phone the sentence takes its own line. */
-export function DecisionHeader({ decision, viewer, onDelete }: HeaderProps) {
+export function DecisionHeader({ decision, viewer, onEdit, onDelete }: HeaderProps) {
   return (
     <header className="flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1">
       <StateBadge decision={decision} viewer={viewer} />
@@ -42,10 +44,10 @@ export function DecisionHeader({ decision, viewer, onDelete }: HeaderProps) {
           asked: <Who userId={decision.asked_id} />,
         })}
         <time className="text-ink-3" title={exact(decision.created_at)}>
-          {ago(decision.created_at)}
+          <Ago ms={decision.created_at} />
         </time>
       </p>
-      {viewer.canDelete && (
+      {(viewer.canEdit || viewer.canDelete) && (
         <Menu>
           <MenuTrigger asChild>
             <IconButton label={t("decision.menu")} size="sm" className="ml-auto max-sm:size-9">
@@ -53,9 +55,16 @@ export function DecisionHeader({ decision, viewer, onDelete }: HeaderProps) {
             </IconButton>
           </MenuTrigger>
           <MenuContent align="end">
-            <MenuItem danger icon={<Trash2 />} onSelect={onDelete}>
-              {t("decision.delete")}
-            </MenuItem>
+            {viewer.canEdit && (
+              <MenuItem icon={<Pencil />} onSelect={onEdit}>
+                {t("decision.edit")}
+              </MenuItem>
+            )}
+            {viewer.canDelete && (
+              <MenuItem danger icon={<Trash2 />} onSelect={onDelete}>
+                {t("decision.delete")}
+              </MenuItem>
+            )}
           </MenuContent>
         </Menu>
       )}
@@ -115,7 +124,7 @@ export function DecisionResult({ decision, viewer, onUnclear }: ResultProps) {
           {rich(t("decision.answeredBy"), { name: <Who userId={decision.decided_by} capital /> })}
           {decision.decided_at && (
             <time className="text-ink-3" title={exact(decision.decided_at)}>
-              {ago(decision.decided_at)}
+              <Ago ms={decision.decided_at} />
             </time>
           )}
           {viewer.canReopen && (

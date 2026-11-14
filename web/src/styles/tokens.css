@@ -26,7 +26,8 @@
 
   --ink: #1b1d22;
   --ink-2: #5b6070;
-  --ink-3: #8b90a0;
+  /* The quietest text still has to be read: 4.5:1 or better on the surface, a little under on the canvas. */
+  --ink-3: #6c7182;
 
   --accent: #3451e0;
   --accent-hover: #2a43c4;
@@ -39,11 +40,12 @@
   --move-soft: #fff5bf;
   --move-text: #7a5d00;
 
-  --ok: #16874a;
+  /* Each of these three reads at 4.5:1 or better on its own soft tint (a badge) and on the surface. */
+  --ok: #127c43;
   --ok-soft: #e0f4e8;
-  --danger: #d1343b;
+  --danger: #c92c33;
   --danger-soft: #fde9ea;
-  --wait: #b05a00;
+  --wait: #a85600;
   --wait-soft: #fdeedd;
 
   --cat-backlog: #9aa0af;

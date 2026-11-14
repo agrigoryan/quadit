@@ -20,7 +20,6 @@ export const workspaceStrings = {
   "members.you": "you",
   "members.suspended": "Suspended",
   "members.lastSeen": "Seen",
-  "members.role": "Role",
   "members.roleOf": "Role of {name}",
   "members.edit": "Edit handle and title",
   "members.suspend": "Suspend",
@@ -37,11 +36,6 @@ export const workspaceStrings = {
   "members.remove.title": "Remove {name}?",
   "members.remove.body":
     "They lose access to this workspace and their API tokens stop working. Their history stays under their name; open tasks they held become unassigned.",
-  "members.role.title": "Make {name} {role}?",
-  "members.role.owner": "Owners can do everything, including removing other owners and deleting projects.",
-  "members.role.admin": "Admins manage members, agents, projects and automation.",
-  "members.role.member": "Members work on tasks, decisions and pages. They cannot change the workspace.",
-  "members.role.confirm": "Change role",
 
   "invites.title": "Invitations",
   "invites.lead": "An invitation is a link. Whoever opens it joins this workspace with the role you choose.",

@@ -33,9 +33,10 @@ function ScopeBadges({ scopes }: { scopes: string | undefined }) {
 /** The tokens issued to one agent: make one (shown once), see when each was used, revoke. */
 export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: boolean }) {
   const slug = useSlug();
+  // The server lists an agent's tokens for admins only; anyone else is told so rather than shown an empty list.
   const tokens = useLoad(
-    () => api.get<{ tokens: Token[] }>(ws(slug, "/tokens")).then((r) => r.tokens.filter((tk) => tk.user_id === agent.user_id)),
-    [slug, agent.user_id],
+    () => (canEdit ? api.get<{ tokens: Token[] }>(ws(slug, "/tokens")).then((r) => r.tokens.filter((tk) => tk.user_id === agent.user_id)) : Promise.resolve(null)),
+    [slug, agent.user_id, canEdit],
   );
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState("");
@@ -56,6 +57,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
       }
     >
       {tokens.error && <FormAlert>{tokens.error}</FormAlert>}
+      {!canEdit && <EmptyRow>{t("tokens.adminsOnly")}</EmptyRow>}
       {tokens.data?.length === 0 && <EmptyRow>{t("tokens.none")}</EmptyRow>}
       {!!tokens.data?.length && (
         <Rows>
