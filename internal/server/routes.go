@@ -194,6 +194,7 @@ var collections = map[string]collection{
 	"templates":   {load: listOf[core.Template]("name")},
 	"preferences": {load: listOf[core.Preference]("created_at")},
 	"resources":   {load: listOf[core.Resource]("name")},
+	"secrets":     {admin: true, load: listOf[core.Secret]("name")},
 	"claims":      {load: listOf[core.ResourceClaim]("requested_at", store.Ne("state", "released"))},
 	"sessions":    {load: listOf[core.AgentSession]("-started_at")},
 	"relations":   {load: listOf[core.Relation]("created_at")},

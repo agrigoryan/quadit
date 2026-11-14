@@ -606,3 +606,29 @@ type RateCounter struct {
 	Bucket int64  `db:"bucket"`
 	Hits   int    `db:"hits"`
 }
+
+// Secret is one entry of the vault: a key or a password that agents can use
+// but never read. The server puts it into requests it makes on their behalf,
+// only to the hosts it is bound to.
+type Secret struct {
+	ID          string `json:"id" db:"id"`
+	WorkspaceID string `json:"-" db:"workspace_id"`
+	Name        string `json:"name" db:"name"`
+	Description string `json:"description,omitempty" db:"description"`
+	Value       string `json:"-" db:"value"` // sealed
+	// Hosts are the hosts a request with this secret may go to, as
+	// "api.example.com", "*.example.com", or with "http://" in front for a
+	// host reached without TLS.
+	Hosts []string `json:"hosts,omitempty" db:"hosts,json"`
+	// Agents are the agents that may use it; empty means every member.
+	Agents []string `json:"agents,omitempty" db:"agents,json"`
+	// Env lets the companion on an agent's machine receive the value, to put
+	// in the environment of the command it runs.
+	Env        bool   `json:"env" db:"env"`
+	CreatedBy  string `json:"created_by" db:"created_by"`
+	CreatedAt  int64  `json:"created_at" db:"created_at"`
+	UpdatedAt  int64  `json:"updated_at" db:"updated_at"`
+	UpdatedSeq int64  `json:"updated_seq" db:"updated_seq"`
+	LastUsedAt int64  `json:"last_used_at,omitempty" db:"last_used_at,null"`
+	DeletedAt  int64  `json:"deleted_at,omitempty" db:"deleted_at,null"`
+}

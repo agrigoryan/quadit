@@ -445,6 +445,9 @@ type tokenBody struct {
 	ReadOnly    bool     `json:"read_only"`
 	Projects    []string `json:"projects"` // keys; empty = every project the member may use
 	ExpiresDays int      `json:"expires_days"`
+	// Secrets makes a token for a companion: it may receive the secrets
+	// marked for use in an environment. Admins only.
+	Secrets bool `json:"secrets"`
 }
 
 // hTokenCreate issues a token for an agent (admins) or for oneself. The
@@ -478,6 +481,15 @@ func (s *Server) hTokenCreate(x *c) error {
 	var scopes []string
 	if b.ReadOnly {
 		scopes = append(scopes, "read")
+	}
+	if b.Secrets {
+		if err := x.admin(); err != nil {
+			return err
+		}
+		if x.token != nil {
+			return errForbidden("a token for secrets is made by a signed-in admin, not with another token")
+		}
+		scopes = append(scopes, "secrets")
 	}
 	for _, ref := range b.Projects {
 		p, err := rs.Project(ref)

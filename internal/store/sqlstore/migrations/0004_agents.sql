@@ -143,3 +143,26 @@ CREATE TABLE integrations (
     updated_seq   {{BIGINT}} NOT NULL,
     deleted_at    {{TS}}
 );
+
+-- The vault: named secrets (keys, passwords) agents can use but not read.
+-- The server puts the value into requests it makes for them, to the hosts
+-- the secret is bound to; a secret marked env may also be handed to the
+-- companion on the machine that runs an agent.
+CREATE TABLE secrets (
+    id            {{ID}} PRIMARY KEY,
+    workspace_id  {{ID}} NOT NULL REFERENCES workspaces (id),
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',
+    -- Encrypted. Used by the server, never returned.
+    value         TEXT NOT NULL DEFAULT '',
+    hosts         {{JSON}},
+    agents        {{JSON}},
+    env           {{BOOL}} NOT NULL DEFAULT FALSE,
+    created_by    {{ID}} NOT NULL REFERENCES users (id),
+    created_at    {{TS}} NOT NULL,
+    updated_at    {{TS}} NOT NULL,
+    updated_seq   {{BIGINT}} NOT NULL,
+    last_used_at  {{TS}},
+    deleted_at    {{TS}}
+);
+CREATE UNIQUE INDEX secrets_name ON secrets (workspace_id, name) WHERE deleted_at IS NULL;

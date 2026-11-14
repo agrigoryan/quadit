@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/importer"
@@ -43,7 +44,11 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
           unclear DECISION NOTE
           attach KEY PATH ... [option=ID] | upload PATH | read [all | ID ...]
           do TYPE JSON               send any change; "changes" lists them all
-more      quadit help docs           pages, databases, memory
+secrets   secrets                    the keys I may use (names only; values are never shown)
+          request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]
+                                     an HTTP request with {{secret}} filled in by the server
+more      quadit help secrets        using keys without holding them
+          quadit help docs           pages, databases, memory
           quadit help code           git links, pictures of pages
           quadit help import         bring work in from other tools
           quadit help server         serve, admin, backup, restore
@@ -53,6 +58,21 @@ Connect with QUADIT_URL and QUADIT_TOKEN, or: quadit login URL TOKEN
 `
 
 var helpTopics = map[string]string{
+	"secrets": `secrets: keys and passwords an agent can use but not read
+  An admin sets one:   quadit do secret.set '{"name":"DEPLOY_KEY","value":"…","hosts":["api.example.com"],"agents":["@coder"]}'
+  secrets                      the secrets I may use, with the hosts each may go to
+  request NAME URL [method=POST] [header="Authorization:Bearer {{secret}}"] [body=TEXT|-]
+                               the server makes the request and writes the value where
+                               {{secret}} stands ({{basic:USER}} = base64 of USER:secret).
+                               It goes only to the secret's hosts, redirects are not followed,
+                               and the value is blanked out of the answer.
+  run --secret NAME [--secret NAME ...] -- COMMAND [ARG ...]
+                               for tools on this machine: runs COMMAND with each secret in its
+                               environment under its name, and blanks the values out of what it
+                               prints. Needs a token made for a companion (an admin makes it:
+                               POST tokens {"user":"@agent","secrets":true}) and a secret marked
+                               env. The same --secret works with: listen --secret NAME --exec CMD
+`,
 	"docs": `pages, databases and memory
   docs                         the page tree with ids
   doc ID                       one page as Markdown
@@ -410,6 +430,44 @@ func (r *runner) run(cmd string, rest []string) error {
 		return err
 	case "listen":
 		return r.listen(rest)
+	case "secrets":
+		return r.get("/secrets", nil)
+	case "request":
+		if err := need(pos, 2, "request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]"); err != nil {
+			return err
+		}
+		req := map[string]any{"url": pos[1], "method": first(f["method"])}
+		headers := map[string]string{}
+		for _, h := range f["header"] {
+			k, v, ok := strings.Cut(h, ":")
+			if !ok {
+				return fmt.Errorf("header=%q: write header=Name:value", h)
+			}
+			headers[strings.TrimSpace(k)] = strings.TrimSpace(v)
+		}
+		req["headers"] = headers
+		if b := first(f["body"]); b == "-" {
+			raw, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return err
+			}
+			req["body"] = string(raw)
+		} else {
+			req["body"] = b
+		}
+		raw, _ := json.Marshal(req)
+		accept := "text/plain"
+		if r.json {
+			accept = "application/json"
+		}
+		out, err := r.c.do("POST", "/secrets/"+url.PathEscape(pos[0])+"/request", url.Values{"format": {map[bool]string{true: "json", false: "text"}[r.json]}}, bytes.NewReader(raw), "application/json", accept)
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(r.out, string(out))
+		return nil
+	case "run":
+		return r.runWithSecrets(rest)
 
 	case "new", "create":
 		if err := need(pos, 2, "new PROJECT TITLE [field=value ...]"); err != nil {
@@ -647,10 +705,13 @@ func (r *runner) uploads(paths []string) ([]map[string]any, error) {
 // and runs a command for each item, so an agent with nothing running can
 // still be woken. The item is passed in QUADIT_EVENT and on stdin.
 func (r *runner) listen(args []string) error {
-	var command []string
+	var command, secrets []string
 	cursor := "listen"
 	for i := 0; i < len(args); i++ {
 		switch {
+		case args[i] == "--secret" && i+1 < len(args):
+			secrets = append(secrets, args[i+1])
+			i++
 		case args[i] == "--exec" && i+1 < len(args):
 			command = args[i+1:]
 			i = len(args)
@@ -681,13 +742,26 @@ func (r *runner) listen(args []string) error {
 		}
 		for _, line := range page.Events {
 			fmt.Fprintln(r.out, line)
+			// Secrets are fetched for each run, so a changed or withdrawn one
+			// takes effect at once.
+			env, err := r.secretEnv(secrets)
+			if err != nil {
+				fmt.Fprintln(r.out, "secrets:", err)
+				time.Sleep(backoff)
+				continue
+			}
+			out := newMasker(r.out, env)
 			cmd := exec.Command(command[0], command[1:]...)
 			cmd.Env = append(os.Environ(), "QUADIT_EVENT="+line)
+			for k, v := range env {
+				cmd.Env = append(cmd.Env, k+"="+v)
+			}
 			cmd.Stdin = strings.NewReader(line + "\n")
-			cmd.Stdout, cmd.Stderr = r.out, r.out
+			cmd.Stdout, cmd.Stderr = out, out
 			if err := cmd.Run(); err != nil {
 				fmt.Fprintln(r.out, "command failed:", err)
 			}
+			out.Flush()
 		}
 		// Mark handled only after the command ran, so a crash repeats the
 		// item instead of losing it.
@@ -785,3 +859,116 @@ func (s clientSink) Upload(path string) (string, error) {
 }
 
 func (s clientSink) Logf(format string, a ...any) { fmt.Fprintf(s.r.out, format+"\n", a...) }
+
+// secretEnv asks the server for the secrets a companion may put in a
+// command's environment.
+func (r *runner) secretEnv(names []string) (map[string]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	raw, _ := json.Marshal(map[string]any{"names": names})
+	out, err := r.c.do("POST", "/secrets/env", nil, bytes.NewReader(raw), "application/json", "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var res struct {
+		Env map[string]string `json:"env"`
+	}
+	return res.Env, json.Unmarshal(out, &res)
+}
+
+// runWithSecrets runs a command with secrets in its environment and blanks
+// their values out of what it prints.
+func (r *runner) runWithSecrets(args []string) error {
+	var names, command []string
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--secret" && i+1 < len(args):
+			names = append(names, args[i+1])
+			i++
+		case args[i] == "--":
+			command = args[i+1:]
+			i = len(args)
+		default:
+			command = args[i:]
+			i = len(args)
+		}
+	}
+	if len(command) == 0 || len(names) == 0 {
+		return errors.New("usage: quadit run --secret NAME [--secret NAME ...] -- COMMAND [ARG ...]")
+	}
+	env, err := r.secretEnv(names)
+	if err != nil {
+		return err
+	}
+	out := newMasker(r.out, env)
+	defer out.Flush()
+	cmd := exec.Command(command[0], command[1:]...)
+	cmd.Env = os.Environ()
+	for k, v := range env {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, out, out
+	return cmd.Run()
+}
+
+// masker passes text through with secret values blanked out. It holds back
+// an unfinished line, so a value split across two writes is still caught.
+type masker struct {
+	mu     sync.Mutex
+	w      io.Writer
+	values []string
+	held   []byte
+}
+
+func newMasker(w io.Writer, env map[string]string) *masker {
+	m := &masker{w: w}
+	for _, v := range env {
+		if len(v) >= 4 {
+			m.values = append(m.values, v)
+		}
+	}
+	return m
+}
+
+func (m *masker) Write(p []byte) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.held = append(m.held, p...)
+	i := bytes.LastIndexByte(m.held, '\n')
+	if i < 0 && len(m.held) < 64<<10 {
+		return len(p), nil
+	}
+	if i < 0 {
+		i = len(m.held) - 1
+	}
+	out := m.held[:i+1]
+	m.held = append([]byte(nil), m.held[i+1:]...)
+	_, err := m.w.Write(m.mask(out))
+	return len(p), err
+}
+
+func (m *masker) mask(b []byte) []byte {
+	for _, v := range m.values {
+		b = bytes.ReplaceAll(b, []byte(v), []byte("•••"))
+	}
+	return b
+}
+
+// Flush writes out what is held back.
+func (m *masker) Flush() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.held) > 0 {
+		m.w.Write(m.mask(m.held))
+		m.held = nil
+	}
+}
+
+// first is the first value given for a field, or nothing.
+func first(vals []string) string {
+	if len(vals) == 0 {
+		return ""
+	}
+	return vals[0]
+}

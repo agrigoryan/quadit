@@ -200,6 +200,28 @@ var mcpTools = []mcpTool{
 			}
 			return fmt.Sprintf("%s seq=%d", line, r.Seq), true
 		}},
+	{Name: "secrets", Desc: "The secrets (keys, passwords) I may use, by name, with the hosts each may be sent to. Values are never shown.", Run: get("/secrets")},
+	{Name: "secret_request", Desc: "Make an HTTP request with a secret I cannot read: write {{secret}} where the value belongs (a header, the URL or the body); {{basic:USER}} gives base64 of USER:secret. " +
+		"It goes only to the secret's hosts, and the value is blanked out of the answer.",
+		Props: map[string]string{"!name": "the secret's name", "!url": "full https address", "method": "GET (default), POST, PUT, PATCH, DELETE",
+			"headers": `JSON object, e.g. {"Authorization": "Bearer {{secret}}"}`, "body": "request body, as text"},
+		Run: func(s *Server, token string, a map[string]any) (string, bool) {
+			req := map[string]any{"method": str(a, "method"), "url": str(a, "url"), "body": str(a, "body")}
+			switch h := a["headers"].(type) {
+			case map[string]any:
+				req["headers"] = h
+			case string:
+				if h != "" {
+					var m map[string]string
+					if json.Unmarshal([]byte(h), &m) != nil {
+						return "headers must be a JSON object of strings", false
+					}
+					req["headers"] = m
+				}
+			}
+			raw, _ := json.Marshal(req)
+			return s.internal(token, "POST", "/secrets/"+url.PathEscape(str(a, "name"))+"/request", url.Values{"format": {"text"}}, raw)
+		}},
 	{Name: "upload", Desc: "Store a file and get its id and address. Attach it with change attachment.add {file, task|comment|decision|option}, or name it in comment.create {attachments:[{file}]}.",
 		Props: map[string]string{"!name": "file name with its extension", "text": "the content, as text", "base64": "or the content, base64-encoded"},
 		Run: func(s *Server, token string, a map[string]any) (string, bool) {

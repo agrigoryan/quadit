@@ -212,7 +212,7 @@ const adminHelp = `quadit admin: commands run on the server's machine
         make the first person and workspace without the web page
   quadit admin reset-password EMAIL
         set a new random password and print it (for installs with no mail)
-  quadit admin token WORKSPACE @HANDLE [NAME]
+  quadit admin token [--secrets] WORKSPACE @HANDLE [NAME]
         issue an API token for a member and print it once
   quadit admin make-admin EMAIL
         let a person run the install
@@ -233,11 +233,15 @@ func Admin(args []string, version string) int {
 	email := fs.String("email", "", "the person's email")
 	password := fs.String("password", "", "the person's password")
 	workspace := fs.String("workspace", "", "the workspace's name")
+	forSecrets := fs.Bool("secrets", false, "token: for a companion, which may receive secrets marked for an environment")
 	// Flags may come before or after the positional arguments.
 	var pos, flags []string
 	for i := 1; i < len(args); i++ {
 		if strings.HasPrefix(args[i], "-") {
 			flags = append(flags, args[i])
+			if name := strings.TrimLeft(args[i], "-"); name == "secrets" {
+				continue // a switch: it takes no value
+			}
 			if !strings.Contains(args[i], "=") && i+1 < len(args) {
 				i++
 				flags = append(flags, args[i])
@@ -310,7 +314,7 @@ func Admin(args []string, version string) int {
 		fmt.Printf("%s can now run the install\n", u.Email)
 	case "token":
 		if len(pos) < 2 {
-			return fail(errors.New("usage: quadit admin token WORKSPACE @HANDLE [NAME]"))
+			return fail(errors.New("usage: quadit admin token [--secrets] WORKSPACE @HANDLE [NAME]"))
 		}
 		var ws core.Workspace
 		if err := st.Get(ctx, &ws, store.Eq("slug", pos[0]), store.Live); err != nil {
@@ -321,12 +325,15 @@ func Admin(args []string, version string) int {
 			return fail(fmt.Errorf("no member %s in %s", pos[1], ws.Slug))
 		}
 		token, prefix := auth.NewAPIToken()
-		label := "issued from the shell"
+		label, scopes := "issued from the shell", ""
+		if *forSecrets {
+			scopes = "secrets"
+		}
 		if len(pos) > 2 {
 			label = strings.Join(pos[2:], " ")
 		}
 		t := core.APIToken{ID: id.New(), WorkspaceID: ws.ID, UserID: m.UserID, Name: label, TokenHash: auth.Hash(token), Prefix: prefix,
-			Kind: "token", CreatedBy: m.UserID, CreatedAt: time.Now().UnixMilli()}
+			Scopes: scopes, Kind: "token", CreatedBy: m.UserID, CreatedAt: time.Now().UnixMilli()}
 		if err := st.Insert(ctx, t); err != nil {
 			return fail(err)
 		}

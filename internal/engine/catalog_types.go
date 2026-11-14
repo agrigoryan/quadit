@@ -68,6 +68,8 @@ var argTypes = map[string]any{
 	"template.create":    templateCreateArgs{},
 	"template.update":    templateUpdateArgs{},
 	"template.delete":    idArgs{},
+	"secret.set":         secretArgs{},
+	"secret.delete":      idArgs{},
 	"task.create":        taskCreateArgs{},
 	"task.update":        taskUpdateArgs{},
 	"task.delete":        idArgs{},

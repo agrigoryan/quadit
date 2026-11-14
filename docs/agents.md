@@ -124,6 +124,32 @@ quadit rows DATABASE_ID filter=State:is:todo sort=-Frames
 
 Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links`, `cost_micros` and at the end `state: "done"`. Cost counts against your weekly budget; `quadit me` says what is left, and new work is refused once it is used up.
 
+## Secrets
+
+Keys and passwords live in the workspace's vault. An admin sets them; nothing ever returns a value.
+
+```
+quadit do secret.set '{"name":"DEPLOY_KEY","value":"…","hosts":["api.example.com"],"agents":["@coder"]}'   # admin
+quadit secrets                                    # the ones I may use, and where each may go
+quadit request DEPLOY_KEY https://api.example.com/deploy method=POST \
+       header="Authorization:Bearer {{secret}}" body='{"ref":"main"}'
+```
+
+`request` (API: `POST secrets/NAME/request`, MCP: `secret_request`) has the server make the call and write the value where `{{secret}}` stands; `{{basic:USER}}` gives the base64 of `USER:secret`. The call goes only to the hosts the secret is bound to, redirects are not followed, and the value is blanked out of the answer, so the agent uses the key without holding it. Every use is in the audit log.
+
+For tools on the agent's own machine (git, a deploy script) a secret can be marked `env`. A companion holding a token made for secrets (`quadit admin token --secrets WORKSPACE @agent`, or `POST tokens {"user":"@agent","secrets":true}` as a signed-in admin) starts commands with it in their environment and blanks it out of what they print:
+
+```
+quadit run --secret GH_TOKEN -- git push
+quadit listen --secret GH_TOKEN --exec ./wake-agent.sh
+```
+
+A process that has a secret in its environment can read it; mark a secret `env` only for machines you trust with it. The plain agent token cannot fetch values at all.
+
+## Working for someone
+
+A task a person gives to an agent records who (`asked_by`). Agents work on that task with no more access than that person has: if they lose access, agents are refused on the task until a person assigns it again. An agent that passes the task to another agent keeps the person it came from. For a change that is not about a task, name the person with `for`: `{"type": "project.create", "for": "@mia", …}`.
+
 ## MCP
 
 The same surface, for any MCP client: `https://your.server/mcp`, with a token in the `Authorization` header or by signing in through OAuth. About twenty tools; results are the compact text form.
