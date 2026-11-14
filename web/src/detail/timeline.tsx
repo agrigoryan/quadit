@@ -1,0 +1,68 @@
+// What happened in the task, oldest first: changes as short lines, comments
+// as cards, and the comment box at the end.
+
+import { memo, useMemo } from "react";
+import { t } from "@/lib/i18n";
+import { useCollection, useMember } from "@/lib/selectors";
+import { useTaskEvents } from "@/lib/task-detail";
+import type { Task } from "@/lib/types";
+import { CommentCard, When } from "@/detail/comment-card";
+import { Composer } from "@/detail/composer";
+import { nameOf, useAttachmentsBySubject } from "@/detail/data";
+import { Section } from "@/detail/section";
+import { buildTimeline, type LineItem } from "@/detail/timeline-model";
+import { joinPhrases } from "@/detail/timeline-phrases";
+import { Avatar } from "@/ui/avatar";
+import { Loading } from "@/ui/spinner";
+
+/** "Aram moved this from Todo to In progress", with when. */
+const Line = memo(function Line({ actorId, at, text, note }: { actorId: string; at: number; text: string; note?: string }) {
+  const actor = useMember(actorId);
+  return (
+    <li className="flex items-start gap-2 px-3 text-xs leading-5 text-ink-2">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+        <Avatar member={actor} size="xs" />
+      </span>
+      <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+        <p>
+          <span className="font-medium text-ink">{nameOf(actor)}</span> {text} <When at={at} />
+        </p>
+        {note && <p className="mt-0.5 border-l-2 border-line pl-2 text-ink-2">{note}</p>}
+      </div>
+    </li>
+  );
+});
+
+const lineText = (item: LineItem) => joinPhrases(item.phrases);
+
+export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
+  const events = useTaskEvents(task.id);
+  const comments = useCollection("comments");
+  const files = useAttachmentsBySubject("comment");
+  const items = useMemo(() => buildTimeline(task.id, events, comments), [task.id, events, comments]);
+
+  return (
+    <Section title={t("timeline.title")} className="pb-6">
+      {loading && items.length === 0 ? (
+        <Loading />
+      ) : (
+        <ol className="mt-1 flex flex-col gap-2.5">
+          {items.map((item) =>
+            item.kind === "line" ? (
+              <Line key={item.id} actorId={item.actorId} at={item.at} text={lineText(item)} note={item.note} />
+            ) : (
+              <li key={item.id}>
+                <CommentCard task={task} comment={item.comment} replies={item.replies} files={files} />
+              </li>
+            ),
+          )}
+        </ol>
+      )}
+      {!task.deleted_at && (
+        <div className="mt-3">
+          <Composer task={task} />
+        </div>
+      )}
+    </Section>
+  );
+}

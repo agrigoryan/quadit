@@ -1,0 +1,110 @@
+/*
+ * Design tokens. Every colour in the app comes from here.
+ *
+ * The interface is quiet on purpose: cool greys and one working blue. The
+ * one loud colour, the highlighter yellow ("move"), is kept for a single
+ * meaning: it is your move. A task waiting on you, a question asked of you
+ * and an unread inbox item are the only things that wear it.
+ *
+ * lib/theme.ts always sets data-theme to "light" or "dark" (resolving
+ * "system" itself), so there is one dark block and no media query.
+ */
+
+:root {
+  color-scheme: light;
+
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --sunken: #eceef2;
+  --hover: #e9ebf0;
+  --press: #dadde5;
+  --line: #e2e4ea;
+  --line-strong: #cdd0d9;
+
+  --ink: #1b1d22;
+  --ink-2: #5b6070;
+  --ink-3: #8b90a0;
+
+  --accent: #3451e0;
+  --accent-hover: #2a43c4;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8ecff;
+  --accent-text: #2f49cf;
+
+  --move: #ffd60a;
+  --move-ink: #2b2300;
+  --move-soft: #fff5bf;
+  --move-text: #7a5d00;
+
+  --ok: #16874a;
+  --ok-soft: #e0f4e8;
+  --danger: #d1343b;
+  --danger-soft: #fde9ea;
+  --wait: #b05a00;
+  --wait-soft: #fdeedd;
+
+  --cat-backlog: #9aa0af;
+  --cat-unstarted: #6b7183;
+  --cat-started: #3451e0;
+  --cat-waiting: #c26a00;
+  --cat-done: #16874a;
+  --cat-canceled: #9aa0af;
+
+  /* Tooltips and toasts are dark in both themes. */
+  --inverse: #23252c;
+  --inverse-ink: #f2f3f6;
+
+  --overlay: rgb(20 22 28 / 0.38);
+  --shadow-pop: 0 0 0 1px rgb(20 22 28 / 0.06), 0 6px 20px -4px rgb(20 22 28 / 0.16);
+  --shadow-panel: 0 0 0 1px rgb(20 22 28 / 0.06), -12px 0 32px -12px rgb(20 22 28 / 0.18);
+  --shadow-card: 0 1px 2px rgb(20 22 28 / 0.06);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #131419;
+  --surface: #1b1d23;
+  --sunken: #17181d;
+  --hover: #262931;
+  --press: #2e313b;
+  --line: #2a2d36;
+  --line-strong: #3a3e4a;
+
+  --ink: #e7e8ec;
+  --ink-2: #a3a8b6;
+  --ink-3: #737888;
+
+  --accent: #7189ff;
+  --accent-hover: #8a9eff;
+  --accent-ink: #0d1024;
+  --accent-soft: #232a4d;
+  --accent-text: #a3b3ff;
+
+  --move: #ffd60a;
+  --move-ink: #2b2300;
+  --move-soft: #3a3210;
+  --move-text: #ffd60a;
+
+  --ok: #4cc38a;
+  --ok-soft: #173326;
+  --danger: #ff6b70;
+  --danger-soft: #3a1c1f;
+  --wait: #f0a04b;
+  --wait-soft: #38270f;
+
+  --cat-backlog: #6c7181;
+  --cat-unstarted: #9499a8;
+  --cat-started: #7189ff;
+  --cat-waiting: #f0a04b;
+  --cat-done: #4cc38a;
+  --cat-canceled: #6c7181;
+
+  --inverse: #2e313b;
+  --inverse-ink: #f2f3f6;
+
+  --overlay: rgb(0 0 0 / 0.55);
+  --shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.07), 0 8px 28px -6px rgb(0 0 0 / 0.6);
+  --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.06), -16px 0 40px -12px rgb(0 0 0 / 0.6);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+}

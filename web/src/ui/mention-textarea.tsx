@@ -1,0 +1,140 @@
+import { type KeyboardEvent, type Ref, type TextareaHTMLAttributes, useRef, useState } from "react";
+import { cx } from "@/lib/cx";
+import { useMembers } from "@/lib/selectors";
+import type { Member } from "@/lib/types";
+import { Avatar } from "@/ui/avatar";
+import { Textarea } from "@/ui/input";
+
+interface Props extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
+  value: string;
+  onChange: (value: string) => void;
+  /** Cmd/Ctrl-Enter. */
+  onSubmit?: () => void;
+  /** Files pasted or dropped into the text. */
+  onFiles?: (files: File[]) => void;
+  bare?: boolean;
+  ref?: Ref<HTMLTextAreaElement>;
+}
+
+/** The "@par" being typed just before the caret, if any. */
+function mentionAt(text: string, caret: number): { start: number; query: string } | null {
+  const m = /(^|[\s(])@([a-z0-9_-]*)$/i.exec(text.slice(0, caret));
+  return m ? { start: caret - (m[2]?.length ?? 0) - 1, query: (m[2] ?? "").toLowerCase() } : null;
+}
+
+/**
+ * A growing text box for Markdown. Typing @ offers the people and agents of
+ * the workspace; arrows move, Enter or Tab picks.
+ */
+export function MentionTextarea({ value, onChange, onSubmit, onFiles, className, bare, ref, onKeyDown, ...rest }: Props) {
+  const box = useRef<HTMLTextAreaElement | null>(null);
+  const members = useMembers();
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [active, setActive] = useState(0);
+
+  const options: Member[] = mention
+    ? members.filter((m) => m.handle.startsWith(mention.query) || m.name.toLowerCase().includes(mention.query)).slice(0, 6)
+    : [];
+  const open = options.length > 0;
+
+  function track(el: HTMLTextAreaElement) {
+    setMention(mentionAt(el.value, el.selectionStart));
+    setActive(0);
+  }
+
+  function pick(member: Member) {
+    const el = box.current;
+    if (!el || !mention) return;
+    const caret = el.selectionStart;
+    const insert = `@${member.handle} `;
+    onChange(value.slice(0, mention.start) + insert + value.slice(caret));
+    setMention(null);
+    const at = mention.start + insert.length;
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(at, at);
+    });
+  }
+
+  function keyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (open) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setActive((i) => (i + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length);
+        return;
+      }
+      if ((e.key === "Enter" && !e.metaKey && !e.ctrlKey) || e.key === "Tab") {
+        e.preventDefault();
+        pick(options[active] as Member);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setMention(null);
+        return;
+      }
+    }
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onSubmit) {
+      e.preventDefault();
+      onSubmit();
+      return;
+    }
+    onKeyDown?.(e);
+  }
+
+  return (
+    <div className="relative">
+      <Textarea
+        ref={(el) => {
+          box.current = el;
+          if (typeof ref === "function") ref(el);
+          else if (ref) ref.current = el;
+        }}
+        value={value}
+        autoGrow
+        bare={bare}
+        className={className}
+        aria-autocomplete="list"
+        aria-expanded={open}
+        onChange={(e) => {
+          onChange(e.target.value);
+          track(e.target);
+        }}
+        onKeyDown={keyDown}
+        onClick={(e) => track(e.currentTarget)}
+        onBlur={() => setMention(null)}
+        onPaste={(e) => {
+          const files = [...e.clipboardData.files];
+          if (files.length && onFiles) {
+            e.preventDefault();
+            onFiles(files);
+          }
+        }}
+        {...rest}
+      />
+      {open && (
+        <ul
+          role="listbox"
+          className="absolute top-full left-0 z-[65] mt-1 w-60 rounded-lg bg-surface p-1 shadow-pop animate-pop"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {options.map((m, i) => (
+            <li
+              key={m.user_id}
+              role="option"
+              aria-selected={i === active}
+              onMouseEnter={() => setActive(i)}
+              onClick={() => pick(m)}
+              className={cx("flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm", i === active && "bg-hover")}
+            >
+              <Avatar member={m} size="sm" />
+              <span className="min-w-0 flex-1 truncate">{m.name}</span>
+              <span className="text-xs text-ink-3">@{m.handle}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

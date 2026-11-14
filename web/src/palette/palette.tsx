@@ -1,0 +1,125 @@
+import { useState } from "react";
+import { Command } from "cmdk";
+import { Search } from "lucide-react";
+import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
+import { type Location, matchPath, useLocation, useNavigate } from "react-router";
+import { t } from "@/lib/i18n";
+import { useProjects, useSlug, useTaskByKey } from "@/lib/selectors";
+import { ui, useUi } from "@/lib/ui-state";
+import { choiceTitle, ChoicesPage } from "@/palette/palette-choices";
+import { type ChoicePage, RootPage } from "@/palette/palette-root";
+import { useServerSearch } from "@/palette/palette-search";
+import { Spinner } from "@/ui/spinner";
+
+/**
+ * The command palette (Cmd/Ctrl-K): one box to jump anywhere, find a task,
+ * search every text, and act on the task that is open.
+ */
+export function CommandPalette() {
+  const open = useUi((s) => s.paletteOpen);
+  // Mounted only while open, so each opening starts on the first page with an empty box.
+  return open ? <Palette /> : null;
+}
+
+function Palette() {
+  const slug = useSlug();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const projects = useProjects();
+  const [page, setPage] = useState<"root" | ChoicePage>("root");
+  const [query, setQuery] = useState("");
+
+  const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
+  const task = useTaskByKey(taskKey);
+  const openTask = task && !task.deleted_at ? task : undefined;
+  const background = (location.state as { background?: Location } | null)?.background;
+  // The page under the task panel, or the page itself, says which project is in view.
+  const pagePath = taskKey ? (background?.pathname ?? "") : location.pathname;
+  const projectKey = matchPath("/:ws/p/:key/*", pagePath)?.params.key;
+  const project =
+    projects.find((p) => p.id === openTask?.project_id) ?? projects.find((p) => p.key === projectKey?.toUpperCase()) ?? projects[0];
+
+  const onRoot = page === "root" || !openTask;
+  const search = useServerSearch(onRoot ? query : "");
+
+  const close = () => ui.setPalette(false);
+  const run = (action: () => void) => {
+    close();
+    action();
+  };
+  const toPage = (next: "root" | ChoicePage) => {
+    setPage(next);
+    setQuery("");
+  };
+
+  return (
+    <RDialog.Root open onOpenChange={(next) => !next && close()}>
+      <RDialog.Portal>
+        <RDialog.Overlay className="fixed inset-0 z-[70] bg-overlay animate-fade" />
+        <RDialog.Content
+          aria-describedby={undefined}
+          onEscapeKeyDown={(e) => {
+            if (onRoot) return;
+            e.preventDefault();
+            toPage("root");
+          }}
+          className="fixed inset-x-0 top-0 z-[70] overflow-hidden bg-surface text-ink shadow-pop outline-none animate-pop max-sm:rounded-b-xl sm:top-[12vh] sm:left-1/2 sm:w-[min(600px,calc(100vw-2rem))] sm:-translate-x-1/2 sm:rounded-xl"
+        >
+          <VisuallyHidden.Root>
+            <RDialog.Title>{t("palette.title")}</RDialog.Title>
+          </VisuallyHidden.Root>
+          <Command
+            label={t("palette.title")}
+            shouldFilter={false}
+            vimBindings={false}
+            loop
+            onKeyDown={(e) => {
+              if (!onRoot && e.key === "Backspace" && query === "") {
+                e.preventDefault();
+                toPage("root");
+              }
+            }}
+          >
+            <div className="flex h-12 items-center gap-2.5 border-b border-line pr-3 pl-4">
+              {onRoot ? (
+                <Search className="size-4 shrink-0 text-ink-3" aria-hidden />
+              ) : (
+                <span className="flex h-5 shrink-0 items-center rounded-sm bg-sunken px-1.5 text-xs font-medium text-ink-2 tnum">{openTask.key}</span>
+              )}
+              <Command.Input
+                autoFocus
+                value={query}
+                onValueChange={setQuery}
+                placeholder={onRoot ? t("palette.placeholder") : choiceTitle[page as ChoicePage]()}
+                className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-3 max-sm:text-[16px]"
+              />
+              <span className="flex size-4 shrink-0 items-center justify-center">
+                {search.busy && <Spinner className="size-3.5" label={t("palette.searching")} />}
+              </span>
+            </div>
+            <Command.List className="max-h-[min(26rem,60dvh)] scroll-py-1.5 overflow-y-auto overscroll-contain p-1.5">
+              {onRoot ? (
+                <RootPage
+                  query={query}
+                  slug={slug}
+                  task={openTask}
+                  project={project}
+                  hits={search.hits}
+                  searching={search.busy}
+                  run={run}
+                  go={(path) => run(() => navigate(path))}
+                  openTask={(key) =>
+                    run(() => navigate(`/${slug}/task/${key}`, { state: { background: taskKey ? background : location } }))
+                  }
+                  openPage={toPage}
+                />
+              ) : (
+                <ChoicesPage page={page as ChoicePage} task={openTask} query={query} run={run} />
+              )}
+            </Command.List>
+          </Command>
+        </RDialog.Content>
+      </RDialog.Portal>
+    </RDialog.Root>
+  );
+}
