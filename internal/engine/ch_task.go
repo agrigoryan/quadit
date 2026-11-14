@@ -106,6 +106,9 @@ func taskCreate(c *cx) error {
 	if t.AssigneeID, err = c.optMember("assignee", a.Assignee); err != nil {
 		return err
 	}
+	if t.AskedBy, err = c.askedBy(t); err != nil {
+		return err
+	}
 	if t.WaitingOnID, err = c.optMember("waiting_on", a.WaitingOn); err != nil {
 		return err
 	}
@@ -414,6 +417,14 @@ func taskUpdate(c *cx) error {
 			return err
 		}
 	}
+	if t.AssigneeID != before.AssigneeID {
+		by, err := c.askedBy(t)
+		if err != nil {
+			return err
+		}
+		p.put("asked_by", t.AskedBy, by)
+		t.AskedBy = by
+	}
 	if err := member("waiting_on_id", "waiting_on", a.WaitingOn, &t.WaitingOnID); err != nil {
 		return err
 	}
@@ -697,6 +708,10 @@ func taskTake(c *cx) error {
 	if t.AssigneeID != c.actor.UserID {
 		p.put("assignee_id", t.AssigneeID, c.actor.UserID)
 		t.AssigneeID = c.actor.UserID
+		if c.actor.Kind != core.KindAgent {
+			p.put("asked_by", t.AskedBy, "") // a person holds it now
+			t.AskedBy = ""
+		}
 	}
 	if t.WaitingOnID == c.actor.UserID {
 		p.put("waiting_on_id", t.WaitingOnID, "")
@@ -858,8 +873,19 @@ func relationAdd(c *cx) error {
 			return err
 		}
 	}
-	return c.emit(seq, "relation.created", "relation", r.ID, "task", t.ID, t.ProjectID,
-		map[string]any{"row": r, "key": t.Key, "other_key": o.Key})
+	if err := c.emit(seq, "relation.created", "relation", r.ID, "task", t.ID, t.ProjectID,
+		map[string]any{"row": r, "key": t.Key, "other_key": o.Key}); err != nil {
+		return err
+	}
+	return c.related(o, t, r, false)
+}
+
+// related tells those who follow the other end of a relation. The relation's
+// own event belongs to one task; this one belongs to the other, so a feed
+// narrowed to either task has it.
+func (c *cx) related(t, other core.Task, r core.Relation, removed bool) error {
+	return c.emit(c.tx.NextSeq(), "task.related", "task", t.ID, "task", t.ID, t.ProjectID,
+		map[string]any{"id": t.ID, "key": t.Key, "other_key": other.Key, "relation": r.ID, "type": r.Type, "removed": removed})
 }
 
 func relationRemove(c *cx) error {
@@ -878,7 +904,20 @@ func relationRemove(c *cx) error {
 	if err := c.tx.Get(c.ctx, &t, store.Eq("id", r.TaskID)); err != nil {
 		return err
 	}
-	return c.gone("relation", r.ID, "task", t.ID, t.ProjectID)
+	if err := c.gone("relation", r.ID, "task", t.ID, t.ProjectID); err != nil {
+		return err
+	}
+	var o core.Task
+	if err := c.tx.Get(c.ctx, &o, store.Eq("id", r.RelatedTaskID)); err != nil {
+		return nil // the other task is gone for good
+	}
+	seq := c.tx.Seq()
+	for _, tid := range []string{t.ID, o.ID} {
+		if err := c.touch(tid, seq); err != nil {
+			return err
+		}
+	}
+	return c.related(o, t, r, true)
 }
 
 // ---- links to the outside ----

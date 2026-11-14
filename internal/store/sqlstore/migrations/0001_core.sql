@@ -175,6 +175,7 @@ CREATE TABLE tasks (
     assignee_id      {{ID}} REFERENCES users (id),
     -- Who has the next move. A member, or an outside event named in the note.
     waiting_on_id    {{ID}} REFERENCES users (id),
+    asked_by         {{ID}} REFERENCES users (id),
     waiting_on_note  TEXT NOT NULL DEFAULT '',
     parent_id        {{ID}} REFERENCES tasks (id),
     epic_id          {{ID}},

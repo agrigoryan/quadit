@@ -18,6 +18,7 @@ func init() {
 	register("decision.pick", core.RoleMember, decisionPick)
 	register("decision.unclear", core.RoleMember, decisionUnclear)
 	register("decision.delete", core.RoleMember, decisionDelete)
+	register("decision.restore", core.RoleMember, decisionRestore)
 	register("preference.create", core.RoleAdmin, preferenceCreate)
 	register("preference.update", core.RoleAdmin, preferenceUpdate)
 	register("preference.delete", core.RoleAdmin, preferenceDelete)
@@ -954,6 +955,55 @@ func decisionDelete(c *cx) error {
 		return err
 	}
 	return c.touch(t.ID, c.tx.Seq())
+}
+
+// decisionRestore takes a decision back out of the trash, as it was.
+func decisionRestore(c *cx) error {
+	var a idArgs
+	if err := c.args(&a); err != nil {
+		return err
+	}
+	var d core.Decision
+	if a.ID == "" {
+		return invalid("id", "id is required")
+	}
+	if err := c.tx.Get(c.ctx, &d, store.Eq("id", a.ID)); err != nil {
+		return missing(err, "decision", a.ID)
+	}
+	t, err := c.anyTask("id", d.TaskID)
+	if err != nil {
+		return err
+	}
+	c.ref, c.key = d.ID, t.Key
+	if d.DeletedAt == 0 {
+		return nil // not in the trash: nothing to do
+	}
+	if t.DeletedAt != 0 {
+		return conflictErr("%s is in the trash; restore the task first", t.Key)
+	}
+	if d.CreatedBy != c.actor.UserID && !c.actor.Role.AtLeast(core.RoleAdmin) {
+		return forbidden("only the one who asked, or an admin, can restore a decision")
+	}
+	seq := c.tx.NextSeq()
+	if _, err := c.tx.Update(c.ctx, "decisions", map[string]any{"deleted_at": int64(0), "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {
+		return err
+	}
+	d.DeletedAt, d.UpdatedSeq = 0, seq
+	if err := c.loadOptions(&d); err != nil {
+		return err
+	}
+	body := d.Details
+	for _, o := range d.Options {
+		body += "\n" + o.Label + " " + o.Description
+	}
+	if err := c.index("decision", d.ID, "task", t.ID, t.ProjectID, "", d.Question, body); err != nil {
+		return err
+	}
+	if err := c.touch(t.ID, seq); err != nil {
+		return err
+	}
+	// The whole decision goes out again: a copy that dropped it has it back.
+	return c.emit(seq, "decision.restored", "decision", d.ID, "task", t.ID, t.ProjectID, map[string]any{"row": d, "key": t.Key})
 }
 
 func hasOption(d core.Decision, optionID string) bool {

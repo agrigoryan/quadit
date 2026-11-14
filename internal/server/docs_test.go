@@ -2,9 +2,11 @@ package server_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -243,5 +245,58 @@ func TestSharedPagesChipsAndUndo(t *testing.T) {
 		if tr := s.call(s.owner, "", "GET", w+"/docs?trash=1", nil, 200, nil); !strings.Contains(tr, `"title":"Chips"`) {
 			t.Fatalf("page trash: %s", tr)
 		}
+	})
+}
+
+func TestRenameOption(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		db := s.change(s.owner, "", "doc.create", M{"title": "Sprites", "kind": "database"})["ref"].(string)
+		state := s.change(s.owner, "", "property.create", M{"database": db, "name": "State", "type": "select"})["ref"].(string)
+		tags := s.change(s.owner, "", "property.create", M{"database": db, "name": "Tags", "type": "multi_select"})["ref"].(string)
+		s.change(s.owner, "", "doc.create", M{"parent": db, "title": "Boss idle", "props": M{"State": "todo", "Tags": []string{"boss", "todo"}}})
+		s.change(s.owner, "", "doc.create", M{"parent": db, "title": "Boss attack", "props": M{"State": "drawn"}})
+		gone := s.change(s.owner, "", "doc.create", M{"parent": db, "title": "Old idea", "props": M{"State": "todo"}})["ref"].(string)
+		s.change(s.owner, "", "doc.delete", M{"id": gone})
+		view := s.change(s.owner, "", "dbview.create", M{"database": db, "name": "To draw", "type": "table",
+			"config": M{"filters": []M{{"prop": state, "op": "is", "value": "todo"}}}})["ref"].(string)
+
+		res := s.change(s.owner, "", "property.update", M{"id": state, "rename_option": M{"from": "todo", "to": "to draw"}})
+		_ = res
+		rows := s.call(s.owner, "", "GET", w+"/docs/"+db+"/rows?format=text", nil, 200, nil)
+		if !strings.Contains(rows, "to draw") || !strings.Contains(rows, "drawn") {
+			t.Fatalf("rows after the rename: %s", rows)
+		}
+		// The other property's option of the same name is left alone.
+		var out struct {
+			Rows []struct {
+				Title  string
+				Values map[string]any
+			}
+		}
+		s.call(s.owner, "", "GET", w+"/docs/"+db+"/rows", nil, 200, &out)
+		for _, r := range out.Rows {
+			if r.Title == "Boss idle" && (r.Values["State"] != "to draw" || fmt.Sprint(r.Values["Tags"]) != "[boss todo]") {
+				t.Fatalf("Boss idle after the rename: %+v", r.Values)
+			}
+		}
+		_ = tags
+		// The saved view still finds the row, by the new name.
+		if v := s.call(s.owner, "", "GET", w+"/docs/"+db+"/rows?format=text&view=To+draw", nil, 200, nil); !strings.Contains(v, "Boss idle") || strings.Contains(v, "Boss attack") {
+			t.Fatalf("the view after the rename: %s", v)
+		}
+		_ = view
+		// A row in the trash comes back with the new name too.
+		s.change(s.owner, "", "doc.restore", M{"id": gone})
+		if v := s.call(s.owner, "", "GET", w+"/docs/"+db+"/rows?format=text&filter=State:is:to+draw", nil, 200, nil); !strings.Contains(v, "Old idea") {
+			t.Fatalf("the restored row kept the old name: %s", v)
+		}
+		// Everyone following along hears of each row.
+		if ev := s.call(s.owner, "", "GET", w+"/events?types=doc.updated,dbview.updated,property.updated&limit=100", nil, 200, nil); strings.Count(ev, `to draw`) < 4 {
+			t.Fatalf("events of the rename: %s", ev)
+		}
+		// Refusals: a name already taken, an option that is not there, not a select.
+		s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "property.update", "args": M{"id": state, "rename_option": M{"from": "to draw", "to": "drawn"}}}, 409, nil)
+		s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "property.update", "args": M{"id": state, "rename_option": M{"from": "nope", "to": "x"}}}, 400, nil)
 	})
 }

@@ -46,6 +46,14 @@ type propertyArgs struct {
 	Type     Opt[string]          `json:"type"`
 	Config   Opt[json.RawMessage] `json:"config"` // options of a select, the target of a relation, a formula's text…
 	Rank     Opt[string]          `json:"rank"`
+	// RenameOption gives an option of a select a new name, in the property,
+	// in every row that holds it and in the filters of the views (update only).
+	RenameOption *renameOption `json:"rename_option"`
+}
+
+type renameOption struct {
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 func propertyCreate(c *cx) error {
@@ -127,6 +135,17 @@ func propertyUpdate(c *cx) error {
 		return err
 	}
 	c.ref = pr.ID
+	if a.RenameOption != nil {
+		if a.Config.Set || a.Type.Set {
+			return invalid("rename_option", "rename an option in a change of its own, without config or type")
+		}
+		cfg, err := renamedOption(pr, a.RenameOption.From, strings.TrimSpace(a.RenameOption.To))
+		if err != nil {
+			return err
+		}
+		p.set["config"] = json.RawMessage(cfg)
+		p.changes["config"] = core.FieldChange{From: pr.Config, To: json.RawMessage(cfg)}
+	}
 	if p.empty() {
 		return nil
 	}
@@ -135,7 +154,133 @@ func propertyUpdate(c *cx) error {
 	if _, err := c.tx.Update(c.ctx, "db_properties", p.set, store.Eq("id", pr.ID)); err != nil {
 		return err
 	}
-	return c.emitTo(docAudience(d), seq, "property.updated", "property", pr.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": pr.ID, "changes": p.changes})
+	if err := c.emitTo(docAudience(d), seq, "property.updated", "property", pr.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": pr.ID, "changes": p.changes}); err != nil {
+		return err
+	}
+	if a.RenameOption != nil {
+		return c.renameInRows(pr, d, a.RenameOption.From, strings.TrimSpace(a.RenameOption.To))
+	}
+	return nil
+}
+
+// renamedOption returns a select's config with one option renamed.
+func renamedOption(pr core.DBProperty, from, to string) ([]byte, error) {
+	if pr.Type != "select" && pr.Type != "multi_select" {
+		return nil, invalid("rename_option", "%q is not a select: it has no options", pr.Name)
+	}
+	if to == "" {
+		return nil, invalid("rename_option.to", "the new name is required")
+	}
+	cfg := map[string]any{}
+	if len(pr.Config) > 0 {
+		json.Unmarshal(pr.Config, &cfg)
+	}
+	opts, _ := cfg["options"].([]any)
+	var names []string
+	found := false
+	for _, o := range opts {
+		om, _ := o.(map[string]any)
+		name, _ := om["name"].(string)
+		names = append(names, name)
+		if name == to && to != from {
+			return nil, conflictErr("%q already has an option named %q", pr.Name, to)
+		}
+		if name == from {
+			om["name"] = to
+			found = true
+		}
+	}
+	if !found {
+		return nil, oneOf("rename_option.from", "option", from, names)
+	}
+	return json.Marshal(cfg)
+}
+
+// renameInRows carries an option's new name into every row that holds the
+// old one, the trash included, and into the filters of the database's views.
+func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error {
+	// swap returns the value with the name replaced, and whether it changed.
+	swap := func(raw json.RawMessage) (json.RawMessage, bool) {
+		var one string
+		if json.Unmarshal(raw, &one) == nil {
+			if one != from {
+				return raw, false
+			}
+			out, _ := json.Marshal(to)
+			return out, true
+		}
+		var many []string
+		if json.Unmarshal(raw, &many) != nil {
+			return raw, false
+		}
+		hit := false
+		for i, v := range many {
+			if v == from {
+				many[i], hit = to, true
+			}
+		}
+		out, _ := json.Marshal(many)
+		return out, hit
+	}
+	var rows []core.Doc
+	if err := c.tx.List(c.ctx, &rows, store.Where(store.Eq("parent_id", d.ID), store.Eq("kind", core.DocRow))); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		props := map[string]json.RawMessage{}
+		if len(row.Props) == 0 || json.Unmarshal(row.Props, &props) != nil {
+			continue
+		}
+		next, hit := swap(props[pr.ID])
+		if !hit {
+			continue
+		}
+		props[pr.ID] = next
+		raw, _ := json.Marshal(props)
+		seq := c.tx.NextSeq()
+		if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"props": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", row.ID)); err != nil {
+			return err
+		}
+		if err := c.emitTo(docAudience(row), seq, "doc.updated", "doc", row.ID, "doc", row.ID, row.ProjectID,
+			map[string]any{"id": row.ID, "changes": map[string]core.FieldChange{"props": {To: json.RawMessage(raw)}}}); err != nil {
+			return err
+		}
+	}
+	var views []core.DBView
+	if err := c.tx.List(c.ctx, &views, store.Where(store.Eq("database_id", d.ID), store.Live)); err != nil {
+		return err
+	}
+	for _, v := range views {
+		cfg := map[string]json.RawMessage{}
+		var filters []map[string]json.RawMessage
+		if len(v.Config) == 0 || json.Unmarshal(v.Config, &cfg) != nil || json.Unmarshal(cfg["filters"], &filters) != nil {
+			continue
+		}
+		hit := false
+		for _, f := range filters {
+			var prop string
+			if json.Unmarshal(f["prop"], &prop) != nil || (prop != pr.ID && prop != pr.Name) {
+				continue
+			}
+			if next, ok := swap(f["value"]); ok {
+				f["value"], hit = next, true
+			}
+		}
+		if !hit {
+			continue
+		}
+		cfg["filters"], _ = json.Marshal(filters)
+		raw, _ := json.Marshal(cfg)
+		seq := c.tx.NextSeq()
+		if _, err := c.tx.Update(c.ctx, "db_views", map[string]any{"config": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", v.ID)); err != nil {
+			return err
+		}
+		if err := c.emitTo(docAudience(d), seq, "dbview.updated", "dbview", v.ID, "doc", d.ID, d.ProjectID,
+			map[string]any{"id": v.ID, "changes": map[string]core.FieldChange{"config": {From: v.Config, To: json.RawMessage(raw)}}}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func propertyDelete(c *cx) error {

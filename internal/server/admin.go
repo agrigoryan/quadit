@@ -22,6 +22,7 @@ func init() {
 		m.HandleFunc("GET /api/v1/admin/users", s.signed(s.installAdmin(s.hUsers)))
 		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signed(s.installAdmin(s.hUserPatch)))
 		m.HandleFunc("GET /api/v1/admin/workspaces", s.signed(s.installAdmin(s.hWorkspaces)))
+		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/join", s.signed(s.installAdmin(s.hWorkspaceJoin)))
 		m.HandleFunc("GET /api/v1/admin/health", s.signed(s.installAdmin(s.hHealth)))
 		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.in(s.hWorkspaceAudit))
 	})
@@ -95,12 +96,17 @@ func (s *Server) auditQuery(x *c, workspaceID string) error {
 	if a := x.intParam("after", 0); a > 0 {
 		conds = append(conds, store.Gt("at", int64(a)))
 	}
+	// Entries are numbered in the order they were written: paging by the
+	// last id seen never skips or repeats one, however many share a moment.
+	if cur := v.Get("cursor"); cur != "" {
+		conds = append(conds, store.Lt("id", cur))
+	}
 	limit := min(x.intParam("limit", 100), 5000)
 	if v.Get("format") == "csv" {
 		limit = 50000
 	}
 	var rows []core.AuditEntry
-	if err := s.st.List(x.ctx(), &rows, store.Q{Where: conds, Order: "-at", Limit: limit}); err != nil {
+	if err := s.st.List(x.ctx(), &rows, store.Q{Where: conds, Order: "-id", Limit: limit}); err != nil {
 		return err
 	}
 	if v.Get("format") == "csv" {
@@ -115,7 +121,11 @@ func (s *Server) auditQuery(x *c, workspaceID string) error {
 		cw.Flush()
 		return cw.Error()
 	}
-	return x.ok(map[string]any{"audit": rows})
+	out := map[string]any{"audit": rows}
+	if len(rows) == limit {
+		out["next"] = rows[len(rows)-1].ID // pass as cursor= for the page after
+	}
+	return x.ok(out)
 }
 
 func (s *Server) hAudit(x *c) error { return s.auditQuery(x, "") }
@@ -209,6 +219,39 @@ func (s *Server) hWorkspaces(x *c) error {
 		out[i].Tasks, _ = s.st.Count(ctx, "tasks", store.Eq("workspace_id", ws.ID), store.Live)
 	}
 	return x.ok(map[string]any{"workspaces": out})
+}
+
+// hWorkspaceJoin makes the one who runs the install an admin of a workspace
+// they are not in, so they can look after it. It is written to the audit
+// log of the install and of the workspace, and its members see them join.
+func (s *Server) hWorkspaceJoin(x *c) error {
+	ctx := x.ctx()
+	var ws core.Workspace
+	if err := s.st.Get(ctx, &ws, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+		if err := s.st.Get(ctx, &ws, store.Eq("slug", x.r.PathValue("id")), store.Live); err != nil {
+			return errNotFound("workspace")
+		}
+	}
+	db := s.st.In(ws.ID)
+	if n, _ := db.Count(ctx, "members", store.Eq("user_id", x.user.ID), store.Null("removed_at")); n > 0 {
+		return x.ok(map[string]any{"workspace": ws, "already_member": true})
+	}
+	// The change is made in the name of the workspace's longest-standing owner.
+	var owners []core.Member
+	if err := db.List(ctx, &owners, store.Q{Where: []store.Cond{store.Eq("role", string(core.RoleOwner)), store.Null("removed_at")}, Order: "created_at", Limit: 1}); err != nil {
+		return err
+	}
+	if len(owners) == 0 {
+		return errBad("this workspace has no owner to act for")
+	}
+	err := s.eng.System(ctx, ws.ID, owners[0].UserID, func(sys *engine.Sys) error {
+		return sys.Do("member.add", map[string]any{"user": x.user.ID, "role": string(core.RoleAdmin)})
+	})
+	if err != nil {
+		return err
+	}
+	s.audit(x.r, ws.ID, x.user, "workspace.joined_by_install_admin", "workspace", ws.ID, nil)
+	return x.ok(map[string]any{"workspace": ws})
 }
 
 // hHealth is the health panel: what is failing or waiting behind the scenes.

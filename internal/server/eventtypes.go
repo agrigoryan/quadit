@@ -11,9 +11,9 @@ func init() {
 // eventTypes lists the kinds of event the feed carries, for pickers in
 // webhook and rule forms. A family can be chosen whole as "task.*".
 var eventTypes = []string{
-	"task.created", "task.updated", "task.restored",
+	"task.created", "task.updated", "task.restored", "task.related",
 	"comment.created", "comment.updated", "comment.deleted",
-	"decision.opened", "decision.picked", "decision.unclear", "decision.updated", "decision.deleted",
+	"decision.opened", "decision.picked", "decision.unclear", "decision.updated", "decision.deleted", "decision.restored",
 	"attachment.created", "attachment.deleted", "relation.created", "relation.deleted", "link.created", "link.updated", "link.deleted",
 	"project.created", "project.updated", "project.deleted", "status.created", "status.updated", "status.deleted",
 	"label.created", "label.updated", "label.deleted",

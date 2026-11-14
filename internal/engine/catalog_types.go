@@ -39,6 +39,7 @@ var argTypes = map[string]any{
 	"decision.pick":      decisionPickArgs{},
 	"decision.unclear":   decisionUnclearArgs{},
 	"decision.delete":    idArgs{},
+	"decision.restore":   idArgs{},
 	"preference.create":  preferenceCreateArgs{},
 	"preference.update":  preferenceUpdateArgs{},
 	"preference.delete":  idArgs{},

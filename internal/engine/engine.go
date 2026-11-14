@@ -203,6 +203,10 @@ type cx struct {
 	// origin, when set, is stamped on every event the write emits, so the
 	// rule that caused a change is known and rules do not set each other off.
 	origin string
+	// asker is the member named with "for": the one this change is made for.
+	asker string
+	// askerOK remembers the tasks whose asker was already checked.
+	askerOK map[string]bool
 }
 
 // args decodes the change's arguments into v. Unknown fields are refused, so
@@ -236,6 +240,11 @@ func (c *cx) emit(seq int64, typ, entityType, entityID, scopeType, scopeID, proj
 func (c *cx) emitTo(audience string, seq int64, typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error {
 	if projectID != "" && !c.system && len(c.scope.Projects) > 0 && !contains(c.scope.Projects, projectID) {
 		return forbidden("your access does not include this project")
+	}
+	if scopeType == "task" {
+		if err := c.checkAsker(scopeID); err != nil {
+			return err
+		}
 	}
 	if m, ok := data.(map[string]any); ok && c.origin != "" {
 		m["rule"] = c.origin
@@ -409,11 +418,13 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 	if !m.Role.AtLeast(h.min) {
 		return nil, forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, m.Role)
 	}
+	askerID := ""
 	if ch.For != "" {
 		asker, err := (&Resolver{ctx: ctx, db: tx, actor: m, at: now}).memberRef("for", ch.For)
 		if err != nil {
 			return nil, err
 		}
+		askerID = asker.UserID
 		if asker.SuspendedAt != 0 || !asker.Role.AtLeast(h.min) {
 			return nil, forbidden("%s needs the %s role; @%s, who asked for it, is a %s", ch.Type, h.min, asker.Handle, asker.Role)
 		}
@@ -430,7 +441,7 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 		return nil, forbidden("this credential is read-only")
 	}
 	c := &cx{Resolver: &Resolver{ctx: ctx, db: tx, actor: m, at: now}, e: e, tx: tx, ws: tx.WorkspaceID(), scope: scope,
-		change: ch, notified: map[string]bool{}}
+		change: ch, notified: map[string]bool{}, asker: askerID, askerOK: map[string]bool{}}
 	if contains(scope.NeedsApproval, ch.Type) {
 		if err := c.checkApproval(); err != nil {
 			return nil, err
@@ -610,4 +621,62 @@ func checkHandle(h string) error {
 		}
 	}
 	return nil
+}
+
+// checkAsker holds an agent, on a task a person gave to an agent, to that
+// person's access: the work runs as the one who asked for it, not with the
+// agent's wider access. It is checked where a write to the task is recorded,
+// so it covers every kind of change to the task.
+func (c *cx) checkAsker(taskID string) error {
+	if c.system || c.actor.Kind != core.KindAgent || c.askerOK == nil || c.askerOK[taskID] {
+		return nil
+	}
+	var t core.Task
+	if err := c.tx.Get(c.ctx, &t, store.Eq("id", taskID)); err != nil {
+		return nil // the task is gone; there is nothing to hold to
+	}
+	c.askerOK[taskID] = true
+	if t.AskedBy == "" || t.AskedBy == c.actor.UserID {
+		return nil
+	}
+	var m core.Member
+	if err := c.tx.Get(c.ctx, &m, store.Eq("user_id", t.AskedBy)); err != nil || m.SuspendedAt != 0 {
+		return forbidden("%s was given to an agent by someone who no longer has access here; a person has to assign it again", t.Key)
+	}
+	min := handlers[c.change.Type].min
+	if !m.Role.AtLeast(min) {
+		return forbidden("%s needs the %s role; @%s, who asked for the work on %s, is a %s", c.change.Type, min, m.Handle, t.Key, m.Role)
+	}
+	if m.Scope != nil {
+		if m.Scope.ReadOnly {
+			return forbidden("@%s, who asked for the work on %s, may only read", m.Handle, t.Key)
+		}
+		if len(m.Scope.Projects) > 0 {
+			if !contains(m.Scope.Projects, t.ProjectID) {
+				return forbidden("@%s, who asked for the work on %s, has no access to its project", m.Handle, t.Key)
+			}
+			c.scope.Projects = narrow(c.scope.Projects, m.Scope.Projects)
+		}
+	}
+	return nil
+}
+
+// askedBy works out who a task is worked for once its assignee is set: the
+// person who gave it to an agent. An agent passing it on keeps the person it
+// came from; a task a person holds is worked for nobody else.
+func (c *cx) askedBy(t core.Task) (string, error) {
+	if t.AssigneeID == "" {
+		return "", nil
+	}
+	to, err := c.memberRef("assignee", t.AssigneeID)
+	if err != nil || to.Kind != core.KindAgent {
+		return "", err
+	}
+	switch {
+	case c.asker != "":
+		return c.asker, nil
+	case !c.system && c.actor.Kind != core.KindAgent:
+		return c.actor.UserID, nil
+	}
+	return t.AskedBy, nil
 }

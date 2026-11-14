@@ -1033,8 +1033,14 @@ func (s *Server) hSearch(x *c) error {
 func (s *Server) hDecisions(x *c) error {
 	v := x.r.URL.Query()
 	conds := []store.Cond{store.Live}
+	if truthyParam(v, "trash") {
+		conds = []store.Cond{store.NotNull("deleted_at")}
+	}
 	switch st := v.Get("state"); st {
 	case "", "answered":
+		if truthyParam(v, "trash") {
+			break // the trash holds decisions in any state
+		}
 		conds = append(conds, store.Ne("state", core.StateOpen))
 	case "all":
 	case core.StateOpen, core.StatePicked, core.StateSentBack:

@@ -238,3 +238,113 @@ func TestAPI(t *testing.T) {
 		s.call(nil, "", "POST", "/api/v1/auth/setup", M{"name": "X", "email": "x@example.com", "password": "another-long-password", "workspace_name": "X"}, 409, nil)
 	})
 }
+
+// TestLooseEnds covers small things that were missing: a deleted decision
+// comes back, both ends of a relation hear of it, a webhook test is in the
+// delivery log, the audit log pages without skipping, and the one who runs
+// the install can step into a workspace they are not in.
+func TestLooseEnds(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music"})
+
+		// A decision goes to the trash and comes back whole.
+		d := s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "options": []M{{"label": "Ring"}, {"label": "Burst"}}})["ref"].(string)
+		s.change(s.owner, "", "decision.delete", M{"id": d})
+		if out := s.call(s.owner, "", "GET", w+"/decisions?trash=1", nil, 200, nil); !strings.Contains(out, "Which explosion?") {
+			t.Fatalf("decision trash: %s", out)
+		}
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); strings.Contains(out, "Which explosion?") {
+			t.Fatal("a deleted decision is still on its task")
+		}
+		s.change(s.owner, "", "decision.restore", M{"id": d})
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "Which explosion?") || !strings.Contains(out, "Burst") {
+			t.Fatalf("the decision did not come back with its options: %s", out)
+		}
+		if out := s.call(s.owner, "", "GET", w+"/events?types=decision.restored", nil, 200, nil); !strings.Contains(out, `"label":"Burst"`) {
+			t.Fatalf("the restore event does not carry the decision: %s", out)
+		}
+		if out := s.call(s.owner, "", "GET", w+"/search?q=explosion", nil, 200, nil); !strings.Contains(out, "Which explosion?") {
+			t.Fatalf("a restored decision is not found by search: %s", out)
+		}
+
+		// A relation is heard on both tasks.
+		rel := s.change(s.owner, "", "relation.add", M{"task": "SVA-1", "other": "SVA-2", "type": "blocks"})
+		for _, key := range []string{"SVA-1", "SVA-2"} {
+			if out := s.call(s.owner, "", "GET", w+"/events?task="+key+"&types=relation.created,task.related", nil, 200, nil); !strings.Contains(out, `"SVA-`) {
+				t.Fatalf("%s did not hear of the relation: %s", key, out)
+			}
+		}
+		_ = rel
+
+		// A webhook test is in the delivery log.
+		got := 0
+		rcv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { got++; rw.WriteHeader(204) }))
+		defer rcv.Close()
+		hook := s.change(s.owner, "", "webhook.create", M{"name": "probe", "url": rcv.URL, "event_types": []string{"comment.created"}})["ref"].(string)
+		s.call(s.owner, "", "POST", w+"/webhooks/"+hook+"/test", nil, 200, nil)
+		var log struct {
+			Deliveries []struct {
+				ID, State  string
+				EventType  string `json:"event_type"`
+				StatusCode int    `json:"status_code"`
+			}
+		}
+		s.call(s.owner, "", "GET", w+"/list/deliveries", nil, 200, &log)
+		if got != 1 || len(log.Deliveries) != 1 || log.Deliveries[0].EventType != "webhook.test" || log.Deliveries[0].State != "ok" || log.Deliveries[0].StatusCode != 204 {
+			t.Fatalf("test delivery log: got=%d %+v", got, log.Deliveries)
+		}
+		s.call(s.owner, "", "POST", w+"/deliveries/"+log.Deliveries[0].ID+"/redeliver", nil, 400, nil)
+
+		// The audit log pages by entry, never skipping or repeating one.
+		for i := 0; i < 7; i++ {
+			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", i%2 == 0, 200, nil)
+		}
+		seen, cursor := map[string]bool{}, ""
+		for page := 0; page < 20; page++ {
+			var out struct {
+				Audit []struct{ ID string }
+				Next  string
+			}
+			s.call(s.owner, "", "GET", "/api/v1/admin/audit?limit=3&cursor="+cursor, nil, 200, &out)
+			for _, e := range out.Audit {
+				if seen[e.ID] {
+					t.Fatalf("audit entry %s came twice", e.ID)
+				}
+				seen[e.ID] = true
+			}
+			if cursor = out.Next; cursor == "" {
+				break
+			}
+		}
+		var all struct{ Audit []struct{ ID string } }
+		s.call(s.owner, "", "GET", "/api/v1/admin/audit?limit=5000", nil, 200, &all)
+		if len(seen) != len(all.Audit) || len(seen) < 8 {
+			t.Fatalf("paged through %d audit entries of %d", len(seen), len(all.Audit))
+		}
+
+		// Someone else makes a workspace; the install admin is not in it, and
+		// steps in as an admin, on the record.
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
+		dee := browser()
+		s.call(dee, "", "POST", "/api/v1/auth/register", M{"name": "Dee", "email": "dee@example.com", "password": "another-long-password"}, 201, nil)
+		var made struct{ ID, Slug string }
+		s.call(dee, "", "POST", "/api/v1/workspaces", M{"name": "Dee's place", "slug": "dees"}, 201, &made)
+		s.call(s.owner, "", "GET", "/api/v1/w/dees/me", nil, 404, nil)
+		s.call(dee, "", "POST", "/api/v1/admin/workspaces/"+made.ID+"/join", nil, 403, nil)
+		s.call(s.owner, "", "POST", "/api/v1/admin/workspaces/"+made.ID+"/join", nil, 200, nil)
+		var me struct{ Role string }
+		s.call(s.owner, "", "GET", "/api/v1/w/dees/me", nil, 200, &me)
+		if me.Role != "admin" {
+			t.Fatalf("joined as %q", me.Role)
+		}
+		if out := s.call(dee, "", "GET", "/api/v1/w/dees/audit", nil, 200, nil); !strings.Contains(out, "workspace.joined_by_install_admin") {
+			t.Fatalf("the join is not in the workspace's audit log: %s", out)
+		}
+		if out := s.call(s.owner, "", "POST", "/api/v1/admin/workspaces/dees/join", nil, 200, nil); !strings.Contains(out, "already_member") {
+			t.Fatalf("joining twice: %s", out)
+		}
+	})
+}

@@ -74,3 +74,64 @@ func TestGuardRails(t *testing.T) {
 		}
 	})
 }
+
+// TestAskedBy checks that work a member gives to an agent runs with that
+// member's access, without the agent having to say whom it works for.
+func TestAskedBy(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		ctx := context.Background()
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		a, b := w.agent("alpha"), w.agent("beta")
+		mia := core.User{ID: id.New(), Kind: core.KindPerson, Name: "Mia", Email: "mia-" + id.New() + "@example.com", CreatedAt: 1, UpdatedAt: 1}
+		if err := st.Insert(ctx, mia); err != nil {
+			t.Fatal(err)
+		}
+		w.do(w.owner.ID, "member.add", M{"user": mia.ID, "handle": "mia"})
+
+		// A person gives a task to an agent: it is worked for them.
+		w.do(mia.ID, "task.create", M{"project": "SVA", "title": "Draw the boss", "assignee": "@alpha"})
+		if got := w.task("SVA-1").AskedBy; got != mia.ID {
+			t.Fatalf("asked_by after a person assigned it: %q", got)
+		}
+		// The agent passes it on: still for the same person.
+		w.do(a, "task.update", M{"id": "SVA-1", "assignee": "@beta"})
+		if got := w.task("SVA-1").AskedBy; got != mia.ID {
+			t.Fatalf("asked_by after an agent passed it on: %q", got)
+		}
+		w.do(b, "comment.create", M{"task": "SVA-1", "body": "On it."})
+
+		// The person loses access: agents can no longer work on it for them,
+		// whatever they do to the task.
+		w.do(w.owner.ID, "member.update", M{"id": "@mia", "suspended": true})
+		for typ, args := range map[string]M{
+			"comment.create": {"task": "SVA-1", "body": "Still here."},
+			"task.update":    {"id": "SVA-1", "title": "Draw the big boss"},
+			"decision.open":  {"task": "SVA-1", "question": "Which?", "options": []M{{"label": "A"}, {"label": "B"}}},
+		} {
+			if e := w.refused(engine.CodeForbidden, b, typ, args); !strings.Contains(e.Message, "no longer has access") {
+				t.Fatalf("%s for a suspended asker: %v", typ, e)
+			}
+		}
+		if got := w.task("SVA-1").Title; got != "Draw the boss" {
+			t.Fatalf("a refused change still changed the task: %q", got)
+		}
+		// Another person assigns it again: it is worked for them now.
+		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "assignee": "@alpha"})
+		if got := w.task("SVA-1").AskedBy; got != w.owner.ID {
+			t.Fatalf("asked_by after it was assigned again: %q", got)
+		}
+		w.do(a, "comment.create", M{"task": "SVA-1", "body": "Back on it."})
+		// A person holding the task works for nobody else.
+		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "assignee": "@aram"})
+		if got := w.task("SVA-1").AskedBy; got != "" {
+			t.Fatalf("asked_by on a task a person holds: %q", got)
+		}
+		// An agent's own task, given by no person, runs with the agent's access.
+		w.do(a, "task.create", M{"project": "SVA", "title": "Tidy up", "assignee": "@beta"})
+		if got := w.task("SVA-2").AskedBy; got != "" {
+			t.Fatalf("asked_by on an agent's own task: %q", got)
+		}
+		w.do(b, "task.update", M{"id": "SVA-2", "title": "Tidy up the sprites"})
+	})
+}

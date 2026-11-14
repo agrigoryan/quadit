@@ -210,18 +210,21 @@ type Label struct {
 }
 
 type Task struct {
-	ID            string   `json:"id" db:"id"`
-	WorkspaceID   string   `json:"-" db:"workspace_id"`
-	ProjectID     string   `json:"project_id" db:"project_id"`
-	Number        int      `json:"number" db:"number"`
-	Key           string   `json:"key" db:"key"` // project key + number, e.g. SVA-12
-	Title         string   `json:"title" db:"title"`
-	Description   string   `json:"description,omitempty" db:"description"`
-	StatusID      string   `json:"status_id" db:"status_id"`
-	Priority      int      `json:"priority" db:"priority"`
-	AssigneeID    string   `json:"assignee_id,omitempty" db:"assignee_id,null"`
-	WaitingOnID   string   `json:"waiting_on_id,omitempty" db:"waiting_on_id,null"`
-	WaitingOnNote string   `json:"waiting_on_note,omitempty" db:"waiting_on_note"`
+	ID            string `json:"id" db:"id"`
+	WorkspaceID   string `json:"-" db:"workspace_id"`
+	ProjectID     string `json:"project_id" db:"project_id"`
+	Number        int    `json:"number" db:"number"`
+	Key           string `json:"key" db:"key"` // project key + number, e.g. SVA-12
+	Title         string `json:"title" db:"title"`
+	Description   string `json:"description,omitempty" db:"description"`
+	StatusID      string `json:"status_id" db:"status_id"`
+	Priority      int    `json:"priority" db:"priority"`
+	AssigneeID    string `json:"assignee_id,omitempty" db:"assignee_id,null"`
+	WaitingOnID   string `json:"waiting_on_id,omitempty" db:"waiting_on_id,null"`
+	WaitingOnNote string `json:"waiting_on_note,omitempty" db:"waiting_on_note"`
+	// AskedBy is the person an agent works this task for: whoever gave it
+	// to an agent. Agents work on the task with no more access than theirs.
+	AskedBy       string   `json:"asked_by,omitempty" db:"asked_by,null"`
 	ParentID      string   `json:"parent_id,omitempty" db:"parent_id,null"`
 	EpicID        string   `json:"epic_id,omitempty" db:"epic_id,null"`
 	MilestoneID   string   `json:"milestone_id,omitempty" db:"milestone_id,null"`

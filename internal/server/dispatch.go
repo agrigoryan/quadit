@@ -451,6 +451,9 @@ func (s *Server) hRedeliver(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
+	if n, _ := x.db.Count(x.ctx(), "webhook_deliveries", store.Eq("id", x.r.PathValue("id")), store.Lt("seq", int64(0))); n > 0 {
+		return errBad("this was a test; send a new test instead")
+	}
 	n, err := x.db.Update(x.ctx(), "webhook_deliveries", map[string]any{"state": "pending", "attempts": 0, "next_at": time.Now().UnixMilli(), "done_at": 0, "error": ""},
 		store.Eq("id", x.r.PathValue("id")))
 	if err != nil {
@@ -475,7 +478,19 @@ func (s *Server) hWebhookTest(x *c) error {
 	sample, _ := json.Marshal(map[string]any{"test": true})
 	ev := core.Event{WorkspaceID: x.ws.ID, At: time.Now().UnixMilli(), ActorID: x.member.UserID, Type: "webhook.test", EntityType: "webhook",
 		EntityID: h.ID, ScopeType: "workspace", ScopeID: x.ws.ID, Data: sample}
-	status, errText, took := s.post(x.ctx(), h, id.New(), ev)
+	did := id.New()
+	status, errText, took := s.post(x.ctx(), h, did, ev)
+	// A test shows in the delivery log like any other delivery. It has no
+	// place in the feed, so it gets a number of its own below zero.
+	now := time.Now().UnixMilli()
+	d := core.WebhookDelivery{ID: did, WorkspaceID: x.ws.ID, WebhookID: h.ID, Seq: -now, EventType: ev.Type, State: "ok", Attempts: 1,
+		StatusCode: status, Error: errText, DurationMS: int(took.Milliseconds()), CreatedAt: now, DoneAt: now}
+	if status < 200 || status >= 300 {
+		d.State = "dead"
+	}
+	if err := x.db.Insert(x.ctx(), d); err != nil {
+		s.log.Error("webhook test: delivery log", "err", err)
+	}
 	return x.ok(map[string]any{"status": status, "error": errText, "ms": took.Milliseconds(), "ok": status >= 200 && status < 300})
 }
 
