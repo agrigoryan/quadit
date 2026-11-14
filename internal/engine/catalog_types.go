@@ -97,4 +97,5 @@ var argTypes = map[string]any{
 	"label.create":       labelCreateArgs{},
 	"label.update":       labelUpdateArgs{},
 	"label.delete":       memberRefArgs{},
+	"workspace.delete":   workspaceDeleteArgs{},
 }

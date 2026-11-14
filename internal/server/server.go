@@ -228,6 +228,15 @@ func (x *c) intParam(name string, def int) int {
 	return def
 }
 
+// whole reports whether the caller acts with everything the account may
+// do: a signed-in session, or a token with no narrowing on it.
+func (x *c) whole() bool {
+	if x.sess != nil {
+		return x.sess.Stage == "full"
+	}
+	return x.token != nil && x.token.Kind == "token" && x.token.Scopes == ""
+}
+
 func (x *c) admin() error {
 	if !x.member.Role.AtLeast(core.RoleAdmin) {
 		return errForbidden("this needs the admin role; you are a %s", x.member.Role)

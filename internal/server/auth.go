@@ -262,8 +262,8 @@ func (s *Server) hProfile(x *c) error {
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	if x.token != nil {
-		return errForbidden("a profile is changed by its person, signed in")
+	if !x.whole() || x.user.Kind != core.KindPerson {
+		return errForbidden("a profile is changed by its person: signed in, or with a personal token that is not narrowed")
 	}
 	ctx := x.ctx()
 	set := map[string]any{}
@@ -420,8 +420,8 @@ func (s *Server) hWorkspaceCreate(x *c) error {
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	if x.user.Kind != core.KindPerson || x.token != nil {
-		return errForbidden("a workspace is created by a person, signed in")
+	if x.user.Kind != core.KindPerson || !x.whole() {
+		return errForbidden("a workspace is created by a person: signed in, or with a personal token that is not narrowed")
 	}
 	if !x.user.IsAdmin && !s.settingBool(x.ctx(), "workspaces.anyone_can_create", true) {
 		return errForbidden("only an install admin can create workspaces here")

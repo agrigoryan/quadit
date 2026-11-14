@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -177,5 +178,27 @@ func TestBatchSeesItsOwnWrites(t *testing.T) {
 				t.Fatalf("a batch used a name an earlier change in it had taken away: %s", bad.Args)
 			}
 		}
+	})
+}
+
+// TestNewAgentsAskFirst checks the default: a new agent needs approval for
+// what cannot be taken back or reaches outside, unless its maker says not.
+func TestNewAgentsAskFirst(t *testing.T) {
+	for _, typ := range engine.AsksFirst {
+		if !slices.Contains(engine.ChangeTypes(), typ) {
+			t.Errorf("%s is not a change type", typ)
+		}
+	}
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		careful := w.do(w.owner.ID, "agent.create", M{"name": "Careful", "handle": "careful", "role": "admin"}).Ref
+		trusted := w.do(w.owner.ID, "agent.create", M{"name": "Trusted", "handle": "trusted", "role": "admin", "scope": M{"needs_approval": []string{}}}).Ref
+		hook := M{"name": "out", "url": "https://example.com/hook"}
+		if e := w.refused(engine.CodeNeedsApproval, careful, "webhook.create", hook); !strings.Contains(e.Message, "needs approval") {
+			t.Fatalf("a new agent reached outside without asking: %v", e)
+		}
+		w.do(careful, "task.create", M{"project": "SVA", "title": "ordinary work needs no approval"})
+		w.do(trusted, "webhook.create", hook)
 	})
 }

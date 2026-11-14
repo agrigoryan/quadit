@@ -582,6 +582,15 @@ func agentCreate(c *cx) error {
 	if err != nil {
 		return err
 	}
+	// The person decides: unless its maker says otherwise (an explicit
+	// needs_approval list, empty for none), a new agent asks before anything
+	// that cannot be taken back or that reaches outside.
+	if a.Scope == nil || a.Scope.NeedsApproval == nil {
+		if scope == nil {
+			scope = &core.Scope{}
+		}
+		scope.NeedsApproval = append([]string(nil), AsksFirst...)
+	}
 	scope = c.capScope(scope)
 	u := core.User{ID: uid, Kind: core.KindAgent, Name: name, Description: a.Description, Avatar: a.Avatar, WorkspaceID: c.ws,
 		ResponsibleID: rm.UserID, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
@@ -1215,4 +1224,13 @@ func workspaceDelete(c *cx) error {
 	}
 	c.ref = w.ID
 	return c.emit(seq, "workspace.deleted", "workspace", w.ID, "workspace", w.ID, "", map[string]any{"id": w.ID, "gone": true, "slug": w.Slug})
+}
+
+// AsksFirst are the changes a new agent needs approval for unless told
+// otherwise: those that cannot be taken back, and those that reach outside
+// the workspace or change who can get in.
+var AsksFirst = []string{
+	"project.delete", "member.remove", "member.add", "workspace.update",
+	"webhook.create", "webhook.update", "integration.create", "integration.update", "source.create", "source.update",
+	"secret.set", "secret.delete",
 }
