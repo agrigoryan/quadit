@@ -136,7 +136,10 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 			return nil, err
 		}
 		var out map[string][]row
-		return out[name], json.Unmarshal(raw, &out)
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return nil, err
+		}
+		return out[name], nil
 	}
 	projects, err := list("projects")
 	if err != nil {

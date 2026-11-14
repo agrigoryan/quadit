@@ -203,7 +203,12 @@ func (c conn) Tasks(ctx context.Context, f store.TaskFilter) ([]core.Task, error
 		return nil, err
 	}
 	var out []core.Task
-	return out, scanAll(rows, m, reflect.ValueOf(&out).Elem())
+	// Fill first, then return: in one statement Go may read out before the
+	// call has filled it.
+	if err := scanAll(rows, m, reflect.ValueOf(&out).Elem()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c conn) CountTasks(ctx context.Context, f store.TaskFilter) (int, error) {
@@ -288,7 +293,12 @@ func (c conn) Events(ctx context.Context, f store.EventFilter) ([]core.Event, er
 		return nil, err
 	}
 	var out []core.Event
-	return out, scanAll(rows, m, reflect.ValueOf(&out).Elem())
+	// Fill first, then return: in one statement Go may read out before the
+	// call has filled it.
+	if err := scanAll(rows, m, reflect.ValueOf(&out).Elem()); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // ---- full-text search ----
