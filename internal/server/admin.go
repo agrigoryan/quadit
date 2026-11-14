@@ -1,0 +1,228 @@
+package server
+
+import (
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/store"
+)
+
+func init() {
+	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
+		m.HandleFunc("GET /api/v1/admin/settings", s.signed(s.installAdmin(s.hSettings)))
+		m.HandleFunc("PUT /api/v1/admin/settings/{name}", s.signed(s.installAdmin(s.hSettingPut)))
+		m.HandleFunc("POST /api/v1/admin/mail/test", s.signed(s.installAdmin(s.hMailTest)))
+		m.HandleFunc("GET /api/v1/admin/audit", s.signed(s.installAdmin(s.hAudit)))
+		m.HandleFunc("GET /api/v1/admin/users", s.signed(s.installAdmin(s.hUsers)))
+		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signed(s.installAdmin(s.hUserPatch)))
+		m.HandleFunc("GET /api/v1/admin/workspaces", s.signed(s.installAdmin(s.hWorkspaces)))
+		m.HandleFunc("GET /api/v1/admin/health", s.signed(s.installAdmin(s.hHealth)))
+		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.in(s.hWorkspaceAudit))
+	})
+}
+
+// installAdmin lets through only people who run the install.
+func (s *Server) installAdmin(h handler) handler {
+	return func(x *c) error {
+		if !x.user.IsAdmin || x.user.Kind != core.KindPerson || x.sess == nil {
+			return errForbidden("this is for the people who run the install")
+		}
+		return h(x)
+	}
+}
+
+func (s *Server) hSettings(x *c) error {
+	return x.ok(map[string]any{"settings": s.maskedSettings(x.ctx())})
+}
+
+// hSettingPut sets one install setting. The body is its JSON value.
+func (s *Server) hSettingPut(x *c) error {
+	name := x.r.PathValue("name")
+	var value json.RawMessage
+	if err := json.NewDecoder(http.MaxBytesReader(x.w, x.r.Body, 1<<20)).Decode(&value); err != nil {
+		return errBad("the body must be the setting's JSON value")
+	}
+	if _, fromEnv := s.rawSetting(x.ctx(), name); fromEnv {
+		return &engine.Error{Code: engine.CodeConflict, Message: fmt.Sprintf("%s is set by the environment variable %s, which wins; change it there", name, envName(name))}
+	}
+	if err := s.saveSetting(x.ctx(), name, value, x.user.ID); err != nil {
+		return err
+	}
+	s.audit(x.r, "", x.user, "setting.changed", "setting", name, nil)
+	return s.hSettings(x)
+}
+
+func (s *Server) hMailTest(x *c) error {
+	var b struct {
+		To string `json:"to"`
+	}
+	if err := x.body(&b); err != nil {
+		return err
+	}
+	if b.To == "" {
+		b.To = x.user.Email
+	}
+	if err := s.sendMail(x.ctx(), b.To, "Test message", "This is a test message from your install. Mail works."); err != nil {
+		return &engine.Error{Code: engine.CodeInvalid, Message: err.Error()}
+	}
+	return x.ok(map[string]any{"sent_to": b.To})
+}
+
+// auditQuery reads the audit log with the URL's filters.
+func (s *Server) auditQuery(x *c, workspaceID string) error {
+	v := x.r.URL.Query()
+	var conds []store.Cond
+	if workspaceID != "" {
+		conds = append(conds, store.Eq("workspace_id", workspaceID))
+	} else if ws := v.Get("workspace"); ws != "" {
+		conds = append(conds, store.Eq("workspace_id", ws))
+	}
+	if a := v.Get("action"); a != "" {
+		conds = append(conds, store.Like("action", strings.ReplaceAll(a, "*", "%")))
+	}
+	if a := v.Get("actor"); a != "" {
+		conds = append(conds, store.Eq("actor_id", a))
+	}
+	if b := x.intParam("before", 0); b > 0 {
+		conds = append(conds, store.Lt("at", int64(b)))
+	}
+	if a := x.intParam("after", 0); a > 0 {
+		conds = append(conds, store.Gt("at", int64(a)))
+	}
+	limit := min(x.intParam("limit", 100), 5000)
+	if v.Get("format") == "csv" {
+		limit = 50000
+	}
+	var rows []core.AuditEntry
+	if err := s.st.List(x.ctx(), &rows, store.Q{Where: conds, Order: "-at", Limit: limit}); err != nil {
+		return err
+	}
+	if v.Get("format") == "csv" {
+		s.audit(x.r, workspaceID, x.user, "audit.exported", "audit", "", nil)
+		x.w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		x.w.Header().Set("Content-Disposition", `attachment; filename="audit-log.csv"`)
+		cw := csv.NewWriter(x.w)
+		cw.Write([]string{"time", "actor", "action", "target_type", "target_id", "workspace", "ip", "data"})
+		for _, r := range rows {
+			cw.Write([]string{time.UnixMilli(r.At).UTC().Format(time.RFC3339), r.ActorName, r.Action, r.TargetType, r.TargetID, r.WorkspaceID, r.IP, string(r.Data)})
+		}
+		cw.Flush()
+		return cw.Error()
+	}
+	return x.ok(map[string]any{"audit": rows})
+}
+
+func (s *Server) hAudit(x *c) error { return s.auditQuery(x, "") }
+
+// hWorkspaceAudit is a workspace's own slice of the audit log, for its admins.
+func (s *Server) hWorkspaceAudit(x *c) error {
+	if err := x.admin(); err != nil {
+		return err
+	}
+	return s.auditQuery(x, x.ws.ID)
+}
+
+func (s *Server) hUsers(x *c) error {
+	var us []core.User
+	conds := []store.Cond{store.Live}
+	if k := x.r.URL.Query().Get("kind"); k != "" {
+		conds = append(conds, store.Eq("kind", k))
+	}
+	if err := s.st.List(x.ctx(), &us, store.Q{Where: conds, Order: "name", Limit: 5000}); err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"users": us})
+}
+
+type userPatch struct {
+	Disabled *bool `json:"disabled"`
+	IsAdmin  *bool `json:"is_admin"`
+}
+
+// hUserPatch disables or enables an account, or changes who runs the install.
+func (s *Server) hUserPatch(x *c) error {
+	var b userPatch
+	if err := x.body(&b); err != nil {
+		return err
+	}
+	ctx := x.ctx()
+	var u core.User
+	if err := s.st.Get(ctx, &u, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+		return errNotFound("user")
+	}
+	set := map[string]any{}
+	if b.Disabled != nil {
+		if *b.Disabled && u.ID == x.user.ID {
+			return errBad("you cannot disable your own account")
+		}
+		if *b.Disabled {
+			set["disabled_at"] = time.Now().UnixMilli()
+		} else {
+			set["disabled_at"] = 0
+		}
+	}
+	if b.IsAdmin != nil {
+		if !*b.IsAdmin && u.ID == x.user.ID {
+			if n, _ := s.st.Count(ctx, "users", store.Eq("is_admin", true), store.Live, store.Null("disabled_at")); n <= 1 {
+				return &engine.Error{Code: engine.CodeConflict, Message: "an install needs someone to run it: make someone else an admin first"}
+			}
+		}
+		set["is_admin"] = *b.IsAdmin
+	}
+	if len(set) == 0 {
+		return x.ok(u)
+	}
+	if _, err := s.st.Update(ctx, "users", set, store.Eq("id", u.ID)); err != nil {
+		return err
+	}
+	if b.Disabled != nil && *b.Disabled {
+		now := time.Now().UnixMilli()
+		s.st.Update(ctx, "sessions", map[string]any{"revoked_at": now}, store.Eq("user_id", u.ID), store.Null("revoked_at"))
+		s.st.Update(ctx, "api_tokens", map[string]any{"revoked_at": now}, store.Eq("user_id", u.ID), store.Null("revoked_at"))
+	}
+	s.audit(x.r, "", x.user, "user.changed", "user", u.ID, b)
+	s.st.Get(ctx, &u, store.Eq("id", u.ID))
+	return x.ok(u)
+}
+
+func (s *Server) hWorkspaces(x *c) error {
+	ctx := x.ctx()
+	var wss []core.Workspace
+	if err := s.st.List(ctx, &wss, store.Q{Where: []store.Cond{store.Live}, Order: "name"}); err != nil {
+		return err
+	}
+	type row struct {
+		core.Workspace
+		Members int `json:"members"`
+		Tasks   int `json:"tasks"`
+	}
+	out := make([]row, len(wss))
+	for i, ws := range wss {
+		out[i].Workspace = ws
+		out[i].Members, _ = s.st.Count(ctx, "members", store.Eq("workspace_id", ws.ID), store.Null("removed_at"))
+		out[i].Tasks, _ = s.st.Count(ctx, "tasks", store.Eq("workspace_id", ws.ID), store.Live)
+	}
+	return x.ok(map[string]any{"workspaces": out})
+}
+
+// hHealth is the health panel: what is failing or waiting behind the scenes.
+func (s *Server) hHealth(x *c) error {
+	ctx := x.ctx()
+	out := map[string]any{"version": s.cfg.Version, "database": s.st.Dialect(), "files": s.files.Kind(), "mail": s.mailReady(ctx)}
+	out["jobs_waiting"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"))
+	out["jobs_failing"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"), store.Gt("attempts", 2))
+	out["webhooks_failing"], _ = s.st.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0))
+	out["deliveries_dead"], _ = s.st.Count(ctx, "webhook_deliveries", store.Eq("state", "dead"))
+	out["deliveries_pending"], _ = s.st.Count(ctx, "webhook_deliveries", store.Eq("state", "pending"))
+	var backups []core.Backup
+	if err := s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err == nil && len(backups) > 0 {
+		out["last_backup"] = backups[0]
+	}
+	return x.ok(out)
+}

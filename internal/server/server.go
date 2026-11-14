@@ -48,6 +48,8 @@ type Server struct {
 
 	seenMu sync.Mutex
 	seen   map[string]int64 // user id -> last time presence was written
+	setMu  sync.Mutex
+	setTTL map[string]cachedSetting
 	limits *limiter
 	stats  stats
 }
@@ -120,6 +122,8 @@ type c struct {
 	projects []string
 	db       store.DB // bound to the workspace
 	nm       *names
+	// halfOK lets a session that still owes its second step through.
+	halfOK bool
 }
 
 func (x *c) ctx() context.Context { return x.r.Context() }
@@ -235,6 +239,21 @@ func (s *Server) signed(h handler) http.HandlerFunc {
 	}
 }
 
+// half wraps a handler for someone who has passed the first sign-in step
+// and may still owe the second.
+func (s *Server) half(h handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		x := &c{s: s, w: w, r: r, halfOK: true}
+		if err := s.identify(x); err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if err := h(x); err != nil {
+			s.fail(w, r, err)
+		}
+	}
+}
+
 // in wraps a handler that works inside the workspace named in the path.
 func (s *Server) in(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -285,8 +304,8 @@ func (s *Server) identify(x *c) error {
 	if err := s.st.Get(ctx, &sess, store.Eq("token_hash", auth.Hash(ck.Value)), store.Null("revoked_at")); err != nil || sess.ExpiresAt < now {
 		return errUnauthorized("your session has ended; sign in again")
 	}
-	if sess.Stage != "full" {
-		return errUnauthorized("finish signing in with your second step")
+	if sess.Stage != "full" && !x.halfOK {
+		return &httpError{Status: 401, Code: "second_step", Message: "finish signing in with your second step"}
 	}
 	// A cookie rides along on requests other sites make; refuse those.
 	if x.r.Method != http.MethodGet && x.r.Method != http.MethodHead {
@@ -327,6 +346,11 @@ func (s *Server) enter(x *c, ref string) error {
 	}
 	if x.member.SuspendedAt != 0 {
 		return errForbidden("your membership in this workspace is suspended")
+	}
+	if x.sess != nil && s.settingBool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
+		if n, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); n == 0 {
+			return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
+		}
 	}
 	x.actor = engine.Actor{UserID: x.user.ID}
 	if x.member.Scope != nil {

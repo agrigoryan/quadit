@@ -17,30 +17,6 @@ import (
 
 const sessionLife = 30 * 24 * time.Hour
 
-// setting reads one install setting into dst; a missing one leaves dst alone.
-func (s *Server) setting(ctx context.Context, name string, dst any) bool {
-	var st core.Setting
-	if err := s.st.Get(ctx, &st, store.Eq("name", name)); err != nil || len(st.Value) == 0 {
-		return false
-	}
-	return json.Unmarshal(st.Value, dst) == nil
-}
-
-func (s *Server) settingInt(ctx context.Context, name string, def int) int {
-	s.setting(ctx, name, &def)
-	return def
-}
-
-func (s *Server) settingBool(ctx context.Context, name string, def bool) bool {
-	s.setting(ctx, name, &def)
-	return def
-}
-
-func (s *Server) settingStr(ctx context.Context, name, def string) string {
-	s.setting(ctx, name, &def)
-	return def
-}
-
 // throttle counts an attempt under a name and refuses when there were more
 // than max in the window. The count is in the database, so every server
 // sharing it sees the same number.

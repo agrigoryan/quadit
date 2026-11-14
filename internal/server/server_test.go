@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -36,11 +37,15 @@ func newSite(t *testing.T, st store.Store) *site {
 		t.Fatal(err)
 	}
 	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
-	srv := server.New(server.Config{DataDir: dir, BaseURL: "http://test", Version: "test"}, st, files, sealer)
-	hs := httptest.NewServer(srv.Handler())
+	hs := httptest.NewUnstartedServer(nil)
+	_, port, _ := net.SplitHostPort(hs.Listener.Addr().String())
+	base := "http://localhost:" + port // a name, not an address: passkeys need one
+	srv := server.New(server.Config{DataDir: dir, BaseURL: base, Version: "test"}, st, files, sealer)
+	hs.Config.Handler = srv.Handler()
+	hs.Start()
 	t.Cleanup(hs.Close)
 	jar, _ := cookiejar.New(nil)
-	s := &site{t: t, url: hs.URL, owner: &http.Client{Jar: jar}, srv: srv}
+	s := &site{t: t, url: base, owner: &http.Client{Jar: jar}, srv: srv}
 	s.call(s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
 		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
 	return s
