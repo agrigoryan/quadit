@@ -186,9 +186,26 @@ func Restore(args []string, version string) int {
 					if err := s.Tx().Get(ctx, &d, store.Eq("id", rid)); err != nil {
 						return err
 					}
-					return s.Emit("doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": d, "from_backup": true})
+					if err := s.Emit("doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": d, "from_backup": true}); err != nil {
+						return err
+					}
+					// And the page's text as it stands now, so an open editor follows.
+					var all []core.Block
+					if err := s.Tx().List(ctx, &all, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "rank"}); err != nil {
+						return err
+					}
+					live, gone := []core.Block{}, []string{}
+					for _, b := range all {
+						if b.DeletedAt != 0 {
+							gone = append(gone, b.ID)
+						} else {
+							live = append(live, b)
+						}
+					}
+					return s.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true})
 				})
 			}
+			shellAudit(ctx, st, ws.ID, it.Kind+".restored_from_backup", it.Kind, rid, map[string]string{"archive": file})
 			eng.Reindex(ctx, ws.ID)
 		}
 		fmt.Printf("brought back %s %s\n", it.Kind, it.Ref)
@@ -206,6 +223,7 @@ func Restore(args []string, version string) int {
 			fmt.Fprintln(os.Stderr, "rebuilding search:", err)
 		}
 	}
+	shellAudit(ctx, st, "", "install.restored_from_backup", "backup", "", map[string]string{"archive": file})
 	fmt.Printf("restored the archive made %s: %d workspaces\n", time.UnixMilli(m.CreatedAt).UTC().Format(time.RFC3339), len(wss))
 	return 0
 }

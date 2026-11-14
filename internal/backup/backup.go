@@ -321,22 +321,23 @@ type Item struct {
 }
 
 // RestoreItem brings one task or page back from an archive into a database
-// that has moved on: rows that are gone are put back, a row in the trash
-// is taken out of it, and rows that are still there are left as they are.
-// It returns the id of the task or page.
+// that has moved on, as it was when the archive was made: rows that are
+// gone are put back, a row in the trash is taken out of it, and rows that
+// changed since are set back. What was added since stays, except in a page:
+// blocks the archive does not know are moved to the page's trash, so the
+// page reads as it did. It returns the id of the task or page.
 func RestoreItem(ctx context.Context, st store.Store, files blob.Store, r io.Reader, it Item) (string, error) {
 	var wsID, rootID string
 	decisions, keys := map[string]bool{}, map[string]bool{}
+	var blocks []string                    // the page's blocks in the archive
 	pending := map[string]map[string]any{} // file rows seen, until we know which are wanted
 	put := func(table string, row map[string]any, cond ...store.Cond) error {
 		if n, err := st.Count(ctx, table, cond...); err != nil {
 			return err
 		} else if n > 0 {
-			if table == "tasks" || table == "docs" {
-				_, err := st.Update(ctx, table, map[string]any{"deleted_at": 0}, cond...)
-				return err
-			}
-			return nil
+			// Still here: set it back. Its place in the feed, and a task's
+			// number, belong to the database as it is now.
+			return st.Overwrite(ctx, table, row, []string{"created_seq", "updated_seq", "activity_seq", "number", "key", "seq"}, cond...)
 		}
 		return st.Load(ctx, table, []map[string]any{row})
 	}
@@ -392,6 +393,9 @@ func RestoreItem(ctx context.Context, st store.Store, files blob.Store, r io.Rea
 				case (table == "comments" || table == "task_links") && (str(row, "task_id") == rootID || str(row, "doc_id") == rootID):
 					err = put(table, row, store.Eq("id", id))
 				case (table == "doc_blocks" || table == "doc_versions") && str(row, "doc_id") == rootID:
+					if table == "doc_blocks" {
+						blocks = append(blocks, id)
+					}
 					err = put(table, row, store.Eq("id", id))
 				case (table == "db_properties" || table == "db_views") && str(row, "database_id") == rootID:
 					err = put(table, row, store.Eq("id", id))
@@ -428,6 +432,16 @@ func RestoreItem(ctx context.Context, st store.Store, files blob.Store, r io.Rea
 	}
 	if rootID == "" {
 		return "", fmt.Errorf("the archive has no %s %q in %s", it.Kind, it.Ref, it.Workspace)
+	}
+	if it.Kind == "doc" {
+		// Blocks written after the archive go to the page's trash.
+		conds := []store.Cond{store.Eq("doc_id", rootID), store.Null("deleted_at")}
+		if len(blocks) > 0 {
+			conds = append(conds, store.NotIn("id", blocks))
+		}
+		if _, err := st.Update(ctx, "doc_blocks", map[string]any{"deleted_at": time.Now().UnixMilli()}, conds...); err != nil {
+			return "", err
+		}
 	}
 	return rootID, nil
 }

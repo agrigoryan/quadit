@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -26,6 +28,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/store/postgres"
 	"github.com/agrigoryan/quadit/internal/store/sqlite"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Commands are extra server-side commands added by other files.
@@ -113,7 +116,19 @@ func Serve(args []string, version string) int {
 	fs.StringVar(&o.Listen, "listen", env("QUADIT_LISTEN", ":4780"), "address to listen on (QUADIT_LISTEN)")
 	fs.StringVar(&o.BaseURL, "url", env("QUADIT_BASE_URL", ""), "the address people use to reach the server, e.g. https://quadit.example.com (QUADIT_BASE_URL)")
 	jsonLog := fs.Bool("log-json", env("QUADIT_LOG", "") == "json", "write logs as JSON (QUADIT_LOG=json)")
+	tlsCert := fs.String("tls-cert", env("QUADIT_TLS_CERT", ""), "serve HTTPS with this certificate file (QUADIT_TLS_CERT), with --tls-key")
+	tlsKey := fs.String("tls-key", env("QUADIT_TLS_KEY", ""), "the certificate's private key file (QUADIT_TLS_KEY)")
+	tlsDomain := fs.String("tls-domain", env("QUADIT_TLS_DOMAIN", ""), "serve HTTPS for this name with a free certificate from Let's Encrypt, got and renewed by itself; needs ports 443 and 80 reachable (QUADIT_TLS_DOMAIN)")
+	localListen := fs.String("local-listen", env("QUADIT_LOCAL_LISTEN", "127.0.0.1:4781"), "with HTTPS on: a plain address on this machine only, for the server's own use (QUADIT_LOCAL_LISTEN)")
 	fs.Parse(args)
+	https := *tlsDomain != "" || *tlsCert != ""
+	if (*tlsCert == "") != (*tlsKey == "") {
+		fmt.Fprintln(os.Stderr, "--tls-cert and --tls-key go together")
+		return 1
+	}
+	if https && o.Listen == ":4780" {
+		o.Listen = ":443" // the usual place for HTTPS, unless told otherwise
+	}
 
 	var handler slog.Handler = slog.NewTextHandler(os.Stderr, nil)
 	if *jsonLog {
@@ -136,6 +151,11 @@ func Serve(args []string, version string) int {
 			host = "localhost" + host
 		}
 		o.BaseURL = "http://" + host
+		if *tlsDomain != "" {
+			o.BaseURL = "https://" + *tlsDomain
+		} else if https {
+			o.BaseURL = "https://" + host
+		}
 	}
 	o.BaseURL = strings.TrimRight(o.BaseURL, "/")
 	files, err := blob.NewDisk(filepath.Join(o.Data, "files"))
@@ -147,6 +167,9 @@ func Serve(args []string, version string) int {
 	if strings.HasPrefix(local, ":") {
 		local = "127.0.0.1" + local
 	}
+	if https {
+		local = *localListen // the server reaches itself without TLS, on this machine only
+	}
 	srv := server.New(server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + local, Version: version, Log: log}, st, files, sealer)
 	if web := WebHandler(); web != nil {
 		srv.SetWeb(web)
@@ -154,9 +177,33 @@ func Serve(args []string, version string) int {
 	go srv.Run(ctx)
 
 	hs := &http.Server{Addr: o.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	errc := make(chan error, 1)
-	go func() { errc <- hs.ListenAndServe() }()
-	log.Info("quadit is running", "version", version, "listen", o.Listen, "url", o.BaseURL, "database", st.Dialect(), "files", files.Kind())
+	errc := make(chan error, 3)
+	switch {
+	case *tlsDomain != "":
+		// Certificates from Let's Encrypt, kept in the data directory and
+		// renewed as they age. Port 80 answers its checks and sends
+		// everyone else to HTTPS.
+		m := &autocert.Manager{Prompt: autocert.AcceptTOS, HostPolicy: autocert.HostWhitelist(strings.Split(*tlsDomain, ",")...),
+			Cache: autocert.DirCache(filepath.Join(o.Data, "certs"))}
+		hs.TLSConfig = m.TLSConfig()
+		go func() { errc <- hs.ListenAndServeTLS("", "") }()
+		go func() {
+			errc <- (&http.Server{Addr: ":80", Handler: m.HTTPHandler(nil), ReadHeaderTimeout: 10 * time.Second}).ListenAndServe()
+		}()
+	case https:
+		hs.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		go func() { errc <- hs.ListenAndServeTLS(*tlsCert, *tlsKey) }()
+	default:
+		go func() { errc <- hs.ListenAndServe() }()
+	}
+	if https {
+		// A plain door for the server itself (pictures of pages, health
+		// checks on the machine); nothing outside can reach it.
+		ls := &http.Server{Addr: *localListen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
+		go func() { errc <- ls.ListenAndServe() }()
+		defer ls.Close()
+	}
+	log.Info("quadit is running", "version", version, "listen", o.Listen, "https", https, "url", o.BaseURL, "database", st.Dialect(), "files", files.Kind())
 	select {
 	case err := <-errc:
 		log.Error("server stopped", "err", err)
@@ -301,6 +348,7 @@ func Admin(args []string, version string) int {
 		hash, _ := auth.HashPassword(pw)
 		st.Update(ctx, "users", map[string]any{"password_hash": hash, "totp_secret": "", "totp_at": 0}, store.Eq("id", u.ID))
 		st.Update(ctx, "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("user_id", u.ID), store.Null("revoked_at"))
+		shellAudit(ctx, st, "", "password.reset_from_shell", "user", u.ID, map[string]string{"email": u.Email})
 		fmt.Printf("new password for %s: %s\nTwo-step verification was turned off and every session signed out.\n", u.Email, pw)
 	case "make-admin":
 		if len(pos) != 1 {
@@ -311,6 +359,7 @@ func Admin(args []string, version string) int {
 			return fail(err)
 		}
 		st.Update(ctx, "users", map[string]any{"is_admin": true}, store.Eq("id", u.ID))
+		shellAudit(ctx, st, "", "user.made_install_admin", "user", u.ID, map[string]string{"email": u.Email})
 		fmt.Printf("%s can now run the install\n", u.Email)
 	case "token":
 		if len(pos) < 2 {
@@ -337,10 +386,27 @@ func Admin(args []string, version string) int {
 		if err := st.Insert(ctx, t); err != nil {
 			return fail(err)
 		}
+		shellAudit(ctx, st, ws.ID, "token.created", "token", t.ID, map[string]string{"for": m.Handle, "scopes": scopes, "name": label})
 		fmt.Println(token)
 	default:
 		fmt.Print(adminHelp)
 		return 2
 	}
 	return 0
+}
+
+// shellAudit writes what was done from the server's own shell to the audit
+// log. Nobody is signed in there, so the entry says where it came from.
+func shellAudit(ctx context.Context, st store.Store, workspaceID, action, targetType, targetID string, data any) {
+	e := core.AuditEntry{ID: id.New(), At: time.Now().UnixMilli(), WorkspaceID: workspaceID, ActorName: "server shell",
+		Action: action, TargetType: targetType, TargetID: targetID}
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		e.ActorName = "server shell (" + u.Username + ")"
+	}
+	if data != nil {
+		e.Data, _ = json.Marshal(data)
+	}
+	if err := st.Insert(ctx, e); err != nil {
+		fmt.Fprintln(os.Stderr, "audit log:", err)
+	}
 }

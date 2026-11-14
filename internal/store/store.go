@@ -126,6 +126,9 @@ type Store interface {
 	// databases.
 	Dump(ctx context.Context, table string, each func(row map[string]any) error) error
 	Load(ctx context.Context, table string, rows []map[string]any) error
+	// Overwrite sets the matching rows to what an archive row says, leaving
+	// the columns named in keep as they are.
+	Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...Cond) error
 }
 
 // TaskFilter selects tasks. Conditions combine with AND; inside a list, OR.

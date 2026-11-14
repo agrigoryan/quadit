@@ -523,6 +523,8 @@ func (s *Server) audit(r *http.Request, workspaceID string, actor core.User, act
 func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		w, done := compressed(w, r)
+		defer done()
 		rec := &recorder{ResponseWriter: w, status: 200}
 		defer func() {
 			if p := recover(); p != nil {
@@ -537,6 +539,10 @@ func (s *Server) Handler() http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("X-Frame-Options", "DENY")
+		if r.TLS != nil || (strings.HasPrefix(s.cfg.BaseURL, "https://") && r.Header.Get("X-Forwarded-Proto") == "https") {
+			// Once reached over HTTPS, a browser keeps to it.
+			h.Set("Strict-Transport-Security", "max-age=31536000")
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/f/") || strings.HasPrefix(r.URL.Path, "/mcp") ||
 			strings.HasPrefix(r.URL.Path, "/.well-known/") || strings.HasPrefix(r.URL.Path, "/oauth/") ||
 			r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/metrics" || strings.HasPrefix(r.URL.Path, "/hooks/") {

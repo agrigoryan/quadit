@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -467,6 +468,35 @@ func (s *Store) Dump(ctx context.Context, table string, each func(row map[string
 }
 
 // Load inserts rows produced by Dump (after a trip through JSON).
+// loadArgs turns a row from an archive into the values to store, one per
+// column of the table, in column order.
+func loadArgs(m *meta, table string, row map[string]any) ([]any, error) {
+	args := make([]any, len(m.fields))
+	for i := range m.fields {
+		f := &m.fields[i]
+		val, ok := row[f.col]
+		if !ok || val == nil {
+			// Absent = the zero value, which a NOT NULL column needs.
+			val = reflect.Zero(m.table.Type.Field(f.idx).Type).Interface()
+		}
+		var a any
+		var err error
+		if f.json {
+			// The value went through JSON, so write it back as JSON.
+			if b, err := json.Marshal(val); err == nil && string(b) != "null" && !reflect.ValueOf(val).IsZero() {
+				a = string(b)
+			}
+		} else if a, err = toDB(f, reflect.ValueOf(val)); err != nil {
+			return nil, fmt.Errorf("%s.%s: %w", table, f.col, err)
+		}
+		if a == nil && !f.null && !f.json {
+			a = reflect.Zero(m.table.Type.Field(f.idx).Type).Interface()
+		}
+		args[i] = a
+	}
+	return args, nil
+}
+
 func (s *Store) Load(ctx context.Context, table string, rows []map[string]any) error {
 	m, err := metaNamed(table)
 	if err != nil {
@@ -474,32 +504,46 @@ func (s *Store) Load(ctx context.Context, table string, rows []map[string]any) e
 	}
 	return s.inTx(ctx, func(x q) error {
 		for _, row := range rows {
-			args := make([]any, len(m.fields))
-			for i := range m.fields {
-				f := &m.fields[i]
-				val, ok := row[f.col]
-				if !ok || val == nil {
-					// Absent = the zero value, which a NOT NULL column needs.
-					val = reflect.Zero(m.table.Type.Field(f.idx).Type).Interface()
-				}
-				var a any
-				if f.json {
-					// The value went through JSON, so write it back as JSON.
-					if b, err := json.Marshal(val); err == nil && string(b) != "null" && !reflect.ValueOf(val).IsZero() {
-						a = string(b)
-					}
-				} else if a, err = toDB(f, reflect.ValueOf(val)); err != nil {
-					return fmt.Errorf("%s.%s: %w", table, f.col, err)
-				}
-				if a == nil && !f.null && !f.json {
-					a = reflect.Zero(m.table.Type.Field(f.idx).Type).Interface()
-				}
-				args[i] = a
+			args, err := loadArgs(m, table, row)
+			if err != nil {
+				return err
 			}
 			if _, err := x.exec(ctx, "INSERT INTO "+table+" ("+m.cols+") VALUES ("+placeholders(len(args))+")", args...); err != nil {
 				return fmt.Errorf("%s: %w", table, err)
 			}
 		}
 		return nil
+	})
+}
+
+// Overwrite sets the matching rows to what an archive row says, column by
+// column. The columns named in keep are left as they are now: a row's place
+// in the feed belongs to this database, not to the archive.
+func (s *Store) Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...store.Cond) error {
+	m, err := metaNamed(table)
+	if err != nil {
+		return err
+	}
+	args, err := loadArgs(m, table, row)
+	if err != nil {
+		return err
+	}
+	var sets []string
+	var vals []any
+	for i := range m.fields {
+		col := m.fields[i].col
+		if col == "id" || col == "workspace_id" || slices.Contains(keep, col) {
+			continue
+		}
+		sets = append(sets, col+" = ?")
+		vals = append(vals, args[i])
+	}
+	return s.inTx(ctx, func(x q) error {
+		w, wargs, err := (conn{q: x}).where(m, "", where)
+		if err != nil {
+			return err
+		}
+		_, err = x.exec(ctx, "UPDATE "+table+" SET "+strings.Join(sets, ", ")+" WHERE "+w, append(vals, wargs...)...)
+		return err
 	})
 }

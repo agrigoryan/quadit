@@ -179,6 +179,57 @@ func TestRestoreOneTask(t *testing.T) {
 		if n, _ := db.Count(ctx, "comments"); n != 1 {
 			t.Fatalf("a second restore duplicated rows: %d comments", n)
 		}
+		// A task edited since the backup is set back to how it was, and keeps
+		// what was added to it since.
+		was := task.Title
+		for typ, args := range map[string]M{
+			"task.update":    {"id": "SVA-1", "title": "Edited after the backup", "priority": 1},
+			"comment.create": {"task": "SVA-1", "body": "Said after the backup."},
+		} {
+			raw, _ := json.Marshal(args)
+			if _, err := e.Apply(ctx, ws.ID, engine.Actor{UserID: owner.ID}, engine.Change{ID: id.New(), Type: typ, Args: raw}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
+			t.Fatal(err)
+		}
+		var back core.Task
+		if err := db.Get(ctx, &back, store.Eq("key", "SVA-1")); err != nil || back.Title != was || back.Priority != task.Priority || back.UpdatedSeq <= task.UpdatedSeq-1000 {
+			t.Fatalf("an edited task after restore = %+v (title was %q), %v", back, was, err)
+		}
+		if n, _ := db.Count(ctx, "comments"); n != 2 {
+			t.Fatalf("comments after restoring an edited task = %d, want the old one and the new one", n)
+		}
+		// A page comes back reading as it did: its text set back, and what
+		// was written since in the page's trash.
+		raw, _ = json.Marshal(M{"title": "Plan", "markdown": "first line\n\nsecond line\n"})
+		res, err := e.Apply(ctx, ws.ID, engine.Actor{UserID: owner.ID}, engine.Change{ID: id.New(), Type: "doc.create", Args: raw})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var archive2 bytes.Buffer
+		if _, err := backup.Write(ctx, st, files, "test", &archive2); err != nil {
+			t.Fatal(err)
+		}
+		raw, _ = json.Marshal(M{"doc": res.Ref, "markdown": "first line, rewritten\n\nsecond line\n\na third line\n"})
+		if _, err := e.Apply(ctx, ws.ID, engine.Actor{UserID: owner.ID}, engine.Change{ID: id.New(), Type: "doc.write", Args: raw}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive2.Bytes()), backup.Item{Workspace: "games", Kind: "doc", Ref: res.Ref}); err != nil {
+			t.Fatal(err)
+		}
+		var live []core.Block
+		if err := db.List(ctx, &live, store.Q{Where: []store.Cond{store.Eq("doc_id", res.Ref), store.Live}, Order: "rank"}); err != nil {
+			t.Fatal(err)
+		}
+		text := ""
+		for _, b := range live {
+			text += string(b.Content) + "|"
+		}
+		if len(live) != 2 || strings.Contains(text, "rewritten") || strings.Contains(text, "third") || !strings.Contains(text, "first line") {
+			t.Fatalf("a page after restore reads: %s", text)
+		}
 		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-99"}); err == nil {
 			t.Fatal("a task that is not in the archive was 'restored'")
 		}
