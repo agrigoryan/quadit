@@ -37,7 +37,10 @@ var apiOps = []op{
 	{"GET", "/tasks/{ref}", "One task with decisions, comments, sub-tasks, relations, links and files.", "since: feed position, to get only what changed after it; full: true to not cut long text; max_chars; raw: true", "find"},
 	{"GET", "/tasks/{ref}/context", "The context pack: the task, its parents, epic, standing preferences, recent decisions, linked docs.", "full: true", "find"},
 	{"GET", "/search", "Full-text search across tasks, decisions, comments and docs.", "q: text; kind: task, comment, decision, doc; limit", "find"},
-	{"GET", "/decisions", "The decision log.", "state: answered, open, picked, sent_back, all; project; q; asked; limit; offset", "find"},
+	{"GET", "/decisions", "The decision log.", "state: answered, open, picked, sent_back, all; project; q; asked; trash: true for deleted ones; limit; offset", "find"},
+	{"GET", "/secrets", "The secrets the caller may use: names, hosts and what they are for. Values are never returned.", "", "secrets"},
+	{"POST", "/secrets/{name}/request", "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; the value is blanked out of the answer.", "", "secrets"},
+	{"POST", "/secrets/env", "For a companion's token made for secrets: the values of secrets marked env. Body: {names}.", "", "secrets"},
 	{"GET", "/inbox", "The caller's inbox.", "all: true to include read items; limit", "find"},
 	{"GET", "/events", "The change feed after a position. wait holds the request until something matching arrives. Task filters narrow it to the events of matching tasks.",
 		"after: feed position; cursor: name of a server-kept cursor; ack: move that cursor to this position first; wait: seconds, up to 55; mine: true; others: true; " +
