@@ -198,6 +198,12 @@ func (s *Server) hStream(x *c) error {
 	if !ok {
 		return errBad("this connection cannot stream")
 	}
+	if x.sess != nil && x.sess.Stage == "render" {
+		// The browser taking a picture must see the page settle; an open
+		// stream would keep it waiting. "No content" tells it not to retry.
+		x.w.WriteHeader(http.StatusNoContent)
+		return nil
+	}
 	ctx := x.ctx()
 	after := int64(x.intParam("after", 0))
 	if last := x.r.Header.Get("Last-Event-ID"); last != "" {
