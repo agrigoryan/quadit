@@ -409,6 +409,11 @@ func taskUpdate(c *cx) error {
 	if err := member("assignee_id", "assignee", a.Assignee, &t.AssigneeID); err != nil {
 		return err
 	}
+	if t.AssigneeID != before.AssigneeID && t.AssigneeID != "" && c.actor.Kind == core.KindAgent && !c.system {
+		if err := c.checkHandoff(t); err != nil {
+			return err
+		}
+	}
 	if err := member("waiting_on_id", "waiting_on", a.WaitingOn, &t.WaitingOnID); err != nil {
 		return err
 	}
@@ -1081,6 +1086,38 @@ func (c *cx) checkBudget() error {
 	}
 	if b.CostMicros > 0 && cost >= b.CostMicros || b.Minutes > 0 && minutes >= b.Minutes {
 		return &Error{Code: CodeBudget, Message: "this agent has used its budget for the week; finish or hand over what is open, and ask the person responsible to raise the limit"}
+	}
+	return nil
+}
+
+const maxHandoffs = 5
+
+// checkHandoff stops a task from bouncing between agents with no person in
+// between: after a few agent-to-agent hand-offs in a row, a person has to
+// step in.
+func (c *cx) checkHandoff(t core.Task) error {
+	to, err := c.memberRef("assignee", t.AssigneeID)
+	if err != nil || to.Kind != core.KindAgent {
+		return err
+	}
+	evs, err := c.tx.Events(c.ctx, store.EventFilter{ScopeType: "task", ScopeID: t.ID, Types: []string{"task.updated", "task.created"}, Desc: true, Limit: 60})
+	if err != nil {
+		return err
+	}
+	chain := 0
+	for _, ev := range evs {
+		if !strings.Contains(string(ev.Data), `"assignee_id"`) {
+			continue
+		}
+		var actor core.Member
+		if err := c.tx.Get(c.ctx, &actor, store.Eq("user_id", ev.ActorID)); err != nil || actor.Kind != core.KindAgent {
+			break // a person assigned it: the chain starts over
+		}
+		chain++
+	}
+	if chain >= maxHandoffs {
+		return &Error{Code: CodeConflict, Message: "this task has been handed from agent to agent " + itoa(chain) +
+			" times in a row; hand it to a person (waiting_on or assignee) so they can decide where it goes"}
 	}
 	return nil
 }

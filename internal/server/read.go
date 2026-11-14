@@ -23,6 +23,7 @@ type changesBody struct {
 	Type     string          `json:"type"`
 	Args     json.RawMessage `json:"args"`
 	Approval string          `json:"approval"`
+	For      string          `json:"for"`
 }
 
 var auditedPrefixes = []string{"member.", "agent.", "project.delete", "webhook.", "rule.", "integration.", "workspace.update"}
@@ -34,7 +35,7 @@ func (s *Server) hChanges(x *c) error {
 		return err
 	}
 	if len(b.Changes) == 0 && b.Type != "" {
-		b.Changes = []engine.Change{{ID: b.ID, Type: b.Type, Args: b.Args, Approval: b.Approval}}
+		b.Changes = []engine.Change{{ID: b.ID, Type: b.Type, Args: b.Args, Approval: b.Approval, For: b.For}}
 	}
 	dry := b.DryRun || truthyParam(x.r.URL.Query(), "dry_run")
 	res, err := s.eng.Batch(x.ctx(), x.ws.ID, x.actor, b.Changes, dry)

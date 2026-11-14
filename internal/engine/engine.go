@@ -30,6 +30,11 @@ type Change struct {
 	// Approval is the id of an approved decision, for a change the actor
 	// may only make with approval.
 	Approval string `json:"approval,omitempty"`
+	// For names the member an agent is doing this for (@handle or id). The
+	// change is then allowed only if that member could make it too, so a
+	// shared agent with wide access cannot be used to get around someone's
+	// own narrower access.
+	For string `json:"for,omitempty"`
 }
 
 // Result says what a change produced.
@@ -404,6 +409,23 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 	if !m.Role.AtLeast(h.min) {
 		return nil, forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, m.Role)
 	}
+	if ch.For != "" {
+		asker, err := (&Resolver{ctx: ctx, db: tx, actor: m, at: now}).memberRef("for", ch.For)
+		if err != nil {
+			return nil, err
+		}
+		if asker.SuspendedAt != 0 || !asker.Role.AtLeast(h.min) {
+			return nil, forbidden("%s needs the %s role; @%s, who asked for it, is a %s", ch.Type, h.min, asker.Handle, asker.Role)
+		}
+		if asker.Scope != nil {
+			if asker.Scope.ReadOnly {
+				return nil, forbidden("@%s, who asked for this, may only read", asker.Handle)
+			}
+			if len(asker.Scope.Projects) > 0 {
+				scope.Projects = narrow(scope.Projects, asker.Scope.Projects)
+			}
+		}
+	}
 	if scope.ReadOnly {
 		return nil, forbidden("this credential is read-only")
 	}
@@ -466,7 +488,7 @@ func argsHash(ch Change) string {
 		buf.Reset()
 		buf.Write(ch.Args)
 	}
-	sum := sha256.Sum256(append([]byte(ch.Type+"\n"), buf.Bytes()...))
+	sum := sha256.Sum256(append([]byte(ch.Type+"\n"+ch.For+"\n"), buf.Bytes()...))
 	return hex.EncodeToString(sum[:])
 }
 

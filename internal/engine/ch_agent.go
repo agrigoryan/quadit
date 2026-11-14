@@ -83,6 +83,23 @@ func sessionStart(c *cx) error {
 		if s.Title == "" {
 			s.Title = t.Title
 		}
+		// A task can carry its own limit on what may be spent on it.
+		if b := t.Budget; b != nil && !c.system {
+			var spent []core.AgentSession
+			if err := c.tx.List(c.ctx, &spent, store.Where(store.Eq("task_id", t.ID))); err != nil {
+				return err
+			}
+			var cost, minutes int64
+			for _, sp := range spent {
+				cost += sp.CostMicros
+				if sp.EndedAt != 0 {
+					minutes += (sp.EndedAt - sp.StartedAt) / 60_000
+				}
+			}
+			if b.CostMicros > 0 && cost >= b.CostMicros || b.Minutes > 0 && minutes >= b.Minutes {
+				return &Error{Code: CodeBudget, Message: "the budget set for " + t.Key + " is used up; say so on the task and ask for more before going on"}
+			}
+		}
 	}
 	if err := c.tx.Insert(c.ctx, s); err != nil {
 		return taken(err, "id", sid)

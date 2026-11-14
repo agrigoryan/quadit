@@ -49,8 +49,13 @@ func (c *cx) notifyTask(userID, typ string, t core.Task, entityType, entityID, t
 
 // notifyWatchers notifies everyone watching a task, except those in skip.
 func (c *cx) notifyWatchers(t core.Task, typ, entityType, entityID, text string) error {
+	// Watching a task's epic or its project is watching the task.
+	subjects := []string{t.ID, t.ProjectID}
+	if t.EpicID != "" {
+		subjects = append(subjects, t.EpicID)
+	}
 	var ws []core.Watcher
-	if err := c.tx.List(c.ctx, &ws, store.Where(store.Eq("subject_id", t.ID))); err != nil {
+	if err := c.tx.List(c.ctx, &ws, store.Where(store.In("subject_id", subjects))); err != nil {
 		return err
 	}
 	for _, w := range ws {

@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build server web test test-all dev seed clean fmt
+.PHONY: all build server web test test-all dev seed clean fmt release image
 
 all: build
 
@@ -36,6 +36,14 @@ seed:
 
 fmt:
 	gofmt -w cmd internal
+
+# Binaries for Linux and macOS, x86 and ARM, in dist/.
+release: web
+	VERSION=$(VERSION) ./scripts/release.sh
+
+# The Docker image.
+image:
+	docker build --build-arg VERSION=$(VERSION) -t quadit:$(VERSION) .
 
 clean:
 	rm -rf bin web/dist
