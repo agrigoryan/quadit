@@ -15,7 +15,7 @@ import (
 
 // feedParams are the feed's own URL parameters; any other parameter is a
 // task filter, so the feed can be narrowed exactly like a task query.
-var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "mine", "others", "compact", "inbox"}
+var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox"}
 
 // events writes a list of events in the form asked for.
 func (x *c) events(evs []core.Event, seq int64, more bool) error {
@@ -82,6 +82,13 @@ func (s *Server) hEvents(x *c) error {
 			return err
 		}
 		f.ScopeType, f.ScopeID = "task", t.ID
+	}
+	if ref := v.Get("doc"); ref != "" {
+		d, err := x.docByID(ref)
+		if err != nil {
+			return err
+		}
+		f.ScopeType, f.ScopeID = "doc", d.ID
 	}
 	q, err := x.queryFromRequest(feedParams...)
 	if err != nil {
