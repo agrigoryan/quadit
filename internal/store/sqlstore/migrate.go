@@ -136,6 +136,28 @@ func (s *Store) applyMigration(ctx context.Context, m migration) error {
 	return tx.Commit()
 }
 
+// Pending reports the schema version the database is at and the one this
+// binary brings it to. A fresh database is at 0.
+func (s *Store) Pending(ctx context.Context) (current, latest int, err error) {
+	migs, err := loadMigrations(s.d)
+	if err != nil {
+		return 0, 0, err
+	}
+	var n int
+	// No table yet means nothing was ever applied.
+	if err := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&n); err != nil {
+		return 0, len(migs), nil
+	}
+	return n, len(migs), nil
+}
+
+// Exec runs one statement outside the data layer, for the few things that
+// are about the database file itself.
+func (s *Store) Exec(ctx context.Context, query string) error {
+	_, err := s.db.ExecContext(ctx, query)
+	return err
+}
+
 // SchemaVersion returns the applied schema version.
 func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
 	var v int

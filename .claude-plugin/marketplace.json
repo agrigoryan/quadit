@@ -1,0 +1,7 @@
+{
+  "name": "quadit",
+  "owner": { "name": "Quadit" },
+  "plugins": [
+    { "name": "quadit", "source": "./integrations/claude-code" }
+  ]
+}

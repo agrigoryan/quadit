@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "quadit": {
+      "type": "http",
+      "url": "${QUADIT_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${QUADIT_TOKEN}"
+      }
+    }
+  }
+}

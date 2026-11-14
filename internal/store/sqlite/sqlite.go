@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
+	"strings"
 
 	_ "modernc.org/sqlite" // pure-Go driver: the binary needs no C toolchain
 
@@ -32,6 +34,19 @@ func Open(ctx context.Context, path string) (*sqlstore.Store, error) {
 	if err := s.Ping(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("sqlite: open %s: %w", path, err)
+	}
+	// An upgrade that changes the schema first leaves a copy of the database
+	// as it was, beside it. Going back is: stop, put the copy in place, run
+	// the old binary.
+	if cur, latest, err := s.Pending(ctx); err == nil && cur > 0 && cur < latest {
+		snapshot := fmt.Sprintf("%s.before-v%d", path, latest)
+		if _, serr := os.Stat(snapshot); serr != nil {
+			if err := s.Exec(ctx, "VACUUM INTO '"+strings.ReplaceAll(snapshot, "'", "''")+"'"); err != nil {
+				db.Close()
+				return nil, fmt.Errorf("sqlite: could not copy the database before upgrading it (%w); nothing was changed", err)
+			}
+			fmt.Fprintf(os.Stderr, "quadit: upgrading the database from version %d to %d; a copy of it as it was is at %s\n", cur, latest, snapshot)
+		}
 	}
 	if err := s.Migrate(ctx); err != nil {
 		db.Close()

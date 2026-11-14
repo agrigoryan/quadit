@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" driver
 
@@ -22,6 +23,10 @@ func Open(ctx context.Context, url string) (*sqlstore.Store, error) {
 	if err := s.Ping(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("postgres: connect: %w", err)
+	}
+	if cur, latest, err := s.Pending(ctx); err == nil && cur > 0 && cur < latest {
+		fmt.Fprintf(os.Stderr, "quadit: upgrading the database from version %d to %d. If you have no backup from before this start, "+
+			"stop now and take one (quadit backup with the old binary, or pg_dump).\n", cur, latest)
 	}
 	if err := s.Migrate(ctx); err != nil {
 		db.Close()
