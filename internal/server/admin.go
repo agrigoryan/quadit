@@ -23,6 +23,7 @@ func init() {
 		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signed(s.installAdmin(s.hUserPatch)))
 		m.HandleFunc("GET /api/v1/admin/workspaces", s.signed(s.installAdmin(s.hWorkspaces)))
 		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/join", s.signed(s.installAdmin(s.hWorkspaceJoin)))
+		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/restore", s.signed(s.installAdmin(s.hWorkspaceRestore)))
 		m.HandleFunc("GET /api/v1/admin/health", s.signed(s.installAdmin(s.hHealth)))
 		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.in(s.hWorkspaceAudit))
 	})
@@ -208,21 +209,47 @@ func (s *Server) hUserPatch(x *c) error {
 func (s *Server) hWorkspaces(x *c) error {
 	ctx := x.ctx()
 	var wss []core.Workspace
-	if err := s.st.List(ctx, &wss, store.Q{Where: []store.Cond{store.Live}, Order: "name"}); err != nil {
+	// Deleted ones are listed too, marked, for the 30 days they can come back.
+	if err := s.st.List(ctx, &wss, store.Q{Order: "name"}); err != nil {
 		return err
 	}
 	type row struct {
 		core.Workspace
 		Members int `json:"members"`
 		Tasks   int `json:"tasks"`
+		// DeletedAt is set for a workspace in the trash; it can be restored
+		// until it is removed for good 30 days later.
+		DeletedAt int64 `json:"deleted_at,omitempty"`
 	}
 	out := make([]row, len(wss))
 	for i, ws := range wss {
-		out[i].Workspace = ws
+		out[i].Workspace, out[i].DeletedAt = ws, ws.DeletedAt
 		out[i].Members, _ = s.st.Count(ctx, "members", store.Eq("workspace_id", ws.ID), store.Null("removed_at"))
 		out[i].Tasks, _ = s.st.Count(ctx, "tasks", store.Eq("workspace_id", ws.ID), store.Live)
 	}
 	return x.ok(map[string]any{"workspaces": out})
+}
+
+// hWorkspaceRestore brings a deleted workspace back, within the 30 days
+// before it is removed for good.
+func (s *Server) hWorkspaceRestore(x *c) error {
+	ctx := x.ctx()
+	var ws core.Workspace
+	if err := s.st.Get(ctx, &ws, store.Eq("id", x.r.PathValue("id"))); err != nil {
+		return errNotFound("workspace")
+	}
+	if ws.DeletedAt == 0 {
+		return x.ok(map[string]any{"workspace": ws})
+	}
+	if n, _ := s.st.Count(ctx, "workspaces", store.Eq("slug", ws.Slug), store.Live); n > 0 {
+		return &engine.Error{Code: engine.CodeConflict, Message: fmt.Sprintf("another workspace uses the address %q now; rename that one first", ws.Slug)}
+	}
+	if _, err := s.st.Update(ctx, "workspaces", map[string]any{"deleted_at": 0}, store.Eq("id", ws.ID)); err != nil {
+		return err
+	}
+	ws.DeletedAt = 0
+	s.audit(x.r, ws.ID, x.user, "workspace.restored", "workspace", ws.ID, nil)
+	return x.ok(map[string]any{"workspace": ws})
 }
 
 // hWorkspaceJoin makes the one who runs the install an admin of a workspace

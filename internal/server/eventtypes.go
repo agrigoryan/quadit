@@ -20,7 +20,7 @@ var eventTypes = []string{
 	"epic.created", "epic.updated", "epic.deleted", "milestone.created", "milestone.updated", "milestone.deleted",
 	"cycle.created", "cycle.updated", "cycle.deleted", "view.created", "view.updated", "view.deleted",
 	"template.created", "template.updated", "template.deleted", "preference.created", "preference.updated", "preference.deleted",
-	"member.created", "member.updated", "workspace.updated",
+	"member.created", "member.updated", "workspace.updated", "workspace.deleted",
 	"doc.created", "doc.updated", "doc.edited", "doc.deleted", "doc.restored", "doc.unshared",
 	"property.created", "property.updated", "property.deleted", "dbview.created", "dbview.updated", "dbview.deleted",
 	"session.created", "session.updated", "resource.created", "resource.deleted", "claim.created", "claim.updated",

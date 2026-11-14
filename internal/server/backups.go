@@ -34,6 +34,19 @@ func init() {
 		if n > 0 {
 			s.log.Info("emptied the trash", "items", n)
 		}
+		// Workspaces deleted a month ago go for good, with their files.
+		prefixes, werr := s.eng.PurgeWorkspaces(ctx, 30*24*time.Hour)
+		for _, prefix := range prefixes {
+			var keys []string
+			s.fileStore().List(ctx, prefix, func(key string, _ int64) error { keys = append(keys, key); return nil })
+			for _, k := range keys {
+				s.fileStore().Delete(ctx, k)
+			}
+			s.log.Info("removed a deleted workspace for good", "files", len(keys))
+		}
+		if err == nil {
+			err = werr
+		}
 		// Old one-time secrets and ended sessions go too.
 		now := time.Now().UnixMilli()
 		s.st.Delete(ctx, "one_time_tokens", store.Lt("expires_at", now-24*3600_000))

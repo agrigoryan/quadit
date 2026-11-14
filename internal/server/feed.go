@@ -323,6 +323,9 @@ func (s *Server) access(x *c) (fingerprint string, ok bool) {
 	if err := s.st.Get(ctx, &u, store.Eq("id", x.user.ID), store.Live); err != nil || u.DisabledAt != 0 {
 		return "", false
 	}
+	if n, _ := s.st.Count(ctx, "workspaces", store.Eq("id", x.ws.ID), store.Live); n == 0 {
+		return "", false // the workspace itself is gone
+	}
 	var m core.Member
 	if err := x.db.Get(ctx, &m, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil || m.SuspendedAt != 0 {
 		return "", false

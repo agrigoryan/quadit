@@ -1,11 +1,13 @@
 package server_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -237,6 +239,68 @@ func TestSmallGuards(t *testing.T) {
 		m := s.call(s.owner, "", "GET", "/metrics", nil, 200, nil)
 		if strings.Count(m, "# TYPE quadit_rows ") != 1 {
 			t.Fatalf("metrics: %s", m)
+		}
+	})
+}
+
+// TestDeleteWorkspace checks that an owner can delete a workspace, that it
+// can be brought back for a while, and that afterwards nothing of it is left.
+func TestDeleteWorkspace(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Stays"})
+		var made struct{ ID, Slug string }
+		s.call(s.owner, "", "POST", "/api/v1/workspaces", M{"name": "Side project", "slug": "side"}, 201, &made)
+		side := "/api/v1/w/side"
+		do := func(typ string, args M) map[string]any {
+			var out map[string]any
+			s.call(s.owner, "", "POST", side+"/changes", M{"id": id.New(), "type": typ, "args": args}, 200, &out)
+			return out
+		}
+		do("project.create", M{"key": "SP", "name": "Side"})
+		do("agent.create", M{"name": "Helper", "handle": "helper"})
+		do("task.create", M{"project": "SP", "title": "Goes away", "assignee": "@helper"})
+		do("comment.create", M{"task": "SP-1", "body": "words"})
+		do("decision.open", M{"task": "SP-1", "question": "Which?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		do("doc.create", M{"title": "Notes", "markdown": "some notes\n"})
+		do("webhook.create", M{"name": "hook", "url": "http://127.0.0.1:1/x"})
+		do("secret.set", M{"name": "KEY", "value": "v-123456", "hosts": []string{"example.com"}})
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", side+"/tokens", M{"user": "@helper"}, 201, &tok)
+		var f struct{ ID string }
+		s.call(nil, tok.Token, "POST", "/api/v1/w/-/files?name=a.txt", []byte("file body"), 201, &f)
+
+		// Only with its name, only by its owner.
+		s.call(s.owner, "", "POST", side+"/changes", M{"id": id.New(), "type": "workspace.delete", "args": M{"confirm": "nope"}}, 400, nil)
+		s.call(nil, tok.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": "workspace.delete", "args": M{"confirm": "side"}}, 403, nil)
+		do("workspace.delete", M{"confirm": "side"})
+		s.call(s.owner, "", "GET", side+"/me", nil, 404, nil)
+		s.call(nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 404, nil)
+		if out := s.call(s.owner, "", "GET", "/api/v1/admin/workspaces", nil, 200, nil); !strings.Contains(out, `"deleted_at"`) {
+			t.Fatalf("a deleted workspace is not listed for the install admin: %s", out)
+		}
+		// It can come back.
+		s.call(s.owner, "", "POST", "/api/v1/admin/workspaces/"+made.ID+"/restore", nil, 200, nil)
+		if out := s.call(s.owner, "", "GET", side+"/tasks/SP-1", nil, 200, nil); !strings.Contains(out, "Goes away") {
+			t.Fatalf("a restored workspace: %s", out)
+		}
+		// Deleted again and a month on, nothing of it is left; the other is whole.
+		do("workspace.delete", M{"confirm": "side"})
+		prefixes, err := s.srv.Engine().PurgeWorkspaces(context.Background(), -time.Hour)
+		if err != nil || len(prefixes) != 1 {
+			t.Fatalf("purge: %v %v", prefixes, err)
+		}
+		for _, table := range []string{"tasks", "comments", "decisions", "docs", "doc_blocks", "events", "members", "webhooks", "secrets", "api_tokens", "files"} {
+			if n, _ := st.Count(context.Background(), table, store.Eq("workspace_id", made.ID)); n != 0 {
+				t.Errorf("%d rows left in %s", n, table)
+			}
+		}
+		if n, _ := st.Count(context.Background(), "workspaces", store.Eq("id", made.ID)); n != 0 {
+			t.Error("the workspace row is still there")
+		}
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "Stays") {
+			t.Fatalf("the other workspace: %s", out)
 		}
 	})
 }

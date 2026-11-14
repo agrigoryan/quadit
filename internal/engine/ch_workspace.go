@@ -29,8 +29,11 @@ func init() {
 	register("status.update", core.RoleAdmin, statusUpdate)
 	register("status.delete", core.RoleAdmin, statusDelete)
 	register("label.create", core.RoleMember, labelCreate)
-	register("label.update", core.RoleMember, labelUpdate)
-	register("label.delete", core.RoleMember, labelDelete)
+	// Anyone tags with a new label; renaming or removing one changes it for
+	// everybody, which is an admin's call.
+	register("label.update", core.RoleAdmin, labelUpdate)
+	register("label.delete", core.RoleAdmin, labelDelete)
+	register("workspace.delete", core.RoleOwner, workspaceDelete)
 }
 
 // nextRank returns a rank after the last row matching conds.
@@ -1181,4 +1184,35 @@ func without(list []string, v string) []string {
 		}
 	}
 	return out
+}
+
+type workspaceDeleteArgs struct {
+	// Confirm must be the workspace's slug, so nothing deletes one by accident.
+	Confirm string `json:"confirm"`
+}
+
+// workspaceDelete puts the whole workspace in the trash. Nobody can enter
+// it from then on; the people who run the install can bring it back for 30
+// days, after which it and its files are removed for good.
+func workspaceDelete(c *cx) error {
+	var a workspaceDeleteArgs
+	if err := c.args(&a); err != nil {
+		return err
+	}
+	var w core.Workspace
+	if err := c.tx.Get(c.ctx, &w, store.Eq("id", c.ws)); err != nil {
+		return err
+	}
+	if a.Confirm != w.Slug {
+		return invalid("confirm", "to delete this workspace, send its slug as confirm: %q", w.Slug)
+	}
+	if c.actor.Kind != core.KindPerson {
+		return forbidden("only a person who owns the workspace can delete it")
+	}
+	seq := c.tx.NextSeq()
+	if _, err := c.tx.Update(c.ctx, "workspaces", map[string]any{"deleted_at": c.at}, store.Eq("id", c.ws)); err != nil {
+		return err
+	}
+	c.ref = w.ID
+	return c.emit(seq, "workspace.deleted", "workspace", w.ID, "workspace", w.ID, "", map[string]any{"id": w.ID, "gone": true, "slug": w.Slug})
 }

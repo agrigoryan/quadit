@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -212,4 +213,41 @@ func (e *Engine) PurgeTrash(ctx context.Context, keep time.Duration) (purged int
 		}
 	}
 	return purged, blobKeys, nil
+}
+
+// PurgeWorkspaces removes for good the workspaces deleted more than keep
+// ago: every row that belongs to them, and returns the prefixes under which
+// their files are stored.
+func (e *Engine) PurgeWorkspaces(ctx context.Context, keep time.Duration) (prefixes []string, err error) {
+	cutoff := e.now().Add(-keep).UnixMilli()
+	var wss []core.Workspace
+	if err := e.st.List(ctx, &wss, store.Where(store.NotNull("deleted_at"), store.Lt("deleted_at", cutoff))); err != nil {
+		return nil, err
+	}
+	tables := store.Tables()
+	for _, ws := range wss {
+		err := e.st.Atomic(ctx, func(db store.DB) error {
+			// Children before parents: the reverse of the order a restore loads in.
+			for i := len(tables) - 1; i >= 0; i-- {
+				t := tables[i]
+				if t.Global || t.Name == "workspaces" {
+					continue
+				}
+				if _, err := db.Delete(ctx, t.Name, store.Eq("workspace_id", ws.ID)); err != nil {
+					return fmt.Errorf("%s: %w", t.Name, err)
+				}
+			}
+			// Its agents are accounts of this workspace only.
+			if _, err := db.Delete(ctx, "users", store.Eq("workspace_id", ws.ID), store.Eq("kind", core.KindAgent)); err != nil {
+				return err
+			}
+			_, err := db.Delete(ctx, "workspaces", store.Eq("id", ws.ID))
+			return err
+		})
+		if err != nil {
+			return prefixes, fmt.Errorf("purging workspace %s: %w", ws.Slug, err)
+		}
+		prefixes = append(prefixes, ws.ID+"/")
+	}
+	return prefixes, nil
 }

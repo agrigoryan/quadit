@@ -27,7 +27,7 @@ type changesBody struct {
 	For      string          `json:"for"`
 }
 
-var auditedPrefixes = []string{"member.", "agent.", "project.delete", "webhook.", "rule.", "integration.", "secret.", "workspace.update"}
+var auditedPrefixes = []string{"member.", "agent.", "project.delete", "webhook.", "rule.", "integration.", "secret.", "workspace.update", "workspace.delete"}
 
 // auditArgs is a change's arguments as the audit log keeps them: what was
 // asked, with anything secret blanked out.
