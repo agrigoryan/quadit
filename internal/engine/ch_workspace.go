@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
@@ -710,7 +711,22 @@ func projectCreate(c *cx) error {
 		}
 	}
 	c.ref, c.key = p.ID, p.Key
-	return nil
+	return c.startCycles(p)
+}
+
+// startCycles makes a project's first cycles as soon as cycles are on, so
+// there is a current one to put work in straight away.
+func (c *cx) startCycles(p core.Project) error {
+	if p.Settings == nil || !p.Settings.Cycles {
+		return nil
+	}
+	if p.Settings.CycleDays <= 0 {
+		p.Settings.CycleDays = 14
+	}
+	ref, key := c.ref, c.key
+	err := c.rollProject(p, time.UnixMilli(c.at).UTC().Format("2006-01-02"))
+	c.ref, c.key = ref, key
+	return err
 }
 
 type projectUpdateArgs struct {
@@ -809,6 +825,10 @@ func projectUpdate(c *cx) error {
 		}
 	}
 	c.key = pr.Key
+	if sp, ok := p.set["settings"].(*core.ProjectSettings); ok {
+		pr.Settings = sp
+		return c.startCycles(pr)
+	}
 	return nil
 }
 
