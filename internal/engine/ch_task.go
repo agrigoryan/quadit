@@ -109,7 +109,14 @@ func taskCreate(c *cx) error {
 	if t.AskedBy, err = c.askedBy(t); err != nil {
 		return err
 	}
-	if t.WaitingOnID, err = c.optMember("waiting_on", a.WaitingOn); err != nil {
+	if isOutside(a.WaitingOn) {
+		// The next move is not a member's: a build, a reply, a date. The
+		// note says what the task waits for.
+		if strings.TrimSpace(a.WaitingOnNote) == "" {
+			return invalid("waiting_on_note", "say what outside event the task waits for, in waiting_on_note")
+		}
+		t.WaitingOutside = true
+	} else if t.WaitingOnID, err = c.optMember("waiting_on", a.WaitingOn); err != nil {
 		return err
 	}
 	if err := checkDate("due_on", a.DueOn); err != nil {
@@ -304,6 +311,13 @@ func (c *cx) saveTask(t core.Task, p *patch, extra map[string]any) error {
 	if p.empty() {
 		return nil
 	}
+	// Whenever the next move goes to a member, or to nobody, the task no
+	// longer waits on an outside event.
+	if _, moved := p.set["waiting_on_id"]; moved && t.WaitingOutside {
+		if _, said := p.set["waiting_outside"]; !said {
+			p.put("waiting_outside", true, false)
+		}
+	}
 	seq := c.tx.NextSeq()
 	p.set["updated_seq"], p.set["activity_seq"], p.set["updated_at"] = seq, seq, c.at
 	if _, err := c.tx.Update(c.ctx, "tasks", p.set, store.Eq("id", t.ID)); err != nil {
@@ -425,7 +439,18 @@ func taskUpdate(c *cx) error {
 		p.put("asked_by", t.AskedBy, by)
 		t.AskedBy = by
 	}
-	if err := member("waiting_on_id", "waiting_on", a.WaitingOn, &t.WaitingOnID); err != nil {
+	if a.WaitingOn.Set && isOutside(a.WaitingOn.V) {
+		note := t.WaitingOnNote
+		if a.WaitingOnNote.Set {
+			note = a.WaitingOnNote.V
+		}
+		if strings.TrimSpace(note) == "" {
+			return invalid("waiting_on_note", "say what outside event the task waits for, in waiting_on_note")
+		}
+		p.put("waiting_on_id", t.WaitingOnID, "")
+		p.put("waiting_outside", t.WaitingOutside, true)
+		t.WaitingOnID = ""
+	} else if err := member("waiting_on_id", "waiting_on", a.WaitingOn, &t.WaitingOnID); err != nil {
 		return err
 	}
 	p.str("waiting_on_note", a.WaitingOnNote, &t.WaitingOnNote)
@@ -1166,4 +1191,14 @@ func weekStart(at int64) int64 {
 	t := time.UnixMilli(at).UTC()
 	wd := (int(t.Weekday()) + 6) % 7
 	return time.Date(t.Year(), t.Month(), t.Day()-wd, 0, 0, 0, 0, time.UTC).UnixMilli()
+}
+
+// isOutside reports whether a "waiting on" names no member but an outside
+// event: a build, a delivery, a date, someone who is not here.
+func isOutside(ref string) bool {
+	switch strings.ToLower(strings.TrimSpace(ref)) {
+	case "outside", "external", "event":
+		return true
+	}
+	return false
 }

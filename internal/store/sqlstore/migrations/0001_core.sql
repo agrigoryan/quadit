@@ -176,6 +176,9 @@ CREATE TABLE tasks (
     -- Who has the next move. A member, or an outside event named in the note.
     waiting_on_id    {{ID}} REFERENCES users (id),
     asked_by         {{ID}} REFERENCES users (id),
+    -- waits on an outside event (a build, a reply, a date), which
+    -- waiting_on_note describes, and not on a member
+    waiting_outside  {{BOOL}} NOT NULL DEFAULT FALSE,
     waiting_on_note  TEXT NOT NULL DEFAULT '',
     parent_id        {{ID}} REFERENCES tasks (id),
     epic_id          {{ID}},

@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -301,6 +302,90 @@ func TestDeleteWorkspace(t *testing.T) {
 		}
 		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "Stays") {
 			t.Fatalf("the other workspace: %s", out)
+		}
+	})
+}
+
+// TestCheapReads checks that list reads take a field selector and a
+// "changed since" form.
+func TestCheapReads(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss"})
+		s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Old question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(s.owner, "", "doc.create", M{"title": "Old page", "markdown": "x\n"})
+		var me struct{ Seq int64 }
+		s.call(s.owner, "", "GET", w+"/me", nil, 200, &me)
+		mark := fmt.Sprint(me.Seq)
+		s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "New question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(s.owner, "", "doc.create", M{"title": "New page", "markdown": "y\n"})
+		s.change(s.owner, "", "label.create", M{"project": "SVA", "name": "fresh"})
+		for path, want := range map[string][2]string{
+			w + "/decisions?state=all&since=" + mark:             {"New question?", "Old question?"},
+			w + "/decisions?state=all&format=text&since=" + mark: {"New question?", "Old question?"},
+			w + "/docs?since=" + mark:                            {"New page", "Old page"},
+			w + "/docs?format=text&since=" + mark:                {"New page", "Old page"},
+			w + "/list/labels?since=" + mark:                     {"fresh", "bug"},
+		} {
+			if out := s.call(s.owner, "", "GET", path, nil, 200, nil); !strings.Contains(out, want[0]) || strings.Contains(out, want[1]) {
+				t.Errorf("%s: %.300s", path, out)
+			}
+		}
+		// Only the fields asked for, and the id.
+		out := s.call(s.owner, "", "GET", w+"/docs?fields=title", nil, 200, nil)
+		if !strings.Contains(out, `"title":"New page"`) || !strings.Contains(out, `"id"`) || strings.Contains(out, "updated_seq") || strings.Contains(out, "created_by") {
+			t.Errorf("fields on docs: %.300s", out)
+		}
+		if out := s.call(s.owner, "", "GET", w+"/decisions?state=all&fields=question,state", nil, 200, nil); !strings.Contains(out, `"question"`) || strings.Contains(out, `"options"`) {
+			t.Errorf("fields on decisions: %.300s", out)
+		}
+		// Plain lists have a text form.
+		if out := s.call(s.owner, "", "GET", w+"/list/statuses?format=text", nil, 200, nil); !strings.Contains(out, "Todo") || !strings.Contains(out, "id=") || strings.Contains(out, "{") {
+			t.Errorf("statuses as text: %.300s", out)
+		}
+	})
+}
+
+// TestNamesNotIDs checks that an agent can say what it means by name.
+func TestNamesNotIDs(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "epic.create", M{"project": "SVA", "name": "Boss fight"})
+		s.change(s.owner, "", "milestone.create", M{"epic": "Boss fight", "name": "Alpha"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design", "epic": "Boss fight", "milestone": "Alpha", "priority": "high"})
+		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "milestone": "alpha", "priority": "urgent"})
+		if out := s.call(s.owner, "", "GET", w+"/tasks?priority=urgent&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+			t.Fatalf("tasks by priority name: %s", out)
+		}
+		out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "task.update", "args": M{"id": "SVA-1", "priority": "hihg"}}, 400, nil)
+		if !strings.Contains(out, `"nearest":"high"`) || !strings.Contains(out, "urgent") {
+			t.Fatalf("a misspelt priority: %s", out)
+		}
+		s.call(s.owner, "", "GET", w+"/tasks?priority=hihg", nil, 400, nil)
+		// A decision by its task; with two, by its number. An agent asks, the owner answers.
+		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		var art struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &art)
+		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "options": []M{{"label": "Ring"}, {"label": "Burst"}}})
+		s.change(s.owner, "", "decision.pick", M{"id": "SVA-1", "option": "2"})
+		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which colour?", "options": []M{{"label": "Red"}, {"label": "Blue"}}})
+		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which sound?", "options": []M{{"label": "Boom"}, {"label": "Zap"}}})
+		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "decision.pick", "args": M{"id": "SVA-1", "option": "1"}}, 400, nil); !strings.Contains(out, "SVA-1#") {
+			t.Fatalf("two open decisions and no number: %s", out)
+		}
+		s.change(s.owner, "", "decision.pick", M{"id": "SVA-1#3", "option": "Zap"})
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "Burst") || !strings.Contains(out, "Zap") {
+			t.Fatalf("picks made by task key: %s", out)
+		}
+		// Watching an epic and a view by name.
+		s.change(s.owner, "", "view.create", M{"name": "Urgent things", "query": M{"priority": []int{1}}})
+		s.change(s.owner, "", "watch.set", M{"type": "epic", "subject": "Boss fight"})
+		s.change(s.owner, "", "watch.set", M{"type": "view", "subject": "Urgent things"})
+		// A name nothing has says which names there are.
+		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "watch.set", "args": M{"type": "epic", "subject": "Bos fight"}}, 404, nil); !strings.Contains(out, `"nearest":"Boss fight"`) {
+			t.Fatalf("a misspelt epic: %s", out)
 		}
 	})
 }

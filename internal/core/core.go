@@ -222,6 +222,9 @@ type Task struct {
 	AssigneeID    string `json:"assignee_id,omitempty" db:"assignee_id,null"`
 	WaitingOnID   string `json:"waiting_on_id,omitempty" db:"waiting_on_id,null"`
 	WaitingOnNote string `json:"waiting_on_note,omitempty" db:"waiting_on_note"`
+	// WaitingOutside: the next move is no member's but an outside event's,
+	// which the note describes.
+	WaitingOutside bool `json:"waiting_outside,omitempty" db:"waiting_outside"`
 	// AskedBy is the person an agent works this task for: whoever gave it
 	// to an agent. Agents work on the task with no more access than theirs.
 	AskedBy       string   `json:"asked_by,omitempty" db:"asked_by,null"`

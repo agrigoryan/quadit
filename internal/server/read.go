@@ -436,6 +436,9 @@ func (s *Server) hInbox(x *c) error {
 	if err != nil {
 		return err
 	}
+	if since := int64(x.intParam("since", -1)); since >= 0 {
+		items = keep(items, func(i inboxItem) bool { return i.Seq > since })
+	}
 	if x.wantText() {
 		return x.text(lines(items, func(i inboxItem) string { return i.line() }, "inbox is empty"))
 	}
@@ -551,6 +554,7 @@ func (s *Server) hTasks(x *c) error {
 	if truthyParam(v, "raw") {
 		return x.ok(map[string]any{"tasks": tasks, "more": more})
 	}
+	x.narrowedAlready()
 	fields := splitList(v.Get("fields"))
 	views, err := x.taskViews(tasks, has(fields, "description") || has(fields, "id") || has(fields, "project"))
 	if err != nil {
@@ -824,6 +828,7 @@ func (s *Server) hTask(x *c) error {
 		return err
 	}
 	v := x.r.URL.Query()
+	x.narrowedAlready()
 	if since := x.intParam("since", -1); since >= 0 {
 		evs, err := x.db.Events(x.ctx(), store.EventFilter{After: int64(since), ScopeType: "task", ScopeID: t.ID, Viewer: x.member.UserID, Limit: 500})
 		if err != nil {
@@ -1086,6 +1091,9 @@ func (s *Server) hDecisions(x *c) error {
 		conds = append(conds, store.Eq("state", st))
 	default:
 		return &engine.Error{Code: engine.CodeInvalid, Field: "state", Message: "unknown state " + st, Allowed: []string{"answered", "open", "picked", "sent_back", "all"}}
+	}
+	if since := x.intParam("since", -1); since >= 0 {
+		conds = append(conds, store.Gt("updated_seq", int64(since))) // only what changed after that position
 	}
 	if q := v.Get("q"); q != "" {
 		conds = append(conds, store.Like("question", "%"+strings.NewReplacer("%", "", "_", " ").Replace(q)+"%"))

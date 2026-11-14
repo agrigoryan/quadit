@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,6 +65,11 @@ func (s *Server) hDocs(x *c) error {
 		return err
 	}
 	docs = keep(docs, func(d core.Doc) bool { return d.Kind != core.DocRow })
+	if since := int64(x.intParam("since", -1)); since >= 0 && x.wantText() {
+		// Only the pages changed after that position, as a flat list.
+		changed := keep(docs, func(d core.Doc) bool { return d.UpdatedSeq > since })
+		return x.text(lines(changed, func(d core.Doc) string { return fmt.Sprintf("%s  %s  (changed at %d)", d.ID, d.Title, d.UpdatedSeq) }, "no page changed since "+strconv.FormatInt(since, 10)))
+	}
 	if !x.wantText() {
 		return x.ok(map[string]any{"docs": docs})
 	}

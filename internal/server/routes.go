@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -243,6 +244,37 @@ func (s *Server) hList(x *c) error {
 	rows, err := col.load(x)
 	if err != nil {
 		return err
+	}
+	if x.wantText() {
+		// One line per row: what it is called, then its id.
+		raw, _ := json.Marshal(rows)
+		var list []map[string]any
+		json.Unmarshal(raw, &list)
+		since := int64(x.intParam("since", -1))
+		var b strings.Builder
+		for _, r := range list {
+			if seq, ok := r["updated_seq"].(float64); ok && since >= 0 && int64(seq) <= since {
+				continue
+			}
+			var words []string
+			for _, k := range []string{"key", "handle", "slug", "name", "title", "kind", "type", "state", "category", "role", "url"} {
+				if v, ok := r[k].(string); ok && v != "" {
+					if k == "handle" {
+						v = "@" + v
+					}
+					words = append(words, v)
+				}
+			}
+			id, _ := r["id"].(string)
+			if id == "" {
+				id, _ = r["user_id"].(string)
+			}
+			fmt.Fprintf(&b, "%s  id=%s\n", strings.Join(words, "  "), id)
+		}
+		if b.Len() == 0 {
+			b.WriteString("nothing\n")
+		}
+		return x.text(b.String())
 	}
 	return x.ok(map[string]any{name: rows})
 }

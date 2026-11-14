@@ -3,6 +3,7 @@ package engine
 import (
 	"encoding/json"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -719,6 +720,15 @@ type decisionUpdateArgs struct {
 }
 
 func (c *cx) decisionTask(ref string) (core.Decision, core.Task, error) {
+	if ref != "" && !looksLikeID(ref) {
+		// By its task: "SVA-7" is that task's one open decision, "SVA-7#2"
+		// its second decision in the order they were asked.
+		id, err := c.decisionOnTask(ref)
+		if err != nil {
+			return core.Decision{}, core.Task{}, err
+		}
+		ref = id
+	}
 	d, err := get[core.Decision](c, "decision", "id", ref)
 	if err != nil {
 		return d, core.Task{}, err
@@ -807,6 +817,10 @@ func decisionPick(c *cx) error {
 			if opt.ID == o || strings.EqualFold(opt.Label, o) {
 				optionID = opt.ID
 			}
+		}
+		// A position written as text ("2") is a position still.
+		if n, err := strconv.Atoi(strings.TrimSpace(o)); optionID == "" && err == nil && n >= 1 && n <= len(d.Options) {
+			optionID = d.Options[n-1].ID
 		}
 		if optionID == "" && o != "" {
 			labels := make([]string, len(d.Options))
@@ -1135,4 +1149,39 @@ func preferenceDelete(c *cx) error {
 	}
 	st, sid := prefScope(c, pf)
 	return c.trash("preferences", "preference", pf.ID, st, sid, pf.ProjectID, nil)
+}
+
+// decisionOnTask resolves "KEY" or "KEY#N" to a decision's id.
+func (c *cx) decisionOnTask(ref string) (string, error) {
+	key, nth, numbered := strings.Cut(ref, "#")
+	t, err := c.task("id", key)
+	if err != nil {
+		return "", err
+	}
+	var ds []core.Decision
+	if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_at"}); err != nil {
+		return "", err
+	}
+	if numbered {
+		n, err := strconv.Atoi(nth)
+		if err != nil || n < 1 || n > len(ds) {
+			return "", invalid("id", "%s has %d decisions; %q is not one of them", t.Key, len(ds), ref)
+		}
+		return ds[n-1].ID, nil
+	}
+	var open []core.Decision
+	for _, d := range ds {
+		if d.State == core.StateOpen {
+			open = append(open, d)
+		}
+	}
+	switch {
+	case len(open) == 1:
+		return open[0].ID, nil
+	case len(ds) == 1:
+		return ds[0].ID, nil
+	case len(ds) == 0:
+		return "", invalid("id", "%s has no decisions", t.Key)
+	}
+	return "", invalid("id", "%s has %d decisions, %d of them open; say which with %s#1, %s#2, …", t.Key, len(ds), len(open), t.Key, t.Key)
 }

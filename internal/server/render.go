@@ -100,7 +100,7 @@ func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
 	for i, t := range tasks {
 		st := nm.statuses[t.StatusID]
 		v := taskView{Key: t.Key, Title: t.Title, Status: st.Name, Category: st.Category, Assignee: nm.handle(t.AssigneeID),
-			WaitingOn: nm.handle(t.WaitingOnID), WaitingOnNote: t.WaitingOnNote, Labels: nm.labelNames(t.LabelIDs),
+			WaitingOn: waitsOn(nm, t), WaitingOnNote: t.WaitingOnNote, Labels: nm.labelNames(t.LabelIDs),
 			Epic: nm.epics[t.EpicID].Name, Cycle: nm.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
 			Estimate: t.Estimate, Seq: t.ActivitySeq, UpdatedSeq: t.UpdatedSeq, Trashed: t.DeletedAt != 0}
 		if t.Priority > 0 && t.Priority < len(priorityNames) {
@@ -152,6 +152,9 @@ func (v taskView) line() string {
 	}
 	if v.WaitingOn != "" {
 		b.WriteString("  waits on " + v.WaitingOn)
+		if v.WaitingOn == "outside" {
+			b.WriteString(" (" + oneLine(v.WaitingOnNote, 60) + ")")
+		}
 	}
 	if v.HeldBy != "" && v.HeldBy != v.Assignee {
 		b.WriteString("  held by " + v.HeldBy)
@@ -576,4 +579,13 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 		parts = append(parts, fmt.Sprintf("%s: %s -> %s", strings.TrimSuffix(strings.TrimSuffix(f, "_id"), "_ids"), from, to))
 	}
 	return strings.Join(parts, "; ")
+}
+
+// waitsOn names who has the next move on a task: a member's handle, or
+// "outside" when it waits for an event its note describes.
+func waitsOn(nm *names, t core.Task) string {
+	if t.WaitingOutside {
+		return "outside"
+	}
+	return nm.handle(t.WaitingOnID)
 }

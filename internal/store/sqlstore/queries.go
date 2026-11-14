@@ -86,6 +86,12 @@ func (c conn) taskWhere(f store.TaskFilter) *clause {
 	if f.CreatedBy != "" {
 		w.add(`t.created_by = ?`, idOrNone(f.CreatedBy))
 	}
+	if f.WaitingOutside {
+		w.add(`t.waiting_outside`)
+	}
+	if f.WaitingNobody {
+		w.add(`t.waiting_on_id IS NULL AND NOT t.waiting_outside`)
+	}
 	if f.WaitingOnID != "" {
 		w.add(`t.waiting_on_id = ?`, idOrNone(f.WaitingOnID))
 	}

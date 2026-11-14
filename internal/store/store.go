@@ -142,38 +142,42 @@ type Store interface {
 
 // TaskFilter selects tasks. Conditions combine with AND; inside a list, OR.
 type TaskFilter struct {
-	IDs           []string
-	Keys          []string
-	ProjectIDs    []string
-	AssigneeIDs   []string // any of these
-	Unassigned    bool     // only tasks with no assignee
-	CreatedBy     string
-	WaitingOnID   string
-	LeaseHolderID string
-	StatusIDs     []string
-	Categories    []string // status categories, e.g. started, waiting
-	Open          bool     // not done and not canceled
-	Closed        bool     // done, canceled or archived: everything Open with Archived off leaves out
-	LabelIDs      []string // has every one of these
-	ParentID      string
-	TopLevel      bool // no parent
-	EpicIDs       []string
-	NoEpic        bool
-	MilestoneID   string
-	CycleIDs      []string
-	NoCycle       bool
-	Priorities    []int
-	DueBefore     string // due on or before this date
-	DueAfter      string
-	MentionsID    string // tasks that mention this member
-	WatchedBy     string
-	ActivityAfter int64  // something happened in the task after this seq
-	UpdatedAfter  int64  // the task's own fields changed after this seq
-	OpenDecision  bool   // has an open decision
-	AskedID       string // has an open decision asked of this member
-	Text          string // title contains
-	InTrash       bool   // only deleted tasks; default is only live ones
-	Archived      bool   // include archived tasks
+	IDs         []string
+	Keys        []string
+	ProjectIDs  []string
+	AssigneeIDs []string // any of these
+	Unassigned  bool     // only tasks with no assignee
+	CreatedBy   string
+	WaitingOnID string
+	// WaitingOutside: waits on an outside event (a note and no member).
+	// WaitingNobody: names neither a member nor an event.
+	WaitingOutside bool
+	WaitingNobody  bool
+	LeaseHolderID  string
+	StatusIDs      []string
+	Categories     []string // status categories, e.g. started, waiting
+	Open           bool     // not done and not canceled
+	Closed         bool     // done, canceled or archived: everything Open with Archived off leaves out
+	LabelIDs       []string // has every one of these
+	ParentID       string
+	TopLevel       bool // no parent
+	EpicIDs        []string
+	NoEpic         bool
+	MilestoneID    string
+	CycleIDs       []string
+	NoCycle        bool
+	Priorities     []int
+	DueBefore      string // due on or before this date
+	DueAfter       string
+	MentionsID     string // tasks that mention this member
+	WatchedBy      string
+	ActivityAfter  int64  // something happened in the task after this seq
+	UpdatedAfter   int64  // the task's own fields changed after this seq
+	OpenDecision   bool   // has an open decision
+	AskedID        string // has an open decision asked of this member
+	Text           string // title contains
+	InTrash        bool   // only deleted tasks; default is only live ones
+	Archived       bool   // include archived tasks
 	// Sort is one of: created (default), -created, rank, priority, due,
 	// -activity, -updated, key.
 	Sort   string

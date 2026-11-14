@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -288,6 +289,9 @@ func get[T any](c *cx, what, field, ref string) (T, error) {
 	if _, ok := reflect.TypeFor[T]().FieldByName("DeletedAt"); ok {
 		conds = append(conds, store.Live)
 	}
+	if !looksLikeID(ref) {
+		return byName[T](c, what, field, ref)
+	}
 	err := c.tx.Get(c.ctx, &row, conds...)
 	if errors.Is(err, store.ErrNotFound) {
 		e := notFound(what, ref)
@@ -295,6 +299,59 @@ func get[T any](c *cx, what, field, ref string) (T, error) {
 		return row, e
 	}
 	return row, err
+}
+
+// looksLikeID reports whether a reference has the shape of an id.
+func looksLikeID(ref string) bool {
+	return len(ref) == 36 && ref[8] == '-' && ref[13] == '-' && ref[18] == '-' && ref[23] == '-'
+}
+
+// byName finds a row by what it is called: its slug, its name or its title.
+// Names are not ids: when two rows share one the caller is told to use the
+// id, and when none matches, which names there are.
+func byName[T any](c *cx, what, field, ref string) (T, error) {
+	var row T
+	t := reflect.TypeFor[T]()
+	var rows []T
+	q := store.Q{Limit: 2000}
+	if _, ok := t.FieldByName("DeletedAt"); ok {
+		q.Where = append(q.Where, store.Live)
+	}
+	if err := c.tx.List(c.ctx, &rows, q); err != nil {
+		return row, err
+	}
+	var hits []T
+	var names []string
+	for _, r := range rows {
+		v := reflect.ValueOf(r)
+		matched := false
+		for _, f := range []string{"Slug", "Name", "Title"} {
+			fv := v.FieldByName(f)
+			if !fv.IsValid() || fv.Kind() != reflect.String || fv.String() == "" {
+				continue
+			}
+			names = append(names, fv.String())
+			if strings.EqualFold(fv.String(), ref) {
+				matched = true
+			}
+		}
+		if matched {
+			hits = append(hits, r)
+		}
+	}
+	switch len(hits) {
+	case 1:
+		return hits[0], nil
+	case 0:
+		e := notFound(what, ref)
+		e.Field = field
+		if len(names) <= 50 {
+			e.Allowed = names
+		}
+		e.Nearest = nearest(ref, names)
+		return row, e
+	}
+	return row, &Error{Code: CodeInvalid, Field: field, Message: fmt.Sprintf("%d %ss are called %q; use the id of the one you mean", len(hits), what, ref)}
 }
 
 func checkDate(field, s string) error {

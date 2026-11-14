@@ -297,6 +297,12 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 	if f.CreatedBy, err = member("creator", q.Creator); err != nil {
 		return f, err
 	}
+	switch strings.ToLower(q.WaitingOn) {
+	case "outside", "external", "event":
+		f.WaitingOutside, q.WaitingOn = true, ""
+	case "none", "nobody":
+		f.WaitingNobody, q.WaitingOn = true, ""
+	}
 	if f.WaitingOnID, err = member("waiting_on", q.WaitingOn); err != nil {
 		return f, err
 	}
@@ -468,7 +474,27 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 			q.Project = []string{view.ProjectID}
 		}
 	}
-	err := fromURL(v, &q, append(skip, "view", "format", "fields", "count", "raw")...)
+	// A priority may be asked for by name.
+	if ps := v["priority"]; len(ps) > 0 {
+		var nums []string
+		for _, p := range splitList(strings.Join(ps, ",")) {
+			found := false
+			for n, name := range engine.PriorityNames {
+				if strings.EqualFold(p, name) {
+					nums, found = append(nums, strconv.Itoa(n)), true
+				}
+			}
+			if _, err := strconv.Atoi(p); err == nil {
+				nums, found = append(nums, p), true
+			}
+			if !found {
+				return q, &engine.Error{Code: engine.CodeInvalid, Field: "priority", Message: "unknown priority " + strconv.Quote(p), Allowed: engine.PriorityNames, Nearest: nearestOf(p, engine.PriorityNames)}
+			}
+		}
+		v = cloneValues(v)
+		v["priority"] = []string{strings.Join(nums, ",")}
+	}
+	err := fromURL(v, &q, append(skip, "view", "format", "fields", "count", "raw", "since")...)
 	return q, err
 }
 
@@ -481,4 +507,12 @@ func init() {
 		}
 		return nil
 	}
+}
+
+func cloneValues(v url.Values) url.Values {
+	out := url.Values{}
+	for k, vs := range v {
+		out[k] = append([]string(nil), vs...)
+	}
+	return out
 }

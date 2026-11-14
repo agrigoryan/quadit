@@ -147,15 +147,16 @@ var statusOf = map[string]int{
 
 // c is one request with who is asking.
 type c struct {
-	s      *Server
-	w      http.ResponseWriter
-	r      *http.Request
-	user   core.User
-	sess   *core.Session
-	token  *core.APIToken
-	ws     core.Workspace
-	member core.Member
-	actor  engine.Actor
+	narrowed bool // fields= and since= were applied by the handler
+	s        *Server
+	w        http.ResponseWriter
+	r        *http.Request
+	user     core.User
+	sess     *core.Session
+	token    *core.APIToken
+	ws       core.Workspace
+	member   core.Member
+	actor    engine.Actor
 	// projects, when not nil, are the only projects this caller may read.
 	projects []string
 	db       store.DB // bound to the workspace
@@ -193,7 +194,64 @@ func noNulls(v any) any {
 	return m
 }
 
-func (x *c) ok(v any) error { return x.json(200, v) }
+// ok answers with v. Every read that answers with a list takes fields=a,b
+// to get only those fields of each row (and its id), and since=N to get
+// only the rows that changed after that position in the feed, so a caller
+// never pays for what it already knows.
+func (x *c) ok(v any) error {
+	q := x.r.URL.Query()
+	fields, since := splitList(q.Get("fields")), q.Get("since")
+	if x.r.Method != http.MethodGet || (len(fields) == 0 && since == "") || x.narrowed {
+		return x.json(200, v)
+	}
+	raw, err := json.Marshal(noNulls(v))
+	if err != nil {
+		return x.json(200, v)
+	}
+	var doc map[string]any
+	if json.Unmarshal(raw, &doc) != nil {
+		return x.json(200, v)
+	}
+	after, _ := strconv.ParseInt(since, 10, 64)
+	keep := map[string]bool{"id": true, "key": true}
+	for _, f := range fields {
+		keep[f] = true
+	}
+	for name, val := range doc {
+		rows, ok := val.([]any)
+		if !ok {
+			continue
+		}
+		out := make([]any, 0, len(rows))
+		for _, r := range rows {
+			row, ok := r.(map[string]any)
+			if !ok {
+				out = append(out, r)
+				continue
+			}
+			if since != "" {
+				// A row's place in the feed: when it last changed, or when it was made.
+				at, has := row["updated_seq"].(float64)
+				if !has {
+					at, has = row["seq"].(float64)
+				}
+				if has && int64(at) <= after {
+					continue
+				}
+			}
+			if len(fields) > 0 {
+				for k := range row {
+					if !keep[k] {
+						delete(row, k)
+					}
+				}
+			}
+			out = append(out, row)
+		}
+		doc[name] = out
+	}
+	return x.json(200, doc)
+}
 
 func (x *c) text(body string) error {
 	x.w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -227,6 +285,10 @@ func (x *c) intParam(name string, def int) int {
 	}
 	return def
 }
+
+// narrowedAlready marks an answer whose handler applied fields and since
+// itself, so they are not applied a second time.
+func (x *c) narrowedAlready() { x.narrowed = true }
 
 // whole reports whether the caller acts with everything the account may
 // do: a signed-in session, or a token with no narrowing on it.

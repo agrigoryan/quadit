@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -216,6 +217,10 @@ func (c *cx) args(v any) error {
 	raw := c.change.Args
 	if len(bytes.TrimSpace(raw)) == 0 {
 		raw = []byte("{}")
+	}
+	raw, err := namedPriority(raw)
+	if err != nil {
+		return err
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
@@ -697,4 +702,31 @@ func (c *cx) askedBy(t core.Task) (string, error) {
 		return c.actor.UserID, nil
 	}
 	return t.AskedBy, nil
+}
+
+// PriorityNames are a priority's names, by its number.
+var PriorityNames = []string{"none", "urgent", "high", "medium", "low"}
+
+// namedPriority lets a priority be written by name ("high") as well as by
+// number, and says what the names are when one is misspelt.
+func namedPriority(raw json.RawMessage) (json.RawMessage, error) {
+	if !bytes.Contains(raw, []byte(`"priority"`)) {
+		return raw, nil
+	}
+	var args map[string]json.RawMessage
+	if json.Unmarshal(raw, &args) != nil {
+		return raw, nil
+	}
+	var name string
+	if json.Unmarshal(args["priority"], &name) != nil {
+		return raw, nil // a number, or null: as it is
+	}
+	for n, known := range PriorityNames {
+		if strings.EqualFold(strings.TrimSpace(name), known) {
+			args["priority"] = json.RawMessage(strconv.Itoa(n))
+			return json.Marshal(args)
+		}
+	}
+	return nil, &Error{Code: CodeInvalid, Field: "priority", Message: fmt.Sprintf("unknown priority %q", name),
+		Allowed: PriorityNames, Nearest: nearest(name, PriorityNames)}
 }
