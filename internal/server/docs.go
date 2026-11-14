@@ -50,6 +50,16 @@ func (x *c) visibleDocs() ([]core.Doc, error) {
 
 // hDocs lists the page tree. The text form is an indented outline with ids.
 func (s *Server) hDocs(x *c) error {
+	if truthyParam(x.r.URL.Query(), "trash") {
+		var gone []core.Doc
+		if err := x.db.List(x.ctx(), &gone, store.Q{Where: []store.Cond{store.NotNull("deleted_at")}, Order: "-deleted_at", Limit: 1000}); err != nil {
+			return err
+		}
+		gone = keep(gone, func(d core.Doc) bool {
+			return engine.CanSeeDoc(d, x.member.UserID) && x.canProject(d.ProjectID) && d.Kind != core.DocRow
+		})
+		return x.ok(map[string]any{"docs": gone})
+	}
 	docs, err := x.visibleDocs()
 	if err != nil {
 		return err

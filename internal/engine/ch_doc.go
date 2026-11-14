@@ -379,7 +379,16 @@ func docUpdate(c *cx) error {
 	if wasAudience == "" {
 		audience = ""
 	}
-	if err := c.emitTo(audience, seq, "doc.updated", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "changes": p.changes}); err != nil {
+	data := map[string]any{"id": d.ID, "changes": p.changes}
+	if _, sharing := p.set["shared_with"]; sharing || wasAudience != docAudience(d) {
+		// Someone may be seeing this page for the first time: send all of it.
+		var now core.Doc
+		if err := c.tx.Get(c.ctx, &now, store.Eq("id", d.ID)); err != nil {
+			return err
+		}
+		data["row"] = now
+	}
+	if err := c.emitTo(audience, seq, "doc.updated", "doc", d.ID, "doc", d.ID, d.ProjectID, data); err != nil {
 		return err
 	}
 	if _, ok := p.set["title"]; ok {
@@ -672,6 +681,9 @@ func (e *editor) apply(op BlockOp) error {
 		}
 		if op.Props != nil {
 			r.Props = *op.Props
+			if p := strings.TrimSpace(string(r.Props)); p == "{}" || p == "null" {
+				r.Props = nil // no props is stored as nothing
+			}
 		}
 		if op.Content != nil {
 			r.Content = *op.Content
@@ -843,6 +855,32 @@ func docEdit(c *cx) error {
 	}
 	before := append([]core.Block(nil), rows...)
 	ed := newEditor(c, d, rows)
+	// A block that was deleted may come back under its own id (an undo):
+	// let the editor know those rows, so the insert revives them.
+	var ids []string
+	var collect func(b md.Block)
+	collect = func(b md.Block) {
+		if b.ID != "" {
+			ids = append(ids, b.ID)
+		}
+		for _, ch := range b.Children {
+			collect(ch)
+		}
+	}
+	for _, op := range a.Ops {
+		if op.Op == "insert" && op.Block != nil {
+			collect(*op.Block)
+		}
+	}
+	if len(ids) > 0 {
+		var gone []core.Block
+		if err := c.tx.List(c.ctx, &gone, store.Where(store.Eq("doc_id", d.ID), store.In("id", ids), store.NotNull("deleted_at"))); err != nil {
+			return err
+		}
+		for i := range gone {
+			ed.rows[gone[i].ID] = &gone[i]
+		}
+	}
 	for _, op := range a.Ops {
 		if err := ed.apply(op); err != nil {
 			return err
@@ -868,6 +906,15 @@ func signature(b md.Block) string {
 	var content any
 	json.Unmarshal(b.Content, &content)
 	canon, _ := json.Marshal(content)
+	if _, inline := content.([]any); inline {
+		// Text is compared as the Markdown it reads as: a mention chip and
+		// the plain "@name" an agent wrote back are the same block, and the
+		// chip is kept.
+		canon = []byte(md.RenderInline(b.Content))
+	}
+	if len(b.Props) == 0 {
+		props = []byte("{}")
+	}
 	sb.WriteString(b.Type + "\x00" + string(props) + "\x00" + string(canon))
 	for _, ch := range b.Children {
 		sb.WriteString("\x01" + signature(ch))

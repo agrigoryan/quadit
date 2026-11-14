@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -133,6 +134,9 @@ func (x *c) computed(t *table) (map[string]map[string]any, error) {
 			}})
 			if err != nil {
 				return "#error: " + err.Error()
+			}
+			if n, ok := v.(float64); ok && (math.IsNaN(n) || math.IsInf(n, 0)) {
+				return "#error: not a number"
 			}
 			return v
 		case "rollup":

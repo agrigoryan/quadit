@@ -264,7 +264,11 @@ func (c conn) Events(ctx context.Context, f store.EventFilter) ([]core.Event, er
 	if f.OnlyAudience != "" {
 		w.add(`e.audience_id = ?`, idOrNone(f.OnlyAudience))
 	} else if f.Viewer != "" {
-		w.add(`(e.audience_id IS NULL OR e.audience_id = ?)`, idOrNone(f.Viewer))
+		// Public events, the viewer's own, and those of private pages that
+		// are shared with the viewer.
+		w.add(`(e.audience_id IS NULL OR e.audience_id = ? OR (e.scope_type = 'doc' AND e.scope_id IN
+			(SELECT d.id FROM docs d WHERE d.workspace_id = e.workspace_id AND CAST(d.shared_with AS TEXT) LIKE ?)))`,
+			idOrNone(f.Viewer), `%"`+idOrNone(f.Viewer)+`"%`)
 	}
 	if f.Tasks != nil {
 		tw := c.taskWhere(*f.Tasks)

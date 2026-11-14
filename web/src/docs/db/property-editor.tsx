@@ -2,7 +2,7 @@
 // type, set what the type needs (options, the database a relation points
 // into, a rollup's source, a formula), hide it in this view, delete it.
 
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { EyeOff, Sigma, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { docTitle, useDocs, useProperties } from "@/docs/data";
@@ -60,9 +60,11 @@ function RollupConfig({ prop, save }: { prop: DBProperty; save: (c: PropConfig) 
   const relations = own.filter((p) => p.type === "relation");
   const rel = relations.find((p) => p.id === prop.config?.relation || p.name === prop.config?.relation);
   const targetDb = rel?.config?.database;
-  ensureDatabase(targetDb);
+  useEffect(() => ensureDatabase(targetDb), [targetDb]);
   const theirs = useProperties(targetDb);
   const cfg = prop.config ?? {};
+  // A rollup made through the API may name its target instead of giving its id.
+  const target = theirs.find((p) => p.id === cfg.target || p.name.toLowerCase() === cfg.target?.toLowerCase());
   return (
     <>
       <Labeled label={t("db.rollup.relation")}>
@@ -79,7 +81,7 @@ function RollupConfig({ prop, save }: { prop: DBProperty; save: (c: PropConfig) 
         <Select
           label={t("db.rollup.target")}
           items={[{ id: "", label: t("db.title") }, ...theirs.map((p) => ({ id: p.id, label: p.name, icon: <PropIcon type={p.type} /> }))]}
-          value={cfg.target ?? ""}
+          value={target?.id ?? ""}
           onPick={(target) => save({ ...cfg, target: target || undefined })}
           buttonProps={wide}
         />

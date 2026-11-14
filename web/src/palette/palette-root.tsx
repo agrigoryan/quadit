@@ -3,6 +3,7 @@ import {
   Bookmark,
   CircleDot,
   Copy,
+  FileText,
   Inbox,
   Kanban,
   Keyboard,
@@ -138,7 +139,7 @@ export function RootPage({ query, slug, task, project, hits, searching, run, go,
   const foundTasks = searchTasks(tasks, q);
   const listed = new Set(foundTasks.map((tk) => tk.key));
   // What the server found that is not already a row above; only things inside a task can be opened.
-  const inText = hits.filter((h) => h.task && !(h.kind === "task" && listed.has(h.task))).slice(0, 8);
+  const inText = hits.filter((h) => (h.task && !(h.kind === "task" && listed.has(h.task))) || h.scope_type === "doc").slice(0, 8);
 
   const taskRows = show(forTask);
   const goRows = show(goTo);
@@ -168,7 +169,7 @@ export function RootPage({ query, slug, task, project, hits, searching, run, go,
       <Group heading={t("palette.group.general")}>{generalRows.map(row)}</Group>
       <Group heading={t("palette.group.found")}>
         {inText.map((hit) => (
-          <HitRow key={`${hit.kind}:${hit.entity_id}`} hit={hit} onSelect={() => openTask(hit.task as string)} />
+          <HitRow key={`${hit.kind}:${hit.entity_id}`} hit={hit} onSelect={() => (hit.scope_type === "doc" ? go(`/${slug}/docs/${hit.scope_id}`) : openTask(hit.task as string))} />
         ))}
       </Group>
     </>
@@ -180,7 +181,7 @@ function HitRow({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
   const key = hit.task ?? "";
   const title = hit.title.startsWith(`${key} `) ? hit.title.slice(key.length + 1) : hit.title;
   const icon =
-    hit.kind === "decision" ? <DecisionMark mine={false} /> : hit.kind === "task" ? <ListTodo /> : <MessageSquare />;
+    hit.scope_type === "doc" ? <FileText /> : hit.kind === "decision" ? <DecisionMark mine={false} /> : hit.kind === "task" ? <ListTodo /> : <MessageSquare />;
   return (
     <Item
       value={`hit:${hit.kind}:${hit.entity_id}`}

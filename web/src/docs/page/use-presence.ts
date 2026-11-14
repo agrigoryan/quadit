@@ -9,7 +9,7 @@ import { getState } from "@/lib/store";
 import { setPresence } from "@/docs/store";
 import type { PresenceEntry } from "@/docs/types";
 
-const EVERY_MS = 4000;
+const EVERY_MS = 4_000;
 
 export function usePresence(docId: string, block: string | null, enabled = true) {
   const at = useRef(block);
@@ -21,7 +21,6 @@ export function usePresence(docId: string, block: string | null, enabled = true)
     const path = ws(getState().slug, `/docs/${docId}/presence`);
     let gone = false;
     say.current = () => {
-      if (document.hidden) return;
       api
         .post<{ others: PresenceEntry[] }>(path, { block: at.current ?? "" })
         .then((out) => !gone && setPresence(docId, out.others ?? []))

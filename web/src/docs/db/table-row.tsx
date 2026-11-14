@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type MouseEvent } from "react";
 import { Ellipsis, FileText, PanelRight, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
@@ -27,8 +27,12 @@ interface Props {
   onOpen: (rowId: string) => void;
 }
 
-/** A press inside the cell's own text box is for the box, not a new selection. */
-const inEditor = (target: EventTarget) => (target as HTMLElement).tagName === "INPUT";
+/**
+ * A press inside the cell's own text box, or in a list opened from it (which
+ * React hands up through the cell although it is drawn elsewhere), is for
+ * the editor, not a new selection.
+ */
+const inEditor = (e: MouseEvent<HTMLElement>) => (e.target as HTMLElement).tagName === "INPUT" || !e.currentTarget.contains(e.target as Node);
 
 const cellBox = "relative flex shrink-0 items-stretch border-r border-line";
 const selected = "z-[1] outline outline-2 -outline-offset-2 outline-accent";
@@ -45,7 +49,7 @@ export const TableRow = memo(function TableRow({ row, cells, props, widths, acti
         data-cell={`${row.id}:${TITLE}`}
         style={{ width: `min(${widths[TITLE] ?? TITLE_WIDTH}px, 60vw)` }}
         className={cx(cellBox, "sticky left-0 z-[2] bg-surface group-hover/row:bg-[color-mix(in_srgb,var(--hover)_40%,var(--surface))]", titleOn && selected)}
-        onMouseDown={(e) => inEditor(e.target) || onActive(row.id, TITLE)}
+        onMouseDown={(e) => inEditor(e) || onActive(row.id, TITLE)}
       >
         {titleOn && editing ? (
           <CellInput
@@ -108,7 +112,7 @@ export const TableRow = memo(function TableRow({ row, cells, props, widths, acti
             data-cell={`${row.id}:${p.id}`}
             style={{ width: widths[p.id] }}
             className={cx(cellBox, on && selected)}
-            onMouseDown={(e) => inEditor(e.target) || onActive(row.id, p.id)}
+            onMouseDown={(e) => inEditor(e) || onActive(row.id, p.id)}
           >
             <Cell
               prop={p}

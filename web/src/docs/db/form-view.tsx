@@ -111,3 +111,4 @@ export function FormView({ db, view, onAdd }: ViewProps) {
     </div>
   );
 }
+

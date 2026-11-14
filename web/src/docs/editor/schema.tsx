@@ -11,9 +11,10 @@ import { MentionChip, PageChip, TaskChip } from "@/docs/editor/chips";
 // New blocks get ids like every other row of the product (UUIDv7, made in the
 // browser). BlockNote has no option for this; its id extension reads its
 // defaults when an editor is made, so the default is replaced here, once.
-const defaults = UniqueID.config.addOptions;
-UniqueID.config.addOptions = function addOptions(this: never) {
-  return { ...(defaults?.call(this) as object), generateID: newId } as never;
+const idConfig = UniqueID.config as { addOptions?: (this: unknown) => object };
+const defaults = idConfig.addOptions;
+idConfig.addOptions = function addOptions() {
+  return { ...defaults?.call(this), generateID: newId };
 };
 
 const mention = createReactInlineContentSpec(

@@ -3,16 +3,17 @@
 // its views), with the comments column beside it.
 
 import { GitBranch, Sparkles } from "lucide-react";
-import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { useMe } from "@/lib/selectors";
 import { CommentsPanel, useOpenThreads } from "@/docs/comments/panel";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { PageTitle } from "@/docs/page/title";
 import { usePage } from "@/docs/page/use-page";
 import { usePresence } from "@/docs/page/use-presence";
-import { useDocsStore } from "@/docs/store";
+import { loadPage, useDocsStore } from "@/docs/store";
 import type { Doc } from "@/docs/types";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
@@ -32,6 +33,7 @@ const NO_OTHERS: never[] = [];
 /** A page's title, icon, properties (for a row) and its editor. */
 export function PageBody({ doc, compact }: Props) {
   const page = usePage(doc.id);
+  const me = useMe();
   const source = useDocsStore((s) => s.meta[doc.id]?.source);
   const others = useDocsStore((s) => s.presence[doc.id]) ?? NO_OTHERS;
   const commentsOpen = usePageUi((s) => s.commentsOpen) && !compact;
@@ -43,6 +45,16 @@ export function PageBody({ doc, compact }: Props) {
   const readOnly = !!doc.generated || mirrorsReadOnly || !!doc.deleted_at;
 
   usePresence(doc.id, block, page.status === "ready" && !isDatabase);
+
+  // The live feed carries a private page's changes to its owner only. For a
+  // page someone shared with me, ask for it every few seconds instead; the
+  // editor takes what changed like any other remote edit.
+  const sharedWithMe = !!doc.owner_id && doc.owner_id !== me.user_id;
+  useEffect(() => {
+    if (!sharedWithMe || page.status !== "ready") return;
+    const timer = setInterval(() => void loadPage(doc.id).catch(() => {}), 5000);
+    return () => clearInterval(timer);
+  }, [doc.id, sharedWithMe, page.status]);
 
   const focusText = () => document.querySelector<HTMLElement>(`[data-page="${doc.id}"] .bn-editor`)?.focus();
 

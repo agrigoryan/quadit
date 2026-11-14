@@ -155,3 +155,80 @@ func TestDocs(t *testing.T) {
 		_ = block{}
 	})
 }
+
+func TestSharedPagesChipsAndUndo(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(s.owner, "", "agent.create", M{"name": "Writer", "handle": "writer"})
+		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other"})
+		var wt, ot struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@writer"}, 201, &wt)
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &ot)
+		feed := func(token string) string {
+			return s.call(nil, token, "GET", "/api/v1/w/-/events?limit=2000&types=doc.created,doc.updated,doc.edited", nil, 200, nil)
+		}
+
+		// A private page shared with one member: they follow it live, and
+		// get the whole page the moment it is shared; nobody else sees it.
+		page := s.change(s.owner, "", "doc.create", M{"title": "Plans", "private": true, "markdown": "first\n"})["ref"].(string)
+		if strings.Contains(feed(wt.Token), page) {
+			t.Fatal("a private page was in another member's feed before it was shared")
+		}
+		s.change(s.owner, "", "doc.update", M{"id": page, "shared_with": []string{"@writer"}})
+		s.change(s.owner, "", "doc.write", M{"doc": page, "markdown": "first\n\nsecond\n"})
+		got := feed(wt.Token)
+		if !strings.Contains(got, `"title":"Plans"`) || !strings.Contains(got, "doc.edited") {
+			t.Fatalf("the member it was shared with does not follow the page: %s", got)
+		}
+		if strings.Contains(feed(ot.Token), page) {
+			t.Fatal("a shared private page leaked to a member it was not shared with")
+		}
+		s.call(nil, wt.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 200, nil)
+		s.call(nil, ot.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 404, nil)
+
+		// A block with a mention chip and a task chip, as the editor stores it.
+		chips := s.change(s.owner, "", "doc.create", M{"title": "Chips", "blocks": []M{
+			{"id": "0192f0c0-0000-7000-8000-00000000000a", "type": "paragraph", "content": []M{{"type": "text", "text": "Ask "},
+				{"type": "mention", "props": M{"handle": "writer"}}, {"type": "text", "text": " about "}, {"type": "task", "props": M{"key": "SVA-1"}}}},
+			{"id": "0192f0c0-0000-7000-8000-00000000000b", "type": "paragraph", "content": []M{{"type": "text", "text": "Second."}}},
+		}})["ref"].(string)
+		md := s.call(nil, wt.Token, "GET", "/api/v1/w/-/docs/"+chips+"?format=md", nil, 200, nil)
+		if !strings.Contains(md, "Ask @writer about SVA-1") {
+			t.Fatalf("chips as Markdown: %s", md)
+		}
+		// An agent writes the page back with one line changed: the chip block
+		// is the same words, so it keeps its id and its chips.
+		s.change(nil, wt.Token, "doc.write", M{"doc": chips, "markdown": strings.Replace(md, "Second.", "Second, edited.", 1)})
+		var out struct {
+			Blocks []struct {
+				ID      string
+				Content json.RawMessage
+			}
+		}
+		s.call(s.owner, "", "GET", w+"/docs/"+chips, nil, 200, &out)
+		kept := false
+		for _, b := range out.Blocks {
+			if b.ID == "0192f0c0-0000-7000-8000-00000000000a" && strings.Contains(string(b.Content), `"mention"`) {
+				kept = true
+			}
+		}
+		if !kept || len(out.Blocks) != 2 {
+			t.Fatalf("the chip block was replaced by the rewrite: %+v", out.Blocks)
+		}
+
+		// Undo of a delete puts the block back under its own id.
+		s.change(s.owner, "", "doc.edit", M{"doc": chips, "ops": []M{{"op": "delete", "id": "0192f0c0-0000-7000-8000-00000000000a"}}})
+		s.change(s.owner, "", "doc.edit", M{"doc": chips, "ops": []M{{"op": "insert", "before": out.Blocks[len(out.Blocks)-1].ID,
+			"block": M{"id": "0192f0c0-0000-7000-8000-00000000000a", "type": "paragraph", "content": []M{{"type": "text", "text": "Back again."}}}}}})
+		if back := s.call(s.owner, "", "GET", w+"/docs/"+chips+"?format=md", nil, 200, nil); !strings.HasPrefix(back, "Back again.") {
+			t.Fatalf("the block did not come back in place: %s", back)
+		}
+		// The page trash can be listed.
+		s.change(s.owner, "", "doc.delete", M{"id": chips})
+		if tr := s.call(s.owner, "", "GET", w+"/docs?trash=1", nil, 200, nil); !strings.Contains(tr, `"title":"Chips"`) {
+			t.Fatalf("page trash: %s", tr)
+		}
+	})
+}

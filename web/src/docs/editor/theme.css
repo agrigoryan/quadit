@@ -137,7 +137,8 @@
 }
 
 /* Placeholders and the "add file" box. */
-.qd-editor .bn-inline-content:has(> .ProseMirror-trailingBreak):before {
+.qd-editor .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after,
+.qd-editor .bn-inline-content:has(> .ProseMirror-trailingBreak)::before {
   color: var(--ink-3);
   font-style: normal;
 }
@@ -263,9 +264,9 @@
 }
 .qd-presence-name {
   position: absolute;
-  bottom: 100%;
-  left: 0;
-  border-radius: 4px 4px 4px 0;
+  top: 0;
+  right: 100%;
+  border-radius: 4px 0 0 4px;
   padding: 0 5px;
   color: #fff;
   font-size: 0.6875rem;
@@ -311,6 +312,13 @@
   }
   .qd-presence {
     left: 0.375rem;
+  }
+  /* No gutter for a name on a phone: the coloured line stays, the header says who. */
+  .qd-presence {
+    width: 3px;
+  }
+  .qd-presence-name {
+    display: none;
   }
   .qd-thread-mark {
     right: 0;

@@ -85,7 +85,7 @@ export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState
   callbacks.current = { onSaveState, onFocusBlock, onComment };
 
   useEffect(() => {
-    if (readOnly) return;
+    // A page that cannot be edited here still follows what others (or the server) write in it.
     const sync = new DocSync(editor, docId, rows, seq, (state) => callbacks.current.onSaveState?.(state));
     const dom = editor.domElement;
     const onBlur = () => sync.flush();

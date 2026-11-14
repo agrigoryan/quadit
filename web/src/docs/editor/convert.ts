@@ -5,6 +5,7 @@
 // back to that short form, so a page written by an agent and the same page
 // edited here stay the same blocks to the server.
 
+import { chipify } from "@/docs/editor/refs";
 import type { BlockRow, BlockTree } from "@/docs/types";
 
 type Obj = Record<string, unknown>;
@@ -43,7 +44,8 @@ const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !
 
 // ---- server -> editor ----
 
-function inlineIn(content: unknown): unknown {
+/** Inline content for the editor. `rich` text also gets chips for the things it names (editor/refs.ts). */
+function inlineIn(content: unknown, rich = true): unknown {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return [];
   const out: unknown[] = [];
@@ -51,9 +53,11 @@ function inlineIn(content: unknown): unknown {
     if (!isObj(raw)) continue;
     const type = String(raw.type ?? "text");
     if (type === "text") {
-      out.push({ type: "text", text: String(raw.text ?? ""), styles: isObj(raw.styles) ? raw.styles : {} });
+      const styles = isObj(raw.styles) ? raw.styles : {};
+      if (rich) out.push(...chipify(String(raw.text ?? ""), styles));
+      else out.push({ type: "text", text: String(raw.text ?? ""), styles });
     } else if (type === "link") {
-      out.push({ type: "link", href: String(raw.href ?? ""), content: inlineIn(raw.content) });
+      out.push({ type: "link", href: String(raw.href ?? ""), content: inlineIn(raw.content, false) });
     } else if (TO_EDITOR[type] && isObj(raw.props)) {
       const prop = CHIP_PROP[type] as string;
       out.push({ type: TO_EDITOR[type], props: { [prop]: String(raw.props[prop] ?? "").replace(/^@/, "") } });
@@ -95,7 +99,7 @@ export function toEditor(block: Pick<BlockRow, "id" | "type" | "props" | "conten
   }
   const out: Omit<EdBlock, "children"> = { id: block.id, type: block.type, props };
   if (spec.content === "table") out.content = tableIn(block.content);
-  else if (spec.content !== "none") out.content = inlineIn(block.content);
+  else if (spec.content !== "none") out.content = inlineIn(block.content, spec.content === "inline");
   return out;
 }
 

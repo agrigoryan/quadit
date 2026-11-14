@@ -43,7 +43,8 @@ export function ViewTabs({ databaseId, views, active, onPick }: Props) {
   }
 
   return (
-    <div role="tablist" aria-label={t("db.views")} className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto no-scrollbar">
+    <div className="flex min-w-0 flex-1 items-center gap-0.5">
+      <div role="tablist" aria-label={t("db.views")} className="flex min-w-0 items-center gap-0.5 overflow-x-auto no-scrollbar">
       {views.map((view) => {
         const Icon = VIEW_ICONS[view.type] ?? VIEW_ICONS.table;
         const on = view.id === active?.id;
@@ -111,6 +112,7 @@ export function ViewTabs({ databaseId, views, active, onPick }: Props) {
           </Menu>
         );
       })}
+      </div>
       <Menu>
         <MenuTrigger aria-label={t("db.view.add")} className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover">
           <Plus className="size-4" aria-hidden />

@@ -80,7 +80,7 @@ function LazyInput({ value, onChange, type }: { value: string; onChange: (v: str
 
 function ValueInput({ prop, filter, onChange }: { prop: DBProperty | undefined; filter: RowFilter; onChange: (value: unknown) => void }) {
   const members = useMembers();
-  const small = { size: "md" as const, className: "min-w-0 flex-1" };
+  const small = { size: "md" as const, className: "min-w-0 flex-1 [&>span]:flex-1" };
   if (prop?.type === "select" || prop?.type === "multi_select") {
     return <Select label={t("db.filter.value")} placeholder={t("db.filter.pick")} items={optionsOf(prop).map((o) => ({ id: o.name, label: o.name }))} value={typeof filter.value === "string" ? filter.value : undefined} onPick={onChange} buttonProps={small} />;
   }
@@ -116,9 +116,9 @@ export function FilterEditor({ view, props }: { view: DBView; props: DBProperty[
                 const nextOps = opsFor(props.find((p) => p.id === id));
                 patch(i, { prop: id, op: nextOps.includes(f.op) ? f.op : (nextOps[0] as FilterOp), value: undefined });
               }}
-              buttonProps={{ className: "w-32" }}
+              buttonProps={{ className: "w-32 [&>span]:flex-1" }}
             />
-            <Select label={t("db.filter.op")} items={ops.map((op) => ({ id: op, label: opName(op, DATES.includes(prop?.type ?? "")) }))} value={f.op} onPick={(op) => patch(i, { op: op as FilterOp })} buttonProps={{ className: "w-32" }} />
+            <Select label={t("db.filter.op")} items={ops.map((op) => ({ id: op, label: opName(op, DATES.includes(prop?.type ?? "")) }))} value={f.op} onPick={(op) => patch(i, { op: op as FilterOp })} buttonProps={{ className: "w-32 [&>span]:flex-1" }} />
             {!NO_VALUE.includes(f.op) && <ValueInput prop={prop} filter={f} onChange={(value) => patch(i, { value })} />}
             <button type="button" aria-label={t("db.filter.remove")} onClick={() => save(filters.filter((_, j) => j !== i))} className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 hover:bg-hover hover:text-ink">
               <X className="size-4" aria-hidden />
@@ -144,7 +144,7 @@ export function SortEditor({ view, props }: { view: DBView; props: DBProperty[] 
       {sorts.length === 0 && <p className="px-1 py-1 text-sm text-ink-2">{t("db.sort.none")}</p>}
       {sorts.map((s, i) => (
         <div key={i} className="flex items-center gap-1.5">
-          <Select label={t("db.filter.prop")} items={propItems(props)} value={s.prop} onPick={(prop) => patch(i, { prop })} buttonProps={{ className: "min-w-0 flex-1" }} />
+          <Select label={t("db.filter.prop")} items={propItems(props)} value={s.prop} onPick={(prop) => patch(i, { prop })} buttonProps={{ className: "min-w-0 flex-1 [&>span]:flex-1" }} />
           <Button onClick={() => patch(i, { desc: !s.desc })} className="w-32 justify-start">
             {s.desc ? <ArrowDown className="size-3.5" aria-hidden /> : <ArrowUp className="size-3.5" aria-hidden />}
             {s.desc ? t("db.sort.desc") : t("db.sort.asc")}

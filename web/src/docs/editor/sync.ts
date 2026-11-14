@@ -22,6 +22,7 @@ import type { FeedEvent } from "@/lib/types";
 import { type BlockSchemaLike, type EdBlock, rowsToEditor, signature, toEditor, toWire } from "@/docs/editor/convert";
 import { diff, flatten, type Known } from "@/docs/editor/diff";
 import { keepCursor } from "@/docs/editor/cursor";
+import { placeBlock } from "@/docs/editor/place";
 import { loadPage } from "@/docs/store";
 import type { BlockRow, Doc } from "@/docs/types";
 
@@ -258,38 +259,9 @@ export class DocSync {
       keepCursor(this.editor, row.id, () => this.editor.updateBlock(row.id, update as never));
     } else {
       if (cur) this.editor.removeBlocks([row.id]);
-      this.insertAt({ ...block, children: cur?.children ?? [] }, parent, row);
+      placeBlock(this.editor, this.known, { ...block, children: cur?.children ?? [] }, parent, row);
     }
     this.remember(row);
-  }
-
-  /** Puts a block where its rank says, next to the nearest neighbour that is on screen. */
-  private insertAt(block: EdBlock, parent: string, row: BlockRow) {
-    const sibs: { id: string; rank: string }[] = [{ id: row.id, rank: row.rank }];
-    for (const [id, k] of this.known) {
-      if (k.parent === parent && id !== row.id) sibs.push({ id, rank: k.rank });
-    }
-    sibs.sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.id < b.id ? -1 : 1));
-    const at = sibs.findIndex((s) => s.id === row.id);
-    const here = (id: string) => !!this.editor.getBlock(id) && (this.editor.getParentBlock(id)?.id ?? "") === parent;
-    for (let i = at + 1; i < sibs.length; i++) {
-      const id = (sibs[i] as { id: string }).id;
-      if (here(id)) return void this.editor.insertBlocks([block as never], id, "before");
-    }
-    for (let i = at - 1; i >= 0; i--) {
-      const id = (sibs[i] as { id: string }).id;
-      if (here(id)) return void this.editor.insertBlocks([block as never], id, "after");
-    }
-    if (parent) {
-      const p = this.editor.getBlock(parent) as unknown as EdBlock | undefined;
-      if (!p) return;
-      const first = p.children[0];
-      if (first) this.editor.insertBlocks([block as never], first.id, "before");
-      else this.editor.updateBlock(parent, { children: [block] } as never);
-      return;
-    }
-    const first = this.doc()[0];
-    if (first) this.editor.insertBlocks([block as never], first.id, "before");
   }
 
   /**
