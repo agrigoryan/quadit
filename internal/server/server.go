@@ -276,6 +276,11 @@ type handler func(*c) error
 func (s *Server) open(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
+		// Calls that need no sign-in are counted by where they come from.
+		if err := s.limits.check("ip:"+clientIP(r), 600); err != nil {
+			s.fail(w, r, err)
+			return
+		}
 		if err := h(x); err != nil {
 			s.fail(w, r, err)
 		}
@@ -349,6 +354,11 @@ func (s *Server) identify(x *c) error {
 			return errUnauthorized("this token's account is disabled")
 		}
 		x.token = &t
+		if now-t.LastUsedAt > 24*3600_000 {
+			// A token's use is on the record: its first, and then once for
+			// each day it is used.
+			s.audit(x.r, t.WorkspaceID, x.user, "token.used", "token", t.ID, map[string]string{"name": t.Name})
+		}
 		if now-t.LastUsedAt > 60_000 {
 			s.st.Update(ctx, "api_tokens", map[string]any{"last_used_at": now}, store.Eq("id", t.ID))
 		}

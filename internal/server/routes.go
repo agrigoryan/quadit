@@ -94,9 +94,10 @@ func (s *Server) hMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	s.stats.mu.Unlock()
 	ctx := r.Context()
+	fmt.Fprintf(w, "# TYPE quadit_rows gauge\n")
 	for _, t := range []string{"workspaces", "users", "tasks", "events", "docs", "files"} {
 		if n, err := s.st.Count(ctx, t); err == nil {
-			fmt.Fprintf(w, "# TYPE quadit_rows gauge\nquadit_rows{table=%q} %d\n", t, n)
+			fmt.Fprintf(w, "quadit_rows{table=%q} %d\n", t, n)
 		}
 	}
 	if n, err := s.st.Count(ctx, "jobs", store.Null("done_at")); err == nil {

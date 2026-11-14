@@ -52,10 +52,14 @@ func (s *Server) hSettingPut(x *c) error {
 	if _, fromEnv := s.rawSetting(x.ctx(), name); fromEnv {
 		return &engine.Error{Code: engine.CodeConflict, Message: fmt.Sprintf("%s is set by the environment variable %s, which wins; change it there", name, envName(name))}
 	}
+	if err := s.keepsADoor(x, name, value); err != nil {
+		return err
+	}
 	if err := s.saveSetting(x.ctx(), name, value, x.user.ID); err != nil {
 		return err
 	}
-	s.audit(x.r, "", x.user, "setting.changed", "setting", name, nil)
+	// The record says what it was set to, with anything secret blanked.
+	s.audit(x.r, "", x.user, "setting.changed", "setting", name, s.maskedSettings(x.ctx())[name])
 	return s.hSettings(x)
 }
 
@@ -270,4 +274,50 @@ func (s *Server) hHealth(x *c) error {
 	out["sources_failing"], _ = s.st.Count(ctx, "doc_sources", store.Live, store.Ne("last_error", ""))
 	out["integrations_failing"], _ = s.st.Count(ctx, "integrations", store.Live, store.Ne("last_error", ""))
 	return x.ok(out)
+}
+
+// keepsADoor refuses a change to the sign-in settings that would leave the
+// one making it with no way to sign in: turning passwords off needs a
+// passkey or a provider account of theirs that still works.
+func (s *Server) keepsADoor(x *c, name string, value json.RawMessage) error {
+	ctx := x.ctx()
+	on := func(setting string, def bool) bool {
+		if setting == name {
+			var v struct {
+				Enabled *bool `json:"enabled"`
+			}
+			var b bool
+			if json.Unmarshal(value, &b) == nil {
+				return b
+			}
+			if json.Unmarshal(value, &v) == nil && v.Enabled != nil {
+				return *v.Enabled
+			}
+			return false
+		}
+		if strings.HasPrefix(setting, "auth.") && setting != "auth.password" && setting != "auth.passkeys" {
+			cfg, ok := s.oauthConfig(ctx, strings.TrimPrefix(setting, "auth."))
+			return ok && cfg.Enabled
+		}
+		return s.settingBool(ctx, setting, def)
+	}
+	if name != "auth.password" && name != "auth.passkeys" && name != "auth.google" && name != "auth.github" && name != "auth.oidc" {
+		return nil
+	}
+	if on("auth.password", true) && x.user.PasswordHash != "" {
+		return nil
+	}
+	if on("auth.passkeys", true) {
+		if n, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); n > 0 {
+			return nil
+		}
+	}
+	for _, p := range []string{"google", "github", "oidc"} {
+		if on("auth."+p, false) {
+			if n, _ := s.st.Count(ctx, "identities", store.Eq("user_id", x.user.ID), store.Eq("provider", p)); n > 0 {
+				return nil
+			}
+		}
+	}
+	return &engine.Error{Code: engine.CodeConflict, Message: "this would leave you with no way to sign in: first add a passkey, or sign in once with a provider that stays on"}
 }

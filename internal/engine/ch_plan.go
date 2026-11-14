@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -594,8 +595,10 @@ func viewCreate(c *cx) error {
 	}
 	v := core.View{ID: vid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), Description: a.Description, Icon: a.Icon,
 		OwnerID: c.actor.UserID, Shared: a.Shared == nil || *a.Shared, Query: a.Query, Layout: a.Layout, Display: a.Display, CreatedAt: c.at}
-	if len(a.Query) > 0 && !json.Valid(a.Query) {
-		return invalid("query", "query must be a JSON object")
+	if len(a.Query) > 0 {
+		if err := CheckViewQuery(a.Query); err != nil {
+			return invalid("query", "%v", err)
+		}
 	}
 	scopeType, scopeID := "workspace", c.ws
 	if a.Project != "" {
@@ -701,6 +704,11 @@ func viewUpdate(c *cx) error {
 			p.changes[col] = core.FieldChange{From: cur, To: o.V}
 		}
 		return nil
+	}
+	if a.Query.Set && len(a.Query.V) > 0 {
+		if err := CheckViewQuery(a.Query.V); err != nil {
+			return invalid("query", "%v", err)
+		}
 	}
 	if err := raw("query", a.Query, v.Query); err != nil {
 		return err
@@ -896,4 +904,13 @@ func (c *cx) applyTemplate(p core.Project, a *taskCreateArgs) (*decisionOpenArgs
 		a.Estimate = ps.Estimate
 	}
 	return ps.Decision, nil
+}
+
+// CheckViewQuery says whether a saved view's filter can be read. The server
+// sets it: the filter's fields belong to its task queries.
+var CheckViewQuery = func(q json.RawMessage) error {
+	if !json.Valid(q) {
+		return errors.New("query must be a JSON object")
+	}
+	return nil
 }

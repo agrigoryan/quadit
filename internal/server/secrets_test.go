@@ -194,3 +194,49 @@ func TestAgentsCannotWidenThemselves(t *testing.T) {
 		s.call(mia, "", "GET", w+"/tasks/OPS-1", nil, 200, nil)
 	})
 }
+
+// TestSmallGuards covers a handful of refusals that keep people and agents
+// out of trouble.
+func TestSmallGuards(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
+		// A view is saved only with a filter that can be read.
+		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "view.create", "args": M{"name": "Art", "query": M{"label": "art"}}}, 400, nil); !strings.Contains(out, "lists") {
+			t.Fatalf("a view with a broken filter: %s", out)
+		}
+		s.change(s.owner, "", "view.create", M{"name": "Art", "query": M{"label": []string{"art"}}})
+		// Turning passwords off with no other way in is refused.
+		if out := s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.password", false, 409, nil); !strings.Contains(out, "no way to sign in") {
+			t.Fatalf("locking oneself out: %s", out)
+		}
+		// The record says what a setting was changed to.
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
+		if out := s.call(s.owner, "", "GET", "/api/v1/admin/audit?action=setting.changed", nil, 200, nil); !strings.Contains(out, `"value":true`) {
+			t.Fatalf("audit of a setting: %s", out)
+		}
+		// A token's first use is on the record.
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coder", "name": "ci"}, 201, &tok)
+		s.call(nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 200, nil)
+		s.call(nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 200, nil)
+		if out := s.call(s.owner, "", "GET", w+"/audit?action=token.used", nil, 200, nil); strings.Count(out, `"token.used"`) != 1 {
+			t.Fatalf("audit of token use: %s", out)
+		}
+		// A page built from the data mentions nobody.
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Fix the jump", "assignee": "@coder"})
+		s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "@coder please look"})
+		before := s.call(nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil)
+		page := s.change(s.owner, "", "doc.create", M{"title": "Open questions", "generated": "open_questions"})["ref"].(string)
+		s.call(nil, tok.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 200, nil)
+		if after := s.call(nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil); after != before {
+			t.Fatalf("a generated page wrote to someone's inbox:\n%s\n---\n%s", before, after)
+		}
+		// The metrics page is valid: one TYPE line per name.
+		m := s.call(s.owner, "", "GET", "/metrics", nil, 200, nil)
+		if strings.Count(m, "# TYPE quadit_rows ") != 1 {
+			t.Fatalf("metrics: %s", m)
+		}
+	})
+}

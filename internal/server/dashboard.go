@@ -75,6 +75,9 @@ func (x *c) agentStates(tasks []core.Task, nm *names) ([]agentState, error) {
 	}
 	pushed := map[string]bool{}
 	for _, h := range hooks {
+		if h.Failures >= 3 {
+			continue // it keeps failing: nothing is hearing these
+		}
 		pushed[h.UserID] = true
 	}
 	keyOf := map[string]core.Task{}

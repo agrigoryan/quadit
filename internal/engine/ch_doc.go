@@ -215,7 +215,9 @@ func (c *cx) afterDocText(d core.Doc, ed *editor) error {
 		return err
 	}
 	for _, m := range mentioned {
-		if !CanSeeDoc(d, m.UserID) {
+		// A page built from the data names people because the data does;
+		// nobody wrote to them.
+		if !CanSeeDoc(d, m.UserID) || d.Generated != "" {
 			continue
 		}
 		if err := c.notify(m.UserID, core.NoteMentioned, core.Notification{DocID: d.ID, EntityType: "doc", EntityID: d.ID, Title: d.Title, Snippet: snippet(text, 200)}); err != nil {

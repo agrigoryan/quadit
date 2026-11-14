@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -460,7 +461,7 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		}
 		if len(view.Query) > 0 {
 			if err := json.Unmarshal(view.Query, &q); err != nil {
-				return q, fmt.Errorf("view %s has a broken query: %w", view.Slug, err)
+				return q, &engine.Error{Code: engine.CodeInvalid, Field: "view", Message: fmt.Sprintf("the view %s has a filter that cannot be read (%s); save it again with view.update", view.Slug, strings.TrimPrefix(err.Error(), "json: "))}
 			}
 		}
 		if view.ProjectID != "" && len(q.Project) == 0 {
@@ -469,4 +470,15 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 	}
 	err := fromURL(v, &q, append(skip, "view", "format", "fields", "count", "raw")...)
 	return q, err
+}
+
+func init() {
+	// A view is saved only with a filter that task queries can read.
+	engine.CheckViewQuery = func(raw json.RawMessage) error {
+		var q TaskQuery
+		if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&q); err != nil {
+			return fmt.Errorf("this filter cannot be read (%s). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}", strings.TrimPrefix(err.Error(), "json: "))
+		}
+		return nil
+	}
 }
