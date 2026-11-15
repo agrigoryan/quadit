@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { updateDoc } from "@/docs/actions";
+import { docTitle } from "@/docs/data";
 import { AddCoverButton } from "@/docs/page/cover";
 import { PageIcon } from "@/docs/page-icon";
 import { IconPicker } from "@/docs/tree/icon-picker";
@@ -43,6 +44,12 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
     updateDoc(doc.id, { title: title.trim() });
   };
 
+  // The title's type, the same whether it can be edited or not.
+  const type = cx(
+    "font-bold tracking-tight",
+    compact ? "text-xl leading-7" : "text-[1.75rem] leading-9 sm:text-[2rem] sm:leading-10",
+  );
+
   return (
     <div className={cx("group/title", compact ? "pt-2" : doc.cover ? "pt-5" : "pt-8 sm:pt-12")}>
       {!readOnly && doc.icon && (
@@ -78,37 +85,38 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
           <PageIcon doc={doc} />
         </div>
       )}
-      <Textarea
-        ref={box}
-        bare
-        autoGrow
-        rows={1}
-        readOnly={readOnly}
-        value={value}
-        aria-label={t("docs.title.label")}
-        placeholder={t("docs.untitled")}
-        className={cx(
-          "font-bold tracking-tight placeholder:text-ink-3/70",
-          compact ? "text-xl leading-7" : "text-[1.75rem] leading-9 sm:text-[2rem] sm:leading-10",
-        )}
-        onFocus={() => setFocused(true)}
-        onBlur={() => {
-          setFocused(false);
-          save(value);
-        }}
-        onChange={(e) => {
-          const next = e.target.value.replace(/\n/g, " ");
-          setValue(next);
-          clearTimeout(timer.current);
-          timer.current = setTimeout(() => save(next), 500);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === "ArrowDown") {
-            e.preventDefault();
-            onEnter?.();
-          }
-        }}
-      />
+      {readOnly ? (
+        // Someone who may not edit the page reads its title as words, not as a box to Tab into.
+        <h1 className={cx(type, "break-words", !doc.title.trim() && "text-ink-3/70")}>{docTitle(doc)}</h1>
+      ) : (
+        <Textarea
+          ref={box}
+          bare
+          autoGrow
+          rows={1}
+          value={value}
+          aria-label={t("docs.title.label")}
+          placeholder={t("docs.untitled")}
+          className={cx(type, "placeholder:text-ink-3/70")}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            save(value);
+          }}
+          onChange={(e) => {
+            const next = e.target.value.replace(/\n/g, " ");
+            setValue(next);
+            clearTimeout(timer.current);
+            timer.current = setTimeout(() => save(next), 500);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "ArrowDown") {
+              e.preventDefault();
+              onEnter?.();
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
