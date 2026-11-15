@@ -4,9 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,4 +180,43 @@ func TestGitHubSignInGivesUp(t *testing.T) {
 			t.Fatalf("the sign-in waited %s for GitHub", took)
 		}
 	})
+}
+
+// mcpPost sends one body to /mcp as the bearer of token.
+func mcpPost(t *testing.T, s *site, token, body string) (*http.Response, string) {
+	t.Helper()
+	req, _ := http.NewRequest("POST", s.url+"/mcp", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	return resp, string(raw)
+}
+
+// mcpAgentToken is a token of an agent of the test site.
+func mcpAgentToken(s *site) string {
+	s.change(s.owner, "", "agent.create", M{"name": "Writer", "handle": "writer"})
+	var tok struct{ Token string }
+	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@writer"}, 201, &tok)
+	return tok.Token
+}
+
+// TestMCPToolListIsStable: tools/list answers the same, byte for byte,
+// every time it is asked, so a client can tell nothing changed.
+func TestMCPToolListIsStable(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	token := mcpAgentToken(s)
+	_, first := mcpPost(t, s, token, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	if !strings.Contains(first, `"secret_request"`) {
+		t.Fatalf("tools/list = %.200s", first)
+	}
+	for i := 0; i < 50; i++ {
+		if _, again := mcpPost(t, s, token, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`); again != first {
+			t.Fatalf("tools/list answered differently the %d. time", i+2)
+		}
+	}
 }

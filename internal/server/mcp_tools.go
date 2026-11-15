@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -126,6 +127,9 @@ func toolSchema(t mcpTool) map[string]any {
 		}
 		props[name] = p
 	}
+	// Props is a map, so it has no order of its own: the same tool is
+	// described the same way every time.
+	sort.Strings(required)
 	return map[string]any{"type": "object", "properties": props, "required": required}
 }
 
