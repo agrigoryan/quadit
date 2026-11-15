@@ -1,3 +1,4 @@
+// oxlint-disable jsx-a11y/prefer-tag-over-role -- the table is a grid of flex rows, with a sticky title column and columns that are dragged and resized, which a <table> cannot lay out; a column's resize handle is a separator drawn as a line, which an <hr> cannot be
 import { type PointerEvent as ReactPointerEvent, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";

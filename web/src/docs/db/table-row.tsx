@@ -1,3 +1,4 @@
+// oxlint-disable jsx-a11y/prefer-tag-over-role -- the table is a grid of flex rows, with a sticky title column and columns that are dragged and resized, which a <table> cannot lay out
 import { memo, type MouseEvent } from "react";
 import { Ellipsis, FileText, PanelRight, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -13,6 +14,9 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/me
 import { docPath } from "@/docs/area";
 
 export const TITLE = "title";
+
+/** The id of a cell, which the grid names as its active one (aria-activedescendant). */
+export const cellId = (rowId: string, col: string) => `db-cell-${rowId}-${col}`;
 
 interface Props {
   row: Doc;
@@ -60,8 +64,11 @@ export const TableRow = memo(function TableRow({
   const titleOn = activeCol === TITLE;
   return (
     <div role="row" className="group/row flex w-max min-w-full border-b border-line hover:bg-hover/40">
+      {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the grid keeps the focus and points at its active cell */}
       <div
         role="gridcell"
+        id={cellId(row.id, TITLE)}
+        aria-selected={titleOn}
         data-cell={`${row.id}:${TITLE}`}
         style={{ width: `min(${widths[TITLE] ?? TITLE_WIDTH}px, 60vw)` }}
         className={cx(
@@ -84,6 +91,7 @@ export const TableRow = memo(function TableRow({
             }}
           />
         ) : (
+          // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the mouse's way in; from the keyboard, Enter on the active cell edits it
           <div
             className={cx("flex min-h-8 w-full min-w-0 items-center gap-1 pr-1 pl-2", !readOnly && "cursor-text")}
             onClick={() => onEditing(row.id, TITLE, true)}
@@ -135,9 +143,12 @@ export const TableRow = memo(function TableRow({
       {props.map((p) => {
         const on = activeCol === p.id;
         return (
+          // oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the grid keeps the focus and points at its active cell
           <div
             key={p.id}
             role="gridcell"
+            id={cellId(row.id, p.id)}
+            aria-selected={on}
             data-cell={`${row.id}:${p.id}`}
             style={{ width: widths[p.id] }}
             className={cx(cellBox, on && selected)}

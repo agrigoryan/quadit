@@ -348,6 +348,7 @@ export const docs = {
   "db.calendar.needsDateHint": "Rows show on the day their date says.",
   "db.calendar.addDate": "Add a Date property",
   "db.calendar.date": "Date",
+  "db.calendar.addOn": "Add a row on {day}",
 
   "db.timeline.start": "Start",
   "db.timeline.end": "End",

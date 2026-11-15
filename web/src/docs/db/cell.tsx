@@ -189,6 +189,7 @@ export function Cell({
     return (
       <button
         type="button"
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a box drawn to match the other cells; a native checkbox would need a hidden input and a label
         role="checkbox"
         aria-checked={stored === true}
         aria-label={prop.name}
@@ -219,6 +220,7 @@ export function Cell({
       );
     }
     return (
+      // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the mouse's way in; from the keyboard, Enter on the table's active cell edits it
       <div className={cx(box, "cursor-text")} onClick={() => onEditing(true)}>
         {hint ?? value}
       </div>
@@ -228,6 +230,7 @@ export function Cell({
   return (
     <Popover open={editing} onOpenChange={onEditing}>
       <PopoverAnchor asChild>
+        {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the mouse's way in; from the keyboard, Enter on the table's active cell opens it */}
         <div ref={anchor} className={cx(box, "cursor-default")} onClick={() => onEditing(!editing)}>
           {hint ?? value}
         </div>

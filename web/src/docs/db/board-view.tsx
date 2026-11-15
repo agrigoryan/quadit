@@ -55,6 +55,7 @@ function Card({ row, cells, props, onOpen, readOnly }: CardProps) {
     disabled: readOnly,
   });
   return (
+    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- dnd-kit's attributes make it a focusable button; the linter cannot see through the spread
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}

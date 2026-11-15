@@ -1,3 +1,4 @@
+// oxlint-disable jsx-a11y/prefer-tag-over-role -- the table is a grid of flex rows, with a sticky title column and columns that are dragged and resized, which a <table> cannot lay out
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
@@ -17,7 +18,7 @@ import { AddPropertyMenu } from "@/docs/db/add-property";
 import { takesTyping } from "@/docs/db/cell";
 import { isComputed, PROP_WIDTHS, TITLE_WIDTH } from "@/docs/db/prop-meta";
 import { HeaderCell } from "@/docs/db/table-header";
-import { TableRow, TITLE } from "@/docs/db/table-row";
+import { cellId, TableRow, TITLE } from "@/docs/db/table-row";
 import { shownProps, type ViewProps } from "@/docs/db/use-table";
 
 interface Active {
@@ -178,6 +179,7 @@ export function TableView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps
         tabIndex={0}
         aria-label={view.name}
         aria-rowcount={rows.length}
+        aria-activedescendant={active ? cellId(active.row, active.col) : undefined}
         onKeyDown={onKeyDown}
         onFocus={(e) => e.target === grid.current && !active && rows[0] && setActive({ row: rows[0].id, col: TITLE })}
         className="w-max min-w-full border-t border-line outline-none"

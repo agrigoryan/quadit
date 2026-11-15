@@ -23,7 +23,7 @@ import {
   startOfWeek,
   weekday,
 } from "@/lib/days";
-import { monthAndYear, today, weekdayName } from "@/lib/time";
+import { formatDay, monthAndYear, today, weekdayName } from "@/lib/time";
 import { setRowProps } from "@/docs/actions";
 import { createProperty, setViewConfig } from "@/docs/db/actions";
 import type { ViewProps } from "@/docs/db/use-table";
@@ -78,6 +78,7 @@ function DayCell({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: day, disabled: readOnly });
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a click anywhere on the day adds a row; the keyboard has the day's own button
     <div
       ref={setNodeRef}
       onClick={readOnly ? undefined : onAdd}
@@ -88,10 +89,21 @@ function DayCell({
       )}
     >
       <div className="flex h-5 items-center justify-between">
-        <Plus
-          className={cx("size-3.5 text-ink-3 opacity-0 max-sm:hidden", !readOnly && "group-hover/day:opacity-100")}
-          aria-hidden
-        />
+        {readOnly ? (
+          <span className="size-5 max-sm:hidden" aria-hidden />
+        ) : (
+          <button
+            type="button"
+            aria-label={t("db.calendar.addOn", { day: formatDay(day) })}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+            className="flex size-5 items-center justify-center rounded-sm text-ink-3 opacity-0 group-hover/day:opacity-100 focus-visible:opacity-100 max-sm:hidden"
+          >
+            <Plus className="size-3.5" aria-hidden />
+          </button>
+        )}
         <span
           className={cx(
             "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs tnum",
