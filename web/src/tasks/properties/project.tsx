@@ -1,5 +1,6 @@
 // The project a task is in. Changing it moves the task: a new key there.
 
+import { FolderInput } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useProjects } from "@/lib/selectors";
 import { moveToProject } from "@/tasks/actions";
@@ -17,4 +18,5 @@ export const project = {
     }),
     pick: moveToProject,
   },
+  bulk: { place: "move", icon: <FolderInput />, label: () => t("bulk.move") },
 } satisfies TaskProperty<"project">;

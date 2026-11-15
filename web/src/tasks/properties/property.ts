@@ -6,8 +6,8 @@
 // instead of naming the kinds. A part a kind has no use for is left out:
 // a due date is typed, not picked from a list, so it has no picker.
 
-import type { ComponentType } from "react";
-import type { Task } from "@/lib/types";
+import type { ComponentType, ReactNode } from "react";
+import type { Project, Task } from "@/lib/types";
 import type { PickerItem } from "@/ui/picker";
 
 /** "Nothing set", where an id would be: in a picker, a filter, a group. */
@@ -30,6 +30,20 @@ export interface TaskProperty<Name extends string = string> {
   manage?: "labels" | "statuses";
   /** Its row in the task's property panel; it draws nothing where the task or its project has no such thing. */
   Panel?: ComponentType<PanelProps>;
+  /** Changing it on every task of a selection, from the bulk bar. */
+  bulk?: BulkPart;
+}
+
+export interface BulkPart {
+  icon: ReactNode;
+  /** A button on the bar itself, named by the title; or an entry of its More menu, after a line when it moves the tasks rather than changing them. */
+  place: "bar" | "menu" | "move";
+  /** The menu entry's words. */
+  label?: () => string;
+  /** Offered only where the project has such a thing (cycles, estimates). */
+  offered?: (project: Project | undefined) => boolean;
+  /** For a value typed rather than picked: the form that sets it on them all. */
+  Form?: ComponentType<{ tasks: Task[]; onDone: () => void }>;
 }
 
 /** What the property panel hands each row. */
@@ -75,3 +89,5 @@ export function shared<T>(tasks: Task[], get: (task: Task) => T): T | undefined 
 
 /** A kind changed by picking from a list. */
 export type PickerProperty = TaskProperty & { picker: PickerPart };
+
+export const hasPicker = <P extends TaskProperty>(p: P): p is P & PickerProperty => p.picker !== undefined;

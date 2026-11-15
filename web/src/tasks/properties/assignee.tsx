@@ -1,5 +1,6 @@
 // Who has the task: a person or an agent, or nobody.
 
+import { UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
@@ -58,4 +59,5 @@ export const assignee = {
     pick: (tasks, id) => setAssignee(tasks, id === NONE ? null : id),
   },
   Panel: AssigneeRow,
+  bulk: { place: "bar", icon: <UserRound className="size-3.5" aria-hidden /> },
 } satisfies TaskProperty<"assignee">;

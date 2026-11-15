@@ -47,4 +47,10 @@ export const cycle = {
     pick: (tasks, id) => setCycle(tasks, id === NONE ? null : id),
   },
   Panel: CycleRow,
+  bulk: {
+    place: "menu",
+    icon: <RefreshCw />,
+    label: () => t("prop.set.cycle"),
+    offered: (project) => !!project?.settings?.cycles,
+  },
 } satisfies TaskProperty<"cycle">;

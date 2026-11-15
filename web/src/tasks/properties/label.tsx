@@ -1,5 +1,6 @@
 // A task's labels: any number of its project's (or the workspace's) labels.
 
+import { Tag } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLabels, useLookupEvenIfGone } from "@/lib/selectors";
 import { toggleLabel } from "@/tasks/actions";
@@ -48,4 +49,5 @@ export const label = {
     pick: toggleLabel,
   },
   Panel: LabelRow,
+  bulk: { place: "bar", icon: <Tag className="size-3.5" aria-hidden /> },
 } satisfies TaskProperty<"label">;

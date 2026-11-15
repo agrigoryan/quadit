@@ -1,34 +1,14 @@
-import { memo, useRef, useState } from "react";
-import {
-  CalendarDays,
-  CircleDot,
-  Ellipsis,
-  FolderInput,
-  Gauge,
-  Layers,
-  RefreshCw,
-  Tag,
-  Trash2,
-  UserRound,
-  X,
-} from "lucide-react";
+import { Fragment, memo, useRef, useState } from "react";
+import { Ellipsis, Trash2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useRowEvenIfGone } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
-import { setDue, setEstimate, trashTasks } from "@/tasks/actions";
-import { assignee } from "@/tasks/properties/assignee";
-import { cycle } from "@/tasks/properties/cycle";
-import { epic } from "@/tasks/properties/epic";
-import { label } from "@/tasks/properties/label";
-import { priority } from "@/tasks/properties/priority";
-import { project as projectProperty } from "@/tasks/properties/project";
-import type { PickerProperty } from "@/tasks/properties/property";
-import { status } from "@/tasks/properties/status";
+import { trashTasks } from "@/tasks/actions";
+import { BULK } from "@/tasks/properties";
+import { hasPicker } from "@/tasks/properties/property";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { Button, IconButton } from "@/ui/button";
-import { PriorityIcon } from "@/ui/icons";
-import { Input } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 
@@ -37,32 +17,29 @@ interface Props {
   onClear: () => void;
 }
 
-const actions: { kind: PickerProperty; label: () => string; icon: React.ReactNode }[] = [
-  { kind: status, label: () => t("prop.status"), icon: <CircleDot className="size-3.5" aria-hidden /> },
-  { kind: assignee, label: () => t("prop.assignee"), icon: <UserRound className="size-3.5" aria-hidden /> },
-  { kind: priority, label: () => t("prop.priority"), icon: <PriorityIcon priority={2} title="" /> },
-  { kind: label, label: () => t("prop.labels"), icon: <Tag className="size-3.5" aria-hidden /> },
-];
+type Bulk = (typeof BULK)[number];
 
-/** What the "More" menu opens next to itself. */
-type More = "epic" | "cycle" | "project" | "due" | "estimate";
-
-/** Floats above the list while tasks are selected: change them all at once, as one batch. */
+/**
+ * Floats above the list while tasks are selected: change them all at once,
+ * as one batch. What it offers, and where, each property says
+ * (tasks/properties).
+ */
 export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
-  const [more, setMore] = useState<More | null>(null);
+  /** What a More menu entry opened next to the menu's button. */
+  const [more, setMore] = useState<Bulk | null>(null);
   const moreButton = useRef<HTMLButtonElement>(null);
   /** Set when a menu entry opens something of its own, so the closing menu does not take the focus back. */
   const handingOver = useRef(false);
   // The tasks may be in an archived project, whose page still lists them.
   const project = useRowEvenIfGone("projects", tasks[0]?.project_id);
-  const cycles = !!project?.settings?.cycles;
-  const estimates = project?.settings?.estimates !== false;
   const can = useCan();
   if (tasks.length === 0) return null;
   // Every action here changes the tasks: for a selection the viewer may not change, they are all disabled.
   const readOnly = !tasks.every((task) => can.editTask(task));
+  const offered = BULK.filter((p) => p.bulk.offered?.(project) ?? true);
+  const menu = offered.filter((p) => p.bulk.place !== "bar");
 
-  const open = (what: More) => () => {
+  const open = (what: Bulk) => () => {
     handingOver.current = true;
     setMore(what);
   };
@@ -71,7 +48,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
     setMore(null);
     moreButton.current?.focus();
   };
-  const picker = more === "epic" ? epic : more === "cycle" ? cycle : more === "project" ? projectProperty : null;
+  const Form = more?.bulk.Form;
 
   return (
     <div
@@ -80,14 +57,18 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
       className="absolute inset-x-0 bottom-4 z-20 mx-auto flex w-fit max-w-[calc(100%-1.5rem)] items-center gap-1 overflow-x-auto rounded-lg bg-surface p-1.5 pl-3 shadow-pop no-scrollbar animate-pop"
     >
       <span className="mr-1 shrink-0 text-sm font-medium tnum">{t("bulk.selected", { n: tasks.length })}</span>
-      {actions.map((a) => (
-        <TaskPropertyPicker key={a.kind.name} property={a.kind} tasks={tasks} side="top">
-          <Button size="md" className="max-sm:px-2" disabled={readOnly} aria-label={a.label()}>
-            {a.icon}
-            <span className="max-sm:hidden">{a.label()}</span>
-          </Button>
-        </TaskPropertyPicker>
-      ))}
+      {offered.map(
+        (p) =>
+          p.bulk.place === "bar" &&
+          hasPicker(p) && (
+            <TaskPropertyPicker key={p.name} property={p} tasks={tasks} side="top">
+              <Button size="md" className="max-sm:px-2" disabled={readOnly} aria-label={p.title()}>
+                {p.bulk.icon}
+                <span className="max-sm:hidden">{p.title()}</span>
+              </Button>
+            </TaskPropertyPicker>
+          ),
+      )}
 
       <Menu>
         <MenuTrigger asChild>
@@ -104,31 +85,19 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
             handingOver.current = false;
           }}
         >
-          <MenuItem icon={<Layers />} onSelect={open("epic")}>
-            {t("prop.set.epic")}
-          </MenuItem>
-          {cycles && (
-            <MenuItem icon={<RefreshCw />} onSelect={open("cycle")}>
-              {t("prop.set.cycle")}
-            </MenuItem>
-          )}
-          <MenuItem icon={<CalendarDays />} onSelect={open("due")}>
-            {t("bulk.due")}
-          </MenuItem>
-          {estimates && (
-            <MenuItem icon={<Gauge />} onSelect={open("estimate")}>
-              {t("bulk.estimate")}
-            </MenuItem>
-          )}
-          <MenuSeparator />
-          <MenuItem icon={<FolderInput />} onSelect={open("project")}>
-            {t("bulk.move")}
-          </MenuItem>
+          {menu.map((p, i) => (
+            <Fragment key={p.name}>
+              {p.bulk.place === "move" && menu[i - 1]?.bulk.place !== "move" && <MenuSeparator />}
+              <MenuItem icon={p.bulk.icon} onSelect={open(p)}>
+                {p.bulk.label?.()}
+              </MenuItem>
+            </Fragment>
+          ))}
         </MenuContent>
       </Menu>
-      {picker && (
+      {more && hasPicker(more) && (
         <TaskPropertyPicker
-          property={picker}
+          property={more}
           tasks={tasks}
           open
           onOpenChange={(next) => !next && close()}
@@ -137,16 +106,11 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
           align="end"
         />
       )}
-      {(more === "due" || more === "estimate") && (
+      {more && Form && (
         <Popover open onOpenChange={(next) => !next && close()}>
           <PopoverAnchor virtualRef={moreButton} />
-          <PopoverContent
-            side="top"
-            align="end"
-            aria-label={t(more === "due" ? "bulk.due" : "bulk.estimate")}
-            className="w-60 p-3"
-          >
-            {more === "due" ? <DueForm tasks={tasks} onDone={close} /> : <EstimateForm tasks={tasks} onDone={close} />}
+          <PopoverContent side="top" align="end" aria-label={more.bulk.label?.()} className="w-60 p-3">
+            <Form tasks={tasks} onDone={close} />
           </PopoverContent>
         </Popover>
       )}
@@ -170,87 +134,3 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
     </div>
   );
 });
-
-/** The value every task shares, or nothing when they differ. */
-function shared<T>(tasks: Task[], get: (task: Task) => T | undefined): T | undefined {
-  const first = tasks[0] ? get(tasks[0]) : undefined;
-  return tasks.every((task) => get(task) === first) ? first : undefined;
-}
-
-interface FormProps {
-  tasks: Task[];
-  onDone: () => void;
-}
-
-/** One due date for the whole selection, or none. */
-function DueForm({ tasks, onDone }: FormProps) {
-  const [day, setDay] = useState(() => shared(tasks, (task) => task.due_on) ?? "");
-  const set = (value: string | null) => {
-    setDue(tasks, value);
-    onDone();
-  };
-  return (
-    <form
-      className="flex flex-col gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (day) set(day);
-      }}
-    >
-      <label htmlFor="bulk-due" className="text-xs font-medium text-ink-2">
-        {t("bulk.due.label", { n: tasks.length })}
-      </label>
-      <Input id="bulk-due" type="date" autoFocus value={day} onChange={(e) => setDay(e.target.value)} />
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={() => set(null)}>
-          {t("prop.clearDue")}
-        </Button>
-        <Button type="submit" variant="primary" disabled={!day}>
-          {t("bulk.set")}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-/** One estimate, in points, for the whole selection, or none. */
-function EstimateForm({ tasks, onDone }: FormProps) {
-  const [points, setPoints] = useState(() => String(shared(tasks, (task) => task.estimate) ?? ""));
-  const n = Number(points);
-  const valid = points.trim() !== "" && Number.isInteger(n) && n > 0;
-  const set = (value: number | null) => {
-    setEstimate(tasks, value);
-    onDone();
-  };
-  return (
-    <form
-      className="flex flex-col gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (valid) set(n);
-      }}
-    >
-      <label htmlFor="bulk-estimate" className="text-xs font-medium text-ink-2">
-        {t("bulk.estimate.label", { n: tasks.length })}
-      </label>
-      <Input
-        id="bulk-estimate"
-        type="number"
-        inputMode="numeric"
-        min={1}
-        step={1}
-        autoFocus
-        value={points}
-        onChange={(e) => setPoints(e.target.value)}
-      />
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={() => set(null)}>
-          {t("bulk.estimate.clear")}
-        </Button>
-        <Button type="submit" variant="primary" disabled={!valid}>
-          {t("bulk.set")}
-        </Button>
-      </div>
-    </form>
-  );
-}

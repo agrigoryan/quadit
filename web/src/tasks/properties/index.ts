@@ -14,7 +14,7 @@ import { milestone } from "@/tasks/properties/milestone";
 import { parent } from "@/tasks/properties/parent";
 import { priority } from "@/tasks/properties/priority";
 import { project } from "@/tasks/properties/project";
-import type { PickerProperty, TaskProperty } from "@/tasks/properties/property";
+import type { BulkPart, PickerProperty, TaskProperty } from "@/tasks/properties/property";
 import { status } from "@/tasks/properties/status";
 import { waiting } from "@/tasks/properties/waiting";
 
@@ -38,6 +38,22 @@ const TABLE = [
 export type PropertyName = (typeof TABLE)[number]["name"];
 
 export const PROPERTIES: readonly TaskProperty<PropertyName>[] = TABLE;
+
+/**
+ * The bulk bar's, in its order: the More menu has the due date before the
+ * estimate, where the panel has them the other way round.
+ */
+export const BULK: (TaskProperty<PropertyName> & { bulk: BulkPart })[] = [
+  status,
+  assignee,
+  priority,
+  label,
+  epic,
+  cycle,
+  due,
+  estimate,
+  project,
+];
 
 /** The properties a key opens the picker of (S, A, P, L), in the table's order. */
 export const KEYED = PROPERTIES.filter((p): p is TaskProperty<PropertyName> & PickerProperty => !!p.picker?.hotkey);

@@ -38,4 +38,5 @@ export const epic = {
     pick: (tasks, id) => setEpic(tasks, id === NONE ? null : id),
   },
   Panel: EpicRow,
+  bulk: { place: "menu", icon: <Layers />, label: () => t("prop.set.epic") },
 } satisfies TaskProperty<"epic">;

@@ -1,5 +1,6 @@
 // A task's status: where it is in its project's workflow.
 
+import { CircleDot } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { useRowEvenIfGone, useStatuses } from "@/lib/selectors";
 import { setStatus } from "@/tasks/actions";
@@ -37,4 +38,5 @@ export const status = {
     pick: setStatus,
   },
   Panel: StatusRow,
+  bulk: { place: "bar", icon: <CircleDot className="size-3.5" aria-hidden /> },
 } satisfies TaskProperty<"status">;

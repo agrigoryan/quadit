@@ -38,4 +38,5 @@ export const priority = {
     pick: (tasks, id) => setPriority(tasks, Number(id)),
   },
   Panel: PriorityRow,
+  bulk: { place: "bar", icon: <PriorityIcon priority={2} title="" /> },
 } satisfies TaskProperty<"priority">;
