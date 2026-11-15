@@ -22,7 +22,7 @@ import { useMember } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/lib/types";
-import { archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
+import { anchorOf, archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { useTaskLink } from "@/tasks/task-link";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
@@ -68,6 +68,8 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
   // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
   const taskKey = useStore((s) => (item.task_id ? s.c.tasks[item.task_id]?.key : undefined)) ?? key;
   const link = useTaskLink({ key: taskKey ?? "" });
+  const anchor = anchorOf(item);
+  const to = anchor ? `${link.to}#${anchor}` : link.to;
   const what = (
     <>
       {key && <span className="shrink-0 text-xs text-ink-3 tnum">{key}</span>}
@@ -105,7 +107,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
           <span className="truncate">{sentence}</span>
         </p>
         {taskKey ? (
-          <Link {...link} onClick={() => unread && markRead([item.id])} aria-label={label} className={whatStyle}>
+          <Link {...link} to={to} onClick={() => unread && markRead([item.id])} aria-label={label} className={whatStyle}>
             {what}
           </Link>
         ) : (

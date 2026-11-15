@@ -10,6 +10,10 @@ export function splitTitle(title: string | undefined): { key: string; title: str
   return m ? { key: m[1] ?? "", title: m[2] ?? "" } : { key: "", title: title ?? "" };
 }
 
+/** The part of its task an item is about, as the task's address names it: a question asked opens at that question. */
+export const anchorOf = (item: Notification): string | undefined =>
+  item.entity_type === "decision" && item.entity_id ? `decision-${item.entity_id}` : undefined;
+
 export function markRead(ids: string[]) {
   const now = Date.now();
   send({ type: "notification.read", args: { ids } }, (tx) => {

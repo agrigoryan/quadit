@@ -5,7 +5,7 @@ import { useCollection, useMe } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import type { Notification } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
-import { archive, markAllRead, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
+import { anchorOf, archive, markAllRead, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { InboxRow } from "@/pages/inbox-row";
 import { type OpenAs, useListKeys } from "@/pages/list-keys";
 import { useTaskNav } from "@/tasks/task-link";
@@ -38,7 +38,7 @@ export function InboxPage() {
     (item: Notification, as: OpenAs = "peek") => {
       if (!item.read_at) markRead([item.id]);
       const key = taskKeyOf(item);
-      if (key) tasks[as](key);
+      if (key) tasks[as](key, anchorOf(item));
     },
     [tasks],
   );
