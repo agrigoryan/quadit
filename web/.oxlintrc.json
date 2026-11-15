@@ -32,7 +32,8 @@
     "jsx-a11y/media-has-caption": "off",
 
     // Warnings: findings today, to be fixed one rule at a time.
-    "no-sequences": "warn",
+    // Prettier puts parentheses around a comma sequence; they do not make it fine.
+    "no-sequences": ["warn", { "allowInParentheses": false }],
     "no-unused-vars": "warn",
     "typescript/no-unnecessary-type-assertion": "warn",
     "typescript/no-floating-promises": "warn",
