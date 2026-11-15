@@ -1,12 +1,12 @@
-// Strings for the insights part of the app. They are kept beside the pages
-// that use them (insights/strings/*.ts) and gathered here.
+// Strings for the insights part of the app, one file per page (insights-*.ts),
+// gathered here.
 
-import { agentsStrings } from "@/insights/strings/agents";
-import { coreStrings } from "@/insights/strings/core";
-import { dashboardStrings } from "@/insights/strings/dashboard";
-import { decisionsStrings } from "@/insights/strings/decisions";
-import { planStrings } from "@/insights/strings/plan";
-import { timelineStrings } from "@/insights/strings/timeline";
+import { agentsStrings } from "@/i18n/en/insights-agents";
+import { dashboardStrings } from "@/i18n/en/insights-dashboard";
+import { decisionsStrings } from "@/i18n/en/insights-decisions";
+import { planStrings } from "@/i18n/en/insights-plan";
+import { coreStrings } from "@/i18n/en/insights-shared";
+import { timelineStrings } from "@/i18n/en/insights-timeline";
 
 export const insights = {
   ...coreStrings,

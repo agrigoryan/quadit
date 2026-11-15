@@ -105,13 +105,7 @@
     // relative imports and layers, so these files warn on both; take a file
     // off its list once it imports only what its layer allows.
     {
-      "files": [
-        "src/ui/markdown.tsx",
-        "src/ui/mention-textarea.tsx",
-        "src/i18n/en/admin.ts",
-        "src/i18n/en/insights.ts",
-        "src/i18n/en/settings.ts"
-      ],
+      "files": ["src/ui/markdown.tsx", "src/ui/mention-textarea.tsx"],
       "rules": {
         "no-restricted-imports": [
           "warn",

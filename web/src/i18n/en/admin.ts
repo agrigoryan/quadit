@@ -1,7 +1,6 @@
-// Strings for the admin part of the app, kept beside its pages (admin/strings*.ts).
+// Strings for the admin part of the app: its pages, and the audit log.
 
-import { adminStrings } from "@/admin/strings";
-import { auditStrings } from "@/admin/strings-audit";
-import { adminMoreStrings } from "@/admin/strings-more";
+import { auditStrings } from "@/i18n/en/admin-audit";
+import { adminStrings } from "@/i18n/en/admin-pages";
 
-export const admin = { ...adminStrings, ...adminMoreStrings, ...auditStrings };
+export const admin = { ...adminStrings, ...auditStrings };

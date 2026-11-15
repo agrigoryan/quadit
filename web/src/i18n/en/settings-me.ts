@@ -1,7 +1,7 @@
 // Strings for the Me pages of settings: profile, notifications, API tokens.
-// Sign-in and security has its own file.
+// Sign-in and security has its own file (settings-me-security.ts).
 
-import { meSecurityStrings } from "@/settings/strings/me-security";
+import { meSecurityStrings } from "@/i18n/en/settings-me-security";
 
 export const meStrings = {
   ...meSecurityStrings,
