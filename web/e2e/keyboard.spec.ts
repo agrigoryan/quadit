@@ -34,6 +34,7 @@ test("J and K move, Space peeks, Enter opens, Escape and Back return to the same
 
   // J J J K: the second row.
   for (const key of ["j", "j", "j", "k"]) await page.keyboard.press(key);
+  await expect(page.getByRole("link", { name: `Open ${keys[1]}` })).toHaveAttribute("aria-current", "true");
   await page.keyboard.press(" ");
   const panel = page.getByRole("complementary", { name: keys[1] });
   await expect(panel.getByRole("textbox", { name: "Title" })).toHaveValue("Second in line");

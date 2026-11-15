@@ -123,6 +123,13 @@ describe("TaskList keys", () => {
     expect(current()).toBe("t1");
   });
 
+  it("marks the row the keys are on as the current one, for a screen reader too", () => {
+    renderList();
+    press("j");
+    press("j");
+    expect(screen.getByRole("link", { current: true }).getAttribute("aria-label")).toBe("Open SVA-2");
+  });
+
   it("starts from the last row on K", () => {
     renderList();
     press("k");

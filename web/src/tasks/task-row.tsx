@@ -156,10 +156,14 @@ export const TaskRow = memo(function TaskRow({
       )}
 
       {draft ? (
-        <span className="min-w-0 flex-1 truncate py-2 text-ink-2">{task.title}</span>
+        <span aria-current={focused || undefined} className="min-w-0 flex-1 truncate py-2 text-ink-2">
+          {task.title}
+        </span>
       ) : (
         <Link
           {...link}
+          // J and K move a marker, not the page's focus: the row's link says it is the one they are on.
+          aria-current={focused || undefined}
           aria-label={context ? t("list.openContext", { key: task.key }) : t("task.open", { key: task.key })}
           className={cx(
             "min-w-0 flex-1 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']",
