@@ -25,7 +25,7 @@ func (e *exporter) docs(rows *exportRows) error {
 	}
 	used := map[string]bool{}
 	for _, d := range rows.docs {
-		if !engine.CanSeeDoc(d, e.who.member.UserID) {
+		if !e.who.canSeeDoc(d) {
 			continue
 		}
 		path := "docs/" + docPath(byID, d, 0)

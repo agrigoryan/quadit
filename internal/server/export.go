@@ -59,6 +59,11 @@ func (s *Server) handleExportWorkspace(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
+	// The export is written as stored, with no rule of who may see what:
+	// it is for a caller who may see it all.
+	if x.limited() {
+		return errForbidden("an export holds every project of the workspace, and this credential is limited to some of them; ask with one that is not")
+	}
 	names, err := x.names(x.ctx())
 	if err != nil {
 		return err

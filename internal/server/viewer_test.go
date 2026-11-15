@@ -122,3 +122,21 @@ func TestListedAttachmentsFollowTheirPage(t *testing.T) {
 		}
 	})
 }
+
+// TestAnExportIsNotForATokenLimitedToSomeProjects: an export holds the
+// whole workspace, so an admin's token made for some projects is refused
+// one; the admin's token for every project, and the admin signed in, get it.
+func TestAnExportIsNotForATokenLimitedToSomeProjects(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		oneProjectOnly(t, s)
+		var whole, part struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"name": "every project"}, 201, &whole)
+		s.call(s.owner, "", "POST", w+"/tokens", M{"name": "SVA only", "projects": []string{"SVA"}}, 201, &part)
+		s.call(s.owner, "", "GET", w+"/export", nil, 200, nil)
+		s.call(nil, whole.Token, "GET", w+"/export", nil, 200, nil)
+		if out := s.call(nil, part.Token, "GET", w+"/export", nil, 403, nil); strings.Contains(out, "Rotate keys") || !strings.Contains(out, "every project") {
+			t.Fatalf("the refusal: %s", out)
+		}
+	})
+}
