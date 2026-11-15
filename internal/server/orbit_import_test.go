@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
 
@@ -140,25 +141,35 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 
 		// The whole workflow came, used by a task or not, in Orbit's order
 		// within each kind, with its colours.
+		// The project is new here, so its workflow is exactly Orbit's: every
+		// status, used by a task or not, in Orbit's order, each of the right
+		// kind; the statuses a new project starts with that Orbit does not
+		// have ("Waiting", "Canceled") are gone, and new tasks still start
+		// in "Todo".
 		var lay struct {
-			Statuses []struct{ Name, Category, Color, Rank string }
-			Labels   []struct{ Name, Color string }
+			Statuses []struct {
+				Name, Category, Color, Rank string
+				IsDefault                   bool   `json:"is_default"`
+				DeletedAt                   *int64 `json:"deleted_at"`
+			}
+			Labels []struct{ Name, Color string }
 		}
 		s.call(s.owner, "", "GET", w+"/list/statuses", nil, 200, &lay)
 		s.call(s.owner, "", "GET", w+"/list/labels", nil, 200, &lay)
-		cat, rank, all := map[string]string{}, map[string]string{}, ""
+		sort.Slice(lay.Statuses, func(i, j int) bool { return lay.Statuses[i].Rank < lay.Statuses[j].Rank })
+		all, starts := "", ""
 		for _, st := range lay.Statuses {
-			cat[st.Name], rank[st.Name] = st.Category, st.Rank
+			if st.DeletedAt != nil && *st.DeletedAt != 0 {
+				continue
+			}
 			all += st.Name + " (" + st.Category + "), "
-		}
-		for name, want := range map[string]string{"Backlog": "backlog", "Parked": "unstarted", "Todo": "unstarted", "In Progress": "started",
-			"Waiting on you": "waiting", "Done": "done", "Cancelled": "canceled", "Duplicate": "canceled"} {
-			if cat[name] != want {
-				t.Fatalf("status %q is %q, want %q (all: %s)", name, cat[name], want, all)
+			if st.IsDefault {
+				starts += st.Name
 			}
 		}
-		if rank["Cancelled"] >= rank["Duplicate"] {
-			t.Fatalf("Cancelled comes before Duplicate there: ranks %q and %q", rank["Cancelled"], rank["Duplicate"])
+		const want = "Backlog (backlog), Parked (unstarted), Todo (unstarted), In Progress (started), Waiting on you (waiting), Done (done), Cancelled (canceled), Duplicate (canceled), "
+		if all != want || starts != "Todo" {
+			t.Fatalf("the workflow:\n got %s\nwant %s\nnew tasks start in %q", all, want, starts)
 		}
 		labels := map[string]string{}
 		for _, l := range lay.Labels {

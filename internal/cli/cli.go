@@ -661,7 +661,7 @@ func (r *runner) run(cmd string, rest []string) error {
 		if r.dry {
 			return nil
 		}
-		sum, err := importer.Apply(clientSink{r, new(bool)}, plan, opts["project"])
+		sum, err := importer.Apply(importer.NewSink(importAPI{r.c}, r.importLog), plan, opts["project"])
 		if r.json {
 			raw, _ := json.Marshal(map[string]any{"made": map[string]int{"tasks": sum.Tasks, "comments": sum.Comments, "pages": sum.Docs, "rows": sum.Rows, "files": sum.Files},
 				"already_there": sum.Already, "unmatched_people": sum.Unmatched})
@@ -900,51 +900,29 @@ func (r *runner) link(pos []string, approval string) error {
 	return err
 }
 
-// clientSink lets an import write through the API as the caller.
-type clientSink struct {
-	r   *runner
-	dup *bool
-}
+// importAPI is the API as an import writes through it: as the caller,
+// over the network.
+type importAPI struct{ c *Client }
 
-func (s clientSink) Change(changeID, typ string, args any) error {
-	raw, _ := json.Marshal(map[string]any{"id": changeID, "type": typ, "args": args})
-	out, err := s.r.c.do("POST", "/changes", nil, bytes.NewReader(raw), "application/json", "application/json")
-	var res struct {
-		Results []struct {
-			Duplicate bool `json:"duplicate"`
-		} `json:"results"`
+func (a importAPI) Call(method, path string, q url.Values, body []byte) ([]byte, error) {
+	if body == nil {
+		return a.c.do(method, path, q, nil, "", "application/json")
 	}
-	*s.dup = err == nil && json.Unmarshal(out, &res) == nil && len(res.Results) > 0 && res.Results[0].Duplicate
-	return err
+	return a.c.do(method, path, q, bytes.NewReader(body), "application/json", "application/json")
 }
 
-// WasDuplicate reports whether the last change had been made before.
-func (s clientSink) WasDuplicate() bool { return *s.dup }
-
-func (s clientSink) Get(path string, q url.Values) ([]byte, error) { return s.r.c.JSON(path, q) }
-
-func (s clientSink) Upload(path string) (string, error) {
-	_, u, err := s.r.c.Upload(path)
+func (a importAPI) SendFile(fileID, path string) (string, error) {
+	_, u, err := a.c.UploadAs(fileID, path)
 	return u, err
 }
 
-// UploadAs sends a file under the import's own id for it, unless an
-// earlier run of the same import has.
-func (s clientSink) UploadAs(fileID, path string) (string, bool, error) {
-	var had struct{ URL, State string }
-	if raw, err := s.r.c.JSON("/files/"+fileID, nil); err == nil && json.Unmarshal(raw, &had) == nil && had.State == "ready" {
-		return had.URL, false, nil
-	}
-	_, u, err := s.r.c.UploadAs(fileID, path)
-	return u, true, err
-}
-
-func (s clientSink) Logf(format string, a ...any) {
-	if s.r.json {
+// importLog prints an import's notes and progress.
+func (r *runner) importLog(format string, a ...any) {
+	if r.json {
 		fmt.Fprintf(os.Stderr, format+"\n", a...) // --json keeps standard output to the one JSON answer
 		return
 	}
-	fmt.Fprintf(s.r.out, format+"\n", a...)
+	fmt.Fprintf(r.out, format+"\n", a...)
 }
 
 // secretEnv asks the server for the secrets a companion may put in a

@@ -104,25 +104,55 @@ func (s *Server) hImport(x *c) error {
 	if b.DryRun {
 		return x.ok(map[string]any{"found": found, "dry_run": true})
 	}
-	sink := &serverSink{s: s, x: x}
+	var log []string
+	sink := importer.NewSink(selfAPI{s: s, x: x}, func(format string, a ...any) {
+		if len(log) < 500 {
+			log = append(log, strings.TrimSpace(fmt.Sprintf(format, a...)))
+		}
+	})
 	sum, err := importer.Apply(sink, plan, b.Options["project"])
 	s.audit(x.r, x.ws.ID, x.user, "import.ran", "import", b.Kind, map[string]any{"found": found, "tasks": sum.Tasks, "pages": sum.Docs})
 	if err != nil {
 		return &engine.Error{Code: engine.CodeInvalid, Message: "the import stopped: " + err.Error() + " (what was made so far stays; running it again continues without making anything twice)"}
 	}
 	return x.ok(map[string]any{"found": found, "made": map[string]int{"tasks": sum.Tasks, "comments": sum.Comments, "pages": sum.Docs, "rows": sum.Rows, "files": sum.Files},
-		"already_there": sum.Already, "unmatched_people": sum.Unmatched, "summary": sum.String(), "log": sink.log})
+		"already_there": sum.Already, "unmatched_people": sum.Unmatched, "summary": sum.String(), "log": log})
 }
 
-// serverSink writes an import through the server's own API as the caller.
-type serverSink struct {
-	s   *Server
-	x   *c
-	log []string
-	dup bool
+// selfAPI is the server's own API as an import writes through it: with
+// the sign-in of the request that asked for the import.
+type selfAPI struct {
+	s *Server
+	x *c
 }
 
-func (k *serverSink) do(method, path string, q url.Values, body []byte, contentType string) ([]byte, error) {
+func (k selfAPI) Call(method, path string, q url.Values, body []byte) ([]byte, error) {
+	contentType := ""
+	if body != nil {
+		contentType = "application/json"
+	}
+	return k.do(method, path, q, body, contentType)
+}
+
+func (k selfAPI) SendFile(fileID, path string) (string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	q := url.Values{"name": {filepath.Base(path)}}
+	if fileID != "" {
+		q.Set("id", fileID)
+	}
+	out, err := k.do("POST", "/files", q, raw, "application/octet-stream")
+	if err != nil {
+		return "", err
+	}
+	var f struct{ URL string }
+	json.Unmarshal(out, &f)
+	return f.URL, nil
+}
+
+func (k selfAPI) do(method, path string, q url.Values, body []byte, contentType string) ([]byte, error) {
 	u := "/api/v1/w/" + k.x.ws.Slug + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
@@ -154,62 +184,4 @@ func (k *serverSink) do(method, path string, q url.Values, body []byte, contentT
 		return nil, fmt.Errorf("%s %s: %d", method, path, rec.status)
 	}
 	return rec.body.Bytes(), nil
-}
-
-func (k *serverSink) Change(changeID, typ string, args any) error {
-	raw, _ := json.Marshal(map[string]any{"id": changeID, "type": typ, "args": args})
-	out, err := k.do("POST", "/changes", nil, raw, "application/json")
-	var res struct {
-		Results []struct {
-			Duplicate bool `json:"duplicate"`
-		} `json:"results"`
-	}
-	k.dup = err == nil && json.Unmarshal(out, &res) == nil && len(res.Results) > 0 && res.Results[0].Duplicate
-	return err
-}
-
-// WasDuplicate reports whether the last change had been made before.
-func (k *serverSink) WasDuplicate() bool { return k.dup }
-
-func (k *serverSink) Get(path string, q url.Values) ([]byte, error) {
-	return k.do("GET", path, q, nil, "")
-}
-
-func (k *serverSink) Upload(path string) (string, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	out, err := k.do("POST", "/files", url.Values{"name": {filepath.Base(path)}}, raw, "application/octet-stream")
-	if err != nil {
-		return "", err
-	}
-	var f struct{ URL string }
-	json.Unmarshal(out, &f)
-	return f.URL, nil
-}
-
-// UploadAs sends a file under the import's own id for it, unless an
-// earlier run of the same import has.
-func (k *serverSink) UploadAs(fileID, path string) (string, bool, error) {
-	var f struct{ URL, State string }
-	if out, err := k.do("GET", "/files/"+fileID, nil, nil, ""); err == nil && json.Unmarshal(out, &f) == nil && f.State == "ready" {
-		return f.URL, false, nil
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return "", false, err
-	}
-	out, err := k.do("POST", "/files", url.Values{"name": {filepath.Base(path)}, "id": {fileID}}, raw, "application/octet-stream")
-	if err != nil {
-		return "", false, err
-	}
-	json.Unmarshal(out, &f)
-	return f.URL, true, nil
-}
-
-func (k *serverSink) Logf(format string, a ...any) {
-	if len(k.log) < 500 {
-		k.log = append(k.log, strings.TrimSpace(fmt.Sprintf(format, a...)))
-	}
 }
