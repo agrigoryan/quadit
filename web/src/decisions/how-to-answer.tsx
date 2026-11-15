@@ -11,7 +11,9 @@ import { memberItems } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Picker } from "@/ui/picker";
-import type { AnswerKind } from "@/decisions/use-new-decision";
+import type { NewDecision } from "@/decisions/actions";
+
+export type AnswerKind = NewDecision["kind"];
 
 const ANYONE = "anyone";
 
