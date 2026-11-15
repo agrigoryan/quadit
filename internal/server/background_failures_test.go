@@ -20,9 +20,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
 
-// bgOutage is what a faulty store answers with: a database that is
+// errBgOutage is what a faulty store answers with: a database that is
 // briefly unreachable, not a row that is missing.
-var bgOutage = errors.New("the database is briefly unreachable")
+var errBgOutage = errors.New("the database is briefly unreachable")
 
 // bgFault makes the next calls of one store method on one table fail.
 type bgFault struct {
@@ -47,7 +47,7 @@ func (fs *bgFaults) check(op, table string, set map[string]any, where []store.Co
 	for _, f := range fs.list {
 		if f.op == op && f.table == table && f.hits < f.times && (f.match == nil || f.match(set, where)) {
 			f.hits++
-			return bgOutage
+			return errBgOutage
 		}
 	}
 	return nil
@@ -314,7 +314,7 @@ func TestAJobOutlivesABriefOutage(t *testing.T) {
 		job := id.New()
 		queueJob(t, st.Store, job, bgWorkspaceID(t, st.Store), item)
 		eventually(t, "the job to run once", func() bool { j := jobOf(t, st.Store, job); return j.DoneAt != 0 || j.Error != "" })
-		if j := jobOf(t, st.Store, job); j.DoneAt != 0 || !strings.Contains(j.Error, bgOutage.Error()) {
+		if j := jobOf(t, st.Store, job); j.DoneAt != 0 || !strings.Contains(j.Error, errBgOutage.Error()) {
 			t.Fatalf("after a failed read the job is done at %d with error %q; want it waiting to be tried again", j.DoneAt, j.Error)
 		}
 		eventually(t, "the job to be done on its second try", func() bool { return jobOf(t, st.Store, job).DoneAt != 0 })
