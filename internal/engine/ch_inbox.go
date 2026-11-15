@@ -57,7 +57,7 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 		set = map[string]any{"read_at": c.at}
 	}
 	var rows []core.Notification
-	if err := c.tx.List(c.ctx, &rows, store.Q{Where: conds, Limit: 5000}); err != nil {
+	if err := c.tx.List(c.ctx, &rows, store.Q{Where: conds, Limit: scanLimit}); err != nil {
 		return err
 	}
 	if len(rows) == 0 {

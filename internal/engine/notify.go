@@ -246,7 +246,7 @@ func (l *linker) wikiLinks(text string) error {
 		if len(ds) == 0 {
 			// Written in another case than the page's title.
 			var all []core.Doc
-			if err := l.c.tx.List(l.c.ctx, &all, store.Q{Where: []store.Cond{store.Live, store.Ne("kind", core.DocRow)}, Limit: 5000}); err != nil {
+			if err := l.c.tx.List(l.c.ctx, &all, store.Q{Where: []store.Cond{store.Live, store.Ne("kind", core.DocRow)}, Limit: scanLimit}); err != nil {
 				return err
 			}
 			for _, d := range all {

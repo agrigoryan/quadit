@@ -32,17 +32,9 @@ func taskMove(c *cx, a taskMoveArgs) error {
 		c.ref, c.key = t.ID, t.Key
 		return nil
 	}
-	var cur core.Status
-	if err := c.tx.Get(c.ctx, &cur, store.Eq("id", t.StatusID)); err != nil {
-		return err
-	}
-	st, err := c.status(to, "status", cur.Name)
+	st, err := c.nearestStatus(to, t.StatusID)
 	if err != nil {
-		if st, err = c.status(to, "status", cur.Category); err != nil {
-			if st, err = c.defaultStatus(to); err != nil {
-				return err
-			}
-		}
+		return err
 	}
 	n, err := c.tx.Incr(c.ctx, "projects", "task_counter", 1, store.Eq("id", to.ID))
 	if err != nil {
@@ -60,32 +52,9 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	p.put("epic_id", t.EpicID, "")
 	p.put("milestone_id", t.MilestoneID, "")
 	p.put("cycle_id", t.CycleID, "")
-	var keep []string
-	for _, lid := range t.LabelIDs {
-		var l core.Label
-		ok, err := found(c.tx.Get(c.ctx, &l, store.Eq("id", lid)))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			continue
-		}
-		if l.ProjectID == "" {
-			keep = append(keep, lid)
-			continue
-		}
-		// A label of the old project: the new project's label of the same
-		// name takes its place, when it has one.
-		var same []core.Label
-		if err := c.tx.List(c.ctx, &same, store.Where(store.Eq("project_id", to.ID), store.Live)); err != nil {
-			return err
-		}
-		for _, s := range same {
-			if strings.EqualFold(s.Name, l.Name) {
-				keep = append(keep, s.ID)
-				break
-			}
-		}
+	keep, err := c.labelsIn(to, t.LabelIDs)
+	if err != nil {
+		return err
 	}
 	if err := c.setLabels(p, &t, keep); err != nil {
 		return err
@@ -95,4 +64,52 @@ func taskMove(c *cx, a taskMoveArgs) error {
 		return err
 	}
 	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})
+}
+
+// nearestStatus is the status a task moved to project to takes: the one of
+// the same name, else the first of the same category, else the default.
+func (c *cx) nearestStatus(to core.Project, statusID string) (core.Status, error) {
+	var cur core.Status
+	if err := c.tx.Get(c.ctx, &cur, store.Eq("id", statusID)); err != nil {
+		return cur, err
+	}
+	for _, ref := range []string{cur.Name, cur.Category} {
+		st, err := c.status(to, "status", ref)
+		if !isRefusal(err) {
+			return st, err
+		}
+	}
+	return c.defaultStatus(to)
+}
+
+// labelsIn is the labels a task moved to project to keeps: the workspace's
+// own, and for each of the old project's the new project's label of the
+// same name, when it has one.
+func (c *cx) labelsIn(to core.Project, labelIDs []string) ([]string, error) {
+	var keep []string
+	for _, lid := range labelIDs {
+		var l core.Label
+		ok, err := found(c.tx.Get(c.ctx, &l, store.Eq("id", lid)))
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		if l.ProjectID == "" {
+			keep = append(keep, lid)
+			continue
+		}
+		var same []core.Label
+		if err := c.tx.List(c.ctx, &same, store.Where(store.Eq("project_id", to.ID), store.Live)); err != nil {
+			return nil, err
+		}
+		for _, s := range same {
+			if strings.EqualFold(s.Name, l.Name) {
+				keep = append(keep, s.ID)
+				break
+			}
+		}
+	}
+	return keep, nil
 }

@@ -208,7 +208,7 @@ func (run *purge) delete(rows ...rowsOf) error {
 // tasks removes tasks trashed before the cutoff with everything on them.
 func (run *purge) tasks() error {
 	tx := run.c.tx
-	tasks, err := tx.Tasks(run.ctx, store.TaskFilter{InTrash: true, Limit: 5000})
+	tasks, err := tx.Tasks(run.ctx, store.TaskFilter{InTrash: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}

@@ -108,7 +108,7 @@ func cycleDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{CycleIDs: []string{cy.ID}, Archived: true, Limit: 5000})
+	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{CycleIDs: []string{cy.ID}, Archived: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (c *cx) startCycles(p core.Project) error {
 		return nil
 	}
 	if p.Settings.CycleDays <= 0 {
-		p.Settings.CycleDays = 14
+		p.Settings.CycleDays = defaultCycleDays
 	}
 	ref, key := c.ref, c.key
 	err := c.rollProject(p, time.UnixMilli(c.at).UTC().Format("2006-01-02"))
@@ -160,7 +160,7 @@ func (e *Engine) RollCycles(ctx context.Context) error {
 func (c *cx) rollProject(p core.Project, today string) error {
 	days := p.Settings.CycleDays
 	if days <= 0 {
-		days = 14
+		days = defaultCycleDays
 	}
 	var all []core.Cycle
 	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "starts_on"}); err != nil {
@@ -209,7 +209,7 @@ func (c *cx) rollProject(p core.Project, today string) error {
 				break
 			}
 		}
-		open, err := c.tx.Tasks(c.ctx, store.TaskFilter{CycleIDs: []string{cy.ID}, Open: true, Limit: 5000})
+		open, err := c.tx.Tasks(c.ctx, store.TaskFilter{CycleIDs: []string{cy.ID}, Open: true, Limit: scanLimit})
 		if err != nil {
 			return err
 		}

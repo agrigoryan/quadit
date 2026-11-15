@@ -93,7 +93,7 @@ func milestoneDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{MilestoneID: m.ID, Archived: true, Limit: 5000})
+	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{MilestoneID: m.ID, Archived: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}

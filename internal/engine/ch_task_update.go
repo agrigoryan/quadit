@@ -277,13 +277,7 @@ func (u *taskEdit) dueAndRank() error {
 
 func (u *taskEdit) archived() error {
 	a, t, p := u.a, &u.t, u.p
-	if a.Archived.Set {
-		if a.Archived.V && t.ArchivedAt == 0 {
-			p.put("archived_at", int64(0), u.c.at)
-		} else if !a.Archived.V && t.ArchivedAt != 0 {
-			p.put("archived_at", t.ArchivedAt, int64(0))
-		}
-	}
+	p.setStamp("archived_at", a.Archived, t.ArchivedAt, u.c.at)
 	return nil
 }
 

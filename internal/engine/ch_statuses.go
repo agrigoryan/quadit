@@ -132,40 +132,47 @@ func statusDelete(c *cx, a statusDeleteArgs) error {
 	if err := c.tx.Get(c.ctx, &pr, store.Eq("id", st.ProjectID)); err != nil {
 		return err
 	}
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{StatusIDs: []string{st.ID}, Archived: true, Limit: 5000})
+	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{StatusIDs: []string{st.ID}, Archived: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}
-	trashed, err := c.tx.Tasks(c.ctx, store.TaskFilter{StatusIDs: []string{st.ID}, InTrash: true, Limit: 5000})
+	trashed, err := c.tx.Tasks(c.ctx, store.TaskFilter{StatusIDs: []string{st.ID}, InTrash: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}
 	tasks = append(tasks, trashed...)
 	if len(tasks) > 0 || st.IsDefault {
-		if a.MoveTo == "" {
-			return invalid("move_to", "%d tasks have this status: say where they go with move_to", len(tasks))
-		}
-		to, err := c.status(pr, "move_to", a.MoveTo)
-		if err != nil {
+		if err := c.moveOffStatus(st, pr, a.MoveTo, tasks); err != nil {
 			return err
-		}
-		if to.ID == st.ID {
-			return invalid("move_to", "move_to must be another status")
-		}
-		for _, t := range tasks {
-			tp := newPatch()
-			c.setStatus(tp, &t, to)
-			if err := c.saveOther(t, tp, nil); err != nil {
-				return err
-			}
-		}
-		if st.IsDefault {
-			op := newPatch()
-			op.put("is_default", false, true)
-			if err := c.save(op, target{table: "statuses", entity: "status", id: to.ID, place: inProject(pr.ID)}); err != nil {
-				return err
-			}
 		}
 	}
 	return c.trash(target{table: "statuses", entity: "status", id: st.ID, place: inProject(pr.ID)})
+}
+
+// moveOffStatus moves the tasks of a status being deleted to another, which
+// also takes over being the default when the deleted one was.
+func (c *cx) moveOffStatus(st core.Status, pr core.Project, moveTo string, tasks []core.Task) error {
+	if moveTo == "" {
+		return invalid("move_to", "%d tasks have this status: say where they go with move_to", len(tasks))
+	}
+	to, err := c.status(pr, "move_to", moveTo)
+	if err != nil {
+		return err
+	}
+	if to.ID == st.ID {
+		return invalid("move_to", "move_to must be another status")
+	}
+	for _, t := range tasks {
+		tp := newPatch()
+		c.setStatus(tp, &t, to)
+		if err := c.saveOther(t, tp, nil); err != nil {
+			return err
+		}
+	}
+	if !st.IsDefault {
+		return nil
+	}
+	defaultPatch := newPatch()
+	defaultPatch.put("is_default", false, true)
+	return c.save(defaultPatch, target{table: "statuses", entity: "status", id: to.ID, place: inProject(pr.ID)})
 }

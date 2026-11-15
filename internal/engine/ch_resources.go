@@ -143,7 +143,7 @@ func (c *cx) promote(r core.Resource, live []core.ResourceClaim) error {
 	}
 	next := live[0]
 	// The one who was waiting gets half an hour to notice and renew.
-	if err := c.setClaim(next, map[string]any{"state": "holding", "acquired_at": c.at, "lease_until": c.at + 30*60_000}, "acquired"); err != nil {
+	if err := c.setClaim(next, map[string]any{"state": "holding", "acquired_at": c.at, "lease_until": c.at + defaultLeaseMinutes*msPerMinute}, "acquired"); err != nil {
 		return err
 	}
 	return c.notify(next.UserID, core.NoteWaitingOn, core.Notification{EntityType: "resource", EntityID: r.ID, TaskID: next.TaskID,
@@ -159,9 +159,9 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 		return err
 	}
 	if a.Minutes <= 0 {
-		a.Minutes = 30
+		a.Minutes = defaultLeaseMinutes
 	}
-	if a.Minutes > 24*60 {
+	if a.Minutes > maxLeaseMinutes {
 		return invalid("minutes", "a hold lasts at most 1440 minutes; renew it by acquiring again")
 	}
 	live, err := c.activeClaims(r)
@@ -172,7 +172,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 		if cl.UserID == c.actor.UserID {
 			c.ref, c.key = cl.ID, cl.State
 			if cl.State == "holding" { // renew
-				return c.setClaim(cl, map[string]any{"lease_until": c.at + int64(a.Minutes)*60_000}, "renewed")
+				return c.setClaim(cl, map[string]any{"lease_until": c.at + int64(a.Minutes)*msPerMinute}, "renewed")
 			}
 			return nil // already queued
 		}
@@ -194,7 +194,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 		held = held || o.State == "holding"
 	}
 	if !held && len(live) == 0 {
-		cl.State, cl.AcquiredAt, cl.LeaseUntil = "holding", c.at, c.at+int64(a.Minutes)*60_000
+		cl.State, cl.AcquiredAt, cl.LeaseUntil = "holding", c.at, c.at+int64(a.Minutes)*msPerMinute
 	}
 	if err := c.tx.Insert(c.ctx, cl); err != nil {
 		return alreadyInUse(err, "id", cid)

@@ -376,13 +376,7 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 			p.changes["edited_at"] = core.FieldChange{From: zeroNil(cm.EditedAt), To: c.at}
 		}
 	}
-	if a.Resolved.Set {
-		if a.Resolved.V && cm.ResolvedAt == 0 {
-			p.put("resolved_at", int64(0), c.at)
-		} else if !a.Resolved.V && cm.ResolvedAt != 0 {
-			p.put("resolved_at", cm.ResolvedAt, int64(0))
-		}
-	}
+	p.setStamp("resolved_at", a.Resolved, cm.ResolvedAt, c.at)
 	where, key, err := c.commentPlace(cm)
 	if err != nil {
 		return err

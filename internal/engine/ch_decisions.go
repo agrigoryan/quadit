@@ -449,45 +449,55 @@ func pickedOption(d core.Decision, option any) (string, error) {
 // pickOutcome works out how a decision is answered and the state that
 // leaves it in: picked, or sent back to the asker.
 func pickOutcome(d core.Decision, a decisionPickArgs, optionID string) (outcome, state string, err error) {
-	outcome, state = a.Outcome, core.StatePicked
 	if d.Kind == core.DecisionApproval {
-		if optionID != "" {
-			return "", "", invalid("option", "an approval has no options")
-		}
-		switch outcome {
-		case core.OutcomeApproved:
-		case core.OutcomeDeclined:
-			state = core.StateSentBack
-		default:
-			return "", "", &Error{Code: CodeInvalid, Field: "outcome", Message: "an approval is answered approved or declined",
-				Allowed: []string{core.OutcomeApproved, core.OutcomeDeclined}}
-		}
-	} else {
-		if outcome == "" && optionID != "" {
-			outcome = core.OutcomeAsIs
-			if strings.TrimSpace(a.Note) != "" {
-				outcome = core.OutcomeWithChanges
-			}
-		}
-		switch outcome {
-		case core.OutcomeAsIs, core.OutcomeWithChanges:
-			if optionID == "" {
-				return "", "", &Error{Code: CodeInvalid, Field: "option", Message: "say which option: its position, id or label", Allowed: optionIDs(d)}
-			}
-			if outcome == core.OutcomeWithChanges && strings.TrimSpace(a.Note) == "" {
-				return "", "", invalid("note", "\"with_changes\" needs a note saying what to change")
-			}
-		case core.OutcomeNone:
-			if optionID != "" {
-				return "", "", invalid("option", "outcome \"none\" picks no option")
-			}
-			state = core.StateSentBack
-		default:
-			return "", "", &Error{Code: CodeInvalid, Field: "outcome", Message: "a choice is answered with an option, or sent back",
-				Allowed: []string{core.OutcomeAsIs, core.OutcomeWithChanges, core.OutcomeNone}}
+		return approvalOutcome(a.Outcome, optionID)
+	}
+	return choiceOutcome(d, a, optionID)
+}
+
+// approvalOutcome is pickOutcome for an approval: approved, or declined
+// and sent back.
+func approvalOutcome(outcome, optionID string) (string, string, error) {
+	if optionID != "" {
+		return "", "", invalid("option", "an approval has no options")
+	}
+	switch outcome {
+	case core.OutcomeApproved:
+		return outcome, core.StatePicked, nil
+	case core.OutcomeDeclined:
+		return outcome, core.StateSentBack, nil
+	}
+	return "", "", &Error{Code: CodeInvalid, Field: "outcome", Message: "an approval is answered approved or declined",
+		Allowed: []string{core.OutcomeApproved, core.OutcomeDeclined}}
+}
+
+// choiceOutcome is pickOutcome for a choice: an option as it is or with
+// changes, or none and sent back.
+func choiceOutcome(d core.Decision, a decisionPickArgs, optionID string) (string, string, error) {
+	outcome := a.Outcome
+	if outcome == "" && optionID != "" {
+		outcome = core.OutcomeAsIs
+		if strings.TrimSpace(a.Note) != "" {
+			outcome = core.OutcomeWithChanges
 		}
 	}
-	return outcome, state, nil
+	switch outcome {
+	case core.OutcomeAsIs, core.OutcomeWithChanges:
+		if optionID == "" {
+			return "", "", &Error{Code: CodeInvalid, Field: "option", Message: "say which option: its position, id or label", Allowed: optionIDs(d)}
+		}
+		if outcome == core.OutcomeWithChanges && strings.TrimSpace(a.Note) == "" {
+			return "", "", invalid("note", "\"with_changes\" needs a note saying what to change")
+		}
+		return outcome, core.StatePicked, nil
+	case core.OutcomeNone:
+		if optionID != "" {
+			return "", "", invalid("option", "outcome \"none\" picks no option")
+		}
+		return outcome, core.StateSentBack, nil
+	}
+	return "", "", &Error{Code: CodeInvalid, Field: "outcome", Message: "a choice is answered with an option, or sent back",
+		Allowed: []string{core.OutcomeAsIs, core.OutcomeWithChanges, core.OutcomeNone}}
 }
 
 type decisionUnclearArgs struct {

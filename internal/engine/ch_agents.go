@@ -88,46 +88,54 @@ func agentCreate(c *cx, a agentCreateArgs) error {
 // actor may make this agent at all: a helper for a task, within the limit
 // on helpers, or with the admin role a standing agent.
 func (c *cx) agentTask(a agentCreateArgs, role core.Role) (core.Task, error) {
-	var err error
-	var forTask core.Task
-	if a.Task != "" {
-		if forTask, err = c.task("task", a.Task); err != nil {
+	if a.Task == "" {
+		if c.system || c.actor.Role.AtLeast(core.RoleAdmin) {
+			return core.Task{}, nil
+		}
+		if err := c.refuseHelper("a helper made for a task cannot make agents; ask the agent that made you"); err != nil {
+			return core.Task{}, err
+		}
+		return core.Task{}, forbidden("agent.create needs the admin role; you are a %s. To get help on one task, make a sub-agent for it: add \"task\": \"SVA-12\"", c.actor.Role)
+	}
+	forTask, err := c.task("task", a.Task)
+	if err != nil {
+		return forTask, err
+	}
+	if role != core.RoleMember {
+		return forTask, invalid("role", "a sub-agent made for a task is a member")
+	}
+	// Help does not nest: a helper was made for one task and does not
+	// hand it, or another, further down.
+	if !c.system {
+		if err := c.refuseHelper("a helper made for a task cannot make helpers of its own; ask the agent that made you"); err != nil {
 			return forTask, err
 		}
-		if role != core.RoleMember {
-			return forTask, invalid("role", "a sub-agent made for a task is a member")
-		}
-		// Help does not nest: a helper was made for one task and does not
-		// hand it, or another, further down.
-		if !c.system && c.actor.Kind == core.KindAgent {
-			var me core.Member
-			ok, err := found(c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)))
-			if err != nil {
-				return forTask, err
-			}
-			if ok && me.DelegatedTask != "" {
-				return forTask, forbidden("a helper made for a task cannot make helpers of its own; ask the agent that made you")
-			}
-		}
-		if n, err := c.tx.Count(c.ctx, "members", store.Eq("delegated_task", forTask.ID), store.Null("suspended_at"), store.Null("removed_at")); err != nil {
-			return forTask, err
-		} else if n >= maxHelpers {
-			return forTask, conflictErr("%s already has %d helpers at work; that is the most a task takes", forTask.Key, n)
-		}
-	} else if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
-		if c.actor.Kind == core.KindAgent {
-			var me core.Member
-			ok, err := found(c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)))
-			if err != nil {
-				return forTask, err
-			}
-			if ok && me.DelegatedTask != "" {
-				return forTask, forbidden("a helper made for a task cannot make agents; ask the agent that made you")
-			}
-		}
-		return forTask, forbidden("agent.create needs the admin role; you are a %s. To get help on one task, make a sub-agent for it: add \"task\": \"SVA-12\"", c.actor.Role)
+	}
+	n, err := c.tx.Count(c.ctx, "members", store.Eq("delegated_task", forTask.ID), store.Null("suspended_at"), store.Null("removed_at"))
+	if err != nil {
+		return forTask, err
+	}
+	if n >= maxHelpers {
+		return forTask, conflictErr("%s already has %d helpers at work; that is the most a task takes", forTask.Key, n)
 	}
 	return forTask, nil
+}
+
+// refuseHelper refuses, with the reason given, an actor that is a helper
+// made for a task.
+func (c *cx) refuseHelper(reason string) error {
+	if c.actor.Kind != core.KindAgent {
+		return nil
+	}
+	var me core.Member
+	ok, err := found(c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)))
+	if err != nil {
+		return err
+	}
+	if ok && me.DelegatedTask != "" {
+		return forbidden("%s", reason)
+	}
+	return nil
 }
 
 // agentResponsible finds the person who answers for a new agent.
@@ -228,7 +236,7 @@ func (c *cx) capScope(scope *core.Scope) *core.Scope {
 	}
 	mine := c.actor.Scope
 	if len(mine.Projects) > 0 {
-		scope.Projects = intersectProjects(mine.Projects, orAll(scope.Projects, mine.Projects))
+		scope.Projects = intersectProjects(mine.Projects, ifEmpty(scope.Projects, mine.Projects))
 	}
 	scope.ReadOnly = scope.ReadOnly || mine.ReadOnly
 	for _, t := range mine.NeedsApproval {
@@ -239,9 +247,10 @@ func (c *cx) capScope(scope *core.Scope) *core.Scope {
 	return scope
 }
 
-func orAll(list, all []string) []string {
+// ifEmpty is list, or instead when list is empty.
+func ifEmpty(list, instead []string) []string {
 	if len(list) == 0 {
-		return all
+		return instead
 	}
 	return list
 }
@@ -265,9 +274,32 @@ func agentUpdate(c *cx, a agentUpdateArgs) error {
 		return invalid("id", "@%s is a person; people edit their own profile", m.Handle)
 	}
 	p := newPatch()
+	userSet, err := c.agentProfile(p, a, &m)
+	if err != nil {
+		return err
+	}
+	if !c.system && c.actor.Kind == core.KindAgent && m.UserID == c.actor.UserID && (a.Scope.Set || a.Budget.Set) {
+		return forbidden("an agent cannot change its own role, limits or budget; the person responsible for it can")
+	}
+	if err := c.agentLimits(p, a, m); err != nil {
+		return err
+	}
+	if len(userSet) > 0 {
+		userSet["updated_at"] = c.at
+		if _, err := c.tx.Update(c.ctx, "users", userSet, store.Eq("id", m.UserID)); err != nil {
+			return err
+		}
+	}
+	return c.saveMember(m, p)
+}
+
+// agentProfile applies what is shown of an agent: its name, description,
+// picture and the person responsible for it. Those are kept on its account
+// too; it returns what to write there.
+func (c *cx) agentProfile(p *patch, a agentUpdateArgs, m *core.Member) (map[string]any, error) {
 	userSet := map[string]any{}
 	if err := p.name("name", a.Name, &m.Name); err != nil {
-		return err
+		return nil, err
 	}
 	if _, ok := p.set["name"]; ok {
 		userSet["name"] = m.Name
@@ -283,20 +315,23 @@ func agentUpdate(c *cx, a agentUpdateArgs) error {
 	if a.Responsible.Set {
 		rm, err := c.memberRef("responsible", a.Responsible.V)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if rm.Kind != core.KindPerson {
-			return invalid("responsible", "the one responsible for an agent must be a person")
+			return nil, invalid("responsible", "the one responsible for an agent must be a person")
 		}
 		userSet["responsible_id"] = rm.UserID
 		p.changes["responsible_id"] = core.FieldChange{To: rm.UserID}
 	}
-	if !c.system && c.actor.Kind == core.KindAgent && m.UserID == c.actor.UserID && (a.Scope.Set || a.Budget.Set) {
-		return forbidden("an agent cannot change its own role, limits or budget; the person responsible for it can")
-	}
+	return userSet, nil
+}
+
+// agentLimits applies what an agent may reach and spend.
+func (c *cx) agentLimits(p *patch, a agentUpdateArgs, m core.Member) error {
 	if a.Scope.Set {
 		var sc *core.Scope
 		if !a.Scope.Null {
+			var err error
 			if sc, err = c.scopeArg(&a.Scope.V, m.Scope); err != nil {
 				return err
 			}
@@ -313,11 +348,5 @@ func agentUpdate(c *cx, a agentUpdateArgs) error {
 		p.set["budget"] = b
 		p.changes["budget"] = core.FieldChange{From: m.Budget, To: b}
 	}
-	if len(userSet) > 0 {
-		userSet["updated_at"] = c.at
-		if _, err := c.tx.Update(c.ctx, "users", userSet, store.Eq("id", m.UserID)); err != nil {
-			return err
-		}
-	}
-	return c.saveMember(m, p)
+	return nil
 }

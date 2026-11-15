@@ -45,13 +45,9 @@ func secretSet(c *cx, a secretArgs) error {
 	if !secretName.MatchString(a.Name) {
 		return invalid("name", "a secret's name is letters, digits and _, starting with a letter (like GITHUB_TOKEN)")
 	}
-	var hosts []string
-	for _, h := range a.Hosts.V {
-		h = strings.ToLower(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(h), "https://"), "/"))
-		if !secretHost.MatchString(h) {
-			return invalid("hosts", "%q is not a host; write api.example.com or *.example.com", h)
-		}
-		hosts = append(hosts, h)
+	hosts, err := secretHosts(a.Hosts.V)
+	if err != nil {
+		return err
 	}
 	var agents []string
 	for _, ref := range a.Agents.V {
@@ -62,32 +58,55 @@ func secretSet(c *cx, a secretArgs) error {
 		agents = append(agents, m.UserID)
 	}
 	var cur core.Secret
-	err := c.tx.Get(c.ctx, &cur, store.Eq("name", a.Name), store.Live)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	ok, err := found(c.tx.Get(c.ctx, &cur, store.Eq("name", a.Name), store.Live))
+	if err != nil {
 		return err
 	}
-	if err != nil {
-		// New.
-		if a.Value.V == "" {
-			return invalid("value", "a new secret needs its value")
-		}
-		sid, err := newID("id", a.ID)
-		if err != nil {
-			return err
-		}
-		sealed, err := Seal(a.Value.V)
-		if err != nil {
-			return err
-		}
-		s := core.Secret{ID: sid, WorkspaceID: c.ws, Name: a.Name, Description: a.Description.V, Value: sealed, Hosts: hosts, Agents: agents,
-			Env: a.Env.V, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
-		seq := c.tx.NextSeq()
-		s.UpdatedSeq = seq
-		if err := c.tx.Insert(c.ctx, s); err != nil {
-			return alreadyInUse(err, "id", sid)
-		}
-		return c.created(seq, "secret", s.ID, inWorkspace(c.ws), s)
+	if !ok {
+		return c.secretNew(a, hosts, agents)
 	}
+	return c.secretChange(cur, a, hosts, agents)
+}
+
+// secretHosts reads the hosts a secret may be sent to, in one spelling.
+func secretHosts(given []string) ([]string, error) {
+	var hosts []string
+	for _, h := range given {
+		h = strings.ToLower(strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(h), "https://"), "/"))
+		if !secretHost.MatchString(h) {
+			return nil, invalid("hosts", "%q is not a host; write api.example.com or *.example.com", h)
+		}
+		hosts = append(hosts, h)
+	}
+	return hosts, nil
+}
+
+// secretNew keeps a secret under a name not used yet.
+func (c *cx) secretNew(a secretArgs, hosts, agents []string) error {
+	if a.Value.V == "" {
+		return invalid("value", "a new secret needs its value")
+	}
+	sid, err := newID("id", a.ID)
+	if err != nil {
+		return err
+	}
+	sealed, err := Seal(a.Value.V)
+	if err != nil {
+		return err
+	}
+	s := core.Secret{ID: sid, WorkspaceID: c.ws, Name: a.Name, Description: a.Description.V, Value: sealed, Hosts: hosts, Agents: agents,
+		Env: a.Env.V, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
+	seq := c.tx.NextSeq()
+	s.UpdatedSeq = seq
+	if err := c.tx.Insert(c.ctx, s); err != nil {
+		return alreadyInUse(err, "id", sid)
+	}
+	return c.created(seq, "secret", s.ID, inWorkspace(c.ws), s)
+}
+
+// secretChange changes what is given of the secret already kept under the
+// name.
+func (c *cx) secretChange(cur core.Secret, a secretArgs, hosts, agents []string) error {
 	p := newPatch()
 	p.setText("description", a.Description, &cur.Description)
 	if a.Hosts.Set {

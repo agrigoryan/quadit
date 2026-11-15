@@ -22,6 +22,34 @@ type ruleArgs struct {
 
 var ruleActions = []string{"notify", "webhook", "assign", "wait_on"}
 
+// checkRuleMatch resolves the names in what a rule matches to ids.
+func (c *cx) checkRuleMatch(m *core.RuleMatch) error {
+	if m == nil {
+		return nil
+	}
+	if m.ProjectID != "" {
+		project, err := c.project(m.ProjectID)
+		if err != nil {
+			return err
+		}
+		m.ProjectID = project.ID
+	}
+	if m.ActorID != "" {
+		mem, err := c.memberRef("match.actor_id", m.ActorID)
+		if err != nil {
+			return err
+		}
+		m.ActorID = mem.UserID
+	}
+	if m.ActorKind != "" && m.ActorKind != core.KindPerson && m.ActorKind != core.KindAgent {
+		return oneOf("match.actor_kind", "kind", m.ActorKind, []string{core.KindPerson, core.KindAgent})
+	}
+	if m.ToCategory != "" && !core.ValidCategory(m.ToCategory) {
+		return oneOf("match.to_category", "category", m.ToCategory, core.Categories)
+	}
+	return nil
+}
+
 // checkRule resolves the names in a rule to ids and refuses what cannot run.
 func (c *cx) checkRule(m *core.RuleMatch, a *core.RuleAction) error {
 	if a == nil || !contains(ruleActions, a.Kind) {
@@ -31,27 +59,8 @@ func (c *cx) checkRule(m *core.RuleMatch, a *core.RuleAction) error {
 		}
 		return oneOf("action.kind", "action", kind, ruleActions)
 	}
-	if m != nil {
-		if m.ProjectID != "" {
-			p, err := c.project(m.ProjectID)
-			if err != nil {
-				return err
-			}
-			m.ProjectID = p.ID
-		}
-		if m.ActorID != "" {
-			mem, err := c.memberRef("match.actor_id", m.ActorID)
-			if err != nil {
-				return err
-			}
-			m.ActorID = mem.UserID
-		}
-		if m.ActorKind != "" && m.ActorKind != core.KindPerson && m.ActorKind != core.KindAgent {
-			return oneOf("match.actor_kind", "kind", m.ActorKind, []string{core.KindPerson, core.KindAgent})
-		}
-		if m.ToCategory != "" && !core.ValidCategory(m.ToCategory) {
-			return oneOf("match.to_category", "category", m.ToCategory, core.Categories)
-		}
+	if err := c.checkRuleMatch(m); err != nil {
+		return err
 	}
 	if a.Kind == "webhook" {
 		if _, err := loadLive[core.Webhook](c, "webhook", "action.webhook_id", a.WebhookID); err != nil {

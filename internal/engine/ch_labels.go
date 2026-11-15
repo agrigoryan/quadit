@@ -75,7 +75,7 @@ func labelDelete(c *cx, a memberRefArgs) error {
 		return err
 	}
 	// Tasks drop the label; each says so in its own timeline.
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{LabelIDs: []string{l.ID}, Archived: true, Limit: 5000})
+	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{LabelIDs: []string{l.ID}, Archived: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}

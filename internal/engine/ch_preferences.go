@@ -74,13 +74,7 @@ func preferenceUpdate(c *cx, a preferenceUpdateArgs) error {
 	if err := p.name("body", a.Body, &pf.Body); err != nil {
 		return err
 	}
-	if a.Retired.Set {
-		if a.Retired.V && pf.RetiredAt == 0 {
-			p.put("retired_at", int64(0), c.at)
-		} else if !a.Retired.V && pf.RetiredAt != 0 {
-			p.put("retired_at", pf.RetiredAt, int64(0))
-		}
-	}
+	p.setStamp("retired_at", a.Retired, pf.RetiredAt, c.at)
 	return c.save(p, target{table: "preferences", entity: "preference", id: pf.ID, place: c.inProjectOrWorkspace(pf.ProjectID)})
 }
 

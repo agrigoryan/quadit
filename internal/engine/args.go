@@ -23,30 +23,35 @@ func (c *cx) args(v any) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		msg := err.Error()
-		if strings.HasPrefix(msg, "json: unknown field ") {
-			name := strings.Trim(strings.TrimPrefix(msg, "json: unknown field "), `"`)
-			allowed := jsonFields(v)
-			return &Error{Code: CodeInvalid, Field: name, Message: fmt.Sprintf("%s has no field %q", c.change.Type, name),
-				Allowed: allowed, Nearest: nearest(name, allowed)}
-		}
-		var te *json.UnmarshalTypeError
-		if errors.As(err, &te) {
-			field := te.Field
-			if i := strings.LastIndex(field, "."); i >= 0 && !strings.Contains(field, "[") {
-				field = field[i+1:]
-			}
-			field = strings.TrimSuffix(strings.TrimSuffix(field, ".V"), ".Value")
-			if field == "" || field == "V" || field == "Value" {
-				return &Error{Code: CodeInvalid, Field: "args", Message: fmt.Sprintf("%s: its arguments are %s, and %s was given", c.change.Type, jsonKind(te.Type), jsonGiven(te.Value)),
-					Allowed: jsonFields(v)}
-			}
-			return &Error{Code: CodeInvalid, Field: field, Message: fmt.Sprintf("%s: %s takes %s, and was given %s", c.change.Type, field, jsonTakes(te), jsonGiven(te.Value)),
-				Allowed: jsonFields(v)}
-		}
-		return invalid("args", "%s: %v", c.change.Type, err)
+		return c.argsRefusal(v, err)
 	}
 	return nil
+}
+
+// argsRefusal says in a caller's words what was wrong with the arguments:
+// a field the change does not have, or a value of the wrong kind.
+func (c *cx) argsRefusal(v any, err error) error {
+	if name, ok := strings.CutPrefix(err.Error(), "json: unknown field "); ok {
+		name = strings.Trim(name, `"`)
+		allowed := jsonFields(v)
+		return &Error{Code: CodeInvalid, Field: name, Message: fmt.Sprintf("%s has no field %q", c.change.Type, name),
+			Allowed: allowed, Nearest: nearest(name, allowed)}
+	}
+	te, ok := errors.AsType[*json.UnmarshalTypeError](err)
+	if !ok {
+		return invalid("args", "%s: %v", c.change.Type, err)
+	}
+	field := te.Field
+	if i := strings.LastIndex(field, "."); i >= 0 && !strings.Contains(field, "[") {
+		field = field[i+1:]
+	}
+	field = strings.TrimSuffix(strings.TrimSuffix(field, ".V"), ".Value")
+	if field == "" || field == "V" || field == "Value" {
+		return &Error{Code: CodeInvalid, Field: "args", Message: fmt.Sprintf("%s: its arguments are %s, and %s was given", c.change.Type, jsonKind(te.Type), jsonGiven(te.Value)),
+			Allowed: jsonFields(v)}
+	}
+	return &Error{Code: CodeInvalid, Field: field, Message: fmt.Sprintf("%s: %s takes %s, and was given %s", c.change.Type, field, jsonTakes(te), jsonGiven(te.Value)),
+		Allowed: jsonFields(v)}
 }
 
 // PriorityNames are a priority's names, by its number.

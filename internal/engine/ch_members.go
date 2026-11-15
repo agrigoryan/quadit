@@ -211,61 +211,93 @@ func memberUpdate(c *cx, a memberUpdateArgs) error {
 		return forbidden("an agent cannot change its own role or limits; the person responsible for it can")
 	}
 	p := newPatch()
-	if a.Scope.Set {
-		if m.Kind == core.KindAgent {
-			return invalid("scope", "an agent's limits are set with agent.update")
+	for _, step := range []func(*patch, memberUpdateArgs, core.Member) error{c.memberScope, c.memberRole, memberHandle, c.memberSuspended} {
+		if err := step(p, a, m); err != nil {
+			return err
 		}
-		if m.Role == core.RoleOwner && !a.Scope.Null {
-			return invalid("scope", "an owner sees the whole workspace; change their role first")
-		}
-		var sc *core.Scope
-		if !a.Scope.Null {
-			if sc, err = c.scopeArg(&a.Scope.V, m.Scope); err != nil {
-				return err
-			}
-			if sc != nil && len(sc.NeedsApproval) > 0 {
-				return invalid("scope.needs_approval", "approvals are for agents; a person's scope is projects and read-only")
-			}
-		}
-		sc = c.capScope(sc)
-		p.set["scope"] = sc
-		p.changes["scope"] = core.FieldChange{From: m.Scope, To: sc}
 	}
-	if a.Role.Set && core.Role(a.Role.V) != m.Role {
-		role, err := c.roleArg(a.Role.V, m.Kind == core.KindAgent)
+	p.setText("title", a.Title, &m.Title)
+	return c.saveMember(m, p)
+}
+
+// memberScope applies a person's new limits: the projects they reach, and
+// whether they may only read.
+func (c *cx) memberScope(p *patch, a memberUpdateArgs, m core.Member) error {
+	if !a.Scope.Set {
+		return nil
+	}
+	if m.Kind == core.KindAgent {
+		return invalid("scope", "an agent's limits are set with agent.update")
+	}
+	if m.Role == core.RoleOwner && !a.Scope.Null {
+		return invalid("scope", "an owner sees the whole workspace; change their role first")
+	}
+	var sc *core.Scope
+	if !a.Scope.Null {
+		var err error
+		if sc, err = c.scopeArg(&a.Scope.V, m.Scope); err != nil {
+			return err
+		}
+		if sc != nil && len(sc.NeedsApproval) > 0 {
+			return invalid("scope.needs_approval", "approvals are for agents; a person's scope is projects and read-only")
+		}
+	}
+	sc = c.capScope(sc)
+	p.set["scope"] = sc
+	p.changes["scope"] = core.FieldChange{From: m.Scope, To: sc}
+	return nil
+}
+
+// memberRole applies a new role, keeping an owner on the workspace and an
+// agent from raising another above itself.
+func (c *cx) memberRole(p *patch, a memberUpdateArgs, m core.Member) error {
+	if !a.Role.Set || core.Role(a.Role.V) == m.Role {
+		return nil
+	}
+	role, err := c.roleArg(a.Role.V, m.Kind == core.KindAgent)
+	if err != nil {
+		return err
+	}
+	if !c.system && c.actor.Kind == core.KindAgent && role.AtLeast(c.actor.Role) && role != c.actor.Role {
+		return forbidden("an agent cannot give a role above its own")
+	}
+	last, err := c.lastOwner(m)
+	if err != nil {
+		return err
+	}
+	if last {
+		return conflictErr("a workspace needs an owner: make someone else an owner first")
+	}
+	p.put("role", string(m.Role), string(role))
+	return nil
+}
+
+// memberHandle applies a new @handle.
+func memberHandle(p *patch, a memberUpdateArgs, m core.Member) error {
+	if !a.Handle.Set || a.Handle.V == m.Handle {
+		return nil
+	}
+	if err := checkHandle(a.Handle.V); err != nil {
+		return err
+	}
+	p.put("handle", m.Handle, a.Handle.V)
+	return nil
+}
+
+// memberSuspended suspends a member, or lets them back; the only owner
+// cannot be suspended.
+func (c *cx) memberSuspended(p *patch, a memberUpdateArgs, m core.Member) error {
+	if a.Suspended.Set && a.Suspended.V && m.SuspendedAt == 0 {
+		last, err := c.lastOwner(m)
 		if err != nil {
 			return err
 		}
-		if !c.system && c.actor.Kind == core.KindAgent && role.AtLeast(c.actor.Role) && role != c.actor.Role {
-			return forbidden("an agent cannot give a role above its own")
-		}
-		if last, err := c.lastOwner(m); err != nil {
-			return err
-		} else if last {
-			return conflictErr("a workspace needs an owner: make someone else an owner first")
-		}
-		p.put("role", string(m.Role), string(role))
-	}
-	if a.Handle.Set && a.Handle.V != m.Handle {
-		if err := checkHandle(a.Handle.V); err != nil {
-			return err
-		}
-		p.put("handle", m.Handle, a.Handle.V)
-	}
-	p.setText("title", a.Title, &m.Title)
-	if a.Suspended.Set {
-		if a.Suspended.V && m.SuspendedAt == 0 {
-			if last, err := c.lastOwner(m); err != nil {
-				return err
-			} else if last {
-				return conflictErr("the only owner cannot be suspended")
-			}
-			p.put("suspended_at", int64(0), c.at)
-		} else if !a.Suspended.V && m.SuspendedAt != 0 {
-			p.put("suspended_at", m.SuspendedAt, int64(0))
+		if last {
+			return conflictErr("the only owner cannot be suspended")
 		}
 	}
-	return c.saveMember(m, p)
+	p.setStamp("suspended_at", a.Suspended, m.SuspendedAt, c.at)
+	return nil
 }
 
 type memberRefArgs struct {
@@ -295,7 +327,7 @@ func memberRemove(c *cx, a memberRefArgs) error {
 	if _, err := c.tx.Update(c.ctx, "api_tokens", map[string]any{"revoked_at": c.at}, store.Eq("user_id", m.UserID), store.Null("revoked_at")); err != nil {
 		return err
 	}
-	open, err := c.tx.Tasks(c.ctx, store.TaskFilter{AssigneeIDs: []string{m.UserID}, Open: true, Limit: 5000})
+	open, err := c.tx.Tasks(c.ctx, store.TaskFilter{AssigneeIDs: []string{m.UserID}, Open: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}

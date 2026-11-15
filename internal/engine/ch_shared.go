@@ -8,6 +8,20 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+const (
+	// scanLimit is the most rows of one kind a change reads in one go.
+	scanLimit = 5000
+	// msPerMinute turns minutes into the Unix milliseconds times are kept in.
+	msPerMinute = 60_000
+	// defaultLeaseMinutes is how long a hold on a task or a resource lasts
+	// without renewing, unless the one taking it says; maxLeaseMinutes the
+	// longest it may.
+	defaultLeaseMinutes = 30
+	maxLeaseMinutes     = 24 * 60
+	// defaultCycleDays is how long a cycle is when a project does not say.
+	defaultCycleDays = 14
+)
+
 type idArgs struct {
 	ID string `json:"id"`
 }

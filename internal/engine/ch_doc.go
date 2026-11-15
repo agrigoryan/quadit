@@ -384,13 +384,7 @@ func (u *pageEdit) sharedWith() error {
 
 func (u *pageEdit) archived() error {
 	a, d := u.a, u.d
-	if a.Archived.Set {
-		if a.Archived.V && d.ArchivedAt == 0 {
-			u.p.put("archived_at", int64(0), u.c.at)
-		} else if !a.Archived.V && d.ArchivedAt != 0 {
-			u.p.put("archived_at", d.ArchivedAt, int64(0))
-		}
-	}
+	u.p.setStamp("archived_at", a.Archived, d.ArchivedAt, u.c.at)
 	return nil
 }
 

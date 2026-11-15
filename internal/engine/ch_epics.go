@@ -150,7 +150,7 @@ func epicDelete(c *cx, a idArgs) error {
 		return err
 	}
 	// Its tasks stay, without an epic.
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{EpicIDs: []string{e.ID}, Archived: true, Limit: 5000})
+	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{EpicIDs: []string{e.ID}, Archived: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}

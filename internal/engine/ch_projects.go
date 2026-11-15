@@ -105,12 +105,8 @@ func projectUpdate(c *cx, a projectUpdateArgs) error {
 	}
 	p := newPatch()
 	oldKey := pr.Key
-	if a.Key.Set {
-		a.Key.V = strings.ToUpper(strings.TrimSpace(a.Key.V))
-		if !projectKeyRE.MatchString(a.Key.V) {
-			return invalid("key", "a project key is 2 to 10 upper-case letters or digits, starting with a letter")
-		}
-		p.setText("key", a.Key, &pr.Key)
+	if err := projectKey(p, a.Key, &pr); err != nil {
+		return err
 	}
 	if err := p.name("name", a.Name, &pr.Name); err != nil {
 		return err
@@ -118,42 +114,16 @@ func projectUpdate(c *cx, a projectUpdateArgs) error {
 	p.setText("description", a.Description, &pr.Description)
 	p.setText("icon", a.Icon, &pr.Icon)
 	p.setText("color", a.Color, &pr.Color)
-	if a.Lead.Set {
-		lead := ""
-		if !a.Lead.Null {
-			if lead, err = c.optMember("lead", a.Lead.V); err != nil {
-				return err
-			}
-		}
-		p.put("lead_id", pr.LeadID, lead)
+	if err := c.projectLead(p, a.Lead, pr); err != nil {
+		return err
 	}
 	if err := p.rank(a.Rank, &pr.Rank); err != nil {
 		return err
 	}
-	if a.Settings.Set {
-		s := a.Settings.V
-		if s.Cycles && s.CycleDays == 0 {
-			s.CycleDays = 14
-		}
-		if s.CycleDays < 0 || s.CycleDays > 90 || s.CycleStart < 0 || s.CycleStart > 6 {
-			return invalid("settings", "cycle_days is 1 to 90 and cycle_start is a weekday, 0 (Sunday) to 6")
-		}
-		var old core.ProjectSettings
-		if pr.Settings != nil {
-			old = *pr.Settings
-		}
-		if old != s {
-			p.set["settings"] = &s
-			p.changes["settings"] = core.FieldChange{From: pr.Settings, To: &s}
-		}
+	if err := projectSettings(p, a.Settings, pr); err != nil {
+		return err
 	}
-	if a.Archived.Set {
-		if a.Archived.V && pr.ArchivedAt == 0 {
-			p.put("archived_at", int64(0), c.at)
-		} else if !a.Archived.V && pr.ArchivedAt != 0 {
-			p.put("archived_at", pr.ArchivedAt, int64(0))
-		}
-	}
+	p.setStamp("archived_at", a.Archived, pr.ArchivedAt, c.at)
 	if !p.empty() {
 		p.set["updated_at"] = c.at
 	}
@@ -173,15 +143,67 @@ func projectUpdate(c *cx, a projectUpdateArgs) error {
 	return nil
 }
 
+// projectKey applies a new project key, written in upper case.
+func projectKey(p *patch, key Opt[string], pr *core.Project) error {
+	if !key.Set {
+		return nil
+	}
+	key.V = strings.ToUpper(strings.TrimSpace(key.V))
+	if !projectKeyRE.MatchString(key.V) {
+		return invalid("key", "a project key is 2 to 10 upper-case letters or digits, starting with a letter")
+	}
+	p.setText("key", key, &pr.Key)
+	return nil
+}
+
+// projectLead applies a new lead, a member; null leaves the project without one.
+func (c *cx) projectLead(p *patch, lead Opt[string], pr core.Project) error {
+	if !lead.Set {
+		return nil
+	}
+	leadID := ""
+	if !lead.Null {
+		var err error
+		if leadID, err = c.optMember("lead", lead.V); err != nil {
+			return err
+		}
+	}
+	p.put("lead_id", pr.LeadID, leadID)
+	return nil
+}
+
+// projectSettings applies new cycle settings, as a whole.
+func projectSettings(p *patch, settings Opt[core.ProjectSettings], pr core.Project) error {
+	if !settings.Set {
+		return nil
+	}
+	s := settings.V
+	if s.Cycles && s.CycleDays == 0 {
+		s.CycleDays = defaultCycleDays
+	}
+	if s.CycleDays < 0 || s.CycleDays > 90 || s.CycleStart < 0 || s.CycleStart > 6 {
+		return invalid("settings", "cycle_days is 1 to 90 and cycle_start is a weekday, 0 (Sunday) to 6")
+	}
+	var old core.ProjectSettings
+	if pr.Settings != nil {
+		old = *pr.Settings
+	}
+	if old != s {
+		p.set["settings"] = &s
+		p.changes["settings"] = core.FieldChange{From: pr.Settings, To: &s}
+	}
+	return nil
+}
+
 // rekeyTasks gives a project's tasks, the trash included, keys under the
 // project's new key. Task keys follow the project key. The old keys stop
 // resolving.
 func (c *cx) rekeyTasks(pr core.Project) error {
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{ProjectIDs: []string{pr.ID}, Archived: true, Limit: 5000})
+	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{ProjectIDs: []string{pr.ID}, Archived: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}
-	trashed, err := c.tx.Tasks(c.ctx, store.TaskFilter{ProjectIDs: []string{pr.ID}, InTrash: true, Limit: 5000})
+	trashed, err := c.tx.Tasks(c.ctx, store.TaskFilter{ProjectIDs: []string{pr.ID}, InTrash: true, Limit: scanLimit})
 	if err != nil {
 		return err
 	}

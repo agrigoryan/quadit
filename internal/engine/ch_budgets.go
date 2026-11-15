@@ -21,7 +21,7 @@ func (e *Engine) Usage(ctx context.Context, db store.DB, agentID string, since i
 		if end == 0 {
 			end = now
 		}
-		minutes += (end - s.StartedAt) / 60_000
+		minutes += (end - s.StartedAt) / msPerMinute
 	}
 	return costMicros, minutes, nil
 }
@@ -62,7 +62,7 @@ func (c *cx) taskSpend(taskID string) (cost, minutes int64, err error) {
 		if end == 0 {
 			end = c.at
 		}
-		minutes += (end - sp.StartedAt) / 60_000
+		minutes += (end - sp.StartedAt) / msPerMinute
 	}
 	return cost, minutes, nil
 }
@@ -87,37 +87,49 @@ func (c *cx) checkTaskBudget(t core.Task) error {
 // budgetWarnings tells the people concerned, once, when an agent's week or
 // a task's own budget is four-fifths used: in cost or in time.
 func (c *cx) budgetWarnings(s core.AgentSession) error {
-	near := func(used, limit int64) bool { return limit > 0 && used*10 >= limit*8 }
-	once := func(userID, entityType, entityID, title string, since int64) error {
-		if userID == "" {
-			return nil
-		}
-		n, err := c.tx.Count(c.ctx, "notifications", store.Eq("user_id", userID), store.Eq("type", core.NoteBudget),
-			store.Eq("entity_id", entityID), store.Eq("title", title), store.Gte("created_at", since))
-		if err != nil || n > 0 {
-			return err
-		}
-		return c.notify(userID, core.NoteBudget, core.Notification{EntityType: entityType, EntityID: entityID, Title: title, TaskID: s.TaskID})
-	}
 	var self core.User
 	if ok, err := found(c.tx.Get(c.ctx, &self, store.Eq("id", s.AgentID))); !ok {
 		return err // the agent's account is gone: nobody to warn
 	}
-	if b := c.actor.Budget; b != nil && c.actor.UserID == s.AgentID {
-		cost, minutes, err := c.e.Usage(c.ctx, c.tx, s.AgentID, weekStart(c.at))
-		if err != nil {
-			return err
-		}
-		if near(cost, b.CostMicros) || near(minutes, b.Minutes) {
-			title := c.actor.Name + " has used 80% of its weekly budget"
-			if b.CostMicros > 0 && cost >= b.CostMicros || b.Minutes > 0 && minutes >= b.Minutes {
-				title = c.actor.Name + " has used up its weekly budget"
-			}
-			if err := once(self.ResponsibleID, "member", s.AgentID, title, weekStart(c.at)); err != nil {
-				return err
-			}
-		}
+	if err := c.weekWarning(s, self); err != nil {
+		return err
 	}
+	return c.taskBudgetWarning(s, self)
+}
+
+// nearLimit reports whether used is four-fifths of a limit or more; a limit
+// of 0 is none.
+func nearLimit(used, limit int64) bool { return limit > 0 && used*10 >= limit*8 }
+
+// usedUp reports whether cost or time has reached its limit.
+func usedUp(cost, minutes int64, b *core.Budget) bool {
+	return b.CostMicros > 0 && cost >= b.CostMicros || b.Minutes > 0 && minutes >= b.Minutes
+}
+
+// weekWarning warns the person responsible for an agent that is near or
+// at its weekly budget.
+func (c *cx) weekWarning(s core.AgentSession, self core.User) error {
+	b := c.actor.Budget
+	if b == nil || c.actor.UserID != s.AgentID {
+		return nil
+	}
+	cost, minutes, err := c.e.Usage(c.ctx, c.tx, s.AgentID, weekStart(c.at))
+	if err != nil {
+		return err
+	}
+	if !nearLimit(cost, b.CostMicros) && !nearLimit(minutes, b.Minutes) {
+		return nil
+	}
+	title := c.actor.Name + " has used 80% of its weekly budget"
+	if usedUp(cost, minutes, b) {
+		title = c.actor.Name + " has used up its weekly budget"
+	}
+	return c.warnOnce(self.ResponsibleID, core.Notification{EntityType: "member", EntityID: s.AgentID, Title: title, TaskID: s.TaskID}, weekStart(c.at))
+}
+
+// taskBudgetWarning warns the one who asked for a task, or else the person
+// responsible for the agent, that the task is near or at its own budget.
+func (c *cx) taskBudgetWarning(s core.AgentSession, self core.User) error {
 	if s.TaskID == "" {
 		return nil
 	}
@@ -129,16 +141,30 @@ func (c *cx) budgetWarnings(s core.AgentSession) error {
 	if err != nil {
 		return err
 	}
-	if near(cost, t.Budget.CostMicros) || near(minutes, t.Budget.Minutes) {
-		who := t.AskedBy
-		if who == "" {
-			who = self.ResponsibleID
-		}
-		title := t.Key + " has used 80% of its budget"
-		if cost >= t.Budget.CostMicros && t.Budget.CostMicros > 0 || minutes >= t.Budget.Minutes && t.Budget.Minutes > 0 {
-			title = t.Key + " has used up its budget"
-		}
-		return once(who, "task", t.ID, title, 0)
+	if !nearLimit(cost, t.Budget.CostMicros) && !nearLimit(minutes, t.Budget.Minutes) {
+		return nil
 	}
-	return nil
+	who := t.AskedBy
+	if who == "" {
+		who = self.ResponsibleID
+	}
+	title := t.Key + " has used 80% of its budget"
+	if usedUp(cost, minutes, t.Budget) {
+		title = t.Key + " has used up its budget"
+	}
+	return c.warnOnce(who, core.Notification{EntityType: "task", EntityID: t.ID, Title: title, TaskID: s.TaskID}, 0)
+}
+
+// warnOnce puts a budget warning in a member's inbox unless the same one
+// is there already since the given time.
+func (c *cx) warnOnce(userID string, n core.Notification, since int64) error {
+	if userID == "" {
+		return nil
+	}
+	had, err := c.tx.Count(c.ctx, "notifications", store.Eq("user_id", userID), store.Eq("type", core.NoteBudget),
+		store.Eq("entity_id", n.EntityID), store.Eq("title", n.Title), store.Gte("created_at", since))
+	if err != nil || had > 0 {
+		return err
+	}
+	return c.notify(userID, core.NoteBudget, n)
 }

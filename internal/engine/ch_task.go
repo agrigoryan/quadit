@@ -48,7 +48,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	}
 	d := &taskDraft{c: c, a: a, id: tid}
 	steps := []func() error{
-		d.place,
+		d.findProject,
 		d.template,
 		d.basics,
 		d.people,
@@ -69,20 +69,20 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 // taskDraft is one task.create under way: what was asked for, where the
 // task goes, and its row as far as it is filled in.
 type taskDraft struct {
-	c      *cx
-	a      taskCreateArgs
-	id     string
-	p      core.Project
-	parent core.Task
-	st     core.Status
-	t      core.Task
+	c       *cx
+	a       taskCreateArgs
+	id      string
+	project core.Project
+	parent  core.Task
+	st      core.Status
+	t       core.Task
 	// opens is the decision the task's template opens on it, if any.
 	opens *decisionOpenArgs
 }
 
-// place finds the task's parent and its project: the one named, or else the
+// findProject finds the task's parent and its project: the one named, or else the
 // parent's.
-func (d *taskDraft) place() error {
+func (d *taskDraft) findProject() error {
 	c := d.c
 	var err error
 	if d.a.Parent != "" {
@@ -93,11 +93,11 @@ func (d *taskDraft) place() error {
 			d.a.Project = d.parent.ProjectID
 		}
 	}
-	if d.p, err = c.project(d.a.Project); err != nil {
+	if d.project, err = c.project(d.a.Project); err != nil {
 		return err
 	}
-	if d.p.ArchivedAt != 0 {
-		return conflictErr("project %s is archived", d.p.Key)
+	if d.project.ArchivedAt != 0 {
+		return conflictErr("project %s is archived", d.project.Key)
 	}
 	return nil
 }
@@ -108,7 +108,7 @@ func (d *taskDraft) template() error {
 		return nil
 	}
 	var err error
-	d.opens, err = d.c.applyTemplate(d.p, &d.a)
+	d.opens, err = d.c.applyTemplate(d.project, &d.a)
 	return err
 }
 
@@ -127,14 +127,14 @@ func (d *taskDraft) basics() error {
 	}
 	var err error
 	if a.Status != "" {
-		d.st, err = c.status(d.p, "status", a.Status)
+		d.st, err = c.status(d.project, "status", a.Status)
 	} else {
-		d.st, err = c.defaultStatus(d.p)
+		d.st, err = c.defaultStatus(d.project)
 	}
 	if err != nil {
 		return err
 	}
-	d.t = core.Task{ID: d.id, WorkspaceID: c.ws, ProjectID: d.p.ID, Title: title, Description: a.Description, StatusID: d.st.ID,
+	d.t = core.Task{ID: d.id, WorkspaceID: c.ws, ProjectID: d.project.ID, Title: title, Description: a.Description, StatusID: d.st.ID,
 		Priority: a.Priority, WaitingOnNote: a.WaitingOnNote, ParentID: d.parent.ID, Estimate: a.Estimate, DueOn: a.DueOn,
 		Budget: a.Budget, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 	return nil
@@ -169,7 +169,7 @@ func (d *taskDraft) dueAndLabels() error {
 		return err
 	}
 	var err error
-	d.t.LabelIDs, err = d.c.labelIDs(d.p, "labels", d.a.Labels)
+	d.t.LabelIDs, err = d.c.labelIDs(d.project, "labels", d.a.Labels)
 	return err
 }
 
@@ -179,10 +179,10 @@ func (d *taskDraft) plan() error {
 	c, a, t := d.c, d.a, &d.t
 	var err error
 	if a.Epic != "" {
-		if t.EpicID, err = c.taskEpic(d.p, a.Epic); err != nil {
+		if t.EpicID, err = c.taskEpic(d.project, a.Epic); err != nil {
 			return err
 		}
-	} else if d.parent.EpicID != "" && d.parent.ProjectID == d.p.ID {
+	} else if d.parent.EpicID != "" && d.parent.ProjectID == d.project.ID {
 		t.EpicID = d.parent.EpicID
 	}
 	if a.Milestone != "" {
@@ -192,67 +192,82 @@ func (d *taskDraft) plan() error {
 		}
 		t.MilestoneID, t.EpicID = ms.ID, ms.EpicID
 	}
-	t.CycleID, err = c.taskCycle(d.p, a.Cycle)
+	t.CycleID, err = c.taskCycle(d.project, a.Cycle)
 	return err
 }
 
 // number gives the task its number, the next one or the one asked for, and
 // with it its key and its place in the order.
 func (d *taskDraft) number() error {
-	c, a, p, t := d.c, d.a, d.p, &d.t
-	var n int64
-	var err error
-	if a.Number != 0 {
-		if a.Number < 0 {
-			return invalid("number", "a task's number is 1 or more")
-		}
-		if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
-			return forbidden("choosing a task's number is for imports and needs the admin role; leave number out and the task gets the next one")
-		}
-		key := p.Key + "-" + itoa(a.Number)
-		taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", p.ID), store.Eq("number", a.Number))
-		if err != nil {
-			return err
-		}
-		was, err := c.tx.Count(c.ctx, "task_keys", store.Eq("key", key))
-		if err != nil {
-			return err
-		}
-		if taken+was > 0 {
-			return conflictErr("%s is taken; leave number out and the task gets the next one", key)
-		}
-		// The project's own count moves past it, so the next task made the
-		// usual way does not land on it.
-		if over := a.Number - p.TaskCounter; over > 0 {
-			if _, err := c.tx.Incr(c.ctx, "projects", "task_counter", int64(over), store.Eq("id", p.ID)); err != nil {
-				return err
-			}
-		}
-		n = int64(a.Number)
-	} else {
-		// The next number, past any a task was given by hand.
-		for {
-			if n, err = c.tx.Incr(c.ctx, "projects", "task_counter", 1, store.Eq("id", p.ID)); err != nil {
-				return err
-			}
-			taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", p.ID), store.Eq("number", int(n)))
-			if err != nil {
-				return err
-			}
-			if taken == 0 {
-				break
-			}
-		}
+	t := &d.t
+	pick := d.nextNumber
+	if d.a.Number != 0 {
+		pick = d.givenNumber
+	}
+	n, err := pick()
+	if err != nil {
+		return err
 	}
 	t.Number = int(n)
-	t.Key = p.Key + "-" + itoa(t.Number)
-	t.Rank = a.Rank
+	t.Key = d.project.Key + "-" + itoa(t.Number)
+	t.Rank = d.a.Rank
 	if t.Rank == "" {
 		t.Rank = rank.ForNumber(t.Number)
 	} else if !rank.Valid(t.Rank) {
 		return invalid("rank", "%q is not a rank", t.Rank)
 	}
 	return nil
+}
+
+// givenNumber checks a number asked for (by an import) is free, and moves
+// the project's count past it.
+func (d *taskDraft) givenNumber() (int64, error) {
+	c, number, project := d.c, d.a.Number, d.project
+	if number < 0 {
+		return 0, invalid("number", "a task's number is 1 or more")
+	}
+	if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
+		return 0, forbidden("choosing a task's number is for imports and needs the admin role; leave number out and the task gets the next one")
+	}
+	key := project.Key + "-" + itoa(number)
+	taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", project.ID), store.Eq("number", number))
+	if err != nil {
+		return 0, err
+	}
+	was, err := c.tx.Count(c.ctx, "task_keys", store.Eq("key", key))
+	if err != nil {
+		return 0, err
+	}
+	if taken+was > 0 {
+		return 0, conflictErr("%s is taken; leave number out and the task gets the next one", key)
+	}
+	// The project's own count moves past it, so the next task made the
+	// usual way does not land on it.
+	if over := number - project.TaskCounter; over > 0 {
+		if _, err := c.tx.Incr(c.ctx, "projects", "task_counter", int64(over), store.Eq("id", project.ID)); err != nil {
+			return 0, err
+		}
+	}
+	return int64(number), nil
+}
+
+// nextNumber is the project's next task number, past any a task was given
+// by hand.
+func (d *taskDraft) nextNumber() (int64, error) {
+	c, project := d.c, d.project
+	for {
+		n, err := c.tx.Incr(c.ctx, "projects", "task_counter", 1, store.Eq("id", project.ID))
+		if err != nil {
+			return 0, err
+		}
+		taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", project.ID), store.Eq("number", int(n)))
+		if err != nil {
+			return 0, err
+		}
+		if taken == 0 {
+			return n, nil
+		}
+	}
 }
 
 // insert writes the task and says so: in the feed, to search, and to the
@@ -270,7 +285,7 @@ func (d *taskDraft) insert() error {
 			return err
 		}
 	}
-	if err := c.created(seq, "task", t.ID, place{scopeType: "task", scopeID: t.ID, projectID: d.p.ID}, *t); err != nil {
+	if err := c.created(seq, "task", t.ID, place{scopeType: "task", scopeID: t.ID, projectID: d.project.ID}, *t); err != nil {
 		return err
 	}
 	c.key = t.Key

@@ -31,21 +31,13 @@ func taskTake(c *cx, a taskTakeArgs) error {
 		return err
 	}
 	if a.Minutes <= 0 {
-		a.Minutes = 30
+		a.Minutes = defaultLeaseMinutes
 	}
-	if a.Minutes > 24*60 {
+	if a.Minutes > maxLeaseMinutes {
 		return invalid("minutes", "a lease lasts at most 1440 minutes; renew it by taking the task again")
 	}
-	if t.LeaseHolderID != "" && t.LeaseHolderID != c.actor.UserID && t.LeaseUntil > c.at {
-		holder := t.LeaseHolderID
-		m, err := c.memberRef("id", t.LeaseHolderID)
-		if err != nil && !isRefusal(err) {
-			return err
-		}
-		if err == nil {
-			holder = "@" + m.Handle
-		}
-		return conflictErr("%s is held by %s until %s", t.Key, holder, time.UnixMilli(t.LeaseUntil).UTC().Format(time.RFC3339))
+	if err := c.refuseHeld(t); err != nil {
+		return err
 	}
 	if err := c.checkBudget(); err != nil {
 		return err
@@ -63,7 +55,7 @@ func taskTake(c *cx, a taskTakeArgs) error {
 	}
 	p := newPatch()
 	p.put("lease_holder_id", t.LeaseHolderID, c.actor.UserID)
-	p.put("lease_until", t.LeaseUntil, c.at+int64(a.Minutes)*60_000)
+	p.put("lease_until", t.LeaseUntil, c.at+int64(a.Minutes)*msPerMinute)
 	newAssignee := ""
 	if t.AssigneeID != c.actor.UserID {
 		p.put("assignee_id", t.AssigneeID, c.actor.UserID)
@@ -77,19 +69,47 @@ func taskTake(c *cx, a taskTakeArgs) error {
 		p.put("waiting_on_id", t.WaitingOnID, "")
 		p.put("waiting_on_note", t.WaitingOnNote, "")
 	}
-	if cur.Category == core.CatBacklog || cur.Category == core.CatUnstarted {
-		st, err := c.status(pr, "status", core.CatStarted)
-		if err != nil && !isRefusal(err) {
-			return err
-		}
-		if err == nil {
-			c.setStatus(p, &t, st)
-		}
+	if err := c.markStarted(p, &t, pr, cur); err != nil {
+		return err
 	}
 	if err := c.saveTask(t, p, nil); err != nil {
 		return err
 	}
 	return c.afterTaskText(t, false, newAssignee, "")
+}
+
+// refuseHeld refuses to take a task someone else holds a live lease on,
+// saying who and until when.
+func (c *cx) refuseHeld(t core.Task) error {
+	if t.LeaseHolderID == "" || t.LeaseHolderID == c.actor.UserID || t.LeaseUntil <= c.at {
+		return nil
+	}
+	holder := t.LeaseHolderID
+	m, err := c.memberRef("id", t.LeaseHolderID)
+	if err != nil && !isRefusal(err) {
+		return err
+	}
+	if err == nil {
+		holder = "@" + m.Handle
+	}
+	return conflictErr("%s is held by %s until %s", t.Key, holder, time.UnixMilli(t.LeaseUntil).UTC().Format(time.RFC3339))
+}
+
+// markStarted moves a task that was not started yet to its project's first
+// started status, when it has one.
+func (c *cx) markStarted(p *patch, t *core.Task, pr core.Project, cur core.Status) error {
+	if cur.Category != core.CatBacklog && cur.Category != core.CatUnstarted {
+		return nil
+	}
+	st, err := c.status(pr, "status", core.CatStarted)
+	if isRefusal(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	c.setStatus(p, t, st)
+	return nil
 }
 
 func taskRelease(c *cx, a idArgs) error {

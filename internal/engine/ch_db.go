@@ -2,7 +2,8 @@ package engine
 
 import (
 	"encoding/json"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -403,82 +404,99 @@ func (c *cx) rowProps(databaseID string, given map[string]json.RawMessage) (map[
 	if err := c.tx.List(c.ctx, &props, store.Q{Where: []store.Cond{store.Eq("database_id", databaseID), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
-	keys := make([]string, 0, len(given))
-	for key := range given {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(given))
 	out := map[string]json.RawMessage{}
 	for _, key := range keys {
+		prop, err := propertyNamed(props, key)
+		if err != nil {
+			return nil, err
+		}
 		raw := given[key]
-		var p *core.DBProperty
-		for i := range props {
-			if props[i].ID == key || strings.EqualFold(props[i].Name, key) {
-				p = &props[i]
-			}
-		}
-		if p == nil {
-			names := make([]string, len(props))
-			for i, q := range props {
-				names[i] = q.Name
-			}
-			return nil, &Error{Code: CodeInvalid, Field: "props", Message: "this database has no property " + key, Allowed: names, Nearest: nearest(key, names)}
-		}
-		if string(raw) == "null" {
-			out[p.ID] = raw
-			continue
-		}
-		switch p.Type {
-		case "formula", "rollup", "created_at", "updated_at", "created_by":
-			return nil, invalid("props", "%q is worked out, not set", p.Name)
-		case "number":
-			var n float64
-			if json.Unmarshal(raw, &n) != nil {
-				return nil, invalid("props", "%q takes a number", p.Name)
-			}
-		case "checkbox":
-			var b bool
-			if json.Unmarshal(raw, &b) != nil {
-				return nil, invalid("props", "%q takes true or false", p.Name)
-			}
-		case "date":
-			var s string
-			if json.Unmarshal(raw, &s) != nil || checkDate("props", s) != nil {
-				return nil, invalid("props", "%q takes a date, YYYY-MM-DD", p.Name)
-			}
-		case "member":
-			var ref string
-			if json.Unmarshal(raw, &ref) != nil {
-				return nil, invalid("props", "%q takes a member", p.Name)
-			}
-			m, err := c.memberRef("props", ref)
-			if err != nil {
+		if string(raw) != "null" {
+			if raw, err = c.propValue(prop, raw); err != nil {
 				return nil, err
 			}
-			raw, _ = json.Marshal(m.UserID)
-		case "select", "multi_select":
-			var vals []string
-			if p.Type == "select" {
-				var one string
-				if json.Unmarshal(raw, &one) != nil {
-					return nil, invalid("props", "%q takes one option", p.Name)
-				}
-				vals = []string{one}
-			} else if json.Unmarshal(raw, &vals) != nil {
-				return nil, invalid("props", "%q takes a list of options", p.Name)
-			}
-			if err := c.addOptions(p, vals); err != nil {
-				return nil, err
-			}
-		case "relation":
-			var ids []string
-			if json.Unmarshal(raw, &ids) != nil {
-				return nil, invalid("props", "%q takes a list of row ids", p.Name)
-			}
 		}
-		out[p.ID] = raw
+		out[prop.ID] = raw
 	}
 	return out, nil
+}
+
+// propertyNamed finds a database's property by its id or name. It points
+// into props, so that options a value adds are seen by the next value.
+func propertyNamed(props []core.DBProperty, key string) (*core.DBProperty, error) {
+	var prop *core.DBProperty
+	for i := range props {
+		if props[i].ID == key || strings.EqualFold(props[i].Name, key) {
+			prop = &props[i]
+		}
+	}
+	if prop != nil {
+		return prop, nil
+	}
+	names := make([]string, len(props))
+	for i, q := range props {
+		names[i] = q.Name
+	}
+	return nil, &Error{Code: CodeInvalid, Field: "props", Message: "this database has no property " + key, Allowed: names, Nearest: nearest(key, names)}
+}
+
+// propValue checks one value against its property's type, and turns it
+// into what is stored.
+func (c *cx) propValue(prop *core.DBProperty, raw json.RawMessage) (json.RawMessage, error) {
+	switch prop.Type {
+	case "formula", "rollup", "created_at", "updated_at", "created_by":
+		return nil, invalid("props", "%q is worked out, not set", prop.Name)
+	case "number":
+		var n float64
+		if json.Unmarshal(raw, &n) != nil {
+			return nil, invalid("props", "%q takes a number", prop.Name)
+		}
+	case "checkbox":
+		var b bool
+		if json.Unmarshal(raw, &b) != nil {
+			return nil, invalid("props", "%q takes true or false", prop.Name)
+		}
+	case "date":
+		var s string
+		if json.Unmarshal(raw, &s) != nil || checkDate("props", s) != nil {
+			return nil, invalid("props", "%q takes a date, YYYY-MM-DD", prop.Name)
+		}
+	case "member":
+		var ref string
+		if json.Unmarshal(raw, &ref) != nil {
+			return nil, invalid("props", "%q takes a member", prop.Name)
+		}
+		m, err := c.memberRef("props", ref)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(m.UserID)
+	case "select", "multi_select":
+		return raw, c.selectValue(prop, raw)
+	case "relation":
+		var ids []string
+		if json.Unmarshal(raw, &ids) != nil {
+			return nil, invalid("props", "%q takes a list of row ids", prop.Name)
+		}
+	}
+	return raw, nil
+}
+
+// selectValue checks the option, or options, of a select, and adds those
+// that are new.
+func (c *cx) selectValue(prop *core.DBProperty, raw json.RawMessage) error {
+	var vals []string
+	if prop.Type == "select" {
+		var one string
+		if json.Unmarshal(raw, &one) != nil {
+			return invalid("props", "%q takes one option", prop.Name)
+		}
+		vals = []string{one}
+	} else if json.Unmarshal(raw, &vals) != nil {
+		return invalid("props", "%q takes a list of options", prop.Name)
+	}
+	return c.addOptions(prop, vals)
 }
 
 var optionColors = []string{"gray", "blue", "green", "yellow", "orange", "red", "purple", "pink"}

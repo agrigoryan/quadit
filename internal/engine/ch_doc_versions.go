@@ -15,7 +15,7 @@ func init() {
 	register("doc.revert", core.RoleMember, docRevert)
 }
 
-const versionEvery = 15 * 60_000 // a page keeps a version at most this often while it is edited
+const versionEvery = 15 * msPerMinute // a page keeps a version at most this often while it is edited
 
 // keepVersion stores the page as it stands. Unless forced it does so only
 // when the newest version is older than versionEvery.

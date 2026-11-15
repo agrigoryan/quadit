@@ -73,6 +73,19 @@ func (p *patch) setFlag(col string, o Opt[bool], cur *bool) {
 	*cur = o.V && !o.Null
 }
 
+// setStamp applies an optional on/off argument kept as the time it was
+// turned on (archived_at, resolved_at): on stamps now, off clears it, and
+// either leaves a field already so as it is.
+func (p *patch) setStamp(col string, o Opt[bool], cur, now int64) {
+	switch {
+	case !o.Set:
+	case o.V && cur == 0:
+		p.put(col, int64(0), now)
+	case !o.V && cur != 0:
+		p.put(col, cur, int64(0))
+	}
+}
+
 // name applies an optional text argument that may not be empty.
 func (p *patch) name(col string, o Opt[string], cur *string) error {
 	if !o.Set {
