@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -30,6 +31,7 @@ func (c *cx) stale(t core.Task, base int64) error {
 	for f := range fields {
 		changed = append(changed, f)
 	}
+	sort.Strings(changed)
 	return &Error{Code: CodeStale, Allowed: changed, Message: "task " + t.Key + " changed since seq " + itoa(int(base)) +
 		" (it is now at " + itoa(int(t.UpdatedSeq)) + "; changed fields are listed); read it again, or resend without base_seq to overwrite"}
 }

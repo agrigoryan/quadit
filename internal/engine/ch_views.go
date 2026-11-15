@@ -227,7 +227,8 @@ func (c *cx) checkViewValues(raw json.RawMessage) error {
 			return oneOf("query.category", "category", cat, core.Categories)
 		}
 	}
-	people := map[string][]string{"query.assignee": q.Assignee, "query.creator": {q.Creator}, "query.asked": {q.Asked}, "query.mentions": {q.Mentions}}
+	people := []viewPeople{{"query.assignee", q.Assignee}, {"query.creator", []string{q.Creator}},
+		{"query.asked", []string{q.Asked}}, {"query.mentions", []string{q.Mentions}}}
 	if err := c.checkViewPeople(people, q.Parent); err != nil {
 		return err
 	}
@@ -243,15 +244,22 @@ func (c *cx) checkViewValues(raw json.RawMessage) error {
 	return c.checkViewLabels(q.Label)
 }
 
+// viewPeople is one filter of a view that names members.
+type viewPeople struct {
+	field string
+	refs  []string
+}
+
 // checkViewPeople refuses a filter on a member, or on a parent task, that
-// is not there.
-func (c *cx) checkViewPeople(people map[string][]string, parent string) error {
-	for field, refs := range people {
-		for _, ref := range refs {
+// is not there. The filters are checked in the order given, so a view with
+// more than one wrong is always told of the same one.
+func (c *cx) checkViewPeople(people []viewPeople, parent string) error {
+	for _, f := range people {
+		for _, ref := range f.refs {
 			if ref == "" || ref == "me" || ref == "none" {
 				continue
 			}
-			if _, err := c.memberRef(field, ref); err != nil {
+			if _, err := c.memberRef(f.field, ref); err != nil {
 				var e *Error
 				if errors.As(err, &e) {
 					e.Code = CodeInvalid // the view is what is wrong, not the address asked

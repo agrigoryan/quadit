@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -396,14 +397,22 @@ func dbviewDelete(c *cx, a idArgs) error {
 
 // rowProps turns a row's values as a caller sends them (by property name or
 // id) into what is stored (by property id). A member is stored by id, and a
-// select value that is not yet an option becomes one.
+// select value that is not yet an option becomes one. The values are taken
+// in the order of their names, so a row with more than one wrong is always
+// told of the same one.
 func (c *cx) rowProps(databaseID string, given map[string]json.RawMessage) (map[string]json.RawMessage, error) {
 	var props []core.DBProperty
 	if err := c.tx.List(c.ctx, &props, store.Q{Where: []store.Cond{store.Eq("database_id", databaseID), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
+	keys := make([]string, 0, len(given))
+	for key := range given {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
 	out := map[string]json.RawMessage{}
-	for key, raw := range given {
+	for _, key := range keys {
+		raw := given[key]
 		var p *core.DBProperty
 		for i := range props {
 			if props[i].ID == key || strings.EqualFold(props[i].Name, key) {
