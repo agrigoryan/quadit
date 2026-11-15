@@ -191,8 +191,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		return res, err
 	}
 	root := filepath.Join(dir, filepath.FromSlash(src.Subdir))
-	// Whatever is stored, nothing outside the checkout is ever read.
-	if rel, rerr := filepath.Rel(dir, root); rerr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	// Whatever is stored, and whatever links the repository holds, nothing
+	// outside the checkout is ever read or written.
+	if !staysInside(dir, root) {
 		return res, errors.New("the source's folder leads out of its repository; set it to a path inside, such as docs")
 	}
 	if st, serr := os.Stat(root); src.Subdir != "" && serr == nil && !st.IsDir() {
@@ -208,6 +209,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			return nil
 		}
 		name := e.Name()
+		if e.Type()&os.ModeSymlink != 0 {
+			return nil // a link may point anywhere on the server: it is not a page
+		}
 		if e.IsDir() {
 			if p != root && (strings.HasPrefix(name, ".") || name == "node_modules") {
 				return filepath.SkipDir
@@ -386,6 +390,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	}
 	for path, text := range toWrite {
 		full := filepath.Join(root, filepath.FromSlash(path))
+		if !staysInside(dir, full) {
+			continue // through a link out of the repository: not written
+		}
 		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
 			return res, err
 		}
@@ -394,7 +401,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		}
 	}
 	for _, path := range toRemove {
-		os.Remove(filepath.Join(root, filepath.FromSlash(path)))
+		if full := filepath.Join(root, filepath.FromSlash(path)); staysInside(dir, full) {
+			os.Remove(full)
+		}
 	}
 	if _, err := git(ctx, dir, "add", "--all", "."); err != nil {
 		return res, err
@@ -496,4 +505,34 @@ func (s *Server) commitAuthor(ctx context.Context, db store.DB, editors map[stri
 	}
 	sort.Strings(others)
 	return author, others
+}
+
+// staysInside reports whether path, once every symbolic link on the way is
+// followed, is still under dir, and is not itself a link. A repository can
+// hold links to anywhere on the server; sync neither reads nor writes
+// through them. A path that does not exist yet is judged by the nearest
+// folder above it that does.
+func staysInside(dir, path string) bool {
+	realDir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return false
+	}
+	if st, err := os.Lstat(path); err == nil && st.Mode()&os.ModeSymlink != 0 {
+		return false
+	}
+	at, rest := path, ""
+	for {
+		real, err := filepath.EvalSymlinks(at)
+		if err == nil {
+			full := filepath.Join(real, rest)
+			rel, rerr := filepath.Rel(realDir, full)
+			return rerr == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+		}
+		up := filepath.Dir(at)
+		if up == at {
+			return false
+		}
+		rest = filepath.Join(filepath.Base(at), rest)
+		at = up
+	}
 }

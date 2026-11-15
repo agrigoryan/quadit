@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -299,4 +302,54 @@ func TestThirdAuditFindings(t *testing.T) {
 			t.Fatal("140 calls with no token were never slowed down")
 		}
 	})
+}
+
+// TestSyncDoesNotFollowLinks: a repository may hold symbolic links to
+// anywhere on the server. Sync reads none of them as pages, takes no folder
+// through one, and writes nothing through one.
+func TestSyncDoesNotFollowLinks(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	s := newSite(t, testdb.SQLite(t))
+	outside := t.TempDir()
+	os.WriteFile(filepath.Join(outside, "secret.md"), []byte("the server's own secret"), 0o600)
+	os.MkdirAll(filepath.Join(outside, "sub"), 0o700)
+	os.WriteFile(filepath.Join(outside, "sub", "deep.md"), []byte("deep outside text"), 0o600)
+	work := t.TempDir()
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = work
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	os.MkdirAll(filepath.Join(work, "docs"), 0o755)
+	os.WriteFile(filepath.Join(work, "docs", "real.md"), []byte("# Real\n\nA real page.\n"), 0o644)
+	os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(work, "docs", "leak.md"))
+	os.Symlink(outside, filepath.Join(work, "link"))
+	run("add", "-A")
+	run("commit", "-q", "-m", "docs")
+
+	src := s.change(s.owner, "", "source.create", M{"title": "Handbook", "repo": work, "subdir": "docs"})["ref"].(string)
+	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil)
+	pages := func() string {
+		return strings.ToLower(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil))
+	}
+	if out := pages(); strings.Contains(out, "leak") || !strings.Contains(out, "real") {
+		t.Fatalf("after a sync the pages are (the linked file must not be one, the real one must):\n%s", out)
+	}
+	// A folder reached through a link is refused when syncing.
+	s.change(s.owner, "", "source.update", M{"id": src, "subdir": "link/sub"})
+	if out := s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 409, nil); !strings.Contains(out, "leads out of its repository") {
+		t.Fatalf("a folder through a link: %s", out)
+	}
+	if out := pages(); strings.Contains(out, "deep") {
+		t.Fatalf("a folder outside the repository was read through a link:\n%s", out)
+	}
+	if raw, _ := os.ReadFile(filepath.Join(outside, "secret.md")); string(raw) != "the server's own secret" {
+		t.Fatalf("the file outside was changed: %q", raw)
+	}
 }

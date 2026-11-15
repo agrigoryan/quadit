@@ -26,6 +26,13 @@ export function ago(ms: number, now: number = Date.now()): string {
 export const exact = (ms: number) => fullTime.format(ms);
 export const timeOfDay = (ms: number) => clock.format(ms);
 
+/**
+ * Today as the server counts days (UTC), as YYYY-MM-DD. Cycles start and end
+ * on the server's days, so "the current cycle" is the same one for everybody
+ * and for the API, whatever time zone a browser is in.
+ */
+export const serverDay = (now: Date = new Date()): string => now.toISOString().slice(0, 10);
+
 /** Today as YYYY-MM-DD in the person's own time zone. */
 export function today(now: Date = new Date()): string {
   const m = String(now.getMonth() + 1).padStart(2, "0");

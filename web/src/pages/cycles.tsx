@@ -6,7 +6,7 @@ import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
 import { useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
-import { daysUntil, formatDay, today } from "@/lib/time";
+import { daysUntil, formatDay, serverDay, today } from "@/lib/time";
 import type { Cycle, Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { addDays } from "@/insights/lib/format";
@@ -43,7 +43,7 @@ function Cycles({ project }: { project: Project }) {
   const cycles = useCycles(project.id);
   const tasksBy = useTasksBy(project.id, "cycle_id");
   const tallies = useTallies("cycle_id");
-  const now = today();
+  const now = serverDay();
   const groups = useMemo(() => inGroups(cycles, now), [cycles, now]);
   const [openId, setOpenId] = useState<string | null>(null);
 

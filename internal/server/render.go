@@ -595,7 +595,8 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 
 // quiet fields say nothing a reader needs on a feed line.
 var quietFields = map[string]bool{"started_at": true, "completed_at": true, "canceled_at": true, "lease_until": true, "rank": true,
-	"number": true, "deleted_at": true, "archived_at": true, "updated_at": true}
+	"number": true, "deleted_at": true, "archived_at": true, "updated_at": true, "content_seq": true, "updated_by": true,
+	"removed_at": true, "suspended_at": true}
 
 func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 	var parts []string
@@ -686,6 +687,14 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 					parts = append(parts, "moved to trash")
 				} else {
 					parts = append(parts, "restored")
+				}
+			}
+			if f == "removed_at" || f == "suspended_at" {
+				word := map[string][2]string{"removed_at": {"removed", "brought back"}, "suspended_at": {"suspended", "no longer suspended"}}[f]
+				if ch.To != nil && ch.To != float64(0) {
+					parts = append(parts, word[0])
+				} else {
+					parts = append(parts, word[1])
 				}
 			}
 			if f == "archived_at" {

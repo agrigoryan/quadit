@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { statusesOf, useCollection, useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { daysUntil, formatDay, today } from "@/lib/time";
+import { daysUntil, formatDay, serverDay, today } from "@/lib/time";
 import { type Cycle, isOpenCategory, type Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
@@ -33,7 +33,7 @@ import { Spinner } from "@/ui/spinner";
 export const cycleName = (cycle: Cycle) => cycle.name || t("prop.cycleName", { n: String(cycle.number) });
 
 /** Where a cycle stands against today. */
-export function cyclePhase(cycle: Cycle, now = today()): "current" | "upcoming" | "past" {
+export function cyclePhase(cycle: Cycle, now = serverDay()): "current" | "upcoming" | "past" {
   return cycle.ends_on < now ? "past" : cycle.starts_on > now ? "upcoming" : "current";
 }
 

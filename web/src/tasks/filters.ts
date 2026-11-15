@@ -5,6 +5,7 @@
 import { t, tMaybe } from "@/lib/i18n";
 import type { Collections, Dict } from "@/lib/store";
 import { CATEGORIES, type Category, type GroupBy, type SortBy, type Task, type TaskQuery } from "@/lib/types";
+import { serverDay } from "@/lib/time";
 
 export const NONE = "none";
 /** In the "waiting on" filter: tasks that wait on an outside event. */
@@ -258,7 +259,7 @@ export function normalizeQuery(raw: unknown): TaskQuery | null {
  * gone (a deleted label, status or epic, a person removed): the server
  * refuses those, and no task can match them.
  */
-export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string, today: string): Filters {
+export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string, _today?: string): Filters {
   if (!q) return emptyFilters;
   const low = (s: string) => s.toLowerCase();
   const projectIds = (q.project ?? [])
@@ -286,8 +287,9 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
     // as the filter: no task is in "current", so none is shown, as the
     // server answers too. Dropping it would show every task.
     const orWord = (ids: string[]) => (ids.length ? ids : [ref]);
-    if (ref === "current") return orWord(rows.filter((cy) => cy.starts_on <= today && today <= cy.ends_on).map((cy) => cy.id));
-    if (ref === "next") return orWord(rows.filter((cy) => cy.starts_on > today).slice(0, 1).map((cy) => cy.id));
+    const day = serverDay(); // a cycle's days are the server's, not this browser's
+    if (ref === "current") return orWord(rows.filter((cy) => cy.starts_on <= day && day <= cy.ends_on).map((cy) => cy.id));
+    if (ref === "next") return orWord(rows.filter((cy) => cy.starts_on > day).slice(0, 1).map((cy) => cy.id));
     return rows.filter((cy) => cy.id === ref || String(cy.number) === ref).map((cy) => cy.id);
   };
 

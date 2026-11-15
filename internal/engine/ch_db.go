@@ -497,6 +497,9 @@ func sourceUpdate(c *cx) error {
 	if err != nil {
 		return err
 	}
+	if a.Title != "" || a.Root != "" {
+		return invalid("title", "a source keeps the page it was made under; to rename that page use doc.update {\"id\": %q, \"title\": …}", src.RootDocID)
+	}
 	p := newPatch()
 	if err := p.name("repo", a.Repo, &src.Repo); err != nil {
 		return err
