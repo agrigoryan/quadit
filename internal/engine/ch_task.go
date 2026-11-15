@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers task.create, task.delete and task.restore.
 func init() {
 	register("task.create", core.RoleMember, taskCreate)
 	register("task.delete", core.RoleMember, taskDelete)

@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
-// init registers rule.*.
 func init() {
 	register("rule.create", core.RoleAdmin, ruleCreate)
 	register("rule.update", core.RoleAdmin, ruleUpdate)
@@ -105,7 +104,8 @@ func ruleCreate(c *cx, a ruleArgs) error {
 	return c.created(seq, "rule", r.ID, inWorkspace(c.ws), r)
 }
 
-// ruleUpdate changes a rule.
+// ruleUpdate changes what is given of a rule. A new match or action is
+// checked together with the half the rule keeps.
 func ruleUpdate(c *cx, a ruleArgs) error {
 	r, err := loadLive[core.Rule](c, "rule", "id", a.ID)
 	if err != nil {

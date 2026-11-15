@@ -11,7 +11,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers resource.*.
 func init() {
 	register("resource.create", core.RoleAdmin, resourceCreate)
 	register("resource.delete", core.RoleAdmin, resourceDelete)

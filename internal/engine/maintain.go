@@ -133,7 +133,6 @@ func (r *reindex) indexDecisions() error {
 	return nil
 }
 
-// indexEpics indexes every live epic.
 func (r *reindex) indexEpics() error {
 	var epics []core.Epic
 	if err := r.db.List(r.ctx, &epics, store.Where(store.Live)); err != nil {

@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
-// init registers integration.*.
 func init() {
 	register("integration.create", core.RoleAdmin, integrationCreate)
 	register("integration.update", core.RoleAdmin, integrationUpdate)

@@ -7,7 +7,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers relation.*.
 func init() {
 	register("relation.add", core.RoleMember, relationAdd)
 	register("relation.remove", core.RoleMember, relationRemove)

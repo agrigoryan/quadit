@@ -12,7 +12,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers decision.*.
 func init() {
 	register("decision.open", core.RoleMember, decisionOpen)
 	register("decision.update", core.RoleMember, decisionUpdate)

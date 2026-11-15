@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers source.*.
 func init() {
 	register("source.create", core.RoleAdmin, sourceCreate)
 	register("source.update", core.RoleAdmin, sourceUpdate)
@@ -87,7 +86,9 @@ func sourceCreate(c *cx, a sourceArgs) error {
 	return c.created(seq, "source", src.ID, place{scopeType: "doc", scopeID: src.RootDocID}, src)
 }
 
-// sourceUpdate changes a mirrored repository.
+// sourceUpdate changes how a repository is mirrored. It refuses a new
+// title or root: a source keeps the page it was made under, which
+// doc.update renames.
 func sourceUpdate(c *cx, a sourceArgs) error {
 	src, err := loadLive[core.DocSource](c, "source", "id", a.ID)
 	if err != nil {

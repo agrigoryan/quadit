@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers milestone.*.
 func init() {
 	register("milestone.create", core.RoleMember, milestoneCreate)
 	register("milestone.update", core.RoleMember, milestoneUpdate)

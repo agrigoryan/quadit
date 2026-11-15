@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers status.*.
 func init() {
 	register("status.create", core.RoleAdmin, statusCreate)
 	register("status.update", core.RoleAdmin, statusUpdate)

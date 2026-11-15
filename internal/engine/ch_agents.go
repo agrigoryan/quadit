@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers agent.*.
 func init() {
 	// Members may make a sub-agent for a task; a standing agent needs an admin.
 	register("agent.create", core.RoleMember, agentCreate)

@@ -8,7 +8,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
-// init registers preference.*.
 func init() {
 	register("preference.create", core.RoleAdmin, preferenceCreate)
 	register("preference.update", core.RoleAdmin, preferenceUpdate)

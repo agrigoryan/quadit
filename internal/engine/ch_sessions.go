@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers session.*.
 func init() {
 	register("session.start", core.RoleMember, sessionStart)
 	register("session.update", core.RoleMember, sessionUpdate)

@@ -11,7 +11,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers secret.*.
 func init() {
 	register("secret.set", core.RoleAdmin, secretSet)
 	register("secret.delete", core.RoleAdmin, secretDelete)

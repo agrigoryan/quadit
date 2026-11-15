@@ -12,7 +12,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers cycle.*.
 func init() {
 	register("cycle.create", core.RoleMember, cycleCreate)
 	register("cycle.update", core.RoleMember, cycleUpdate)

@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers task.take and task.release.
 func init() {
 	register("task.take", core.RoleMember, taskTake)
 	register("task.release", core.RoleMember, taskRelease)

@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
-// init registers webhook.*.
 func init() {
 	register("webhook.create", core.RoleAdmin, webhookCreate)
 	register("webhook.update", core.RoleAdmin, webhookUpdate)
@@ -84,7 +83,8 @@ type webhookUpdateArgs struct {
 	Active     Opt[bool]     `json:"active"`
 }
 
-// webhookUpdate changes a webhook.
+// webhookUpdate changes what is given of a webhook. Its event says that
+// the secret changed, never what it is.
 func webhookUpdate(c *cx, a webhookUpdateArgs) error {
 	w, err := loadLive[core.Webhook](c, "webhook", "id", a.ID)
 	if err != nil {

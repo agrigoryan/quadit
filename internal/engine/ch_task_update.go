@@ -1,5 +1,3 @@
-// task.update.
-
 package engine
 
 import (
@@ -9,7 +7,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers task.update.
 func init() {
 	register("task.update", core.RoleMember, taskUpdate)
 }

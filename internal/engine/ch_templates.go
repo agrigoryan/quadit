@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers template.*.
 func init() {
 	register("template.create", core.RoleMember, templateCreate)
 	register("template.update", core.RoleMember, templateUpdate)
@@ -74,7 +73,8 @@ type templateUpdateArgs struct {
 	Preset      Opt[Preset] `json:"preset"`
 }
 
-// templateUpdate changes a template.
+// templateUpdate changes what is given of a template; a preset sent as
+// null clears it.
 func templateUpdate(c *cx, a templateUpdateArgs) error {
 	tp, err := loadLive[core.Template](c, "template", "id", a.ID)
 	if err != nil {

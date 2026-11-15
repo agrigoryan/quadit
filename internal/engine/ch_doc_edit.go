@@ -13,7 +13,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers doc.edit and doc.write.
 func init() {
 	register("doc.edit", core.RoleMember, docEdit)
 	register("doc.write", core.RoleMember, docWrite)

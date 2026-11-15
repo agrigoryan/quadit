@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers notification.read and notify.
 func init() {
 	register("notification.read", core.RoleMember, notificationRead)
 	register("notify", core.RoleMember, notifyMember)

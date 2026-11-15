@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers attachment.*.
 func init() {
 	register("attachment.add", core.RoleMember, attachmentAdd)
 	register("attachment.remove", core.RoleMember, attachmentRemove)

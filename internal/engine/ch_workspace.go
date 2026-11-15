@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers workspace.*.
 func init() {
 	register("workspace.update", core.RoleAdmin, workspaceUpdate)
 	register("workspace.delete", core.RoleOwner, workspaceDelete)

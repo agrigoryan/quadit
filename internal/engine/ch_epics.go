@@ -10,7 +10,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers epic.*.
 func init() {
 	register("epic.create", core.RoleMember, epicCreate)
 	register("epic.update", core.RoleMember, epicUpdate)
@@ -98,7 +97,8 @@ type epicUpdateArgs struct {
 	Rank        Opt[string] `json:"rank"`
 }
 
-// epicUpdate changes an epic.
+// epicUpdate changes what is given of an epic. Marking it done stamps
+// completed_at, and moving it out of done clears that.
 func epicUpdate(c *cx, a epicUpdateArgs) error {
 	e, err := loadLive[core.Epic](c, "epic", "id", a.ID)
 	if err != nil {

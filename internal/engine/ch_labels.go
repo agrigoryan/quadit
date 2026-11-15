@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers label.*.
 func init() {
 	register("label.create", core.RoleMember, labelCreate)
 	// Anyone tags with a new label; renaming or removing one changes it for

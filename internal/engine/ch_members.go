@@ -12,7 +12,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers member.*.
 func init() {
 	register("member.add", core.RoleAdmin, memberAdd)
 	register("member.update", core.RoleAdmin, memberUpdate)
@@ -283,7 +282,8 @@ func (c *cx) memberRole(p *patch, a memberUpdateArgs, m core.Member) error {
 	return nil
 }
 
-// memberHandle applies a new @handle.
+// memberHandle puts a new @handle in the patch, once it is checked; the
+// same handle again changes nothing.
 func memberHandle(p *patch, a memberUpdateArgs, m core.Member) error {
 	if !a.Handle.Set || a.Handle.V == m.Handle {
 		return nil

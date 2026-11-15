@@ -9,7 +9,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers comment.*.
 func init() {
 	register("comment.create", core.RoleMember, commentCreate)
 	register("comment.update", core.RoleMember, commentUpdate)

@@ -173,7 +173,8 @@ func (l *linker) members(text string) error {
 	return nil
 }
 
-// tasks finds task keys (SVA-12).
+// tasks links the tasks named by key (SVA-12) that exist; a key followed
+// by #N names a decision, and is left to numberedDecisions.
 func (l *linker) tasks(text string) error {
 	for _, loc := range keyRE.FindAllStringSubmatchIndex(text, -1) {
 		if rest := text[loc[1]:]; len(rest) > 1 && rest[0] == '#' && rest[1] >= '0' && rest[1] <= '9' {

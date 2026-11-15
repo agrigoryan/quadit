@@ -13,7 +13,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers doc.create, doc.update, doc.delete and doc.restore.
 func init() {
 	register("doc.create", core.RoleMember, docCreate)
 	register("doc.update", core.RoleMember, docUpdate)

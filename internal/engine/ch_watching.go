@@ -7,7 +7,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers watch.set.
 func init() {
 	register("watch.set", core.RoleMember, watchSet)
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers project.*.
 func init() {
 	register("project.create", core.RoleAdmin, projectCreate)
 	register("project.update", core.RoleAdmin, projectUpdate)

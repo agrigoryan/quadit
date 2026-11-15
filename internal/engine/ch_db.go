@@ -12,7 +12,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init registers property.* and dbview.*.
 func init() {
 	register("property.create", core.RoleMember, propertyCreate)
 	register("property.update", core.RoleMember, propertyUpdate)
@@ -354,7 +353,8 @@ func (c *cx) dbviewDoc(ref string) (core.DBView, core.Doc, error) {
 	return v, d, err
 }
 
-// dbviewUpdate changes a database view.
+// dbviewUpdate changes what is given of a database view. Its event goes
+// only to those who can see the page.
 func dbviewUpdate(c *cx, a dbviewArgs) error {
 	v, d, err := c.dbviewDoc(a.ID)
 	if err != nil {
