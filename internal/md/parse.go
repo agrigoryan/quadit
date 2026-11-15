@@ -80,8 +80,18 @@ func (p *parser) block() Block {
 	if m := fenceRE.FindStringSubmatch(line); m != nil {
 		return p.code(m[1], m[2])
 	}
-	if b, ok := p.oneLine(line, trimmed); ok {
-		return b
+	if m := headingRE.FindStringSubmatch(trimmed); m != nil {
+		p.pos++
+		return Block{Type: "heading", Props: map[string]any{"level": len(m[1])}, Content: inline(m[2])}
+	}
+	if ruleRE.MatchString(line) && !bulletRE.MatchString(line) {
+		p.pos++
+		return Block{Type: "divider"}
+	}
+	if m := imageRE.FindStringSubmatch(trimmed); m != nil {
+		// A picture or video on a line of its own.
+		p.pos++
+		return media(m[1], m[2])
 	}
 	if strings.HasPrefix(trimmed, ">") {
 		return p.quote()
@@ -96,24 +106,6 @@ func (p *parser) block() Block {
 		return p.item(len(m[1]), m[3], "numberedListItem")
 	}
 	return p.paragraph()
-}
-
-// oneLine reads a block that is one line: a heading, a divider, or a
-// picture or video on a line of its own.
-func (p *parser) oneLine(line, trimmed string) (Block, bool) {
-	if m := headingRE.FindStringSubmatch(trimmed); m != nil {
-		p.pos++
-		return Block{Type: "heading", Props: map[string]any{"level": len(m[1])}, Content: inline(m[2])}, true
-	}
-	if ruleRE.MatchString(line) && !bulletRE.MatchString(line) {
-		p.pos++
-		return Block{Type: "divider"}, true
-	}
-	if m := imageRE.FindStringSubmatch(trimmed); m != nil {
-		p.pos++
-		return media(m[1], m[2]), true
-	}
-	return Block{}, false
 }
 
 // media is a picture, or a video when the address names a video file.

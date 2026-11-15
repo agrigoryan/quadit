@@ -20,8 +20,7 @@ func isList(t string) bool {
 	return t == "bulletListItem" || t == "numberedListItem" || t == "checkListItem"
 }
 
-// render writes blocks out, each line under indent, with a blank line
-// between blocks except between the items of a list.
+// render writes blocks out, each line under indent.
 func render(b *strings.Builder, blocks []Block, indent string) {
 	number := 0
 	for i, bl := range blocks {
@@ -30,7 +29,9 @@ func render(b *strings.Builder, blocks []Block, indent string) {
 		} else {
 			number = 0
 		}
-		if i > 0 && (!isList(bl.Type) || !isList(blocks[i-1].Type)) {
+		// A blank line between blocks, except between the items of a list.
+		inList := i > 0 && isList(bl.Type) && isList(blocks[i-1].Type)
+		if i > 0 && !inList {
 			b.WriteString("\n")
 		}
 		renderBlock(b, bl, number, indent)
@@ -208,7 +209,8 @@ func escape(s string) string {
 		case '*':
 			before := i == 0 || s[i-1] == ' ' || s[i-1] == '*'
 			after := i+1 == len(s) || s[i+1] == ' ' || s[i+1] == '*'
-			if !before || !after {
+			alone := before && after // a star between spaces is left as it is
+			if !alone {
 				b.WriteByte('\\')
 			}
 		case '`':
