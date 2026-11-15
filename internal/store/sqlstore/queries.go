@@ -1,5 +1,5 @@
 // The task and event lists, the two reads a Q cannot express:
-// a task filter's conditions group by group, keyset paging, and the feed.
+// a task filter's conditions, keyset paging, and the feed.
 
 package sqlstore
 
@@ -32,43 +32,25 @@ func limitOr(asked, byDefault, most int) int {
 }
 
 // taskWhere builds the WHERE of a task filter on the tasks table under the
-// alias t: the workspace, then each group of conditions below in a fixed
-// order, so that one filter always makes the same statement. Values that
-// should be ids and are not select nothing rather than fail (idOrNone).
+// alias t: the workspace, then each condition the filter asks for, always in
+// this order, so that one filter always makes the same statement. Values
+// that should be ids and are not select nothing rather than fail (idOrNone).
 func (c conn) taskWhere(filter store.TaskFilter) *clause {
 	where := &clause{}
 	if c.workspaceID != "" {
 		where.add(`t.workspace_id = ?`, c.workspaceID)
 	}
-	taskLife(where, &filter)
-	taskWhich(where, &filter)
-	taskWho(where, &filter)
-	taskState(where, &filter)
-	taskLabels(where, &filter)
-	taskPlace(where, &filter)
-	taskDue(where, &filter)
-	taskFollowers(where, &filter)
-	taskChangedAfter(where, &filter)
-	taskDecisions(where, &filter)
-	taskText(where, &filter)
-	return where
-}
-
-// taskLife keeps live tasks, or with InTrash only deleted ones; archived
-// tasks only with Archived.
-func taskLife(where *clause, filter *store.TaskFilter) {
+	// Live tasks, or with InTrash only deleted ones; archived ones only with
+	// Archived.
 	if filter.InTrash {
 		where.add(`t.deleted_at IS NOT NULL`)
-		return
+	} else {
+		where.add(`t.deleted_at IS NULL`)
+		if !filter.Archived {
+			where.add(`t.archived_at IS NULL`)
+		}
 	}
-	where.add(`t.deleted_at IS NULL`)
-	if !filter.Archived {
-		where.add(`t.archived_at IS NULL`)
-	}
-}
-
-// taskWhich keeps the tasks named by id or key, or in the projects.
-func taskWhich(where *clause, filter *store.TaskFilter) {
+	// Which tasks: by id, by key, by project.
 	if len(filter.IDs) > 0 {
 		where.inIDs(`t.id`, filter.IDs)
 	}
@@ -78,11 +60,8 @@ func taskWhich(where *clause, filter *store.TaskFilter) {
 	if len(filter.ProjectIDs) > 0 {
 		where.inIDs(`t.project_id`, filter.ProjectIDs)
 	}
-}
-
-// taskWho is about people: the assignee, who made the task, what it waits
-// on, and who holds its lease.
-func taskWho(where *clause, filter *store.TaskFilter) {
+	// People: the assignee, who made the task, what it waits on, who holds
+	// its lease.
 	where.inOrNone(`t.assignee_id`, filter.AssigneeIDs, filter.Unassigned)
 	if filter.CreatedBy != "" {
 		where.add(`t.created_by = ?`, idOrNone(filter.CreatedBy))
@@ -99,11 +78,8 @@ func taskWho(where *clause, filter *store.TaskFilter) {
 	if filter.LeaseHolderID != "" {
 		where.add(`t.lease_holder_id = ?`, idOrNone(filter.LeaseHolderID))
 	}
-}
-
-// taskState is about where a task is in its life: its status or the
-// status's category, open or closed, and made at or before a feed position.
-func taskState(where *clause, filter *store.TaskFilter) {
+	// State: the status or its category, open or closed, made at or before a
+	// feed position.
 	if len(filter.StatusIDs) > 0 {
 		where.inIDs(`t.status_id`, filter.StatusIDs)
 	}
@@ -120,18 +96,11 @@ func taskState(where *clause, filter *store.TaskFilter) {
 	if filter.Closed {
 		where.add(`(t.archived_at IS NOT NULL OR t.status_id IN (SELECT id FROM statuses WHERE workspace_id = t.workspace_id AND category IN ('done', 'canceled')))`)
 	}
-}
-
-// taskLabels keeps the tasks that have every one of the labels.
-func taskLabels(where *clause, filter *store.TaskFilter) {
+	// Labels: every one of them.
 	for _, label := range filter.LabelIDs {
 		where.add(`EXISTS (SELECT 1 FROM task_labels tl WHERE tl.task_id = t.id AND tl.label_id = ?)`, idOrNone(label))
 	}
-}
-
-// taskPlace is about where a task sits in the plan: its parent, epic,
-// milestone and cycle, and its priority.
-func taskPlace(where *clause, filter *store.TaskFilter) {
+	// The plan: parent, epic, milestone, cycle.
 	if filter.ParentID != "" {
 		where.add(`t.parent_id = ?`, idOrNone(filter.ParentID))
 	}
@@ -143,6 +112,7 @@ func taskPlace(where *clause, filter *store.TaskFilter) {
 		where.add(`t.milestone_id = ?`, idOrNone(filter.MilestoneID))
 	}
 	where.inOrNone(`t.cycle_id`, filter.CycleIDs, filter.NoCycle)
+	// Priority.
 	if len(filter.Priorities) > 0 {
 		args := make([]any, len(filter.Priorities))
 		for i, priority := range filter.Priorities {
@@ -150,59 +120,42 @@ func taskPlace(where *clause, filter *store.TaskFilter) {
 		}
 		where.add(`t.priority IN (`+placeholders(len(filter.Priorities))+`)`, args...)
 	}
-}
-
-// taskDue keeps the tasks due in a range of dates.
-func taskDue(where *clause, filter *store.TaskFilter) {
+	// Due in a range of dates.
 	if filter.DueBefore != "" {
 		where.add(`t.due_on <= ?`, filter.DueBefore)
 	}
 	if filter.DueAfter != "" {
 		where.add(`t.due_on >= ?`, filter.DueAfter)
 	}
-}
-
-// taskFollowers keeps the tasks that mention a member, or that a member
-// watches.
-func taskFollowers(where *clause, filter *store.TaskFilter) {
+	// Mentioning a member, or watched by one.
 	if filter.MentionsID != "" {
 		where.add(`EXISTS (SELECT 1 FROM refs r WHERE r.from_scope_id = t.id AND r.to_id = ?)`, idOrNone(filter.MentionsID))
 	}
 	if filter.WatchedBy != "" {
 		where.add(`EXISTS (SELECT 1 FROM watchers wt WHERE wt.subject_id = t.id AND wt.user_id = ?)`, idOrNone(filter.WatchedBy))
 	}
-}
-
-// taskChangedAfter keeps the tasks in which something happened, or whose
-// own fields changed, after a feed position.
-func taskChangedAfter(where *clause, filter *store.TaskFilter) {
+	// Something happened in the task, or its own fields changed, after a
+	// feed position.
 	if filter.ActivityAfter > 0 {
 		where.add(`t.activity_seq > ?`, filter.ActivityAfter)
 	}
 	if filter.UpdatedAfter > 0 {
 		where.add(`t.updated_seq > ?`, filter.UpdatedAfter)
 	}
-}
-
-// taskDecisions keeps the tasks with an open decision, or one asked of a
-// member.
-func taskDecisions(where *clause, filter *store.TaskFilter) {
+	// An open decision, or one asked of a member.
 	if filter.OpenDecision {
 		where.add(`EXISTS (SELECT 1 FROM decisions d WHERE d.task_id = t.id AND d.state = 'open' AND d.deleted_at IS NULL)`)
 	}
 	if filter.AskedID != "" {
 		where.add(`EXISTS (SELECT 1 FROM decisions d WHERE d.task_id = t.id AND d.state = 'open' AND d.deleted_at IS NULL AND d.asked_id = ?)`, idOrNone(filter.AskedID))
 	}
-}
-
-// taskText keeps the tasks whose title or key holds the text, in any case.
-// LIKE's wildcards in the text are taken out ("%") or made a space ("_").
-func taskText(where *clause, filter *store.TaskFilter) {
-	if filter.Text == "" {
-		return
+	// Text in the title or the key, in any case. LIKE's wildcards in the
+	// text are taken out ("%") or made a space ("_").
+	if filter.Text != "" {
+		like := "%" + strings.ToLower(strings.NewReplacer("%", "", "_", " ").Replace(filter.Text)) + "%"
+		where.add(`(LOWER(t.title) LIKE ? OR LOWER(t.key) LIKE ?)`, like, like)
 	}
-	like := "%" + strings.ToLower(strings.NewReplacer("%", "", "_", " ").Replace(filter.Text)) + "%"
-	where.add(`(LOWER(t.title) LIKE ? OR LOWER(t.key) LIKE ?)`, like, like)
+	return where
 }
 
 // TaskSorts lists the accepted values of TaskFilter.Sort.
@@ -271,46 +224,36 @@ func sortOrder(keys []store.SortKey) string {
 // k1 values are the same parameter. Numbers count from the start of the
 // query, so where must be the query's first clause.
 func (c conn) afterRow(where *clause, keys []store.SortKey, after []any) {
-	params := keysetParams{after: after, numbered: c.dialect.NamesRepeats, before: len(where.args), named: map[int]string{}}
+	var args []any               // the values to pass, in placeholder order
+	numbered := map[int]string{} // key index -> its numbered placeholder
+	// param is the placeholder of the i-th key's value: a plain "?" with the
+	// value passed again, or the value's own "?N", passed the first time.
+	param := func(i int) string {
+		if !c.dialect.NamesRepeats {
+			args = append(args, after[i])
+			return "?"
+		}
+		if name, ok := numbered[i]; ok {
+			return name
+		}
+		args = append(args, after[i])
+		numbered[i] = "?" + strconv.Itoa(len(where.args)+len(args))
+		return numbered[i]
+	}
 	alternatives := make([]string, 0, len(keys))
 	for i, key := range keys {
 		var parts []string
 		for j := range i {
-			parts = append(parts, keys[j].Expr+" = "+params.param(j))
+			parts = append(parts, keys[j].Expr+" = "+param(j))
 		}
 		op := " > "
 		if key.Desc {
 			op = " < "
 		}
-		parts = append(parts, key.Expr+op+params.param(i))
+		parts = append(parts, key.Expr+op+param(i))
 		alternatives = append(alternatives, "("+strings.Join(parts, " AND ")+")")
 	}
-	where.add("("+strings.Join(alternatives, " OR ")+")", params.args...)
-}
-
-// keysetParams hands out the placeholders of afterRow's condition and
-// collects their values.
-type keysetParams struct {
-	after    []any          // the last row's sort key values
-	numbered bool           // name a repeated value by its number
-	before   int            // how many placeholders the query has before these
-	args     []any          // the values to pass, in placeholder order
-	named    map[int]string // key index -> its numbered placeholder
-}
-
-// param returns the placeholder of the i-th key's value: a plain "?" with
-// the value passed again, or the value's own "?N", passed the first time.
-func (p *keysetParams) param(i int) string {
-	if !p.numbered {
-		p.args = append(p.args, p.after[i])
-		return "?"
-	}
-	if name, ok := p.named[i]; ok {
-		return name
-	}
-	p.args = append(p.args, p.after[i])
-	p.named[i] = "?" + strconv.Itoa(p.before+len(p.args))
-	return p.named[i]
+	where.add("("+strings.Join(alternatives, " OR ")+")", args...)
 }
 
 // CountTasks counts the tasks a filter selects.
@@ -347,37 +290,22 @@ func (c conn) Events(ctx context.Context, filter store.EventFilter) ([]core.Even
 }
 
 // eventWhere builds the WHERE of an event filter on the events table under
-// the alias e: the workspace, then each group of conditions in a fixed
-// order.
+// the alias e: the workspace, then each condition the filter asks for, in a
+// fixed order.
 func (c conn) eventWhere(filter store.EventFilter) *clause {
 	where := &clause{}
 	if c.workspaceID != "" {
 		where.add(`e.workspace_id = ?`, c.workspaceID)
 	}
-	eventRange(where, &filter)
-	eventPlace(where, &filter)
-	eventKind(where, &filter)
-	eventAudience(where, &filter)
-	if filter.Tasks != nil {
-		tasks := c.taskWhere(*filter.Tasks)
-		where.add(`e.scope_type = 'task' AND e.scope_id IN (SELECT t.id FROM tasks t WHERE `+tasks.sql()+`)`, tasks.args...)
-	}
-	return where
-}
-
-// eventRange keeps the events after, or before, a sequence number.
-func eventRange(where *clause, filter *store.EventFilter) {
+	// After, or before, a sequence number.
 	if filter.After > 0 {
 		where.add(`e.seq > ?`, filter.After)
 	}
 	if filter.Before > 0 {
 		where.add(`e.seq < ?`, filter.Before)
 	}
-}
-
-// eventPlace keeps one object's timeline, or the events of some projects
-// (and with AllowNoProject those of no project).
-func eventPlace(where *clause, filter *store.EventFilter) {
+	// One object's timeline, or the events of some projects (and with
+	// AllowNoProject those of no project).
 	if filter.ScopeID != "" {
 		where.add(`e.scope_id = ?`, idOrNone(filter.ScopeID))
 		if filter.ScopeType != "" {
@@ -387,10 +315,7 @@ func eventPlace(where *clause, filter *store.EventFilter) {
 	if len(filter.ProjectIDs) > 0 {
 		where.inOrNone(`e.project_id`, filter.ProjectIDs, filter.AllowNoProject)
 	}
-}
-
-// eventKind keeps events of some types, or by (or not by) an actor.
-func eventKind(where *clause, filter *store.EventFilter) {
+	// Of some types, or by (or not by) an actor.
 	if len(filter.Types) > 0 {
 		where.in(`e.type`, filter.Types)
 	}
@@ -400,18 +325,20 @@ func eventKind(where *clause, filter *store.EventFilter) {
 	if filter.NotActorID != "" {
 		where.add(`e.actor_id <> ?`, idOrNone(filter.NotActorID))
 	}
-}
-
-// eventAudience keeps only the events addressed to one member, or hides
-// from a viewer the events addressed to someone else.
-func eventAudience(where *clause, filter *store.EventFilter) {
+	// Only the events addressed to one member, or, for a viewer: public
+	// events, the viewer's own, and those of private pages that are shared
+	// with the viewer.
 	if filter.OnlyAudience != "" {
 		where.add(`e.audience_id = ?`, idOrNone(filter.OnlyAudience))
 	} else if filter.Viewer != "" {
-		// Public events, the viewer's own, and those of private pages that
-		// are shared with the viewer.
 		where.add(`(e.audience_id IS NULL OR e.audience_id = ? OR (e.scope_type = 'doc' AND e.scope_id IN
 			(SELECT d.id FROM docs d WHERE d.workspace_id = e.workspace_id AND CAST(d.shared_with AS TEXT) LIKE ?)))`,
 			idOrNone(filter.Viewer), `%"`+idOrNone(filter.Viewer)+`"%`)
 	}
+	// Events in the tasks a task filter selects.
+	if filter.Tasks != nil {
+		tasks := c.taskWhere(*filter.Tasks)
+		where.add(`e.scope_type = 'task' AND e.scope_id IN (SELECT t.id FROM tasks t WHERE `+tasks.sql()+`)`, tasks.args...)
+	}
+	return where
 }
