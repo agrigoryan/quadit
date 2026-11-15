@@ -1,3 +1,6 @@
+// The dashboard's flow part: tasks by status, opened and closed by week, and
+// how long work waits on each member.
+
 package server
 
 import (
@@ -27,6 +30,8 @@ type flowStatus struct {
 	Count    int    `json:"count"`
 }
 
+// flowByStatus counts the tasks, archived ones left out, in each status of
+// the projects the dashboard covers.
 func (d *dashboard) flowByStatus() []flowStatus {
 	names := d.names
 	count := map[string]int{}

@@ -1,3 +1,5 @@
+// One task in full: GET /tasks/KEY, as names for agents or as rows for the web app.
+
 package server
 
 import (
@@ -103,8 +105,9 @@ func (b *detailBuilder) attachments() error {
 	return nil
 }
 
+// comments fills in the task's comments, each with its files, where it
+// sits ("option 2 of decision 1"), and cut at half of maxChars.
 func (b *detailBuilder) comments() error {
-	// "option 2 of decision 1" says where a comment sits.
 	where := map[string]string{}
 	for _, dv := range b.d.Decisions {
 		where[dv.ID] = fmt.Sprintf("decision %d", dv.N)

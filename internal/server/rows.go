@@ -284,11 +284,14 @@ type rowFilter struct {
 	Value any    `json:"value"`
 }
 
+// rowSort is one sort of a database view, or of a rows query.
 type rowSort struct {
 	Prop string `json:"prop"`
 	Desc bool   `json:"desc"`
 }
 
+// matchRow reports whether a cell's value passes a filter. Values compare
+// as text, ignoring case; gt and lt compare numbers when both are.
 func matchRow(f rowFilter, v any) bool {
 	text := strings.ToLower(formula.Text(v))
 	want := strings.ToLower(formula.Text(f.Value))
@@ -337,6 +340,9 @@ func matchRow(f rowFilter, v any) bool {
 // handleListDatabaseRows returns a database's rows with every cell worked out, by property
 // name. view=NAME applies a saved view's filters and sorts; filter and sort
 // in the URL do the same for one query: filter=Status:is:Done,Points:gt:3.
+// In order: the database and its cells, the view's filters and sorts, the
+// URL's, the rows kept and sorted (the first sort counts most), and the
+// answer as rows, as a Markdown table (text) or as raw cells (raw=1).
 func (s *Server) handleListDatabaseRows(x *c) error {
 	d, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
@@ -361,6 +367,7 @@ func (s *Server) handleListDatabaseRows(x *c) error {
 		}
 		return core.DBProperty{}, false
 	}
+	// The filters and sorts: the view's, then the URL's.
 	var cfg struct {
 		Filters []rowFilter `json:"filters"`
 		Sorts   []rowSort   `json:"sorts"`
@@ -402,6 +409,7 @@ func (s *Server) handleListDatabaseRows(x *c) error {
 	for _, part := range splitList(v.Get("sort")) {
 		cfg.Sorts = append(cfg.Sorts, rowSort{Prop: strings.TrimPrefix(part, "-"), Desc: strings.HasPrefix(part, "-")})
 	}
+	// value is a row's cell for a property named by name or id, or its title.
 	value := func(r core.Doc, ref string) (any, error) {
 		if strings.EqualFold(ref, "title") {
 			if _, isProp := prop(ref); !isProp {
@@ -456,6 +464,7 @@ func (s *Server) handleListDatabaseRows(x *c) error {
 			return less
 		})
 	}
+	// The answer.
 	type rowOut struct {
 		ID     string         `json:"id"`
 		Title  string         `json:"title"`

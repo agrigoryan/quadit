@@ -1,3 +1,5 @@
+// Agents: what each is doing right now (/agents, and the dashboard's agents part).
+
 package server
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// agentState is what one agent is doing, as /agents and the dashboard show it.
 type agentState struct {
 	Handle string `json:"handle"`
 	Name   string `json:"name"`

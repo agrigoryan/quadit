@@ -1,3 +1,5 @@
+// The task list: GET /tasks, a page at a time, and the cursor that continues it.
+
 package server
 
 import (

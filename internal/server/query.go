@@ -1,3 +1,6 @@
+// Task queries: the TaskQuery a request, a feed or a saved view asks with,
+// read from the URL and turned into the store's filter, every name resolved.
+
 package server
 
 import (
@@ -96,6 +99,7 @@ func (n *nameLookup) handle(userID string) string {
 	return "@unknown"
 }
 
+// labelNames names labels by id, leaving out the ids of none.
 func (n *nameLookup) labelNames(ids []string) []string {
 	var out []string
 	for _, l := range ids {
@@ -228,6 +232,7 @@ func nearestOf(got string, allowed []string) string {
 	return best
 }
 
+// levenshtein counts the single-byte edits that turn a into b.
 func levenshtein(a, b string) int {
 	prev := make([]int, len(b)+1)
 	cur := make([]int, len(b)+1)
@@ -248,12 +253,19 @@ func levenshtein(a, b string) int {
 	return prev[len(b)]
 }
 
+// resolver finds tasks, projects, members and cycles by what the caller
+// calls them, as the caller.
 func (x *c) resolver() *engine.Resolver {
 	return engine.NewResolver(x.ctx(), x.db, x.member, time.Now().UnixMilli())
 }
 
 // filter turns a TaskQuery into the store's filter, resolving every name
-// and keeping the caller inside the projects it may read.
+// and keeping the caller inside the projects it may read. A name that finds
+// nothing is refused with the names allowed and the nearest one, except in
+// a saved view, where it is left out and noted (noteStaleView). It runs in
+// this order: the plain fields, the projects (which bound every other name),
+// categories and open=, members, statuses, labels, epics, cycles, the
+// milestone, the parent, and last the sort.
 func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 	f := store.TaskFilter{Keys: upperAll(q.Keys), Priorities: q.Priorities(), DueBefore: q.DueBefore, DueAfter: q.DueAfter,
 		ActivityAfter: q.ChangedSince, UpdatedAfter: q.UpdatedSince, OpenDecision: q.OpenDecision, TopLevel: q.TopLevel,
@@ -485,11 +497,13 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 	return f, nil
 }
 
+// sortNames are the sorts a task query may ask for.
 var sortNames = []string{"created", "-created", "rank", "priority", "due", "-activity", "-updated", "key"}
 
 // Priorities returns the priority filter.
 func (q TaskQuery) Priorities() []int { return q.Priority }
 
+// upperAll is the list in upper case: task keys are matched that way.
 func upperAll(list []string) []string {
 	out := make([]string, len(list))
 	for i, s := range list {
@@ -588,8 +602,9 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 	return q, err
 }
 
+// init gives the engine the check a saved view's filter must pass: a view
+// is saved only with a filter that task queries can read.
 func init() {
-	// A view is saved only with a filter that task queries can read.
 	engine.CheckViewQuery = func(ctx context.Context, db store.DB, actor core.Member, project string, raw json.RawMessage) error {
 		var q TaskQuery
 		dec := json.NewDecoder(bytes.NewReader(raw))
@@ -636,6 +651,7 @@ func (x *c) noteStaleView(view, what string) {
 	}
 }
 
+// cloneValues copies URL parameters, so they can be changed.
 func cloneValues(v url.Values) url.Values {
 	out := url.Values{}
 	for k, vs := range v {

@@ -1,3 +1,6 @@
+// The dashboard (/dashboard): where everything stands, in one call. Its
+// parts are filled in by the other dashboard_*.go files.
+
 package server
 
 import (
@@ -9,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init adds the dashboard's routes to the server's routes.
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("GET /api/v1/w/{ws}/dashboard", s.workspaceMember(s.handleShowDashboard))

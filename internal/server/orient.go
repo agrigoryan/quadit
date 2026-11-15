@@ -1,3 +1,5 @@
+// Orientation: who am I (/me), what is mine to do (/my-work), and the inbox.
+
 package server
 
 import (
@@ -164,14 +166,17 @@ func whoAmIText(out map[string]any, ws core.Workspace, keys []string, cursors ma
 	return b.String()
 }
 
+// weekStart is the start of the week (Monday, UTC) a moment falls in.
 func weekStart(t time.Time) int64 {
 	t = t.UTC()
 	wd := (int(t.Weekday()) + 6) % 7
 	return time.Date(t.Year(), t.Month(), t.Day()-wd, 0, 0, 0, 0, time.UTC).UnixMilli()
 }
 
+// formatMoney is an amount in millionths of a dollar, in dollars and cents.
 func formatMoney(micros int64) string { return fmt.Sprintf("%.2f", float64(micros)/1e6) }
 
+// inboxItem is one notification as the inbox lists it.
 type inboxItem struct {
 	ID      string `json:"id"`
 	Seq     int64  `json:"seq"`

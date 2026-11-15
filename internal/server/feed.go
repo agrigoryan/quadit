@@ -1,3 +1,7 @@
+// The feed: reading it after a position (GET /events, which can wait for
+// what comes next), the live stream, and the cursors that remember where a
+// reader stands.
+
 package server
 
 import (
@@ -269,6 +273,10 @@ func (s *Server) handleMoveFeedCursor(x *c) error {
 
 // handleStreamFeed is the live stream: server-sent events, one per feed event, from
 // a position. The web app keeps one open; an agent can too.
+//
+// After the headers it loops: check the caller may still be here (and end
+// the stream with "gone" or "reset" if not), read what is new, send it, and
+// wait for the feed to move or for the heartbeat.
 func (s *Server) handleStreamFeed(x *c) error {
 	flusher, ok := x.w.(http.Flusher)
 	if !ok {

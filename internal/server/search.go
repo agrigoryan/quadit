@@ -1,3 +1,5 @@
+// Search (/search) and the decision log (/decisions).
+
 package server
 
 import (

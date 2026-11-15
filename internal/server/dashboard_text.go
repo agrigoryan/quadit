@@ -1,3 +1,5 @@
+// The dashboard as text.
+
 package server
 
 import (

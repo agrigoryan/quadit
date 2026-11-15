@@ -1,3 +1,6 @@
+// Helpers the reads share: request flags, list filters, files with their
+// addresses, decisions in their named form, and who answers for an agent.
+
 package server
 
 import (
@@ -9,10 +12,12 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// truthyParam reports whether a flag parameter is given and on (see truthy).
 func truthyParam(v url.Values, name string) bool {
 	return v.Has(name) && truthy(v.Get(name))
 }
 
+// keep returns, in a new list, the items ok says yes to.
 func keep[T any](list []T, ok func(T) bool) []T {
 	out := make([]T, 0, len(list))
 	for _, v := range list {
@@ -23,6 +28,7 @@ func keep[T any](list []T, ok func(T) bool) []T {
 	return out
 }
 
+// lines is items as text, one line each, or the line empty when there are none.
 func lines[T any](items []T, line func(T) string, empty string) string {
 	if len(items) == 0 {
 		return empty + "\n"

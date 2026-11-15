@@ -1,3 +1,6 @@
+// The starting copy (/bootstrap): the workspace as rows, for a client that
+// keeps a local copy and follows the feed from there.
+
 package server
 
 import (

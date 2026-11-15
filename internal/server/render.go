@@ -22,6 +22,7 @@ import (
 // The compact forms below are what agents read: names instead of ids, one
 // line per thing in text form, and long text cut at a stated size.
 
+// priorityNames names the priorities by number; 0 is none.
 var priorityNames = []string{"", "urgent", "high", "medium", "low"}
 
 // taskView is a task the way it is listed.
@@ -57,6 +58,8 @@ type taskView struct {
 	Archived    bool         `json:"archived,omitempty"`
 }
 
+// formatTime is a moment as the compact forms show it, in UTC to the
+// minute; "" for none.
 func formatTime(ms int64) string {
 	if ms == 0 {
 		return ""
@@ -208,6 +211,7 @@ func (v taskView) line() string {
 	return b.String()
 }
 
+// attachmentView is a file as it is shown on a task, a comment or a decision.
 type attachmentView struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
@@ -219,6 +223,7 @@ type attachmentView struct {
 	Caption string `json:"caption,omitempty"`
 }
 
+// optionView is one option of a decision, numbered from 1.
 type optionView struct {
 	N           int              `json:"n"`
 	ID          string           `json:"id"`
@@ -228,6 +233,8 @@ type optionView struct {
 	Comments    int              `json:"comments,omitempty"`
 }
 
+// decisionView is a decision the way it is shown: numbered within its task,
+// people by handle, its options with theirs.
 type decisionView struct {
 	N         int    `json:"n"`
 	ID        string `json:"id"`
@@ -259,6 +266,8 @@ type decisionView struct {
 // fileLine is a file of a decision in text: its name and address.
 func fileLine(a attachmentView) string { return "file: " + a.Name + " " + a.URL }
 
+// text is the decision as lines: the question, each option with its marks
+// (recommended, picked), and the answer.
 func (d decisionView) text() string {
 	var b strings.Builder
 	head := fmt.Sprintf("--- decision %d (%s", d.N, d.State)
@@ -307,6 +316,7 @@ func (d decisionView) text() string {
 	return b.String()
 }
 
+// commentView is a comment the way it is shown on its task.
 type commentView struct {
 	ID          string           `json:"id"`
 	Seq         int64            `json:"seq"`
@@ -322,6 +332,7 @@ type commentView struct {
 	Edited      bool             `json:"edited,omitempty"`
 }
 
+// text is the comment on one line, with its evidence and files below it.
 func (cm commentView) text() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "[#%d %s %s]", cm.Seq, cm.By, cm.At)
@@ -352,6 +363,7 @@ func (cm commentView) text() string {
 	return b.String()
 }
 
+// relationView is a task related to the one shown, from that one's side.
 type relationView struct {
 	ID    string `json:"id"`
 	Type  string `json:"type"` // blocks, blocked_by, relates, duplicates, duplicated_by
@@ -360,6 +372,7 @@ type relationView struct {
 	State string `json:"status"`
 }
 
+// linkView is a link on a task: a branch, a pull request, a URL.
 type linkView struct {
 	ID     string `json:"id"`
 	Kind   string `json:"kind"`
@@ -374,6 +387,7 @@ type linkView struct {
 	Data json.RawMessage `json:"data,omitempty"`
 }
 
+// taskDetail is one task with everything in it, as GET /tasks/KEY gives it.
 type taskDetail struct {
 	Task        taskView         `json:"task"`
 	Subtasks    []taskView       `json:"subtasks,omitempty"`
@@ -388,6 +402,10 @@ type taskDetail struct {
 	Seq int64 `json:"seq"`
 }
 
+// text is the task in full as text, in this order: the title, a line of
+// status and people, a line of everything else it has (labels, epic,
+// budget, dates, the feed position), the description, files, sub-tasks,
+// relations, links, decisions and comments.
 func (d taskDetail) text() string {
 	var b strings.Builder
 	t := d.Task
@@ -651,13 +669,18 @@ func (x *c) foundForLine(dst any, where ...store.Cond) bool {
 	return err == nil
 }
 
-// quiet fields say nothing a reader needs on a feed line.
+// quietFields say nothing a reader needs on a feed line.
 var quietFields = map[string]bool{"started_at": true, "completed_at": true, "canceled_at": true, "lease_until": true, "rank": true,
 	"number": true, "deleted_at": true, "archived_at": true, "updated_at": true, "content_seq": true, "updated_by": true,
 	"removed_at": true, "suspended_at": true}
 
+// changeText says in words what an update changed, field by field in
+// alphabetical order: "status: Todo -> Done; assignee: none -> @ann". Ids
+// become names, quiet fields are left out, and the moves into and out of
+// the trash, the archive, removal and suspension are said as one word.
 func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) string {
 	var parts []string
+	// name says one value of a field: what the id names, or the value itself.
 	name := func(field string, v any) string {
 		s, _ := v.(string)
 		switch field {

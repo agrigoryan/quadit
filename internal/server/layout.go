@@ -1,3 +1,5 @@
+// A project's layout (/projects/KEY/layout): what it has, by name.
+
 package server
 
 import (

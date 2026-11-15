@@ -1,3 +1,5 @@
+// A cycle's chart (/cycles/ID/chart): scope against done, day by day.
+
 package server
 
 import (

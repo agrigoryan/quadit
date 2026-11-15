@@ -20,6 +20,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init adds the page routes to the server's routes.
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		const w = "/api/v1/w/{ws}"
@@ -591,7 +592,8 @@ func (s *Server) handleShowAgentMemory(x *c) error {
 }
 
 // handleSaveAgentMemory saves a note: the page with this title under the caller's
-// memory, made if it is not there. Mode append adds to it.
+// memory, made if it is not there. Mode append adds to it. The memory's root
+// page is made with the first note.
 func (s *Server) handleSaveAgentMemory(x *c) error {
 	var b struct {
 		Title    string `json:"title"`
