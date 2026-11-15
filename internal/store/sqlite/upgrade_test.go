@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,9 +16,9 @@ import (
 // that stops a schema version short), checks that a copy of it as it was
 // is left beside it, and goes back to that copy. It does so in a plain data
 // folder and in one whose name has the characters a file pattern gives
-// meaning to.
+// meaning to, and in one whose name looks like a copy's.
 func TestUpgradeAndBack(t *testing.T) {
-	for _, folder := range []string{"data", "data [1] *?"} {
+	for _, folder := range []string{"data", "data [1] *?", "data.before-v2"} {
 		t.Run(folder, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), folder)
 			if err := os.Mkdir(dir, 0o700); err != nil {
@@ -62,6 +63,8 @@ func upgradeAndBack(t *testing.T, path string) {
 		t.Fatal(err)
 	} else if _, err := os.Stat(aside); err != nil {
 		t.Fatalf("the upgraded database was not kept: %v", err)
+	} else if want := fmt.Sprintf("%s.after-v%d", path, latest); aside != want {
+		t.Fatalf("the upgraded database was kept as %s, want %s", aside, want)
 	}
 	back, err := OpenAt(ctx, path, latest-1)
 	if err != nil {

@@ -47,7 +47,10 @@ func UndoUpgrade(ctx context.Context, path string) (from, to string, err error) 
 	if err := looksLikeOurs(ctx, newest); err != nil {
 		return "", "", fmt.Errorf("%s is not a copy of the database (%w); nothing was changed", newest, err)
 	}
-	aside := strings.Replace(newest, ".before-v", ".after-v", 1)
+	// "<path>.before-vN" goes back in place; the upgraded database goes
+	// aside as "<path>.after-vN". N is read from the copy's own name: a
+	// folder in the path may hold ".before-v" too.
+	aside := path + ".after-v" + strings.TrimPrefix(filepath.Base(newest), filepath.Base(path)+".before-v")
 	if _, err := os.Stat(aside); err == nil {
 		return "", "", fmt.Errorf("%s from an earlier undo is in the way; move it away first (nothing was changed)", aside)
 	}
