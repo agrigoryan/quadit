@@ -153,6 +153,19 @@ func TestAccessSettingsFailClosedWhenTheyCannotBeRead(t *testing.T) {
 	})
 }
 
+func TestMetricsAreClosedWhenTheirTokenCannotBeRead(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		fs := newFaultyStore(st)
+		s := newSite(t, fs)
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/metrics.token", "scrape-secret", 200, nil)
+		// A server that has not read the token yet does not know there is one.
+		again := secondServer(t, fs)
+		fs.faults.set("get settings")
+		defer fs.faults.clear()
+		again.call(nil, "", "GET", "/metrics", nil, 500, nil)
+	})
+}
+
 func TestPasswordChangesFailWhenOtherSessionsCannotBeEnded(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)

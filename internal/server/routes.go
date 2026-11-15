@@ -99,7 +99,14 @@ func (s *Server) handleCheckReadiness(w http.ResponseWriter, r *http.Request) {
 
 // handleShowMetrics writes counters in the Prometheus text format.
 func (s *Server) handleShowMetrics(w http.ResponseWriter, r *http.Request) {
-	if tok := s.settingStr(r.Context(), "metrics.token", ""); tok != "" && r.Header.Get("Authorization") != "Bearer "+tok {
+	// The token decides access: when it cannot be read, nobody is let in.
+	var tok string
+	if err := s.checkedSetting(r.Context(), "metrics.token", &tok); err != nil {
+		s.log.Error("metrics: the token cannot be read, so the page is not shown", "err", err)
+		http.Error(w, "the metrics token cannot be read", http.StatusInternalServerError)
+		return
+	}
+	if tok != "" && r.Header.Get("Authorization") != "Bearer "+tok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
