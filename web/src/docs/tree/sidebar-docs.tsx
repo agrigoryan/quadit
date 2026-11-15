@@ -14,6 +14,7 @@ import { marksProject, ProjectMark } from "@/docs/project-mark";
 import { setOpen, useTreeState } from "@/docs/tree/state";
 import type { Doc } from "@/lib/types-docs";
 import { NavSection } from "@/ui/nav-item";
+import { docPath } from "@/docs/area";
 
 const MAX_DEPTH = 3;
 
@@ -48,7 +49,7 @@ function Row({ doc, tree, depth, slug, parentProject }: RowProps) {
           <ChevronRight className={cx("size-3.5 transition-transform", open && "rotate-90")} />
         </button>
         <NavLink
-          to={`/${slug}/docs/${doc.id}`}
+          to={docPath(slug, doc.id)}
           onClick={() => ui.setDrawer(false)}
           className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-2"
         >
@@ -82,7 +83,7 @@ export function SidebarDocs({ collapsed }: { collapsed: boolean }) {
           title={t("docs.new.blank")}
           onClick={() => {
             ui.setDrawer(false);
-            void navigate(`/${slug}/docs/${createDoc()}`);
+            void navigate(docPath(slug, createDoc()));
           }}
           className="absolute -top-6 right-1 flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink"
         >

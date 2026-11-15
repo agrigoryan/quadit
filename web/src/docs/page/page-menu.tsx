@@ -20,7 +20,7 @@ import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { keepVersion, trashDoc } from "@/docs/actions";
-import { useDocsArea } from "@/docs/area";
+import { docPath, useDocsArea } from "@/docs/area";
 import { docTitle } from "@/docs/data";
 import { fileNameOf, saveText } from "@/docs/files";
 import { BacklinksDialog, useBacklinks } from "@/docs/page/backlinks";
@@ -94,7 +94,7 @@ export function PageMenu({ doc }: { doc: Doc }) {
           <MenuItem
             icon={<Link2 />}
             onSelect={() =>
-              void copyText(`${location.origin}/${slug}/docs/${doc.id}`).then((ok) =>
+              void copyText(location.origin + docPath(slug, doc.id)).then((ok) =>
                 toast.info(t(ok ? "common.copied" : "common.copyFailed")),
               )
             }

@@ -10,6 +10,7 @@ import type { Value } from "@/docs/db/formula";
 import { TITLE_WIDTH } from "@/docs/db/prop-meta";
 import type { DBProperty, Doc } from "@/lib/types-docs";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
+import { docPath } from "@/docs/area";
 
 export const TITLE = "title";
 
@@ -112,7 +113,7 @@ export const TableRow = memo(function TableRow({
                 <MenuItem icon={<PanelRight />} onSelect={() => onOpen(row.id)}>
                   {t("db.row.peek")}
                 </MenuItem>
-                <MenuItem icon={<FileText />} onSelect={() => navigate(`/${slug}/docs/${row.id}`)}>
+                <MenuItem icon={<FileText />} onSelect={() => navigate(docPath(slug, row.id))}>
                   {t("db.row.page")}
                 </MenuItem>
                 <MenuSeparator />

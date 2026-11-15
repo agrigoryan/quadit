@@ -19,6 +19,13 @@ const Context = createContext<DocsArea | null>(null);
 export const workspaceDocs = (slug: string) => `/${slug}/docs`;
 export const projectDocs = (slug: string, project: Pick<Project, "key">) => `/${slug}/p/${project.key}/docs`;
 
+/**
+ * A page's address: in the workspace's Docs, which every page has (the one to
+ * hand on), or in the Docs of `project`, one of whose pages it is.
+ */
+export const docPath = (slug: string, id: string, project?: Pick<Project, "key">) =>
+  `${project ? projectDocs(slug, project) : workspaceDocs(slug)}/${id}`;
+
 export function DocsAreaProvider({ project, children }: { project?: Project; children: ReactNode }) {
   const slug = useSlug();
   const area = useMemo(

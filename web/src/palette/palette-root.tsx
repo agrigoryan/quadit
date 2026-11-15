@@ -8,6 +8,7 @@ import { Group, Item, Note } from "@/palette/palette-rows";
 import { matches, searchTasks, snippetParts } from "@/palette/palette-search";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 import { ProjectGlyph } from "@/ui/project-glyph";
+import { docPath } from "@/docs/area";
 
 interface Props extends CommandContext {
   query: string;
@@ -91,9 +92,7 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
           <HitRow
             key={`${hit.kind}:${hit.entity_id}`}
             hit={hit}
-            onSelect={() =>
-              hit.scope_type === "doc" ? go(`/${slug}/docs/${hit.scope_id}`) : openTask(hit.task as string)
-            }
+            onSelect={() => (hit.scope_type === "doc" ? go(docPath(slug, hit.scope_id)) : openTask(hit.task as string))}
           />
         ))}
       </Group>

@@ -18,6 +18,7 @@ import { useLoad } from "@/lib/use-load";
 import { change, listSources, type Source, type SyncResult } from "@/settings/automation/data";
 import { SourceForm } from "@/settings/automation/source-form";
 import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
+import { docPath } from "@/docs/area";
 
 /** "docs" for ".../owner/docs.git": what to call a source whose root page is not in view. */
 const repoName = (repo: string) =>
@@ -97,7 +98,7 @@ function SourceItem({ src, sync, onSync, onEdit, onDelete }: ItemProps) {
             </span>
           </Fact>
         )}
-        <Link to={`/${slug}/docs/${src.root_doc_id}`} className="text-accent-text underline-offset-2 hover:underline">
+        <Link to={docPath(slug, src.root_doc_id)} className="text-accent-text underline-offset-2 hover:underline">
           {t("auto.src.openPages")}
         </Link>
       </div>

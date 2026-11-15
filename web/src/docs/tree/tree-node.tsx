@@ -13,7 +13,7 @@ import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
 import { trashDoc, updateDoc } from "@/docs/actions";
-import { useDocsArea } from "@/docs/area";
+import { docPath, useDocsArea } from "@/docs/area";
 import { docTitle, type DocTree } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
 import { marksProject, ProjectMark } from "@/docs/project-mark";
@@ -142,7 +142,7 @@ export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Pr
                 <MenuItem
                   icon={<Link2 />}
                   onSelect={() =>
-                    void copyText(`${location.origin}/${slug}/docs/${doc.id}`).then((ok) =>
+                    void copyText(location.origin + docPath(slug, doc.id)).then((ok) =>
                       toast.info(t(ok ? "common.copied" : "common.copyFailed")),
                     )
                   }

@@ -17,6 +17,7 @@ import { Section } from "@/detail/section";
 import { PageIcon } from "@/docs/page-icon";
 import { useTaskLink } from "@/lib/task-link";
 import { StatusIcon } from "@/ui/icons";
+import { docPath } from "@/docs/area";
 
 /** One reference as the server sends it: what is mentioned, and the task or page the mention is in. */
 interface Ref {
@@ -105,7 +106,7 @@ function DocMention({ mention }: { mention: Mention }) {
         {doc ? <PageIcon doc={doc} /> : <FileText className="size-4 text-ink-3" aria-hidden />}
       </span>
       <span className="shrink-0 text-xs text-ink-3">{t("detail.mentions.page")}</span>
-      <Link to={`/${slug}/docs/${mention.id}`} className={linkStyle}>
+      <Link to={docPath(slug, mention.id)} className={linkStyle}>
         {doc?.title || mention.title || t("detail.mentions.untitled")}
       </Link>
     </li>

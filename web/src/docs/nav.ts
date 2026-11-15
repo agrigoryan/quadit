@@ -4,7 +4,7 @@
 
 import { type Location, matchPath, type NavigateFunction } from "react-router";
 import { getState } from "@/lib/store";
-import { projectDocs, workspaceDocs } from "@/docs/area";
+import { docPath } from "@/docs/area";
 import { getDocs, inProject } from "@/docs/data";
 import { isTaskPath, taskPath } from "@/lib/task-link";
 
@@ -22,16 +22,12 @@ function projectOnScreen() {
   return key ? Object.values(getState().collections.projects).find((p) => p.key.toLowerCase() === key) : undefined;
 }
 
-/** A page's address: in the Docs of the project on screen when it is one of that project's pages, else in the workspace's. */
-function docPath(id: string): string {
-  const slug = getState().slug;
-  const project = projectOnScreen();
-  return `${project && inProject(getDocs(), id, project.id) ? projectDocs(slug, project) : workspaceDocs(slug)}/${id}`;
-}
-
+/** Opens a page: in the Docs of the project on screen when it is one of that project's pages, else in the workspace's. */
 export function openDoc(id: string) {
-  if (navigate) void navigate(docPath(id));
-  else window.location.assign(docPath(id));
+  const project = projectOnScreen();
+  const path = docPath(getState().slug, id, project && inProject(getDocs(), id, project.id) ? project : undefined);
+  if (navigate) void navigate(path);
+  else window.location.assign(path);
 }
 
 /** A panel already open over the page gives its place to the next task (see lib/task-link.ts). */

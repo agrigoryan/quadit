@@ -12,6 +12,7 @@ import type { Doc } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { docPath } from "@/docs/area";
 
 export function SharePopover({ doc }: { doc: Doc }) {
   const me = useMe();
@@ -86,7 +87,7 @@ export function SharePopover({ doc }: { doc: Doc }) {
           <button
             type="button"
             onClick={() =>
-              void copyText(`${location.origin}/${slug}/docs/${doc.id}`).then((ok) =>
+              void copyText(location.origin + docPath(slug, doc.id)).then((ok) =>
                 toast.info(t(ok ? "common.copied" : "common.copyFailed")),
               )
             }

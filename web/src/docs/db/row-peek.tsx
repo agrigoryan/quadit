@@ -9,6 +9,7 @@ import { docTitle, useDoc } from "@/docs/data";
 import { IconButton } from "@/ui/button";
 import { Loading } from "@/ui/spinner";
 import { Tooltip } from "@/ui/tooltip";
+import { docPath } from "@/docs/area";
 
 // The page body brings the editor with it: fetched when a row is first opened.
 const PageBody = lazy(() => import("@/docs/page/page-body").then((m) => ({ default: m.PageBody })));
@@ -50,7 +51,7 @@ export function RowPeek({ rowId, onClose }: { rowId: string; onClose: () => void
             </IconButton>
             <Tooltip label={t("db.row.page")}>
               <Link
-                to={`/${slug}/docs/${row.id}`}
+                to={docPath(slug, row.id)}
                 aria-label={t("db.row.page")}
                 className="inline-flex size-7 items-center justify-center rounded-md text-ink-2 hover:bg-hover hover:text-ink"
               >
