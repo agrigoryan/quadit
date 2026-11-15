@@ -4,6 +4,8 @@ package sqlstore
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/store"
@@ -34,13 +36,17 @@ func (ftsSearch) index(ctx context.Context, c conn, d store.SearchDoc) error {
 // unindex removes an entity's entry and its rowid, if it has one.
 func (ftsSearch) unindex(ctx context.Context, c conn, entityID string) error {
 	var rowID int64
-	if err := c.row(ctx, `SELECT rid FROM search_map WHERE entity_id = ?`, entityID).Scan(&rowID); err != nil {
+	err := c.row(ctx, `SELECT rid FROM search_map WHERE entity_id = ?`, entityID).Scan(&rowID)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil // not indexed
+	}
+	if err != nil {
+		return err
 	}
 	if _, err := c.exec(ctx, `DELETE FROM search_index WHERE rowid = ?`, rowID); err != nil {
 		return err
 	}
-	_, err := c.exec(ctx, `DELETE FROM search_map WHERE entity_id = ?`, entityID)
+	_, err = c.exec(ctx, `DELETE FROM search_map WHERE entity_id = ?`, entityID)
 	return err
 }
 

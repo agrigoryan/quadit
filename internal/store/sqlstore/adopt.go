@@ -1,8 +1,12 @@
+// Taking over a database whose schema was put in place before
+// this code used goose.
+
 package sqlstore
 
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 
 	"github.com/pressly/goose/v3/database"
 )
@@ -20,7 +24,9 @@ func (s *Store) adopt(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close() //nolint:errcheck // it only goes back to the pool: nothing is lost if that fails
+	}()
 	unlock, err := s.lockMigrations(ctx, conn)
 	if err != nil {
 		return err
@@ -58,7 +64,7 @@ func recordApplied(ctx context.Context, conn *sql.Conn, d Dialect, applied int64
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() // after Commit it does nothing; before, the error that stopped us is the one returned
 	if err := own.CreateVersionTable(ctx, tx); err != nil {
 		return err
 	}
@@ -84,5 +90,11 @@ func (s *Store) lockMigrations(ctx context.Context, conn *sql.Conn) (unlock func
 	if err := l.SessionLock(ctx, conn); err != nil {
 		return nil, err
 	}
-	return func() { l.SessionUnlock(context.WithoutCancel(ctx), conn) }, nil
+	return func() {
+		// The lock belongs to conn's session, which outlives conn.Close in
+		// the pool: one not given back keeps other servers waiting.
+		if err := l.SessionUnlock(context.WithoutCancel(ctx), conn); err != nil {
+			slog.Warn("store: could not give back the migration lock", "err", err)
+		}
+	}, nil
 }
