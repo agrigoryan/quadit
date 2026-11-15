@@ -50,9 +50,12 @@ export function usePageState({ scope, saved, tables, meId, project, routeLayout 
   }
 
   // The address changed from outside (a link, Back, a reload): take its filters. What the page then holds is compared as it stands.
+  // An address the page's own filters would write is not from outside, and says less than the page holds: it drops a space
+  // just typed at the end of the search text, so taking it would eat the space.
   const takeAddress = useEffectEvent(() => {
     const asked = readAddress();
-    if (asked && !sameFilters(asked, stored.filters)) setState({ filters: asked });
+    const pageWroteIt = searchFromFilters(stored.filters, tables, project?.id, location.search) === location.search;
+    if (asked && !pageWroteIt && !sameFilters(asked, stored.filters)) setState({ filters: asked });
   });
   useLayoutEffect(() => takeAddress(), [location.search]);
 
