@@ -1,6 +1,7 @@
-package server
+package mcp
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -17,54 +18,47 @@ import (
 // path: each takes the tool's arguments and answers with text and whether
 // the call succeeded.
 
-// callAPI calls the API from inside the server, as who. It returns the
-// answer's text and whether the call succeeded; a refusal comes back as its
-// message, with the allowed values when there are any.
-func (s *Server) callAPI(who selfCaller, method, path string, q url.Values, body []byte) (string, bool) {
-	if strings.HasPrefix(path, "/api/") {
-		who.base = "" // a path outside the workspace is given whole
-	}
+// caller is one tool call: the client's token, the request it came in
+// (the call ends when that does), and how the API is reached.
+type caller struct {
+	ctx   context.Context
+	token string
+	api   API
+}
+
+// callAPI calls the API as the client, with a JSON body when there is one.
+// It returns the answer's text and whether the call succeeded.
+func (c caller) callAPI(method, path string, q url.Values, body []byte) (string, bool) {
 	contentType := ""
 	if body != nil {
 		contentType = "application/json"
 	}
-	return answerText(s.selfCall(who, method, path, q, body, contentType))
+	return c.api(c.ctx, c.token, method, path, q, body, contentType)
 }
 
 // callAPIWithBytes is callAPI for a body that is a file's bytes.
-func (s *Server) callAPIWithBytes(who selfCaller, method, path string, q url.Values, body []byte) (string, bool) {
-	return answerText(s.selfCall(who, method, path, q, body, "application/octet-stream"))
+func (c caller) callAPIWithBytes(method, path string, q url.Values, body []byte) (string, bool) {
+	return c.api(c.ctx, c.token, method, path, q, body, "application/octet-stream")
 }
 
-// answerText is what a tool makes of an in-process call's answer.
-func answerText(ans *recordedAnswer, err error) (string, bool) {
-	if err != nil {
-		return err.Error(), false
-	}
-	if refused := ans.refusal(); refused != nil {
-		return refused.Error(), false
-	}
-	return ans.body.String(), ans.status < 300
-}
-
-func toolAck(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func toolAck(c caller, a map[string]any) (string, bool) {
 	name := argText(a, "cursor")
 	if name == "" {
 		name = "main"
 	}
 	body := plainjson.Marshal(map[string]any{"seq": a["seq"]})
-	return s.callAPI(who, "PUT", "/cursors/"+url.PathEscape(name), nil, body)
+	return c.callAPI("PUT", "/cursors/"+url.PathEscape(name), nil, body)
 }
 
-func toolRemember(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func toolRemember(c caller, a map[string]any) (string, bool) {
 	body := plainjson.Marshal(map[string]any{"title": a["title"], "markdown": a["markdown"], "mode": argText(a, "mode")})
-	return s.callAPI(who, "POST", "/memory", nil, body)
+	return c.callAPI("POST", "/memory", nil, body)
 }
 
 // toolChange makes one change, or several together when changes lists them.
-func toolChange(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func toolChange(c caller, a map[string]any) (string, bool) {
 	if list, ok := a["changes"].([]any); ok && len(list) > 0 {
-		return toolChangeBatch(s, who, a, list)
+		return toolChangeBatch(c, a, list)
 	}
 	if argText(a, "type") == "" {
 		return "give type and args, or changes", false
@@ -90,7 +84,7 @@ func toolChange(s *Server, who selfCaller, a map[string]any) (string, bool) {
 		}
 	}
 	body := plainjson.Marshal(req)
-	out, ok := s.callAPI(who, "POST", "/changes", nil, body)
+	out, ok := c.callAPI("POST", "/changes", nil, body)
 	if !ok {
 		return out, false
 	}
@@ -117,7 +111,7 @@ func toolChange(s *Server, who selfCaller, a map[string]any) (string, bool) {
 
 // toolChangeBatch makes the listed changes together. A batch: every change
 // gets an id, and the answer is one line each.
-func toolChangeBatch(s *Server, who selfCaller, a map[string]any, list []any) (string, bool) {
+func toolChangeBatch(c caller, a map[string]any, list []any) (string, bool) {
 	for i, c := range list {
 		if m, ok := c.(map[string]any); ok {
 			if _, has := m["id"]; !has {
@@ -131,7 +125,7 @@ func toolChangeBatch(s *Server, who selfCaller, a map[string]any, list []any) (s
 		req["dry_run"] = true
 	}
 	body := plainjson.Marshal(req)
-	out, ok := s.callAPI(who, "POST", "/changes", nil, body)
+	out, ok := c.callAPI("POST", "/changes", nil, body)
 	if !ok {
 		return out, false
 	}
@@ -148,21 +142,21 @@ func toolChangeBatch(s *Server, who selfCaller, a map[string]any, list []any) (s
 	return b.String(), true
 }
 
-func toolRender(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func toolRender(c caller, a map[string]any) (string, bool) {
 	q := url.Values{}
 	for _, k := range []string{"task", "doc", "width", "theme"} {
 		if v := argText(a, k); v != "" {
 			q.Set(k, v)
 		}
 	}
-	out, ok := s.callAPI(who, "GET", "/render", q, nil)
+	out, ok := c.callAPI("GET", "/render", q, nil)
 	if !ok {
 		return out, false
 	}
 	return pictureMark + base64.StdEncoding.EncodeToString([]byte(out)), true
 }
 
-func toolSecretRequest(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func toolSecretRequest(c caller, a map[string]any) (string, bool) {
 	req := map[string]any{"method": argText(a, "method"), "url": argText(a, "url"), "body": argText(a, "body")}
 	switch h := a["headers"].(type) {
 	case map[string]any:
@@ -177,13 +171,13 @@ func toolSecretRequest(s *Server, who selfCaller, a map[string]any) (string, boo
 		}
 	}
 	raw := plainjson.Marshal(req)
-	return s.callAPI(who, "POST", "/secrets/"+url.PathEscape(argText(a, "name"))+"/request", url.Values{"format": {"text"}}, raw)
+	return c.callAPI("POST", "/secrets/"+url.PathEscape(argText(a, "name"))+"/request", url.Values{"format": {"text"}}, raw)
 }
 
 // toolUpload stores a file sent whole, or one part of a file sent in several calls.
-func toolUpload(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func toolUpload(c caller, a map[string]any) (string, bool) {
 	if argText(a, "size") != "" || argText(a, "id") != "" {
-		return s.uploadPart(who, a)
+		return uploadPart(c, a)
 	}
 	if argText(a, "name") == "" {
 		return "give the file a name", false
@@ -196,7 +190,7 @@ func toolUpload(s *Server, who selfCaller, a map[string]any) (string, bool) {
 		}
 		data = raw
 	}
-	out, ok := s.callAPIWithBytes(who, "POST", "/files", url.Values{"name": {argText(a, "name")}}, data)
+	out, ok := c.callAPIWithBytes("POST", "/files", url.Values{"name": {argText(a, "name")}}, data)
 	if !ok {
 		return out, false
 	}
@@ -208,7 +202,7 @@ func toolUpload(s *Server, who selfCaller, a map[string]any) (string, bool) {
 }
 
 // uploadPart takes one part of a file that comes in several calls.
-func (s *Server) uploadPart(who selfCaller, a map[string]any) (string, bool) {
+func uploadPart(c caller, a map[string]any) (string, bool) {
 	raw, err := base64.StdEncoding.DecodeString(argText(a, "base64"))
 	if err != nil {
 		return "base64 does not decode: " + err.Error(), false
@@ -216,9 +210,9 @@ func (s *Server) uploadPart(who selfCaller, a map[string]any) (string, bool) {
 	var out string
 	var ok bool
 	if fid := argText(a, "id"); fid != "" {
-		out, ok = s.callAPIWithBytes(who, "PATCH", "/files/"+url.PathEscape(fid), url.Values{"offset": {argText(a, "offset")}}, raw)
+		out, ok = c.callAPIWithBytes("PATCH", "/files/"+url.PathEscape(fid), url.Values{"offset": {argText(a, "offset")}}, raw)
 	} else {
-		out, ok = s.callAPIWithBytes(who, "POST", "/files", url.Values{"name": {argText(a, "name")}, "size": {argText(a, "size")}}, raw)
+		out, ok = c.callAPIWithBytes("POST", "/files", url.Values{"name": {argText(a, "name")}, "size": {argText(a, "size")}}, raw)
 	}
 	if !ok {
 		return out, false

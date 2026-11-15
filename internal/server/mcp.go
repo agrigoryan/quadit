@@ -1,25 +1,17 @@
 package server
 
 import (
-	"encoding/json"
-	"io"
+	"context"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/auth"
-	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// The MCP server gives any MCP client the same surface as the API, under
-// the same permissions, with results in the compact text form. It speaks
-// MCP's streamable HTTP transport: JSON-RPC requests posted to /mcp.
-//
-// This file is the protocol: who may ask, and the answer to each method.
-// The tools are listed in mcp_tools.go and run in mcp_calls.go; they reach
-// the API through the in-process call of inprocess.go.
+// The MCP endpoint: signing the client in, and the in-process call its
+// tools make. The protocol and the tools are package mcp.
 
 // mcpRoutes are the routes of the MCP endpoint.
 func (s *Server) mcpRoutes() []route {
@@ -33,59 +25,14 @@ func (s *Server) mcpRoutes() []route {
 	}
 }
 
-// rpcRequest is one JSON-RPC 2.0 request.
-type rpcRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id,omitempty"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
-}
-
-// rpcError is the error a JSON-RPC request ends in.
-type rpcError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-// rpcResponse is the answer to one JSON-RPC request.
-type rpcResponse struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id"`
-	Result  any             `json:"result,omitempty"`
-	Error   *rpcError       `json:"error,omitempty"`
-}
-
-// mcpVersions are the versions of MCP spoken, newest first.
-var mcpVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
-
-// mcpBodyLimit is the largest request read.
-const mcpBodyLimit = 32 << 20
-
-// handleServeMCP answers one JSON-RPC request posted to /mcp.
+// handleServeMCP answers one JSON-RPC request posted to /mcp, once the
+// client has signed in.
 func (s *Server) handleServeMCP(w http.ResponseWriter, r *http.Request) {
 	token, ok := s.mcpSignIn(w, r)
 	if !ok {
 		return
 	}
-	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, mcpBodyLimit))
-	if err != nil {
-		http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
-		return
-	}
-	var req rpcRequest
-	if err := json.Unmarshal(raw, &req); err != nil || req.JSONRPC != "2.0" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{Code: -32700, Message: "send one JSON-RPC 2.0 request"}})
-		return
-	}
-	if len(req.ID) == 0 { // a notification: nothing to answer
-		w.WriteHeader(http.StatusAccepted)
-		return
-	}
-	resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-	resp.Result, resp.Error = s.mcpAnswer(bearerOf(r.Context(), token), req)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	s.mcp.Serve(w, r, token)
 }
 
 // mcpSignIn returns the token a request carries. When there is none, or it
@@ -113,7 +60,7 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 			return "", false
 		}
 	}
-	if _, ok := s.callAPI(bearerOf(r.Context(), token), "GET", "/me", url.Values{"format": {"text"}}, nil); !ok {
+	if _, ok := s.callAsToken(r.Context(), token, "GET", "/me", url.Values{"format": {"text"}}, nil, ""); !ok {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token", resource_metadata="`+s.cfg.BaseURL+`/.well-known/oauth-protected-resource"`)
 		http.Error(w, "this token is not valid", http.StatusUnauthorized)
 		return "", false
@@ -121,63 +68,21 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 	return token, true
 }
 
-// mcpAnswer is the result of one request, or the error it ends in.
-func (s *Server) mcpAnswer(who selfCaller, req rpcRequest) (any, *rpcError) {
-	switch req.Method {
-	case "initialize":
-		return s.mcpInitialize(req.Params), nil
-	case "ping":
-		return map[string]any{}, nil
-	case "tools/list":
-		return mcpToolList(), nil
-	case "tools/call":
-		return s.mcpCallTool(who, req.Params)
+// callAsToken is package mcp's way to the API: a call from inside the
+// process with token, in its workspace unless the path is under /api/
+// already. It answers the text of the answer and whether the call
+// succeeded; a refusal comes back as its message.
+func (s *Server) callAsToken(ctx context.Context, token, method, path string, q url.Values, body []byte, contentType string) (string, bool) {
+	who := bearerOf(ctx, token)
+	if strings.HasPrefix(path, "/api/") {
+		who.base = "" // a path outside the workspace is given whole
 	}
-	return nil, &rpcError{Code: -32601, Message: "method not found: " + req.Method}
-}
-
-// mcpInitialize answers initialize: the version spoken (the client's, when
-// it is one of ours, else the newest), and what the server offers.
-func (s *Server) mcpInitialize(params json.RawMessage) map[string]any {
-	var p struct {
-		ProtocolVersion string `json:"protocolVersion"`
+	ans, err := s.selfCall(who, method, path, q, body, contentType)
+	if err != nil {
+		return err.Error(), false
 	}
-	version := mcpVersions[0]
-	if err := json.Unmarshal(params, &p); err == nil && slices.Contains(mcpVersions, p.ProtocolVersion) {
-		version = p.ProtocolVersion
+	if refused := ans.refusal(); refused != nil {
+		return refused.Error(), false
 	}
-	return map[string]any{"protocolVersion": version, "capabilities": map[string]any{"tools": map[string]any{}},
-		"serverInfo": map[string]any{"name": "quadit", "version": s.cfg.Version, "surface": engine.Surface},
-		"instructions": "Tasks, decisions and docs shared by people and agents. Start with whoami and my_work. Follow changes with events (wait=N holds the call) and ack. " +
-			"Write with change; a refusal says how to fix the call."}
-}
-
-// mcpCallTool runs the tool a tools/call names, as who.
-func (s *Server) mcpCallTool(who selfCaller, params json.RawMessage) (any, *rpcError) {
-	var p struct {
-		Name      string         `json:"name"`
-		Arguments map[string]any `json:"arguments"`
-	}
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, &rpcError{Code: -32602, Message: "the params do not read: give an object with name and arguments"} // the decoder's own words name Go types
-	}
-	var tool *mcpTool
-	for i := range mcpTools {
-		if mcpTools[i].Name == p.Name {
-			tool = &mcpTools[i]
-			break
-		}
-	}
-	if tool == nil {
-		return nil, &rpcError{Code: -32602, Message: "unknown tool " + p.Name}
-	}
-	if p.Arguments == nil {
-		p.Arguments = map[string]any{}
-	}
-	text, ok := tool.Run(s, who, p.Arguments)
-	if data, isPicture := strings.CutPrefix(text, pictureMark); ok && isPicture {
-		// A picture goes back as a picture, which a model can look at.
-		return map[string]any{"content": []map[string]any{{"type": "image", "data": data, "mimeType": "image/png"}}, "isError": false}, nil
-	}
-	return map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "isError": !ok}, nil
+	return ans.body.String(), ans.status < 300
 }

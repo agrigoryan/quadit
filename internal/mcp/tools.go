@@ -1,4 +1,4 @@
-package server
+package mcp
 
 import (
 	"fmt"
@@ -9,21 +9,21 @@ import (
 
 // The MCP tools: their list, what each takes, and the API path most of them read.
 
-// mcpTool is one tool: what it is called, what it takes, and how it maps
+// tool is one tool: what it is called, what it takes, and how it maps
 // onto the API.
-type mcpTool struct {
+type tool struct {
 	Name  string
 	Desc  string
 	Props map[string]string // argument -> description; a leading "!" marks it required
-	Run   func(s *Server, who selfCaller, a map[string]any) (string, bool)
+	Run   func(c caller, a map[string]any) (string, bool)
 }
 
 // pictureMark starts the result of a tool that answers with a PNG, base64 after it.
 const pictureMark = "\x00png:"
 
 // The tools, in the order a client is shown them. Most read one API path
-// (get); the ones that do more are in mcp_calls.go.
-var mcpTools = []mcpTool{
+// (get); the ones that do more are in calls.go.
+var tools = []tool{
 	{Name: "whoami", Desc: "Who am I: role, projects, what needs approval, budget left, unread count, feed position. Call first in a session.", Run: readPathTool("/me")},
 	{Name: "my_work", Desc: "What waits on me, questions asked of me, tasks assigned to me, and my unread inbox. One line each.", Run: readPathTool("/my-work")},
 	{Name: "tasks", Desc: "Find tasks. All filters combine. Returns one line per task; count=true returns only the number.",
@@ -103,18 +103,18 @@ var mcpTools = []mcpTool{
 		Run: toolUpload},
 }
 
-// mcpToolList is the answer to tools/list: every tool with what it takes.
-func mcpToolList() map[string]any {
-	tools := make([]map[string]any, len(mcpTools))
-	for i, t := range mcpTools {
-		tools[i] = map[string]any{"name": t.Name, "description": t.Desc, "inputSchema": toolSchema(t)}
+// toolList is the answer to tools/list: every tool with what it takes.
+func toolList() map[string]any {
+	list := make([]map[string]any, len(tools))
+	for i, t := range tools {
+		list[i] = map[string]any{"name": t.Name, "description": t.Desc, "inputSchema": toolSchema(t)}
 	}
-	return map[string]any{"tools": tools}
+	return map[string]any{"tools": list}
 }
 
 // toolSchema is a tool's input schema: each argument with its type and
 // what it is for, and which are required.
-func toolSchema(t mcpTool) map[string]any {
+func toolSchema(t tool) map[string]any {
 	props := map[string]any{}
 	required := []string{}
 	for name, desc := range t.Props {
@@ -160,8 +160,8 @@ func toolSchema(t mcpTool) map[string]any {
 
 // readPathTool makes a tool that reads one API path in text form. Arguments named
 // in path are filled into it; the rest become URL parameters.
-func readPathTool(path string, pathArgs ...string) func(s *Server, who selfCaller, a map[string]any) (string, bool) {
-	return func(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func readPathTool(path string, pathArgs ...string) func(c caller, a map[string]any) (string, bool) {
+	return func(c caller, a map[string]any) (string, bool) {
 		p := path
 		q := url.Values{"format": {"text"}}
 		for k := range a {
@@ -179,7 +179,7 @@ func readPathTool(path string, pathArgs ...string) func(s *Server, who selfCalle
 		if strings.Contains(p, "{") {
 			return "missing argument: " + p[strings.Index(p, "{")+1:strings.Index(p, "}")], false
 		}
-		return s.callAPI(who, "GET", p, q, nil)
+		return c.callAPI("GET", p, q, nil)
 	}
 }
 

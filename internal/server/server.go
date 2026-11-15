@@ -48,7 +48,9 @@
 //	Integrations
 //	  github*.go, reposync.go (routes of package reposync: pages kept in a git repository), secrets.go
 //	MCP
-//	  mcp.go, mcp_tools.go, mcp_calls.go, mcp_ask.go, oauth_server.go
+//	  mcp.go         signing an MCP client in and the call its tools make;
+//	                 the protocol and the tools are package mcp
+//	  oauth_server.go  the sign-in server MCP clients use
 //	Import and export
 //	  importing.go, export*.go
 package server
@@ -76,6 +78,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/hub"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/mcp"
 	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/reposync"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -121,6 +124,8 @@ type Server struct {
 
 	// repos mirrors folders of git repositories as pages (reposync.go).
 	repos *reposync.Syncer
+	// mcp answers MCP clients once they are signed in (mcp.go).
+	mcp *mcp.Server
 }
 
 // Stop ends the connections the server holds open for its callers, so a
@@ -150,6 +155,7 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{})}
 	s.eng.OnCommit = s.hub.Notify
 	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}
+	s.mcp = mcp.New(s.callAsToken, cfg.Version)
 	s.routes()
 	return s
 }

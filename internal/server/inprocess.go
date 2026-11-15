@@ -11,7 +11,8 @@ import (
 )
 
 // The server calls its own API from inside the process in two places: an
-// MCP tool is an API call made with the client's token (mcp_calls.go), and
+// MCP tool is an API call made with the client's token (callAsToken in
+// mcp.go), and
 // an import writes through the API as whoever asked for it (importing.go).
 // Both go through selfCall, so a call made this way passes the same checks
 // as one from outside; what differs between the two is in selfCaller.

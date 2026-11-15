@@ -1,4 +1,4 @@
-package server
+package mcp
 
 import (
 	"encoding/json"
@@ -27,7 +27,7 @@ type askOption struct {
 
 // toolAsk asks a person a question: a choice when it has options, a yes or
 // no when it has none, with any files on the question or its options.
-func toolAsk(s *Server, who selfCaller, a map[string]any) (string, bool) {
+func toolAsk(c caller, a map[string]any) (string, bool) {
 	open := map[string]any{"task": argText(a, "task"), "question": argText(a, "question")}
 	for _, k := range []string{"details", "ask"} {
 		if v := argText(a, k); v != "" {
@@ -45,7 +45,7 @@ func toolAsk(s *Server, who selfCaller, a map[string]any) (string, bool) {
 	} else if err = approvalArgs(a, open); err != nil {
 		return err.Error(), false
 	}
-	return s.askWithFiles(who, a, open, onOptions)
+	return askWithFiles(c, a, open, onOptions)
 }
 
 // choiceArgs adds a choice's options and recommendation to open, and gives
@@ -93,7 +93,7 @@ func approvalArgs(a, open map[string]any) error {
 // askWithFiles opens the decision with each option's files on it and the
 // question's files attached, all in one batch. Given an id, every id in the
 // batch comes from it, so sending the call again does nothing twice.
-func (s *Server) askWithFiles(who selfCaller, a, open map[string]any, onOptions [][]string) (string, bool) {
+func askWithFiles(c caller, a, open map[string]any, onOptions [][]string) (string, bool) {
 	base := argText(a, "id")
 	ids := func(parts ...string) string {
 		if base == "" {
@@ -127,7 +127,7 @@ func (s *Server) askWithFiles(who selfCaller, a, open map[string]any, onOptions 
 		req["dry_run"] = true
 	}
 	body := plainjson.Marshal(req)
-	out, ok := s.callAPI(who, "POST", "/changes", nil, body)
+	out, ok := c.callAPI("POST", "/changes", nil, body)
 	if !ok {
 		return out, false
 	}
