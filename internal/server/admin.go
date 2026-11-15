@@ -15,17 +15,17 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/admin/settings", s.signed(s.installAdmin(s.handleListSettings)))
-		m.HandleFunc("PUT /api/v1/admin/settings/{name}", s.signed(s.installAdmin(s.handleUpdateSetting)))
-		m.HandleFunc("POST /api/v1/admin/mail/test", s.signed(s.installAdmin(s.handleSendTestMail)))
-		m.HandleFunc("GET /api/v1/admin/audit", s.signed(s.installAdmin(s.handleListInstallAuditLog)))
-		m.HandleFunc("GET /api/v1/admin/users", s.signed(s.installAdmin(s.handleListUsers)))
-		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signed(s.installAdmin(s.handleUpdateUser)))
-		m.HandleFunc("GET /api/v1/admin/workspaces", s.signed(s.installAdmin(s.handleListWorkspaces)))
-		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/join", s.signed(s.installAdmin(s.handleJoinWorkspace)))
-		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/restore", s.signed(s.installAdmin(s.handleRestoreWorkspace)))
-		m.HandleFunc("GET /api/v1/admin/health", s.signed(s.installAdmin(s.handleShowInstallHealth)))
-		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.in(s.handleListWorkspaceAuditLog))
+		m.HandleFunc("GET /api/v1/admin/settings", s.signedIn(s.installAdmin(s.handleListSettings)))
+		m.HandleFunc("PUT /api/v1/admin/settings/{name}", s.signedIn(s.installAdmin(s.handleUpdateSetting)))
+		m.HandleFunc("POST /api/v1/admin/mail/test", s.signedIn(s.installAdmin(s.handleSendTestMail)))
+		m.HandleFunc("GET /api/v1/admin/audit", s.signedIn(s.installAdmin(s.handleListInstallAuditLog)))
+		m.HandleFunc("GET /api/v1/admin/users", s.signedIn(s.installAdmin(s.handleListUsers)))
+		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signedIn(s.installAdmin(s.handleUpdateUser)))
+		m.HandleFunc("GET /api/v1/admin/workspaces", s.signedIn(s.installAdmin(s.handleListWorkspaces)))
+		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/join", s.signedIn(s.installAdmin(s.handleJoinWorkspace)))
+		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/restore", s.signedIn(s.installAdmin(s.handleRestoreWorkspace)))
+		m.HandleFunc("GET /api/v1/admin/health", s.signedIn(s.installAdmin(s.handleShowInstallHealth)))
+		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.workspaceMember(s.handleListWorkspaceAuditLog))
 	})
 }
 

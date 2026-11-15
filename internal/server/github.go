@@ -38,8 +38,8 @@ func init() {
 	runners = append(runners, (*Server).runGitHub)
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("POST /hooks/github/{id}", s.handleReceiveGitHubEvent)
-		m.HandleFunc("POST /api/v1/w/{ws}/integrations/{id}/sync", s.in(s.handleSyncIntegration))
-		m.HandleFunc("GET /api/v1/w/{ws}/integrations/{id}/webhook", s.in(s.handleShowIntegrationWebhook))
+		m.HandleFunc("POST /api/v1/w/{ws}/integrations/{id}/sync", s.workspaceMember(s.handleSyncIntegration))
+		m.HandleFunc("GET /api/v1/w/{ws}/integrations/{id}/webhook", s.workspaceMember(s.handleShowIntegrationWebhook))
 	})
 }
 

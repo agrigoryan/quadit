@@ -35,8 +35,8 @@ import (
 func init() {
 	runners = append(runners, (*Server).runSources)
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/sources/{id}/sync", s.in(s.handleSyncSource))
-		m.HandleFunc("GET /api/v1/w/{ws}/sources", s.in(func(x *c) error {
+		m.HandleFunc("POST /api/v1/w/{ws}/sources/{id}/sync", s.workspaceMember(s.handleSyncSource))
+		m.HandleFunc("GET /api/v1/w/{ws}/sources", s.workspaceMember(func(x *c) error {
 			var list []core.DocSource
 			if err := x.db.List(x.ctx(), &list, store.Where(store.Live)); err != nil {
 				return err

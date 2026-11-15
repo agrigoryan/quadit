@@ -32,9 +32,9 @@ import (
 // Every use is written to the audit log.
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/secrets", s.in(s.handleListSecrets))
-		m.HandleFunc("POST /api/v1/w/{ws}/secrets/{name}/request", s.in(s.handleSendRequestWithSecret))
-		m.HandleFunc("POST /api/v1/w/{ws}/secrets/env", s.in(s.handleListEnvSecrets))
+		m.HandleFunc("GET /api/v1/w/{ws}/secrets", s.workspaceMember(s.handleListSecrets))
+		m.HandleFunc("POST /api/v1/w/{ws}/secrets/{name}/request", s.workspaceMember(s.handleSendRequestWithSecret))
+		m.HandleFunc("POST /api/v1/w/{ws}/secrets/env", s.workspaceMember(s.handleListEnvSecrets))
 	})
 }
 

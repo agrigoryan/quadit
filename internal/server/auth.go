@@ -20,20 +20,20 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/auth/second-step", s.half(s.handleFinishSecondStep))
-		m.HandleFunc("POST /api/v1/auth/totp/start", s.signed(s.handleStartTwoStepSetup))
-		m.HandleFunc("POST /api/v1/auth/totp/enable", s.signed(s.handleEnableTwoStep))
-		m.HandleFunc("POST /api/v1/auth/totp/disable", s.signed(s.handleDisableTwoStep))
-		m.HandleFunc("POST /api/v1/auth/recovery-codes", s.signed(s.handleRenewRecoveryCodes))
-		m.HandleFunc("POST /api/v1/auth/reset/request", s.open(s.handleRequestPasswordReset))
-		m.HandleFunc("POST /api/v1/auth/reset/confirm", s.open(s.handleConfirmPasswordReset))
-		m.HandleFunc("POST /api/v1/auth/register", s.open(s.handleRegisterAccount))
-		m.HandleFunc("GET /api/v1/auth/invite/{token}", s.open(s.handleShowInvite))
-		m.HandleFunc("POST /api/v1/auth/invite/{token}", s.open(s.handleAcceptInvite))
+		m.HandleFunc("POST /api/v1/auth/second-step", s.firstStepPassed(s.handleFinishSecondStep))
+		m.HandleFunc("POST /api/v1/auth/totp/start", s.signedIn(s.handleStartTwoStepSetup))
+		m.HandleFunc("POST /api/v1/auth/totp/enable", s.signedIn(s.handleEnableTwoStep))
+		m.HandleFunc("POST /api/v1/auth/totp/disable", s.signedIn(s.handleDisableTwoStep))
+		m.HandleFunc("POST /api/v1/auth/recovery-codes", s.signedIn(s.handleRenewRecoveryCodes))
+		m.HandleFunc("POST /api/v1/auth/reset/request", s.public(s.handleRequestPasswordReset))
+		m.HandleFunc("POST /api/v1/auth/reset/confirm", s.public(s.handleConfirmPasswordReset))
+		m.HandleFunc("POST /api/v1/auth/register", s.public(s.handleRegisterAccount))
+		m.HandleFunc("GET /api/v1/auth/invite/{token}", s.public(s.handleShowInvite))
+		m.HandleFunc("POST /api/v1/auth/invite/{token}", s.public(s.handleAcceptInvite))
 		const w = "/api/v1/w/{ws}"
-		m.HandleFunc("GET "+w+"/invites", s.in(s.handleListInvites))
-		m.HandleFunc("POST "+w+"/invites", s.in(s.handleCreateInvite))
-		m.HandleFunc("DELETE "+w+"/invites/{id}", s.in(s.handleRevokeInvite))
+		m.HandleFunc("GET "+w+"/invites", s.workspaceMember(s.handleListInvites))
+		m.HandleFunc("POST "+w+"/invites", s.workspaceMember(s.handleCreateInvite))
+		m.HandleFunc("DELETE "+w+"/invites/{id}", s.workspaceMember(s.handleRevokeInvite))
 	})
 }
 

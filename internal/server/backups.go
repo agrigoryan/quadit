@@ -54,10 +54,10 @@ func init() {
 		return err
 	}
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/admin/backups", s.signed(s.installAdmin(s.handleListBackups)))
-		m.HandleFunc("POST /api/v1/admin/backups", s.signed(s.installAdmin(s.handleCreateBackup)))
-		m.HandleFunc("POST /api/v1/admin/backups/{id}/restore-item", s.signed(s.installAdmin(s.handleRestoreItemFromBackup)))
-		m.HandleFunc("GET /api/v1/admin/backups/{id}/download", s.signed(s.installAdmin(s.handleDownloadBackup)))
+		m.HandleFunc("GET /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleListBackups)))
+		m.HandleFunc("POST /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleCreateBackup)))
+		m.HandleFunc("POST /api/v1/admin/backups/{id}/restore-item", s.signedIn(s.installAdmin(s.handleRestoreItemFromBackup)))
+		m.HandleFunc("GET /api/v1/admin/backups/{id}/download", s.signedIn(s.installAdmin(s.handleDownloadBackup)))
 	})
 }
 

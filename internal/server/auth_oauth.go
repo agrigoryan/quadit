@@ -19,10 +19,10 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", s.open(s.handleStartProviderSignIn))
-		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", s.open(s.handleFinishProviderSignIn))
-		m.HandleFunc("GET /api/v1/auth/identities", s.signed(s.handleListIdentities))
-		m.HandleFunc("DELETE /api/v1/auth/identities/{id}", s.signed(s.handleUnlinkIdentity))
+		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", s.public(s.handleStartProviderSignIn))
+		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", s.public(s.handleFinishProviderSignIn))
+		m.HandleFunc("GET /api/v1/auth/identities", s.signedIn(s.handleListIdentities))
+		m.HandleFunc("DELETE /api/v1/auth/identities/{id}", s.signedIn(s.handleUnlinkIdentity))
 	})
 }
 

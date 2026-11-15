@@ -35,10 +35,10 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/push/key", s.signed(s.handleShowPushKey))
-		m.HandleFunc("POST /api/v1/push/subscriptions", s.signed(s.handleSubscribeToPush))
-		m.HandleFunc("DELETE /api/v1/push/subscriptions", s.signed(s.handleUnsubscribeFromPush))
-		m.HandleFunc("POST /api/v1/push/test", s.signed(s.handleSendTestNotification))
+		m.HandleFunc("GET /api/v1/push/key", s.signedIn(s.handleShowPushKey))
+		m.HandleFunc("POST /api/v1/push/subscriptions", s.signedIn(s.handleSubscribeToPush))
+		m.HandleFunc("DELETE /api/v1/push/subscriptions", s.signedIn(s.handleUnsubscribeFromPush))
+		m.HandleFunc("POST /api/v1/push/test", s.signedIn(s.handleSendTestNotification))
 	})
 }
 

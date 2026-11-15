@@ -4,7 +4,7 @@ import "net/http"
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/events/types", s.open(func(x *c) error { return x.ok(map[string]any{"types": eventTypes}) }))
+		m.HandleFunc("GET /api/v1/events/types", s.public(func(x *c) error { return x.ok(map[string]any{"types": eventTypes}) }))
 	})
 }
 

@@ -11,9 +11,9 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/dashboard", s.in(s.handleShowDashboard))
-		m.HandleFunc("GET /api/v1/w/{ws}/cycles/{id}/chart", s.in(s.handleShowCycleChart)) // dashboard_cycle.go
-		m.HandleFunc("GET /api/v1/w/{ws}/agents", s.in(s.handleListAgents))                // dashboard_agents.go
+		m.HandleFunc("GET /api/v1/w/{ws}/dashboard", s.workspaceMember(s.handleShowDashboard))
+		m.HandleFunc("GET /api/v1/w/{ws}/cycles/{id}/chart", s.workspaceMember(s.handleShowCycleChart)) // dashboard_cycle.go
+		m.HandleFunc("GET /api/v1/w/{ws}/agents", s.workspaceMember(s.handleListAgents))                // dashboard_agents.go
 	})
 }
 

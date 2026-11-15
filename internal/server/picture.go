@@ -24,8 +24,8 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/render", s.in(s.handleTakePicture))
-		m.HandleFunc("GET /api/v1/auth/render-session", s.open(s.handleSignInPictureBrowser))
+		m.HandleFunc("GET /api/v1/w/{ws}/render", s.workspaceMember(s.handleTakePicture))
+		m.HandleFunc("GET /api/v1/auth/render-session", s.public(s.handleSignInPictureBrowser))
 	})
 }
 

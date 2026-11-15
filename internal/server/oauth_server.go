@@ -27,9 +27,9 @@ func init() {
 		m.HandleFunc("GET /.well-known/oauth-protected-resource", s.handleDescribeProtectedResource)
 		m.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", s.handleDescribeProtectedResource)
 		m.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleDescribeAuthorizationServer)
-		m.HandleFunc("POST /oauth/register", s.open(s.handleRegisterOAuthClient))
-		m.HandleFunc("GET /oauth/authorize", s.open(s.handleShowConsentPage))
-		m.HandleFunc("POST /oauth/authorize", s.open(s.handleAnswerConsentPage))
+		m.HandleFunc("POST /oauth/register", s.public(s.handleRegisterOAuthClient))
+		m.HandleFunc("GET /oauth/authorize", s.public(s.handleShowConsentPage))
+		m.HandleFunc("POST /oauth/authorize", s.public(s.handleAnswerConsentPage))
 		m.HandleFunc("POST /oauth/token", s.handleIssueOAuthToken)
 	})
 }

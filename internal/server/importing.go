@@ -24,7 +24,7 @@ import (
 // any other work, and running the same import twice adds nothing twice.
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/import", s.in(s.handleImportWork))
+		m.HandleFunc("POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork))
 	})
 }
 

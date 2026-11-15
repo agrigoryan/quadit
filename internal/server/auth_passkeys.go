@@ -21,13 +21,13 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/auth/passkeys", s.signed(s.handleListPasskeys))
-		m.HandleFunc("POST /api/v1/auth/passkeys/register/start", s.signed(s.handleStartPasskeyRegistration))
-		m.HandleFunc("POST /api/v1/auth/passkeys/register/finish", s.signed(s.handleFinishPasskeyRegistration))
-		m.HandleFunc("PATCH /api/v1/auth/passkeys/{id}", s.signed(s.handleRenamePasskey))
-		m.HandleFunc("DELETE /api/v1/auth/passkeys/{id}", s.signed(s.handleDeletePasskey))
-		m.HandleFunc("POST /api/v1/auth/passkeys/login/start", s.open(s.handleStartPasskeySignIn))
-		m.HandleFunc("POST /api/v1/auth/passkeys/login/finish", s.open(s.handleFinishPasskeySignIn))
+		m.HandleFunc("GET /api/v1/auth/passkeys", s.signedIn(s.handleListPasskeys))
+		m.HandleFunc("POST /api/v1/auth/passkeys/register/start", s.signedIn(s.handleStartPasskeyRegistration))
+		m.HandleFunc("POST /api/v1/auth/passkeys/register/finish", s.signedIn(s.handleFinishPasskeyRegistration))
+		m.HandleFunc("PATCH /api/v1/auth/passkeys/{id}", s.signedIn(s.handleRenamePasskey))
+		m.HandleFunc("DELETE /api/v1/auth/passkeys/{id}", s.signedIn(s.handleDeletePasskey))
+		m.HandleFunc("POST /api/v1/auth/passkeys/login/start", s.public(s.handleStartPasskeySignIn))
+		m.HandleFunc("POST /api/v1/auth/passkeys/login/finish", s.public(s.handleFinishPasskeySignIn))
 	})
 }
 

@@ -368,8 +368,9 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 
 type handler func(*c) error
 
-// open wraps a handler that needs no sign-in.
-func (s *Server) open(h handler) http.HandlerFunc {
+// public wraps a handler that anyone may call, without signing in. Such
+// calls are limited by the address they come from.
+func (s *Server) public(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
 		// Calls that need no sign-in are counted by where they come from.
@@ -383,9 +384,9 @@ func (s *Server) open(h handler) http.HandlerFunc {
 	}
 }
 
-// signed wraps a handler that needs a signed-in person or a token, but no
+// signedIn wraps a handler that needs a signed-in person or a token, but no
 // workspace.
-func (s *Server) signed(h handler) http.HandlerFunc {
+func (s *Server) signedIn(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
 		if err := s.identify(x); err != nil {
@@ -398,9 +399,9 @@ func (s *Server) signed(h handler) http.HandlerFunc {
 	}
 }
 
-// half wraps a handler for someone who has passed the first sign-in step
-// and may still owe the second.
-func (s *Server) half(h handler) http.HandlerFunc {
+// firstStepPassed wraps a handler for someone who has passed the first
+// sign-in step and may still owe the second.
+func (s *Server) firstStepPassed(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r, halfOK: true}
 		if err := s.identify(x); err != nil {
@@ -413,8 +414,11 @@ func (s *Server) half(h handler) http.HandlerFunc {
 	}
 }
 
-// in wraps a handler that works inside the workspace named in the path.
-func (s *Server) in(h handler) http.HandlerFunc {
+// workspaceMember wraps a handler that works inside the workspace named in
+// the path: the caller, a signed-in person or a token, must be a member of
+// it, and the context is given the workspace, the membership and a
+// database bound to it.
+func (s *Server) workspaceMember(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
 		err := s.identify(x)

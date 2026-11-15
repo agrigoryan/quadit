@@ -20,14 +20,14 @@ import (
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		const w = "/api/v1/w/{ws}"
-		m.HandleFunc("GET "+w+"/docs", s.in(s.handleListPages))
-		m.HandleFunc("GET "+w+"/docs/{id}", s.in(s.handleShowPage))
-		m.HandleFunc("GET "+w+"/docs/{id}/versions", s.in(s.handleListPageVersions))
-		m.HandleFunc("GET "+w+"/docs/{id}/versions/{version}", s.in(s.handleShowPageVersion))
-		m.HandleFunc("POST "+w+"/docs/{id}/presence", s.in(s.handleReportPagePresence))
-		m.HandleFunc("GET "+w+"/docs/{id}/rows", s.in(s.handleListDatabaseRows))
-		m.HandleFunc("GET "+w+"/memory", s.in(s.handleShowAgentMemory))
-		m.HandleFunc("POST "+w+"/memory", s.in(s.handleSaveAgentMemory))
+		m.HandleFunc("GET "+w+"/docs", s.workspaceMember(s.handleListPages))
+		m.HandleFunc("GET "+w+"/docs/{id}", s.workspaceMember(s.handleShowPage))
+		m.HandleFunc("GET "+w+"/docs/{id}/versions", s.workspaceMember(s.handleListPageVersions))
+		m.HandleFunc("GET "+w+"/docs/{id}/versions/{version}", s.workspaceMember(s.handleShowPageVersion))
+		m.HandleFunc("POST "+w+"/docs/{id}/presence", s.workspaceMember(s.handleReportPagePresence))
+		m.HandleFunc("GET "+w+"/docs/{id}/rows", s.workspaceMember(s.handleListDatabaseRows))
+		m.HandleFunc("GET "+w+"/memory", s.workspaceMember(s.handleShowAgentMemory))
+		m.HandleFunc("POST "+w+"/memory", s.workspaceMember(s.handleSaveAgentMemory))
 	})
 }
 

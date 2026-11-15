@@ -13,7 +13,7 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/export", s.in(s.handleExportWorkspace))
+		m.HandleFunc("GET /api/v1/w/{ws}/export", s.workspaceMember(s.handleExportWorkspace))
 	})
 }
 
