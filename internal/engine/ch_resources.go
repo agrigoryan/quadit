@@ -38,7 +38,7 @@ func resourceCreate(c *cx, a resourceCreateArgs) error {
 	return c.created(seq, "resource", r.ID, inWorkspace(c.ws), r)
 }
 
-func (c *cx) resource(ref string) (core.Resource, error) {
+func (c *cx) loadResource(ref string) (core.Resource, error) {
 	var r core.Resource
 	cond := store.Eq("name", ref)
 	if isID(ref) {
@@ -62,7 +62,7 @@ func (c *cx) resource(ref string) (core.Resource, error) {
 }
 
 func resourceDelete(c *cx, a idArgs) error {
-	r, err := c.resource(a.ID)
+	r, err := c.loadResource(a.ID)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (c *cx) promote(r core.Resource, live []core.ResourceClaim) error {
 // caller holds it now or is waiting in the queue; when it frees up the next
 // in the queue is told.
 func resourceAcquire(c *cx, a resourceAcquireArgs) error {
-	r, err := c.resource(a.Resource)
+	r, err := c.loadResource(a.Resource)
 	if err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ type resourceReleaseArgs struct {
 }
 
 func resourceRelease(c *cx, a resourceReleaseArgs) error {
-	r, err := c.resource(a.Resource)
+	r, err := c.loadResource(a.Resource)
 	if err != nil {
 		return err
 	}

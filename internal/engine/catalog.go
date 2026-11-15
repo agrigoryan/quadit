@@ -44,9 +44,8 @@ func argsOf(t reflect.Type) []ArgInfo { return argsAt(t, 0) }
 
 func argsAt(t reflect.Type, depth int) []ArgInfo {
 	var out []ArgInfo
-	for i := 0; i < t.NumField(); i++ {
-		f := t.Field(i)
-		name := strings.Split(f.Tag.Get("json"), ",")[0]
+	for f := range t.Fields() {
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 		if name == "" || name == "-" {
 			continue
 		}

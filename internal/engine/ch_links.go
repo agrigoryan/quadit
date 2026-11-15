@@ -3,6 +3,7 @@ package engine
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -34,7 +35,7 @@ func linkSet(c *cx, a linkSetArgs) error {
 		return err
 	}
 	kinds := []string{"branch", "commit", "pr", "issue", "url"}
-	if !contains(kinds, a.Kind) {
+	if !slices.Contains(kinds, a.Kind) {
 		return oneOf("kind", "link kind", a.Kind, kinds)
 	}
 	if a.Kind == "url" && a.URL == "" {

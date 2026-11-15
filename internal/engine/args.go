@@ -10,7 +10,7 @@ import (
 )
 
 // args decodes the change's arguments into v. Unknown fields are refused, so
-// a misspelt field is an error and not a silent no-op.
+// a misspelled field is an error and not a silent no-op.
 func (c *cx) args(v any) error {
 	raw := c.change.Args
 	if len(bytes.TrimSpace(raw)) == 0 {
@@ -58,7 +58,7 @@ func (c *cx) argsRefusal(v any, err error) error {
 var PriorityNames = []string{"none", "urgent", "high", "medium", "low"}
 
 // namedPriority lets a priority be written by name ("high") as well as by
-// number, and says what the names are when one is misspelt.
+// number, and says what the names are when one is misspelled.
 func namedPriority(raw json.RawMessage) (json.RawMessage, error) {
 	if !bytes.Contains(raw, []byte(`"priority"`)) {
 		return raw, nil

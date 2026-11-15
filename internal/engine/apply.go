@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
@@ -203,7 +204,7 @@ func (b *batch) apply(ch Change) (*Result, error) {
 	}
 	c := &cx{Resolver: b.resolver(), e: b.e, tx: b.tx, ws: b.tx.WorkspaceID(), scope: scope,
 		change: ch, notified: map[string]bool{}, asker: askerID, askerOK: map[string]bool{}, quiet: ch.Quiet}
-	if contains(scope.NeedsApproval, ch.Type) {
+	if slices.Contains(scope.NeedsApproval, ch.Type) {
 		if err := c.checkApproval(); err != nil {
 			return nil, err
 		}
@@ -284,38 +285,38 @@ func (c *cx) checkApproval() error {
 	if c.change.Approval == "" {
 		return need
 	}
-	var d core.Decision
-	if ok, err := found(c.tx.Get(c.ctx, &d, store.Eq("id", c.change.Approval), store.Live)); !ok {
+	var approval core.Decision
+	if ok, err := found(c.tx.Get(c.ctx, &approval, store.Eq("id", c.change.Approval), store.Live)); !ok {
 		if err != nil {
 			return err
 		}
 		return need
 	}
 	switch {
-	case d.Kind != core.DecisionApproval || d.Action != c.change.Type:
-		need.Message = fmt.Sprintf("decision %s is not an approval for %s", d.ID, c.change.Type)
-	case d.CreatedBy != c.actor.UserID:
+	case approval.Kind != core.DecisionApproval || approval.Action != c.change.Type:
+		need.Message = fmt.Sprintf("decision %s is not an approval for %s", approval.ID, c.change.Type)
+	case approval.CreatedBy != c.actor.UserID:
 		need.Message = "that approval was asked for by someone else"
-	case d.State == core.StateOpen:
+	case approval.State == core.StateOpen:
 		need.Message = "that approval has not been answered yet"
-	case d.Outcome != core.OutcomeApproved:
+	case approval.Outcome != core.OutcomeApproved:
 		need.Code, need.Message = CodeForbidden, "that approval was declined"
-	case d.ActionUsedAt != 0:
+	case approval.ActionUsedAt != 0:
 		need.Message = "that approval was already used; an approval covers one change, once. Ask again for this one"
-	case !sameArgs(d.ActionArgs, c.change.Args):
-		need.Message = "that approval was given for different arguments (" + string(d.ActionArgs) + "); it covers that change and no other. Ask again for this one"
+	case !sameArgs(approval.ActionArgs, c.change.Args):
+		need.Message = "that approval was given for different arguments (" + string(approval.ActionArgs) + "); it covers that change and no other. Ask again for this one"
 	default:
 		// Used up, in the same write as the change it allows; and said in
 		// the feed, so the approval shows as used wherever it is open.
 		seq := c.tx.NextSeq()
-		if _, err := c.tx.Update(c.ctx, "decisions", map[string]any{"action_used_at": c.at, "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {
+		if _, err := c.tx.Update(c.ctx, "decisions", map[string]any{"action_used_at": c.at, "updated_seq": seq}, store.Eq("id", approval.ID)); err != nil {
 			return err
 		}
 		var t core.Task
-		if err := c.tx.Get(c.ctx, &t, store.Eq("id", d.TaskID)); err != nil {
+		if err := c.tx.Get(c.ctx, &t, store.Eq("id", approval.TaskID)); err != nil {
 			return err
 		}
-		return c.emit(event{seq: seq, typ: "decision.updated", entity: "decision", entityID: d.ID, place: inTask(t), data: map[string]any{"id": d.ID, "changes": map[string]core.FieldChange{"action_used_at": {To: c.at}}}})
+		return c.emit(event{seq: seq, typ: "decision.updated", entity: "decision", entityID: approval.ID, place: inTask(t), data: map[string]any{"id": approval.ID, "changes": map[string]core.FieldChange{"action_used_at": {To: c.at}}}})
 	}
 	return need
 }

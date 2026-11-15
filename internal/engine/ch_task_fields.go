@@ -49,11 +49,11 @@ func refOf(o Opt[string]) string {
 }
 
 // taskEpic is the id of the epic a task names; "" names none.
-func (c *cx) taskEpic(p core.Project, ref string) (string, error) {
+func (c *cx) taskEpic(project core.Project, ref string) (string, error) {
 	if ref == "" {
 		return "", nil
 	}
-	e, err := c.epic(p, "epic", ref)
+	e, err := c.epic(project, "epic", ref)
 	return e.ID, err
 }
 
@@ -72,10 +72,10 @@ func (c *cx) taskMilestone(ref, epicID string) (core.Milestone, error) {
 }
 
 // taskCycle is the id of the cycle a task names; "" names none.
-func (c *cx) taskCycle(p core.Project, ref string) (string, error) {
+func (c *cx) taskCycle(project core.Project, ref string) (string, error) {
 	if ref == "" {
 		return "", nil
 	}
-	cy, err := c.cycle(p, "cycle", ref)
+	cy, err := c.cycle(project, "cycle", ref)
 	return cy.ID, err
 }

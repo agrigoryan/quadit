@@ -192,13 +192,13 @@ func (l *linker) tasks(text string) error {
 // docs finds links to pages by id.
 func (l *linker) docs(text string) error {
 	for _, m := range docRefRE.FindAllStringSubmatch(text, -1) {
-		var d core.Doc
-		ok, err := found(l.c.tx.Get(l.c.ctx, &d, store.Eq("id", m[1])))
+		var doc core.Doc
+		ok, err := found(l.c.tx.Get(l.c.ctx, &doc, store.Eq("id", m[1])))
 		if err != nil {
 			return err
 		}
 		if ok {
-			l.add("doc", d.ID)
+			l.add("doc", doc.ID)
 		}
 	}
 	return nil
@@ -207,13 +207,13 @@ func (l *linker) docs(text string) error {
 // decisions finds links to decisions by id.
 func (l *linker) decisions(text string) error {
 	for _, m := range decisionRefRE.FindAllStringSubmatch(text, -1) {
-		var d core.Decision
-		ok, err := found(l.c.tx.Get(l.c.ctx, &d, store.Eq("id", m[1]), store.Live))
+		var decision core.Decision
+		ok, err := found(l.c.tx.Get(l.c.ctx, &decision, store.Eq("id", m[1]), store.Live))
 		if err != nil {
 			return err
 		}
 		if ok {
-			l.add("decision", d.ID)
+			l.add("decision", decision.ID)
 		}
 	}
 	return nil
@@ -249,9 +249,9 @@ func (l *linker) wikiLinks(text string) error {
 			if err := l.c.tx.List(l.c.ctx, &all, store.Q{Where: []store.Cond{store.Live, store.Ne("kind", core.DocRow)}, Limit: scanLimit}); err != nil {
 				return err
 			}
-			for _, d := range all {
-				if strings.EqualFold(d.Title, title) {
-					ds = append(ds, d)
+			for _, doc := range all {
+				if strings.EqualFold(doc.Title, title) {
+					ds = append(ds, doc)
 				}
 			}
 		}

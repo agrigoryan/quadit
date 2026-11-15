@@ -1,13 +1,16 @@
 package engine
 
 import (
+	"maps"
+	"slices"
+
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// afterTaskText keeps search, mentions, watchers and the inbox in step with
-// a task whose text or people changed.
-func (c *cx) afterTaskText(t core.Task, textChanged bool, newAssignee, newWaitingOn string) error {
+// afterTaskPeople has the people new on a task follow it and hears of it:
+// its creator, a new assignee, and a new one it waits on.
+func (c *cx) afterTaskPeople(t core.Task, newAssignee, newWaitingOn string) error {
 	if err := c.watch(t.CreatedBy, "task", t.ID); err != nil {
 		return err
 	}
@@ -24,9 +27,12 @@ func (c *cx) afterTaskText(t core.Task, textChanged bool, newAssignee, newWaitin
 			return err
 		}
 	}
-	if !textChanged {
-		return nil
-	}
+	return nil
+}
+
+// afterTaskText keeps search and mentions in step with a task whose text
+// changed, and tells those newly mentioned.
+func (c *cx) afterTaskText(t core.Task) error {
 	mentioned, err := c.link("task", t.ID, "task", t.ID, t.Title+"\n"+t.Description)
 	if err != nil {
 		return err
@@ -96,14 +102,14 @@ func (c *cx) setStatus(p *patch, t *core.Task, st core.Status) {
 func (c *cx) setLabels(p *patch, t *core.Task, ids []string) error {
 	old := t.LabelIDs
 	for _, l := range old {
-		if !contains(ids, l) {
+		if !slices.Contains(ids, l) {
 			if _, err := c.tx.Delete(c.ctx, "task_labels", store.Eq("task_id", t.ID), store.Eq("label_id", l)); err != nil {
 				return err
 			}
 		}
 	}
 	for _, l := range ids {
-		if !contains(old, l) {
+		if !slices.Contains(old, l) {
 			if err := c.tx.Upsert(c.ctx, core.TaskLabel{TaskID: t.ID, LabelID: l, WorkspaceID: c.ws}, "task_id", "label_id"); err != nil {
 				return err
 			}
@@ -140,9 +146,7 @@ func (c *cx) saveTask(t core.Task, p *patch, extra map[string]any) error {
 		return err
 	}
 	data := map[string]any{"id": t.ID, "key": t.Key, "changes": p.changes}
-	for k, v := range extra {
-		data[k] = v
-	}
+	maps.Copy(data, extra)
 	if err := c.emit(event{seq: seq, typ: "task.updated", entity: "task", entityID: t.ID, place: inTask(t), data: data}); err != nil {
 		return err
 	}

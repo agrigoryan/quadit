@@ -17,18 +17,21 @@ func init() {
 
 const versionEvery = 15 * msPerMinute // a page keeps a version at most this often while it is edited
 
-// keepVersion stores the page as it stands. Unless forced it does so only
-// when the newest version is older than versionEvery.
-func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string, force bool) error {
-	if !force {
-		var last []core.DocVersion
-		if err := c.tx.List(c.ctx, &last, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "-seq", Limit: 1}); err != nil {
-			return err
-		}
-		if (len(last) > 0 && c.at-last[0].CreatedAt < versionEvery) || len(rows) == 0 {
-			return nil
-		}
+// keepVersionIfDue stores the page as it stands when it has blocks and
+// its newest version is older than versionEvery.
+func (c *cx) keepVersionIfDue(d core.Doc, rows []core.Block) error {
+	var last []core.DocVersion
+	if err := c.tx.List(c.ctx, &last, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "-seq", Limit: 1}); err != nil {
+		return err
 	}
+	if (len(last) > 0 && c.at-last[0].CreatedAt < versionEvery) || len(rows) == 0 {
+		return nil
+	}
+	return c.keepVersion(d, rows, "")
+}
+
+// keepVersion stores the page as it stands.
+func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string) error {
 	snap, _ := json.Marshal(BlockTree(rows))
 	return c.tx.Insert(c.ctx, core.DocVersion{ID: id.New(), WorkspaceID: c.ws, DocID: d.ID, Seq: c.tx.Seq(), Label: label, Title: d.Title,
 		Snapshot: snap, CreatedBy: firstNonEmpty(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at})
@@ -41,7 +44,7 @@ type docSnapshotArgs struct {
 
 // docSnapshot keeps a named version of a page as it is now.
 func docSnapshot(c *cx, a docSnapshotArgs) error {
-	d, err := c.doc("doc", a.Doc)
+	d, err := c.loadDoc("doc", a.Doc)
 	if err != nil {
 		return err
 	}
@@ -51,7 +54,7 @@ func docSnapshot(c *cx, a docSnapshotArgs) error {
 	}
 	c.ref = d.ID
 	d.UpdatedBy = c.actor.UserID
-	return c.keepVersion(d, rows, a.Label, true)
+	return c.keepVersion(d, rows, a.Label)
 }
 
 type docRevertArgs struct {
@@ -62,7 +65,7 @@ type docRevertArgs struct {
 // docRevert puts a page back to a kept version. What it was just before is
 // kept as a version too, so reverting can be undone.
 func docRevert(c *cx, a docRevertArgs) error {
-	d, err := c.doc("doc", a.Doc)
+	d, err := c.loadDoc("doc", a.Doc)
 	if err != nil {
 		return err
 	}
@@ -81,7 +84,7 @@ func docRevert(c *cx, a docRevertArgs) error {
 	if err != nil {
 		return err
 	}
-	if err := c.keepVersion(d, rows, "before reverting", true); err != nil {
+	if err := c.keepVersion(d, rows, "before reverting"); err != nil {
 		return err
 	}
 	ed := newEditor(c, d, rows)

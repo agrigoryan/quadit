@@ -75,7 +75,7 @@ func taskTake(c *cx, a taskTakeArgs) error {
 	if err := c.saveTask(t, p, nil); err != nil {
 		return err
 	}
-	return c.afterTaskText(t, false, newAssignee, "")
+	return c.afterTaskPeople(t, newAssignee, "")
 }
 
 // refuseHeld refuses to take a task someone else holds a live lease on,

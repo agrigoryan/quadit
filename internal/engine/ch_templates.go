@@ -48,11 +48,11 @@ func templateCreate(c *cx, a templateCreateArgs) error {
 		tp.Preset, _ = json.Marshal(a.Preset)
 	}
 	if a.Project != "" {
-		p, err := c.project(a.Project)
+		project, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		tp.ProjectID = p.ID
+		tp.ProjectID = project.ID
 	}
 	seq := c.tx.NextSeq()
 	tp.UpdatedSeq = seq
@@ -102,15 +102,15 @@ func templateDelete(c *cx, a idArgs) error {
 	return c.trash(target{table: "templates", entity: "template", id: tp.ID, place: c.inProjectOrWorkspace(tp.ProjectID)})
 }
 
-// template finds a template usable in project p by id or name.
-func (c *cx) template(p core.Project, ref string) (core.Template, error) {
+// loadTemplate loads a template usable in the project by id or name.
+func (c *cx) loadTemplate(project core.Project, ref string) (core.Template, error) {
 	var all []core.Template
 	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "name"}); err != nil {
 		return core.Template{}, err
 	}
 	var names []string
 	for _, t := range all {
-		if t.ProjectID != "" && t.ProjectID != p.ID {
+		if t.ProjectID != "" && t.ProjectID != project.ID {
 			continue
 		}
 		if t.ID == ref || strings.EqualFold(t.Name, ref) {
@@ -118,14 +118,14 @@ func (c *cx) template(p core.Project, ref string) (core.Template, error) {
 		}
 		names = append(names, t.Name)
 	}
-	return core.Template{}, &Error{Code: CodeInvalid, Field: "template", Message: "no template " + ref + " in project " + p.Key,
+	return core.Template{}, &Error{Code: CodeInvalid, Field: "template", Message: "no template " + ref + " in project " + project.Key,
 		Allowed: names, Nearest: nearest(ref, names)}
 }
 
 // applyTemplate fills what the caller left empty on a new task from a
 // template, and returns the decision the template opens, if any.
-func (c *cx) applyTemplate(p core.Project, a *taskCreateArgs) (*decisionOpenArgs, error) {
-	tp, err := c.template(p, a.Template)
+func (c *cx) applyTemplate(project core.Project, a *taskCreateArgs) (*decisionOpenArgs, error) {
+	tp, err := c.loadTemplate(project, a.Template)
 	if err != nil {
 		return nil, err
 	}

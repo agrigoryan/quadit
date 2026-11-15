@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -49,14 +50,14 @@ func sourceCreate(c *cx, a sourceArgs) error {
 	}
 	src := core.DocSource{ID: sid, WorkspaceID: c.ws, Repo: strings.TrimSpace(a.Repo.V), Branch: a.Branch.V, Subdir: strings.Trim(a.Subdir.V, "/"),
 		Authority: firstNonEmpty(a.Authority.V, "repo"), WriteMode: firstNonEmpty(a.WriteMode.V, "commit"), CreatedBy: c.actor.UserID, CreatedAt: c.at}
-	if !contains(authorities, src.Authority) {
+	if !slices.Contains(authorities, src.Authority) {
 		return oneOf("authority", "authority", src.Authority, authorities)
 	}
-	if !contains(writeModes, src.WriteMode) {
+	if !slices.Contains(writeModes, src.WriteMode) {
 		return oneOf("write_mode", "write mode", src.WriteMode, writeModes)
 	}
 	if a.Root != "" {
-		root, err := c.doc("root", a.Root)
+		root, err := c.loadDoc("root", a.Root)
 		if err != nil {
 			return err
 		}
@@ -103,13 +104,13 @@ func sourceUpdate(c *cx, a sourceArgs) error {
 	}
 	p.setText("subdir", a.Subdir, &src.Subdir)
 	if a.Authority.Set {
-		if !contains(authorities, a.Authority.V) {
+		if !slices.Contains(authorities, a.Authority.V) {
 			return oneOf("authority", "authority", a.Authority.V, authorities)
 		}
 		p.setText("authority", a.Authority, &src.Authority)
 	}
 	if a.WriteMode.Set {
-		if !contains(writeModes, a.WriteMode.V) {
+		if !slices.Contains(writeModes, a.WriteMode.V) {
 			return oneOf("write_mode", "write mode", a.WriteMode.V, writeModes)
 		}
 		p.setText("write_mode", a.WriteMode, &src.WriteMode)

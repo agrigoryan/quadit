@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"slices"
+
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -313,7 +315,7 @@ func (u *taskEdit) labels() error {
 		return err
 	}
 	for _, l := range add {
-		if !contains(ids, l) {
+		if !slices.Contains(ids, l) {
 			ids = append(ids, l)
 		}
 	}
@@ -341,9 +343,13 @@ func (u *taskEdit) notifyConcerned() error {
 	if t.WaitingOnID != before.WaitingOnID {
 		newWaiting = t.WaitingOnID
 	}
-	textChanged := t.Title != before.Title || t.Description != before.Description
-	if err := c.afterTaskText(t, textChanged, newAssignee, newWaiting); err != nil {
+	if err := c.afterTaskPeople(t, newAssignee, newWaiting); err != nil {
 		return err
+	}
+	if t.Title != before.Title || t.Description != before.Description {
+		if err := c.afterTaskText(t); err != nil {
+			return err
+		}
 	}
 	if u.moved != nil && !core.OpenCategory(u.moved.Category) {
 		return c.notifyWatchers(t, core.NoteStatus, about{entity: "task", id: t.ID, text: "moved to " + u.moved.Name})

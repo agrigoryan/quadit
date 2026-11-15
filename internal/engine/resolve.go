@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,38 +35,40 @@ func NewResolver(ctx context.Context, db store.DB, actor core.Member, at int64) 
 	return &Resolver{ctx: ctx, db: db, actor: actor, at: at}
 }
 
-func (c *Resolver) Project(ref string) (core.Project, error)      { return c.project(ref) }
-func (c *Resolver) Task(ref string) (core.Task, error)            { return c.anyTask("task", ref) }
-func (c *Resolver) Member(field, ref string) (core.Member, error) { return c.memberRef(field, ref) }
-func (c *Resolver) Status(p core.Project, ref string) (core.Status, error) {
-	return c.status(p, "status", ref)
+func (r *Resolver) Project(ref string) (core.Project, error)      { return r.project(ref) }
+func (r *Resolver) Task(ref string) (core.Task, error)            { return r.anyTask("task", ref) }
+func (r *Resolver) Member(field, ref string) (core.Member, error) { return r.memberRef(field, ref) }
+func (r *Resolver) Status(project core.Project, ref string) (core.Status, error) {
+	return r.status(project, "status", ref)
 }
-func (c *Resolver) Label(p core.Project, ref string) (core.Label, error) {
-	return c.label(p, "label", ref)
+func (r *Resolver) Label(project core.Project, ref string) (core.Label, error) {
+	return r.label(project, "label", ref)
 }
-func (c *Resolver) Epic(p core.Project, ref string) (core.Epic, error) { return c.epic(p, "epic", ref) }
-func (c *Resolver) Cycle(p core.Project, ref string) (core.Cycle, error) {
-	return c.cycle(p, "cycle", ref)
+func (r *Resolver) Epic(project core.Project, ref string) (core.Epic, error) {
+	return r.epic(project, "epic", ref)
+}
+func (r *Resolver) Cycle(project core.Project, ref string) (core.Cycle, error) {
+	return r.cycle(project, "cycle", ref)
 }
 
 var taskKeyRE = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{1,9}-\d+$`)
 
 func isID(s string) bool { return len(s) == 36 && id.Valid(s) }
 
-func (c *Resolver) project(ref string) (core.Project, error) {
-	var p core.Project
+func (r *Resolver) project(ref string) (core.Project, error) {
+	var project core.Project
 	if ref == "" {
-		return p, invalid("project", "a project is required: give its key (SVA) or id")
+		return project, invalid("project", "a project is required: give its key (SVA) or id")
 	}
 	cond := store.Eq("key", strings.ToUpper(ref))
 	if isID(ref) {
 		cond = store.Eq("id", ref)
 	}
-	err := c.db.Get(c.ctx, &p, cond, store.Live)
+	err := r.db.Get(r.ctx, &project, cond, store.Live)
 	if errors.Is(err, store.ErrNotFound) {
 		var all []core.Project
-		if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "key"}); err != nil {
-			return p, err
+		if err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "key"}); err != nil {
+			return project, err
 		}
 		keys := make([]string, len(all))
 		for i, x := range all {
@@ -73,13 +76,13 @@ func (c *Resolver) project(ref string) (core.Project, error) {
 		}
 		e := notFound("project", ref)
 		e.Field, e.Allowed, e.Nearest = "project", keys, nearest(strings.ToUpper(ref), keys)
-		return p, e
+		return project, e
 	}
-	return p, err
+	return project, err
 }
 
 // anyTask loads a task by id or key, in the trash or not.
-func (c *Resolver) anyTask(field, ref string) (core.Task, error) {
+func (r *Resolver) anyTask(field, ref string) (core.Task, error) {
 	var t core.Task
 	if ref == "" {
 		return t, invalid(field, "a task is required: give its key (SVA-12) or id")
@@ -93,16 +96,16 @@ func (c *Resolver) anyTask(field, ref string) (core.Task, error) {
 	default:
 		return t, invalid(field, "%q is not a task: use its key (SVA-12) or id", ref)
 	}
-	err := c.db.Get(c.ctx, &t, cond)
+	err := r.db.Get(r.ctx, &t, cond)
 	if errors.Is(err, store.ErrNotFound) && !isID(ref) {
 		// The key it had before it moved to another project still finds it.
 		var was core.TaskKey
-		ok, wasErr := found(c.db.Get(c.ctx, &was, store.Eq("key", strings.ToUpper(ref))))
+		ok, wasErr := found(r.db.Get(r.ctx, &was, store.Eq("key", strings.ToUpper(ref))))
 		if wasErr != nil {
 			return t, wasErr
 		}
 		if ok {
-			err = c.db.Get(c.ctx, &t, store.Eq("id", was.TaskID))
+			err = r.db.Get(r.ctx, &t, store.Eq("id", was.TaskID))
 		}
 	}
 	if errors.Is(err, store.ErrNotFound) {
@@ -114,8 +117,8 @@ func (c *Resolver) anyTask(field, ref string) (core.Task, error) {
 }
 
 // task loads a task that is not in the trash.
-func (c *Resolver) task(field, ref string) (core.Task, error) {
-	t, err := c.anyTask(field, ref)
+func (r *Resolver) task(field, ref string) (core.Task, error) {
+	t, err := r.anyTask(field, ref)
 	if err != nil {
 		return t, err
 	}
@@ -126,19 +129,19 @@ func (c *Resolver) task(field, ref string) (core.Task, error) {
 }
 
 // memberRef finds a member by id, @handle, or "me".
-func (c *Resolver) memberRef(field, ref string) (core.Member, error) {
+func (r *Resolver) memberRef(field, ref string) (core.Member, error) {
 	if ref == "me" {
-		return c.actor, nil
+		return r.actor, nil
 	}
 	var m core.Member
 	cond := store.Eq("handle", strings.ToLower(strings.TrimPrefix(ref, "@")))
 	if isID(ref) {
 		cond = store.Eq("user_id", ref)
 	}
-	err := c.db.Get(c.ctx, &m, cond, store.Null("removed_at"))
+	err := r.db.Get(r.ctx, &m, cond, store.Null("removed_at"))
 	if errors.Is(err, store.ErrNotFound) {
 		var all []core.Member
-		if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Null("removed_at")}, Order: "handle"}); err != nil {
+		if err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Null("removed_at")}, Order: "handle"}); err != nil {
 			return m, err
 		}
 		handles := make([]string, len(all))
@@ -153,24 +156,24 @@ func (c *Resolver) memberRef(field, ref string) (core.Member, error) {
 }
 
 // optMember resolves an optional member reference to a user id; "" stays "".
-func (c *Resolver) optMember(field, ref string) (string, error) {
+func (r *Resolver) optMember(field, ref string) (string, error) {
 	if ref == "" {
 		return "", nil
 	}
-	m, err := c.memberRef(field, ref)
+	m, err := r.memberRef(field, ref)
 	return m.UserID, err
 }
 
-func (c *Resolver) statuses(projectID string) ([]core.Status, error) {
+func (r *Resolver) statuses(projectID string) ([]core.Status, error) {
 	var all []core.Status
-	err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", projectID), store.Live}, Order: "rank"})
+	err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", projectID), store.Live}, Order: "rank"})
 	return all, err
 }
 
-// status finds a status of project p by id, by name, or by category (the
+// status finds a status of the project by id, by name, or by category (the
 // first status of that category).
-func (c *Resolver) status(p core.Project, field, ref string) (core.Status, error) {
-	all, err := c.statuses(p.ID)
+func (r *Resolver) status(project core.Project, field, ref string) (core.Status, error) {
+	all, err := r.statuses(project.ID)
 	if err != nil {
 		return core.Status{}, err
 	}
@@ -189,12 +192,12 @@ func (c *Resolver) status(p core.Project, field, ref string) (core.Status, error
 	for i, s := range all {
 		names[i] = s.Name
 	}
-	return core.Status{}, &Error{Code: CodeInvalid, Field: field, Message: "project " + p.Key + " has no status " + strconv.Quote(ref),
+	return core.Status{}, &Error{Code: CodeInvalid, Field: field, Message: "project " + project.Key + " has no status " + strconv.Quote(ref),
 		Allowed: names, Nearest: nearest(ref, names)}
 }
 
-func (c *Resolver) defaultStatus(p core.Project) (core.Status, error) {
-	all, err := c.statuses(p.ID)
+func (r *Resolver) defaultStatus(project core.Project) (core.Status, error) {
+	all, err := r.statuses(project.ID)
 	if err != nil {
 		return core.Status{}, err
 	}
@@ -211,20 +214,20 @@ func (c *Resolver) defaultStatus(p core.Project) (core.Status, error) {
 	if len(all) > 0 {
 		return all[0], nil
 	}
-	return core.Status{}, conflictErr("project %s has no statuses", p.Key)
+	return core.Status{}, conflictErr("project %s has no statuses", project.Key)
 }
 
-// label finds a label usable in project p (its own, or one shared by the
+// label finds a label usable in the project (its own, or one shared by the
 // workspace) by id or name.
-func (c *Resolver) label(p core.Project, field, ref string) (core.Label, error) {
+func (r *Resolver) label(project core.Project, field, ref string) (core.Label, error) {
 	var all []core.Label
-	if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "name"}); err != nil {
+	if err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "name"}); err != nil {
 		return core.Label{}, err
 	}
 	low := strings.ToLower(strings.TrimSpace(ref))
 	var names []string
 	for _, l := range all {
-		if l.ProjectID != "" && l.ProjectID != p.ID {
+		if l.ProjectID != "" && l.ProjectID != project.ID {
 			continue
 		}
 		if l.ID == ref || strings.ToLower(l.Name) == low {
@@ -232,28 +235,28 @@ func (c *Resolver) label(p core.Project, field, ref string) (core.Label, error) 
 		}
 		names = append(names, l.Name)
 	}
-	return core.Label{}, &Error{Code: CodeInvalid, Field: field, Message: "no label " + strconv.Quote(ref) + " in project " + p.Key,
+	return core.Label{}, &Error{Code: CodeInvalid, Field: field, Message: "no label " + strconv.Quote(ref) + " in project " + project.Key,
 		Allowed: names, Nearest: nearest(ref, names)}
 }
 
-func (c *Resolver) labelIDs(p core.Project, field string, refs []string) ([]string, error) {
+func (r *Resolver) labelIDs(project core.Project, field string, refs []string) ([]string, error) {
 	var out []string
-	for _, r := range refs {
-		l, err := c.label(p, field, r)
+	for _, ref := range refs {
+		l, err := r.label(project, field, ref)
 		if err != nil {
 			return nil, err
 		}
-		if !contains(out, l.ID) {
+		if !slices.Contains(out, l.ID) {
 			out = append(out, l.ID)
 		}
 	}
 	return out, nil
 }
 
-// epic finds an epic of project p by id or name.
-func (c *Resolver) epic(p core.Project, field, ref string) (core.Epic, error) {
+// epic finds an epic of the project by id or name.
+func (r *Resolver) epic(project core.Project, field, ref string) (core.Epic, error) {
 	var all []core.Epic
-	if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "rank"}); err != nil {
+	if err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", project.ID), store.Live}, Order: "rank"}); err != nil {
 		return core.Epic{}, err
 	}
 	low := strings.ToLower(strings.TrimSpace(ref))
@@ -264,17 +267,17 @@ func (c *Resolver) epic(p core.Project, field, ref string) (core.Epic, error) {
 		}
 		names[i] = e.Name
 	}
-	return core.Epic{}, &Error{Code: CodeInvalid, Field: field, Message: "no epic " + strconv.Quote(ref) + " in project " + p.Key,
+	return core.Epic{}, &Error{Code: CodeInvalid, Field: field, Message: "no epic " + strconv.Quote(ref) + " in project " + project.Key,
 		Allowed: names, Nearest: nearest(ref, names)}
 }
 
-// cycle finds a cycle of project p by id, number, "current" or "next".
-func (c *Resolver) cycle(p core.Project, field, ref string) (core.Cycle, error) {
+// cycle finds a cycle of the project by id, number, "current" or "next".
+func (r *Resolver) cycle(project core.Project, field, ref string) (core.Cycle, error) {
 	var all []core.Cycle
-	if err := c.db.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "starts_on"}); err != nil {
+	if err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", project.ID), store.Live}, Order: "starts_on"}); err != nil {
 		return core.Cycle{}, err
 	}
-	today := time.UnixMilli(c.at).UTC().Format("2006-01-02")
+	today := time.UnixMilli(r.at).UTC().Format("2006-01-02")
 	n, err := strconv.Atoi(strings.TrimPrefix(ref, "#"))
 	if err != nil {
 		n = 0 // not a number: an id, "current" or "next"
@@ -289,7 +292,7 @@ func (c *Resolver) cycle(p core.Project, field, ref string) (core.Cycle, error) 
 			return cy, nil
 		}
 	}
-	return core.Cycle{}, &Error{Code: CodeInvalid, Field: field, Message: "no cycle " + strconv.Quote(ref) + " in project " + p.Key +
+	return core.Cycle{}, &Error{Code: CodeInvalid, Field: field, Message: "no cycle " + strconv.Quote(ref) + " in project " + project.Key +
 		": use its number, \"current\" or \"next\""}
 }
 
@@ -388,8 +391,8 @@ func jsonFields(v any) []string {
 		return nil
 	}
 	var out []string
-	for i := 0; i < t.NumField(); i++ {
-		name := strings.Split(t.Field(i).Tag.Get("json"), ",")[0]
+	for f := range t.Fields() {
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 		if name != "" && name != "-" {
 			out = append(out, name)
 		}
@@ -402,9 +405,9 @@ func nearest(got string, allowed []string) string {
 	got = strings.ToLower(got)
 	best, bestD := "", 1<<30
 	for _, a := range allowed {
-		d := editDistance(got, strings.ToLower(a))
-		if d < bestD {
-			best, bestD = a, d
+		distance := editDistance(got, strings.ToLower(a))
+		if distance < bestD {
+			best, bestD = a, distance
 		}
 	}
 	if bestD == 0 || bestD > max(2, len(got)/2) {
@@ -434,9 +437,9 @@ func editDistance(a, b string) int {
 	return prev[len(rb)]
 }
 
-// doc loads a page the actor may see. A private page of someone else that
+// loadDoc loads a page the actor may see. A private page of someone else that
 // was not shared with the actor does not exist as far as they can tell.
-func (c *cx) doc(field, ref string) (core.Doc, error) {
+func (c *cx) loadDoc(field, ref string) (core.Doc, error) {
 	d, err := loadLive[core.Doc](c, "doc", field, ref)
 	if err != nil {
 		return d, err
@@ -451,5 +454,5 @@ func (c *cx) doc(field, ref string) (core.Doc, error) {
 
 // CanSeeDoc reports whether a member may see a page.
 func CanSeeDoc(d core.Doc, userID string) bool {
-	return d.OwnerID == "" || d.OwnerID == userID || contains(d.SharedWith, userID)
+	return d.OwnerID == "" || d.OwnerID == userID || slices.Contains(d.SharedWith, userID)
 }

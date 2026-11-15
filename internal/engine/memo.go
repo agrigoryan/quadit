@@ -83,8 +83,7 @@ func cloneRows(src reflect.Value) reflect.Value {
 func cloneRow(src reflect.Value) reflect.Value {
 	out := reflect.New(src.Type()).Elem()
 	out.Set(src)
-	for i := 0; i < out.NumField(); i++ {
-		f := out.Field(i)
+	for _, f := range out.Fields() {
 		if !f.CanSet() {
 			continue
 		}

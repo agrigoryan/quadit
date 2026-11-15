@@ -164,19 +164,19 @@ func (c *cx) commentSubject(cm *core.Comment, a commentCreateArgs) (core.Task, e
 		cm.SubjectType, cm.SubjectID, a.Decision = "decision_option", o.ID, o.DecisionID
 	}
 	if a.Decision != "" {
-		d, err := loadLive[core.Decision](c, "decision", "decision", a.Decision)
+		decision, err := loadLive[core.Decision](c, "decision", "decision", a.Decision)
 		if err != nil {
 			return core.Task{}, err
 		}
 		if a.Task == "" {
-			a.Task = d.TaskID
+			a.Task = decision.TaskID
 		}
 		if cm.SubjectType == "" {
-			cm.SubjectType, cm.SubjectID = "decision", d.ID
+			cm.SubjectType, cm.SubjectID = "decision", decision.ID
 		}
 		if t, err := c.task("task", a.Task); err != nil {
 			return core.Task{}, err
-		} else if t.ID != d.TaskID {
+		} else if t.ID != decision.TaskID {
 			return core.Task{}, invalid("decision", "that decision belongs to another task")
 		}
 	}
@@ -284,31 +284,31 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 			a.Doc = b.DocID
 		}
 	}
-	d, err := c.doc("doc", a.Doc)
+	doc, err := c.loadDoc("doc", a.Doc)
 	if err != nil {
 		return err
 	}
 	if cm.SubjectType == "" {
-		cm.SubjectType, cm.SubjectID = "doc", d.ID
+		cm.SubjectType, cm.SubjectID = "doc", doc.ID
 	}
-	cm.DocID = d.ID
+	cm.DocID = doc.ID
 	seq := c.tx.NextSeq()
 	cm.CreatedSeq, cm.UpdatedSeq = seq, seq
 	if err := c.tx.Insert(c.ctx, cm); err != nil {
 		return alreadyInUse(err, "id", cm.ID)
 	}
 	c.ref = cm.ID
-	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(d), audience: d.OwnerID, data: map[string]any{"row": cm}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(doc), audience: doc.OwnerID, data: map[string]any{"row": cm}}); err != nil {
 		return err
 	}
-	if err := c.watch(c.actor.UserID, "doc", d.ID); err != nil {
+	if err := c.watch(c.actor.UserID, "doc", doc.ID); err != nil {
 		return err
 	}
-	mentioned, err := c.link("comment", cm.ID, "doc", d.ID, cm.Body)
+	mentioned, err := c.link("comment", cm.ID, "doc", doc.ID, cm.Body)
 	if err != nil {
 		return err
 	}
-	n := core.Notification{DocID: d.ID, EntityType: "comment", EntityID: cm.ID, Title: d.Title, Snippet: cm.Body}
+	n := core.Notification{DocID: doc.ID, EntityType: "comment", EntityID: cm.ID, Title: doc.Title, Snippet: cm.Body}
 	for _, m := range mentioned {
 		if err := c.notify(m.UserID, core.NoteMentioned, n); err != nil {
 			return err
@@ -327,7 +327,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 		}
 	}
 	var ws []core.Watcher
-	if err := c.tx.List(c.ctx, &ws, store.Where(store.Eq("subject_id", d.ID))); err != nil {
+	if err := c.tx.List(c.ctx, &ws, store.Where(store.Eq("subject_id", doc.ID))); err != nil {
 		return err
 	}
 	for _, w := range ws {
@@ -335,7 +335,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 			return err
 		}
 	}
-	return c.index(store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "doc", ScopeID: d.ID, ProjectID: d.ProjectID, AudienceID: d.OwnerID, Title: d.Title, Body: cm.Body})
+	return c.index(store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "doc", ScopeID: doc.ID, ProjectID: doc.ProjectID, AudienceID: doc.OwnerID, Title: doc.Title, Body: cm.Body})
 }
 
 // commentPlace returns where a comment's events belong, and the key of its

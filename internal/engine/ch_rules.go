@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -52,7 +53,7 @@ func (c *cx) checkRuleMatch(m *core.RuleMatch) error {
 
 // checkRule resolves the names in a rule to ids and refuses what cannot run.
 func (c *cx) checkRule(m *core.RuleMatch, a *core.RuleAction) error {
-	if a == nil || !contains(ruleActions, a.Kind) {
+	if a == nil || !slices.Contains(ruleActions, a.Kind) {
 		kind := ""
 		if a != nil {
 			kind = a.Kind

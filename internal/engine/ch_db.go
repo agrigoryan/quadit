@@ -26,9 +26,9 @@ var PropertyTypes = []string{"text", "number", "select", "multi_select", "date",
 // DBViewTypes are the ways a database can be shown.
 var DBViewTypes = []string{"table", "board", "calendar", "gallery", "timeline", "form"}
 
-// database loads a page that is a database the actor may see.
-func (c *cx) database(field, ref string) (core.Doc, error) {
-	d, err := c.doc(field, ref)
+// loadDatabase loads a page that is a database the actor may see.
+func (c *cx) loadDatabase(field, ref string) (core.Doc, error) {
+	d, err := c.loadDoc(field, ref)
 	if err != nil {
 		return d, err
 	}
@@ -60,7 +60,7 @@ func propertyCreate(c *cx, a propertyArgs) error {
 	if err != nil {
 		return err
 	}
-	d, err := c.database("database", a.Database)
+	d, err := c.loadDatabase("database", a.Database)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func propertyCreate(c *cx, a propertyArgs) error {
 	if a.Type.V == "" {
 		a.Type.V = "text"
 	}
-	if !contains(PropertyTypes, a.Type.V) {
+	if !slices.Contains(PropertyTypes, a.Type.V) {
 		return oneOf("type", "property type", a.Type.V, PropertyTypes)
 	}
 	if n, err := c.tx.Count(c.ctx, "db_properties", store.Eq("database_id", d.ID), store.Eq("name", name), store.Live); err != nil {
@@ -95,12 +95,12 @@ func propertyCreate(c *cx, a propertyArgs) error {
 }
 
 func (c *cx) propertyDoc(ref string) (core.DBProperty, core.Doc, error) {
-	p, err := loadLive[core.DBProperty](c, "property", "id", ref)
+	prop, err := loadLive[core.DBProperty](c, "property", "id", ref)
 	if err != nil {
-		return p, core.Doc{}, err
+		return prop, core.Doc{}, err
 	}
-	d, err := c.doc("id", p.DatabaseID)
-	return p, d, err
+	d, err := c.loadDoc("id", prop.DatabaseID)
+	return prop, d, err
 }
 
 func propertyUpdate(c *cx, a propertyArgs) error {
@@ -113,7 +113,7 @@ func propertyUpdate(c *cx, a propertyArgs) error {
 		return err
 	}
 	if a.Type.Set {
-		if !contains(PropertyTypes, a.Type.V) {
+		if !slices.Contains(PropertyTypes, a.Type.V) {
 			return oneOf("type", "property type", a.Type.V, PropertyTypes)
 		}
 		p.setText("type", a.Type, &pr.Type)
@@ -309,14 +309,14 @@ func dbviewCreate(c *cx, a dbviewArgs) error {
 	if err != nil {
 		return err
 	}
-	d, err := c.database("database", a.Database)
+	d, err := c.loadDatabase("database", a.Database)
 	if err != nil {
 		return err
 	}
 	if a.Type.V == "" {
 		a.Type.V = "table"
 	}
-	if !contains(DBViewTypes, a.Type.V) {
+	if !slices.Contains(DBViewTypes, a.Type.V) {
 		return oneOf("type", "view type", a.Type.V, DBViewTypes)
 	}
 	name := strings.TrimSpace(a.Name.V)
@@ -343,7 +343,7 @@ func (c *cx) dbviewDoc(ref string) (core.DBView, core.Doc, error) {
 	if err != nil {
 		return v, core.Doc{}, err
 	}
-	d, err := c.doc("id", v.DatabaseID)
+	d, err := c.loadDoc("id", v.DatabaseID)
 	return v, d, err
 }
 
@@ -357,7 +357,7 @@ func dbviewUpdate(c *cx, a dbviewArgs) error {
 		return err
 	}
 	if a.Type.Set {
-		if !contains(DBViewTypes, a.Type.V) {
+		if !slices.Contains(DBViewTypes, a.Type.V) {
 			return oneOf("type", "view type", a.Type.V, DBViewTypes)
 		}
 		p.setText("type", a.Type, &v.Type)
@@ -502,10 +502,10 @@ func (c *cx) selectValue(prop *core.DBProperty, raw json.RawMessage) error {
 var optionColors = []string{"gray", "blue", "green", "yellow", "orange", "red", "purple", "pink"}
 
 // addOptions adds select values that are not options yet.
-func (c *cx) addOptions(p *core.DBProperty, vals []string) error {
+func (c *cx) addOptions(prop *core.DBProperty, vals []string) error {
 	var cfg map[string]any
-	if len(p.Config) > 0 {
-		if err := json.Unmarshal(p.Config, &cfg); err != nil {
+	if len(prop.Config) > 0 {
+		if err := json.Unmarshal(prop.Config, &cfg); err != nil {
 			return err
 		}
 	}
@@ -531,15 +531,15 @@ func (c *cx) addOptions(p *core.DBProperty, vals []string) error {
 	}
 	cfg["options"] = opts
 	raw, _ := json.Marshal(cfg)
-	old := p.Config
-	p.Config = raw
+	old := prop.Config
+	prop.Config = raw
 	var d core.Doc
-	if err := c.tx.Get(c.ctx, &d, store.Eq("id", p.DatabaseID)); err != nil {
+	if err := c.tx.Get(c.ctx, &d, store.Eq("id", prop.DatabaseID)); err != nil {
 		return err
 	}
 	seq := c.tx.NextSeq()
-	if _, err := c.tx.Update(c.ctx, "db_properties", map[string]any{"config": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", p.ID)); err != nil {
+	if _, err := c.tx.Update(c.ctx, "db_properties", map[string]any{"config": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", prop.ID)); err != nil {
 		return err
 	}
-	return c.emit(event{seq: seq, typ: "property.updated", entity: "property", entityID: p.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": p.ID, "changes": map[string]core.FieldChange{"config": {From: old, To: json.RawMessage(raw)}}}})
+	return c.emit(event{seq: seq, typ: "property.updated", entity: "property", entityID: prop.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": prop.ID, "changes": map[string]core.FieldChange{"config": {From: old, To: json.RawMessage(raw)}}}})
 }

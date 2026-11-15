@@ -61,16 +61,16 @@ func (r *reindex) indexDocs() error {
 	if err := r.db.List(r.ctx, &docs, store.Where(store.Live)); err != nil {
 		return err
 	}
-	for _, d := range docs {
-		r.docs[d.ID] = d
+	for _, doc := range docs {
+		r.docs[doc.ID] = doc
 		var blocks []core.Block
-		if err := r.db.List(r.ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Live}, Order: "rank"}); err != nil {
+		if err := r.db.List(r.ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", doc.ID), store.Live}, Order: "rank"}); err != nil {
 			return err
 		}
 		var b strings.Builder
 		writePlain(&b, BlockTree(blocks))
-		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "doc", EntityID: d.ID, ScopeType: "doc", ScopeID: d.ID, ProjectID: d.ProjectID,
-			AudienceID: d.OwnerID, Title: d.Title, Body: b.String()}); err != nil {
+		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "doc", EntityID: doc.ID, ScopeType: "doc", ScopeID: doc.ID, ProjectID: doc.ProjectID,
+			AudienceID: doc.OwnerID, Title: doc.Title, Body: b.String()}); err != nil {
 			return err
 		}
 	}
@@ -112,21 +112,16 @@ func (r *reindex) indexDecisions() error {
 	if err := r.db.List(r.ctx, &decisions, store.Where(store.Live)); err != nil {
 		return err
 	}
-	for _, d := range decisions {
-		t, ok := r.tasks[d.TaskID]
+	for _, decision := range decisions {
+		t, ok := r.tasks[decision.TaskID]
 		if !ok {
 			continue
 		}
 		var opts []core.Option
-		if err := r.db.List(r.ctx, &opts, store.Where(store.Eq("decision_id", d.ID), store.Live)); err != nil {
+		if err := r.db.List(r.ctx, &opts, store.Where(store.Eq("decision_id", decision.ID), store.Live)); err != nil {
 			return err
 		}
-		var body strings.Builder
-		body.WriteString(d.Details)
-		for _, o := range opts {
-			body.WriteString("\n" + o.Label + " " + o.Description)
-		}
-		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "decision", EntityID: d.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: d.Question, Body: body.String()}); err != nil {
+		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "decision", EntityID: decision.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: decision.Question, Body: decisionText(decision.Details, opts)}); err != nil {
 			return err
 		}
 	}
@@ -220,8 +215,8 @@ func (run *purge) tasks() error {
 		if err := tx.List(run.ctx, &ds, store.Where(store.Eq("task_id", t.ID))); err != nil {
 			return err
 		}
-		for _, d := range ds {
-			if err := run.delete(rowsOf{"decision_options", store.Eq("decision_id", d.ID)}); err != nil {
+		for _, decision := range ds {
+			if err := run.delete(rowsOf{"decision_options", store.Eq("decision_id", decision.ID)}); err != nil {
 				return err
 			}
 		}
@@ -249,16 +244,16 @@ func (run *purge) docs() error {
 	if err := tx.List(run.ctx, &docs, store.Where(store.NotNull("deleted_at"), store.Lte("deleted_at", run.cutoff))); err != nil {
 		return err
 	}
-	for _, d := range docs {
-		if _, err := tx.Update(run.ctx, "docs", map[string]any{"parent_id": ""}, store.Eq("parent_id", d.ID)); err != nil {
+	for _, doc := range docs {
+		if _, err := tx.Update(run.ctx, "docs", map[string]any{"parent_id": ""}, store.Eq("parent_id", doc.ID)); err != nil {
 			return err
 		}
-		if err := run.delete(rowsOf{"doc_blocks", store.Eq("doc_id", d.ID)}, rowsOf{"doc_versions", store.Eq("doc_id", d.ID)}, rowsOf{"comments", store.Eq("doc_id", d.ID)},
-			rowsOf{"db_properties", store.Eq("database_id", d.ID)}, rowsOf{"db_views", store.Eq("database_id", d.ID)}, rowsOf{"attachments", store.Eq("subject_id", d.ID)},
-			rowsOf{"watchers", store.Eq("subject_id", d.ID)}, rowsOf{"refs", store.Eq("from_scope_id", d.ID)}, rowsOf{"refs", store.Eq("to_id", d.ID)}, rowsOf{"docs", store.Eq("id", d.ID)}); err != nil {
+		if err := run.delete(rowsOf{"doc_blocks", store.Eq("doc_id", doc.ID)}, rowsOf{"doc_versions", store.Eq("doc_id", doc.ID)}, rowsOf{"comments", store.Eq("doc_id", doc.ID)},
+			rowsOf{"db_properties", store.Eq("database_id", doc.ID)}, rowsOf{"db_views", store.Eq("database_id", doc.ID)}, rowsOf{"attachments", store.Eq("subject_id", doc.ID)},
+			rowsOf{"watchers", store.Eq("subject_id", doc.ID)}, rowsOf{"refs", store.Eq("from_scope_id", doc.ID)}, rowsOf{"refs", store.Eq("to_id", doc.ID)}, rowsOf{"docs", store.Eq("id", doc.ID)}); err != nil {
 			return err
 		}
-		if err := run.c.emit(event{seq: tx.NextSeq(), typ: "doc.deleted", entity: "doc", entityID: d.ID, place: inDoc(d), audience: d.OwnerID, data: map[string]any{"id": d.ID, "gone": true}}); err != nil {
+		if err := run.c.emit(event{seq: tx.NextSeq(), typ: "doc.deleted", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: doc.OwnerID, data: map[string]any{"id": doc.ID, "gone": true}}); err != nil {
 			return err
 		}
 		run.purged++
@@ -362,15 +357,15 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 		if _, err := tx.Update(ctx, "doc_blocks", map[string]any{"updated_seq": next + 1}, store.Eq("doc_id", id)); err != nil {
 			return err
 		}
-		var d core.Doc
-		if err := tx.Get(ctx, &d, store.Eq("id", id)); err != nil {
+		var doc core.Doc
+		if err := tx.Get(ctx, &doc, store.Eq("id", id)); err != nil {
 			return err
 		}
-		if err := sys.Emit("doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": d, "from_backup": true}); err != nil {
+		if err := sys.Emit("doc.restored", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, map[string]any{"row": doc, "from_backup": true}); err != nil {
 			return err
 		}
 		var all []core.Block
-		if err := tx.List(ctx, &all, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "rank"}); err != nil {
+		if err := tx.List(ctx, &all, store.Q{Where: []store.Cond{store.Eq("doc_id", doc.ID)}, Order: "rank"}); err != nil {
 			return err
 		}
 		live, gone := []core.Block{}, []string{}
@@ -381,15 +376,15 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 				live = append(live, b)
 			}
 		}
-		if err := sys.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true,
+		if err := sys.Emit("doc.edited", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, map[string]any{"id": doc.ID, "blocks": live, "deleted": gone, "from_backup": true,
 			"changes": map[string]core.FieldChange{"content_seq": {To: next + 1}}}); err != nil {
 			return err
 		}
 		// What the page mentions is worked out again from its text as it stands.
-		rows, err := LoadBlocks(cxLister{sys.c}, d.ID)
+		rows, err := LoadBlocks(cxLister{sys.c}, doc.ID)
 		if err != nil {
 			return err
 		}
-		return sys.c.afterDocText(d, newEditor(sys.c, d, rows))
+		return sys.c.afterDocText(doc, newEditor(sys.c, doc, rows))
 	})
 }

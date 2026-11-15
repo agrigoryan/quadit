@@ -85,7 +85,7 @@ func decisionOpen(c *cx, a decisionOpenArgs) error {
 	if asked == "" {
 		return nil
 	}
-	return c.ask(d, t)
+	return c.putQuestion(d, t)
 }
 
 // decisionKind is the kind of a new decision, the one given or the one its
@@ -233,16 +233,12 @@ func (c *cx) insertDecision(d *core.Decision, t core.Task, a decisionOpenArgs) e
 	if err := c.watch(c.actor.UserID, "task", t.ID); err != nil {
 		return err
 	}
-	body := d.Details
-	for _, o := range d.Options {
-		body += "\n" + o.Label + " " + o.Description
-	}
-	return c.index(store.SearchDoc{Kind: "decision", EntityID: d.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: d.Question, Body: body})
+	return c.index(store.SearchDoc{Kind: "decision", EntityID: d.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: d.Question, Body: decisionText(d.Details, d.Options)})
 }
 
-// ask puts a new decision to the one who should answer it: they follow the
-// task, are told, and the task waits on them.
-func (c *cx) ask(d core.Decision, t core.Task) error {
+// putQuestion puts a new decision to the one who should answer it: they
+// follow the task, are told, and the task waits on them.
+func (c *cx) putQuestion(d core.Decision, t core.Task) error {
 	asked := d.AskedID
 	if err := c.watch(asked, "task", t.ID); err != nil {
 		return err
@@ -590,11 +586,7 @@ func decisionRestore(c *cx, a idArgs) error {
 	if err := c.loadOptions(&d); err != nil {
 		return err
 	}
-	body := d.Details
-	for _, o := range d.Options {
-		body += "\n" + o.Label + " " + o.Description
-	}
-	if err := c.index(store.SearchDoc{Kind: "decision", EntityID: d.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: d.Question, Body: body}); err != nil {
+	if err := c.index(store.SearchDoc{Kind: "decision", EntityID: d.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: d.Question, Body: decisionText(d.Details, d.Options)}); err != nil {
 		return err
 	}
 	if err := c.touchTask(t.ID, seq); err != nil {
@@ -654,4 +646,15 @@ func (c *cx) decisionOnTask(ref string) (string, error) {
 		return "", invalid("id", "%s has no decisions", t.Key)
 	}
 	return "", invalid("id", "%s has %d decisions, %d of them open; say which with %s#1, %s#2, …", t.Key, len(ds), len(open), t.Key, t.Key)
+}
+
+// decisionText is what search finds a decision by besides its question:
+// its details, and each option's label and description, a line each.
+func decisionText(details string, options []core.Option) string {
+	var b strings.Builder
+	b.WriteString(details)
+	for _, o := range options {
+		b.WriteString("\n" + o.Label + " " + o.Description)
+	}
+	return b.String()
 }

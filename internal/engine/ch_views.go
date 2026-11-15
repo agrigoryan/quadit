@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 
@@ -54,7 +55,7 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 	if a.Layout == "" {
 		a.Layout = "list"
 	}
-	if !contains(viewLayouts, a.Layout) {
+	if !slices.Contains(viewLayouts, a.Layout) {
 		return oneOf("layout", "layout", a.Layout, viewLayouts)
 	}
 	v := core.View{ID: vid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), Description: a.Description, Icon: a.Icon,
@@ -68,11 +69,11 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 		}
 	}
 	if a.Project != "" {
-		p, err := c.project(a.Project)
+		project, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		v.ProjectID = p.ID
+		v.ProjectID = project.ID
 	}
 	base := slugify(v.Name)
 	v.Slug = base
@@ -146,7 +147,7 @@ func viewUpdate(c *cx, a viewUpdateArgs) error {
 	p.setText("description", a.Description, &v.Description)
 	p.setText("icon", a.Icon, &v.Icon)
 	if a.Layout.Set {
-		if !contains(viewLayouts, a.Layout.V) {
+		if !slices.Contains(viewLayouts, a.Layout.V) {
 			return oneOf("layout", "layout", a.Layout.V, viewLayouts)
 		}
 		p.setText("layout", a.Layout, &v.Layout)
@@ -256,8 +257,7 @@ func (c *cx) checkViewPeople(people []viewPeople, parent string) error {
 				continue
 			}
 			if _, err := c.memberRef(f.field, ref); err != nil {
-				var e *Error
-				if errors.As(err, &e) {
+				if e, ok := errors.AsType[*Error](err); ok {
 					e.Code = CodeInvalid // the view is what is wrong, not the address asked
 				}
 				return err
@@ -266,8 +266,7 @@ func (c *cx) checkViewPeople(people []viewPeople, parent string) error {
 	}
 	if parent != "" {
 		if _, err := c.anyTask("query.parent", parent); err != nil {
-			var e *Error
-			if errors.As(err, &e) {
+			if e, ok := errors.AsType[*Error](err); ok {
 				e.Code = CodeInvalid
 			}
 			return err
@@ -324,7 +323,7 @@ func (c *cx) checkViewStatuses(refs []string) error {
 		names, found := []string{}, core.ValidCategory(strings.ToLower(ref))
 		for _, s := range all {
 			found = found || s.ID == ref || strings.EqualFold(s.Name, ref)
-			if !contains(names, s.Name) {
+			if !slices.Contains(names, s.Name) {
 				names = append(names, s.Name)
 			}
 		}
@@ -348,7 +347,7 @@ func (c *cx) checkViewLabels(refs []string) error {
 		names, found := []string{}, false
 		for _, l := range all {
 			found = found || l.ID == ref || strings.EqualFold(l.Name, ref)
-			if !contains(names, l.Name) {
+			if !slices.Contains(names, l.Name) {
 				names = append(names, l.Name)
 			}
 		}
@@ -365,7 +364,7 @@ func (c *cx) checkViewLabels(refs []string) error {
 // and date in it real. The server sets it, because the filter's fields are
 // its task queries' and it resolves them the same way when the view is
 // opened; a view that saves is then a view that opens.
-var CheckViewQuery = func(ctx context.Context, db store.DB, actor core.Member, project string, q json.RawMessage) error {
+var CheckViewQuery = func(_ context.Context, _ store.DB, _ core.Member, _ string, q json.RawMessage) error {
 	if !json.Valid(q) {
 		return errors.New("query must be a JSON object")
 	}
@@ -377,8 +376,7 @@ func (c *cx) checkViewQuery(project string, q json.RawMessage) error {
 	if err == nil {
 		return nil
 	}
-	var e *Error
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[*Error](err); ok {
 		// What is wrong is the view, whatever the lookup inside called it.
 		out := *e
 		out.Code = CodeInvalid

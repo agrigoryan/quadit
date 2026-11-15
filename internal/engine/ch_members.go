@@ -3,6 +3,7 @@ package engine
 import (
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -24,7 +25,10 @@ type memberAddArgs struct {
 	Scope *scopeArgs `json:"scope"`
 }
 
-func (c *cx) roleArg(s string, agent bool) (core.Role, error) {
+// roleArg reads the role to give a member of the kind given (a person or
+// an agent), up to the actor's own.
+func (c *cx) roleArg(s, kind string) (core.Role, error) {
+	agent := kind == core.KindAgent
 	role := core.Role(s)
 	if s == "" {
 		role = core.RoleMember
@@ -33,7 +37,7 @@ func (c *cx) roleArg(s string, agent bool) (core.Role, error) {
 	if agent {
 		allowed = allowed[:2]
 	}
-	if !contains(allowed, string(role)) {
+	if !slices.Contains(allowed, string(role)) {
 		e := oneOf("role", "role", s, allowed)
 		if agent && role == core.RoleOwner {
 			e.Message = "an agent can be a member or an admin; the owner role is for people"
@@ -48,7 +52,7 @@ func (c *cx) roleArg(s string, agent bool) (core.Role, error) {
 }
 
 func memberAdd(c *cx, a memberAddArgs) error {
-	role, err := c.roleArg(a.Role, false)
+	role, err := c.roleArg(a.Role, core.KindPerson)
 	if err != nil {
 		return err
 	}
@@ -254,7 +258,7 @@ func (c *cx) memberRole(p *patch, a memberUpdateArgs, m core.Member) error {
 	if !a.Role.Set || core.Role(a.Role.V) == m.Role {
 		return nil
 	}
-	role, err := c.roleArg(a.Role.V, m.Kind == core.KindAgent)
+	role, err := c.roleArg(a.Role.V, m.Kind)
 	if err != nil {
 		return err
 	}
@@ -370,11 +374,11 @@ func (c *cx) scopeArg(a *scopeArgs, base *core.Scope) (*core.Scope, error) {
 		s.ReadOnly = *a.ReadOnly
 	}
 	for _, ref := range a.Projects {
-		p, err := c.project(ref)
+		project, err := c.project(ref)
 		if err != nil {
 			return nil, err
 		}
-		s.Projects = append(s.Projects, p.ID)
+		s.Projects = append(s.Projects, project.ID)
 	}
 	for _, t := range a.NeedsApproval {
 		if _, ok := handlers[t]; !ok {

@@ -42,7 +42,7 @@ func cycleCreate(c *cx, a cycleCreateArgs) error {
 	if err != nil {
 		return err
 	}
-	p, err := c.project(a.Project)
+	project, err := c.project(a.Project)
 	if err != nil {
 		return err
 	}
@@ -58,20 +58,20 @@ func cycleCreate(c *cx, a cycleCreateArgs) error {
 	if a.EndsOn < a.StartsOn {
 		return invalid("ends_on", "a cycle ends on or after the day it starts")
 	}
-	if err := c.cycleOverlap(p.ID, "", a.StartsOn, a.EndsOn); err != nil {
+	if err := c.cycleOverlap(project.ID, "", a.StartsOn, a.EndsOn); err != nil {
 		return err
 	}
-	n, err := c.tx.Incr(c.ctx, "projects", "cycle_counter", 1, store.Eq("id", p.ID))
+	n, err := c.tx.Incr(c.ctx, "projects", "cycle_counter", 1, store.Eq("id", project.ID))
 	if err != nil {
 		return err
 	}
 	seq := c.tx.NextSeq()
-	cy := core.Cycle{ID: cid, WorkspaceID: c.ws, ProjectID: p.ID, Number: int(n), Name: strings.TrimSpace(a.Name),
+	cy := core.Cycle{ID: cid, WorkspaceID: c.ws, ProjectID: project.ID, Number: int(n), Name: strings.TrimSpace(a.Name),
 		StartsOn: a.StartsOn, EndsOn: a.EndsOn, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, cy); err != nil {
 		return alreadyInUse(err, "id", cid)
 	}
-	return c.created(seq, "cycle", cy.ID, inProject(p.ID), cy)
+	return c.created(seq, "cycle", cy.ID, inProject(project.ID), cy)
 }
 
 type cycleUpdateArgs struct {
@@ -124,15 +124,15 @@ func cycleDelete(c *cx, a idArgs) error {
 
 // startCycles makes a project's first cycles as soon as cycles are on, so
 // there is a current one to put work in straight away.
-func (c *cx) startCycles(p core.Project) error {
-	if p.Settings == nil || !p.Settings.Cycles {
+func (c *cx) startCycles(project core.Project) error {
+	if project.Settings == nil || !project.Settings.Cycles {
 		return nil
 	}
-	if p.Settings.CycleDays <= 0 {
-		p.Settings.CycleDays = defaultCycleDays
+	if project.Settings.CycleDays <= 0 {
+		project.Settings.CycleDays = defaultCycleDays
 	}
 	ref, key := c.ref, c.key
-	err := c.rollProject(p, time.UnixMilli(c.at).UTC().Format("2006-01-02"))
+	err := c.rollProject(project, time.UnixMilli(c.at).UTC().Format("2006-01-02"))
 	c.ref, c.key = ref, key
 	return err
 }
@@ -157,13 +157,13 @@ func (e *Engine) RollCycles(ctx context.Context) error {
 	return nil
 }
 
-func (c *cx) rollProject(p core.Project, today string) error {
-	days := p.Settings.CycleDays
+func (c *cx) rollProject(project core.Project, today string) error {
+	days := project.Settings.CycleDays
 	if days <= 0 {
 		days = defaultCycleDays
 	}
 	var all []core.Cycle
-	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "starts_on"}); err != nil {
+	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", project.ID), store.Live}, Order: "starts_on"}); err != nil {
 		return err
 	}
 	// Make cycles until one starts after today.
@@ -181,11 +181,11 @@ func (c *cx) rollProject(p core.Project, today string) error {
 			if err != nil {
 				return err
 			}
-			back := (int(t.Weekday()) - p.Settings.CycleStart + 7) % 7
+			back := (int(t.Weekday()) - project.Settings.CycleStart + 7) % 7
 			start = addDays(today, -back)
 		}
 		end := addDays(start, days-1)
-		if err := c.applyNested("cycle.create", cycleCreateArgs{ID: id.New(), Project: p.ID, StartsOn: start, EndsOn: end}); err != nil {
+		if err := c.applyNested("cycle.create", cycleCreateArgs{ID: id.New(), Project: project.ID, StartsOn: start, EndsOn: end}); err != nil {
 			return err
 		}
 		all = append(all, core.Cycle{StartsOn: start, EndsOn: end})
@@ -194,7 +194,7 @@ func (c *cx) rollProject(p core.Project, today string) error {
 			break
 		}
 	}
-	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", p.ID), store.Live}, Order: "starts_on"}); err != nil {
+	if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Eq("project_id", project.ID), store.Live}, Order: "starts_on"}); err != nil {
 		return err
 	}
 	// Roll unfinished work out of cycles that have ended.
@@ -222,7 +222,7 @@ func (c *cx) rollProject(p core.Project, today string) error {
 		}
 		cp := newPatch()
 		cp.put("closed_at", int64(0), c.at)
-		if err := c.save(cp, target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(p.ID), extra: map[string]any{"rolled": len(open)}}); err != nil {
+		if err := c.save(cp, target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(project.ID), extra: map[string]any{"rolled": len(open)}}); err != nil {
 			return err
 		}
 	}

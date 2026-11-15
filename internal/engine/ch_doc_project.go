@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"slices"
+
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -20,7 +22,7 @@ func (u *pageEdit) project() error {
 		}
 		pid = pr.ID
 	}
-	if pid != "" && !c.system && len(c.scope.Projects) > 0 && !contains(c.scope.Projects, pid) {
+	if pid != "" && !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, pid) {
 		return forbidden("your access does not include this project")
 	}
 	u.moved, u.toProject = pid != u.d.ProjectID, pid

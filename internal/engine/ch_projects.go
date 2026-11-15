@@ -61,28 +61,28 @@ func projectCreate(c *cx, a projectCreateArgs) error {
 		return err
 	}
 	seq := c.tx.NextSeq()
-	p := core.Project{ID: pid, WorkspaceID: c.ws, Key: a.Key, Name: strings.TrimSpace(a.Name), Description: a.Description,
+	project := core.Project{ID: pid, WorkspaceID: c.ws, Key: a.Key, Name: strings.TrimSpace(a.Name), Description: a.Description,
 		Icon: a.Icon, Color: a.Color, LeadID: lead, Rank: rk, Settings: a.Settings,
 		CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at, CreatedSeq: seq, UpdatedSeq: seq}
-	if err := c.tx.Insert(c.ctx, p); err != nil {
+	if err := c.tx.Insert(c.ctx, project); err != nil {
 		return alreadyInUse(err, "project key", a.Key)
 	}
-	if err := c.created(seq, "project", p.ID, inProject(p.ID), p); err != nil {
+	if err := c.created(seq, "project", project.ID, inProject(project.ID), project); err != nil {
 		return err
 	}
-	for i, d := range defaultStatuses {
+	for i, status := range defaultStatuses {
 		seq := c.tx.NextSeq()
-		st := core.Status{ID: id.New(), WorkspaceID: c.ws, ProjectID: p.ID, Name: d.name, Color: d.color, Category: d.category,
-			Rank: rank.ForNumber(i + 1), IsDefault: d.category == core.CatUnstarted, CreatedAt: c.at, UpdatedSeq: seq}
+		st := core.Status{ID: id.New(), WorkspaceID: c.ws, ProjectID: project.ID, Name: status.name, Color: status.color, Category: status.category,
+			Rank: rank.ForNumber(i + 1), IsDefault: status.category == core.CatUnstarted, CreatedAt: c.at, UpdatedSeq: seq}
 		if err := c.tx.Insert(c.ctx, st); err != nil {
 			return err
 		}
-		if err := c.emit(event{seq: seq, typ: "status.created", entity: "status", entityID: st.ID, place: inProject(p.ID), data: map[string]any{"row": st}}); err != nil {
+		if err := c.emit(event{seq: seq, typ: "status.created", entity: "status", entityID: st.ID, place: inProject(project.ID), data: map[string]any{"row": st}}); err != nil {
 			return err
 		}
 	}
-	c.ref, c.key = p.ID, p.Key
-	return c.startCycles(p)
+	c.ref, c.key = project.ID, project.Key
+	return c.startCycles(project)
 }
 
 type projectUpdateArgs struct {

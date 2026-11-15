@@ -119,8 +119,7 @@ func withIndex(i int, e *Error) *Error {
 // PlainJSON says what was wrong with a JSON body in a caller's words, with
 // none of the decoder's own vocabulary.
 func PlainJSON(err error) string {
-	var te *json.UnmarshalTypeError
-	if errors.As(err, &te) {
+	if te, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
 		field := te.Field
 		if i := strings.LastIndex(field, "."); i >= 0 && !strings.Contains(field, "[") {
 			field = field[i+1:]

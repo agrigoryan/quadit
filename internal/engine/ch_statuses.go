@@ -28,7 +28,7 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 	if err != nil {
 		return err
 	}
-	p, err := c.project(a.Project)
+	project, err := c.project(a.Project)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 	rk := a.Rank
 	if rk == "" {
 		// A new status goes after the last one of its category.
-		all, err := c.statuses(p.ID)
+		all, err := c.statuses(project.ID)
 		if err != nil {
 			return err
 		}
@@ -62,12 +62,12 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 		return invalid("rank", "%q is not a rank", rk)
 	}
 	seq := c.tx.NextSeq()
-	st := core.Status{ID: sid, WorkspaceID: c.ws, ProjectID: p.ID, Name: strings.TrimSpace(a.Name), Color: a.Color,
+	st := core.Status{ID: sid, WorkspaceID: c.ws, ProjectID: project.ID, Name: strings.TrimSpace(a.Name), Color: a.Color,
 		Category: a.Category, Rank: rk, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, st); err != nil {
 		return alreadyInUse(err, "status name", st.Name)
 	}
-	return c.created(seq, "status", st.ID, inProject(p.ID), st)
+	return c.created(seq, "status", st.ID, inProject(project.ID), st)
 }
 
 type statusUpdateArgs struct {

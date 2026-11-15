@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -32,7 +33,7 @@ func epicCreate(c *cx, a epicCreateArgs) error {
 	if err != nil {
 		return err
 	}
-	p, err := c.project(a.Project)
+	project, err := c.project(a.Project)
 	if err != nil {
 		return err
 	}
@@ -42,7 +43,7 @@ func epicCreate(c *cx, a epicCreateArgs) error {
 	if a.State == "" {
 		a.State = core.EpicPlanned
 	}
-	if !contains(core.EpicStates, a.State) {
+	if !slices.Contains(core.EpicStates, a.State) {
 		return oneOf("state", "epic state", a.State, core.EpicStates)
 	}
 	lead, err := c.optMember("lead", a.Lead)
@@ -57,12 +58,12 @@ func epicCreate(c *cx, a epicCreateArgs) error {
 	}
 	rk := a.Rank
 	if rk == "" {
-		if rk, err = nextRank[core.Epic](c, store.Eq("project_id", p.ID)); err != nil {
+		if rk, err = nextRank[core.Epic](c, store.Eq("project_id", project.ID)); err != nil {
 			return err
 		}
 	}
 	seq := c.tx.NextSeq()
-	e := core.Epic{ID: eid, WorkspaceID: c.ws, ProjectID: p.ID, Name: strings.TrimSpace(a.Name), Description: a.Description, State: a.State,
+	e := core.Epic{ID: eid, WorkspaceID: c.ws, ProjectID: project.ID, Name: strings.TrimSpace(a.Name), Description: a.Description, State: a.State,
 		LeadID: lead, Color: a.Color, Icon: a.Icon, StartOn: a.StartOn, TargetOn: a.TargetOn, Rank: rk,
 		CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at, UpdatedSeq: seq}
 	if e.State == core.EpicDone {
@@ -74,10 +75,10 @@ func epicCreate(c *cx, a epicCreateArgs) error {
 	if err := c.watch(c.actor.UserID, "epic", e.ID); err != nil {
 		return err
 	}
-	if err := c.index(store.SearchDoc{Kind: "epic", EntityID: e.ID, ScopeType: "epic", ScopeID: e.ID, ProjectID: p.ID, Title: e.Name, Body: e.Description}); err != nil {
+	if err := c.index(store.SearchDoc{Kind: "epic", EntityID: e.ID, ScopeType: "epic", ScopeID: e.ID, ProjectID: project.ID, Title: e.Name, Body: e.Description}); err != nil {
 		return err
 	}
-	return c.created(seq, "epic", e.ID, inProject(p.ID), e)
+	return c.created(seq, "epic", e.ID, inProject(project.ID), e)
 }
 
 type epicUpdateArgs struct {
@@ -104,7 +105,7 @@ func epicUpdate(c *cx, a epicUpdateArgs) error {
 	}
 	p.setText("description", a.Description, &e.Description)
 	if a.State.Set {
-		if !contains(core.EpicStates, a.State.V) {
+		if !slices.Contains(core.EpicStates, a.State.V) {
 			return oneOf("state", "epic state", a.State.V, core.EpicStates)
 		}
 		was := e.State

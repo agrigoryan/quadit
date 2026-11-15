@@ -2,6 +2,8 @@ package engine
 
 import (
 	"encoding/json"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -29,7 +31,12 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block, extra map[s
 	if err != nil {
 		return err
 	}
-	if err := c.keepVersion(d, before, "", others); err != nil {
+	if others {
+		err = c.keepVersion(d, before, "")
+	} else {
+		err = c.keepVersionIfDue(d, before)
+	}
+	if err != nil {
 		return err
 	}
 	seq := c.tx.NextSeq()
@@ -43,9 +50,7 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block, extra map[s
 	c.ref = d.ID
 	data := map[string]any{"id": d.ID, "blocks": rows, "deleted": gone,
 		"changes": map[string]core.FieldChange{"content_seq": {To: seq}, "updated_at": {To: c.at}, "updated_by": {To: c.actor.UserID}}}
-	for k, v := range extra {
-		data[k] = v
-	}
+	maps.Copy(data, extra)
 	if err := c.emit(event{seq: seq, typ: "doc.edited", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: data}); err != nil {
 		return err
 	}
@@ -64,7 +69,7 @@ func (c *cx) overwritesOthers(d core.Doc, ed *editor, before []core.Block) (bool
 		kept = last[0].Seq
 	}
 	for _, b := range before {
-		if contains(ed.touched, b.ID) && b.UpdatedBy != "" && b.UpdatedBy != c.actor.UserID && b.UpdatedSeq > kept {
+		if slices.Contains(ed.touched, b.ID) && b.UpdatedBy != "" && b.UpdatedBy != c.actor.UserID && b.UpdatedSeq > kept {
 			return true, nil
 		}
 	}
@@ -79,7 +84,7 @@ type docEditArgs struct {
 // docEdit applies block edits to a page. Two people in one page each send
 // their own blocks' edits; a block edited by both keeps the later edit.
 func docEdit(c *cx, a docEditArgs) error {
-	d, err := c.doc("doc", a.Doc)
+	d, err := c.loadDoc("doc", a.Doc)
 	if err != nil {
 		return err
 	}
@@ -166,7 +171,7 @@ func signature(b md.Block) string {
 // before and after keep their ids, so comments on them stay attached and
 // only the real differences reach other readers.
 func docWrite(c *cx, a docWriteArgs) error {
-	d, err := c.doc("doc", a.Doc)
+	d, err := c.loadDoc("doc", a.Doc)
 	if err != nil {
 		return err
 	}

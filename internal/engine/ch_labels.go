@@ -33,11 +33,11 @@ func labelCreate(c *cx, a labelCreateArgs) error {
 	}
 	projectID := ""
 	if a.Project != "" {
-		p, err := c.project(a.Project)
+		project, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		projectID = p.ID
+		projectID = project.ID
 	}
 	seq := c.tx.NextSeq()
 	l := core.Label{ID: lid, WorkspaceID: c.ws, ProjectID: projectID, Name: strings.TrimSpace(a.Name), Color: a.Color,

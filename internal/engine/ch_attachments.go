@@ -2,6 +2,7 @@ package engine
 
 import (
 	"net/url"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -40,7 +41,7 @@ func (c *cx) attach(a attachArgs, subjectType, subjectID string, t core.Task) (c
 	if f.State != "ready" {
 		return at, conflictErr("file %s is still uploading", f.Name)
 	}
-	if !contains([]string{"", "before", "after"}, a.Role) {
+	if !slices.Contains([]string{"", "before", "after"}, a.Role) {
 		return at, oneOf("role", "role", a.Role, []string{"before", "after"})
 	}
 	rk, err := nextRank[core.Attachment](c, store.Eq("subject_id", subjectID))
@@ -72,17 +73,17 @@ func attachmentAdd(c *cx, a attachArgs) error {
 		if err != nil {
 			return err
 		}
-		d, err := loadLive[core.Decision](c, "decision", "option", o.DecisionID)
+		decision, err := loadLive[core.Decision](c, "decision", "option", o.DecisionID)
 		if err != nil {
 			return err
 		}
-		subjectType, subjectID, a.Task = "decision_option", o.ID, d.TaskID
+		subjectType, subjectID, a.Task = "decision_option", o.ID, decision.TaskID
 	case a.Decision != "":
-		d, err := loadLive[core.Decision](c, "decision", "decision", a.Decision)
+		decision, err := loadLive[core.Decision](c, "decision", "decision", a.Decision)
 		if err != nil {
 			return err
 		}
-		subjectType, subjectID, a.Task = "decision", d.ID, d.TaskID
+		subjectType, subjectID, a.Task = "decision", decision.ID, decision.TaskID
 	case a.Comment != "":
 		cm, err := loadLive[core.Comment](c, "comment", "comment", a.Comment)
 		if err != nil {
@@ -90,11 +91,11 @@ func attachmentAdd(c *cx, a attachArgs) error {
 		}
 		subjectType, subjectID, a.Task, docID = "comment", cm.ID, cm.TaskID, cm.DocID
 	case a.Doc != "":
-		d, err := loadLive[core.Doc](c, "doc", "doc", a.Doc)
+		doc, err := loadLive[core.Doc](c, "doc", "doc", a.Doc)
 		if err != nil {
 			return err
 		}
-		subjectType, subjectID, docID = "doc", d.ID, d.ID
+		subjectType, subjectID, docID = "doc", doc.ID, doc.ID
 	case a.Task != "":
 	default:
 		return invalid("task", "say what the file is shown on: task, comment, decision, option or doc")

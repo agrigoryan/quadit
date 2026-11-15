@@ -19,7 +19,7 @@ func (o *Opt[T]) UnmarshalJSON(b []byte) error {
 		o.Null = true
 		return nil
 	}
-	// As strict as the arguments around it: a misspelt field inside is
+	// As strict as the arguments around it: a misspelled field inside is
 	// refused, not dropped.
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()

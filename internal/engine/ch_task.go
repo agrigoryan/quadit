@@ -289,7 +289,10 @@ func (d *taskDraft) insert() error {
 		return err
 	}
 	c.key = t.Key
-	return c.afterTaskText(*t, true, t.AssigneeID, t.WaitingOnID)
+	if err := c.afterTaskPeople(*t, t.AssigneeID, t.WaitingOnID); err != nil {
+		return err
+	}
+	return c.afterTaskText(*t)
 }
 
 // openDecision opens the decision the template asks for on the new task.

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -58,7 +59,7 @@ func agentCreate(c *cx, a agentCreateArgs) error {
 	if err := checkHandle(handle); err != nil {
 		return err
 	}
-	role, err := c.roleArg(a.Role, true)
+	role, err := c.roleArg(a.Role, core.KindAgent)
 	if err != nil {
 		return err
 	}
@@ -240,7 +241,7 @@ func (c *cx) capScope(scope *core.Scope) *core.Scope {
 	}
 	scope.ReadOnly = scope.ReadOnly || mine.ReadOnly
 	for _, t := range mine.NeedsApproval {
-		if !contains(scope.NeedsApproval, t) {
+		if !slices.Contains(scope.NeedsApproval, t) {
 			scope.NeedsApproval = append(scope.NeedsApproval, t)
 		}
 	}

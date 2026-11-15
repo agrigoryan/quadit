@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 )
@@ -31,17 +32,17 @@ func integrationCreate(c *cx, a integrationArgs) error {
 	if err != nil {
 		return err
 	}
-	if !contains(integrationKinds, a.Kind) {
+	if !slices.Contains(integrationKinds, a.Kind) {
 		return oneOf("kind", "integration", a.Kind, integrationKinds)
 	}
 	in := core.Integration{ID: iid, WorkspaceID: c.ws, Kind: a.Kind, Name: a.Name.V, Config: a.Config.V, Active: !a.Active.Set || a.Active.V,
 		CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if a.Project.V != "" {
-		p, err := c.project(a.Project.V)
+		project, err := c.project(a.Project.V)
 		if err != nil {
 			return err
 		}
-		in.ProjectID = p.ID
+		in.ProjectID = project.ID
 	}
 	if a.Secret.V != "" {
 		if in.Secret, err = Seal(a.Secret.V); err != nil {

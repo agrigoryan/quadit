@@ -52,11 +52,11 @@ func webhookCreate(c *cx, a webhookCreateArgs) error {
 		w.Name = u.Host
 	}
 	if a.Project != "" {
-		p, err := c.project(a.Project)
+		project, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		w.ProjectID = p.ID
+		w.ProjectID = project.ID
 	}
 	if w.UserID, err = c.optMember("for", a.For); err != nil {
 		return err

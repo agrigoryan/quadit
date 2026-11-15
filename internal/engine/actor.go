@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"slices"
+
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -21,7 +23,7 @@ func intersectProjects(a, b []string) []string {
 	}
 	var out []string
 	for _, x := range b {
-		if contains(a, x) {
+		if slices.Contains(a, x) {
 			out = append(out, x)
 		}
 	}
@@ -55,16 +57,16 @@ func (c *cx) checkAsker(taskID string) error {
 	if !ok || m.SuspendedAt != 0 {
 		return forbidden("%s was given to an agent by someone who no longer has access here; a person has to assign it again", t.Key)
 	}
-	min := handlers[c.change.Type].min
-	if !m.Role.AtLeast(min) {
-		return forbidden("%s needs the %s role; @%s, who asked for the work on %s, is a %s", c.change.Type, min, m.Handle, t.Key, m.Role)
+	least := handlers[c.change.Type].min
+	if !m.Role.AtLeast(least) {
+		return forbidden("%s needs the %s role; @%s, who asked for the work on %s, is a %s", c.change.Type, least, m.Handle, t.Key, m.Role)
 	}
 	if m.Scope != nil {
 		if m.Scope.ReadOnly {
 			return forbidden("@%s, who asked for the work on %s, may only read", m.Handle, t.Key)
 		}
 		if len(m.Scope.Projects) > 0 {
-			if !contains(m.Scope.Projects, t.ProjectID) {
+			if !slices.Contains(m.Scope.Projects, t.ProjectID) {
 				return forbidden("@%s, who asked for the work on %s, has no access to its project", m.Handle, t.Key)
 			}
 			c.scope.Projects = intersectProjects(c.scope.Projects, m.Scope.Projects)

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
@@ -82,7 +83,7 @@ type event struct {
 // emit records an event, after checking that the actor may write where it
 // belongs.
 func (c *cx) emit(e event) error {
-	if e.place.projectID != "" && !c.system && len(c.scope.Projects) > 0 && !contains(c.scope.Projects, e.place.projectID) {
+	if e.place.projectID != "" && !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, e.place.projectID) {
 		return forbidden("your access does not include this project")
 	}
 	if e.place.scopeType == "task" {
@@ -116,15 +117,6 @@ func (c *cx) emit(e event) error {
 func (c *cx) created(seq int64, entity, entityID string, where place, row any) error {
 	c.ref = entityID
 	return c.emit(event{seq: seq, typ: entity + ".created", entity: entity, entityID: entityID, place: where, data: map[string]any{"row": row}})
-}
-
-func contains(list []string, v string) bool {
-	for _, x := range list {
-		if x == v {
-			return true
-		}
-	}
-	return false
 }
 
 // newID returns given if the caller made an id, else a fresh one.

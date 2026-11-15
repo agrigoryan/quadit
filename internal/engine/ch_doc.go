@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -55,7 +56,7 @@ func docCreate(c *cx, a docCreateArgs) error {
 	if d.Kind != core.DocPage && d.Kind != core.DocDatabase {
 		return oneOf("kind", "kind", a.Kind, []string{core.DocPage, core.DocDatabase})
 	}
-	if a.Generated != "" && !contains(generatedKinds, a.Generated) {
+	if a.Generated != "" && !slices.Contains(generatedKinds, a.Generated) {
 		return oneOf("generated", "generated page", a.Generated, generatedKinds)
 	}
 	if err := c.placeDoc(&d, a); err != nil {
@@ -77,7 +78,7 @@ func docCreate(c *cx, a docCreateArgs) error {
 // parent is, the page is too: private, an agent's memory, a mirrored file.
 func (c *cx) placeDoc(d *core.Doc, a docCreateArgs) error {
 	if a.Parent != "" {
-		parent, err := c.doc("parent", a.Parent)
+		parent, err := c.loadDoc("parent", a.Parent)
 		if err != nil {
 			return err
 		}
@@ -90,11 +91,11 @@ func (c *cx) placeDoc(d *core.Doc, a docCreateArgs) error {
 		}
 	}
 	if a.Project != "" {
-		p, err := c.project(a.Project)
+		project, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		d.ProjectID = p.ID
+		d.ProjectID = project.ID
 	}
 	return nil
 }
@@ -257,7 +258,7 @@ func (c *cx) canEditDoc(d core.Doc) error {
 // docUpdate changes what a page is called, where it sits, who sees it and
 // its properties. Its text is changed with doc.edit and doc.write.
 func docUpdate(c *cx, a docUpdateArgs) error {
-	d, err := c.doc("id", a.ID)
+	d, err := c.loadDoc("id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -312,7 +313,7 @@ func (u *pageEdit) parent() error {
 	}
 	pid := ""
 	if !a.Parent.Null && a.Parent.V != "" {
-		parent, err := c.doc("parent", a.Parent.V)
+		parent, err := c.loadDoc("parent", a.Parent.V)
 		if err != nil {
 			return err
 		}
@@ -375,7 +376,7 @@ func (u *pageEdit) sharedWith() error {
 	}
 	u.p.put("shared_with", u.d.SharedWith, ids)
 	for _, was := range u.d.SharedWith {
-		if !contains(ids, was) {
+		if !slices.Contains(ids, was) {
 			u.unshared = append(u.unshared, was)
 		}
 	}
@@ -509,7 +510,7 @@ func (c *cx) subtree(root core.Doc, deletedAt int64) ([]core.Doc, error) {
 
 // docDelete moves a page and the pages under it to the trash.
 func docDelete(c *cx, a idArgs) error {
-	d, err := c.doc("id", a.ID)
+	d, err := c.loadDoc("id", a.ID)
 	if err != nil {
 		return err
 	}

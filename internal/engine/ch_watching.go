@@ -61,8 +61,8 @@ func (c *cx) watchSubject(subjectType, ref string) (string, place, error) {
 		e, err := loadLive[core.Epic](c, "epic", "subject", ref)
 		return e.ID, inProject(e.ProjectID), err
 	case "project":
-		p, err := c.project(ref)
-		return p.ID, inProject(p.ID), err
+		project, err := c.project(ref)
+		return project.ID, inProject(project.ID), err
 	case "view":
 		v, err := loadLive[core.View](c, "view", "subject", ref)
 		return v.ID, inWorkspace(c.ws), err

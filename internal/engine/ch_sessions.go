@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -94,7 +95,7 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	p.setText("summary", a.Summary, &s.Summary)
 	if a.State.Set {
 		states := []string{"running", "done", "failed", "stopped"}
-		if !contains(states, a.State.V) {
+		if !slices.Contains(states, a.State.V) {
 			return oneOf("state", "session state", a.State.V, states)
 		}
 		p.setText("state", a.State, &s.State)
