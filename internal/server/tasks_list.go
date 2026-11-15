@@ -151,7 +151,11 @@ func (x *c) readTaskPage(f store.TaskFilter) (taskPage, error) {
 	p.tasks = tasks
 	if p.more = len(p.tasks) > limit; p.more {
 		p.tasks = p.tasks[:limit]
-		p.next = x.cursorAfter(f, p.tasks[limit-1]).token()
+		next, err := x.cursorAfter(f, p.tasks[limit-1])
+		if err != nil {
+			return p, err
+		}
+		p.next = next.token()
 		return p, nil
 	}
 	if len(f.After) > 0 && f.MadeUpTo > 0 {
@@ -181,18 +185,20 @@ func (x *c) changedDuringWalk(f store.TaskFilter, lastPage []core.Task) ([]core.
 }
 
 // cursorAfter makes the cursor that continues a list after one of its rows.
-func (x *c) cursorAfter(f store.TaskFilter, last core.Task) taskCursor {
+// The first page's cursor notes where the feed stands.
+func (x *c) cursorAfter(f store.TaskFilter, last core.Task) (taskCursor, error) {
 	cur := taskCursor{S: f.MadeUpTo, Sort: f.Sort}
 	if cur.S == 0 {
 		var ws core.Workspace
-		if err := x.s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err == nil {
-			cur.S = ws.Seq
+		if err := x.s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err != nil {
+			return cur, err
 		}
+		cur.S = ws.Seq
 	}
 	for _, k := range store.TaskSortKeys[f.Sort] {
 		cur.K = append(cur.K, k.Val(last))
 	}
-	return cur
+	return cur, nil
 }
 
 // text is the page as lines, one task each. note says a view named in the

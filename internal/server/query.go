@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -510,10 +511,15 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 			cond = store.Eq("id", slug)
 		}
 		err := x.db.Get(x.ctx(), &view, cond, store.Live)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return q, err
+		}
 		if err != nil {
 			// By its name, as it reads in the sidebar.
 			var named []core.View
-			x.db.List(x.ctx(), &named, store.Where(store.Live))
+			if err := x.db.List(x.ctx(), &named, store.Where(store.Live)); err != nil {
+				return q, err
+			}
 			for _, nv := range named {
 				if strings.EqualFold(nv.Name, slug) && (nv.Shared || nv.OwnerID == x.member.UserID) {
 					view, err = nv, nil
@@ -523,7 +529,9 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		}
 		if err != nil || (!view.Shared && view.OwnerID != x.member.UserID) {
 			var all []core.View
-			x.db.List(x.ctx(), &all, store.Where(store.Live))
+			if err := x.db.List(x.ctx(), &all, store.Where(store.Live)); err != nil {
+				return q, err
+			}
 			var slugs []string
 			for _, a := range all {
 				if a.Shared || a.OwnerID == x.member.UserID {

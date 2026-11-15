@@ -36,7 +36,11 @@ func (s *Server) handleBootstrapLocalCopy(x *c) error {
 	b.fill(out)
 	if b.part == "open" {
 		out["part"] = b.part
-		out["rest"], _ = x.db.CountTasks(ctx, store.TaskFilter{ProjectIDs: x.projects, Archived: true, Closed: true})
+		rest, err := x.db.CountTasks(ctx, store.TaskFilter{ProjectIDs: x.projects, Archived: true, Closed: true})
+		if err != nil {
+			return err
+		}
+		out["rest"] = rest
 	}
 	return x.ok(out)
 }

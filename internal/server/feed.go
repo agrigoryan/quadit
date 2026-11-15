@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -63,10 +64,13 @@ func (s *Server) handleReadFeed(x *c) error {
 				return err
 			}
 		}
+		// A cursor not moved yet stands at the start.
 		var cu core.Cursor
-		if err := x.db.Get(ctx, &cu, store.Eq("user_id", x.member.UserID), store.Eq("name", cursor)); err == nil {
-			f.After = cu.Seq
+		err := x.db.Get(ctx, &cu, store.Eq("user_id", x.member.UserID), store.Eq("name", cursor))
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return err
 		}
+		f.After = cu.Seq
 	}
 	if v.Has("after") {
 		f.After = int64(x.intParam("after", 0))
@@ -176,8 +180,10 @@ func hasTaskFilter(q TaskQuery) bool {
 // is what "is this agent running?" shows.
 func (s *Server) listening(x *c, seconds int) {
 	until := time.Now().Add(time.Duration(seconds) * time.Second).UnixMilli()
-	x.db.Update(context.WithoutCancel(x.ctx()), "members", map[string]any{"listening_until": until, "last_seen_at": time.Now().UnixMilli()},
-		store.Eq("user_id", x.member.UserID))
+	set := map[string]any{"listening_until": until, "last_seen_at": time.Now().UnixMilli()}
+	if _, err := x.db.Update(context.WithoutCancel(x.ctx()), "members", set, store.Eq("user_id", x.member.UserID)); err != nil {
+		s.log.Warn("listening not noted", "member", x.member.UserID, "err", err)
+	}
 }
 
 // setCursor moves a cursor forward; a cursor never moves back.
@@ -199,6 +205,9 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 	}
 	var cur core.Cursor
 	err := x.db.Get(x.ctx(), &cur, store.Eq("user_id", x.member.UserID), store.Eq("name", name))
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	if err == nil && cur.Seq >= seq {
 		return nil
 	}
@@ -208,7 +217,10 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 
 func (s *Server) handleShowFeedCursor(x *c) error {
 	var cu core.Cursor
-	x.db.Get(x.ctx(), &cu, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name")))
+	err := x.db.Get(x.ctx(), &cu, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name")))
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	return x.ok(map[string]any{"name": x.r.PathValue("name"), "seq": cu.Seq})
 }
 
@@ -281,6 +293,11 @@ func (s *Server) handleStreamFeed(x *c) error {
 		f.After = after
 		evs, err := x.db.Events(ctx, f)
 		if err != nil {
+			// The headers are sent: the error cannot be the answer. The
+			// client reconnects and reads on from its last event.
+			if ctx.Err() == nil {
+				s.log.Warn("live stream ended on a failed read", "err", err)
+			}
 			return nil
 		}
 		if len(evs) > 0 {
@@ -352,7 +369,7 @@ func (s *Server) recheckAccess(x *c) (fingerprint string, ok bool) {
 	if err := s.st.Get(ctx, &u, store.Eq("id", x.user.ID), store.Live); err != nil || u.DisabledAt != 0 {
 		return "", false
 	}
-	if n, _ := s.st.Count(ctx, "workspaces", store.Eq("id", x.ws.ID), store.Live); n == 0 {
+	if n, err := s.st.Count(ctx, "workspaces", store.Eq("id", x.ws.ID), store.Live); err != nil || n == 0 {
 		return "", false // the workspace itself is gone
 	}
 	var m core.Member
@@ -369,6 +386,11 @@ func (s *Server) recheckAccess(x *c) (fingerprint string, ok bool) {
 func (s *Server) accessChanged() {
 	s.hub.PokeAll()
 	if p, ok := s.st.(interface{ Poke(context.Context) error }); ok {
-		p.Poke(context.Background())
+		// Detached: the change that ended the access is done, and no request
+		// waits on this. Best effort: a held connection on another server
+		// still asks again before it sends anything.
+		if err := p.Poke(context.Background()); err != nil {
+			s.log.Warn("other servers not woken", "err", err)
+		}
 	}
 }

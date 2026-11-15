@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -11,7 +12,11 @@ import (
 // and in points.
 func (s *Server) handleShowCycleChart(x *c) error {
 	var cy core.Cycle
-	if err := x.db.Get(x.ctx(), &cy, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil || !x.canProject(cy.ProjectID) {
+	err := x.db.Get(x.ctx(), &cy, store.Eq("id", x.r.PathValue("id")), store.Live)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	if err != nil || !x.canProject(cy.ProjectID) {
 		return errNotFound("cycle")
 	}
 	names, err := x.names()
@@ -29,8 +34,14 @@ func (s *Server) handleShowCycleChart(x *c) error {
 		Points     int    `json:"points"`
 		PointsDone int    `json:"points_done"`
 	}
-	start, _ := time.Parse("2006-01-02", cy.StartsOn)
-	end, _ := time.Parse("2006-01-02", cy.EndsOn)
+	start, err := time.Parse("2006-01-02", cy.StartsOn)
+	if err != nil {
+		return err
+	}
+	end, err := time.Parse("2006-01-02", cy.EndsOn)
+	if err != nil {
+		return err
+	}
 	today := time.Now().UTC()
 	var days []day
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {

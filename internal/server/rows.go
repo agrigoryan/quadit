@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -60,7 +61,10 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 	for _, p := range t.props {
 		byName[strings.ToLower(p.Name)] = p
 	}
-	related := map[string]*loadedDatabase{} // other databases, loaded when a relation needs them
+	// Other databases, loaded when a relation needs them. A read that fails
+	// is kept in readErr and fails the answer once every cell is done.
+	related := map[string]*loadedDatabase{}
+	var readErr error
 	other := func(dbID string) *loadedDatabase {
 		if dbID == t.doc.ID {
 			return t
@@ -70,8 +74,14 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 		}
 		var d core.Doc
 		var rt *loadedDatabase
-		if x.db.Get(x.ctx(), &d, store.Eq("id", dbID), store.Live) == nil && engine.CanSeeDoc(d, x.member.UserID) {
-			rt, _ = x.loadTable(d)
+		err := x.db.Get(x.ctx(), &d, store.Eq("id", dbID), store.Live)
+		switch {
+		case err == nil && engine.CanSeeDoc(d, x.member.UserID):
+			if rt, err = x.loadTable(d); err != nil && readErr == nil {
+				readErr = err
+			}
+		case err != nil && !errors.Is(err, store.ErrNotFound) && readErr == nil:
+			readErr = err
 		}
 		related[dbID] = rt
 		return rt
@@ -184,6 +194,9 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 			}
 		}
 		out[r.ID] = cells
+	}
+	if readErr != nil {
+		return nil, readErr
 	}
 	return out, nil
 }

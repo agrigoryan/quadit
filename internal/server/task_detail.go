@@ -277,7 +277,10 @@ func (s *Server) rawTask(x *c, t core.Task) error {
 	if err := x.db.List(ctx, &refs, store.Where(store.In("to_id", targets))); err != nil {
 		return err
 	}
-	mentioned := x.namedRefs(refs)
+	mentioned, err := x.namedRefs(refs)
+	if err != nil {
+		return err
+	}
 	var rels, relsIn []core.Relation
 	if err := x.db.List(ctx, &rels, store.Where(store.Eq("task_id", t.ID))); err != nil {
 		return err

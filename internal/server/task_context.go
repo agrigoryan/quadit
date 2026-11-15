@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -48,10 +49,17 @@ func (p *contextPack) parents() error {
 	var parents []taskView
 	for cur, depth := p.t.ParentID, 0; cur != "" && depth < 5; depth++ {
 		var up core.Task
-		if err := x.db.Get(x.ctx(), &up, store.Eq("id", cur)); err != nil {
+		err := x.db.Get(x.ctx(), &up, store.Eq("id", cur))
+		if errors.Is(err, store.ErrNotFound) {
 			break
 		}
-		pv, _ := x.taskViews([]core.Task{up}, true)
+		if err != nil {
+			return err
+		}
+		pv, err := x.taskViews([]core.Task{up}, true)
+		if err != nil {
+			return err
+		}
 		pv[0].Description, pv[0].Truncated = truncate(pv[0].Description, 1500)
 		parents = append(parents, pv[0])
 		cur = up.ParentID
@@ -68,7 +76,10 @@ func (p *contextPack) parents() error {
 
 // epic adds the epic the task is in.
 func (p *contextPack) epic() error {
-	names, _ := p.x.names()
+	names, err := p.x.names()
+	if err != nil {
+		return err
+	}
 	if e, ok := names.epics[p.t.EpicID]; ok {
 		desc, _ := truncate(e.Description, 2000)
 		p.out["epic"] = map[string]any{"name": e.Name, "state": e.State, "target_on": e.TargetOn, "description": desc}
@@ -126,11 +137,22 @@ func (p *contextPack) recentDecisions() error {
 			continue
 		}
 		var dt core.Task
-		if err := x.db.Get(ctx, &dt, store.Eq("id", dc.TaskID)); err == nil && dt.ProjectID == t.ProjectID {
+		err := x.db.Get(ctx, &dt, store.Eq("id", dc.TaskID))
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if dt.ProjectID == t.ProjectID {
 			recent = append(recent, dc)
 		}
 	}
-	if rv, err := x.decisionViews(recent, false); err == nil && len(rv) > 0 {
+	rv, err := x.decisionViews(recent, false)
+	if err != nil {
+		return err
+	}
+	if len(rv) > 0 {
 		p.out["recent_decisions"] = rv
 		p.text.WriteString("=== recent decisions in this project\n")
 		for _, r := range rv {
@@ -152,9 +174,13 @@ func (p *contextPack) recentDecisions() error {
 func (p *contextPack) docs() error {
 	x, ctx, t := p.x, p.x.ctx(), p.t
 	var refs []core.Ref
-	x.db.List(ctx, &refs, store.Where(store.Eq("from_scope_id", t.ID), store.Eq("to_type", "doc")))
+	if err := x.db.List(ctx, &refs, store.Where(store.Eq("from_scope_id", t.ID), store.Eq("to_type", "doc"))); err != nil {
+		return err
+	}
 	var back []core.Ref
-	x.db.List(ctx, &back, store.Where(store.Eq("to_id", t.ID), store.Eq("from_scope_type", "doc")))
+	if err := x.db.List(ctx, &back, store.Where(store.Eq("to_id", t.ID), store.Eq("from_scope_type", "doc"))); err != nil {
+		return err
+	}
 	docIDs := map[string]bool{}
 	for _, r := range refs {
 		docIDs[r.ToID] = true
@@ -165,7 +191,14 @@ func (p *contextPack) docs() error {
 	var docs []map[string]any
 	for did := range docIDs {
 		var doc core.Doc
-		if err := x.db.Get(ctx, &doc, store.Eq("id", did), store.Live); err == nil && engine.CanSeeDoc(doc, x.member.UserID) {
+		err := x.db.Get(ctx, &doc, store.Eq("id", did), store.Live)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if engine.CanSeeDoc(doc, x.member.UserID) {
 			docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": x.s.cfg.BaseURL + "/" + x.ws.Slug + "/docs/" + doc.ID})
 		}
 	}
@@ -189,8 +222,8 @@ type namedRef struct {
 }
 
 // namedRefs gives each mention the name of where it was made, leaving out
-// those the caller may not see.
-func (x *c) namedRefs(refs []core.Ref) []namedRef {
+// those the caller may not see and those made in something since deleted.
+func (x *c) namedRefs(refs []core.Ref) ([]namedRef, error) {
 	out := []namedRef{}
 	ctx := x.ctx()
 	for _, r := range refs {
@@ -198,18 +231,32 @@ func (x *c) namedRefs(refs []core.Ref) []namedRef {
 		switch r.FromScopeType {
 		case "doc":
 			var d core.Doc
-			if err := x.db.Get(ctx, &d, store.Eq("id", r.FromScopeID), store.Live); err != nil || !engine.CanSeeDoc(d, x.member.UserID) || !x.canProject(d.ProjectID) {
+			err := x.db.Get(ctx, &d, store.Eq("id", r.FromScopeID), store.Live)
+			if errors.Is(err, store.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			if !engine.CanSeeDoc(d, x.member.UserID) || !x.canProject(d.ProjectID) {
 				continue
 			}
 			nr.Title = d.Title
 		case "task":
 			var t core.Task
-			if err := x.db.Get(ctx, &t, store.Eq("id", r.FromScopeID), store.Live); err != nil || !x.canProject(t.ProjectID) {
+			err := x.db.Get(ctx, &t, store.Eq("id", r.FromScopeID), store.Live)
+			if errors.Is(err, store.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			if !x.canProject(t.ProjectID) {
 				continue
 			}
 			nr.Title, nr.Key = t.Title, t.Key
 		}
 		out = append(out, nr)
 	}
-	return out
+	return out, nil
 }

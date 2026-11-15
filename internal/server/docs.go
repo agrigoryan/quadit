@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -34,7 +35,11 @@ func init() {
 // docByID loads a page the caller may see.
 func (x *c) docByID(ref string) (core.Doc, error) {
 	var d core.Doc
-	if err := x.db.Get(x.ctx(), &d, store.Eq("id", ref), store.Live); err != nil || !engine.CanSeeDoc(d, x.member.UserID) || !x.canProject(d.ProjectID) {
+	err := x.db.Get(x.ctx(), &d, store.Eq("id", ref), store.Live)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return d, err
+	}
+	if err != nil || !engine.CanSeeDoc(d, x.member.UserID) || !x.canProject(d.ProjectID) {
 		return d, errNotFound("doc " + ref)
 	}
 	return d, nil
@@ -227,7 +232,11 @@ func (s *Server) handleShowPage(x *c) error {
 	out["attachments"] = atts
 	if d.SourceID != "" {
 		var src core.DocSource
-		if x.db.Get(ctx, &src, store.Eq("id", d.SourceID)) == nil {
+		err := x.db.Get(ctx, &src, store.Eq("id", d.SourceID))
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return err
+		}
+		if err == nil {
 			out["source"] = src
 		}
 	}
@@ -255,8 +264,12 @@ func (s *Server) handleShowPageVersion(x *c) error {
 		return err
 	}
 	var v core.DocVersion
-	if err := x.db.Get(x.ctx(), &v, store.Eq("id", x.r.PathValue("version")), store.Eq("doc_id", d.ID)); err != nil {
+	err = x.db.Get(x.ctx(), &v, store.Eq("id", x.r.PathValue("version")), store.Eq("doc_id", d.ID))
+	if errors.Is(err, store.ErrNotFound) {
 		return errNotFound("version")
+	}
+	if err != nil {
+		return err
 	}
 	var tree []md.Block
 	json.Unmarshal(v.Snapshot, &tree)
@@ -285,11 +298,16 @@ func (s *Server) handleReportPagePresence(x *c) error {
 	now := time.Now().UnixMilli()
 	ctx := x.ctx()
 	if b.Leave {
-		x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Eq("user_id", x.member.UserID))
+		if _, err := x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Eq("user_id", x.member.UserID)); err != nil {
+			// Best effort: the row is swept once it is 15 seconds old.
+			s.log.Warn("presence not cleared", "doc", d.ID, "err", err)
+		}
 	} else if err := x.db.Upsert(ctx, core.Presence{WorkspaceID: x.ws.ID, DocID: d.ID, UserID: x.member.UserID, Block: b.Block, At: now}, "doc_id", "user_id"); err != nil {
 		return err
 	}
-	x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Lt("at", now-15_000))
+	if _, err := x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Lt("at", now-15_000)); err != nil {
+		s.log.Warn("old presence not swept", "doc", d.ID, "err", err) // best effort: swept again on the next call
+	}
 	var here []core.Presence
 	if err := x.db.List(ctx, &here, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Ne("user_id", x.member.UserID)}, Order: "user_id"}); err != nil {
 		return err
@@ -445,14 +463,17 @@ func (s *Server) generated(x *c, d core.Doc) (string, error) {
 
 // ---- agent memory ----
 
-// memoryRoot finds the page an agent's notes hang under.
-func (x *c) memoryRoot(agentID string) (core.Doc, bool) {
+// memoryRoot finds the page an agent's notes hang under, and says whether
+// it has one yet.
+func (x *c) memoryRoot(agentID string) (core.Doc, bool, error) {
 	var roots []core.Doc
-	x.db.List(x.ctx(), &roots, store.Q{Where: []store.Cond{store.Eq("memory_of", agentID), store.Null("parent_id"), store.Live}, Order: "created_seq", Limit: 1})
-	if len(roots) == 0 {
-		return core.Doc{}, false
+	if err := x.db.List(x.ctx(), &roots, store.Q{Where: []store.Cond{store.Eq("memory_of", agentID), store.Null("parent_id"), store.Live}, Order: "created_seq", Limit: 1}); err != nil {
+		return core.Doc{}, false, err
 	}
-	return roots[0], true
+	if len(roots) == 0 {
+		return core.Doc{}, false, nil
+	}
+	return roots[0], true, nil
 }
 
 func (x *c) memoryAgent() (core.Member, error) {
@@ -477,7 +498,10 @@ func (s *Server) handleShowAgentMemory(x *c) error {
 	if err != nil {
 		return err
 	}
-	root, ok := x.memoryRoot(m.UserID)
+	root, ok, err := x.memoryRoot(m.UserID)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		if !x.wantText() {
 			return x.ok(map[string]any{"pages": []any{}})
@@ -540,7 +564,10 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 		raw, _ := json.Marshal(args)
 		return s.eng.Apply(ctx, x.ws.ID, x.actor, engine.Change{ID: id.New(), Type: typ, Args: raw})
 	}
-	root, ok := x.memoryRoot(x.member.UserID)
+	root, ok, err := x.memoryRoot(x.member.UserID)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		res, err := mk("doc.create", map[string]any{"title": x.member.Name + ": memory", "memory_of": "me", "icon": "brain"})
 		if err != nil {
@@ -549,7 +576,10 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 		root.ID = res.Ref
 	}
 	var page core.Doc
-	err := x.db.Get(ctx, &page, store.Eq("parent_id", root.ID), store.Eq("title", strings.TrimSpace(b.Title)), store.Live)
+	err = x.db.Get(ctx, &page, store.Eq("parent_id", root.ID), store.Eq("title", strings.TrimSpace(b.Title)), store.Live)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	if err != nil {
 		res, err := mk("doc.create", map[string]any{"parent": root.ID, "title": strings.TrimSpace(b.Title), "markdown": b.Markdown})
 		if err != nil {

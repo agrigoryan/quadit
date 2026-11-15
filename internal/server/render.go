@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -552,7 +553,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 			// server handing the resource to the next in line.
 			what = "claim " + firstNonEmpty(cd.Why, "changed")
 			var res core.Resource
-			if cd.ResourceID != "" && x.db.Get(x.ctx(), &res, store.Eq("id", cd.ResourceID)) == nil {
+			if cd.ResourceID != "" && x.foundForLine(&res, store.Eq("id", cd.ResourceID)) {
 				what += ": " + res.Name
 			}
 			if cd.UserID != "" {
@@ -566,7 +567,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		}
 		if cd.Row.TaskID != "" {
 			var tk core.Task
-			if x.db.Get(x.ctx(), &tk, store.Eq("id", cd.Row.TaskID)) == nil {
+			if x.foundForLine(&tk, store.Eq("id", cd.Row.TaskID)) {
 				what += " for " + tk.Key
 			}
 		}
@@ -599,6 +600,17 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		}
 	}
 	return head + " " + what
+}
+
+// foundForLine reads one row that a line of text names, if it can, and
+// says whether it was found. The line is written without it otherwise; a
+// read that failed is logged, since a line cannot report it.
+func (x *c) foundForLine(dst any, where ...store.Cond) bool {
+	err := x.db.Get(x.ctx(), dst, where...)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		x.s.log.Warn("a feed line left out a name it could not read", "err", err)
+	}
+	return err == nil
 }
 
 // quiet fields say nothing a reader needs on a feed line.

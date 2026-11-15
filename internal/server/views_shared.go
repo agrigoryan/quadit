@@ -165,6 +165,7 @@ func (s *Server) withResponsible(ctx context.Context, members []core.Member) {
 	}
 	var users []core.User
 	if err := s.st.List(ctx, &users, store.Where(store.In("id", ids))); err != nil {
+		s.log.Warn("agents listed without who answers for them", "err", err)
 		return
 	}
 	by := map[string]string{}
