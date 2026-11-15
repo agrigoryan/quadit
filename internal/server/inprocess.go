@@ -20,20 +20,26 @@ import (
 // behalf; such requests are not counted against the caller's rate limit.
 type inProcess struct{}
 
-// selfCaller is who an in-process call is made for.
+// selfCaller is who an in-process call is made for. It is one call's
+// worth of who and where, so it carries the call's context.
 type selfCaller struct {
-	ctx        context.Context
-	base       string      // what a path is put under: the API of one workspace
-	signIn     http.Header // the headers that say who is calling
-	remoteAddr string      // where the call counts as coming from
+	ctx        context.Context // the call ends when this ends
+	base       string          // what a path is put under: the API of one workspace
+	signIn     http.Header     // the headers that say who is calling
+	remoteAddr string          // where the call counts as coming from
 }
 
 // bearerOf is the bearer of a token calling from this machine, in the
 // token's own workspace. Each call is counted against the token's rate
 // limit like one from outside.
+//
+// The call is detached: an MCP tool reaches here without the context of
+// the MCP request it serves (mcpCallTool takes none), so a call keeps
+// running when that client goes away, up to the end of its own work (a
+// feed wait is at most 55 seconds).
 func bearerOf(token string) selfCaller {
 	return selfCaller{ctx: context.Background(), base: "/api/v1/w/-",
-		signIn: http.Header{"Authorization": {"Bearer " + token}}, remoteAddr: "127.0.0.1:0"}
+		signIn: http.Header{"Authorization": {"Bearer " + token}}, remoteAddr: selfCallAddr}
 }
 
 // callerOf is the one who sent the request x, in its workspace: the same
@@ -78,6 +84,7 @@ type recordedAnswer struct {
 	body   bytes.Buffer
 }
 
+// Header, WriteHeader and Write make recordedAnswer an http.ResponseWriter.
 func (b *recordedAnswer) Header() http.Header         { return b.h }
 func (b *recordedAnswer) WriteHeader(code int)        { b.status = code }
 func (b *recordedAnswer) Write(p []byte) (int, error) { return b.body.Write(p) }
@@ -91,7 +98,9 @@ func (b *recordedAnswer) refusal() *engine.Error {
 	var wrap struct {
 		Error engine.Error `json:"error"`
 	}
-	if json.Unmarshal(b.body.Bytes(), &wrap) != nil || wrap.Error.Code == "" {
+	// A body that is not an error of that shape carries no refusal.
+	isRefusal := json.Unmarshal(b.body.Bytes(), &wrap) == nil && wrap.Error.Code != ""
+	if !isRefusal {
 		return nil
 	}
 	return &wrap.Error

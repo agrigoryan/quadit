@@ -1,5 +1,41 @@
 // Package server is the HTTP API. The web app, the command-line tool, the
 // MCP server and agents all use it; nothing reaches the data another way.
+// Every write is a change applied by internal/engine; this package parses
+// requests, checks who is asking, reads, and writes answers.
+//
+// How the package is laid out:
+//
+//	Routing and the request context
+//	  server.go      the Server, the request context c, the route wrappers
+//	                 (public, signedIn, firstStepPassed, workspaceMember),
+//	                 sign-in by token or cookie, errors and the audit log
+//	  routes.go      the core routes, and /list/{collection}
+//	  params.go      checking number, yes/no and date parameters
+//	  gzip.go, limits.go, stats.go   compression, rate limits, metrics
+//	  inprocess.go   the server calling its own API (MCP tools, imports)
+//	  openapi.go     the description of every route (openapi.json)
+//	  settings.go, admin.go          install settings and administration
+//	Sign-in
+//	  auth.go, auth_totp.go, auth_reset.go, auth_invites.go,
+//	  auth_passkeys.go, auth_oauth.go, signin_provider.go,
+//	  signin_github.go, signin_oidc.go, tokens.go
+//	Reads
+//	  orient.go (who am I, my work), layout.go, tasks_list.go,
+//	  task_detail.go, task_context.go, query.go, render.go, views_shared.go,
+//	  search.go, feed.go, bootstrap.go, docs.go, rows.go, files.go,
+//	  picture.go, picture_cdp.go, dashboard*.go
+//	Changes
+//	  changes.go     POST /changes: the engine applies, this audits
+//	  eventtypes.go  the event types the feed carries
+//	Background work
+//	  run.go         Run and the list of background loops
+//	  jobs.go, dispatch.go, deliveries.go, push.go, backups.go
+//	Integrations
+//	  github*.go, reposync*.go (pages kept in a git repository), secrets.go
+//	MCP
+//	  mcp.go, mcp_tools.go, mcp_calls.go, mcp_ask.go, oauth_server.go
+//	Import and export
+//	  importing.go, export*.go
 package server
 
 import (
@@ -13,6 +49,7 @@ import (
 	"net/http"
 	"reflect"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,37 +71,38 @@ type Config struct {
 	// LocalURL is where the server reaches itself, for taking pictures of
 	// its own pages. Empty means BaseURL.
 	LocalURL string
-	Version  string
-	Log      *slog.Logger
+	Version  string       // shown in /me, openapi.json and the metrics
+	Log      *slog.Logger // nil means slog.Default()
 }
 
-// Server holds everything a request needs.
+// Server holds everything a request needs. New sets every field except
+// web (SetWeb), the file store after a "files" setting (useFiles), the
+// caches, which fill as requests come, and the limiter's factor (applyLimits).
 type Server struct {
-	cfg     Config
-	st      store.Store
-	eng     *engine.Engine
-	hub     *hub.Hub
-	filesMu sync.RWMutex
-	files   blob.Store // where files go now
-	disk    blob.Store // the local store, always there
-	sealer  *auth.Sealer
-	log     *slog.Logger
-	mux     *http.ServeMux
-	web     http.Handler // the web app, when built in
+	cfg     Config         // as given to New, with Log filled in
+	st      store.Store    // the database
+	eng     *engine.Engine // applies every change
+	hub     *hub.Hub       // wakes the requests waiting for the feed to move
+	filesMu sync.RWMutex   // guards files, which useFiles replaces
+	files   blob.Store     // where files go now
+	disk    blob.Store     // the local store, always there
+	sealer  *auth.Sealer   // encrypts secrets kept in the database
+	log     *slog.Logger   // cfg.Log
+	mux     *http.ServeMux // the API's routes, made by routes()
+	web     http.Handler   // the web app, when built in
 
-	seenMu        sync.Mutex
-	seen          map[string]int64 // user id -> last time presence was written
-	settingsMu    sync.Mutex
-	settingsCache map[string]cachedSetting
-	limits        *limiter
+	seenMu        sync.Mutex               // guards seen
+	seen          map[string]int64         // user id + workspace id -> last time presence was written
+	settingsMu    sync.Mutex               // guards settingsCache
+	settingsCache map[string]cachedSetting // settings read in the last few seconds (settings.go)
+	limits        *limiter                 // requests per caller per minute (limits.go)
 	// quit is closed when the server is told to stop: held connections
 	// (live streams, waits for the next event) end then, at once.
 	quit     chan struct{}
-	quitOnce sync.Once
-	stats    stats
+	quitOnce sync.Once // Stop closes quit once
+	stats    stats     // request counts for /metrics
 }
 
-// New wires a server. Call Handler to serve it and Run for background work.
 // Stop ends the connections the server holds open for its callers, so a
 // shutdown does not wait out their timeouts. Requests in progress finish.
 func (s *Server) Stop() { s.quitOnce.Do(func() { close(s.quit) }) }
@@ -83,6 +121,7 @@ func (s *Server) keptOpenContext(parent context.Context) (context.Context, conte
 	return ctx, cancel
 }
 
+// New wires a server. Call Handler to serve it and Run for background work.
 func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Server {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
@@ -117,7 +156,7 @@ func (s *Server) useFiles(ctx context.Context, c blob.Config) error {
 		if err := cloud.Put(ctx, probe, strings.NewReader("ok"), "text/plain"); err != nil {
 			return fmt.Errorf("file storage: the store refused a test write: %w", err)
 		}
-		cloud.Delete(ctx, probe)
+		_ = cloud.Delete(ctx, probe) //nolint:errcheck // best effort: a leftover probe is a two-byte file and harms nothing
 		next = blob.Layered{Primary: cloud, Old: s.disk}
 		s.enqueue(ctx, "files.move", "", "files.move", nil, time.Now().Add(5*time.Second))
 	}
@@ -136,60 +175,77 @@ func (s *Server) Hub() *hub.Hub { return s.hub }
 // SetWeb installs the handler that serves the web app.
 func (s *Server) SetWeb(h http.Handler) { s.web = h }
 
-// httpError is a refusal made by the API itself rather than the engine.
+// httpError is a refusal made by the API itself rather than the engine:
+// sign-in, rate limits. fail writes it with its own status.
 type httpError struct {
-	Status     int
-	Code       string
-	Message    string
-	RetryAfter int
+	Status     int    // the HTTP status
+	Code       string // what a client compares: "unauthorized", "rate_limited", …
+	Message    string // what a person reads
+	RetryAfter int    // seconds to wait, sent as Retry-After when not 0
 }
 
 func (e *httpError) Error() string { return e.Code + ": " + e.Message }
 
+// errUnauthorized refuses a caller who is not signed in (401).
 func errUnauthorized(msg string) error {
 	return &httpError{Status: 401, Code: "unauthorized", Message: msg}
 }
 
+// errBad refuses a request that is wrong as sent (400).
 func errBad(format string, a ...any) error {
 	return &engine.Error{Code: engine.CodeInvalid, Message: fmt.Sprintf(format, a...)}
 }
 
+// errForbidden refuses what the caller may not do (403).
 func errForbidden(format string, a ...any) error {
 	return &engine.Error{Code: engine.CodeForbidden, Message: fmt.Sprintf(format, a...)}
 }
 
+// errNotFound says that what was asked for is not there, or not for this
+// caller (404).
 func errNotFound(what string) error {
 	return &engine.Error{Code: engine.CodeNotFound, Message: what + " not found"}
 }
 
+// statusOf is the HTTP status of each engine error code; fail answers 400
+// for a code not listed.
 var statusOf = map[string]int{
 	engine.CodeInvalid: 400, engine.CodeForbidden: 403, engine.CodeNotFound: 404, engine.CodeConflict: 409,
 	engine.CodeStale: 409, engine.CodeNeedsApproval: 403, engine.CodeBudget: 403,
 }
 
-// c is one request with who is asking.
+// c is one request with who is asking: the request context every handler
+// takes, named x. The route wrapper makes it with s, w and r (and
+// firstStepEnough); identify fills in who is asking; enterWorkspace fills
+// in the workspace and what the caller may do there. Contexts made for work
+// outside a request (dispatch.go, query.go) set only what that work reads.
 type c struct {
-	narrowed bool // fields= and since= were applied by the handler
+	narrowed bool // fields= and since= were applied by the handler (narrowedAlready)
 	// staleView says what a saved view filters by that is gone, when the
-	// list was read without that part.
+	// list was read without that part. Set while a view's query is read.
 	staleView string
 	s         *Server
 	w         http.ResponseWriter
 	r         *http.Request
-	user      core.User
-	sess      *core.Session
-	token     *core.APIToken
-	ws        core.Workspace
-	member    core.Member
-	actor     engine.Actor
-	// projects, when not nil, are the only projects this caller may read.
+	user      core.User      // the account asking (identify)
+	sess      *core.Session  // the session, when signed in by cookie (identify)
+	token     *core.APIToken // the token, when signed in by one (identify)
+	ws        core.Workspace // the workspace in the path (enterWorkspace)
+	member    core.Member    // the caller's membership in ws (enterWorkspace)
+	// actor is who the engine applies changes as, read-only or limited to
+	// projects by the token's scopes (enterWorkspace).
+	actor engine.Actor
+	// projects, when not nil, are the only projects this caller may read:
+	// the membership's scope, narrowed by the token's (enterWorkspace).
 	projects  []string
-	db        store.DB // bound to the workspace
-	nameCache *nameLookup
+	db        store.DB    // bound to ws (enterWorkspace)
+	nameCache *nameLookup // the workspace's names, loaded once per request (query.go)
 	// firstStepEnough lets a session that still owes its second step through.
+	// Set by firstStepPassed.
 	firstStepEnough bool
 }
 
+// ctx is the request's context: it ends when the caller goes away.
 func (x *c) ctx() context.Context { return x.r.Context() }
 
 // json writes v with a status.
@@ -219,65 +275,103 @@ func noNulls(v any) any {
 	return m
 }
 
-// ok answers with v. Every read that answers with a list takes fields=a,b
-// to get only those fields of each row (and its id), and since=N to get
-// only the rows that changed after that position in the feed, so a caller
-// never pays for what it already knows.
+// ok answers 200 with v as JSON, after applying the list selectors of a
+// GET: fields=a,b keeps only those fields of each row (and its id and key),
+// and since=N keeps only the rows that changed after that position in the
+// feed, so a caller never pays for what it already knows. The selectors
+// apply to every list at the top level of v; a handler that applied them
+// itself says so with narrowedAlready.
 func (x *c) ok(v any) error {
 	q := x.r.URL.Query()
 	fields, since := splitList(q.Get("fields")), q.Get("since")
 	if x.r.Method != http.MethodGet || (len(fields) == 0 && since == "") || x.narrowed {
 		return x.json(200, v)
 	}
-	raw, err := json.Marshal(noNulls(v))
-	if err != nil {
+	doc, ok := asDocument(v)
+	if !ok {
 		return x.json(200, v)
 	}
-	var doc map[string]any
-	if json.Unmarshal(raw, &doc) != nil {
-		return x.json(200, v)
-	}
-	after, _ := strconv.ParseInt(since, 10, 64)
-	keep := map[string]bool{"id": true, "key": true}
-	for _, f := range fields {
-		keep[f] = true
-	}
+	sel := newRowSelector(fields, since)
 	for name, val := range doc {
-		rows, ok := val.([]any)
-		if !ok {
-			continue
+		if rows, isList := val.([]any); isList {
+			doc[name] = sel.apply(rows)
 		}
-		out := make([]any, 0, len(rows))
-		for _, r := range rows {
-			row, ok := r.(map[string]any)
-			if !ok {
-				out = append(out, r)
-				continue
-			}
-			if since != "" {
-				// A row's place in the feed: when it last changed, or when it was made.
-				at, has := row["updated_seq"].(float64)
-				if !has {
-					at, has = row["seq"].(float64)
-				}
-				if has && int64(at) <= after {
-					continue
-				}
-			}
-			if len(fields) > 0 {
-				for k := range row {
-					if !keep[k] {
-						delete(row, k)
-					}
-				}
-			}
-			out = append(out, row)
-		}
-		doc[name] = out
 	}
 	return x.json(200, doc)
 }
 
+// asDocument is v as the JSON object it is sent as, with its lists as
+// []any and its rows as maps; false when v is not an object.
+func asDocument(v any) (map[string]any, bool) {
+	raw, err := json.Marshal(noNulls(v))
+	if err != nil {
+		return nil, false
+	}
+	var doc map[string]any
+	if json.Unmarshal(raw, &doc) != nil {
+		return nil, false
+	}
+	return doc, true
+}
+
+// rowSelector is what fields= and since= ask of the rows of a list.
+type rowSelector struct {
+	fields map[string]bool // the fields to keep; nil keeps every field
+	since  bool            // since= was given
+	after  int64           // keep only the rows that changed after this feed position
+}
+
+func newRowSelector(fields []string, since string) rowSelector {
+	// A since that is not a number reads as 0; the workspace routes refuse
+	// one before this, in checkParams.
+	after, _ := strconv.ParseInt(since, 10, 64) //nolint:errcheck // a bad since reads as 0 (see above)
+	sel := rowSelector{since: since != "", after: after}
+	if len(fields) > 0 {
+		sel.fields = map[string]bool{"id": true, "key": true}
+		for _, f := range fields {
+			sel.fields[f] = true
+		}
+	}
+	return sel
+}
+
+// apply returns the rows the selector keeps, with only the fields it keeps.
+// An item that is not a row is kept as it is.
+func (sel rowSelector) apply(rows []any) []any {
+	out := make([]any, 0, len(rows))
+	for _, r := range rows {
+		row, ok := r.(map[string]any)
+		if !ok {
+			out = append(out, r)
+			continue
+		}
+		if sel.since && !sel.changedAfter(row) {
+			continue
+		}
+		if sel.fields != nil {
+			for k := range row {
+				if !sel.fields[k] {
+					delete(row, k)
+				}
+			}
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+// changedAfter reports whether a row changed after the selector's position.
+// A row's place in the feed is when it last changed, or when it was made;
+// a row with neither is kept.
+func (sel rowSelector) changedAfter(row map[string]any) bool {
+	at, found := row["updated_seq"].(float64)
+	if !found {
+		at, found = row["seq"].(float64)
+	}
+	return !found || int64(at) > sel.after
+}
+
+// text answers 200 with body as plain text.
 func (x *c) text(body string) error {
 	x.w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, err := io.WriteString(x.w, body)
@@ -292,7 +386,8 @@ func (x *c) wantText() bool {
 	return strings.HasPrefix(x.r.Header.Get("Accept"), "text/plain")
 }
 
-// body decodes a JSON request body, refusing unknown fields.
+// body decodes the JSON request body into v. A field v does not have, a
+// body over 16 MB, or one that is not JSON is refused as a bad request.
 func (x *c) body(v any) error {
 	dec := json.NewDecoder(http.MaxBytesReader(x.w, x.r.Body, 16<<20))
 	dec.DisallowUnknownFields()
@@ -302,6 +397,8 @@ func (x *c) body(v any) error {
 	return nil
 }
 
+// intParam is a whole-number URL parameter, or def when it is missing or
+// not a number.
 func (x *c) intParam(name string, def int) int {
 	if v := x.r.URL.Query().Get(name); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
@@ -324,6 +421,7 @@ func (x *c) hasFullAccess() bool {
 	return x.token != nil && x.token.Kind == "token" && x.token.Scopes == ""
 }
 
+// admin refuses a caller whose role in the workspace is below admin.
 func (x *c) admin() error {
 	if !x.member.Role.AtLeast(core.RoleAdmin) {
 		return errForbidden("this needs the admin role; you are a %s", x.member.Role)
@@ -366,15 +464,33 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	json.NewEncoder(w).Encode(map[string]any{"error": body})
 }
 
+// handler is an API handler: it reads the request from x and writes the
+// answer to it, or returns the error fail writes.
 type handler func(*c) error
 
-// public wraps a handler that anyone may call, without signing in. Such
-// calls are limited by the address they come from.
+// Rate limits, in requests per minute; the admin area scales them all
+// (limits.api_per_minute).
+const (
+	limitPerAddress   = 600  // calls that need no sign-in, by address
+	limitBadTokens    = 120  // tokens that are not valid, by address
+	limitPerToken     = 1200 // calls made with one token
+	limitPerSignedIn  = 3000 // calls made by a signed-in person
+	presenceEvery     = 20_000
+	signInWriteEvery  = 60_000        // how often a token's or session's last use is written, in ms
+	tokenAuditedEvery = 24 * 3600_000 // how often a token's use goes in the audit log, in ms
+)
+
+// selfCallAddr is the address an in-process call made with a token comes
+// from (bearerOf). Its bad tokens are not counted as guesses.
+const selfCallAddr = "127.0.0.1:0"
+
+// public wraps a handler that anyone may call, without signing in. It
+// checks only the rate limit of the caller's address and fills in nothing
+// beyond the request; the handler's URL parameters are not checked.
 func (s *Server) public(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
-		// Calls that need no sign-in are counted by where they come from.
-		if err := s.limits.check("ip:"+clientIP(r), 600); err != nil {
+		if err := s.limits.check("ip:"+clientIP(r), limitPerAddress); err != nil {
 			s.fail(w, r, err)
 			return
 		}
@@ -385,11 +501,13 @@ func (s *Server) public(h handler) http.HandlerFunc {
 }
 
 // signedIn wraps a handler that needs a signed-in person or a token, but no
-// workspace.
+// workspace. It runs identify, which fills in user and either sess or
+// token, refuses a session that still owes its second step, and checks the
+// caller's rate limit.
 func (s *Server) signedIn(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
-		if err := s.identify(x); err != nil {
+		if err := s.identify(x); err != nil { //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
 			s.fail(w, r, err)
 			return
 		}
@@ -400,11 +518,12 @@ func (s *Server) signedIn(h handler) http.HandlerFunc {
 }
 
 // firstStepPassed wraps a handler for someone who has passed the first
-// sign-in step and may still owe the second.
+// sign-in step and may still owe the second: it is signedIn with
+// firstStepEnough set, so a session at any stage is let through.
 func (s *Server) firstStepPassed(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r, firstStepEnough: true}
-		if err := s.identify(x); err != nil {
+		if err := s.identify(x); err != nil { //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
 			s.fail(w, r, err)
 			return
 		}
@@ -415,15 +534,18 @@ func (s *Server) firstStepPassed(h handler) http.HandlerFunc {
 }
 
 // workspaceMember wraps a handler that works inside the workspace named in
-// the path: the caller, a signed-in person or a token, must be a member of
-// it, and the context is given the workspace, the membership and a
-// database bound to it.
+// the path ({ws}, or "-" for a token's own). It runs identify as signedIn
+// does, then enterWorkspace: the caller must be a member, not suspended,
+// and the context is given the workspace, the membership, the actor, the
+// projects the caller may read and a database bound to the workspace.
+// Last, the URL's number, yes/no and date parameters are checked
+// (checkParams).
 func (s *Server) workspaceMember(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
-		err := s.identify(x)
+		err := s.identify(x) //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
 		if err == nil {
-			err = s.enterWorkspace(x, r.PathValue("ws"))
+			err = s.enterWorkspace(x, r.PathValue("ws")) //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
 		}
 		if err == nil {
 			err = checkParams(r.URL.Query())
@@ -440,48 +562,84 @@ func (s *Server) workspaceMember(h handler) http.HandlerFunc {
 const sessionCookie = "quadit_session"
 
 // identify finds who is asking: a token in the Authorization header, or a
-// session cookie.
+// session cookie. It fills in x.user and x.token or x.sess, and counts the
+// request against the caller's rate limit unless it is made inside another
+// request (inProcess).
 func (s *Server) identify(x *c) error {
-	ctx := x.ctx()
 	now := time.Now().UnixMilli()
 	if h := x.r.Header.Get("Authorization"); h != "" {
-		tok := strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
-		var t core.APIToken
-		if err := s.st.Get(ctx, &t, store.Eq("token_hash", auth.Hash(tok)), store.Null("revoked_at")); err != nil {
-			// Guesses are counted by where they come from.
-			if lerr := s.limits.check("bad:"+clientIP(x.r), 120); lerr != nil && x.r.RemoteAddr != "127.0.0.1:0" {
-				return lerr
-			}
-			return errUnauthorized("this token is not valid, or was revoked")
-		}
-		if t.ExpiresAt != 0 && t.ExpiresAt < now {
-			return errUnauthorized("this token has expired")
-		}
-		if err := s.st.Get(ctx, &x.user, store.Eq("id", t.UserID), store.Live); err != nil || x.user.DisabledAt != 0 {
-			return errUnauthorized("this token's account is disabled")
-		}
-		x.token = &t
-		if now-t.LastUsedAt > 24*3600_000 {
-			// A token's use is on the record: its first, and then once for
-			// each day it is used.
-			s.audit(x.r, t.WorkspaceID, x.user, "token.used", "token", t.ID, map[string]string{"name": t.Name})
-		}
-		if now-t.LastUsedAt > 60_000 {
-			s.st.Update(ctx, "api_tokens", map[string]any{"last_used_at": now}, store.Eq("id", t.ID))
-		}
-		if x.r.Context().Value(inProcess{}) != nil {
-			return nil // the server working for the caller, inside one request already counted
-		}
-		return s.limits.check("t:"+t.ID, 1200)
+		return s.identifyByToken(x, h, now)
 	}
+	return s.identifyBySession(x, now)
+}
+
+// identifyByToken signs the caller in with the token in an Authorization
+// header.
+func (s *Server) identifyByToken(x *c, header string, now int64) error {
+	ctx := x.ctx()
+	tok := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+	var t core.APIToken
+	if err := s.st.Get(ctx, &t, store.Eq("token_hash", auth.Hash(tok)), store.Null("revoked_at")); err != nil {
+		// Guesses are counted by where they come from.
+		if lerr := s.limits.check("bad:"+clientIP(x.r), limitBadTokens); lerr != nil && x.r.RemoteAddr != selfCallAddr {
+			return lerr
+		}
+		return errUnauthorized("this token is not valid, or was revoked")
+	}
+	if t.ExpiresAt != 0 && t.ExpiresAt < now {
+		return errUnauthorized("this token has expired")
+	}
+	if err := s.loadAccount(ctx, x, t.UserID, "this token's account is disabled"); err != nil {
+		return err
+	}
+	x.token = &t
+	if now-t.LastUsedAt > tokenAuditedEvery {
+		// A token's use is on the record: its first, and then once for
+		// each day it is used.
+		s.audit(x.r, t.WorkspaceID, x.user, "token.used", "token", t.ID, map[string]string{"name": t.Name})
+	}
+	if now-t.LastUsedAt > signInWriteEvery {
+		_, _ = s.st.Update(ctx, "api_tokens", map[string]any{"last_used_at": now}, store.Eq("id", t.ID)) //nolint:errcheck // best effort: last use is shown to people, and written again on the next call
+	}
+	if x.r.Context().Value(inProcess{}) != nil {
+		return nil // the server working for the caller, inside one request already counted
+	}
+	return s.limits.check("t:"+t.ID, limitPerToken)
+}
+
+// identifyBySession signs the caller in with the session cookie.
+func (s *Server) identifyBySession(x *c, now int64) error {
+	ctx := x.ctx()
 	ck, err := x.r.Cookie(sessionCookie)
 	if err != nil || ck.Value == "" {
 		return errUnauthorized("sign in, or send a token in the Authorization header")
 	}
 	var sess core.Session
-	if err := s.st.Get(ctx, &sess, store.Eq("token_hash", auth.Hash(ck.Value)), store.Null("revoked_at")); err != nil || sess.ExpiresAt < now {
+	err = s.st.Get(ctx, &sess, store.Eq("token_hash", auth.Hash(ck.Value)), store.Null("revoked_at"))
+	if err != nil || sess.ExpiresAt < now {
 		return errUnauthorized("your session has ended; sign in again")
 	}
+	if err := x.sessionMayAct(sess); err != nil {
+		return err
+	}
+	if err := s.loadAccount(ctx, x, sess.UserID, "this account is disabled"); err != nil {
+		return err
+	}
+	x.sess = &sess
+	if now-sess.LastSeenAt > signInWriteEvery {
+		_, _ = s.st.Update(ctx, "sessions", map[string]any{"last_seen_at": now}, store.Eq("id", sess.ID)) //nolint:errcheck // best effort: last seen is shown to people, and written again on the next call
+	}
+	if x.r.Context().Value(inProcess{}) != nil {
+		return nil
+	}
+	return s.limits.check("u:"+x.user.ID, limitPerSignedIn)
+}
+
+// sessionMayAct refuses what a session may not do with this request: a
+// session made for taking pictures may only read, one that owes its second
+// step gets only as far as firstStepPassed routes, and a write another
+// site's page sent with the cookie is refused.
+func (x *c) sessionMayAct(sess core.Session) error {
 	switch {
 	case sess.Stage == "render":
 		// A session made to take a picture of a page: it may only look.
@@ -497,23 +655,48 @@ func (s *Server) identify(x *c) error {
 			return errForbidden("cross-site requests are not accepted")
 		}
 	}
-	if err := s.st.Get(ctx, &x.user, store.Eq("id", sess.UserID), store.Live); err != nil || x.user.DisabledAt != 0 {
-		return errUnauthorized("this account is disabled")
+	return nil
+}
+
+// loadAccount loads the signed-in account into x.user, refusing with
+// disabledMsg when it is disabled or gone.
+func (s *Server) loadAccount(ctx context.Context, x *c, userID, disabledMsg string) error {
+	err := s.st.Get(ctx, &x.user, store.Eq("id", userID), store.Live)
+	if err != nil || x.user.DisabledAt != 0 {
+		return errUnauthorized(disabledMsg)
 	}
-	x.sess = &sess
-	if now-sess.LastSeenAt > 60_000 {
-		s.st.Update(ctx, "sessions", map[string]any{"last_seen_at": now}, store.Eq("id", sess.ID))
-	}
-	if x.r.Context().Value(inProcess{}) != nil {
-		return nil
-	}
-	return s.limits.check("u:"+x.user.ID, 3000)
+	return nil
 }
 
 // enterWorkspace binds the request to a workspace the caller belongs to. "-" means
-// the workspace of the token used.
+// the workspace of the token used. It fills in x.ws, x.db, x.member,
+// x.actor and x.projects, and records the member's presence.
 func (s *Server) enterWorkspace(x *c, ref string) error {
 	ctx := x.ctx()
+	if err := s.loadMembership(ctx, x, ref); err != nil {
+		return err
+	}
+	if x.sess != nil && s.settingBool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
+		// Fails closed: when the passkeys cannot be counted, the answer is no.
+		if n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); err != nil || n == 0 {
+			return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
+		}
+	}
+	x.actor = engine.Actor{UserID: x.user.ID}
+	if x.member.Scope != nil {
+		x.projects = x.member.Scope.Projects
+	}
+	if x.token != nil {
+		x.applyTokenScopes()
+	}
+	s.touchPresence(x, "")
+	return nil
+}
+
+// loadMembership finds the workspace ref names and the caller's membership
+// in it, filling in x.ws, x.db and x.member. A workspace the caller is not
+// a member of is not found, as if it did not exist.
+func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 	cond := store.Eq("slug", ref)
 	if ref == "-" {
 		if x.token == nil {
@@ -534,52 +717,44 @@ func (s *Server) enterWorkspace(x *c, ref string) error {
 	if x.member.SuspendedAt != 0 {
 		return errForbidden("your membership in this workspace is suspended")
 	}
-	if x.sess != nil && s.settingBool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
-		if n, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); n == 0 {
-			return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
-		}
-	}
-	x.actor = engine.Actor{UserID: x.user.ID}
-	if x.member.Scope != nil {
-		x.projects = x.member.Scope.Projects
-	}
-	if x.token != nil {
-		for _, sc := range strings.Fields(x.token.Scopes) {
-			switch {
-			case sc == "read":
-				x.actor.ReadOnly = true
-			case strings.HasPrefix(sc, "project:"):
-				x.actor.Projects = append(x.actor.Projects, strings.TrimPrefix(sc, "project:"))
-			}
-		}
-		if len(x.actor.Projects) > 0 {
-			if x.projects == nil {
-				x.projects = x.actor.Projects
-			} else {
-				var both []string
-				for _, p := range x.actor.Projects {
-					if has(x.projects, p) {
-						both = append(both, p)
-					}
-				}
-				if both == nil {
-					both = []string{"none"}
-				}
-				x.projects = both
-			}
-		}
-	}
-	s.touchPresence(x, "")
 	return nil
 }
 
-func has(list []string, v string) bool {
-	for _, x := range list {
-		if x == v {
-			return true
+// applyTokenScopes narrows the actor and the readable projects by the
+// token's scopes: "read" makes the actor read-only, and "project:ID" limits
+// the actor to those projects, and what the caller may read to those of
+// them the membership allows.
+func (x *c) applyTokenScopes() {
+	for sc := range strings.FieldsSeq(x.token.Scopes) {
+		switch {
+		case sc == "read":
+			x.actor.ReadOnly = true
+		case strings.HasPrefix(sc, "project:"):
+			x.actor.Projects = append(x.actor.Projects, strings.TrimPrefix(sc, "project:"))
 		}
 	}
-	return false
+	if len(x.actor.Projects) == 0 {
+		return
+	}
+	if x.projects == nil {
+		x.projects = x.actor.Projects
+		return
+	}
+	var both []string
+	for _, p := range x.actor.Projects {
+		if has(x.projects, p) {
+			both = append(both, p)
+		}
+	}
+	if both == nil {
+		both = []string{"none"} // no project in both: a list that matches none
+	}
+	x.projects = both
+}
+
+// has reports whether list holds v.
+func has(list []string, v string) bool {
+	return slices.Contains(list, v)
 }
 
 // canProject reports whether the caller may read a project.
@@ -588,12 +763,13 @@ func (x *c) canProject(projectID string) bool {
 }
 
 // touchPresence records that a member was just here, at most every 20
-// seconds, and what it did when that is worth showing.
+// seconds, and what it did when that is worth showing. The write is
+// detached from the request's end: the member was here either way.
 func (s *Server) touchPresence(x *c, action string) {
 	now := time.Now().UnixMilli()
 	s.seenMu.Lock()
 	last := s.seen[x.member.UserID+x.ws.ID]
-	fresh := now-last > 20_000 || action != ""
+	fresh := now-last > presenceEvery || action != ""
 	if fresh {
 		s.seen[x.member.UserID+x.ws.ID] = now
 	}
@@ -605,7 +781,7 @@ func (s *Server) touchPresence(x *c, action string) {
 	if action != "" {
 		set["last_action"] = action
 	}
-	x.db.Update(context.WithoutCancel(x.ctx()), "members", set, store.Eq("user_id", x.member.UserID))
+	_, _ = x.db.Update(context.WithoutCancel(x.ctx()), "members", set, store.Eq("user_id", x.member.UserID)) //nolint:errcheck // best effort: presence is written again on the next request
 }
 
 // clientIP returns the caller's address, trusting a proxy's header only
@@ -624,7 +800,8 @@ func clientIP(r *http.Request) string {
 }
 
 // audit writes one line in the audit log. Failures are logged, not returned:
-// the action already happened.
+// the action already happened. For the same reason the line is written even
+// when the caller has gone away: it is detached from the request's end.
 func (s *Server) audit(r *http.Request, workspaceID string, actor core.User, action, targetType, targetID string, data any) {
 	e := core.AuditEntry{ID: id.New(), At: time.Now().UnixMilli(), WorkspaceID: workspaceID, ActorID: actor.ID, ActorName: actor.Name,
 		Action: action, TargetType: targetType, TargetID: targetID}
@@ -637,12 +814,20 @@ func (s *Server) audit(r *http.Request, workspaceID string, actor core.User, act
 	if data != nil {
 		e.Data, _ = json.Marshal(data)
 	}
-	if err := s.st.Insert(context.Background(), e); err != nil {
+	ctx := context.Background() //nolint:contextcheck // detached: no request, work the server does on its own
+	if r != nil {
+		ctx = context.WithoutCancel(r.Context())
+	}
+	if err := s.st.Insert(ctx, e); err != nil {
 		s.log.Error("audit log", "action", action, "err", err)
 	}
 }
 
-// Handler returns the server's HTTP handler.
+// Handler returns the server's HTTP handler. Around every request it
+// compresses the answer when it can, sets the security headers, turns a
+// panic into a 500, and counts the request for /metrics. The API, files,
+// MCP, OAuth, hooks and monitoring go to the routes; any other path is the
+// web app's, or not found when it is not built in.
 func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -666,9 +851,7 @@ func (s *Server) Handler() http.Handler {
 			// Once reached over HTTPS, a browser keeps to it.
 			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/f/") || strings.HasPrefix(r.URL.Path, "/mcp") ||
-			strings.HasPrefix(r.URL.Path, "/.well-known/") || strings.HasPrefix(r.URL.Path, "/oauth/") ||
-			r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/metrics" || strings.HasPrefix(r.URL.Path, "/hooks/") {
+		if servedByMux(r.URL.Path) {
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				h.Set("Cache-Control", "no-store")
 			}
@@ -683,6 +866,19 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
+// servedByMux reports whether a path is one of the server's routes rather
+// than a page of the web app.
+func servedByMux(path string) bool {
+	for _, prefix := range []string{"/api/", "/f/", "/mcp", "/.well-known/", "/oauth/", "/hooks/"} {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return path == "/healthz" || path == "/readyz" || path == "/metrics"
+}
+
+// recorder notes the status of an answer, for the metrics, and whether
+// anything was written yet, so a panic is answered only when nothing was.
 type recorder struct {
 	http.ResponseWriter
 	status int

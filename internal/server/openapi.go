@@ -8,6 +8,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 )
 
+// GET /api/v1/openapi.json: every route described in words, as OpenAPI.
+
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("GET /api/v1/openapi.json", s.handleDescribeAPI)
@@ -165,66 +167,88 @@ var rootOps = []apiOperation{
 
 // handleDescribeAPI describes the API as an OpenAPI 3.1 document, built from the
 // routes above and the engine's catalog of changes.
-func (s *Server) handleDescribeAPI(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDescribeAPI(w http.ResponseWriter, _ *http.Request) {
 	paths := map[string]map[string]any{}
+	add := func(path, method string, item map[string]any) {
+		if paths[path] == nil {
+			paths[path] = map[string]any{}
+		}
+		paths[path][strings.ToLower(method)] = item
+	}
 	prefixed := make([]apiOperation, 0, len(installOps)+len(rootOps))
 	for _, o := range installOps {
 		o.Path = "/api/v1" + o.Path
 		prefixed = append(prefixed, o)
 	}
 	for _, o := range append(prefixed, rootOps...) {
-		path := o.Path
-		params := []map[string]any{}
-		for _, seg := range strings.Split(o.Path, "/") {
-			if strings.HasPrefix(seg, "{") {
-				params = append(params, map[string]any{"name": strings.Trim(seg, "{}"), "in": "path", "required": true, "schema": map[string]string{"type": "string"}})
-			}
-		}
-		for _, q := range strings.Split(o.Query, ";") {
-			if name, desc, _ := strings.Cut(strings.TrimSpace(q), ":"); name != "" {
-				params = append(params, map[string]any{"name": name, "in": "query", "schema": map[string]string{"type": "string"}, "description": strings.TrimSpace(desc)})
-			}
-		}
-		if paths[path] == nil {
-			paths[path] = map[string]any{}
-		}
-		paths[path][strings.ToLower(o.Method)] = map[string]any{"summary": o.Summary, "tags": []string{o.Tag}, "parameters": params,
-			"responses": map[string]any{
-				"200":     map[string]any{"description": "JSON."},
-				"default": map[string]any{"description": "A refusal.", "content": map[string]any{"application/json": map[string]any{"schema": map[string]string{"$ref": "#/components/schemas/Error"}}}},
-			}}
+		params := append(pathParams(o.Path), queryParams(o.Query)...)
+		add(o.Path, o.Method, describeOperation(o, params, "JSON."))
 	}
 	for _, o := range apiOps {
-		path := "/api/v1/w/{workspace}" + o.Path
 		params := []map[string]any{{"name": "workspace", "in": "path", "required": true, "schema": map[string]string{"type": "string"},
 			"description": "The workspace's slug, or - for the workspace of the token used."}}
-		for _, seg := range strings.Split(o.Path, "/") {
-			if strings.HasPrefix(seg, "{") {
-				params = append(params, map[string]any{"name": strings.Trim(seg, "{}"), "in": "path", "required": true, "schema": map[string]string{"type": "string"}})
-			}
-		}
-		for _, q := range strings.Split(o.Query, ";") {
-			name, desc, _ := strings.Cut(strings.TrimSpace(q), ":")
-			if name == "" {
-				continue
-			}
-			params = append(params, map[string]any{"name": name, "in": "query", "schema": map[string]string{"type": "string"}, "description": strings.TrimSpace(desc)})
-		}
-		item := map[string]any{"summary": o.Summary, "tags": []string{o.Tag}, "parameters": params,
-			"responses": map[string]any{
-				"200":     map[string]any{"description": "JSON, or one line per item as text/plain when format=text or Accept: text/plain."},
-				"default": map[string]any{"description": "A refusal.", "content": map[string]any{"application/json": map[string]any{"schema": map[string]string{"$ref": "#/components/schemas/Error"}}}},
-			}}
+		params = append(params, pathParams(o.Path)...)
+		params = append(params, queryParams(o.Query)...)
+		item := describeOperation(o, params, "JSON, or one line per item as text/plain when format=text or Accept: text/plain.")
 		if o.Path == "/changes" {
 			item["requestBody"] = map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{
 				"oneOf": []map[string]string{{"$ref": "#/components/schemas/Change"}, {"$ref": "#/components/schemas/Batch"}}}}}}
 		}
-		if paths[path] == nil {
-			paths[path] = map[string]any{}
-		}
-		paths[path][strings.ToLower(o.Method)] = item
+		add("/api/v1/w/{workspace}"+o.Path, o.Method, item)
 	}
-	// Each change type with its arguments.
+	doc := map[string]any{
+		"openapi": "3.1.0",
+		"info": map[string]any{"title": "Quadit API", "version": s.cfg.Version, "description": "One API for people's browsers and for agents. " +
+			"Reads return JSON, or compact text with format=text. Every write is a named change sent to /changes. " +
+			"Names work wherever ids do: project keys, task keys (SVA-12), @handles, status and label names. " +
+			"A refusal has a code, a message, the allowed values and the nearest match. Rate limits answer 429 with Retry-After."},
+		"servers":    []map[string]string{{"url": s.cfg.BaseURL}},
+		"security":   []map[string][]string{{"token": {}}},
+		"paths":      paths,
+		"components": apiComponents(),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", " ")
+	enc.Encode(doc)
+}
+
+// pathParams describes the {name} parts of a path.
+func pathParams(path string) []map[string]any {
+	params := []map[string]any{}
+	for seg := range strings.SplitSeq(path, "/") {
+		if strings.HasPrefix(seg, "{") {
+			params = append(params, map[string]any{"name": strings.Trim(seg, "{}"), "in": "path", "required": true, "schema": map[string]string{"type": "string"}})
+		}
+	}
+	return params
+}
+
+// queryParams describes the parameters of an operation's Query: "name:
+// what it does; name2: …".
+func queryParams(query string) []map[string]any {
+	var params []map[string]any
+	for q := range strings.SplitSeq(query, ";") {
+		if name, desc, _ := strings.Cut(strings.TrimSpace(q), ":"); name != "" {
+			params = append(params, map[string]any{"name": name, "in": "query", "schema": map[string]string{"type": "string"}, "description": strings.TrimSpace(desc)})
+		}
+	}
+	return params
+}
+
+// describeOperation is one operation of the document, answering okAnswer
+// when it succeeds and an Error when it does not.
+func describeOperation(o apiOperation, params []map[string]any, okAnswer string) map[string]any {
+	return map[string]any{"summary": o.Summary, "tags": []string{o.Tag}, "parameters": params,
+		"responses": map[string]any{
+			"200":     map[string]any{"description": okAnswer},
+			"default": map[string]any{"description": "A refusal.", "content": map[string]any{"application/json": map[string]any{"schema": map[string]string{"$ref": "#/components/schemas/Error"}}}},
+		}}
+}
+
+// apiComponents are the document's shared parts: how to sign in, each
+// change type with its arguments, a batch, and the shape of a refusal.
+func apiComponents() map[string]any {
 	changes := []map[string]any{}
 	for _, ci := range engine.Catalog() {
 		props := map[string]any{}
@@ -237,31 +261,17 @@ func (s *Server) handleDescribeAPI(w http.ResponseWriter, r *http.Request) {
 			"args": map[string]any{"type": "object", "properties": props, "additionalProperties": false},
 		}, "required": []string{"id", "type"}})
 	}
-	doc := map[string]any{
-		"openapi": "3.1.0",
-		"info": map[string]any{"title": "Quadit API", "version": s.cfg.Version, "description": "One API for people's browsers and for agents. " +
-			"Reads return JSON, or compact text with format=text. Every write is a named change sent to /changes. " +
-			"Names work wherever ids do: project keys, task keys (SVA-12), @handles, status and label names. " +
-			"A refusal has a code, a message, the allowed values and the nearest match. Rate limits answer 429 with Retry-After."},
-		"servers":  []map[string]string{{"url": s.cfg.BaseURL}},
-		"security": []map[string][]string{{"token": {}}},
-		"paths":    paths,
-		"components": map[string]any{
-			"securitySchemes": map[string]any{"token": map[string]string{"type": "http", "scheme": "bearer", "description": "An API token (qd_…) issued in the workspace's settings."}},
-			"schemas": map[string]any{
-				"Change": map[string]any{"oneOf": changes},
-				"Batch": map[string]any{"type": "object", "properties": map[string]any{"changes": map[string]any{"type": "array", "items": map[string]string{"$ref": "#/components/schemas/Change"}},
-					"dry_run": map[string]string{"type": "boolean"}}},
-				"Error": map[string]any{"type": "object", "properties": map[string]any{"error": map[string]any{"type": "object", "properties": map[string]any{
-					"code":    map[string]any{"enum": []string{"invalid", "forbidden", "not_found", "conflict", "stale", "needs_approval", "budget_exceeded", "unauthorized", "rate_limited"}},
-					"message": map[string]string{"type": "string"}, "field": map[string]string{"type": "string"},
-					"allowed": map[string]any{"type": "array", "items": map[string]string{"type": "string"}}, "nearest": map[string]string{"type": "string"},
-					"index": map[string]string{"type": "integer", "description": "Which change of a batch was refused."}}}}},
-			},
+	return map[string]any{
+		"securitySchemes": map[string]any{"token": map[string]string{"type": "http", "scheme": "bearer", "description": "An API token (qd_…) issued in the workspace's settings."}},
+		"schemas": map[string]any{
+			"Change": map[string]any{"oneOf": changes},
+			"Batch": map[string]any{"type": "object", "properties": map[string]any{"changes": map[string]any{"type": "array", "items": map[string]string{"$ref": "#/components/schemas/Change"}},
+				"dry_run": map[string]string{"type": "boolean"}}},
+			"Error": map[string]any{"type": "object", "properties": map[string]any{"error": map[string]any{"type": "object", "properties": map[string]any{
+				"code":    map[string]any{"enum": []string{"invalid", "forbidden", "not_found", "conflict", "stale", "needs_approval", "budget_exceeded", "unauthorized", "rate_limited"}},
+				"message": map[string]string{"type": "string"}, "field": map[string]string{"type": "string"},
+				"allowed": map[string]any{"type": "array", "items": map[string]string{"type": "string"}}, "nearest": map[string]string{"type": "string"},
+				"index": map[string]string{"type": "integer", "description": "Which change of a batch was refused."}}}}},
 		},
 	}
-	w.Header().Set("Content-Type", "application/json")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", " ")
-	enc.Encode(doc)
 }

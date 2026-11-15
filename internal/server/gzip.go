@@ -14,12 +14,19 @@ import (
 // alone (they are compressed already, and are read in ranges), and so is
 // the live stream.
 
-var gzipPool = sync.Pool{New: func() any { w, _ := gzip.NewWriterLevel(nil, gzip.BestSpeed); return w }}
+// gzipPool keeps gzip writers for reuse: making one costs more than the
+// answers it usually compresses.
+var gzipPool = sync.Pool{New: func() any {
+	w, _ := gzip.NewWriterLevel(nil, gzip.BestSpeed) //nolint:errcheck // cannot fail: BestSpeed is a valid level
+	return w
+}}
 
+// gzipWriter compresses an answer when, at its first write, the answer
+// turns out to be worth it (decide).
 type gzipWriter struct {
 	http.ResponseWriter
-	gz      *gzip.Writer
-	decided bool
+	gz      *gzip.Writer // nil while undecided, and when not compressing
+	decided bool         // whether to compress has been settled
 }
 
 // compressible reports whether a kind of content shrinks.
@@ -32,6 +39,9 @@ func compressible(contentType string) bool {
 		strings.Contains(ct, "xml") || strings.Contains(ct, "wasm")
 }
 
+// decide settles, from the status and headers about to be sent, whether to
+// compress the answer: a body worth compressing, of a kind that shrinks,
+// not already encoded, and not known to be under 1 KB.
 func (g *gzipWriter) decide(status int) {
 	if g.decided {
 		return
@@ -57,6 +67,8 @@ func (g *gzipWriter) WriteHeader(status int) {
 	g.ResponseWriter.WriteHeader(status)
 }
 
+// Write decides on the first write, telling the content's type from the
+// bytes when the handler did not set one.
 func (g *gzipWriter) Write(b []byte) (int, error) {
 	if !g.decided {
 		if g.Header().Get("Content-Type") == "" {
@@ -70,9 +82,10 @@ func (g *gzipWriter) Write(b []byte) (int, error) {
 	return g.ResponseWriter.Write(b)
 }
 
+// Flush sends what was compressed so far, for answers that stream.
 func (g *gzipWriter) Flush() {
 	if g.gz != nil {
-		g.gz.Flush()
+		_ = g.gz.Flush() //nolint:errcheck // Flush cannot report it; the next Write fails the same way
 	}
 	if f, ok := g.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
