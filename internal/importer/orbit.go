@@ -81,7 +81,7 @@ func (r *orbitReader) members() error {
 		UserID          string `json:"user_id"`
 	}]
 	if getJSON(r.base+"/members", r.token, &members) != nil {
-		return nil // the token may not read members: people are known by their ids
+		return nil //nolint:nilerr // the token may not read members: people are known by their ids
 	}
 	for _, m := range members.Items {
 		name := orStr(m.DisplayName, m.Name)
@@ -275,7 +275,7 @@ func (r *orbitReader) docs() error {
 		ParentID  string `json:"parent_id"`
 	}]
 	if getJSON(r.base+"/docs", r.token, &docs) != nil {
-		return nil // docs need a scope the token may not have
+		return nil //nolint:nilerr // docs need a scope the token may not have
 	}
 	for _, d := range docs.Items {
 		var full struct{ Markdown string }
