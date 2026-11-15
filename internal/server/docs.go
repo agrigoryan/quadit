@@ -192,7 +192,7 @@ func (s *Server) handleShowPage(x *c) error {
 	if format := x.r.URL.Query().Get("format"); format == "md" || x.wantText() {
 		return x.text(pageText(page, blocks, format, x.maxChars()))
 	}
-	out, err := x.pageRows(page, blocks)
+	out, err := x.pageAnswer(page, blocks)
 	if err != nil {
 		return err
 	}
@@ -213,11 +213,11 @@ func pageText(page core.Doc, blocks []core.Block, format string, maxChars int) s
 	return fmt.Sprintf("# %s\n(doc %s, seq %d)\n\n%s", firstNonEmpty(page.Title, "Untitled"), page.ID, page.ContentSeq, text)
 }
 
-// pageRows is a page as rows for the editor: with its blocks, its
+// pageAnswer is a page as the editor reads it: with its blocks, its
 // sub-pages, a database's properties, views and rows, its comments, what
 // mentions it and what it mentions, its files, and the source it is synced
 // from.
-func (x *c) pageRows(page core.Doc, blocks []core.Block) (map[string]any, error) {
+func (x *c) pageAnswer(page core.Doc, blocks []core.Block) (map[string]any, error) {
 	ctx := x.ctx()
 	out := map[string]any{"doc": page, "blocks": blocks}
 	var children []core.Doc
@@ -225,10 +225,18 @@ func (x *c) pageRows(page core.Doc, blocks []core.Block) (map[string]any, error)
 		return nil, err
 	}
 	if page.Kind == core.DocDatabase {
-		var err error
-		if children, err = x.addDatabaseRows(page, children, out); err != nil {
+		// A database's children are its rows; any others are its sub-pages.
+		var props []core.DBProperty
+		var views []core.DBView
+		if err := x.db.List(ctx, &props, store.Q{Where: []store.Cond{store.Eq("database_id", page.ID), store.Live}, Order: "rank"}); err != nil {
 			return nil, err
 		}
+		if err := x.db.List(ctx, &views, store.Q{Where: []store.Cond{store.Eq("database_id", page.ID), store.Live}, Order: "rank"}); err != nil {
+			return nil, err
+		}
+		out["properties"], out["views"] = props, views
+		out["rows"] = keep(children, func(child core.Doc) bool { return child.Kind == core.DocRow })
+		children = keep(children, func(child core.Doc) bool { return child.Kind != core.DocRow })
 	}
 	out["children"] = children
 	var comments []core.Comment
@@ -261,22 +269,6 @@ func (x *c) pageRows(page core.Doc, blocks []core.Block) (map[string]any, error)
 		}
 	}
 	return out, nil
-}
-
-// addDatabaseRows adds a database's properties, views and rows to its
-// answer, and returns its children without the rows: its sub-pages.
-func (x *c) addDatabaseRows(database core.Doc, children []core.Doc, out map[string]any) ([]core.Doc, error) {
-	var props []core.DBProperty
-	var views []core.DBView
-	if err := x.db.List(x.ctx(), &props, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
-		return nil, err
-	}
-	if err := x.db.List(x.ctx(), &views, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
-		return nil, err
-	}
-	out["properties"], out["views"] = props, views
-	out["rows"] = keep(children, func(child core.Doc) bool { return child.Kind == core.DocRow })
-	return keep(children, func(child core.Doc) bool { return child.Kind != core.DocRow }), nil
 }
 
 // handleListPageVersions lists a page's saved versions, newest first,
