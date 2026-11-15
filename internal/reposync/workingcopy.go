@@ -201,9 +201,11 @@ func (w *workingCopy) read() (folder, error) {
 		if err != nil {
 			return err
 		}
-		if len(raw) < maxPageFile {
-			f.files[rel] = string(raw)
+		if len(raw) >= maxPageFile {
+			f.taken[rel] = true // not a page, and not to be written over by one
+			return nil
 		}
+		f.files[rel] = string(raw)
 		return nil
 	})
 	return f, err

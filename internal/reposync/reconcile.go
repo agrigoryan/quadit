@@ -30,7 +30,7 @@ type syncedPage struct {
 type folder struct {
 	files map[string]string // each Markdown file: path under the folder -> text
 	// taken are other paths under the folder that no page's file may be
-	// given: a link or a folder stands there.
+	// given: a link, a folder or a file too large to be a page stands there.
 	taken   map[string]bool
 	missing bool // the repository has no such folder (yet)
 }
