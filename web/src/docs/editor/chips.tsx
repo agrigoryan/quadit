@@ -31,8 +31,10 @@ export function TaskChip({ taskKey }: { taskKey: string }) {
   const task = useTaskByKeyEvenIfGone(taskKey);
   const category = useRowEvenIfGone("statuses", task?.status_id)?.category;
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- a chip inside the editor's text: the caret moves over it, and the mouse opens it
     <span
       className={cx("qd-chip qd-task", (!task || !!task.deleted_at) && "is-missing")}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- an <a> inside the editor's text would be edited as a link of the text
       role="link"
       tabIndex={-1}
       onMouseDown={(e) => e.preventDefault()}
@@ -70,8 +72,10 @@ export function DecisionChip({ decisionRef }: { decisionRef: string }) {
   const mine = !!decision && decision.state === "open" && decision.asked_id === meId;
   const open = decision?.state === "open";
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- a chip inside the editor's text: the caret moves over it, and the mouse opens it
     <span
       className={cx("qd-chip qd-decision", !decision && "is-missing")}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- an <a> inside the editor's text would be edited as a link of the text
       role="link"
       tabIndex={-1}
       title={decision ? `${decisionRef.toUpperCase()} · ${decision.question}` : undefined}
@@ -98,8 +102,10 @@ export function PageChip({ docId }: { docId: string }) {
   const doc = useRowEvenIfGone("docs", docId);
   const gone = !doc || !!doc.deleted_at;
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- a chip inside the editor's text: the caret moves over it, and the mouse opens it
     <span
       className={cx("qd-chip qd-page", gone && "is-missing")}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- an <a> inside the editor's text would be edited as a link of the text
       role="link"
       tabIndex={-1}
       onMouseDown={(e) => e.preventDefault()}

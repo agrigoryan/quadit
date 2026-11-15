@@ -61,6 +61,7 @@ function Row({ item }: { item: Item }) {
           <DecisionMark mine title={t("dash.waiting.question")} />
         ) : (
           <span
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a picture drawn with CSS or SVG, not an image file
             role="img"
             aria-label={t("dash.waiting.task")}
             className="flex size-[15px] items-center justify-center rounded-xs bg-move text-move-ink"

@@ -154,6 +154,7 @@ export function Description({ task, loading }: { task: Task; loading: boolean })
   return (
     <div className="group relative mt-2">
       {/* The pencil is the keyboard's way in; the click is a shortcut for the mouse. */}
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- see above */}
       <div onClick={clickToEdit} className={readOnly ? undefined : "cursor-text"}>
         <Markdown text={text} />
       </div>

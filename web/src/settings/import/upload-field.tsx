@@ -89,6 +89,7 @@ export function UploadField({ accept, label, value, onChange, onBusy, error }: P
       </div>
       {sending && (
         <div
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the bar is a child element drawn to match the app; <progress> is drawn by the browser
           role="progressbar"
           aria-label={sending.name}
           aria-valuemin={0}

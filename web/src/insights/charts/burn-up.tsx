@@ -92,9 +92,12 @@ export function BurnUp({ days, unit, today }: Props) {
         ]}
         className="mb-1"
       />
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the chart takes the focus, and the arrows step through its days */}
       <div
         ref={box}
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- as above
         tabIndex={0}
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a chart's days, not form fields: <fieldset> is for those
         role="group"
         aria-label={
           end

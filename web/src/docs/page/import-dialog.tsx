@@ -53,6 +53,7 @@ export function ImportDialog({ doc, open, onClose }: { doc: Doc; open: boolean; 
           <button
             key={m}
             type="button"
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
             role="radio"
             aria-checked={mode === m}
             onClick={() => setMode(m)}

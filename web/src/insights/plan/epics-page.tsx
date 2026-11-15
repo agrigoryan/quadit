@@ -134,6 +134,7 @@ function EpicBadges({ epic, tally }: { epic: Epic; tally: Tally | undefined }) {
       {risk && (
         <Tooltip label={t("dash.epics.atRisk", { why: riskLabel(risk) })} side="top">
           <span
+            // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the keyboard can show the tooltip that says why the epic is at risk
             tabIndex={0}
             className="inline-flex h-5 shrink-0 items-center gap-1 rounded-sm bg-wait-soft px-1.5 text-xs font-medium text-wait"
           >

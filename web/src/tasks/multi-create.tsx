@@ -105,6 +105,7 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
         </>
       }
     >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- keys typed in the form's fields bubble up to here; the form itself is not a control */}
       <form
         onSubmit={(e) => {
           e.preventDefault();

@@ -105,6 +105,7 @@ export const TaskRow = memo(function TaskRow({
       {onSelect && !context && (
         <button
           type="button"
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as a box; a native checkbox would need a hidden input and a label; Shift-click picks a range
           role="checkbox"
           aria-checked={!!selected}
           aria-label={t("list.select", { key: task.key })}

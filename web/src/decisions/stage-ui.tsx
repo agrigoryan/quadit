@@ -62,6 +62,7 @@ export function ZoomControls({ c }: { c: Compare }) {
   const { zoom } = c;
   const percent = Math.round(c.fit * zoom.view.k * 100);
   return (
+    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a set of buttons, not form fields: <fieldset> is for those
     <div role="group" aria-label={t("compare.zoom")} className="flex items-center">
       <StageButton
         tip={t("compare.zoomOut")}

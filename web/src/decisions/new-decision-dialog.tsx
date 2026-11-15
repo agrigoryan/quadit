@@ -152,6 +152,7 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
         </>
       }
     >
+      {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- keys typed in the form's fields bubble up to here; the form itself is not a control */}
       <div ref={form} className="flex flex-col gap-4" onKeyDown={(e) => sendOnModEnter(e, submit)}>
         <FormField label={t("decision.new.question")} htmlFor={ids.question} error={questionError}>
           <Input

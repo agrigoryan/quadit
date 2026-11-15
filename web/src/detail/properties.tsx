@@ -122,6 +122,7 @@ export function Properties({ task, side }: Props) {
           <PropRow label={t("prop.workingFor")} wide>
             <Tooltip label={t("prop.workingForHint", { name: askedBy.name })}>
               <span
+                // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the keyboard can show the tooltip that says whom the agent works for
                 tabIndex={0}
                 className="flex h-7 min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-md text-sm text-ink-2 max-md:h-9"
               >

@@ -80,6 +80,7 @@ export function AddStatusColumn({ project }: { project: Project }) {
 
   return (
     <section aria-label={t("col.add")} className="w-72 shrink-0 rounded-lg bg-sunken p-2 max-sm:w-[82vw]">
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- keys typed in the form's fields bubble up to here; the form itself is not a control */}
       <form
         onSubmit={(e) => void add(e)}
         onKeyDown={(e) => {

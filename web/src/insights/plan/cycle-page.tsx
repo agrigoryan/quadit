@@ -185,6 +185,7 @@ function BurnPanel({ cycle, hasPoints }: { cycle: Cycle; hasPoints: boolean }) {
         <span className="flex items-center gap-2">
           {hasPoints && (
             <span
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a set of buttons, not form fields: <fieldset> is for those
               role="group"
               aria-label={t("cycle.chart.unit")}
               className="flex items-center rounded-md bg-sunken p-0.5"

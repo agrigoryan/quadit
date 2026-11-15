@@ -132,6 +132,7 @@ export function OptionEditor(props: Props) {
   const position = index + 1;
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a drop target for files dragged in from outside; the option's file button adds them from the keyboard
     <li
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes("Files")) return;

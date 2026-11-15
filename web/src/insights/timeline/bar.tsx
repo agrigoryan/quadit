@@ -176,6 +176,7 @@ export function Bar({
       style={{ left: xOf(scale, shown.s), width: (shown.e - shown.s + 1) * scale.dayW }}
     >
       <div
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the bar itself is dragged to change its dates, with its own keys; an <input type=range> cannot be
         role="slider"
         tabIndex={0}
         aria-label={name}

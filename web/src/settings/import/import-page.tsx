@@ -46,6 +46,7 @@ function SourceCards({
         <button
           key={s.kind}
           type="button"
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
           role="radio"
           aria-checked={value === s.kind}
           disabled={disabled}

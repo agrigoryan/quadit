@@ -29,6 +29,7 @@ function UsedBy({ ids }: { ids: string[] }) {
     <span className="inline-flex items-center gap-1.5 align-middle">
       {known.map((m) => (
         <Tooltip key={m.user_id} label={`${m.name} · @${m.handle}`}>
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the keyboard can show the tooltip with the agent's name */}
           <span className="inline-flex" tabIndex={0}>
             <Avatar member={m} size="sm" />
             <span className="sr-only">@{m.handle}</span>

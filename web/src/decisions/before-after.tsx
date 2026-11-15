@@ -48,6 +48,7 @@ export function SwipeHandle({ pos, onChange }: HandleProps) {
 
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a handle dragged across the two pictures, with its own keys; an <input type=range> cannot lie over them
       role="slider"
       tabIndex={0}
       aria-label={t("decision.pair.slider")}

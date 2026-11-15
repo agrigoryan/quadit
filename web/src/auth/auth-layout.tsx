@@ -64,6 +64,7 @@ export function TextLink({ to, children }: { to: string; children: ReactNode }) 
 /** "or", between two ways of doing the same thing. */
 export function OrLine({ children }: { children: ReactNode }) {
   return (
+    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a line with words in the middle, which an <hr> cannot hold
     <div className="my-2 flex items-center gap-3 text-xs text-ink-3" role="separator">
       <span className="h-px flex-1 bg-line-strong" />
       {children}

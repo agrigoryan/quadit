@@ -140,6 +140,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
         </>
       }
     >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- keys typed in the form's fields bubble up to here; the form itself is not a control */}
       <form onSubmit={submit} onKeyDown={(e) => sendOnModEnter(e, submit)} className="flex flex-col gap-2.5">
         <div className="flex items-center gap-2">
           <ProjectSelect value={projectId} onPick={changeProject} />

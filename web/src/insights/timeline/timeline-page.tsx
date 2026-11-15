@@ -104,6 +104,7 @@ function Timeline({ project }: { project: Project }) {
             <button
               key={z}
               type="button"
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
               role="radio"
               aria-checked={zoom === z}
               onClick={() => pickZoom(z)}

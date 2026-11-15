@@ -71,6 +71,7 @@ function TransferRow({ item }: { item: Transfer }) {
         <span className="shrink-0 text-xs text-ink-3">{fileSize(item.total)}</span>
       </div>
       <div
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the bar is a child element drawn to match the app; <progress> is drawn by the browser
         role="progressbar"
         aria-label={item.name}
         aria-valuemin={0}

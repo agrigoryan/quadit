@@ -100,6 +100,7 @@ export function BudgetBar({ agent, className }: BudgetProps) {
         {time && <span className="text-ink-3">{time}</span>}
       </div>
       <div
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the bar is a child element drawn to match the app; <meter> is drawn by the browser
         role="meter"
         aria-label={label}
         aria-valuemin={0}

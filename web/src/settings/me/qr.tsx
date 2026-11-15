@@ -31,6 +31,7 @@ export function QrCode({ value, label, size = 176 }: Props) {
   const box = count + quiet * 2;
   return (
     <svg
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a picture drawn with CSS or SVG, not an image file
       role="img"
       aria-label={label}
       width={size}

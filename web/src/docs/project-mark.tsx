@@ -27,6 +27,7 @@ export function ProjectMark({ projectId, className }: Props) {
   const label = project ? t("docs.project.in", { project: project.name }) : t("docs.project.notInParents");
   return (
     <Tooltip label={label}>
+      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a picture drawn with CSS or SVG, not an image file */}
       <span role="img" aria-label={label} className={cx("flex shrink-0 items-center", className)}>
         {project ? <ProjectGlyph project={project} /> : <NoProjectGlyph />}
       </span>

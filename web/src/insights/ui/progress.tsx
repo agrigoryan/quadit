@@ -22,6 +22,7 @@ export function Progress({ done, started = 0, total, className, thin }: Props) {
     started > 0 ? t("ins.progress.withStarted", { done, started, total }) : t("ins.progress", { done, total });
   return (
     <span
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a picture drawn with CSS or SVG, not an image file
       role="img"
       aria-label={label}
       title={label}

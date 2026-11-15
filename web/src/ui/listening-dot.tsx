@@ -11,6 +11,7 @@ export function ListeningDot({ on, className }: { on: boolean; className?: strin
   const label = on ? t("agents.listening") : t("agents.notListening");
   return (
     <span
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a picture drawn with CSS or SVG, not an image file
       role="img"
       aria-label={label}
       title={on ? t("agents.listeningHint") : t("agents.notListeningHint")}

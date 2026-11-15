@@ -53,6 +53,7 @@ function Bar({ row }: { row: ProjectRow }) {
   return (
     <div
       ref={box}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a chart's parts, not form fields: <fieldset> is for those
       role="group"
       aria-label={t("ins.chart.statusLabel", { project: row.project, summary })}
       className="flex h-7 gap-0.5"
@@ -66,6 +67,7 @@ function Bar({ row }: { row: ProjectRow }) {
         return (
           <Tooltip key={part.status} label={tip} side="top">
             <span
+              // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- each part of the bar can be stepped to with Tab, to read its numbers in the tooltip
               tabIndex={0}
               aria-label={tip}
               className="flex h-full min-w-1 items-center rounded-[4px] pl-1.5 text-xs font-semibold tnum outline-offset-2 hover:brightness-110"
@@ -102,6 +104,7 @@ export function StatusStack({ rows, names }: { rows: StatusCount[]; names: Recor
           {row.total > 0 ? (
             <Bar row={row} />
           ) : (
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a picture drawn with CSS or SVG, not an image file
             <div className="h-7 rounded-[4px] bg-sunken" role="img" aria-label={t("ins.chart.noTasks")} />
           )}
         </div>

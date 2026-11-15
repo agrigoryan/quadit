@@ -175,7 +175,9 @@ function Diamond({ x, label }: { x: number; label: string }) {
   return (
     <Tooltip label={label} side="top">
       <span
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a diamond drawn with CSS, not an image file
         role="img"
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the keyboard can show the milestone's name in the tooltip
         tabIndex={0}
         aria-label={label}
         className="absolute top-1/2 z-[1] flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"

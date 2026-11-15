@@ -62,6 +62,7 @@ export function Transport({ c }: { c: Compare }) {
 
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a set of buttons, not form fields: <fieldset> is for those
       role="group"
       aria-label={t("compare.transport")}
       className="flex h-11 shrink-0 items-center gap-2 border-t border-white/10 bg-inverse px-3"

@@ -90,6 +90,7 @@ export function ChartTip({ x, width, title, rows }: TipProps) {
   const left = Math.min(Math.max(x, half), Math.max(half, width - half));
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- it holds paragraphs, which an <output> cannot
       role="status"
       className="pointer-events-none absolute -top-12 z-10 w-40 -translate-x-1/2 rounded-sm bg-inverse px-2 py-1.5 text-xs text-inverse-ink shadow-pop"
       style={{ left }}

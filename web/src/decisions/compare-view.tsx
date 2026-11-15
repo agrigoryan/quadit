@@ -120,6 +120,7 @@ export function CompareView(props: CompareProps) {
               {c.decision.question}
             </RDialog.Title>
             {paged && (
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a set of buttons, not form fields: <fieldset> is for those
               <div role="group" aria-label={t("compare.pages")} className="flex items-center">
                 <StageButton
                   aria-label={t("compare.prevPage")}

@@ -70,6 +70,7 @@ export function SharePopover({ doc }: { doc: Doc }) {
                   <li key={m.user_id}>
                     <button
                       type="button"
+                      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as a box; a native checkbox would need a hidden input and a label
                       role="checkbox"
                       aria-checked={shared.includes(m.user_id)}
                       disabled={!mayChange}
@@ -123,6 +124,7 @@ function Choice({
   return (
     <button
       type="button"
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
       role="radio"
       aria-checked={checked}
       disabled={disabled || checked}

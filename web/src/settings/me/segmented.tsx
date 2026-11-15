@@ -28,6 +28,7 @@ export function Segmented<T extends string>({ label, value, onChange, options, d
     buttons[(i + step + options.length) % options.length]?.focus();
   }
   return (
+    // oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the focus is on the picked radio inside (one Tab stop); the arrows move it
     <div
       role="radiogroup"
       aria-label={label}
@@ -40,6 +41,7 @@ export function Segmented<T extends string>({ label, value, onChange, options, d
           <button
             key={o.value}
             type="button"
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
             role="radio"
             aria-checked={on}
             tabIndex={on ? 0 : -1}

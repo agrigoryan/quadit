@@ -94,6 +94,7 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
           <svg
             width={width}
             height={H}
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a chart's parts, not form fields: <fieldset> is for those
             role="group"
             aria-label={t("ins.chart.weeklyLabel", { n: weeks.length })}
             className="block"
@@ -120,6 +121,7 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
                 <g
                   key={w.week}
                   tabIndex={0}
+                  // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a bar of the chart, drawn in SVG, named for a screen reader
                   role="img"
                   aria-label={label}
                   onPointerEnter={() => setAt(i)}

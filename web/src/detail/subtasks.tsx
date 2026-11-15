@@ -124,6 +124,7 @@ export function Subtasks({ task, subtasks, focusAdd }: Props) {
         total > 0 && (
           <span className="flex items-center gap-2 text-xs text-ink-3 tnum">
             <span
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the bar is a child element drawn to match the app; <progress> is drawn by the browser
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={total}

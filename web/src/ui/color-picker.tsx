@@ -19,6 +19,7 @@ export function ColorPicker({ value, onChange, label }: ColorProps) {
         <button
           key={color}
           type="button"
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
           role="radio"
           aria-checked={value.toLowerCase() === color}
           aria-label={tMaybe(`swatch.${color}`, color)}
