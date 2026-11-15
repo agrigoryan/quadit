@@ -11,7 +11,9 @@ import (
 )
 
 // masker passes text through with secret values blanked out. It holds back
-// an unfinished line, so a value split across two writes is still caught.
+// an unfinished line, and a value that may run on into the next write (one
+// with a line end in it, begun before the last line end), so a value split
+// across two writes is still caught.
 type masker struct {
 	mu     sync.Mutex
 	w      io.Writer
@@ -48,13 +50,37 @@ func (m *masker) Write(p []byte) (int, error) {
 	if i < 0 && len(m.held) < maskHold {
 		return len(p), nil
 	}
+	cut := i + 1
 	if i < 0 {
-		i = len(m.held) - 1
+		cut = len(m.held)
 	}
-	out := m.held[:i+1]
-	m.held = append([]byte(nil), m.held[i+1:]...)
+	cut = m.safeCut(m.held, cut)
+	out := m.held[:cut]
+	m.held = append([]byte(nil), m.held[cut:]...)
 	_, err := m.w.Write(m.mask(out))
 	return len(p), err
+}
+
+// safeCut moves cut back, if need be, so that no secret value in b crosses
+// it: one that begins before cut and ends after it, or that begins before cut
+// and runs to the end of b, where the next write may finish it. What is
+// before the cut can then be masked on its own.
+func (m *masker) safeCut(b []byte, cut int) int {
+	for moved := true; moved; {
+		moved = false
+		for _, v := range m.values {
+			for start := max(0, cut-len(v)+1); start < cut; start++ {
+				rest := b[start:]
+				crosses := len(rest) >= len(v) && bytes.HasPrefix(rest, []byte(v))
+				begun := len(rest) < len(v) && bytes.HasPrefix([]byte(v), rest)
+				if crosses || begun {
+					cut, moved = start, true
+					break
+				}
+			}
+		}
+	}
+	return cut
 }
 
 // mask blanks every secret value out of b.

@@ -39,6 +39,10 @@ func TestMaskerBlanksSecrets(t *testing.T) {
 		{"a value too short to blank", map[string]string{"A": "abc"}, []string{"abc\n"}, "abc\n"},
 		{"an empty value", map[string]string{"A": ""}, []string{"plain text\n"}, "plain text\n"},
 		{"no secrets", nil, []string{"plain", " text\n"}, "plain text\n"},
+		{"a secret with a line end, written at it", map[string]string{"K": "BEGIN\nkey\nEND"}, []string{"pem: BEGIN\n", "key\nEND\n"}, "pem: •••\n"},
+		{"a secret with a line end, written past it", map[string]string{"K": "BEGIN\nkey\nEND"}, []string{"pem: BEGIN\nk", "ey\nEND\n"}, "pem: •••\n"},
+		{"a secret with a line end, written whole", map[string]string{"K": "BEGIN\nkey\nEND"}, []string{"pem: BEGIN\nkey\nEND\n"}, "pem: •••\n"},
+		{"a line that only starts like a secret", map[string]string{"K": "BEGIN\nkey\nEND"}, []string{"pem: BEGIN\n", "other\n"}, "pem: BEGIN\nother\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
