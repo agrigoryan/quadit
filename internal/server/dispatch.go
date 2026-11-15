@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,8 +30,16 @@ func init() {
 	})
 }
 
+// Timing and size of the dispatcher's passes.
+const (
+	dispatchTick  = 5 * time.Second // a pass at least this often, and on every write
+	dispatchBatch = 300             // events handled per batch
+	notifyDelay   = 20 * time.Second
+)
+
+// runDispatcher turns new events into wake-ups until ctx ends.
 func (s *Server) runDispatcher(ctx context.Context) {
-	tick := time.NewTicker(5 * time.Second)
+	tick := time.NewTicker(dispatchTick)
 	defer tick.Stop()
 	for {
 		wake := s.hub.Any()
@@ -46,6 +55,7 @@ func (s *Server) runDispatcher(ctx context.Context) {
 	}
 }
 
+// dispatchAll brings every workspace's dispatched position up to its last event.
 func (s *Server) dispatchAll(ctx context.Context) error {
 	var wss []core.Workspace
 	if err := s.st.List(ctx, &wss, store.Where(store.Live)); err != nil {
@@ -70,26 +80,23 @@ func (s *Server) dispatchAll(ctx context.Context) error {
 // position.
 func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error) {
 	db := s.st.In(ws.ID)
-	evs, err := db.Events(ctx, store.EventFilter{After: ws.DispatchedSeq, Limit: 300})
+	evs, err := db.Events(ctx, store.EventFilter{After: ws.DispatchedSeq, Limit: dispatchBatch})
 	if err != nil || len(evs) == 0 {
 		return ws.DispatchedSeq, err
 	}
-	var hooks []core.Webhook
-	var rules []core.Rule
-	if err := db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true))); err != nil {
+	l := listeners{ws: ws, db: db}
+	if err := db.List(ctx, &l.hooks, store.Where(store.Live, store.Eq("active", true))); err != nil {
 		return 0, err
 	}
-	if err := db.List(ctx, &rules, store.Where(store.Live, store.Eq("active", true))); err != nil {
+	if err := db.List(ctx, &l.rules, store.Where(store.Live, store.Eq("active", true))); err != nil {
 		return 0, err
 	}
-	// Saved views someone watches: a task that comes into one is news for them.
-	var viewWatchers []core.Watcher
-	if err := db.List(ctx, &viewWatchers, store.Where(store.Eq("subject_type", "view"))); err != nil {
+	if err := db.List(ctx, &l.viewWatchers, store.Where(store.Eq("subject_type", "view"))); err != nil {
 		return 0, err
 	}
 	for _, ev := range evs {
 		// Webhooks mirror the feed, history too: its payload says quiet.
-		for _, h := range hooks {
+		for _, h := range l.hooks {
 			if hookWants(h, ev) {
 				if err := s.queueDelivery(ctx, db, h, ev); err != nil {
 					return 0, err
@@ -97,12 +104,22 @@ func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error)
 			}
 		}
 		if isNews(ev) {
-			s.reactToNews(ctx, ws, db, ev, hooks, rules, viewWatchers)
+			s.reactToNews(ctx, l, ev)
 		}
 	}
 	last := evs[len(evs)-1].Seq
 	_, err = s.st.Update(ctx, "workspaces", map[string]any{"dispatched_seq": last}, store.Eq("id", ws.ID), store.Lt("dispatched_seq", last))
 	return last, err
+}
+
+// listeners is what in one workspace reacts to its events, read once for
+// a batch of them.
+type listeners struct {
+	ws           core.Workspace
+	db           store.DB
+	hooks        []core.Webhook
+	rules        []core.Rule
+	viewWatchers []core.Watcher // saved views someone watches: a task that comes into one is news for them
 }
 
 // isNews says whether an event is something happening now, which rules,
@@ -113,16 +130,19 @@ func isNews(ev core.Event) bool {
 	var d struct {
 		Quiet bool `json:"quiet"`
 	}
-	json.Unmarshal(ev.Data, &d)
+	if err := json.Unmarshal(ev.Data, &d); err != nil {
+		return true // data that does not read says nothing of being quiet
+	}
 	return !d.Quiet
 }
 
 // reactToNews does what one event of news sets off: alerts for the saved
 // views it brings a task into, the rules it matches, and a wake-up (push or
 // mail) for an inbox item.
-func (s *Server) reactToNews(ctx context.Context, ws core.Workspace, db store.DB, ev core.Event, hooks []core.Webhook, rules []core.Rule, viewWatchers []core.Watcher) {
-	if len(viewWatchers) > 0 && ev.AudienceID == "" && ev.ScopeType == "task" && (ev.Type == "task.created" || ev.Type == "task.updated") {
-		for _, vw := range viewWatchers {
+func (s *Server) reactToNews(ctx context.Context, l listeners, ev core.Event) {
+	ws := l.ws
+	if len(l.viewWatchers) > 0 && ev.AudienceID == "" && ev.ScopeType == "task" && (ev.Type == "task.created" || ev.Type == "task.updated") {
+		for _, vw := range l.viewWatchers {
 			if vw.UserID == ev.ActorID {
 				continue
 			}
@@ -131,9 +151,9 @@ func (s *Server) reactToNews(ctx context.Context, ws core.Workspace, db store.DB
 			}
 		}
 	}
-	if len(rules) > 0 && ev.AudienceID == "" && !strings.Contains(string(ev.Data), `"rule":`) {
-		for _, r := range rules {
-			if err := s.runRule(ctx, ws, db, r, hooks, ev); err != nil {
+	if len(l.rules) > 0 && ev.AudienceID == "" && !strings.Contains(string(ev.Data), `"rule":`) {
+		for _, r := range l.rules {
+			if err := s.runRule(ctx, l, r, ev); err != nil {
 				s.log.Error("rule", "rule", r.Name, "seq", ev.Seq, "err", err)
 			}
 		}
@@ -144,37 +164,42 @@ func (s *Server) reactToNews(ctx context.Context, ws core.Workspace, db store.DB
 		}
 		if json.Unmarshal(ev.Data, &d) == nil && d.Row.ID != "" {
 			// Give the person a moment to see it in an open window first.
-			s.enqueue(ctx, "notify", ws.ID, "notify:"+d.Row.ID, map[string]string{"id": d.Row.ID}, time.Now().Add(20*time.Second))
+			s.enqueue(ctx, "notify", ws.ID, "notify:"+d.Row.ID, map[string]string{"id": d.Row.ID}, time.Now().Add(notifyDelay))
 		}
 	}
 }
 
 // viewNews tells the watcher of a saved view when a change leaves a task in
 // that view. A task is announced once a day at most, however often it moves.
+// A view or a watcher that is gone, or a view whose query no longer reads,
+// has nothing to tell.
 func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watcher, ev core.Event) error {
 	db := s.st.In(ws.ID)
 	var view core.View
 	var m core.Member
-	if db.Get(ctx, &view, store.Eq("id", vw.SubjectID), store.Live) != nil || db.Get(ctx, &m, store.Eq("user_id", vw.UserID), store.Null("removed_at")) != nil {
+	if there, err := rowFound(db.Get(ctx, &view, store.Eq("id", vw.SubjectID), store.Live)); err != nil || !there {
+		return err
+	}
+	if there, err := rowFound(db.Get(ctx, &m, store.Eq("user_id", vw.UserID), store.Null("removed_at"))); err != nil || !there {
+		return err
+	}
+	q, ok := viewQuery(view)
+	if !ok {
 		return nil
 	}
-	// Run the view's query as the watcher, narrowed to this one task.
+	// Run the view's query as the watcher, narrowed to this one task. The
+	// query is read by the same code that answers requests, which reads
+	// through a request: this one is made up, and carries ctx.
 	x := &c{s: s, r: (&http.Request{URL: &url.URL{}}).WithContext(ctx), ws: ws, db: db, member: m}
 	if m.Scope != nil {
 		x.projects = m.Scope.Projects
 	}
-	var q TaskQuery
-	if len(view.Query) > 0 {
-		if err := json.Unmarshal(view.Query, &q); err != nil {
-			return nil
-		}
+	f, err := x.filter(q) //nolint:contextcheck // x carries ctx in its made-up request
+	if _, refused := errors.AsType[*engine.Error](err); refused {
+		return nil // the view names something that is gone, or out of the watcher's reach: nothing to watch
 	}
-	if view.ProjectID != "" && len(q.Project) == 0 {
-		q.Project = []string{view.ProjectID}
-	}
-	f, err := x.filter(q)
 	if err != nil {
-		return nil // the view names something that is gone; nothing to watch
+		return err
 	}
 	f.IDs, f.Limit, f.Offset, f.Sort = []string{ev.ScopeID}, 1, 0, ""
 	if n, err := db.CountTasks(ctx, f); err != nil || n == 0 {
@@ -187,6 +212,21 @@ func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watche
 		}
 		return sys.Do("notify", map[string]any{"user": vw.UserID, "task": ev.ScopeID, "message": "in your view \"" + view.Name + "\""})
 	})
+}
+
+// viewQuery reads a saved view's query, with the view's project when the
+// query names none. It reports false when the query does not read.
+func viewQuery(view core.View) (TaskQuery, bool) {
+	var q TaskQuery
+	if len(view.Query) > 0 {
+		if err := json.Unmarshal(view.Query, &q); err != nil {
+			return q, false
+		}
+	}
+	if view.ProjectID != "" && len(q.Project) == 0 {
+		q.Project = []string{view.ProjectID}
+	}
+	return q, true
 }
 
 // typeMatches checks an event type against a list where "task.*" covers a
@@ -220,62 +260,105 @@ func hookWants(h core.Webhook, ev core.Event) bool {
 }
 
 // runRule applies one rule to one event if it matches.
-func (s *Server) runRule(ctx context.Context, ws core.Workspace, db store.DB, r core.Rule, hooks []core.Webhook, ev core.Event) error {
-	m, a := r.Match, r.Action
-	if a == nil {
+func (s *Server) runRule(ctx context.Context, l listeners, r core.Rule, ev core.Event) error {
+	if r.Action == nil {
 		return nil
 	}
-	if m == nil {
-		m = &core.RuleMatch{}
-	}
-	if !typeMatches(m.EventTypes, ev.Type) || (m.ProjectID != "" && m.ProjectID != ev.ProjectID) || (m.ActorID != "" && m.ActorID != ev.ActorID) {
-		return nil
-	}
-	var d struct {
-		Key     string                      `json:"key"`
-		Row     json.RawMessage             `json:"row"`
-		Changes map[string]core.FieldChange `json:"changes"`
-	}
-	json.Unmarshal(ev.Data, &d)
-	if m.ActorKind != "" {
-		var actor core.Member
-		if err := db.Get(ctx, &actor, store.Eq("user_id", ev.ActorID)); err != nil || actor.Kind != m.ActorKind {
-			return nil
-		}
-	}
-	if m.Outcome != "" {
-		var dc core.Decision
-		if json.Unmarshal(d.Row, &dc) != nil || dc.Outcome != m.Outcome {
-			return nil
-		}
-	}
-	if m.ToCategory != "" {
-		to, _ := d.Changes["status_id"].To.(string)
-		var st core.Status
-		if to == "" || db.Get(ctx, &st, store.Eq("id", to)) != nil || st.Category != m.ToCategory {
-			return nil
-		}
+	if ok, err := ruleMatches(ctx, l.db, r.Match, ev); err != nil || !ok {
+		return err
 	}
 	taskID := ""
 	if ev.ScopeType == "task" {
 		taskID = ev.ScopeID
 	}
-	if m.LabelID != "" {
-		var t core.Task
-		if taskID == "" || db.Get(ctx, &t, store.Eq("id", taskID)) != nil || !has(t.LabelIDs, m.LabelID) {
-			return nil
-		}
-	}
-	if a.Kind == "webhook" {
-		for _, h := range hooks {
-			if h.ID == a.WebhookID {
-				return s.queueDelivery(ctx, db, h, ev)
+	if r.Action.Kind == "webhook" {
+		for _, h := range l.hooks {
+			if h.ID == r.Action.WebhookID {
+				return s.queueDelivery(ctx, l.db, h, ev)
 			}
 		}
 		return nil
 	}
-	// The id is made from the rule and the event, so running the same
-	// event through twice acts once.
+	return s.ruleAct(ctx, l.ws, r, taskID, ev)
+}
+
+// ruleEventData is the part of an event's data that a rule's match reads.
+type ruleEventData struct {
+	Row     json.RawMessage             `json:"row"`
+	Changes map[string]core.FieldChange `json:"changes"`
+}
+
+// ruleMatches reports whether an event is one a rule's match describes. A
+// match with nothing set takes every event. A row a condition names that is
+// gone does not match; a read that fails is an error.
+func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Event) (bool, error) {
+	if m == nil {
+		m = &core.RuleMatch{}
+	}
+	if !typeMatches(m.EventTypes, ev.Type) || (m.ProjectID != "" && m.ProjectID != ev.ProjectID) || (m.ActorID != "" && m.ActorID != ev.ActorID) {
+		return false, nil
+	}
+	var d ruleEventData
+	_ = json.Unmarshal(ev.Data, &d) //nolint:errcheck // data that does not read matches no condition on it
+	if m.ActorKind != "" {
+		var actor core.Member
+		if there, err := rowFound(db.Get(ctx, &actor, store.Eq("user_id", ev.ActorID))); err != nil || !there || actor.Kind != m.ActorKind {
+			return false, err
+		}
+	}
+	if m.Outcome != "" && decisionOutcome(d.Row) != m.Outcome {
+		return false, nil
+	}
+	if ok, err := statusInCategory(ctx, db, d, m.ToCategory); err != nil || !ok {
+		return false, err
+	}
+	return taskHasLabel(ctx, db, ev, m.LabelID)
+}
+
+// statusInCategory reports whether an event moved a task to a status of the
+// category given; any event does when none is given.
+func statusInCategory(ctx context.Context, db store.DB, d ruleEventData, category string) (bool, error) {
+	if category == "" {
+		return true, nil
+	}
+	to, _ := d.Changes["status_id"].To.(string)
+	if to == "" {
+		return false, nil
+	}
+	var st core.Status
+	there, err := rowFound(db.Get(ctx, &st, store.Eq("id", to)))
+	return there && st.Category == category, err
+}
+
+// taskHasLabel reports whether an event is about a task with the label
+// given; any event is when none is given.
+func taskHasLabel(ctx context.Context, db store.DB, ev core.Event, labelID string) (bool, error) {
+	if labelID == "" {
+		return true, nil
+	}
+	if ev.ScopeType != "task" {
+		return false, nil
+	}
+	var t core.Task
+	there, err := rowFound(db.Get(ctx, &t, store.Eq("id", ev.ScopeID)))
+	return there && has(t.LabelIDs, labelID), err
+}
+
+// decisionOutcome is the outcome of the decision in an event's row, or ""
+// when the row is not one that reads.
+func decisionOutcome(row json.RawMessage) string {
+	var dc core.Decision
+	if err := json.Unmarshal(row, &dc); err != nil {
+		return ""
+	}
+	return dc.Outcome
+}
+
+// ruleAct does what a rule says, as the one who made it. The id is made
+// from the rule and the event, so running the same event through twice
+// acts once.
+func (s *Server) ruleAct(ctx context.Context, ws core.Workspace, r core.Rule, taskID string, ev core.Event) error {
+	a := r.Action
 	once := id.From("rule", r.ID, fmt.Sprint(ev.Seq))
 	return s.eng.System(ctx, ws.ID, r.CreatedBy, func(sys *engine.Sys) error {
 		if done, err := sys.Once(once, "rule"); err != nil || done {

@@ -25,70 +25,118 @@ import (
 // webhook gets its events in order, one at a time; a delivery that fails is
 // tried again later and holds up only its own queue.
 
+// Timing of deliveries.
+const (
+	deliveryTick    = 2 * time.Second  // how often the queues are looked at
+	deliveryClaim   = 60 * time.Second // how long a claimed delivery is held before another try
+	deliveryTimeout = 15 * time.Second // how long a receiver has to answer
+	deliveryBatch   = 200              // how many waiting deliveries of one webhook are read at a time
+	maxAttempts     = 8
+)
+
+// queueDelivery puts one event in a webhook's queue.
 func (s *Server) queueDelivery(ctx context.Context, db store.DB, h core.Webhook, ev core.Event) error {
 	now := time.Now().UnixMilli()
 	return db.Upsert(ctx, core.WebhookDelivery{ID: id.New(), WorkspaceID: h.WorkspaceID, WebhookID: h.ID, Seq: ev.Seq, EventType: ev.Type,
 		State: "pending", CreatedAt: now, NextAt: now}, "webhook_id", "seq")
 }
 
+// busyHooks is the set of webhooks being delivered to right now, shared by
+// the loop that starts deliveries and the goroutines that make them.
+type busyHooks struct {
+	mu  sync.Mutex
+	ids map[string]bool
+}
+
+func (b *busyHooks) has(hookID string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.ids[hookID]
+}
+
+// claim marks a webhook busy unless it already is, and reports whether it did.
+func (b *busyHooks) claim(hookID string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.ids[hookID] {
+		return false
+	}
+	b.ids[hookID] = true
+	return true
+}
+
+func (b *busyHooks) release(hookID string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.ids, hookID)
+}
+
+// runDeliveries works through the webhooks' queues until ctx ends.
 func (s *Server) runDeliveries(ctx context.Context) {
-	tick := time.NewTicker(2 * time.Second)
+	tick := time.NewTicker(deliveryTick)
 	defer tick.Stop()
-	var mu sync.Mutex
-	busy := map[string]bool{} // webhooks being delivered to right now
+	busy := &busyHooks{ids: map[string]bool{}}
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
 		}
-		// Each webhook's own queue is read by itself: one that keeps
-		// failing, however long its backlog, takes nothing from the others.
-		var hooks []core.Webhook
-		if err := s.st.List(ctx, &hooks, store.Where(store.Live)); err != nil {
+		byHook, err := s.waitingDeliveries(ctx, busy)
+		if err != nil {
 			continue
-		}
-		// A webhook gets its events in order: one at a time, and nothing
-		// overtakes a delivery that is waiting to be retried.
-		byHook := map[string][]core.WebhookDelivery{}
-		for _, h := range hooks {
-			mu.Lock()
-			at := busy[h.ID]
-			mu.Unlock()
-			if at {
-				continue
-			}
-			var list []core.WebhookDelivery
-			if err := s.st.List(ctx, &list, store.Q{Where: []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", "pending")}, Order: "seq", Limit: 200}); err == nil && len(list) > 0 {
-				byHook[h.ID] = list
-			}
 		}
 		now := time.Now().UnixMilli()
 		for hookID, list := range byHook {
-			mu.Lock()
-			skip := busy[hookID] || list[0].NextAt > now
-			if !skip {
-				busy[hookID] = true
-			}
-			mu.Unlock()
-			if skip {
+			if list[0].NextAt > now || !busy.claim(hookID) {
 				continue
 			}
 			go func() {
-				defer func() { mu.Lock(); delete(busy, hookID); mu.Unlock() }()
-				for _, d := range list {
-					// Claim it by moving its time on; only one server wins.
-					n, err := s.st.Update(ctx, "webhook_deliveries", map[string]any{"next_at": time.Now().UnixMilli() + 60_000, "attempts": d.Attempts + 1},
-						store.Eq("id", d.ID), store.Eq("state", "pending"), store.Eq("attempts", d.Attempts))
-					if err != nil || n != 1 {
-						return
-					}
-					d.Attempts++
-					if !s.deliver(context.WithoutCancel(ctx), d) {
-						return // the rest wait behind this one
-					}
-				}
+				defer busy.release(hookID)
+				s.deliverInOrder(ctx, list)
 			}()
+		}
+	}
+}
+
+// waitingDeliveries reads the waiting deliveries of each webhook that is
+// not busy, oldest first. Each webhook's own queue is read by itself: one
+// that keeps failing, however long its backlog, takes nothing from the
+// others.
+func (s *Server) waitingDeliveries(ctx context.Context, busy *busyHooks) (map[string][]core.WebhookDelivery, error) {
+	var hooks []core.Webhook
+	if err := s.st.List(ctx, &hooks, store.Where(store.Live)); err != nil {
+		return nil, err
+	}
+	byHook := map[string][]core.WebhookDelivery{}
+	for _, h := range hooks {
+		if busy.has(h.ID) {
+			continue
+		}
+		var list []core.WebhookDelivery
+		q := store.Q{Where: []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", "pending")}, Order: "seq", Limit: deliveryBatch}
+		if err := s.st.List(ctx, &list, q); err == nil && len(list) > 0 {
+			byHook[h.ID] = list
+		}
+	}
+	return byHook, nil
+}
+
+// deliverInOrder makes one webhook's deliveries one after another. A
+// webhook gets its events in order: nothing overtakes a delivery that is
+// waiting to be retried, so it stops at the first that is not finished.
+func (s *Server) deliverInOrder(ctx context.Context, list []core.WebhookDelivery) {
+	for _, d := range list {
+		// Claim it by moving its time on; only one server wins.
+		n, err := s.st.Update(ctx, "webhook_deliveries", map[string]any{"next_at": time.Now().UnixMilli() + deliveryClaim.Milliseconds(), "attempts": d.Attempts + 1},
+			store.Eq("id", d.ID), store.Eq("state", "pending"), store.Eq("attempts", d.Attempts))
+		if err != nil || n != 1 {
+			return
+		}
+		d.Attempts++
+		// The delivery is finished, and recorded, even if the server stops meanwhile.
+		if !s.deliver(context.WithoutCancel(ctx), d) {
+			return // the rest wait behind this one
 		}
 	}
 }
@@ -102,24 +150,36 @@ func backoff(attempts int) time.Duration {
 	return min(15*time.Second<<min(attempts-2, 10), time.Hour)
 }
 
-const maxAttempts = 8
-
 // deliver sends one event to one webhook and records what happened. It
-// reports whether the receiver took it.
+// reports whether the delivery is finished, so the next one may go. A
+// delivery whose webhook or event is gone is given up; one that could not
+// be read for any other reason waits for its claim to run out and is tried
+// again.
 func (s *Server) deliver(ctx context.Context, d core.WebhookDelivery) bool {
 	db := s.st.In(d.WorkspaceID)
 	var h core.Webhook
-	var evs []core.Event
-	if err := db.Get(ctx, &h, store.Eq("id", d.WebhookID), store.Live); err != nil {
-		db.Update(ctx, "webhook_deliveries", map[string]any{"state": "dead", "error": "the webhook was deleted", "done_at": time.Now().UnixMilli()}, store.Eq("id", d.ID))
-		return true
+	err := db.Get(ctx, &h, store.Eq("id", d.WebhookID), store.Live)
+	if errors.Is(err, store.ErrNotFound) {
+		return s.giveUpDelivery(ctx, db, d, "the webhook was deleted")
 	}
-	evs, _ = db.Events(ctx, store.EventFilter{After: d.Seq - 1, Limit: 1})
+	if err != nil {
+		s.log.Error("webhook delivery: reading its webhook", "delivery", d.ID, "err", err)
+		return false
+	}
+	evs, err := db.Events(ctx, store.EventFilter{After: d.Seq - 1, Limit: 1})
+	if err != nil {
+		s.log.Error("webhook delivery: reading its event", "delivery", d.ID, "err", err)
+		return false
+	}
 	if len(evs) == 0 || evs[0].Seq != d.Seq {
-		db.Update(ctx, "webhook_deliveries", map[string]any{"state": "dead", "error": "the event is gone", "done_at": time.Now().UnixMilli()}, store.Eq("id", d.ID))
-		return true
+		return s.giveUpDelivery(ctx, db, d, "the event is gone")
 	}
-	status, errText, took := s.sendDelivery(ctx, h, d.ID, evs[0])
+	var ws core.Workspace
+	if err := s.st.Get(ctx, &ws, store.Eq("id", h.WorkspaceID)); err != nil {
+		s.log.Error("webhook delivery: reading its workspace", "delivery", d.ID, "err", err)
+		return false
+	}
+	status, errText, took := s.sendDelivery(ctx, ws, h, d.ID, evs[0])
 	now := time.Now().UnixMilli()
 	set := map[string]any{"status_code": status, "error": errText, "duration_ms": int(took.Milliseconds())}
 	hookSet := map[string]any{"last_at": now}
@@ -134,9 +194,29 @@ func (s *Server) deliver(ctx context.Context, d core.WebhookDelivery) bool {
 		set["next_at"] = now + backoff(d.Attempts).Milliseconds()
 		hookSet["failures"], hookSet["last_status"] = h.Failures+1, firstNonEmpty(errText, fmt.Sprint(status))
 	}
-	db.Update(ctx, "webhook_deliveries", set, store.Eq("id", d.ID))
-	db.Update(ctx, "webhooks", hookSet, store.Eq("id", h.ID))
+	// Not recorded, the delivery is sent again when its claim runs out; the
+	// ones behind it wait so they do not overtake it.
+	if !s.recordOutcome(ctx, "webhook delivery", func(ctx context.Context) error {
+		_, err := db.Update(ctx, "webhook_deliveries", set, store.Eq("id", d.ID))
+		return err
+	}, "delivery", d.ID) {
+		return false
+	}
+	if _, err := db.Update(ctx, "webhooks", hookSet, store.Eq("id", h.ID)); err != nil {
+		s.log.Error("webhook delivery: the webhook's last result", "webhook", h.ID, "err", err)
+	}
 	return set["state"] == "ok" || set["state"] == "dead"
+}
+
+// giveUpDelivery records a delivery as dead for the reason given, and
+// reports that the next one may go. Not recorded, it is given up again on
+// its next try.
+func (s *Server) giveUpDelivery(ctx context.Context, db store.DB, d core.WebhookDelivery, reason string) bool {
+	s.recordOutcome(ctx, "webhook delivery", func(ctx context.Context) error {
+		_, err := db.Update(ctx, "webhook_deliveries", map[string]any{"state": "dead", "error": reason, "done_at": time.Now().UnixMilli()}, store.Eq("id", d.ID))
+		return err
+	}, "delivery", d.ID)
+	return true
 }
 
 func firstNonEmpty(a, b string) string {
@@ -148,23 +228,23 @@ func firstNonEmpty(a, b string) string {
 
 // sendDelivery sends the request. The body carries the event as stored plus one
 // line saying what happened, so a receiver can act without calling back.
-func (s *Server) sendDelivery(ctx context.Context, h core.Webhook, deliveryID string, ev core.Event) (status int, errText string, took time.Duration) {
-	var ws core.Workspace
-	s.st.Get(ctx, &ws, store.Eq("id", h.WorkspaceID))
+func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Webhook, deliveryID string, ev core.Event) (status int, errText string, took time.Duration) {
+	// The line is written by the same code that answers requests, which
+	// reads through a request: this one is made up, and carries ctx.
 	x := &c{s: s, r: (&http.Request{}).WithContext(ctx), ws: ws, db: s.st.In(ws.ID)}
 	line := ""
-	if names, err := x.names(); err == nil {
-		line = x.eventLine(ev, names)
+	if names, err := x.names(); err == nil { //nolint:contextcheck // x carries ctx in its made-up request
+		line = x.eventLine(ev, names) //nolint:contextcheck // as above
 	}
 	payload := map[string]any{"delivery": deliveryID, "workspace": ws.Slug, "seq": ev.Seq, "type": ev.Type, "text": line, "event": ev,
 		"url": s.cfg.BaseURL}
 	if !isNews(ev) {
 		payload["quiet"] = true // history brought in, not done now: the receiver may want to hold back
 	}
-	body, _ := json.Marshal(payload)
-	rctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	body, _ := json.Marshal(payload) // plain values and a stored event: always encodes
+	rctx, cancel := context.WithTimeout(ctx, deliveryTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(rctx, "POST", h.URL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(rctx, http.MethodPost, h.URL, bytes.NewReader(body))
 	if err != nil {
 		return 0, err.Error(), 0
 	}
@@ -184,7 +264,7 @@ func (s *Server) sendDelivery(ctx context.Context, h core.Webhook, deliveryID st
 		return 0, plainNetError(err), took
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10)) //nolint:errcheck // drained only so the connection is reused; the status is the answer
 	if resp.StatusCode >= 300 {
 		return resp.StatusCode, "answered " + resp.Status, took
 	}
@@ -207,8 +287,7 @@ func plainNetError(err error) string {
 	case strings.Contains(said, "certificate"):
 		return "could not connect: the address's certificate was not accepted (" + oneLine(said[strings.LastIndex(said, ": ")+2:], 120) + ")"
 	}
-	var ue *url.Error
-	if errors.As(err, &ue) {
+	if ue, ok := errors.AsType[*url.Error](err); ok {
 		said = ue.Err.Error()
 	}
 	return "could not connect: " + oneLine(said, 200)
@@ -219,7 +298,11 @@ func (s *Server) handleResendDelivery(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
-	if n, _ := x.db.Count(x.ctx(), "webhook_deliveries", store.Eq("id", x.r.PathValue("id")), store.Lt("seq", int64(0))); n > 0 {
+	tests, err := x.db.Count(x.ctx(), "webhook_deliveries", store.Eq("id", x.r.PathValue("id")), store.Lt("seq", int64(0)))
+	if err != nil {
+		return err
+	}
+	if tests > 0 {
 		return errBad("this was a test; send a new test instead")
 	}
 	n, err := x.db.Update(x.ctx(), "webhook_deliveries", map[string]any{"state": "pending", "attempts": 0, "next_at": time.Now().UnixMilli(), "done_at": 0, "error": ""},
@@ -240,14 +323,18 @@ func (s *Server) handleSendTestWebhook(x *c) error {
 		return err
 	}
 	var h core.Webhook
-	if err := x.db.Get(x.ctx(), &h, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+	err := x.db.Get(x.ctx(), &h, store.Eq("id", x.r.PathValue("id")), store.Live)
+	if errors.Is(err, store.ErrNotFound) {
 		return errNotFound("webhook")
 	}
-	sample, _ := json.Marshal(map[string]any{"test": true})
+	if err != nil {
+		return err
+	}
+	sample, _ := json.Marshal(map[string]any{"test": true}) // a constant: always encodes
 	ev := core.Event{WorkspaceID: x.ws.ID, At: time.Now().UnixMilli(), ActorID: x.member.UserID, Type: "webhook.test", EntityType: "webhook",
 		EntityID: h.ID, ScopeType: "workspace", ScopeID: x.ws.ID, Data: sample}
 	did := id.New()
-	status, errText, took := s.sendDelivery(x.ctx(), h, did, ev)
+	status, errText, took := s.sendDelivery(x.ctx(), x.ws, h, did, ev)
 	// A test shows in the delivery log like any other delivery. It has no
 	// place in the feed, so it gets a number of its own below zero.
 	now := time.Now().UnixMilli()
