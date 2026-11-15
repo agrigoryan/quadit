@@ -86,9 +86,11 @@ type exporter struct {
 	rows exportRows // export_data.go
 
 	// What tasks/ is written from, by indexTasks.
-	optionsOf map[string][]core.Option // a decision's options
-	filesOn   map[string][]string      // where in the archive the files on a task or an option are
-	keyOf     map[string]string        // a task's key, by its id
+	optionsOf   map[string][]core.Option   // a decision's options
+	decisionsOn map[string][]core.Decision // a task's decisions, in the order data/ holds them
+	commentsOn  map[string][]core.Comment  // a task's comments, in the order data/ holds them
+	filesOn     map[string][]string        // where in the archive the files on a task or an option are
+	keyOf       map[string]string          // a task's key, by its id
 }
 
 // put writes one file of text into the archive.

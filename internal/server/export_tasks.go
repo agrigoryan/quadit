@@ -20,12 +20,21 @@ func (e *exporter) tasks() error {
 	return nil
 }
 
-// indexTasks sorts out what the task files point at: each decision's
-// options, the files on each task and option, and every task's key.
+// indexTasks sorts out what the task files point at: each task's decisions
+// and comments, each decision's options, the files on each task and option,
+// and every task's key.
 func (e *exporter) indexTasks() {
 	e.optionsOf = map[string][]core.Option{}
 	for _, o := range e.rows.options {
 		e.optionsOf[o.DecisionID] = append(e.optionsOf[o.DecisionID], o)
+	}
+	e.decisionsOn = map[string][]core.Decision{}
+	for _, d := range e.rows.decisions {
+		e.decisionsOn[d.TaskID] = append(e.decisionsOn[d.TaskID], d)
+	}
+	e.commentsOn = map[string][]core.Comment{}
+	for _, cm := range e.rows.comments {
+		e.commentsOn[cm.TaskID] = append(e.commentsOn[cm.TaskID], cm)
 	}
 	fileOf := map[string]core.File{}
 	for _, f := range e.rows.files {
@@ -53,22 +62,12 @@ func (e *exporter) taskMarkdown(t core.Task) string {
 	for _, f := range e.filesOn[t.ID] {
 		fmt.Fprintf(&b, "\n- file: ../../%s", f)
 	}
-	n := 0
-	for _, d := range e.rows.decisions {
-		if d.TaskID != t.ID {
-			continue
-		}
-		n++
-		e.decisionMarkdown(&b, n, d)
+	for i, d := range e.decisionsOn[t.ID] {
+		e.decisionMarkdown(&b, i+1, d)
 	}
-	first := true
-	for _, cm := range e.rows.comments {
-		if cm.TaskID != t.ID {
-			continue
-		}
-		if first {
+	for i, cm := range e.commentsOn[t.ID] {
+		if i == 0 {
 			b.WriteString("\n\n## Comments\n")
-			first = false
 		}
 		fmt.Fprintf(&b, "\n**%s**, %s", nm.handle(cm.AuthorID), when(cm.CreatedAt))
 		if cm.Kind == "result" {
