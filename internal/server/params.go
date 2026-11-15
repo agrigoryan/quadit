@@ -20,6 +20,10 @@ var (
 	dateParams = []string{"due_before", "due_after"}
 )
 
+// checkParams refuses a URL whose number, yes/no or date parameters do not
+// read as one: a number must be a whole number of 0 or more, a yes/no one
+// of 1, 0, true, false, yes, no (or empty), and a date YYYY-MM-DD. Every
+// workspace route runs it (workspaceMember).
 func checkParams(v url.Values) error {
 	for _, name := range numberParams {
 		if !v.Has(name) || v.Get(name) == "" {

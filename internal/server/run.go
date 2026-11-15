@@ -10,8 +10,21 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// Run does the server's background work until ctx ends: rolling cycles
-// over, and whatever other files of this package add to runners.
+// Background work: Run, the list of loops it starts, and two of them.
+
+// Run does the server's background work until ctx ends. It first switches
+// file storage to what the "files" setting says and applies the rate-limit
+// setting, then starts each loop in runners in a goroutine of its own, and
+// itself rolls cycles over every hour and expires quiet holds on shared
+// resources every minute.
+//
+// At shutdown, when ctx ends, Run returns at once and does not wait for the
+// loops it started: nothing can. Each loop sees ctx end at its next check
+// and returns; one in the middle of a piece of work (a job, a webhook
+// delivery, a repository sync) carries on until that work next looks at
+// ctx, and may still be running when the caller closes the store, or be cut
+// off when the process exits. A job cut off this way is claimed for five
+// minutes and then tried again; a delivery stays in its queue.
 func (s *Server) Run(ctx context.Context) {
 	var fc blob.Config
 	if s.setting(ctx, "files", &fc) {
@@ -48,12 +61,13 @@ func (s *Server) Run(ctx context.Context) {
 	}
 }
 
-// runners are background loops started with the server.
+// runners are background loops started with the server. Each runs until
+// ctx ends; Run does not wait for them (see Run).
 var runners []func(s *Server, ctx context.Context)
 
 func init() {
 	// files.move copies files left on local disk into the cloud store.
-	jobKinds["files.move"] = func(s *Server, ctx context.Context, j core.Job) error {
+	jobKinds["files.move"] = func(s *Server, ctx context.Context, _ core.Job) error {
 		l, ok := s.fileStore().(blob.Layered)
 		if !ok {
 			return nil

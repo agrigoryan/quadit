@@ -8,6 +8,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 )
 
+// POST /changes: the one way to write, and what of it goes in the audit log.
+
+// changesBody is the body of POST /changes: a batch, or one change.
 type changesBody struct {
 	Changes []engine.Change `json:"changes"`
 	DryRun  bool            `json:"dry_run"`
@@ -16,6 +19,8 @@ type changesBody struct {
 	engine.Change
 }
 
+// auditedPrefixes are the change types that go in the audit log: those that
+// change who may do what, and those that remove a lot at once.
 var auditedPrefixes = []string{"member.", "agent.", "project.delete", "webhook.", "rule.", "integration.", "secret.", "workspace.update", "workspace.delete"}
 
 // auditArgs is a change's arguments as the audit log keeps them: what was
@@ -34,6 +39,9 @@ func auditArgs(raw json.RawMessage) any {
 }
 
 // handleApplyChanges applies one change or a batch. A batch is all or nothing.
+// dry_run checks without writing; events=1 (or a dry run) answers with the
+// events each change made. Changes of the audited kinds, and every use of
+// an approval, are written to the audit log.
 func (s *Server) handleApplyChanges(x *c) error {
 	var b changesBody
 	if err := x.body(&b); err != nil {

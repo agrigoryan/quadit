@@ -10,11 +10,13 @@ import (
 // stats counts requests for the metrics endpoint.
 type stats struct {
 	mu       sync.Mutex
-	requests map[string]int64 // "METHOD class"
-	seconds  float64
-	started  time.Time
+	requests map[string]int64 // requests by "METHOD 2xx"
+	seconds  float64          // time spent answering, in all
+	started  time.Time        // when the first request was counted
 }
 
+// observe counts one answered request: its method, its status class and
+// how long it took.
 func (s *stats) observe(r *http.Request, status int, d time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
