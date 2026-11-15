@@ -23,7 +23,7 @@ func (r *syncRun) findFolder() error {
 		// Said, and not the end of it: pages written here may be what
 		// makes the folder.
 		r.noFolder = "the repository has no folder " + r.src.Subdir + " on " + r.branch + " yet"
-		r.res.Note = r.noFolder
+		r.say(r.noFolder)
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (r *syncRun) writeOut() error {
 			names = append(names, path)
 		}
 		sort.Strings(names)
-		r.res.Note = fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 800))
+		r.say(fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 800)))
 	}
 	r.sayRenamed()
 	return nil

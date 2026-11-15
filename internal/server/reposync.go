@@ -169,10 +169,16 @@ type syncRun struct {
 	blocked  map[string]bool   // paths a link in the repository stands on, or in the way of
 }
 
+// say adds to the sync's note: what one step says never hides what an
+// earlier step of the same sync said.
+func (r *syncRun) say(note string) {
+	r.res.Note = strings.TrimSpace(r.res.Note + " " + note)
+}
+
 // sayRenamed adds to the sync's note what it has to say about single pages
 // and files.
 func (r *syncRun) sayRenamed() {
 	if len(r.renamed) > 0 {
-		r.res.Note = strings.TrimSpace(r.res.Note + " " + oneLine(strings.Join(r.renamed, "; "), 1500))
+		r.say(oneLine(strings.Join(r.renamed, "; "), 1500))
 	}
 }
