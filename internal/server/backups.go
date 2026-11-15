@@ -133,108 +133,102 @@ func (s *Server) runSchedule(ctx context.Context) {
 // backupDir is where archives are written.
 func (s *Server) backupDir() string { return filepath.Join(s.cfg.DataDir, "backups") }
 
-// backupRun is one backup being written: its record, where it goes and
-// the setting it follows.
-type backupRun struct {
-	s       *Server
-	b       core.Backup
-	name    string
-	path    string
-	setting backupSetting
-}
-
 // runBackup writes an archive, reads it back to verify it, records it, and
 // drops the oldest beyond the number to keep.
 func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
-	r := &backupRun{s: s, b: core.Backup{ID: id.New(), StartedAt: time.Now().UnixMilli()}}
+	var setting backupSetting
+	s.setting(ctx, "backup", &setting)
+	b := core.Backup{ID: id.New(), StartedAt: time.Now().UnixMilli()}
 	if err := os.MkdirAll(s.backupDir(), 0o750); err != nil {
-		return r.b, err
+		return b, err
 	}
-	r.name = "quadit-" + time.Now().UTC().Format("20060102-150405") + ".tar.gz"
-	r.path = filepath.Join(s.backupDir(), r.name)
-	r.b.Location = r.path
-	if err := s.st.Insert(ctx, r.b); err != nil {
-		return r.b, err
+	name := "quadit-" + time.Now().UTC().Format("20060102-150405") + ".tar.gz"
+	path := filepath.Join(s.backupDir(), name)
+	b.Location = path
+	if err := s.st.Insert(ctx, b); err != nil {
+		return b, err
 	}
-	for _, step := range []func(context.Context) error{r.write, r.verify, r.copyToFiles} {
-		if err := step(ctx); err != nil {
-			return r.finish(ctx, err)
-		}
-	}
-	r.dropOldest(ctx)
-	s.log.Info("backup written and verified", "file", r.path, "bytes", r.b.Size)
-	return r.finish(ctx, nil)
-}
 
-// write writes the archive and notes its size and checksum.
-func (r *backupRun) write(ctx context.Context) error {
-	out, err := os.Create(r.path)
+	// finish records how the backup ended. A failed one's archive is
+	// removed. The record is written even when ctx has ended, so it does not
+	// stay unfinished.
+	finish := func(err error) (core.Backup, error) {
+		b.FinishedAt = time.Now().UnixMilli()
+		set := map[string]any{"finished_at": b.FinishedAt, "size": b.Size, "sha256": b.SHA256, "verified_at": b.VerifiedAt, "location": b.Location}
+		if err != nil {
+			b.Error = oneLine(err.Error(), lastErrorSize)
+			set["error"] = b.Error
+			os.Remove(path)
+			s.log.Error("backup failed", "err", err)
+		}
+		if _, uerr := s.st.Update(context.WithoutCancel(ctx), "backups", set, store.Eq("id", b.ID)); uerr != nil {
+			s.log.Error("recording how a backup ended", "backup", b.ID, "err", uerr)
+		}
+		return b, err
+	}
+
+	// Write the archive, noting its size and checksum.
+	out, err := os.Create(path)
 	if err != nil {
-		return err
+		return finish(err)
 	}
 	h := sha256.New()
-	_, err = backup.Write(ctx, r.s.st, r.s.fileStore(), r.s.cfg.Version, io.MultiWriter(out, h))
+	_, err = backup.Write(ctx, s.st, s.fileStore(), s.cfg.Version, io.MultiWriter(out, h))
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
-		return err
+		return finish(err)
 	}
-	info, err := os.Stat(r.path)
+	info, err := os.Stat(path)
 	if err != nil {
-		return err
+		return finish(err)
 	}
-	r.b.Size, r.b.SHA256 = info.Size(), hex.EncodeToString(h.Sum(nil))
-	return nil
-}
+	b.Size, b.SHA256 = info.Size(), hex.EncodeToString(h.Sum(nil))
 
-// verify reads the archive back: a backup that cannot be read back is not
-// a backup.
-func (r *backupRun) verify(context.Context) error {
-	in, err := os.Open(r.path)
+	// Read it back: a backup that cannot be read back is not a backup.
+	in, err := os.Open(path)
 	if err != nil {
-		return err
+		return finish(err)
 	}
 	_, err = backup.Verify(in)
 	in.Close()
 	if err != nil {
-		return fmt.Errorf("the archive did not verify: %w", err)
+		return finish(fmt.Errorf("the archive did not verify: %w", err))
 	}
-	r.b.VerifiedAt = time.Now().UnixMilli()
-	return nil
+	b.VerifiedAt = time.Now().UnixMilli()
+
+	// Put it in file storage too when the setting says so, which is how a
+	// backup gets off the machine.
+	if setting.CopyToFiles {
+		in, err := os.Open(path)
+		if err != nil {
+			return finish(err)
+		}
+		err = s.fileStore().Put(ctx, "backups/"+name, in, "application/gzip")
+		in.Close()
+		if err != nil {
+			return finish(fmt.Errorf("copying the archive to file storage: %w", err))
+		}
+	}
+
+	s.dropOldBackups(ctx, setting)
+	s.log.Info("backup written and verified", "file", path, "bytes", b.Size)
+	return finish(nil)
 }
 
-// copyToFiles puts the archive in file storage too, when the setting says
-// so, which is how a backup gets off the machine.
-func (r *backupRun) copyToFiles(ctx context.Context) error {
-	r.s.setting(ctx, "backup", &r.setting)
-	if !r.setting.CopyToFiles {
-		return nil
-	}
-	in, err := os.Open(r.path)
-	if err != nil {
-		return err
-	}
-	err = r.s.fileStore().Put(ctx, "backups/"+r.name, in, "application/gzip")
-	in.Close()
-	if err != nil {
-		return fmt.Errorf("copying the archive to file storage: %w", err)
-	}
-	return nil
-}
-
-// dropOldest keeps the newest few archives and removes the rest, with
-// their copies and records. What cannot be removed is logged and tried
-// again after the next backup.
-func (r *backupRun) dropOldest(ctx context.Context) {
-	keep := r.setting.Keep
+// dropOldBackups keeps the newest few archives the setting asks for and
+// removes the rest, with their copies in file storage and their records.
+// What cannot be removed is logged and tried again after the next backup.
+func (s *Server) dropOldBackups(ctx context.Context, setting backupSetting) {
+	keep := setting.Keep
 	if keep <= 0 {
 		keep = defaultBackupsKept
 	}
-	dir := r.s.backupDir()
+	dir := s.backupDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		r.s.log.Warn("listing old backups to drop", "err", err)
+		s.log.Warn("listing old backups to drop", "err", err)
 		return
 	}
 	var names []string
@@ -247,37 +241,18 @@ func (r *backupRun) dropOldest(ctx context.Context) {
 	for ; len(names) > keep; names = names[1:] {
 		old := filepath.Join(dir, names[0])
 		if err := os.Remove(old); err != nil {
-			r.s.log.Warn("dropping an old backup", "file", old, "err", err)
+			s.log.Warn("dropping an old backup", "file", old, "err", err)
 			continue
 		}
-		if r.setting.CopyToFiles {
-			if err := r.s.fileStore().Delete(ctx, "backups/"+names[0]); err != nil {
-				r.s.log.Warn("dropping the copy of an old backup", "file", names[0], "err", err)
+		if setting.CopyToFiles {
+			if err := s.fileStore().Delete(ctx, "backups/"+names[0]); err != nil {
+				s.log.Warn("dropping the copy of an old backup", "file", names[0], "err", err)
 			}
 		}
-		if _, err := r.s.st.Delete(ctx, "backups", store.Eq("location", old)); err != nil {
-			r.s.log.Warn("dropping the record of an old backup", "file", old, "err", err)
+		if _, err := s.st.Delete(ctx, "backups", store.Eq("location", old)); err != nil {
+			s.log.Warn("dropping the record of an old backup", "file", old, "err", err)
 		}
 	}
-}
-
-// finish records how the backup ended. A failed one's archive is removed.
-// The record is written even when ctx has ended, so it does not stay
-// unfinished.
-func (r *backupRun) finish(ctx context.Context, err error) (core.Backup, error) {
-	b := &r.b
-	b.FinishedAt = time.Now().UnixMilli()
-	set := map[string]any{"finished_at": b.FinishedAt, "size": b.Size, "sha256": b.SHA256, "verified_at": b.VerifiedAt, "location": b.Location}
-	if err != nil {
-		b.Error = oneLine(err.Error(), lastErrorSize)
-		set["error"] = b.Error
-		os.Remove(r.path)
-		r.s.log.Error("backup failed", "err", err)
-	}
-	if _, uerr := r.s.st.Update(context.WithoutCancel(ctx), "backups", set, store.Eq("id", b.ID)); uerr != nil {
-		r.s.log.Error("recording how a backup ended", "backup", b.ID, "err", uerr)
-	}
-	return *b, err
 }
 
 // handleListBackups lists the newest backups, with the schedule.
