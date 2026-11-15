@@ -141,6 +141,8 @@ quadit write new "Release notes" < notes.md
 quadit rows DATABASE_ID filter=State:is:todo sort=-Frames
 ```
 
+A page that mirrors a Markdown file in a repository is called by the file's opening `# heading` (else by its file name) and does not repeat it in its text; written back, the title is the heading again. Renaming the page changes the heading, not the file name.
+
 ## Session records and budgets
 
 Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links`, `cost_micros` and at the end `state: "done"`. Cost and time count against your weekly budget, and against the task's own budget when it has one; `quadit me` says what is left. The person concerned is told at 80%. Once a budget is used up new work is refused (a new run, taking the task), while saying so on the task and handing it back still work. A budget can also limit hand-offs between agents; past it, hand the task to a person.

@@ -80,15 +80,20 @@ func (r *syncRun) newFile(sys *engine.Sys, path, text string) error {
 	if err != nil {
 		return err
 	}
-	if err := sys.Do("doc.create", map[string]any{"parent": parent, "title": strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)), "markdown": text}); err != nil {
+	// Called by its opening heading, or else by its name.
+	title, markdown := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)), text
+	if heading, rest, ok := titleOfFile(text); ok {
+		title, markdown = heading, rest
+	}
+	if err := sys.Do("doc.create", map[string]any{"parent": parent, "title": title, "markdown": markdown}); err != nil {
 		return err
 	}
 	pid := sys.Ref()
-	body, err := pageMarkdownInTx(r.ctx, sys.Tx(), pid)
+	side, err := pageSideInTx(r.ctx, sys.Tx(), pid, text)
 	if err != nil {
 		return err
 	}
-	if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_id": r.src.ID, "source_path": path, "source_hash": shortHash(text) + ":" + shortHash(body)}, store.Eq("id", pid)); err != nil {
+	if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_id": r.src.ID, "source_path": path, "source_hash": shortHash(text) + ":" + shortHash(side)}, store.Eq("id", pid)); err != nil {
 		return err
 	}
 	r.res.PagesCreated++
@@ -119,25 +124,44 @@ func (r *syncRun) reconcilePage(sys *engine.Sys, path, text string, page core.Do
 	if err != nil {
 		return err
 	}
-	pageChanged := shortHash(body) != lastPage
+	// The page is as it was if its text, with or without its title as the
+	// heading, is what was synced last: the file's heading may have come or
+	// gone since.
+	pageChanged := shortHash(body) != lastPage && shortHash(withHeading(page.Title, body)) != lastPage
 	fileChanged := fileHash != lastFile
 	switch {
 	case fileChanged && (!pageChanged || r.src.Authority == "repo"):
-		if err := sys.Do("doc.write", map[string]any{"doc": page.ID, "markdown": text}); err != nil {
+		if err := r.pageFromFile(sys, page, text); err != nil {
 			return err
 		}
-		if body, err = pageMarkdownInTx(r.ctx, sys.Tx(), page.ID); err != nil {
+		side, err := pageSideInTx(r.ctx, sys.Tx(), page.ID, text)
+		if err != nil {
 			return err
 		}
-		if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_hash": fileHash + ":" + shortHash(body)}, store.Eq("id", page.ID)); err != nil {
+		if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_hash": fileHash + ":" + shortHash(side)}, store.Eq("id", page.ID)); err != nil {
 			return err
 		}
 		r.res.PagesUpdated++
 	case pageChanged:
-		r.queue(path, page.ID, body)
+		r.queue(path, page.ID, pageSide(page.Title, text, body))
 		r.editedBy(page)
 	}
 	return nil
+}
+
+// pageFromFile writes a file's text into its page. A file that opens with a
+// heading gives the page its title, and the rest its text.
+func (r *syncRun) pageFromFile(sys *engine.Sys, page core.Doc, text string) error {
+	heading, rest, ok := titleOfFile(text)
+	if !ok {
+		return sys.Do("doc.write", map[string]any{"doc": page.ID, "markdown": text})
+	}
+	if heading != page.Title {
+		if err := sys.Do("doc.update", map[string]any{"id": page.ID, "title": heading}); err != nil {
+			return err
+		}
+	}
+	return sys.Do("doc.write", map[string]any{"doc": page.ID, "markdown": rest})
 }
 
 // fromPage settles one page against the repository. Only a page with no
@@ -235,10 +259,11 @@ func (r *syncRun) takeOver(sys *engine.Sys, page core.Doc, path string, at int) 
 		}
 	}
 	set := map[string]any{"source_id": r.src.ID, "source_path": path}
-	if strings.TrimSpace(r.files[path]) == strings.TrimSpace(body) {
-		set["source_hash"] = shortHash(r.files[path]) + ":" + shortHash(body) // already the same: nothing to write
+	side := pageSide(page.Title, r.files[path], body)
+	if strings.TrimSpace(r.files[path]) == strings.TrimSpace(side) {
+		set["source_hash"] = shortHash(r.files[path]) + ":" + shortHash(side) // already the same: nothing to write
 	} else {
-		r.queue(path, page.ID, body)
+		r.queue(path, page.ID, side)
 	}
 	_, err = sys.Tx().Update(r.ctx, "docs", set, store.Eq("id", page.ID))
 	return err

@@ -59,6 +59,20 @@ func pageMarkdownInTx(ctx context.Context, tx store.Tx, docID string) (string, e
 	return md.Render(engine.BlockTree(blocks)), nil
 }
 
+// pageSideInTx is what a page says as its file would say it, inside a
+// write, seeing what the write just did (see pageSide).
+func pageSideInTx(ctx context.Context, tx store.Tx, docID, file string) (string, error) {
+	var d core.Doc
+	if err := tx.Get(ctx, &d, store.Eq("id", docID)); err != nil {
+		return "", err
+	}
+	body, err := pageMarkdownInTx(ctx, tx, docID)
+	if err != nil {
+		return "", err
+	}
+	return pageSide(d.Title, file, body), nil
+}
+
 // queue notes that a page's text is to be written to a file.
 func (r *syncRun) queue(path, docID, body string) {
 	r.toWrite[path] = body

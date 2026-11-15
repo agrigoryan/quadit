@@ -29,6 +29,7 @@ import (
 //	reposync_files.go      the folder in the working copy: reading it, writing to it
 //	reposync_inside.go     what keeps reading and writing inside the working copy
 //	reposync_pages.go      the source's pages, and the hashes of the last sync
+//	reposync_title.go      a page's title from its file's opening heading, and back
 //	reposync_reconcile.go  settling each file against its page, and each page
 //	                       against its file
 

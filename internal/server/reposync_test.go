@@ -69,7 +69,7 @@ func TestRepositorySync(t *testing.T) {
 			t.Fatalf("first sync = %+v", res)
 		}
 		tree := s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
-		if !strings.Contains(tree, "Game docs") || !strings.Contains(tree, "\n  design  (") || !strings.Contains(tree, "\n  art  (") || !strings.Contains(tree, "\n    sprites  (") || strings.Contains(tree, "README") {
+		if !strings.Contains(tree, "Game docs") || !strings.Contains(tree, "\n  Design  (") || !strings.Contains(tree, "\n  art  (") || !strings.Contains(tree, "\n    sprites  (") || strings.Contains(tree, "README") {
 			t.Fatalf("page tree:\n%s", tree)
 		}
 		idOf := func(title string) string {
@@ -89,7 +89,7 @@ func TestRepositorySync(t *testing.T) {
 		}
 
 		// A page edited here becomes a commit there.
-		design := idOf("design")
+		design := idOf("Design") // called by its heading
 		s.change(s.owner, "", "doc.write", M{"doc": design, "markdown": "# Design\n\nThe boss has four phases.\n"})
 		sync()
 		if res.FilesWritten != 1 || res.Pushed != "main" {

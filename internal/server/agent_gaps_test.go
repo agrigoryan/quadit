@@ -2,8 +2,12 @@ package server_test
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -210,4 +214,161 @@ func TestUnassign(t *testing.T) {
 			}
 		}
 	})
+}
+
+// syncedRepo is a bare repository with a clone to change it from, and a
+// source syncing it on the site.
+type syncedRepo struct {
+	t            *testing.T
+	s            *site
+	origin, work string
+	src          string
+}
+
+func newSyncedRepo(t *testing.T, s *site, files map[string]string) *syncedRepo {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	tmp := t.TempDir()
+	r := &syncedRepo{t: t, s: s, origin: filepath.Join(tmp, "origin.git"), work: filepath.Join(tmp, "work")}
+	gitIn(t, tmp, "init", "--quiet", "--bare", "-b", "main", r.origin)
+	gitIn(t, tmp, "clone", "--quiet", r.origin, r.work)
+	for rel, text := range files {
+		r.write(rel, text)
+	}
+	r.push("first")
+	return r
+}
+
+func (r *syncedRepo) write(rel, text string) {
+	p := filepath.Join(r.work, rel)
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
+		r.t.Fatal(err)
+	}
+}
+
+func (r *syncedRepo) push(msg string) {
+	gitIn(r.t, r.work, "add", "--all")
+	gitIn(r.t, r.work, "commit", "--quiet", "-m", msg)
+	gitIn(r.t, r.work, "push", "--quiet", "origin", "HEAD:main")
+}
+
+// read is a file as the repository's branch has it now.
+func (r *syncedRepo) read(branch, rel string) string {
+	return gitIn(r.t, r.origin, "show", branch+":"+rel) + "\n"
+}
+
+type syncAnswer struct {
+	PagesCreated int    `json:"pages_created"`
+	PagesUpdated int    `json:"pages_updated"`
+	FilesWritten int    `json:"files_written"`
+	Pushed       string `json:"pushed"`
+	Note         string `json:"note"`
+}
+
+func (r *syncedRepo) sync() syncAnswer {
+	r.t.Helper()
+	var res syncAnswer
+	r.s.call(r.s.owner, "", "POST", w+"/sources/"+r.src+"/sync", nil, 200, &res)
+	return res
+}
+
+// idle checks that a sync finds nothing to do on either side.
+func (r *syncedRepo) idle(when string) {
+	r.t.Helper()
+	if res := r.sync(); res.PagesUpdated != 0 || res.FilesWritten != 0 || res.PagesCreated != 0 {
+		r.t.Fatalf("%s, a sync with nothing changed did something: %+v", when, res)
+	}
+}
+
+// pageID finds a page by its title in the page tree.
+func (s *site) pageID(title string) string {
+	s.t.Helper()
+	for _, line := range strings.Split(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), title+"  (") {
+			return line[strings.LastIndex(line, "(")+1 : len(line)-1]
+		}
+	}
+	s.t.Fatalf("no page %q in:\n%s", title, s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil))
+	return ""
+}
+
+func hashOf(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:8])
+}
+
+// TestSyncTitleFromHeading: a file is called by its opening heading, which
+// its page does not repeat; written back, the heading comes first again,
+// and an unchanged file stays unchanged. A page synced before this keeps
+// its title until its file changes.
+func TestSyncTitleFromHeading(t *testing.T) {
+	st := testdb.SQLite(t)
+	s := newSite(t, st)
+	r := newSyncedRepo(t, s, map[string]string{
+		"docs/WEAPON_VFX_PLAN.md": "# Weapon VFX plan\n\nThree phases.\n",
+		"docs/notes.md":           "No heading here.\n",
+		"docs/front.md":           "---\nowner: aram\n---\n\n# Front matter title\n\nText.\n",
+		"docs/OLD_STYLE.md":       "# Old style\n\nBody.\n",
+	})
+	r.src = s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": r.origin, "subdir": "docs"})["ref"].(string)
+	if res := r.sync(); res.PagesCreated != 4 {
+		t.Fatalf("first sync: %+v", res)
+	}
+	plan := s.pageID("Weapon VFX plan")
+	s.pageID("notes")
+	s.pageID("Front matter title")
+	if md := s.call(s.owner, "", "GET", w+"/docs/"+plan+"?format=md", nil, 200, nil); strings.Contains(md, "# Weapon VFX plan") || !strings.Contains(md, "Three phases.") {
+		t.Fatalf("the page repeats its heading, or lost its text:\n%s", md)
+	}
+	r.idle("after the first sync")
+
+	// Edited here: the file gets the heading back in front, and nothing else.
+	s.change(s.owner, "", "doc.write", M{"doc": plan, "markdown": "Four phases.\n"})
+	if res := r.sync(); res.FilesWritten != 1 {
+		t.Fatalf("page edit: %+v", res)
+	}
+	if got := r.read("main", "docs/WEAPON_VFX_PLAN.md"); got != "# Weapon VFX plan\n\nFour phases.\n" {
+		t.Fatalf("the file after a page edit: %q", got)
+	}
+	r.idle("after a page edit")
+
+	// Renamed here: the heading follows, the file keeps its name.
+	s.change(s.owner, "", "doc.update", M{"id": plan, "title": "Weapon plan"})
+	if res := r.sync(); res.FilesWritten != 1 {
+		t.Fatalf("rename: %+v", res)
+	}
+	if got := r.read("main", "docs/WEAPON_VFX_PLAN.md"); got != "# Weapon plan\n\nFour phases.\n" {
+		t.Fatalf("the file after a rename: %q", got)
+	}
+	if out := gitIn(t, r.origin, "ls-tree", "--name-only", "main", "docs/"); strings.Contains(out, "weapon-plan") {
+		t.Fatalf("a rename made a new file: %s", out)
+	}
+	r.idle("after a rename")
+
+	// A page synced before titles came from headings: called by its file's
+	// name, the heading in its text, and the hashes of then.
+	old := s.pageID("Old style")
+	s.change(s.owner, "", "doc.update", M{"id": old, "title": "OLD_STYLE"})
+	s.change(s.owner, "", "doc.write", M{"doc": old, "markdown": "# Old style\n\nBody.\n"})
+	if _, err := st.Update(context.Background(), "docs", map[string]any{"source_hash": hashOf("# Old style\n\nBody.\n") + ":" + hashOf("# Old style\n\nBody.\n")}, store.Eq("id", old)); err != nil {
+		t.Fatal(err)
+	}
+	r.idle("with a page synced the old way")
+	s.pageID("OLD_STYLE")
+	// Once its file changes, it is called by the heading too.
+	gitIn(t, r.work, "pull", "--quiet", "origin", "main")
+	r.write("docs/OLD_STYLE.md", "# Old style\n\nBody two.\n")
+	r.push("edit")
+	if res := r.sync(); res.PagesUpdated != 1 || res.FilesWritten != 0 {
+		t.Fatalf("file edit of an old page: %+v", res)
+	}
+	if md := s.call(s.owner, "", "GET", w+"/docs/"+s.pageID("Old style")+"?format=md", nil, 200, nil); strings.Contains(md, "# Old style") {
+		t.Fatalf("the old page still repeats its heading:\n%s", md)
+	}
+	r.idle("after the old page took its heading")
+	if got := r.read("main", "docs/OLD_STYLE.md"); got != "# Old style\n\nBody two.\n" {
+		t.Fatalf("the old page's file: %q", got)
+	}
 }
