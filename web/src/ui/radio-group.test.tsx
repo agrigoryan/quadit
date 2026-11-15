@@ -24,15 +24,13 @@ function Sizes({ start = "medium" }: { start?: string }) {
   );
 }
 
-/** Presses a key on what has the focus, as a browser would, and lets the focus move. */
+/** A quick key press, as a script or some assistive technology makes it: the key is up before the focus moves. */
 function press(key: string) {
   const target = document.activeElement ?? document.body;
   act(() => {
     fireEvent.keyDown(target, { key });
-    vi.runAllTimers();
-  });
-  act(() => {
     fireEvent.keyUp(target, { key });
+    vi.runAllTimers();
   });
 }
 

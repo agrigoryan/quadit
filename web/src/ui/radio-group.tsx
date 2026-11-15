@@ -1,7 +1,8 @@
 // One choice of a few, drawn as buttons (a segmented control, colour
-// swatches, cards). Radix's radio group gives the keyboard a radio group
-// has: the group is one Tab stop, on the picked choice; the arrows move and
-// pick; Home and End go to the first and the last choice and pick it.
+// swatches, cards), with the keyboard of a radio group: the group is one
+// Tab stop, on the picked choice; the arrows move and pick, round the ends;
+// Home and End go to the first and the last choice and pick it. Radix's
+// radio group does the roving focus.
 
 import type { ComponentProps, KeyboardEvent, ReactNode } from "react";
 import { RadioGroup as RRadio } from "radix-ui";
@@ -18,12 +19,25 @@ interface GroupProps<T extends string> {
 }
 
 export function RadioGroup<T extends string>({ label, value, onChange, disabled, className, children }: GroupProps<T>) {
-  // Radix moves the focus on Home and End but picks only on the arrows.
+  // Radix moves the focus, a moment after the key press, and picks the
+  // choice it lands on only if an arrow key is still held then (a quick
+  // press, a script or some assistive technology lets go first), and never
+  // for Home and End. So the pick is made here, at the key press.
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Home" && e.key !== "End") return;
     const radios = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)')];
-    const end = e.key === "Home" ? radios[0] : radios[radios.length - 1];
-    if (end && end.value !== value) onChange(end.value as T);
+    const at = radios.findIndex((radio) => radio === e.target);
+    if (at < 0) return;
+    const step: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+    const to =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? radios.length - 1
+          : e.key in step
+            ? (at + (step[e.key] ?? 0) + radios.length) % radios.length
+            : -1;
+    const next = radios[to];
+    if (next && next.value !== value) onChange(next.value as T);
   }
   return (
     <RRadio.Root
