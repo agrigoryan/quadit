@@ -12,7 +12,7 @@ import { makeTitle, MakePageRows } from "@/palette/palette-make";
 import { RootPage } from "@/palette/palette-root";
 import { useServerSearch } from "@/palette/palette-search";
 import { pageUnder, projectInView } from "@/shell/project-in-view";
-import { taskPath, useTaskNav } from "@/tasks/task-link";
+import { useTaskNav } from "@/tasks/task-link";
 import { Spinner } from "@/ui/spinner";
 
 /**
@@ -116,7 +116,7 @@ function Palette() {
                   query={query}
                   slug={slug}
                   task={openTask}
-                  expand={openTask && pageUnder(location) ? () => navigate(taskPath(slug, openTask.key), { replace: true }) : undefined}
+                  expand={openTask && pageUnder(location) ? () => tasks.page(openTask.key) : undefined}
                   project={project}
                   hits={search.hits}
                   searching={search.busy}

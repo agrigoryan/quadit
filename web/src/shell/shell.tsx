@@ -19,6 +19,7 @@ import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
 import { UploadsIndicator } from "@/shell/uploads";
 import { canGoBack, isTaskPath, type Peek, PeekContext, taskPath } from "@/tasks/task-link";
+import { leaveForPage } from "@/tasks/task-queue";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
 
 // The larger parts of the app are fetched when first opened.
@@ -93,7 +94,10 @@ export function Shell() {
   // The panel is one step above its page in the history: closing it is going back that step.
   const closePanel = useCallback(() => void (background && canGoBack() ? navigate(-1) : navigate(fallback)), [background, fallback, navigate]);
   // The page's place is taken by the panel's, so one step back from the page is the list again.
-  const expandPanel = () => taskKey && void navigate(taskPath(slug, taskKey), { replace: !!background });
+  const expandPanel = () => {
+    const from = leaveForPage();
+    if (taskKey) void navigate(taskPath(slug, taskKey), { replace: !!background, state: from ? { from } : undefined });
+  };
   // From a task's page: back to where the person was, or to the task's list when they arrived by its address.
   const leavePage = () => void (canGoBack() ? navigate(-1) : navigate(fallback));
   const peek = useMemo<Peek>(() => ({ key: inPanel ? taskKey : undefined, close: closePanel }), [inPanel, taskKey, closePanel]);

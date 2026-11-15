@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
 import { isDraft } from "@/lib/store";
@@ -8,6 +8,7 @@ import { NONE, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";
 import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
 import { usePeek, useTaskNav } from "@/tasks/task-link";
+import { takeSeen, useTaskOrder } from "@/tasks/task-queue";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { useViewport } from "@/tasks/use-viewport";
 
@@ -150,6 +151,17 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
     reveal(at);
     return next;
   }
+
+  // A task's page opened from here steps along these rows (tasks/task-queue.ts). Come back to
+  // from a page that stepped on, the focus is on the task it ended at.
+  const listStep = useTaskOrder(() => rows.map((row) => row.task.key));
+  useLayoutEffect(() => {
+    const key = takeSeen(listStep);
+    const at = key ? rows.findIndex((row) => row.task.key === key) : -1;
+    if (at < 0) return;
+    setFocusKey(rows[at]?.key ?? null);
+    reveal(at);
+  }, [listStep]);
 
   /** Where the task in the panel is listed, when the focus is not on it. */
   const peekedAt = focused?.key === peek.key ? focusAt : rows.findIndex((row) => row.task.key === peek.key);

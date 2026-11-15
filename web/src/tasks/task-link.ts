@@ -15,6 +15,7 @@ import { useLocation, useNavigate } from "react-router";
 import { useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { pageUnder } from "@/shell/project-in-view";
+import { leaveForPage } from "@/tasks/task-queue";
 
 export const taskPath = (slug: string, key: string) => `/${slug}/task/${key}`;
 
@@ -64,14 +65,18 @@ export function useTaskNav() {
   return useMemo(() => {
     const under = pageUnder(location);
     const replace = peeking || !!under;
+    /** `anchor` names a part of the task to open it at: "decision-<id>". */
+    const at = (key: string, anchor?: string) => taskPath(slug, key) + (anchor ? `#${anchor}` : "");
     return {
-      peek(key: string) {
+      peek(key: string, anchor?: string) {
         // From a task's own page there is no list to stay on: the next task opens as a page too.
-        if (!under && isTaskPath(location.pathname)) return void navigate(taskPath(slug, key));
-        void navigate(taskPath(slug, key), { state: { background: under ?? location }, replace });
+        if (!under && isTaskPath(location.pathname)) return void navigate(at(key, anchor));
+        void navigate(at(key, anchor), { state: { background: under ?? location }, replace });
       },
-      page(key: string) {
-        void navigate(taskPath(slug, key), { replace });
+      page(key: string, anchor?: string) {
+        // The page takes the order of the list it leaves with it, for its next and previous (tasks/task-queue.ts).
+        const from = leaveForPage();
+        void navigate(at(key, anchor), { replace, state: from ? { from } : undefined });
       },
     };
   }, [slug, location, navigate, peeking]);

@@ -2,7 +2,7 @@
 // lives, and what can be done to it as a whole (watch, copy its link, move
 // it to the trash, open it as a page, close or go back).
 
-import { ArrowLeft, ChevronRight, Eye, EyeOff, Link2, Maximize2, MoreHorizontal, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff, Link2, Maximize2, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { copyText } from "@/lib/files";
@@ -13,6 +13,7 @@ import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Task } from "@/lib/types";
 import type { TaskLayout } from "@/detail/task-body";
+import type { QueuePlace } from "@/detail/task-view";
 import { restoreTasks, trashTasks } from "@/tasks/actions";
 import { taskPath } from "@/tasks/task-link";
 import { Button, IconButton } from "@/ui/button";
@@ -24,6 +25,7 @@ interface Props {
   layout: TaskLayout;
   onClose: () => void;
   onExpand?: () => void;
+  queue?: QueuePlace;
 }
 
 function setWatching(task: Task, userId: string, watching: boolean) {
@@ -33,7 +35,7 @@ function setWatching(task: Task, userId: string, watching: boolean) {
   });
 }
 
-export function PanelHeader({ taskKey, task, layout, onClose, onExpand }: Props) {
+export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }: Props) {
   const me = useMe();
   const slug = useSlug();
   const project = useStore((s) => (task ? s.c.projects[task.project_id] : undefined));
@@ -67,6 +69,7 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand }: Props)
           </>
         )}
         <span className="shrink-0 text-ink tnum">{taskKey}</span>
+        {queue && <QueueSteps queue={queue} />}
       </div>
       {task && (
         <>
@@ -115,6 +118,21 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand }: Props)
         </IconButton>
       )}
     </header>
+  );
+}
+
+/** "3 of 27" and the way to the task before and after, on a page opened from a list. */
+function QueueSteps({ queue }: { queue: QueuePlace }) {
+  return (
+    <span className="ml-3 flex shrink-0 items-center gap-0.5 border-l border-line pl-2">
+      <IconButton size="sm" label={t("detail.prevTask")} hint="K" disabled={queue.at === 0} onClick={() => queue.step(-1)}>
+        <ChevronUp className="size-3.5" />
+      </IconButton>
+      <IconButton size="sm" label={t("detail.nextTask")} hint="J" disabled={queue.at >= queue.total - 1} onClick={() => queue.step(1)}>
+        <ChevronDown className="size-3.5" />
+      </IconButton>
+      <span className="ml-1 text-xs text-ink-3 tnum">{t("detail.queue", { at: queue.at + 1, total: queue.total })}</span>
+    </span>
   );
 }
 

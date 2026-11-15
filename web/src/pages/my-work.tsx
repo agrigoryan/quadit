@@ -73,7 +73,7 @@ export function MyWorkPage() {
     ],
     [waiting, questions, assigned],
   );
-  const focusId = useListKeys({ rows, idOf: (row) => row.id, onOpen: (row, as) => open[as](row.task.key), scroller });
+  const focusId = useListKeys({ rows, idOf: (row) => row.id, onOpen: (row, as) => open[as](row.task.key), taskKeyOf: (row) => row.task.key, scroller });
   const yours = waiting.length + questions.length;
   const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 

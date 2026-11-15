@@ -17,6 +17,15 @@ import { isTaskPath } from "@/tasks/task-link";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 
+/** Where a task's page stands in the list it was opened from. */
+export interface QueuePlace {
+  /** Counted from 0. */
+  at: number;
+  total: number;
+  /** Goes to the task `by` places on (1) or back (-1); nothing at either end. */
+  step: (by: number) => void;
+}
+
 interface Props {
   taskKey: string;
   layout: TaskLayout;
@@ -24,6 +33,8 @@ interface Props {
   onClose: () => void;
   /** In the panel: turns it into the task's own page. Enter does the same. */
   onExpand?: () => void;
+  /** On the page, when it was opened from a list: J and K (and the arrows) step along that list. */
+  queue?: QueuePlace;
 }
 
 /**
@@ -42,7 +53,7 @@ function PageTitle({ title }: { title: string }) {
   return null;
 }
 
-export function TaskView({ taskKey, layout, onClose, onExpand }: Props) {
+export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
   const task = useTaskByKey(taskKey);
   const looking = useFindTask(taskKey, !!task);
   const lost = useLostProject(taskKey.split("-")[0]);
@@ -60,11 +71,16 @@ export function TaskView({ taskKey, layout, onClose, onExpand }: Props) {
     },
     { layer: "panel" },
   );
+  const step = (by: number) => (e: KeyboardEvent) => {
+    e.preventDefault();
+    queue?.step(by);
+  };
+  useHotkeys({ j: step(1), k: step(-1), ArrowDown: step(1), ArrowUp: step(-1) }, { layer: "panel", enabled: !!queue });
 
   return (
     <div {...drop.handlers} className="relative flex min-h-0 flex-1 flex-col">
       {layout === "page" && <PageTitle title={task ? `${task.key} ${task.title}` : taskKey} />}
-      <PanelHeader taskKey={taskKey} task={task} layout={layout} onClose={onClose} onExpand={onExpand} />
+      <PanelHeader taskKey={taskKey} task={task} layout={layout} onClose={onClose} onExpand={onExpand} queue={queue} />
       {!task ? (
         looking ? (
           <Loading />

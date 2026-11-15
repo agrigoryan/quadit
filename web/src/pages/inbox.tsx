@@ -12,6 +12,9 @@ import { useTaskNav } from "@/tasks/task-link";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 
+/** The task an item is about: by the task itself, or by the key its title starts with. */
+const taskKeyOf = (item: Notification) => (item.task_id && getState().c.tasks[item.task_id]?.key) || splitTitle(item.title).key || undefined;
+
 const toggleRead = (item: Notification) => (item.read_at ? markUnread([item.id]) : markRead([item.id]));
 
 /** The inbox: everything that was sent to me, newest first, until I archive it. */
@@ -34,7 +37,7 @@ export function InboxPage() {
   const open = useCallback(
     (item: Notification, as: OpenAs = "peek") => {
       if (!item.read_at) markRead([item.id]);
-      const key = (item.task_id && getState().c.tasks[item.task_id]?.key) || splitTitle(item.title).key;
+      const key = taskKeyOf(item);
       if (key) tasks[as](key);
     },
     [tasks],
@@ -44,6 +47,7 @@ export function InboxPage() {
     rows: items,
     idOf: (item) => item.id,
     onOpen: open,
+    taskKeyOf,
     scroller,
     keys: { e: (item) => archive([item.id]), u: toggleRead },
   });

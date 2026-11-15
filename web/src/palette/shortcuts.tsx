@@ -45,6 +45,7 @@ const sections: Section[] = [
       { what: "shortcuts.priority", keys: ["P"] },
       { what: "shortcuts.labels", keys: ["L"] },
       { what: "shortcuts.clear", keys: ["Esc"] },
+      { what: "shortcuts.lift", keys: ["Shift Space"] },
     ],
   },
   {
@@ -54,6 +55,7 @@ const sections: Section[] = [
       { what: "shortcuts.peekNext", keys: ["J", "K"], join: "or" },
       { what: "shortcuts.openPage", keys: ["Enter"] },
       { what: "shortcuts.peekClose", keys: ["Space", "Esc"], join: "or" },
+      { what: "shortcuts.pageNext", keys: ["J", "K"], join: "or" },
       { what: "shortcuts.back", keys: ["Esc"] },
       { what: "shortcuts.status", keys: ["S"] },
       { what: "shortcuts.assignee", keys: ["A"] },

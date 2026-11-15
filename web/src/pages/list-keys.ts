@@ -5,10 +5,11 @@
 // while the page is open do not move it; left and come back to, the page is
 // where it was (lib/place.ts).
 
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Hotkeys, useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
 import { usePeek } from "@/tasks/task-link";
+import { takeSeen, useTaskOrder } from "@/tasks/task-queue";
 
 /** A focused link or button answers Enter and Space itself. */
 const onControl = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("a, button") !== null;
@@ -21,6 +22,8 @@ interface Options<Row> {
   rows: Row[];
   idOf: (row: Row) => string;
   onOpen: (row: Row, as: OpenAs) => void;
+  /** The key of the task a row opens. A task's page opened from here steps along the rows by it. */
+  taskKeyOf: (row: Row) => string | undefined;
   /** The element that scrolls the rows. */
   scroller: RefObject<HTMLElement | null>;
   /** More keys that act on the focused row ("e" archives it). */
@@ -28,7 +31,7 @@ interface Options<Row> {
 }
 
 /** Returns the id of the focused row, or null before the keyboard is used. */
-export function useListKeys<Row>({ rows, idOf, onOpen, scroller, keys = {} }: Options<Row>): string | null {
+export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys = {} }: Options<Row>): string | null {
   const peek = usePeek();
   const peeking = peek.key !== undefined;
   const place = useRef<{ focus: string | null }>({ focus: null });
@@ -36,6 +39,14 @@ export function useListKeys<Row>({ rows, idOf, onOpen, scroller, keys = {} }: Op
   const [focusId, setFocusId] = useState<string | null>(saved?.focus ?? null);
   place.current = { focus: focusId };
   const lastIndex = useRef(-1);
+
+  // Come back to from a task's page that stepped on to another task, the focus is on the task it ended at.
+  const listStep = useTaskOrder(() => rows.map(taskKeyOf));
+  useLayoutEffect(() => {
+    const key = takeSeen(listStep);
+    const row = key ? rows.find((r) => taskKeyOf(r) === key) : undefined;
+    if (row) setFocusId(idOf(row));
+  }, [listStep]);
 
   let index = focusId === null ? -1 : rows.findIndex((row) => idOf(row) === focusId);
   // The focused row left the list (archived, answered): stay where it was.
