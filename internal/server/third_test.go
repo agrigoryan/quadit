@@ -198,6 +198,10 @@ func TestThirdAuditFindings(t *testing.T) {
 			t.Fatalf("the sender got the other member's notice: %s", out)
 		}
 
+		// A push subscription is taken as browsers send it, with its
+		// (empty) expiry: a real phone's was refused for that field.
+		s.call(s.owner, "", "POST", "/api/v1/push/subscriptions", json.RawMessage(`{"endpoint":"https://fcm.googleapis.com/fcm/send/abc","expirationTime":null,"keys":{"p256dh":"BPk","auth":"x1"}}`), 201, nil)
+
 		// A call to MCP with no token at all is counted like a wrong one.
 		limited := false
 		for i := 0; i < 140 && !limited; i++ {

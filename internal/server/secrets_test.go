@@ -763,7 +763,7 @@ func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
 }
 
 // TestEveryRouteIsDescribed checks that the API description leaves no route
-// out: every address the server answers under /api/v1 is in openapi.json.
+// out: every address the server answers is in openapi.json.
 func TestEveryRouteIsDescribed(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
 	var spec struct {
@@ -777,7 +777,7 @@ func TestEveryRouteIsDescribed(t *testing.T) {
 		}
 	}
 	files, _ := filepath.Glob("*.go")
-	plain := regexp.MustCompile(`HandleFunc\("([A-Z]+) (/api/v1[^"]*)"`)
+	plain := regexp.MustCompile(`HandleFunc\("([A-Z]+) (/[^"]*)"`)
 	inWorkspace := regexp.MustCompile(`HandleFunc\("([A-Z]+) "\+w\+"([^"]*)"`)
 	n := 0
 	for _, file := range files {

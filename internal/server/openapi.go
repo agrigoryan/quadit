@@ -145,10 +145,34 @@ var installOps = []op{
 	{"POST", "/admin/backups/{id}/restore-item", "Bring one task or page back from a backup, as it was then. Body: {workspace, task} or {workspace, doc}.", "", "install"},
 }
 
+// rootOps are the addresses outside /api/v1: files, the MCP endpoint and
+// its sign-in, incoming GitHub events, and what monitoring reads.
+var rootOps = []op{
+	{"GET", "/f/{id}/{name}", "A file's bytes. The name is for the reader; the id decides. /f/{id}/preview is its small preview. Takes a session or a token, and byte ranges.", "", "files"},
+	{"POST", "/mcp", "The MCP endpoint (streamable HTTP). Takes a personal token or an OAuth token as a Bearer credential.", "", "mcp"},
+	{"GET", "/mcp", "The MCP endpoint's event stream, for clients that open one.", "", "mcp"},
+	{"GET", "/.well-known/oauth-protected-resource", "Where an MCP client signs its user in (RFC 9728).", "", "mcp"},
+	{"GET", "/.well-known/oauth-protected-resource/mcp", "The same, at the address some clients ask.", "", "mcp"},
+	{"GET", "/.well-known/oauth-authorization-server", "The sign-in server's own description (RFC 8414).", "", "mcp"},
+	{"POST", "/oauth/register", "An MCP client registers itself (RFC 7591).", "", "mcp"},
+	{"GET", "/oauth/authorize", "The consent page a person sees: which client, and which agent it will work as.", "", "mcp"},
+	{"POST", "/oauth/authorize", "The person's answer on the consent page.", "", "mcp"},
+	{"POST", "/oauth/token", "Exchange a code, or a refresh token, for an access token (with PKCE).", "", "mcp"},
+	{"POST", "/hooks/github/{id}", "Where GitHub sends events for an integration, signed with its secret.", "", "integrations"},
+	{"GET", "/healthz", "The process is up.", "", "monitoring"},
+	{"GET", "/readyz", "The database and the file store answer.", "", "monitoring"},
+	{"GET", "/metrics", "Counters in the Prometheus text format.", "", "monitoring"},
+}
+
 func (s *Server) hOpenAPI(w http.ResponseWriter, r *http.Request) {
 	paths := map[string]map[string]any{}
+	prefixed := make([]op, 0, len(installOps)+len(rootOps))
 	for _, o := range installOps {
-		path := "/api/v1" + o.Path
+		o.Path = "/api/v1" + o.Path
+		prefixed = append(prefixed, o)
+	}
+	for _, o := range append(prefixed, rootOps...) {
+		path := o.Path
 		params := []map[string]any{}
 		for _, seg := range strings.Split(o.Path, "/") {
 			if strings.HasPrefix(seg, "{") {

@@ -5,6 +5,9 @@ api DELETE /api/v1/auth/sessions/{id}
 api DELETE /api/v1/push/subscriptions
 api DELETE /api/v1/w/{workspace}/invites/{id}
 api DELETE /api/v1/w/{workspace}/tokens/{id}
+api GET /.well-known/oauth-authorization-server
+api GET /.well-known/oauth-protected-resource
+api GET /.well-known/oauth-protected-resource/mcp
 api GET /api/v1/admin/audit
 api GET /api/v1/admin/backups
 api GET /api/v1/admin/backups/{id}/download
@@ -57,6 +60,12 @@ api GET /api/v1/w/{workspace}/tasks
 api GET /api/v1/w/{workspace}/tasks/{ref}
 api GET /api/v1/w/{workspace}/tasks/{ref}/context
 api GET /api/v1/w/{workspace}/tokens
+api GET /f/{id}/{name}
+api GET /healthz
+api GET /mcp
+api GET /metrics
+api GET /oauth/authorize
+api GET /readyz
 api PATCH /api/v1/admin/users/{id}
 api PATCH /api/v1/auth/me
 api PATCH /api/v1/auth/passkeys/{id}
@@ -99,6 +108,11 @@ api POST /api/v1/w/{workspace}/sources/{id}/sync
 api POST /api/v1/w/{workspace}/tokens
 api POST /api/v1/w/{workspace}/webhooks/{id}/test
 api POST /api/v1/workspaces
+api POST /hooks/github/{id}
+api POST /mcp
+api POST /oauth/authorize
+api POST /oauth/register
+api POST /oauth/token
 api PUT /api/v1/admin/settings/{name}
 api PUT /api/v1/w/{workspace}/cursors/{name}
 change agent.create

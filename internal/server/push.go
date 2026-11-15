@@ -90,9 +90,14 @@ func (s *Server) hPushKey(x *c) error {
 	return x.ok(map[string]any{"public_key": pk.PublicKey})
 }
 
+// pushSubBody is a browser's subscription as its own toJSON() gives it.
 type pushSubBody struct {
 	Endpoint string `json:"endpoint"`
-	Keys     struct {
+	// ExpirationTime is part of what browsers send (null in practice). It
+	// is taken and not used: a subscription that ends is dropped when the
+	// push service says it is gone.
+	ExpirationTime any `json:"expirationTime"`
+	Keys           struct {
 		P256dh string `json:"p256dh"`
 		Auth   string `json:"auth"`
 	} `json:"keys"`
