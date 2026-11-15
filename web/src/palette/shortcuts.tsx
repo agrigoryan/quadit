@@ -76,6 +76,11 @@ const sections: Section[] = [
     }),
   },
   {
+    title: "shortcuts.group.page",
+    hint: "shortcuts.group.pageHint",
+    rows: [{ what: "shortcuts.openChip", keys: [`${MOD} Enter`] }],
+  },
+  {
     title: "shortcuts.group.inbox",
     rows: [
       { what: "shortcuts.archive", keys: ["E"] },
