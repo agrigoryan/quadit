@@ -1,5 +1,5 @@
 // What can be done to inbox items. Each shows at once and is sent as the
-// `notification.read` change (internal/engine/ch_agent.go).
+// `notification.read` change (internal/engine/ch_inbox.go).
 
 import { send } from "@/lib/mutate";
 import type { Notification } from "@/lib/types";
