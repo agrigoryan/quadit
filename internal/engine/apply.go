@@ -76,7 +76,7 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 	if err := checkBatch(changes); err != nil {
 		return nil, err
 	}
-	run := &batch{ctx: ctx, e: e, dryRun: dryRun}
+	run := &batch{ctx: ctx, e: e}
 	results := make([]*Result, len(changes))
 	var lastSeq int64
 	err := e.st.Write(ctx, workspaceID, func(raw store.Tx) error {
@@ -91,7 +91,12 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 			results[i] = res
 		}
 		lastSeq = run.tx.Seq()
-		return run.end()
+		if dryRun {
+			// A dry run is undone by failing the transaction: the error
+			// rolls back every write, and is not reported.
+			return errDryRun
+		}
+		return nil
 	})
 	if err != nil && !errors.Is(err, errDryRun) {
 		return nil, err
@@ -134,8 +139,8 @@ func refusedAt(i int, ch Change, err error) error {
 	return fmt.Errorf("change %d (%s): %w", i, ch.Type, err)
 }
 
-// batch is one run of Batch: one actor's changes in one transaction. It
-// holds its ctx because it is one run of work.
+// batch is one run of Batch: one actor's changes in one transaction, with
+// what is known of the actor once it has started.
 type batch struct {
 	ctx    context.Context
 	e      *Engine
@@ -143,7 +148,6 @@ type batch struct {
 	member core.Member // the actor
 	scope  core.Scope  // what the actor's membership and credential allow
 	now    int64
-	dryRun bool // check the changes and keep nothing
 }
 
 // start checks that the actor may write to the workspace at all, and works
@@ -173,21 +177,12 @@ func (b *batch) start(tx store.Tx, actor Actor) error {
 	return nil
 }
 
-// end keeps the batch's writes, or, for a dry run, undoes them.
-func (b *batch) end() error {
-	if b.dryRun {
-		return errDryRun
-	}
-	return nil
-}
-
 // apply runs one change of the batch, or answers it from the first time
 // its id was used.
 func (b *batch) apply(ch Change) (*Result, error) {
 	h := handlers[ch.Type]
 	hash := argsHash(ch)
-	res, err := b.resent(ch, hash)
-	if res != nil || err != nil {
+	if res, dup, err := b.resent(ch, hash); dup || err != nil {
 		return res, err
 	}
 	if !b.member.Role.AtLeast(h.min) {
@@ -221,19 +216,19 @@ func (b *batch) resolver() *Resolver {
 	return &Resolver{ctx: b.ctx, db: b.tx, actor: b.member, at: b.now}
 }
 
-// resent answers a change whose id was already applied with what it did
-// then, and refuses one whose id was used for another change. It returns
-// nil for a new id.
-func (b *batch) resent(ch Change, hash string) (*Result, error) {
+// resent answers a change whose id was already applied (dup) with what it
+// did then, and refuses one whose id was used for another change. A new id
+// is neither.
+func (b *batch) resent(ch Change, hash string) (res *Result, dup bool, err error) {
 	var prev core.AppliedChange
 	ok, err := found(b.tx.Get(b.ctx, &prev, store.Eq("id", ch.ID)))
 	if !ok {
-		return nil, err
+		return nil, false, err
 	}
 	if prev.Type != ch.Type || prev.ArgsHash != hash || prev.ActorID != b.member.UserID {
-		return nil, conflictErr("change id %s was already used for a different change; use a new id", ch.ID)
+		return nil, false, conflictErr("change id %s was already used for a different change; use a new id", ch.ID)
 	}
-	return &Result{ChangeID: ch.ID, Type: ch.Type, Duplicate: true, FirstSeq: prev.FirstSeq, Seq: prev.LastSeq, Ref: prev.Ref, Key: prev.Key}, nil
+	return &Result{ChangeID: ch.ID, Type: ch.Type, Duplicate: true, FirstSeq: prev.FirstSeq, Seq: prev.LastSeq, Ref: prev.Ref, Key: prev.Key}, true, nil
 }
 
 // checkFor holds a change made "for" a member to what that member may do,
