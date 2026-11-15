@@ -14,6 +14,7 @@ import type { Member, User, Workspace } from "@/lib/types";
 import { useToasts } from "@/lib/toast";
 import { ui, useUi } from "@/lib/ui-state";
 import { CreateTaskDialog } from "@/tasks/create-task";
+import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";
 
 /** A change as the server receives it: JSON, read field by field. */
@@ -85,6 +86,7 @@ function open(many = false, at: { pathname: string; state?: unknown } = { pathna
         <Here />
       </TooltipProvider>
     </MemoryRouter>,
+    { wrapper: WithQuery },
   );
 }
 
