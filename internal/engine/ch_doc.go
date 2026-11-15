@@ -805,7 +805,14 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block, extra map[s
 		c.ref = d.ID
 		return nil
 	}
-	if err := c.keepVersion(d, before, "", false); err != nil {
+	// When this edit changes a block someone else wrote since the last kept
+	// version, the page as they left it is kept first: the last edit wins,
+	// and the other stays in the page's history.
+	others, err := c.overwritesOthers(d, ed, before)
+	if err != nil {
+		return err
+	}
+	if err := c.keepVersion(d, before, "", others); err != nil {
 		return err
 	}
 	seq := c.tx.NextSeq()
@@ -826,6 +833,25 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block, extra map[s
 		return err
 	}
 	return c.afterDocText(d, ed)
+}
+
+// overwritesOthers reports whether an edit touches a block that another
+// member changed after the newest kept version.
+func (c *cx) overwritesOthers(d core.Doc, ed *editor, before []core.Block) (bool, error) {
+	var last []core.DocVersion
+	if err := c.tx.List(c.ctx, &last, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "-seq", Limit: 1}); err != nil {
+		return false, err
+	}
+	var kept int64
+	if len(last) > 0 {
+		kept = last[0].Seq
+	}
+	for _, b := range before {
+		if contains(ed.touched, b.ID) && b.UpdatedBy != "" && b.UpdatedBy != c.actor.UserID && b.UpdatedSeq > kept {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // keepVersion stores the page as it stands. Unless forced it does so only

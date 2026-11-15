@@ -95,6 +95,12 @@ var (
 	mentionRE = regexp.MustCompile(`(^|[^A-Za-z0-9_@/])@([a-z0-9][a-z0-9_-]{1,31})`)
 	keyRE     = regexp.MustCompile(`\b([A-Z][A-Z0-9]{1,9}-\d+)\b`)
 	docRefRE  = regexp.MustCompile(`(?:doc:|/docs?/)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
+	// A decision is named by its id ("decision:<id>", or a link to it) or by
+	// its task and number ("SVA-7#2").
+	decisionRefRE = regexp.MustCompile(`(?:decision:|/decisions?/|#decision-)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
+	decisionNthRE = regexp.MustCompile(`\b([A-Z][A-Z0-9]{1,9}-\d+)#(\d+)\b`)
+	// A page is also named by its title in double brackets: [[Art guide]].
+	wikiRefRE = regexp.MustCompile(`\[\[([^\[\]\n]{1,200})\]\]`)
 )
 
 // link records what a piece of text mentions (members by @handle, tasks by
@@ -137,6 +143,23 @@ func (c *cx) link(fromType, fromID, scopeType, scopeID, text string) ([]core.Mem
 		var d core.Doc
 		if err := c.tx.Get(c.ctx, &d, store.Eq("id", m[1])); err == nil {
 			add("doc", d.ID)
+		}
+	}
+	for _, m := range decisionRefRE.FindAllStringSubmatch(text, -1) {
+		var d core.Decision
+		if err := c.tx.Get(c.ctx, &d, store.Eq("id", m[1]), store.Live); err == nil {
+			add("decision", d.ID)
+		}
+	}
+	for _, m := range decisionNthRE.FindAllStringSubmatch(text, -1) {
+		if id, err := c.decisionOnTask(m[1] + "#" + m[2]); err == nil {
+			add("decision", id)
+		}
+	}
+	for _, m := range wikiRefRE.FindAllStringSubmatch(text, -1) {
+		var ds []core.Doc
+		if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("title", strings.TrimSpace(m[1])), store.Live}, Limit: 2}); err == nil && len(ds) == 1 {
+			add("doc", ds[0].ID)
 		}
 	}
 	for _, r := range old {

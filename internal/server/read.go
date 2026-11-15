@@ -872,11 +872,22 @@ func (s *Server) rawTask(x *c, t core.Task) error {
 	if err != nil {
 		return err
 	}
-	var refs []core.Ref
-	if err := x.db.List(ctx, &refs, store.Where(store.Eq("to_id", t.ID))); err != nil {
+	// Where this task, and each of its decisions, is mentioned: in pages,
+	// in other tasks, in comments. Each says what it is called.
+	targets := []string{t.ID}
+	var ds []core.Decision
+	if err := x.db.List(ctx, &ds, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
 		return err
 	}
-	return x.ok(map[string]any{"task": t, "comments": cms, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions, "mentioned_in": refs})
+	for _, d := range ds {
+		targets = append(targets, d.ID)
+	}
+	var refs []core.Ref
+	if err := x.db.List(ctx, &refs, store.Where(store.In("to_id", targets))); err != nil {
+		return err
+	}
+	mentioned := x.namedRefs(refs)
+	return x.ok(map[string]any{"task": t, "comments": cms, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions, "mentioned_in": mentioned})
 }
 
 // hContext is the context pack: one call with everything an agent needs to
@@ -1280,4 +1291,39 @@ func (s *Server) withResponsible(ctx context.Context, members []core.Member) {
 	for i := range members {
 		members[i].ResponsibleID = by[members[i].UserID]
 	}
+}
+
+// namedRef is one mention with what the mentioning thing is called.
+type namedRef struct {
+	core.Ref
+	// Title is the page's title or the task's; Key the task's key, when the
+	// mention is in a task or one of its comments.
+	Title string `json:"title,omitempty"`
+	Key   string `json:"key,omitempty"`
+}
+
+// namedRefs gives each mention the name of where it was made, leaving out
+// those the caller may not see.
+func (x *c) namedRefs(refs []core.Ref) []namedRef {
+	out := []namedRef{}
+	ctx := x.ctx()
+	for _, r := range refs {
+		nr := namedRef{Ref: r}
+		switch r.FromScopeType {
+		case "doc":
+			var d core.Doc
+			if err := x.db.Get(ctx, &d, store.Eq("id", r.FromScopeID), store.Live); err != nil || !engine.CanSeeDoc(d, x.member.UserID) || !x.canProject(d.ProjectID) {
+				continue
+			}
+			nr.Title = d.Title
+		case "task":
+			var t core.Task
+			if err := x.db.Get(ctx, &t, store.Eq("id", r.FromScopeID), store.Live); err != nil || !x.canProject(t.ProjectID) {
+				continue
+			}
+			nr.Title, nr.Key = t.Title, t.Key
+		}
+		out = append(out, nr)
+	}
+	return out
 }

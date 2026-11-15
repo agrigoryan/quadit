@@ -3,6 +3,7 @@ package server_test
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -298,5 +299,90 @@ func TestRenameOption(t *testing.T) {
 		// Refusals: a name already taken, an option that is not there, not a select.
 		s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "property.update", "args": M{"id": state, "rename_option": M{"from": "to draw", "to": "drawn"}}}, 409, nil)
 		s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "property.update", "args": M{"id": state, "rename_option": M{"from": "nope", "to": "x"}}}, 400, nil)
+	})
+}
+
+// TestOverwrittenEditStaysInHistory checks the co-editing rule: when two
+// members change the same block the last one wins, and the other's words
+// can still be found in the page's history.
+func TestOverwrittenEditStaysInHistory(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "agent.create", M{"name": "Writer", "handle": "writer"})
+		var wt struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@writer"}, 201, &wt)
+		block := "0192f0c0-0000-7000-8000-0000000000b1"
+		page := s.change(s.owner, "", "doc.create", M{"title": "Plan", "blocks": []M{{"id": block, "type": "paragraph", "content": []M{{"type": "text", "text": "The first draft."}}}}})["ref"].(string)
+		edit := func(token, text string) {
+			var hc *http.Client
+			if token == "" {
+				hc = s.owner
+			}
+			s.change(hc, token, "doc.edit", M{"doc": page, "ops": []M{{"op": "update", "id": block, "content": []M{{"type": "text", "text": text}}}}})
+		}
+		edit(wt.Token, "The agent's careful rewrite.")
+		edit("", "The owner's quick overwrite.")
+		// The page reads as the last edit says.
+		if md := s.call(s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil); !strings.Contains(md, "quick overwrite") {
+			t.Fatalf("the page: %s", md)
+		}
+		// And the overwritten words are in a kept version, under their author.
+		var vs struct {
+			Versions []struct {
+				ID        string
+				CreatedBy string `json:"created_by"`
+			}
+		}
+		s.call(s.owner, "", "GET", w+"/docs/"+page+"/versions", nil, 200, &vs)
+		found := false
+		for _, v := range vs.Versions {
+			if out := s.call(s.owner, "", "GET", w+"/docs/"+page+"/versions/"+v.ID, nil, 200, nil); strings.Contains(out, "careful rewrite") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("the overwritten edit is in none of the %d kept versions", len(vs.Versions))
+		}
+	})
+}
+
+// TestDecisionsAndTitlesAsLinks checks that a decision and a page title can
+// be mentioned, and that the task says where it and its decisions are named.
+func TestDecisionsAndTitlesAsLinks(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music"})
+		d := s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "options": []M{{"label": "Ring"}, {"label": "Burst"}}})["ref"].(string)
+		guide := s.change(s.owner, "", "doc.create", M{"title": "Art guide", "markdown": "Sprites are 32px.\n"})["ref"].(string)
+		s.change(s.owner, "", "doc.create", M{"title": "Plan", "markdown": "See [[Art guide]]. The explosion was settled in SVA-1#1 and decision:" + d + ".\n"})
+		s.change(s.owner, "", "comment.create", M{"task": "SVA-2", "body": "Match the pick in SVA-1#1."})
+		var detail struct {
+			MentionedIn []struct {
+				FromScopeType string `json:"from_scope_type"`
+				ToType        string `json:"to_type"`
+				ToID          string `json:"to_id"`
+				Title, Key    string
+			} `json:"mentioned_in"`
+		}
+		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &detail)
+		var inPlan, inTask bool
+		for _, m := range detail.MentionedIn {
+			inPlan = inPlan || (m.ToType == "decision" && m.ToID == d && m.Title == "Plan")
+			inTask = inTask || (m.ToType == "decision" && m.Key == "SVA-2")
+		}
+		if !inPlan || !inTask {
+			t.Fatalf("where the decision is mentioned: %+v", detail.MentionedIn)
+		}
+		var page struct {
+			MentionedIn []struct {
+				FromScopeID string `json:"from_scope_id"`
+			} `json:"mentioned_in"`
+		}
+		s.call(s.owner, "", "GET", w+"/docs/"+guide, nil, 200, &page)
+		if len(page.MentionedIn) != 1 {
+			t.Fatalf("a page named by its title in brackets: %+v", page.MentionedIn)
+		}
 	})
 }
