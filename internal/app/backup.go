@@ -4,7 +4,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -219,8 +218,10 @@ func restoreItem(ctx context.Context, st store.Store, files blob.Store, archive 
 	}
 	// Tell open browsers, and put the text back in the search index.
 	var ws core.Workspace
-	switch err := st.Get(ctx, &ws, store.Eq("slug", it.Workspace)); {
-	case err == nil:
+	switch there, err := store.Find(ctx, st, &ws, store.Eq("slug", it.Workspace)); {
+	case err != nil:
+		fmt.Fprintln(os.Stderr, "restored, but open browsers and search were not told:", err)
+	case there:
 		eng := engine.New(st, nil) // it only announces and reindexes: no secret to seal
 		if err := eng.AnnounceRestored(ctx, ws.ID, it.Kind, rid); err != nil {
 			fmt.Fprintln(os.Stderr, "restored, but open browsers were not told:", err)
@@ -229,8 +230,6 @@ func restoreItem(ctx context.Context, st store.Store, files blob.Store, archive 
 			fmt.Fprintln(os.Stderr, "rebuilding search:", err)
 		}
 		shellAudit(ctx, st, shellAction{workspaceID: ws.ID, action: it.Kind + ".restored_from_backup", targetType: it.Kind, targetID: rid, data: map[string]string{"archive": ra.file}})
-	case !errors.Is(err, store.ErrNotFound):
-		fmt.Fprintln(os.Stderr, "restored, but open browsers and search were not told:", err)
 	}
 	fmt.Printf("brought back %s %s\n", it.Kind, it.Ref)
 	return 0

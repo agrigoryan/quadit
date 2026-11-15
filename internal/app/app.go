@@ -395,11 +395,8 @@ func filesConfig(ctx context.Context, st store.Store, sealer *auth.Sealer) (blob
 		return cfg, nil
 	}
 	var set core.Setting
-	err := st.Get(ctx, &set, store.Eq("name", "files"))
-	if errors.Is(err, store.ErrNotFound) {
-		return cfg, nil
-	}
-	if err != nil {
+	there, err := store.Find(ctx, st, &set, store.Eq("name", "files"))
+	if err != nil || !there {
 		return cfg, err
 	}
 	if err := json.Unmarshal(set.Value, &cfg); err != nil {
@@ -512,11 +509,14 @@ func splitAdminArgs(args []string) (pos, flags []string) {
 // person finds the person with an email address.
 func (run *adminRun) person(addr string) (core.User, error) {
 	var u core.User
-	err := run.st.Get(run.ctx, &u, store.Eq("email", strings.ToLower(addr)), store.Live)
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(run.ctx, run.st, &u, store.Eq("email", strings.ToLower(addr)), store.Live)
+	if err != nil {
+		return u, err
+	}
+	if !there {
 		return u, fmt.Errorf("no person with the email %s", addr)
 	}
-	return u, err
+	return u, nil
 }
 
 // setup makes the first person and workspace.
@@ -600,16 +600,19 @@ func (run *adminRun) token() error {
 		return errors.New("usage: quadit admin token [--secrets] WORKSPACE @HANDLE [NAME]")
 	}
 	var ws core.Workspace
-	if err := st.Get(ctx, &ws, store.Eq("slug", pos[0]), store.Live); errors.Is(err, store.ErrNotFound) {
-		return fmt.Errorf("no workspace %s", pos[0])
-	} else if err != nil {
+	there, err := store.Find(ctx, st, &ws, store.Eq("slug", pos[0]), store.Live)
+	if err != nil {
 		return err
 	}
+	if !there {
+		return fmt.Errorf("no workspace %s", pos[0])
+	}
 	var m core.Member
-	if err := st.In(ws.ID).Get(ctx, &m, store.Eq("handle", strings.TrimPrefix(pos[1], "@")), store.Null("removed_at")); errors.Is(err, store.ErrNotFound) {
-		return fmt.Errorf("no member %s in %s", pos[1], ws.Slug)
-	} else if err != nil {
+	if there, err = store.Find(ctx, st.In(ws.ID), &m, store.Eq("handle", strings.TrimPrefix(pos[1], "@")), store.Null("removed_at")); err != nil {
 		return err
+	}
+	if !there {
+		return fmt.Errorf("no member %s in %s", pos[1], ws.Slug)
 	}
 	token, prefix := auth.NewAPIToken()
 	label, scopes := "issued from the shell", ""
