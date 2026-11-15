@@ -37,3 +37,26 @@ test("the workspace is renamed", async ({ page }) => {
   await expect(name).toHaveValue(newName);
   await expect(switcher).toContainText(newName);
 });
+
+test("the API tokens list catches up after the browser was offline, without a reload", async ({
+  page,
+  context,
+  request,
+}) => {
+  const run = currentRun();
+  const tokenName = unique("made while away");
+  await page.goto("/e2e/settings/me/tokens");
+  await expect(page.getByRole("button", { name: "New token" })).toBeVisible();
+
+  await context.setOffline(true);
+  // Made elsewhere while this browser cannot hear of it. A token is not an event: only asking again shows it.
+  const made = await request.post(`${run.url}/api/v1/w/e2e/tokens`, {
+    headers: { Authorization: `Bearer ${run.token}` },
+    data: { user: "me", name: tokenName, read_only: true, projects: [], expires_days: 30 },
+  });
+  expect(made.ok()).toBe(true);
+  await expect(page.getByRole("main").getByText(tokenName)).toBeHidden();
+
+  await context.setOffline(false);
+  await expect(page.getByRole("main").getByText(tokenName)).toBeVisible({ timeout: 15_000 });
+});
