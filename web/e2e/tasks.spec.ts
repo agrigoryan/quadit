@@ -21,10 +21,13 @@ test("the New task button makes a task too", async ({ page, project }) => {
   await expect(page.getByRole("link", { name: `Open ${project.key}-1` })).toHaveText("Book the venue");
 });
 
+const PICKERS: Record<string, string> = { s: "Change status…", a: "Assign to…", p: "Set priority…" };
+
 /** Presses a row key (S, A, P) and picks the choice from the keyboard: typing narrows the picker, Enter picks. */
 async function pickWithKey(page: Page, letter: string, choice: string) {
   await page.keyboard.press(letter);
-  const search = page.getByRole("combobox");
+  const picker = page.getByRole("dialog", { name: PICKERS[letter] });
+  const search = picker.getByRole("combobox", { name: PICKERS[letter] });
   await expect(search).toBeFocused();
   await search.pressSequentially(choice);
   await page.keyboard.press("Enter");
@@ -103,8 +106,8 @@ test("filters by text and by status, in the address, through a reload", async ({
   await page.getByRole("searchbox", { name: "Filter by title or key…" }).clear();
   await expect(page.getByRole("link", { name: `Open ${beta}` })).toBeVisible();
   await page.getByRole("button", { name: "Filter", exact: true }).click();
-  await page.getByRole("option", { name: "Status", exact: true }).click();
-  await page.getByRole("option", { name: "In Progress" }).click();
+  await page.getByRole("dialog", { name: "Filter" }).getByRole("option", { name: "Status", exact: true }).click();
+  await page.getByRole("dialog", { name: "Status" }).getByRole("option", { name: "In Progress" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("link", { name: `Open ${alpha}` })).toBeHidden();
   await expect(page).toHaveURL(/[?&]status=In(\+|%20)Progress/);

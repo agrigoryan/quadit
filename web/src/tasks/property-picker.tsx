@@ -337,7 +337,7 @@ export function TaskPropertyPicker({ kind, tasks, open, onOpenChange, children, 
       {children && <PopoverTrigger asChild>{children}</PopoverTrigger>}
       {anchor && <PopoverAnchor virtualRef={anchor} />}
       {isOpen && (
-        <PopoverContent align={align} side={side} className="p-0">
+        <PopoverContent align={align} side={side} aria-label={titles[kind]()} className="p-0">
           {kind === "assignee" || kind === "waiting" ? (
             <MemberChoices kind={kind} tasks={tasks} close={() => setOpen(false)} />
           ) : (

@@ -119,6 +119,17 @@ describe("Picker", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
   });
 
+  it("opens as a dialog named like its list", () => {
+    render(
+      <Picker label="Labels" items={labels} onPick={() => {}}>
+        <button type="button">Open</button>
+      </Picker>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    const dialog = screen.getByRole("dialog", { name: "Labels" });
+    expect(within(dialog).getByRole("combobox", { name: "Labels" })).toHaveFocus();
+  });
+
   it("stays open for several picks, and empties the search after each", () => {
     const onPick = vi.fn();
     render(

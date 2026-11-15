@@ -177,7 +177,7 @@ export function Picker({
     <Popover open={isOpen} onOpenChange={setOpen}>
       {children && <PopoverTrigger asChild>{children}</PopoverTrigger>}
       {anchor && <PopoverAnchor virtualRef={anchor} />}
-      <PopoverContent align={align} side={side} className="p-0">
+      <PopoverContent align={align} side={side} aria-label={list.label} className="p-0">
         <PickerList
           {...list}
           onPick={(id) => {

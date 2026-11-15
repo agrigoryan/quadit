@@ -187,7 +187,7 @@ export function FilterBar({ filters, onChange, project }: Props) {
             {t("filter.add")}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="p-0">
+        <PopoverContent aria-label={t(stage === null ? "filter.add" : FILTER_LABEL[stage])} className="p-0">
           {stage === null ? (
             <PickerList
               label={t("filter.add")}
