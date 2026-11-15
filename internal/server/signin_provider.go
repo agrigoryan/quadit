@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 )
 
@@ -120,6 +122,15 @@ func (s *Server) providerList(ctx context.Context) []map[string]string {
 	return out
 }
 
+// providerCalls is ctx for the requests a sign-in makes to its provider:
+// reading where it lives and its keys, trading the code for a token, asking
+// who signed in. Each gives up after githubTimeout, the limit a request to
+// GitHub has, so a provider that never answers cannot hold a sign-in open.
+// An OpenID Connect provider keeps the client for reading its keys later.
+func providerCalls(ctx context.Context) context.Context {
+	return oidc.ClientContext(ctx, &http.Client{Timeout: githubTimeout})
+}
+
 // oauth2Config is this server as a client of the provider: who it says it
 // is, where the provider sends the browser back, and where the provider
 // lives.
@@ -127,7 +138,7 @@ func (s *Server) oauth2Config(ctx context.Context, p signInProvider, cfg oauthSe
 	oc := &oauth2.Config{ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
 		RedirectURL: s.cfg.BaseURL + "/api/v1/auth/oauth/" + p.ID() + "/callback"}
 	var err error
-	if oc.Endpoint, oc.Scopes, err = p.Endpoint(ctx, cfg); err != nil {
+	if oc.Endpoint, oc.Scopes, err = p.Endpoint(providerCalls(ctx), cfg); err != nil {
 		return nil, err
 	}
 	return oc, nil
@@ -141,6 +152,7 @@ func (s *Server) oauthIdentity(ctx context.Context, p signInProvider, cfg oauthS
 	if err != nil {
 		return who, err
 	}
+	ctx = providerCalls(ctx)
 	tok, err := oc.Exchange(ctx, code, oauth2.VerifierOption(st.Verifier))
 	if err != nil {
 		return who, fmt.Errorf("the provider refused the sign-in: %w", err)

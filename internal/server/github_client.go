@@ -21,7 +21,8 @@ type githubClient struct {
 	header map[string]string
 }
 
-// githubTimeout is how long one request to GitHub may take.
+// githubTimeout is how long one request to GitHub may take; a sign-in's
+// requests to any provider have the same limit (see providerCalls).
 var githubTimeout = 20 * time.Second
 
 // githubAnswerLimit is how much of an answer is read.

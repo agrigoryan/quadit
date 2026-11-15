@@ -35,6 +35,10 @@ type oauthState struct {
 	LinkUser string `json:"link_user"`
 }
 
+// couldNotConfirm is what a person is told when the provider did not say,
+// or could not be asked, who signed in.
+const couldNotConfirm = "The provider could not confirm who you are."
+
 // handleStartProviderSignIn sends the browser to the provider to sign in.
 func (s *Server) handleStartProviderSignIn(x *c) error {
 	ctx := x.ctx()
@@ -45,7 +49,11 @@ func (s *Server) handleStartProviderSignIn(x *c) error {
 	}
 	oc, err := s.oauth2Config(ctx, p, cfg)
 	if err != nil {
-		return err
+		// The provider did not say where it lives: the browser goes back to
+		// the sign-in page, as when the provider cannot say who signed in.
+		s.log.Error("oauth sign-in", "provider", provider, "err", err)
+		http.Redirect(x.w, x.r, "/login?error="+url.QueryEscape(couldNotConfirm), http.StatusFound)
+		return nil
 	}
 	st := oauthState{Provider: provider, Verifier: oauth2.GenerateVerifier(), Nonce: id.New(), Next: x.r.URL.Query().Get("next"), Invite: x.r.URL.Query().Get("invite")}
 	if !strings.HasPrefix(st.Next, "/") || strings.HasPrefix(st.Next, "//") {
@@ -89,7 +97,7 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 	who, err := s.oauthIdentity(ctx, p, cfg, st, q.Get("code"))
 	if err != nil {
 		s.log.Error("oauth sign-in", "provider", provider, "err", err)
-		return back("The provider could not confirm who you are.")
+		return back(couldNotConfirm)
 	}
 	u, refusal, err := s.oauthAccount(ctx, x, provider, cfg.Name, st, who)
 	if err != nil {
