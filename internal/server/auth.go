@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -428,7 +429,7 @@ func profileChanges(b profileBody) (set, memberSet map[string]any, err error) {
 		set["timezone"] = *b.Timezone
 	}
 	if b.Theme != nil {
-		if !has([]string{"", "light", "dark", "system"}, *b.Theme) {
+		if !slices.Contains([]string{"", "light", "dark", "system"}, *b.Theme) {
 			return nil, nil, errBad("theme is light, dark or system")
 		}
 		set["theme"] = *b.Theme

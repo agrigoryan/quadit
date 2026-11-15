@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -174,7 +175,7 @@ func (s *Server) handleShowConsentPage(x *c) error {
 	if err := s.st.Get(ctx, &client, store.Eq("id", q.Get("client_id"))); err != nil {
 		return errBad("unknown client; the client must register first")
 	}
-	if !has(client.RedirectURIs, q.Get("redirect_uri")) {
+	if !slices.Contains(client.RedirectURIs, q.Get("redirect_uri")) {
 		return errBad("that redirect URI is not one the client registered")
 	}
 	if q.Get("response_type") != "code" || q.Get("code_challenge") == "" || (q.Get("code_challenge_method") != "S256" && q.Get("code_challenge_method") != "") {

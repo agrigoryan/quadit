@@ -766,7 +766,7 @@ func (x *c) applyTokenScopes() {
 	}
 	var both []string
 	for _, p := range x.actor.Projects {
-		if has(x.projects, p) {
+		if slices.Contains(x.projects, p) {
 			both = append(both, p)
 		}
 	}
@@ -783,7 +783,7 @@ func has(list []string, v string) bool {
 
 // canProject reports whether the caller may read a project.
 func (x *c) canProject(projectID string) bool {
-	return x.projects == nil || projectID == "" || has(x.projects, projectID)
+	return x.projects == nil || projectID == "" || slices.Contains(x.projects, projectID)
 }
 
 // touchPresence records that a member was just here, at most every 20

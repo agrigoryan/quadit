@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/auth"
@@ -141,7 +142,7 @@ func (s *Server) mcpInitialize(params json.RawMessage) map[string]any {
 		ProtocolVersion string `json:"protocolVersion"`
 	}
 	version := mcpVersions[0]
-	if err := json.Unmarshal(params, &p); err == nil && has(mcpVersions, p.ProtocolVersion) {
+	if err := json.Unmarshal(params, &p); err == nil && slices.Contains(mcpVersions, p.ProtocolVersion) {
 		version = p.ProtocolVersion
 	}
 	return map[string]any{"protocolVersion": version, "capabilities": map[string]any{"tools": map[string]any{}},

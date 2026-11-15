@@ -3,6 +3,7 @@
 package server
 
 import (
+	"slices"
 	"sort"
 	"time"
 
@@ -35,7 +36,7 @@ func (d *dashboard) epicProgress() error {
 	names := d.names
 	byEpic := map[string]*epicProgress{}
 	for _, epic := range names.epics {
-		if epic.DeletedAt != 0 || (len(d.projects) > 0 && !has(d.projects, epic.ProjectID)) || epic.State == core.EpicCanceled {
+		if epic.DeletedAt != 0 || (len(d.projects) > 0 && !slices.Contains(d.projects, epic.ProjectID)) || epic.State == core.EpicCanceled {
 			continue
 		}
 		byEpic[epic.ID] = &epicProgress{ID: epic.ID, Name: epic.Name, Project: names.projects[epic.ProjectID].Key, State: epic.State, Lead: names.handle(epic.LeadID), TargetOn: epic.TargetOn}

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -54,7 +55,7 @@ func (s *Server) handleImportWork(x *c) error {
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	if !has(importer.Kinds, b.Kind) {
+	if !slices.Contains(importer.Kinds, b.Kind) {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "kind", Message: "unknown source " + b.Kind, Allowed: importer.Kinds, Nearest: nearestOf(b.Kind, importer.Kinds)}
 	}
 	source, cleanup, err := s.importSource(x, b)

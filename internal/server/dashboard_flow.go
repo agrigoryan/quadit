@@ -4,6 +4,7 @@
 package server
 
 import (
+	"slices"
 	"sort"
 	"time"
 
@@ -41,7 +42,7 @@ func (d *dashboard) flowByStatus() []flowStatus {
 	}
 	var statuses []core.Status
 	for _, status := range names.statuses {
-		if status.DeletedAt == 0 && (len(d.projects) == 0 || has(d.projects, status.ProjectID)) && d.x.canProject(status.ProjectID) {
+		if status.DeletedAt == 0 && (len(d.projects) == 0 || slices.Contains(d.projects, status.ProjectID)) && d.x.canProject(status.ProjectID) {
 			statuses = append(statuses, status)
 		}
 	}

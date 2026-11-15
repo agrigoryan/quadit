@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -215,7 +216,7 @@ func (s *Server) handleUploadFile(x *c) error {
 // taken.
 func (s *Server) startedUpload(x *c, fid string) (core.File, bool, error) {
 	var had core.File
-	if !looksUUID(fid) {
+	if !id.Valid(fid) {
 		return had, false, errBad("id must be a UUID made by the caller")
 	}
 	there, err := rowFound(x.db.Get(x.ctx(), &had, store.Eq("id", fid)))
@@ -621,24 +622,6 @@ func (s *Server) handleServeFile(x *c) error {
 	return nil
 }
 
-// looksUUID reports whether s has the shape of a lower-case UUID.
-func looksUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, r := range s {
-		switch {
-		case i == 8 || i == 13 || i == 18 || i == 23:
-			if r != '-' {
-				return false
-			}
-		case (r < '0' || r > '9') && (r < 'a' || r > 'f'):
-			return false
-		}
-	}
-	return true
-}
-
 // maySeeFile reports whether a member limited to some projects, or to
 // reading with a token for some projects, may have a file: it is theirs, or
 // it is attached to a task of a project they are in, or to a page they can
@@ -666,13 +649,13 @@ func (s *Server) maySeeFile(x *c, f core.File) bool {
 	for _, a := range atts {
 		if a.TaskID != "" {
 			var t core.Task
-			if db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && has(allowed, t.ProjectID) {
+			if db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && slices.Contains(allowed, t.ProjectID) {
 				return true
 			}
 			continue
 		}
 		var d core.Doc
-		if db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && (d.ProjectID == "" || has(allowed, d.ProjectID)) {
+		if db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && (d.ProjectID == "" || slices.Contains(allowed, d.ProjectID)) {
 			return true
 		}
 	}
@@ -702,7 +685,7 @@ func filesAllowedProjects(x *c, m core.Member) []string {
 	case len(allowed) == 0:
 		return mine
 	}
-	allowed = keep(allowed, func(p string) bool { return has(mine, p) })
+	allowed = keep(allowed, func(p string) bool { return slices.Contains(mine, p) })
 	if len(allowed) == 0 {
 		return []string{"none"}
 	}

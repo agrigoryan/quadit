@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
@@ -52,7 +53,7 @@ func (s *Server) handleListTasks(x *c) error {
 	x.narrowedAlready()
 	fields := splitList(v.Get("fields"))
 	viewsOf := x.taskViews
-	if has(fields, "description") || has(fields, "id") || has(fields, "project") {
+	if slices.Contains(fields, "description") || slices.Contains(fields, "id") || slices.Contains(fields, "project") {
 		viewsOf = x.detailedTaskViews
 	}
 	views, err := viewsOf(page.tasks)

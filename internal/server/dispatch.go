@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -314,7 +315,7 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 			return false, nil
 		}
 		var t core.Task
-		if there, err := rowFound(db.Get(ctx, &t, store.Eq("id", ev.ScopeID))); err != nil || !there || !has(t.LabelIDs, m.LabelID) {
+		if there, err := rowFound(db.Get(ctx, &t, store.Eq("id", ev.ScopeID))); err != nil || !there || !slices.Contains(t.LabelIDs, m.LabelID) {
 			return false, err
 		}
 	}

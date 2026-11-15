@@ -121,7 +121,7 @@ func (pack *contextPack) preferences() error {
 		if pref.ProjectID != "" && pref.ProjectID != t.ProjectID {
 			continue
 		}
-		if len(pref.LabelIDs) > 0 && !slices.ContainsFunc(pref.LabelIDs, func(l string) bool { return has(t.LabelIDs, l) }) {
+		if len(pref.LabelIDs) > 0 && !slices.ContainsFunc(pref.LabelIDs, func(l string) bool { return slices.Contains(t.LabelIDs, l) }) {
 			continue
 		}
 		rules = append(rules, pref.Body)

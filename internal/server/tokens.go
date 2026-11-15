@@ -4,6 +4,7 @@ package server
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -116,7 +117,7 @@ func agentMayHandOut(agent, m core.Member) error {
 		return errForbidden("@%s works in every project and you do not; you cannot make a token for it", m.Handle)
 	}
 	for _, p := range theirs.Projects {
-		if !has(mine.Projects, p) {
+		if !slices.Contains(mine.Projects, p) {
 			return errForbidden("@%s works in projects you do not; you cannot make a token for it", m.Handle)
 		}
 	}
@@ -150,7 +151,7 @@ func tokenScopes(x *c, resolver *engine.Resolver, b tokenBody) ([]string, error)
 		if err != nil {
 			return nil, err
 		}
-		if x.token != nil && len(x.actor.Projects) > 0 && !has(x.actor.Projects, p.ID) {
+		if x.token != nil && len(x.actor.Projects) > 0 && !slices.Contains(x.actor.Projects, p.ID) {
 			return nil, errForbidden("this token does not reach project %s, so it cannot make one that does", p.Key)
 		}
 		scopes = append(scopes, "project:"+p.ID)

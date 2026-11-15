@@ -4,6 +4,7 @@ package server
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -168,7 +169,7 @@ func (x *c) decisionsInProjects(decisions []core.Decision, refs []string) ([]cor
 	}
 	okTask := map[string]bool{}
 	for _, t := range tasks {
-		okTask[t.ID] = x.canProject(t.ProjectID) && (len(projectIDs) == 0 || has(projectIDs, t.ProjectID))
+		okTask[t.ID] = x.canProject(t.ProjectID) && (len(projectIDs) == 0 || slices.Contains(projectIDs, t.ProjectID))
 	}
 	return keep(decisions, func(decision core.Decision) bool { return okTask[decision.TaskID] }), nil
 }

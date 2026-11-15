@@ -5,6 +5,7 @@ package server
 
 import (
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
@@ -160,7 +161,7 @@ func (d *dashboard) recentDecisions() error {
 		return err
 	}
 	d.prefs = keep(prefs, func(pref core.Preference) bool {
-		return len(d.projects) == 0 || pref.ProjectID == "" || has(d.projects, pref.ProjectID)
+		return len(d.projects) == 0 || pref.ProjectID == "" || slices.Contains(d.projects, pref.ProjectID)
 	})
 	return nil
 }
