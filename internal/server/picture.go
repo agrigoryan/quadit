@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -99,27 +98,19 @@ func (s *Server) hRender(x *c) error {
 		return err
 	}
 	defer os.RemoveAll(dir)
-	out := filepath.Join(dir, "page.png")
-	args := []string{"--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run", "--user-data-dir=" + filepath.Join(dir, "profile"),
-		fmt.Sprintf("--window-size=%d,%d", width, height), "--virtual-time-budget=6000", "--screenshot=" + out}
+	var extra []string
 	if os.Geteuid() == 0 {
-		args = append(args, "--no-sandbox") // Chrome refuses to sandbox as root, as in a container
+		extra = append(extra, "--no-sandbox") // Chrome refuses to sandbox as root, as in a container
 	}
 	// Extra switches for where the server runs: a container usually cannot
 	// give Chrome its own sandbox, and says so with QUADIT_CHROME_ARGS=--no-sandbox.
-	args = append(args, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
-	if q.Get("theme") == "dark" {
-		args = append(args, "--force-dark-mode", "--enable-features=WebContentsForceDark")
-	}
+	extra = append(extra, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
 	ctx, cancel := context.WithTimeout(x.ctx(), 45*time.Second)
 	defer cancel()
-	if outp, err := exec.CommandContext(ctx, chrome, append(args, target)...).CombinedOutput(); err != nil {
-		s.log.Warn("render", "err", err, "output", oneLine(string(outp), 300))
-		return &httpError{Status: 502, Code: "render_failed", Message: "the browser could not take the picture: " + oneLine(err.Error(), 120)}
-	}
-	png, err := os.ReadFile(out)
+	png, err := takePicture(ctx, chrome, extra, filepath.Join(dir, "profile"), target, width, height, q.Get("theme") == "dark")
 	if err != nil {
-		return &httpError{Status: 502, Code: "render_failed", Message: "the browser made no picture"}
+		s.log.Warn("render", "err", err)
+		return &httpError{Status: 502, Code: "render_failed", Message: "the browser could not take the picture: " + oneLine(err.Error(), 120)}
 	}
 	x.w.Header().Set("Content-Type", "image/png")
 	x.w.Header().Set("Cache-Control", "no-store")

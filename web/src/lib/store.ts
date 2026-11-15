@@ -365,6 +365,8 @@ export function mergeRest(slug: string, data: RestData): string[] | null {
     for (const id of target.keys) if (!next.tasks[id]) missing.add(id);
   }
   useStore.setState({ c: next, restLoaded: true });
+  // A mark for the server's picture-taking browser: the page has its data.
+  document.documentElement.dataset.loaded = "1";
   return [...missing];
 }
 
