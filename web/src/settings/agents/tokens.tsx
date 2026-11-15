@@ -191,8 +191,9 @@ function AgentTokenFields({
           empty={t("s.everyProject")}
         />
       </FormField>
-      <FormField label={t("tokens.expires")}>
+      <FormField label={t("tokens.expires")} htmlFor="agent-token-expiry">
         <NativeSelect
+          id="agent-token-expiry"
           value={String(days)}
           onChange={(v) => setDays(Number(v))}
           options={EXPIRY.map((n) => ({

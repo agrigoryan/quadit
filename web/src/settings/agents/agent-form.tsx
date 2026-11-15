@@ -160,8 +160,9 @@ export function AgentProfileFields({ draft, set, errors, creating, disabled, see
         />
       </FormField>
       <div className="grid gap-3.5 sm:grid-cols-2">
-        <FormField label={t("agent.role")} hint={t("agent.roleHint")} error={errors.fields.role}>
+        <FormField label={t("agent.role")} htmlFor="agent-role" hint={t("agent.roleHint")} error={errors.fields.role}>
           <NativeSelect
+            id="agent-role"
             value={draft.role}
             onChange={(v) => set({ role: v as AgentDraft["role"] })}
             disabled={disabled}
@@ -173,10 +174,12 @@ export function AgentProfileFields({ draft, set, errors, creating, disabled, see
         </FormField>
         <FormField
           label={t("agent.responsibleField")}
+          htmlFor="agent-responsible"
           hint={t("agent.responsibleHint")}
           error={errors.fields.responsible}
         >
           <NativeSelect
+            id="agent-responsible"
             value={draft.responsible}
             onChange={(v) => set({ responsible: v })}
             disabled={disabled}

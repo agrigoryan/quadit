@@ -140,11 +140,12 @@ export function TemplateDialog({
         />
       </FormField>
       <div className="grid grid-cols-2 gap-3.5">
-        <FormField label={t("templates.status")}>
-          <NativeSelect value={status} onChange={setStatus} options={statusChoices} />
+        <FormField label={t("templates.status")} htmlFor="tpl-status">
+          <NativeSelect id="tpl-status" value={status} onChange={setStatus} options={statusChoices} />
         </FormField>
-        <FormField label={t("templates.priority")}>
+        <FormField label={t("templates.priority")} htmlFor="tpl-priority">
           <NativeSelect
+            id="tpl-priority"
             value={String(priority)}
             onChange={(v) => setPriority(Number(v))}
             options={[0, 1, 2, 3, 4].map((p) => ({
@@ -174,8 +175,9 @@ export function TemplateDialog({
       </div>
       {asks && (
         <div className="flex flex-col gap-3.5 rounded-lg border border-line bg-sunken/50 p-3">
-          <FormField label={t("templates.decisionKind")}>
+          <FormField label={t("templates.decisionKind")} htmlFor="tpl-kind">
             <NativeSelect
+              id="tpl-kind"
               value={kind}
               onChange={(v) => setKind(v as "choice" | "approval")}
               options={[

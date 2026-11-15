@@ -215,8 +215,12 @@ export function ProjectStatuses({ project, admin }: { project: Project; admin: b
         }
       >
         {needsMove && (
-          <FormField label={`${t("statuses.moveTo")} (${t("statuses.count", { n: counts[deleting?.id ?? ""] ?? 0 })})`}>
+          <FormField
+            label={`${t("statuses.moveTo")} (${t("statuses.count", { n: counts[deleting?.id ?? ""] ?? 0 })})`}
+            htmlFor="status-move-to"
+          >
             <NativeSelect
+              id="status-move-to"
               value={moveTo}
               onChange={setMoveTo}
               options={others.map((s) => ({ value: s.id, label: s.name }))}

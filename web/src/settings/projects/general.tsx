@@ -103,16 +103,18 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
           />
           {settings.cycles && (
             <div className="grid max-w-md grid-cols-2 gap-3.5 pb-1">
-              <FormField label={t("project.cycleDays")}>
+              <FormField label={t("project.cycleDays")} htmlFor="project-cycle-days">
                 <NativeSelect
+                  id="project-cycle-days"
                   value={String(Math.max(1, Math.round((settings.cycle_days || 14) / 7)))}
                   disabled={!admin}
                   onChange={(v) => setOption({ cycle_days: Number(v) * 7 })}
                   options={WEEKS.map((n) => ({ value: String(n), label: t("project.cycleWeeks", { n }) }))}
                 />
               </FormField>
-              <FormField label={t("project.cycleStart")}>
+              <FormField label={t("project.cycleStart")} htmlFor="project-cycle-start">
                 <NativeSelect
+                  id="project-cycle-start"
                   value={String(settings.cycle_start ?? 0)}
                   disabled={!admin}
                   onChange={(v) => setOption({ cycle_start: Number(v) })}
