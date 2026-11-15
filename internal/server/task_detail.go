@@ -12,51 +12,32 @@ import (
 )
 
 // buildTaskDetail builds everything about one task in its named form.
+// maxChars is where a long description is cut, and half of it where a long
+// comment is; 0 cuts nothing.
 func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
-	b := &detailBuilder{x: x, t: t, maxChars: maxChars}
-	for _, part := range []func() error{b.task, b.subtasks, b.decisions, b.attachments, b.comments, b.relations, b.links, b.watchers} {
-		if err := part(); err != nil {
-			return b.d, err
-		}
+	ctx := x.ctx()
+	var d taskDetail
+	names, err := x.names()
+	if err != nil {
+		return d, err
 	}
-	return b.d, nil
-}
 
-// detailBuilder is one task's detail in the making.
-type detailBuilder struct {
-	x *c
-	t core.Task
-	// maxChars is where a long description is cut, and twice where a long
-	// comment is; 0 cuts nothing.
-	maxChars int
-	d        taskDetail
-	names    *nameLookup
-	files    map[string][]attachmentView // by what each file is attached to
-}
-
-// task fills in the task itself, where the feed stands, and what has been
-// spent of the task's budget.
-func (b *detailBuilder) task() error {
-	x, ctx, t := b.x, b.x.ctx(), b.t
-	var err error
-	if b.names, err = x.names(); err != nil {
-		return err
-	}
+	// The task itself, and where the feed stands.
 	var ws core.Workspace
 	if err := x.s.st.Get(ctx, &ws, store.Eq("id", x.ws.ID)); err != nil {
-		return err
+		return d, err
 	}
-	b.d.Seq = ws.Seq
+	d.Seq = ws.Seq
 	tv, err := x.detailedTaskViews([]core.Task{t})
 	if err != nil {
-		return err
+		return d, err
 	}
-	b.d.Task = tv[0]
+	d.Task = tv[0]
 	if t.Budget != nil {
 		// What agents have spent of the task's own budget so far.
 		var runs []core.AgentSession
 		if err := x.db.List(ctx, &runs, store.Where(store.Eq("task_id", t.ID))); err != nil {
-			return err
+			return d, err
 		}
 		spent := core.Budget{}
 		now := time.Now().UnixMilli()
@@ -68,78 +49,66 @@ func (b *detailBuilder) task() error {
 			}
 			spent.Minutes += (end - r.StartedAt) / 60_000
 		}
-		b.d.Task.Spent = &spent
+		d.Task.Spent = &spent
 	}
-	b.d.Task.Description, b.d.Task.Truncated = truncate(b.d.Task.Description, b.maxChars)
-	return nil
-}
+	d.Task.Description, d.Task.Truncated = truncate(d.Task.Description, maxChars)
 
-// subtasks fills in the task's sub-tasks, in their order.
-func (b *detailBuilder) subtasks() error {
-	subs, err := b.x.db.Tasks(b.x.ctx(), store.TaskFilter{ParentID: b.t.ID, Sort: "rank", Limit: 500})
+	// Its sub-tasks, in their order.
+	subs, err := x.db.Tasks(ctx, store.TaskFilter{ParentID: t.ID, Sort: "rank", Limit: 500})
 	if err != nil {
-		return err
+		return d, err
 	}
-	b.d.Subtasks, err = b.x.taskViews(subs)
-	return err
-}
+	if d.Subtasks, err = x.taskViews(subs); err != nil {
+		return d, err
+	}
 
-// decisions fills in the task's decisions, with their files.
-func (b *detailBuilder) decisions() error {
+	// Its decisions, with their files.
 	var decisions []core.Decision
-	if err := b.x.db.List(b.x.ctx(), &decisions, store.Q{Where: []store.Cond{store.Eq("task_id", b.t.ID), store.Live}, Order: "rank"}); err != nil {
-		return err
+	if err := x.db.List(ctx, &decisions, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "rank"}); err != nil {
+		return d, err
 	}
-	var err error
-	b.d.Decisions, err = b.x.decisionViewsWithFiles(decisions)
-	return err
-}
-
-// attachments loads every file in the task, and gives the task its own.
-func (b *detailBuilder) attachments() error {
-	var err error
-	if b.files, _, err = b.x.attachments(store.Eq("task_id", b.t.ID)); err != nil {
-		return err
+	if d.Decisions, err = x.decisionViewsWithFiles(decisions); err != nil {
+		return d, err
 	}
-	b.d.Attachments = b.files[b.t.ID]
-	return nil
-}
 
-// comments fills in the task's comments, each with its files, where it
-// sits ("option 2 of decision 1"), and cut at half of maxChars.
-func (b *detailBuilder) comments() error {
+	// Every file in the task, by what it is attached to; the task's own go
+	// on the task, the comments' on their comments.
+	files, _, err := x.attachments(store.Eq("task_id", t.ID))
+	if err != nil {
+		return d, err
+	}
+	d.Attachments = files[t.ID]
+
+	// Its comments, each with its files, where it sits ("option 2 of
+	// decision 1"), and cut at half of maxChars.
 	where := map[string]string{}
-	for _, dv := range b.d.Decisions {
+	for _, dv := range d.Decisions {
 		where[dv.ID] = fmt.Sprintf("decision %d", dv.N)
 		for _, o := range dv.Options {
 			where[o.ID] = fmt.Sprintf("option %d of decision %d", o.N, dv.N)
 		}
 	}
 	var comments []core.Comment
-	if err := b.x.db.List(b.x.ctx(), &comments, store.Q{Where: []store.Cond{store.Eq("task_id", b.t.ID), store.Live}, Order: "created_seq"}); err != nil {
-		return err
+	if err := x.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_seq"}); err != nil {
+		return d, err
 	}
 	for _, cm := range comments {
-		v := commentView{ID: cm.ID, Seq: cm.CreatedSeq, By: b.names.handle(cm.AuthorID), At: formatTime(cm.CreatedAt), On: where[cm.SubjectID],
-			ReplyTo: cm.ParentID, Evidence: cm.Evidence, Attachments: b.files[cm.ID], Edited: cm.EditedAt != 0}
+		v := commentView{ID: cm.ID, Seq: cm.CreatedSeq, By: names.handle(cm.AuthorID), At: formatTime(cm.CreatedAt), On: where[cm.SubjectID],
+			ReplyTo: cm.ParentID, Evidence: cm.Evidence, Attachments: files[cm.ID], Edited: cm.EditedAt != 0}
 		if cm.Kind != core.CommentPlain {
 			v.Kind = cm.Kind
 		}
-		v.Body, v.Truncated = truncate(cm.Body, b.maxChars/2)
-		b.d.Comments = append(b.d.Comments, v)
+		v.Body, v.Truncated = truncate(cm.Body, maxChars/2)
+		d.Comments = append(d.Comments, v)
 	}
-	return nil
-}
 
-// relations names the tasks this one is related to, from either end.
-func (b *detailBuilder) relations() error {
-	x, ctx, t := b.x, b.x.ctx(), b.t
+	// The tasks it is related to, from either end.
 	var outgoing, incoming []core.Relation
 	if err := x.db.List(ctx, &outgoing, store.Where(store.Eq("task_id", t.ID))); err != nil {
-		return err
+		return d, err
 	}
 	if err := x.db.List(ctx, &incoming, store.Where(store.Eq("related_task_id", t.ID))); err != nil {
-		return err
+		return d, err
 	}
 	var otherIDs []string
 	for _, r := range outgoing {
@@ -148,55 +117,48 @@ func (b *detailBuilder) relations() error {
 	for _, r := range incoming {
 		otherIDs = append(otherIDs, r.TaskID)
 	}
-	if len(otherIDs) == 0 {
-		return nil
-	}
-	others, err := x.db.Tasks(ctx, store.TaskFilter{IDs: otherIDs, Archived: true, Limit: 1000})
-	if err != nil {
-		return err
-	}
-	byID := map[string]core.Task{}
-	for _, o := range others {
-		byID[o.ID] = o
-	}
-	add := func(r core.Relation, otherID, typ string) {
-		if o, ok := byID[otherID]; ok {
-			b.d.Relations = append(b.d.Relations, relationView{ID: r.ID, Type: typ, Task: o.Key, Title: o.Title, State: b.names.statuses[o.StatusID].Name})
+	if len(otherIDs) > 0 {
+		others, err := x.db.Tasks(ctx, store.TaskFilter{IDs: otherIDs, Archived: true, Limit: 1000})
+		if err != nil {
+			return d, err
+		}
+		byID := map[string]core.Task{}
+		for _, o := range others {
+			byID[o.ID] = o
+		}
+		add := func(r core.Relation, otherID, typ string) {
+			if o, ok := byID[otherID]; ok {
+				d.Relations = append(d.Relations, relationView{ID: r.ID, Type: typ, Task: o.Key, Title: o.Title, State: names.statuses[o.StatusID].Name})
+			}
+		}
+		for _, r := range outgoing {
+			add(r, r.RelatedTaskID, r.Type)
+		}
+		reverse := map[string]string{core.RelBlocks: "blocked_by", core.RelDuplicates: "duplicated_by", core.RelRelates: core.RelRelates}
+		for _, r := range incoming {
+			add(r, r.TaskID, reverse[r.Type])
 		}
 	}
-	for _, r := range outgoing {
-		add(r, r.RelatedTaskID, r.Type)
-	}
-	reverse := map[string]string{core.RelBlocks: "blocked_by", core.RelDuplicates: "duplicated_by", core.RelRelates: core.RelRelates}
-	for _, r := range incoming {
-		add(r, r.TaskID, reverse[r.Type])
-	}
-	return nil
-}
 
-// links fills in the task's links: branches, pull requests, addresses.
-func (b *detailBuilder) links() error {
+	// Its links: branches, pull requests, addresses.
 	var links []core.TaskLink
-	if err := b.x.db.List(b.x.ctx(), &links, store.Where(store.Eq("task_id", b.t.ID), store.Live)); err != nil {
-		return err
+	if err := x.db.List(ctx, &links, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
+		return d, err
 	}
 	for _, l := range links {
-		b.d.Links = append(b.d.Links, linkView{ID: l.ID, Kind: l.Kind, Ref: l.Ref, Repo: l.Repo, Title: l.Title, URL: l.URL, State: l.State, Checks: l.Checks, Data: l.Data})
+		d.Links = append(d.Links, linkView{ID: l.ID, Kind: l.Kind, Ref: l.Ref, Repo: l.Repo, Title: l.Title, URL: l.URL, State: l.State, Checks: l.Checks, Data: l.Data})
 	}
-	return nil
-}
 
-// watchers fills in who watches the task, by handle.
-func (b *detailBuilder) watchers() error {
+	// Who watches it, by handle.
 	var watchers []core.Watcher
-	if err := b.x.db.List(b.x.ctx(), &watchers, store.Where(store.Eq("subject_id", b.t.ID))); err != nil {
-		return err
+	if err := x.db.List(ctx, &watchers, store.Where(store.Eq("subject_id", t.ID))); err != nil {
+		return d, err
 	}
 	for _, w := range watchers {
-		b.d.Watchers = append(b.d.Watchers, b.names.handle(w.UserID))
+		d.Watchers = append(d.Watchers, names.handle(w.UserID))
 	}
-	sort.Strings(b.d.Watchers)
-	return nil
+	sort.Strings(d.Watchers)
+	return d, nil
 }
 
 // taskByRef loads a task the caller may read.
