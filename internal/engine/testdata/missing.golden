@@ -1,0 +1,378 @@
+workspace.update {}: ok
+workspace.update -name: ok
+agent.create {}: invalid [name] an agent needs a name
+agent.create -handle: ok
+agent.create -name: invalid [name] an agent needs a name
+agent.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+agent.create -role: ok
+agent.create -scope: ok
+agent.update {}: not_found [id] member "" does not exist in this workspace
+agent.update -description: ok
+agent.update -id: not_found [id] member "" does not exist in this workspace
+agent.update -id others wrong: not_found [id] member "" does not exist in this workspace
+member.update {}: not_found [id] member "" does not exist in this workspace
+member.update -id: not_found [id] member "" does not exist in this workspace
+member.update -id others wrong: not_found [id] member "" does not exist in this workspace
+member.update -title: ok
+member.add {}: not_found [] user "" does not exist in this workspace
+member.add -handle: ok
+member.add -role: ok
+member.add -user: not_found [] user "" does not exist in this workspace
+member.add -user others wrong: invalid [role] unknown role "zz"
+member.remove {}: not_found [id] member "" does not exist in this workspace
+member.remove -id: not_found [id] member "" does not exist in this workspace
+member.remove -id others wrong: not_found [id] member "" does not exist in this workspace
+project.create {}: invalid [key] a project key is 2 to 10 upper-case letters or digits, starting with a letter (it prefixes task numbers: SVA-12)
+project.create -key: invalid [key] a project key is 2 to 10 upper-case letters or digits, starting with a letter (it prefixes task numbers: SVA-12)
+project.create -key others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+project.create -name: invalid [name] a project needs a name
+project.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+project.update {}: invalid [project] a project is required: give its key (SVA) or id
+project.update -description: ok
+project.update -id: invalid [project] a project is required: give its key (SVA) or id
+project.update -id others wrong: invalid [project] a project is required: give its key (SVA) or id
+status.create {}: invalid [project] a project is required: give its key (SVA) or id
+status.create -category: invalid [category] unknown category ""
+status.create -category others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+status.create -name: invalid [name] a status needs a name
+status.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+status.create -project: invalid [project] a project is required: give its key (SVA) or id
+status.create -project others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+status.update {}: invalid [id] id is required
+status.update -color: ok
+status.update -id: invalid [id] id is required
+status.update -id others wrong: invalid [id] id is required
+label.create {}: invalid [name] a label needs a name
+label.create -name: invalid [name] a label needs a name
+label.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+label.create -project: ok
+label.update {}: invalid [id] id is required
+label.update -color: ok
+label.update -id: invalid [id] id is required
+label.update -id others wrong: invalid [id] id is required
+epic.create {}: invalid [project] a project is required: give its key (SVA) or id
+epic.create -name: invalid [name] an epic needs a name
+epic.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+epic.create -project: invalid [project] a project is required: give its key (SVA) or id
+epic.create -project others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+epic.update {}: invalid [id] id is required
+epic.update -id: invalid [id] id is required
+epic.update -id others wrong: invalid [id] id is required
+epic.update -state: ok
+milestone.create {}: invalid [epic] epic is required
+milestone.create -epic: invalid [epic] epic is required
+milestone.create -epic others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+milestone.create -name: invalid [name] a milestone needs a name
+milestone.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+milestone.update {}: invalid [id] id is required
+milestone.update -description: ok
+milestone.update -id: invalid [id] id is required
+milestone.update -id others wrong: invalid [id] id is required
+cycle.create {}: invalid [project] a project is required: give its key (SVA) or id
+cycle.create -ends_on: invalid [starts_on] a cycle needs starts_on and ends_on (YYYY-MM-DD)
+cycle.create -ends_on others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+cycle.create -name: ok
+cycle.create -project: invalid [project] a project is required: give its key (SVA) or id
+cycle.create -project others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+cycle.create -starts_on: invalid [starts_on] a cycle needs starts_on and ends_on (YYYY-MM-DD)
+cycle.create -starts_on others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+cycle.update {}: invalid [id] id is required
+cycle.update -id: invalid [id] id is required
+cycle.update -id others wrong: invalid [id] id is required
+cycle.update -name: ok
+template.create {}: invalid [name] a template needs a name
+template.create -name: invalid [name] a template needs a name
+template.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+template.create -project: ok
+template.create -title: ok
+template.update {}: invalid [id] id is required
+template.update -description: ok
+template.update -id: invalid [id] id is required
+template.update -id others wrong: invalid [id] id is required
+view.create {}: invalid [name] a view needs a name
+view.create -name: invalid [name] a view needs a name
+view.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+view.create -project: ok
+view.create -query: ok
+view.create -shared: ok
+view.update {}: not_found [] view "" does not exist in this workspace
+view.update -description: ok
+view.update -id: not_found [] view "" does not exist in this workspace
+view.update -id others wrong: not_found [] view "" does not exist in this workspace
+preference.create {}: invalid [body] a preference needs its rule in words
+preference.create -body: invalid [body] a preference needs its rule in words
+preference.create -body others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+preference.create -project: ok
+preference.update {}: invalid [id] id is required
+preference.update -body: ok
+preference.update -id: invalid [id] id is required
+preference.update -id others wrong: invalid [id] id is required
+task.create {}: invalid [project] a project is required: give its key (SVA) or id
+task.create -assignee: ok
+task.create -labels: ok
+task.create -project: invalid [project] a project is required: give its key (SVA) or id
+task.create -project others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+task.create -title: invalid [title] a task needs a title
+task.create -title others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+task.update {}: invalid [id] a task is required: give its key (SVA-12) or id
+task.update -id: invalid [id] a task is required: give its key (SVA-12) or id
+task.update -id others wrong: invalid [id] a task is required: give its key (SVA-12) or id
+task.update -title: ok
+task.take {}: invalid [id] a task is required: give its key (SVA-12) or id
+task.take -id: invalid [id] a task is required: give its key (SVA-12) or id
+task.take -id others wrong: invalid [id] a task is required: give its key (SVA-12) or id
+task.release {}: invalid [id] a task is required: give its key (SVA-12) or id
+task.release -id: invalid [id] a task is required: give its key (SVA-12) or id
+task.release -id others wrong: invalid [id] a task is required: give its key (SVA-12) or id
+watch.set {}: invalid [subject] a task is required: give its key (SVA-12) or id
+watch.set -subject: invalid [subject] a task is required: give its key (SVA-12) or id
+watch.set -subject others wrong: not_found [user] member "zz" does not exist in this workspace
+watch.set -type: ok
+watch.set -watching: ok
+relation.add {}: invalid [task] a task is required: give its key (SVA-12) or id
+relation.add -other: invalid [other] a task is required: give its key (SVA-12) or id
+relation.add -other others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+relation.add -task: invalid [task] a task is required: give its key (SVA-12) or id
+relation.add -task others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+relation.add -type: ok
+relation.remove {}: invalid [id] id is required
+relation.remove -id: invalid [id] id is required
+relation.remove -id others wrong: invalid [id] id is required
+link.set {}: invalid [task] a task is required: give its key (SVA-12) or id
+link.set -kind: invalid [kind] unknown link kind ""
+link.set -kind others wrong: invalid [task] "zz" is not a task: use its key (SVA-12) or id
+link.set -task: invalid [task] a task is required: give its key (SVA-12) or id
+link.set -task others wrong: invalid [task] a task is required: give its key (SVA-12) or id
+link.set -url: invalid [url] a url link needs a url
+link.set -url others wrong: invalid [task] "zz" is not a task: use its key (SVA-12) or id
+link.remove {}: invalid [id] id is required
+link.remove -id: invalid [id] id is required
+link.remove -id others wrong: invalid [id] id is required
+comment.create {}: invalid [body] a comment needs text
+comment.create -body: invalid [body] a comment needs text
+comment.create -body others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+comment.create -task: invalid [task] a task is required: give its key (SVA-12) or id
+comment.create -task others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+comment.update {}: invalid [id] id is required
+comment.update -body: ok
+comment.update -id: invalid [id] id is required
+comment.update -id others wrong: invalid [id] id is required
+comment.delete {}: invalid [id] id is required
+comment.delete -id: invalid [id] id is required
+comment.delete -id others wrong: invalid [id] id is required
+attachment.add {}: invalid [task] say what the file is shown on: task, comment, decision, option or doc
+attachment.add -file: invalid [file] file is required
+attachment.add -file others wrong: not_found [option] option "zz" does not exist in this workspace
+attachment.add -task: invalid [task] say what the file is shown on: task, comment, decision, option or doc
+attachment.add -task others wrong: not_found [option] option "zz" does not exist in this workspace
+attachment.remove {}: invalid [id] id is required
+attachment.remove -id: invalid [id] id is required
+attachment.remove -id others wrong: invalid [id] id is required
+attachment.restore {}: invalid [id] id is required
+attachment.restore -id: invalid [id] id is required
+attachment.restore -id others wrong: invalid [id] id is required
+decision.open {}: invalid [task] a task is required: give its key (SVA-12) or id
+decision.open -ask: ok
+decision.open -options: ok
+decision.open -question: invalid [question] a decision needs a question
+decision.open -question others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+decision.open -task: invalid [task] a task is required: give its key (SVA-12) or id
+decision.open -task others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+decision.update {}: invalid [id] id is required
+decision.update -details: ok
+decision.update -id: invalid [id] id is required
+decision.update -id others wrong: invalid [id] id is required
+decision.pick {}: invalid [id] id is required
+decision.pick -id: invalid [id] id is required
+decision.pick -id others wrong: invalid [id] id is required
+decision.pick -option: invalid [outcome] a choice is answered with an option, or sent back
+decision.pick -option others wrong: invalid [id] "zz" is not a task: use its key (SVA-12) or id
+decision.unclear {}: invalid [id] id is required
+decision.unclear -id: invalid [id] id is required
+decision.unclear -id others wrong: invalid [id] id is required
+decision.unclear -note: invalid [note] say in one line what is unclear
+decision.unclear -note others wrong: invalid [id] "zz" is not a task: use its key (SVA-12) or id
+decision.delete {}: invalid [id] id is required
+decision.delete -id: invalid [id] id is required
+decision.delete -id others wrong: invalid [id] id is required
+decision.restore {}: invalid [id] id is required
+decision.restore -id: invalid [id] id is required
+decision.restore -id others wrong: invalid [id] id is required
+notify {}: not_found [user] member "" does not exist in this workspace
+notify -message: invalid [message] say what the member should know
+notify -message others wrong: not_found [user] member "zz" does not exist in this workspace
+notify -user: not_found [user] member "" does not exist in this workspace
+notify -user others wrong: not_found [user] member "" does not exist in this workspace
+notification.read {}: invalid [ids] say which items: ids, task, or all
+notification.read -all: invalid [ids] say which items: ids, task, or all
+notification.read -all others wrong: ok
+session.start {}: ok
+session.start -title: ok
+session.update {}: invalid [id] id is required
+session.update -id: invalid [id] id is required
+session.update -id others wrong: invalid [id] id is required
+session.update -summary: ok
+task.move {}: invalid [id] a task is required: give its key (SVA-12) or id
+task.move -id: invalid [id] a task is required: give its key (SVA-12) or id
+task.move -id others wrong: invalid [id] a task is required: give its key (SVA-12) or id
+task.move -project: invalid [project] a project is required: give its key (SVA) or id
+task.move -project others wrong: invalid [id] "zz" is not a task: use its key (SVA-12) or id
+task.delete {}: invalid [id] a task is required: give its key (SVA-12) or id
+task.delete -id: invalid [id] a task is required: give its key (SVA-12) or id
+task.delete -id others wrong: invalid [id] a task is required: give its key (SVA-12) or id
+task.restore {}: invalid [id] a task is required: give its key (SVA-12) or id
+task.restore -id: invalid [id] a task is required: give its key (SVA-12) or id
+task.restore -id others wrong: invalid [id] a task is required: give its key (SVA-12) or id
+rule.create {}: invalid [name] a rule needs a name
+rule.create -action: invalid [action.kind] unknown action ""
+rule.create -action others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+rule.create -match: ok
+rule.create -name: invalid [name] a rule needs a name
+rule.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+rule.update {}: invalid [id] id is required
+rule.update -id: invalid [id] id is required
+rule.update -id others wrong: invalid [id] id is required
+rule.update -name: ok
+resource.create {}: invalid [name] a resource needs a name
+resource.create -name: invalid [name] a resource needs a name
+resource.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+resource.acquire {}: not_found [resource] resource "" does not exist in this workspace
+resource.acquire -resource: not_found [resource] resource "" does not exist in this workspace
+resource.acquire -resource others wrong: not_found [resource] resource "" does not exist in this workspace
+resource.release {}: not_found [resource] resource "" does not exist in this workspace
+resource.release -resource: not_found [resource] resource "" does not exist in this workspace
+resource.release -resource others wrong: not_found [resource] resource "" does not exist in this workspace
+resource.delete {}: not_found [resource] resource "" does not exist in this workspace
+resource.delete -id: not_found [resource] resource "" does not exist in this workspace
+resource.delete -id others wrong: not_found [resource] resource "" does not exist in this workspace
+webhook.create {}: invalid [url] "" is not an http or https URL
+webhook.create -name: ok
+webhook.create -url: invalid [url] "" is not an http or https URL
+webhook.create -url others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+webhook.update {}: invalid [id] id is required
+webhook.update -active: ok
+webhook.update -id: invalid [id] id is required
+webhook.update -id others wrong: invalid [id] id is required
+webhook.delete {}: invalid [id] id is required
+webhook.delete -id: invalid [id] id is required
+webhook.delete -id others wrong: invalid [id] id is required
+integration.create {}: invalid [kind] unknown integration ""
+integration.create -kind: invalid [kind] unknown integration ""
+integration.create -kind others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+integration.create -name: ok
+integration.update {}: invalid [id] id is required
+integration.update -active: ok
+integration.update -id: invalid [id] id is required
+integration.update -id others wrong: invalid [id] id is required
+integration.delete {}: invalid [id] id is required
+integration.delete -id: invalid [id] id is required
+integration.delete -id others wrong: invalid [id] id is required
+secret.set {}: invalid [name] a secret's name is letters, digits and _, starting with a letter (like GITHUB_TOKEN)
+secret.set -name: invalid [name] a secret's name is letters, digits and _, starting with a letter (like GITHUB_TOKEN)
+secret.set -name others wrong: invalid [name] a secret's name is letters, digits and _, starting with a letter (like GITHUB_TOKEN)
+secret.set -value: invalid [value] a new secret needs its value
+secret.set -value others wrong: not_found [agents] member "zz" does not exist in this workspace
+secret.delete {}: not_found [] secret "" does not exist in this workspace
+secret.delete -id: not_found [] secret "" does not exist in this workspace
+secret.delete -id others wrong: not_found [] secret "" does not exist in this workspace
+doc.create {}: ok
+doc.create -markdown: ok
+doc.create -title: ok
+doc.edit {}: invalid [doc] doc is required
+doc.edit -doc: invalid [doc] doc is required
+doc.edit -doc others wrong: invalid [doc] doc is required
+doc.edit -ops: invalid [ops] send at least one op
+doc.edit -ops others wrong: not_found [doc] doc "zz" does not exist in this workspace
+doc.snapshot {}: invalid [doc] doc is required
+doc.snapshot -doc: invalid [doc] doc is required
+doc.snapshot -doc others wrong: invalid [doc] doc is required
+doc.snapshot -label: ok
+doc.write {}: invalid [doc] doc is required
+doc.write -doc: invalid [doc] doc is required
+doc.write -doc others wrong: invalid [doc] doc is required
+doc.write -markdown: ok
+doc.revert {}: invalid [doc] doc is required
+doc.revert -doc: invalid [doc] doc is required
+doc.revert -doc others wrong: invalid [doc] doc is required
+doc.revert -version: not_found [] version "" does not exist in this workspace
+doc.revert -version others wrong: not_found [doc] doc "zz" does not exist in this workspace
+doc.update {}: invalid [id] id is required
+doc.update -id: invalid [id] id is required
+doc.update -id others wrong: invalid [id] id is required
+doc.update -title: ok
+property.create {}: invalid [database] database is required
+property.create -database: invalid [database] database is required
+property.create -database others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+property.create -name: invalid [name] a property needs a name
+property.create -name others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+property.create -type: ok
+property.update {}: invalid [id] id is required
+property.update -id: invalid [id] id is required
+property.update -id others wrong: invalid [id] id is required
+property.update -name: ok
+dbview.create {}: invalid [database] database is required
+dbview.create -database: invalid [database] database is required
+dbview.create -database others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+dbview.create -name: ok
+dbview.create -type: ok
+dbview.update {}: invalid [id] id is required
+dbview.update -id: invalid [id] id is required
+dbview.update -id others wrong: invalid [id] id is required
+dbview.update -name: ok
+dbview.delete {}: invalid [id] id is required
+dbview.delete -id: invalid [id] id is required
+dbview.delete -id others wrong: invalid [id] id is required
+property.delete {}: invalid [id] id is required
+property.delete -id: invalid [id] id is required
+property.delete -id others wrong: invalid [id] id is required
+source.create {}: invalid [repo] give the repository: a path on the server, or a URL git can clone
+source.create -repo: invalid [repo] give the repository: a path on the server, or a URL git can clone
+source.create -repo others wrong: invalid [id] "zz" is not a valid id: use a lower-case UUID, or leave it out
+source.create -title: ok
+source.update {}: invalid [id] id is required
+source.update -branch: ok
+source.update -id: invalid [id] id is required
+source.update -id others wrong: invalid [id] id is required
+source.delete {}: invalid [id] id is required
+source.delete -id: invalid [id] id is required
+source.delete -id others wrong: invalid [id] id is required
+doc.delete {}: invalid [id] id is required
+doc.delete -id: invalid [id] id is required
+doc.delete -id others wrong: invalid [id] id is required
+doc.restore {}: not_found [] doc "" does not exist in this workspace
+doc.restore -id: not_found [] doc "" does not exist in this workspace
+doc.restore -id others wrong: not_found [] doc "" does not exist in this workspace
+label.delete {}: invalid [id] id is required
+label.delete -id: invalid [id] id is required
+label.delete -id others wrong: invalid [id] id is required
+milestone.delete {}: invalid [id] id is required
+milestone.delete -id: invalid [id] id is required
+milestone.delete -id others wrong: invalid [id] id is required
+epic.delete {}: invalid [id] id is required
+epic.delete -id: invalid [id] id is required
+epic.delete -id others wrong: invalid [id] id is required
+status.delete {}: invalid [id] id is required
+status.delete -id: invalid [id] id is required
+status.delete -id others wrong: invalid [id] id is required
+status.delete -move_to: ok
+cycle.delete {}: invalid [id] id is required
+cycle.delete -id: invalid [id] id is required
+cycle.delete -id others wrong: invalid [id] id is required
+template.delete {}: invalid [id] id is required
+template.delete -id: invalid [id] id is required
+template.delete -id others wrong: invalid [id] id is required
+view.delete {}: not_found [] view "" does not exist in this workspace
+view.delete -id: not_found [] view "" does not exist in this workspace
+view.delete -id others wrong: not_found [] view "" does not exist in this workspace
+preference.delete {}: invalid [id] id is required
+preference.delete -id: invalid [id] id is required
+preference.delete -id others wrong: invalid [id] id is required
+rule.delete {}: invalid [id] id is required
+rule.delete -id: invalid [id] id is required
+rule.delete -id others wrong: invalid [id] id is required
+project.delete {}: invalid [project] a project is required: give its key (SVA) or id
+project.delete -id: invalid [project] a project is required: give its key (SVA) or id
+project.delete -id others wrong: invalid [project] a project is required: give its key (SVA) or id
+workspace.delete {}: invalid [confirm] to delete this workspace, send its slug as confirm: "missing"
+workspace.delete -confirm: invalid [confirm] to delete this workspace, send its slug as confirm: "missing"
+workspace.delete -confirm others wrong: invalid [confirm] to delete this workspace, send its slug as confirm: "missing"
