@@ -77,21 +77,12 @@ export interface FieldErrors {
   clear: () => void;
 }
 
-interface FieldErrorOptions {
-  /**
-   * Every refusal is one message above the buttons, also one that names a
-   * field: for a form with no field to point at, and for a sign-in, which
-   * must not say which of the address and the password was wrong.
-   */
-  wholeForm?: boolean;
-}
-
 /**
  * Where a form keeps what is wrong. A server refusal that names a field
  * (error.field) lands next to that field; `known` lists the fields the form
  * shows, so a refusal about any other lands above the buttons.
  */
-export function useFieldErrors(known: string[] = [], { wholeForm = false }: FieldErrorOptions = {}): FieldErrors {
+export function useFieldErrors(known: string[] = []): FieldErrors {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [form, setForm] = useState("");
   const knownKey = known.join(",");
@@ -99,7 +90,7 @@ export function useFieldErrors(known: string[] = [], { wholeForm = false }: Fiel
     (err: unknown) => {
       const names = knownKey ? knownKey.split(",") : [];
       // The server may name a nested field ("match.project_id"): try the whole name, then its last part.
-      const field = err instanceof ApiError && !wholeForm ? err.field : undefined;
+      const field = err instanceof ApiError ? err.field : undefined;
       const hit = field
         ? [field, field.split(".").pop() as string].find((f) => names.length === 0 || names.includes(f))
         : undefined;
@@ -111,7 +102,7 @@ export function useFieldErrors(known: string[] = [], { wholeForm = false }: Fiel
         setForm(errorMessage(err));
       }
     },
-    [knownKey, wholeForm],
+    [knownKey],
   );
   const set = useCallback((field: string, message: string) => setFields((f) => ({ ...f, [field]: message })), []);
   const clear = useCallback(() => {

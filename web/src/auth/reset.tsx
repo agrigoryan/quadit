@@ -2,9 +2,9 @@ import { type FormEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AuthLayout, FormError, TextLink } from "@/auth/auth-layout";
 import { useAuthConfig } from "@/auth/config";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FormField, Note, useFieldErrors, useSubmit } from "@/ui/form";
+import { FormField, Note, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Field, Input } from "@/ui/input";
 
@@ -18,27 +18,26 @@ const backToSignIn = () => (
 export function ResetRequestPage() {
   const config = useAuthConfig();
   const [email, setEmail] = useState("");
-  const errors = useFieldErrors([], { wholeForm: true });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   /** An install with no mail server cannot send a link; the server says what to do instead. */
   const [noMail, setNoMail] = useState("");
   const [sentTo, setSentTo] = useState("");
-  const { busy, run } = useSubmit({
-    clear: () => {
-      errors.clear();
-      setNoMail("");
-    },
-    fail: (err) => {
-      if (err instanceof ApiError && err.code === "no_mail") setNoMail(err.message);
-      else errors.fail(err);
-    },
-  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    await run(async () => {
+    setBusy(true);
+    setError("");
+    setNoMail("");
+    try {
       await api.post("/api/v1/auth/reset/request", { email: email.trim() });
       setSentTo(email.trim());
-    });
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "no_mail") setNoMail(err.message);
+      else setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (sentTo) {
@@ -91,7 +90,7 @@ export function ResetRequestPage() {
             <Note tone="wait">{noMail}</Note>
           </div>
         )}
-        <FormError>{errors.form}</FormError>
+        <FormError>{error}</FormError>
         <Button type="submit" variant="primary" size="lg" disabled={busy} className="mt-1 w-full">
           {busy ? t("auth.reset.busy") : t("auth.reset.submit")}
         </Button>
@@ -105,26 +104,24 @@ export function ResetConfirmPage() {
   const { token = "" } = useParams();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["password"]);
   /** The link is spent or too old: nothing more can be done with this page. */
   const [gone, setGone] = useState(false);
-  const { busy, run } = useSubmit(
-    {
-      clear: errors.clear,
-      fail: (err) => {
-        errors.fail(err);
-        if (err instanceof ApiError && err.status === 404 && err.field !== "password") setGone(true);
-      },
-    },
-    { once: true },
-  );
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    await run(async () => {
+    setBusy(true);
+    errors.clear();
+    try {
       await api.post("/api/v1/auth/reset/confirm", { token, password });
+      // The button stays off on the way to the sign-in page.
       void navigate("/login", { replace: true, state: { notice: t("auth.reset.done") } });
-    });
+    } catch (err) {
+      errors.fail(err);
+      if (err instanceof ApiError && err.status === 404 && err.field !== "password") setGone(true);
+      setBusy(false);
+    }
   }
 
   if (gone) {

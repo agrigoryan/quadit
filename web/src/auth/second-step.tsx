@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { AuthLayout, FormError } from "@/auth/auth-layout";
 import { secondStep, signOut } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { FormField, useFieldErrors, useSubmit } from "@/ui/form";
+import { FormField, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
@@ -16,22 +16,22 @@ export function SecondStep() {
   const [code, setCode] = useState("");
   /** A refusal about the code itself goes under the field; anything else above the button. */
   const errors = useFieldErrors(["code"]);
-  // On success the session is whole and the sign-in page moves on by itself; a refused code is cleared for the next try.
-  const { busy, run } = useSubmit(
-    {
-      clear: errors.clear,
-      fail: (err) => {
-        errors.fail(err);
-        setCode("");
-      },
-    },
-    { once: true },
-  );
   const codeError = errors.fields.code;
+  const [busy, setBusy] = useState(false);
 
   async function send(value: string) {
     if (busy || !value.trim()) return;
-    await run(() => secondStep(value));
+    setBusy(true);
+    errors.clear();
+    try {
+      // On success the session is whole and the sign-in page moves on by itself.
+      await secondStep(value);
+    } catch (err) {
+      errors.fail(err);
+      // A refused code is cleared for the next try.
+      setCode("");
+      setBusy(false);
+    }
   }
 
   function submit(e: FormEvent) {

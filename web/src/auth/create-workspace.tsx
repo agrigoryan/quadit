@@ -5,7 +5,7 @@ import { slugFrom, useCanCreateWorkspace } from "@/auth/config";
 import { createWorkspace, signOut, useSession } from "@/auth/session";
 import { ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FormAlert, FormField, useFieldErrors, useSubmit } from "@/ui/form";
+import { FormAlert, FormField, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
@@ -21,16 +21,9 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
   const [name, setName] = useState("");
   /** Empty until the person types their own; the address then follows the name. */
   const [slug, setSlug] = useState("");
+  const [busy, setBusy] = useState(false);
   // The server names the address "slug" (or "workspace_slug") and the name "name" (or "workspace_name").
   const errors = useFieldErrors(["slug", "workspace_slug", "name", "workspace_name"]);
-  const { busy, run } = useSubmit({
-    clear: errors.clear,
-    fail: (err) => {
-      // An older server refuses a taken address without naming the field; it is the address that needs changing.
-      if (err instanceof ApiError && err.code === "conflict" && !err.field) errors.set("slug", err.message);
-      else errors.fail(err);
-    },
-  });
   const address = slug || slugFrom(name);
 
   function change(next: boolean) {
@@ -48,11 +41,19 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
       errors.set("name", t("auth.workspace.nameNeeded"));
       return;
     }
-    await run(async () => {
+    setBusy(true);
+    errors.clear();
+    try {
       const made = await createWorkspace(name, address);
       change(false);
       void navigate(`/${made}`);
-    });
+    } catch (err) {
+      // An older server refuses a taken address without naming the field; it is the address that needs changing.
+      if (err instanceof ApiError && err.code === "conflict" && !err.field) errors.set("slug", err.message);
+      else errors.fail(err);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

@@ -1,11 +1,12 @@
 // The ways in other than a password: a passkey, and the outside accounts the
 // install has set up (Google, GitHub, a company's single sign-on).
 
+import { useState } from "react";
 import { KeyRound, LogIn } from "lucide-react";
 import { passkeySignIn } from "@/auth/session";
 import { passkeyCanceled, passkeysSupported } from "@/auth/webauthn";
+import { errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { type FieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 
 function GoogleMark() {
@@ -71,19 +72,26 @@ export function ProviderButtons({ providers, query }: Props) {
   );
 }
 
-/** "Sign in with a passkey". Shows nothing in a browser that has no passkeys. Its refusal shows in the sign-in form's place. */
-export function PasskeyButton({ errors }: { errors: Pick<FieldErrors, "clear" | "fail"> }) {
-  const { busy, run } = useSubmit({
-    clear: errors.clear,
-    // Closing the browser's sheet is a change of mind, not a failure.
-    fail: (err) => {
-      if (!passkeyCanceled(err)) errors.fail(err);
-    },
-  });
+/** "Sign in with a passkey". Shows nothing in a browser that has no passkeys. */
+export function PasskeyButton({ onError }: { onError: (message: string) => void }) {
+  const [busy, setBusy] = useState(false);
   if (!passkeysSupported()) return null;
 
+  async function run() {
+    setBusy(true);
+    onError("");
+    try {
+      await passkeySignIn();
+    } catch (err) {
+      // Closing the browser's sheet is a change of mind, not a failure.
+      if (!passkeyCanceled(err)) onError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <Button size="lg" className="w-full" disabled={busy} onClick={() => void run(passkeySignIn)}>
+    <Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>
       <KeyRound className="size-4" aria-hidden />
       {busy ? t("auth.passkey.busy") : t("auth.passkey.signIn")}
     </Button>
