@@ -322,6 +322,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 				// the file changed since and the repository has the say.
 				if fileHash == lastFile || src.Authority == "pages" {
 					toRemove = append(toRemove, path)
+				} else {
+					// Kept, and said: the file now has no page to follow it.
+					renamed = append(renamed, fmt.Sprintf("%s changed in the repository after its page %q was deleted here; the file was kept, and restoring the page takes up its text", path, orText(page.Title, "untitled")))
 				}
 				continue
 			}
@@ -460,7 +463,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	if (len(toWrite) == 0 && len(toRemove) == 0) || src.WriteMode == "none" {
 		// Still said, on a sync with nothing to write: why a page has no file.
 		if len(renamed) > 0 {
-			res.Note = strings.TrimSpace(res.Note + " " + oneLine(strings.Join(renamed, "; "), 400))
+			res.Note = strings.TrimSpace(res.Note + " " + oneLine(strings.Join(renamed, "; "), 1500))
 		}
 		return res, nil
 	}
@@ -498,10 +501,10 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			names = append(names, path)
 		}
 		sort.Strings(names)
-		res.Note = fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 200))
+		res.Note = fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 800))
 	}
 	if len(renamed) > 0 {
-		res.Note = strings.TrimSpace(res.Note + " " + oneLine(strings.Join(renamed, "; "), 400))
+		res.Note = strings.TrimSpace(res.Note + " " + oneLine(strings.Join(renamed, "; "), 1500))
 	}
 	if _, err := git(ctx, dir, "add", "--all", "."); err != nil {
 		return res, err

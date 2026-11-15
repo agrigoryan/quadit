@@ -597,6 +597,19 @@ func TestSyncAwkwardRepositories(t *testing.T) {
 	if got := git(bare, "show", "main:docs/solo.md"); !strings.Contains(got, "edited by its new owner") {
 		t.Fatalf("the page that took the file over does not write to it: %q", got)
 	}
+	// A page thrown away here while its file is changed there: the file
+	// stays, and the sync says that it now has no page.
+	s.change(s.owner, "", "doc.delete", M{"id": first})
+	git(work, "pull", "-q", "origin", "main")
+	os.WriteFile(filepath.Join(work, "docs", "solo.md"), []byte("solo, changed in the repository\n"), 0o644)
+	git(work, "commit", "-qam", "solo changed there")
+	git(work, "push", "-q", "origin", "main")
+	if out := sync(200); !strings.Contains(out, "solo.md changed in the repository after its page") {
+		t.Fatalf("a file kept without a page is not said: %s", out)
+	}
+	if got := git(bare, "show", "main:docs/solo.md"); got != "solo, changed in the repository\n" {
+		t.Fatalf("the file changed there was not kept: %q", got)
+	}
 	var live struct{ Docs []struct{ Title string } }
 	s.call(s.owner, "", "GET", w+"/docs", nil, 200, &live)
 	found := false
