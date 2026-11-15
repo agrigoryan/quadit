@@ -58,6 +58,7 @@ func relationAdd(c *cx, a relationArgs) error {
 	if err := c.tx.Insert(c.ctx, r); err != nil {
 		return alreadyInUse(err, "id", rid)
 	}
+	c.ref = r.ID
 	seq := c.tx.NextSeq()
 	for _, tid := range []string{t.ID, o.ID} {
 		if err := c.touchTask(tid, seq); err != nil {

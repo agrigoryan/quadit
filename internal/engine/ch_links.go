@@ -67,6 +67,7 @@ func linkSet(c *cx, a linkSetArgs) error {
 		if err := c.tx.Insert(c.ctx, l); err != nil {
 			return err
 		}
+		c.ref = l.ID
 		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
