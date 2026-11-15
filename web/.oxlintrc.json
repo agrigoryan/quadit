@@ -43,22 +43,22 @@
     // A label's words may sit two elements in (a title and a hint, each in a span).
     "jsx-a11y/label-has-associated-control": ["error", { "depth": 3 }],
 
-    // Warnings: findings today, to be fixed one rule at a time.
-    "react-hooks/exhaustive-deps": "warn",
-    "react/refs": "warn",
-    "react/set-state-in-effect": "warn",
-    "react/immutability": "warn",
-    "react/purity": "warn",
-    "react/preserve-manual-memoization": "warn",
-    "react/no-did-update-set-state": "warn",
-    "react/incompatible-library": "warn",
-    "jsx-a11y/prefer-tag-over-role": "warn",
-    "jsx-a11y/click-events-have-key-events": "warn",
-    "jsx-a11y/no-static-element-interactions": "warn",
-    "jsx-a11y/no-noninteractive-element-interactions": "warn",
-    "jsx-a11y/no-noninteractive-tabindex": "warn",
-    "jsx-a11y/no-noninteractive-element-to-interactive-role": "warn",
-    "jsx-a11y/interactive-supports-focus": "warn"
+    // Warnings once, fixed one rule at a time. Where a finding stays, a disable comment says why.
+    "react-hooks/exhaustive-deps": "error",
+    "react/refs": "error",
+    "react/set-state-in-effect": "error",
+    "react/immutability": "error",
+    "react/purity": "error",
+    "react/preserve-manual-memoization": "error",
+    "react/no-did-update-set-state": "error",
+    "react/incompatible-library": "error",
+    "jsx-a11y/prefer-tag-over-role": "error",
+    "jsx-a11y/click-events-have-key-events": "error",
+    "jsx-a11y/no-static-element-interactions": "error",
+    "jsx-a11y/no-noninteractive-element-interactions": "error",
+    "jsx-a11y/no-noninteractive-tabindex": "error",
+    "jsx-a11y/no-noninteractive-element-to-interactive-role": "error",
+    "jsx-a11y/interactive-supports-focus": "error"
   },
   "overrides": [
     {

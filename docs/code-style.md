@@ -146,18 +146,4 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 
 | Rule | Findings |
 | --- | ---: |
-| `jsx-a11y/prefer-tag-over-role` | 67 |
-| `react/refs` | 21 |
-| `react-hooks/exhaustive-deps` | 21 |
-| `react/set-state-in-effect` | 15 |
-| `jsx-a11y/click-events-have-key-events` | 11 |
-| `jsx-a11y/no-static-element-interactions` | 9 |
-| `jsx-a11y/no-noninteractive-element-interactions` | 8 |
-| `jsx-a11y/no-noninteractive-tabindex` | 6 |
-| `react/immutability` | 3 |
-| `jsx-a11y/no-noninteractive-element-to-interactive-role` | 3 |
-| `jsx-a11y/interactive-supports-focus` | 3 |
-| `react/purity` | 3 |
-| `react/preserve-manual-memoization` | 2 |
-| `react/no-did-update-set-state` | 2 |
-| `react/incompatible-library` | 1 |
+| none: every rule that was a warning is an error now | 0 |
