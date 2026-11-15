@@ -1,8 +1,7 @@
 import { type ReactNode, type RefObject, useState } from "react";
 import { CircleSlash, Globe, Layers, RefreshCw, Target } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
-import { useCycles, useEpics, useLabels, useMe, useMembers, useProjects, useStatuses } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useCycles, useEpics, useLabels, useMe, useMembers, useProjects, useRows, useStatuses } from "@/lib/selectors";
 import type { Member, Project, Task } from "@/lib/types";
 import { formatDay } from "@/lib/time";
 import { useListening } from "@/lib/listening";
@@ -81,7 +80,7 @@ function useItems(
   const labels = useLabels(projectId);
   const epics = useEpics(projectId);
   const cycles = useCycles(projectId);
-  const milestones = useStore((s) => s.collections.milestones);
+  const milestones = useRows("milestones");
   const projects = useProjects();
   const same = <T,>(get: (task: Task) => T) =>
     tasks.every((task) => get(task) === get(first as Task)) ? get(first as Task) : undefined;
@@ -154,13 +153,8 @@ function useItems(
       return {
         items: [
           { id: NONE, label: t("task.noMilestone"), icon: noneIcon },
-          ...Object.values(milestones)
-            .filter(
-              (m) =>
-                !m.deleted_at &&
-                (!first?.epic_id || m.epic_id === first.epic_id) &&
-                epics.some((e) => e.id === m.epic_id),
-            )
+          ...milestones
+            .filter((m) => (!first?.epic_id || m.epic_id === first.epic_id) && epics.some((e) => e.id === m.epic_id))
             .map((m) => ({
               id: m.id,
               label: m.name,

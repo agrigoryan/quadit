@@ -2,8 +2,8 @@ import { memo } from "react";
 import { ChevronDown, Layers, Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { formatNumber, t } from "@/lib/i18n";
-import { useMember } from "@/lib/selectors";
-import { useRestLoaded, useStore } from "@/lib/store";
+import { useMember, useRow } from "@/lib/selectors";
+import { useRestLoaded } from "@/lib/store";
 import { isOpenCategory } from "@/lib/types";
 import { RestLoadingNote } from "@/ui/rest-note";
 import { NONE, type TaskGroup } from "@/tasks/filters";
@@ -14,7 +14,7 @@ import { PriorityIcon, StatusIcon } from "@/ui/icons";
 /** The mark that goes with a group's name: a status quad, an avatar, a priority, a label's colour. */
 export function GroupIcon({ group }: { group: TaskGroup }) {
   const member = useMember(group.kind === "assignee" && group.value !== NONE ? group.value : undefined);
-  const color = useStore((s) => (group.kind === "label" ? s.collections.labels[group.value]?.color : undefined));
+  const color = useRow("labels", group.kind === "label" ? group.value : undefined)?.color;
   if (group.kind === "label") {
     return (
       <span

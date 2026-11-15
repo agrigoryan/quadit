@@ -213,3 +213,23 @@ describe("CreateTaskDialog, several tasks", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Write at least one title");
   });
 });
+
+describe("CreateTaskDialog, for a read-only member", () => {
+  it("offers nothing to create and sends nothing", () => {
+    const me = { user_id: "u1", handle: "ann", name: "Ann", scope: { read_only: true } } as Member;
+    loadBootstrap("acme", {
+      seq: 2,
+      me,
+      user: { id: "u1" } as User,
+      workspace: { id: "w", slug: "acme" } as Workspace,
+      projects: [{ id: "p1", key: "SVA", name: "Game" }],
+      statuses: [{ id: "s1", project_id: "p1", name: "Todo", category: "unstarted", is_default: true, rank: "a" }],
+    });
+    open();
+    fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Fix the menu" } });
+    expect(screen.getByRole("button", { name: /^Create task/ })).toBeDisabled();
+    fireEvent.submit(screen.getByLabelText("Task title"));
+    expect(isOpen()).toBe(true);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+});

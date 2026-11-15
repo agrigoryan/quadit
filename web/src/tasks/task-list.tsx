@@ -7,7 +7,8 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
-import { useCollection } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useLookup } from "@/lib/selectors";
 import { isDraft } from "@/lib/store";
 import { usePeek, useTaskNav } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";
@@ -39,8 +40,8 @@ interface Props {
   sort: SortBy;
   selected: Set<string>;
   onSelectedChange: (next: Set<string>) => void;
-  /** Opens the create dialog with these values filled in. */
-  onAdd: (draft: NewTaskDraft) => void;
+  /** Opens the create dialog with these values filled in; left out for someone who may not create tasks here. */
+  onAdd?: (draft: NewTaskDraft) => void;
 }
 
 /** What a new task in this group starts with. */
@@ -84,7 +85,8 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
   const anchor = useRef<Element | null>(null);
   const lastPicked = useRef<string | null>(null);
   const view = useViewport(scroller);
-  const tasks = useCollection("tasks");
+  const tasks = useLookup("tasks");
+  const can = useCan();
 
   // `collapsed` holds the groups folded, by id, and the parents folded, by row key.
   const { sections, rows, indexOf, total } = useMemo(
@@ -205,11 +207,12 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     if ("toggle" in to) fold(to.toggle);
     else focusRow(to.focus);
   }
-  const addTo = useCallback((group: TaskGroup) => onAdd(draftFor(group)), [onAdd]);
+  const addTo = useCallback((group: TaskGroup) => onAdd?.(draftFor(group)), [onAdd]);
 
   function openPicker(kind: TaskProperty) {
     const first = targets[0];
-    if (!first) return;
+    // Like the row's own buttons: nothing to pick for a task the viewer may not change.
+    if (!first || !targets.every((task) => can.editTask(task))) return;
     // The row may be scrolled out of the window; the list itself then holds the picker.
     anchor.current = scroller.current?.querySelector(`[data-task="${first.id}"]`) ?? scroller.current;
     setPicker(kind);
@@ -287,7 +290,12 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
               style={{ top: section.top, height: section.height }}
             >
               {section.head > 0 && (
-                <GroupHeader group={group} collapsed={collapsed.has(group.id)} onToggle={toggle} onAdd={addTo} />
+                <GroupHeader
+                  group={group}
+                  collapsed={collapsed.has(group.id)}
+                  onToggle={toggle}
+                  onAdd={onAdd && addTo}
+                />
               )}
               {/* Nested, the rows are announced as a list whose items carry their level in the tree. */}
               <div role={rows[section.first]?.branch ? "list" : undefined}>

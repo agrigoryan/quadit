@@ -6,7 +6,8 @@ import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { FileWarning, ListTodo, Plus, SearchX } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
-import { useCollection, useLiveTasks, useMe, useOpenDecisions } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useLiveTasks, useLookup, useLookupEvenIfGone, useMe, useOpenDecisions } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { isOpenCategory, type Project, type View } from "@/lib/types";
@@ -38,13 +39,18 @@ interface Props {
 
 export function TasksView({ project, view, layout: routeLayout }: Props) {
   const me = useMe();
+  const can = useCan();
   // Only the tables the page reads: a change to anything else (a comment, a notification) redraws nothing here.
-  const projects = useCollection("projects");
-  const statuses = useCollection("statuses");
-  const members = useCollection("members");
-  const labels = useCollection("labels");
-  const epics = useCollection("epics");
-  const cycles = useCollection("cycles");
+  // A view of an archived project is still about that project.
+  const projects = useLookupEvenIfGone("projects");
+  const statuses = useLookup("statuses");
+  const members = useLookup("members");
+  const labels = useLookup("labels");
+  const epics = useLookup("epics");
+  const cycles = useLookup("cycles");
+  // Grouping still names a removed assignee or a deleted epic that tasks are in (tasks/filters.ts, GroupSource).
+  const everyMember = useLookupEvenIfGone("members");
+  const everyEpic = useLookupEvenIfGone("epics");
   const tables = useMemo(
     () => ({ projects, members, statuses, labels, epics, cycles }),
     [projects, members, statuses, labels, epics, cycles],
@@ -87,10 +93,11 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
   const restLoaded = useRestLoaded();
   const groups = useMemo(() => {
     const by = board ? state.boardGroup : state.group;
-    const made = groupTasks(tasks, by, { statuses, members, epics, labels }, project?.id, board || !restLoaded);
+    const source = { statuses, members: everyMember, epics: everyEpic, labels };
+    const made = groupTasks(tasks, by, source, project?.id, board || !restLoaded);
     if (board || restLoaded) return made;
     return made.filter((g) => g.tasks.length > 0 || (g.kind === "status" && !isOpenCategory(g.category)));
-  }, [tasks, state.group, state.boardGroup, board, restLoaded, statuses, members, epics, labels, project?.id]);
+  }, [tasks, state.group, state.boardGroup, board, restLoaded, statuses, everyMember, everyEpic, labels, project?.id]);
 
   const changed =
     !!view &&
@@ -141,15 +148,21 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
           className="flex min-h-8 shrink-0 items-center gap-2 border-b border-line bg-sunken px-3 text-xs text-ink-2 md:px-4"
         >
           {t("view.gone")}
-          <Button size="sm" onClick={fixView}>
-            {t("view.fix")}
-          </Button>
+          {view && can.editMadeBy(view.owner_id) && (
+            <Button size="sm" onClick={fixView}>
+              {t("view.fix")}
+            </Button>
+          )}
         </p>
       )}
 
       <div className="relative min-h-0 flex-1">
         {tasks.length === 0 && !board && restLoaded ? (
-          <NoTasks filters={state.filters} onClearFilters={() => setFilters(emptyFilters)} onAdd={() => add()} />
+          <NoTasks
+            filters={state.filters}
+            onClearFilters={() => setFilters(emptyFilters)}
+            onAdd={can.edit(project?.id) ? () => add() : undefined}
+          />
         ) : board ? (
           <Suspense fallback={<Loading />}>
             <Board groups={groups} project={project} />
@@ -161,7 +174,7 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
             sort={state.sort}
             selected={selected}
             onSelectedChange={setSelected}
-            onAdd={add}
+            onAdd={can.edit(project?.id) ? add : undefined}
           />
         )}
         {!board && <BulkBar tasks={chosen} onClear={clearSelection} />}
@@ -178,7 +191,8 @@ function NoTasks({
 }: {
   filters: Filters;
   onClearFilters: () => void;
-  onAdd: () => void;
+  /** Left out for someone who may not create tasks here. */
+  onAdd?: () => void;
 }) {
   if (countFilters(filters) > 0 || filters.text !== "") {
     return (
@@ -196,10 +210,12 @@ function NoTasks({
       title={t("list.empty")}
       hint={t("list.emptyHint")}
       action={
-        <Button variant="primary" onClick={onAdd}>
-          <Plus className="size-4" aria-hidden />
-          {t("top.newTask")}
-        </Button>
+        onAdd && (
+          <Button variant="primary" onClick={onAdd}>
+            <Plus className="size-4" aria-hidden />
+            {t("top.newTask")}
+          </Button>
+        )
       }
     />
   );

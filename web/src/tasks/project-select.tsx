@@ -1,12 +1,12 @@
 // The project a new task goes into, at the top left of the create dialog.
 
 import { t } from "@/lib/i18n";
-import { useProjects } from "@/lib/selectors";
+import { useCreatableProjects } from "@/tasks/data";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Select } from "@/ui/picker";
 
 export function ProjectSelect({ value, onPick }: { value: string; onPick: (id: string) => void }) {
-  const projects = useProjects();
+  const projects = useCreatableProjects();
   return (
     <Select
       label={t("prop.project")}

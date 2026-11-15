@@ -6,8 +6,8 @@ import { useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
-import { useMe } from "@/lib/selectors";
-import { getState, useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { getRows, useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { SWATCHES } from "@/lib/swatches";
 
 /**
@@ -17,7 +17,7 @@ import { SWATCHES } from "@/lib/swatches";
  */
 export function createLabel(projectId: string | undefined, name: string): string {
   const id = newId();
-  const used = Object.values(getState().collections.labels).filter((l) => !l.deleted_at).length;
+  const used = getRows("labels").length;
   const color = SWATCHES[(used + 2) % SWATCHES.length];
   const args: Changes["label.create"] = { id, name, color };
   if (projectId) args.project = projectId;
@@ -42,13 +42,14 @@ export function useManageLinks(projectId: string | undefined): {
   statuses: ManageLink | undefined;
 } {
   const navigate = useNavigate();
-  const me = useMe();
-  const slug = useStore((s) => s.slug);
-  const key = useStore((s) => (projectId ? s.collections.projects[projectId]?.key : undefined));
+  const can = useCan();
+  const slug = useSlug();
+  // A task in an archived project still leads to that project's settings.
+  const key = useRowEvenIfGone("projects", projectId)?.key;
   const to = (tab: string) => () =>
     void navigate(key ? `/${slug}/settings/projects/${key}/${tab}` : `/${slug}/settings/projects`);
   return {
     labels: { label: t("pick.manageLabels"), onSelect: to("labels") },
-    statuses: me.role !== "member" && key ? { label: t("pick.manageStatuses"), onSelect: to("statuses") } : undefined,
+    statuses: can.administer && key ? { label: t("pick.manageStatuses"), onSelect: to("statuses") } : undefined,
   };
 }

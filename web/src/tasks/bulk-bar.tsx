@@ -13,7 +13,8 @@ import {
   X,
 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { useRowEvenIfGone } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { setDue, setEstimate, trashTasks } from "@/tasks/actions";
 import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
@@ -44,9 +45,14 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
   const moreButton = useRef<HTMLButtonElement>(null);
   /** Set when a menu entry opens something of its own, so the closing menu does not take the focus back. */
   const handingOver = useRef(false);
-  const cycles = useStore((s) => !!s.collections.projects[tasks[0]?.project_id ?? ""]?.settings?.cycles);
-  const estimates = useStore((s) => s.collections.projects[tasks[0]?.project_id ?? ""]?.settings?.estimates !== false);
+  // The tasks may be in an archived project, whose page still lists them.
+  const project = useRowEvenIfGone("projects", tasks[0]?.project_id);
+  const cycles = !!project?.settings?.cycles;
+  const estimates = project?.settings?.estimates !== false;
+  const can = useCan();
   if (tasks.length === 0) return null;
+  // Every action here changes the tasks: for a selection the viewer may not change, they are all disabled.
+  const readOnly = !tasks.every((task) => can.editTask(task));
 
   const open = (what: More) => () => {
     handingOver.current = true;
@@ -68,7 +74,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
       <span className="mr-1 shrink-0 text-sm font-medium tnum">{t("bulk.selected", { n: tasks.length })}</span>
       {actions.map((a) => (
         <TaskPropertyPicker key={a.kind} kind={a.kind} tasks={tasks} side="top">
-          <Button size="md" className="max-sm:px-2" aria-label={a.label()}>
+          <Button size="md" className="max-sm:px-2" disabled={readOnly} aria-label={a.label()}>
             {a.icon}
             <span className="max-sm:hidden">{a.label()}</span>
           </Button>
@@ -77,7 +83,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
 
       <Menu>
         <MenuTrigger asChild>
-          <Button ref={moreButton} size="md" className="max-sm:px-2" aria-label={t("bulk.more")}>
+          <Button ref={moreButton} size="md" className="max-sm:px-2" disabled={readOnly} aria-label={t("bulk.more")}>
             <Ellipsis className="size-3.5" aria-hidden />
             <span className="max-sm:hidden">{t("common.more")}</span>
           </Button>
@@ -135,6 +141,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
       <Button
         variant="danger-quiet"
         className="max-sm:px-2"
+        disabled={readOnly}
         aria-label={t("bulk.delete")}
         onClick={() => {
           trashTasks(tasks);

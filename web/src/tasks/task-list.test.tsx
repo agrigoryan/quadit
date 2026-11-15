@@ -8,9 +8,9 @@ import { useMemo, useState } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { emptyCollections } from "@/lib/collections";
-import { useStore } from "@/lib/store";
+import { loadBootstrap, useStore } from "@/lib/store";
 import { PeekContext } from "@/lib/task-link";
-import type { Task } from "@/lib/types";
+import type { Member, Task, User, Workspace } from "@/lib/types";
 import type { TaskGroup } from "@/tasks/filters";
 import { TaskList } from "@/tasks/task-list";
 import { DisplayControls } from "@/tasks/view-controls";
@@ -277,5 +277,37 @@ describe("DisplayControls", () => {
     fireEvent.click(screen.getByRole("button", { name: /Sub-tasks\s*Nested/ }));
     fireEvent.click(screen.getByRole("option", { name: "Flat" }));
     expect(onChange).toHaveBeenCalledWith({ subtasks: "flat" });
+  });
+});
+
+describe("TaskList for who may change the tasks, and who may not", () => {
+  const seed = (scope?: Member["scope"]) =>
+    loadBootstrap("test", {
+      seq: 1,
+      me: { user_id: "u", handle: "ann", name: "Ann", role: "member", kind: "person", scope } as Member,
+      user: { id: "u" } as User,
+      workspace: { id: "w", slug: "test" } as Workspace,
+      statuses: [{ id: "s", project_id: "p", name: "Todo", category: "unstarted", rank: "a" }],
+      tasks: [task(1)],
+    });
+  const statusPicker = () => screen.queryByPlaceholderText("Change status…");
+
+  it("opens the status picker with S, and from the row's own button", () => {
+    seed();
+    renderList([group("Todo", [1])]);
+    press("j");
+    press("s");
+    expect(statusPicker()).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Status: Todo" })).toBeEnabled();
+  });
+
+  it("opens nothing for a read-only member: S does nothing and the row's buttons are off", () => {
+    seed({ read_only: true });
+    renderList([group("Todo", [1])]);
+    press("j");
+    press("s");
+    expect(statusPicker()).toBeNull();
+    expect(screen.getByRole("button", { name: "Status: Todo" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Assignee" })).toBeDisabled();
   });
 });

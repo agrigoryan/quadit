@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { Bookmark, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { mutate, send } from "@/lib/mutate";
 import { useSlug } from "@/lib/selectors";
@@ -151,6 +152,11 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
   const slug = useSlug();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"save" | "rename" | null>(null);
+  const can = useCan();
+  /** Saving the page as a new view. */
+  const mayCreate = can.write;
+  /** Updating, renaming or deleting the view shown: its owner's, or an admin's. */
+  const mayChange = !!view && can.editMadeBy(view.owner_id);
 
   async function create(name: string) {
     try {
@@ -187,32 +193,32 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
     <>
       {view ? (
         <>
-          {changed && (
+          {changed && mayChange && (
             <Button size="sm" variant="secondary" onClick={update}>
               {t("view.update")}
             </Button>
           )}
           <Menu>
             <MenuTrigger asChild>
-              <IconButton size="sm" label={t("view.menu")}>
+              <IconButton size="sm" label={t("view.menu")} disabled={!mayChange && !mayCreate}>
                 <Ellipsis className="size-4" />
               </IconButton>
             </MenuTrigger>
             <MenuContent align="end">
-              <MenuItem icon={<Pencil />} onSelect={() => setDialog("rename")}>
+              <MenuItem icon={<Pencil />} disabled={!mayChange} onSelect={() => setDialog("rename")}>
                 {t("view.rename")}
               </MenuItem>
-              <MenuItem icon={<Bookmark />} onSelect={() => setDialog("save")}>
+              <MenuItem icon={<Bookmark />} disabled={!mayCreate} onSelect={() => setDialog("save")}>
                 {t("view.save")}
               </MenuItem>
-              <MenuItem icon={<Trash2 />} danger onSelect={remove}>
+              <MenuItem icon={<Trash2 />} danger disabled={!mayChange} onSelect={remove}>
                 {t("view.delete")}
               </MenuItem>
             </MenuContent>
           </Menu>
         </>
       ) : (
-        <Button size="sm" variant="ghost" onClick={() => setDialog("save")}>
+        <Button size="sm" variant="ghost" disabled={!mayCreate} onClick={() => setDialog("save")}>
           <Bookmark className="size-3.5" aria-hidden />
           <span className="max-sm:hidden">{t("view.save")}</span>
         </Button>

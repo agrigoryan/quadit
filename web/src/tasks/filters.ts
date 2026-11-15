@@ -119,7 +119,13 @@ export interface TaskGroup {
   tasks: Task[];
 }
 
-/** The tables grouping reads; a page passes only these, so it regroups only when one of them changes. */
+/**
+ * The tables grouping reads; a page passes only these, so it regroups only
+ * when one of them changes. Statuses and labels are the live ones
+ * (useLookup); members and epics are every row (useLookupEvenIfGone), so a
+ * task still assigned to someone removed, or in a deleted epic, keeps a group
+ * under that name.
+ */
 export type GroupSource = Pick<Collections, "statuses" | "members" | "epics" | "labels">;
 
 /**
@@ -149,7 +155,7 @@ export function groupTasks(
   if (by === "status") {
     if (projectId) {
       const own = Object.values(c.statuses)
-        .filter((s) => s.project_id === projectId && !s.deleted_at)
+        .filter((s) => s.project_id === projectId)
         .sort((a, b) => (a.rank < b.rank ? -1 : 1));
       for (const s of own) add({ id: s.id, title: s.name, value: s.id, category: s.category });
       for (const task of tasks) groups.get(task.status_id)?.tasks.push(task);
@@ -169,7 +175,7 @@ export function groupTasks(
 
   if (by === "label") {
     const labels = Object.values(c.labels)
-      .filter((l) => !l.deleted_at && (!l.project_id || !projectId || l.project_id === projectId))
+      .filter((l) => !l.project_id || !projectId || l.project_id === projectId)
       .sort((a, b) => a.name.localeCompare(b.name));
     for (const l of labels) add({ id: l.id, title: l.name, value: l.id });
     const none = add({ id: NONE, title: t("task.noLabel"), value: NONE });
@@ -210,7 +216,11 @@ export function groupTasks(
   return shown();
 }
 
-/** The tables a stored query's names are looked up in. */
+/**
+ * The tables a stored query's names are looked up in: the live rows
+ * (useLookup), so a name of something gone matches nothing; projects every
+ * row (useLookupEvenIfGone), so a view of an archived project stays about it.
+ */
 export type QuerySource = Pick<Collections, "projects" | "members" | "statuses" | "labels" | "epics" | "cycles">;
 
 const SORT_TO_QUERY: Record<SortBy, string> = {
@@ -302,20 +312,16 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
     if (ref === OUTSIDE) return OUTSIDE;
     if (ref === "me") return meId;
     const handle = low(ref.replace(/^@/, ""));
-    return Object.values(c.members).find((m) => !m.removed_at && (m.user_id === ref || low(m.handle) === handle))
-      ?.user_id;
+    return Object.values(c.members).find((m) => m.user_id === ref || low(m.handle) === handle)?.user_id;
   };
-  const byName = <T extends { id: string; name: string; project_id?: string; deleted_at?: number }>(
-    table: Dict<T>,
-    ref: string,
-  ): string[] =>
+  const byName = <T extends { id: string; name: string; project_id?: string }>(table: Dict<T>, ref: string): string[] =>
     Object.values(table)
-      .filter((row) => !row.deleted_at && (row.id === ref || low(row.name) === low(ref)) && inScope(row.project_id))
+      .filter((row) => (row.id === ref || low(row.name) === low(ref)) && inScope(row.project_id))
       .map((row) => row.id);
   const cycle = (ref: string): string[] => {
     if (ref === NONE) return [NONE];
     const rows = Object.values(c.cycles)
-      .filter((cy) => !cy.deleted_at && inScope(cy.project_id))
+      .filter((cy) => inScope(cy.project_id))
       .sort((a, b) => a.starts_on.localeCompare(b.starts_on));
     // On a day with no cycle running (or none to come) the word itself stays
     // as the filter: no task is in "current", so none is shown, as the

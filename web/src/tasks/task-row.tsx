@@ -3,9 +3,10 @@ import { Check, ChevronDown } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useDecisionFlag } from "@/lib/selectors";
-import { useIsDraft, useStore } from "@/lib/store";
-import type { Task } from "@/lib/types";
+import { useCan } from "@/lib/access";
+import { useDecisionFlag, useLookup, useRow } from "@/lib/selectors";
+import { useIsDraft } from "@/lib/store";
+import { isClosedCategory, type Task } from "@/lib/types";
 import { useTaskLink } from "@/lib/task-link";
 import type { Branch } from "@/tasks/list-layout";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
@@ -71,14 +72,16 @@ export const TaskRow = memo(function TaskRow({
   branch,
   onFold,
 }: Props) {
-  const status = useStore((s) => s.collections.statuses[task.status_id]);
-  const epic = useStore((s) => (task.epic_id ? s.collections.epics[task.epic_id] : undefined));
-  const labels = useStore((s) => s.collections.labels);
+  const status = useRow("statuses", task.status_id);
+  const epic = useRow("epics", task.epic_id);
+  const labels = useLookup("labels");
   const decision = useDecisionFlag(task.id);
   const link = useTaskLink(task);
   // Just made here and not yet numbered by the server: there is no address to open it at.
   const draft = useIsDraft(task.id);
-  const closed = status?.category === "done" || status?.category === "canceled";
+  const closed = isClosedCategory(status?.category);
+  // The pickers stay shut on a task the viewer may not change (read-only, another project, the trash).
+  const readOnly = !useCan().editTask(task);
   const context = branch?.context ?? false;
 
   return (
@@ -128,6 +131,7 @@ export const TaskRow = memo(function TaskRow({
         <button
           type="button"
           className={iconButton}
+          disabled={readOnly}
           aria-label={`${t("prop.priority")}: ${t(`priority.${task.priority}` as "priority.0")}`}
         >
           <PriorityIcon priority={task.priority} title="" />
@@ -138,7 +142,12 @@ export const TaskRow = memo(function TaskRow({
 
       {status && (
         <TaskPropertyPicker kind="status" tasks={[task]}>
-          <button type="button" className={iconButton} aria-label={`${t("prop.status")}: ${status.name}`}>
+          <button
+            type="button"
+            className={iconButton}
+            disabled={readOnly}
+            aria-label={`${t("prop.status")}: ${status.name}`}
+          >
             <StatusIcon category={status.category} />
           </button>
         </TaskPropertyPicker>
@@ -179,7 +188,7 @@ export const TaskRow = memo(function TaskRow({
         {task.due_on && <DueChip day={task.due_on} done={closed} className="max-sm:hidden" />}
         {!hide?.assignee && (
           <TaskPropertyPicker kind="assignee" tasks={[task]} align="end">
-            <button type="button" className={iconButton} aria-label={t("prop.assignee")}>
+            <button type="button" className={iconButton} disabled={readOnly} aria-label={t("prop.assignee")}>
               <AssigneeAvatar userId={task.assignee_id} />
             </button>
           </TaskPropertyPicker>

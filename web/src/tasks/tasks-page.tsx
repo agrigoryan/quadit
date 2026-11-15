@@ -1,6 +1,5 @@
 import { useParams } from "react-router";
-import { useProjectByKey, useViews } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useLookupEvenIfGone, useProjectByKey, useViews } from "@/lib/selectors";
 import { NotFoundPage } from "@/ui/not-found";
 import { normalizeQuery } from "@/tasks/filters";
 import { TasksView } from "@/tasks/tasks-view";
@@ -17,7 +16,8 @@ export function ProjectTasksPage({ layout }: { layout: "list" | "board" }) {
 export function ViewPage() {
   const { slug } = useParams();
   const view = useViews().find((v) => v.slug === slug);
-  const projects = useStore((s) => s.collections.projects);
+  // A view of an archived project is still about that project.
+  const projects = useLookupEvenIfGone("projects");
   if (!view) return <NotFoundPage />;
   // The query may be anything a person or an agent stored; read it carefully.
   const keys = normalizeQuery(view.query)?.project ?? [];

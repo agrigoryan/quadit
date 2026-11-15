@@ -1,11 +1,15 @@
 // Filtering and grouping tasks, and filters to and from a saved view's query (tasks/filters.ts).
 
 import { describe, expect, it } from "vitest";
+import { isLive } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/lib/types";
 import { emptyFilters, type Filters, fromQuery, groupTasks, matcher, sortFromQuery, toQuery } from "@/tasks/filters";
 
 const byId = <T extends { id: string }>(rows: T[]): Dict<T> => Object.fromEntries(rows.map((r) => [r.id, r]));
+/** The table as useLookup hands it over: the gone rows left out. */
+const live = <T extends object>(table: Dict<T>): Dict<T> =>
+  Object.fromEntries(Object.entries(table).filter(([, row]) => isLive(row)));
 
 const statuses = byId([
   { id: "s-todo", project_id: "p1", name: "To do", category: "unstarted", rank: "a" },
@@ -104,7 +108,8 @@ describe("matcher", () => {
 });
 
 describe("groupTasks", () => {
-  const c = { statuses, members, epics, labels };
+  // As a page passes them (tasks/tasks-view.tsx): removed members and deleted epics still name their groups.
+  const c = { statuses: live(statuses), members, epics, labels: live(labels) };
   const shape = (groups: ReturnType<typeof groupTasks>) => groups.map((g) => [g.id, g.tasks.map((t) => t.id)]);
 
   it("groups by the project's own statuses in their order, keeping the empty ones of that project", () => {
@@ -162,7 +167,15 @@ describe("groupTasks", () => {
 });
 
 describe("toQuery and fromQuery", () => {
-  const source = { projects, members, statuses, labels, epics, cycles };
+  // As a page passes them (tasks/tasks-view.tsx): what is gone is not there to be found.
+  const source = {
+    projects,
+    members: live(members),
+    statuses: live(statuses),
+    labels: live(labels),
+    epics: live(epics),
+    cycles: live(cycles),
+  };
 
   it("give back the same filters and sort", () => {
     const f: Filters = {

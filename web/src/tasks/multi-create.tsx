@@ -3,6 +3,7 @@
 // are sent as one batch, so either all of them are made or none.
 
 import { useMemo, useState } from "react";
+import { useCan } from "@/lib/access";
 import { errorMessage } from "@/lib/api";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
@@ -42,10 +43,12 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
   /** What is missing, or why the server made none of them: one line under the list. */
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Opened by someone who may change nothing, the dialog offers nothing to create.
+  const readOnly = !useCan().write;
   const titles = useMemo(() => titlesOf(text), [text]);
 
   async function submit() {
-    if (busy) return;
+    if (busy || readOnly) return;
     if (!project) return setError(t("create.noProject"));
     if (titles.length === 0) return setError(t("multi.needTitles"));
     setError("");
@@ -90,7 +93,7 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
           </Button>
           <Button
             variant="primary"
-            disabled={busy || titles.length === 0}
+            disabled={busy || readOnly || titles.length === 0}
             onClick={() => void submit()}
             className="max-sm:h-10 max-sm:px-4"
           >

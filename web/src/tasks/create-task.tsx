@@ -6,7 +6,8 @@ import { errorMessage } from "@/lib/api";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
-import { getState } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { getRow } from "@/lib/selectors";
 import { useTaskNav } from "@/lib/task-link";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
@@ -36,6 +37,8 @@ export function CreateTaskDialog({ draft }: { draft: NewTaskDraft }) {
 /** One task. Cmd/Ctrl-Enter creates; "Create more" keeps it open for the next one. */
 function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => void }) {
   const nav = useTaskNav();
+  // Opened by someone who may change nothing, the dialog offers nothing to create.
+  const readOnly = !useCan().write;
   const titleBox = useRef<HTMLInputElement>(null);
   const { projectId, project, fields, change: changeFields, changeProject } = useTaskFields(draft);
   const [title, setTitle] = useState("");
@@ -49,7 +52,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
   function change(patch: Partial<TaskFields>) {
     if (patch.templateId !== undefined && project) {
       // Picking a template fills what is still empty, so its effect is visible before creating.
-      const template = getState().collections.templates[patch.templateId];
+      const template = getRow("templates", patch.templateId);
       if (template?.title && !title.trim()) setTitle(template.title);
       if (template?.description && !description.trim()) setDescription(template.description);
       patch = { ...presetOf(template, project), ...patch };
@@ -63,6 +66,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
    */
   async function submit(e?: FormEvent) {
     e?.preventDefault();
+    if (readOnly) return;
     if (!project) return setError(t("create.noProject"));
     if (!title.trim()) {
       setError(t("create.needTitle"));
@@ -122,7 +126,12 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
           <Button variant="ghost" onClick={ui.closeNewTask}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" onClick={() => void submit()} className="max-sm:h-10 max-sm:px-4">
+          <Button
+            variant="primary"
+            disabled={readOnly}
+            onClick={() => void submit()}
+            className="max-sm:h-10 max-sm:px-4"
+          >
             {t("create.submit")}
             <span className="max-sm:hidden">
               <Kbd onDark>{`${MOD} ↵`}</Kbd>

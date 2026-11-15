@@ -4,8 +4,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useDecisionFlag, useSubtaskProgress } from "@/lib/selectors";
-import { useIsDraft, useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { useDecisionFlag, useLookup, useSubtaskProgress } from "@/lib/selectors";
+import { useIsDraft } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { waitsOutside } from "@/tasks/actions";
 import { AssigneeAvatar, DueChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
@@ -15,7 +16,7 @@ import { DecisionMark, PriorityIcon } from "@/ui/icons";
 
 /** What a card shows; shared by the card in its column and the copy that follows the pointer. */
 const CardBody = memo(function CardBody({ task }: { task: Task }) {
-  const labels = useStore((s) => s.collections.labels);
+  const labels = useLookup("labels");
   const decision = useDecisionFlag(task.id);
   const progress = useSubtaskProgress(task.id);
   const tags = (task.label_ids ?? []).map((id) => labels[id]).filter((l) => l !== undefined);
@@ -53,7 +54,12 @@ const shell = "block rounded-md border border-line bg-surface p-2.5 shadow-card"
 export const BoardCard = memo(function BoardCard({ id, task }: { id: string; task: Task }) {
   const draft = useIsDraft(task.id);
   // A card just made waits for its number: it cannot be opened or moved until the server has it.
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled: draft });
+  // Nor is it moved by someone who may not change the task (read-only, another project).
+  const fixed = !useCan().editTask(task);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: draft || fixed,
+  });
   const link = useTaskLink(task);
   const style = { transform: CSS.Translate.toString(transform), transition };
   if (draft) {

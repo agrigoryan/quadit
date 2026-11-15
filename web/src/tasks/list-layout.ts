@@ -61,6 +61,7 @@ export interface Branch {
 
 /** How to nest: the tasks a parent is looked up in, and the list's order, which siblings follow too. */
 export interface Nesting {
+  /** The live tasks by id (useLookup), where each task's parent is looked up. */
   tasks: Dict<Task>;
   compare: (a: Task, b: Task) => number;
 }
@@ -126,7 +127,7 @@ function treeRows(group: TaskGroup, folded: ReadonlySet<string>, { tasks, compar
   const members = new Set(group.tasks.map((task) => task.id));
   for (const task of group.tasks) {
     const parent = task.parent_id ? tasks[task.parent_id] : undefined;
-    if (parent && !parent.deleted_at && !parent.archived_at && !members.has(parent.id)) context.set(parent.id, parent);
+    if (parent && !members.has(parent.id)) context.set(parent.id, parent);
   }
   const nodes = [...group.tasks, ...context.values()].sort(compare);
   const inGroup = new Set(nodes.map((task) => task.id));

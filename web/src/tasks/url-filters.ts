@@ -49,11 +49,11 @@ export function filtersFromSearch(
 }
 
 /** A name to write in place of an id: only when it is the one row of that name and cannot be misread. */
-function nameFor<T extends { id: string; name?: string; deleted_at?: number }>(rows: T[], id: string): string {
+function nameFor<T extends { id: string; name?: string }>(rows: T[], id: string): string {
   const row = rows.find((r) => r.id === id);
   const name = row?.name ?? "";
   const plain = name !== "" && !/[,&]/.test(name) && name.toLowerCase() !== NONE;
-  const only = rows.filter((r) => !r.deleted_at && (r.name ?? "").toLowerCase() === name.toLowerCase()).length === 1;
+  const only = rows.filter((r) => (r.name ?? "").toLowerCase() === name.toLowerCase()).length === 1;
   return plain && only ? name : id;
 }
 

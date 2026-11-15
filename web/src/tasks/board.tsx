@@ -15,14 +15,15 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
-import { statusesOf, useMe } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { getRow } from "@/lib/selectors";
 import type { Project, Task } from "@/lib/types";
 import { type CardMove, moveCard } from "@/tasks/actions";
 import { AddStatusColumn } from "@/tasks/add-status";
 import { CardOverlay } from "@/tasks/board-card";
 import { BoardColumn, type Card } from "@/tasks/board-column";
 import { useBoardKeys } from "@/tasks/board-keys";
+import { projectStatuses } from "@/tasks/data";
 import { NONE, type TaskGroup } from "@/tasks/filters";
 
 interface Props {
@@ -54,9 +55,8 @@ const cardId = (group: TaskGroup, task: Task) => `${group.id}|${task.id}`;
 
 /** The status a task takes when dropped in a column. A category column maps to the task's own project. */
 function statusOf(group: TaskGroup, task: Task): string | undefined {
-  const { statuses } = getState().collections;
-  if (statuses[group.value]) return group.value;
-  return statusesOf(statuses, task.project_id).find((s) => s.category === group.value)?.id;
+  if (getRow("statuses", group.value)) return group.value;
+  return projectStatuses(task.project_id).find((s) => s.category === group.value)?.id;
 }
 
 /** What landing in `to` changes for a card that started in `from`. Nothing (null) when the column cannot take it. */
@@ -85,7 +85,7 @@ function changeFor(task: Task, from: TaskGroup, to: TaskGroup): CardMove | null 
  * tasks/board-keys.ts.
  */
 export function Board({ groups, project }: Props) {
-  const me = useMe();
+  const can = useCan();
   const [activeId, setActiveId] = useState<string | null>(null);
   // While a card is being dragged the columns follow the pointer, not the store.
   const [order, setOrder] = useState<Order | null>(null);
@@ -167,7 +167,7 @@ export function Board({ groups, project }: Props) {
 
   const active = activeId ? cards.get(activeId)?.task : undefined;
   // Statuses are edited where they are used: on a project's board, by those who may.
-  const editable = !!project && me.role !== "member" && groups[0]?.kind === "status";
+  const editable = !!project && can.administer && groups[0]?.kind === "status";
 
   return (
     <DndContext

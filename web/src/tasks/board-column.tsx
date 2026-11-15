@@ -8,7 +8,9 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { usePlace } from "@/lib/place";
 import { rankBetween } from "@/lib/rank";
-import { useRestLoaded, useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { useRow } from "@/lib/selectors";
+import { useRestLoaded } from "@/lib/store";
 import { isOpenCategory, type Project, type Task } from "@/lib/types";
 import { createTask, type NewTask } from "@/tasks/actions";
 import { BoardCard } from "@/tasks/board-card";
@@ -63,7 +65,10 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState("");
   const scroller = useRef<HTMLDivElement | null>(null);
-  const status = useStore((s) => (editable ? s.collections.statuses[group.value] : undefined));
+  const status = useRow("statuses", editable ? group.value : undefined);
+  // Quick-add creates in the board's project: offered to those who may.
+  const can = useCan();
+  const canAdd = !!project && can.edit(project.id);
   // A Done or Canceled column is not empty while the finished work is still on its way; its header says so.
   const waitingForRest = !useRestLoaded() && group.kind === "status" && !isOpenCategory(group.category);
 
@@ -143,7 +148,7 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
         {status && project && !renaming && (
           <StatusMenu status={status} project={project} onRename={() => setRenaming(true)} />
         )}
-        {project && !renaming && (
+        {canAdd && !renaming && (
           <IconButton
             size="sm"
             label={t("board.add", { name: group.title })}
@@ -155,7 +160,7 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
         )}
       </header>
 
-      {adding && (
+      {adding && canAdd && (
         <form onSubmit={add} className="px-2 pb-2">
           <input
             autoFocus

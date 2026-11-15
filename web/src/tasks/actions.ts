@@ -7,10 +7,11 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
-import { statusesOf } from "@/lib/selectors";
+import { getRow, getRows } from "@/lib/selectors";
 import { draftKey, getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { isOpenCategory, type Status, type Task } from "@/lib/types";
+import { projectStatuses } from "@/tasks/data";
 import { OUTSIDE } from "@/tasks/filters";
 
 type Fields = Record<string, unknown>;
@@ -36,12 +37,12 @@ function updateAll(tasks: Task[], args: (task: Task) => Changes["task.update"] |
  */
 function statusFor(task: Task, status: Status): Status | undefined {
   if (status.project_id === task.project_id) return status;
-  const own = statusesOf(getState().collections.statuses, task.project_id);
+  const own = projectStatuses(task.project_id);
   return own.find((s) => s.name === status.name) ?? own.find((s) => s.category === status.category);
 }
 
 export function setStatus(tasks: Task[], statusId: string) {
-  const status = getState().collections.statuses[statusId];
+  const status = getRow("statuses", statusId);
   if (!status) return;
   const target = (task: Task) => statusFor(task, status);
   updateAll(
@@ -185,7 +186,7 @@ export function moveCard(task: Task, rank: string | undefined, move: CardMove = 
  * redraws them; nothing is guessed ahead of it.
  */
 export function moveToProject(tasks: Task[], projectId: string) {
-  const project = getState().collections.projects[projectId];
+  const project = getRow("projects", projectId);
   const moving = tasks.filter((task) => task.project_id !== projectId);
   if (!project || moving.length === 0) return;
   mutate(moving.map((task) => ({ type: "task.move", args: { id: task.id, project: projectId } })))
@@ -235,7 +236,7 @@ export interface NewTask {
 function endOf(projectId: string): { number: number; lastRank: string } {
   let number = 1;
   let lastRank = "";
-  for (const task of Object.values(getState().collections.tasks)) {
+  for (const task of getRows("tasks")) {
     if (task.project_id !== projectId) continue;
     number = Math.max(number, task.number + 1);
     if (task.rank > lastRank) lastRank = task.rank;
@@ -245,12 +246,12 @@ function endOf(projectId: string): { number: number; lastRank: string } {
 
 /** The change that creates a task, and the row shown until the server's own arrives. */
 function creation(input: NewTask, number: number, rank: string): { change: ChangeSpec; row: Fields } | null {
-  const { collections: c, me } = getState();
-  const project = c.projects[input.projectId];
+  const { me } = getState();
+  const project = getRow("projects", input.projectId);
   if (!project || !me) return null;
   const id = newId();
-  const statuses = statusesOf(c.statuses, project.id);
-  const status = (input.statusId && c.statuses[input.statusId]) || statuses.find((s) => s.is_default) || statuses[0];
+  const statuses = projectStatuses(project.id);
+  const status = getRow("statuses", input.statusId) || statuses.find((s) => s.is_default) || statuses[0];
   const args: Changes["task.create"] = { id, project: project.id, title: input.title.trim() };
   if (input.description?.trim()) args.description = input.description;
   if (input.statusId) args.status = input.statusId;

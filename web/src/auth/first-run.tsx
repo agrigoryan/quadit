@@ -2,7 +2,8 @@ import { FolderPlus } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMe, useProjects, useSlug } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useProjects, useSlug } from "@/lib/selectors";
 
 /**
  * Shown at the top of My work while the workspace has no project: tasks
@@ -11,10 +12,10 @@ import { useMe, useProjects, useSlug } from "@/lib/selectors";
  */
 export function FirstProjectNudge() {
   const projects = useProjects();
-  const me = useMe();
+  const can = useCan();
   const slug = useSlug();
   if (projects.length > 0) return null;
-  const canCreate = me.role !== "member";
+  const canCreate = can.administer;
   return (
     // The highlighter means "your move": only for someone who can make the project.
     <section
