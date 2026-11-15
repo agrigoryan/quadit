@@ -73,6 +73,7 @@ export function TableView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps
     const pinned =
       grid.current?.querySelector(`[data-cell="${active.row}:${TITLE}"]`)?.getBoundingClientRect().right ?? 0;
     const left = cell.getBoundingClientRect().left;
+    // oxlint-disable-next-line react/immutability -- the table's scroller, scrolled to show the active cell: what an effect is for
     if (active.col !== TITLE && left < pinned) box.scrollLeft -= pinned - left;
   }, [active]);
 

@@ -61,6 +61,7 @@ export function TaskBody({ task, status, layout }: Props) {
     files: files.length > 0 || pending.length > 0,
   };
   const attach = () => chooser.current?.click();
+  // oxlint-disable-next-line react/refs -- `attach` reads the ref when a button is pressed, not while drawing; the list only carries it to the button
   const adders = [
     { on: !show.subtasks, icon: ListTree, label: t("detail.add.subtask"), run: () => open("subtasks") },
     { on: !show.relations, icon: GitFork, label: t("detail.add.relation"), run: () => open("relations") },

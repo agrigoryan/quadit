@@ -31,6 +31,7 @@ function useCoverPage(panel: RefObject<HTMLElement | null>) {
     for (const other of frame.children) {
       if (other === el || !(other instanceof HTMLElement) || other.contains(el)) continue;
       put.push({ el: other, inert: other.inert, hidden: other.getAttribute("aria-hidden") });
+      // oxlint-disable-next-line react/immutability -- the page's own elements, made inert while the panel covers them: what an effect is for
       other.inert = true;
       other.setAttribute("aria-hidden", "true");
     }

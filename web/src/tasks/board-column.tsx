@@ -77,6 +77,7 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
   const saved = usePlace(scroller, NO_FOCUS, part);
   const heightsAt = `${useLocation().key}#${part}`;
   const activeIndex = activeId ? cards.findIndex((card) => card.id === activeId) : -1;
+  // oxlint-disable-next-line react/incompatible-library -- the app is not built with the React Compiler, which is what this warns about; the virtualizer is asked afresh each render
   const virtual = useVirtualizer({
     count: cards.length,
     initialOffset: saved?.top ?? 0,
