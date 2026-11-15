@@ -171,7 +171,6 @@ export function SecretForm({ secret, onClose }: Props) {
           draft={hostDraft}
           onDraft={setHostDraft}
           onError={(message) => errors.set("hosts", message)}
-          invalid={!!errors.fields.hosts}
         />
       </FormField>
 

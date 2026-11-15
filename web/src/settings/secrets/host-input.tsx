@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { addHosts } from "@/settings/secrets/data";
+import { useFieldControl } from "@/ui/form";
 
 interface Props {
   id: string;
@@ -13,12 +14,16 @@ interface Props {
   onDraft: (text: string) => void;
   /** Called with what is wrong with the text, or "" once it is fine. */
   onError: (message: string) => void;
-  invalid?: boolean;
 }
 
-/** Hosts as chips: type one and press Enter or comma. Backspace in the empty box takes the last one off. */
-export function HostInput({ id, value, onChange, draft, onDraft, onError, invalid }: Props) {
+/**
+ * Hosts as chips: type one and press Enter or comma. Backspace in the empty
+ * box takes the last one off. Its FormField's hint and error describe it.
+ */
+export function HostInput({ id, value, onChange, draft, onDraft, onError }: Props) {
   const input = useRef<HTMLInputElement>(null);
+  const field = useFieldControl(id);
+  const invalid = field["aria-invalid"];
 
   function commit(text: string): boolean {
     if (!text.trim()) return true;
@@ -63,6 +68,7 @@ export function HostInput({ id, value, onChange, draft, onDraft, onError, invali
   }
 
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- a click beside the chips puts the caret in the box; the keyboard reaches the box itself
     <div
       onClick={() => input.current?.focus()}
       className={cx(
@@ -99,7 +105,7 @@ export function HostInput({ id, value, onChange, draft, onDraft, onError, invali
         onPaste={onPaste}
         onBlur={() => commit(draft)}
         placeholder={value.length === 0 ? t("secrets.hostsPlaceholder") : undefined}
-        aria-invalid={invalid || undefined}
+        {...field}
         autoCapitalize="none"
         autoCorrect="off"
         autoComplete="off"
