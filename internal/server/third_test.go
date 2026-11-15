@@ -502,4 +502,35 @@ func TestSyncAwkwardRepositories(t *testing.T) {
 	if got := git(bare, "show", "main:docs/za.md"); !strings.Contains(got, "za v3") {
 		t.Fatalf("a restored page was not written back: %q", got)
 	}
+
+	// A file deleted there and then put back there (a reverted commit) is
+	// a file again here: it gets its page, and is not deleted once more.
+	git(work, "pull", "-q", "origin", "main")
+	os.WriteFile(filepath.Join(work, "docs", "plain.md"), []byte("plain text\n"), 0o644)
+	git(work, "add", "-A")
+	git(work, "commit", "-q", "-m", "plain")
+	git(work, "push", "-q", "origin", "main")
+	sync(200)
+	git(work, "pull", "-q", "origin", "main")
+	git(work, "rm", "-q", "docs/plain.md")
+	git(work, "commit", "-q", "-m", "plain deleted")
+	git(work, "push", "-q", "origin", "main")
+	sync(200)
+	git(work, "pull", "-q", "origin", "main")
+	git(work, "revert", "--no-edit", "HEAD")
+	git(work, "push", "-q", "origin", "main")
+	sync(200)
+	sync(200)
+	if got := git(bare, "show", "main:docs/plain.md"); got != "plain text\n" {
+		t.Fatalf("a file put back in the repository: %q", got)
+	}
+	var live struct{ Docs []struct{ Title string } }
+	s.call(s.owner, "", "GET", w+"/docs", nil, 200, &live)
+	found := false
+	for _, d := range live.Docs {
+		found = found || d.Title == "plain"
+	}
+	if !found {
+		t.Fatal("the file that came back has no page")
+	}
 }

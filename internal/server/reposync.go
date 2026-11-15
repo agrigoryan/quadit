@@ -359,6 +359,15 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 				if err := sys.Do("doc.delete", map[string]any{"id": page.ID}); err != nil {
 					return err
 				}
+				// It went to the trash because the repository dropped its
+				// file, not because someone here threw it away: it lets go
+				// of the file's name. Should the file come back there (a
+				// reverted commit), it is a file like any new one and gets
+				// its page, instead of being deleted again on this page's
+				// behalf.
+				if _, err := tx.Update(ctx, "docs", map[string]any{"source_path": "", "source_hash": ""}, store.Eq("id", page.ID)); err != nil {
+					return err
+				}
 				res.PagesTrashed++
 				continue
 			}
