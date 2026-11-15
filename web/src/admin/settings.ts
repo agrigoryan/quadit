@@ -3,7 +3,7 @@
 // setting by name and gets its value, whether the environment locks it, and
 // a way to save it.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { type FieldErrors, useFieldErrors } from "@/ui/form";
 
@@ -55,12 +55,12 @@ export function useSetting<T>(name: string, fallback: T): Setting<T> {
   const { settings, replace } = useCtx();
   const entry = settings[name];
   const stored = entry?.value;
-  const fallbackRef = useRef(fallback);
+  // The fallback the caller first gave: a literal written in its render is new each time.
+  const [fb] = useState(fallback);
   const value = useMemo(() => {
-    const fb = fallbackRef.current;
     if (stored === undefined || stored === null) return fb;
     return (isObject(fb) && isObject(stored) ? { ...fb, ...stored } : stored) as T;
-  }, [stored]);
+  }, [stored, fb]);
   const save = useCallback(
     async (next: T | null) => {
       const out = await api.put<{ settings: SettingsMap }>(`${PATH}/${encodeURIComponent(name)}`, next);
@@ -98,11 +98,12 @@ export function useDraft<T>(name: string, fallback: T, opts: DraftOptions<T> = {
   const [saved, setSaved] = useState(false);
   // Server refusals about settings name no field of ours: they go above the buttons.
   const errors = useFieldErrors(["-"]);
-  const options = useRef(opts);
-  options.current = opts;
-
   // A save (here or of another setting) hands back fresh values: start again from them.
-  useEffect(() => setDraft(setting.value), [setting.value]);
+  const [base, setBase] = useState(setting.value);
+  if (base !== setting.value) {
+    setBase(setting.value);
+    setDraft(setting.value);
+  }
 
   const set = useCallback((next: Partial<T> | T) => {
     setSaved(false);
@@ -113,9 +114,9 @@ export function useDraft<T>(name: string, fallback: T, opts: DraftOptions<T> = {
 
   const { save } = setting;
   const { clear, set: setError, fail } = errors;
-  const submit = useCallback(async () => {
+  async function submit() {
     clear();
-    const wrong = options.current.validate?.(draft) ?? {};
+    const wrong = opts.validate?.(draft) ?? {};
     const found = Object.entries(wrong).filter((pair): pair is [string, string] => !!pair[1]);
     if (found.length > 0) {
       for (const [field, message] of found) setError(field, message);
@@ -123,7 +124,7 @@ export function useDraft<T>(name: string, fallback: T, opts: DraftOptions<T> = {
     }
     setBusy(true);
     try {
-      await save(options.current.toValue ? options.current.toValue(draft) : draft);
+      await save(opts.toValue ? opts.toValue(draft) : draft);
       setSaved(true);
       return true;
     } catch (err) {
@@ -132,7 +133,7 @@ export function useDraft<T>(name: string, fallback: T, opts: DraftOptions<T> = {
     } finally {
       setBusy(false);
     }
-  }, [draft, save, clear, setError, fail]);
+  }
 
   return { ...setting, draft, set, dirty, busy, saved, errors, submit };
 }
