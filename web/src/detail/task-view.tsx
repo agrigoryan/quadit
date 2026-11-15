@@ -1,6 +1,6 @@
 // One task, whole: its header, then its body or the reason there is none
-// (still looking, no access, nothing at this address). The panel and the
-// task's own page are both a frame around this.
+// (still looking, the server did not answer, no access, nothing at this
+// address). The panel and the task's own page are both a frame around this.
 
 import { useHotkeys } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
@@ -15,6 +15,7 @@ import { TaskBody, type TaskLayout } from "@/detail/task-body";
 import { LostProject, useLostProject } from "@/ui/not-found";
 import { isTaskPath } from "@/lib/task-link";
 import { EmptyState } from "@/ui/empty";
+import { LoadFailed } from "@/ui/load-gate";
 import { Loading } from "@/ui/spinner";
 
 /** Where a task's page stands in the list it was opened from. */
@@ -59,7 +60,7 @@ function PageTitle({ title }: { title: string }) {
 
 export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
   const task = useTaskByKey(taskKey);
-  const looking = useFindTask(taskKey, !!task);
+  const find = useFindTask(taskKey, !!task);
   const lost = useLostProject(taskKey.split("-")[0]);
   const status = useTaskDetail(task?.id);
   useRevealFromHash(!!task);
@@ -86,8 +87,10 @@ export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
       {layout === "page" && <PageTitle title={task ? `${task.key} ${task.title}` : taskKey} />}
       <PanelHeader taskKey={taskKey} task={task} layout={layout} onClose={onClose} onExpand={onExpand} queue={queue} />
       {!task ? (
-        looking ? (
+        find.looking ? (
           <Loading />
+        ) : find.error ? (
+          <LoadFailed error={find.error} onRetry={find.retry} />
         ) : lost ? (
           <LostProject />
         ) : (

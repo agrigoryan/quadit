@@ -2,36 +2,46 @@
 // sub-tasks, relations, links and files, and how a person or agent is named
 // in a sentence.
 
-import { useEffect, useMemo, useState } from "react";
-import { api, workspacePath } from "@/lib/api";
+import { useEffect, useMemo } from "react";
+import { api, ApiError, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { sortByRank, useCollection } from "@/lib/selectors";
 import { type Dict, getState, mergeRows, useStore } from "@/lib/store";
 import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/lib/types";
+import { useLoad } from "@/lib/use-load";
 
 /** An attachment whose file is known (every one the panel draws). */
 export type Attached = Attachment & { file: FileRow };
 
+/** Where the look for a task the store does not have stands. */
+export interface FindTask {
+  /** True while the answer is on its way. */
+  looking: boolean;
+  /** Why the server could not answer, or "". A task that is not there is not an error. */
+  error: string;
+  retry: () => void;
+}
+
 /**
  * Asks the server for a task the store does not have: one in the trash, which
- * the starting copy leaves out. True while the answer is on its way.
+ * the starting copy leaves out. A failed look is tried again when the live
+ * stream comes back.
  */
-export function useFindTask(taskKey: string, have: boolean): boolean {
-  const [looking, setLooking] = useState(!have);
-  useEffect(() => {
+export function useFindTask(taskKey: string, have: boolean): FindTask {
+  const live = useStore((s) => s.stream === "live");
+  const found = useLoad(async () => {
     if (have) return;
-    let current = true;
-    setLooking(true);
-    api
-      .get<{ task: Task }>(workspacePath(getState().slug, `/tasks/${encodeURIComponent(taskKey)}?raw=1`))
-      .then((raw) => mergeRows("tasks", [raw.task]))
-      .catch(() => {})
-      .finally(() => current && setLooking(false));
-    return () => {
-      current = false;
-    };
-  }, [taskKey, have]);
-  return looking && !have;
+    try {
+      const raw = await api.get<{ task: Task }>(
+        workspacePath(getState().slug, `/tasks/${encodeURIComponent(taskKey)}?raw=1`),
+      );
+      mergeRows("tasks", [raw.task]);
+    } catch (err) {
+      // Not there, or not for this person: the page says so.
+      if (!(err instanceof ApiError && err.status === 404)) throw err;
+    }
+  }, [taskKey, have, live]);
+  return { looking: found.loading && !have, error: have ? "" : found.error, retry: () => void found.reload() };
 }
 
 export function useSubtasks(taskId: string): Task[] {
