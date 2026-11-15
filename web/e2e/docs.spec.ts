@@ -63,8 +63,11 @@ test("a database column is resized from the keyboard and keeps its width", async
   await page.keyboard.press("ArrowLeft");
   await expect(handle).toHaveAttribute("aria-valuenow", String(start + 50));
 
-  await expect(async () => {
-    await page.reload();
-    await expect(handle).toHaveAttribute("aria-valuenow", String(start + 50), { timeout: 1_000 });
-  }).toPass({ timeout: 10_000 });
+  // Letting go of the key keeps the width: the view's settings on the server say so, and it is there after a reload.
+  const widths = async () =>
+    (JSON.parse(await quadit.cli("--json", "doc", made.ref)) as { views: { config?: { widths?: object } }[] }).views[0]
+      ?.config?.widths;
+  await expect.poll(async () => Object.values((await widths()) ?? {})).toEqual([start + 50]);
+  await page.reload();
+  await expect(handle).toHaveAttribute("aria-valuenow", String(start + 50));
 });

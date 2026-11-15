@@ -75,9 +75,12 @@ test("the import source is picked from the keyboard", async ({ page }) => {
   await page.keyboard.press("End");
   await expect(source("Orbit")).toBeFocused();
   await expect(source("Orbit")).toBeChecked();
+  // Round the ends, both ways. (The focus moves a moment after the key: the next key waits for it, as a person does.)
   await page.keyboard.press("ArrowDown");
+  await expect(source("Linear")).toBeFocused();
   await expect(source("Linear")).toBeChecked();
   await page.keyboard.press("ArrowLeft");
+  await expect(source("Orbit")).toBeFocused();
   await expect(source("Orbit")).toBeChecked();
   await page.keyboard.press("Home");
   await expect(source("Linear")).toBeFocused();
