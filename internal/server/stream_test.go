@@ -99,8 +99,12 @@ func TestStreamsEndWithAccess(t *testing.T) {
 		}
 		// A request held open on the feed, by the one about to be suspended.
 		held := make(chan string, 1)
+		var at struct{ Seq int64 }
+		s.call(nil, coder, "GET", "/api/v1/w/-/me", nil, 200, &at)
+		heldFrom := at.Seq
 		go func() {
-			req, _ := http.NewRequest("GET", s.url+"/api/v1/w/-/events?wait=20&types=comment.created&after=999999", nil)
+			// From where the feed stands now, so the request is really held.
+			req, _ := http.NewRequest("GET", s.url+"/api/v1/w/-/events?wait=20&types=comment.created&after="+fmt.Sprint(heldFrom), nil)
 			req.Header.Set("Authorization", "Bearer "+coder)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -137,7 +141,7 @@ func TestStreamsEndWithAccess(t *testing.T) {
 		}
 		select {
 		case got := <-held:
-			if strings.Contains(got, "second words") || !strings.HasPrefix(got, "40") {
+			if strings.Contains(got, "second words") || !strings.HasPrefix(got, "401") {
 				t.Fatalf("a held request outlived a suspension: %s", got)
 			}
 		case <-time.After(10 * time.Second):

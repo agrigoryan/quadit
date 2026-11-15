@@ -54,7 +54,22 @@ func (h *Hub) Notify(ws string, seq int64) {
 // Wait returns when the workspace's feed is past after, or ctx ends. It
 // reports whether there is news.
 func (h *Hub) Wait(ctx context.Context, ws string, after int64) bool {
-	started := -1
+	return h.WaitSince(ctx, ws, after, -1)
+}
+
+// Pokes is how many times a workspace's waiters have been told to look
+// again. A caller that checks something first and waits after reads it
+// before the check and hands it to WaitSince, so that a poke falling
+// between the two is not lost.
+func (h *Hub) Pokes(ws string) int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.room(ws).pokes + h.pokes
+}
+
+// WaitSince is Wait that also returns at once when there has been a poke
+// since the count the caller read (see Pokes); -1 counts from now.
+func (h *Hub) WaitSince(ctx context.Context, ws string, after int64, started int) bool {
 	for {
 		h.mu.Lock()
 		r := h.room(ws)

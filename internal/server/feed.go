@@ -259,6 +259,9 @@ func (s *Server) hStream(x *c) error {
 	defer beat.Stop()
 	opened, _ := s.access(x)
 	for {
+		// Counted before the check: a change of access that lands right
+		// after it is then seen by the read and the wait below, not missed.
+		pokes := s.hub.Pokes(x.ws.ID)
 		// Before anything more goes out: may they still have it? Someone
 		// removed, suspended or signed out is told to go; someone whose role
 		// or projects changed is told to start over with what they may see now.
@@ -279,6 +282,14 @@ func (s *Server) hStream(x *c) error {
 		evs, err := x.db.Events(ctx, f)
 		if err != nil {
 			return nil
+		}
+		if len(evs) > 0 {
+			// What was read may have been written after the check above,
+			// and after the caller lost the right to it: check once more
+			// before any of it is sent.
+			if now, ok := s.access(x); !ok || now != opened {
+				continue // the top of the loop says how it ends
+			}
 		}
 		if len(evs) == f.Limit && evs[len(evs)-1].Seq-after > 5000 {
 			// Too far behind to replay: tell the client to start over.
@@ -302,7 +313,7 @@ func (s *Server) hStream(x *c) error {
 		}
 		woke := make(chan bool, 1)
 		wctx, cancel := context.WithCancel(ctx)
-		go func() { woke <- s.hub.Wait(wctx, x.ws.ID, max(after, mark)) }()
+		go func() { woke <- s.hub.WaitSince(wctx, x.ws.ID, max(after, mark), pokes) }()
 		select {
 		case <-woke:
 		case <-beat.C:
