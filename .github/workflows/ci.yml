@@ -26,6 +26,10 @@ jobs:
         run: |
           test -z "$(gofmt -l cmd internal)"
           go vet ./...
+      # Not blocking yet: the rules are being brought in package by package.
+      - name: Lint
+        continue-on-error: true
+        run: make lint
       - name: Test on SQLite and Postgres
         env:
           QUADIT_TEST_POSTGRES: postgres://postgres:quadit@127.0.0.1:5432/quadit

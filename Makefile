@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build server web test test-all dev seed clean fmt release image
+.PHONY: all build server web test test-all lint dev seed clean fmt release image
 
 all: build
 
@@ -25,6 +25,11 @@ test:
 test-all:
 	QUADIT_TEST_POSTGRES='postgres://postgres:quadit@127.0.0.1:54329/quadit' go test -race ./...
 	cd web && pnpm typecheck
+
+# The rules of docs/code-style.md that a tool can check (.golangci.yml).
+GOLANGCI ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+lint:
+	$(GOLANGCI) run ./...
 
 # A local server on :4780 with data in ./data.
 dev: server

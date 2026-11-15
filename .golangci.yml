@@ -1,0 +1,138 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    # correctness
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - wastedassign
+    - errcheck
+    - errorlint
+    - nilerr
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - contextcheck
+    - noctx
+    - durationcheck
+    - makezero
+    # readability
+    - revive
+    - misspell
+    - unconvert
+    - unparam
+    - predeclared
+    - usestdlibvars
+    - modernize
+    - nolintlint
+    - gochecknoinits
+    # size
+    - funlen
+    - gocyclo
+    - nestif
+  settings:
+    govet:
+      enable-all: true
+      disable: [fieldalignment, shadow]
+    staticcheck:
+      checks: ["all", "-ST1003", "-QF1008"]
+    errcheck:
+      check-blank: true
+      check-type-assertions: false
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (net.Conn).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Tx).Rollback
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+        - encoding/json.Marshal
+        - encoding/json.MarshalIndent
+        - (*database/sql.DB).Close
+        - (github.com/agrigoryan/quadit/internal/store.Store).Close
+        - (*bufio.Writer).Write
+        - (*encoding/csv.Writer).Write
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - io.WriteString
+        - os.Remove
+        - os.RemoveAll
+        - (*flag.FlagSet).Parse
+        - (*compress/gzip.Writer).Close
+        - (*text/tabwriter.Writer).Flush
+    revive:
+      rules:
+        - name: exported
+          arguments: [disableStutteringCheck]
+        - name: package-comments
+        - name: var-naming
+        - name: receiver-naming
+        - name: error-return
+        - name: error-naming
+        - name: error-strings
+        - name: errorf
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: early-return
+        - name: unused-parameter
+        - name: blank-imports
+        - name: redefines-builtin-id
+        - name: argument-limit
+          arguments: [6]
+        - name: function-result-limit
+          arguments: [3]
+        - name: flag-parameter
+          severity: warning
+    funlen:
+      lines: 80
+      statements: 60
+      ignore-comments: true
+    gocyclo:
+      min-complexity: 20
+    nestif:
+      min-complexity: 6
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    rules:
+      # Tests tell a story top to bottom: size limits and bare errors in
+      # set-up are not what we police there.
+      - path: _test\.go
+        linters: [funlen, gocyclo, nestif, errcheck, noctx, unparam, contextcheck, bodyclose]
+      - path: _test\.go
+        linters: [revive]
+        text: "(exported|unused-parameter|argument-limit|flag-parameter)"
+      # The formula parser reports syntax errors by panic and recovers at Eval.
+      - path: internal/formula/
+        linters: [funlen, gocyclo]
+      # main and the command table.
+      - path: cmd/
+        linters: [gochecknoinits]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [github.com/agrigoryan/quadit]
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
