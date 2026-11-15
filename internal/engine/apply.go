@@ -76,11 +76,11 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 	if err := checkBatch(changes); err != nil {
 		return nil, err
 	}
-	run := &batch{ctx: ctx, e: e}
 	results := make([]*Result, len(changes))
 	var lastSeq int64
 	err := e.st.Write(ctx, workspaceID, func(raw store.Tx) error {
-		if err := run.start(newMemoTx(raw), actor); err != nil {
+		run, err := e.startBatch(ctx, newMemoTx(raw), actor)
+		if err != nil {
 			return err
 		}
 		for i, ch := range changes {
@@ -150,19 +150,19 @@ type batch struct {
 	now    int64
 }
 
-// start checks that the actor may write to the workspace at all, and works
-// out how far their credential reaches.
-func (b *batch) start(tx store.Tx, actor Actor) error {
-	b.tx = tx
-	err := tx.Get(b.ctx, &b.member, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
+// startBatch starts a run in tx: it checks that the actor may write to the
+// workspace at all, and works out how far their credential reaches.
+func (e *Engine) startBatch(ctx context.Context, tx store.Tx, actor Actor) (*batch, error) {
+	b := &batch{ctx: ctx, e: e, tx: tx}
+	err := tx.Get(ctx, &b.member, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
 	if errors.Is(err, store.ErrNotFound) {
-		return forbidden("you are not a member of this workspace")
+		return nil, forbidden("you are not a member of this workspace")
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if b.member.SuspendedAt != 0 {
-		return forbidden("your membership is suspended")
+		return nil, forbidden("your membership is suspended")
 	}
 	if b.member.Scope != nil {
 		b.scope = *b.member.Scope
@@ -173,8 +173,8 @@ func (b *batch) start(tx store.Tx, actor Actor) error {
 	if len(actor.Projects) > 0 {
 		b.scope.Projects = intersectProjects(b.scope.Projects, actor.Projects)
 	}
-	b.now = b.e.now().UnixMilli()
-	return nil
+	b.now = e.now().UnixMilli()
+	return b, nil
 }
 
 // apply runs one change of the batch, or answers it from the first time
