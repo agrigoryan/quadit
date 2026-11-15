@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessions } from "@/insights/agents/session-data";
 import { api, ApiError } from "@/lib/api";
 import { clearStore, useStore } from "@/lib/store";
+import { WithQuery } from "@/test/query";
 
 const all = () => true;
 
@@ -21,7 +22,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("useSessions", () => {
   it("reports a failed fetch, and clears it once a fetch on reconnect works", async () => {
     const get = vi.spyOn(api, "get").mockRejectedValue(new ApiError(500, { message: "database is down" }));
-    const { result } = renderHook(() => useSessions("limit=300", all));
+    const { result } = renderHook(() => useSessions("limit=300", all), { wrapper: WithQuery });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe("database is down");
 
