@@ -494,7 +494,6 @@ const shapeDashboardOPS = `{
    "state": "has_work",
    "listening": false,
    "last_seen": "TIME",
-   "last_action": "comment.create SVA-1",
    "open_tasks": 1,
    "waiting_on_it": 1
   }

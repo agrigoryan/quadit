@@ -31,9 +31,11 @@ type agentState struct {
 	Budget    string `json:"budget,omitempty"`
 }
 
-// agentStates says what every agent is doing right now.
-func (x *c) agentStates(tasks []core.Task, names *nameLookup) ([]agentState, error) {
-	w, err := x.agentWork(tasks, names)
+// agentStates says what every agent is doing right now. With projects,
+// every agent is still listed, but what it is shown doing (working, on
+// what, its last action) is only what it does in those projects.
+func (x *c) agentStates(tasks []core.Task, names *nameLookup, projects []string) ([]agentState, error) {
+	w, err := x.agentWork(tasks, names, projects)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +66,14 @@ type agentWork struct {
 	sessions []core.AgentSession
 	pushed   map[string]bool // members with a webhook that is being delivered
 	asked    []core.Decision
+	// keys are the keys of the projects the agents are seen in; nil when
+	// that is the whole workspace.
+	keys map[string]bool
 }
 
-// agentWork reads it, for the open tasks given.
-func (x *c) agentWork(tasks []core.Task, names *nameLookup) (*agentWork, error) {
+// agentWork reads it, for the open tasks given, in the projects given (or
+// the whole workspace).
+func (x *c) agentWork(tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
 	ctx := x.ctx()
 	w := &agentWork{x: x, names: names, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
 	if err := x.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", "running"), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
@@ -75,6 +81,16 @@ func (x *c) agentWork(tasks []core.Task, names *nameLookup) (*agentWork, error) 
 		return nil, err
 	}
 	w.sessions = keepByTask(x, w.sessions, func(v core.AgentSession) string { return v.TaskID })
+	if len(projects) > 0 {
+		w.keys = map[string]bool{}
+		for _, id := range projects {
+			w.keys[names.projects[id].Key] = true
+		}
+		var err error
+		if w.sessions, err = x.sessionsIn(w.sessions, projects); err != nil {
+			return nil, err
+		}
+	}
 	var hooks []core.Webhook
 	if err := x.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
 		return nil, err
@@ -96,11 +112,48 @@ func (x *c) agentWork(tasks []core.Task, names *nameLookup) (*agentWork, error) 
 	return w, nil
 }
 
+// sessionsIn keeps the sessions on tasks of the projects.
+func (x *c) sessionsIn(sessions []core.AgentSession, projects []string) ([]core.AgentSession, error) {
+	var ids []string
+	for _, se := range sessions {
+		if se.TaskID != "" {
+			ids = append(ids, se.TaskID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ts, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: ids, ProjectIDs: projects, Archived: true, Limit: 5000})
+	if err != nil {
+		return nil, err
+	}
+	in := map[string]bool{}
+	for _, t := range ts {
+		in[t.ID] = true
+	}
+	return keep(sessions, func(se core.AgentSession) bool { return in[se.TaskID] }), nil
+}
+
+// actsIn reports whether a last action ("comment.create SVA-12") was on a
+// task of the projects with these keys: it names one, and none elsewhere.
+func actsIn(action string, keys map[string]bool) bool {
+	found := taskKeyIn.FindAllStringSubmatch(action, -1)
+	for _, m := range found {
+		if !keys[m[1]] {
+			return false
+		}
+	}
+	return len(found) > 0
+}
+
 // stateOf says what one agent is doing.
 func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 	x, names, now := w.x, w.names, w.now
 	shown := []core.Member{m}
 	x.hideActions(shown)
+	if w.keys != nil && !actsIn(shown[0].LastAction, w.keys) {
+		shown[0].LastAction = ""
+	}
 	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: shown[0].LastAction,
 		Listening: m.ListeningUntil > now.UnixMilli() || w.pushed[m.UserID]}
 	var waitsOnOthers, mine int
@@ -173,7 +226,7 @@ func (s *Server) handleListAgents(x *c) error {
 	if err != nil {
 		return err
 	}
-	agents, err := x.agentStates(tasks, names)
+	agents, err := x.agentStates(tasks, names, nil)
 	if err != nil {
 		return err
 	}
@@ -196,7 +249,8 @@ func (s *Server) handleListAgents(x *c) error {
 }
 
 // agentStates fills in what every agent is doing, from the open tasks the
-// dashboard covers.
+// dashboard covers. Narrowed to one project, that is what each agent does
+// there.
 func (d *dashboard) agentStates() error {
 	var open []core.Task
 	for _, t := range d.tasks {
@@ -205,6 +259,10 @@ func (d *dashboard) agentStates() error {
 		}
 	}
 	var err error
-	d.agents, err = d.x.agentStates(open, d.names)
+	var only []string
+	if d.x.r.URL.Query().Get("project") != "" {
+		only = d.projects
+	}
+	d.agents, err = d.x.agentStates(open, d.names, only)
 	return err
 }

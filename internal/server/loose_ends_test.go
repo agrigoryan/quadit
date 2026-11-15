@@ -222,3 +222,54 @@ func TestSyncKeepsFrontMatter(t *testing.T) {
 	}
 	r.idle("after the page edits")
 }
+
+// TestDashboardOfOneProjectShowsAgentsThere: narrowed to one project, the
+// dashboard still lists every agent, but shows each one working, and its
+// last action, only from that project.
+func TestDashboardOfOneProjectShowsAgentsThere(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	s.change(s.owner, "", "agent.create", M{"name": "Clerk", "handle": "clerk"})
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+	token := func(handle string) string {
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &tok)
+		return tok.Token
+	}
+	artist, clerk := token("artist"), token("clerk")
+	s.change(nil, artist, "session.start", M{"task": "SVA-1", "title": "Drawing the boss"})
+	s.change(nil, artist, "comment.create", M{"task": "SVA-1", "body": "Sketched."})
+	s.change(nil, clerk, "session.start", M{"title": "Tidying up"})
+
+	type agent struct {
+		Handle, State, Task, Doing string
+		LastAction                 string `json:"last_action"`
+	}
+	agents := func(query string) map[string]agent {
+		var out struct{ Agents []agent }
+		s.call(s.owner, "", "GET", w+"/dashboard"+query, nil, 200, &out)
+		by := map[string]agent{}
+		for _, a := range out.Agents {
+			by[a.Handle] = a
+		}
+		return by
+	}
+	if got := agents("")["@artist"]; got.State != "working" || got.Task != "SVA-1" || got.LastAction != "comment.create SVA-1" {
+		t.Fatalf("the whole dashboard: %+v", got)
+	}
+	if got := agents("?project=SVA")["@artist"]; got.State != "working" || got.Task != "SVA-1" || got.LastAction != "comment.create SVA-1" {
+		t.Fatalf("the dashboard of SVA: %+v", got)
+	}
+	ops := agents("?project=OPS")
+	if len(ops) != 2 {
+		t.Fatalf("the dashboard of OPS lists %+v, want both agents", ops)
+	}
+	for _, a := range ops {
+		if a.State == "working" || a.Task != "" || a.Doing != "" || a.LastAction != "" {
+			t.Errorf("the dashboard of OPS shows what %s does elsewhere: %+v", a.Handle, a)
+		}
+	}
+}
