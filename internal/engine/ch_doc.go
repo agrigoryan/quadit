@@ -494,7 +494,10 @@ func docRestore(c *cx) error {
 	for i, x := range all {
 		ids[i] = x.ID
 	}
-	set := map[string]any{"deleted_at": int64(0), "updated_seq": seq}
+	// A page that came from a repository forgets what it last agreed on
+	// with its file: brought back, it is written there again, not taken
+	// for a page whose file was deleted and sent back to the trash.
+	set := map[string]any{"deleted_at": int64(0), "updated_seq": seq, "source_hash": ""}
 	// A page whose parent is still in the trash comes back at the top.
 	if d.ParentID != "" {
 		var parent core.Doc

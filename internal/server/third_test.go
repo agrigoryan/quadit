@@ -466,4 +466,40 @@ func TestSyncAwkwardRepositories(t *testing.T) {
 	if got := git(bare, "show", "main:docs/inl"); got != "now a file\n" {
 		t.Fatalf("the file in the way was changed: %q", got)
 	}
+
+	// A folder with the very name a page's file would have: the page gets
+	// another name and the sync goes on.
+	git(work, "pull", "-q", "origin", "main")
+	os.MkdirAll(filepath.Join(work, "docs", "yy.md"), 0o755)
+	os.WriteFile(filepath.Join(work, "docs", "yy.md", "keep.txt"), []byte("k\n"), 0o644)
+	git(work, "add", "-A")
+	git(work, "commit", "-q", "-m", "a folder named like a file")
+	git(work, "push", "-q", "origin", "main")
+	s.change(s.owner, "", "doc.create", M{"title": "yy", "parent": root, "markdown": "yy text\n"})
+	s.change(s.owner, "", "doc.write", M{"doc": za, "markdown": "za v3\n"})
+	sync(200)
+	if got := git(bare, "show", "main:docs/za.md"); !strings.Contains(got, "za v3") {
+		t.Fatalf("a folder named like a page's file stopped the sync: %q", got)
+	}
+	if got := git(bare, "show", "main:docs/yy-2.md"); !strings.Contains(got, "yy text") {
+		t.Fatalf("the page beside the folder: %q", got)
+	}
+
+	// A page trashed because its file was deleted there, then brought
+	// back here, is written again and stays.
+	git(work, "pull", "-q", "origin", "main")
+	git(work, "rm", "-q", "docs/za.md")
+	git(work, "commit", "-q", "-m", "za deleted there")
+	git(work, "push", "-q", "origin", "main")
+	if out := sync(200); !strings.Contains(out, `"pages_trashed":1`) {
+		t.Fatalf("a file deleted in the repository: %s", out)
+	}
+	s.change(s.owner, "", "doc.restore", M{"id": za})
+	sync(200)
+	if out := sync(200); strings.Contains(out, `"pages_trashed":1`) {
+		t.Fatalf("a restored page was trashed again: %s", out)
+	}
+	if got := git(bare, "show", "main:docs/za.md"); !strings.Contains(got, "za v3") {
+		t.Fatalf("a restored page was not written back: %q", got)
+	}
 }

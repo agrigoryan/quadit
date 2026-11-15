@@ -378,8 +378,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 				if _, ok := toWrite[p]; ok {
 					return true
 				}
+				// Or a link, or a folder, by that very name.
 				st, lerr := os.Lstat(filepath.Join(root, filepath.FromSlash(p)))
-				return lerr == nil && st.Mode()&os.ModeSymlink != 0
+				return lerr == nil && (st.Mode()&os.ModeSymlink != 0 || st.IsDir())
 			}
 			for n := 2; taken(path); n++ {
 				path = fmt.Sprintf("%s%s-%d.md", dirOf, slugFrom(page.Title), n)
@@ -421,11 +422,12 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			werr = os.WriteFile(full, []byte(text), 0o640)
 		}
 		if werr != nil {
-			// Leave the checkout as the branch has it, and say what failed
-			// without the server's own paths.
-			git(ctx, dir, "reset", "--quiet", "--hard", "origin/"+branch)
-			git(ctx, dir, "clean", "--quiet", "-fd")
-			return res, fmt.Errorf("could not write %s in the repository: %s", path, strings.ReplaceAll(werr.Error(), dir+string(filepath.Separator), ""))
+			// One page that cannot be written (a folder has its file's name,
+			// the disk refuses) is held back and named; the rest go on.
+			blocked[path] = true
+			delete(toWrite, path)
+			s.log.Warn("repository sync: a page was not written", "source", src.ID, "path", path, "err", werr)
+			continue
 		}
 	}
 	for _, path := range toRemove {
