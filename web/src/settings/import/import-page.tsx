@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useProjects, useSlug } from "@/lib/selectors";
+import { githubRepo } from "@/lib/url";
 import { useSettingsBase } from "@/settings/base";
 import {
   checkImport,
@@ -124,12 +125,8 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
       }
       req.file = file.id;
     } else if (source.kind === "github") {
-      const repo = address
-        .trim()
-        .replace(/^https?:\/\/github\.com\//i, "")
-        .replace(/\.git$/, "")
-        .replace(/\/+$/, "");
-      if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+      const repo = githubRepo(address);
+      if (!repo) {
         errors.set("source", t("import.repoBad"));
         return null;
       }

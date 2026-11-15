@@ -10,6 +10,7 @@ import { Input } from "@/ui/input";
 import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
 import { change } from "@/settings/automation/data";
 import type { GitHubConfig, Integration } from "@/lib/types-automation";
+import { githubRepo } from "@/lib/url";
 
 interface Props {
   /** The integration to edit; none to connect a repository. */
@@ -40,12 +41,8 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     errors.clear();
-    const cleanRepo = repo
-      .trim()
-      .replace(/^https?:\/\/github\.com\//i, "")
-      .replace(/\.git$/, "")
-      .replace(/\/+$/, "");
-    if (!/^[\w.-]+\/[\w.-]+$/.test(cleanRepo)) return errors.set("repo", t("auto.gh.repoInvalid"));
+    const cleanRepo = githubRepo(repo);
+    if (!cleanRepo) return errors.set("repo", t("auto.gh.repoInvalid"));
     if (apiUrl.trim() && !/^https?:\/\/\S+$/i.test(apiUrl.trim()))
       return errors.set("config", t("auto.hook.urlInvalid"));
 
