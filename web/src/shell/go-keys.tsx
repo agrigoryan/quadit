@@ -7,7 +7,7 @@ import { useLocation, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { useKeySequences, usePendingKey } from "@/lib/key-sequence";
 import { useStore } from "@/lib/store";
-import { DESTINATIONS, destinationPath, type Where } from "@/shell/destinations";
+import { DESTINATIONS, destinationPath, listedName, type Where } from "@/shell/destinations";
 import { projectInView } from "@/shell/project-in-view";
 import { Kbd } from "@/ui/kbd";
 
@@ -78,7 +78,7 @@ export function GoHint() {
             <span className="flex w-5 shrink-0 justify-center">
               <Kbd onDark>{(place.key ?? "").toUpperCase()}</Kbd>
             </span>
-            <span className="min-w-0 truncate">{t(place.label)}</span>
+            <span className="min-w-0 truncate">{t(listedName(place))}</span>
           </li>
         ))}
       </ul>

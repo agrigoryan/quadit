@@ -1,6 +1,7 @@
 // The page tree of the Docs area: the team's pages, the person's private
 // ones, each agent's memory, and the pages built from data. Pages are
-// dragged to reorder them or to put one inside another.
+// dragged to reorder them or to put one inside another. In a project's
+// Docs it is the same tree, of that project's pages.
 
 import { DndContext, type DragEndEvent, type DragMoveEvent, DragOverlay, PointerSensor, pointerWithin, useSensor, useSensors } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
@@ -10,7 +11,8 @@ import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
 import { useCollection, useMe } from "@/lib/selectors";
 import { lastRank, moveDoc } from "@/docs/actions";
-import { docTitle, type DocTree, getDocs, isWithin, sectionOf, useDocTree } from "@/docs/data";
+import { useDocsArea } from "@/docs/area";
+import { docTitle, type DocTree, getDocs, isWithin, sectionOf } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
 import { NewPageItems } from "@/docs/tree/new-page";
 import { setOpen } from "@/docs/tree/state";
@@ -64,8 +66,14 @@ function onTreeKey(e: KeyboardEvent<HTMLElement>) {
   else if (e.key === "ArrowLeft") setOpen(id, false);
 }
 
-export function DocsTree({ className }: { className?: string }) {
-  const tree = useDocTree();
+interface Props {
+  /** The pages to show: the area's own tree (docs/data.ts useDocTree). */
+  tree: DocTree;
+  className?: string;
+}
+
+export function DocsTree({ tree, className }: Props) {
+  const projectId = useDocsArea().project?.id;
   const me = useMe();
   const members = useCollection("members");
   const [dragging, setDragging] = useState<Doc | null>(null);
@@ -80,7 +88,7 @@ export function DocsTree({ className }: { className?: string }) {
   };
 
   const nodes = (list: Doc[], editable: boolean) =>
-    list.map((doc) => <TreeNode key={doc.id} doc={doc} tree={tree} depth={0} editable={editable} drop={target} />);
+    list.map((doc) => <TreeNode key={doc.id} doc={doc} tree={tree} depth={0} editable={editable} drop={target} parentProject={projectId} />);
 
   // An agent's notes hang under one page per agent; group them by whose they are.
   const byAgent = new Map<string, Doc[]>();
@@ -100,10 +108,10 @@ export function DocsTree({ className }: { className?: string }) {
         }}
       >
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-          <TreeSection title={t("docs.section.team")} add={<NewPageItems generated />} empty={t("docs.section.teamEmpty")}>
+          <TreeSection title={t("docs.section.team")} add={<NewPageItems generated projectId={projectId} />} empty={t("docs.section.teamEmpty")}>
             {nodes(tree.roots.team, true)}
           </TreeSection>
-          <TreeSection title={t("docs.section.private")} add={<NewPageItems private />} empty={t("docs.section.privateEmpty")}>
+          <TreeSection title={t("docs.section.private")} add={<NewPageItems private projectId={projectId} />} empty={t("docs.section.privateEmpty")}>
             {nodes(
               tree.roots.private.filter((d) => d.owner_id === me.user_id),
               true,
@@ -134,7 +142,7 @@ export function DocsTree({ className }: { className?: string }) {
         </DragOverlay>
       </DndContext>
       <div className="shrink-0 border-t border-line p-2">
-        <TrashButton />
+        <TrashButton projectId={projectId} />
       </div>
     </nav>
   );

@@ -32,6 +32,8 @@ const GENERATED = [
 
 interface Props {
   parentId?: string;
+  /** Tie it to this project (at the top of a project's pages; under a parent it is in the parent's). */
+  projectId?: string;
   /** Make it private to the person. */
   private?: boolean;
   /** Offer the pages built from data (only at the top of the team's pages). */
@@ -39,8 +41,8 @@ interface Props {
 }
 
 /** The entries of a "new page" menu; put them inside a MenuContent. */
-export function NewPageItems({ parentId, private: isPrivate, generated }: Props) {
-  const base: NewDoc = { parentId, private: isPrivate };
+export function NewPageItems({ parentId, projectId, private: isPrivate, generated }: Props) {
+  const base: NewDoc = { parentId, projectId, private: isPrivate };
   return (
     <>
       <MenuItem icon={<FileText />} onSelect={() => createAndOpen(base)}>
@@ -57,7 +59,7 @@ export function NewPageItems({ parentId, private: isPrivate, generated }: Props)
           <MenuSeparator />
           <MenuLabel>{t("docs.new.generated")}</MenuLabel>
           {GENERATED.map((g) => (
-            <MenuItem key={g.kind} icon={<Sparkles />} onSelect={() => createAndOpen({ title: t(g.key), generated: g.kind })}>
+            <MenuItem key={g.kind} icon={<Sparkles />} onSelect={() => createAndOpen({ title: t(g.key), generated: g.kind, projectId })}>
               {t(g.key)}
             </MenuItem>
           ))}

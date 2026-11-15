@@ -2,8 +2,10 @@
 // editor are also drawn outside the page (when their block is copied), where
 // router hooks do not work. The docs routes keep this pointed at the router.
 
-import type { Location, NavigateFunction } from "react-router";
+import { type Location, matchPath, type NavigateFunction } from "react-router";
 import { getState } from "@/lib/store";
+import { projectDocs, workspaceDocs } from "@/docs/area";
+import { getDocs, inProject } from "@/docs/data";
 import { isTaskPath, taskPath } from "@/tasks/task-link";
 
 let navigate: NavigateFunction | null = null;
@@ -14,7 +16,18 @@ export function setNavigator(nav: NavigateFunction | null, at: Location | null) 
   location = at;
 }
 
-export const docPath = (id: string) => `/${getState().slug}/docs/${id}`;
+/** The project whose Docs are on screen, going by the address. */
+function projectOnScreen() {
+  const key = matchPath("/:ws/p/:key/docs/*", window.location.pathname)?.params.key?.toLowerCase();
+  return key ? Object.values(getState().c.projects).find((p) => p.key.toLowerCase() === key) : undefined;
+}
+
+/** A page's address: in the Docs of the project on screen when it is one of that project's pages, else in the workspace's. */
+export function docPath(id: string): string {
+  const slug = getState().slug;
+  const project = projectOnScreen();
+  return `${project && inProject(getDocs(), id, project.id) ? projectDocs(slug, project) : workspaceDocs(slug)}/${id}`;
+}
 
 export function openDoc(id: string) {
   if (navigate) void navigate(docPath(id));

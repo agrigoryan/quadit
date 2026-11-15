@@ -40,8 +40,8 @@ export function loadTrash(): Promise<void> {
   return loading;
 }
 
-/** Deleted pages, newest first. Only the top of what went together: the pages under it come back with it. */
-export function useTrashed(): Trashed[] {
+/** Deleted pages, newest first; with a project, those tied to it. Only the top of what went together: the pages under it come back with it. */
+export function useTrashed(projectId?: string): Trashed[] {
   const docs = useDocs();
   const me = useMe();
   const slug = useStore((s) => s.slug);
@@ -54,10 +54,11 @@ export function useTrashed(): Trashed[] {
     const out: Trashed[] = [];
     for (const doc of Object.values(docs)) {
       if (!doc.deleted_at || doc.kind === "row" || !canSee(doc, me.user_id)) continue;
+      if (projectId && doc.project_id !== projectId) continue;
       const parent = doc.parent_id ? docs[doc.parent_id] : undefined;
       if (parent?.deleted_at === doc.deleted_at) continue;
       out.push({ id: doc.id, title: doc.title, icon: doc.icon, kind: doc.kind, deleted_at: doc.deleted_at });
     }
     return out.sort((a, b) => b.deleted_at - a.deleted_at);
-  }, [docs, me.user_id]);
+  }, [docs, me.user_id, projectId]);
 }

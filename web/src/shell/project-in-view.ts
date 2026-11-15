@@ -1,5 +1,6 @@
 // The project the screen is about: where a new task goes, and which
-// project's list "G then T" opens.
+// project's list "G then T" opens. A page open in the workspace's Docs
+// brings its project into view as an open task does.
 
 import { type Location, matchPath } from "react-router";
 import { findTaskByKey } from "@/lib/selectors";
@@ -14,8 +15,8 @@ export const pageUnder = (location: Location) => (location.state as { background
 
 /**
  * The project of the open task, else the project named in the address (of
- * the page under the panel, when a panel is open), else the last one that
- * was in view, else the first.
+ * the page under the panel, when a panel is open), else that of the open
+ * page of the docs, else the last one that was in view, else the first.
  */
 export function projectInView(location: Location): Project | undefined {
   const { c } = getState();
@@ -24,7 +25,9 @@ export function projectInView(location: Location): Project | undefined {
   const pagePath = taskKey ? (pageUnder(location)?.pathname ?? "") : location.pathname;
   const key = matchPath("/:ws/p/:key/*", pagePath)?.params.key?.toUpperCase();
   const task = taskKey ? findTaskByKey(c.tasks, taskKey) : undefined;
-  const named = projects.find((p) => p.id === task?.project_id) ?? projects.find((p) => p.key === key);
+  const docId = matchPath("/:ws/docs/:id", pagePath)?.params.id;
+  const doc = docId ? (c.docs[docId] as { project_id?: string } | undefined) : undefined;
+  const named = projects.find((p) => p.id === task?.project_id) ?? projects.find((p) => p.key === key) ?? projects.find((p) => p.id === doc?.project_id);
   if (named) lastId = named.id;
   return named ?? projects.find((p) => p.id === lastId) ?? projects.sort((a, b) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1))[0];
 }

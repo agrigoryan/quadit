@@ -24,8 +24,19 @@ export function useDoc(id: string | undefined): Doc | undefined {
 export const getDoc = (id: string) => getState().c.docs[id] as unknown as Doc | undefined;
 export const getDocs = () => getState().c.docs as unknown as Dict<Doc>;
 
-/** Whether this person may see a page: a private one shows to its owner and those it is shared with. */
-export const canSee = (doc: Doc, userId: string) => !doc.owner_id || doc.owner_id === userId || !!doc.shared_with?.includes(userId);
+/**
+ * True unless the person is limited to some projects and the page is tied
+ * to another. The server sends such a person no page of another project; one
+ * that is moved out of theirs while they look is still in the copy.
+ */
+function withinMyProjects(doc: Doc): boolean {
+  const mine = getState().me?.scope?.projects;
+  return !doc.project_id || !mine?.length || mine.includes(doc.project_id);
+}
+
+/** Whether this person may see a page: a private one shows to its owner and those it is shared with, a project's to those who see the project. */
+export const canSee = (doc: Doc, userId: string) =>
+  (!doc.owner_id || doc.owner_id === userId || !!doc.shared_with?.includes(userId)) && withinMyProjects(doc);
 
 export type Section = "team" | "private" | "memory" | "generated";
 
@@ -59,10 +70,70 @@ export function buildTree(docs: Dict<Doc>, userId: string): DocTree {
   return { roots, children };
 }
 
-export function useDocTree(): DocTree {
+/**
+ * The part of the tree that is one project's: the pages tied to it, each
+ * with everything under it. A page under one of them that is tied elsewhere
+ * stays in its place there, and says so (docs/project-mark.tsx).
+ */
+export function projectTree(tree: DocTree, projectId: string): DocTree {
+  const roots: DocTree["roots"] = { team: [], private: [], memory: [], generated: [] };
+  const collect = (list: Doc[], into: Doc[]) => {
+    for (const doc of list) {
+      if (doc.project_id === projectId) into.push(doc);
+      else collect(tree.children[doc.id] ?? [], into);
+    }
+  };
+  for (const section of Object.keys(roots) as Section[]) collect(tree.roots[section], roots[section]);
+  return { roots, children: tree.children };
+}
+
+/** The page tree: the whole workspace's, or one project's. */
+export function useDocTree(projectId?: string): DocTree {
   const docs = useDocs();
   const me = useMe();
-  return useMemo(() => buildTree(docs, me.user_id), [docs, me.user_id]);
+  return useMemo(() => {
+    const tree = buildTree(docs, me.user_id);
+    return projectId ? projectTree(tree, projectId) : tree;
+  }, [docs, me.user_id, projectId]);
+}
+
+export const treeIsEmpty = (tree: DocTree) => Object.values(tree.roots).every((list) => list.length === 0);
+
+/** True when a page is one of a project's pages: tied to it, or under a page that is. */
+export function inProject(docs: Dict<Doc>, id: string, projectId: string): boolean {
+  for (let cur = docs[id], depth = 0; cur && depth < 60; depth++) {
+    if (cur.project_id === projectId) return true;
+    cur = cur.parent_id ? docs[cur.parent_id] : undefined;
+  }
+  return false;
+}
+
+/**
+ * The pages under a page that are in its project, down to the first that
+ * is not: they are in the project because the page is, and go with it when
+ * its project changes. The server's rule (internal/engine/ch_doc_project.go).
+ */
+export function sameProjectBelow(docs: Dict<Doc>, root: Doc): Doc[] {
+  const byParent: Dict<Doc[]> = {};
+  for (const doc of Object.values(docs)) if (doc.parent_id) (byParent[doc.parent_id] ??= []).push(doc);
+  const out: Doc[] = [];
+  for (let at = [root]; at.length > 0; at = at.slice(1)) {
+    for (const kid of byParent[(at[0] as Doc).id] ?? []) {
+      if ((kid.project_id ?? "") !== (root.project_id ?? "")) continue;
+      out.push(kid);
+      at.push(kid);
+    }
+  }
+  return out;
+}
+
+/** How many pages are under a page, not counting a database's rows or the trash. */
+export function countBelow(docs: Dict<Doc>, id: string): number {
+  let n = 0;
+  for (const doc of Object.values(docs)) {
+    if (doc.id !== id && doc.kind !== "row" && !doc.deleted_at && isWithin(docs, doc.id, id)) n++;
+  }
+  return n;
 }
 
 /** The pages above a page, outermost first. */

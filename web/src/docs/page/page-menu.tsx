@@ -10,6 +10,7 @@ import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { keepVersion, trashDoc } from "@/docs/actions";
+import { useDocsArea } from "@/docs/area";
 import { docTitle } from "@/docs/data";
 import { fileNameOf, saveText } from "@/docs/files";
 import { BacklinksDialog, useBacklinks } from "@/docs/page/backlinks";
@@ -34,6 +35,7 @@ async function exportMarkdown(slug: string, doc: Doc) {
 
 export function PageMenu({ doc }: { doc: Doc }) {
   const slug = useSlug();
+  const { base } = useDocsArea();
   const navigate = useNavigate();
   const source = useDocsStore((s) => s.meta[doc.id]?.source);
   const backlinks = useBacklinks(doc.id);
@@ -106,7 +108,7 @@ export function PageMenu({ doc }: { doc: Doc }) {
             danger
             onSelect={() => {
               trashDoc(doc.id);
-              void navigate(doc.parent_id ? `/${slug}/docs/${doc.parent_id}` : `/${slug}/docs`);
+              void navigate(doc.parent_id ? `${base}/${doc.parent_id}` : base);
             }}
           >
             {t("docs.delete")}

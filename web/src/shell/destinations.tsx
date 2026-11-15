@@ -22,6 +22,8 @@ export interface Destination {
   path: string;
   /** A page each project has. The palette lists it once per project, under this name. */
   perProject?: Key;
+  /** Its name where places of every kind are listed together (the card after G, the shortcuts sheet) and its own would be taken for another's. */
+  listedAs?: Key;
   /** More words the palette's search should match. */
   words?: string;
   /** A number the sidebar shows beside it, in the highlighter: what waits unread. */
@@ -32,7 +34,8 @@ export interface Destination {
 
 // The letter is the place's initial where that is free (Inbox, My work as
 // in Linear and Gmail), else the first letter of its name that is; Decisions
-// are the questions (Q), and the trash is X as Linear's archive is.
+// are the questions (Q), and the trash is X as Linear's archive is. A
+// project's docs take O: D is the workspace's Docs, which hold them too.
 export const DESTINATIONS: Destination[] = [
   { id: "inbox", group: "top", key: "i", label: "nav.inbox", icon: <Inbox />, path: "inbox", words: "notifications", count: "unread" },
   { id: "my-work", group: "top", key: "m", label: "nav.myWork", icon: <UserRound />, path: "my-work", words: "home assigned" },
@@ -41,6 +44,7 @@ export const DESTINATIONS: Destination[] = [
   { id: "timeline", group: "project", key: "l", label: "nav.timeline", icon: <ChartGantt />, path: "timeline", perProject: "palette.projectTimeline", words: "gantt roadmap" },
   { id: "epics", group: "project", key: "e", label: "nav.epics", icon: <Layers />, path: "epics", perProject: "palette.projectEpics" },
   { id: "cycles", group: "project", key: "c", label: "nav.cycles", icon: <RefreshCw />, path: "cycles", perProject: "palette.projectCycles", words: "sprints", needs: "cycles" },
+  { id: "project-docs", group: "project", key: "o", label: "nav.docs", listedAs: "nav.projectDocs", icon: <FileText />, path: "docs", perProject: "palette.projectDocs", words: "pages documents wiki" },
   { id: "docs", group: "more", key: "d", label: "nav.docs", icon: <FileText />, path: "docs", words: "pages documents wiki" },
   { id: "dashboard", group: "more", key: "h", label: "nav.dashboard", icon: <LayoutDashboard />, path: "dashboard", words: "overview charts home" },
   { id: "agents", group: "more", key: "a", label: "nav.agents", icon: <Bot />, path: "agents", words: "sessions" },
@@ -69,6 +73,9 @@ export function destinationPath(place: Destination, { slug, project, installAdmi
   if (!project || (place.needs === "cycles" && !project.settings?.cycles)) return undefined;
   return `/${slug}/p/${project.key}/${place.path}`;
 }
+
+/** What a place is called in a list of places of every kind. */
+export const listedName = (place: Destination): Key => place.listedAs ?? place.label;
 
 /** How a place's sequence is written in a hint: "G I". */
 export const goKeys = (place: Destination) => (place.key ? `G ${place.key.toUpperCase()}` : undefined);

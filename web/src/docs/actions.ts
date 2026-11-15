@@ -7,7 +7,7 @@ import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { byRank, getDoc, getDocs } from "@/docs/data";
+import { byRank, getDoc, getDocs, sameProjectBelow } from "@/docs/data";
 import { loadPage } from "@/docs/store";
 import type { Doc, DocComment, DocKind } from "@/docs/types";
 
@@ -18,6 +18,8 @@ export interface NewDoc {
   title?: string;
   kind?: "page" | "database";
   icon?: string;
+  /** The project it is tied to. Left out, a page under another is in its parent's project, and one at the top in none. */
+  projectId?: string;
   /** Only the person making it sees it. */
   private?: boolean;
   /** decision_log, changelog or open_questions: a page built from data. */
@@ -49,6 +51,7 @@ export function createDoc(input: NewDoc = {}): string {
   if (input.parentId) args.parent = input.parentId;
   if (input.kind === "database") args.kind = "database";
   if (input.icon) args.icon = input.icon;
+  if (input.projectId) args.project = input.projectId;
   if (input.private) args.private = true;
   if (input.generated) args.generated = input.generated;
   if (input.markdown) args.markdown = input.markdown;
@@ -66,7 +69,7 @@ export function createDoc(input: NewDoc = {}): string {
       owner_id: input.private ? me?.user_id : parent?.owner_id,
       shared_with: parent?.shared_with,
       memory_of: parent?.memory_of,
-      project_id: parent?.project_id,
+      project_id: input.projectId ?? parent?.project_id,
       props: input.props,
       rank,
       created_by: me?.user_id,
@@ -118,6 +121,21 @@ export function setSharing(id: string, sharing: { private?: boolean; sharedWith?
     local.shared_with = sharing.sharedWith.length ? sharing.sharedWith : null;
   }
   send({ type: "doc.update", args }, (tx) => tx.patch("docs", id, local));
+}
+
+/**
+ * Ties a page to a project, or to none. The pages under it that are in its
+ * project go with it. Returns the pages that went along, the page itself
+ * not among them.
+ */
+export function setProject(id: string, projectId: string | null): Doc[] {
+  const doc = getDoc(id);
+  if (!doc || (doc.project_id ?? null) === projectId) return [];
+  const along = sameProjectBelow(getDocs(), doc);
+  send({ type: "doc.update", args: { id, project: projectId } }, (tx) => {
+    for (const each of [doc, ...along]) tx.patch("docs", each.id, { project_id: projectId });
+  });
+  return along;
 }
 
 /** A page and every page under it. */

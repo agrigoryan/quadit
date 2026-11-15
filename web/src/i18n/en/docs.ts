@@ -16,6 +16,25 @@ export const docs = {
   "docs.home.title": "Pages for everything that is not a task",
   "docs.home.hint": "Specs, notes, logs and databases. People and agents write in the same pages; pick one on the left or start a new one.",
 
+  "docs.projectHome.title": "{project} docs",
+  "docs.projectHome.hint": "The specs, notes and logs of {project}, beside its tasks. Whoever can see the project can see them, and they are in the workspace's Docs too. Pick one on the left or start a new one.",
+  "docs.projectEmpty.title": "{project} has no docs yet",
+  "docs.projectEmpty.hint": "A page tied to a project sits beside its tasks: the spec, the notes, the decision log. Whoever can see the project can see it, and it stays in the workspace's Docs too.",
+  "docs.projectEmpty.move": "Move a page here…",
+  "docs.projectEmpty.movePick": "Pages in no project",
+  "docs.projectEmpty.inside": "+{n} inside",
+
+  "docs.project.none": "No project",
+  "docs.project.set": "Set project…",
+  "docs.project.in": "Project: {project}",
+  "docs.project.notInParents": "In no project, unlike the page it is under",
+  "docs.project.note": "The project decides who sees the page: people limited to other projects do not.",
+  "docs.project.along": "The page inside it moves with it. | The {n} pages inside it move with it.",
+  "docs.project.stay": "One page inside is tied differently and stays as it is. | {n} pages inside are tied differently and stay as they are.",
+  "docs.project.source": "It mirrors a file in {repo}. The project is kept here; nothing changes in the repository.",
+  "docs.project.sourceRoot": "Pages synced from {repo} appear under this one, in its project.",
+  "docs.project.movedAlong": "The page inside it moved with it | The {n} pages inside it moved with it",
+
   "docs.tree.label": "Pages",
   "docs.tree.expand": "Show pages inside",
   "docs.tree.collapse": "Hide pages inside",
@@ -62,6 +81,7 @@ export const docs = {
 
   "docs.header.back": "Back",
   "docs.header.path": "Where this page is",
+  "docs.header.projectDocs": "{project} docs",
   "docs.header.saving": "Saving…",
   "docs.header.saved": "Saved",
   "docs.header.others": "{n} other here | {n} others here",

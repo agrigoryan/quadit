@@ -138,6 +138,7 @@ export function Shell() {
             <Route path="p/:key/epics" element={<Later><EpicsPage /></Later>} />
             <Route path="p/:key/cycles" element={<Later><CyclesPage /></Later>} />
             <Route path="view/:slug" element={<ViewPage />} />
+            <Route path="p/:key/docs/*" element={<Later><DocsRoutes /></Later>} />
             <Route path="docs/*" element={<Later><DocsRoutes /></Later>} />
             <Route path="settings/*" element={<Later><SettingsRoutes /></Later>} />
             {insightPaths.map((path) => (

@@ -13,8 +13,10 @@ import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
 import { trashDoc, updateDoc } from "@/docs/actions";
+import { useDocsArea } from "@/docs/area";
 import { docTitle, type DocTree } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
+import { marksProject, ProjectMark } from "@/docs/project-mark";
 import { IconPicker } from "@/docs/tree/icon-picker";
 import { createAndOpen, NewPageItems } from "@/docs/tree/new-page";
 import { setOpen, startRename, useTreeState } from "@/docs/tree/state";
@@ -35,10 +37,13 @@ interface Props {
   /** Pages of this part of the tree can be moved and changed. */
   editable: boolean;
   drop: DropTarget | null;
+  /** The project of the page it hangs under (at the top: of the Docs area). Its own is marked when it differs. */
+  parentProject: string | undefined;
 }
 
-export function TreeNode({ doc, tree, depth, editable, drop }: Props) {
+export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Props) {
   const slug = useSlug();
+  const { base } = useDocsArea();
   const open = useTreeState((s) => !!s.open[doc.id]);
   const renaming = useTreeState((s) => s.renaming === doc.id);
   const [iconOpen, setIconOpen] = useState(false);
@@ -47,6 +52,7 @@ export function TreeNode({ doc, tree, depth, editable, drop }: Props) {
   const dropRef = useDroppable({ id: doc.id, disabled: !editable });
   const zone = drop?.id === doc.id ? drop.zone : null;
   const canChange = editable && !doc.generated;
+  const marked = marksProject(doc, parentProject);
 
   return (
     <li role="treeitem" aria-expanded={kids.length ? open : undefined}>
@@ -90,13 +96,14 @@ export function TreeNode({ doc, tree, depth, editable, drop }: Props) {
           <RenameBox doc={doc} />
         ) : (
           <NavLink
-            to={`/${slug}/docs/${doc.id}`}
+            to={`${base}/${doc.id}`}
             data-tree-row={doc.id}
             draggable={false}
             onClick={() => ui.setDrawer(false)}
-            className="ml-1 min-w-0 flex-1 truncate py-1 outline-none focus-visible:underline aria-[current]:font-medium"
+            className="ml-1 flex min-w-0 flex-1 items-center gap-1.5 py-1 outline-none focus-visible:underline aria-[current]:font-medium"
           >
-            {docTitle(doc)}
+            <span className="truncate">{docTitle(doc)}</span>
+            {marked && <ProjectMark projectId={doc.project_id} />}
           </NavLink>
         )}
         {canChange && !renaming && (
@@ -149,7 +156,7 @@ export function TreeNode({ doc, tree, depth, editable, drop }: Props) {
       {open && kids.length > 0 && (
         <ul role="group">
           {kids.map((kid) => (
-            <TreeNode key={kid.id} doc={kid} tree={tree} depth={depth + 1} editable={editable} drop={drop} />
+            <TreeNode key={kid.id} doc={kid} tree={tree} depth={depth + 1} editable={editable} drop={drop} parentProject={doc.project_id} />
           ))}
         </ul>
       )}

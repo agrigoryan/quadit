@@ -8,9 +8,9 @@ import { loadTrash, useTrashed } from "@/docs/trash";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Ago } from "@/ui/ago";
 
-/** The trash for pages: what was deleted, each with a way back. */
-export function TrashButton() {
-  const trashed = useTrashed();
+/** The trash for pages: what was deleted, each with a way back. In a project's Docs, that project's deleted pages. */
+export function TrashButton({ projectId }: { projectId?: string }) {
+  const trashed = useTrashed(projectId);
   return (
     <Popover onOpenChange={(open) => open && void loadTrash()}>
       <PopoverTrigger asChild>

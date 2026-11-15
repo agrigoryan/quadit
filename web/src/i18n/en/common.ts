@@ -65,6 +65,7 @@ export const common = {
   "nav.cycles": "Cycles",
   "nav.views": "Views",
   "nav.docs": "Docs",
+  "nav.projectDocs": "Project docs",
   "nav.dashboard": "Dashboard",
   "nav.trash": "Trash",
   "nav.settings": "Settings",
