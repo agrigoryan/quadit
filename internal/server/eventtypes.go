@@ -14,7 +14,7 @@ var eventTypes = []string{
 	"task.created", "task.updated", "task.restored", "task.related",
 	"comment.created", "comment.updated", "comment.deleted",
 	"decision.opened", "decision.picked", "decision.unclear", "decision.updated", "decision.deleted", "decision.restored",
-	"attachment.created", "attachment.deleted", "relation.created", "relation.deleted", "link.created", "link.updated", "link.deleted",
+	"attachment.created", "attachment.deleted", "attachment.restored", "relation.created", "relation.deleted", "link.created", "link.updated", "link.deleted",
 	"project.created", "project.updated", "project.deleted", "status.created", "status.updated", "status.deleted",
 	"label.created", "label.updated", "label.deleted",
 	"epic.created", "epic.updated", "epic.deleted", "milestone.created", "milestone.updated", "milestone.deleted",

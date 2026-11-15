@@ -107,6 +107,9 @@ func get(path string, pathArgs ...string) func(s *Server, token string, a map[st
 	}
 }
 
+// pictureMark starts the result of a tool that answers with a PNG, base64 after it.
+const pictureMark = "\x00png:"
+
 var mcpTools = []mcpTool{
 	{Name: "whoami", Desc: "Who am I: role, projects, what needs approval, budget left, unread count, feed position. Call first in a session.", Run: get("/me")},
 	{Name: "my_work", Desc: "What waits on me, questions asked of me, tasks assigned to me, and my unread inbox. One line each.", Run: get("/my-work")},
@@ -115,7 +118,9 @@ var mcpTools = []mcpTool{
 			"open": "true for not done and not canceled", "waiting_on": "me or @handle", "label": "label name", "epic": "epic name, or none", "cycle": "current, next, a number, or none",
 			"priority": "1 urgent, 2 high, 3 medium, 4 low", "has_open_decision": "true", "asked": "tasks with an open question asked of this member",
 			"changed_since": "feed position: tasks with any activity after it", "mentions": "me or @handle", "q": "text in the title", "parent": "task key",
-			"view": "a saved view's slug", "sort": "created, -created, rank, priority, due, -activity, -updated, key", "limit": "default 50", "offset": "", "count": "true"},
+			"creator": "me or @handle", "held_by": "who has taken it: me or @handle", "due_before": "YYYY-MM-DD", "due_after": "YYYY-MM-DD",
+			"fields": "comma-separated fields to return instead of the line, e.g. key,title,status",
+			"view":   "a saved view's slug", "sort": "created, -created, rank, priority, due, -activity, -updated, key", "limit": "default 50", "offset": "", "count": "true"},
 		Run: get("/tasks")},
 	{Name: "task", Desc: "One task with its description, decisions (with numbered options), comments, sub-tasks, links and files. since=<seq> returns only what changed after that feed position.",
 		Props: map[string]string{"!key": "task key, e.g. SVA-12", "since": "feed position", "full": "true to not cut long text"}, Run: get("/tasks/{key}", "key")},
@@ -160,9 +165,52 @@ var mcpTools = []mcpTool{
 		"decision.open {task, question, options:[{label, description}], recommended, recommendation, ask}; decision.pick {id, option, note}; " +
 		"doc.create {title, markdown, parent}; doc.write {doc, markdown, mode}. Names work wherever ids do (SVA-12, @handle, status and label names). " +
 		"A refusal says what was wrong and lists what would have been accepted. dry_run=true checks without writing.",
-		Props: map[string]string{"!type": "change type, e.g. task.update", "!args": "the change's arguments, an object", "approval": "id of an approved decision, when the change needs approval", "dry_run": "true"},
+		Props: map[string]string{"type": "change type, e.g. task.update", "args": "the change's arguments, an object", "approval": "id of an approved decision, when the change needs approval", "dry_run": "true",
+			"id": "a UUID you make for this change; sending the same id again does nothing, so a retry is safe", "for": "@handle of the member this is done for; it then runs with their access",
+			"changes": "instead of type and args: a list of {type, args} applied together, all or nothing"},
 		Run: func(s *Server, token string, a map[string]any) (string, bool) {
-			req := map[string]any{"id": id.New(), "type": a["type"], "args": a["args"]}
+			if list, ok := a["changes"].([]any); ok && len(list) > 0 {
+				// A batch: every change gets an id, and the answer is one line each.
+				for i, c := range list {
+					if m, ok := c.(map[string]any); ok {
+						if _, has := m["id"]; !has {
+							m["id"] = id.New()
+						}
+						list[i] = m
+					}
+				}
+				req := map[string]any{"changes": list}
+				if b, _ := a["dry_run"].(bool); b {
+					req["dry_run"] = true
+				}
+				body, _ := json.Marshal(req)
+				out, ok := s.internal(token, "POST", "/changes", nil, body)
+				if !ok {
+					return out, false
+				}
+				var res struct {
+					Results []engine.Result `json:"results"`
+				}
+				if json.Unmarshal([]byte(out), &res) != nil {
+					return out, true
+				}
+				var b strings.Builder
+				for _, r := range res.Results {
+					fmt.Fprintf(&b, "ok %s %s id=%s seq=%d\n", r.Type, r.Key, r.Ref, r.Seq)
+				}
+				return b.String(), true
+			}
+			if str(a, "type") == "" {
+				return "give type and args, or changes", false
+			}
+			cid := str(a, "id")
+			if cid == "" {
+				cid = id.New()
+			}
+			req := map[string]any{"id": cid, "type": a["type"], "args": a["args"]}
+			if v := str(a, "for"); v != "" {
+				req["for"] = v
+			}
 			if v := str(a, "approval"); v != "" {
 				req["approval"] = v
 			}
@@ -200,6 +248,24 @@ var mcpTools = []mcpTool{
 			}
 			return fmt.Sprintf("%s seq=%d", line, r.Seq), true
 		}},
+	{Name: "dashboard", Desc: "Where everything stands: what waits on me, epics with progress, flow, agents, recent decisions, health.", Props: map[string]string{"project": "project key"}, Run: get("/dashboard")},
+	{Name: "agents", Desc: "What every agent is doing now, what it holds, and whether anything is listening for it.", Run: get("/agents")},
+	{Name: "render", Desc: "A picture of a task or a page as a person sees it, to check how work looks. Give task or doc.",
+		Props: map[string]string{"task": "task key", "doc": "page id", "width": "390 for a phone, 1280 (default) for a desktop", "theme": "light or dark"},
+		Run: func(s *Server, token string, a map[string]any) (string, bool) {
+			q := url.Values{}
+			for _, k := range []string{"task", "doc", "width", "theme"} {
+				if v := str(a, k); v != "" {
+					q.Set(k, v)
+				}
+			}
+			out, ok := s.internal(token, "GET", "/render", q, nil)
+			if !ok {
+				return out, false
+			}
+			return pictureMark + base64.StdEncoding.EncodeToString([]byte(out)), true
+		}},
+	{Name: "file", Desc: "A file's details: name, type, size, checksum, address, and whether its upload is complete.", Props: map[string]string{"!id": "file id"}, Run: get("/files/{id}", "id")},
 	{Name: "secrets", Desc: "The secrets (keys, passwords) I may use, by name, with the hosts each may be sent to. Values are never shown.", Run: get("/secrets")},
 	{Name: "secret_request", Desc: "Make an HTTP request with a secret I cannot read: write {{secret}} where the value belongs (a header, the URL or the body); {{basic:USER}} gives base64 of USER:secret. " +
 		"It goes only to the secret's hosts, and the value is blanked out of the answer.",
@@ -222,9 +288,16 @@ var mcpTools = []mcpTool{
 			raw, _ := json.Marshal(req)
 			return s.internal(token, "POST", "/secrets/"+url.PathEscape(str(a, "name"))+"/request", url.Values{"format": {"text"}}, raw)
 		}},
-	{Name: "upload", Desc: "Store a file and get its id and address. Attach it with change attachment.add {file, task|comment|decision|option}, or name it in comment.create {attachments:[{file}]}.",
-		Props: map[string]string{"!name": "file name with its extension", "text": "the content, as text", "base64": "or the content, base64-encoded"},
+	{Name: "upload", Desc: "Store a file and get its id and address. A large file goes in parts: first name, size and the first part; then id, offset and the next part, until the answer says ready. Attach it with change attachment.add {file, task|comment|decision|option}, or name it in comment.create {attachments:[{file}]}.",
+		Props: map[string]string{"name": "file name with its extension", "text": "the content, as text", "base64": "or the content, base64-encoded",
+			"size": "for a large file sent in parts: its total size in bytes, with the first part in base64", "id": "later parts: the file id the first answer gave", "offset": "later parts: bytes received so far"},
 		Run: func(s *Server, token string, a map[string]any) (string, bool) {
+			if str(a, "size") != "" || str(a, "id") != "" {
+				return s.uploadPart(token, a)
+			}
+			if str(a, "name") == "" {
+				return "give the file a name", false
+			}
 			data := []byte(str(a, "text"))
 			if b := str(a, "base64"); b != "" {
 				raw, err := base64.StdEncoding.DecodeString(b)
@@ -292,6 +365,61 @@ func (s *Server) internal(token, method, path string, q url.Values, body []byte)
 	return out, false
 }
 
+// uploadPart takes one part of a file that comes in several calls.
+func (s *Server) uploadPart(token string, a map[string]any) (string, bool) {
+	raw, err := base64.StdEncoding.DecodeString(str(a, "base64"))
+	if err != nil {
+		return "base64 does not decode: " + err.Error(), false
+	}
+	var out string
+	var ok bool
+	if fid := str(a, "id"); fid != "" {
+		out, ok = s.internalRaw(token, "PATCH", "/files/"+url.PathEscape(fid), url.Values{"offset": {str(a, "offset")}}, raw)
+	} else {
+		out, ok = s.internalRaw(token, "POST", "/files", url.Values{"name": {str(a, "name")}, "size": {str(a, "size")}}, raw)
+	}
+	if !ok {
+		return out, false
+	}
+	var f struct {
+		ID, State, URL string
+		Received, Size int64
+	}
+	json.Unmarshal([]byte(out), &f)
+	if f.State == "ready" {
+		return fmt.Sprintf("file id=%s ready %s", f.ID, f.URL), true
+	}
+	return fmt.Sprintf("file id=%s received %d of %d; send the next part with id and offset=%d", f.ID, f.Received, f.Size, f.Received), true
+}
+
+// internalRaw is internal for a body that is a file's bytes.
+func (s *Server) internalRaw(token, method, path string, q url.Values, body []byte) (string, bool) {
+	u := "/api/v1/w/-" + path
+	if len(q) > 0 {
+		u += "?" + q.Encode()
+	}
+	req, err := http.NewRequest(method, u, bytes.NewReader(body))
+	if err != nil {
+		return err.Error(), false
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.RemoteAddr = "127.0.0.1:0"
+	rec := &buffer{h: http.Header{}, status: 200}
+	s.mux.ServeHTTP(rec, req)
+	out := rec.body.String()
+	if rec.status < 300 {
+		return out, true
+	}
+	var wrap struct {
+		Error engine.Error `json:"error"`
+	}
+	if json.Unmarshal(rec.body.Bytes(), &wrap) == nil && wrap.Error.Code != "" {
+		return wrap.Error.Error(), false
+	}
+	return out, false
+}
+
 func toolSchema(t mcpTool) map[string]any {
 	props := map[string]any{}
 	required := []string{}
@@ -305,6 +433,14 @@ func toolSchema(t mcpTool) map[string]any {
 			typ = "object"
 		}
 		p := map[string]any{"type": typ}
+		if name == "changes" {
+			p = map[string]any{"type": "array", "items": map[string]any{"type": "object", "properties": map[string]any{
+				"type": map[string]any{"type": "string"}, "args": map[string]any{"type": "object"}}, "required": []string{"type"}}}
+			typ = "array"
+		}
+		if name == "headers" {
+			p, typ = map[string]any{"type": []string{"object", "string"}}, "object"
+		}
 		if typ == "string" {
 			// Numbers and true/false are welcome too; they are read as text.
 			p = map[string]any{"type": []string{"string", "number", "boolean"}}
@@ -387,7 +523,12 @@ func (s *Server) hMCP(w http.ResponseWriter, r *http.Request) {
 			p.Arguments = map[string]any{}
 		}
 		text, ok := tool.Run(s, token, p.Arguments)
-		resp.Result = map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "isError": !ok}
+		if data, isPicture := strings.CutPrefix(text, pictureMark); ok && isPicture {
+			// A picture goes back as a picture, which a model can look at.
+			resp.Result = map[string]any{"content": []map[string]any{{"type": "image", "data": data, "mimeType": "image/png"}}, "isError": false}
+		} else {
+			resp.Result = map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "isError": !ok}
+		}
 	default:
 		resp.Error = &rpcError{Code: -32601, Message: "method not found: " + req.Method}
 	}

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -89,6 +90,52 @@ type authRequest struct {
 	Scope       string `json:"scope"`
 	UserID      string `json:"user_id"`
 	WorkspaceID string `json:"workspace_id"`
+	// ActAs is whose name the client works under: an agent the approver
+	// answers for, or the approver.
+	ActAs string `json:"act_as"`
+}
+
+// actor is one name a client can be let in under.
+type oauthActor struct {
+	Value string // workspace id, a colon, the member's user id
+	Label string
+	Agent bool
+}
+
+// oauthActors lists, per workspace the person is in, the agents they may let
+// a client work as (those they answer for; every agent for an admin), and
+// themselves.
+func (s *Server) oauthActors(ctx context.Context, u core.User) ([]struct {
+	Name   string
+	Actors []oauthActor
+}, error) {
+	wss, err := s.memberships(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	var out []struct {
+		Name   string
+		Actors []oauthActor
+	}
+	for _, ws := range wss {
+		var members []core.Member
+		if err := s.st.In(ws.ID).List(ctx, &members, store.Q{Where: []store.Cond{store.Eq("kind", core.KindAgent), store.Null("removed_at"), store.Null("suspended_at")}, Order: "name"}); err != nil {
+			return nil, err
+		}
+		s.withResponsible(ctx, members)
+		group := struct {
+			Name   string
+			Actors []oauthActor
+		}{Name: ws.Name}
+		for _, m := range members {
+			if m.ResponsibleID == u.ID || ws.Role.AtLeast(core.RoleAdmin) {
+				group.Actors = append(group.Actors, oauthActor{Value: ws.ID + ":" + m.UserID, Label: m.Name + " (agent, @" + m.Handle + ")", Agent: true})
+			}
+		}
+		group.Actors = append(group.Actors, oauthActor{Value: ws.ID + ":" + u.ID, Label: u.Name + " (yourself)"})
+		out = append(out, group)
+	}
+	return out, nil
 }
 
 var consentPage = template.Must(template.New("consent").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -103,11 +150,13 @@ select{width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid #d
 button{font:inherit;padding:8px 16px;border-radius:8px;border:1px solid #d4d4d8;background:transparent;color:inherit;cursor:pointer}
 button.go{background:#4f46e5;border-color:#4f46e5;color:#fff}
 </style></head><body><form class="card" method="post" action="/oauth/authorize">
-<h1>Allow {{.Client}} to work as you?</h1>
-<p><b>{{.Client}}</b> will be able to read and change tasks, decisions and docs as <b>{{.User}}</b>, in the workspace you pick.
+<h1>Let {{.Client}} in?</h1>
+<p><b>{{.Client}}</b> will be able to read and change tasks, decisions and docs under the name you pick.
+Pick an agent, so that what it does is shown as the agent's work and not as yours.
 You can take this back at any time in Settings, under tokens.</p>
-<label for="ws">Workspace</label>
-<select id="ws" name="workspace">{{range .Workspaces}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select>
+<label for="as">It works as</label>
+<select id="as" name="as">{{range .Groups}}<optgroup label="{{.Name}}">{{range .Actors}}<option value="{{.Value}}">{{.Label}}</option>{{end}}</optgroup>{{end}}</select>
+{{if not .HasAgent}}<p>You have no agent to offer yet. An admin makes one in Settings, under Agents; until then it can only work as you.</p>{{end}}
 <input type="hidden" name="request" value="{{.Request}}">
 <div class="row"><button name="answer" value="deny">Cancel</button><button class="go" name="answer" value="allow">Allow</button></div>
 </form></body></html>`))
@@ -131,12 +180,18 @@ func (s *Server) hOAuthAuthorize(x *c) error {
 		http.Redirect(x.w, x.r, "/login?next="+url.QueryEscape(x.r.URL.RequestURI()), http.StatusFound)
 		return nil
 	}
-	wss, err := s.memberships(ctx, x.user.ID)
+	groups, err := s.oauthActors(ctx, x.user)
 	if err != nil {
 		return err
 	}
-	if len(wss) == 0 {
+	if len(groups) == 0 {
 		return errBad("you are not in any workspace yet")
+	}
+	hasAgent := false
+	for _, g := range groups {
+		for _, a := range g.Actors {
+			hasAgent = hasAgent || a.Agent
+		}
 	}
 	req := authRequest{ClientID: cl.ID, RedirectURI: q.Get("redirect_uri"), State: q.Get("state"), Challenge: q.Get("code_challenge"), Scope: q.Get("scope"), UserID: x.user.ID}
 	token, err := s.oneTime(ctx, "oauth_consent", x.user.ID, req, 15*time.Minute)
@@ -145,7 +200,7 @@ func (s *Server) hOAuthAuthorize(x *c) error {
 	}
 	x.w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	x.w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' "+originOf(req.RedirectURI))
-	return consentPage.Execute(x.w, map[string]any{"Client": cl.Name, "User": x.user.Name, "Workspaces": wss, "Request": token})
+	return consentPage.Execute(x.w, map[string]any{"Client": cl.Name, "User": x.user.Name, "Groups": groups, "HasAgent": hasAgent, "Request": token})
 }
 
 func originOf(raw string) string {
@@ -180,16 +235,31 @@ func (s *Server) hOAuthApprove(x *c) error {
 	if x.r.PostForm.Get("answer") != "allow" {
 		q.Set("error", "access_denied")
 	} else {
-		req.WorkspaceID = x.r.PostForm.Get("workspace")
-		if n, _ := s.st.Count(ctx, "members", store.Eq("workspace_id", req.WorkspaceID), store.Eq("user_id", x.user.ID), store.Null("removed_at")); n == 0 {
-			return errBad("you are not a member of that workspace")
+		// "as" names the workspace and who the client works as; a plain
+		// "workspace" means as the person themselves.
+		req.WorkspaceID, req.ActAs = x.r.PostForm.Get("workspace"), x.user.ID
+		if as := x.r.PostForm.Get("as"); as != "" {
+			req.WorkspaceID, req.ActAs, _ = strings.Cut(as, ":")
+		}
+		groups, err := s.oauthActors(ctx, x.user)
+		if err != nil {
+			return err
+		}
+		allowed := false
+		for _, g := range groups {
+			for _, a := range g.Actors {
+				allowed = allowed || a.Value == req.WorkspaceID+":"+req.ActAs
+			}
+		}
+		if !allowed {
+			return errBad("you cannot let a client work as that member there")
 		}
 		code, err := s.oneTime(ctx, "oauth_code", x.user.ID, req, 5*time.Minute)
 		if err != nil {
 			return err
 		}
 		q.Set("code", code)
-		s.audit(x.r, req.WorkspaceID, x.user, "oauth.approved", "client", req.ClientID, nil)
+		s.audit(x.r, req.WorkspaceID, x.user, "oauth.approved", "client", req.ClientID, map[string]string{"works_as": req.ActAs})
 	}
 	back.RawQuery = q.Encode()
 	http.Redirect(x.w, x.r, back.String(), http.StatusFound)
@@ -249,7 +319,7 @@ func (s *Server) hOAuthToken(w http.ResponseWriter, r *http.Request) {
 			fail("invalid_grant", "the client, redirect URI or code verifier does not match the request")
 			return
 		}
-		issue(req.UserID, req.WorkspaceID, req.ClientID, req.Scope)
+		issue(orText(req.ActAs, req.UserID), req.WorkspaceID, req.ClientID, req.Scope)
 	case "refresh_token":
 		var old core.APIToken
 		if err := s.st.Get(ctx, &old, store.Eq("refresh_hash", auth.Hash(f.Get("refresh_token"))), store.Null("revoked_at")); err != nil ||

@@ -200,10 +200,58 @@ var collections = map[string]collection{
 	"claims":      {load: listOf[core.ResourceClaim]("requested_at", store.Ne("state", "released"))},
 	"sessions":    {load: listOf[core.AgentSession]("-started_at")},
 	"relations":   {load: listOf[core.Relation]("created_at")},
-	"links":       {load: listOf[core.TaskLink]("created_at")},
-	"webhooks":    {admin: true, load: listOf[core.Webhook]("name")},
-	"deliveries":  {admin: true, load: listOf[core.WebhookDelivery]("-created_at")},
-	"rules":       {admin: true, load: listOf[core.Rule]("name")},
+	// Files attached to tasks, decisions, options, comments and pages;
+	// trash=1 lists the removed ones, which attachment.restore puts back.
+	"attachments": {load: func(x *c) (any, error) {
+		conds := []store.Cond{store.Live}
+		if truthyParam(x.r.URL.Query(), "trash") {
+			conds = []store.Cond{store.NotNull("deleted_at")}
+		}
+		if ref := x.r.URL.Query().Get("task"); ref != "" {
+			t, err := x.taskByRef(ref)
+			if err != nil {
+				return nil, err
+			}
+			conds = append(conds, store.Eq("task_id", t.ID))
+		}
+		var atts []core.Attachment
+		if err := x.db.List(x.ctx(), &atts, store.Q{Where: conds, Order: "-created_at", Limit: 1000}); err != nil {
+			return nil, err
+		}
+		ids := make([]string, 0, len(atts))
+		for _, a := range atts {
+			ids = append(ids, a.FileID)
+		}
+		byID := map[string]core.File{}
+		if len(ids) > 0 {
+			var files []core.File
+			if err := x.db.List(x.ctx(), &files, store.Where(store.In("id", ids))); err != nil {
+				return nil, err
+			}
+			for _, f := range files {
+				f.URL, f.PreviewURL = x.fileURL(f)
+				byID[f.ID] = f
+			}
+		}
+		out := atts[:0]
+		for _, a := range atts {
+			if a.TaskID != "" {
+				var t core.Task
+				if err := x.db.Get(x.ctx(), &t, store.Eq("id", a.TaskID)); err != nil || !x.canProject(t.ProjectID) {
+					continue
+				}
+			}
+			if f, ok := byID[a.FileID]; ok {
+				a.File = &f
+			}
+			out = append(out, a)
+		}
+		return out, nil
+	}},
+	"links":      {load: listOf[core.TaskLink]("created_at")},
+	"webhooks":   {admin: true, load: listOf[core.Webhook]("name")},
+	"deliveries": {admin: true, load: listOf[core.WebhookDelivery]("-created_at")},
+	"rules":      {admin: true, load: listOf[core.Rule]("name")},
 	"integrations": {admin: true, load: func(x *c) (any, error) {
 		rows, err := listOf[core.Integration]("created_at")(x)
 		if err != nil {

@@ -389,3 +389,28 @@ func TestNamesNotIDs(t *testing.T) {
 		}
 	})
 }
+
+// TestRestoreAFile checks that a removed file can be put back.
+func TestRestoreAFile(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		var f struct{ ID, URL string }
+		s.call(s.owner, "", "POST", w+"/files?name=sketch.txt", []byte("a sketch"), 201, &f)
+		att := s.change(s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})["ref"].(string)
+		path := strings.TrimPrefix(f.URL, s.url)
+		s.change(s.owner, "", "attachment.remove", M{"id": att})
+		s.call(s.owner, "", "GET", path, nil, 404, nil)
+		if out := s.call(s.owner, "", "GET", w+"/list/attachments?trash=1", nil, 200, nil); !strings.Contains(out, "sketch.txt") {
+			t.Fatalf("removed files are not listed: %s", out)
+		}
+		s.change(s.owner, "", "attachment.restore", M{"id": att})
+		if out := s.call(s.owner, "", "GET", path, nil, 200, nil); out != "a sketch" {
+			t.Fatalf("a restored file reads %q", out)
+		}
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "sketch.txt") {
+			t.Fatalf("a restored file is not back on its task: %s", out)
+		}
+	})
+}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestMCPWithOAuth(t *testing.T) {
 	}
 	html, _ := io.ReadAll(page.Body)
 	page.Body.Close()
-	if !strings.Contains(string(html), "Allow Test Client to work as you?") {
+	if !strings.Contains(string(html), "Let Test Client in?") {
 		t.Fatalf("consent page: %.300s", html)
 	}
 	field := func(name string) string {
@@ -57,7 +58,7 @@ func TestMCPWithOAuth(t *testing.T) {
 		return rest[:strings.Index(rest, `"`)]
 	}
 	wsID := string(html)[strings.Index(string(html), `<option value="`)+15:]
-	wsID = wsID[:strings.Index(wsID, `"`)]
+	wsID = wsID[:strings.Index(wsID, `:`)] // the option is workspace:member; alone, the workspace means "as myself"
 	noFollow := *s.owner
 	noFollow.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	done, err := noFollow.PostForm(s.url+"/oauth/authorize", url.Values{"request": {field("request")}, "workspace": {wsID}, "answer": {"allow"}})
@@ -121,7 +122,7 @@ func TestMCPWithOAuth(t *testing.T) {
 		t.Fatalf("protocol version = %v", v)
 	}
 	tools := rpc(tok.Access, "tools/list", nil)["tools"].([]any)
-	if len(tools) < 15 || len(tools) > 24 {
+	if len(tools) < 15 || len(tools) > 26 {
 		t.Fatalf("the tool list should stay short: %d tools", len(tools))
 	}
 	// The token works as the person who approved it.
@@ -146,6 +147,88 @@ func TestMCPWithOAuth(t *testing.T) {
 	}
 	if out := text(rpc(tok.Access, "tools/call", M{"name": "task", "arguments": M{"key": "SVA-1"}})); !strings.Contains(out, "from MCP") {
 		t.Fatalf("task = %s", out)
+	}
+	// Several changes at once, all or nothing; and a change sent twice with
+	// one id is made once.
+	batch := text(rpc(tok.Access, "tools/call", M{"name": "change", "arguments": M{"changes": []M{
+		{"type": "task.create", "args": M{"project": "SVA", "title": "From a batch, one"}},
+		{"type": "task.create", "args": M{"project": "SVA", "title": "From a batch, two"}}}}}))
+	if strings.Count(batch, "ok task.create") != 2 {
+		t.Fatalf("batch = %s", batch)
+	}
+	once := M{"name": "change", "arguments": M{"id": "0192f0c0-0000-7000-8000-0000000000aa", "type": "comment.create", "args": M{"task": "SVA-1", "body": "said once"}}}
+	rpc(tok.Access, "tools/call", once)
+	rpc(tok.Access, "tools/call", once)
+	if out := text(rpc(tok.Access, "tools/call", M{"name": "task", "arguments": M{"key": "SVA-1", "full": true}})); strings.Count(out, "said once") != 1 {
+		t.Fatalf("a change retried with its id was made twice: %s", out)
+	}
+	// A file in parts.
+	part := func(b []byte) string { return base64.StdEncoding.EncodeToString(b) }
+	big := []byte(strings.Repeat("0123456789", 500))
+	first := text(rpc(tok.Access, "tools/call", M{"name": "upload", "arguments": M{"name": "big.bin", "size": len(big), "base64": part(big[:2000])}}))
+	fid := strings.TrimPrefix(strings.Fields(first)[1], "id=")
+	if !strings.Contains(first, "received 2000 of 5000") {
+		t.Fatalf("first part = %s", first)
+	}
+	if last := text(rpc(tok.Access, "tools/call", M{"name": "upload", "arguments": M{"id": fid, "offset": 2000, "base64": part(big[2000:])}})); !strings.Contains(last, "ready") {
+		t.Fatalf("last part = %s", last)
+	}
+	if out := text(rpc(tok.Access, "tools/call", M{"name": "file", "arguments": M{"id": fid}})); !strings.Contains(out, "5000") {
+		t.Fatalf("file = %s", out)
+	}
+	if out := text(rpc(tok.Access, "tools/call", M{"name": "dashboard"})); out == "" || strings.Contains(out, "not found") {
+		t.Fatalf("dashboard = %s", out)
+	}
+
+	// The same client let in as an agent works under the agent's name.
+	s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
+	var list struct {
+		Members []struct {
+			Handle string
+			UserID string `json:"user_id"`
+		}
+	}
+	s.call(s.owner, "", "GET", w+"/list/members", nil, 200, &list)
+	agentID := ""
+	for _, m := range list.Members {
+		if m.Handle == "coder" {
+			agentID = m.UserID
+		}
+	}
+	asAgent := func(as string) string {
+		ch := sha256.Sum256([]byte("verifier-two"))
+		page, _ := s.owner.Get(meta.Auth + "?" + url.Values{"client_id": {cl.ID}, "redirect_uri": {redirect}, "response_type": {"code"},
+			"code_challenge": {base64.RawURLEncoding.EncodeToString(ch[:])}, "code_challenge_method": {"S256"}}.Encode())
+		raw, _ := io.ReadAll(page.Body)
+		page.Body.Close()
+		if !strings.Contains(string(raw), "Coder (agent, @coder)") {
+			t.Fatalf("the consent page does not offer the agent: %s", raw)
+		}
+		m := regexp.MustCompile(`name="request" value="([^"]+)"`).FindStringSubmatch(string(raw))
+		done, err := noFollow.PostForm(s.url+"/oauth/authorize", url.Values{"request": {m[1]}, "as": {as}, "answer": {"allow"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		done.Body.Close()
+		if done.StatusCode != http.StatusFound {
+			return ""
+		}
+		loc, _ := url.Parse(done.Header.Get("Location"))
+		tr, _ := http.PostForm(meta.Token, url.Values{"grant_type": {"authorization_code"}, "code": {loc.Query().Get("code")}, "client_id": {cl.ID},
+			"redirect_uri": {redirect}, "code_verifier": {"verifier-two"}})
+		var got struct {
+			Access string `json:"access_token"`
+		}
+		json.NewDecoder(tr.Body).Decode(&got)
+		tr.Body.Close()
+		return got.Access
+	}
+	agentTok := asAgent(wsID + ":" + agentID)
+	if out := text(rpc(agentTok, "tools/call", M{"name": "whoami"})); !strings.Contains(out, "you are @coder (agent") {
+		t.Fatalf("a client let in as an agent is: %s", out)
+	}
+	if asAgent(wsID+":"+"0192f0c0-0000-7000-8000-00000000dead") != "" {
+		t.Fatal("a client was let in as someone the person cannot offer")
 	}
 
 	// Refreshing gives a new pair and ends the old one.

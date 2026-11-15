@@ -26,6 +26,7 @@ func init() {
 	register("preference.delete", core.RoleAdmin, preferenceDelete)
 	register("attachment.add", core.RoleMember, attachmentAdd)
 	register("attachment.remove", core.RoleMember, attachmentRemove)
+	register("attachment.restore", core.RoleMember, attachmentRestore)
 }
 
 // ---- attachments ----
@@ -171,6 +172,62 @@ func attachmentRemove(c *cx) error {
 		return c.trash("attachments", "attachment", at.ID, "task", t.ID, t.ProjectID, nil)
 	}
 	return c.trash("attachments", "attachment", at.ID, "doc", at.SubjectID, "", nil)
+}
+
+// attachmentRestore puts a removed file back where it was, within the 30
+// days its trash is kept.
+func attachmentRestore(c *cx) error {
+	var a idArgs
+	if err := c.args(&a); err != nil {
+		return err
+	}
+	var at core.Attachment
+	if a.ID == "" {
+		return invalid("id", "id is required")
+	}
+	if err := c.tx.Get(c.ctx, &at, store.Eq("id", a.ID)); err != nil {
+		return missing(err, "attachment", a.ID)
+	}
+	c.ref = at.ID
+	if at.DeletedAt == 0 {
+		return nil
+	}
+	if at.CreatedBy != c.actor.UserID && !c.actor.Role.AtLeast(core.RoleAdmin) {
+		return forbidden("only the one who attached a file, or an admin, can put it back")
+	}
+	var f core.File
+	if err := c.tx.Get(c.ctx, &f, store.Eq("id", at.FileID)); err != nil {
+		return conflictErr("the file itself is gone for good; it was removed more than 30 days ago")
+	}
+	if f.DeletedAt != 0 {
+		if _, err := c.tx.Update(c.ctx, "files", map[string]any{"deleted_at": int64(0)}, store.Eq("id", f.ID)); err != nil {
+			return err
+		}
+		f.DeletedAt = 0
+	}
+	seq := c.tx.NextSeq()
+	set := map[string]any{"deleted_at": int64(0)}
+	if tb, ok := store.TableNamed("attachments"); ok {
+		if _, has := tb.Type.FieldByName("UpdatedSeq"); has {
+			set["updated_seq"] = seq
+		}
+	}
+	if _, err := c.tx.Update(c.ctx, "attachments", set, store.Eq("id", at.ID)); err != nil {
+		return err
+	}
+	at.DeletedAt, at.File = 0, &f
+	scopeType, scopeID, projectID := "doc", at.SubjectID, ""
+	if at.TaskID != "" {
+		var t core.Task
+		if err := c.tx.Get(c.ctx, &t, store.Eq("id", at.TaskID)); err != nil {
+			return err
+		}
+		scopeType, scopeID, projectID = "task", t.ID, t.ProjectID
+		if err := c.touch(t.ID, seq); err != nil {
+			return err
+		}
+	}
+	return c.emit(seq, "attachment.restored", "attachment", at.ID, scopeType, scopeID, projectID, map[string]any{"row": at})
 }
 
 // ---- comments ----

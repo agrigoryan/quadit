@@ -45,6 +45,7 @@ var argTypes = map[string]any{
 	"preference.delete":  idArgs{},
 	"attachment.add":     attachArgs{},
 	"attachment.remove":  idArgs{},
+	"attachment.restore": idArgs{},
 	"doc.create":         docCreateArgs{},
 	"doc.update":         docUpdateArgs{},
 	"doc.delete":         idArgs{},
