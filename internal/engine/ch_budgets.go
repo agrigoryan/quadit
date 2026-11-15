@@ -100,8 +100,8 @@ func (c *cx) budgetWarnings(s core.AgentSession) error {
 		return c.notify(userID, core.NoteBudget, core.Notification{EntityType: entityType, EntityID: entityID, Title: title, TaskID: s.TaskID})
 	}
 	var self core.User
-	if err := c.tx.Get(c.ctx, &self, store.Eq("id", s.AgentID)); err != nil {
-		return nil
+	if ok, err := found(c.tx.Get(c.ctx, &self, store.Eq("id", s.AgentID))); !ok {
+		return err // the agent's account is gone: nobody to warn
 	}
 	if b := c.actor.Budget; b != nil && c.actor.UserID == s.AgentID {
 		cost, minutes, err := c.e.Usage(c.ctx, c.tx, s.AgentID, weekStart(c.at))
@@ -122,8 +122,8 @@ func (c *cx) budgetWarnings(s core.AgentSession) error {
 		return nil
 	}
 	var t core.Task
-	if err := c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)); err != nil || t.Budget == nil {
-		return nil
+	if ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID))); !ok || t.Budget == nil {
+		return err
 	}
 	cost, minutes, err := c.taskSpend(t.ID)
 	if err != nil {

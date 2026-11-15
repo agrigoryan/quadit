@@ -38,7 +38,11 @@ func taskTake(c *cx, a taskTakeArgs) error {
 	}
 	if t.LeaseHolderID != "" && t.LeaseHolderID != c.actor.UserID && t.LeaseUntil > c.at {
 		holder := t.LeaseHolderID
-		if m, err := c.memberRef("id", t.LeaseHolderID); err == nil {
+		m, err := c.memberRef("id", t.LeaseHolderID)
+		if err != nil && !isRefusal(err) {
+			return err
+		}
+		if err == nil {
 			holder = "@" + m.Handle
 		}
 		return conflictErr("%s is held by %s until %s", t.Key, holder, time.UnixMilli(t.LeaseUntil).UTC().Format(time.RFC3339))
@@ -74,7 +78,11 @@ func taskTake(c *cx, a taskTakeArgs) error {
 		p.put("waiting_on_note", t.WaitingOnNote, "")
 	}
 	if cur.Category == core.CatBacklog || cur.Category == core.CatUnstarted {
-		if st, err := c.status(pr, "status", core.CatStarted); err == nil {
+		st, err := c.status(pr, "status", core.CatStarted)
+		if err != nil && !isRefusal(err) {
+			return err
+		}
+		if err == nil {
 			c.setStatus(p, &t, st)
 		}
 	}

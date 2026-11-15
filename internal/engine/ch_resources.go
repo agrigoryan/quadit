@@ -107,24 +107,28 @@ func (c *cx) setClaim(cl core.ResourceClaim, set map[string]any, why string) err
 	}
 	// Letting go of a hold, or having it run out, is never refused: also
 	// not to someone limited to other projects since they took it.
+	projectID, err := c.claimProject(cl)
+	if err != nil {
+		return err
+	}
 	was := c.system
 	c.system = true
-	err := c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource_id": cl.ResourceID, "user_id": cl.UserID, "task_id": cl.TaskID})
+	err = c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, projectID, map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource_id": cl.ResourceID, "user_id": cl.UserID, "task_id": cl.TaskID})
 	c.system = was
 	return err
 }
 
 // claimProject is the project of the task a claim was made for, so that a
 // member limited to other projects is not told of it.
-func (c *cx) claimProject(cl core.ResourceClaim) string {
+func (c *cx) claimProject(cl core.ResourceClaim) (string, error) {
 	if cl.TaskID == "" {
-		return ""
+		return "", nil
 	}
 	var t core.Task
-	if err := c.tx.Get(c.ctx, &t, store.Eq("id", cl.TaskID)); err != nil {
-		return ""
+	if ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", cl.TaskID))); !ok {
+		return "", err
 	}
-	return t.ProjectID
+	return t.ProjectID, nil
 }
 
 // promote gives a free resource to the first in its queue.
@@ -196,7 +200,11 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 		return alreadyInUse(err, "id", cid)
 	}
 	c.ref, c.key = cl.ID, cl.State
-	if err := c.emit(c.tx.NextSeq(), "claim.created", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"row": cl, "resource": r.Name}); err != nil {
+	projectID, err := c.claimProject(cl)
+	if err != nil {
+		return err
+	}
+	if err := c.emit(c.tx.NextSeq(), "claim.created", "claim", cl.ID, "workspace", c.ws, projectID, map[string]any{"row": cl, "resource": r.Name}); err != nil {
 		return err
 	}
 	if cl.State == "waiting" {
@@ -259,8 +267,8 @@ func (e *Engine) ExpireHolds(ctx context.Context) error {
 		seen[cl.ResourceID] = true
 		err := e.System(ctx, cl.WorkspaceID, cl.UserID, func(s *Sys) error {
 			var r core.Resource
-			if err := s.c.tx.Get(ctx, &r, store.Eq("id", cl.ResourceID), store.Live); err != nil {
-				return nil
+			if ok, err := found(s.c.tx.Get(ctx, &r, store.Eq("id", cl.ResourceID), store.Live)); !ok {
+				return err // the resource was deleted: nothing to hand on
 			}
 			live, err := s.c.activeClaims(r)
 			if err != nil {

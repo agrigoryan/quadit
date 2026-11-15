@@ -211,7 +211,11 @@ func (c *cx) commentReaches(cm core.Comment, t core.Task) error {
 	}
 	if cm.ParentID != "" {
 		var parent core.Comment
-		if err := c.tx.Get(c.ctx, &parent, store.Eq("id", cm.ParentID)); err == nil {
+		ok, err := found(c.tx.Get(c.ctx, &parent, store.Eq("id", cm.ParentID)))
+		if err != nil {
+			return err
+		}
+		if ok {
 			if err := c.notifyTask(parent.AuthorID, core.NoteReplied, t, "comment", cm.ID, cm.Body); err != nil {
 				return err
 			}
@@ -312,7 +316,11 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	}
 	if cm.ParentID != "" {
 		var parent core.Comment
-		if err := c.tx.Get(c.ctx, &parent, store.Eq("id", cm.ParentID)); err == nil {
+		ok, err := found(c.tx.Get(c.ctx, &parent, store.Eq("id", cm.ParentID)))
+		if err != nil {
+			return err
+		}
+		if ok {
 			if err := c.notify(parent.AuthorID, core.NoteReplied, n); err != nil {
 				return err
 			}

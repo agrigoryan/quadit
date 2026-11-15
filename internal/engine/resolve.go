@@ -97,7 +97,11 @@ func (c *Resolver) anyTask(field, ref string) (core.Task, error) {
 	if errors.Is(err, store.ErrNotFound) && !isID(ref) {
 		// The key it had before it moved to another project still finds it.
 		var was core.TaskKey
-		if c.db.Get(c.ctx, &was, store.Eq("key", strings.ToUpper(ref))) == nil {
+		ok, wasErr := found(c.db.Get(c.ctx, &was, store.Eq("key", strings.ToUpper(ref))))
+		if wasErr != nil {
+			return t, wasErr
+		}
+		if ok {
 			err = c.db.Get(c.ctx, &t, store.Eq("id", was.TaskID))
 		}
 	}
@@ -271,7 +275,10 @@ func (c *Resolver) cycle(p core.Project, field, ref string) (core.Cycle, error) 
 		return core.Cycle{}, err
 	}
 	today := time.UnixMilli(c.at).UTC().Format("2006-01-02")
-	n, _ := strconv.Atoi(strings.TrimPrefix(ref, "#"))
+	n, err := strconv.Atoi(strings.TrimPrefix(ref, "#"))
+	if err != nil {
+		n = 0 // not a number: an id, "current" or "next"
+	}
 	for _, cy := range all {
 		switch {
 		case cy.ID == ref, n > 0 && cy.Number == n:

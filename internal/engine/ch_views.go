@@ -214,8 +214,8 @@ func (c *cx) checkViewValues(raw json.RawMessage) error {
 		Asked    string   `json:"asked"`
 		Mentions string   `json:"mentions"`
 	}
-	if json.Unmarshal(raw, &q) != nil {
-		return nil // CheckViewQuery has said so already
+	if err := json.Unmarshal(raw, &q); err != nil {
+		return nil //nolint:nilerr // a query of another shape is CheckViewQuery's to refuse, and it has had its say
 	}
 	for _, p := range q.Priority {
 		if !priorityOK(p) {

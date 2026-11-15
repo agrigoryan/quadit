@@ -69,14 +69,16 @@ type sessionUpdateArgs struct {
 	TokensOut  Opt[int] `json:"tokens_out"`
 }
 
-func appendJSON(cur json.RawMessage, add []json.RawMessage) json.RawMessage {
+// appendJSON adds items to a JSON list kept in a row.
+func appendJSON(cur json.RawMessage, add []json.RawMessage) (json.RawMessage, error) {
 	var list []json.RawMessage
 	if len(cur) > 0 {
-		_ = json.Unmarshal(cur, &list)
+		if err := json.Unmarshal(cur, &list); err != nil {
+			return nil, err
+		}
 	}
 	list = append(list, add...)
-	out, _ := json.Marshal(list)
-	return out
+	return json.Marshal(list)
 }
 
 func sessionUpdate(c *cx, a sessionUpdateArgs) error {
@@ -103,12 +105,18 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	// The event carries the whole new list, so a reader's copy stays right
 	// without asking again.
 	if len(a.AddSteps) > 0 {
-		all := appendJSON(s.Steps, a.AddSteps)
+		all, err := appendJSON(s.Steps, a.AddSteps)
+		if err != nil {
+			return err
+		}
 		p.set["steps"] = all
 		p.changes["steps"] = core.FieldChange{To: all}
 	}
 	if len(a.AddLinks) > 0 {
-		all := appendJSON(s.Links, a.AddLinks)
+		all, err := appendJSON(s.Links, a.AddLinks)
+		if err != nil {
+			return err
+		}
 		p.set["links"] = all
 		p.changes["links"] = core.FieldChange{To: all}
 	}
@@ -125,7 +133,11 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	scopeType, scopeID, projectID := "workspace", c.ws, ""
 	if s.TaskID != "" {
 		var t core.Task
-		if err := c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)); err == nil {
+		ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)))
+		if err != nil {
+			return err
+		}
+		if ok {
 			scopeType, scopeID, projectID = "task", t.ID, t.ProjectID
 		}
 	}

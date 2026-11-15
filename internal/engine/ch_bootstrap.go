@@ -32,27 +32,7 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 	}
 	err := e.st.Atomic(ctx, func(db store.DB) error {
 		var err error
-		if a.OwnerID != "" {
-			err = db.Get(ctx, &owner, store.Eq("id", a.OwnerID), store.Live)
-		} else {
-			email := strings.ToLower(strings.TrimSpace(a.OwnerEmail))
-			if email == "" || !strings.Contains(email, "@") {
-				return invalid("owner_email", "an owner needs an email address")
-			}
-			err = db.Get(ctx, &owner, store.Eq("email", email), store.Live)
-			if errors.Is(err, store.ErrNotFound) {
-				owner = core.User{ID: id.New(), Kind: core.KindPerson, Name: strings.TrimSpace(a.OwnerName), Email: email, CreatedAt: at, UpdatedAt: at}
-				if owner.Name == "" {
-					return invalid("owner_name", "an owner needs a name")
-				}
-				// The first person on an install runs it.
-				if n, cerr := db.Count(ctx, "users", store.Eq("kind", core.KindPerson)); cerr == nil && n == 0 {
-					owner.IsAdmin = true
-				}
-				err = db.Insert(ctx, owner)
-			}
-		}
-		if err != nil {
+		if owner, err = ownerFor(ctx, db, a, at); err != nil {
 			return err
 		}
 		if owner.Kind != core.KindPerson {
@@ -79,4 +59,32 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 			Kind: owner.Kind, Name: owner.Name, Avatar: owner.Avatar, CreatedAt: at})
 	})
 	return ws, owner, err
+}
+
+// ownerFor finds the person who will own a new workspace: by id, or by
+// email address, making their account when there is none yet.
+func ownerFor(ctx context.Context, db store.DB, a BootstrapArgs, at int64) (core.User, error) {
+	var owner core.User
+	if a.OwnerID != "" {
+		return owner, db.Get(ctx, &owner, store.Eq("id", a.OwnerID), store.Live)
+	}
+	email := strings.ToLower(strings.TrimSpace(a.OwnerEmail))
+	if email == "" || !strings.Contains(email, "@") {
+		return owner, invalid("owner_email", "an owner needs an email address")
+	}
+	err := db.Get(ctx, &owner, store.Eq("email", email), store.Live)
+	if !errors.Is(err, store.ErrNotFound) {
+		return owner, err
+	}
+	owner = core.User{ID: id.New(), Kind: core.KindPerson, Name: strings.TrimSpace(a.OwnerName), Email: email, CreatedAt: at, UpdatedAt: at}
+	if owner.Name == "" {
+		return owner, invalid("owner_name", "an owner needs a name")
+	}
+	// The first person on an install runs it.
+	people, err := db.Count(ctx, "users", store.Eq("kind", core.KindPerson))
+	if err != nil {
+		return owner, err
+	}
+	owner.IsAdmin = people == 0
+	return owner, db.Insert(ctx, owner)
 }

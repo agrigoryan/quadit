@@ -166,7 +166,11 @@ func attachmentRestore(c *cx, a idArgs) error {
 		return forbidden("only the one who attached a file, or an admin, can put it back")
 	}
 	var f core.File
-	if err := c.tx.Get(c.ctx, &f, store.Eq("id", at.FileID)); err != nil {
+	ok, err := found(c.tx.Get(c.ctx, &f, store.Eq("id", at.FileID)))
+	if err != nil {
+		return err
+	}
+	if !ok {
 		return conflictErr("the file itself is gone for good; it was removed more than 30 days ago")
 	}
 	if f.DeletedAt != 0 {

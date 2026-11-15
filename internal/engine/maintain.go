@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,92 +15,131 @@ import (
 // Reindex rebuilds a workspace's full-text index from its rows. It is run
 // after a restore, since the index itself is not part of a backup.
 func (e *Engine) Reindex(ctx context.Context, workspaceID string) error {
-	db := e.st.In(workspaceID)
-	tasks, err := db.Tasks(ctx, store.TaskFilter{Archived: true, Limit: 5000})
-	for more := tasks; err == nil && len(more) == 5000; {
-		more, err = db.Tasks(ctx, store.TaskFilter{Archived: true, Limit: 5000, Offset: len(tasks)})
+	r := &reindex{ctx: ctx, db: e.st.In(workspaceID), tasks: map[string]core.Task{}, docs: map[string]core.Doc{}}
+	for _, step := range []func() error{r.indexTasks, r.indexDocs, r.indexComments, r.indexDecisions, r.indexEpics} {
+		if err := step(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reindex is one run of Reindex. It holds its ctx because it is one run of
+// work; the tasks and pages it indexed are kept by id for the comments and
+// decisions on them.
+type reindex struct {
+	ctx   context.Context
+	db    store.DB
+	tasks map[string]core.Task
+	docs  map[string]core.Doc
+}
+
+// reindexPage is how many tasks are read at a time.
+const reindexPage = 5000
+
+func (r *reindex) indexTasks() error {
+	tasks, err := r.db.Tasks(r.ctx, store.TaskFilter{Archived: true, Limit: reindexPage})
+	for more := tasks; err == nil && len(more) == reindexPage; {
+		more, err = r.db.Tasks(r.ctx, store.TaskFilter{Archived: true, Limit: reindexPage, Offset: len(tasks)})
 		tasks = append(tasks, more...)
 	}
 	if err != nil {
 		return err
 	}
-	byID := map[string]core.Task{}
 	for _, t := range tasks {
-		byID[t.ID] = t
-		if err := db.Index(ctx, store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID,
+		r.tasks[t.ID] = t
+		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID,
 			Title: t.Key + " " + t.Title, Body: t.Description}); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *reindex) indexDocs() error {
 	var docs []core.Doc
-	if err := db.List(ctx, &docs, store.Where(store.Live)); err != nil {
+	if err := r.db.List(r.ctx, &docs, store.Where(store.Live)); err != nil {
 		return err
 	}
-	docByID := map[string]core.Doc{}
 	for _, d := range docs {
-		docByID[d.ID] = d
+		r.docs[d.ID] = d
 		var blocks []core.Block
-		if err := db.List(ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Live}, Order: "rank"}); err != nil {
+		if err := r.db.List(r.ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Live}, Order: "rank"}); err != nil {
 			return err
 		}
 		var b strings.Builder
-		var walk func([]md.Block)
-		walk = func(list []md.Block) {
-			for _, bl := range list {
-				b.WriteString(md.Plain(bl) + "\n")
-				walk(bl.Children)
-			}
-		}
-		walk(BlockTree(blocks))
-		if err := db.Index(ctx, store.SearchDoc{Kind: "doc", EntityID: d.ID, ScopeType: "doc", ScopeID: d.ID, ProjectID: d.ProjectID,
+		writePlain(&b, BlockTree(blocks))
+		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "doc", EntityID: d.ID, ScopeType: "doc", ScopeID: d.ID, ProjectID: d.ProjectID,
 			AudienceID: d.OwnerID, Title: d.Title, Body: b.String()}); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// writePlain writes the plain text of blocks and their children, a line
+// each.
+func writePlain(b *strings.Builder, blocks []md.Block) {
+	for _, bl := range blocks {
+		b.WriteString(md.Plain(bl) + "\n")
+		writePlain(b, bl.Children)
+	}
+}
+
+func (r *reindex) indexComments() error {
 	var comments []core.Comment
-	if err := db.List(ctx, &comments, store.Where(store.Live)); err != nil {
+	if err := r.db.List(r.ctx, &comments, store.Where(store.Live)); err != nil {
 		return err
 	}
 	for _, cm := range comments {
 		sd := store.SearchDoc{Kind: "comment", EntityID: cm.ID, Body: cm.Body}
-		if t, ok := byID[cm.TaskID]; ok {
+		if t, ok := r.tasks[cm.TaskID]; ok {
 			sd.ScopeType, sd.ScopeID, sd.ProjectID, sd.Title = "task", t.ID, t.ProjectID, t.Key+" "+t.Title
-		} else if d, ok := docByID[cm.DocID]; ok {
+		} else if d, ok := r.docs[cm.DocID]; ok {
 			sd.ScopeType, sd.ScopeID, sd.ProjectID, sd.Title, sd.AudienceID = "doc", d.ID, d.ProjectID, d.Title, d.OwnerID
 		} else {
 			continue
 		}
-		if err := db.Index(ctx, sd); err != nil {
+		if err := r.db.Index(r.ctx, sd); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *reindex) indexDecisions() error {
 	var decisions []core.Decision
-	if err := db.List(ctx, &decisions, store.Where(store.Live)); err != nil {
+	if err := r.db.List(r.ctx, &decisions, store.Where(store.Live)); err != nil {
 		return err
 	}
 	for _, d := range decisions {
-		t, ok := byID[d.TaskID]
+		t, ok := r.tasks[d.TaskID]
 		if !ok {
 			continue
 		}
 		var opts []core.Option
-		if err := db.List(ctx, &opts, store.Where(store.Eq("decision_id", d.ID), store.Live)); err != nil {
+		if err := r.db.List(r.ctx, &opts, store.Where(store.Eq("decision_id", d.ID), store.Live)); err != nil {
 			return err
 		}
-		body := d.Details
+		var body strings.Builder
+		body.WriteString(d.Details)
 		for _, o := range opts {
-			body += "\n" + o.Label + " " + o.Description
+			body.WriteString("\n" + o.Label + " " + o.Description)
 		}
-		if err := db.Index(ctx, store.SearchDoc{Kind: "decision", EntityID: d.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: d.Question, Body: body}); err != nil {
+		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "decision", EntityID: d.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: d.Question, Body: body.String()}); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *reindex) indexEpics() error {
 	var epics []core.Epic
-	if err := db.List(ctx, &epics, store.Where(store.Live)); err != nil {
+	if err := r.db.List(r.ctx, &epics, store.Where(store.Live)); err != nil {
 		return err
 	}
 	for _, ep := range epics {
-		if err := db.Index(ctx, store.SearchDoc{Kind: "epic", EntityID: ep.ID, ScopeType: "epic", ScopeID: ep.ID, ProjectID: ep.ProjectID, Title: ep.Name, Body: ep.Description}); err != nil {
+		if err := r.db.Index(r.ctx, store.SearchDoc{Kind: "epic", EntityID: ep.ID, ScopeType: "epic", ScopeID: ep.ID, ProjectID: ep.ProjectID, Title: ep.Name, Body: ep.Description}); err != nil {
 			return err
 		}
 	}
@@ -110,109 +150,148 @@ func (e *Engine) Reindex(ctx context.Context, workspaceID string) error {
 // It returns the storage keys of the files it removed, for the caller to
 // delete from file storage.
 func (e *Engine) PurgeTrash(ctx context.Context, keep time.Duration) (purged int, blobKeys []string, err error) {
-	cutoff := e.now().Add(-keep).UnixMilli()
+	run := &purge{ctx: ctx, cutoff: e.now().Add(-keep).UnixMilli()}
 	var wss []core.Workspace
 	if err := e.st.List(ctx, &wss, store.Where(store.Live)); err != nil {
 		return 0, nil, err
 	}
 	for _, ws := range wss {
 		var owner core.Member
-		if err := e.st.In(ws.ID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner))); err != nil {
+		ok, err := found(e.st.In(ws.ID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner))))
+		if err != nil {
+			return run.purged, run.blobKeys, err
+		}
+		if !ok {
 			continue
 		}
-		err := e.System(ctx, ws.ID, owner.UserID, func(s *Sys) error {
-			tx, c := s.c.tx, s.c
-			del := func(table string, conds ...store.Cond) error {
-				_, err := tx.Delete(ctx, table, conds...)
-				return err
-			}
-			tasks, err := tx.Tasks(ctx, store.TaskFilter{InTrash: true, Limit: 5000})
-			if err != nil {
-				return err
-			}
-			for _, t := range tasks {
-				if t.DeletedAt > cutoff {
-					continue
-				}
-				var ds []core.Decision
-				if err := tx.List(ctx, &ds, store.Where(store.Eq("task_id", t.ID))); err != nil {
+		err = e.System(ctx, ws.ID, owner.UserID, func(s *Sys) error {
+			run.c = s.c
+			for _, step := range []func() error{run.tasks, run.docs, run.files} {
+				if err := step(); err != nil {
 					return err
 				}
-				for _, d := range ds {
-					if err := del("decision_options", store.Eq("decision_id", d.ID)); err != nil {
-						return err
-					}
-				}
-				if _, err := tx.Update(ctx, "tasks", map[string]any{"parent_id": ""}, store.Eq("parent_id", t.ID)); err != nil {
-					return err
-				}
-				for _, step := range []struct {
-					table string
-					cond  store.Cond
-				}{{"decisions", store.Eq("task_id", t.ID)}, {"comments", store.Eq("task_id", t.ID)}, {"attachments", store.Eq("task_id", t.ID)},
-					{"task_labels", store.Eq("task_id", t.ID)}, {"task_relations", store.Eq("task_id", t.ID)}, {"task_relations", store.Eq("related_task_id", t.ID)},
-					{"task_links", store.Eq("task_id", t.ID)}, {"watchers", store.Eq("subject_id", t.ID)}, {"notifications", store.Eq("task_id", t.ID)},
-					{"refs", store.Eq("from_scope_id", t.ID)}, {"refs", store.Eq("to_id", t.ID)}, {"tasks", store.Eq("id", t.ID)}} {
-					if err := del(step.table, step.cond); err != nil {
-						return err
-					}
-				}
-				if err := c.emitDeleted("task", t.ID, "task", t.ID, t.ProjectID); err != nil {
-					return err
-				}
-				purged++
-			}
-			var docs []core.Doc
-			if err := tx.List(ctx, &docs, store.Where(store.NotNull("deleted_at"), store.Lte("deleted_at", cutoff))); err != nil {
-				return err
-			}
-			for _, d := range docs {
-				if _, err := tx.Update(ctx, "docs", map[string]any{"parent_id": ""}, store.Eq("parent_id", d.ID)); err != nil {
-					return err
-				}
-				for _, step := range []struct {
-					table string
-					cond  store.Cond
-				}{{"doc_blocks", store.Eq("doc_id", d.ID)}, {"doc_versions", store.Eq("doc_id", d.ID)}, {"comments", store.Eq("doc_id", d.ID)},
-					{"db_properties", store.Eq("database_id", d.ID)}, {"db_views", store.Eq("database_id", d.ID)}, {"attachments", store.Eq("subject_id", d.ID)},
-					{"watchers", store.Eq("subject_id", d.ID)}, {"refs", store.Eq("from_scope_id", d.ID)}, {"refs", store.Eq("to_id", d.ID)}, {"docs", store.Eq("id", d.ID)}} {
-					if err := del(step.table, step.cond); err != nil {
-						return err
-					}
-				}
-				if err := c.emitTo(d.OwnerID, tx.NextSeq(), "doc.deleted", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "gone": true}); err != nil {
-					return err
-				}
-				purged++
-			}
-			// Files nothing shows any more.
-			var files []core.File
-			if err := tx.List(ctx, &files, store.Where(store.NotNull("deleted_at"), store.Lte("deleted_at", cutoff))); err != nil {
-				return err
-			}
-			for _, f := range files {
-				if n, err := tx.Count(ctx, "attachments", store.Eq("file_id", f.ID), store.Live); err != nil || n > 0 {
-					continue
-				}
-				if err := del("attachments", store.Eq("file_id", f.ID)); err != nil {
-					return err
-				}
-				if err := del("files", store.Eq("id", f.ID)); err != nil {
-					return err
-				}
-				blobKeys = append(blobKeys, f.StorageKey)
-				if f.PreviewKey != "" {
-					blobKeys = append(blobKeys, f.PreviewKey)
-				}
-				purged++
 			}
 			return nil
 		})
 		if err != nil {
-			return purged, blobKeys, err
+			return run.purged, run.blobKeys, err
 		}
 	}
-	return purged, blobKeys, nil
+	return run.purged, run.blobKeys, nil
+}
+
+// purge is one run of PurgeTrash. It holds its ctx because it is one run of
+// work; c is the system write to the workspace being purged.
+type purge struct {
+	ctx      context.Context
+	c        *cx
+	cutoff   int64 // what was trashed at or before this goes
+	purged   int
+	blobKeys []string
+}
+
+// rowsOf names the rows of one table that belong to what is purged.
+type rowsOf struct {
+	table string
+	cond  store.Cond
+}
+
+func (run *purge) delete(rows ...rowsOf) error {
+	for _, r := range rows {
+		if _, err := run.c.tx.Delete(run.ctx, r.table, r.cond); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// tasks removes tasks trashed before the cutoff with everything on them.
+func (run *purge) tasks() error {
+	tx := run.c.tx
+	tasks, err := tx.Tasks(run.ctx, store.TaskFilter{InTrash: true, Limit: 5000})
+	if err != nil {
+		return err
+	}
+	for _, t := range tasks {
+		if t.DeletedAt > run.cutoff {
+			continue
+		}
+		var ds []core.Decision
+		if err := tx.List(run.ctx, &ds, store.Where(store.Eq("task_id", t.ID))); err != nil {
+			return err
+		}
+		for _, d := range ds {
+			if err := run.delete(rowsOf{"decision_options", store.Eq("decision_id", d.ID)}); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Update(run.ctx, "tasks", map[string]any{"parent_id": ""}, store.Eq("parent_id", t.ID)); err != nil {
+			return err
+		}
+		if err := run.delete(rowsOf{"decisions", store.Eq("task_id", t.ID)}, rowsOf{"comments", store.Eq("task_id", t.ID)}, rowsOf{"attachments", store.Eq("task_id", t.ID)},
+			rowsOf{"task_labels", store.Eq("task_id", t.ID)}, rowsOf{"task_relations", store.Eq("task_id", t.ID)}, rowsOf{"task_relations", store.Eq("related_task_id", t.ID)},
+			rowsOf{"task_links", store.Eq("task_id", t.ID)}, rowsOf{"watchers", store.Eq("subject_id", t.ID)}, rowsOf{"notifications", store.Eq("task_id", t.ID)},
+			rowsOf{"refs", store.Eq("from_scope_id", t.ID)}, rowsOf{"refs", store.Eq("to_id", t.ID)}, rowsOf{"tasks", store.Eq("id", t.ID)}); err != nil {
+			return err
+		}
+		if err := run.c.emitDeleted("task", t.ID, "task", t.ID, t.ProjectID); err != nil {
+			return err
+		}
+		run.purged++
+	}
+	return nil
+}
+
+// docs removes pages trashed before the cutoff with everything in them.
+func (run *purge) docs() error {
+	tx := run.c.tx
+	var docs []core.Doc
+	if err := tx.List(run.ctx, &docs, store.Where(store.NotNull("deleted_at"), store.Lte("deleted_at", run.cutoff))); err != nil {
+		return err
+	}
+	for _, d := range docs {
+		if _, err := tx.Update(run.ctx, "docs", map[string]any{"parent_id": ""}, store.Eq("parent_id", d.ID)); err != nil {
+			return err
+		}
+		if err := run.delete(rowsOf{"doc_blocks", store.Eq("doc_id", d.ID)}, rowsOf{"doc_versions", store.Eq("doc_id", d.ID)}, rowsOf{"comments", store.Eq("doc_id", d.ID)},
+			rowsOf{"db_properties", store.Eq("database_id", d.ID)}, rowsOf{"db_views", store.Eq("database_id", d.ID)}, rowsOf{"attachments", store.Eq("subject_id", d.ID)},
+			rowsOf{"watchers", store.Eq("subject_id", d.ID)}, rowsOf{"refs", store.Eq("from_scope_id", d.ID)}, rowsOf{"refs", store.Eq("to_id", d.ID)}, rowsOf{"docs", store.Eq("id", d.ID)}); err != nil {
+			return err
+		}
+		if err := run.c.emitTo(d.OwnerID, tx.NextSeq(), "doc.deleted", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "gone": true}); err != nil {
+			return err
+		}
+		run.purged++
+	}
+	return nil
+}
+
+// files removes trashed files nothing shows any more, and keeps their
+// storage keys for the caller.
+func (run *purge) files() error {
+	tx := run.c.tx
+	var files []core.File
+	if err := tx.List(run.ctx, &files, store.Where(store.NotNull("deleted_at"), store.Lte("deleted_at", run.cutoff))); err != nil {
+		return err
+	}
+	for _, f := range files {
+		shown, err := tx.Count(run.ctx, "attachments", store.Eq("file_id", f.ID), store.Live)
+		if err != nil {
+			return err
+		}
+		if shown > 0 {
+			continue
+		}
+		if err := run.delete(rowsOf{"attachments", store.Eq("file_id", f.ID)}, rowsOf{"files", store.Eq("id", f.ID)}); err != nil {
+			return err
+		}
+		run.blobKeys = append(run.blobKeys, f.StorageKey)
+		if f.PreviewKey != "" {
+			run.blobKeys = append(run.blobKeys, f.PreviewKey)
+		}
+		run.purged++
+	}
+	return nil
 }
 
 // PurgeWorkspaces removes for good the workspaces deleted more than keep
@@ -228,8 +307,7 @@ func (e *Engine) PurgeWorkspaces(ctx context.Context, keep time.Duration) (prefi
 	for _, ws := range wss {
 		err := e.st.Atomic(ctx, func(db store.DB) error {
 			// Children before parents: the reverse of the order a restore loads in.
-			for i := len(tables) - 1; i >= 0; i-- {
-				t := tables[i]
+			for _, t := range slices.Backward(tables) {
 				if t.Global || t.Name == "workspaces" {
 					continue
 				}

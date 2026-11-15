@@ -63,7 +63,11 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	var keep []string
 	for _, lid := range t.LabelIDs {
 		var l core.Label
-		if err := c.tx.Get(c.ctx, &l, store.Eq("id", lid)); err != nil {
+		ok, err := found(c.tx.Get(c.ctx, &l, store.Eq("id", lid)))
+		if err != nil {
+			return err
+		}
+		if !ok {
 			continue
 		}
 		if l.ProjectID == "" {

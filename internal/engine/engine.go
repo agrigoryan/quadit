@@ -145,6 +145,16 @@ func missing(err error, what, ref string) error {
 	return err
 }
 
+// found answers "is the row there?" from the error of a store read: false
+// for not found, and any other error returned, so that a read that failed
+// is never taken for a row that is absent.
+func found(err error) (bool, error) {
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // alreadyInUse turns a broken uniqueness rule into a refusal naming what was
 // asked for. The refusal still is the store's conflict underneath, so a
 // handler around a generic write (save names only the row) can name the
@@ -618,7 +628,10 @@ func (c *cx) checkApproval() error {
 		return need
 	}
 	var d core.Decision
-	if err := c.tx.Get(c.ctx, &d, store.Eq("id", c.change.Approval), store.Live); err != nil {
+	if ok, err := found(c.tx.Get(c.ctx, &d, store.Eq("id", c.change.Approval), store.Live)); !ok {
+		if err != nil {
+			return err
+		}
 		return need
 	}
 	switch {
@@ -805,15 +818,19 @@ func (c *cx) checkAsker(taskID string) error {
 		return nil
 	}
 	var t core.Task
-	if err := c.tx.Get(c.ctx, &t, store.Eq("id", taskID)); err != nil {
-		return nil // the task is gone; there is nothing to hold to
+	if ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", taskID))); !ok {
+		return err // nil when the task is gone: there is nothing to hold to
 	}
 	c.askerOK[taskID] = true
 	if t.AskedBy == "" || t.AskedBy == c.actor.UserID {
 		return nil
 	}
 	var m core.Member
-	if err := c.tx.Get(c.ctx, &m, store.Eq("user_id", t.AskedBy)); err != nil || m.SuspendedAt != 0 {
+	ok, err := found(c.tx.Get(c.ctx, &m, store.Eq("user_id", t.AskedBy)))
+	if err != nil {
+		return err
+	}
+	if !ok || m.SuspendedAt != 0 {
 		return forbidden("%s was given to an agent by someone who no longer has access here; a person has to assign it again", t.Key)
 	}
 	min := handlers[c.change.Type].min
@@ -864,12 +881,12 @@ func namedPriority(raw json.RawMessage) (json.RawMessage, error) {
 		return raw, nil
 	}
 	var args map[string]json.RawMessage
-	if json.Unmarshal(raw, &args) != nil {
-		return raw, nil
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return raw, nil //nolint:nilerr // not an object: the strict decoder after this refuses it in a caller's words
 	}
 	var name string
-	if json.Unmarshal(args["priority"], &name) != nil {
-		return raw, nil // a number, or null: as it is
+	if err := json.Unmarshal(args["priority"], &name); err != nil {
+		return raw, nil //nolint:nilerr // a number, or null: as it is
 	}
 	for n, known := range PriorityNames {
 		if strings.EqualFold(strings.TrimSpace(name), known) {
@@ -879,4 +896,11 @@ func namedPriority(raw json.RawMessage) (json.RawMessage, error) {
 	}
 	return nil, &Error{Code: CodeInvalid, Field: "priority", Message: fmt.Sprintf("unknown priority %q", name),
 		Allowed: PriorityNames, Nearest: nearest(name, PriorityNames)}
+}
+
+// isRefusal reports whether err is a refusal: the answer that a reference
+// names nothing usable, as opposed to a failure to read.
+func isRefusal(err error) bool {
+	var e *Error
+	return errors.As(err, &e)
 }

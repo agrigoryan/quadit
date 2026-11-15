@@ -243,7 +243,11 @@ func (c *cx) canEditDoc(d core.Doc) error {
 	}
 	if d.SourceID != "" && !c.system {
 		var src core.DocSource
-		if err := c.tx.Get(c.ctx, &src, store.Eq("id", d.SourceID), store.Live); err == nil && src.Authority == "repo" && src.WriteMode == "none" {
+		ok, err := found(c.tx.Get(c.ctx, &src, store.Eq("id", d.SourceID), store.Live))
+		if err != nil {
+			return err
+		}
+		if ok && src.Authority == "repo" && src.WriteMode == "none" {
 			return conflictErr("this page mirrors a file in a repository that is read-only here; change the file instead")
 		}
 	}
@@ -319,7 +323,11 @@ func (u *pageEdit) parent() error {
 			if cur.ParentID == "" {
 				break
 			}
-			if err := c.tx.Get(c.ctx, &cur, store.Eq("id", cur.ParentID)); err != nil {
+			ok, err := found(c.tx.Get(c.ctx, &cur, store.Eq("id", cur.ParentID)))
+			if err != nil {
+				return err
+			}
+			if !ok {
 				break
 			}
 		}
@@ -400,7 +408,9 @@ func (u *pageEdit) props() error {
 	}
 	cur := map[string]json.RawMessage{}
 	if len(d.Props) > 0 {
-		json.Unmarshal(d.Props, &cur)
+		if err := json.Unmarshal(d.Props, &cur); err != nil {
+			return err
+		}
 	}
 	changed := map[string]any{}
 	for k, v := range props {
@@ -559,7 +569,11 @@ func docRestore(c *cx, a idArgs) error {
 	// A page whose parent is still in the trash comes back at the top.
 	if d.ParentID != "" {
 		var parent core.Doc
-		if err := c.tx.Get(c.ctx, &parent, store.Eq("id", d.ParentID), store.Live); err != nil {
+		ok, err := found(c.tx.Get(c.ctx, &parent, store.Eq("id", d.ParentID), store.Live))
+		if err != nil {
+			return err
+		}
+		if !ok {
 			if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"parent_id": ""}, store.Eq("id", d.ID)); err != nil {
 				return err
 			}

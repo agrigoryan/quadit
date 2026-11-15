@@ -324,9 +324,14 @@ func (u *taskEdit) labels() error {
 		}
 	}
 	for _, ref := range a.RemoveLabels {
-		if l, err := c.label(u.pr, "remove_labels", ref); err == nil {
-			ids = without(ids, l.ID)
+		l, err := c.label(u.pr, "remove_labels", ref)
+		if isRefusal(err) {
+			continue // no such label: nothing to take off
 		}
+		if err != nil {
+			return err
+		}
+		ids = without(ids, l.ID)
 	}
 	return c.setLabels(u.p, &u.t, ids)
 }

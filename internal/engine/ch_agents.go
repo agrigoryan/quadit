@@ -101,7 +101,11 @@ func (c *cx) agentTask(a agentCreateArgs, role core.Role) (core.Task, error) {
 		// hand it, or another, further down.
 		if !c.system && c.actor.Kind == core.KindAgent {
 			var me core.Member
-			if err := c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)); err == nil && me.DelegatedTask != "" {
+			ok, err := found(c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)))
+			if err != nil {
+				return forTask, err
+			}
+			if ok && me.DelegatedTask != "" {
 				return forTask, forbidden("a helper made for a task cannot make helpers of its own; ask the agent that made you")
 			}
 		}
@@ -111,9 +115,15 @@ func (c *cx) agentTask(a agentCreateArgs, role core.Role) (core.Task, error) {
 			return forTask, conflictErr("%s already has %d helpers at work; that is the most a task takes", forTask.Key, n)
 		}
 	} else if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
-		var me core.Member
-		if c.actor.Kind == core.KindAgent && c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)) == nil && me.DelegatedTask != "" {
-			return forTask, forbidden("a helper made for a task cannot make agents; ask the agent that made you")
+		if c.actor.Kind == core.KindAgent {
+			var me core.Member
+			ok, err := found(c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)))
+			if err != nil {
+				return forTask, err
+			}
+			if ok && me.DelegatedTask != "" {
+				return forTask, forbidden("a helper made for a task cannot make agents; ask the agent that made you")
+			}
 		}
 		return forTask, forbidden("agent.create needs the admin role; you are a %s. To get help on one task, make a sub-agent for it: add \"task\": \"SVA-12\"", c.actor.Role)
 	}

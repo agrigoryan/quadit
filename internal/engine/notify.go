@@ -23,8 +23,8 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 		return nil
 	}
 	var m core.Member
-	if err := c.tx.Get(c.ctx, &m, store.Eq("user_id", userID), store.Null("removed_at")); err != nil {
-		return nil // not a member any more: nobody to tell
+	if ok, err := found(c.tx.Get(c.ctx, &m, store.Eq("user_id", userID), store.Null("removed_at"))); !ok {
+		return err // nil when they are not a member any more: nobody to tell
 	}
 	c.notified[key] = true
 	seq := c.tx.NextSeq()
@@ -112,91 +112,167 @@ func (c *cx) link(fromType, fromID, scopeType, scopeID, text string) ([]core.Mem
 	if err := c.tx.List(c.ctx, &old, store.Where(store.Eq("from_id", fromID))); err != nil {
 		return nil, err
 	}
-	had := map[string]bool{}
+	l := &linker{c: c, from: core.Ref{WorkspaceID: c.ws, FromType: fromType, FromID: fromID, FromScopeType: scopeType, FromScopeID: scopeID},
+		had: map[string]bool{}, want: map[string]core.Ref{}}
 	for _, r := range old {
-		had[r.ToID] = true
+		l.had[r.ToID] = true
 	}
-	want := map[string]core.Ref{}
-	var fresh []core.Member
-	add := func(toType, toID string) {
-		if toID != fromID && toID != scopeID {
-			want[toID] = core.Ref{WorkspaceID: c.ws, FromType: fromType, FromID: fromID, FromScopeType: scopeType, FromScopeID: scopeID, ToType: toType, ToID: toID}
+	for _, step := range []func(string) error{l.members, l.tasks, l.docs, l.decisions, l.numberedDecisions, l.wikiLinks} {
+		if err := step(text); err != nil {
+			return nil, err
 		}
 	}
+	if err := l.save(old); err != nil {
+		return nil, err
+	}
+	return l.fresh, nil
+}
+
+// linker is one run of link: what a text mentions, found kind by kind.
+type linker struct {
+	c     *cx
+	from  core.Ref            // the mentioning side, the same for every ref
+	had   map[string]bool     // ids the text mentioned before
+	want  map[string]core.Ref // what it mentions now, by id
+	fresh []core.Member       // members mentioned now and not before
+}
+
+// add records a mention of toID, unless it is the text's own subject.
+func (l *linker) add(toType, toID string) {
+	if toID != l.from.FromID && toID != l.from.FromScopeID {
+		r := l.from
+		r.ToType, r.ToID = toType, toID
+		l.want[toID] = r
+	}
+}
+
+// members finds @handles of current members.
+func (l *linker) members(text string) error {
 	for _, m := range mentionRE.FindAllStringSubmatch(text, -1) {
 		var mem core.Member
-		if err := c.tx.Get(c.ctx, &mem, store.Eq("handle", m[2]), store.Null("removed_at")); err != nil {
+		ok, err := found(l.c.tx.Get(l.c.ctx, &mem, store.Eq("handle", m[2]), store.Null("removed_at")))
+		if err != nil {
+			return err
+		}
+		if !ok {
 			continue
 		}
-		if _, dup := want[mem.UserID]; !dup && !had[mem.UserID] {
-			fresh = append(fresh, mem)
+		if _, dup := l.want[mem.UserID]; !dup && !l.had[mem.UserID] {
+			l.fresh = append(l.fresh, mem)
 		}
-		add("member", mem.UserID)
+		l.add("member", mem.UserID)
 	}
+	return nil
+}
+
+// tasks finds task keys (SVA-12).
+func (l *linker) tasks(text string) error {
 	for _, loc := range keyRE.FindAllStringSubmatchIndex(text, -1) {
-		m := []string{text[loc[0]:loc[1]], text[loc[2]:loc[3]]}
 		if rest := text[loc[1]:]; len(rest) > 1 && rest[0] == '#' && rest[1] >= '0' && rest[1] <= '9' {
-			continue // "SVA-7#2" names a decision, taken below
+			continue // "SVA-7#2" names a decision, taken in numberedDecisions
 		}
 		var t core.Task
-		if err := c.tx.Get(c.ctx, &t, store.Eq("key", m[1])); err == nil {
-			add("task", t.ID)
+		ok, err := found(l.c.tx.Get(l.c.ctx, &t, store.Eq("key", text[loc[2]:loc[3]])))
+		if err != nil {
+			return err
+		}
+		if ok {
+			l.add("task", t.ID)
 		}
 	}
+	return nil
+}
+
+// docs finds links to pages by id.
+func (l *linker) docs(text string) error {
 	for _, m := range docRefRE.FindAllStringSubmatch(text, -1) {
 		var d core.Doc
-		if err := c.tx.Get(c.ctx, &d, store.Eq("id", m[1])); err == nil {
-			add("doc", d.ID)
+		ok, err := found(l.c.tx.Get(l.c.ctx, &d, store.Eq("id", m[1])))
+		if err != nil {
+			return err
+		}
+		if ok {
+			l.add("doc", d.ID)
 		}
 	}
+	return nil
+}
+
+// decisions finds links to decisions by id.
+func (l *linker) decisions(text string) error {
 	for _, m := range decisionRefRE.FindAllStringSubmatch(text, -1) {
 		var d core.Decision
-		if err := c.tx.Get(c.ctx, &d, store.Eq("id", m[1]), store.Live); err == nil {
-			add("decision", d.ID)
+		ok, err := found(l.c.tx.Get(l.c.ctx, &d, store.Eq("id", m[1]), store.Live))
+		if err != nil {
+			return err
+		}
+		if ok {
+			l.add("decision", d.ID)
 		}
 	}
+	return nil
+}
+
+// numberedDecisions finds decisions named by their task and number (SVA-7#2).
+func (l *linker) numberedDecisions(text string) error {
 	for _, m := range decisionNthRE.FindAllStringSubmatch(text, -1) {
-		if id, err := c.decisionOnTask(m[1] + "#" + m[2]); err == nil {
-			add("decision", id)
+		decisionID, err := l.c.decisionOnTask(m[1] + "#" + m[2])
+		if isRefusal(err) {
+			continue // names no decision
 		}
+		if err != nil {
+			return err
+		}
+		l.add("decision", decisionID)
 	}
+	return nil
+}
+
+// wikiLinks finds pages named by their title in double brackets, when the
+// title names exactly one page.
+func (l *linker) wikiLinks(text string) error {
 	for _, m := range wikiRefRE.FindAllStringSubmatch(text, -1) {
-		want := strings.TrimSpace(m[1])
+		title := strings.TrimSpace(m[1])
 		var ds []core.Doc
-		if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("title", want), store.Live}, Limit: 2}); err != nil {
-			continue
+		if err := l.c.tx.List(l.c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("title", title), store.Live}, Limit: 2}); err != nil {
+			return err
 		}
 		if len(ds) == 0 {
 			// Written in another case than the page's title.
 			var all []core.Doc
-			if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live, store.Ne("kind", core.DocRow)}, Limit: 5000}); err != nil {
-				continue
+			if err := l.c.tx.List(l.c.ctx, &all, store.Q{Where: []store.Cond{store.Live, store.Ne("kind", core.DocRow)}, Limit: 5000}); err != nil {
+				return err
 			}
 			for _, d := range all {
-				if strings.EqualFold(d.Title, want) {
+				if strings.EqualFold(d.Title, title) {
 					ds = append(ds, d)
 				}
 			}
 		}
 		if len(ds) == 1 {
-			add("doc", ds[0].ID)
+			l.add("doc", ds[0].ID)
 		}
 	}
+	return nil
+}
+
+// save deletes the refs the text no longer makes and inserts the new ones.
+func (l *linker) save(old []core.Ref) error {
 	for _, r := range old {
-		if _, keep := want[r.ToID]; !keep {
-			if _, err := c.tx.Delete(c.ctx, "refs", store.Eq("from_id", fromID), store.Eq("to_id", r.ToID)); err != nil {
-				return nil, err
+		if _, keep := l.want[r.ToID]; !keep {
+			if _, err := l.c.tx.Delete(l.c.ctx, "refs", store.Eq("from_id", l.from.FromID), store.Eq("to_id", r.ToID)); err != nil {
+				return err
 			}
 		}
 	}
-	for toID, r := range want {
-		if !had[toID] {
-			if err := c.tx.Insert(c.ctx, r); err != nil {
-				return nil, err
+	for toID, r := range l.want {
+		if !l.had[toID] {
+			if err := l.c.tx.Insert(l.c.ctx, r); err != nil {
+				return err
 			}
 		}
 	}
-	return fresh, nil
+	return nil
 }
 
 // index puts text in the full-text index.

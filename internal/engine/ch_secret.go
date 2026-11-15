@@ -116,6 +116,9 @@ func secretSet(c *cx, a secretArgs) error {
 func secretDelete(c *cx, a idArgs) error {
 	var s core.Secret
 	if err := c.tx.Get(c.ctx, &s, store.Eq("id", a.ID), store.Live); err != nil {
+		if !errors.Is(err, store.ErrNotFound) {
+			return err
+		}
 		if err := c.tx.Get(c.ctx, &s, store.Eq("name", a.ID), store.Live); err != nil {
 			return missing(err, "secret", a.ID)
 		}

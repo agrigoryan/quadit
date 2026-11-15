@@ -163,7 +163,9 @@ func renamedOption(pr core.DBProperty, from, to string) ([]byte, error) {
 	}
 	cfg := map[string]any{}
 	if len(pr.Config) > 0 {
-		json.Unmarshal(pr.Config, &cfg)
+		if err := json.Unmarshal(pr.Config, &cfg); err != nil {
+			return nil, err
+		}
 	}
 	opts, _ := cfg["options"].([]any)
 	var names []string
@@ -489,7 +491,9 @@ var optionColors = []string{"gray", "blue", "green", "yellow", "orange", "red", 
 func (c *cx) addOptions(p *core.DBProperty, vals []string) error {
 	var cfg map[string]any
 	if len(p.Config) > 0 {
-		json.Unmarshal(p.Config, &cfg)
+		if err := json.Unmarshal(p.Config, &cfg); err != nil {
+			return err
+		}
 	}
 	if cfg == nil {
 		cfg = map[string]any{}

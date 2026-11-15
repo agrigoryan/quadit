@@ -144,7 +144,11 @@ func (c *cx) askedOf(a decisionOpenArgs, kind string) (string, error) {
 		asked = self.ResponsibleID
 	}
 	if kind == core.DecisionApproval && a.Action != "" && asked != "" {
-		if m, err := c.memberRef("ask", asked); err == nil && m.Kind != core.KindPerson {
+		m, err := c.memberRef("ask", asked)
+		if err != nil && !isRefusal(err) {
+			return "", err
+		}
+		if err == nil && m.Kind != core.KindPerson {
 			return "", invalid("ask", "an approval for a change is asked of a person; @%s is an agent", m.Handle)
 		}
 	}
@@ -248,7 +252,11 @@ func (c *cx) ask(d core.Decision, t core.Task) error {
 	}
 	// A closed task waits on nobody; the question still reaches its inbox.
 	var st core.Status
-	if err := c.tx.Get(c.ctx, &st, store.Eq("id", t.StatusID)); err == nil && !core.OpenCategory(st.Category) {
+	ok, err := found(c.tx.Get(c.ctx, &st, store.Eq("id", t.StatusID)))
+	if err != nil {
+		return err
+	}
+	if ok && !core.OpenCategory(st.Category) {
 		return nil
 	}
 	return c.setWaitingOn(t, asked, "answer: "+snippet(d.Question, 80))
@@ -373,8 +381,10 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 	if err := c.notifyTask(d.CreatedBy, core.NotePicked, t, "decision", d.ID, text); err != nil {
 		return err
 	}
-	if _, err := c.memberRef("id", d.CreatedBy); err != nil {
+	if _, err := c.memberRef("id", d.CreatedBy); isRefusal(err) {
 		return nil // the asker left the workspace
+	} else if err != nil {
+		return err
 	}
 	// Other open questions on the task keep it with whoever must answer them.
 	if n, err := c.tx.Count(c.ctx, "decisions", store.Eq("task_id", t.ID), store.Eq("state", core.StateOpen), store.Live,

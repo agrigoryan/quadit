@@ -45,7 +45,10 @@ func webhookCreate(c *cx, a webhookCreateArgs) error {
 	w := core.Webhook{ID: wid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), URL: a.URL, Secret: a.Secret, EventTypes: a.EventTypes,
 		Active: a.Active == nil || *a.Active, CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if w.Name == "" {
-		u, _ := url.Parse(a.URL)
+		u, err := url.Parse(a.URL)
+		if err != nil {
+			return err
+		}
 		w.Name = u.Host
 	}
 	if a.Project != "" {

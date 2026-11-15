@@ -172,12 +172,15 @@ func (c *cx) rollProject(p core.Project, today string) error {
 		last = all[len(all)-1].EndsOn
 	}
 	for last <= today || !hasFuture(all, today) {
-		start := today
+		var start string
 		if last != "" {
 			start = addDays(last, 1)
 		} else {
 			// The first cycle starts on the project's cycle weekday.
-			t, _ := time.Parse("2006-01-02", today)
+			t, err := time.Parse("2006-01-02", today)
+			if err != nil {
+				return err
+			}
 			back := (int(t.Weekday()) - p.Settings.CycleStart + 7) % 7
 			start = addDays(today, -back)
 		}

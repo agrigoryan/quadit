@@ -91,8 +91,8 @@ func relationRemove(c *cx, a idArgs) error {
 		return err
 	}
 	var o core.Task
-	if err := c.tx.Get(c.ctx, &o, store.Eq("id", r.RelatedTaskID)); err != nil {
-		return nil // the other task is gone for good
+	if ok, err := found(c.tx.Get(c.ctx, &o, store.Eq("id", r.RelatedTaskID))); !ok {
+		return err // nil when the other task is gone for good
 	}
 	seq := c.tx.Seq()
 	for _, tid := range []string{t.ID, o.ID} {
