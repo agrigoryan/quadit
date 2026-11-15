@@ -309,39 +309,26 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 	if m.Outcome != "" && decisionOutcome(d.Row) != m.Outcome {
 		return false, nil
 	}
-	if ok, err := statusInCategory(ctx, db, d, m.ToCategory); err != nil || !ok {
-		return false, err
+	if m.ToCategory != "" {
+		to, _ := d.Changes["status_id"].To.(string)
+		if to == "" {
+			return false, nil
+		}
+		var st core.Status
+		if there, err := rowFound(db.Get(ctx, &st, store.Eq("id", to))); err != nil || !there || st.Category != m.ToCategory {
+			return false, err
+		}
 	}
-	return taskHasLabel(ctx, db, ev, m.LabelID)
-}
-
-// statusInCategory reports whether an event moved a task to a status of the
-// category given; any event does when none is given.
-func statusInCategory(ctx context.Context, db store.DB, d ruleEventData, category string) (bool, error) {
-	if category == "" {
-		return true, nil
+	if m.LabelID != "" {
+		if ev.ScopeType != "task" {
+			return false, nil
+		}
+		var t core.Task
+		if there, err := rowFound(db.Get(ctx, &t, store.Eq("id", ev.ScopeID))); err != nil || !there || !has(t.LabelIDs, m.LabelID) {
+			return false, err
+		}
 	}
-	to, _ := d.Changes["status_id"].To.(string)
-	if to == "" {
-		return false, nil
-	}
-	var st core.Status
-	there, err := rowFound(db.Get(ctx, &st, store.Eq("id", to)))
-	return there && st.Category == category, err
-}
-
-// taskHasLabel reports whether an event is about a task with the label
-// given; any event is when none is given.
-func taskHasLabel(ctx context.Context, db store.DB, ev core.Event, labelID string) (bool, error) {
-	if labelID == "" {
-		return true, nil
-	}
-	if ev.ScopeType != "task" {
-		return false, nil
-	}
-	var t core.Task
-	there, err := rowFound(db.Get(ctx, &t, store.Eq("id", ev.ScopeID)))
-	return there && has(t.LabelIDs, labelID), err
+	return true, nil
 }
 
 // decisionOutcome is the outcome of the decision in an event's row, or ""

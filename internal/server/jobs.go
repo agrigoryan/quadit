@@ -147,69 +147,46 @@ var noteVerbs = map[string]string{core.NoteAssigned: "assigned you", core.NoteMe
 // they have already read it. An item or a person that is gone is nothing
 // to tell; a read that fails is an error, and the job is tried again.
 func (s *Server) jobNotify(ctx context.Context, j core.Job) error {
-	note, ok, err := s.readNotice(ctx, j)
-	if err != nil || !ok {
-		return err
-	}
-	return s.sendNotice(ctx, note)
-}
-
-// notice is an inbox item to tell its person about outside the app.
-type notice struct {
-	item  core.Notification
-	user  core.User
-	prefs notifyPrefs
-	title string
-	link  string
-}
-
-// readNotice reads what a notify job tells about, and to whom. It reports
-// false when there is nothing to tell.
-func (s *Server) readNotice(ctx context.Context, j core.Job) (notice, bool, error) {
-	var note notice
 	var p struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(j.Payload, &p); err != nil {
-		return note, false, fmt.Errorf("the job's payload: %w", err)
+		return fmt.Errorf("the job's payload: %w", err)
 	}
 	db := s.st.In(j.WorkspaceID)
-	n := &note.item
-	if there, err := rowFound(db.Get(ctx, n, store.Eq("id", p.ID))); err != nil || !there || n.ReadAt != 0 {
-		return note, false, err
+	var n core.Notification
+	if there, err := rowFound(db.Get(ctx, &n, store.Eq("id", p.ID))); err != nil || !there || n.ReadAt != 0 {
+		return err
 	}
-	u := &note.user
-	if there, err := rowFound(s.st.Get(ctx, u, store.Eq("id", n.UserID), store.Live)); err != nil || !there {
-		return note, false, err
+	var u core.User
+	if there, err := rowFound(s.st.Get(ctx, &u, store.Eq("id", n.UserID), store.Live)); err != nil || !there {
+		return err
 	}
 	if u.Kind != core.KindPerson || u.DisabledAt != 0 {
-		return note, false, nil // agents are woken through the feed and webhooks
+		return nil // agents are woken through the feed and webhooks
 	}
+	var prefs notifyPrefs
 	if len(u.Notify) > 0 {
-		_ = json.Unmarshal(u.Notify, &note.prefs) //nolint:errcheck // choices that do not read are the defaults
+		_ = json.Unmarshal(u.Notify, &prefs) //nolint:errcheck // choices that do not read are the defaults
 	}
 	var ws core.Workspace
 	var actor core.Member
 	if err := s.st.Get(ctx, &ws, store.Eq("id", j.WorkspaceID)); err != nil {
-		return note, false, err
+		return err
 	}
 	// An actor who is no longer a member is named by nobody.
 	if _, err := rowFound(db.Get(ctx, &actor, store.Eq("user_id", n.ActorID))); err != nil {
-		return note, false, err
+		return err
 	}
-	note.link = s.cfg.BaseURL + "/" + ws.Slug + "/inbox"
+	link := s.cfg.BaseURL + "/" + ws.Slug + "/inbox"
 	if n.TaskID != "" {
-		note.link = s.cfg.BaseURL + "/" + ws.Slug + "/task/" + strings.SplitN(n.Title, " ", 2)[0]
+		link = s.cfg.BaseURL + "/" + ws.Slug + "/task/" + strings.SplitN(n.Title, " ", 2)[0]
 	} else if n.DocID != "" {
-		note.link = s.cfg.BaseURL + "/" + ws.Slug + "/docs/" + n.DocID
+		link = s.cfg.BaseURL + "/" + ws.Slug + "/docs/" + n.DocID
 	}
-	note.title = strings.TrimSpace(actor.Name + " " + noteVerbs[n.Type] + " " + n.Title)
-	return note, true, nil
-}
+	title := strings.TrimSpace(actor.Name + " " + noteVerbs[n.Type] + " " + n.Title)
 
-// sendNotice tells by push and by mail, as the person chose.
-func (s *Server) sendNotice(ctx context.Context, note notice) error {
-	n, u, prefs, title, link := note.item, note.user, note.prefs, note.title, note.link
+	// Tell by push and by mail, as the person chose.
 	if prefs.Push == nil || *prefs.Push {
 		if _, err := s.pushTo(ctx, u.ID, pushMessage{Title: title, Body: n.Snippet, URL: strings.TrimPrefix(link, s.cfg.BaseURL), Tag: n.TaskID + n.DocID}); err != nil {
 			s.log.Warn("push", "err", err)
