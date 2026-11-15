@@ -320,6 +320,6 @@ describe("TaskList for who may change the tasks, and who may not", () => {
     press("s");
     expect(statusPicker()).toBeNull();
     expect(screen.getByRole("button", { name: "Status: Todo" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Assignee" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Assignee: Unassigned" })).toBeDisabled();
   });
 });
