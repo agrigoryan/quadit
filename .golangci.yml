@@ -101,8 +101,11 @@ linters:
       - path: _test\.go
         linters: [revive]
         text: "(exported|unused-parameter)"
-      # main and the command table.
-      - path: cmd/
+      # Each file of changes registers its own change types from init, next
+      # to their code: the engine's catalogue is a map with no order, and
+      # TestCatalog checks it whole. One central list of every change would
+      # make each new change an edit in two files.
+      - path: internal/engine/ch_[^/]*\.go
         linters: [gochecknoinits]
 
 formatters:
