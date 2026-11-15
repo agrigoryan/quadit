@@ -106,3 +106,21 @@ func TestEveryRouteIsDescribed(t *testing.T) {
 		t.Fatalf("openapi.json describes only %d operations", n)
 	}
 }
+
+// TestAListsTrashIsTheDeletedRowsAlone: /list/{kind}?trash=1 lists the rows
+// in the trash instead of the live ones, as the page and file trash do.
+func TestAListsTrashIsTheDeletedRowsAlone(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	s.change(s.owner, "", "label.create", M{"name": "kept"})
+	gone := s.change(s.owner, "", "label.create", M{"name": "gone"})["ref"].(string)
+	s.change(s.owner, "", "label.delete", M{"id": gone})
+	var out struct{ Labels []struct{ Name string } }
+	s.call(s.owner, "", "GET", w+"/list/labels?trash=1", nil, 200, &out)
+	var names []string
+	for _, l := range out.Labels {
+		names = append(names, l.Name)
+	}
+	if !slices.Equal(names, []string{"gone"}) {
+		t.Fatalf("the labels' trash lists %v, want only the deleted one", names)
+	}
+}

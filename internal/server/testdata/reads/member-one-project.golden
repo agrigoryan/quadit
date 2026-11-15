@@ -16056,19 +16056,7 @@ SVA  Samurai vs Alien  id=<project SVA>
 === GET /api/v1/w/games/list/projects?trash=1
 200
 {
- "projects": [
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "description": "The game.",
-   "id": "<project SVA>",
-   "key": "SVA",
-   "name": "Samurai vs Alien",
-   "rank": "00000000sg",
-   "updated_seq": 1,
-   "workspace_id": "<id #153>"
-  }
- ]
+ "projects": []
 }
 
 === GET /api/v1/w/games/list/statuses
@@ -16154,71 +16142,7 @@ Canceled  canceled  id=<id #198>
 === GET /api/v1/w/games/list/statuses?trash=1
 200
 {
- "statuses": [
-  {
-   "category": "backlog",
-   "color": "#9ca3af",
-   "id": "<id #196>",
-   "name": "Backlog",
-   "project_id": "<project SVA>",
-   "rank": "00000000sg",
-   "updated_seq": 2
-  },
-  {
-   "category": "unstarted",
-   "color": "#6b7280",
-   "id": "<id #166>",
-   "is_default": true,
-   "name": "Todo",
-   "project_id": "<project SVA>",
-   "rank": "00000001kw",
-   "updated_seq": 3
-  },
-  {
-   "category": "started",
-   "color": "#f59e0b",
-   "id": "<id #164>",
-   "name": "In Progress",
-   "project_id": "<project SVA>",
-   "rank": "00000002dc",
-   "updated_seq": 4
-  },
-  {
-   "category": "started",
-   "id": "<status Review>",
-   "name": "Review",
-   "project_id": "<project SVA>",
-   "rank": "00000002o",
-   "updated_seq": 37
-  },
-  {
-   "category": "waiting",
-   "color": "#8b5cf6",
-   "id": "<id #197>",
-   "name": "Waiting",
-   "project_id": "<project SVA>",
-   "rank": "000000035s",
-   "updated_seq": 5
-  },
-  {
-   "category": "done",
-   "color": "#10b981",
-   "id": "<id #167>",
-   "name": "Done",
-   "project_id": "<project SVA>",
-   "rank": "00000003y8",
-   "updated_seq": 6
-  },
-  {
-   "category": "canceled",
-   "color": "#ef4444",
-   "id": "<id #198>",
-   "name": "Canceled",
-   "project_id": "<project SVA>",
-   "rank": "00000004qo",
-   "updated_seq": 7
-  }
- ]
+ "statuses": []
 }
 
 === GET /api/v1/w/games/list/labels
@@ -16254,22 +16178,6 @@ last  id=<label last>
 200
 {
  "labels": [
-  {
-   "id": "<label art>",
-   "name": "art",
-   "project_id": "<project SVA>",
-   "updated_seq": 39
-  },
-  {
-   "id": "<label bug>",
-   "name": "bug",
-   "updated_seq": 38
-  },
-  {
-   "id": "<label last>",
-   "name": "last",
-   "updated_seq": 264
-  },
   {
    "deleted_at": 1700000000000,
    "id": "<label temp>",
@@ -16308,20 +16216,6 @@ Boss fight  planned  id=<epic Boss fight>
 200
 {
  "epics": [
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "description": "The last level.",
-   "id": "<epic Boss fight>",
-   "lead_id": "<@aram>",
-   "name": "Boss fight",
-   "project_id": "<project SVA>",
-   "rank": "00000000sg",
-   "state": "planned",
-   "target_on": "<day+30>",
-   "updated_at": 1700000000000,
-   "updated_seq": 44
-  },
   {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
@@ -16372,23 +16266,6 @@ Dropped  id=<milestone Dropped>
  "milestones": [
   {
    "created_at": 1700000000000,
-   "epic_id": "<epic Boss fight>",
-   "id": "<milestone Alpha>",
-   "name": "Alpha",
-   "rank": "00000000sg",
-   "target_on": "<day+14>",
-   "updated_seq": 47
-  },
-  {
-   "created_at": 1700000000000,
-   "epic_id": "<epic Scrapped>",
-   "id": "<milestone Dropped>",
-   "name": "Dropped",
-   "rank": "00000000sg",
-   "updated_seq": 49
-  },
-  {
-   "created_at": 1700000000000,
    "deleted_at": 1700000000000,
    "epic_id": "<epic Boss fight>",
    "id": "<milestone Removed>",
@@ -16436,25 +16313,6 @@ Dropped  id=<milestone Dropped>
  "cycles": [
   {
    "created_at": 1700000000000,
-   "ends_on": "<day+10>",
-   "id": "<cycle SVA now>",
-   "name": "Sprint",
-   "number": 1,
-   "project_id": "<project SVA>",
-   "starts_on": "<day-3>",
-   "updated_seq": 53
-  },
-  {
-   "created_at": 1700000000000,
-   "ends_on": "<day+24>",
-   "id": "<cycle SVA next>",
-   "number": 2,
-   "project_id": "<project SVA>",
-   "starts_on": "<day+11>",
-   "updated_seq": 54
-  },
-  {
-   "created_at": 1700000000000,
    "deleted_at": 1700000000000,
    "ends_on": "<day+30>",
    "id": "<cycle SVA gone>",
@@ -16497,24 +16355,7 @@ Sprite  Sprite:  id=<template Sprite>
 === GET /api/v1/w/games/list/templates?trash=1
 200
 {
- "templates": [
-  {
-   "created_at": 1700000000000,
-   "description": "Steps to reproduce",
-   "id": "<template Bug report>",
-   "name": "Bug report",
-   "title": "Bug: ",
-   "updated_seq": 58
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<template Sprite>",
-   "name": "Sprite",
-   "project_id": "<project SVA>",
-   "title": "Sprite: ",
-   "updated_seq": 59
-  }
- ]
+ "templates": []
 }
 
 === GET /api/v1/w/games/list/preferences
@@ -16551,24 +16392,6 @@ Explosions are ring-shaped.  id=<preference rings>
 200
 {
  "preferences": [
-  {
-   "body": "Write short.",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<preference short>",
-   "updated_seq": 63
-  },
-  {
-   "body": "Explosions are ring-shaped.",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<preference rings>",
-   "label_ids": [
-    "<label art>"
-   ],
-   "project_id": "<project SVA>",
-   "updated_seq": 64
-  },
   {
    "body": "Deleted rule.",
    "created_at": 1700000000000,
@@ -16611,23 +16434,10 @@ staging  id=<resource staging>
  "resources": [
   {
    "created_at": 1700000000000,
-   "description": "the one render machine",
-   "id": "<resource gpu>",
-   "name": "gpu",
-   "updated_seq": 227
-  },
-  {
-   "created_at": 1700000000000,
    "deleted_at": 1700000000000,
    "id": "<resource gone>",
    "name": "old-box",
    "updated_seq": 230
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<resource staging>",
-   "name": "staging",
-   "updated_seq": 228
   }
  ]
 }
@@ -16984,21 +16794,6 @@ Boss phases  pr  open  https://git.example.com/games/sva/pull/12  12  id=<link S
 {
  "links": [
   {
-   "checks": "passing",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<link SVA-1 pr>",
-   "kind": "pr",
-   "ref": "12",
-   "repo": "games/sva",
-   "state": "open",
-   "task_id": "<task SVA-1>",
-   "title": "Boss phases",
-   "updated_at": 1700000000000,
-   "updated_seq": 109,
-   "url": "https://git.example.com/games/sva/pull/12"
-  },
-  {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "deleted_at": 1700000000000,
@@ -17188,57 +16983,6 @@ stale  Stale  id=<view Stale>
 200
 {
  "views": [
-  {
-   "created_at": 1700000000000,
-   "id": "<view Art bugs>",
-   "layout": "list",
-   "name": "Art bugs",
-   "owner_id": "<@aram>",
-   "project_id": "<project SVA>",
-   "query": {
-    "label": [
-     "art"
-    ],
-    "open": true
-   },
-   "rank": "00000000sg",
-   "shared": true,
-   "slug": "art-bugs",
-   "updated_seq": 219
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<view Bea's>",
-   "layout": "list",
-   "name": "Bea's",
-   "owner_id": "<@bea>",
-   "query": {
-    "waiting_on": "me"
-   },
-   "rank": "r",
-   "shared": false,
-   "slug": "bea-s",
-   "updated_seq": 221
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<view Stale>",
-   "layout": "list",
-   "name": "Stale",
-   "owner_id": "<@aram>",
-   "query": {
-    "label": [
-     "temp"
-    ],
-    "status": [
-     "todo"
-    ]
-   },
-   "rank": "x",
-   "shared": true,
-   "slug": "stale",
-   "updated_seq": 223
-  },
   {
    "created_at": 1700000000000,
    "deleted_at": 1700000000000,

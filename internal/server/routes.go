@@ -218,8 +218,8 @@ var narrowingParams = map[string]string{"project": "ProjectID", "task": "TaskID"
 // listQuery reads from the request which rows of a kind /list is asked
 // for. The URL narrows the list by the columns most kinds have (project=,
 // task=, epic=, …; one counts when the kind has its column, and a project or
-// a task may be named by its key), trash=1 lists the deleted rows with the
-// live ones, and limit= and offset= page it (at most 5000 rows).
+// a task may be named by its key), trash=1 lists the deleted rows instead of
+// the live ones, and limit= and offset= page it (at most 5000 rows).
 func (x *c) listQuery(kind rowKind) (store.Q, error) {
 	where := append([]store.Cond(nil), kind.list.conds...)
 	v := x.r.URL.Query()
@@ -236,8 +236,12 @@ func (x *c) listQuery(kind rowKind) (store.Q, error) {
 		}
 		where = append(where, store.Eq(col, id))
 	}
-	if _, ok := kind.row.FieldByName("DeletedAt"); ok && !truthyParam(v, "trash") {
-		where = append(where, store.Live)
+	if _, ok := kind.row.FieldByName("DeletedAt"); ok {
+		if truthyParam(v, "trash") {
+			where = append(where, store.NotNull("deleted_at"))
+		} else {
+			where = append(where, store.Live)
+		}
 	}
 	return store.Q{Where: where, Order: kind.list.order, Limit: min(x.intParam("limit", 1000), 5000), Offset: x.intParam("offset", 0)}, nil
 }

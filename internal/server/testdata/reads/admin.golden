@@ -24035,38 +24035,6 @@ ARC  Archived project  id=<project ARC>
   {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "description": "The game.",
-   "id": "<project SVA>",
-   "key": "SVA",
-   "name": "Samurai vs Alien",
-   "rank": "00000000sg",
-   "updated_seq": 1,
-   "workspace_id": "<id #153>"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<project OPS>",
-   "key": "OPS",
-   "name": "Operations",
-   "rank": "i",
-   "updated_seq": 8,
-   "workspace_id": "<id #153>"
-  },
-  {
-   "archived_at": 1700000000000,
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<project ARC>",
-   "key": "ARC",
-   "name": "Archived project",
-   "rank": "r",
-   "updated_seq": 95,
-   "workspace_id": "<id #153>"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
    "deleted_at": 1700000000000,
    "id": "<project DEL>",
    "key": "DEL",
@@ -24344,236 +24312,7 @@ Canceled  canceled  id=<id #215>
 === GET /api/v1/w/games/list/statuses?trash=1
 200
 {
- "statuses": [
-  {
-   "category": "backlog",
-   "color": "#9ca3af",
-   "id": "<id #196>",
-   "name": "Backlog",
-   "project_id": "<project SVA>",
-   "rank": "00000000sg",
-   "updated_seq": 2
-  },
-  {
-   "category": "backlog",
-   "color": "#9ca3af",
-   "id": "<id #200>",
-   "name": "Backlog",
-   "project_id": "<project OPS>",
-   "rank": "00000000sg",
-   "updated_seq": 9
-  },
-  {
-   "category": "backlog",
-   "color": "#9ca3af",
-   "id": "<id #205>",
-   "name": "Backlog",
-   "project_id": "<project ARC>",
-   "rank": "00000000sg",
-   "updated_seq": 16
-  },
-  {
-   "category": "backlog",
-   "color": "#9ca3af",
-   "id": "<id #211>",
-   "name": "Backlog",
-   "project_id": "<project DEL>",
-   "rank": "00000000sg",
-   "updated_seq": 23
-  },
-  {
-   "category": "unstarted",
-   "color": "#6b7280",
-   "id": "<id #166>",
-   "is_default": true,
-   "name": "Todo",
-   "project_id": "<project SVA>",
-   "rank": "00000001kw",
-   "updated_seq": 3
-  },
-  {
-   "category": "unstarted",
-   "color": "#6b7280",
-   "id": "<id #165>",
-   "is_default": true,
-   "name": "Todo",
-   "project_id": "<project OPS>",
-   "rank": "00000001kw",
-   "updated_seq": 10
-  },
-  {
-   "category": "unstarted",
-   "color": "#6b7280",
-   "id": "<id #169>",
-   "is_default": true,
-   "name": "Todo",
-   "project_id": "<project ARC>",
-   "rank": "00000001kw",
-   "updated_seq": 17
-  },
-  {
-   "category": "unstarted",
-   "color": "#6b7280",
-   "id": "<id #170>",
-   "is_default": true,
-   "name": "Todo",
-   "project_id": "<project DEL>",
-   "rank": "00000001kw",
-   "updated_seq": 24
-  },
-  {
-   "category": "started",
-   "color": "#f59e0b",
-   "id": "<id #164>",
-   "name": "In Progress",
-   "project_id": "<project SVA>",
-   "rank": "00000002dc",
-   "updated_seq": 4
-  },
-  {
-   "category": "started",
-   "color": "#f59e0b",
-   "id": "<id #201>",
-   "name": "In Progress",
-   "project_id": "<project OPS>",
-   "rank": "00000002dc",
-   "updated_seq": 11
-  },
-  {
-   "category": "started",
-   "color": "#f59e0b",
-   "id": "<id #206>",
-   "name": "In Progress",
-   "project_id": "<project ARC>",
-   "rank": "00000002dc",
-   "updated_seq": 18
-  },
-  {
-   "category": "started",
-   "color": "#f59e0b",
-   "id": "<id #212>",
-   "name": "In Progress",
-   "project_id": "<project DEL>",
-   "rank": "00000002dc",
-   "updated_seq": 25
-  },
-  {
-   "category": "started",
-   "id": "<status Review>",
-   "name": "Review",
-   "project_id": "<project SVA>",
-   "rank": "00000002o",
-   "updated_seq": 37
-  },
-  {
-   "category": "waiting",
-   "color": "#8b5cf6",
-   "id": "<id #197>",
-   "name": "Waiting",
-   "project_id": "<project SVA>",
-   "rank": "000000035s",
-   "updated_seq": 5
-  },
-  {
-   "category": "waiting",
-   "color": "#8b5cf6",
-   "id": "<id #202>",
-   "name": "Waiting",
-   "project_id": "<project OPS>",
-   "rank": "000000035s",
-   "updated_seq": 12
-  },
-  {
-   "category": "waiting",
-   "color": "#8b5cf6",
-   "id": "<id #207>",
-   "name": "Waiting",
-   "project_id": "<project ARC>",
-   "rank": "000000035s",
-   "updated_seq": 19
-  },
-  {
-   "category": "waiting",
-   "color": "#8b5cf6",
-   "id": "<id #213>",
-   "name": "Waiting",
-   "project_id": "<project DEL>",
-   "rank": "000000035s",
-   "updated_seq": 26
-  },
-  {
-   "category": "done",
-   "color": "#10b981",
-   "id": "<id #167>",
-   "name": "Done",
-   "project_id": "<project SVA>",
-   "rank": "00000003y8",
-   "updated_seq": 6
-  },
-  {
-   "category": "done",
-   "color": "#10b981",
-   "id": "<id #168>",
-   "name": "Done",
-   "project_id": "<project OPS>",
-   "rank": "00000003y8",
-   "updated_seq": 13
-  },
-  {
-   "category": "done",
-   "color": "#10b981",
-   "id": "<id #208>",
-   "name": "Done",
-   "project_id": "<project ARC>",
-   "rank": "00000003y8",
-   "updated_seq": 20
-  },
-  {
-   "category": "done",
-   "color": "#10b981",
-   "id": "<id #214>",
-   "name": "Done",
-   "project_id": "<project DEL>",
-   "rank": "00000003y8",
-   "updated_seq": 27
-  },
-  {
-   "category": "canceled",
-   "color": "#ef4444",
-   "id": "<id #198>",
-   "name": "Canceled",
-   "project_id": "<project SVA>",
-   "rank": "00000004qo",
-   "updated_seq": 7
-  },
-  {
-   "category": "canceled",
-   "color": "#ef4444",
-   "id": "<id #203>",
-   "name": "Canceled",
-   "project_id": "<project OPS>",
-   "rank": "00000004qo",
-   "updated_seq": 14
-  },
-  {
-   "category": "canceled",
-   "color": "#ef4444",
-   "id": "<id #209>",
-   "name": "Canceled",
-   "project_id": "<project ARC>",
-   "rank": "00000004qo",
-   "updated_seq": 21
-  },
-  {
-   "category": "canceled",
-   "color": "#ef4444",
-   "id": "<id #215>",
-   "name": "Canceled",
-   "project_id": "<project DEL>",
-   "rank": "00000004qo",
-   "updated_seq": 28
-  }
- ]
+ "statuses": []
 }
 
 === GET /api/v1/w/games/list/labels
@@ -24617,33 +24356,11 @@ last  id=<label last>
 {
  "labels": [
   {
-   "id": "<label art>",
-   "name": "art",
-   "project_id": "<project SVA>",
-   "updated_seq": 39
-  },
-  {
-   "id": "<label bug>",
-   "name": "bug",
-   "updated_seq": 38
-  },
-  {
    "deleted_at": 1700000000000,
    "id": "<label gone>",
    "name": "gone",
    "project_id": "<project OPS>",
    "updated_seq": 43
-  },
-  {
-   "id": "<label infra>",
-   "name": "infra",
-   "project_id": "<project OPS>",
-   "updated_seq": 40
-  },
-  {
-   "id": "<label last>",
-   "name": "last",
-   "updated_seq": 264
   },
   {
    "deleted_at": 1700000000000,
@@ -24696,32 +24413,6 @@ Hardening  planned  id=<epic Hardening>
 200
 {
  "epics": [
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "description": "The last level.",
-   "id": "<epic Boss fight>",
-   "lead_id": "<@aram>",
-   "name": "Boss fight",
-   "project_id": "<project SVA>",
-   "rank": "00000000sg",
-   "state": "planned",
-   "target_on": "<day+30>",
-   "updated_at": 1700000000000,
-   "updated_seq": 44
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "description": "Keys and backups.",
-   "id": "<epic Hardening>",
-   "name": "Hardening",
-   "project_id": "<project OPS>",
-   "rank": "00000000sg",
-   "state": "planned",
-   "updated_at": 1700000000000,
-   "updated_seq": 45
-  },
   {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
@@ -24781,31 +24472,6 @@ Dropped  id=<milestone Dropped>
  "milestones": [
   {
    "created_at": 1700000000000,
-   "epic_id": "<epic Boss fight>",
-   "id": "<milestone Alpha>",
-   "name": "Alpha",
-   "rank": "00000000sg",
-   "target_on": "<day+14>",
-   "updated_seq": 47
-  },
-  {
-   "created_at": 1700000000000,
-   "epic_id": "<epic Hardening>",
-   "id": "<milestone Audit>",
-   "name": "Audit",
-   "rank": "00000000sg",
-   "updated_seq": 48
-  },
-  {
-   "created_at": 1700000000000,
-   "epic_id": "<epic Scrapped>",
-   "id": "<milestone Dropped>",
-   "name": "Dropped",
-   "rank": "00000000sg",
-   "updated_seq": 49
-  },
-  {
-   "created_at": 1700000000000,
    "deleted_at": 1700000000000,
    "epic_id": "<epic Boss fight>",
    "id": "<milestone Removed>",
@@ -24863,34 +24529,6 @@ Dropped  id=<milestone Dropped>
  "cycles": [
   {
    "created_at": 1700000000000,
-   "ends_on": "<day+10>",
-   "id": "<cycle SVA now>",
-   "name": "Sprint",
-   "number": 1,
-   "project_id": "<project SVA>",
-   "starts_on": "<day-3>",
-   "updated_seq": 53
-  },
-  {
-   "created_at": 1700000000000,
-   "ends_on": "<day+5>",
-   "id": "<cycle OPS now>",
-   "number": 1,
-   "project_id": "<project OPS>",
-   "starts_on": "<day-1>",
-   "updated_seq": 55
-  },
-  {
-   "created_at": 1700000000000,
-   "ends_on": "<day+24>",
-   "id": "<cycle SVA next>",
-   "number": 2,
-   "project_id": "<project SVA>",
-   "starts_on": "<day+11>",
-   "updated_seq": 54
-  },
-  {
-   "created_at": 1700000000000,
    "deleted_at": 1700000000000,
    "ends_on": "<day+30>",
    "id": "<cycle SVA gone>",
@@ -24945,35 +24583,11 @@ Sprite  Sprite:  id=<template Sprite>
  "templates": [
   {
    "created_at": 1700000000000,
-   "description": "Steps to reproduce",
-   "id": "<template Bug report>",
-   "name": "Bug report",
-   "title": "Bug: ",
-   "updated_seq": 58
-  },
-  {
-   "created_at": 1700000000000,
    "deleted_at": 1700000000000,
    "id": "<template gone>",
    "name": "Gone",
    "project_id": "<project OPS>",
    "updated_seq": 62
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<template Runbook>",
-   "name": "Runbook",
-   "project_id": "<project OPS>",
-   "title": "Runbook: ",
-   "updated_seq": 60
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<template Sprite>",
-   "name": "Sprite",
-   "project_id": "<project SVA>",
-   "title": "Sprite: ",
-   "updated_seq": 59
   }
  ]
 }
@@ -25032,41 +24646,6 @@ Retired rule.  id=<preference retired>
 {
  "preferences": [
   {
-   "body": "Write short.",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<preference short>",
-   "updated_seq": 63
-  },
-  {
-   "body": "Explosions are ring-shaped.",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<preference rings>",
-   "label_ids": [
-    "<label art>"
-   ],
-   "project_id": "<project SVA>",
-   "updated_seq": 64
-  },
-  {
-   "body": "Rotate keys monthly.",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<preference rotate>",
-   "project_id": "<project OPS>",
-   "updated_seq": 65
-  },
-  {
-   "body": "Retired rule.",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<preference retired>",
-   "project_id": "<project OPS>",
-   "retired_at": 1700000000000,
-   "updated_seq": 67
-  },
-  {
    "body": "Deleted rule.",
    "created_at": 1700000000000,
    "created_by": "<@aram>",
@@ -25108,23 +24687,10 @@ staging  id=<resource staging>
  "resources": [
   {
    "created_at": 1700000000000,
-   "description": "the one render machine",
-   "id": "<resource gpu>",
-   "name": "gpu",
-   "updated_seq": 227
-  },
-  {
-   "created_at": 1700000000000,
    "deleted_at": 1700000000000,
    "id": "<resource gone>",
    "name": "old-box",
    "updated_seq": 230
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<resource staging>",
-   "name": "staging",
-   "updated_seq": 228
   }
  ]
 }
@@ -25156,21 +24722,7 @@ DEPLOY_KEY  id=<secret DEPLOY_KEY>
 === GET /api/v1/w/games/list/secrets?trash=1
 200
 {
- "secrets": [
-  {
-   "agents": [
-    "<@ops>"
-   ],
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "description": "for the staging box",
-   "env": false,
-   "id": "<secret DEPLOY_KEY>",
-   "name": "DEPLOY_KEY",
-   "updated_at": 1700000000000,
-   "updated_seq": 250
-  }
- ]
+ "secrets": []
 }
 
 === GET /api/v1/w/games/list/claims
@@ -25762,32 +25314,6 @@ branch  rotate-keys  task=<task OPS-1>  id=<link OPS-1 branch>
 {
  "links": [
   {
-   "checks": "passing",
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<link SVA-1 pr>",
-   "kind": "pr",
-   "ref": "12",
-   "repo": "games/sva",
-   "state": "open",
-   "task_id": "<task SVA-1>",
-   "title": "Boss phases",
-   "updated_at": 1700000000000,
-   "updated_seq": 109,
-   "url": "https://git.example.com/games/sva/pull/12"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<link OPS-1 branch>",
-   "kind": "branch",
-   "ref": "rotate-keys",
-   "repo": "games/ops",
-   "task_id": "<task OPS-1>",
-   "updated_at": 1700000000000,
-   "updated_seq": 110
-  },
-  {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "deleted_at": 1700000000000,
@@ -25850,21 +25376,6 @@ ops events  http://receiver.test/ops  id=<webhook OPS>
    "active": true,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "event_types": [
-    "comment.created"
-   ],
-   "failures": 0,
-   "id": "<webhook comments>",
-   "last_at": 1700000000000,
-   "last_status": "200",
-   "name": "comments",
-   "updated_seq": 260,
-   "url": "http://receiver.test/comments"
-  },
-  {
-   "active": true,
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
    "deleted_at": 1700000000000,
    "event_types": [
     "never.matches"
@@ -25874,20 +25385,6 @@ ops events  http://receiver.test/ops  id=<webhook OPS>
    "name": "gone",
    "updated_seq": 247,
    "url": "http://receiver.test/gone"
-  },
-  {
-   "active": true,
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "event_types": [
-    "never.matches"
-   ],
-   "failures": 0,
-   "id": "<webhook OPS>",
-   "name": "ops events",
-   "project_id": "<project OPS>",
-   "updated_seq": 245,
-   "url": "http://receiver.test/ops"
   }
  ]
 }
@@ -25984,24 +25481,6 @@ tell the owner  id=<rule notify>
    },
    "name": "gone",
    "updated_seq": 244
-  },
-  {
-   "action": {
-    "kind": "notify",
-    "user_id": "<@aram>"
-   },
-   "active": false,
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<rule notify>",
-   "match": {
-    "event_types": [
-     "task.created"
-    ],
-    "project_id": "<project OPS>"
-   },
-   "name": "tell the owner",
-   "updated_seq": 242
   }
  ]
 }
@@ -26043,30 +25522,7 @@ ops on github  github  id=<integration OPS>
 === GET /api/v1/w/games/list/integrations?trash=1
 200
 {
- "integrations": [
-  {
-   "active": false,
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "has_secret": true,
-   "id": "<integration github>",
-   "kind": "github",
-   "name": "sva on github",
-   "project_id": "<project SVA>",
-   "updated_seq": 248
-  },
-  {
-   "active": false,
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "has_secret": true,
-   "id": "<integration OPS>",
-   "kind": "github",
-   "name": "ops on github",
-   "project_id": "<project OPS>",
-   "updated_seq": 249
-  }
- ]
+ "integrations": []
 }
 
 === GET /api/v1/w/games/list/views
@@ -26157,76 +25613,6 @@ stale  Stale  id=<view Stale>
 200
 {
  "views": [
-  {
-   "created_at": 1700000000000,
-   "id": "<view Art bugs>",
-   "layout": "list",
-   "name": "Art bugs",
-   "owner_id": "<@aram>",
-   "project_id": "<project SVA>",
-   "query": {
-    "label": [
-     "art"
-    ],
-    "open": true
-   },
-   "rank": "00000000sg",
-   "shared": true,
-   "slug": "art-bugs",
-   "updated_seq": 219
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<view Mine>",
-   "layout": "list",
-   "name": "Mine",
-   "owner_id": "<@aram>",
-   "query": {
-    "assignee": [
-     "me"
-    ]
-   },
-   "rank": "i",
-   "shared": false,
-   "slug": "mine",
-   "updated_seq": 220
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<view Ops infra>",
-   "layout": "board",
-   "name": "Ops infra",
-   "owner_id": "<@aram>",
-   "project_id": "<project OPS>",
-   "query": {
-    "label": [
-     "infra"
-    ]
-   },
-   "rank": "v",
-   "shared": true,
-   "slug": "ops-infra",
-   "updated_seq": 222
-  },
-  {
-   "created_at": 1700000000000,
-   "id": "<view Stale>",
-   "layout": "list",
-   "name": "Stale",
-   "owner_id": "<@aram>",
-   "query": {
-    "label": [
-     "temp"
-    ],
-    "status": [
-     "todo"
-    ]
-   },
-   "rank": "x",
-   "shared": true,
-   "slug": "stale",
-   "updated_seq": 223
-  },
   {
    "created_at": 1700000000000,
    "deleted_at": 1700000000000,
