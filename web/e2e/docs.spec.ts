@@ -37,6 +37,25 @@ test("a project page keeps what was typed, gets a sub-page, and is listed with t
   await expect(tree.getByRole("link", { name: "Launch checklist" })).toBeVisible();
 });
 
+// A title is saved once typing pauses. A reload within that pause must not
+// lose it: what waits is handed over as the page goes, and the next page sends it.
+test("a page's title typed just before a reload reaches the server", async ({ page, project, quadit }) => {
+  const made = JSON.parse(
+    await quadit.cli("--json", "do", "doc.create", JSON.stringify({ title: "Draft", project: project.key })),
+  ) as { ref: string };
+  const title = async () =>
+    (JSON.parse(await quadit.cli("--json", "doc", made.ref)) as { doc: { title: string } }).doc.title;
+
+  await page.goto(`/e2e/docs/${made.ref}`);
+  const box = page.getByRole("textbox", { name: "Page title" });
+  await expect(box).toHaveValue("Draft");
+  await box.fill("Quarterly review");
+  await page.reload();
+
+  await expect.poll(title).toBe("Quarterly review");
+  await expect(box).toHaveValue("Quarterly review");
+});
+
 // A column's resize handle is a window splitter: a Tab stop that says the
 // column's width, moved with Left and Right (Shift for bigger steps).
 test("a database column is resized from the keyboard and keeps its width", async ({ page, project, quadit }) => {

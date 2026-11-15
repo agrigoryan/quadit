@@ -19,6 +19,7 @@ import { mutate } from "@/data/mutate";
 import { getRowEvenIfGone } from "@/data/selectors";
 import { onEvents, useStore } from "@/data/store";
 import { toast } from "@/lib/toast";
+import { pausedWrite } from "@/hooks/paused-write";
 import type { FeedEvent } from "@/types/core";
 import { type BlockSchemaLike, type EdBlock, rowsToEditor, signature, toEditor, toWire } from "@/docs/editor/convert";
 import { diff, flatten, type Known } from "@/docs/editor/diff";
@@ -43,7 +44,8 @@ export class DocSync {
   private held = new Map<string, BlockRow>();
   /** Ids removed on the server: a block that comes back locally (undo) needs a new one. */
   private graveyard = new Set<string>();
-  private timer: ReturnType<typeof setTimeout> | undefined;
+  /** The send that waits for typing to pause; it goes at once if the page is hidden or left. */
+  private out = pausedWrite(DEBOUNCE_MS);
   private applying = false;
   private pending = 0;
   private seq: number;
@@ -64,8 +66,6 @@ export class DocSync {
     this.stops.push(editor.onChange(() => !this.applying && this.schedule()));
     this.stops.push(onEvents(this.onFeed));
     this.stops.push(useStore.subscribe(this.onStore));
-    window.addEventListener("pagehide", this.flush);
-    this.stops.push(() => window.removeEventListener("pagehide", this.flush));
   }
 
   /** Sends what is unsent and stops following. */
@@ -100,8 +100,7 @@ export class DocSync {
   // ---- going out ----
 
   private schedule() {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(this.flush, DEBOUNCE_MS);
+    this.out.hold(() => this.send(true));
   }
 
   private setPending(by: number) {
@@ -116,9 +115,11 @@ export class DocSync {
    * still waiting, and it goes.
    */
   flush = () => {
-    const waiting = this.timer !== undefined;
-    clearTimeout(this.timer);
-    this.timer = undefined;
+    if (this.out.waiting) this.out.flush();
+    else this.send(false);
+  };
+
+  private send(waiting: boolean) {
     if (this.dead || (!waiting && !this.editor.isEditable)) return;
     this.rehome();
     const flat = flatten(this.doc(), (b) => toWire(b, this.schema), this.known);
@@ -148,7 +149,7 @@ export class DocSync {
         toast.error(errorMessage(err));
         void this.resync(true);
       });
-  };
+  }
 
   /** A block brought back by undo after its removal was sent cannot reuse its id: give it a fresh one. */
   private rehome() {
@@ -308,7 +309,7 @@ export class DocSync {
       );
       return;
     }
-    clearTimeout(this.timer);
+    this.out.cancel();
     this.known.clear();
     this.held.clear();
     this.inflight.clear();

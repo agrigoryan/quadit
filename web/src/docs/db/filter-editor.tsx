@@ -2,10 +2,11 @@
 // toolbar. Both are kept in the view's config, where the server reads them
 // too (rows?view=).
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useMembers } from "@/data/selectors";
+import { getRowEvenIfGone, useMembers } from "@/data/selectors";
+import { usePausedWrite } from "@/hooks/paused-write";
 import { setViewConfig } from "@/docs/db/actions";
 import { optionsOf } from "@/docs/db/options";
 import { PropIcon } from "@/docs/db/prop-meta";
@@ -60,8 +61,7 @@ const field =
 /** A text box that saves a moment after typing stops, so the view filters as you type without a change per key. */
 function LazyInput({ value, onChange, type }: { value: string; onChange: (v: string) => void; type: string }) {
   const [text, setText] = useState(value);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const save = usePausedWrite(350);
   return (
     <input
       type={type}
@@ -71,8 +71,7 @@ function LazyInput({ value, onChange, type }: { value: string; onChange: (v: str
       onChange={(e) => {
         const next = e.target.value;
         setText(next);
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => onChange(next), 350);
+        save.hold(() => onChange(next));
       }}
       className={field}
     />
@@ -139,8 +138,18 @@ const propItems = (props: DBProperty[]) => [
 export function FilterEditor({ view, props }: { view: DBView; props: DBProperty[] }) {
   const filters = view.config?.filters ?? [];
   const save = (next: RowFilter[]) => setViewConfig(view, { filters: next.length ? next : undefined });
-  const patch = (i: number, fields: Partial<RowFilter>) =>
-    save(filters.map((f, j) => (j === i ? { ...f, ...fields } : f)));
+  /**
+   * Changes filter i as the view now is: a value typed is saved after a
+   * pause, or as its box goes (the filter taken away, the popover closed),
+   * when this render's filters may be out of date. It is dropped when filter
+   * i is no longer on the property it was on in this render.
+   */
+  const patch = (i: number, fields: Partial<RowFilter>) => {
+    const now = getRowEvenIfGone("dbviews", view.id) ?? view;
+    const current = now.config?.filters ?? [];
+    if (current[i]?.prop !== filters[i]?.prop) return;
+    setViewConfig(now, { filters: current.map((f, j) => (j === i ? { ...f, ...fields } : f)) });
+  };
   return (
     <div className="flex w-[min(30rem,calc(100vw-1rem))] flex-col gap-1.5 p-2">
       {filters.length === 0 && <p className="px-1 py-1 text-sm text-ink-2">{t("db.filter.none")}</p>}

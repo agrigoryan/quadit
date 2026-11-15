@@ -1,5 +1,6 @@
 import { SmilePlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { usePausedWrite } from "@/hooks/paused-write";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { updateDoc } from "@/docs/actions";
@@ -26,7 +27,7 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
   const [value, setValue] = useState(doc.title);
   const [focused, setFocused] = useState(false);
   const box = useRef<HTMLTextAreaElement | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const save = usePausedWrite(500);
 
   // Someone else renamed the page: show it, unless the person is typing here.
   useEffect(() => {
@@ -38,11 +39,6 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
     if (!readOnly && !doc.title && Date.now() - doc.created_at < 4000) box.current?.focus();
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- only when another page opens, not when its title changes
   }, [doc.id]);
-
-  const save = (title: string) => {
-    clearTimeout(timer.current);
-    updateDoc(doc.id, { title: title.trim() });
-  };
 
   // The title's type, the same whether it can be edited or not.
   const type = cx(
@@ -101,13 +97,12 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
           onFocus={() => setFocused(true)}
           onBlur={() => {
             setFocused(false);
-            save(value);
+            save.flush();
           }}
           onChange={(e) => {
             const next = e.target.value.replace(/\n/g, " ");
             setValue(next);
-            clearTimeout(timer.current);
-            timer.current = setTimeout(() => save(next), 500);
+            save.hold(() => updateDoc(doc.id, { title: next.trim() }));
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === "ArrowDown") {
