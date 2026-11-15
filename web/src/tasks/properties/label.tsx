@@ -3,12 +3,19 @@
 import { useMemo } from "react";
 import { Tag } from "lucide-react";
 import { joinPhrases, t } from "@/lib/i18n";
-import { getRowEvenIfGone, useLabels, useLookupEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone, useLabels, useLookupEvenIfGone, useRow } from "@/lib/selectors";
 import { toggleLabel } from "@/tasks/actions";
 import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { leaving, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import { asIds, type CreateProps, type PanelProps, type TaskProperty } from "@/tasks/properties/property";
+import {
+  asIds,
+  type CreateProps,
+  type GroupHead,
+  NONE,
+  type PanelProps,
+  type TaskProperty,
+} from "@/tasks/properties/property";
 import { LabelChip } from "@/ui/badge";
 import { Picker } from "@/ui/picker";
 import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
@@ -64,6 +71,18 @@ function LabelPill({ project, value, onChange, onLeave }: CreateProps) {
         </Pill>
       </button>
     </Picker>
+  );
+}
+
+/** A group's dot, in its label's colour. */
+function LabelMark({ group }: { group: GroupHead }) {
+  const color = useRow("labels", group.value !== NONE ? group.value : undefined)?.color;
+  return (
+    <span
+      className="mx-0.5 size-2.5 shrink-0 rounded-full"
+      style={{ background: group.value === NONE ? "var(--line-strong)" : color || "var(--ink-3)" }}
+      aria-hidden
+    />
   );
 }
 
@@ -141,5 +160,22 @@ export const label = {
     read: (q, ctx) => (q.label ?? []).flatMap((ref) => rowsNamed(ctx.c.labels, ref, ctx)),
     address: (id, c, projectId) => nameWord(c.labels, id, projectId),
     canBeGone: true,
+  },
+  group: {
+    title: () => t("group.label"),
+    groups: (c, projectId) => [
+      ...Object.values(c.labels)
+        .filter((l) => !l.project_id || !projectId || l.project_id === projectId)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((l) => ({ id: l.id, title: l.name, value: l.id })),
+      { id: NONE, title: t("task.noLabel"), value: NONE },
+    ],
+    // In each of its labels' groups; in "No label" when it has none of them.
+    place: (task, _c, has) => {
+      const ids = (task.label_ids ?? []).filter(has);
+      return ids.length ? ids : [NONE];
+    },
+    Icon: LabelMark,
+    draft: (group) => (group.value !== NONE ? { labelIds: [group.value] } : {}),
   },
 } satisfies TaskProperty<"label">;

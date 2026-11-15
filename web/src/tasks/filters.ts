@@ -2,14 +2,10 @@
 // set converts to and from the server's TaskQuery, which is what a saved
 // view stores, so views made here work for agents and the other way round.
 
-import { t, tMaybe } from "@/lib/i18n";
 import type { Collections, Dict } from "@/lib/store";
-import { CATEGORIES, type Category, type GroupBy, type SortBy, type Task, type TaskQuery } from "@/lib/types";
-import { type FilterName, FILTERS } from "@/tasks/properties";
-import { NONE, type QueryContext, type QuerySource } from "@/tasks/properties/property";
-
-/** How a page groups its tasks: the server's groupings, and by label. */
-export type Grouping = GroupBy | "label";
+import type { SortBy, Task, TaskQuery } from "@/lib/types";
+import { type FilterName, FILTERS, type Grouping, GROUPINGS } from "@/tasks/properties";
+import type { GroupHead, GroupSource, QueryContext, QuerySource } from "@/tasks/properties/property";
 
 /**
  * What a task list is filtered by: for each property it can be filtered by
@@ -68,32 +64,20 @@ export function comparer(sort: SortBy): (a: Task, b: Task) => number {
   }
 }
 
-export interface TaskGroup {
-  /** Unique within the list. For status groups this is the status id (or the category, across projects). */
-  id: string;
-  title: string;
+/** A group of a list, or a board's column, with its tasks. */
+export interface TaskGroup extends GroupHead {
   kind: Grouping;
-  /** The value the group stands for: a status id or category, a user id, an epic id, a label id, a priority. */
-  value: string;
-  category?: Category;
   tasks: Task[];
 }
-
-/**
- * The tables grouping reads; a page passes only these, so it regroups only
- * when one of them changes. Statuses and labels are the live ones
- * (useLookup); members and epics are every row (useLookupEvenIfGone), so a
- * task still assigned to someone removed, or in a deleted epic, keeps a group
- * under that name.
- */
-export type GroupSource = Pick<Collections, "statuses" | "members" | "epics" | "labels">;
 
 /**
  * Splits tasks into groups, in a fixed order with empty groups left out
  * (status groups of the project in view are always shown, so a column or
  * section does not vanish when its last task moves). The board asks to keep
- * the empty ones, so there is always a column to drop a card in. Grouped by
- * label, a task with several labels is in each of their groups.
+ * the empty ones, so there is always a column to drop a card in. How the
+ * groups are made and which a task goes in, each property says
+ * (tasks/properties): grouped by label, a task with several labels is in
+ * each of their groups.
  */
 export function groupTasks(
   tasks: Task[],
@@ -102,78 +86,19 @@ export function groupTasks(
   projectId: string | undefined,
   keepEmpty = false,
 ): TaskGroup[] {
-  if (by === "none") return [{ id: "all", title: "", kind: "none", value: "", tasks }];
+  const part = GROUPINGS.find((p) => p.name === by)?.group;
+  if (!part) return [{ id: "all", title: "", kind: "none", value: "", tasks }];
   const groups = new Map<string, TaskGroup>();
   /** Groups that are shown only when they hold a task: someone removed, a deleted epic. */
   const quiet = new Set<string>();
-  const add = (g: Omit<TaskGroup, "tasks" | "kind">) => {
-    if (!groups.has(g.id)) groups.set(g.id, { ...g, kind: by, tasks: [] });
-    return groups.get(g.id) as TaskGroup;
-  };
-  const shown = () => [...groups.values()].filter((g) => g.tasks.length > 0 || (keepEmpty && !quiet.has(g.id)));
-
-  if (by === "status") {
-    if (projectId) {
-      const own = Object.values(c.statuses)
-        .filter((s) => s.project_id === projectId)
-        .sort((a, b) => (a.rank < b.rank ? -1 : 1));
-      for (const s of own) add({ id: s.id, title: s.name, value: s.id, category: s.category });
-      for (const task of tasks) groups.get(task.status_id)?.tasks.push(task);
-      return shown();
-    }
-    // Several projects: their statuses differ, the six categories do not.
-    for (const cat of CATEGORIES) add({ id: cat, title: tMaybe(`category.${cat}`), value: cat, category: cat });
-    for (const task of tasks) groups.get(c.statuses[task.status_id]?.category ?? "backlog")?.tasks.push(task);
-    return shown();
+  for (const { quiet: isQuiet, ...head } of part.groups(c, projectId)) {
+    if (groups.has(head.id)) continue;
+    groups.set(head.id, { ...head, kind: by, tasks: [] });
+    if (isQuiet) quiet.add(head.id);
   }
-
-  if (by === "priority") {
-    for (const p of [1, 2, 3, 4, 0]) add({ id: String(p), title: tMaybe(`priority.${p}`), value: String(p) });
-    for (const task of tasks) groups.get(String(task.priority))?.tasks.push(task);
-    return shown();
-  }
-
-  if (by === "label") {
-    const labels = Object.values(c.labels)
-      .filter((l) => !l.project_id || !projectId || l.project_id === projectId)
-      .sort((a, b) => a.name.localeCompare(b.name));
-    for (const l of labels) add({ id: l.id, title: l.name, value: l.id });
-    const none = add({ id: NONE, title: t("task.noLabel"), value: NONE });
-    for (const task of tasks) {
-      let placed = false;
-      for (const id of task.label_ids ?? []) {
-        const group = groups.get(id);
-        if (!group) continue;
-        group.tasks.push(task);
-        placed = true;
-      }
-      if (!placed) none.tasks.push(task);
-    }
-    return shown();
-  }
-
-  if (by === "assignee") {
-    const members = Object.values(c.members).sort((a, b) =>
-      a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "person" ? -1 : 1,
-    );
-    for (const m of members) {
-      add({ id: m.user_id, title: m.name, value: m.user_id });
-      if (m.removed_at || m.suspended_at) quiet.add(m.user_id);
-    }
-  } else {
-    const epics = Object.values(c.epics).sort((a, b) => (a.rank < b.rank ? -1 : 1));
-    for (const e of epics) {
-      add({ id: e.id, title: e.name, value: e.id });
-      if (e.deleted_at || (projectId && e.project_id !== projectId)) quiet.add(e.id);
-    }
-  }
-  add({ id: NONE, title: by === "assignee" ? t("task.unassigned") : t("task.noEpic"), value: NONE });
-  for (const task of tasks) {
-    const key = (by === "assignee" ? task.assignee_id : task.epic_id) ?? NONE;
-    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- tsc needs it: get() may be undefined, and the NONE group was added above
-    (groups.get(key) ?? (groups.get(NONE) as TaskGroup)).tasks.push(task);
-  }
-  return shown();
+  const has = (id: string) => groups.has(id);
+  for (const task of tasks) for (const id of part.place(task, c, has)) groups.get(id)?.tasks.push(task);
+  return [...groups.values()].filter((g) => g.tasks.length > 0 || (keepEmpty && !quiet.has(g.id)));
 }
 
 const SORT_TO_QUERY: Record<SortBy, string> = {

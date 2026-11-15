@@ -9,7 +9,8 @@
 import type { ComponentType, ReactNode } from "react";
 import type { Key } from "@/lib/i18n";
 import type { Collections } from "@/lib/store";
-import type { FeedEvent, FieldChange, Project, Task, TaskQuery } from "@/lib/types";
+import type { Category, FeedEvent, FieldChange, Project, Task, TaskQuery } from "@/lib/types";
+import type { NewTaskDraft } from "@/tasks/draft";
 import type { PickerItem } from "@/ui/picker";
 
 /** "Nothing set", where an id would be: in a picker, a filter, a group. */
@@ -42,6 +43,45 @@ export interface TaskProperty<Name extends string = string> {
   timeline?: Phrase[];
   /** Filtering a task list by it, and its word in a task query. */
   filter?: FilterPart;
+  /** Grouping a task list by it: the list's sections, a board's columns. */
+  group?: GroupPart;
+}
+
+/**
+ * The tables grouping reads; a page passes only these, so it regroups only
+ * when one of them changes. Statuses and labels are the live ones
+ * (useLookup); members and epics are every row (useLookupEvenIfGone), so a
+ * task still assigned to someone removed, or in a deleted epic, keeps a group
+ * under that name.
+ */
+export type GroupSource = Pick<Collections, "statuses" | "members" | "epics" | "labels">;
+
+/** A group a list is split into, before its tasks are put in. */
+export interface GroupHead {
+  /** Unique within the list. For status groups this is the status id (or the category, across projects). */
+  id: string;
+  title: string;
+  /** The value the group stands for: a status id or category, a user id, an epic id, a label id, a priority. */
+  value: string;
+  category?: Category;
+}
+
+export interface GroupPart {
+  /** Its name in the list's "Group" menu. */
+  title: () => string;
+  /**
+   * The groups, in order, for the project in view (or for several). A quiet
+   * one (someone removed, a deleted epic) is shown only while it holds a task.
+   */
+  groups: (c: GroupSource, projectId: string | undefined) => (GroupHead & { quiet?: boolean })[];
+  /** The ids of the groups a task goes in, given which there are: several for labels; none leaves it out. */
+  place: (task: Task, c: GroupSource, has: (id: string) => boolean) => string[];
+  /** The mark beside a group's name. */
+  Icon?: ComponentType<{ group: GroupHead }>;
+  /** What a new task added to a list's group starts with. */
+  draft?: (group: GroupHead) => NewTaskDraft;
+  /** What the rows under its headings leave out, because the heading says it. Kept here so a row's props stay the same object. */
+  hides?: { epic?: boolean; assignee?: boolean };
 }
 
 /**

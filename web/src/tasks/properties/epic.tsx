@@ -104,4 +104,25 @@ export const epic = {
     address: (id, c, projectId) => (id === NONE ? NONE : nameWord(c.epics, id, projectId)),
     canBeGone: true,
   },
+  group: {
+    title: () => t("group.epic"),
+    groups: (c, projectId) => [
+      ...Object.values(c.epics)
+        .sort((a, b) => (a.rank < b.rank ? -1 : 1))
+        .map((e) => ({
+          id: e.id,
+          title: e.name,
+          value: e.id,
+          quiet: !!(e.deleted_at || (projectId && e.project_id !== projectId)),
+        })),
+      { id: NONE, title: t("task.noEpic"), value: NONE },
+    ],
+    place: (task, _c, has) => {
+      const id = task.epic_id ?? NONE;
+      return [has(id) ? id : NONE];
+    },
+    Icon: () => <Layers className="size-3.5 text-ink-3" aria-hidden />,
+    draft: (group) => (group.value !== NONE ? { epicId: group.value } : {}),
+    hides: { epic: true },
+  },
 } satisfies TaskProperty<"epic">;

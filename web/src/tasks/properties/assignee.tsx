@@ -14,6 +14,7 @@ import {
   asText,
   type Choice,
   type CreateProps,
+  type GroupHead,
   NONE,
   type PanelProps,
   shared,
@@ -111,6 +112,12 @@ function useChoices(task: Task): Choice[] {
   ];
 }
 
+/** A group's avatar: the person's, or the empty one for "Unassigned". */
+function AssigneeMark({ group }: { group: GroupHead }) {
+  const person = useMember(group.value !== NONE ? group.value : undefined);
+  return <Avatar member={person} size="xs" />;
+}
+
 export const assignee = {
   name: "assignee",
   title: () => t("prop.assignee"),
@@ -157,5 +164,21 @@ export const assignee = {
     read: (q, ctx) => (q.assignee ?? []).map((ref) => memberOf(ref, ctx)).filter((id) => id !== undefined),
     address: (id, c) => memberWord(id, c),
     canBeGone: true,
+  },
+  group: {
+    title: () => t("group.assignee"),
+    groups: (c) => [
+      ...Object.values(c.members)
+        .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "person" ? -1 : 1))
+        .map((m) => ({ id: m.user_id, title: m.name, value: m.user_id, quiet: !!(m.removed_at || m.suspended_at) })),
+      { id: NONE, title: t("task.unassigned"), value: NONE },
+    ],
+    place: (task, _c, has) => {
+      const id = task.assignee_id ?? NONE;
+      return [has(id) ? id : NONE];
+    },
+    Icon: AssigneeMark,
+    draft: (group) => (group.value !== NONE ? { assigneeId: group.value } : {}),
+    hides: { assignee: true },
   },
 } satisfies TaskProperty<"assignee">;

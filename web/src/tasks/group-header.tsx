@@ -1,35 +1,18 @@
 import { memo } from "react";
-import { ChevronDown, Layers, Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { formatNumber, t } from "@/lib/i18n";
-import { useMember, useRow } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
 import { isOpenCategory } from "@/lib/types";
 import { RestLoadingNote } from "@/ui/rest-note";
 import type { TaskGroup } from "@/tasks/filters";
-import { NONE } from "@/tasks/properties/property";
-import { Avatar } from "@/ui/avatar";
+import { GROUPINGS } from "@/tasks/properties";
 import { IconButton } from "@/ui/button";
-import { PriorityIcon, StatusIcon } from "@/ui/icons";
 
-/** The mark that goes with a group's name: a status quad, an avatar, a priority, a label's colour. */
+/** The mark that goes with a group's name, as its property draws it: a status quad, an avatar, a priority, a label's colour. */
 export function GroupIcon({ group }: { group: TaskGroup }) {
-  const member = useMember(group.kind === "assignee" && group.value !== NONE ? group.value : undefined);
-  const color = useRow("labels", group.kind === "label" ? group.value : undefined)?.color;
-  if (group.kind === "label") {
-    return (
-      <span
-        className="mx-0.5 size-2.5 shrink-0 rounded-full"
-        style={{ background: group.value === NONE ? "var(--line-strong)" : color || "var(--ink-3)" }}
-        aria-hidden
-      />
-    );
-  }
-  if (group.kind === "status" && group.category) return <StatusIcon category={group.category} />;
-  if (group.kind === "assignee") return <Avatar member={member} size="xs" />;
-  if (group.kind === "priority") return <PriorityIcon priority={Number(group.value)} title="" />;
-  if (group.kind === "epic") return <Layers className="size-3.5 text-ink-3" aria-hidden />;
-  return null;
+  const Icon = GROUPINGS.find((p) => p.name === group.kind)?.group.Icon;
+  return Icon ? <Icon group={group} /> : null;
 }
 
 /**

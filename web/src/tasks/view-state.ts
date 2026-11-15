@@ -4,12 +4,14 @@
 
 import { create } from "zustand";
 import type { SortBy, ViewDisplay } from "@/lib/types";
-import { emptyFilters, type Filters, type Grouping } from "@/tasks/filters";
+import { emptyFilters, type Filters } from "@/tasks/filters";
+import { type Grouping, GROUPINGS } from "@/tasks/properties";
 
 /** What the columns of a board can stand for. */
 export type BoardGrouping = "status" | "assignee" | "label";
 export const BOARD_GROUPS: BoardGrouping[] = ["status", "assignee", "label"];
-export const LIST_GROUPS: Grouping[] = ["status", "assignee", "label", "epic", "priority", "none"];
+/** What a list can be grouped by: a property (tasks/properties), or nothing. */
+export const LIST_GROUPS: Grouping[] = [...GROUPINGS.map((p) => p.name), "none"];
 /** How the list shows sub-tasks: under their parents, or as rows like any other. */
 export type Subtasks = "nested" | "flat";
 export const SUBTASKS: Subtasks[] = ["nested", "flat"];

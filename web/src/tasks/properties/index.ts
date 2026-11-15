@@ -20,6 +20,7 @@ import type {
   BulkPart,
   CreateProps,
   FilterPart,
+  GroupPart,
   PalettePart,
   PickerProperty,
   TaskProperty,
@@ -107,6 +108,14 @@ export type FilterName = (typeof FILTER_TABLE)[number]["name"];
  * the wait last, unlike the panel.
  */
 export const FILTERS: readonly (TaskProperty<FilterName> & { filter: FilterPart })[] = FILTER_TABLE;
+
+const GROUP_TABLE = [status, assignee, label, epic, priority] as const;
+
+/** How a list can be grouped: by one of these properties, or not at all. */
+export type Grouping = (typeof GROUP_TABLE)[number]["name"] | "none";
+
+/** What a list can be grouped by, in the "Group" menu's order: the label before the epic and the priority, unlike the panel. */
+export const GROUPINGS: readonly (TaskProperty<Exclude<Grouping, "none">> & { group: GroupPart })[] = GROUP_TABLE;
 
 /** The ones the command palette changes on the open task, in the table's order. */
 export const PALETTE = PROPERTIES.filter(

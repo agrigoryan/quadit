@@ -99,4 +99,11 @@ export const priority = {
     matches: (task, picked) => picked.includes(String(task.priority)),
     read: (q) => (q.priority ?? []).filter((p) => PRIORITIES.includes(p)).map(String),
   },
+  group: {
+    title: () => t("group.priority"),
+    // Urgent first, "no priority" last.
+    groups: () => [1, 2, 3, 4, 0].map((p) => ({ id: String(p), title: tMaybe(`priority.${p}`), value: String(p) })),
+    place: (task) => [String(task.priority)],
+    Icon: ({ group }) => <PriorityIcon priority={Number(group.value)} title="" />,
+  },
 } satisfies TaskProperty<"priority">;

@@ -7,11 +7,11 @@ import { mutate, send } from "@/lib/mutate";
 import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import type { Project, SortBy, View } from "@/lib/types";
-import { type Grouping, toQuery } from "@/tasks/filters";
+import { toQuery } from "@/tasks/filters";
+import { type Grouping, GROUPINGS } from "@/tasks/properties";
 import {
   BOARD_GROUPS,
   type BoardGrouping,
-  LIST_GROUPS,
   resetViewState,
   type StoredDisplay,
   SUBTASKS,
@@ -54,7 +54,10 @@ export function DisplayControls({
         label={t("group.by")}
         prefix={t("group.by")}
         value={state.group}
-        items={LIST_GROUPS.map((g) => ({ id: g, label: t(`group.${g}`) }))}
+        items={[
+          ...GROUPINGS.map((p) => ({ id: p.name, label: p.group.title() })),
+          { id: "none", label: t("group.none") },
+        ]}
         onPick={(id) => onChange({ group: id as Grouping })}
         align="end"
         buttonProps={{ variant: "ghost", size: "sm" }}

@@ -15,7 +15,6 @@ import { takeSeen, useTaskOrder } from "@/lib/task-queue";
 import type { SortBy, Task } from "@/lib/types";
 import type { NewTaskDraft } from "@/tasks/draft";
 import { comparer, type TaskGroup } from "@/tasks/filters";
-import { NONE } from "@/tasks/properties/property";
 import { GroupHeader } from "@/tasks/group-header";
 import {
   layOut,
@@ -30,7 +29,7 @@ import {
   treeStep,
 } from "@/tasks/list-layout";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
-import { KEYED } from "@/tasks/properties";
+import { GROUPINGS, KEYED } from "@/tasks/properties";
 import type { PickerProperty } from "@/tasks/properties/property";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
@@ -47,19 +46,8 @@ interface Props {
   onAdd?: (draft: NewTaskDraft) => void;
 }
 
-/** What a new task in this group starts with. */
-function draftFor(group: TaskGroup): NewTaskDraft {
-  if (group.kind === "status" && group.id === group.value && group.category !== group.value)
-    return { statusId: group.value };
-  if (group.kind === "assignee" && group.value !== NONE) return { assigneeId: group.value };
-  if (group.kind === "epic" && group.value !== NONE) return { epicId: group.value };
-  if (group.kind === "label" && group.value !== NONE) return { labelIds: [group.value] };
-  return {};
-}
-
-// What a row leaves out because its group heading already says it.
-const HIDE_EPIC = { epic: true };
-const HIDE_ASSIGNEE = { assignee: true };
+/** The property a group stands for (tasks/properties). */
+const groupingOf = (group: TaskGroup) => GROUPINGS.find((p) => p.name === group.kind)?.group;
 
 /**
  * Tasks as dense rows under collapsible group headings, driven from the
@@ -212,7 +200,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     if ("toggle" in to) fold(to.toggle);
     else focusRow(to.focus);
   }
-  const addTo = useCallback((group: TaskGroup) => onAdd?.(draftFor(group)), [onAdd]);
+  const addTo = useCallback((group: TaskGroup) => onAdd?.(groupingOf(group)?.draft?.(group) ?? {}), [onAdd]);
 
   function openPicker(property: PickerProperty) {
     const first = targets[0];
@@ -286,7 +274,8 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
           if (section.top + section.height < from || section.top > to) return null;
           const { group } = section;
           const { start, end } = rowsBetween(section, from, to);
-          const hide = group.kind === "epic" ? HIDE_EPIC : group.kind === "assignee" ? HIDE_ASSIGNEE : undefined;
+          // What a row leaves out because its group heading already says it.
+          const hide = groupingOf(group)?.hides;
           return (
             <section
               key={group.id}

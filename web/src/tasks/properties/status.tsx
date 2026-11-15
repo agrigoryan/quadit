@@ -12,6 +12,7 @@ import { PickerRow } from "@/tasks/properties/panel-row";
 import { asText, type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { StatusIcon } from "@/ui/icons";
 import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
+import { CATEGORIES } from "@/lib/types";
 
 function StatusRow(panel: PanelProps) {
   // Named even when it is gone, as everything a task is filed under.
@@ -107,5 +108,21 @@ export const status = {
     read: (q, ctx) => (q.status ?? []).flatMap((ref) => rowsNamed(ctx.c.statuses, ref, ctx)),
     address: (id, c, projectId) => nameWord(c.statuses, id, projectId),
     canBeGone: true,
+  },
+  group: {
+    title: () => t("group.status"),
+    groups: (c, projectId) =>
+      projectId
+        ? Object.values(c.statuses)
+            .filter((s) => s.project_id === projectId)
+            .sort((a, b) => (a.rank < b.rank ? -1 : 1))
+            .map((s) => ({ id: s.id, title: s.name, value: s.id, category: s.category }))
+        : // Several projects: their statuses differ, the six categories do not.
+          CATEGORIES.map((cat) => ({ id: cat, title: tMaybe(`category.${cat}`), value: cat, category: cat })),
+    place: (task, c, has) =>
+      has(task.status_id) ? [task.status_id] : [c.statuses[task.status_id]?.category ?? "backlog"],
+    Icon: ({ group }) => (group.category ? <StatusIcon category={group.category} /> : null),
+    // A project's own status; a group of a category across projects says nothing about which.
+    draft: (group) => (group.id === group.value && group.category !== group.value ? { statusId: group.value } : {}),
   },
 } satisfies TaskProperty<"status">;

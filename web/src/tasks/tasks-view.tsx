@@ -48,7 +48,7 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
   const labels = useLookup("labels");
   const epics = useLookup("epics");
   const cycles = useLookup("cycles");
-  // Grouping still names a removed assignee or a deleted epic that tasks are in (tasks/filters.ts, GroupSource).
+  // Grouping still names a removed assignee or a deleted epic that tasks are in (tasks/properties/property.ts, GroupSource).
   const everyMember = useLookupEvenIfGone("members");
   const everyEpic = useLookupEvenIfGone("epics");
   const tables = useMemo(
