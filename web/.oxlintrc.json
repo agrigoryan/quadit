@@ -6,7 +6,7 @@
   "plugins": ["typescript", "react", "jsx-a11y", "import"],
   "categories": { "correctness": "error" },
   "env": { "browser": true, "es2023": true },
-  "ignorePatterns": ["dist"],
+  "ignorePatterns": ["dist", "playwright-report", "test-results"],
   "rules": {
     "react/react-in-jsx-scope": "off",
     "react/rules-of-hooks": "error",
@@ -99,6 +99,24 @@
         ]
       }
     },
-    { "files": ["src/**/*.test.{ts,tsx}", "src/test/**"], "rules": { "typescript/no-non-null-assertion": "off" } }
+    { "files": ["src/**/*.test.{ts,tsx}", "src/test/**"], "rules": { "typescript/no-non-null-assertion": "off" } },
+    {
+      // The end-to-end suite drives the built product from outside; it imports none of the app.
+      "files": ["e2e/**", "playwright.config.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["@/*"], "message": "End-to-end tests drive the product; they do not import the app." }
+            ]
+          }
+        ],
+        // Playwright's fixtures hand their value on with a function named use; it is not React's.
+        "react/rules-of-hooks": "off",
+        // A fixture that needs no other fixture still takes them as its first parameter: ({}, use).
+        "no-empty-pattern": "off"
+      }
+    }
   ]
 }

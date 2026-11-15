@@ -1,0 +1,11 @@
+// The end-to-end suite runs in Node under Playwright, not in the browser
+// bundle: it has Node's types and none of the app's. `pnpm typecheck` checks
+// it beside the app.
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {}
+  },
+  "include": [".", "../playwright.config.ts"]
+}

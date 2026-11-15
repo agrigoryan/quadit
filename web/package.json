@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
     "preview": "vite preview",
     "lint": "oxlint --type-aware",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "e2e": "playwright test",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
   },
   "dependencies": {
@@ -37,6 +38,7 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@tailwindcss/vite": "^4.3.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
