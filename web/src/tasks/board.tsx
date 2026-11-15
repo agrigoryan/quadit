@@ -7,6 +7,8 @@ import {
   type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
+  type ClientRect,
+  type KeyboardCoordinateGetter,
   type UniqueIdentifier,
   KeyboardSensor,
   MouseSensor,
@@ -14,7 +16,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { arrayMove, hasSortableData, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
 import { useCan } from "@/lib/access";
@@ -51,6 +53,42 @@ class LiftSensor extends KeyboardSensor {
     handler: (event, options, context) => event.nativeEvent.shiftKey && activator.handler(event, options, context),
   }));
 }
+
+/**
+ * Where the arrows take a lifted card. Up and down are dnd-kit's own, within
+ * the column. Left and right go to the column beside, to the card nearest the
+ * same height, or to the top of the column when it is empty. dnd-kit's own
+ * takes "to the right" to mean "left edge further right": the lifted card is
+ * drawn tilted, a little wider than the cards it lies among, so the other
+ * cards of its own column counted as to the right and it never left them.
+ */
+export const boardCoordinates: KeyboardCoordinateGetter = (event, args) => {
+  const across = event.code === "ArrowRight" ? 1 : event.code === "ArrowLeft" ? -1 : 0;
+  if (across === 0) return sortableKeyboardCoordinates(event, args);
+  event.preventDefault();
+  const { collisionRect, droppableContainers, droppableRects } = args.context;
+  if (!collisionRect) return undefined;
+  const columns: ClientRect[] = [];
+  const cards: ClientRect[] = [];
+  for (const entry of droppableContainers.getEnabled()) {
+    const rect = droppableRects.get(entry.id);
+    if (!rect || entry.id === args.active) continue;
+    (hasSortableData(entry) ? cards : columns).push(rect);
+  }
+  columns.sort((a, b) => a.left - b.left);
+  const middle = collisionRect.left + collisionRect.width / 2;
+  const at = columns.findIndex((column) => column.left <= middle && middle < column.right);
+  const column = at < 0 ? undefined : columns[at + across];
+  if (!column) return undefined;
+  const inColumn = cards.filter((card) => column.left <= card.left && card.right <= column.right);
+  const distance = (card: ClientRect) => Math.abs(card.top - collisionRect.top);
+  const nearest = inColumn.reduce<ClientRect | undefined>(
+    (best, card) => (!best || distance(card) < distance(best) ? card : best),
+    undefined,
+  );
+  const to = nearest ?? column;
+  return { x: to.left, y: to.top };
+};
 
 /** Grouped by label a task can be in two columns, so a card is a task in a column. */
 const cardId = (group: TaskGroup, task: Task) => `${group.id}|${task.id}`;
@@ -109,7 +147,10 @@ export function Board({ groups, project }: Props) {
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
     useSensor(LiftSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+      coordinateGetter: boardCoordinates,
+      // A column beyond the middle of the board is reached by scrolling the board. A smooth scroll
+      // asked for during the drag never ran (no scroll followed), and the card stayed where it was.
+      scrollBehavior: "auto",
       keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
     }),
   );
