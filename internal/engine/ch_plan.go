@@ -597,8 +597,8 @@ func viewCreate(c *cx) error {
 	v := core.View{ID: vid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), Description: a.Description, Icon: a.Icon,
 		OwnerID: c.actor.UserID, Shared: a.Shared == nil || *a.Shared, Query: a.Query, Layout: a.Layout, Display: a.Display, CreatedAt: c.at}
 	if len(a.Query) > 0 {
-		if err := CheckViewQuery(a.Query); err != nil {
-			return invalid("query", "%v", err)
+		if err := c.checkViewQuery(a.Project, a.Query); err != nil {
+			return err
 		}
 		if err := c.checkViewValues(a.Query); err != nil {
 			return err
@@ -710,8 +710,8 @@ func viewUpdate(c *cx) error {
 		return nil
 	}
 	if a.Query.Set && len(a.Query.V) > 0 {
-		if err := CheckViewQuery(a.Query.V); err != nil {
-			return invalid("query", "%v", err)
+		if err := c.checkViewQuery(v.ProjectID, a.Query.V); err != nil {
+			return err
 		}
 		if err := c.checkViewValues(a.Query.V); err != nil {
 			return err
@@ -1035,11 +1035,32 @@ func (c *cx) checkViewValues(raw json.RawMessage) error {
 	return nil
 }
 
-// CheckViewQuery says whether a saved view's filter can be read. The server
-// sets it: the filter's fields belong to its task queries.
-var CheckViewQuery = func(q json.RawMessage) error {
+// CheckViewQuery says whether a saved view's filter can be read and run as
+// it stands: every field known, every member, status, label, epic, task
+// and date in it real. The server sets it, because the filter's fields are
+// its task queries' and it resolves them the same way when the view is
+// opened; a view that saves is then a view that opens.
+var CheckViewQuery = func(ctx context.Context, db store.DB, actor core.Member, project string, q json.RawMessage) error {
 	if !json.Valid(q) {
 		return errors.New("query must be a JSON object")
 	}
 	return nil
+}
+
+func (c *cx) checkViewQuery(project string, q json.RawMessage) error {
+	err := CheckViewQuery(c.ctx, c.tx, c.actor, project, q)
+	if err == nil {
+		return nil
+	}
+	var e *Error
+	if errors.As(err, &e) {
+		// What is wrong is the view, whatever the lookup inside called it.
+		out := *e
+		out.Code = CodeInvalid
+		if !strings.HasPrefix(out.Field, "query") {
+			out.Field = strings.TrimSuffix("query."+out.Field, ".")
+		}
+		return &out
+	}
+	return invalid("query", "%v", err)
 }

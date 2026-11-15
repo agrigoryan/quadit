@@ -447,7 +447,7 @@ func (s *Server) post(ctx context.Context, h core.Webhook, deliveryID string, ev
 	resp, err := http.DefaultClient.Do(req)
 	took = time.Since(start)
 	if err != nil {
-		return 0, oneLine(err.Error(), 300), took
+		return 0, plainNetError(err), took
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
@@ -640,4 +640,25 @@ func (s *Server) jobNotify(ctx context.Context, j core.Job) error {
 		return s.sendMail(ctx, u.Email, title, body)
 	}
 	return nil
+}
+
+// plainNetError says why a request did not get through, without the
+// library's own framing ("Post \"url\": dial tcp …").
+func plainNetError(err error) string {
+	said := err.Error()
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || strings.Contains(said, "Client.Timeout"):
+		return "no answer in time"
+	case strings.Contains(said, "connection refused"):
+		return "could not connect: nothing is listening at that address"
+	case strings.Contains(said, "no such host"):
+		return "could not connect: the host name was not found"
+	case strings.Contains(said, "certificate"):
+		return "could not connect: the address's certificate was not accepted (" + oneLine(said[strings.LastIndex(said, ": ")+2:], 120) + ")"
+	}
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		said = ue.Err.Error()
+	}
+	return "could not connect: " + oneLine(said, 200)
 }

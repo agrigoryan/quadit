@@ -380,7 +380,7 @@ func (c *cx) setClaim(cl core.ResourceClaim, set map[string]any, why string) err
 	// not to someone limited to other projects since they took it.
 	was := c.system
 	c.system = true
-	err := c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource": cl.ResourceID})
+	err := c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource_id": cl.ResourceID, "user_id": cl.UserID, "task_id": cl.TaskID})
 	c.system = was
 	return err
 }

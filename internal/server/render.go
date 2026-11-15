@@ -530,14 +530,27 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 		what += "  (id=" + dc.ID + ")"
 	case "claim.created", "claim.updated":
 		var cd struct {
-			Row      core.ResourceClaim `json:"row"`
-			Resource string             `json:"resource"`
-			Why      string             `json:"why"`
+			Row        core.ResourceClaim `json:"row"`
+			Resource   string             `json:"resource"`
+			Why        string             `json:"why"`
+			ResourceID string             `json:"resource_id"`
+			UserID     string             `json:"user_id"`
+			TaskID     string             `json:"task_id"`
 		}
 		json.Unmarshal(ev.Data, &cd)
 		switch {
 		case ev.Type == "claim.updated":
+			// Whose hold on what: the one acting may be an admin, or the
+			// server handing the resource to the next in line.
 			what = "claim " + orText(cd.Why, "changed")
+			var res core.Resource
+			if cd.ResourceID != "" && x.db.Get(x.ctx(), &res, store.Eq("id", cd.ResourceID)) == nil {
+				what += ": " + res.Name
+			}
+			if cd.UserID != "" {
+				what += " (" + nm.handle(cd.UserID) + ")"
+			}
+			cd.Row.TaskID = cd.TaskID
 		case cd.Row.State == "holding":
 			what = "claim: took " + cd.Resource
 		default:
@@ -562,6 +575,16 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 	default:
 		if len(d.Changes) > 0 {
 			what += " " + x.changeText(d.Changes, nm)
+		} else if d.Key == "" && len(d.Row) > 0 {
+			// Something new that the cases above do not know: its name.
+			var row map[string]any
+			json.Unmarshal(d.Row, &row)
+			for _, k := range []string{"key", "title", "name", "slug", "handle"} {
+				if v, _ := row[k].(string); v != "" {
+					what += " " + strconv.Quote(oneLine(v, 80))
+					break
+				}
+			}
 		}
 	}
 	return head + " " + what
@@ -638,7 +661,7 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 				parts = append(parts, strings.ReplaceAll(k, "_", " ")+" "+strings.Trim(string(raw), `"`))
 			}
 			sort.Strings(parts)
-			return oneLine(strings.Join(parts, "; "), 120)
+			return oneLine(strings.Join(parts, "; "), 300)
 		case []any:
 			raw, _ := json.Marshal(t)
 			return oneLine(string(raw), 80)

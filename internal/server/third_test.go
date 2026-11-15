@@ -249,6 +249,16 @@ func TestThirdAuditFindings(t *testing.T) {
 		for _, q := range []string{"/events?after=-5", "/tasks?due_before=notadate", "/events?compact=maybe", "/render?task=SVA-1&height=10"} {
 			s.call(nil, wide, "GET", "/api/v1/w/-"+q, nil, 400, nil)
 		}
+		// A sixth check: whatever a view names is looked up as opening it will.
+		for _, q := range []M{{"waiting_on": "@nobody"}, {"held_by": "@nobody"}, {"due_before": "notadate"}, {"due_after": "2026-13-45"}, {"changed_since": -4}, {"keys": []string{"SVA-999"}}} {
+			if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "view.create", "args": M{"name": "Bad", "query": q}}, 400, nil); strings.Contains(out, "Go ") {
+				t.Fatalf("%v: %s", q, out)
+			}
+		}
+		s.change(s.owner, "", "view.create", M{"name": "Good", "project": "SVA", "query": M{"waiting_on": "me", "held_by": "@wide", "due_before": "2026-12-31", "keys": []string{"SVA-1"}, "status": []string{"Todo"}, "open": true}})
+		s.call(s.owner, "", "GET", w+"/tasks?view=good", nil, 200, nil)
+		s.call(nil, wide, "GET", "/api/v1/w/-/render?task=SVA-1&width=5", nil, 400, nil)
+
 		// A failed press of "Test" is in the log, not among the lost.
 		hook := s.change(s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x"})["ref"].(string)
 		s.call(s.owner, "", "POST", w+"/webhooks/"+hook+"/test", nil, 200, nil)

@@ -57,7 +57,10 @@ func (s *Server) hRender(x *c) error {
 		return &httpError{Status: 501, Code: "no_browser", Message: "the server has no Chrome or Chromium to take pictures with; install one, or set QUADIT_CHROME to its path"}
 	}
 	q := x.r.URL.Query()
-	width := min(max(x.intParam("width", 1280), 320), 2560)
+	width := x.intParam("width", 1280)
+	if width < 320 || width > 2560 {
+		return errBad("width is from 320 to 2560: 390 for a phone, 1280 for a desktop")
+	}
 	if h := x.intParam("height", 0); h != 0 && (h < 200 || h > 8000) {
 		return errBad("height is from 200 to 8000; leave it out for the usual size, or use full=1 for the whole page")
 	}

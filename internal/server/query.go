@@ -2,8 +2,10 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"sort"
@@ -156,6 +158,9 @@ func fromURL(v url.Values, dst any, skip ...string) error {
 	var known []string
 	for i := 0; i < rt.NumField(); i++ {
 		name := strings.Split(rt.Field(i).Tag.Get("json"), ",")[0]
+		if name == "" || name == "-" {
+			continue // a field that is not a parameter
+		}
 		fields[name] = i
 		known = append(known, name)
 	}
@@ -564,12 +569,39 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 
 func init() {
 	// A view is saved only with a filter that task queries can read.
-	engine.CheckViewQuery = func(raw json.RawMessage) error {
+	engine.CheckViewQuery = func(ctx context.Context, db store.DB, actor core.Member, project string, raw json.RawMessage) error {
 		var q TaskQuery
 		dec := json.NewDecoder(bytes.NewReader(raw))
 		dec.DisallowUnknownFields() // "labels" for "label" would otherwise match everything
 		if err := dec.Decode(&q); err != nil {
 			return fmt.Errorf("this filter cannot be read (%s). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}", engine.PlainJSON(err))
+		}
+		for name, day := range map[string]string{"due_before": q.DueBefore, "due_after": q.DueAfter} {
+			if _, err := time.Parse("2006-01-02", day); day != "" && err != nil {
+				return &engine.Error{Code: engine.CodeInvalid, Field: name, Message: name + " takes a date like 2026-03-31, and was given " + strconv.Quote(day)}
+			}
+		}
+		for name, n := range map[string]int64{"changed_since": q.ChangedSince, "updated_since": q.UpdatedSince, "limit": int64(q.Limit), "offset": int64(q.Offset)} {
+			if n < 0 {
+				return &engine.Error{Code: engine.CodeInvalid, Field: name, Message: name + " cannot be less than 0"}
+			}
+		}
+		// Resolved the way it will be when the view is opened, by the one
+		// saving it: a name that finds nothing is refused now.
+		x := &c{db: db, member: actor, r: (&http.Request{}).WithContext(ctx)}
+		if actor.Scope != nil && len(actor.Scope.Projects) > 0 {
+			x.projects = actor.Scope.Projects
+		}
+		if project != "" && len(q.Project) == 0 {
+			q.Project = []string{project}
+		}
+		if _, err := x.filter(q); err != nil {
+			return err
+		}
+		for _, key := range q.Keys {
+			if _, err := x.resolver().Task(key); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
