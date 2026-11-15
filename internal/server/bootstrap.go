@@ -39,7 +39,7 @@ func (s *Server) handleBootstrapLocalCopy(x *c) error {
 	rows.fill(out)
 	if rows.part == "open" {
 		out["part"] = rows.part
-		rest, err := x.db.CountTasks(ctx, store.TaskFilter{ProjectIDs: x.projects, Archived: true, Closed: true})
+		rest, err := x.db.CountTasks(ctx, x.readable(store.TaskFilter{Archived: true, Closed: true}))
 		if err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func (b *bootstrapRows) loadLists() error {
 // loadTasks reads the tasks of the part asked for, in the order they were
 // made and without their descriptions.
 func (b *bootstrapRows) loadTasks() error {
-	want := store.TaskFilter{ProjectIDs: b.x.projects, Archived: true}
+	want := b.x.readable(store.TaskFilter{Archived: true})
 	switch b.part {
 	case "":
 	case "open":
@@ -216,11 +216,11 @@ func (b *bootstrapRows) keepToCaller() {
 	b.epics = keep(b.epics, func(v core.Epic) bool { return inScope(v.ProjectID) })
 	b.milestones = keep(b.milestones, func(v core.Milestone) bool { return epicOK[v.EpicID] })
 	b.cycles = keep(b.cycles, func(v core.Cycle) bool { return inScope(v.ProjectID) })
-	b.views = keep(b.views, func(v core.View) bool { return (v.Shared || v.OwnerID == x.member.UserID) && inScope(v.ProjectID) })
+	b.views = keep(b.views, x.canSeeView)
 	b.templates = keep(b.templates, func(v core.Template) bool { return inScope(v.ProjectID) })
 	b.prefs = keep(b.prefs, func(v core.Preference) bool { return inScope(v.ProjectID) })
 	b.claims = keepByTask(x.ctx(), &x.viewer, b.claims, func(v core.ResourceClaim) string { return v.TaskID })
-	b.docs = keep(b.docs, func(doc core.Doc) bool { return engine.CanSeeDoc(doc, x.member.UserID) && inScope(doc.ProjectID) })
+	b.docs = keep(b.docs, x.canSeeDoc)
 	b.sessions = keepByTask(x.ctx(), &x.viewer, b.sessions, func(v core.AgentSession) string { return v.TaskID })
 }
 

@@ -18,8 +18,7 @@ import (
 // key, and the address to open it at. Hits in the trash are left out.
 func (s *Server) handleSearch(x *c) error {
 	v := x.r.URL.Query()
-	hits, err := x.db.Search(x.ctx(), store.SearchQuery{Text: v.Get("q"), Kinds: splitList(v.Get("kind")), ProjectIDs: x.projects,
-		Viewer: x.member.UserID, Limit: x.intParam("limit", defaultSearchHits)})
+	hits, err := x.search(x.ctx(), v.Get("q"), splitList(v.Get("kind")), x.intParam("limit", defaultSearchHits))
 	if err != nil {
 		return err
 	}
@@ -157,7 +156,7 @@ func (who *viewer) decisionsInProjects(ctx context.Context, decisions []core.Dec
 		}
 		projectIDs = append(projectIDs, project.ID)
 	}
-	if len(projectIDs) == 0 && who.projects == nil {
+	if len(projectIDs) == 0 && !who.limited() {
 		return decisions, nil
 	}
 	var taskIDs []string

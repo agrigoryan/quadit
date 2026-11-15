@@ -44,7 +44,7 @@ func (who *viewer) docByID(ctx context.Context, ref string) (core.Doc, error) {
 	if err != nil {
 		return doc, err
 	}
-	if !there || !engine.CanSeeDoc(doc, who.member.UserID) || !who.canProject(doc.ProjectID) {
+	if !there || !who.canSeeDoc(doc) {
 		return doc, errNotFound("doc " + ref)
 	}
 	return doc, nil
@@ -56,7 +56,7 @@ func (who *viewer) visibleDocs(ctx context.Context) ([]core.Doc, error) {
 	if err := who.db.List(ctx, &docs, store.Q{Where: []store.Cond{store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
-	return keep(docs, func(d core.Doc) bool { return engine.CanSeeDoc(d, who.member.UserID) && who.canProject(d.ProjectID) }), nil
+	return keep(docs, who.canSeeDoc), nil
 }
 
 // handleListPages lists the page tree. The text form is an indented outline with ids.
@@ -67,7 +67,7 @@ func (s *Server) handleListPages(x *c) error {
 			return err
 		}
 		gone = keep(gone, func(d core.Doc) bool {
-			return engine.CanSeeDoc(d, x.member.UserID) && x.canProject(d.ProjectID) && d.Kind != core.DocRow
+			return x.canSeeDoc(d) && d.Kind != core.DocRow
 		})
 		return x.ok(map[string]any{"docs": gone})
 	}

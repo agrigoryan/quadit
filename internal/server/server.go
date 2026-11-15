@@ -746,23 +746,9 @@ func (x *c) applyTokenScopes() {
 			x.actor.Projects = append(x.actor.Projects, strings.TrimPrefix(sc, "project:"))
 		}
 	}
-	if len(x.actor.Projects) == 0 {
-		return
+	if len(x.actor.Projects) > 0 {
+		x.limitTo(x.actor.Projects)
 	}
-	if x.projects == nil {
-		x.projects = x.actor.Projects
-		return
-	}
-	var both []string
-	for _, p := range x.actor.Projects {
-		if slices.Contains(x.projects, p) {
-			both = append(both, p)
-		}
-	}
-	if both == nil {
-		both = engine.NoProjects() // no project in both
-	}
-	x.projects = both
 }
 
 // has reports whether list holds v.

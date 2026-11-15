@@ -185,7 +185,7 @@ func listOf[T any](order string, conds ...store.Cond) func(x *c) (any, error) {
 		if err := x.db.List(x.ctx(), &rows, store.Q{Where: where, Order: order, Limit: min(x.intParam("limit", 1000), 5000), Offset: x.intParam("offset", 0)}); err != nil {
 			return nil, err
 		}
-		if x.projects != nil {
+		if x.limited() {
 			rows = keepInProjects(x.ctx(), &x.viewer, rows)
 		}
 		if rows == nil {
@@ -287,7 +287,7 @@ func keepByEpic[T any](ctx context.Context, who *viewer, rows []T, epicOf func(T
 // keepByTask keeps, for a caller limited to some projects, the rows that
 // hang on a task of those projects, and the rows on no task.
 func keepByTask[T any](ctx context.Context, who *viewer, rows []T, taskOf func(T) string) []T {
-	if who.projects == nil {
+	if !who.limited() {
 		return rows
 	}
 	projectOf := map[string]string{}
@@ -315,7 +315,7 @@ var taskKeyIn = regexp.MustCompile(`\b([A-Z][A-Z0-9]{1,9})-\d+\b`)
 // hideActions blanks, for a caller limited to some projects, what a member
 // last did when it names a task of another project.
 func (who *viewer) hideActions(ctx context.Context, members []core.Member) {
-	if who.projects == nil {
+	if !who.limited() {
 		return
 	}
 	// When the projects cannot be read, mine stays empty and every action
@@ -375,7 +375,7 @@ var collections = map[string]collection{
 		if err != nil {
 			return nil, err
 		}
-		return keep(rows.([]core.View), func(v core.View) bool { return v.Shared || v.OwnerID == x.member.UserID }), nil
+		return keep(rows.([]core.View), x.canSeeView), nil
 	}},
 }
 

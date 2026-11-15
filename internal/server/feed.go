@@ -75,7 +75,8 @@ func (x *c) events(page eventPage) error {
 func (s *Server) handleReadFeed(x *c) error {
 	ctx := x.ctx()
 	v := x.r.URL.Query()
-	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: nil, Limit: min(x.intParam("limit", defaultFeedPage), maxFeedPage), Types: splitList(v.Get("types"))}
+	f := x.feed()
+	f.Limit, f.Types = min(x.intParam("limit", defaultFeedPage), maxFeedPage), splitList(v.Get("types"))
 	cursor := v.Get("cursor")
 	if cursor != "" {
 		if ack := x.intParam("ack", 0); ack > 0 {
@@ -128,11 +129,10 @@ func (s *Server) handleReadFeed(x *c) error {
 			return err
 		}
 		tf.Limit, tf.Sort = 0, ""
-		f.Tasks = &tf
-	} else if x.projects != nil {
-		// Their projects, and what belongs to no project (labels of the
-		// workspace, members), exactly as the live stream gives it.
-		f.ProjectIDs, f.AllowNoProject = x.projects, true
+		// The tasks are kept to the caller's projects by their own filter,
+		// and the events are those of the tasks, whatever project each
+		// was written in.
+		f.Tasks, f.ProjectIDs = &tf, nil
 	}
 	// The rounds.
 	wait := min(x.intParam("wait", 0), maxFeedWait)
@@ -300,7 +300,8 @@ func (s *Server) handleStreamFeed(x *c) error {
 	x.w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(x.w, "retry: 2000\n\n")
 	flusher.Flush()
-	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: x.projects, AllowNoProject: true, Limit: streamBatch}
+	f := x.feed()
+	f.Limit = streamBatch
 	beat := time.NewTicker(streamBeat)
 	defer beat.Stop()
 	opened, _ := s.recheckAccess(x)

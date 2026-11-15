@@ -245,7 +245,7 @@ func (s *Server) handleListAgents(x *c) error {
 	if err != nil {
 		return err
 	}
-	tasks, err := x.everyTask(x.ctx(), store.TaskFilter{Open: true, ProjectIDs: x.projects})
+	tasks, err := x.everyTask(x.ctx(), x.readable(store.TaskFilter{Open: true}))
 	if err != nil {
 		return err
 	}

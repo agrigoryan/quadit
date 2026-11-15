@@ -260,7 +260,7 @@ func (who *viewer) namedRefs(ctx context.Context, refs []core.Ref) ([]namedRef, 
 			if !there {
 				continue
 			}
-			if !engine.CanSeeDoc(doc, who.member.UserID) || !who.canProject(doc.ProjectID) {
+			if !who.canSeeDoc(doc) {
 				continue
 			}
 			named.Title = doc.Title

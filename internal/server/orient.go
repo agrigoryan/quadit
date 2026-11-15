@@ -262,11 +262,11 @@ const myWorkTasks = 200
 func (s *Server) handleShowMyWork(x *c) error {
 	ctx := x.ctx()
 	me := x.member.UserID
-	assigned, err := x.db.Tasks(ctx, store.TaskFilter{AssigneeIDs: []string{me}, Open: true, ProjectIDs: x.projects, Sort: "priority", Limit: myWorkTasks})
+	assigned, err := x.db.Tasks(ctx, x.readable(store.TaskFilter{AssigneeIDs: []string{me}, Open: true, Sort: "priority", Limit: myWorkTasks}))
 	if err != nil {
 		return err
 	}
-	waiting, err := x.db.Tasks(ctx, store.TaskFilter{WaitingOnID: me, Open: true, ProjectIDs: x.projects, Sort: "-activity", Limit: myWorkTasks})
+	waiting, err := x.db.Tasks(ctx, x.readable(store.TaskFilter{WaitingOnID: me, Open: true, Sort: "-activity", Limit: myWorkTasks}))
 	if err != nil {
 		return err
 	}

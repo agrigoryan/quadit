@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -57,6 +58,63 @@ func (s *Server) viewerFor(ws core.Workspace, member core.Member) *viewer {
 // no project ("") is the workspace's, and open to every member.
 func (who *viewer) canProject(projectID string) bool {
 	return who.projects == nil || projectID == "" || slices.Contains(who.projects, projectID)
+}
+
+// limited reports whether the viewer is kept to some of the projects.
+func (who *viewer) limited() bool { return who.projects != nil }
+
+// limitTo keeps the viewer to the projects named, of those it may read
+// already: what a token made for some projects does to its member's reach.
+func (who *viewer) limitTo(projects []string) {
+	if who.projects == nil {
+		who.projects = projects
+		return
+	}
+	var both []string
+	for _, p := range projects {
+		if slices.Contains(who.projects, p) {
+			both = append(both, p)
+		}
+	}
+	if both == nil {
+		both = engine.NoProjects() // no project in both
+	}
+	who.projects = both
+}
+
+// canSeeDoc reports whether the viewer may see a page: it is not someone
+// else's private page, and it is the workspace's or of a project the viewer
+// may read.
+func (who *viewer) canSeeDoc(doc core.Doc) bool {
+	return engine.CanSeeDoc(doc, who.member.UserID) && who.canProject(doc.ProjectID)
+}
+
+// canSeeView reports whether the viewer may see a saved view: it is shared
+// or the viewer's own, and it is the workspace's or of a project the viewer
+// may read.
+func (who *viewer) canSeeView(view core.View) bool {
+	return (view.Shared || view.OwnerID == who.member.UserID) && who.canProject(view.ProjectID)
+}
+
+// readable is a task filter kept to the projects the viewer may read. Every
+// read of tasks that is not of one task by name starts from it, or from
+// taskFilter when it is a query.
+func (who *viewer) readable(f store.TaskFilter) store.TaskFilter {
+	f.ProjectIDs = who.projects
+	return f
+}
+
+// feed is the filter of the events the viewer may read: those of its
+// projects and of no project, and none that is addressed to someone else.
+func (who *viewer) feed() store.EventFilter {
+	return store.EventFilter{Viewer: who.member.UserID, ProjectIDs: who.projects, AllowNoProject: true}
+}
+
+// search finds what the viewer may read by its words: in its projects, and
+// not in someone else's private pages. kinds narrows it to some kinds of
+// thing; none means all.
+func (who *viewer) search(ctx context.Context, text string, kinds []string, limit int) ([]store.SearchHit, error) {
+	return who.db.Search(ctx, store.SearchQuery{Text: text, Kinds: kinds, ProjectIDs: who.projects, Viewer: who.member.UserID, Limit: limit})
 }
 
 // admin refuses a viewer whose role in the workspace is below admin.
