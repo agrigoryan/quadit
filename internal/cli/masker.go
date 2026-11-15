@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"cmp"
 	"io"
+	"slices"
 	"sync"
 )
 
@@ -22,6 +24,9 @@ func newMasker(w io.Writer, env map[string]string) *masker {
 			m.values = append(m.values, v)
 		}
 	}
+	// Longest first, so a value that begins with another is blanked whole
+	// and not left with its tail showing.
+	slices.SortFunc(m.values, func(a, b string) int { return cmp.Compare(len(b), len(a)) })
 	return m
 }
 
