@@ -133,7 +133,7 @@ make test-all
 
 ## Checking against real services
 
-The test suite runs without a network. Three of its checks also run against real services when told where they are:
+The test suite runs without a network. Some of its checks also run against real services when told where they are:
 
 ```
 # S3 (AWS, R2, MinIO), Azure Blob and Google Cloud Storage: the store's settings as JSON, as the admin area saves them
@@ -141,6 +141,14 @@ QUADIT_TEST_FILES_S3='{"kind":"s3","bucket":"quadit","endpoint":"http://127.0.0.
 QUADIT_TEST_FILES_AZURE='{"kind":"azure","bucket":"quadit","account":"…","account_key":"…"}' \
 QUADIT_TEST_FILES_GCS='{"kind":"gcs","bucket":"quadit","credentials":"{…service account key…}"}' \
   go test -run TestRealBuckets ./internal/blob
+
+# Google and GitHub, as far as that goes without signing in: Google's sign-in addresses are found
+# the way sign-in finds them, and GitHub's own answer about who a token belongs to is read
+QUADIT_TEST_GOOGLE=1 QUADIT_TEST_GITHUB_TOKEN=$(gh auth token) go test -run TestRealProviders ./internal/server
+
+# Automatic certificates, against an authority that can reach this machine (Pebble, for one)
+QUADIT_TEST_ACME=https://localhost:14000/dir,pebble.minica.pem,quadit.test,127.0.0.1:5001,127.0.0.1:5002 \
+  go test -run TestAutomaticCertificate ./internal/app
 ```
 
-What has been run this way, and by hand against a live server: file storage on MinIO (uploads, ranges, and moving an install's files from disk to the bucket), Azurite and a Google Cloud Storage emulator; mail through an SMTP server (test message, invitation, password reset, following the links); OpenID Connect sign-in with Dex in a browser; GitHub pull request and check linking against github.com; browser push through Google's push service to Chrome. Sign-in with Google and with GitHub themselves need your own OAuth app, and are the same code as OpenID Connect and the GitHub tests: try them once after you set them up.
+What has been run this way, and by hand against a live server: file storage on MinIO (uploads, ranges, and moving an install's files from disk to the bucket), Azurite and a Google Cloud Storage emulator; mail through an SMTP server (test message, invitation, password reset, following the links); OpenID Connect sign-in with Dex in a browser; GitHub pull request and check linking against github.com; browser push through Google's push service to Chrome on a desktop and on an Android phone (emulated); the web app in Chrome on Android and in Safari on an iPhone (both emulated); the Docker image, built and run; automatic certificates from Pebble. Sign-in with Google and with GitHub themselves need your own OAuth app. The whole GitHub flow is tested against a stand-in that answers as GitHub does (`TestSignInWithGitHub`), Google's is the OpenID Connect code tested with Dex, and the two checks above touch the real services: try each once after you set it up.

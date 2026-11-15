@@ -231,12 +231,14 @@ func githubIdentity(ctx context.Context, hc *http.Client, api string) (outsider,
 		Primary  bool   `json:"primary"`
 		Verified bool   `json:"verified"`
 	}
-	if err := get("/user/emails", &emails); err != nil {
-		return who, err
-	}
 	who = outsider{Subject: fmt.Sprint(u.ID), Name: u.Name}
 	if who.Name == "" {
 		who.Name = u.Login
+	}
+	if err := get("/user/emails", &emails); err != nil {
+		// GitHub hides the list from a sign-in that was not given the
+		// "user:email" permission, and says "not found".
+		return who, fmt.Errorf("GitHub did not give this account's email addresses (%w); the sign-in must be allowed to read them (the user:email permission)", err)
 	}
 	for _, e := range emails {
 		if e.Verified && (e.Primary || who.Email == "") {
