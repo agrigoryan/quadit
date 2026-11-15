@@ -20,7 +20,6 @@ import {
   toggleLabel,
   waitsOutside,
 } from "@/tasks/actions";
-import { ChoiceList } from "@/tasks/choice-list";
 import { OUTSIDE } from "@/tasks/filters";
 import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { Avatar } from "@/ui/avatar";
@@ -28,7 +27,7 @@ import { Button } from "@/ui/button";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";
 import { Input } from "@/ui/input";
 import { ListeningDot } from "@/ui/listening-dot";
-import type { PickerItem } from "@/ui/picker";
+import { type PickerItem, PickerList } from "@/ui/picker";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 export type TaskProperty =
@@ -263,7 +262,7 @@ function Choices({ kind, tasks, close, listening }: ChoicesProps) {
   const [outside, setOutside] = useState(false);
   if (outside) return <OutsideNote tasks={tasks} onDone={close} />;
   return (
-    <ChoiceList
+    <PickerList
       items={items}
       value={value}
       label={titles[kind]()}

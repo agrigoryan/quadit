@@ -10,7 +10,6 @@ import { useEpics, useLabels, useLiveTasks, useMe, useMembers, useStatuses, useT
 import { formatDay } from "@/lib/time";
 import type { Project } from "@/lib/types";
 import { useListening } from "@/lib/listening";
-import { ChoicePicker } from "@/tasks/choice-list";
 import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { memberItems, PRIORITIES } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
@@ -92,7 +91,7 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <ChoicePicker
+      <Picker
         label={t("prop.status")}
         placeholder={t("prop.set.status")}
         value={status?.id}
@@ -105,7 +104,7 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
             {status?.name ?? t("prop.status")}
           </Pill>
         </button>
-      </ChoicePicker>
+      </Picker>
 
       <Picker
         label={t("prop.assignee")}
@@ -145,7 +144,7 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
         </button>
       </Picker>
 
-      <ChoicePicker
+      <Picker
         multiple
         label={t("prop.labels")}
         placeholder={t("prop.set.labels")}
@@ -173,7 +172,7 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
             {picked.length > 0 ? picked.map((l) => l.name).join(", ") : t("prop.labels")}
           </Pill>
         </button>
-      </ChoicePicker>
+      </Picker>
 
       {epics.length > 0 && (
         <Picker

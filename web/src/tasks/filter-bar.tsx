@@ -2,12 +2,11 @@ import { useState } from "react";
 import { ListFilter, Search, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import type { Project } from "@/lib/types";
-import { ChoiceList, ChoicePicker } from "@/tasks/choice-list";
 import { FILTER_LABEL, type FilterKind, useFilterOptions } from "@/tasks/filter-options";
 import { countFilters, emptyFilters, type Filters, LIST_KEYS, type ListFilterKey } from "@/tasks/filters";
 import { createLabel, createLabelText, type ManageLink, useManageLinks } from "@/tasks/manage";
 import { Button } from "@/ui/button";
-import { type PickerItem, PickerList } from "@/ui/picker";
+import { Picker, type PickerItem, PickerList } from "@/ui/picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 interface Props {
@@ -75,7 +74,7 @@ function FilterChip({
   }
   return (
     <span className="flex h-6 shrink-0 items-stretch rounded-sm border border-line bg-surface text-xs">
-      <ChoicePicker
+      <Picker
         items={items}
         value={values}
         multiple={kind !== "waitingOn"}
@@ -96,7 +95,7 @@ function FilterChip({
             </span>
           </span>
         </button>
-      </ChoicePicker>
+      </Picker>
       <RemoveFilter name={name} onClick={() => onChange(clear(filters, kind))} />
     </span>
   );
@@ -204,7 +203,7 @@ export function FilterBar({ filters, onChange, project }: Props) {
               }}
             />
           ) : (
-            <ChoiceList
+            <PickerList
               key={stage}
               label={t(FILTER_LABEL[stage])}
               placeholder={t(FILTER_LABEL[stage])}

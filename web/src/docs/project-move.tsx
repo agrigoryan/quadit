@@ -7,7 +7,7 @@ import type { Project } from "@/lib/types";
 import { setProject } from "@/docs/actions";
 import { countBelow, docTitle, useDocs, useLinkablePages } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
-import { ChoicePicker } from "@/tasks/choice-list";
+import { Picker } from "@/ui/picker";
 import { Button } from "@/ui/button";
 
 /** A button that lists the pages in no project; each pick moves one into the project. Nothing when every page has one. */
@@ -31,7 +31,7 @@ export function MovePagesHere({ project }: { project: Project }) {
   );
   if (items.length === 0) return null;
   return (
-    <ChoicePicker
+    <Picker
       multiple
       items={items}
       label={t("docs.projectEmpty.movePick")}
@@ -40,6 +40,6 @@ export function MovePagesHere({ project }: { project: Project }) {
       align="center"
     >
       <Button>{t("docs.projectEmpty.move")}</Button>
-    </ChoicePicker>
+    </Picker>
   );
 }

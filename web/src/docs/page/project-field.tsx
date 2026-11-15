@@ -14,7 +14,7 @@ import { countBelow, sameProjectBelow, useDocs } from "@/docs/data";
 import { NoProjectGlyph } from "@/docs/project-mark";
 import { useDocsStore } from "@/docs/store";
 import type { Doc } from "@/lib/types-docs";
-import { ChoiceList } from "@/tasks/choice-list";
+import { PickerList } from "@/ui/picker";
 import { projectItems } from "@/tasks/property-picker";
 import { Button } from "@/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -70,7 +70,7 @@ function ProjectChoices({ doc, close }: { doc: Doc; close: () => void }) {
 
   return (
     <>
-      <ChoiceList
+      <PickerList
         items={items}
         value={doc.project_id ?? NONE}
         label={t("docs.project.set")}
