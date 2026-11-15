@@ -12,7 +12,8 @@ import { Kbd } from "@/ui/kbd";
 import { afterClip, PairLabels, RoleLabel, SwipeHandle } from "@/decisions/before-after";
 import { type Compare, paneNote } from "@/decisions/compare-state";
 import { isSmallArt, type OptionFile } from "@/decisions/data";
-import { FileStepper, PickedBadge, RecommendedBadge } from "@/decisions/parts";
+import { FileStepper } from "@/decisions/file-stepper";
+import { PickedBadge, RecommendedBadge } from "@/decisions/option-marks";
 
 interface Size {
   w: number;

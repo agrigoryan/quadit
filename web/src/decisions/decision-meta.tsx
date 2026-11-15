@@ -14,7 +14,7 @@ import { Markdown } from "@/ui/markdown";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { pick } from "@/decisions/actions";
 import { optionsOf, useMemberName, type Viewer } from "@/decisions/data";
-import { rich, Who } from "@/decisions/parts";
+import { rich, Who } from "@/decisions/who";
 import { Ago } from "@/ui/ago";
 
 function StateBadge({ decision, viewer }: { decision: Decision; viewer: Viewer }) {

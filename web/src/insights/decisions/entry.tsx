@@ -12,7 +12,7 @@ import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import type { Decision, DecisionOption } from "@/lib/types";
 import { useMemberName } from "@/decisions/data";
-import { rich, Who } from "@/decisions/parts";
+import { rich, Who } from "@/decisions/who";
 import type { Attached } from "@/detail/data";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { useTaskLink } from "@/lib/task-link";

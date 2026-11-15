@@ -11,7 +11,7 @@ import { useStore } from "@/lib/store";
 import type { FileRow } from "@/lib/types";
 import { RoleLabel, SidePair, SwipePair } from "@/decisions/before-after";
 import { isSmallArt, nameOf, type OptionFile } from "@/decisions/data";
-import { FileStepper } from "@/decisions/parts";
+import { FileStepper } from "@/decisions/file-stepper";
 
 const isSprite = (file: FileRow) => isSmallArt(file.width, file.height);
 

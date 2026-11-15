@@ -9,7 +9,7 @@ import { Button } from "@/ui/button";
 import type { OptionFile, Viewer } from "@/decisions/data";
 import { AttachToOption } from "@/decisions/option-attach";
 import { NoMediaCaption, OptionDocs, OptionMedia } from "@/decisions/option-media";
-import { PickedBadge, RecommendedBadge } from "@/decisions/parts";
+import { PickedBadge, RecommendedBadge } from "@/decisions/option-marks";
 import { ThreadToggle } from "@/decisions/thread";
 
 interface Props {

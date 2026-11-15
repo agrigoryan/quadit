@@ -13,7 +13,7 @@ import { getState, useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Relation, Task } from "@/lib/types";
 import { type Side, sideOf, useEnsureTasks } from "@/detail/data";
-import { rowAction } from "@/detail/bits";
+import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";
 import { TaskPicker } from "@/detail/task-picker";
 import { useTaskLink } from "@/lib/task-link";

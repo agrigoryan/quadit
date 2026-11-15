@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store";
 import { CreateAgentDialog } from "@/settings/agents/agent-create";
 import { type AgentMember } from "@/settings/agents/data";
 import { type AgentState, useAgentStates } from "@/lib/listening";
-import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
+import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { When } from "@/ui/when";

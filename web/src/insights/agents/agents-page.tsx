@@ -13,13 +13,13 @@ import type { AgentSession } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { useLive, useNow } from "@/lib/live";
 import type { AgentState } from "@/insights/lib/types";
-import { isStranded } from "@/insights/ui/agent-bits";
+import { isStranded } from "@/insights/ui/agent-state";
 import { PageBar } from "@/insights/ui/panel";
 import { AgentCard, type HelperOf } from "@/insights/agents/agent-card";
 import { NO_WORK, useAgentWork, useClaims, useResources } from "@/insights/agents/agent-data";
 import { Resources } from "@/insights/agents/resources";
 import { useSessions } from "@/insights/agents/session-data";
-import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
+import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
 import { Checkbox } from "@/ui/form";
 import { EmptyState } from "@/ui/empty";
 

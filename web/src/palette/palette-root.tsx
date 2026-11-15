@@ -4,7 +4,7 @@ import { useCollection } from "@/lib/selectors";
 import { useRestLoaded, useStore } from "@/lib/store";
 import type { SearchHit } from "@/lib/types";
 import { type Cmd, type CommandContext, useCommands } from "@/palette/palette-commands";
-import { Group, Item, Note } from "@/palette/palette-parts";
+import { Group, Item, Note } from "@/palette/palette-rows";
 import { matches, searchTasks, snippetParts } from "@/palette/palette-search";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 import { ProjectGlyph } from "@/ui/project-glyph";

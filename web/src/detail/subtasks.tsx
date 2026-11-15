@@ -8,7 +8,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
-import { rowAction } from "@/detail/bits";
+import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";
 import { createTask, setParent } from "@/tasks/actions";
 import { TaskPropertyPicker } from "@/tasks/property-picker";

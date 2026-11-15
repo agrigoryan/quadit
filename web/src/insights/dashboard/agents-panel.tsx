@@ -9,9 +9,9 @@ import { useCollection, useSlug, useTaskByKey } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { AgentState } from "@/insights/lib/types";
-import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-bits";
+import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-state";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
-import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
+import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
 import { useTaskLink } from "@/lib/task-link";
 import { Avatar } from "@/ui/avatar";
 

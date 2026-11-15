@@ -9,7 +9,8 @@ import { PaneMedia } from "@/decisions/compare-panes";
 import { type Compare, paneNote } from "@/decisions/compare-state";
 import { Transport } from "@/decisions/compare-transport";
 import { useMemberName } from "@/decisions/data";
-import { FileStepper, PickedBadge, RecommendedBadge } from "@/decisions/parts";
+import { FileStepper } from "@/decisions/file-stepper";
+import { PickedBadge, RecommendedBadge } from "@/decisions/option-marks";
 import { StageButton } from "@/decisions/stage-ui";
 
 /** What the bottom bar says to someone who cannot pick: who is to answer, or what the answer was. */

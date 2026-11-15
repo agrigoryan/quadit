@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { CATEGORIES, type Project } from "@/lib/types";
 import type { MakePage } from "@/palette/palette-commands";
-import { Group, Item, Note } from "@/palette/palette-parts";
+import { Group, Item, Note } from "@/palette/palette-rows";
 import { createStatus } from "@/tasks/add-status";
 import { createLabel, createLabelText } from "@/tasks/manage";
 import { StatusIcon } from "@/ui/icons";

@@ -3,7 +3,7 @@ import { CircleSlash, Plus } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { useLabels, useMe, useMembers, useStatuses } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
-import { Group, Item, Note } from "@/palette/palette-parts";
+import { Group, Item, Note } from "@/palette/palette-rows";
 import type { ChoicePage } from "@/palette/palette-commands";
 import { matches } from "@/palette/palette-search";
 import { setAssignee, setPriority, setStatus, toggleLabel } from "@/tasks/actions";

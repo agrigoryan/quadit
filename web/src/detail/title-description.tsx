@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
-import { caretToEnd } from "@/detail/bits";
+import { caretToEnd } from "@/detail/caret-to-end";
 import { setDescription, setTitle } from "@/tasks/actions";
 import { Button, IconButton } from "@/ui/button";
 import { Textarea } from "@/ui/input";

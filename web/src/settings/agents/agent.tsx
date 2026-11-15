@@ -15,7 +15,7 @@ import {
 import { ListeningMark, StateBadge } from "@/settings/agents/agents";
 import { type AgentMember } from "@/settings/agents/data";
 import { useAgentStates } from "@/lib/listening";
-import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helpers";
+import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helper-agents";
 import { AgentTokens } from "@/settings/agents/tokens";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
