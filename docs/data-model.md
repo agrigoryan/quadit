@@ -41,6 +41,14 @@ An event names the row that changed (`entity`) and the object whose timeline it 
 | `{"id", "changes": {field: {from, to}}}` | Fields changed | Set each field to `to` |
 | `{"ids": […], "changes": …}` | The same change to several rows | The same, for each |
 | `{"id", "gone": true}` | The row was removed for good | Drop it |
+| `{"id", "changes", "blocks": […] or null, "deleted": […] or null}` | `doc.edited`: a page's blocks were edited. `id` and `changes` are the page's own; `blocks` are the blocks written, whole; `deleted` the ids of the blocks taken out | Apply the changes to the page, put each block in its copy, drop the deleted ones |
+
+Two keys can be on the data of any event:
+
+- `rule`: the id of the rule whose action made the change. A change a person or an agent made has none.
+- `quiet: true`: the change brought history in (an import) and was not done now. It notifies nobody and sets off no rule; a webhook still gets it, with `quiet` in its payload.
+
+The keys an event's data can have are defined once, by `core.EventData`; `internal/engine/testdata/events.golden` has an example of every event.
 
 A soft delete is a change to `deleted_at`. An event with `audience_id` is for one member only: inbox items, and everything about a private page.
 
