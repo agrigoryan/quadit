@@ -117,7 +117,8 @@ type User struct {
 
 // Scope narrows what an agent may do below its role.
 type Scope struct {
-	// Projects lists the project ids it may work in; empty means all.
+	// Projects lists the project ids it may work in; nil means all. It is
+	// never empty but not nil (JSON leaves [] out): none is engine.NoProjects().
 	Projects []string `json:"projects,omitempty"`
 	ReadOnly bool     `json:"read_only,omitempty"`
 	// NeedsApproval lists the change types it must get approved first.
