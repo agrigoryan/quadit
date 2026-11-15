@@ -1,6 +1,8 @@
 package server_test
 
 import (
+	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -145,4 +147,267 @@ func TestRepositorySync(t *testing.T) {
 			t.Fatalf("new page did not become a file: %v %s", err, raw)
 		}
 	})
+}
+
+// syncOutcome is all a sync answers.
+type syncOutcome struct {
+	PagesCreated int    `json:"pages_created"`
+	PagesUpdated int    `json:"pages_updated"`
+	PagesTrashed int    `json:"pages_trashed"`
+	FilesWritten int    `json:"files_written"`
+	FilesRemoved int    `json:"files_removed"`
+	Commit       string `json:"commit"`
+	Pushed       string `json:"pushed"`
+	Note         string `json:"note"`
+}
+
+// syncAnswering syncs and expects the status want; it gives back the
+// answer, and its raw text for an error.
+func (r *syncedRepo) syncAnswering(want int) (syncOutcome, string) {
+	r.t.Helper()
+	var res syncOutcome
+	raw := r.s.call(r.s.owner, "", "POST", w+"/sources/"+r.src+"/sync", nil, want, nil)
+	if want == 200 {
+		if err := json.Unmarshal([]byte(raw), &res); err != nil {
+			r.t.Fatalf("the answer %q: %v", raw, err)
+		}
+	}
+	return res, raw
+}
+
+// files lists the files a branch holds.
+func (r *syncedRepo) files(branch string) string {
+	return gitIn(r.t, r.origin, "ls-tree", "-r", "--name-only", branch)
+}
+
+// TestRepositorySyncDecides pins, from a real repository to the pages and
+// back, each case a sync decides that the other sync tests do not name.
+func TestRepositorySyncDecides(t *testing.T) {
+	source := func(r *syncedRepo, args M) {
+		a := M{"title": "Game docs", "repo": r.origin, "subdir": "docs"}
+		maps.Copy(a, args)
+		r.src = r.s.change(r.s.owner, "", "source.create", a)["ref"].(string)
+	}
+	cases := []struct {
+		name  string
+		files map[string]string
+		run   func(t *testing.T, s *site, r *syncedRepo)
+	}{
+		{"a repository with no commits says so", nil, func(t *testing.T, s *site, r *syncedRepo) {
+			empty := filepath.Join(t.TempDir(), "empty.git")
+			gitIn(t, filepath.Dir(empty), "init", "--quiet", "--bare", "-b", "main", empty)
+			r.origin = empty
+			source(r, nil)
+			if res, _ := r.syncAnswering(200); res.Note != "the repository has no commits yet; pages will sync once it has" || res.PagesCreated != 0 {
+				t.Fatalf("%+v", res)
+			}
+		}},
+		{"a branch the repository does not have says so", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, M{"branch": "nope"})
+			if res, _ := r.syncAnswering(200); res.Note != "the repository has no branch nope yet; pages will sync once it has" || res.PagesCreated != 0 {
+				t.Fatalf("%+v", res)
+			}
+		}},
+		{"an address with no repository is said", nil, func(t *testing.T, s *site, r *syncedRepo) {
+			r.origin = filepath.Join(t.TempDir(), "nowhere.git")
+			source(r, nil)
+			if _, raw := r.syncAnswering(409); !strings.Contains(raw, "the repository could not be found at that address") {
+				t.Fatal(raw)
+			}
+		}},
+		{"a folder that is a file there is refused", map[string]string{"docs": "a file\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			if _, raw := r.syncAnswering(409); !strings.Contains(raw, "the source's folder docs is a file in the repository; set it to a folder") {
+				t.Fatal(raw)
+			}
+		}},
+		{"a changed address is followed", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			r.syncAnswering(200)
+			other := newSyncedRepo(t, s, map[string]string{"docs/b.md": "B.\n"})
+			s.change(s.owner, "", "source.update", M{"id": r.src, "repo": other.origin})
+			if res, _ := r.syncAnswering(200); res.PagesCreated != 1 || res.PagesTrashed != 1 {
+				t.Fatalf("%+v", res)
+			}
+			s.pageID("b")
+		}},
+		{"a push to a working copy with the branch checked out is refused and explained", nil, func(t *testing.T, s *site, r *syncedRepo) {
+			checkedOut := t.TempDir()
+			gitIn(t, checkedOut, "init", "--quiet", "-b", "main")
+			os.MkdirAll(filepath.Join(checkedOut, "docs"), 0o755)
+			os.WriteFile(filepath.Join(checkedOut, "docs", "a.md"), []byte("A.\n"), 0o644)
+			gitIn(t, checkedOut, "add", "--all")
+			gitIn(t, checkedOut, "commit", "--quiet", "-m", "first")
+			r.origin = checkedOut
+			source(r, nil)
+			r.syncAnswering(200)
+			page := s.pageID("a")
+			s.change(s.owner, "", "doc.write", M{"doc": page, "markdown": "A, edited.\n"})
+			for range 2 {
+				if _, raw := r.syncAnswering(409); !strings.Contains(raw, "the repository is a working copy with main checked out, and git lets nobody push to that") {
+					t.Fatal(raw)
+				}
+			}
+			if got := s.call(s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil); !strings.Contains(got, "A, edited.") {
+				t.Fatalf("the page lost its edit: %q", got)
+			}
+		}},
+		{"both changed and the pages have the say: the page is written", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, M{"authority": "pages"})
+			r.syncAnswering(200)
+			s.change(s.owner, "", "doc.write", M{"doc": s.pageID("a"), "markdown": "A, from the page.\n"})
+			r.write("docs/a.md", "A, from the file.\n")
+			r.push("there")
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 || res.PagesUpdated != 0 {
+				t.Fatalf("%+v", res)
+			}
+			if got := r.read("main", "docs/a.md"); got != "A, from the page.\n" {
+				t.Fatalf("%q", got)
+			}
+			r.idle("after the page won")
+		}},
+		{"a page trashed here takes its unchanged file with it", map[string]string{"docs/a.md": "A.\n", "docs/b.md": "B.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			r.syncAnswering(200)
+			s.change(s.owner, "", "doc.delete", M{"id": s.pageID("a")})
+			if res, _ := r.syncAnswering(200); res.FilesRemoved != 1 || res.FilesWritten != 0 || res.Pushed != "main" {
+				t.Fatalf("%+v", res)
+			}
+			if got := r.files("main"); strings.Contains(got, "docs/a.md") || !strings.Contains(got, "docs/b.md") {
+				t.Fatal(got)
+			}
+			if res, _ := r.syncAnswering(200); res.PagesCreated != 0 || res.FilesRemoved != 0 {
+				t.Fatalf("the sync after: %+v", res)
+			}
+		}},
+		{"a page trashed here while its file changed there, pages having the say: the file goes", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, M{"authority": "pages"})
+			r.syncAnswering(200)
+			s.change(s.owner, "", "doc.delete", M{"id": s.pageID("a")})
+			r.write("docs/a.md", "A, changed there.\n")
+			r.push("there")
+			if res, _ := r.syncAnswering(200); res.FilesRemoved != 1 || res.Note != "" {
+				t.Fatalf("%+v", res)
+			}
+			if got := r.files("main"); strings.Contains(got, "docs/a.md") {
+				t.Fatal(got)
+			}
+		}},
+		{"a source that is never written to takes file edits and writes nothing", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, M{"write_mode": "none"})
+			r.syncAnswering(200)
+			s.change(s.owner, "", "doc.create", M{"parent": s.pageID("Game docs"), "title": "New", "markdown": "New.\n"})
+			r.write("docs/a.md", "A, edited there.\n")
+			r.push("there")
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 0 || res.Pushed != "" || res.PagesUpdated != 1 || res.Commit == "" {
+				t.Fatalf("%+v", res)
+			}
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 0 || res.Pushed != "" || res.PagesUpdated != 0 || res.PagesCreated != 0 {
+				t.Fatalf("the sync after: %+v", res)
+			}
+			if got := r.files("main"); strings.Contains(got, "new.md") {
+				t.Fatal(got)
+			}
+		}},
+		{"a proposal is pushed once, and the branch is left as it was", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, M{"write_mode": "propose"})
+			r.syncAnswering(200)
+			s.change(s.owner, "", "doc.write", M{"doc": s.pageID("a"), "markdown": "A, proposed.\n"})
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 || res.Pushed != "quadit/docs" {
+				t.Fatalf("%+v", res)
+			}
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 0 || res.Pushed != "" || res.PagesUpdated != 0 {
+				t.Fatalf("the sync after the proposal: %+v", res)
+			}
+			if r.read("main", "docs/a.md") != "A.\n" || r.read("quadit/docs", "docs/a.md") != "A, proposed.\n" {
+				t.Fatal("the branches after a proposal")
+			}
+		}},
+		{"only Markdown files under the size limit, outside hidden folders and node_modules, are pages", map[string]string{
+			"docs/a.md": "A.\n", "docs/UPPER.MD": "Upper.\n", "docs/.hidden/b.md": "B.\n", "docs/node_modules/c.md": "C.\n",
+			"docs/notes.txt": "text\n", "docs/big.md": strings.Repeat("x", 2<<20),
+		}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			if res, _ := r.syncAnswering(200); res.PagesCreated != 2 {
+				t.Fatalf("%+v", res)
+			}
+			s.pageID("a")
+			s.pageID("UPPER")
+		}},
+		{"a file with a second opening heading keeps both and is called by its name", map[string]string{"docs/two.md": "# One\n\n# Two\n\nText.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			r.syncAnswering(200)
+			if got := s.call(s.owner, "", "GET", w+"/docs/"+s.pageID("two")+"?format=md", nil, 200, nil); !strings.Contains(got, "# One") {
+				t.Fatalf("%q", got)
+			}
+			r.idle("after the first sync")
+		}},
+		{"folders become pages that hold their files, and a page made in one gets its file there", map[string]string{"docs/a/b/c.md": "C.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			if res, _ := r.syncAnswering(200); res.PagesCreated != 1 {
+				t.Fatalf("%+v", res)
+			}
+			tree := s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
+			if !strings.Contains(tree, "\n  a  (") || !strings.Contains(tree, "\n    b  (") || !strings.Contains(tree, "\n      c  (") {
+				t.Fatal(tree)
+			}
+			s.change(s.owner, "", "doc.create", M{"parent": s.pageID("b"), "title": "New Page", "markdown": "New.\n"})
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 {
+				t.Fatalf("%+v", res)
+			}
+			if got := r.read("main", "docs/a/b/new-page.md"); got != "New.\n" {
+				t.Fatalf("%q", got)
+			}
+			r.idle("after the new page")
+		}},
+		{"a page moved here keeps its file", map[string]string{"docs/a.md": "A.\n", "docs/f/b.md": "B.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			r.syncAnswering(200)
+			s.change(s.owner, "", "doc.update", M{"id": s.pageID("a"), "parent": s.pageID("f")})
+			r.idle("after a move")
+			if got := r.files("main"); !strings.Contains(got, "docs/a.md") || strings.Contains(got, "docs/f/a.md") {
+				t.Fatal(got)
+			}
+		}},
+		{"the commit is the last editor's and names the others", map[string]string{"docs/a.md": "A.\n", "docs/b.md": "B.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			r.syncAnswering(200)
+			s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+			var tok struct{ Token string }
+			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+			s.change(s.owner, "", "doc.write", M{"doc": s.pageID("a"), "markdown": "A, by Aram.\n"})
+			s.change(nil, tok.Token, "doc.write", M{"doc": s.pageID("b"), "markdown": "B, by the artist.\n"})
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 2 {
+				t.Fatalf("%+v", res)
+			}
+			if got := gitIn(t, r.origin, "log", "-1", "--format=%an <%ae>|%B", "main"); got != "Artist <artist@quadit.invalid>|docs: update 2 page(s) from Quadit\n\nAlso edited by: Aram" {
+				t.Fatalf("%q", got)
+			}
+		}},
+		{"a folder that cannot be read stops the sync and trashes nothing", map[string]string{"docs/a.md": "A.\n", "docs/sub/b.md": "B.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			if os.Geteuid() == 0 {
+				t.Skip("root reads any folder")
+			}
+			source(r, nil)
+			r.syncAnswering(200)
+			sub := filepath.Join(s.dir, "repos", r.src, "docs", "sub")
+			if err := os.Chmod(sub, 0o300); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { os.Chmod(sub, 0o755) })
+			r.syncAnswering(409)
+			s.pageID("b")
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newSite(t, testdb.SQLite(t))
+			files := c.files
+			if files == nil {
+				files = map[string]string{"README.md": "readme\n"}
+			}
+			r := newSyncedRepo(t, s, files)
+			c.run(t, s, r)
+		})
+	}
 }
