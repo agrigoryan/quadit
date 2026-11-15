@@ -44,8 +44,13 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// Commands are extra server-side commands added by other files.
-var Commands = map[string]func(args []string, version string) int{}
+// Commands are the commands run on the server's machine besides serve and
+// admin, by name.
+var Commands = map[string]func(args []string, version string) int{
+	"backup":  Backup,  // backup.go
+	"restore": Restore, // backup.go
+	"upgrade": Upgrade, // upgrade.go
+}
 
 // Options say where the data lives. Each can come from a flag or from the
 // environment, so scripted installs need no flags.
@@ -409,10 +414,6 @@ func filesConfig(ctx context.Context, st store.Store, sealer *auth.Sealer) (blob
 	}
 	return cfg, nil
 }
-
-// WebHandler returns the handler that serves the built-in web app, or nil
-// when the binary was built without it.
-var WebHandler = func() http.Handler { return nil }
 
 // adminHelp is the help of quadit admin.
 const adminHelp = `quadit admin: commands run on the server's machine

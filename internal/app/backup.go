@@ -18,11 +18,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-func init() {
-	Commands["backup"] = Backup
-	Commands["restore"] = Restore
-}
-
 // backupHelp is the help of quadit backup and quadit restore.
 const backupHelp = `quadit backup [--out FILE]      write everything to one archive and verify it
 quadit backup verify FILE       check an archive without restoring it

@@ -15,10 +15,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store/sqlite"
 )
 
-func init() {
-	Commands["upgrade"] = Upgrade
-}
-
 // Upgrade brings the database up to this binary's version, leaving a copy
 // of it as it was; with --undo it puts that copy back. Starting the server
 // does the first by itself; the command is for doing it as a step of its own.
