@@ -17,7 +17,15 @@ import { useCan } from "@/lib/access";
 import { useRowEvenIfGone } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { setDue, setEstimate, trashTasks } from "@/tasks/actions";
-import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
+import { assignee } from "@/tasks/properties/assignee";
+import { cycle } from "@/tasks/properties/cycle";
+import { epic } from "@/tasks/properties/epic";
+import { label } from "@/tasks/properties/label";
+import { priority } from "@/tasks/properties/priority";
+import { project as projectProperty } from "@/tasks/properties/project";
+import type { PickerProperty } from "@/tasks/properties/property";
+import { status } from "@/tasks/properties/status";
+import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { Button, IconButton } from "@/ui/button";
 import { PriorityIcon } from "@/ui/icons";
 import { Input } from "@/ui/input";
@@ -29,11 +37,11 @@ interface Props {
   onClear: () => void;
 }
 
-const actions: { kind: TaskProperty; label: () => string; icon: React.ReactNode }[] = [
-  { kind: "status", label: () => t("prop.status"), icon: <CircleDot className="size-3.5" aria-hidden /> },
-  { kind: "assignee", label: () => t("prop.assignee"), icon: <UserRound className="size-3.5" aria-hidden /> },
-  { kind: "priority", label: () => t("prop.priority"), icon: <PriorityIcon priority={2} title="" /> },
-  { kind: "labels", label: () => t("prop.labels"), icon: <Tag className="size-3.5" aria-hidden /> },
+const actions: { kind: PickerProperty; label: () => string; icon: React.ReactNode }[] = [
+  { kind: status, label: () => t("prop.status"), icon: <CircleDot className="size-3.5" aria-hidden /> },
+  { kind: assignee, label: () => t("prop.assignee"), icon: <UserRound className="size-3.5" aria-hidden /> },
+  { kind: priority, label: () => t("prop.priority"), icon: <PriorityIcon priority={2} title="" /> },
+  { kind: label, label: () => t("prop.labels"), icon: <Tag className="size-3.5" aria-hidden /> },
 ];
 
 /** What the "More" menu opens next to itself. */
@@ -63,7 +71,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
     setMore(null);
     moreButton.current?.focus();
   };
-  const picker = more === "epic" || more === "cycle" || more === "project" ? more : null;
+  const picker = more === "epic" ? epic : more === "cycle" ? cycle : more === "project" ? projectProperty : null;
 
   return (
     <div
@@ -73,7 +81,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
     >
       <span className="mr-1 shrink-0 text-sm font-medium tnum">{t("bulk.selected", { n: tasks.length })}</span>
       {actions.map((a) => (
-        <TaskPropertyPicker key={a.kind} kind={a.kind} tasks={tasks} side="top">
+        <TaskPropertyPicker key={a.kind.name} property={a.kind} tasks={tasks} side="top">
           <Button size="md" className="max-sm:px-2" disabled={readOnly} aria-label={a.label()}>
             {a.icon}
             <span className="max-sm:hidden">{a.label()}</span>
@@ -120,7 +128,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
       </Menu>
       {picker && (
         <TaskPropertyPicker
-          kind={picker}
+          property={picker}
           tasks={tasks}
           open
           onOpenChange={(next) => !next && close()}

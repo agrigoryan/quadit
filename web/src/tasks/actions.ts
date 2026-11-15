@@ -12,7 +12,7 @@ import { draftKey, getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { isOpenCategory, type Status, type Task } from "@/lib/types";
 import { projectStatuses } from "@/tasks/data";
-import { OUTSIDE } from "@/tasks/filters";
+import { OUTSIDE } from "@/tasks/properties/property";
 
 type Fields = Record<string, unknown>;
 

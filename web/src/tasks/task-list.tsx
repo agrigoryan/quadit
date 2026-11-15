@@ -14,7 +14,8 @@ import { usePeek, useTaskNav } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";
 import type { SortBy, Task } from "@/lib/types";
 import type { NewTaskDraft } from "@/tasks/draft";
-import { comparer, NONE, type TaskGroup } from "@/tasks/filters";
+import { comparer, type TaskGroup } from "@/tasks/filters";
+import { NONE } from "@/tasks/properties/property";
 import { GroupHeader } from "@/tasks/group-header";
 import {
   layOut,
@@ -29,7 +30,9 @@ import {
   treeStep,
 } from "@/tasks/list-layout";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
-import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
+import { KEYED } from "@/tasks/properties";
+import type { PickerProperty } from "@/tasks/properties/property";
+import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { useViewport } from "@/tasks/use-viewport";
 
@@ -58,8 +61,6 @@ function draftFor(group: TaskGroup): NewTaskDraft {
 const HIDE_EPIC = { epic: true };
 const HIDE_ASSIGNEE = { assignee: true };
 
-const KEY_TO_PROPERTY: Record<string, TaskProperty> = { s: "status", a: "assignee", p: "priority", l: "labels" };
-
 /**
  * Tasks as dense rows under collapsible group headings, driven from the
  * keyboard: J/K move, Space shows the focused task in the panel, Enter
@@ -84,7 +85,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
   useLayoutEffect(() => {
     place.current = { focus: focusKey, folded: [...collapsed] };
   });
-  const [picker, setPicker] = useState<TaskProperty | null>(null);
+  const [picker, setPicker] = useState<PickerProperty | null>(null);
   const anchor = useRef<Element | null>(null);
   const lastPicked = useRef<string | null>(null);
   const view = useViewport(scroller);
@@ -213,13 +214,13 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
   }
   const addTo = useCallback((group: TaskGroup) => onAdd?.(draftFor(group)), [onAdd]);
 
-  function openPicker(kind: TaskProperty) {
+  function openPicker(property: PickerProperty) {
     const first = targets[0];
     // Like the row's own buttons: nothing to pick for a task the viewer may not change.
     if (!first || !targets.every((task) => can.editTask(task))) return;
     // The row may be scrolled out of the window; the list itself then holds the picker.
     anchor.current = scroller.current?.querySelector(`[data-task="${first.id}"]`) ?? scroller.current;
-    setPicker(kind);
+    setPicker(property);
   }
 
   useHotkeys({
@@ -252,11 +253,11 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
       if (selected.size > 0) onSelectedChange(new Set());
     },
     ...Object.fromEntries(
-      Object.entries(KEY_TO_PROPERTY).map(([key, kind]) => [
-        key,
+      KEYED.map((property) => [
+        property.picker.hotkey,
         (e: KeyboardEvent) => {
           e.preventDefault(); // or the letter lands in the picker's search box
-          openPicker(kind);
+          openPicker(property);
         },
       ]),
     ),
@@ -325,7 +326,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
       </div>
       {picker && targets.length > 0 && (
         <TaskPropertyPicker
-          kind={picker}
+          property={picker}
           tasks={targets}
           open
           onOpenChange={(open) => !open && setPicker(null)}

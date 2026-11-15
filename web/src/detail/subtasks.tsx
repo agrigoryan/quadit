@@ -12,6 +12,7 @@ import { isClosedCategory, type Task } from "@/lib/types";
 import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";
 import { createTask, setParent } from "@/tasks/actions";
+import { status as statusProperty } from "@/tasks/properties/status";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { AssigneeAvatar } from "@/tasks/task-chips";
 import { useTaskLink } from "@/lib/task-link";
@@ -27,7 +28,7 @@ function SubtaskRow({ task }: { task: Task }) {
   return (
     <li className="group relative -mx-1.5 flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10">
       {status && (
-        <TaskPropertyPicker kind="status" tasks={[task]}>
+        <TaskPropertyPicker property={statusProperty} tasks={[task]}>
           <button
             type="button"
             aria-label={`${t("prop.status")}: ${status.name}`}

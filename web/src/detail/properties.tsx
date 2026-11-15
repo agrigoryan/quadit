@@ -16,14 +16,19 @@ import { nameOf } from "@/detail/data";
 import { BudgetField } from "@/detail/budget-field";
 import { DueField, EstimateField, ParentField, PropButton, PropRow, WaitingNote } from "@/detail/property-fields";
 import { waitsOutside } from "@/tasks/actions";
-import { TaskPropertyPicker, type TaskProperty } from "@/tasks/property-picker";
+import { KEYED, type PropertyName } from "@/tasks/properties";
+import { cycle as cycleProperty } from "@/tasks/properties/cycle";
+import { epic as epicProperty } from "@/tasks/properties/epic";
+import { milestone as milestoneProperty } from "@/tasks/properties/milestone";
+import type { PickerProperty } from "@/tasks/properties/property";
+import { waiting } from "@/tasks/properties/waiting";
+import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { LabelChip } from "@/ui/badge";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";
 import { Tooltip } from "@/ui/tooltip";
 
-type Keyed = "status" | "assignee" | "priority" | "labels";
-const KEYS: Record<string, Keyed> = { s: "status", a: "assignee", p: "priority", l: "labels" };
+const byName = (name: PropertyName) => KEYED.find((p) => p.name === name) as PickerProperty;
 
 interface Props {
   task: Task;
@@ -52,29 +57,29 @@ export function Properties({ task, side }: Props) {
   const outside = waitsOutside(task);
 
   // Which picker a key opened, and the buttons they open next to.
-  const [opened, setOpened] = useState<Keyed | null>(null);
-  const triggers = useRef<Partial<Record<Keyed, HTMLButtonElement | null>>>({});
+  const [opened, setOpened] = useState<string | null>(null);
+  const triggers = useRef<Partial<Record<string, HTMLButtonElement | null>>>({});
 
   const hotkeys = Object.fromEntries(
-    Object.entries(KEYS).map(([key, kind]) => [
-      key,
+    KEYED.map(({ name, picker }) => [
+      picker.hotkey,
       (e: KeyboardEvent) => {
         if (readOnly) return;
         e.preventDefault();
-        triggers.current[kind]?.scrollIntoView({ block: "nearest" });
-        setOpened(kind);
+        triggers.current[name]?.scrollIntoView({ block: "nearest" });
+        setOpened(name);
       },
     ]),
   );
   useHotkeys(hotkeys, { layer: "panel" });
 
-  const picker = (kind: Keyed) => ({
-    kind: kind as TaskProperty,
+  const picker = (kind: PropertyName) => ({
+    property: byName(kind),
     tasks: [task],
     open: opened === kind,
     onOpenChange: (open: boolean) => setOpened(open ? kind : null),
   });
-  const trigger = (kind: Keyed) => ({
+  const trigger = (kind: PropertyName) => ({
     ref: (el: HTMLButtonElement | null) => {
       triggers.current[kind] = el;
     },
@@ -136,7 +141,7 @@ export function Properties({ task, side }: Props) {
         )}
 
         <PropRow label={t("prop.waitingOn")} wide>
-          <TaskPropertyPicker kind="waiting" tasks={[task]}>
+          <TaskPropertyPicker property={waiting} tasks={[task]}>
             <PropButton
               empty={!waitingOn && !outside}
               disabled={readOnly}
@@ -181,9 +186,9 @@ export function Properties({ task, side }: Props) {
         </PropRow>
 
         <PropRow label={t("prop.labels")}>
-          <TaskPropertyPicker {...picker("labels")}>
+          <TaskPropertyPicker {...picker("label")}>
             <PropButton
-              {...trigger("labels")}
+              {...trigger("label")}
               empty={taskLabels.length === 0}
               aria-label={`${t("prop.labels")}: ${taskLabels.length ? taskLabels.map((l) => l.name).join(", ") : t("task.noLabels")}`}
               className="h-auto min-h-7 flex-wrap gap-1 py-1 max-md:h-auto max-md:min-h-9"
@@ -196,7 +201,7 @@ export function Properties({ task, side }: Props) {
         </PropRow>
 
         <PropRow label={t("prop.epic")}>
-          <TaskPropertyPicker kind="epic" tasks={[task]}>
+          <TaskPropertyPicker property={epicProperty} tasks={[task]}>
             <PropButton
               empty={!epic}
               disabled={readOnly}
@@ -210,7 +215,7 @@ export function Properties({ task, side }: Props) {
 
         {task.epic_id && (
           <PropRow label={t("prop.milestone")}>
-            <TaskPropertyPicker kind="milestone" tasks={[task]}>
+            <TaskPropertyPicker property={milestoneProperty} tasks={[task]}>
               <PropButton
                 empty={!milestone}
                 disabled={readOnly}
@@ -225,7 +230,7 @@ export function Properties({ task, side }: Props) {
 
         {project?.settings?.cycles && (
           <PropRow label={t("prop.cycle")}>
-            <TaskPropertyPicker kind="cycle" tasks={[task]}>
+            <TaskPropertyPicker property={cycleProperty} tasks={[task]}>
               <PropButton empty={!cycle} disabled={readOnly} aria-label={`${t("prop.cycle")}: ${cycleName}`}>
                 <RefreshCw className="size-3.5 shrink-0 text-ink-3" aria-hidden />
                 <span className="truncate">{cycleName}</span>

@@ -28,7 +28,8 @@ import { CardOverlay } from "@/tasks/board-card";
 import { BoardColumn, type Card } from "@/tasks/board-column";
 import { useBoardKeys } from "@/tasks/board-keys";
 import { projectStatuses } from "@/tasks/data";
-import { NONE, type TaskGroup } from "@/tasks/filters";
+import type { TaskGroup } from "@/tasks/filters";
+import { NONE } from "@/tasks/properties/property";
 
 interface Props {
   /**

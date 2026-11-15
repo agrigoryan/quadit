@@ -14,6 +14,7 @@ import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from
 import { tallyOf } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";
 import { createTask, setMilestone } from "@/tasks/actions";
+import { milestone as milestoneProperty } from "@/tasks/properties/milestone";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Button, IconButton } from "@/ui/button";
@@ -180,7 +181,7 @@ function Group({ epic, milestone, ordered, tasks, readOnly }: GroupProps) {
           </div>
           {ordered.length > 0 && !readOnly && (
             <div className="flex items-center border-b border-line/70 pr-2">
-              <TaskPropertyPicker kind="milestone" tasks={[task]} align="end">
+              <TaskPropertyPicker property={milestoneProperty} tasks={[task]} align="end">
                 <IconButton size="sm" label={t("epic.moveTask", { key: task.key })}>
                   <Diamond className="size-3.5" />
                 </IconButton>

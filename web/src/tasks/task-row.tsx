@@ -9,6 +9,9 @@ import { useIsDraft } from "@/lib/store";
 import { isClosedCategory, type Task } from "@/lib/types";
 import { useTaskLink } from "@/lib/task-link";
 import type { Branch } from "@/tasks/list-layout";
+import { assignee as assigneeProperty } from "@/tasks/properties/assignee";
+import { priority } from "@/tasks/properties/priority";
+import { status as statusProperty } from "@/tasks/properties/status";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { DueChip, EpicChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
 import { Avatar } from "@/ui/avatar";
@@ -130,7 +133,7 @@ export const TaskRow = memo(function TaskRow({
 
       {branch && <TreeGutter branch={branch} label={task.key} onFold={onFold && (() => onFold(at ?? task.id))} />}
 
-      <TaskPropertyPicker kind="priority" tasks={[task]}>
+      <TaskPropertyPicker property={priority} tasks={[task]}>
         <button
           type="button"
           className={iconButton}
@@ -144,7 +147,7 @@ export const TaskRow = memo(function TaskRow({
       <span className={cx(keyCell, "max-sm:hidden")}>{task.key}</span>
 
       {status && (
-        <TaskPropertyPicker kind="status" tasks={[task]}>
+        <TaskPropertyPicker property={statusProperty} tasks={[task]}>
           <button
             type="button"
             className={iconButton}
@@ -194,7 +197,7 @@ export const TaskRow = memo(function TaskRow({
         {!hide?.epic && epic && <EpicChip name={epic.name} className="max-xl:hidden" />}
         {task.due_on && <DueChip day={task.due_on} done={closed} className="max-sm:hidden" />}
         {!hide?.assignee && (
-          <TaskPropertyPicker kind="assignee" tasks={[task]} align="end">
+          <TaskPropertyPicker property={assigneeProperty} tasks={[task]} align="end">
             <button
               type="button"
               className={iconButton}

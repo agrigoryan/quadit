@@ -6,13 +6,7 @@ import { t, tMaybe } from "@/lib/i18n";
 import type { Collections, Dict } from "@/lib/store";
 import { CATEGORIES, type Category, type GroupBy, type SortBy, type Task, type TaskQuery } from "@/lib/types";
 import { serverDay } from "@/lib/time";
-
-export const NONE = "none";
-/**
- * The server's word for "an outside event" where a member's id would be: in
- * the "waiting on" filter, in a picker, and in the change that sets it.
- */
-export const OUTSIDE = "outside";
+import { NONE, OUTSIDE } from "@/tasks/properties/property";
 
 /** How a page groups its tasks: the server's groupings, and by label. */
 export type Grouping = GroupBy | "label";

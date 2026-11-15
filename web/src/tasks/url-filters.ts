@@ -5,7 +5,8 @@
 // and an id otherwise. Several values of one filter are joined by commas.
 
 import type { TaskQuery } from "@/lib/types";
-import { type Filters, fromQuery, NONE, normalizeQuery, OUTSIDE, type QuerySource } from "@/tasks/filters";
+import { type Filters, fromQuery, normalizeQuery, type QuerySource } from "@/tasks/filters";
+import { NONE, OUTSIDE } from "@/tasks/properties/property";
 
 const LISTS = ["assignee", "status", "category", "label", "priority", "epic", "cycle"] as const;
 const SINGLE = ["waiting_on", "has_open_decision", "q"] as const;

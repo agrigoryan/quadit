@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, getState, loadBootstrap } from "@/lib/store";
 import type { Member, Task, User, Workspace } from "@/lib/types";
+import { PROPERTIES, type PropertyName } from "@/tasks/properties";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -88,13 +89,13 @@ afterEach(async () => {
 
 const theTask = () => getState().collections.tasks.t1 as Task;
 
-type Kind = Parameters<typeof TaskPropertyPicker>[0]["kind"];
-
-function open(kind: Kind, tasks: Task[] = [theTask()]) {
+function open(kind: PropertyName, tasks: Task[] = [theTask()]) {
+  const property = PROPERTIES.find((p) => p.name === kind);
+  if (!property || !("picker" in property)) throw new Error(`${kind} has no picker`);
   render(
     <MemoryRouter>
       <TooltipProvider>
-        <TaskPropertyPicker kind={kind} tasks={tasks} open onOpenChange={() => {}} />
+        <TaskPropertyPicker property={property} tasks={tasks} open onOpenChange={() => {}} />
       </TooltipProvider>
     </MemoryRouter>,
   );
@@ -164,7 +165,7 @@ describe("TaskPropertyPicker", () => {
   });
 
   it("labels: the project's labels; a pick adds one and the list stays open", async () => {
-    open("labels");
+    open("label");
     expect(screen.getByRole("dialog", { name: "Add or remove labels…" })).toBeInTheDocument();
     expect(rows()).toEqual(["art", "bug", "Manage labels"]);
     pick("art");
@@ -173,7 +174,7 @@ describe("TaskPropertyPicker", () => {
   });
 
   it("labels: a label every task has is taken off them all", async () => {
-    open("labels", [task({ label_ids: ["l1"] }), task({ id: "t2", key: "SVA-2", label_ids: ["l1"] })]);
+    open("label", [task({ label_ids: ["l1"] }), task({ id: "t2", key: "SVA-2", label_ids: ["l1"] })]);
     expect(rows()).toEqual(["art", "bug ✓", "Manage labels"]);
     pick("bug");
     await waitFor(() => expect(sent).toHaveLength(2));

@@ -3,8 +3,10 @@ import { CircleSlash, Globe, Layers, RefreshCw } from "lucide-react";
 import { t, tMaybe, type Key } from "@/lib/i18n";
 import { useCycles, useEpics, useLabels, useMe, useMembers, useStatuses } from "@/lib/selectors";
 import { CATEGORIES, type Project } from "@/lib/types";
-import { type ListFilterKey, NONE, OUTSIDE } from "@/tasks/filters";
-import { memberItems, PRIORITIES } from "@/tasks/property-picker";
+import type { ListFilterKey } from "@/tasks/filters";
+import { PRIORITIES } from "@/tasks/properties/priority";
+import { NONE, OUTSIDE } from "@/tasks/properties/property";
+import { memberItems } from "@/tasks/property-picker";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";
 import type { PickerItem } from "@/ui/picker";
 
