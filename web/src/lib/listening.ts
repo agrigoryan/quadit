@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import { useLive, useNow } from "@/lib/live";
-import { useCollection } from "@/lib/selectors";
+import { useLookup } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 
 export interface AgentState {
@@ -45,7 +45,7 @@ export function useAgentStates(): { data: Record<string, AgentState> | undefined
  */
 export function useListening(): (member: Member | undefined) => boolean | undefined {
   const states = useAgentStates();
-  const members = useCollection("members");
+  const members = useLookup("members");
   const now = useNow();
   return (member) => {
     if (!member || member.kind !== "agent") return undefined;

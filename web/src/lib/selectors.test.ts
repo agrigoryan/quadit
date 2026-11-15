@@ -26,6 +26,7 @@ import {
   useRow,
   useRowEvenIfGone,
   useRows,
+  useSubtaskProgress,
   useStatuses,
   useTaskByKeyEvenIfGone,
   useTemplates,
@@ -187,6 +188,21 @@ describe("what is gone is reached by name", () => {
   });
 });
 
+describe("useSubtaskProgress", () => {
+  it("counts the sub-tasks the list shows: not a trashed or an archived one", () => {
+    loadBootstrap("acme", {
+      ...fixture,
+      tasks: [
+        { id: "t1", key: "SVA-1", project_id: "p1", status_id: "s1", title: "parent" },
+        { id: "t5", key: "SVA-5", project_id: "p1", status_id: "s1", parent_id: "t1", title: "live" },
+        { id: "t6", key: "SVA-6", project_id: "p1", status_id: "s1", parent_id: "t1", title: "x", deleted_at: 1 },
+        { id: "t7", key: "SVA-7", project_id: "p1", status_id: "s1", parent_id: "t1", title: "y", archived_at: 1 },
+      ],
+    });
+    expect(hook(() => useSubtaskProgress("t1"))).toEqual({ done: 0, total: 1 });
+  });
+});
+
 describe("answers are stable", () => {
   it("a list is the same array until a row of its collection changes", () => {
     const { result, rerender } = renderHook(() => ({
@@ -206,6 +222,11 @@ describe("answers are stable", () => {
     act(() => patchRow("tasks", "t1", { deleted_at: 30 }));
     expect(result.current.tasks).toEqual([]);
     expect(result.current.trash.map((t) => t.id)).toEqual(["t1", "t4", "t2"]);
+  });
+
+  it("a shared list cannot be sorted in place under its other readers", () => {
+    const rows = getRows("members");
+    expect(() => rows.reverse()).toThrow(TypeError);
   });
 
   it("a component that lists rows renders once per change, not in a loop", () => {

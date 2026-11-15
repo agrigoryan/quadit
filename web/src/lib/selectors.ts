@@ -49,13 +49,17 @@ export function isLive(row: object): boolean {
 const byRank = (a: { rank?: string }, b: { rank?: string }) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1);
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
-/** Remembers an answer per table: the same table gives back the same array or object. */
-function perTable<T extends object, Out>(compute: (table: T) => Out): (table: T) => Out {
+/**
+ * Remembers an answer per table: the same table gives back the same array
+ * or object. Every reader shares it, so it is frozen: sorting it in place
+ * throws instead of reordering everyone's list. Copy it first.
+ */
+function perTable<T extends object, Out extends object>(compute: (table: T) => Out): (table: T) => Out {
   const memo = new WeakMap<T, Out>();
   return (table) => {
     let out = memo.get(table);
     if (out === undefined) {
-      out = compute(table);
+      out = Object.freeze(compute(table)) as Out;
       memo.set(table, out);
     }
     return out;
@@ -156,7 +160,7 @@ export function useMe(): Member {
 
 export const useSlug = () => useStore((s) => s.slug);
 
-const projectList = perTable((projects: Dict<Project>) => liveList(projects).sort(byRank) as Project[]);
+const projectList = perTable((projects: Dict<Project>) => [...liveList(projects)].sort(byRank) as Project[]);
 
 /** The projects in use, in the order of the sidebar. */
 export function useProjects(): Project[] {
@@ -167,6 +171,11 @@ export function useProjects(): Project[] {
 export function useProjectByKey(key: string | undefined): Project | undefined {
   const projects = useStore((s) => s.collections.projects);
   return useMemo(() => projectByKey(projects, key), [projects, key]);
+}
+
+/** useProjectByKey outside a component. */
+export function getProjectByKey(key: string | undefined): Project | undefined {
+  return projectByKey(getState().collections.projects, key);
 }
 
 /** The project with this key, case aside, an archived one included; not one in the trash. */
@@ -237,7 +246,7 @@ export function useTemplates(projectId: string | undefined): Template[] {
   );
 }
 
-const viewList = perTable((views: Dict<View>) => liveList(views).sort(byRank) as View[]);
+const viewList = perTable((views: Dict<View>) => [...liveList(views)].sort(byRank) as View[]);
 
 export function useViews(): View[] {
   return useStore((s) => viewList(s.collections.views));
@@ -351,11 +360,11 @@ export function useDecisionFlag(taskId: string): "" | "open" | "mine" {
   });
 }
 
-/** Per parent, how many of its sub-tasks are done of those that count: a canceled one is not work left, nor work done. */
+/** Per parent, how many of its sub-tasks are done of those that count: the live ones the sub-task list shows; a canceled one is not work left, nor work done. */
 const childProgress = memoLast((input: { tasks: Dict<Task>; statuses: Dict<Status> }) => {
   const out: Dict<{ done: number; total: number }> = {};
   for (const task of Object.values(input.tasks)) {
-    if (!task.parent_id || task.deleted_at) continue;
+    if (!task.parent_id || !isLive(task)) continue;
     const category = input.statuses[task.status_id]?.category;
     if (isCanceledCategory(category)) continue;
     const p = (out[task.parent_id] ??= { done: 0, total: 0 });
