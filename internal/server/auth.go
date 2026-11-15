@@ -15,6 +15,28 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// The routes of the second step, password reset, registration and
+// invitations: auth_totp.go, auth_reset.go, auth_invites.go.
+
+func init() {
+	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
+		m.HandleFunc("POST /api/v1/auth/second-step", s.half(s.hSecondStep))
+		m.HandleFunc("POST /api/v1/auth/totp/start", s.signed(s.hTOTPStart))
+		m.HandleFunc("POST /api/v1/auth/totp/enable", s.signed(s.hTOTPEnable))
+		m.HandleFunc("POST /api/v1/auth/totp/disable", s.signed(s.hTOTPDisable))
+		m.HandleFunc("POST /api/v1/auth/recovery-codes", s.signed(s.hRecoveryCodes))
+		m.HandleFunc("POST /api/v1/auth/reset/request", s.open(s.hResetRequest))
+		m.HandleFunc("POST /api/v1/auth/reset/confirm", s.open(s.hResetConfirm))
+		m.HandleFunc("POST /api/v1/auth/register", s.open(s.hRegister))
+		m.HandleFunc("GET /api/v1/auth/invite/{token}", s.open(s.hInviteShow))
+		m.HandleFunc("POST /api/v1/auth/invite/{token}", s.open(s.hInviteAccept))
+		const w = "/api/v1/w/{ws}"
+		m.HandleFunc("GET "+w+"/invites", s.in(s.hInvites))
+		m.HandleFunc("POST "+w+"/invites", s.in(s.hInviteCreate))
+		m.HandleFunc("DELETE "+w+"/invites/{id}", s.in(s.hInviteRevoke))
+	})
+}
+
 const sessionLife = 30 * 24 * time.Hour
 
 // throttle counts an attempt under a name and refuses when there were more
@@ -35,6 +57,33 @@ func (s *Server) throttle(ctx context.Context, name string, max int, window time
 	}
 	s.st.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", name), store.Eq("bucket", bucket))
 	return nil
+}
+
+// oneTime makes a short-lived secret and stores its hash with some data.
+func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, life time.Duration) (string, error) {
+	token := auth.Random(32)
+	now := time.Now()
+	ot := core.OneTimeToken{ID: id.New(), Kind: kind, TokenHash: auth.Hash(token), UserID: userID, CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(life).UnixMilli()}
+	if data != nil {
+		ot.Data, _ = json.Marshal(data)
+	}
+	return token, s.st.Insert(ctx, ot)
+}
+
+// useOneTime spends a one-time secret. It works once and only while fresh.
+func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) (core.OneTimeToken, error) {
+	var ot core.OneTimeToken
+	err := s.st.Get(ctx, &ot, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
+	if err != nil || ot.ExpiresAt < time.Now().UnixMilli() {
+		return ot, &engine.Error{Code: engine.CodeNotFound, Message: "this link is no longer valid; ask for a new one"}
+	}
+	if !keep {
+		n, err := s.st.Update(ctx, "one_time_tokens", map[string]any{"used_at": time.Now().UnixMilli()}, store.Eq("id", ot.ID), store.Null("used_at"))
+		if err != nil || n != 1 {
+			return ot, &engine.Error{Code: engine.CodeNotFound, Message: "this link was already used"}
+		}
+	}
+	return ot, nil
 }
 
 // startSession signs a person in on this browser.
@@ -438,152 +487,4 @@ func (s *Server) hWorkspaceCreate(x *c) error {
 	}
 	s.audit(x.r, ws.ID, x.user, "workspace.created", "workspace", ws.ID, nil)
 	return x.json(201, ws)
-}
-
-// ---- API tokens ----
-
-type tokenBody struct {
-	User        string   `json:"user"` // an agent's @handle, or "me"
-	Name        string   `json:"name"`
-	ReadOnly    bool     `json:"read_only"`
-	Projects    []string `json:"projects"` // keys; empty = every project the member may use
-	ExpiresDays int      `json:"expires_days"`
-	// Secrets makes a token for a companion: it may receive the secrets
-	// marked for use in an environment. Admins only.
-	Secrets bool `json:"secrets"`
-}
-
-// hTokenCreate issues a token for an agent (admins) or for oneself. The
-// token is in the answer and nowhere else afterwards.
-func (s *Server) hTokenCreate(x *c) error {
-	var b tokenBody
-	if err := x.body(&b); err != nil {
-		return err
-	}
-	if x.actor.ReadOnly {
-		return errForbidden("this credential is read-only")
-	}
-	rs := x.resolver()
-	if b.User == "" {
-		b.User = "me"
-	}
-	m, err := rs.Member("user", b.User)
-	if err != nil {
-		return err
-	}
-	if m.UserID != x.member.UserID {
-		// An admin makes tokens for agents; anyone makes them for a
-		// sub-agent they made themselves.
-		if m.DelegatedBy != x.member.UserID {
-			if err := x.admin(); err != nil {
-				return err
-			}
-		}
-		if m.Kind != core.KindAgent {
-			return errForbidden("a person's tokens are made by that person")
-		}
-		// An agent hands out no more than it has itself: not a higher role,
-		// not projects beyond its own.
-		if x.member.Kind == core.KindAgent {
-			if m.Role != x.member.Role && m.Role.AtLeast(x.member.Role) {
-				return errForbidden("an agent cannot make a token for an agent with a higher role than its own")
-			}
-			if mine := x.member.Scope; mine != nil {
-				theirs := m.Scope
-				if theirs == nil {
-					theirs = &core.Scope{}
-				}
-				if mine.ReadOnly && !theirs.ReadOnly {
-					return errForbidden("an agent that may only read cannot make a token for one that may write")
-				}
-				if len(mine.Projects) > 0 {
-					if len(theirs.Projects) == 0 {
-						return errForbidden("@%s works in every project and you do not; you cannot make a token for it", m.Handle)
-					}
-					for _, p := range theirs.Projects {
-						if !has(mine.Projects, p) {
-							return errForbidden("@%s works in projects you do not; you cannot make a token for it", m.Handle)
-						}
-					}
-				}
-			}
-		}
-	} else if x.member.Kind == core.KindAgent && x.token != nil {
-		return errForbidden("an agent cannot issue itself more tokens; ask an admin")
-	}
-	var scopes []string
-	if b.ReadOnly || x.actor.ReadOnly {
-		scopes = append(scopes, "read")
-	}
-	// A token made with a token limited to some projects keeps that limit.
-	if len(b.Projects) == 0 && x.token != nil {
-		for _, p := range x.actor.Projects {
-			scopes = append(scopes, "project:"+p)
-		}
-	}
-	if b.Secrets {
-		if err := x.admin(); err != nil {
-			return err
-		}
-		if x.token != nil {
-			return errForbidden("a token for secrets is made by a signed-in admin, not with another token")
-		}
-		scopes = append(scopes, "secrets")
-	}
-	for _, ref := range b.Projects {
-		p, err := rs.Project(ref)
-		if err != nil {
-			return err
-		}
-		if x.token != nil && len(x.actor.Projects) > 0 && !has(x.actor.Projects, p.ID) {
-			return errForbidden("this token does not reach project %s, so it cannot make one that does", p.Key)
-		}
-		scopes = append(scopes, "project:"+p.ID)
-	}
-	token, prefix := auth.NewAPIToken()
-	now := time.Now()
-	t := core.APIToken{ID: id.New(), WorkspaceID: x.ws.ID, UserID: m.UserID, Name: strings.TrimSpace(b.Name), TokenHash: auth.Hash(token), Prefix: prefix,
-		Scopes: strings.Join(scopes, " "), Kind: "token", CreatedBy: x.member.UserID, CreatedAt: now.UnixMilli()}
-	if t.Name == "" {
-		t.Name = "token " + now.UTC().Format("2006-01-02")
-	}
-	if b.ExpiresDays > 0 {
-		t.ExpiresAt = now.AddDate(0, 0, b.ExpiresDays).UnixMilli()
-	}
-	if err := x.db.Insert(x.ctx(), t); err != nil {
-		return err
-	}
-	s.audit(x.r, x.ws.ID, x.user, "token.created", "token", t.ID, map[string]string{"for": m.Handle, "scopes": t.Scopes})
-	return x.json(201, map[string]any{"token": token, "info": t, "note": "this is the only time the token is shown"})
-}
-
-func (s *Server) hTokens(x *c) error {
-	conds := []store.Cond{store.Null("revoked_at")}
-	if !x.member.Role.AtLeast(core.RoleAdmin) {
-		conds = append(conds, store.Eq("user_id", x.member.UserID))
-	}
-	var ts []core.APIToken
-	if err := x.db.List(x.ctx(), &ts, store.Q{Where: conds, Order: "-created_at"}); err != nil {
-		return err
-	}
-	return x.ok(map[string]any{"tokens": ts})
-}
-
-// hTokenRevoke ends a token at once.
-func (s *Server) hTokenRevoke(x *c) error {
-	var t core.APIToken
-	if err := x.db.Get(x.ctx(), &t, store.Eq("id", x.r.PathValue("id")), store.Null("revoked_at")); err != nil {
-		return errNotFound("token")
-	}
-	if t.UserID != x.member.UserID {
-		if err := x.admin(); err != nil {
-			return err
-		}
-	}
-	if _, err := x.db.Update(x.ctx(), "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", t.ID)); err != nil {
-		return err
-	}
-	s.accessChanged()
-	s.audit(x.r, x.ws.ID, x.user, "token.revoked", "token", t.ID, nil)
-	return x.ok(map[string]any{"ok": true})
 }

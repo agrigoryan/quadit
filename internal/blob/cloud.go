@@ -5,24 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	gcblob "gocloud.dev/blob"
-	"gocloud.dev/blob/azureblob"
-	"gocloud.dev/blob/gcsblob"
-	"gocloud.dev/blob/s3blob"
 	"gocloud.dev/gcerrors"
-	"gocloud.dev/gcp"
-	"golang.org/x/oauth2/google"
 )
 
 // Config says where files are kept. It is the "files" setting of the
@@ -53,95 +41,38 @@ type Config struct {
 var Kinds = []string{"disk", "s3", "gcs", "azure"}
 
 // Open returns the file store a Config describes. Disk keeps files under
-// dataDir/files.
+// dataDir/files; each cloud kind is opened in its own file.
 func Open(ctx context.Context, c Config, dataDir string) (Store, error) {
-	prefix := strings.Trim(c.Prefix, "/")
-	if prefix != "" {
-		prefix += "/"
-	}
-	need := func(what, v string) error {
-		if v == "" {
-			return fmt.Errorf("file storage: %s needs %s", c.Kind, what)
-		}
-		return nil
-	}
+	var b *gcblob.Bucket
+	var err error
 	switch c.Kind {
 	case "", "disk":
 		return NewDisk(filepath.Join(dataDir, "files"))
 	case "s3":
-		if err := need("a bucket", c.Bucket); err != nil {
-			return nil, err
-		}
-		opts := []func(*awsconfig.LoadOptions) error{awsconfig.WithRegion(orDefault(c.Region, "auto"))}
-		if c.AccessKey != "" {
-			opts = append(opts, awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(c.AccessKey, c.SecretKey, "")))
-		}
-		ac, err := awsconfig.LoadDefaultConfig(ctx, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("file storage: %w", err)
-		}
-		client := s3.NewFromConfig(ac, func(o *s3.Options) {
-			if c.Endpoint != "" {
-				o.BaseEndpoint = aws.String(c.Endpoint)
-				o.UsePathStyle = true // what MinIO and most other S3 look-alikes expect
-			}
-			if c.PathStyle {
-				o.UsePathStyle = true
-			}
-		})
-		b, err := s3blob.OpenBucket(ctx, client, c.Bucket, nil)
-		if err != nil {
-			return nil, fmt.Errorf("file storage: %w", err)
-		}
-		return &cloud{b: b, kind: "s3", prefix: prefix}, nil
+		b, err = openS3(ctx, c)
 	case "gcs":
-		if err := need("a bucket", c.Bucket); err != nil {
-			return nil, err
-		}
-		var client *gcp.HTTPClient
-		if c.Credentials == "" && os.Getenv("STORAGE_EMULATOR_HOST") != "" {
-			// A local stand-in for Google Cloud Storage takes no sign-in.
-			client = gcp.NewAnonymousHTTPClient(gcp.DefaultTransport())
-		} else {
-			var creds *google.Credentials
-			var err error
-			if c.Credentials != "" {
-				creds, err = google.CredentialsFromJSON(ctx, []byte(c.Credentials), "https://www.googleapis.com/auth/devstorage.read_write")
-			} else {
-				creds, err = gcp.DefaultCredentials(ctx)
-			}
-			if err != nil {
-				return nil, fmt.Errorf("file storage: Google credentials: %w", err)
-			}
-			if client, err = gcp.NewHTTPClient(gcp.DefaultTransport(), gcp.CredentialsTokenSource(creds)); err != nil {
-				return nil, fmt.Errorf("file storage: %w", err)
-			}
-		}
-		b, err := gcsblob.OpenBucket(ctx, client, c.Bucket, nil)
-		if err != nil {
-			return nil, fmt.Errorf("file storage: %w", err)
-		}
-		return &cloud{b: b, kind: "gcs", prefix: prefix}, nil
+		b, err = openGCS(ctx, c)
 	case "azure":
-		if err := errors.Join(need("a container (bucket)", c.Bucket), need("an account", c.Account), need("an account key", c.AccountKey)); err != nil {
-			return nil, err
-		}
-		cred, err := azblob.NewSharedKeyCredential(c.Account, c.AccountKey)
-		if err != nil {
-			return nil, fmt.Errorf("file storage: Azure account key: %w", err)
-		}
-		endpoint := orDefault(c.Endpoint, "https://"+c.Account+".blob.core.windows.net")
-		client, err := container.NewClientWithSharedKeyCredential(strings.TrimRight(endpoint, "/")+"/"+c.Bucket, cred, nil)
-		if err != nil {
-			return nil, fmt.Errorf("file storage: %w", err)
-		}
-		b, err := azureblob.OpenBucket(ctx, client, nil)
-		if err != nil {
-			return nil, fmt.Errorf("file storage: %w", err)
-		}
-		return &cloud{b: b, kind: "azure", prefix: prefix}, nil
+		b, err = openAzure(ctx, c)
+	default:
+		return nil, fmt.Errorf("file storage: unknown kind %q; kinds are: %s", c.Kind, strings.Join(Kinds, ", "))
 	}
-	return nil, fmt.Errorf("file storage: unknown kind %q; kinds are: %s", c.Kind, strings.Join(Kinds, ", "))
+	if err != nil {
+		return nil, err
+	}
+	prefix := strings.Trim(c.Prefix, "/")
+	if prefix != "" {
+		prefix += "/"
+	}
+	return &cloud{b: b, kind: c.Kind, prefix: prefix}, nil
+}
+
+// need says that a kind of store cannot be opened without a setting.
+func (c Config) need(what, v string) error {
+	if v == "" {
+		return fmt.Errorf("file storage: %s needs %s", c.Kind, what)
+	}
+	return nil
 }
 
 func orDefault(v, def string) string {

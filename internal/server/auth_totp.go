@@ -1,0 +1,174 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/agrigoryan/quadit/internal/auth"
+	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/store"
+)
+
+// checkSecond accepts an authenticator code or a recovery code.
+func (s *Server) checkSecond(ctx context.Context, u core.User, code string) bool {
+	code = strings.TrimSpace(code)
+	if u.TOTPSecret == "" || code == "" {
+		return false
+	}
+	secret, err := s.sealer.Open(u.TOTPSecret)
+	if err != nil {
+		return false
+	}
+	if step, ok := auth.CheckTOTP(secret, code, time.Now()); ok {
+		// A code works once: remember the step it was used in.
+		mark := core.OneTimeToken{ID: id.New(), Kind: "totp_used", TokenHash: auth.Hash(fmt.Sprintf("totp:%s:%d", u.ID, step)), UserID: u.ID,
+			CreatedAt: time.Now().UnixMilli(), ExpiresAt: time.Now().Add(5 * time.Minute).UnixMilli()}
+		return s.st.Insert(ctx, mark) == nil
+	}
+	n, err := s.st.Update(ctx, "recovery_codes", map[string]any{"used_at": time.Now().UnixMilli()},
+		store.Eq("user_id", u.ID), store.Eq("code_hash", auth.Hash(strings.ToLower(code))), store.Null("used_at"))
+	return err == nil && n == 1
+}
+
+type codeBody struct {
+	Code     string `json:"code"`
+	Password string `json:"password"`
+}
+
+// hSecondStep finishes a sign-in that is waiting for its second step.
+func (s *Server) hSecondStep(x *c) error {
+	var b codeBody
+	if err := x.body(&b); err != nil {
+		return err
+	}
+	if x.sess == nil || x.sess.Stage == "full" {
+		return x.ok(map[string]any{"user": x.user})
+	}
+	ctx := x.ctx()
+	if err := s.throttle(ctx, "mfa:"+x.user.ID, 8, 15*time.Minute); err != nil {
+		return err
+	}
+	if !s.checkSecond(ctx, x.user, b.Code) {
+		s.audit(x.r, "", x.user, "signin.second_step_failed", "user", x.user.ID, nil)
+		return errUnauthorized("that code is not right; codes change every 30 seconds")
+	}
+	if _, err := s.st.Update(ctx, "sessions", map[string]any{"stage": "full"}, store.Eq("id", x.sess.ID)); err != nil {
+		return err
+	}
+	s.audit(x.r, "", x.user, "signin", "user", x.user.ID, map[string]string{"method": "password+code"})
+	return x.ok(map[string]any{"user": x.user})
+}
+
+// hTOTPStart makes a new secret for the person to add to their app. It is
+// not in force until they prove the app works with hTOTPEnable.
+func (s *Server) hTOTPStart(x *c) error {
+	if x.sess == nil {
+		return errForbidden("two-step verification is set up by its person, signed in")
+	}
+	if x.user.TOTPAt != 0 {
+		return &engine.Error{Code: engine.CodeConflict, Message: "two-step verification is already on; turn it off first to set up a new app"}
+	}
+	secret := auth.NewTOTPSecret()
+	sealed, err := s.sealer.Seal(secret)
+	if err != nil {
+		return err
+	}
+	if _, err := s.st.Update(x.ctx(), "users", map[string]any{"totp_secret": sealed}, store.Eq("id", x.user.ID)); err != nil {
+		return err
+	}
+	issuer := s.settingStr(x.ctx(), "install.name", "Quadit")
+	return x.ok(map[string]any{"secret": secret, "url": auth.TOTPURL(issuer, x.user.Email, secret)})
+}
+
+func (s *Server) newRecoveryCodes(ctx context.Context, userID string) ([]string, error) {
+	codes := auth.NewRecoveryCodes()
+	err := s.st.Atomic(ctx, func(db store.DB) error {
+		if _, err := db.Delete(ctx, "recovery_codes", store.Eq("user_id", userID)); err != nil {
+			return err
+		}
+		for _, code := range codes {
+			if err := db.Insert(ctx, core.RecoveryCode{ID: id.New(), UserID: userID, CodeHash: auth.Hash(code), CreatedAt: time.Now().UnixMilli()}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return codes, err
+}
+
+// hTOTPEnable turns two-step verification on once a code from the app
+// checks out, and returns the recovery codes, shown this once.
+func (s *Server) hTOTPEnable(x *c) error {
+	var b codeBody
+	if err := x.body(&b); err != nil {
+		return err
+	}
+	ctx := x.ctx()
+	if x.sess == nil || x.user.TOTPSecret == "" || x.user.TOTPAt != 0 {
+		return errBad("start the setup first")
+	}
+	secret, err := s.sealer.Open(x.user.TOTPSecret)
+	if err != nil {
+		return err
+	}
+	if _, ok := auth.CheckTOTP(secret, b.Code, time.Now()); !ok {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "code", Message: "that code is not right; check the time on your phone and try the next code"}
+	}
+	if _, err := s.st.Update(ctx, "users", map[string]any{"totp_at": time.Now().UnixMilli()}, store.Eq("id", x.user.ID)); err != nil {
+		return err
+	}
+	codes, err := s.newRecoveryCodes(ctx, x.user.ID)
+	if err != nil {
+		return err
+	}
+	s.audit(x.r, "", x.user, "second_step.enabled", "user", x.user.ID, nil)
+	return x.ok(map[string]any{"recovery_codes": codes})
+}
+
+func (s *Server) hTOTPDisable(x *c) error {
+	var b codeBody
+	if err := x.body(&b); err != nil {
+		return err
+	}
+	ctx := x.ctx()
+	if x.sess == nil {
+		return errForbidden("two-step verification is changed by its person, signed in")
+	}
+	if !s.checkSecond(ctx, x.user, b.Code) && !(x.user.PasswordHash != "" && auth.CheckPassword(x.user.PasswordHash, b.Password)) {
+		return &engine.Error{Code: engine.CodeForbidden, Field: "code", Message: "confirm with a current code or your password"}
+	}
+	if s.settingBool(ctx, "auth.require_2fa", false) {
+		if n, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); n == 0 {
+			return errForbidden("this install requires two-step verification; add a passkey before turning codes off")
+		}
+	}
+	if _, err := s.st.Update(ctx, "users", map[string]any{"totp_at": 0, "totp_secret": ""}, store.Eq("id", x.user.ID)); err != nil {
+		return err
+	}
+	s.st.Delete(ctx, "recovery_codes", store.Eq("user_id", x.user.ID))
+	s.audit(x.r, "", x.user, "second_step.disabled", "user", x.user.ID, nil)
+	return x.ok(map[string]any{"ok": true})
+}
+
+// hRecoveryCodes replaces the recovery codes with ten new ones.
+func (s *Server) hRecoveryCodes(x *c) error {
+	var b codeBody
+	if err := x.body(&b); err != nil {
+		return err
+	}
+	if x.sess == nil || x.user.TOTPAt == 0 {
+		return errBad("two-step verification is not on")
+	}
+	if !s.checkSecond(x.ctx(), x.user, b.Code) {
+		return &engine.Error{Code: engine.CodeForbidden, Field: "code", Message: "confirm with a current code"}
+	}
+	codes, err := s.newRecoveryCodes(x.ctx(), x.user.ID)
+	if err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"recovery_codes": codes})
+}
