@@ -15,6 +15,10 @@ test("on a phone the task list, a task page and the sidebar drawer work", async 
   const row = page.getByRole("link", { name: `Open ${key}` });
   await expect(row).toBeVisible();
   await fitsTheWidth(page);
+  // The toolbar shows icons only here; they keep their names.
+  await expect(page.getByRole("tab", { name: "List", selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Board" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save as view" })).toBeVisible();
 
   // The sidebar is a drawer here. Every project in it has its own "Tasks" and
   // "Board" with nothing around them to tell them apart (shell/sidebar.tsx),

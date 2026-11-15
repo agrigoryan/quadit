@@ -31,7 +31,7 @@ export function LayoutTabs({ projectKey }: { projectKey: string }) {
           )}
         >
           <Icon className="size-3.5" aria-hidden />
-          <span className="max-sm:hidden">{label()}</span>
+          <span className="max-sm:sr-only">{label()}</span>
         </button>
       ))}
     </div>

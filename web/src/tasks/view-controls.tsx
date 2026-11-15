@@ -220,7 +220,7 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
       ) : (
         <Button size="sm" variant="ghost" disabled={!mayCreate} onClick={() => setDialog("save")}>
           <Bookmark className="size-3.5" aria-hidden />
-          <span className="max-sm:hidden">{t("view.save")}</span>
+          <span className="max-sm:sr-only">{t("view.save")}</span>
         </Button>
       )}
       {dialog === "save" && (

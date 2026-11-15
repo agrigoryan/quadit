@@ -114,7 +114,7 @@ export function PageHeader({ doc }: { doc: Doc }) {
         className={cx("gap-1 px-2", commentsOpen && "bg-hover text-ink")}
       >
         <MessageSquare className="size-4" />
-        <span className="max-sm:hidden">{t("docs.comment.title")}</span>
+        <span className="max-sm:sr-only">{t("docs.comment.title")}</span>
         {threads.total > 0 && (
           <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-move px-1 text-2xs font-semibold text-move-ink tnum">
             {threads.total}

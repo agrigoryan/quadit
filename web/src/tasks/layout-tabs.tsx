@@ -46,7 +46,7 @@ export function LayoutTabs({ layout, routeProject, onChange }: Props) {
           )}
         >
           <Icon className="size-3.5" aria-hidden />
-          <span className="max-sm:hidden">{label()}</span>
+          <span className="max-sm:sr-only">{label()}</span>
         </button>
       ))}
       {/* A project's third layout is a page of its own (insights/timeline). */}
@@ -59,7 +59,7 @@ export function LayoutTabs({ layout, routeProject, onChange }: Props) {
           className="flex h-6 items-center gap-1.5 rounded-sm px-2 text-xs font-medium text-ink-2 hover:text-ink"
         >
           <ChartGantt className="size-3.5" aria-hidden />
-          <span className="max-sm:hidden">{t("nav.timeline")}</span>
+          <span className="max-sm:sr-only">{t("nav.timeline")}</span>
         </button>
       )}
     </div>

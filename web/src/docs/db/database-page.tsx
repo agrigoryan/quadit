@@ -108,7 +108,7 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
         {view.type !== "form" && !readOnly && (
           <Button variant="primary" size="sm" className="ml-1 shrink-0" onClick={() => openRow(addRow())}>
             <Plus className="size-3.5" aria-hidden />
-            <span className="max-sm:hidden">{t("db.new")}</span>
+            <span className="max-sm:sr-only">{t("db.new")}</span>
             <span className="sr-only sm:hidden">{t("db.new")}</span>
           </Button>
         )}

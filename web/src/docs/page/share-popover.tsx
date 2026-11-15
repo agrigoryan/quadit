@@ -36,7 +36,7 @@ export function SharePopover({ doc }: { doc: Doc }) {
       <PopoverTrigger asChild>
         <Button variant="ghost" className="gap-1 px-2">
           {isPrivate ? <Lock className="size-4" /> : <Users className="size-4" />}
-          <span className="max-sm:hidden">{t("docs.share.button")}</span>
+          <span className="max-sm:sr-only">{t("docs.share.button")}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-1.5">

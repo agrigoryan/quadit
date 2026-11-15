@@ -26,7 +26,7 @@ export function ConnectionIndicator() {
         ) : (
           <RefreshCw className="size-3.5 animate-spin [animation-duration:2s]" aria-hidden />
         )}
-        <span className="max-sm:hidden">{label}</span>
+        <span className="max-sm:sr-only">{label}</span>
       </output>
     </Tooltip>
   );
