@@ -6,6 +6,7 @@
 import { type FormEvent, useId, useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
+import { sendOnModEnter } from "@/lib/mod-enter";
 import { mutate, send } from "@/lib/mutate";
 import { useLabels, useProjects } from "@/lib/selectors";
 import { getState } from "@/lib/store";
@@ -15,7 +16,7 @@ import { ProjectGlyph } from "@/ui/project-glyph";
 import { LabelChip } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { REFUSAL_IN_TOAST, useFieldErrors, useSubmit } from "@/ui/form";
+import { REFUSAL_IN_TOAST, useSubmit } from "@/ui/form";
 import { Field, Textarea } from "@/ui/input";
 import { Picker, Select } from "@/ui/picker";
 import { prefillRule } from "@/insights/decisions/data";
@@ -78,9 +79,8 @@ export function PreferenceDialog({ from, onClose }: Props) {
   const [scope, setScope] = useState(from?.projectId ?? WORKSPACE);
   const [labelIds, setLabelIds] = useState<string[]>([]);
   // Only the empty rule is caught here; a refusal from the server is a toast, and the dialog stays.
-  const errors = useFieldErrors(["body"]);
+  const [error, setError] = useState("");
   const { busy, run } = useSubmit(REFUSAL_IN_TOAST, { once: true });
-  const error = errors.fields.body;
   const projectId = scope === WORKSPACE ? "" : scope;
   // Only the project's own labels: the server looks a rule's labels up in its project.
   const labels = useLabels(projectId || undefined).filter((l) => l.project_id === projectId);
@@ -91,7 +91,7 @@ export function PreferenceDialog({ from, onClose }: Props) {
     e.preventDefault();
     const rule = body.trim();
     if (!rule) {
-      errors.set("body", t("prefs.bodyRequired"));
+      setError(t("prefs.bodyRequired"));
       return;
     }
     await run(async () => {
@@ -142,11 +142,9 @@ export function PreferenceDialog({ from, onClose }: Props) {
             aria-describedby={error ? `${bodyId}-error` : undefined}
             onChange={(e) => {
               setBody(e.target.value);
-              errors.set("body", "");
+              setError("");
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) e.currentTarget.form?.requestSubmit();
-            }}
+            onKeyDown={(e) => sendOnModEnter(e, () => e.currentTarget.form?.requestSubmit())}
             className="max-sm:text-base"
           />
           {error && (

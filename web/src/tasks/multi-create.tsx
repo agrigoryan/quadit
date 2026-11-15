@@ -3,8 +3,10 @@
 // are sent as one batch, so either all of them are made or none.
 
 import { useMemo, useState } from "react";
+import { errorMessage } from "@/lib/api";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
+import { sendOnModEnter } from "@/lib/mod-enter";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
 import { createTasks } from "@/tasks/actions";
@@ -14,7 +16,6 @@ import { ProjectSelect } from "@/tasks/project-select";
 import { useTaskFields } from "@/tasks/use-task-fields";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { useFieldErrors, useSubmit } from "@/ui/form";
 import { Textarea } from "@/ui/input";
 import { Kbd } from "@/ui/kbd";
 
@@ -38,18 +39,18 @@ interface Props {
 export function MultiCreateDialog({ draft, onSingle }: Props) {
   const { projectId, project, fields, change, changeProject } = useTaskFields(draft, { shared: true });
   const [text, setText] = useState("");
-  // The dialog stays open with the list as typed, and says in one line why nothing was made.
-  const errors = useFieldErrors([], { wholeForm: true });
-  const { busy, run } = useSubmit(errors, { once: true });
+  /** What is missing, or why the server made none of them: one line under the list. */
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const titles = useMemo(() => titlesOf(text), [text]);
-  const error = errors.form || errors.fields.project || errors.fields.titles;
 
   async function submit() {
     if (busy) return;
-    errors.clear();
-    if (!project) return errors.set("project", t("create.noProject"));
-    if (titles.length === 0) return errors.set("titles", t("multi.needTitles"));
-    await run(async () => {
+    if (!project) return setError(t("create.noProject"));
+    if (titles.length === 0) return setError(t("multi.needTitles"));
+    setError("");
+    setBusy(true);
+    try {
       const n = await createTasks(
         {
           projectId: project.id,
@@ -65,7 +66,11 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
       );
       ui.closeNewTask();
       toast.info(t("multi.created", { n, project: project.name }));
-    });
+    } catch (err) {
+      // The dialog stays open with the list as typed, and says why nothing was made.
+      setError(errorMessage(err));
+      setBusy(false);
+    }
   }
 
   return (
@@ -102,9 +107,7 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
           e.preventDefault();
           void submit();
         }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
-        }}
+        onKeyDown={(e) => sendOnModEnter(e, submit)}
         className="flex flex-col gap-2.5"
       >
         <div className="flex items-center gap-2">

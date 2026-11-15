@@ -2,49 +2,56 @@
 // options (each with media) or a plain approval, the asker's recommendation
 // and who should answer. Checked here before it is sent.
 
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
+import { errorMessage } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useTask } from "@/lib/selectors";
+import { useMe, useMembers, useTask } from "@/lib/selectors";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { useFieldErrors, useSubmit } from "@/ui/form";
 import { Field, Input } from "@/ui/input";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { openDecision } from "@/decisions/actions";
 import { useReturnFocus } from "@/decisions/data";
-import { HowToAnswer, useAskable } from "@/decisions/how-to-answer";
-import { sendOnModEnter } from "@/decisions/mod-enter";
+import { HowToAnswer } from "@/decisions/how-to-answer";
+import { sendOnModEnter } from "@/lib/mod-enter";
 import { NewDecisionOptions } from "@/decisions/new-decision-options";
 import { useNewDecision } from "@/decisions/use-new-decision";
 
 /** Mount it only while it is open, so each question starts empty. */
 export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+  const me = useMe();
   const task = useTask(taskId);
   const compose = useNewDecision(taskId);
   const { draft, actions, questionError, uploading } = compose;
-  const asked = useAskable().find((m) => m.user_id === draft.ask);
-  // The server's refusal is one line in the footer, whichever field it names.
-  const errors = useFieldErrors([], { wholeForm: true });
-  const { busy, run } = useSubmit(errors, { once: true });
+  // The people who can be asked: everyone but the asker and the suspended.
+  const askable = useMembers().filter((m) => m.user_id !== me.user_id && !m.suspended_at);
+  const asked = askable.find((m) => m.user_id === draft.ask);
+  /** The server's refusal: one line in the footer, whichever field it names. */
+  const [refusal, setRefusal] = useState("");
+  const [busy, setBusy] = useState(false);
   const ids = { question: useId(), details: useId() };
   const form = useRef<HTMLDivElement | null>(null);
   useReturnFocus();
 
   async function submit() {
     if (busy || uploading) return;
-    errors.clear();
+    setRefusal("");
     const decision = actions.check();
     if (!decision) {
       // Bring the first thing to fix into view once it is drawn.
       requestAnimationFrame(() => form.current?.querySelector('[role="alert"]')?.scrollIntoView({ block: "center" }));
       return;
     }
-    await run(async () => {
+    setBusy(true);
+    try {
       await openDecision(decision);
       onClose();
-    });
+    } catch (err) {
+      setRefusal(errorMessage(err));
+      setBusy(false);
+    }
   }
 
   return (
@@ -56,9 +63,9 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
       size="lg"
       footer={
         <>
-          {errors.form && (
+          {refusal && (
             <p role="alert" className="mr-auto min-w-0 text-xs text-danger">
-              {errors.form}
+              {refusal}
             </p>
           )}
           <Button variant="ghost" className="max-sm:h-10" onClick={onClose}>
@@ -112,7 +119,13 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
           />
         </Field>
 
-        <HowToAnswer compose={compose} />
+        <HowToAnswer
+          kind={draft.kind}
+          onKind={actions.setKind}
+          ask={draft.ask}
+          onAsk={actions.setAsk}
+          people={askable}
+        />
 
         {draft.kind === "choice" ? (
           <NewDecisionOptions compose={compose} />

@@ -5,37 +5,40 @@ import { useId } from "react";
 import { ChevronDown, Users } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMe, useMembers } from "@/lib/selectors";
+import { useMe } from "@/lib/selectors";
+import type { Member } from "@/lib/types";
 import { memberItems } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Picker } from "@/ui/picker";
-import type { AnswerKind, NewDecisionDraft } from "@/decisions/use-new-decision";
+import type { AnswerKind } from "@/decisions/use-new-decision";
 
 const ANYONE = "anyone";
 
-/** The people who can be asked: everyone but the asker and the suspended. */
-export function useAskable() {
-  const me = useMe();
-  return useMembers().filter((m) => m.user_id !== me.user_id && !m.suspended_at);
+interface Props {
+  kind: AnswerKind;
+  onKind: (kind: AnswerKind) => void;
+  /** Who should answer; null for anyone. */
+  ask: string | null;
+  onAsk: (userId: string | null) => void;
+  /** The people who can be asked. */
+  people: Member[];
 }
 
-export function HowToAnswer({ compose }: { compose: NewDecisionDraft }) {
-  const { draft, actions } = compose;
+export function HowToAnswer({ kind, onKind, ask, onAsk, people }: Props) {
   const me = useMe();
-  const others = useAskable();
   const kindId = useId();
-  const asked = others.find((m) => m.user_id === draft.ask);
+  const asked = people.find((m) => m.user_id === ask);
 
   const kindButton = (value: AnswerKind, label: string) => (
     <button
       type="button"
       role="radio"
-      aria-checked={draft.kind === value}
-      onClick={() => actions.setKind(value)}
+      aria-checked={kind === value}
+      onClick={() => onKind(value)}
       className={cx(
         "h-7 rounded-sm px-2.5 text-sm font-medium max-sm:h-9 max-sm:flex-1",
-        draft.kind === value ? "bg-surface text-ink shadow-card" : "text-ink-2 hover:text-ink",
+        kind === value ? "bg-surface text-ink shadow-card" : "text-ink-2 hover:text-ink",
       )}
     >
       {label}
@@ -57,15 +60,15 @@ export function HowToAnswer({ compose }: { compose: NewDecisionDraft }) {
         <span className="text-xs font-medium text-ink-2">{t("decision.new.ask")}</span>
         <Picker
           label={t("decision.new.ask")}
-          value={draft.ask ?? ANYONE}
-          onPick={(id) => actions.setAsk(id === ANYONE ? null : id)}
+          value={ask ?? ANYONE}
+          onPick={(id) => onAsk(id === ANYONE ? null : id)}
           items={[
             {
               id: ANYONE,
               label: t("decision.new.anyone"),
               icon: <Users className="size-3.5 text-ink-3" aria-hidden />,
             },
-            ...memberItems(others, me.user_id),
+            ...memberItems(people, me.user_id),
           ]}
         >
           <Button className="h-8! justify-between! gap-2! max-sm:h-10! max-sm:w-full">

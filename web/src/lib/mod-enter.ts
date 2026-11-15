@@ -1,5 +1,6 @@
-// Cmd/Ctrl-Enter sends a question's dialog from whichever of its fields has
-// the cursor: the new question, the edit of one, the note before an answer.
+// Cmd/Ctrl-Enter sends a dialog's form from whichever of its fields has the
+// cursor: a new task or several, a question asked or edited, the note before
+// an answer, a preference.
 
 import type { KeyboardEvent } from "react";
 

@@ -10,7 +10,7 @@ import { Dialog } from "@/ui/dialog";
 import { Textarea } from "@/ui/input";
 import { Kbd } from "@/ui/kbd";
 import { useReturnFocus } from "@/decisions/data";
-import { sendOnModEnter } from "@/decisions/mod-enter";
+import { sendOnModEnter } from "@/lib/mod-enter";
 
 export interface NotePrompt {
   title: string;
