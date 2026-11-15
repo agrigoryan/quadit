@@ -3,7 +3,7 @@
 // answer is who else is here (kept in docs/store.ts for the header and the
 // marks beside blocks).
 
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { getState } from "@/lib/store";
 import { setPresence } from "@/docs/store";
@@ -12,8 +12,8 @@ import type { PresenceEntry } from "@/lib/types-docs";
 const EVERY_MS = 4_000;
 
 export function usePresence(docId: string, block: string | null, enabled = true) {
-  const at = useRef(block);
-  at.current = block;
+  // The block as of the last render, read when the server is told.
+  const at = useEffectEvent(() => block);
   const say = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function usePresence(docId: string, block: string | null, enabled = true)
     let gone = false;
     say.current = () => {
       api
-        .post<{ others: PresenceEntry[] }>(path, { block: at.current ?? "" })
+        .post<{ others: PresenceEntry[] }>(path, { block: at() ?? "" })
         .then((out) => !gone && setPresence(docId, out.others ?? []))
         .catch(() => {});
     };

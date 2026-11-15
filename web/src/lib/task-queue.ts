@@ -6,7 +6,7 @@
 // reload of the page still knows its list. A page opened by its address
 // has no list, and no next or previous.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useLocation } from "react-router";
 
 const QUEUES = "quadit.queues";
@@ -41,7 +41,9 @@ const seen = new Map<string, string>(stored(SEEN));
 export function useTaskOrder(order: () => (string | undefined)[]): string {
   const step = useLocation().key;
   const latest = useRef(order);
-  latest.current = order;
+  useLayoutEffect(() => {
+    latest.current = order;
+  });
   useEffect(() => {
     const mine = { step, order: () => latest.current() };
     current = mine;

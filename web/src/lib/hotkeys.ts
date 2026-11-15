@@ -2,7 +2,7 @@
 // typed into a field, or while a dialog or menu is open, is left alone.
 // Two keys in a row ("g" then "i") are in lib/key-sequence.ts.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 
 type Handler = (event: KeyboardEvent) => void;
 export type Hotkeys = Record<string, Handler>;
@@ -43,15 +43,15 @@ interface Options {
 }
 
 export function useHotkeys(keys: Hotkeys, { enabled = true, always = false, layer = "page" }: Options = {}) {
-  const latest = useRef(keys);
-  latest.current = keys;
+  // The keys as of the last render, read when a key is pressed.
+  const handlerFor = useEffectEvent((name: string): Handler | undefined => keys[name]);
 
   useEffect(() => {
     if (!enabled) return;
     function onKey(e: KeyboardEvent) {
       if (e.defaultPrevented || e.isComposing) return;
       const name = combo(e);
-      const handler = latest.current[name];
+      const handler = handlerFor(name);
       if (!handler) return;
       // Combinations with the command key work everywhere; bare keys do not.
       const bare = !name.startsWith("mod+");

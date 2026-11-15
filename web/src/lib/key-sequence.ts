@@ -4,7 +4,7 @@
 // Like the single keys, a sequence rests while a field has the focus or a
 // dialog or menu is open.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { create } from "zustand";
 import { isTyping, overlayOpen } from "@/lib/hotkeys";
 
@@ -39,8 +39,8 @@ const elsewhere = (e: KeyboardEvent) => isTyping(e.target) || overlayOpen();
 
 /** Listens for the sequences given. Mount it once, in the frame of the app. */
 export function useKeySequences(sequences: Sequences, enabled = true) {
-  const latest = useRef(sequences);
-  latest.current = sequences;
+  // The sequences as of the last render, read when a key is pressed.
+  const latest = useEffectEvent(() => sequences);
 
   useEffect(() => {
     if (!enabled) return;
@@ -49,7 +49,7 @@ export function useKeySequences(sequences: Sequences, enabled = true) {
       const pending = usePendingKey.getState().prefix;
       const key = keyOf(e);
       if (pending === null) {
-        const starts = key in latest.current && !e.repeat && !e.shiftKey && !withModifier(e) && !e.defaultPrevented;
+        const starts = key in latest() && !e.repeat && !e.shiftKey && !withModifier(e) && !e.defaultPrevented;
         if (starts && !elsewhere(e)) arm(key);
         return;
       }
@@ -59,7 +59,7 @@ export function useKeySequences(sequences: Sequences, enabled = true) {
       // Any other key ends the sequence and is used up by it, also one that leads nowhere (Esc to back out).
       e.preventDefault();
       e.stopPropagation();
-      latest.current[pending]?.[key]?.();
+      latest()[pending]?.[key]?.();
     }
     // Before every other listener, so that the second key reaches nothing else.
     window.addEventListener("keydown", onKey, true);
