@@ -78,8 +78,8 @@ The aim is few places that deal with errors (see "Define errors out of existence
 14. Errors are matched with `errors.Is` or `errors.As`, never by their text. Wrapping uses `%w`.
 
 ### Handlers, reads and writes
-15. An HTTP handler is `func(x *c) error` named `handle<Verb><Object>`. Its job is the HTTP side: read the request, call what does the work, write the answer. The work itself lives where it can be used without a request.
-16. Every write is a change, handled in `internal/engine`. Read logic takes a viewer (who is asking, in which workspace, limited to which projects) and a `ctx`. Neither builds an `http.Request` to reach the other.
+15. An HTTP handler is `func(x *c) error` named `handle<Verb><Object>`. Its job is the HTTP side: read the request, call what does the work, write the answer. The work itself lives where it can be used without a request: a read is a method of the viewer, a write is a change.
+16. Every write is a change, handled in `internal/engine`. Every read of a workspace's data is a method of `viewer` (who is asking, in which workspace, limited to which projects) and takes a `ctx` first; work outside a request gets its viewer from `viewerFor`. What a viewer may see is asked of it (`canProject`, `canSeeDoc`, `canSeeView`, `canSeeFile`, `readable`, `feed`, `search`), never worked out from project ids where the read is made. A kind of row given as stored is one line in `rowKinds`, with its rule. Neither side builds an `http.Request` to reach the other.
 
 ### Names
 17. Names are words. Short names are kept for these and nothing else: `st` the `store.Store`, `db` a workspace-bound `store.DB`, `tx` a `store.Tx`, `x` the request (server only), `c` the change context (engine only), `a` a change's arguments, `t` a task, `ws` the workspace row, `wsID` its id.
