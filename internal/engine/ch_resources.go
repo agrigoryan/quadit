@@ -4,7 +4,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -47,8 +46,11 @@ func (c *cx) loadResource(ref string) (core.Resource, error) {
 	if isID(ref) {
 		cond = store.Eq("id", ref)
 	}
-	err := c.tx.Get(c.ctx, &r, cond, store.Live)
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(c.ctx, c.tx, &r, cond, store.Live)
+	if err != nil {
+		return r, err
+	}
+	if !there {
 		var all []core.Resource
 		if err := c.tx.List(c.ctx, &all, store.Where(store.Live)); err != nil {
 			return r, err
@@ -61,7 +63,7 @@ func (c *cx) loadResource(ref string) (core.Resource, error) {
 		e.Field, e.Allowed, e.Nearest = "resource", names, nearest(ref, names)
 		return r, e
 	}
-	return r, err
+	return r, nil
 }
 
 func resourceDelete(c *cx, a idArgs) error {
@@ -129,7 +131,7 @@ func (c *cx) claimProject(cl core.ResourceClaim) (string, error) {
 		return "", nil
 	}
 	var t core.Task
-	if ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", cl.TaskID))); !ok {
+	if ok, err := store.Find(c.ctx, c.tx, &t, store.Eq("id", cl.TaskID)); !ok {
 		return "", err
 	}
 	return t.ProjectID, nil
@@ -273,7 +275,7 @@ func (e *Engine) ExpireHolds(ctx context.Context) error {
 		seen[cl.ResourceID] = true
 		err := e.System(ctx, cl.WorkspaceID, cl.UserID, func(s *Sys) error {
 			var r core.Resource
-			if ok, err := found(s.c.tx.Get(ctx, &r, store.Eq("id", cl.ResourceID), store.Live)); !ok {
+			if ok, err := store.Find(ctx, s.c.tx, &r, store.Eq("id", cl.ResourceID), store.Live); !ok {
 				return err // the resource was deleted: nothing to hand on
 			}
 			live, err := s.c.activeClaims(r)

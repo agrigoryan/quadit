@@ -131,7 +131,7 @@ func (c *cx) refuseHelper(reason string) error {
 		return nil
 	}
 	var me core.Member
-	ok, err := found(c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)))
+	ok, err := store.Find(c.ctx, c.tx, &me, store.Eq("user_id", c.actor.UserID))
 	if err != nil {
 		return err
 	}

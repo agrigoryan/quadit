@@ -62,10 +62,11 @@ func memberAdd(c *cx, a memberAddArgs) error {
 	}
 	var u core.User
 	if strings.Contains(a.User, "@") && !strings.HasPrefix(a.User, "@") {
-		if err := c.tx.Get(c.ctx, &u, store.Eq("email", strings.ToLower(strings.TrimSpace(a.User))), store.Live); err != nil {
-			if !errors.Is(err, store.ErrNotFound) {
-				return err
-			}
+		there, err := store.Find(c.ctx, c.tx, &u, store.Eq("email", strings.ToLower(strings.TrimSpace(a.User))), store.Live)
+		if err != nil {
+			return err
+		}
+		if !there {
 			e := notFound("account", a.User)
 			e.Field, e.Message = "user", "nobody has an account with "+a.User+"; send them an invitation instead"
 			return e
@@ -87,7 +88,7 @@ func memberAdd(c *cx, a memberAddArgs) error {
 	}
 	// Someone removed earlier comes back on their old row.
 	var old core.Member
-	returning, err := found(c.tx.Get(c.ctx, &old, store.Eq("user_id", u.ID)))
+	returning, err := store.Find(c.ctx, c.tx, &old, store.Eq("user_id", u.ID))
 	if err != nil {
 		return err
 	}

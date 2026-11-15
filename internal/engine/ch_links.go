@@ -4,7 +4,6 @@ package engine
 
 import (
 	"encoding/json"
-	"errors"
 	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -55,8 +54,11 @@ func linkSet(c *cx, a linkSetArgs) error {
 	} else {
 		conds = append(conds, store.Eq("repo", a.Repo), store.Eq("ref", a.Ref))
 	}
-	err = c.tx.Get(c.ctx, &l, conds...)
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(c.ctx, c.tx, &l, conds...)
+	if err != nil {
+		return err
+	}
+	if !there {
 		lid, err := newID("id", a.ID)
 		if err != nil {
 			return err
@@ -72,9 +74,6 @@ func linkSet(c *cx, a linkSetArgs) error {
 			return err
 		}
 		return c.emit(event{seq: seq, typ: "link.created", entity: "link", entityID: l.ID, place: inTask(t), data: core.EventData{Row: l, Key: &t.Key}})
-	}
-	if err != nil {
-		return err
 	}
 	p := newPatch()
 	p.put("url", l.URL, firstNonEmpty(a.URL, l.URL))

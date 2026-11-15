@@ -3,7 +3,6 @@
 package engine
 
 import (
-	"errors"
 	"regexp"
 	"strings"
 
@@ -57,7 +56,7 @@ func secretSet(c *cx, a secretArgs) error {
 		agents = append(agents, m.UserID)
 	}
 	var cur core.Secret
-	ok, err := found(c.tx.Get(c.ctx, &cur, store.Eq("name", a.Name), store.Live))
+	ok, err := store.Find(c.ctx, c.tx, &cur, store.Eq("name", a.Name), store.Live)
 	if err != nil {
 		return err
 	}
@@ -133,10 +132,11 @@ func (c *cx) secretChange(cur core.Secret, a secretArgs, hosts, agents []string)
 
 func secretDelete(c *cx, a idArgs) error {
 	var s core.Secret
-	if err := c.tx.Get(c.ctx, &s, store.Eq("id", a.ID), store.Live); err != nil {
-		if !errors.Is(err, store.ErrNotFound) {
-			return err
-		}
+	there, err := store.Find(c.ctx, c.tx, &s, store.Eq("id", a.ID), store.Live)
+	if err != nil {
+		return err
+	}
+	if !there {
 		if err := c.tx.Get(c.ctx, &s, store.Eq("name", a.ID), store.Live); err != nil {
 			return missing(err, "secret", a.ID)
 		}

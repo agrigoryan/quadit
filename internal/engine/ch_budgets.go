@@ -90,7 +90,7 @@ func (c *cx) checkTaskBudget(t core.Task) error {
 // a task's own budget is four-fifths used: in cost or in time.
 func (c *cx) budgetWarnings(s core.AgentSession) error {
 	var self core.User
-	if ok, err := found(c.tx.Get(c.ctx, &self, store.Eq("id", s.AgentID))); !ok {
+	if ok, err := store.Find(c.ctx, c.tx, &self, store.Eq("id", s.AgentID)); !ok {
 		return err // the agent's account is gone: nobody to warn
 	}
 	if err := c.weekWarning(s, self); err != nil {
@@ -136,7 +136,7 @@ func (c *cx) taskBudgetWarning(s core.AgentSession, self core.User) error {
 		return nil
 	}
 	var t core.Task
-	if ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID))); !ok || t.Budget == nil {
+	if ok, err := store.Find(c.ctx, c.tx, &t, store.Eq("id", s.TaskID)); !ok || t.Budget == nil {
 		return err
 	}
 	cost, minutes, err := c.taskSpend(t.ID)

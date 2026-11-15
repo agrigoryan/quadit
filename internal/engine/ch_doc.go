@@ -247,7 +247,7 @@ func (c *cx) canEditDoc(d core.Doc) error {
 	}
 	if d.SourceID != "" && !c.system {
 		var src core.DocSource
-		ok, err := found(c.tx.Get(c.ctx, &src, store.Eq("id", d.SourceID), store.Live))
+		ok, err := store.Find(c.ctx, c.tx, &src, store.Eq("id", d.SourceID), store.Live)
 		if err != nil {
 			return err
 		}
@@ -329,7 +329,7 @@ func (u *pageEdit) parent() error {
 			if cur.ParentID == "" {
 				break
 			}
-			ok, err := found(c.tx.Get(c.ctx, &cur, store.Eq("id", cur.ParentID)))
+			ok, err := store.Find(c.ctx, c.tx, &cur, store.Eq("id", cur.ParentID))
 			if err != nil {
 				return err
 			}
@@ -569,7 +569,7 @@ func docRestore(c *cx, a idArgs) error {
 	// A page whose parent is still in the trash comes back at the top.
 	if d.ParentID != "" {
 		var parent core.Doc
-		ok, err := found(c.tx.Get(c.ctx, &parent, store.Eq("id", d.ParentID), store.Live))
+		ok, err := store.Find(c.ctx, c.tx, &parent, store.Eq("id", d.ParentID), store.Live)
 		if err != nil {
 			return err
 		}

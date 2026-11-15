@@ -140,7 +140,7 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	where := inWorkspace(c.ws)
 	if s.TaskID != "" {
 		var t core.Task
-		ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)))
+		ok, err := store.Find(c.ctx, c.tx, &t, store.Eq("id", s.TaskID))
 		if err != nil {
 			return err
 		}

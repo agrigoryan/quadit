@@ -91,7 +91,7 @@ func (c *cx) labelsIn(to core.Project, labelIDs []string) ([]string, error) {
 	var keep []string
 	for _, lid := range labelIDs {
 		var l core.Label
-		ok, err := found(c.tx.Get(c.ctx, &l, store.Eq("id", lid)))
+		ok, err := store.Find(c.ctx, c.tx, &l, store.Eq("id", lid))
 		if err != nil {
 			return nil, err
 		}

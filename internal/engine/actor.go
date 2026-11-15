@@ -48,7 +48,7 @@ func (c *cx) checkAsker(taskID string) error {
 		return nil
 	}
 	var t core.Task
-	if ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", taskID))); !ok {
+	if ok, err := store.Find(c.ctx, c.tx, &t, store.Eq("id", taskID)); !ok {
 		return err // nil when the task is gone: there is nothing to hold to
 	}
 	c.askerOK[taskID] = true
@@ -56,7 +56,7 @@ func (c *cx) checkAsker(taskID string) error {
 		return nil
 	}
 	var m core.Member
-	ok, err := found(c.tx.Get(c.ctx, &m, store.Eq("user_id", t.AskedBy)))
+	ok, err := store.Find(c.ctx, c.tx, &m, store.Eq("user_id", t.AskedBy))
 	if err != nil {
 		return err
 	}

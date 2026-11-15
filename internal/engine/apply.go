@@ -154,12 +154,12 @@ type batch struct {
 // workspace at all, and works out how far their credential reaches.
 func (e *Engine) startBatch(ctx context.Context, tx store.Tx, actor Actor) (*batch, error) {
 	b := &batch{ctx: ctx, e: e, tx: tx}
-	err := tx.Get(ctx, &b.member, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
-	if errors.Is(err, store.ErrNotFound) {
-		return nil, forbidden("you are not a member of this workspace")
-	}
+	there, err := store.Find(ctx, tx, &b.member, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
 	if err != nil {
 		return nil, err
+	}
+	if !there {
+		return nil, forbidden("you are not a member of this workspace")
 	}
 	if b.member.SuspendedAt != 0 {
 		return nil, forbidden("your membership is suspended")
@@ -221,7 +221,7 @@ func (b *batch) resolver() *Resolver {
 // is neither.
 func (b *batch) resent(ch Change, hash string) (res *Result, dup bool, err error) {
 	var prev core.AppliedChange
-	ok, err := found(b.tx.Get(b.ctx, &prev, store.Eq("id", ch.ID)))
+	ok, err := store.Find(b.ctx, b.tx, &prev, store.Eq("id", ch.ID))
 	if !ok {
 		return nil, false, err
 	}
@@ -283,7 +283,7 @@ func (c *cx) checkApproval() error {
 		return need
 	}
 	var approval core.Decision
-	if ok, err := found(c.tx.Get(c.ctx, &approval, store.Eq("id", c.change.Approval), store.Live)); !ok {
+	if ok, err := store.Find(c.ctx, c.tx, &approval, store.Eq("id", c.change.Approval), store.Live); !ok {
 		if err != nil {
 			return err
 		}

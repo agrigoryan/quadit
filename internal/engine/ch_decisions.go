@@ -247,7 +247,7 @@ func (c *cx) putQuestion(d core.Decision, t core.Task) error {
 	}
 	// A closed task waits on nobody; the question still reaches its inbox.
 	var st core.Status
-	ok, err := found(c.tx.Get(c.ctx, &st, store.Eq("id", t.StatusID)))
+	ok, err := store.Find(c.ctx, c.tx, &st, store.Eq("id", t.StatusID))
 	if err != nil {
 		return err
 	}

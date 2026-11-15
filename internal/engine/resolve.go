@@ -4,7 +4,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -67,8 +66,11 @@ func (r *Resolver) project(ref string) (core.Project, error) {
 	if isID(ref) {
 		cond = store.Eq("id", ref)
 	}
-	err := r.db.Get(r.ctx, &project, cond, store.Live)
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(r.ctx, r.db, &project, cond, store.Live)
+	if err != nil {
+		return project, err
+	}
+	if !there {
 		var all []core.Project
 		if err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Live}, Order: "key"}); err != nil {
 			return project, err
@@ -81,7 +83,7 @@ func (r *Resolver) project(ref string) (core.Project, error) {
 		e.Field, e.Allowed, e.Nearest = "project", keys, nearest(strings.ToUpper(ref), keys)
 		return project, e
 	}
-	return project, err
+	return project, nil
 }
 
 // anyTask loads a task by id or key, in the trash or not.
@@ -99,24 +101,29 @@ func (r *Resolver) anyTask(field, ref string) (core.Task, error) {
 	default:
 		return t, invalid(field, "%q is not a task: use its key (SVA-12) or id", ref)
 	}
-	err := r.db.Get(r.ctx, &t, cond)
-	if errors.Is(err, store.ErrNotFound) && !isID(ref) {
+	there, err := store.Find(r.ctx, r.db, &t, cond)
+	if err != nil {
+		return t, err
+	}
+	if !there && !isID(ref) {
 		// The key it had before it moved to another project still finds it.
 		var was core.TaskKey
-		ok, wasErr := found(r.db.Get(r.ctx, &was, store.Eq("key", strings.ToUpper(ref))))
-		if wasErr != nil {
-			return t, wasErr
+		ok, err := store.Find(r.ctx, r.db, &was, store.Eq("key", strings.ToUpper(ref)))
+		if err != nil {
+			return t, err
 		}
 		if ok {
-			err = r.db.Get(r.ctx, &t, store.Eq("id", was.TaskID))
+			if there, err = store.Find(r.ctx, r.db, &t, store.Eq("id", was.TaskID)); err != nil {
+				return t, err
+			}
 		}
 	}
-	if errors.Is(err, store.ErrNotFound) {
+	if !there {
 		e := notFound("task", ref)
 		e.Field = field
 		return t, e
 	}
-	return t, err
+	return t, nil
 }
 
 // task loads a task that is not in the trash.
@@ -141,8 +148,11 @@ func (r *Resolver) memberRef(field, ref string) (core.Member, error) {
 	if isID(ref) {
 		cond = store.Eq("user_id", ref)
 	}
-	err := r.db.Get(r.ctx, &m, cond, store.Null("removed_at"))
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(r.ctx, r.db, &m, cond, store.Null("removed_at"))
+	if err != nil {
+		return m, err
+	}
+	if !there {
 		var all []core.Member
 		if err := r.db.List(r.ctx, &all, store.Q{Where: []store.Cond{store.Null("removed_at")}, Order: "handle"}); err != nil {
 			return m, err
@@ -155,7 +165,7 @@ func (r *Resolver) memberRef(field, ref string) (core.Member, error) {
 		e.Field, e.Allowed, e.Nearest = field, handles, nearest("@"+strings.TrimPrefix(ref, "@"), handles)
 		return m, e
 	}
-	return m, err
+	return m, nil
 }
 
 // optMember resolves an optional member reference to a user id; "" stays "".
@@ -313,13 +323,16 @@ func loadLive[T any](c *cx, what, field, ref string) (T, error) {
 	if !looksLikeID(ref) {
 		return byName[T](c, what, field, ref)
 	}
-	err := c.tx.Get(c.ctx, &row, conds...)
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(c.ctx, c.tx, &row, conds...)
+	if err != nil {
+		return row, err
+	}
+	if !there {
 		e := notFound(what, ref)
 		e.Field = field
 		return row, e
 	}
-	return row, err
+	return row, nil
 }
 
 // looksLikeID reports whether a reference has the shape of an id.

@@ -157,7 +157,7 @@ func (e *Engine) PurgeTrash(ctx context.Context, keep time.Duration) (purged int
 	}
 	for _, ws := range wss {
 		var owner core.Member
-		ok, err := found(e.st.In(ws.ID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner))))
+		ok, err := store.Find(ctx, e.st.In(ws.ID), &owner, store.Eq("role", string(core.RoleOwner)))
 		if err != nil {
 			return run.purged, run.blobKeys, err
 		}

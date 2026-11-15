@@ -95,7 +95,7 @@ func isHandoff(ev core.Event) bool {
 // member.
 func (c *cx) byAgent(ev core.Event) (bool, error) {
 	var actor core.Member
-	ok, err := found(c.tx.Get(c.ctx, &actor, store.Eq("user_id", ev.ActorID)))
+	ok, err := store.Find(c.ctx, c.tx, &actor, store.Eq("user_id", ev.ActorID))
 	return ok && actor.Kind == core.KindAgent, err
 }
 

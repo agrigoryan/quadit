@@ -5,7 +5,6 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -61,12 +60,9 @@ func (s *Sys) Do(changeType string, args any) error {
 // its work once.
 func (s *Sys) Once(changeID, what string) (already bool, err error) {
 	var prev core.AppliedChange
-	err = s.c.tx.Get(s.c.ctx, &prev, store.Eq("id", changeID))
-	if err == nil {
-		return true, nil
-	}
-	if !errors.Is(err, store.ErrNotFound) {
-		return false, err
+	already, err = store.Find(s.c.ctx, s.c.tx, &prev, store.Eq("id", changeID))
+	if err != nil || already {
+		return already, err
 	}
 	return false, s.c.tx.Insert(s.c.ctx, core.AppliedChange{WorkspaceID: s.c.ws, ID: changeID, ActorID: s.c.actor.UserID, Type: what,
 		ArgsHash: "-", FirstSeq: s.c.tx.Seq(), LastSeq: s.c.tx.Seq(), CreatedAt: s.c.at})

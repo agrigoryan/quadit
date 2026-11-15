@@ -210,7 +210,7 @@ func (c *cx) commentReaches(cm core.Comment, t core.Task) error {
 	}
 	if cm.ParentID != "" {
 		var parent core.Comment
-		ok, err := found(c.tx.Get(c.ctx, &parent, store.Eq("id", cm.ParentID)))
+		ok, err := store.Find(c.ctx, c.tx, &parent, store.Eq("id", cm.ParentID))
 		if err != nil {
 			return err
 		}
@@ -315,7 +315,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	}
 	if cm.ParentID != "" {
 		var parent core.Comment
-		ok, err := found(c.tx.Get(c.ctx, &parent, store.Eq("id", cm.ParentID)))
+		ok, err := store.Find(c.ctx, c.tx, &parent, store.Eq("id", cm.ParentID))
 		if err != nil {
 			return err
 		}

@@ -173,7 +173,7 @@ func attachmentRestore(c *cx, a idArgs) error {
 		return forbidden("only the one who attached a file, or an admin, can put it back")
 	}
 	var f core.File
-	ok, err := found(c.tx.Get(c.ctx, &f, store.Eq("id", at.FileID)))
+	ok, err := store.Find(c.ctx, c.tx, &f, store.Eq("id", at.FileID))
 	if err != nil {
 		return err
 	}

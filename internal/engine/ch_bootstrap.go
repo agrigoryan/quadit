@@ -74,8 +74,8 @@ func ownerFor(ctx context.Context, db store.DB, a BootstrapArgs, at int64) (core
 	if email == "" || !strings.Contains(email, "@") {
 		return owner, invalid("owner_email", "an owner needs an email address")
 	}
-	err := db.Get(ctx, &owner, store.Eq("email", email), store.Live)
-	if !errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(ctx, db, &owner, store.Eq("email", email), store.Live)
+	if err != nil || there {
 		return owner, err
 	}
 	owner = core.User{ID: id.New(), Kind: core.KindPerson, Name: strings.TrimSpace(a.OwnerName), Email: email, CreatedAt: at, UpdatedAt: at}

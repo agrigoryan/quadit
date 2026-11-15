@@ -25,7 +25,7 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 		return nil
 	}
 	var m core.Member
-	if ok, err := found(c.tx.Get(c.ctx, &m, store.Eq("user_id", userID), store.Null("removed_at"))); !ok {
+	if ok, err := store.Find(c.ctx, c.tx, &m, store.Eq("user_id", userID), store.Null("removed_at")); !ok {
 		return err // nil when they are not a member any more: nobody to tell
 	}
 	c.notified[key] = true
@@ -158,7 +158,7 @@ func (l *linker) add(toType, toID string) {
 func (l *linker) members(text string) error {
 	for _, m := range mentionRE.FindAllStringSubmatch(text, -1) {
 		var mem core.Member
-		ok, err := found(l.c.tx.Get(l.c.ctx, &mem, store.Eq("handle", m[2]), store.Null("removed_at")))
+		ok, err := store.Find(l.c.ctx, l.c.tx, &mem, store.Eq("handle", m[2]), store.Null("removed_at"))
 		if err != nil {
 			return err
 		}
@@ -181,7 +181,7 @@ func (l *linker) tasks(text string) error {
 			continue // "SVA-7#2" names a decision, taken in numberedDecisions
 		}
 		var t core.Task
-		ok, err := found(l.c.tx.Get(l.c.ctx, &t, store.Eq("key", text[loc[2]:loc[3]])))
+		ok, err := store.Find(l.c.ctx, l.c.tx, &t, store.Eq("key", text[loc[2]:loc[3]]))
 		if err != nil {
 			return err
 		}
@@ -196,7 +196,7 @@ func (l *linker) tasks(text string) error {
 func (l *linker) docs(text string) error {
 	for _, m := range docRefRE.FindAllStringSubmatch(text, -1) {
 		var doc core.Doc
-		ok, err := found(l.c.tx.Get(l.c.ctx, &doc, store.Eq("id", m[1])))
+		ok, err := store.Find(l.c.ctx, l.c.tx, &doc, store.Eq("id", m[1]))
 		if err != nil {
 			return err
 		}
@@ -211,7 +211,7 @@ func (l *linker) docs(text string) error {
 func (l *linker) decisions(text string) error {
 	for _, m := range decisionRefRE.FindAllStringSubmatch(text, -1) {
 		var decision core.Decision
-		ok, err := found(l.c.tx.Get(l.c.ctx, &decision, store.Eq("id", m[1]), store.Live))
+		ok, err := store.Find(l.c.ctx, l.c.tx, &decision, store.Eq("id", m[1]), store.Live)
 		if err != nil {
 			return err
 		}
