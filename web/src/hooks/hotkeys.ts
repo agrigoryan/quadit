@@ -22,9 +22,17 @@ export function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-/** True while a dialog, menu or picker is open above the page. */
+/**
+ * True while a dialog, menu or picker is open above the page. One that has
+ * closed but is still on the page, playing its way out (Radix marks it
+ * data-state="closed"), does not count: a key pressed just after Escape works.
+ */
 export function overlayOpen(): boolean {
-  return document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-overlay]') !== null;
+  return (
+    document.querySelector(
+      ':is([role="dialog"], [role="menu"], [role="listbox"], [data-overlay]):not([data-state="closed"])',
+    ) !== null
+  );
 }
 
 function combo(e: KeyboardEvent): string {
