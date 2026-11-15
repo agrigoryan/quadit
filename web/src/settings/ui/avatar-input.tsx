@@ -48,6 +48,7 @@ function shortAvatar(text: string): string {
   try {
     parts = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(trimmed)].map((p) => p.segment);
   } catch {
+    // oxlint-disable-next-line typescript/no-misused-spread -- a browser without Intl.Segmenter: code points are the best it can do
     parts = [...trimmed];
   }
   const first = parts[0] ?? "";

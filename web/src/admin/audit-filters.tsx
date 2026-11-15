@@ -86,6 +86,7 @@ export function AuditFilterBar({ value, onChange, actors, workspaces }: Props) {
         />
         <datalist id={`${id}-actions`}>
           {SUGGESTED.map((a) => (
+            // oxlint-disable-next-line jsx-a11y/control-has-associated-label -- a suggestion's value is its label
             <option key={a} value={a} />
           ))}
         </datalist>

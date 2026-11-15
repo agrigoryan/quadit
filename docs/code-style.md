@@ -106,7 +106,4 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 | `react/purity` | 3 |
 | `react/preserve-manual-memoization` | 2 |
 | `react/no-did-update-set-state` | 2 |
-| `jsx-a11y/control-has-associated-label` | 2 |
-| `typescript/no-misused-spread` | 2 |
-| `jsx-a11y/label-has-associated-control` | 1 |
 | `react/incompatible-library` | 1 |

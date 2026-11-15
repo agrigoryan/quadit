@@ -31,7 +31,6 @@
     "jsx-a11y/no-autofocus": "off",
     "jsx-a11y/media-has-caption": "off",
 
-    // Warnings: findings today, to be fixed one rule at a time.
     // Prettier puts parentheses around a comma sequence; they do not make it fine.
     "no-sequences": ["error", { "allowInParentheses": false }],
     "no-unused-vars": "error",
@@ -39,7 +38,12 @@
     "typescript/no-floating-promises": "error",
     "typescript/no-base-to-string": "error",
     "typescript/no-misused-promises": ["error", { "checksVoidReturn": { "attributes": false } }],
-    "typescript/no-misused-spread": "warn",
+    "typescript/no-misused-spread": "error",
+    "jsx-a11y/control-has-associated-label": "error",
+    // A label's words may sit two elements in (a title and a hint, each in a span).
+    "jsx-a11y/label-has-associated-control": ["error", { "depth": 3 }],
+
+    // Warnings: findings today, to be fixed one rule at a time.
     "react-hooks/exhaustive-deps": "warn",
     "react/refs": "warn",
     "react/set-state-in-effect": "warn",
@@ -54,9 +58,7 @@
     "jsx-a11y/no-noninteractive-element-interactions": "warn",
     "jsx-a11y/no-noninteractive-tabindex": "warn",
     "jsx-a11y/no-noninteractive-element-to-interactive-role": "warn",
-    "jsx-a11y/interactive-supports-focus": "warn",
-    "jsx-a11y/control-has-associated-label": "warn",
-    "jsx-a11y/label-has-associated-control": "warn"
+    "jsx-a11y/interactive-supports-focus": "warn"
   },
   "overrides": [
     {

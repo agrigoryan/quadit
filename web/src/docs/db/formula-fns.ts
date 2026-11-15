@@ -53,6 +53,7 @@ export function callFunction(name: string, a: Value[], env: Env, now: Date): Val
     case "concat":
       return a.map(formulaText).join("");
     case "length":
+      // oxlint-disable-next-line typescript/no-misused-spread -- counts code points, as the server's formula does (len([]rune(s)))
       return [...formulaText(arg(0))].length;
     case "lower":
       return formulaText(arg(0)).toLowerCase();
