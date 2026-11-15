@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { useRow, useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { type MentionRef, useTaskMentions } from "@/lib/task-detail";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { Section } from "@/detail/section";
 import { PageIcon } from "@/docs/page-icon";
 import { useTaskLink } from "@/lib/task-link";

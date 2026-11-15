@@ -11,7 +11,7 @@ import { keep, readKept } from "@/lib/kept";
 import { useCan } from "@/lib/access";
 import { useProjectByKey, useSlug } from "@/lib/selectors";
 import { today } from "@/lib/time";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { count } from "@/insights/lib/amounts";
 import { dayNumber } from "@/lib/days";

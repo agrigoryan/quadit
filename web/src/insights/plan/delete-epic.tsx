@@ -1,7 +1,7 @@
 // Deleting an epic, after asking.
 
 import { t } from "@/lib/i18n";
-import type { Epic } from "@/lib/types";
+import type { Epic } from "@/types/core";
 import { deleteEpic } from "@/insights/plan/actions";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

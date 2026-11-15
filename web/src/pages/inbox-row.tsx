@@ -20,7 +20,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember, useRowEvenIfGone } from "@/lib/selectors";
 import { exact } from "@/lib/time";
-import type { Notification, NotificationType } from "@/lib/types";
+import type { Notification, NotificationType } from "@/types/core";
 import { anchorOf, archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { useTaskLink } from "@/lib/task-link";
 import { Avatar } from "@/ui/avatar";

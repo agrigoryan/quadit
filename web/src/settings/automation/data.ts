@@ -1,14 +1,14 @@
 // The calls that read and change the rows behind the automation pages
-// (their types are in lib/types-automation.ts), and the keys they are cached
+// (their types are in types/automation.ts), and the keys they are cached
 // under. None of these lists is in the store: each page reads its own and it
 // is asked again after a change.
 
 import { api, workspacePath } from "@/lib/api";
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { type ChangeSpec, type ChangeType, mutate } from "@/lib/mutate";
 import { inWorkspace } from "@/lib/query";
-import type { Outcome } from "@/lib/types";
-import type { ActionKind, Delivery, Webhook } from "@/lib/types-automation";
+import type { Outcome } from "@/types/core";
+import type { ActionKind, Delivery, Webhook } from "@/types/automation";
 
 export interface TestResult {
   ok: boolean;

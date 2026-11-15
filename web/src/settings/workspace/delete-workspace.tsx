@@ -8,7 +8,7 @@ import { loadSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import { toast } from "@/lib/toast";
-import type { Workspace } from "@/lib/types";
+import type { Workspace } from "@/types/core";
 import { FormAlert, FormField, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

@@ -13,7 +13,7 @@ import { setProject } from "@/docs/actions";
 import { countBelow, sameProjectBelow } from "@/docs/data";
 import { NoProjectGlyph } from "@/docs/project-mark";
 import { useDocsStore } from "@/docs/store";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { PickerList } from "@/ui/picker";
 import { projectItems } from "@/tasks/property-picker";
 import { Button } from "@/ui/button";

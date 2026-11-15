@@ -1,6 +1,14 @@
 // The rows the server sends, as they are on the wire (internal/core/*.go).
 // Ids are UUIDv7 strings, times are Unix milliseconds, dates are YYYY-MM-DD,
 // and an empty optional field is left out.
+//
+// The types folder: what crosses the wire, declared once and named after
+// the Go type it mirrors. This file holds the rows every part of the app
+// meets (workspace, members, projects, statuses, tasks, comments,
+// decisions, files); feed.ts, plan.ts, docs.ts, agents.ts and automation.ts
+// hold the rest by topic, and changes.gen.ts, generated from the server,
+// holds the arguments of every change. Nothing here imports from outside
+// this folder.
 
 export type Category = "backlog" | "unstarted" | "started" | "waiting" | "done" | "canceled";
 export const CATEGORIES: Category[] = ["backlog", "unstarted", "started", "waiting", "done", "canceled"];
@@ -267,5 +275,5 @@ export type Secret = {
   deleted_at?: number;
 };
 
-export * from "@/lib/types-feed";
-export * from "@/lib/types-plan";
+export * from "@/types/feed";
+export * from "@/types/plan";

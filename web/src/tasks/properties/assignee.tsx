@@ -5,7 +5,7 @@ import { CircleSlash, UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { who } from "@/detail/data";
 import { setAssignee } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";

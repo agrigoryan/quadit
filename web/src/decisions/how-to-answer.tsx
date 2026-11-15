@@ -6,7 +6,7 @@ import { ChevronDown, Users } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMe } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 import { memberItems } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";

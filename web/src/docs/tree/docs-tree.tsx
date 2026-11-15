@@ -28,7 +28,7 @@ import { NewPageItems } from "@/docs/tree/new-page";
 import { setOpen } from "@/docs/tree/state";
 import { type DropTarget, type DropZone, TreeNode } from "@/docs/tree/tree-node";
 import { TrashButton } from "@/docs/tree/trash-button";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { Menu, MenuContent, MenuTrigger } from "@/ui/menu";
 
 /** Where a dragged page would land, if it may land there. */

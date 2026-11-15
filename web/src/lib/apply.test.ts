@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { applyEvent, CopyOnWrite } from "@/lib/apply";
 import { type AnyRow, type Collections, emptyCollections } from "@/lib/collections";
-import type { FeedEvent } from "@/lib/types";
+import type { FeedEvent } from "@/types/core";
 
 const event = (seq: number, over: Partial<FeedEvent>): FeedEvent => ({
   seq,

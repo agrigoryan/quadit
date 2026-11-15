@@ -28,7 +28,7 @@ import {
   type Task,
   type Template,
   type View,
-} from "@/lib/types";
+} from "@/types/core";
 
 /** A row of one collection. */
 export type Row<K extends keyof Collections> = Collections[K][string];

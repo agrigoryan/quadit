@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from "react";
 import { today } from "@/lib/time";
-import type { TaskQuery, View } from "@/lib/types";
+import type { TaskQuery, View } from "@/types/core";
 import { fromQuery, goneFromQuery, normalizeQuery, sameFilters, sortFromQuery } from "@/tasks/filters";
 import { defaultViewState, readDisplay, type ViewState } from "@/tasks/view-state";
 import type { QuerySource } from "@/tasks/properties/property";

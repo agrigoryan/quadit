@@ -6,7 +6,7 @@ import { updateDoc } from "@/docs/actions";
 import { AddCoverButton } from "@/docs/page/cover";
 import { PageIcon } from "@/docs/page-icon";
 import { IconPicker } from "@/docs/tree/icon-picker";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { Textarea } from "@/ui/input";
 
 interface Props {

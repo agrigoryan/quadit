@@ -6,7 +6,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Comment, Member, User, Workspace } from "@/lib/types";
+import type { Comment, Member, User, Workspace } from "@/types/core";
 import { Thread } from "@/docs/comments/thread";
 import { TooltipProvider } from "@/ui/tooltip";
 

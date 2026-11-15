@@ -10,7 +10,7 @@ import { WithQuery } from "@/test/query";
 import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { ui } from "@/lib/ui-state";
 import { CommandPalette } from "@/palette/palette";
 import { ShortcutsSheet } from "@/palette/shortcuts";

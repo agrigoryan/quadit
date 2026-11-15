@@ -11,7 +11,7 @@ import { WithQuery } from "@/test/query";
 import { emptyCollections } from "@/lib/collections";
 import { loadBootstrap, useStore } from "@/lib/store";
 import { PeekContext } from "@/lib/task-link";
-import type { Member, Task, User, Workspace } from "@/lib/types";
+import type { Member, Task, User, Workspace } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
 import { TaskList } from "@/tasks/task-list";
 import { DisplayControls } from "@/tasks/view-controls";

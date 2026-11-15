@@ -2,12 +2,12 @@
 // the app is open, so moving between tasks loses nothing), and the changes
 // that post, edit and delete a comment.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { create } from "zustand";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
 import { getState } from "@/lib/store";
-import type { Comment, FileRow, Task } from "@/lib/types";
+import type { Comment, FileRow, Task } from "@/types/core";
 import { uploadOrToast } from "@/detail/uploads";
 
 interface DraftFile {

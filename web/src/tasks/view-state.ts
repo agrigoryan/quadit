@@ -3,7 +3,7 @@
 // the list and the board, and opening a task.
 
 import { create } from "zustand";
-import type { SortBy, ViewDisplay } from "@/lib/types";
+import type { SortBy, ViewDisplay } from "@/types/core";
 import { emptyFilters, type Filters } from "@/tasks/filters";
 import { type Grouping, GROUPINGS } from "@/tasks/properties";
 

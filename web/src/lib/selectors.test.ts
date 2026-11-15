@@ -38,7 +38,7 @@ import {
   useViews,
 } from "@/lib/selectors";
 import { type BootstrapData, clearStore, getState, loadBootstrap, patchRow } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 
 const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;
 

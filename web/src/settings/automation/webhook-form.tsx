@@ -1,4 +1,4 @@
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -9,7 +9,7 @@ import { Input } from "@/ui/input";
 import { FormField, NativeSelect, refuse, SwitchRow, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { change, randomSecret } from "@/settings/automation/data";
-import type { Webhook } from "@/lib/types-automation";
+import type { Webhook } from "@/types/automation";
 import { isWebAddress } from "@/lib/url";
 import { EventPicker } from "@/settings/automation/event-picker";
 

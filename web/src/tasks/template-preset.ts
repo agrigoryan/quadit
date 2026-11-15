@@ -2,7 +2,7 @@
 // status, priority, labels and assignee, which the template stores by name.
 
 import { getRows } from "@/lib/selectors";
-import type { Project, Template } from "@/lib/types";
+import type { Project, Template } from "@/types/core";
 import type { TaskFields } from "@/tasks/properties/property";
 
 /** What a template fills in, looked up by the names it stores. */

@@ -3,7 +3,7 @@ import { Ellipsis, Trash2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useRowEvenIfGone } from "@/lib/selectors";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { trashTasks } from "@/tasks/actions";
 import { BULK } from "@/tasks/properties";
 import { hasPicker } from "@/tasks/properties/property";

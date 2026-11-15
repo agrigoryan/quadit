@@ -8,7 +8,7 @@ import { clearOutbox } from "@/lib/mutate";
 import { clearStore } from "@/lib/store";
 import { stopSync } from "@/lib/sync";
 import { adoptAccountTheme, applyTheme, type ThemeChoice } from "@/lib/theme";
-import type { Role, User } from "@/lib/types";
+import type { Role, User } from "@/types/core";
 
 interface Membership {
   id: string;

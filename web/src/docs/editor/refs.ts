@@ -6,7 +6,7 @@
 
 import { getLookupEvenIfGone, getRowEvenIfGone, getRows, getTaskByKeyEvenIfGone } from "@/lib/selectors";
 import { findDecision } from "@/docs/editor/decision-refs";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 
 const REF =
   /(^|[\s(])(?:@([a-z0-9][a-z0-9_-]*)|([A-Z][A-Z0-9]{1,9}-\d{1,6}#\d{1,3})|([A-Z][A-Z0-9]{1,9}-\d{1,6})|doc:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))(?![\w-])|\[\[([^[\]\n]{1,200})\]\]/g;

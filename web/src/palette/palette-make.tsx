@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { CATEGORIES, type Project } from "@/lib/types";
+import { CATEGORIES, type Project } from "@/types/core";
 import type { MakePage } from "@/palette/palette-commands";
 import { Group, Item, Note } from "@/palette/palette-rows";
 import { createStatus } from "@/tasks/add-status";

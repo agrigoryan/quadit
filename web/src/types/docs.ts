@@ -1,7 +1,7 @@
 // Pages, their blocks and databases as the server sends them
 // (internal/core/pages.go; Ref in internal/core/tasks.go).
 
-import type { Comment } from "@/lib/types";
+import type { Comment } from "@/types/core";
 
 export type DocKind = "page" | "database" | "row";
 

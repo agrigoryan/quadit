@@ -1,6 +1,6 @@
 import { Bot } from "lucide-react";
 import { cx } from "@/lib/cx";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 
 type Size = "xs" | "sm" | "md" | "lg";
 

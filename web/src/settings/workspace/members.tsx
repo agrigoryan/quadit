@@ -4,7 +4,7 @@ import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { mutate, send } from "@/lib/mutate";
 import { useMe, useMembers } from "@/lib/selectors";
-import type { Member, Role } from "@/lib/types";
+import type { Member, Role } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";

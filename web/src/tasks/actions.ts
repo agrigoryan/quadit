@@ -2,7 +2,7 @@
 // change at once and sends it as a named change; several tasks go as one
 // all-or-nothing batch. Always pass ids from the store.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
@@ -10,7 +10,7 @@ import { rankBetween } from "@/lib/rank";
 import { getRow, getRows } from "@/lib/selectors";
 import { draftKey, getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { isOpenCategory, type Status, type Task } from "@/lib/types";
+import { isOpenCategory, type Status, type Task } from "@/types/core";
 import { projectStatuses } from "@/tasks/data";
 import { OUTSIDE } from "@/tasks/properties/property";
 

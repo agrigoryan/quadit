@@ -4,7 +4,7 @@
 // name says it (@handle, a status or label name, "none", "me", "outside")
 // and an id otherwise. Several values of one filter are joined by commas.
 
-import type { TaskQuery } from "@/lib/types";
+import type { TaskQuery } from "@/types/core";
 import { type Filters, fromQuery, normalizeQuery } from "@/tasks/filters";
 import { FILTERS } from "@/tasks/properties";
 import type { QuerySource } from "@/tasks/properties/property";

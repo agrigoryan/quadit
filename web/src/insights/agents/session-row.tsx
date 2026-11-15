@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember, useRowEvenIfGone } from "@/lib/selectors";
 import { ago, exact } from "@/lib/time";
-import type { AgentSession } from "@/lib/types";
+import type { AgentSession } from "@/types/core";
 import { moneyMicros, short } from "@/insights/lib/amounts";
 import { span } from "@/insights/lib/durations";
 import { sessionLink, stepText } from "@/insights/agents/session-data";

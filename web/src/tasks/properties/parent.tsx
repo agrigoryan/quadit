@@ -8,7 +8,7 @@ import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { getRowEvenIfGone, useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
 import { useTaskLink } from "@/lib/task-link";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { TaskPicker } from "@/detail/task-picker";
 import { setParent } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getRowEvenIfGone } from "@/lib/selectors";
 import { applyEvents, clearStore, loadBootstrap, useStore } from "@/lib/store";
 import { useTaskDetail, useTaskEvents, useTaskMentions } from "@/lib/task-detail";
-import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
+import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { WithQuery } from "@/test/query";
 

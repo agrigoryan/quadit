@@ -13,7 +13,7 @@
 import { createContext, useContext, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useStore } from "@/lib/store";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { pageUnder } from "@/lib/project-in-view";
 import { leaveForPage } from "@/lib/task-queue";
 

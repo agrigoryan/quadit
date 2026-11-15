@@ -4,7 +4,7 @@
 import { useId, useState } from "react";
 import { GitCommitHorizontal } from "lucide-react";
 import { t } from "@/lib/i18n";
-import type { TaskLink } from "@/lib/types";
+import type { TaskLink } from "@/types/core";
 
 interface Commit {
   sha: string;

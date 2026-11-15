@@ -53,7 +53,7 @@ import {
   useStore,
 } from "@/lib/store";
 import { join, type TabShare } from "@/lib/tab-share";
-import type { FeedEvent, Task } from "@/lib/types";
+import type { FeedEvent, Task } from "@/types/core";
 
 /** Past this long without the stream, start from a fresh copy instead of replaying. */
 const LONG_GAP_MS = 5 * 60_000;

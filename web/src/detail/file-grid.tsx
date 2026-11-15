@@ -7,7 +7,7 @@ import { X } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { isMedia } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import type { FileRow } from "@/lib/types";
+import type { FileRow } from "@/types/core";
 import type { Attached } from "@/detail/data";
 import type { PendingUpload } from "@/detail/uploads";
 import { Lightbox, MediaThumb } from "@/ui/media";

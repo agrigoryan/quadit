@@ -1,5 +1,5 @@
 import { t } from "@/lib/i18n";
-import type { Role } from "@/lib/types";
+import type { Role } from "@/types/core";
 
 export const ROLES: Role[] = ["owner", "admin", "member"];
 

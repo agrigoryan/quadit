@@ -10,7 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { getRowEvenIfGone } from "@/lib/selectors";
 import { clearStore, loadBootstrap, useStore } from "@/lib/store";
 import { useToasts } from "@/lib/toast";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import "@/test/query";
 
 beforeEach(() => {

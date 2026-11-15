@@ -10,7 +10,7 @@ import DatabaseView from "@/docs/db/database-page";
 import { useDocsStore } from "@/docs/store";
 import { emptyCollections } from "@/lib/collections";
 import { useStore } from "@/lib/store";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";
 

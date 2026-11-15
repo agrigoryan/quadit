@@ -1,4 +1,4 @@
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useCan } from "@/lib/access";

@@ -10,7 +10,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { api, ApiError } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { useToasts } from "@/lib/toast";
 import { ui, useUi } from "@/lib/ui-state";
 import { CreateTaskDialog } from "@/tasks/create-task";

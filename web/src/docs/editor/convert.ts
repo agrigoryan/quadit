@@ -6,7 +6,7 @@
 // edited here stay the same blocks to the server.
 
 import { chipify } from "@/docs/editor/refs";
-import type { BlockRow, BlockTree } from "@/lib/types-docs";
+import type { BlockRow, BlockTree } from "@/types/docs";
 
 type Obj = Record<string, unknown>;
 

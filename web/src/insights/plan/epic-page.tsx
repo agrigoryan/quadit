@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useMe, useMembers, useProjectByKey, useRow, useSlug } from "@/lib/selectors";
-import type { Epic, Project } from "@/lib/types";
+import type { Epic, Project } from "@/types/core";
 import { ui, usePageTitle } from "@/lib/ui-state";
 import { setWatchingEpic, updateEpic } from "@/insights/plan/actions";
 import { EpicDescription } from "@/insights/plan/epic-description";

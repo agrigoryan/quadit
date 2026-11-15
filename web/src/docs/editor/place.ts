@@ -5,7 +5,7 @@
 import type { BlockNoteEditor } from "@blocknote/core";
 import type { EdBlock } from "@/docs/editor/convert";
 import type { Known } from "@/docs/editor/diff";
-import type { BlockRow } from "@/lib/types-docs";
+import type { BlockRow } from "@/types/docs";
 
 // oxlint-disable-next-line typescript/no-explicit-any -- BlockNote's editor type is generic over the page's schema, and this works with any schema
 type Editor = BlockNoteEditor<any, any, any>;

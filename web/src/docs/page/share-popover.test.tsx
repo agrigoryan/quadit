@@ -8,8 +8,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { SharePopover } from "@/docs/page/share-popover";
 import { emptyCollections } from "@/lib/collections";
 import { useStore } from "@/lib/store";
-import type { Member } from "@/lib/types";
-import type { Doc } from "@/lib/types-docs";
+import type { Member } from "@/types/core";
+import type { Doc } from "@/types/docs";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const member = (fields: Partial<Member>) =>

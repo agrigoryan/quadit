@@ -13,7 +13,7 @@ import { Thread } from "@/docs/comments/thread";
 import { useDocComments } from "@/docs/data";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
-import type { DocComment } from "@/lib/types-docs";
+import type { DocComment } from "@/types/docs";
 import { IconButton } from "@/ui/button";
 import { Radio, RadioGroup } from "@/ui/radio-group";
 

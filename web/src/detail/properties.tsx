@@ -10,7 +10,7 @@ import { useHotkeys } from "@/lib/hotkeys";
 import { useNow } from "@/lib/live";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { nameOf } from "@/detail/data";
 import { KEYED, PROPERTIES, type PropertyName } from "@/tasks/properties";
 import { Avatar } from "@/ui/avatar";

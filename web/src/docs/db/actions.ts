@@ -2,7 +2,7 @@
 // Each shows at once and goes out as a named change; a refusal puts things
 // back. Row values and rows themselves are pages (docs/actions.ts).
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
@@ -16,8 +16,8 @@ import type {
   SelectOption,
   ViewConfig,
   ViewType,
-} from "@/lib/types-docs";
-import { OPTION_COLORS } from "@/lib/types-docs";
+} from "@/types/docs";
+import { OPTION_COLORS } from "@/types/docs";
 import { getLookupEvenIfGone } from "@/lib/selectors";
 
 type Fields = Record<string, unknown>;

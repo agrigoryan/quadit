@@ -1,7 +1,7 @@
 // What the insight endpoints answer (internal/server/dashboard.go).
 
-import type { Category } from "@/lib/types";
-import type { Preference } from "@/lib/types-plan";
+import type { Category } from "@/types/core";
+import type { Preference } from "@/types/plan";
 
 /** A task as the server lists it: names instead of ids. */
 interface TaskView {

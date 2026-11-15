@@ -6,7 +6,7 @@ import { t } from "@/lib/i18n";
 import { mutate, send } from "@/lib/mutate";
 import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
-import type { Project, SortBy, View } from "@/lib/types";
+import type { Project, SortBy, View } from "@/types/core";
 import { toQuery } from "@/tasks/filters";
 import { type Grouping, GROUPINGS } from "@/tasks/properties";
 import {

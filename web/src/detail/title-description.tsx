@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { caretToEnd } from "@/detail/caret-to-end";
 import { setDescription, setTitle } from "@/tasks/actions";
 import { Button, IconButton } from "@/ui/button";

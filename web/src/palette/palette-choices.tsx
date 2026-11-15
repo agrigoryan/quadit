@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import { t } from "@/lib/i18n";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { Group, Item, Note } from "@/palette/palette-rows";
 import { matches } from "@/palette/palette-search";
 import type { PALETTE } from "@/tasks/properties";

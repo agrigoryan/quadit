@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mutate } from "@/lib/mutate";
 import { schema } from "@/docs/editor/schema";
 import { DocSync } from "@/docs/editor/sync";
-import type { BlockRow } from "@/lib/types-docs";
+import type { BlockRow } from "@/types/docs";
 
 vi.mock("@/lib/mutate", () => ({ mutate: vi.fn(() => Promise.resolve([{ seq: 10 }])) }));
 vi.mock("@/docs/store", () => ({ loadPage: vi.fn() }));

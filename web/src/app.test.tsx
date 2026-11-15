@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/app";
 import { useSession } from "@/auth/session";
-import type { User } from "@/lib/types";
+import type { User } from "@/types/core";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 
 vi.mock("@/auth/create-workspace", () => ({ NoWorkspacePage: () => <p>signed in, with no workspace yet</p> }));

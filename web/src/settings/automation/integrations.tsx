@@ -20,7 +20,7 @@ import { Note, Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/page-layout";
 import { queryClient } from "@/lib/query";
 import { automationKeys, change, type HookInfo, listRows } from "@/settings/automation/data";
-import type { Integration } from "@/lib/types-automation";
+import type { Integration } from "@/types/automation";
 import { IntegrationForm } from "@/settings/automation/integration-form";
 import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
 

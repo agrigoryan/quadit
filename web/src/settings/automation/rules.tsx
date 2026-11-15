@@ -14,7 +14,7 @@ import { Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/page-layout";
 import { queryClient } from "@/lib/query";
 import { automationKeys, change, listRows } from "@/settings/automation/data";
-import type { Rule, Webhook } from "@/lib/types-automation";
+import type { Rule, Webhook } from "@/types/automation";
 import { RuleForm } from "@/settings/automation/rule-form";
 import { RuleSentence } from "@/settings/automation/rule-text";
 

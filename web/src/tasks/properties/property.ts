@@ -9,7 +9,7 @@
 import type { ComponentType, ReactNode } from "react";
 import type { Key } from "@/lib/i18n";
 import type { Collections } from "@/lib/store";
-import type { Category, FeedEvent, FieldChange, Project, Task, TaskQuery } from "@/lib/types";
+import type { Category, FeedEvent, FieldChange, Project, Task, TaskQuery } from "@/types/core";
 import type { NewTaskDraft } from "@/tasks/draft";
 import type { PickerItem } from "@/ui/picker";
 

@@ -14,7 +14,7 @@ import type { Value } from "@/docs/db/formula";
 import { formulaText } from "@/docs/db/formula-values";
 import { OptionPicker } from "@/docs/db/option-picker";
 import { isComputed } from "@/docs/db/prop-meta";
-import type { DBProperty } from "@/lib/types-docs";
+import type { DBProperty } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
 import { PickerList } from "@/ui/picker";
 import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";

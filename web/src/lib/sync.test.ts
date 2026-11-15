@@ -11,7 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventStream, EventStreamHandlers } from "@/lib/event-stream";
 import type { BootstrapData } from "@/lib/store";
-import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
+import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { type FakeTabs, fakeTabs } from "@/test/fake-tabs";
 

@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 
 const layouts = [
   { id: "list", icon: ListTodo, label: () => t("list.layout.list") },

@@ -2,7 +2,7 @@
 // trash or the archive is never offered.
 
 import { expect, it } from "vitest";
-import type { SearchHit, Task } from "@/lib/types";
+import type { SearchHit, Task } from "@/types/core";
 import { hitsOnLiveTasks, searchTasks } from "@/palette/palette-search";
 
 const task = (n: number, title: string, gone: Partial<Task> = {}) =>

@@ -4,7 +4,7 @@
 
 import { type Location, matchPath } from "react-router";
 import { getRowEvenIfGone, getRows, getTaskByKeyEvenIfGone, sortByRank } from "@/lib/selectors";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 
 /** The project last seen on screen: on a page of no project (the inbox, My work) it is still the one in view. */
 let lastId: string | undefined;

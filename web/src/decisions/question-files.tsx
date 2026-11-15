@@ -6,7 +6,7 @@ import { useState } from "react";
 import { cx } from "@/lib/cx";
 import { isMedia, isVideo } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import type { FileRow } from "@/lib/types";
+import type { FileRow } from "@/types/core";
 import { Lightbox } from "@/ui/media";
 import { isSmallArt, mediaAspect, type OptionFile } from "@/decisions/data";
 import { OptionDocs, thumbOf } from "@/decisions/option-media";

@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
 import { OptionChip, optionsOf } from "@/docs/db/options";
-import { type DBProperty, OPTION_COLORS } from "@/lib/types-docs";
+import { type DBProperty, OPTION_COLORS } from "@/types/docs";
 import { PickerList } from "@/ui/picker";
 
 interface Props {

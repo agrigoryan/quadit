@@ -5,7 +5,7 @@ import { SidebarDocs } from "@/docs/tree/sidebar-docs";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useProjects, useSlug, useUnreadCount, useViews } from "@/lib/selectors";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 import { ui, useUi } from "@/lib/ui-state";
 import { type DestinationGroup, destinationPath, goKeys, placesIn } from "@/shell/destinations";
 import { NavItem, NavSection } from "@/ui/nav-item";

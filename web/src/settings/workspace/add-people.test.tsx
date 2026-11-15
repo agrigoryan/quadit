@@ -5,7 +5,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 import { useStore } from "@/lib/store";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 import { AddPeopleDialog } from "@/settings/workspace/add-people";
 import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";

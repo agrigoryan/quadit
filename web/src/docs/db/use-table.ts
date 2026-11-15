@@ -8,7 +8,7 @@ import type { Dict } from "@/lib/store";
 import { byRank, canSee } from "@/docs/data";
 import { type Cells, computeCells, type TableData, type World } from "@/docs/db/compute";
 import { pageQuery, useDocsStore } from "@/docs/store";
-import type { DBProperty, DBView, Doc } from "@/lib/types-docs";
+import type { DBProperty, DBView, Doc } from "@/types/docs";
 
 /**
  * Makes sure these databases' properties and views are in the store, each

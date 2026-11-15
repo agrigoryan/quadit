@@ -1,5 +1,5 @@
 // Command webchanges writes the web app's types for the changes the engine
-// accepts (web/src/lib/changes.gen.ts), from the Go structs each change
+// accepts (web/src/types/changes.gen.ts), from the Go structs each change
 // reads its arguments into. Run it from the repository root, after changing
 // any change's arguments:
 //
@@ -22,7 +22,7 @@ import (
 )
 
 // target is where the file is written, from the repository root.
-const target = "web/src/lib/changes.gen.ts"
+const target = "web/src/types/changes.gen.ts"
 
 func main() {
 	if err := os.WriteFile(target, []byte(source()), 0o644); err != nil { //nolint:gosec // a source file, read by everyone

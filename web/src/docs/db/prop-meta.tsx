@@ -24,7 +24,7 @@ import {
   UserRoundPen,
 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { COMPUTED_TYPES, type DBProperty, type PropertyType, type ViewType } from "@/lib/types-docs";
+import { COMPUTED_TYPES, type DBProperty, type PropertyType, type ViewType } from "@/types/docs";
 
 const PROP_ICONS: Record<PropertyType, LucideIcon> = {
   text: Type,

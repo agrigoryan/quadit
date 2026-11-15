@@ -11,7 +11,7 @@
 // This only reads one connection. Opening it again (from the last position
 // applied) is the caller's business: lib/sync.ts.
 
-import type { FeedEvent } from "@/lib/types";
+import type { FeedEvent } from "@/types/core";
 
 /** The server writes a heartbeat every 25 seconds. Two missed and a margin: the connection is dead. */
 const QUIET_MS = 60_000;

@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useEpics, useMember, useProjectByKey, useSlug } from "@/lib/selectors";
 import { formatDay } from "@/lib/time";
-import type { Epic, Project } from "@/lib/types";
+import type { Epic, Project } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { DeleteEpic } from "@/insights/plan/delete-epic";
 import { EpicDialog } from "@/insights/plan/epic-dialog";

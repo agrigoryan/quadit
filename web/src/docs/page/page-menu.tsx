@@ -27,7 +27,7 @@ import { fileNameOf, saveText } from "@/docs/files";
 import { BacklinksDialog, useBacklinks } from "@/docs/page/backlinks";
 import { ImportDialog } from "@/docs/page/import-dialog";
 import { useDocsStore } from "@/docs/store";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/ui/menu";
 

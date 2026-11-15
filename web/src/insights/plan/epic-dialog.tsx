@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useMembers } from "@/lib/selectors";
-import type { Epic } from "@/lib/types";
+import type { Epic } from "@/types/core";
 import { createEpic, type EpicFields, updateEpic } from "@/insights/plan/actions";
 import { EPIC_STATES, epicStateName } from "@/insights/plan/stats";
 import { Avatar } from "@/ui/avatar";

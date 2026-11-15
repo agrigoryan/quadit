@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api";
 import { inWorkspace, queryClient, readError } from "@/lib/query";
 import { getState, markOpened, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
-import type { AgentSession, Attachment, Comment, FeedEvent, Task, TaskLink, Watcher } from "@/lib/types";
+import type { AgentSession, Attachment, Comment, FeedEvent, Task, TaskLink, Watcher } from "@/types/core";
 
 /** One place that names the task or one of its questions, as the server sends it (detail/mentions.tsx reads these). */
 export interface MentionRef {

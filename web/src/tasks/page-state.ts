@@ -6,7 +6,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { today } from "@/lib/time";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 import { type Filters, sameFilters } from "@/tasks/filters";
 import type { QuerySource } from "@/tasks/properties/property";
 import { filtersFromSearch, hasFilters, searchFromFilters } from "@/tasks/url-filters";

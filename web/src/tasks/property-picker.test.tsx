@@ -9,7 +9,7 @@ import { WithQuery } from "@/test/query";
 import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, getState, loadBootstrap } from "@/lib/store";
-import type { Member, Task, User, Workspace } from "@/lib/types";
+import type { Member, Task, User, Workspace } from "@/types/core";
 import { PROPERTIES, type PropertyName } from "@/tasks/properties";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { TooltipProvider } from "@/ui/tooltip";

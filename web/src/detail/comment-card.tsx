@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { useMe, useMember } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import { exact } from "@/lib/time";
-import type { Comment, Task } from "@/lib/types";
+import type { Comment, Task } from "@/types/core";
 import { caretToEnd } from "@/detail/caret-to-end";
 import { createComment, deleteComment, updateComment } from "@/detail/comment-actions";
 import type { Attached } from "@/detail/data";

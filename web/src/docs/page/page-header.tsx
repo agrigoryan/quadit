@@ -17,7 +17,7 @@ import { ProjectField } from "@/docs/page/project-field";
 import { SharePopover } from "@/docs/page/share-popover";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { useDocsStore } from "@/docs/store";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { ProjectGlyph } from "@/ui/project-glyph";

@@ -3,7 +3,7 @@ import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { cx } from "@/lib/cx";
 import { fileSize, isImage, isVideo } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import type { FileRow } from "@/lib/types";
+import type { FileRow } from "@/types/core";
 
 interface ThumbProps {
   file: FileRow;

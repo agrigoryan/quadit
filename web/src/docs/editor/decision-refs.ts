@@ -5,7 +5,7 @@
 
 import { getRows, getTaskByKeyEvenIfGone } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import type { Decision, Task } from "@/lib/types";
+import type { Decision, Task } from "@/types/core";
 
 export const DECISION_REF = /^([A-Z][A-Z0-9]{1,9}-\d{1,6})#(\d{1,3})$/;
 

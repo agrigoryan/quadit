@@ -7,7 +7,7 @@ import { api, workspacePath } from "@/lib/api";
 import { useSlug } from "@/lib/selectors";
 import { localPath } from "@/lib/url";
 import { docsKeys } from "@/docs/store";
-import type { BlockRow, Doc } from "@/lib/types-docs";
+import type { BlockRow, Doc } from "@/types/docs";
 
 /** The fetches waiting for one of the few that run at once. Written by slot and release. */
 const waiting: (() => void)[] = [];

@@ -5,7 +5,7 @@
 
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { useSlug } from "@/lib/selectors";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 
 export interface DocsArea {
   /** The address the pages hang under: `${base}/${id}`. */

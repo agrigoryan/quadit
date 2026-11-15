@@ -1,6 +1,6 @@
 // The feed: events as the server sends them, and what a write answers with.
 
-import type { Attachment } from "@/lib/types";
+import type { Attachment } from "@/types/core";
 
 /** One accepted change from the feed. */
 export interface FeedEvent {

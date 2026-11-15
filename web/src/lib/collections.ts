@@ -22,11 +22,11 @@ import type {
   Template,
   View,
   Watcher,
-} from "@/lib/types";
-import type { Claim, Resource } from "@/lib/types-agents";
-import type { Integration, Rule, Webhook } from "@/lib/types-automation";
-import type { BlockRow, Doc } from "@/lib/types-docs";
-import type { Preference } from "@/lib/types-plan";
+} from "@/types/core";
+import type { Claim, Resource } from "@/types/agents";
+import type { Integration, Rule, Webhook } from "@/types/automation";
+import type { BlockRow, Doc } from "@/types/docs";
+import type { Preference } from "@/types/plan";
 
 export type Dict<T> = Record<string, T>;
 

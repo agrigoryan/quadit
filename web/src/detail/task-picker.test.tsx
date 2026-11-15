@@ -6,7 +6,7 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskPicker } from "@/detail/task-picker";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 
 beforeAll(() => {
   // cmdk scrolls the active row into view and measures the list; jsdom does neither.

@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type EventStreamHandlers, openEventStream } from "@/lib/event-stream";
-import type { FeedEvent } from "@/lib/types";
+import type { FeedEvent } from "@/types/core";
 
 /** A response body the test writes to, chunk by chunk. */
 function serve(status = 200) {

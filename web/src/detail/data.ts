@@ -10,7 +10,7 @@ import { isNotFound, readError } from "@/lib/query";
 import { getRowEvenIfGone, sortByRank, useLookupEvenIfGone, useRows, useSlug } from "@/lib/selectors";
 import { type Dict, mergeRows } from "@/lib/store";
 import { taskKeys } from "@/lib/task-detail";
-import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/lib/types";
+import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/types/core";
 
 /** An attachment whose file is known (every one the panel draws). */
 export type Attached = Attachment & { file: FileRow };

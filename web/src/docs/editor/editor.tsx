@@ -40,7 +40,7 @@ import { schema } from "@/docs/editor/schema";
 import { DocSync, type SaveState } from "@/docs/editor/sync";
 import { chipTyped } from "@/docs/editor/task-keys";
 import { useThemeName } from "@/docs/editor/use-theme";
-import type { BlockRow, PresenceEntry } from "@/lib/types-docs";
+import type { BlockRow, PresenceEntry } from "@/types/docs";
 
 export interface EditorHandle {
   scrollToBlock: (id: string) => void;

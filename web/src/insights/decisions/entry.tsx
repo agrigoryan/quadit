@@ -10,7 +10,7 @@ import { cx } from "@/lib/cx";
 import { isMedia } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
-import type { Decision, DecisionOption } from "@/lib/types";
+import type { Decision, DecisionOption } from "@/types/core";
 import { useMemberName } from "@/decisions/data";
 import { rich, Who } from "@/decisions/who";
 import type { Attached } from "@/detail/data";
@@ -23,7 +23,7 @@ import { MediaThumb } from "@/ui/media";
 import type { Dict } from "@/lib/store";
 import { type Entry, optionsOf, outcomeOf, pickedOption } from "@/insights/decisions/data";
 import { revealDecision } from "@/insights/decisions/reveal";
-import type { Preference } from "@/lib/types-plan";
+import type { Preference } from "@/types/plan";
 import { Ago } from "@/ui/ago";
 
 const SHOWN_OPTIONS = 4;

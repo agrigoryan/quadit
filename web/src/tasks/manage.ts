@@ -1,7 +1,7 @@
 // Making a label where it is first needed, and the way from a picker to the
 // page where a project's labels and statuses are kept.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";

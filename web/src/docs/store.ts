@@ -11,8 +11,8 @@ import { api, workspacePath } from "@/lib/api";
 import { inWorkspace, isNotFound, queryClient } from "@/lib/query";
 import { getRowEvenIfGone } from "@/lib/selectors";
 import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
-import type { FeedEvent } from "@/lib/types";
-import type { BlockRow, DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/lib/types-docs";
+import type { FeedEvent } from "@/types/core";
+import type { BlockRow, DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/types/docs";
 
 interface PageMeta {
   mentioned_in: DocRef[];

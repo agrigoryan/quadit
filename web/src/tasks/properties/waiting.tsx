@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { nameOf, who } from "@/detail/data";
 import { setWaitingOn, setWaitingOutside, waitsOutside } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";

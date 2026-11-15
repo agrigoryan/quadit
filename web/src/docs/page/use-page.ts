@@ -3,7 +3,7 @@ import { retryWait } from "@/lib/api";
 import { isNotFound, readError, retryUnreachable } from "@/lib/query";
 import { useSlug } from "@/lib/selectors";
 import { pageQuery } from "@/docs/store";
-import type { BlockRow } from "@/lib/types-docs";
+import type { BlockRow } from "@/types/docs";
 
 export type PageState =
   | { status: "loading" }

@@ -4,7 +4,7 @@
 
 import { joinPhrases, t } from "@/lib/i18n";
 import { getRowEvenIfGone } from "@/lib/selectors";
-import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/lib/types";
+import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/types/core";
 import { linkName, type Side, sideOf, who } from "@/detail/data";
 import { TIMELINE } from "@/tasks/properties";
 import { asText, type Changes, type Phrase } from "@/tasks/properties/property";

@@ -10,7 +10,7 @@ import { useCan } from "@/lib/access";
 import { useLiveTasks, useLookup, useLookupEvenIfGone, useMe, useOpenDecisions } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { isOpenCategory, type Project, type View } from "@/lib/types";
+import { isOpenCategory, type Project, type View } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { BulkBar } from "@/tasks/bulk-bar";
 import { type NewTaskDraft, openNewTask } from "@/tasks/draft";

@@ -6,7 +6,7 @@ import { Check, MoreHorizontal, Pencil, Trash2, Undo2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { exact } from "@/lib/time";
-import type { Decision, Outcome } from "@/lib/types";
+import type { Decision, Outcome } from "@/types/core";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";

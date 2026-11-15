@@ -4,7 +4,7 @@ import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { renameOption, updateProperty } from "@/docs/db/actions";
 import { ColorDot, optionsOf } from "@/docs/db/options";
-import { type DBProperty, OPTION_COLORS } from "@/lib/types-docs";
+import { type DBProperty, OPTION_COLORS } from "@/types/docs";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 
 const colorName = (color: string): string =>

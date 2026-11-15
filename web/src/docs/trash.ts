@@ -11,7 +11,7 @@ import { getRowEvenIfGone, useLookupEvenIfGone, useMe, useSlug, useTrashed as us
 import { getState, mergeRows } from "@/lib/store";
 import { canSee } from "@/docs/data";
 import { docsKeys } from "@/docs/store";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 
 export interface Trashed {
   id: string;

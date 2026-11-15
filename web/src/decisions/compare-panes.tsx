@@ -6,7 +6,7 @@ import { ImageOff } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { isVideo } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import type { DecisionOption } from "@/lib/types";
+import type { DecisionOption } from "@/types/core";
 import { Button } from "@/ui/button";
 import { Kbd } from "@/ui/kbd";
 import { afterClip, PairLabels, RoleLabel, SwipeHandle } from "@/decisions/before-after";

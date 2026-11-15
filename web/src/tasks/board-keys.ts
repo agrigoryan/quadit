@@ -10,7 +10,7 @@ import { type MouseEvent, type RefObject, useEffect, useEffectEvent, useRef } fr
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
 import { isDraft } from "@/lib/store";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
 import { usePeek, useTaskNav } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";

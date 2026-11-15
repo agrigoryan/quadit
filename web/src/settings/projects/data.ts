@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useArchived, useLiveTasks } from "@/lib/selectors";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 
 /**
  * The tasks out of the trash: live ones and archived ones. The counts on

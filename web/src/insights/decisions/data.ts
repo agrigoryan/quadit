@@ -6,8 +6,8 @@ import { useMemo } from "react";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useRows } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import type { Decision, DecisionOption, Outcome, Project, Task } from "@/lib/types";
-import type { Preference } from "@/lib/types-plan";
+import type { Decision, DecisionOption, Outcome, Project, Task } from "@/types/core";
+import type { Preference } from "@/types/plan";
 
 export interface Entry {
   decision: Decision;

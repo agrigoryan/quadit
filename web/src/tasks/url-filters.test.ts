@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Dict } from "@/lib/store";
-import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/lib/types";
+import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/types/core";
 import { matcher, toQuery } from "@/tasks/filters";
 import { filtersFromSearch, hasFilters, searchFromFilters } from "@/tasks/url-filters";
 

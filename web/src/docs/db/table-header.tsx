@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { PropIcon } from "@/docs/db/prop-meta";
 import { PropertyPopover } from "@/docs/db/property-editor";
-import type { DBProperty, DBView } from "@/lib/types-docs";
+import type { DBProperty, DBView } from "@/types/docs";
 
 const MIN_WIDTH = 72;
 const MAX_WIDTH = 1200;

@@ -1,7 +1,7 @@
 // Every way the app changes a page, in one place. Each function shows the
 // change at once and sends it as a named change (see lib/mutate.ts).
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
@@ -12,7 +12,7 @@ import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { sameProjectBelow } from "@/docs/data";
 import { loadPage } from "@/docs/store";
-import type { Doc, DocComment, DocKind } from "@/lib/types-docs";
+import type { Doc, DocComment, DocKind } from "@/types/docs";
 
 type Fields = Record<string, unknown>;
 

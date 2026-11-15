@@ -17,7 +17,7 @@ import { defaultsFor, useDatabase, useEnsureDatabases, type ViewProps } from "@/
 import { ViewTabs } from "@/docs/db/view-tabs";
 import { ViewToolbar } from "@/docs/db/view-toolbar";
 import { useDocsStore } from "@/docs/store";
-import type { DBView, Doc, ViewType } from "@/lib/types-docs";
+import type { DBView, Doc, ViewType } from "@/types/docs";
 import { Button } from "@/ui/button";
 import { Loading } from "@/ui/spinner";
 

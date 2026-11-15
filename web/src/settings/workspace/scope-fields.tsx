@@ -4,7 +4,7 @@
 
 import { t } from "@/lib/i18n";
 import { useProjects } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 import type { ScopedMember } from "@/settings/agents/data";
 import { FormField, SwitchRow } from "@/ui/form";
 import { MultiPick } from "@/settings/ui/multi-pick";

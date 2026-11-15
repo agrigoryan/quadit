@@ -1,11 +1,11 @@
 // What the timeline draws, read from the store: a project's epics with
 // their tasks, progress and milestones, and the dated tasks with no epic.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useMemo } from "react";
 import { type ChangeSpec, send } from "@/lib/mutate";
 import { useEpics, useLiveTasks, useLookup, useRows } from "@/lib/selectors";
-import { type Category, type Epic, isCanceledCategory, isDoneCategory, type Milestone, type Task } from "@/lib/types";
+import { type Category, type Epic, isCanceledCategory, isDoneCategory, type Milestone, type Task } from "@/types/core";
 import { dayFromNumber, dayNumber } from "@/lib/days";
 import { localDay } from "@/lib/time";
 import type { Extent } from "@/insights/timeline/scale";

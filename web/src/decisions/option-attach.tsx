@@ -5,7 +5,7 @@
 import { useRef } from "react";
 import { ArrowLeftToLine, ArrowRightToLine, Paperclip } from "lucide-react";
 import { t } from "@/lib/i18n";
-import type { Decision, DecisionOption } from "@/lib/types";
+import type { Decision, DecisionOption } from "@/types/core";
 import { uploadOrToast } from "@/detail/uploads";
 import { IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";

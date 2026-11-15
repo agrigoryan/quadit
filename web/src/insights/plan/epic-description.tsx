@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import type { Epic } from "@/lib/types";
+import type { Epic } from "@/types/core";
 import { sendOnModEnter } from "@/lib/mod-enter";
 import { updateEpic } from "@/insights/plan/actions";
 import { Button, IconButton } from "@/ui/button";

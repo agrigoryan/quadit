@@ -5,7 +5,7 @@
 import { useMemo } from "react";
 import { useLookupEvenIfGone } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/lib/types";
+import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/types/core";
 
 /** The store's rows the timeline names things from, gone ones included: a deleted comment, a removed file. */
 export interface StoredRows {

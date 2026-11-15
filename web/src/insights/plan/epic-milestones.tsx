@@ -8,7 +8,7 @@ import { ArrowDown, ArrowUp, Diamond, Ellipsis, Pencil, Plus, Trash2 } from "luc
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { getTaskByKey, sortByRank, useLookup, useRows } from "@/lib/selectors";
-import type { Epic, Milestone, Task } from "@/lib/types";
+import type { Epic, Milestone, Task } from "@/types/core";
 import { count } from "@/insights/lib/amounts";
 import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from "@/insights/plan/actions";
 import { tallyOf } from "@/insights/plan/stats";

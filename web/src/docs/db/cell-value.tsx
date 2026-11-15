@@ -10,7 +10,7 @@ import { docTitle } from "@/docs/data";
 import type { Value } from "@/docs/db/formula";
 import { formulaText } from "@/docs/db/formula-values";
 import { findOption, OptionChip } from "@/docs/db/options";
-import type { DBProperty } from "@/lib/types-docs";
+import type { DBProperty } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
 
 /** A list of strings out of whatever is stored (a property that changed type may hold anything). */

@@ -12,7 +12,7 @@ import { rankBetween } from "@/lib/rank";
 import { getRows } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 
 export interface PendingUpload {
   id: string;

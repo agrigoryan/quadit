@@ -4,7 +4,7 @@
 
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { type Category, isCanceledCategory } from "@/lib/types";
+import { type Category, isCanceledCategory } from "@/types/core";
 import { Legend, useWidth } from "@/insights/charts/base";
 import { count } from "@/insights/lib/amounts";
 import type { StatusCount } from "@/insights/lib/types";

@@ -1,14 +1,14 @@
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useState } from "react";
 import { t, tMaybe } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { useProjects } from "@/lib/selectors";
-import { CATEGORIES } from "@/lib/types";
+import { CATEGORIES } from "@/types/core";
 import { Input } from "@/ui/input";
 import { FormField, NativeSelect, refuse, SwitchRow, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { change } from "@/settings/automation/data";
-import type { GitHubConfig, Integration } from "@/lib/types-automation";
+import type { GitHubConfig, Integration } from "@/types/automation";
 import { githubRepo, isWebAddress } from "@/lib/url";
 
 interface Props {

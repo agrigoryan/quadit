@@ -6,7 +6,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { EpicsPage } from "@/insights/plan/epics-page";
 import { TooltipProvider } from "@/ui/tooltip";
 

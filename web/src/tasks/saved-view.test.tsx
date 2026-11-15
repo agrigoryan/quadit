@@ -3,7 +3,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { Label, View } from "@/lib/types";
+import type { Label, View } from "@/types/core";
 import type { QuerySource } from "@/tasks/properties/property";
 import { useSavedView } from "@/tasks/saved-view";
 

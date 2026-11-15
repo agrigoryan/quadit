@@ -2,7 +2,7 @@
 // already has an account on this install by their email address.
 
 import { useMutation } from "@tanstack/react-query";
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { type ReactNode, useState } from "react";
 import { Link2, Mail, UserCheck } from "lucide-react";
 import { api, ApiError, workspacePath } from "@/lib/api";
@@ -12,7 +12,7 @@ import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import { queryClient } from "@/lib/query";
 import { useSlug } from "@/lib/selectors";
-import type { Role } from "@/lib/types";
+import type { Role } from "@/types/core";
 import { FormField, NativeSelect, refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { type Created, invitesKey } from "@/settings/workspace/data";

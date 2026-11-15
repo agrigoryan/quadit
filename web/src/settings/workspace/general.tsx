@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { Workspace } from "@/lib/types";
+import type { Workspace } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";
 import { download } from "@/lib/download";
 import { FormAlert, FormField, FormFoot, useFieldErrors, useSubmit } from "@/ui/form";

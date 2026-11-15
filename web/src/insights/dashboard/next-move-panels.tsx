@@ -8,7 +8,7 @@ import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { useLiveTasks, useLookup, useProjects, useSlug } from "@/lib/selectors";
 import { exact } from "@/lib/time";
-import { isOpenCategory, type Task } from "@/lib/types";
+import { isOpenCategory, type Task } from "@/types/core";
 import { count } from "@/insights/lib/amounts";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { ProjectGlyph } from "@/ui/project-glyph";

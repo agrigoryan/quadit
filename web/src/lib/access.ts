@@ -11,7 +11,7 @@
 
 import { useMemo } from "react";
 import { useMe } from "@/lib/selectors";
-import type { Member, Task } from "@/lib/types";
+import type { Member, Task } from "@/types/core";
 
 export interface Access {
   /** May change anything at all: not read-only, not suspended. */

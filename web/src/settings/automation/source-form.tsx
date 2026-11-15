@@ -1,4 +1,4 @@
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";

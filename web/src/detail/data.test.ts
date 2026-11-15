@@ -6,7 +6,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSubtasks } from "@/detail/data";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 
 beforeEach(() => {
   clearStore();

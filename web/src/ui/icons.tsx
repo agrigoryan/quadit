@@ -4,7 +4,7 @@
 
 import { cx } from "@/lib/cx";
 import { tMaybe } from "@/lib/i18n";
-import type { Category } from "@/lib/types";
+import type { Category } from "@/types/core";
 
 interface IconProps {
   className?: string;

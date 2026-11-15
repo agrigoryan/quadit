@@ -10,7 +10,7 @@ import { useCan } from "@/lib/access";
 import { useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
 import { daysUntil, formatDay, serverDay } from "@/lib/time";
-import type { Cycle, Project } from "@/lib/types";
+import type { Cycle, Project } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { addDays } from "@/lib/days";
 import { cycleName, cyclePhase } from "@/insights/plan/cycle-page";

@@ -2,7 +2,7 @@
 // `notification.read` change (internal/engine/ch_inbox.go).
 
 import { send } from "@/lib/mutate";
-import type { Notification } from "@/lib/types";
+import type { Notification } from "@/types/core";
 
 /** "SVA-5 Jump feels floaty" as its key and its title; a title with no key stays whole. */
 export function splitTitle(title: string | undefined): { key: string; title: string } {

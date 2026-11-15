@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
 import { emptyCollections } from "@/lib/collections";
 import { useStore } from "@/lib/store";
-import type { Member, Status, Task } from "@/lib/types";
+import type { Member, Status, Task } from "@/types/core";
 import { Subtasks } from "@/detail/subtasks";
 import { TooltipProvider } from "@/ui/tooltip";
 

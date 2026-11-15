@@ -12,7 +12,7 @@ import { create } from "zustand";
 import { api, ApiError, calledOff, NetworkError, whenReachable, workspacePath } from "@/lib/api";
 import { newId } from "@/lib/ids";
 import { getState } from "@/lib/store";
-import type { FileRow } from "@/lib/types";
+import type { FileRow } from "@/types/core";
 import { localPath } from "@/lib/url";
 
 /** Files larger than this go in parts of this size. */

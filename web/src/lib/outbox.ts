@@ -7,7 +7,7 @@
 // refuses it, as some private windows do) every call quietly does nothing
 // and the queue lives in memory only, as it did before.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
 
 /** A change as it is sent: its id, its name and its arguments. */

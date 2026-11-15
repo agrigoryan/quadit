@@ -8,7 +8,7 @@ import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
-import type { FileRow, Task } from "@/lib/types";
+import type { FileRow, Task } from "@/types/core";
 import { addDraftFiles, createComment, editDraft, EMPTY_DRAFT, useDrafts } from "@/detail/comment-actions";
 import { nameOf } from "@/detail/data";
 import { carriesFiles } from "@/detail/uploads";

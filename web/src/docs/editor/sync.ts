@@ -19,13 +19,13 @@ import { mutate } from "@/lib/mutate";
 import { getRowEvenIfGone } from "@/lib/selectors";
 import { onEvents, useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { FeedEvent } from "@/lib/types";
+import type { FeedEvent } from "@/types/core";
 import { type BlockSchemaLike, type EdBlock, rowsToEditor, signature, toEditor, toWire } from "@/docs/editor/convert";
 import { diff, flatten, type Known } from "@/docs/editor/diff";
 import { keepCursor } from "@/docs/editor/cursor";
 import { placeBlock } from "@/docs/editor/place";
 import { loadPage } from "@/docs/store";
-import type { BlockRow } from "@/lib/types-docs";
+import type { BlockRow } from "@/types/docs";
 
 // oxlint-disable-next-line typescript/no-explicit-any -- BlockNote's editor type is generic over the page's schema, and this works with any schema
 export type AnyEditor = BlockNoteEditor<any, any, any>;

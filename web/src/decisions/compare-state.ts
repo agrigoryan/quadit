@@ -4,7 +4,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { isVideo } from "@/lib/files";
-import type { Decision, DecisionOption } from "@/lib/types";
+import type { Decision, DecisionOption } from "@/types/core";
 import { isSmallArt, type OptionFile, type OptionFiles, type Viewer } from "@/decisions/data";
 import { useSharedZoom, type Zoom } from "@/decisions/use-zoom";
 

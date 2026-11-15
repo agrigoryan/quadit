@@ -7,7 +7,7 @@ import { render } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import Editor from "@/docs/editor/editor";
 import { DocSync } from "@/docs/editor/sync";
-import type { BlockRow } from "@/lib/types-docs";
+import type { BlockRow } from "@/types/docs";
 
 vi.mock("@/docs/editor/sync", () => ({
   DocSync: vi.fn(

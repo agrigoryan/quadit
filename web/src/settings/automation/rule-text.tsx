@@ -4,7 +4,7 @@
 import type { ReactNode } from "react";
 import { t, tMaybe } from "@/lib/i18n";
 import { useLookupEvenIfGone } from "@/lib/selectors";
-import type { Rule, Webhook } from "@/lib/types-automation";
+import type { Rule, Webhook } from "@/types/automation";
 import { eventName } from "@/settings/automation/event-picker";
 
 const Strong = ({ children }: { children: ReactNode }) => <span className="font-medium text-ink">{children}</span>;

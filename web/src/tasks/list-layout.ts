@@ -9,7 +9,7 @@
 // group does not count and which cannot be selected.
 
 import type { Dict } from "@/lib/store";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
 
 // Heights in pixels of a row (h-9) and a group heading (h-8), and how far past the edges rows are kept drawn.

@@ -11,7 +11,7 @@ import { rankBetween } from "@/lib/rank";
 import { useCan } from "@/lib/access";
 import { useRow } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
-import { isOpenCategory, type Project, type Task } from "@/lib/types";
+import { isOpenCategory, type Project, type Task } from "@/types/core";
 import { createTask, type NewTask } from "@/tasks/actions";
 import { BoardCard } from "@/tasks/board-card";
 import type { TaskGroup } from "@/tasks/filters";

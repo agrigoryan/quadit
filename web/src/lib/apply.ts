@@ -2,7 +2,7 @@
 // event changes the copy (lib/collections.ts says where each kind lives).
 
 import { type AnyRow, COLLECTION_OF, type CollectionName, type Collections, type Dict, keyOf } from "@/lib/collections";
-import type { FeedEvent } from "@/lib/types";
+import type { FeedEvent } from "@/types/core";
 import { localPath } from "@/lib/url";
 
 export function normalize(collection: CollectionName, row: AnyRow): AnyRow {

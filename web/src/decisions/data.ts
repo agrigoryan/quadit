@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { useCan } from "@/lib/access";
 import { isImage } from "@/lib/files";
 import { useMe, useMember, useRowEvenIfGone, useRows } from "@/lib/selectors";
-import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } from "@/lib/types";
+import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } from "@/types/core";
 
 const byRank = (a: { rank: string }, b: { rank: string }) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0);
 

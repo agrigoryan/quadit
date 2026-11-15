@@ -10,7 +10,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, Project, Task, User, Workspace } from "@/lib/types";
+import type { Member, Project, Task, User, Workspace } from "@/types/core";
 import { BulkBar } from "@/tasks/bulk-bar";
 import { TooltipProvider } from "@/ui/tooltip";
 

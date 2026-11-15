@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { statusesOf, useCycles, useLookup, useProjectByKey, useRow, useSlug } from "@/lib/selectors";
 import { daysUntil, formatDay, serverDay } from "@/lib/time";
-import { type Cycle, isOpenCategory, type Project, type Task } from "@/lib/types";
+import { type Cycle, isOpenCategory, type Project, type Task } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { BurnUp, burnRows } from "@/insights/charts/burn-up";

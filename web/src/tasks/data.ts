@@ -8,7 +8,7 @@ import { useCan } from "@/lib/access";
 import { api, workspacePath } from "@/lib/api";
 import { inWorkspace } from "@/lib/query";
 import { getRows, sortByRank, useProjects, useSlug } from "@/lib/selectors";
-import type { Project, Status } from "@/lib/types";
+import type { Project, Status } from "@/types/core";
 
 /** statusesOf outside a component: a project's live statuses in rank order. */
 export function projectStatuses(projectId: string): Status[] {

@@ -1,7 +1,7 @@
 // Automation as the server sends it (internal/core/agents.go): webhooks and
 // their delivery log, rules, and integrations with other services.
 
-import type { Category, Outcome } from "@/lib/types";
+import type { Category, Outcome } from "@/types/core";
 
 /** Sends the workspace's events to a URL, signed with its secret (core.Webhook). */
 export type Webhook = {

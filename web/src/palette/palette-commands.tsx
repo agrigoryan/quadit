@@ -36,7 +36,7 @@ import { useProjects, useViews } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
-import type { Project, Task } from "@/lib/types";
+import type { Project, Task } from "@/types/core";
 import { ui } from "@/lib/ui-state";
 import { settingsGroups } from "@/settings/pages";
 import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";

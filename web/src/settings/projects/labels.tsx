@@ -1,4 +1,4 @@
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useCan } from "@/lib/access";
@@ -6,7 +6,7 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { useRows } from "@/lib/selectors";
-import type { Label, Project } from "@/lib/types";
+import type { Label, Project } from "@/types/core";
 import { useTasksOutOfTrash } from "@/settings/projects/data";
 import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";

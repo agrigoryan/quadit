@@ -61,8 +61,11 @@
     "jsx-a11y/interactive-supports-focus": "error"
   },
   "overrides": [
+    // The layers, bottom up: types and i18n; lib; data and hooks; nav; ui;
+    // the feature folders (the base rule above); shell, pages and palette.
+    // A layer may import only the layers below it, and the files of its own.
     {
-      "files": ["src/lib/**", "src/ui/**", "src/i18n/**"],
+      "files": ["src/types/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -70,20 +73,59 @@
             "patterns": [
               { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
               {
-                "group": [
-                  "@/admin/**",
-                  "@/auth/**",
-                  "@/decisions/**",
-                  "@/detail/**",
-                  "@/docs/**",
-                  "@/insights/**",
-                  "@/pages/**",
-                  "@/palette/**",
-                  "@/settings/**",
-                  "@/shell/**",
-                  "@/tasks/**"
-                ],
-                "message": "lib, ui and i18n sit below every feature folder."
+                "group": ["@/**", "!@/types/**", "!@/test/**"],
+                "message": "types sit at the bottom: they import nothing from the rest of the app."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/i18n/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": ["@/**", "!@/i18n/**", "!@/test/**"],
+                "message": "i18n holds the words only: it imports nothing from the rest of the app."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/lib/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/test/**"],
+                "message": "lib knows neither the server's data, the router nor the interface: it imports only types and i18n."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/ui/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/ui/**", "!@/test/**"],
+                "message": "ui sits below every feature folder."
               }
             ]
           }

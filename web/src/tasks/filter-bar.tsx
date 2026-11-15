@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ListFilter, Search, X } from "lucide-react";
 import { t } from "@/lib/i18n";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 import { countFilters, emptyFilters, type Filters } from "@/tasks/filters";
 import { useManageLinks } from "@/tasks/manage";
 import { FILTERS } from "@/tasks/properties";

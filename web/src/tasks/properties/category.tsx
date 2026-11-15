@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import { t, tMaybe } from "@/lib/i18n";
-import { CATEGORIES, type Category } from "@/lib/types";
+import { CATEGORIES, type Category } from "@/types/core";
 import type { TaskProperty } from "@/tasks/properties/property";
 import { rowsNamed } from "@/tasks/properties/query-words";
 import { StatusIcon } from "@/ui/icons";

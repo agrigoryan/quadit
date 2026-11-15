@@ -2,7 +2,7 @@
 // on both themes: a wash of the hue behind text pulled toward the ink.
 
 import { cx } from "@/lib/cx";
-import type { DBProperty, SelectOption } from "@/lib/types-docs";
+import type { DBProperty, SelectOption } from "@/types/docs";
 
 const HUES: Record<string, string> = {
   gray: "#8b90a0",

@@ -8,7 +8,7 @@ import { FileText, Maximize2 } from "lucide-react";
 import { isVideo } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
-import type { FileRow } from "@/lib/types";
+import type { FileRow } from "@/types/core";
 import { RoleLabel, SidePair, SwipePair } from "@/decisions/before-after";
 import { isSmallArt, nameOf, type OptionFile } from "@/decisions/data";
 import { FileStepper } from "@/decisions/file-stepper";

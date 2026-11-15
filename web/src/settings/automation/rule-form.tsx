@@ -2,14 +2,14 @@ import { useState } from "react";
 import { t, tMaybe } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { useMembers, useProjects } from "@/lib/selectors";
-import { CATEGORIES } from "@/lib/types";
+import { CATEGORIES } from "@/types/core";
 import { memberChoiceLabel } from "@/settings/agents/data";
 import { useListening } from "@/lib/listening";
 import { Input } from "@/ui/input";
 import { FormField, NativeSelect, refuse, SwitchRow, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { ACTION_KINDS, change, OUTCOMES, typeMatches } from "@/settings/automation/data";
-import type { ActionKind, Rule, RuleAction, RuleMatch, Webhook } from "@/lib/types-automation";
+import type { ActionKind, Rule, RuleAction, RuleMatch, Webhook } from "@/types/automation";
 import { EventPicker } from "@/settings/automation/event-picker";
 
 interface Props {

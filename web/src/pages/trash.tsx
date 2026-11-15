@@ -11,7 +11,7 @@ import { useCan } from "@/lib/access";
 import { useLookupEvenIfGone, useSlug, useTrashedTasks } from "@/lib/selectors";
 import { mergeRows } from "@/lib/store";
 import { ago, exact } from "@/lib/time";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { restoreDecision } from "@/decisions/actions";
 import { useTrashedDecisions } from "@/decisions/trash";

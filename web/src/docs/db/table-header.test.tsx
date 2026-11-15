@@ -7,7 +7,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { HeaderCell } from "@/docs/db/table-header";
-import type { DBProperty, DBView } from "@/lib/types-docs";
+import type { DBProperty, DBView } from "@/types/docs";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const prop = { id: "p1", name: "Owner", type: "text" } as DBProperty;

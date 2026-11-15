@@ -1,4 +1,4 @@
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 
 /** A project's key in a small square: its mark wherever the project is named. */
 export function ProjectGlyph({ project }: { project: Pick<Project, "key" | "color"> }) {

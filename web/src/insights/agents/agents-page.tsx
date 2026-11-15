@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useLookupEvenIfGone, useMembers, useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import type { AgentSession } from "@/lib/types";
+import type { AgentSession } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { useLive, useNow } from "@/lib/live";
 import type { AgentState } from "@/insights/lib/types";

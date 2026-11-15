@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useDecisionFlag, useLookup, useSubtaskProgress } from "@/lib/selectors";
 import { useIsDraft } from "@/lib/store";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { waitsOutside } from "@/tasks/actions";
 import { AssigneeAvatar, DueChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
 import { useTaskLink } from "@/lib/task-link";

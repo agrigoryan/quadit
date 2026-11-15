@@ -7,7 +7,7 @@ import { clearOutbox, mutate, restoreQueue } from "@/lib/mutate";
 import { outbox, type OutboxItem } from "@/lib/outbox";
 import { applyEvents, clearStore, getState, loadBootstrap } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { ChangeResult, FeedEvent, Member, User, Workspace } from "@/lib/types";
+import type { ChangeResult, FeedEvent, Member, User, Workspace } from "@/types/core";
 
 /** A change as the server receives it: JSON, read field by field. */
 type Sent = { id: string; type: string; args: Record<string, unknown> };

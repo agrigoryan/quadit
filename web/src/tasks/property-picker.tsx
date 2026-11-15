@@ -1,7 +1,7 @@
 import { type ReactNode, type RefObject, useState } from "react";
 import { CircleSlash } from "lucide-react";
 import { t } from "@/lib/i18n";
-import type { Member, Project, Task } from "@/lib/types";
+import type { Member, Project, Task } from "@/types/core";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { useManageLinks } from "@/tasks/manage";
 import { NONE, type PickerListProps, type PickerProperty } from "@/tasks/properties/property";

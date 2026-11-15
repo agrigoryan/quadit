@@ -13,7 +13,7 @@ import { docTitle, type DocTree, useDocTree } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
 import { marksProject, ProjectMark } from "@/docs/project-mark";
 import { setOpen, useTreeState } from "@/docs/tree/state";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { NavSection } from "@/ui/nav-item";
 import { docPath } from "@/docs/area";
 

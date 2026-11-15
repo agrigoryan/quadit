@@ -20,7 +20,7 @@ import { t, tMaybe } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
 import { useCan } from "@/lib/access";
 import { useRows } from "@/lib/selectors";
-import type { AgentSession, Task, TaskLink } from "@/lib/types";
+import type { AgentSession, Task, TaskLink } from "@/types/core";
 import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";

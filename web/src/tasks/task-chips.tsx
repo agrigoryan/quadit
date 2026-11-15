@@ -3,7 +3,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMe, useMember, useSubtaskProgress } from "@/lib/selectors";
 import { dueLabel } from "@/lib/time";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { waitsOutside } from "@/tasks/actions";
 import { Avatar } from "@/ui/avatar";
 import { Tooltip } from "@/ui/tooltip";

@@ -10,7 +10,7 @@ import { api, workspacePath } from "@/lib/api";
 import { inWorkspace, readError } from "@/lib/query";
 import { getRow, useRows, useSlug } from "@/lib/selectors";
 import { getState, mergeRows } from "@/lib/store";
-import type { AgentSession } from "@/lib/types";
+import type { AgentSession } from "@/types/core";
 
 /**
  * Sessions matching a /list/sessions query ("agent=ID", "task=KEY",

@@ -6,7 +6,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLive } from "@/lib/live";
 import { applyEvents, clearStore, useStore } from "@/lib/store";
-import type { FeedEvent } from "@/lib/types";
+import type { FeedEvent } from "@/types/core";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { WithQuery } from "@/test/query";
 

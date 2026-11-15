@@ -7,7 +7,7 @@ import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
 import { sortByRank, useArchived, useLookupEvenIfGone, useProjects } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";
 import { useTasksOutOfTrash } from "@/settings/projects/data";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";

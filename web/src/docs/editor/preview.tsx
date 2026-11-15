@@ -9,7 +9,7 @@ import { useMemo } from "react";
 import { type BlockSchemaLike, treeToEditor } from "@/docs/editor/convert";
 import { schema } from "@/docs/editor/schema";
 import { useThemeName } from "@/docs/editor/use-theme";
-import type { BlockTree } from "@/lib/types-docs";
+import type { BlockTree } from "@/types/docs";
 
 export default function Preview({ blocks }: { blocks: BlockTree[] }) {
   const theme = useThemeName();

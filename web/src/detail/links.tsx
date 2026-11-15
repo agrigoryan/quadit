@@ -1,14 +1,14 @@
 // Where the work for this task lives outside Quadit: branches, commits,
 // pull requests and plain web addresses, each as a chip that opens it.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useState } from "react";
 import { GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
 import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
-import type { Task, TaskLink } from "@/lib/types";
+import type { Task, TaskLink } from "@/types/core";
 import { linkName } from "@/detail/data";
 import { Section } from "@/detail/section";
 import { Button, IconButton } from "@/ui/button";

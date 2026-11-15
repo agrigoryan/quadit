@@ -7,7 +7,7 @@ import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { exact, parseWhen } from "@/lib/time";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { DecisionView } from "@/insights/lib/types";
-import type { Preference } from "@/lib/types-plan";
+import type { Preference } from "@/types/plan";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { useTaskLink } from "@/lib/task-link";
 import { Avatar } from "@/ui/avatar";

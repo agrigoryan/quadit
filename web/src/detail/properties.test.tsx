@@ -11,7 +11,7 @@ import { Properties } from "@/detail/properties";
 import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, getState, loadBootstrap } from "@/lib/store";
-import type { Member, Project, Task, User, Workspace } from "@/lib/types";
+import type { Member, Project, Task, User, Workspace } from "@/types/core";
 import { TooltipProvider } from "@/ui/tooltip";
 
 type Sent = { type: string; args: Record<string, unknown> };

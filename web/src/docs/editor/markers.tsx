@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone } from "@/lib/selectors";
 import { tintOf } from "@/docs/presence-tint";
 import type { AnyEditor } from "@/docs/editor/sync";
-import type { PresenceEntry } from "@/lib/types-docs";
+import type { PresenceEntry } from "@/types/docs";
 
 interface Box {
   top: number;

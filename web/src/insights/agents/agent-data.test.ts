@@ -6,7 +6,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { useAgentWork } from "@/insights/agents/agent-data";
 
 const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;

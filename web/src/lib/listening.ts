@@ -4,7 +4,7 @@
 import { useMemo } from "react";
 import { useLive, useNow } from "@/lib/live";
 import { useLookup } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 
 export interface AgentState {
   handle: string;

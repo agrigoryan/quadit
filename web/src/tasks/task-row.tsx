@@ -6,7 +6,7 @@ import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useDecisionFlag, useLookup, useMember, useRow } from "@/lib/selectors";
 import { useIsDraft } from "@/lib/store";
-import { isClosedCategory, type Task } from "@/lib/types";
+import { isClosedCategory, type Task } from "@/types/core";
 import { useTaskLink } from "@/lib/task-link";
 import type { Branch } from "@/tasks/list-layout";
 import { assignee as assigneeProperty } from "@/tasks/properties/assignee";

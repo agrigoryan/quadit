@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useMembers } from "@/lib/selectors";
-import type { Secret } from "@/lib/types";
+import type { Secret } from "@/types/core";
 import { Avatar } from "@/ui/avatar";
 import { Input } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";

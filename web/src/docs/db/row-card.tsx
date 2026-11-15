@@ -3,7 +3,7 @@ import { t } from "@/lib/i18n";
 import { CellValue, CheckMark } from "@/docs/db/cell-value";
 import type { Value } from "@/docs/db/formula";
 import { PropIcon } from "@/docs/db/prop-meta";
-import type { DBProperty, Doc } from "@/lib/types-docs";
+import type { DBProperty, Doc } from "@/types/docs";
 
 const isBlank = (v: Value | undefined) =>
   v === undefined || v === null || v === "" || v === false || (Array.isArray(v) && v.length === 0);

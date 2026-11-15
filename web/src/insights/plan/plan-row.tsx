@@ -8,7 +8,7 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useRestLoaded } from "@/lib/store";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { emptyTally, type Tally } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";
 import { RestLoadingNote } from "@/ui/rest-note";

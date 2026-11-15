@@ -7,7 +7,7 @@ import { cx } from "@/lib/cx";
 import { joinPhrases, t } from "@/lib/i18n";
 import { useLookup, useMember } from "@/lib/selectors";
 import { useTaskEvents } from "@/lib/task-detail";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { CommentCard, When } from "@/detail/comment-card";
 import { Composer } from "@/detail/composer";
 import { nameOf, useAttachmentsBySubject } from "@/detail/data";

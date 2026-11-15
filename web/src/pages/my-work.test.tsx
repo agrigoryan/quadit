@@ -6,7 +6,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { MyWorkPage } from "@/pages/my-work";
 import { TooltipProvider } from "@/ui/tooltip";
 

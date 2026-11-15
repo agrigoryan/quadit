@@ -12,7 +12,7 @@ import { useLookup } from "@/lib/selectors";
 import { isDraft } from "@/lib/store";
 import { usePeek, useTaskNav } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";
-import type { SortBy, Task } from "@/lib/types";
+import type { SortBy, Task } from "@/types/core";
 import type { NewTaskDraft } from "@/tasks/draft";
 import { comparer, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";

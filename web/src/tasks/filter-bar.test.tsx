@@ -7,7 +7,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, getState, loadBootstrap } from "@/lib/store";
-import type { Member, Project, User, Workspace } from "@/lib/types";
+import type { Member, Project, User, Workspace } from "@/types/core";
 import { FilterBar } from "@/tasks/filter-bar";
 import { emptyFilters, type Filters, toQuery } from "@/tasks/filters";
 import { TooltipProvider } from "@/ui/tooltip";

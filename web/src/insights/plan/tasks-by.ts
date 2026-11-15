@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useLiveTasks, useLookup } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import { CATEGORIES, type Task } from "@/lib/types";
+import { CATEGORIES, type Task } from "@/types/core";
 
 /** A project's live tasks by the epic or cycle they are in, in status order. */
 export function useTasksBy(projectId: string, field: "epic_id" | "cycle_id"): Dict<Task[]> {

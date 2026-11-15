@@ -14,7 +14,7 @@ import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { keepVersion, revertTo } from "@/docs/actions";
 import { docsKeys } from "@/docs/store";
-import type { BlockTree, Doc, DocVersion } from "@/lib/types-docs";
+import type { BlockTree, Doc, DocVersion } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

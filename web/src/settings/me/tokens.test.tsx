@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap, useStore } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { MyTokensPage } from "@/settings/me/tokens";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { WithQuery } from "@/test/query";

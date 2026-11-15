@@ -3,7 +3,7 @@
 // view stores, so views made here work for agents and the other way round.
 
 import type { Collections, Dict } from "@/lib/store";
-import type { SortBy, Task, TaskQuery } from "@/lib/types";
+import type { SortBy, Task, TaskQuery } from "@/types/core";
 import { type FilterName, FILTERS, type Grouping, GROUPINGS } from "@/tasks/properties";
 import type { GroupHead, GroupSource, QueryContext, QuerySource } from "@/tasks/properties/property";
 

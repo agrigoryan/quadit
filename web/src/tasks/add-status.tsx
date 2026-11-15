@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
-import { CATEGORIES, type Category, type Project } from "@/lib/types";
+import { CATEGORIES, type Category, type Project } from "@/types/core";
 import { projectStatuses } from "@/tasks/data";
 import { Button } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";

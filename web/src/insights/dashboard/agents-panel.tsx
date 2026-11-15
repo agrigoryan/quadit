@@ -6,7 +6,7 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { AgentState } from "@/insights/lib/types";
 import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-state";

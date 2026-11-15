@@ -14,7 +14,7 @@ import {
   mergeRows,
   onReplaced,
 } from "@/lib/store";
-import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
+import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 
 const me = { user_id: "u1", role: "member", name: "Me" } as Member;
 const base = {

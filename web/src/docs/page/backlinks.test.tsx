@@ -5,10 +5,10 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type BootstrapData, clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { BacklinksDialog } from "@/docs/page/backlinks";
 import { useDocsStore } from "@/docs/store";
-import type { DocRef } from "@/lib/types-docs";
+import type { DocRef } from "@/types/docs";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;

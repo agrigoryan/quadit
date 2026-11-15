@@ -10,7 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import type { OutboxChange } from "@/lib/outbox";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { TooltipProvider } from "@/ui/tooltip";
 
 interface Call {

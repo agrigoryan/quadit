@@ -8,7 +8,7 @@ import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useRow, useSubtaskProgress } from "@/lib/selectors";
-import { isClosedCategory, type Task } from "@/lib/types";
+import { isClosedCategory, type Task } from "@/types/core";
 import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";
 import { createTask, setParent } from "@/tasks/actions";

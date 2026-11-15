@@ -9,7 +9,7 @@ import { DecisionSection } from "@/decisions/decision-section";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { Attachments } from "@/detail/attachments";
 import { useSubtasks, useTaskAttachments, useTaskLinks, useTaskRelations } from "@/detail/data";
 import { Links } from "@/detail/links";

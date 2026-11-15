@@ -4,7 +4,7 @@
 
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import type { Decision, DecisionOption } from "@/lib/types";
+import type { Decision, DecisionOption } from "@/types/core";
 import { Button } from "@/ui/button";
 import type { OptionFile, Viewer } from "@/decisions/data";
 import { AttachToOption } from "@/decisions/option-attach";

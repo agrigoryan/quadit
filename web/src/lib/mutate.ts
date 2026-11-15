@@ -15,7 +15,7 @@
 // it, a note says what was not saved.
 
 import { api, ApiError, errorMessage, NetworkError, whenReachable, workspacePath } from "@/lib/api";
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { outbox, type OutboxChange } from "@/lib/outbox";
@@ -32,7 +32,7 @@ import {
   useStore,
 } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { ChangeResult } from "@/lib/types";
+import type { ChangeResult } from "@/types/core";
 
 type Row = Record<string, unknown>;
 
@@ -40,7 +40,7 @@ export type ChangeType = keyof Changes;
 
 /**
  * One change: its name and the arguments the server takes for it (generated
- * from the engine, see lib/changes.gen.ts), so a misspelt name or argument
+ * from the engine, see types/changes.gen.ts), so a misspelt name or argument
  * fails the type check, not the request.
  */
 export type ChangeSpec<K extends ChangeType = ChangeType> = {

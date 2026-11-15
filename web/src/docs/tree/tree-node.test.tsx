@@ -6,8 +6,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
-import type { Doc } from "@/lib/types-docs";
+import type { Member, User, Workspace } from "@/types/core";
+import type { Doc } from "@/types/docs";
 import { TreeNode } from "@/docs/tree/tree-node";
 import { TooltipProvider } from "@/ui/tooltip";
 

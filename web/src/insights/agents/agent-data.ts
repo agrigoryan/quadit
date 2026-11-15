@@ -4,8 +4,8 @@
 import { useMemo } from "react";
 import { useLiveTasks, useLookup, useOpenDecisions, useRows } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import { type Decision, isOpenCategory, type Task } from "@/lib/types";
-import type { Claim, Resource } from "@/lib/types-agents";
+import { type Decision, isOpenCategory, type Task } from "@/types/core";
+import type { Claim, Resource } from "@/types/agents";
 
 interface Asked {
   decision: Decision;

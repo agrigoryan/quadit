@@ -20,7 +20,7 @@ import {
   Wrench,
 } from "lucide-react";
 import type { Key } from "@/lib/i18n";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 
 /** Where the sidebar puts a place: at the top, under each project, under "More", or at the foot. */
 export type DestinationGroup = "top" | "project" | "more" | "foot";

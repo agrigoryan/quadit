@@ -8,7 +8,7 @@ import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
 import { exact } from "@/lib/time";
-import type { Comment, Decision } from "@/lib/types";
+import type { Comment, Decision } from "@/types/core";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";

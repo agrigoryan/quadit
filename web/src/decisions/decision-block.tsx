@@ -7,7 +7,7 @@ import { Columns3, X } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { isMedia } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import type { Decision, DecisionOption } from "@/lib/types";
+import type { Decision, DecisionOption } from "@/types/core";
 import { DecisionMentions } from "@/detail/mentions";
 import { Button, IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";

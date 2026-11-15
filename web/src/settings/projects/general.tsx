@@ -6,7 +6,7 @@ import { daysFrom } from "@/lib/days";
 import { weekdayName } from "@/lib/time";
 import { mutate, send } from "@/lib/mutate";
 import { toast } from "@/lib/toast";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";
 import { ConfirmDialog } from "@/ui/confirm-dialog";

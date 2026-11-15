@@ -4,7 +4,7 @@ import { useCover } from "@/docs/db/covers";
 import type { Value } from "@/docs/db/formula";
 import { RowCardBody } from "@/docs/db/row-card";
 import { shownProps, type ViewProps } from "@/docs/db/use-table";
-import type { DBProperty, Doc } from "@/lib/types-docs";
+import type { DBProperty, Doc } from "@/types/docs";
 
 function GalleryCard({
   row,

@@ -13,7 +13,7 @@ import { When } from "@/ui/when";
 import { EmptyRow, Rows } from "@/ui/page-layout";
 import { queryClient } from "@/lib/query";
 import { automationKeys, isTest, listRows } from "@/settings/automation/data";
-import type { Delivery, Webhook } from "@/lib/types-automation";
+import type { Delivery, Webhook } from "@/types/automation";
 
 /** A failed redelivery is said in a toast (onError); the row only waits for it to end. */
 const noop = () => {};

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { can } from "@/lib/access";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 
 const member = (over: Partial<Member>): Member =>
   ({ user_id: "me", role: "member", kind: "person", name: "Me", handle: "me", ...over }) as Member;

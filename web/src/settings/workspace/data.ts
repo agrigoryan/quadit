@@ -2,7 +2,7 @@
 // invitations, their shapes, and the key they are cached under.
 
 import { inWorkspace } from "@/lib/query";
-import type { Role } from "@/lib/types";
+import type { Role } from "@/types/core";
 
 export interface Invite {
   id: string;

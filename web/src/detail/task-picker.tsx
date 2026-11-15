@@ -3,7 +3,7 @@
 
 import { type ReactNode, useMemo } from "react";
 import { useLookup, useRows } from "@/lib/selectors";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { StatusIcon } from "@/ui/icons";
 import { Picker, type PickerItem } from "@/ui/picker";
 

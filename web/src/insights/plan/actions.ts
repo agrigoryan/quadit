@@ -1,14 +1,14 @@
 // Every way these pages change an epic, a milestone or a cycle. Each shows
 // the change at once and sends it as a named change (lib/mutate.ts).
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
 import { getRows } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
-import type { Cycle, Epic, Milestone, Task } from "@/lib/types";
+import type { Cycle, Epic, Milestone, Task } from "@/types/core";
 
 type Fields = Record<string, unknown>;
 

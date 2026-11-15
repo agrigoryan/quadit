@@ -8,7 +8,7 @@ import { FilterEditor, SortEditor } from "@/docs/db/filter-editor";
 import { formProps } from "@/docs/db/form-view";
 import { isComputed, PropIcon } from "@/docs/db/prop-meta";
 import { shownProps } from "@/docs/db/use-table";
-import type { DBProperty, DBView, ViewConfig } from "@/lib/types-docs";
+import type { DBProperty, DBView, ViewConfig } from "@/types/docs";
 import { Button } from "@/ui/button";
 import { Select } from "@/ui/picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";

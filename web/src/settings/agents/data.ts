@@ -3,7 +3,7 @@
 // is doing right now is in lib/listening.ts.
 
 import { t } from "@/lib/i18n";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 
 interface Scope {
   projects?: string[];

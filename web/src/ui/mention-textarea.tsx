@@ -1,7 +1,7 @@
 import { type KeyboardEvent, type Ref, type TextareaHTMLAttributes, useId, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { useMembers } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 import { useListening } from "@/lib/listening";
 import { sendOnModEnter } from "@/lib/mod-enter";
 import { Avatar } from "@/ui/avatar";

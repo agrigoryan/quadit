@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { type BootstrapData, clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, Project, Template, User, Workspace } from "@/lib/types";
+import type { Member, Project, Template, User, Workspace } from "@/types/core";
 import { presetOf } from "@/tasks/template-preset";
 
 const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;

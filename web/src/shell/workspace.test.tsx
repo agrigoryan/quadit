@@ -10,7 +10,7 @@ import { useSession } from "@/auth/session";
 import type { EventStreamHandlers } from "@/lib/event-stream";
 import { type BootstrapData, clearStore, getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 import { WorkspaceRoute } from "@/shell/workspace";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 

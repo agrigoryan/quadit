@@ -21,7 +21,7 @@ import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
 import { useCan } from "@/lib/access";
 import { getRow } from "@/lib/selectors";
-import type { Project, Task } from "@/lib/types";
+import type { Project, Task } from "@/types/core";
 import { type CardMove, moveCard } from "@/tasks/actions";
 import { AddStatusColumn } from "@/tasks/add-status";
 import { CardOverlay } from "@/tasks/board-card";

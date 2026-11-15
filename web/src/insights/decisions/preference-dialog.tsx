@@ -3,7 +3,7 @@
 // whole workspace. It can start from an answered decision, whose question
 // and answer become the first draft of the rule.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useId, useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -11,7 +11,7 @@ import { mutate, send } from "@/lib/mutate";
 import { useLabels, useProjects } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { Decision } from "@/lib/types";
+import type { Decision } from "@/types/core";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { LabelChip } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -20,7 +20,7 @@ import { FormDialog } from "@/ui/form-dialog";
 import { Textarea } from "@/ui/input";
 import { Picker, Select } from "@/ui/picker";
 import { prefillRule } from "@/insights/decisions/data";
-import type { Preference } from "@/lib/types-plan";
+import type { Preference } from "@/types/plan";
 
 const WORKSPACE = "workspace";
 

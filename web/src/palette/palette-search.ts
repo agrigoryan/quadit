@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { isLive, useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import type { SearchHit, Task } from "@/lib/types";
+import type { SearchHit, Task } from "@/types/core";
 
 const words = (text: string) =>
   text

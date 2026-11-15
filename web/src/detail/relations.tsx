@@ -13,7 +13,7 @@ import { send } from "@/lib/mutate";
 import { getRows, useLookupEvenIfGone, useRow } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { Relation, Task } from "@/lib/types";
+import type { Relation, Task } from "@/types/core";
 import { type Side, sideOf, useEnsureTasks } from "@/detail/data";
 import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";

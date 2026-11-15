@@ -4,14 +4,14 @@
 // server and never comes back. The key that read is cached under is here.
 
 import { useQuery } from "@tanstack/react-query";
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useMemo } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { mutate } from "@/lib/mutate";
 import { inWorkspace } from "@/lib/query";
 import { useRows, useSlug } from "@/lib/selectors";
 import { getState, mergeRows } from "@/lib/store";
-import type { Secret } from "@/lib/types";
+import type { Secret } from "@/types/core";
 
 /**
  * Fetches every secret into the store (asked again each time the page opens

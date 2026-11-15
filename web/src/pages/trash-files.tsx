@@ -16,7 +16,7 @@ import { useCan } from "@/lib/access";
 import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { onEvents } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { Attachment, FileRow } from "@/lib/types";
+import type { Attachment, FileRow } from "@/types/core";
 import { localPath } from "@/lib/url";
 import { keyCell } from "@/tasks/task-row";
 import { Button } from "@/ui/button";

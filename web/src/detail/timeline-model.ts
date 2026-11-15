@@ -5,7 +5,7 @@
 
 import { t } from "@/lib/i18n";
 import type { Dict } from "@/lib/store";
-import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/lib/types";
+import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/types/core";
 import { type Known, knownRows, type StoredRows } from "@/detail/timeline-known";
 import {
   askedPhrase,

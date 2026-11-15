@@ -1,14 +1,14 @@
 // Every write a decision takes: answering, reopening, deleting, commenting
 // and asking. Each shows at once and is undone if the server refuses it.
 
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { after } from "@/lib/rank";
 import type { FileRole } from "@/decisions/data";
 import { getRows } from "@/lib/selectors";
 import { getState } from "@/lib/store";
-import type { Decision, FileRow, Outcome } from "@/lib/types";
+import type { Decision, FileRow, Outcome } from "@/types/core";
 
 const meId = () => getState().me?.user_id ?? "";
 

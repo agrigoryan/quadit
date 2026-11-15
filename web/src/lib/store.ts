@@ -14,7 +14,7 @@ import {
   emptyCollections,
   keyOf,
 } from "@/lib/collections";
-import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
+import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 
 // The collections' types are declared in lib/collections.ts; the app reads them from the store.
 export type { CollectionName, Collections, Dict };

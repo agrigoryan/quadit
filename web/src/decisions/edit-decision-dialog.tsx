@@ -5,7 +5,7 @@
 import { useId, useState } from "react";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import type { Decision } from "@/lib/types";
+import type { Decision } from "@/types/core";
 import { Input, Textarea } from "@/ui/input";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { updateDecision } from "@/decisions/actions";

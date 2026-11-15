@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import { useLookupEvenIfGone } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 
 /** Members by handle, without the "@". */
 export function useMembersByHandle(): (handle: string | undefined) => Member | undefined {

@@ -5,7 +5,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, Project, User, Workspace } from "@/lib/types";
+import type { Member, Project, User, Workspace } from "@/types/core";
 import { ProjectPreferences } from "@/settings/projects/preferences";
 
 const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;

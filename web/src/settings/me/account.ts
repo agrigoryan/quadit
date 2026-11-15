@@ -9,7 +9,7 @@ import { loadSession } from "@/auth/session";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/query";
 import { useStore } from "@/lib/store";
-import type { User } from "@/lib/types";
+import type { User } from "@/types/core";
 
 export type EmailChoice = "all" | "important" | "none";
 

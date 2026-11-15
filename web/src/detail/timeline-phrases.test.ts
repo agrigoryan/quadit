@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { changePhrases } from "@/detail/timeline-phrases";
 import type { Changes } from "@/tasks/properties/property";
 import { clearStore, loadBootstrap } from "@/lib/store";
-import type { Member, User, Workspace } from "@/lib/types";
+import type { Member, User, Workspace } from "@/types/core";
 
 beforeEach(() => {
   clearStore();

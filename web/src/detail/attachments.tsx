@@ -3,7 +3,7 @@
 import { Paperclip } from "lucide-react";
 import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import type { Attached } from "@/detail/data";
 import { FileGrid } from "@/detail/file-grid";
 import { Section } from "@/detail/section";

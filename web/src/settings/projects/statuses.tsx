@@ -25,7 +25,7 @@ import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
 import { useStatuses } from "@/lib/selectors";
 import { useTasksOutOfTrash } from "@/settings/projects/data";
-import { CATEGORIES, type Category, type Project, type Status } from "@/lib/types";
+import { CATEGORIES, type Category, type Project, type Status } from "@/types/core";
 import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";
 import { ConfirmDialog } from "@/ui/confirm-dialog";

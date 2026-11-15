@@ -2,7 +2,7 @@ import { useState } from "react";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useLookup } from "@/lib/selectors";
-import type { Secret } from "@/lib/types";
+import type { Secret } from "@/types/core";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";

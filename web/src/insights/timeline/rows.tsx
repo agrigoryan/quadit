@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useSlug } from "@/lib/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
-import { type Category, type Epic, isClosedCategory } from "@/lib/types";
+import { type Category, type Epic, isClosedCategory } from "@/types/core";
 import { count } from "@/insights/lib/amounts";
 import { dayFromNumber } from "@/lib/days";
 import { Bar } from "@/insights/timeline/bar";

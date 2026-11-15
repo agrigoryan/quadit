@@ -6,7 +6,7 @@ import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { formatDay } from "@/lib/time";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import { setDue } from "@/tasks/actions";
 import { Pill, pill } from "@/tasks/properties/create-pill";
 import { inlineField, PropRow } from "@/tasks/properties/panel-row";

@@ -7,7 +7,7 @@ import { shortMonthAndYear, today } from "@/lib/time";
 import { setRowProps } from "@/docs/actions";
 import { createProperty, setViewConfig } from "@/docs/db/actions";
 import type { ViewProps } from "@/docs/db/use-table";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 

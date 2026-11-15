@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { CircleDot } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { getRowEvenIfGone, useRowEvenIfGone, useStatuses } from "@/lib/selectors";
-import { CATEGORIES } from "@/lib/types";
+import { CATEGORIES } from "@/types/core";
 import { setStatus } from "@/tasks/actions";
 import { useManageLinks } from "@/tasks/manage";
 import { leaving, Pill, pill } from "@/tasks/properties/create-pill";

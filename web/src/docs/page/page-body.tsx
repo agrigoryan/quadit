@@ -15,7 +15,7 @@ import { PageTitle } from "@/docs/page/title";
 import { usePage } from "@/docs/page/use-page";
 import { usePresence } from "@/docs/page/use-presence";
 import { useDocsStore } from "@/docs/store";
-import type { Doc } from "@/lib/types-docs";
+import type { Doc } from "@/types/docs";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 

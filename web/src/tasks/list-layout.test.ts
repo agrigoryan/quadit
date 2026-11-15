@@ -1,7 +1,7 @@
 // Where the task list's groups and rows sit (tasks/list-layout.ts).
 
 import { describe, expect, it } from "vitest";
-import type { Task } from "@/lib/types";
+import type { Task } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
 import { layOut, type Row, ROW, rowOfSameTask, rowPlace, rowsBetween, stepFrom, treeStep } from "@/tasks/list-layout";
 

@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import type { Project } from "@/lib/types";
+import type { Project } from "@/types/core";
 import { setProject } from "@/docs/actions";
 import { useLookupEvenIfGone } from "@/lib/selectors";
 import { countBelow, docTitle, useLinkablePages } from "@/docs/data";

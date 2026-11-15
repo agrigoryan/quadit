@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { isLive } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
-import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/lib/types";
+import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/types/core";
 import { emptyFilters, type Filters, fromQuery, groupTasks, matcher, sortFromQuery, toQuery } from "@/tasks/filters";
 
 const byId = <T extends { id: string }>(rows: T[]): Dict<T> => Object.fromEntries(rows.map((r) => [r.id, r]));

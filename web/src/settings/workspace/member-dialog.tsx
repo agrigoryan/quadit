@@ -1,8 +1,8 @@
-import type { Changes } from "@/lib/changes.gen";
+import type { Changes } from "@/types/changes.gen";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 import { FormField, Note, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { MemberScopeFields, sameScope, scopeArg, scopeDraftOf } from "@/settings/workspace/scope-fields";

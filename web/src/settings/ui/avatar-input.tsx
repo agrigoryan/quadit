@@ -7,7 +7,7 @@ import { ImageUp, Smile, X } from "lucide-react";
 import { errorMessage } from "@/lib/api";
 import { isImage, uploadFile } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import type { Member } from "@/lib/types";
+import type { Member } from "@/types/core";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";

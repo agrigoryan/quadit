@@ -7,7 +7,7 @@ import { evalFormula, FUNCTIONS } from "@/docs/db/formula";
 import { formulaText } from "@/docs/db/formula-values";
 import { PropIcon } from "@/docs/db/prop-meta";
 import { useDatabase } from "@/docs/db/use-table";
-import type { DBProperty } from "@/lib/types-docs";
+import type { DBProperty } from "@/types/docs";
 import { sendOnModEnter } from "@/lib/mod-enter";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

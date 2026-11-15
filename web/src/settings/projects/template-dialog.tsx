@@ -4,7 +4,7 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
 import { useLabels, useStatuses } from "@/lib/selectors";
-import type { Project, Template } from "@/lib/types";
+import type { Project, Template } from "@/types/core";
 import type { DecisionSkeleton, Preset } from "@/settings/projects/templates";
 import { Dot } from "@/ui/dot";
 import { FormField, NativeSelect, refuse, SwitchRow, useFieldErrors } from "@/ui/form";
