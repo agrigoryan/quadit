@@ -49,8 +49,8 @@ export function ProjectPreferences({ project, admin }: { project: Project; admin
               )}
               <span>{members[p.created_by]?.name ?? t("common.someone")}</span>
               <When ms={p.created_at} />
-              {p.decision_id && <span>· {t("prefs.fromDecision")}</span>}
-              {p.retired_at && <Badge>{t("prefs.retired")}</Badge>}
+              {p.decision_id && <span>· {t("projectPrefs.fromDecision")}</span>}
+              {p.retired_at && <Badge>{t("projectPrefs.retired")}</Badge>}
             </p>
           </div>
           {admin && (
@@ -63,11 +63,11 @@ export function ProjectPreferences({ project, admin }: { project: Project; admin
               <MenuContent align="end">
                 {p.retired_at ? (
                   <MenuItem icon={<RotateCcw />} onSelect={() => retire(p, false)}>
-                    {t("prefs.restore")}
+                    {t("projectPrefs.restore")}
                   </MenuItem>
                 ) : (
                   <MenuItem icon={<Archive />} onSelect={() => retire(p, true)}>
-                    {t("prefs.retire")}
+                    {t("projectPrefs.retire")}
                   </MenuItem>
                 )}
                 <MenuSeparator />
@@ -84,15 +84,15 @@ export function ProjectPreferences({ project, admin }: { project: Project; admin
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="max-w-prose text-sm text-ink-2">{t("prefs.lead")}</p>
-      {active.length === 0 ? <EmptyRow>{t("prefs.none")}</EmptyRow> : list(active)}
+      <p className="max-w-prose text-sm text-ink-2">{t("projectPrefs.lead")}</p>
+      {active.length === 0 ? <EmptyRow>{t("projectPrefs.none")}</EmptyRow> : list(active)}
       {admin && <AddPreference project={project} />}
-      {retired.length > 0 && <Section title={t("prefs.retiredTitle")}>{list(retired)}</Section>}
+      {retired.length > 0 && <Section title={t("projectPrefs.retiredTitle")}>{list(retired)}</Section>}
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}
-        title={t("prefs.delete.title")}
-        body={t("prefs.delete.body")}
+        title={t("projectPrefs.delete.title")}
+        body={t("projectPrefs.delete.body")}
         confirm={t("s.delete")}
         onConfirm={() =>
           deleting
@@ -129,29 +129,29 @@ function AddPreference({ project }: { project: Project }) {
   return (
     <Card>
       <form onSubmit={add} className="flex flex-col gap-3.5">
-        <FormField label={t("prefs.body")} htmlFor="pref-body" error={errors.fields.body}>
+        <FormField label={t("projectPrefs.body")} htmlFor="pref-body" error={errors.fields.body}>
           <Textarea
             id="pref-body"
             rows={2}
             autoGrow
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder={t("prefs.bodyPlaceholder")}
+            placeholder={t("projectPrefs.bodyPlaceholder")}
           />
         </FormField>
-        <FormField label={t("prefs.labels")} error={errors.fields.labels}>
+        <FormField label={t("projectPrefs.labels")} error={errors.fields.labels}>
           <MultiPick
             items={labels.map((l) => ({ id: l.id, label: l.name, icon: <Dot color={l.color} /> }))}
             value={picked}
             onChange={setPicked}
             addLabel={t("templates.labelsAdd")}
-            empty={t("prefs.labelsAny")}
+            empty={t("projectPrefs.labelsAny")}
           />
         </FormField>
         <FormAlert>{errors.form}</FormAlert>
         <FormFoot>
           <Button type="submit" disabled={busy}>
-            {t("prefs.add")}
+            {t("projectPrefs.add")}
           </Button>
         </FormFoot>
       </form>

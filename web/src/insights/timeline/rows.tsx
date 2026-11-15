@@ -162,7 +162,7 @@ export function EpicRow({ line, projectKey, scale, today, open, onToggle, readOn
           <Diamond
             key={milestone.id}
             x={xOf(scale, day) + scale.dayW / 2}
-            label={t("timeline.milestone", { name: milestone.name, day: formatDay(dayFromNumber(day)) })}
+            label={t("timeline.milestoneMark", { name: milestone.name, day: formatDay(dayFromNumber(day)) })}
           />
         ))}
       </div>

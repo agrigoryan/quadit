@@ -88,8 +88,7 @@ describe("changePhrases", () => {
     expect(say({ epic_id: { from: null, to: "e1" } })).toEqual(["added this to the epic Launch"]);
     expect(say({ epic_id: { from: "e1", to: null } })).toEqual(["removed this from its epic"]);
     expect(say({ epic_id: { from: null, to: "gone" } })).toEqual([]);
-    // The words are those of insights' "timeline.milestone", which has the same key and wins: a defect, pinned as it is.
-    expect(say({ milestone_id: { from: null, to: "m1" } })).toEqual(["Milestone: Beta, {day}"]);
+    expect(say({ milestone_id: { from: null, to: "m1" } })).toEqual(["set the milestone to Beta"]);
     expect(say({ milestone_id: { from: "m1", to: null } })).toEqual(["cleared the milestone"]);
     expect(say({ cycle_id: { from: null, to: "c1" } })).toEqual(["added this to Cycle 4"]);
     expect(say({ cycle_id: { from: null, to: "c2" } })).toEqual(["added this to Polish"]);
@@ -99,8 +98,7 @@ describe("changePhrases", () => {
   it("estimate, due date and parent", () => {
     expect(say({ estimate: { from: null, to: 3 } })).toEqual(["set the estimate to 3 pts"]);
     expect(say({ estimate: { from: 3, to: null } })).toEqual(["cleared the estimate"]);
-    // As for the milestone, insights' "timeline.due" wins over the timeline's own.
-    expect(say({ due_on: { from: null, to: "2026-12-01" } })).toEqual(["Due Dec 1"]);
+    expect(say({ due_on: { from: null, to: "2026-12-01" } })).toEqual(["set the due date to Dec 1"]);
     expect(say({ due_on: { from: "2026-12-01", to: null } })).toEqual(["cleared the due date"]);
     expect(say({ parent_id: { from: null, to: "t9" } })).toEqual(["made this a sub-task of SVA-9"]);
     expect(say({ parent_id: { from: "t9", to: null } })).toEqual(["removed the parent task"]);
@@ -143,10 +141,10 @@ describe("changePhrases", () => {
       "set the priority to Urgent",
       "added the label bug",
       "added this to the epic Launch",
-      "Milestone: Beta, {day}",
+      "set the milestone to Beta",
       "added this to Cycle 4",
       "set the estimate to 3 pts",
-      "Due Dec 1",
+      "set the due date to Dec 1",
       "made this a sub-task of SVA-9",
     ]);
   });

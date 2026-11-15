@@ -155,7 +155,7 @@ function Reach({ state, now }: { state: AgentState; now: number }) {
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
       {state.listening ? (
-        <span className="inline-flex items-center gap-1 text-ink-2" title={t("agents.listeningHint")}>
+        <span className="inline-flex items-center gap-1 text-ink-2" title={t("agents.reach.listeningHint")}>
           <Ear className="size-3" aria-hidden />
           {t("agents.listening")}
         </span>

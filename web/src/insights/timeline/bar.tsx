@@ -154,7 +154,7 @@ export function Bar({
   const endSet = hasEnd || !!draft?.end;
   const text =
     edit === "end"
-      ? t("timeline.due", { day: day(shown.e) })
+      ? t("timeline.bar.due", { day: day(shown.e) })
       : startSet && endSet
         ? t("timeline.range", { from: day(shown.s), to: day(shown.e) })
         : startSet

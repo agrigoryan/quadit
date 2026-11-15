@@ -17,10 +17,10 @@ export const timelineStrings = {
   "timeline.range": "{from} to {to}",
   "timeline.from": "From {day}, no target date",
   "timeline.until": "Until {day}, no start date",
-  "timeline.due": "Due {day}",
+  "timeline.bar.due": "Due {day}",
   "timeline.bar.epic": "{name}, epic, {state}",
   "timeline.bar.task": "{key} {title}, due date",
-  "timeline.milestone": "Milestone: {name}, {day}",
+  "timeline.milestoneMark": "Milestone: {name}, {day}",
 
   "timeline.noDates": "No dates",
   "timeline.setDates": "Set dates",
