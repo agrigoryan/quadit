@@ -141,6 +141,21 @@ describe("opening a workspace", () => {
     expect(screen.getByText("the workspace is open")).toBeInTheDocument();
   });
 
+  it("puts away a copy from an earlier visit when the server now refuses the workspace", async () => {
+    const earlier = openWorkspace();
+    await settle();
+    earlier.unmount();
+
+    // Removed from the workspace meanwhile: a copy already here is asked for whole.
+    server.get(WHOLE, refuse(403, "you are not a member of this workspace"));
+    openWorkspace();
+    await settle();
+    expect(screen.queryByText("the workspace is open")).toBeNull();
+    expect(screen.getByText("You can't open this workspace")).toBeInTheDocument();
+    expect(getState().ready).toBe(false);
+    expect(getState().workspace).toBeNull();
+  });
+
   it("says the person may not open it, in the server's words, and does not ask again by itself", async () => {
     server.get(OPEN_PART, refuse(404, "no such workspace"));
     openWorkspace();

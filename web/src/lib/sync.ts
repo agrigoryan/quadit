@@ -341,7 +341,12 @@ async function open(s: Session) {
       if (isAbort(err)) throw err;
       // Signed out: api.onUnauthorized has taken over.
       if (err instanceof ApiError && err.status === 401) return;
-      if (!(err instanceof NetworkError)) return whyNot.setState({ slug, why: whyNotOpened(err) });
+      if (!(err instanceof NetworkError)) {
+        const why = whyNotOpened(err);
+        // The server will not show this workspace to the person now: a copy from an earlier visit is not theirs to keep looking at.
+        if (why.is !== "failed") clearStore();
+        return whyNot.setState({ slug, why });
+      }
       whyNot.setState({ slug, why: { is: "offline" } });
       // A copy from an earlier visit may be on screen meanwhile: say that it is not being kept current.
       showStream("down");
