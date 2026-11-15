@@ -14,6 +14,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// The working copy of a repository source: clone, branch, checkout,
+// commit and push.
+
 // git runs one git command in dir and returns what it printed.
 func git(ctx context.Context, dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -45,7 +48,10 @@ func (r *syncRun) git(args ...string) (string, error) {
 // head is the short name of the commit the working copy is at, or nothing
 // when it is at none.
 func (r *syncRun) head() string {
-	out, _ := r.git("rev-parse", "--short", "HEAD")
+	out, err := r.git("rev-parse", "--short", "HEAD")
+	if err != nil {
+		return "" // at no commit
+	}
 	return out
 }
 
@@ -105,8 +111,11 @@ func (r *syncRun) shallow() bool {
 // checks out everything, as before.
 func (r *syncRun) keepToFolder() {
 	if r.src.Subdir == "" {
-		if on, _ := r.git("config", "--bool", "core.sparseCheckout"); on == "true" {
-			r.git("sparse-checkout", "disable")
+		// git config fails on a setting that was never made: then it is off.
+		if on, err := r.git("config", "--bool", "core.sparseCheckout"); err == nil && on == "true" {
+			if _, err := r.git("sparse-checkout", "disable"); err != nil {
+				r.s.log.Info("repository sync: the checkout stays limited to a folder", "source", r.src.ID, "why", err)
+			}
 		}
 		return
 	}
@@ -127,7 +136,7 @@ func (r *syncRun) fetch() error {
 		return err
 	}
 	if r.src.WriteMode == "propose" {
-		r.git("fetch", "--quiet", "--depth", "1", "origin", "quadit/docs") // none yet is fine
+		_, _ = r.git("fetch", "--quiet", "--depth", "1", "origin", "quadit/docs") //nolint:errcheck // none yet is fine: there is nothing to push over
 	}
 	return nil
 }
@@ -145,7 +154,7 @@ func (r *syncRun) findBranch() error {
 	if err != nil {
 		return err
 	}
-	for _, line := range strings.Split(heads, "\n") {
+	for line := range strings.SplitSeq(heads, "\n") {
 		if rest, ok := strings.CutPrefix(line, "ref: refs/heads/"); ok {
 			r.branch = strings.Fields(rest)[0]
 		}
@@ -184,7 +193,11 @@ func (r *syncRun) commitAndPush() error {
 	if _, err := r.git("add", "--all", "."); err != nil {
 		return err
 	}
-	if status, _ := r.git("status", "--porcelain"); status == "" {
+	status, err := r.git("status", "--porcelain")
+	if err != nil {
+		return err
+	}
+	if status == "" {
 		r.done = true
 		return nil
 	}
@@ -196,7 +209,10 @@ func (r *syncRun) commitAndPush() error {
 		target = "quadit/docs"
 	}
 	if _, err := r.git("push", "--quiet", "--force-with-lease", "origin", "HEAD:refs/heads/"+target); err != nil {
-		r.resetToBranch()
+		if rerr := r.resetToBranch(); rerr != nil {
+			// The next sync's checkout resets it again.
+			r.s.log.Warn("repository sync: taking back a commit that was not pushed", "source", r.src.ID, "err", rerr)
+		}
 		if strings.Contains(err.Error(), "checked out") {
 			return fmt.Errorf("the repository is a working copy with %s checked out, and git lets nobody push to that. Sync with a bare repository or a hosted one, or set write_mode to \"propose\" so page edits go to the branch quadit/docs", target)
 		}
@@ -263,7 +279,7 @@ func (s *Server) commitAuthor(ctx context.Context, db store.DB, editors map[stri
 // was pushed: the proposed commit lives on quadit/docs, not here.
 func (r *syncRun) dropProposal() error {
 	if r.src.WriteMode == "propose" {
-		r.resetToBranch()
+		return r.resetToBranch()
 	}
 	return nil
 }

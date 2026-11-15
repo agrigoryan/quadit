@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -94,7 +95,11 @@ func (r *syncRun) recordHashes() error {
 	// What was pushed is now the common ground for those pages.
 	for docID, pageHash := range r.written {
 		var d core.Doc
-		if r.db.Get(r.ctx, &d, store.Eq("id", docID)) != nil || r.blocked[d.SourcePath] {
+		there, err := rowFound(r.db.Get(r.ctx, &d, store.Eq("id", docID)))
+		if err != nil {
+			return err
+		}
+		if !there || r.blocked[d.SourcePath] {
 			continue
 		}
 		fileHash := pageHash
@@ -106,11 +111,15 @@ func (r *syncRun) recordHashes() error {
 			old, _ := splitHashes(d.SourceHash)
 			fileHash = old
 		}
-		r.db.Update(r.ctx, "docs", map[string]any{"source_hash": fileHash + ":" + pageHash}, store.Eq("id", docID))
+		if _, err := r.db.Update(r.ctx, "docs", map[string]any{"source_hash": fileHash + ":" + pageHash}, store.Eq("id", docID)); err != nil {
+			return fmt.Errorf("remembering what was synced: %w", err)
+		}
 	}
 	for _, path := range r.toRemove {
 		if p, ok := r.byPath[path]; ok {
-			r.db.Update(r.ctx, "docs", map[string]any{"source_hash": "", "source_path": ""}, store.Eq("id", p.ID))
+			if _, err := r.db.Update(r.ctx, "docs", map[string]any{"source_hash": "", "source_path": ""}, store.Eq("id", p.ID)); err != nil {
+				return fmt.Errorf("remembering what was synced: %w", err)
+			}
 		}
 	}
 	return nil

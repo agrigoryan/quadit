@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -492,4 +495,39 @@ func TestAGitHubSyncOutlivesABriefOutage(t *testing.T) {
 			s.call(nil, "", "POST", "/hooks/github/"+in, bytes.Repeat([]byte("x"), 6<<20), 400, nil)
 		})
 	})
+}
+
+func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	st := newBgFaultStore(t)
+	s := newSite(t, st)
+	tmp := t.TempDir()
+	origin, work := filepath.Join(tmp, "origin.git"), filepath.Join(tmp, "work")
+	gitIn(t, tmp, "init", "--quiet", "--bare", "-b", "main", origin)
+	gitIn(t, tmp, "clone", "--quiet", origin, work)
+	if err := os.MkdirAll(filepath.Join(work, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(work, "docs", "design.md"), []byte("# Design\n\nThe boss has three phases.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, work, "add", "--all")
+	gitIn(t, work, "commit", "--quiet", "-m", "first")
+	gitIn(t, work, "push", "--quiet", "origin", "HEAD:main")
+	src := s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": origin, "subdir": "docs"})["ref"].(string)
+	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil)
+	var pages []core.Doc
+	if err := st.Store.List(context.Background(), &pages, store.Where(store.Eq("source_path", "design.md"))); err != nil || len(pages) != 1 {
+		t.Fatalf("the page of design.md: %v %v", pages, err)
+	}
+	s.change(s.owner, "", "doc.write", M{"doc": pages[0].ID, "markdown": "# Design\n\nThe boss has four phases.\n"})
+
+	fired := st.faults.arm(bgFault{op: "Update", table: "docs", times: 1,
+		match: func(set map[string]any, _ []store.Cond) bool { return set["source_hash"] != nil && set["source_hash"] != "" }})
+	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 409, nil)
+	if fired() != 1 {
+		t.Fatalf("the fault fired %d times", fired())
+	}
 }

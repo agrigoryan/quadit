@@ -37,18 +37,24 @@ func init() {
 	runners = append(runners, (*Server).runSources)
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("POST /api/v1/w/{ws}/sources/{id}/sync", s.workspaceMember(s.handleSyncSource))
-		m.HandleFunc("GET /api/v1/w/{ws}/sources", s.workspaceMember(func(x *c) error {
-			var list []core.DocSource
-			if err := x.db.List(x.ctx(), &list, store.Where(store.Live)); err != nil {
-				return err
-			}
-			return x.ok(map[string]any{"sources": list})
-		}))
+		m.HandleFunc("GET /api/v1/w/{ws}/sources", s.workspaceMember(s.handleListSources))
 	})
 }
 
+// syncLocks holds a mutex for each source, so one source is synced by one
+// sync at a time.
 var syncLocks sync.Map // source id -> *sync.Mutex
 
+// handleListSources lists the workspace's repository sources.
+func (s *Server) handleListSources(x *c) error {
+	var list []core.DocSource
+	if err := x.db.List(x.ctx(), &list, store.Where(store.Live)); err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"sources": list})
+}
+
+// runSources syncs each source on its schedule until ctx ends.
 func (s *Server) runSources(ctx context.Context) {
 	tick := time.NewTicker(time.Minute)
 	defer tick.Stop()
@@ -73,12 +79,17 @@ func (s *Server) runSources(ctx context.Context) {
 	}
 }
 
+// handleSyncSource syncs a source now and says what the sync did.
 func (s *Server) handleSyncSource(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
 	var src core.DocSource
-	if err := x.db.Get(x.ctx(), &src, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+	there, err := rowFound(x.db.Get(x.ctx(), &src, store.Eq("id", x.r.PathValue("id")), store.Live))
+	if err != nil {
+		return err
+	}
+	if !there {
 		return errNotFound("source")
 	}
 	res, err := s.syncSource(x.ctx(), src)
@@ -88,6 +99,7 @@ func (s *Server) handleSyncSource(x *c) error {
 	return x.ok(res)
 }
 
+// syncResult is what one sync did, as its answer says.
 type syncResult struct {
 	PagesUpdated int    `json:"pages_updated"`
 	PagesCreated int    `json:"pages_created"`
@@ -112,7 +124,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		} else if res.Commit != "" {
 			set["last_commit"] = res.Commit
 		}
-		db.Update(context.WithoutCancel(ctx), "doc_sources", set, store.Eq("id", src.ID))
+		if _, uerr := db.Update(context.WithoutCancel(ctx), "doc_sources", set, store.Eq("id", src.ID)); uerr != nil {
+			s.log.Error("repository sync: recording how it went", "source", src.ID, "err", uerr)
+		}
 	}()
 	if _, lerr := exec.LookPath("git"); lerr != nil {
 		return res, errors.New("git is not installed on the server")

@@ -28,12 +28,19 @@ func (r *syncRun) findFolder() error {
 	return nil
 }
 
-// readFiles reads every Markdown file under the folder.
+// maxPageFile is the size from which a Markdown file is not taken as a page.
+const maxPageFile = 2 << 20
+
+// readFiles reads every Markdown file under the folder. One that cannot be
+// read stops the sync: read as missing, its page would be trashed.
 func (r *syncRun) readFiles() error {
 	r.files = map[string]string{}
 	return filepath.WalkDir(r.root, func(p string, e os.DirEntry, werr error) error {
+		if werr != nil && p == r.root && errors.Is(werr, os.ErrNotExist) {
+			return nil // no folder yet: no files (findFolder says so)
+		}
 		if werr != nil {
-			return nil
+			return werr
 		}
 		name := e.Name()
 		if e.Type()&os.ModeSymlink != 0 {
@@ -45,11 +52,19 @@ func (r *syncRun) readFiles() error {
 			}
 			return nil
 		}
-		if strings.EqualFold(filepath.Ext(name), ".md") {
-			if raw, rerr := os.ReadFile(p); rerr == nil && len(raw) < 2<<20 {
-				rel, _ := filepath.Rel(r.root, p)
-				r.files[filepath.ToSlash(rel)] = string(raw)
+		if !strings.EqualFold(filepath.Ext(name), ".md") {
+			return nil
+		}
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if len(raw) < maxPageFile {
+			rel, err := filepath.Rel(r.root, p)
+			if err != nil {
+				return err
 			}
+			r.files[filepath.ToSlash(rel)] = string(raw)
 		}
 		return nil
 	})
@@ -106,7 +121,9 @@ func (r *syncRun) writeOut() error {
 	}
 	for _, path := range r.toRemove {
 		if full := filepath.Join(r.root, filepath.FromSlash(path)); staysInside(r.dir, full) {
-			os.Remove(full)
+			if err := os.Remove(full); err != nil && !errors.Is(err, os.ErrNotExist) {
+				r.s.log.Warn("repository sync: a file was not removed", "source", r.src.ID, "path", path, "err", err)
+			}
 		}
 	}
 	if len(r.blocked) > 0 {
