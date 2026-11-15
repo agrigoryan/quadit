@@ -14,7 +14,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
@@ -63,19 +63,6 @@ function drop(tree: DocTree, movingId: string, target: DropTarget) {
   moveDoc(movingId, onto.parent_id ?? null, rank);
 }
 
-/** Arrow keys walk the tree's rows; right and left open and close a page. */
-function onTreeKey(e: KeyboardEvent<HTMLElement>) {
-  const rows = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-tree-row]")];
-  const at = rows.indexOf(document.activeElement as HTMLElement);
-  if (at < 0) return;
-  const id = (rows[at] as HTMLElement).dataset.treeRow as string;
-  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-    e.preventDefault();
-    rows[at + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
-  } else if (e.key === "ArrowRight") setOpen(id, true);
-  else if (e.key === "ArrowLeft") setOpen(id, false);
-}
-
 interface Props {
   /** The pages to show: the area's own tree (docs/data.ts useDocTree). */
   tree: DocTree;
@@ -118,7 +105,7 @@ export function DocsTree({ tree, className }: Props) {
     byAgent.set(doc.memory_of as string, [...(byAgent.get(doc.memory_of as string) ?? []), doc]);
 
   return (
-    <nav aria-label={t("docs.tree.label")} className={cx("flex min-h-0 flex-col", className)} onKeyDown={onTreeKey}>
+    <nav aria-label={t("docs.tree.label")} className={cx("flex min-h-0 flex-col", className)}>
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
@@ -215,9 +202,7 @@ function TreeSection({
         )}
       </div>
       {children.length > 0 ? (
-        <ul role="tree" aria-label={title}>
-          {children}
-        </ul>
+        <ul aria-label={title}>{children}</ul>
       ) : (
         empty && <p className="px-2 py-1 text-xs text-ink-3">{empty}</p>
       )}

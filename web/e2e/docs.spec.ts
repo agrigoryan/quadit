@@ -25,11 +25,7 @@ test("a project page keeps what was typed, gets a sub-page, and is listed with t
   const tree = page.getByRole("navigation", { name: "Pages" });
   await expect(page.getByRole("textbox", { name: "Page title" })).toHaveValue("Release plan");
 
-  await tree
-    .getByRole("treeitem", { name: /Release plan/ })
-    .getByRole("button", { name: "Page inside" })
-    .first()
-    .click();
+  await tree.getByRole("button", { name: "New page inside Release plan" }).click();
   // On the new page, the parent is a step of the path above the title.
   const where = page.getByRole("navigation", { name: "Where this page is" });
   await expect(where.getByRole("link", { name: "Release plan" })).toBeVisible();

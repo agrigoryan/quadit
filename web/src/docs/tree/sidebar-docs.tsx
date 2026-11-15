@@ -39,8 +39,8 @@ function Row({ doc, tree, depth, slug, parentProject }: RowProps) {
       >
         <button
           type="button"
-          tabIndex={-1}
-          aria-label={t(open ? "docs.tree.collapse" : "docs.tree.expand")}
+          aria-expanded={kids.length ? open : undefined}
+          aria-label={t(open ? "docs.tree.collapse" : "docs.tree.expand", { title: docTitle(doc) })}
           onClick={() => setOpen(doc.id, !open)}
           className={cx(
             "flex size-5 shrink-0 items-center justify-center rounded-sm text-ink-3 hover:bg-press",

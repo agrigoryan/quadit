@@ -41,9 +41,10 @@ export const docs = {
   "docs.project.movedAlong": "The page inside it moved with it | The {n} pages inside it moved with it",
 
   "docs.tree.label": "Pages",
-  "docs.tree.expand": "Show pages inside",
-  "docs.tree.collapse": "Hide pages inside",
-  "docs.tree.more": "Page actions",
+  "docs.tree.expand": "Show pages inside {title}",
+  "docs.tree.collapse": "Hide pages inside {title}",
+  "docs.tree.more": "Actions for {title}",
+  "docs.tree.subpage": "New page inside {title}",
   "docs.tree.rename": "Rename",
   "docs.tree.all": "All {n} pages…",
 

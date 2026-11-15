@@ -4,7 +4,7 @@
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronRight, Link2, MoreHorizontal, PenLine, Plus, Smile, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { type KeyboardEvent, useState } from "react";
 import { NavLink } from "react-router";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
@@ -56,9 +56,10 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
   const zone = drop?.id === doc.id ? drop.zone : null;
   const canChange = editable && !doc.generated;
   const marked = marksProject(doc, parentProject);
+  const title = docTitle(doc);
 
   return (
-    <li role="treeitem" aria-expanded={kids.length ? open : undefined}>
+    <li>
       <div
         ref={(el) => {
           drag.setNodeRef(el);
@@ -83,8 +84,8 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
         )}
         <button
           type="button"
-          tabIndex={-1}
-          aria-label={t(open ? "docs.tree.collapse" : "docs.tree.expand")}
+          aria-expanded={kids.length ? open : undefined}
+          aria-label={t(open ? "docs.tree.collapse" : "docs.tree.expand", { title })}
           onClick={() => setOpen(doc.id, !open)}
           className={cx(
             "flex size-5 shrink-0 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink",
@@ -117,9 +118,10 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
             data-tree-row={doc.id}
             draggable={false}
             onClick={() => ui.setDrawer(false)}
+            onKeyDown={onRowKey}
             className="ml-1 flex min-w-0 flex-1 items-center gap-1.5 py-1 outline-none focus-visible:underline aria-[current]:font-medium"
           >
-            <span className="truncate">{docTitle(doc)}</span>
+            <span className="truncate">{title}</span>
             {marked && <ProjectMark projectId={doc.project_id} />}
           </NavLink>
         )}
@@ -129,7 +131,7 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
               <MenuTrigger asChild>
                 <button
                   type="button"
-                  aria-label={t("docs.tree.more")}
+                  aria-label={t("docs.tree.more", { title })}
                   className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink"
                 >
                   <MoreHorizontal className="size-3.5" />
@@ -167,7 +169,7 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
             {doc.kind !== "database" && (
               <button
                 type="button"
-                aria-label={t("docs.new.subpage")}
+                aria-label={t("docs.tree.subpage", { title })}
                 title={t("docs.new.subpage")}
                 onClick={() => createAndOpen({ parentId: doc.id })}
                 className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink"
@@ -179,7 +181,7 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
         )}
       </div>
       {open && kids.length > 0 && (
-        <ul role="group">
+        <ul>
           {kids.map((kid) => (
             <TreeNode
               key={kid.id}
@@ -195,6 +197,21 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
       )}
     </li>
   );
+}
+
+/** On a page's link, the arrows walk the tree's pages; right and left open and close a page. */
+function onRowKey(e: KeyboardEvent<HTMLAnchorElement>) {
+  const tree = e.currentTarget.closest("nav");
+  if (!tree) return;
+  const rows = [...tree.querySelectorAll<HTMLElement>("[data-tree-row]")];
+  const at = rows.indexOf(e.currentTarget);
+  const id = e.currentTarget.dataset.treeRow;
+  if (at < 0 || !id) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    rows[at + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
+  } else if (e.key === "ArrowRight") setOpen(id, true);
+  else if (e.key === "ArrowLeft") setOpen(id, false);
 }
 
 function RenameBox({ doc }: { doc: Doc }) {
