@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build server web generate test test-all lint dev seed clean fmt release image
+.PHONY: all build server web generate test test-all e2e lint dev seed clean fmt release image
 
 all: build
 
@@ -30,6 +30,12 @@ test:
 test-all:
 	QUADIT_TEST_POSTGRES='postgres://postgres:quadit@127.0.0.1:54329/quadit' go test -race ./...
 	cd web && pnpm typecheck && pnpm test
+
+# The end-to-end suite: Chromium drives the binary just built, on a server of
+# its own (web/e2e). The browser is installed once with:
+#   cd web && pnpm exec playwright install chromium
+e2e: build
+	cd web && pnpm e2e
 
 # The rules of docs/code-style.md that a tool can check: .golangci.yml for
 # Go, web/.oxlintrc.json and Prettier for the web app.
