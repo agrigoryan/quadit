@@ -8,6 +8,13 @@
 //
 // A number is written the way people write it ("116,445 tasks"). Give a
 // string for a number that is a name and not an amount, like a cycle's.
+//
+// The lib folder: small modules that know neither the server's data, the
+// router nor any screen, and import only types and i18n: words (this file),
+// days and times, ranks, ids, class names, file addresses, what this
+// browser remembers (kept.ts), colour swatches, Cmd-Enter, downloads; and
+// the three app-wide bits of screen state any part may set: toasts, the
+// theme and what is open (ui-state.ts).
 
 import { en } from "@/i18n/en";
 

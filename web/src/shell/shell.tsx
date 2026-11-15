@@ -2,7 +2,7 @@ import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from 
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { useMedia } from "@/hooks/use-media";
 import { ShortcutsSheet } from "@/palette/shortcuts";
-import { ahead } from "@/lib/ahead";
+import { ahead } from "@/shell/ahead";
 import { useCan } from "@/data/access";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { useStore } from "@/data/store";
@@ -35,7 +35,7 @@ const CyclesPage = lazy(() => import("@/insights/plan/cycles-page").then((m) => 
 // also fetched ahead, once the first page is up, so that opening a task,
 // the palette or the new-task dialog does not wait on the network; and once
 // their code is here they are drawn without a round through Suspense
-// (lib/ahead.tsx).
+// (shell/ahead.tsx).
 const taskPanel = ahead(() => import("@/detail/task-panel").then((m) => m.TaskPanel));
 const taskPage = ahead(() => import("@/detail/task-page").then((m) => m.TaskPage));
 const palette = ahead(() => import("@/palette/palette").then((m) => m.CommandPalette));
