@@ -430,7 +430,7 @@ func (s *Store) Dump(ctx context.Context, table string, each func(row map[string
 	if err != nil {
 		return err
 	}
-	rows, err := s.query(ctx, "SELECT "+m.cols+" FROM "+table)
+	rows, err := s.query(ctx, "SELECT "+m.cols+" FROM "+m.name)
 	if err != nil {
 		return err
 	}
@@ -497,7 +497,7 @@ func (s *Store) Load(ctx context.Context, table string, rows []map[string]any) e
 			if err != nil {
 				return err
 			}
-			if _, err := x.exec(ctx, "INSERT INTO "+table+" ("+m.cols+") VALUES ("+placeholders(len(args))+")", args...); err != nil {
+			if _, err := x.exec(ctx, "INSERT INTO "+m.name+" ("+m.cols+") VALUES ("+placeholders(len(args))+")", args...); err != nil {
 				return fmt.Errorf("%s: %w", table, err)
 			}
 		}
@@ -524,7 +524,7 @@ func (s *Store) Overwrite(ctx context.Context, table string, row map[string]any,
 		if col == "id" || col == "workspace_id" || slices.Contains(keep, col) {
 			continue
 		}
-		sets = append(sets, col+" = ?")
+		sets = append(sets, ident(col)+" = ?")
 		vals = append(vals, args[i])
 	}
 	return s.inTx(ctx, func(x q) error {
@@ -532,7 +532,7 @@ func (s *Store) Overwrite(ctx context.Context, table string, row map[string]any,
 		if err != nil {
 			return err
 		}
-		_, err = x.exec(ctx, "UPDATE "+table+" SET "+strings.Join(sets, ", ")+" WHERE "+w, append(vals, wargs...)...)
+		_, err = x.exec(ctx, "UPDATE "+m.name+" SET "+strings.Join(sets, ", ")+" WHERE "+w, append(vals, wargs...)...)
 		return err
 	})
 }

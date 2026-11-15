@@ -152,16 +152,28 @@ func ids(tasks []core.Task) []string {
 	return out
 }
 
-// recorder keeps the last query sent through it.
+// recorder keeps every statement sent through it, and the last query's
+// arguments.
 type recorder struct {
 	querier
+	sent  []string
 	last  string
 	lastA []any
 }
 
 func (r *recorder) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	r.last, r.lastA = query, args
+	r.sent, r.last, r.lastA = append(r.sent, query), query, args
 	return r.querier.QueryContext(ctx, query, args...)
+}
+
+func (r *recorder) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	r.sent = append(r.sent, query)
+	return r.querier.QueryRowContext(ctx, query, args...)
+}
+
+func (r *recorder) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	r.sent = append(r.sent, query)
+	return r.querier.ExecContext(ctx, query, args...)
 }
 
 // TestTaskPagesSearchTheIndex holds a second page of a list sorted by
@@ -230,4 +242,106 @@ func queryPlan(t *testing.T, db *sql.DB, query string, args []any) string {
 		steps = append(steps, detail)
 	}
 	return strings.Join(steps, "\n")
+}
+
+// badNames are table names, column names and orders no caller may get into
+// a statement: quotes, a semicolon, a comment, a name the table does not
+// have, a function call.
+var badNames = []string{
+	`title"; DROP TABLE tasks; --`,
+	`title; DELETE FROM tasks`,
+	`title -- x`,
+	`title/**/`,
+	`"title"`,
+	`Title`,
+	`nope`,
+	`lower(title)`,
+	`title DESC`,
+	``,
+}
+
+// TestNamesOutsideTheSchemaAreRefused hands every way into the mapper a
+// table, column or order that is not plainly one of the schema's, and holds
+// each to an error before any statement is sent. A valid call is sent with
+// its names quoted.
+func TestNamesOutsideTheSchemaAreRefused(t *testing.T) {
+	s := sqliteStore(t)
+	ws := fillTasks(t, s, 3)
+	ctx := context.Background()
+	rec := &recorder{querier: s.db}
+	db := conn{q: q{c: rec, d: s.d}, ws: ws}
+	var some core.Task
+	if err := db.Get(ctx, &some); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range badNames {
+		entries := map[string]func() error{
+			"Get where":    func() error { return db.Get(ctx, &core.Task{}, store.Eq(bad, "x")) },
+			"List where":   func() error { var r []core.Task; return db.List(ctx, &r, store.Where(store.Like(bad, "x"))) },
+			"List order":   func() error { var r []core.Task; return db.List(ctx, &r, store.Q{Order: bad}) },
+			"List -order":  func() error { var r []core.Task; return db.List(ctx, &r, store.Q{Order: "-" + bad}) },
+			"List order 2": func() error { var r []core.Task; return db.List(ctx, &r, store.Q{Order: "rank," + bad}) },
+			"Count table":  func() error { _, err := db.Count(ctx, bad); return err },
+			"Count where":  func() error { _, err := db.Count(ctx, "tasks", store.Null(bad)); return err },
+			"Update table": func() error { _, err := db.Update(ctx, bad, map[string]any{"title": "x"}); return err },
+			"Update set": func() error {
+				_, err := db.Update(ctx, "tasks", map[string]any{bad: "x"}, store.Eq("id", some.ID))
+				return err
+			},
+			"Update where": func() error {
+				_, err := db.Update(ctx, "tasks", map[string]any{"title": "x"}, store.Gt(bad, 1))
+				return err
+			},
+			"Delete table":  func() error { _, err := db.Delete(ctx, bad); return err },
+			"Delete where":  func() error { _, err := db.Delete(ctx, "tasks", store.In(bad, []string{"x"})); return err },
+			"Incr table":    func() error { _, err := db.Incr(ctx, bad, "number", 1); return err },
+			"Incr column":   func() error { _, err := db.Incr(ctx, "tasks", bad, 1, store.Eq("id", some.ID)); return err },
+			"Tally table":   func() error { _, err := db.Tally(ctx, bad, nil); return err },
+			"Tally group":   func() error { _, err := db.Tally(ctx, "tasks", []string{"priority", bad}); return err },
+			"Tally where":   func() error { _, err := db.Tally(ctx, "tasks", nil, store.NotNull(bad)); return err },
+			"Upsert key":    func() error { return db.Upsert(ctx, some, bad) },
+			"Upsert key 2":  func() error { return db.Upsert(ctx, some, "id", bad) },
+			"Dump table":    func() error { return s.Dump(ctx, bad, func(map[string]any) error { return nil }) },
+			"Load table":    func() error { return s.Load(ctx, bad, []map[string]any{{"id": "x"}}) },
+			"Overwrite tbl": func() error { return s.Overwrite(ctx, bad, map[string]any{}, nil) },
+			"Overwrite at":  func() error { return s.Overwrite(ctx, "tasks", map[string]any{}, nil, store.Eq(bad, "x")) },
+		}
+		if bad == "" {
+			delete(entries, "List order") // no order at all is an order
+		}
+		for name, call := range entries {
+			rec.sent = nil
+			if err := call(); err == nil {
+				t.Errorf("%s with %q: no error", name, bad)
+			}
+			if len(rec.sent) > 0 {
+				t.Errorf("%s with %q: sent %q", name, bad, rec.sent)
+			}
+		}
+	}
+	var after []core.Task
+	if err := db.List(ctx, &after, store.Q{}); err != nil || len(after) != 3 {
+		t.Fatalf("after the bad names: %d tasks (%v), want the 3 there were", len(after), err)
+	}
+
+	rec.sent = nil
+	var rows []core.Task
+	if err := db.List(ctx, &rows, store.Q{Where: []store.Cond{store.Eq("key", some.Key)}, Order: "rank,-id"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Upsert(ctx, core.TaskKey{WorkspaceID: ws, Key: "OLD-1", TaskID: some.ID, At: 1}, "workspace_id", "key"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Incr(ctx, "tasks", "number", 0, store.Eq("id", some.ID)); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		` FROM "tasks" WHERE "workspace_id" = ? AND "key" = ? ORDER BY "rank", "id" DESC`,
+		`ON CONFLICT ("workspace_id", "key") DO UPDATE SET "task_id" = excluded."task_id"`,
+		`UPDATE "tasks" SET "number" = "number" + ? WHERE "workspace_id" = ? AND "id" = ? RETURNING "number"`,
+	} {
+		if !slices.ContainsFunc(rec.sent, func(q string) bool { return strings.Contains(q, want) }) {
+			t.Errorf("no statement has %s:\n%s", want, strings.Join(rec.sent, "\n"))
+		}
+	}
 }

@@ -26,9 +26,10 @@ type field struct {
 // meta is what the mapper knows about one row type.
 type meta struct {
 	table  *store.Table
+	name   string // the table's name, quoted
 	fields []field
 	byCol  map[string]*field
-	cols   string // "a, b, c"
+	cols   string // `"a", "b", "c"`
 }
 
 var metas sync.Map // reflect.Type -> *meta
@@ -41,7 +42,10 @@ func metaOf(t reflect.Type) (*meta, error) {
 	if !ok {
 		return nil, fmt.Errorf("store: %s is not a registered row type", t)
 	}
-	m := &meta{table: tb, byCol: map[string]*field{}}
+	if !plainName(tb.Name) {
+		return nil, fmt.Errorf("store: table name %q is not a plain name", tb.Name)
+	}
+	m := &meta{table: tb, name: ident(tb.Name), byCol: map[string]*field{}}
 	var cols []string
 	for i := 0; i < t.NumField(); i++ {
 		tag := t.Field(i).Tag.Get("db")
@@ -49,6 +53,9 @@ func metaOf(t reflect.Type) (*meta, error) {
 			continue
 		}
 		parts := strings.Split(tag, ",")
+		if !plainName(parts[0]) {
+			return nil, fmt.Errorf("store: %s column %q is not a plain name", tb.Name, parts[0])
+		}
 		f := field{idx: i, col: parts[0]}
 		for _, opt := range parts[1:] {
 			switch opt {
@@ -60,7 +67,7 @@ func metaOf(t reflect.Type) (*meta, error) {
 		}
 		f.isID = (f.col == "id" || strings.HasSuffix(f.col, "_id")) && !textIDs[tb.Name+"."+f.col]
 		m.fields = append(m.fields, f)
-		cols = append(cols, f.col)
+		cols = append(cols, ident(f.col))
 	}
 	for i := range m.fields {
 		m.byCol[m.fields[i].col] = &m.fields[i]
@@ -68,6 +75,35 @@ func metaOf(t reflect.Type) (*meta, error) {
 	m.cols = strings.Join(cols, ", ")
 	metas.Store(t, m)
 	return m, nil
+}
+
+// plainName tells whether s can name a table or a column: lowercase
+// letters, digits and underscores, not starting with a digit.
+func plainName(s string) bool {
+	if s == "" || s[0] >= '0' && s[0] <= '9' {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// ident quotes a table or column name the way both databases read it. Only
+// plain names reach it (metaOf and column check them), so it cannot be
+// broken out of; quoted, a name that is a keyword somewhere (key, rank,
+// order) is still a name.
+func ident(name string) string { return `"` + name + `"` }
+
+// column returns a column of the table, quoted, or an error when the table
+// has no such column.
+func (m *meta) column(name string) (string, error) {
+	if _, ok := m.byCol[name]; !ok {
+		return "", fmt.Errorf("store: table %s has no column %q", m.table.Name, name)
+	}
+	return ident(name), nil
 }
 
 // textIDs are the *_id columns that do not hold UUIDs.
@@ -236,11 +272,12 @@ type conn struct {
 }
 
 // where builds the WHERE clause. prefix is a table alias with its dot, or "".
+// Every column is one of the table's, quoted.
 func (c conn) where(m *meta, prefix string, conds []store.Cond) (string, []any, error) {
 	var parts []string
 	var args []any
 	if c.ws != "" && !m.table.Global {
-		parts = append(parts, prefix+"workspace_id = ?")
+		parts = append(parts, prefix+ident("workspace_id")+" = ?")
 		args = append(args, c.ws)
 	}
 	for _, cd := range conds {
@@ -248,7 +285,7 @@ func (c conn) where(m *meta, prefix string, conds []store.Cond) (string, []any, 
 		if !ok {
 			return "", nil, fmt.Errorf("store: table %s has no column %q", m.table.Name, cd.Col)
 		}
-		col := prefix + cd.Col
+		col := prefix + ident(cd.Col)
 		switch cd.Op {
 		case "null":
 			parts = append(parts, col+" IS NULL")
@@ -311,6 +348,9 @@ func (c conn) where(m *meta, prefix string, conds []store.Cond) (string, []any, 
 	return strings.Join(parts, " AND "), args, nil
 }
 
+// order turns a Q's Order, "a" or "-a,b", into an ORDER BY of the table's
+// own columns, each ascending or (with "-") descending. Anything else in it
+// is refused.
 func (m *meta) order(spec string) (string, error) {
 	if spec == "" {
 		return "", nil
@@ -322,10 +362,11 @@ func (m *meta) order(spec string) (string, error) {
 		if strings.HasPrefix(c, "-") {
 			c, dir = c[1:], " DESC"
 		}
-		if _, ok := m.byCol[c]; !ok {
+		col, err := m.column(c)
+		if err != nil {
 			return "", fmt.Errorf("store: table %s has no column %q to order by", m.table.Name, c)
 		}
-		parts = append(parts, c+dir)
+		parts = append(parts, col+dir)
 	}
 	return " ORDER BY " + strings.Join(parts, ", "), nil
 }
@@ -348,7 +389,7 @@ func (c conn) Get(ctx context.Context, dst any, where ...store.Cond) error {
 	if err != nil {
 		return err
 	}
-	err = c.row(ctx, "SELECT "+m.cols+" FROM "+m.table.Name+" WHERE "+w+" LIMIT 1", args...).Scan(m.dests(v)...)
+	err = c.row(ctx, "SELECT "+m.cols+" FROM "+m.name+" WHERE "+w+" LIMIT 1", args...).Scan(m.dests(v)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return store.ErrNotFound
 	}
@@ -373,7 +414,7 @@ func (c conn) List(ctx context.Context, dst any, q store.Q) error {
 	if err != nil {
 		return err
 	}
-	query := "SELECT " + m.cols + " FROM " + m.table.Name + " WHERE " + w + order
+	query := "SELECT " + m.cols + " FROM " + m.name + " WHERE " + w + order
 	if q.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", q.Limit)
 		if q.Offset > 0 {
@@ -411,7 +452,7 @@ func (c conn) Count(ctx context.Context, table string, where ...store.Cond) (int
 		return 0, err
 	}
 	var n int
-	err = c.row(ctx, "SELECT COUNT(*) FROM "+table+" WHERE "+w, args...).Scan(&n)
+	err = c.row(ctx, "SELECT COUNT(*) FROM "+m.name+" WHERE "+w, args...).Scan(&n)
 	return n, err
 }
 
@@ -454,7 +495,7 @@ func (c conn) Insert(ctx context.Context, row any) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.exec(ctx, "INSERT INTO "+m.table.Name+" ("+m.cols+") VALUES ("+placeholders(len(args))+")", args...)
+	_, err = c.exec(ctx, "INSERT INTO "+m.name+" ("+m.cols+") VALUES ("+placeholders(len(args))+")", args...)
 	return conflict(err)
 }
 
@@ -468,21 +509,27 @@ func (c conn) Upsert(ctx context.Context, row any, key ...string) error {
 		return err
 	}
 	isKey := map[string]bool{}
+	var keys []string
 	for _, k := range key {
+		col, err := m.column(k)
+		if err != nil {
+			return err
+		}
 		isKey[k] = true
+		keys = append(keys, col)
 	}
 	var sets []string
 	for _, f := range m.fields {
 		if !isKey[f.col] {
-			sets = append(sets, f.col+" = excluded."+f.col)
+			sets = append(sets, ident(f.col)+" = excluded."+ident(f.col))
 		}
 	}
 	action := "DO NOTHING"
 	if len(sets) > 0 {
 		action = "DO UPDATE SET " + strings.Join(sets, ", ")
 	}
-	_, err = c.exec(ctx, "INSERT INTO "+m.table.Name+" ("+m.cols+") VALUES ("+placeholders(len(args))+
-		") ON CONFLICT ("+strings.Join(key, ", ")+") "+action, args...)
+	_, err = c.exec(ctx, "INSERT INTO "+m.name+" ("+m.cols+") VALUES ("+placeholders(len(args))+
+		") ON CONFLICT ("+strings.Join(keys, ", ")+") "+action, args...)
 	return conflict(err)
 }
 
@@ -510,14 +557,14 @@ func (c conn) Update(ctx context.Context, table string, set map[string]any, wher
 		if err != nil {
 			return 0, err
 		}
-		sets = append(sets, col+" = ?")
+		sets = append(sets, ident(col)+" = ?")
 		args = append(args, a)
 	}
 	w, wargs, err := c.where(m, "", where)
 	if err != nil {
 		return 0, err
 	}
-	res, err := c.exec(ctx, "UPDATE "+table+" SET "+strings.Join(sets, ", ")+" WHERE "+w, append(args, wargs...)...)
+	res, err := c.exec(ctx, "UPDATE "+m.name+" SET "+strings.Join(sets, ", ")+" WHERE "+w, append(args, wargs...)...)
 	if err != nil {
 		return 0, conflict(err)
 	}
@@ -533,7 +580,7 @@ func (c conn) Delete(ctx context.Context, table string, where ...store.Cond) (in
 	if err != nil {
 		return 0, err
 	}
-	res, err := c.exec(ctx, "DELETE FROM "+table+" WHERE "+w, args...)
+	res, err := c.exec(ctx, "DELETE FROM "+m.name+" WHERE "+w, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -545,15 +592,16 @@ func (c conn) Incr(ctx context.Context, table, col string, n int64, where ...sto
 	if err != nil {
 		return 0, err
 	}
-	if _, ok := m.byCol[col]; !ok {
-		return 0, fmt.Errorf("store: table %s has no column %q", table, col)
+	qc, err := m.column(col)
+	if err != nil {
+		return 0, err
 	}
 	w, args, err := c.where(m, "", where)
 	if err != nil {
 		return 0, err
 	}
 	var out int64
-	err = c.row(ctx, "UPDATE "+table+" SET "+col+" = "+col+" + ? WHERE "+w+" RETURNING "+col, append([]any{n}, args...)...).Scan(&out)
+	err = c.row(ctx, "UPDATE "+m.name+" SET "+qc+" = "+qc+" + ? WHERE "+w+" RETURNING "+qc, append([]any{n}, args...)...).Scan(&out)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, store.ErrNotFound
 	}
@@ -565,20 +613,22 @@ func (c conn) Tally(ctx context.Context, table string, groupBy []string, where .
 	if err != nil {
 		return nil, err
 	}
-	var sel []string
+	var sel, groups []string
 	for _, g := range groupBy {
-		if _, ok := m.byCol[g]; !ok {
-			return nil, fmt.Errorf("store: table %s has no column %q", table, g)
+		qg, err := m.column(g)
+		if err != nil {
+			return nil, err
 		}
-		sel = append(sel, "COALESCE(CAST("+g+" AS TEXT), '')")
+		sel = append(sel, "COALESCE(CAST("+qg+" AS TEXT), '')")
+		groups = append(groups, qg)
 	}
 	w, args, err := c.where(m, "", where)
 	if err != nil {
 		return nil, err
 	}
-	query := "SELECT " + strings.Join(append(sel, "COUNT(*)"), ", ") + " FROM " + table + " WHERE " + w
+	query := "SELECT " + strings.Join(append(sel, "COUNT(*)"), ", ") + " FROM " + m.name + " WHERE " + w
 	if len(groupBy) > 0 {
-		query += " GROUP BY " + strings.Join(groupBy, ", ")
+		query += " GROUP BY " + strings.Join(groups, ", ")
 	}
 	rows, err := c.query(ctx, query, args...)
 	if err != nil {
