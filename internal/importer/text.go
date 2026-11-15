@@ -1,3 +1,6 @@
+// Small helpers on names that several sources share: status categories,
+// priorities and project keys.
+
 package importer
 
 import (

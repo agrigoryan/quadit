@@ -1,3 +1,5 @@
+// The Asana source: the CSV that Asana exports.
+
 package importer
 
 import "strings"
@@ -5,8 +7,10 @@ import "strings"
 // asana reads the CSV that Asana exports.
 type asana struct{}
 
+// Kind is "asana".
 func (asana) Kind() string { return "asana" }
 
+// Read reads the CSV file at path.
 func (asana) Read(path string, _ Options) (Plan, error) {
 	return readCSV(path, "asana", asanaRow)
 }

@@ -1,3 +1,5 @@
+// The Source interface, the list of sources, and Read.
+
 package importer
 
 import (

@@ -1,3 +1,5 @@
+// Where an import writes, and the summary of what it made.
+
 package importer
 
 import (
@@ -39,6 +41,7 @@ type Summary struct {
 	Already int
 }
 
+// String says what was made in words, as the command-line tool prints it.
 func (s Summary) String() string {
 	out := fmt.Sprintf("imported %d tasks, %d comments, %d pages, %d rows, %d files", s.Tasks, s.Comments, s.Docs, s.Rows, s.Files)
 	if s.Already > 0 {

@@ -45,12 +45,13 @@ type Project struct {
 	Key, Name string
 }
 
-// Status is a status of a project's workflow there, and Label a label:
-// they come over whether or not a task uses them, in the order they had.
+// Status is a status of a project's workflow there. Statuses and labels
+// come over whether or not a task uses them, in the order they had.
 type Status struct {
 	Project, Name, Category, Color string
 }
 
+// Label is a label of a project there.
 type Label struct {
 	Project, Name, Color string
 }
@@ -85,9 +86,10 @@ type Task struct {
 	Files []string
 }
 
+// Comment is one comment on a task, as it comes from another tool.
 type Comment struct {
-	Author string
-	At     string
+	Author string // who wrote it there: a name or an email address
+	At     string // when, as the source writes it (the date is its first ten characters)
 	Body   string
 	Files  []string // the plan's files attached to the comment there
 }

@@ -1,3 +1,6 @@
+// The Sink that writes an import through the API, for the command-line
+// tool and the server alike.
+
 package importer
 
 import (
@@ -25,6 +28,7 @@ func NewSink(api API, logf func(format string, a ...any)) Sink {
 	return &apiSink{api: api, logf: logf}
 }
 
+// apiSink is the Sink NewSink makes.
 type apiSink struct {
 	api  API
 	logf func(format string, a ...any)
@@ -72,10 +76,12 @@ func (s *apiSink) mayBeQuiet() bool {
 // WasDuplicate reports whether the last change had been made before.
 func (s *apiSink) WasDuplicate() bool { return s.dup }
 
+// Get reads a path under the workspace.
 func (s *apiSink) Get(path string, q url.Values) ([]byte, error) {
 	return s.api.Call("GET", path, q, nil)
 }
 
+// Upload sends a file under an id the server makes.
 func (s *apiSink) Upload(path string) (string, error) {
 	return s.api.SendFile("", path)
 }
@@ -91,4 +97,5 @@ func (s *apiSink) UploadAs(fileID, path string) (string, bool, error) {
 	return u, true, err
 }
 
+// Logf passes on a note or a line of progress.
 func (s *apiSink) Logf(format string, a ...any) { s.logf(format, a...) }
