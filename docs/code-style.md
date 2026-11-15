@@ -108,6 +108,5 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 | `react/no-did-update-set-state` | 2 |
 | `jsx-a11y/control-has-associated-label` | 2 |
 | `typescript/no-misused-spread` | 2 |
-| `no-unused-vars` (`public/theme.js`) | 2 |
 | `jsx-a11y/label-has-associated-control` | 1 |
 | `react/incompatible-library` | 1 |

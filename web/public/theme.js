@@ -9,7 +9,7 @@
     var t = localStorage.getItem("quadit.theme");
     if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     root.dataset.theme = t;
-  } catch (e) {}
+  } catch {}
   function paint() {
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", colors[root.dataset.theme] || colors.light);
@@ -17,5 +17,5 @@
   paint();
   try {
     new MutationObserver(paint).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-  } catch (e) {}
+  } catch {}
 })();

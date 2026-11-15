@@ -34,7 +34,7 @@
     // Warnings: findings today, to be fixed one rule at a time.
     // Prettier puts parentheses around a comma sequence; they do not make it fine.
     "no-sequences": ["error", { "allowInParentheses": false }],
-    "no-unused-vars": "warn",
+    "no-unused-vars": "error",
     "typescript/no-unnecessary-type-assertion": "error",
     "typescript/no-floating-promises": "error",
     "typescript/no-base-to-string": "error",
