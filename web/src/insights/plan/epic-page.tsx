@@ -18,7 +18,7 @@ import { PageBar } from "@/insights/ui/panel";
 import { Progress } from "@/insights/ui/progress";
 import { DeleteEpic } from "@/pages/epics";
 import { useTasksBy } from "@/pages/plan-parts";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { Avatar } from "@/ui/avatar";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";

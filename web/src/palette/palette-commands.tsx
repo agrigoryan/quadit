@@ -55,7 +55,7 @@ import type { Project, Task } from "@/lib/types";
 import { ui } from "@/lib/ui-state";
 import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";
 import { openNewTask } from "@/tasks/draft";
-import { taskPath } from "@/tasks/task-link";
+import { taskPath } from "@/lib/task-link";
 
 export type ChoicePage = "status" | "assignee" | "priority" | "labels";
 /** Pages where the box takes a name for something new. */

@@ -22,7 +22,7 @@ import { emptyTally, useTallies } from "@/insights/plan/stats";
 import { PageBar, Panel } from "@/insights/ui/panel";
 import { Progress } from "@/insights/ui/progress";
 import { useTasksBy } from "@/pages/plan-parts";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";

@@ -8,8 +8,8 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Hotkeys, useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
-import { usePeek } from "@/tasks/task-link";
-import { takeSeen, useTaskOrder } from "@/tasks/task-queue";
+import { usePeek } from "@/lib/task-link";
+import { takeSeen, useTaskOrder } from "@/lib/task-queue";
 
 /** A focused link or button answers Enter and Space itself. */
 const onControl = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("a, button") !== null;

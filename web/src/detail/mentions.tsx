@@ -16,7 +16,7 @@ import type { Task } from "@/lib/types";
 import { Section } from "@/detail/section";
 import { PageIcon } from "@/docs/page-icon";
 import type { Doc } from "@/docs/types";
-import { useTaskLink } from "@/tasks/task-link";
+import { useTaskLink } from "@/lib/task-link";
 import { StatusIcon } from "@/ui/icons";
 
 /** One reference as the server sends it: what is mentioned, and the task or page the mention is in. */

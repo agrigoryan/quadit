@@ -1,3 +1,6 @@
+// What shows in place of a page that is not there: an address that leads
+// nowhere, or a project the person has just lost access to.
+
 import { Compass, Lock } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { t } from "@/lib/i18n";

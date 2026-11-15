@@ -13,7 +13,7 @@ import { addDays } from "@/insights/lib/format";
 import { cycleName, cyclePhase } from "@/insights/plan/cycle-page";
 import { type Tally, useTallies } from "@/insights/plan/stats";
 import { PlanRow, useTasksBy } from "@/pages/plan-parts";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";

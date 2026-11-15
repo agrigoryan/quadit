@@ -20,7 +20,7 @@ import {
 import { Link, Navigate, Route, Routes } from "react-router";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { AgentPage } from "@/settings/agents/agent";
 import { AgentsPage } from "@/settings/agents/agents";
 import { WorkspaceAuditPage } from "@/settings/audit/audit-page";

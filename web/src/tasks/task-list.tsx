@@ -7,8 +7,8 @@ import type { NewTaskDraft } from "@/tasks/draft";
 import { NONE, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";
 import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
-import { usePeek, useTaskNav } from "@/tasks/task-link";
-import { takeSeen, useTaskOrder } from "@/tasks/task-queue";
+import { usePeek, useTaskNav } from "@/lib/task-link";
+import { takeSeen, useTaskOrder } from "@/lib/task-queue";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { useViewport } from "@/tasks/use-viewport";
 
@@ -154,7 +154,7 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
     return next;
   }
 
-  // A task's page opened from here steps along these rows (tasks/task-queue.ts). Come back to
+  // A task's page opened from here steps along these rows (lib/task-queue.ts). Come back to
   // from a page that stepped on, the focus is on the task it ended at.
   const listStep = useTaskOrder(() => rows.map((row) => row.task.key));
   useLayoutEffect(() => {

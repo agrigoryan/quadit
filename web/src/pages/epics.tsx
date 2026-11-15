@@ -10,7 +10,7 @@ import { deleteEpic } from "@/insights/plan/actions";
 import { EpicDialog } from "@/insights/plan/epic-dialog";
 import { epicStateName, epicTones, riskLabel, riskOf, type Tally, useTallies } from "@/insights/plan/stats";
 import { PlanRow, useTasksBy } from "@/pages/plan-parts";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";

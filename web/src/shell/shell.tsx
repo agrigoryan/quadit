@@ -13,14 +13,14 @@ import { insightPaths } from "@/insights/paths";
 import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
 import { GoHint, useGoKeys } from "@/shell/go-keys";
 import { usePageFocus } from "@/shell/page-focus";
-import { NotFoundPage } from "@/shell/placeholders";
-import { pageUnder, projectInView } from "@/shell/project-in-view";
+import { NotFoundPage } from "@/ui/not-found";
+import { pageUnder, projectInView } from "@/lib/project-in-view";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
 import { UploadsIndicator } from "@/shell/uploads";
-import { canGoBack, isTaskPath, type Peek, PeekContext, taskPath } from "@/tasks/task-link";
-import { leaveForPage } from "@/tasks/task-queue";
+import { canGoBack, isTaskPath, type Peek, PeekContext, taskPath } from "@/lib/task-link";
+import { leaveForPage } from "@/lib/task-queue";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
 
 // The larger parts of the app are fetched when first opened.
@@ -63,7 +63,7 @@ function Part({ on, children }: { on: string | boolean; children: ReactNode }) {
 /**
  * The frame of a workspace: sidebar, top bar, the page, and the task panel.
  *
- * A task's address is /:ws/task/:key (tasks/task-link.ts). Opened from a
+ * A task's address is /:ws/task/:key (lib/task-link.ts). Opened from a
  * list it is a panel over that list, which travels in the link's state as
  * `background`. Opened bare (a pasted address, a link from a notification,
  * Enter in a list) it is the task's own page. A phone has room for one

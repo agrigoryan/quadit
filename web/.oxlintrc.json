@@ -105,7 +105,7 @@
     // relative imports and layers, so these files warn on both; take a file
     // off its list once it imports only what its layer allows.
     {
-      "files": ["src/ui/markdown.tsx", "src/ui/mention-textarea.tsx"],
+      "files": ["src/ui/mention-textarea.tsx"],
       "rules": {
         "no-restricted-imports": [
           "warn",
@@ -134,18 +134,7 @@
       }
     },
     {
-      "files": [
-        "src/detail/task-view.tsx",
-        "src/docs/routes.tsx",
-        "src/docs/tree/sidebar-docs.tsx",
-        "src/insights/plan/cycle-page.tsx",
-        "src/insights/plan/epic-page.tsx",
-        "src/insights/timeline/timeline-page.tsx",
-        "src/settings/routes.tsx",
-        "src/tasks/group-header.tsx",
-        "src/tasks/task-link.ts",
-        "src/tasks/tasks-page.tsx"
-      ],
+      "files": ["src/insights/plan/cycle-page.tsx", "src/insights/plan/epic-page.tsx"],
       "rules": {
         "no-restricted-imports": [
           "warn",

@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n";
 import { useKeySequences, usePendingKey } from "@/lib/key-sequence";
 import { useStore } from "@/lib/store";
 import { DESTINATIONS, destinationPath, listedName, type Where } from "@/shell/destinations";
-import { projectInView } from "@/shell/project-in-view";
+import { projectInView } from "@/lib/project-in-view";
 import { Kbd } from "@/ui/kbd";
 
 const PREFIX = "g";

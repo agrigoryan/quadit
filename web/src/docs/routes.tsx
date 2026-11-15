@@ -14,7 +14,7 @@ import { ProjectDocsHome } from "@/docs/project-home";
 import { DocsTree } from "@/docs/tree/docs-tree";
 import { createAndOpen } from "@/docs/tree/new-page";
 import type { Doc } from "@/docs/types";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { ProjectGlyph } from "@/ui/project-glyph";

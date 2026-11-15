@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import remarkGfm from "remark-gfm";
 import { cx } from "@/lib/cx";
 import { useStore } from "@/lib/store";
-import { useTaskLink } from "@/tasks/task-link";
+import { useTaskLink } from "@/lib/task-link";
 
 // Markdown as the server stores it, with two additions shown as links:
 // @handle of a real member, and a task key such as SVA-12.

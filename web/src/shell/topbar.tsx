@@ -3,7 +3,7 @@ import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
 import { ConnectionIndicator } from "@/shell/connection";
-import { RestLoadingHint } from "@/shell/rest-note";
+import { RestLoadingHint } from "@/ui/rest-note";
 import { UserMenu } from "@/shell/user-menu";
 import { Button, IconButton } from "@/ui/button";
 import { Kbd } from "@/ui/kbd";

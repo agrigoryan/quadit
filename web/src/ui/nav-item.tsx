@@ -1,3 +1,5 @@
+// One destination in a navigation list: an icon, a label and a count.
+
 import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import { cx } from "@/lib/cx";

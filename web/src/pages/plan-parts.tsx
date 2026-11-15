@@ -12,7 +12,7 @@ import { type Dict, useRestLoaded } from "@/lib/store";
 import { CATEGORIES, type Task } from "@/lib/types";
 import { emptyTally, type Tally } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";
-import { RestLoadingNote } from "@/shell/rest-note";
+import { RestLoadingNote } from "@/ui/rest-note";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 
 /** A project's live tasks by the epic or cycle they are in, in status order. */

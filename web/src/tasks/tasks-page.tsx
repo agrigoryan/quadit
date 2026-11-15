@@ -1,7 +1,7 @@
 import { useParams } from "react-router";
 import { useProjectByKey, useViews } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { normalizeQuery } from "@/tasks/filters";
 import { TasksView } from "@/tasks/tasks-view";
 

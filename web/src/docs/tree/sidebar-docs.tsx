@@ -13,7 +13,7 @@ import { PageIcon } from "@/docs/page-icon";
 import { marksProject, ProjectMark } from "@/docs/project-mark";
 import { setOpen, useTreeState } from "@/docs/tree/state";
 import type { Doc } from "@/docs/types";
-import { NavSection } from "@/shell/nav-item";
+import { NavSection } from "@/ui/nav-item";
 
 const MAX_DEPTH = 3;
 

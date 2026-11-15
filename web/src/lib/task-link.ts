@@ -14,8 +14,8 @@ import { createContext, useContext, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
-import { pageUnder } from "@/shell/project-in-view";
-import { leaveForPage } from "@/tasks/task-queue";
+import { pageUnder } from "@/lib/project-in-view";
+import { leaveForPage } from "@/lib/task-queue";
 
 export const taskPath = (slug: string, key: string) => `/${slug}/task/${key}`;
 
@@ -74,7 +74,7 @@ export function useTaskNav() {
         void navigate(at(key, anchor), { state: { background: under ?? location }, replace });
       },
       page(key: string, anchor?: string) {
-        // The page takes the order of the list it leaves with it, for its next and previous (tasks/task-queue.ts).
+        // The page takes the order of the list it leaves with it, for its next and previous (lib/task-queue.ts).
         const from = leaveForPage();
         void navigate(at(key, anchor), { replace, state: from ? { from } : undefined });
       },

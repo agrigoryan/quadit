@@ -12,7 +12,7 @@ import { useMinute } from "@/lib/tick";
 import { ago, exact } from "@/lib/time";
 import { nameOf } from "@/detail/data";
 import { ProjectGlyph } from "@/ui/project-glyph";
-import { useTaskLink } from "@/tasks/task-link";
+import { useTaskLink } from "@/lib/task-link";
 import { LabelChip } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

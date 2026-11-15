@@ -1,3 +1,6 @@
+// A note shown while finished tasks are still loading, so an empty list is
+// not read as "none".
+
 import { useEffect, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";

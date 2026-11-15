@@ -6,7 +6,7 @@ import { type Location, matchPath, type NavigateFunction } from "react-router";
 import { getState } from "@/lib/store";
 import { projectDocs, workspaceDocs } from "@/docs/area";
 import { getDocs, inProject } from "@/docs/data";
-import { isTaskPath, taskPath } from "@/tasks/task-link";
+import { isTaskPath, taskPath } from "@/lib/task-link";
 
 let navigate: NavigateFunction | null = null;
 let location: Location | null = null;
@@ -34,7 +34,7 @@ export function openDoc(id: string) {
   else window.location.assign(docPath(id));
 }
 
-/** A panel already open over the page gives its place to the next task (see tasks/task-link.ts). */
+/** A panel already open over the page gives its place to the next task (see lib/task-link.ts). */
 const panelOpen = () => isTaskPath(window.location.pathname);
 
 /** Opens a task's panel over the page that is showing. */

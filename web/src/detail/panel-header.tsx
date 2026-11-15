@@ -27,7 +27,7 @@ import type { Task } from "@/lib/types";
 import type { TaskLayout } from "@/detail/task-body";
 import type { QueuePlace } from "@/detail/task-view";
 import { restoreTasks, trashTasks } from "@/tasks/actions";
-import { taskPath } from "@/tasks/task-link";
+import { taskPath } from "@/lib/task-link";
 import { Button, IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 

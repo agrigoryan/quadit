@@ -8,7 +8,7 @@ import { usePageTitle } from "@/lib/ui-state";
 import { anchorOf, archive, markAllRead, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { InboxRow } from "@/pages/inbox-row";
 import { type OpenAs, useListKeys } from "@/pages/list-keys";
-import { useTaskNav } from "@/tasks/task-link";
+import { useTaskNav } from "@/lib/task-link";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 

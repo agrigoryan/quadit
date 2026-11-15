@@ -7,7 +7,7 @@ import { useProjects, useSlug, useUnreadCount, useViews } from "@/lib/selectors"
 import type { Project } from "@/lib/types";
 import { ui, useUi } from "@/lib/ui-state";
 import { type DestinationGroup, destinationPath, goKeys, placesIn } from "@/shell/destinations";
-import { NavItem, NavSection } from "@/shell/nav-item";
+import { NavItem, NavSection } from "@/ui/nav-item";
 import { WorkspaceSwitcher } from "@/shell/workspace-switcher";
 import { IconButton } from "@/ui/button";
 import { ProjectGlyph } from "@/ui/project-glyph";

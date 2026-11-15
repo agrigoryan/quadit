@@ -7,7 +7,7 @@ import { useDecisionFlag, useSubtaskProgress } from "@/lib/selectors";
 import { useIsDraft, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
-import { useTaskLink } from "@/tasks/task-link";
+import { useTaskLink } from "@/lib/task-link";
 import { AssigneeAvatar, DueChip, EpicChip, WaitsOnChip } from "@/tasks/task-chips";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon, StatusIcon } from "@/ui/icons";

@@ -12,8 +12,8 @@ import { useFileDrop } from "@/detail/file-drop";
 import { PanelHeader, TrashBanner } from "@/detail/panel-header";
 import { useRevealFromHash } from "@/detail/reveal-hash";
 import { TaskBody, type TaskLayout } from "@/detail/task-body";
-import { LostProject, useLostProject } from "@/shell/placeholders";
-import { isTaskPath } from "@/tasks/task-link";
+import { LostProject, useLostProject } from "@/ui/not-found";
+import { isTaskPath } from "@/lib/task-link";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 

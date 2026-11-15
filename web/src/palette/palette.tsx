@@ -13,8 +13,8 @@ import { RootPage } from "@/palette/palette-root";
 import { useFocusReturn } from "@/palette/focus-return";
 import { useServerSearch } from "@/palette/palette-search";
 import { focusPage } from "@/shell/page-focus";
-import { pageUnder, projectInView } from "@/shell/project-in-view";
-import { useTaskNav } from "@/tasks/task-link";
+import { pageUnder, projectInView } from "@/lib/project-in-view";
+import { useTaskNav } from "@/lib/task-link";
 import { Spinner } from "@/ui/spinner";
 
 /**

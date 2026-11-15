@@ -23,7 +23,7 @@ import { useStore } from "@/lib/store";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/lib/types";
 import { anchorOf, archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
-import { useTaskLink } from "@/tasks/task-link";
+import { useTaskLink } from "@/lib/task-link";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { DecisionMark } from "@/ui/icons";

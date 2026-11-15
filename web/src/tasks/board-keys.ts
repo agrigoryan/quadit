@@ -12,8 +12,8 @@ import { usePlace } from "@/lib/place";
 import { isDraft } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import type { TaskGroup } from "@/tasks/filters";
-import { usePeek, useTaskNav } from "@/tasks/task-link";
-import { takeSeen, useTaskOrder } from "@/tasks/task-queue";
+import { usePeek, useTaskNav } from "@/lib/task-link";
+import { takeSeen, useTaskOrder } from "@/lib/task-queue";
 
 /** Space on a focused button presses it. A card is a link: Space is free there. */
 const onButton = (e: KeyboardEvent) =>

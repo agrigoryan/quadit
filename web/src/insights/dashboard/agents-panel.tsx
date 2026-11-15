@@ -12,7 +12,7 @@ import type { AgentState } from "@/insights/lib/types";
 import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-bits";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
-import { useTaskLink } from "@/tasks/task-link";
+import { useTaskLink } from "@/lib/task-link";
 import { Avatar } from "@/ui/avatar";
 
 function TaskRef({ taskKey, title }: { taskKey: string; title?: string }) {

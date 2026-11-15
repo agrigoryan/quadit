@@ -5,7 +5,7 @@ import { formatNumber, t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
 import { useRestLoaded, useStore } from "@/lib/store";
 import { isOpenCategory } from "@/lib/types";
-import { RestLoadingNote } from "@/shell/rest-note";
+import { RestLoadingNote } from "@/ui/rest-note";
 import { NONE, type TaskGroup } from "@/tasks/filters";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";

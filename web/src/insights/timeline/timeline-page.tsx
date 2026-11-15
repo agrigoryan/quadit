@@ -17,7 +17,7 @@ import { Backdrop, ScaleHeader } from "@/insights/timeline/header";
 import { LayoutTabs } from "@/insights/timeline/layout-tabs";
 import { EpicRow, KEYS_HINT_ID, NoteRow, TaskLineRow } from "@/insights/timeline/rows";
 import { DAY_WIDTH, frame, grow, type Scale, widthOf, xOf, type Zoom } from "@/insights/timeline/scale";
-import { NotFoundPage } from "@/shell/placeholders";
+import { NotFoundPage } from "@/ui/not-found";
 import { Button, IconButton } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 
