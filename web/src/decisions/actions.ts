@@ -3,11 +3,11 @@
 
 import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
-import { mutate, send } from "@/lib/mutate";
+import { mutate, send } from "@/data/mutate";
 import { after } from "@/lib/rank";
 import type { FileRole } from "@/decisions/data";
-import { getRows } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getRows } from "@/data/selectors";
+import { getState } from "@/data/store";
 import type { Decision, FileRow, Outcome } from "@/types/core";
 
 const meId = () => getState().me?.user_id ?? "";

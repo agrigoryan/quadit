@@ -7,7 +7,7 @@ import { CircleSlash, CornerDownRight, Paperclip, X } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useMe, useMember, useMembers } from "@/lib/selectors";
+import { useMe, useMember, useMembers } from "@/data/selectors";
 import type { FileRow, Task } from "@/types/core";
 import { addDraftFiles, createComment, editDraft, EMPTY_DRAFT, useDrafts } from "@/detail/comment-actions";
 import { nameOf } from "@/detail/data";

@@ -4,8 +4,8 @@
 import { Compass, Lock } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { t } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useSlug } from "@/data/selectors";
+import { useStore } from "@/data/store";
 import { usePageTitle } from "@/lib/ui-state";
 import { EmptyState } from "@/ui/empty";
 

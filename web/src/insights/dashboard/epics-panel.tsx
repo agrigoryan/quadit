@@ -5,7 +5,7 @@ import { TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
+import { useSlug } from "@/data/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
 import type { EpicProgress } from "@/insights/lib/types";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";

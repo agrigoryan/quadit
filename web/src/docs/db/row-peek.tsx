@@ -3,7 +3,7 @@ import { ChevronsRight, Maximize2, Trash2 } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useRow, useSlug } from "@/lib/selectors";
+import { useRow, useSlug } from "@/data/selectors";
 import { trashDoc } from "@/docs/actions";
 import { docTitle } from "@/docs/data";
 import { IconButton } from "@/ui/button";

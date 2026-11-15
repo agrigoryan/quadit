@@ -32,7 +32,7 @@ test("a change an agent makes from the CLI shows without a reload", async ({ pag
   await expect(properties.getByRole("button", { name: "Status: In Progress" })).toBeVisible();
 });
 
-// Opening a task fetches it whole (lib/task-detail.ts loadTask). A change that
+// Opening a task fetches it whole (data/task-detail.ts loadTask). A change that
 // arrives through the live stream while that fetch is on its way must not be
 // overwritten by the older fetched copy. Here the fetch is held until the
 // change has arrived, which makes the race certain.

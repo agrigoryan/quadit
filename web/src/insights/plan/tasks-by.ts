@@ -1,8 +1,8 @@
 // A project's tasks grouped by their epic or their cycle.
 
 import { useMemo } from "react";
-import { useLiveTasks, useLookup } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { useLiveTasks, useLookup } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import { CATEGORIES, type Task } from "@/types/core";
 
 /** A project's live tasks by the epic or cycle they are in, in status order. */

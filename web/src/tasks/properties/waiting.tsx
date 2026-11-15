@@ -4,11 +4,11 @@
 
 import { useMemo, useState } from "react";
 import { Globe } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useListening } from "@/lib/listening";
-import { useMe, useMember, useMembers } from "@/lib/selectors";
+import { useListening } from "@/data/listening";
+import { useMe, useMember, useMembers } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { nameOf, who } from "@/detail/data";
 import { setWaitingOn, setWaitingOutside, waitsOutside } from "@/tasks/actions";

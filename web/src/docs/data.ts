@@ -3,8 +3,8 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useLookup, useMe, useRows as useLiveRows } from "@/lib/selectors";
-import { type Dict, getState } from "@/lib/store";
+import { useLookup, useMe, useRows as useLiveRows } from "@/data/selectors";
+import { type Dict, getState } from "@/data/store";
 import { useDocsStore } from "@/docs/store";
 import type { DBProperty, DBView, Doc, DocComment } from "@/types/docs";
 

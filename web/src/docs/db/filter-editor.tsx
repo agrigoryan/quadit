@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useMembers } from "@/lib/selectors";
+import { useMembers } from "@/data/selectors";
 import { setViewConfig } from "@/docs/db/actions";
 import { optionsOf } from "@/docs/db/options";
 import { PropIcon } from "@/docs/db/prop-meta";

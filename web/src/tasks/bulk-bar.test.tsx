@@ -7,9 +7,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@/lib/api";
-import { clearOutbox } from "@/lib/mutate";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { api } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, Project, Task, User, Workspace } from "@/types/core";
 import { BulkBar } from "@/tasks/bulk-bar";
 import { TooltipProvider } from "@/ui/tooltip";

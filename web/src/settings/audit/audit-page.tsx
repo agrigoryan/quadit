@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { workspacePath } from "@/lib/api";
+import { workspacePath } from "@/data/api";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug } from "@/data/selectors";
 import { AuditLog } from "@/admin/audit-log";
 import { useSettingsBase } from "@/settings/base";
 

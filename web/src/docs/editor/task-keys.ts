@@ -4,7 +4,7 @@
 // brackets ("[[Art guide]]", when exactly one page has that title).
 
 import { SuggestionMenu } from "@blocknote/core/extensions";
-import { getTaskByKeyEvenIfGone } from "@/lib/selectors";
+import { getTaskByKeyEvenIfGone } from "@/data/selectors";
 import { findDecision } from "@/docs/editor/decision-refs";
 import { pageByTitle } from "@/docs/editor/refs";
 import type { AnyEditor } from "@/docs/editor/sync";

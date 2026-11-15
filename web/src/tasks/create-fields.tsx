@@ -4,7 +4,7 @@
 
 import { CircleSlash, FileStack } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useTemplates } from "@/lib/selectors";
+import { useTemplates } from "@/data/selectors";
 import { CREATE } from "@/tasks/properties";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { type CreateProps, NONE } from "@/tasks/properties/property";

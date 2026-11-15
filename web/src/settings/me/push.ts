@@ -5,7 +5,7 @@
 
 import { registerServiceWorker } from "@/auth/pwa";
 import { fromBase64Url } from "@/auth/webauthn";
-import { api } from "@/lib/api";
+import { api } from "@/data/api";
 
 /** unsupported: this browser cannot; blocked: the person said no in the browser; off / on: for this device. */
 export type PushState = "unsupported" | "blocked" | "off" | "on";

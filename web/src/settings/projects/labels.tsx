@@ -1,11 +1,11 @@
 import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { mutate, send } from "@/lib/mutate";
-import { useRows } from "@/lib/selectors";
+import { mutate, send } from "@/data/mutate";
+import { useRows } from "@/data/selectors";
 import type { Label, Project } from "@/types/core";
 import { useTasksOutOfTrash } from "@/settings/projects/data";
 import { ColorButton } from "@/settings/projects/color-button";

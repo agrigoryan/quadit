@@ -1,10 +1,10 @@
 import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { type ChangeSpec, mutate, send } from "@/lib/mutate";
-import { useMembers } from "@/lib/selectors";
+import { type ChangeSpec, mutate, send } from "@/data/mutate";
+import { useMembers } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import {
   AGENT_FIELDS,
@@ -16,7 +16,7 @@ import {
 } from "@/settings/agents/agent-form";
 import { ListeningMark, StateBadge } from "@/settings/agents/agents";
 import { type AgentMember } from "@/settings/agents/data";
-import { useAgentStates } from "@/lib/listening";
+import { useAgentStates } from "@/data/listening";
 import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helper-agents";
 import { AgentTokens } from "@/settings/agents/tokens";
 import { useSettingsBase } from "@/settings/base";

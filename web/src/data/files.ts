@@ -9,9 +9,9 @@
 // only: reloading the page drops it, so the browser asks before leaving.
 
 import { create } from "zustand";
-import { api, ApiError, calledOff, NetworkError, whenReachable, workspacePath } from "@/lib/api";
+import { api, ApiError, calledOff, NetworkError, whenReachable, workspacePath } from "@/data/api";
 import { newId } from "@/lib/ids";
-import { getState } from "@/lib/store";
+import { getState } from "@/data/store";
 import type { FileRow } from "@/types/core";
 import { localPath } from "@/lib/url";
 

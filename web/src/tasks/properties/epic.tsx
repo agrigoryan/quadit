@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Layers } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { getRowEvenIfGone, useEpics, useRowEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone, useEpics, useRowEvenIfGone } from "@/data/selectors";
 import { setEpic } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow } from "@/tasks/properties/panel-row";

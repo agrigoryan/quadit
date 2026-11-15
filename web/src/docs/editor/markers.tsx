@@ -4,7 +4,7 @@
 import { MessageSquare } from "lucide-react";
 import { type RefObject, useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import { tintOf } from "@/docs/presence-tint";
 import type { AnyEditor } from "@/docs/editor/sync";
 import type { PresenceEntry } from "@/types/docs";

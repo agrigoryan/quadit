@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { MonitorSmartphone } from "lucide-react";
-import { api } from "@/lib/api";
+import { api } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { summariseAgent } from "@/settings/me/user-agent";
 import { Fact } from "@/ui/fact";
@@ -10,7 +10,7 @@ import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Row, Rows, Section } from "@/ui/page-layout";
 import { accountKeys } from "@/settings/me/account";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 

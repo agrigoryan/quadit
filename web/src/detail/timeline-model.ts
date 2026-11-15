@@ -4,7 +4,7 @@
 // removed) are quiet lines, so the record has no holes.
 
 import { t } from "@/lib/i18n";
-import type { Dict } from "@/lib/store";
+import type { Dict } from "@/data/store";
 import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/types/core";
 import { type Known, knownRows, type StoredRows } from "@/detail/timeline-known";
 import {

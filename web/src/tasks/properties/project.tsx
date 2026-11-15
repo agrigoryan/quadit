@@ -2,7 +2,7 @@
 
 import { FolderInput } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useProjects } from "@/lib/selectors";
+import { useProjects } from "@/data/selectors";
 import { moveToProject } from "@/tasks/actions";
 import { asText, shared, type TaskProperty } from "@/tasks/properties/property";
 import { projectItems } from "@/tasks/property-picker";

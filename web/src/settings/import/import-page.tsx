@@ -4,7 +4,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useProjects, useSlug } from "@/lib/selectors";
+import { useProjects, useSlug } from "@/data/selectors";
 import { githubRepo, isWebAddress } from "@/lib/url";
 import { useSettingsBase } from "@/settings/base";
 import {

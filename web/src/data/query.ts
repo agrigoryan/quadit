@@ -1,4 +1,4 @@
-// Reads of what the workspace copy (lib/store.ts) does not hold: settings
+// Reads of what the workspace copy (data/store.ts) does not hold: settings
 // lists, an opened task's history, a page's blocks, the trash, the admin
 // pages. They go through TanStack Query; this file is the one client and
 // every rule it runs on. A feature names its keys in its data.ts and says
@@ -9,7 +9,7 @@
 // The rules, and why:
 // - Stale at once (staleTime 0): a page that opens asks again, as the app
 //   always has, and shows the answer it had meanwhile. Reads that follow the
-//   feed are asked again by the feed (lib/live.ts).
+//   feed are asked again by the feed (data/live.ts).
 // - Not again on window focus: what changes behind a page's back reaches it
 //   through the feed, or when the stream comes back.
 // - Tried again only when the server could not be reached (NetworkError), a
@@ -30,8 +30,8 @@
 //   again; at sign-out, or when the workspace is lost, every read goes.
 
 import { onlineManager, QueryCache, QueryClient } from "@tanstack/react-query";
-import { ApiError, errorMessage, NetworkError, retryWait } from "@/lib/api";
-import { getState, onReplaced, useStore } from "@/lib/store";
+import { ApiError, errorMessage, NetworkError, retryWait } from "@/data/api";
+import { getState, onReplaced, useStore } from "@/data/store";
 import { type Key, t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 

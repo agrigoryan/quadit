@@ -4,7 +4,7 @@
 
 import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
-import { mutate, send } from "@/lib/mutate";
+import { mutate, send } from "@/data/mutate";
 import { rankBetween } from "@/lib/rank";
 import { dropRow, patchRow, putRow, useDocsStore } from "@/docs/store";
 import type {
@@ -18,7 +18,7 @@ import type {
   ViewType,
 } from "@/types/docs";
 import { OPTION_COLORS } from "@/types/docs";
-import { getLookupEvenIfGone } from "@/lib/selectors";
+import { getLookupEvenIfGone } from "@/data/selectors";
 
 type Fields = Record<string, unknown>;
 

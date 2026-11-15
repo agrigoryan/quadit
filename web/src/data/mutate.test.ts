@@ -1,11 +1,11 @@
-// Edits through mutate() (lib/mutate.ts): shown at once, sent in order, sent
+// Edits through mutate() (data/mutate.ts): shown at once, sent in order, sent
 // again unchanged when the server cannot be reached, undone when refused.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, NetworkError, noteReachable } from "@/lib/api";
-import { clearOutbox, mutate, restoreQueue } from "@/lib/mutate";
-import { outbox, type OutboxItem } from "@/lib/outbox";
-import { applyEvents, clearStore, getState, loadBootstrap } from "@/lib/store";
+import { api, ApiError, NetworkError, noteReachable } from "@/data/api";
+import { clearOutbox, mutate, restoreQueue } from "@/data/mutate";
+import { outbox, type OutboxItem } from "@/data/outbox";
+import { applyEvents, clearStore, getState, loadBootstrap } from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { ChangeResult, FeedEvent, Member, User, Workspace } from "@/types/core";
 

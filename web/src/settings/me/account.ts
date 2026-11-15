@@ -6,9 +6,9 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { loadSession } from "@/auth/session";
-import { api } from "@/lib/api";
-import { queryClient } from "@/lib/query";
-import { useStore } from "@/lib/store";
+import { api } from "@/data/api";
+import { queryClient } from "@/data/query";
+import { useStore } from "@/data/store";
 import type { User } from "@/types/core";
 
 export type EmailChoice = "all" | "important" | "none";

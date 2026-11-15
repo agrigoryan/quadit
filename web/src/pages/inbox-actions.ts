@@ -1,7 +1,7 @@
 // What can be done to inbox items. Each shows at once and is sent as the
 // `notification.read` change (internal/engine/ch_inbox.go).
 
-import { send } from "@/lib/mutate";
+import { send } from "@/data/mutate";
 import type { Notification } from "@/types/core";
 
 /** "SVA-5 Jump feels floaty" as its key and its title; a title with no key stays whole. */

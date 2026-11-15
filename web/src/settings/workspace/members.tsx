@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { MoreHorizontal, Pause, Pencil, Play, UserMinus } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { mutate, send } from "@/lib/mutate";
-import { useMe, useMembers } from "@/lib/selectors";
+import { mutate, send } from "@/data/mutate";
+import { useMe, useMembers } from "@/data/selectors";
 import type { Member, Role } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";
 import { When } from "@/ui/when";

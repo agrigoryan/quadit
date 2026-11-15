@@ -6,7 +6,7 @@
 import { useRef, useState } from "react";
 import { GitFork, Link2, ListTree, Paperclip } from "lucide-react";
 import { DecisionSection } from "@/decisions/decision-section";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/types/core";

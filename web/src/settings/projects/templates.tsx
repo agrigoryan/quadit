@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { HelpCircle, Pencil, Plus, Trash2 } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t, tMaybe } from "@/lib/i18n";
-import { mutate } from "@/lib/mutate";
-import { useTemplates } from "@/lib/selectors";
+import { mutate } from "@/data/mutate";
+import { useTemplates } from "@/data/selectors";
 import type { Project, Template } from "@/types/core";
 import { TemplateDialog } from "@/settings/projects/template-dialog";
 import { ConfirmDialog } from "@/ui/confirm-dialog";

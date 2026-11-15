@@ -6,7 +6,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useViewer } from "@/decisions/data";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Decision, Member, Task, User, Workspace } from "@/types/core";
 
 const decision = {

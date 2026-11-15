@@ -1,8 +1,8 @@
-// When to try again (lib/api.ts): whenReachable's waits, and what ends them early; and a
+// When to try again (data/api.ts): whenReachable's waits, and what ends them early; and a
 // request called off is not a network failure.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, NetworkError, noteReachable, onReachableAgain, whenReachable } from "@/lib/api";
+import { api, ApiError, NetworkError, noteReachable, onReachableAgain, whenReachable } from "@/data/api";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 
 let server: FakeServer;

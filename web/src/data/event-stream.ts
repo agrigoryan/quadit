@@ -9,7 +9,7 @@
 // instead of a bare "error".
 //
 // This only reads one connection. Opening it again (from the last position
-// applied) is the caller's business: lib/sync.ts.
+// applied) is the caller's business: data/sync.ts.
 
 import type { FeedEvent } from "@/types/core";
 

@@ -15,11 +15,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { DropdownMenu as RMenu } from "radix-ui";
-import { ApiError, errorMessage } from "@/lib/api";
+import { ApiError, errorMessage } from "@/data/api";
 import { t, tMaybe } from "@/lib/i18n";
-import { mutate, send } from "@/lib/mutate";
+import { mutate, send } from "@/data/mutate";
 import { rankBetween } from "@/lib/rank";
-import { useStatuses } from "@/lib/selectors";
+import { useStatuses } from "@/data/selectors";
 import { CATEGORIES, type Category, type Project, type Status } from "@/types/core";
 import { SWATCHES } from "@/lib/swatches";
 import { Button, IconButton } from "@/ui/button";

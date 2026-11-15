@@ -1,14 +1,14 @@
 // Every way the app changes a page, in one place. Each function shows the
-// change at once and sends it as a named change (see lib/mutate.ts).
+// change at once and sends it as a named change (see data/mutate.ts).
 
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { mutate, send } from "@/lib/mutate";
+import { mutate, send } from "@/data/mutate";
 import { rankBetween } from "@/lib/rank";
-import { getLookupEvenIfGone, getRow, getRowEvenIfGone, getRows } from "@/lib/selectors";
-import { isNotFound, readError } from "@/lib/query";
-import { getState } from "@/lib/store";
+import { getLookupEvenIfGone, getRow, getRowEvenIfGone, getRows } from "@/data/selectors";
+import { isNotFound, readError } from "@/data/query";
+import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import { sameProjectBelow } from "@/docs/data";
 import { loadPage } from "@/docs/store";

@@ -18,7 +18,7 @@ import {
   useCreateBlockNote,
 } from "@blocknote/react";
 import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { uploadFile } from "@/lib/files";
+import { uploadFile } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { type BlockSchemaLike, type EdBlock, plainText, rowsToEditor } from "@/docs/editor/convert";
 import { Markers } from "@/docs/editor/markers";

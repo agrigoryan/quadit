@@ -2,8 +2,8 @@
 // holds, what waits on it, and its place in the queues of shared resources.
 
 import { useMemo } from "react";
-import { useLiveTasks, useLookup, useOpenDecisions, useRows } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { useLiveTasks, useLookup, useOpenDecisions, useRows } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import { type Decision, isOpenCategory, type Task } from "@/types/core";
 import type { Claim, Resource } from "@/types/agents";
 

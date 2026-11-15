@@ -1,10 +1,10 @@
 import { FileQuestion, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { isNotFound, readError } from "@/lib/query";
-import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
+import { isNotFound, readError } from "@/data/query";
+import { useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { restoreDoc } from "@/docs/actions";
 import { docTitle } from "@/docs/data";

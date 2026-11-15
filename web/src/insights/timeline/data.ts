@@ -3,8 +3,8 @@
 
 import type { Changes } from "@/types/changes.gen";
 import { useMemo } from "react";
-import { type ChangeSpec, send } from "@/lib/mutate";
-import { useEpics, useLiveTasks, useLookup, useRows } from "@/lib/selectors";
+import { type ChangeSpec, send } from "@/data/mutate";
+import { useEpics, useLiveTasks, useLookup, useRows } from "@/data/selectors";
 import { type Category, type Epic, isCanceledCategory, isDoneCategory, type Milestone, type Task } from "@/types/core";
 import { dayFromNumber, dayNumber } from "@/lib/days";
 import { localDay } from "@/lib/time";

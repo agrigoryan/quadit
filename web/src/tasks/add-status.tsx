@@ -3,10 +3,10 @@
 
 import { type FormEvent, useState } from "react";
 import { Plus } from "lucide-react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { mutate } from "@/lib/mutate";
+import { mutate } from "@/data/mutate";
 import { rankBetween } from "@/lib/rank";
 import { CATEGORIES, type Category, type Project } from "@/types/core";
 import { projectStatuses } from "@/tasks/data";

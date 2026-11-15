@@ -6,12 +6,12 @@
 
 import { BlockNoteEditor } from "@blocknote/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mutate } from "@/lib/mutate";
+import { mutate } from "@/data/mutate";
 import { schema } from "@/docs/editor/schema";
 import { DocSync } from "@/docs/editor/sync";
 import type { BlockRow } from "@/types/docs";
 
-vi.mock("@/lib/mutate", () => ({ mutate: vi.fn(() => Promise.resolve([{ seq: 10 }])) }));
+vi.mock("@/data/mutate", () => ({ mutate: vi.fn(() => Promise.resolve([{ seq: 10 }])) }));
 vi.mock("@/docs/store", () => ({ loadPage: vi.fn() }));
 
 const row = (id: string, rank: string, text: string, seq: number): BlockRow => ({

@@ -4,7 +4,7 @@ import { Search } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { matchPath, useLocation, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
-import { useSlug, useTaskByKeyEvenIfGone } from "@/lib/selectors";
+import { useSlug, useTaskByKeyEvenIfGone } from "@/data/selectors";
 import { ui, useUi } from "@/lib/ui-state";
 import { ChoicesPage } from "@/palette/palette-choices";
 import type { MakePage, PalettePage } from "@/palette/palette-commands";

@@ -6,9 +6,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { restoreDoc } from "@/docs/actions";
-import { api, ApiError } from "@/lib/api";
-import { getRowEvenIfGone } from "@/lib/selectors";
-import { clearStore, loadBootstrap, useStore } from "@/lib/store";
+import { api, ApiError } from "@/data/api";
+import { getRowEvenIfGone } from "@/data/selectors";
+import { clearStore, loadBootstrap, useStore } from "@/data/store";
 import { useToasts } from "@/lib/toast";
 import type { Member, User, Workspace } from "@/types/core";
 import "@/test/query";

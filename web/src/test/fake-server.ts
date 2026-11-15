@@ -1,4 +1,4 @@
-// The server, for tests of what talks to it through lib/api.ts: a `fetch`
+// The server, for tests of what talks to it through data/api.ts: a `fetch`
 // that answers by path. A test says what each path answers, can hold a path's
 // answers back to decide when (and whether) each arrives, and can take the
 // whole server away.

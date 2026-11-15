@@ -2,7 +2,7 @@
 // them by id. This finds one from the other.
 
 import { useMemo } from "react";
-import { useLookupEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import type { Member } from "@/types/core";
 
 /** Members by handle, without the "@". */

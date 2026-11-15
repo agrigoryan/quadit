@@ -5,10 +5,10 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { FileWarning, ListTodo, Plus, SearchX } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { send } from "@/lib/mutate";
-import { useCan } from "@/lib/access";
-import { useLiveTasks, useLookup, useLookupEvenIfGone, useMe, useOpenDecisions } from "@/lib/selectors";
-import { useRestLoaded } from "@/lib/store";
+import { send } from "@/data/mutate";
+import { useCan } from "@/data/access";
+import { useLiveTasks, useLookup, useLookupEvenIfGone, useMe, useOpenDecisions } from "@/data/selectors";
+import { useRestLoaded } from "@/data/store";
 import { toast } from "@/lib/toast";
 import { isOpenCategory, type Project, type View } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";

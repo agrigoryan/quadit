@@ -7,7 +7,7 @@ import { Archive, ChevronRight, MoreHorizontal, Plus, RotateCcw, Trash2 } from "
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useMember, useRow, useRowEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone, useMember, useRow, useRowEvenIfGone } from "@/data/selectors";
 import { useMinute } from "@/lib/tick";
 import { ago, exact } from "@/lib/time";
 import { nameOf } from "@/detail/data";

@@ -6,7 +6,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, expect, it } from "vitest";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { WaitingPanel } from "@/insights/dashboard/waiting-panel";
 import { TooltipProvider } from "@/ui/tooltip";

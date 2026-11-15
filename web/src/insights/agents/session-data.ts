@@ -6,10 +6,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { inWorkspace, readError } from "@/lib/query";
-import { getRow, useRows, useSlug } from "@/lib/selectors";
-import { getState, mergeRows } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace, readError } from "@/data/query";
+import { getRow, useRows, useSlug } from "@/data/selectors";
+import { getState, mergeRows } from "@/data/store";
 import type { AgentSession } from "@/types/core";
 
 /**

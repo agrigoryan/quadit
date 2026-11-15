@@ -2,7 +2,7 @@
 // name, and Enter makes it in the project in view.
 
 import { Plus } from "lucide-react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { CATEGORIES, type Project } from "@/types/core";

@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ArchiveRestore, CircleAlert, CircleCheck, Download, LoaderCircle } from "lucide-react";
-import { api, errorMessage } from "@/lib/api";
-import { fileSize } from "@/lib/files";
+import { api, errorMessage } from "@/data/api";
+import { fileSize } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -16,7 +16,7 @@ import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, SwitchRow } from "@/ui/form";
 import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
 import { adminKeys } from "@/admin/data";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 
 export interface Backup {
   id: string;

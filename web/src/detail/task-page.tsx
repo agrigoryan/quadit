@@ -5,7 +5,7 @@
 // previous task of that list, in the same step of the browser's history.
 
 import { useLocation, useNavigate, useParams } from "react-router";
-import { useSlug } from "@/lib/selectors";
+import { useSlug } from "@/data/selectors";
 import { type QueuePlace, TaskView } from "@/detail/task-view";
 import { taskPath } from "@/lib/task-link";
 import { cameFrom, markSeen, placeInQueue } from "@/lib/task-queue";

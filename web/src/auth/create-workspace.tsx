@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { AuthLayout } from "@/auth/auth-layout";
 import { slugFrom, useCanCreateWorkspace } from "@/auth/config";
 import { createWorkspace, signOut, useSession } from "@/auth/session";
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { FormField, refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";

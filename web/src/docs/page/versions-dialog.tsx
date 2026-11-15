@@ -5,11 +5,11 @@
 import { BookmarkPlus, History } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useState } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { queryClient } from "@/lib/query";
+import { api, workspacePath } from "@/data/api";
+import { queryClient } from "@/data/query";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { keepVersion, revertTo } from "@/docs/actions";

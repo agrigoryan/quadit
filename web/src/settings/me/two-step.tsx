@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";

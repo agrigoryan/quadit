@@ -1,10 +1,10 @@
 import { type FormEvent, useState } from "react";
 import { Bookmark, Ellipsis, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { mutate, send } from "@/lib/mutate";
-import { useSlug } from "@/lib/selectors";
+import { mutate, send } from "@/data/mutate";
+import { useSlug } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import type { Project, SortBy, View } from "@/types/core";
 import { toQuery } from "@/tasks/filters";

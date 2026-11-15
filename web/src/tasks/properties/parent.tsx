@@ -4,9 +4,9 @@
 import { useCallback, useMemo } from "react";
 import { ArrowUpRight, CircleSlash, CornerLeftUp } from "lucide-react";
 import { Link } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { getRowEvenIfGone, useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone, useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/data/selectors";
 import { useTaskLink } from "@/lib/task-link";
 import type { Task } from "@/types/core";
 import { TaskPicker } from "@/detail/task-picker";

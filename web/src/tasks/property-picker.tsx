@@ -17,7 +17,7 @@ export const noneItem = (label: string): PickerItem => ({
   icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden />,
 });
 
-/** Says whether something is listening for an agent; nothing for a person. From useListening (lib/listening.ts). */
+/** Says whether something is listening for an agent; nothing for a person. From useListening (data/listening.ts). */
 export type Listening = (member: Member | undefined) => boolean | undefined;
 
 /** People and agents as picker rows, "me" first. With `listening`, each agent shows whether anything waits for its work. */

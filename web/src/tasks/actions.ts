@@ -5,10 +5,10 @@
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { type ChangeSpec, mutate, send } from "@/lib/mutate";
+import { type ChangeSpec, mutate, send } from "@/data/mutate";
 import { rankBetween } from "@/lib/rank";
-import { getRow, getRows } from "@/lib/selectors";
-import { draftKey, getState } from "@/lib/store";
+import { getRow, getRows } from "@/data/selectors";
+import { draftKey, getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import { isOpenCategory, type Status, type Task } from "@/types/core";
 import { projectStatuses } from "@/tasks/data";

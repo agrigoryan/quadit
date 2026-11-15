@@ -4,8 +4,8 @@
 // marks beside blocks).
 
 import { useEffect, useEffectEvent, useRef } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { getState } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { getState } from "@/data/store";
 import { setPresence } from "@/docs/store";
 import type { PresenceEntry } from "@/types/docs";
 

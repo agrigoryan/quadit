@@ -1,8 +1,8 @@
-// What a member may do (lib/access.ts), against the server's rules: each
+// What a member may do (data/access.ts), against the server's rules: each
 // kind of member, each question.
 
 import { describe, expect, it } from "vitest";
-import { can } from "@/lib/access";
+import { can } from "@/data/access";
 import type { Member } from "@/types/core";
 
 const member = (over: Partial<Member>): Member =>

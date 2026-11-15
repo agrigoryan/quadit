@@ -5,9 +5,9 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@/lib/api";
-import { clearOutbox } from "@/lib/mutate";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { api } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, Project, Status, User, Workspace } from "@/types/core";
 import { StatusMenu } from "@/tasks/status-menu";
 import { WithQuery } from "@/test/query";

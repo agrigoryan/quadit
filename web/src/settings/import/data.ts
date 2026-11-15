@@ -2,7 +2,7 @@
 // call that reads it (POST /import). The server reads an uploaded export or
 // an address, and writes what it finds as the person who asked.
 
-import { api, workspacePath } from "@/lib/api";
+import { api, workspacePath } from "@/data/api";
 import { t } from "@/lib/i18n";
 
 export type ImportKind = "linear" | "asana" | "trello" | "notion" | "obsidian" | "markdown" | "github" | "orbit";

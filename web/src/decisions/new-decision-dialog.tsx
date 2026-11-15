@@ -3,12 +3,12 @@
 // and who should answer. Checked here before it is sent.
 
 import { useId, useRef, useState } from "react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
-import { useMe, useMembers, useRow } from "@/lib/selectors";
+import { useMe, useMembers, useRow } from "@/data/selectors";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { FormField } from "@/ui/form";

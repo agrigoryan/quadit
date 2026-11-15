@@ -4,12 +4,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { MessageCircleQuestion, Trash2, Undo2 } from "lucide-react";
-import { api, workspacePath } from "@/lib/api";
-import { inWorkspace, readError } from "@/lib/query";
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace, readError } from "@/data/query";
 import { formatNumber, t } from "@/lib/i18n";
-import { useCan } from "@/lib/access";
-import { useLookupEvenIfGone, useSlug, useTrashedTasks } from "@/lib/selectors";
-import { mergeRows } from "@/lib/store";
+import { useCan } from "@/data/access";
+import { useLookupEvenIfGone, useSlug, useTrashedTasks } from "@/data/selectors";
+import { mergeRows } from "@/data/store";
 import { ago, exact } from "@/lib/time";
 import type { Task } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";

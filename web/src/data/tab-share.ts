@@ -1,7 +1,7 @@
 // One lead among the tabs that have the same thing open.
 //
 // Tabs that join under one name can say things to each other, and exactly
-// one of them leads at a time (lib/sync.ts has the leader hold the live
+// one of them leads at a time (data/sync.ts has the leader hold the live
 // stream for all of them). This file hides how: the leader is whoever holds
 // a Web Lock of that name, and the tabs talk on a BroadcastChannel. When the
 // leader's tab closes, the browser gives the lock to the next tab in line.

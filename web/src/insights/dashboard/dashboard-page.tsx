@@ -6,7 +6,7 @@
 import { FolderKanban } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { t } from "@/lib/i18n";
-import { useProjectByKey, useProjects } from "@/lib/selectors";
+import { useProjectByKey, useProjects } from "@/data/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { AgentsPanel } from "@/insights/dashboard/agents-panel";
 import { DecisionsPanel } from "@/insights/dashboard/decisions-panel";
@@ -15,7 +15,7 @@ import { StatusPanel, WaitsPanel, WeeklyPanel } from "@/insights/dashboard/flow-
 import { HealthPanel } from "@/insights/dashboard/health-panel";
 import { NobodyPanel, OutsidePanel } from "@/insights/dashboard/next-move-panels";
 import { WaitingPanel } from "@/insights/dashboard/waiting-panel";
-import { useLive } from "@/lib/live";
+import { useLive } from "@/data/live";
 import type { Dashboard } from "@/insights/lib/types";
 import { PageBar } from "@/insights/ui/panel";
 import { ProjectGlyph } from "@/ui/project-glyph";

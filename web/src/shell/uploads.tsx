@@ -1,6 +1,6 @@
 import { CloudOff, Upload } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { fileSize, type Transfer, useTransfers } from "@/lib/files";
+import { fileSize, type Transfer, useTransfers } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 

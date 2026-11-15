@@ -4,12 +4,12 @@
 
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api, workspacePath } from "@/lib/api";
+import { api, workspacePath } from "@/data/api";
 import { t } from "@/lib/i18n";
-import { isNotFound, readError } from "@/lib/query";
-import { getRowEvenIfGone, sortByRank, useLookupEvenIfGone, useRows, useSlug } from "@/lib/selectors";
-import { type Dict, mergeRows } from "@/lib/store";
-import { taskKeys } from "@/lib/task-detail";
+import { isNotFound, readError } from "@/data/query";
+import { getRowEvenIfGone, sortByRank, useLookupEvenIfGone, useRows, useSlug } from "@/data/selectors";
+import { type Dict, mergeRows } from "@/data/store";
+import { taskKeys } from "@/data/task-detail";
 import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/types/core";
 
 /** An attachment whose file is known (every one the panel draws). */

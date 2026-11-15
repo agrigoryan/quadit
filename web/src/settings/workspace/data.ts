@@ -1,7 +1,7 @@
 // The workspace settings' reads that are not in the store: the
 // invitations, their shapes, and the key they are cached under.
 
-import { inWorkspace } from "@/lib/query";
+import { inWorkspace } from "@/data/query";
 import type { Role } from "@/types/core";
 
 export interface Invite {

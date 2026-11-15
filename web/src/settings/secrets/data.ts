@@ -6,11 +6,11 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Changes } from "@/types/changes.gen";
 import { useMemo } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { mutate } from "@/lib/mutate";
-import { inWorkspace } from "@/lib/query";
-import { useRows, useSlug } from "@/lib/selectors";
-import { getState, mergeRows } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { mutate } from "@/data/mutate";
+import { inWorkspace } from "@/data/query";
+import { useRows, useSlug } from "@/data/selectors";
+import { getState, mergeRows } from "@/data/store";
 import type { Secret } from "@/types/core";
 
 /**

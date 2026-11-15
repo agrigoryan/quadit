@@ -2,7 +2,7 @@
 
 import { Target } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { getRowEvenIfGone, useEpics, useRowEvenIfGone, useRows } from "@/lib/selectors";
+import { getRowEvenIfGone, useEpics, useRowEvenIfGone, useRows } from "@/data/selectors";
 import { formatDay } from "@/lib/time";
 import { setMilestone } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";

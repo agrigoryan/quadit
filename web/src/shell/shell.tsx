@@ -3,9 +3,9 @@ import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavi
 import { useMedia } from "@/decisions/data";
 import { ShortcutsSheet } from "@/palette/shortcuts";
 import { ahead } from "@/lib/ahead";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { useHotkeys } from "@/lib/hotkeys";
-import { useStore } from "@/lib/store";
+import { useStore } from "@/data/store";
 import { ui, useUi } from "@/lib/ui-state";
 import { InboxPage } from "@/pages/inbox";
 import { MyWorkPage } from "@/pages/my-work";

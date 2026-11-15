@@ -4,10 +4,10 @@
 import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useState } from "react";
 import { GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { send } from "@/lib/mutate";
+import { send } from "@/data/mutate";
 import type { Task, TaskLink } from "@/types/core";
 import { linkName } from "@/detail/data";
 import { Section } from "@/detail/section";

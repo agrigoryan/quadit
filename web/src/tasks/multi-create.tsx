@@ -3,8 +3,8 @@
 // are sent as one batch, so either all of them are made or none.
 
 import { useMemo, useState } from "react";
-import { useCan } from "@/lib/access";
-import { errorMessage } from "@/lib/api";
+import { useCan } from "@/data/access";
+import { errorMessage } from "@/data/api";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";

@@ -6,8 +6,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessions } from "@/insights/agents/session-data";
-import { api, ApiError } from "@/lib/api";
-import { clearStore, useStore } from "@/lib/store";
+import { api, ApiError } from "@/data/api";
+import { clearStore, useStore } from "@/data/store";
 import { WithQuery } from "@/test/query";
 
 const all = () => true;

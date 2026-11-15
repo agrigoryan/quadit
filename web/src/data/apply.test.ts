@@ -1,8 +1,8 @@
-// How one feed event changes the browser's copy (lib/apply.ts).
+// How one feed event changes the browser's copy (data/apply.ts).
 
 import { describe, expect, it } from "vitest";
-import { applyEvent, CopyOnWrite } from "@/lib/apply";
-import { type AnyRow, type Collections, emptyCollections } from "@/lib/collections";
+import { applyEvent, CopyOnWrite } from "@/data/apply";
+import { type AnyRow, type Collections, emptyCollections } from "@/data/collections";
 import type { FeedEvent } from "@/types/core";
 
 const event = (seq: number, over: Partial<FeedEvent>): FeedEvent => ({

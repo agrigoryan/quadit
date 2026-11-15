@@ -7,7 +7,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { adminKeys } from "@/admin/data";
 import { type SettingsMap, useDraft } from "@/admin/settings";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 import { WithQuery } from "@/test/query";
 
 function Form() {

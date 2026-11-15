@@ -2,11 +2,11 @@
 // as cards, and the comment box at the end.
 
 import { memo, useMemo } from "react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { joinPhrases, t } from "@/lib/i18n";
-import { useLookup, useMember } from "@/lib/selectors";
-import { useTaskEvents } from "@/lib/task-detail";
+import { useLookup, useMember } from "@/data/selectors";
+import { useTaskEvents } from "@/data/task-detail";
 import type { Task } from "@/types/core";
 import { CommentCard, When } from "@/detail/comment-card";
 import { Composer } from "@/detail/composer";

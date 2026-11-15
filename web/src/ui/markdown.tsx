@@ -3,8 +3,8 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { Link } from "react-router";
 import remarkGfm from "remark-gfm";
 import { cx } from "@/lib/cx";
-import { getProjectByKey, useRows } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { getProjectByKey, useRows } from "@/data/selectors";
+import { useStore } from "@/data/store";
 import { useTaskLink } from "@/lib/task-link";
 
 // Markdown as the server stores it, with two additions shown as links:

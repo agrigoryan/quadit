@@ -1,9 +1,9 @@
-// One lead among the tabs (lib/tab-share.ts), on a fake BroadcastChannel and
+// One lead among the tabs (data/tab-share.ts), on a fake BroadcastChannel and
 // fake locks. Each `tab()` joins as a tab of its own; where a test needs a
 // leader that says nothing, the test holds the lock itself.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { join, type TabShare } from "@/lib/tab-share";
+import { join, type TabShare } from "@/data/tab-share";
 import { type FakeTabs, fakeTabs } from "@/test/fake-tabs";
 
 const NAME = "things";

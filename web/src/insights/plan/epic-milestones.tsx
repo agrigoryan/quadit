@@ -7,7 +7,7 @@ import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Diamond, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { getTaskByKey, sortByRank, useLookup, useRows } from "@/lib/selectors";
+import { getTaskByKey, sortByRank, useLookup, useRows } from "@/data/selectors";
 import type { Epic, Milestone, Task } from "@/types/core";
 import { count } from "@/insights/lib/amounts";
 import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from "@/insights/plan/actions";

@@ -2,8 +2,8 @@
 
 import { useRef, useState } from "react";
 import { Check, FileUp } from "lucide-react";
-import { calledOff, errorMessage } from "@/lib/api";
-import { fileSize, uploadFile, type UploadProgress } from "@/lib/files";
+import { calledOff, errorMessage } from "@/data/api";
+import { fileSize, uploadFile, type UploadProgress } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 

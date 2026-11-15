@@ -5,7 +5,7 @@
 import { useId, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ImagePlus, ThumbsUp, Trash2, X } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { isImage } from "@/lib/files";
+import { isImage } from "@/data/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
 import { Button, IconButton } from "@/ui/button";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { fullDate } from "@/lib/time";
-import { useLookupEvenIfGone, useMe, useProjects } from "@/lib/selectors";
+import { useLookupEvenIfGone, useMe, useProjects } from "@/data/selectors";
 import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";

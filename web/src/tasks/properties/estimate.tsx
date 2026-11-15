@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Gauge } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useRowEvenIfGone } from "@/lib/selectors";
+import { useRowEvenIfGone } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { setEstimate } from "@/tasks/actions";
 import { inlineField, PropRow } from "@/tasks/properties/panel-row";

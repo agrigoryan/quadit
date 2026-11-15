@@ -5,7 +5,7 @@
 // types, with an empty list meaning it asks for nothing.
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/data/api";
 import { t, tMaybe } from "@/lib/i18n";
 import { Checkbox } from "@/ui/form";
 import { MultiPick } from "@/settings/ui/multi-pick";

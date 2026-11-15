@@ -5,10 +5,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { inWorkspace, queryClient, readError } from "@/lib/query";
-import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
-import { onEvents } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace, queryClient, readError } from "@/data/query";
+import { useLookupEvenIfGone, useSlug } from "@/data/selectors";
+import { onEvents } from "@/data/store";
 
 interface TrashedDecision {
   id: string;

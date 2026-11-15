@@ -6,7 +6,7 @@ import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { isDay } from "@/lib/days";
 import { t } from "@/lib/i18n";
-import { useMembers } from "@/lib/selectors";
+import { useMembers } from "@/data/selectors";
 import { docTitle, useRows } from "@/docs/data";
 import { addOption } from "@/docs/db/actions";
 import { asList, CellValue, CheckMark } from "@/docs/db/cell-value";

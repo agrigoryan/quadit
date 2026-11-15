@@ -3,10 +3,10 @@
 import { create } from "zustand";
 import { registerServiceWorker } from "@/auth/pwa";
 import { getPasskey } from "@/auth/webauthn";
-import { api, ApiError, onUnauthorized } from "@/lib/api";
-import { clearOutbox } from "@/lib/mutate";
-import { clearStore } from "@/lib/store";
-import { stopSync } from "@/lib/sync";
+import { api, ApiError, onUnauthorized } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import { clearStore } from "@/data/store";
+import { stopSync } from "@/data/sync";
 import { adoptAccountTheme, applyTheme, type ThemeChoice } from "@/lib/theme";
 import type { Role, User } from "@/types/core";
 

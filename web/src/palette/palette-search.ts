@@ -3,9 +3,9 @@
 // server's full-text search finds words inside comments and questions.
 
 import { useEffect, useState } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { isLive, useSlug } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { isLive, useSlug } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import type { SearchHit, Task } from "@/types/core";
 
 const words = (text: string) =>

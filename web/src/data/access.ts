@@ -10,7 +10,7 @@
 // is left to the server: the app offers the control and shows the refusal.
 
 import { useMemo } from "react";
-import { useMe } from "@/lib/selectors";
+import { useMe } from "@/data/selectors";
 import type { Member, Task } from "@/types/core";
 
 export interface Access {

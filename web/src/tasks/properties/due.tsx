@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CalendarDays, X } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { formatDay } from "@/lib/time";

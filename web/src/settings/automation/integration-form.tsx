@@ -2,7 +2,7 @@ import type { Changes } from "@/types/changes.gen";
 import { useState } from "react";
 import { t, tMaybe } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { useProjects } from "@/lib/selectors";
+import { useProjects } from "@/data/selectors";
 import { CATEGORIES } from "@/types/core";
 import { Input } from "@/ui/input";
 import { FormField, NativeSelect, refuse, SwitchRow, useFieldErrors } from "@/ui/form";

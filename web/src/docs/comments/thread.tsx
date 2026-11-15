@@ -1,9 +1,9 @@
 import { Check, LocateFixed, RotateCcw, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMember } from "@/lib/selectors";
+import { useMember } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import { addComment, deleteComment, resolveComment } from "@/docs/actions";
 import { Composer } from "@/docs/comments/composer";

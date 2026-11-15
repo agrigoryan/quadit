@@ -3,7 +3,7 @@
 
 import { Fragment, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
-import { useMe, useMember } from "@/lib/selectors";
+import { useMe, useMember } from "@/data/selectors";
 import { Avatar } from "@/ui/avatar";
 import { nameOf } from "@/decisions/data";
 

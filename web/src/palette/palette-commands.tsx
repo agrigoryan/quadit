@@ -29,11 +29,11 @@ import {
 import { matchPath, useLocation } from "react-router";
 import { saveTheme, signOut } from "@/auth/session";
 import { projectDocs, workspaceDocs } from "@/docs/area";
-import { useCan } from "@/lib/access";
-import { copyText } from "@/lib/files";
+import { useCan } from "@/data/access";
+import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
-import { useProjects, useViews } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useProjects, useViews } from "@/data/selectors";
+import { useStore } from "@/data/store";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import type { Project, Task } from "@/types/core";

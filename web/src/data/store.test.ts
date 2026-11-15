@@ -1,4 +1,4 @@
-// The browser's copy of a workspace (lib/store.ts): feed events, the starting
+// The browser's copy of a workspace (data/store.ts): feed events, the starting
 // copy and its second part.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +13,7 @@ import {
   mergeRest,
   mergeRows,
   onReplaced,
-} from "@/lib/store";
+} from "@/data/store";
 import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 
 const me = { user_id: "u1", role: "member", name: "Me" } as Member;

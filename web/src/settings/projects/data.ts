@@ -1,7 +1,7 @@
-// What project settings read beyond lib/selectors.
+// What project settings read beyond data/selectors.
 
 import { useMemo } from "react";
-import { useArchived, useLiveTasks } from "@/lib/selectors";
+import { useArchived, useLiveTasks } from "@/data/selectors";
 import type { Task } from "@/types/core";
 
 /**

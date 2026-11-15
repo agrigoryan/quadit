@@ -4,7 +4,7 @@ import { Ellipsis, FileText, PanelRight, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
+import { useSlug } from "@/data/selectors";
 import { setRowProps, trashDoc, updateDoc } from "@/docs/actions";
 import { Cell, CellInput } from "@/docs/db/cell";
 import type { Value } from "@/docs/db/formula";

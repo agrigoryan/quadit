@@ -2,7 +2,7 @@ import { Keyboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import { useNavigate } from "react-router";
 import { saveTheme, signOut, useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { useMe, useSlug } from "@/lib/selectors";
+import { useMe, useSlug } from "@/data/selectors";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { ui } from "@/lib/ui-state";
 import { Avatar } from "@/ui/avatar";

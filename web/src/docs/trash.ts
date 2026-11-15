@@ -5,10 +5,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { queryClient } from "@/lib/query";
-import { getRowEvenIfGone, useLookupEvenIfGone, useMe, useSlug, useTrashed as useTrashedRows } from "@/lib/selectors";
-import { getState, mergeRows } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { queryClient } from "@/data/query";
+import { getRowEvenIfGone, useLookupEvenIfGone, useMe, useSlug, useTrashed as useTrashedRows } from "@/data/selectors";
+import { getState, mergeRows } from "@/data/store";
 import { canSee } from "@/docs/data";
 import { docsKeys } from "@/docs/store";
 import type { Doc } from "@/types/docs";

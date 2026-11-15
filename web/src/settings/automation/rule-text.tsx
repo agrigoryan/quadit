@@ -3,7 +3,7 @@
 
 import type { ReactNode } from "react";
 import { t, tMaybe } from "@/lib/i18n";
-import { useLookupEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import type { Rule, Webhook } from "@/types/automation";
 import { eventName } from "@/settings/automation/event-picker";
 

@@ -3,11 +3,11 @@
 
 import { memo, useState } from "react";
 import { MoreHorizontal, Pencil, Reply, Trash2 } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useMe, useMember } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { useMe, useMember } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import { exact } from "@/lib/time";
 import type { Comment, Task } from "@/types/core";
 import { caretToEnd } from "@/detail/caret-to-end";

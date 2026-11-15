@@ -7,7 +7,7 @@ import { Fragment } from "react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import { useDocsArea } from "@/docs/area";
 import { useOpenThreads } from "@/docs/comments/panel";
 import { docTitle, pathTo } from "@/docs/data";

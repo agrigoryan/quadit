@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
-// An opened task (lib/task-detail.ts): its rows go to the store, its history
+// An opened task (data/task-detail.ts): its rows go to the store, its history
 // and what mentions it are kept beside it (the history grows with live
 // events), a failure says why, and the task is fetched again when the live
 // stream comes back.
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getRowEvenIfGone } from "@/lib/selectors";
-import { applyEvents, clearStore, loadBootstrap, useStore } from "@/lib/store";
-import { useTaskDetail, useTaskEvents, useTaskMentions } from "@/lib/task-detail";
+import { getRowEvenIfGone } from "@/data/selectors";
+import { applyEvents, clearStore, loadBootstrap, useStore } from "@/data/store";
+import { useTaskDetail, useTaskEvents, useTaskMentions } from "@/data/task-detail";
 import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { WithQuery } from "@/test/query";

@@ -1,10 +1,10 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { daysFrom } from "@/lib/days";
 import { weekdayName } from "@/lib/time";
-import { mutate, send } from "@/lib/mutate";
+import { mutate, send } from "@/data/mutate";
 import { toast } from "@/lib/toast";
 import type { Project } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";

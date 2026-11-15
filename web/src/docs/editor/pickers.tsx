@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useLiveTasks, useLookupEvenIfGone, useMe, useRows } from "@/lib/selectors";
+import { useLiveTasks, useLookupEvenIfGone, useMe, useRows } from "@/data/selectors";
 import { docTitle, useLinkablePages } from "@/docs/data";
 import { decisionStateText } from "@/docs/editor/chips";
 import { mentionable } from "@/docs/editor/decision-refs";

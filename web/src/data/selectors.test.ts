@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The read interface (lib/selectors.ts): lists hold live rows only, what is
+// The read interface (data/selectors.ts): lists hold live rows only, what is
 // gone is reached by name, and an answer stays the same object until its
 // rows change.
 
@@ -36,8 +36,8 @@ import {
   useTrashedTasks,
   useUnreadCount,
   useViews,
-} from "@/lib/selectors";
-import { type BootstrapData, clearStore, getState, loadBootstrap, patchRow } from "@/lib/store";
+} from "@/data/selectors";
+import { type BootstrapData, clearStore, getState, loadBootstrap, patchRow } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 
 const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;

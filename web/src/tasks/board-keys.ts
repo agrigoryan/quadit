@@ -9,7 +9,7 @@
 import { type MouseEvent, type RefObject, useEffect, useEffectEvent, useRef } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
-import { isDraft } from "@/lib/store";
+import { isDraft } from "@/data/store";
 import type { Task } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
 import { usePeek, useTaskNav } from "@/lib/task-link";

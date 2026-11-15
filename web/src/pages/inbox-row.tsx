@@ -18,7 +18,7 @@ import {
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMember, useRowEvenIfGone } from "@/lib/selectors";
+import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/types/core";
 import { anchorOf, archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";

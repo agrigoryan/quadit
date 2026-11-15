@@ -1,4 +1,4 @@
-// The app's query client (lib/query.ts) for a test of what reads through it:
+// The app's query client (data/query.ts) for a test of what reads through it:
 // a failed read shows at once instead of being tried again, and nothing a
 // test fetched is left for the next one.
 //
@@ -8,7 +8,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach } from "vitest";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 
 queryClient.setDefaultOptions({
   ...queryClient.getDefaultOptions(),

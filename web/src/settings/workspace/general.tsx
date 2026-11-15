@@ -1,11 +1,11 @@
 import { type FormEvent, useState } from "react";
 import { Download } from "lucide-react";
 import { loadSession } from "@/auth/session";
-import { workspacePath } from "@/lib/api";
-import { useCan } from "@/lib/access";
+import { workspacePath } from "@/data/api";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { mutate } from "@/lib/mutate";
-import { useStore } from "@/lib/store";
+import { mutate } from "@/data/mutate";
+import { useStore } from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { Workspace } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";

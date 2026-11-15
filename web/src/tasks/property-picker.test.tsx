@@ -6,9 +6,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { WithQuery } from "@/test/query";
-import { api } from "@/lib/api";
-import { clearOutbox } from "@/lib/mutate";
-import { clearStore, getState, loadBootstrap } from "@/lib/store";
+import { api } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import { clearStore, getState, loadBootstrap } from "@/data/store";
 import type { Member, Task, User, Workspace } from "@/types/core";
 import { PROPERTIES, type PropertyName } from "@/tasks/properties";
 import { TaskPropertyPicker } from "@/tasks/property-picker";

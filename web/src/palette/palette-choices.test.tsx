@@ -7,9 +7,9 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { WithQuery } from "@/test/query";
-import { api } from "@/lib/api";
-import { clearOutbox } from "@/lib/mutate";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { api } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { ui } from "@/lib/ui-state";
 import { CommandPalette } from "@/palette/palette";

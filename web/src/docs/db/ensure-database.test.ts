@@ -8,8 +8,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEnsureDatabases } from "@/docs/db/use-table";
 import { useDocsStore } from "@/docs/store";
-import { api, ApiError } from "@/lib/api";
-import { clearStore, useStore } from "@/lib/store";
+import { api, ApiError } from "@/data/api";
+import { clearStore, useStore } from "@/data/store";
 import { useToasts } from "@/lib/toast";
 import { WithQuery } from "@/test/query";
 

@@ -6,7 +6,7 @@ import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { loadSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { mutate } from "@/lib/mutate";
+import { mutate } from "@/data/mutate";
 import { toast } from "@/lib/toast";
 import type { Workspace } from "@/types/core";
 import { FormAlert, FormField, useFieldErrors } from "@/ui/form";

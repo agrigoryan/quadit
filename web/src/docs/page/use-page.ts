@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { retryWait } from "@/lib/api";
-import { isNotFound, readError, retryUnreachable } from "@/lib/query";
-import { useSlug } from "@/lib/selectors";
+import { retryWait } from "@/data/api";
+import { isNotFound, readError, retryUnreachable } from "@/data/query";
+import { useSlug } from "@/data/selectors";
 import { pageQuery } from "@/docs/store";
 import type { BlockRow } from "@/types/docs";
 

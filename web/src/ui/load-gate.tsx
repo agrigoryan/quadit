@@ -3,7 +3,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { t } from "@/lib/i18n";
-import { readError } from "@/lib/query";
+import { readError } from "@/data/query";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";

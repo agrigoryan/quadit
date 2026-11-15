@@ -1,9 +1,9 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { RefreshCw, RotateCw, Send } from "lucide-react";
-import { api, errorMessage, workspacePath } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/data/api";
 import { t } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
+import { useSlug } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -11,7 +11,7 @@ import { Dialog } from "@/ui/dialog";
 import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
 import { EmptyRow, Rows } from "@/ui/page-layout";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 import { automationKeys, isTest, listRows } from "@/settings/automation/data";
 import type { Delivery, Webhook } from "@/types/automation";
 

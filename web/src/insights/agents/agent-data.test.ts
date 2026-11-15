@@ -5,7 +5,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { beforeEach, expect, it } from "vitest";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { useAgentWork } from "@/insights/agents/agent-data";
 

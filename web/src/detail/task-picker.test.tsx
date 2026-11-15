@@ -5,7 +5,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskPicker } from "@/detail/task-picker";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 
 beforeAll(() => {

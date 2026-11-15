@@ -4,9 +4,9 @@
 // the app shows; the finished work (done, canceled and archived tasks) is
 // fetched behind it and merged in when it lands (store.restLoaded says when).
 //
-// All tabs of one workspace share one live connection (lib/tab-share.ts
+// All tabs of one workspace share one live connection (data/tab-share.ts
 // picks the tab that leads). The leader holds the stream
-// (lib/event-stream.ts) and passes each event, and the state of the stream,
+// (data/event-stream.ts) and passes each event, and the state of the stream,
 // to the others, which apply what they are passed exactly as if they had
 // read the stream themselves. When the lead falls to another tab, that tab
 // opens the stream from its own position. A follower that notices it missed
@@ -35,9 +35,9 @@ import {
   onReachableAgain,
   whenReachable,
   workspacePath,
-} from "@/lib/api";
-import { openEventStream } from "@/lib/event-stream";
-import { restoreQueue } from "@/lib/mutate";
+} from "@/data/api";
+import { openEventStream } from "@/data/event-stream";
+import { restoreQueue } from "@/data/mutate";
 import {
   applyEvents,
   type BootstrapData,
@@ -51,8 +51,8 @@ import {
   type RestData,
   type StreamState,
   useStore,
-} from "@/lib/store";
-import { join, type TabShare } from "@/lib/tab-share";
+} from "@/data/store";
+import { join, type TabShare } from "@/data/tab-share";
 import type { FeedEvent, Task } from "@/types/core";
 
 /** Past this long without the stream, start from a fresh copy instead of replaying. */

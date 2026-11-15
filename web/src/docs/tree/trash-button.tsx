@@ -1,5 +1,5 @@
 import { Trash2, Undo2 } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 
 import { restoreDoc } from "@/docs/actions";

@@ -5,7 +5,7 @@ import { ChartGantt, ListTodo, SquareKanban } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
+import { useSlug } from "@/data/selectors";
 
 const layouts = [
   { id: "tasks", icon: ListTodo, label: () => t("list.layout.list") },

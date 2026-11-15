@@ -5,9 +5,9 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { type ComponentType, type Dispatch, type ReactNode, type SetStateAction, useState } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { inWorkspace, queryClient } from "@/lib/query";
-import { useSlug } from "@/lib/selectors";
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace, queryClient } from "@/data/query";
+import { useSlug } from "@/data/selectors";
 import type { Token } from "@/settings/agents/data";
 import { type FieldErrors, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";

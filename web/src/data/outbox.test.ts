@@ -1,8 +1,8 @@
-// The changes kept on the device (lib/outbox.ts), on an IndexedDB in memory.
+// The changes kept on the device (data/outbox.ts), on an IndexedDB in memory.
 
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { outbox, type OutboxChange, type OutboxItem } from "@/lib/outbox";
+import { outbox, type OutboxChange, type OutboxItem } from "@/data/outbox";
 
 const DAY = 24 * 3600_000;
 
@@ -139,7 +139,7 @@ describe("where the browser has no locks", () => {
     // The outbox looks for locks once, as it loads: load it anew in a browser without them.
     vi.stubGlobal("navigator", {});
     vi.resetModules();
-    const { outbox: withoutLocks } = await import("@/lib/outbox");
+    const { outbox: withoutLocks } = await import("@/data/outbox");
 
     const taken = await withoutLocks.adopt("acme", "u1");
     expect(taken.map((i) => i.key)).toEqual(["k1", "k2"]);

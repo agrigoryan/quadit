@@ -3,8 +3,8 @@
 // answer is kept until the page's content changes.
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { api, workspacePath } from "@/lib/api";
-import { useSlug } from "@/lib/selectors";
+import { api, workspacePath } from "@/data/api";
+import { useSlug } from "@/data/selectors";
 import { localPath } from "@/lib/url";
 import { docsKeys } from "@/docs/store";
 import type { BlockRow, Doc } from "@/types/docs";

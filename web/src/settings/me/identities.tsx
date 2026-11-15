@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link2 } from "lucide-react";
 import { authConfig } from "@/auth/session";
-import { api } from "@/lib/api";
+import { api } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";

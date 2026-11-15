@@ -2,7 +2,7 @@ import { memo } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { formatNumber, t } from "@/lib/i18n";
-import { useRestLoaded } from "@/lib/store";
+import { useRestLoaded } from "@/data/store";
 import { isOpenCategory } from "@/types/core";
 import { RestLoadingNote } from "@/ui/rest-note";
 import type { TaskGroup } from "@/tasks/filters";

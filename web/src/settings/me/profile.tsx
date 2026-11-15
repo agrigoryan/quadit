@@ -1,8 +1,8 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { saveTheme } from "@/auth/session";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
-import { useMe } from "@/lib/selectors";
+import { useMe } from "@/data/selectors";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import { useSettingsBase } from "@/settings/base";

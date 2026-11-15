@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, ScrollText, Send, Trash2 } from "lucide-react";
-import { api, errorMessage, workspacePath } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/data/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useRows, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useRows, useSlug } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
@@ -17,7 +17,7 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { RevealDialog } from "@/ui/reveal-dialog";
 import { Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/page-layout";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 import {
   automationKeys,
   change,

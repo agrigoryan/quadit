@@ -3,8 +3,8 @@
 // router hooks do not work. The docs routes keep this pointed at the router.
 
 import { type Location, matchPath, type NavigateFunction } from "react-router";
-import { getLookupEvenIfGone, projectByKey } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getLookupEvenIfGone, projectByKey } from "@/data/selectors";
+import { getState } from "@/data/store";
 import { docPath } from "@/docs/area";
 import { inProject } from "@/docs/data";
 import { isTaskPath, taskPath } from "@/lib/task-link";

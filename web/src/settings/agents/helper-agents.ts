@@ -3,7 +3,7 @@
 // it when that task closes. Lists show a helper under its maker.
 
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import type { Member } from "@/types/core";
 import type { AgentMember } from "@/settings/agents/data";
 

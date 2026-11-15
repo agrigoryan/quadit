@@ -20,8 +20,8 @@ import {
 import { CircleHelp, FileSymlink, ListTodo, MessageSquarePlus } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect } from "react";
 import { t } from "@/lib/i18n";
-import { getLookupEvenIfGone, getRows } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getLookupEvenIfGone, getRows } from "@/data/selectors";
+import { getState } from "@/data/store";
 import { decisionStateText } from "@/docs/editor/chips";
 import { canSee, docTitle, pathTo } from "@/docs/data";
 import { mentionable } from "@/docs/editor/decision-refs";

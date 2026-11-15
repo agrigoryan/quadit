@@ -13,11 +13,11 @@
 // later of the two stays. Removing a block always wins.
 
 import type { BlockNoteEditor } from "@blocknote/core";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { newId } from "@/lib/ids";
-import { mutate } from "@/lib/mutate";
-import { getRowEvenIfGone } from "@/lib/selectors";
-import { onEvents, useStore } from "@/lib/store";
+import { mutate } from "@/data/mutate";
+import { getRowEvenIfGone } from "@/data/selectors";
+import { onEvents, useStore } from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { FeedEvent } from "@/types/core";
 import { type BlockSchemaLike, type EdBlock, rowsToEditor, signature, toEditor, toWire } from "@/docs/editor/convert";

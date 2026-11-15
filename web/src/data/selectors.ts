@@ -11,10 +11,10 @@
 // Each hook returns a stable value until the rows it depends on change, so a
 // list re-renders only when it must: an answer is remembered against the
 // identity of the table it came from, and the store copies a table only when
-// one of its rows changes (lib/apply.ts).
+// one of its rows changes (data/apply.ts).
 
 import { useMemo } from "react";
-import { type Collections, type Dict, getState, type StoreState, useStore } from "@/lib/store";
+import { type Collections, type Dict, getState, type StoreState, useStore } from "@/data/store";
 import {
   type Cycle,
   type Decision,

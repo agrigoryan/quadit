@@ -1,7 +1,7 @@
 import { CloudOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
-import { outbox } from "@/lib/outbox";
+import { outbox } from "@/data/outbox";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 

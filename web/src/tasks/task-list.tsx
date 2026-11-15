@@ -7,9 +7,9 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
-import { useCan } from "@/lib/access";
-import { useLookup } from "@/lib/selectors";
-import { isDraft } from "@/lib/store";
+import { useCan } from "@/data/access";
+import { useLookup } from "@/data/selectors";
+import { isDraft } from "@/data/store";
 import { usePeek, useTaskNav } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";
 import type { SortBy, Task } from "@/types/core";

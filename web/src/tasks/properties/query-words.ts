@@ -2,7 +2,7 @@
 // "@handle", "me", "none" or "outside", a row by its name or its id. A saved
 // view or an address written by hand reads the same as one made here.
 
-import type { Dict } from "@/lib/store";
+import type { Dict } from "@/data/store";
 import { NONE, OUTSIDE, type QueryContext, type QuerySource } from "@/tasks/properties/property";
 
 const low = (s: string) => s.toLowerCase();

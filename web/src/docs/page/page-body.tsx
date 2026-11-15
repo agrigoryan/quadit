@@ -4,7 +4,7 @@
 
 import { GitBranch, Sparkles } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { CommentsPanel, useOpenThreads } from "@/docs/comments/panel";

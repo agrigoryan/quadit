@@ -4,8 +4,8 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
-import { emptyCollections } from "@/lib/collections";
-import { useStore } from "@/lib/store";
+import { emptyCollections } from "@/data/collections";
+import { useStore } from "@/data/store";
 import type { Member, Status, Task } from "@/types/core";
 import { Subtasks } from "@/detail/subtasks";
 import { TooltipProvider } from "@/ui/tooltip";

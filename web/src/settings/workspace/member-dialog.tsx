@@ -1,7 +1,7 @@
 import type { Changes } from "@/types/changes.gen";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
-import { mutate } from "@/lib/mutate";
+import { mutate } from "@/data/mutate";
 import type { Member } from "@/types/core";
 import { FormField, Note, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";

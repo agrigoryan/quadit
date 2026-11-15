@@ -6,7 +6,7 @@ import { FileText } from "lucide-react";
 import { useMemo } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useMe, useRowEvenIfGone, useRows, useTaskByKeyEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone, useMe, useRowEvenIfGone, useRows, useTaskByKeyEvenIfGone } from "@/data/selectors";
 import type { Decision } from "@/types/core";
 import { docTitle } from "@/docs/data";
 import { answerOf, DECISION_REF, decisionsOf } from "@/docs/editor/decision-refs";

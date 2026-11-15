@@ -1,7 +1,7 @@
 // What a template fills in on the create dialog (tasks/template-preset.ts).
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { type BootstrapData, clearStore, loadBootstrap } from "@/lib/store";
+import { type BootstrapData, clearStore, loadBootstrap } from "@/data/store";
 import type { Member, Project, Template, User, Workspace } from "@/types/core";
 import { presetOf } from "@/tasks/template-preset";
 

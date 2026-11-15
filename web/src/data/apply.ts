@@ -1,7 +1,14 @@
 // How rows get into the collections: how a row is filed and how one feed
-// event changes the copy (lib/collections.ts says where each kind lives).
+// event changes the copy (data/collections.ts says where each kind lives).
 
-import { type AnyRow, COLLECTION_OF, type CollectionName, type Collections, type Dict, keyOf } from "@/lib/collections";
+import {
+  type AnyRow,
+  COLLECTION_OF,
+  type CollectionName,
+  type Collections,
+  type Dict,
+  keyOf,
+} from "@/data/collections";
 import type { FeedEvent } from "@/types/core";
 import { localPath } from "@/lib/url";
 

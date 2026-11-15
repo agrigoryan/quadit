@@ -7,9 +7,9 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { useEffect } from "react";
 import { type Location, MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError } from "@/lib/api";
-import { clearOutbox } from "@/lib/mutate";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { api, ApiError } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { useToasts } from "@/lib/toast";
 import { ui, useUi } from "@/lib/ui-state";

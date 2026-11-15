@@ -3,10 +3,10 @@
 // under. None of these lists is in the store: each page reads its own and it
 // is asked again after a change.
 
-import { api, workspacePath } from "@/lib/api";
+import { api, workspacePath } from "@/data/api";
 import type { Changes } from "@/types/changes.gen";
-import { type ChangeSpec, type ChangeType, mutate } from "@/lib/mutate";
-import { inWorkspace } from "@/lib/query";
+import { type ChangeSpec, type ChangeType, mutate } from "@/data/mutate";
+import { inWorkspace } from "@/data/query";
 import type { Outcome } from "@/types/core";
 import type { ActionKind, Delivery, Webhook } from "@/types/automation";
 

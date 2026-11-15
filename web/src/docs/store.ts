@@ -1,4 +1,4 @@
-// What the docs part keeps beside the workspace copy (lib/store.ts). Pages
+// What the docs part keeps beside the workspace copy (data/store.ts). Pages
 // themselves live there, in `docs`; here are the things only an opened page
 // brings: a database's properties and views, what links to a page, and who
 // else is in it. Properties and views follow the live feed like any row.
@@ -7,10 +7,10 @@
 
 import { queryOptions } from "@tanstack/react-query";
 import { create } from "zustand";
-import { api, workspacePath } from "@/lib/api";
-import { inWorkspace, isNotFound, queryClient } from "@/lib/query";
-import { getRowEvenIfGone } from "@/lib/selectors";
-import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace, isNotFound, queryClient } from "@/data/query";
+import { getRowEvenIfGone } from "@/data/selectors";
+import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/data/store";
 import type { FeedEvent } from "@/types/core";
 import type { BlockRow, DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/types/docs";
 

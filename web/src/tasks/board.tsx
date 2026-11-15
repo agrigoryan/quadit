@@ -19,8 +19,8 @@ import {
 import { arrayMove, hasSortableData, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
-import { useCan } from "@/lib/access";
-import { getRow } from "@/lib/selectors";
+import { useCan } from "@/data/access";
+import { getRow } from "@/data/selectors";
 import type { Project, Task } from "@/types/core";
 import { type CardMove, moveCard } from "@/tasks/actions";
 import { AddStatusColumn } from "@/tasks/add-status";

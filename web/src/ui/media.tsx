@@ -1,7 +1,7 @@
 import { FileText, Play, X } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { cx } from "@/lib/cx";
-import { fileSize, isImage, isVideo } from "@/lib/files";
+import { fileSize, isImage, isVideo } from "@/data/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
 

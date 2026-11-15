@@ -1,11 +1,22 @@
 // The browser's copy of one workspace: every row, in collections keyed by
-// id. lib/sync.ts fills it from /bootstrap (the open work first, the finished
+// id. data/sync.ts fills it from /bootstrap (the open work first, the finished
 // work a moment later) and then keeps it current from the event feed;
-// lib/mutate.ts puts the person's own edits in. Pages read from here and never ask
+// data/mutate.ts puts the person's own edits in. Pages read from here and never ask
 // the server for a list.
+//
+// The data folder: everything the app knows from the server and how it stays
+// current. The workspace copy is this file with collections.ts (its shape),
+// apply.ts (how a row or a feed event changes it), sync.ts with
+// event-stream.ts and tab-share.ts (the starting copy and the live stream,
+// shared by the tabs), mutate.ts with outbox.ts (the person's own edits, kept
+// on the device until sent), and selectors.ts and access.ts (how the app
+// reads it, and what the member may do). Beside it: api.ts, the one place
+// that talks HTTP; query.ts, live.ts, task-detail.ts and listening.ts, the
+// reads the copy does not hold; and files.ts, uploads. Nothing here knows
+// the router or the interface.
 
 import { create } from "zustand";
-import { applyEvent, CopyOnWrite, normalize, targetsOf } from "@/lib/apply";
+import { applyEvent, CopyOnWrite, normalize, targetsOf } from "@/data/apply";
 import {
   type AnyRow,
   type CollectionName,
@@ -13,10 +24,10 @@ import {
   type Dict,
   emptyCollections,
   keyOf,
-} from "@/lib/collections";
+} from "@/data/collections";
 import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 
-// The collections' types are declared in lib/collections.ts; the app reads them from the store.
+// The collections' types are declared in data/collections.ts; the app reads them from the store.
 export type { CollectionName, Collections, Dict };
 
 export type StreamState = "connecting" | "live" | "down";
@@ -156,7 +167,7 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
 type OwnListener = (events: FeedEvent[], slug: string) => void;
 const ownListeners = new Set<OwnListener>();
 
-/** Hear the events this tab's own accepted changes came back with (lib/sync.ts passes them to the other tabs). */
+/** Hear the events this tab's own accepted changes came back with (data/sync.ts passes them to the other tabs). */
 export function onOwnEvents(listener: OwnListener): () => void {
   ownListeners.add(listener);
   return () => ownListeners.delete(listener);
@@ -328,7 +339,7 @@ export function mergeRest(slug: string, data: RestData, meanwhile: FeedEvent[]):
   return [...missing];
 }
 
-/** Marks rows made here as waiting for the server (lib/mutate.ts does this for every row an edit inserts). */
+/** Marks rows made here as waiting for the server (data/mutate.ts does this for every row an edit inserts). */
 export function markDrafts(collection: CollectionName, ids: string[]) {
   if (ids.length === 0) return;
   useStore.setState((s) => {

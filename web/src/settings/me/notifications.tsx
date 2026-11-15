@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { useAuthConfig } from "@/auth/config";
 import { useSettingsBase } from "@/settings/base";
 import { useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 import {
   type Account,
   accountKeys,

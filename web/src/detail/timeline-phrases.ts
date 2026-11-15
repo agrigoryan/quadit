@@ -3,7 +3,7 @@
 // phrase is the part after the actor's name, so several can share one line.
 
 import { joinPhrases, t } from "@/lib/i18n";
-import { getRowEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone } from "@/data/selectors";
 import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/types/core";
 import { linkName, type Side, sideOf, who } from "@/detail/data";
 import { TIMELINE } from "@/tasks/properties";

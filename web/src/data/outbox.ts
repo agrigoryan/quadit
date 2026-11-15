@@ -1,5 +1,5 @@
 // The changes not yet sent, kept on the device so that a reload or a closed
-// tab does not lose them. lib/mutate.ts writes here as changes are made and
+// tab does not lose them. data/mutate.ts writes here as changes are made and
 // removes them as the server answers; on start it takes over what an earlier
 // page left behind.
 //

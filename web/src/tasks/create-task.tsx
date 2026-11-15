@@ -2,12 +2,12 @@
 // properties, or, on request, several at once (tasks/multi-create.tsx).
 
 import { type FormEvent, useRef, useState } from "react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
-import { useCan } from "@/lib/access";
-import { getRow } from "@/lib/selectors";
+import { useCan } from "@/data/access";
+import { getRow } from "@/data/selectors";
 import { useTaskNav } from "@/lib/task-link";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";

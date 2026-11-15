@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router";
-import { useCan } from "@/lib/access";
-import { errorMessage, workspacePath } from "@/lib/api";
-import { copyText } from "@/lib/files";
+import { useCan } from "@/data/access";
+import { errorMessage, workspacePath } from "@/data/api";
+import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
+import { useSlug } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import { keepVersion, trashDoc } from "@/docs/actions";
 import { docPath, useDocsArea } from "@/docs/area";

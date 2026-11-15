@@ -6,8 +6,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { adminKeys } from "@/admin/data";
-import { api } from "@/lib/api";
-import { queryClient } from "@/lib/query";
+import { api } from "@/data/api";
+import { queryClient } from "@/data/query";
 import { type FieldErrors, useFieldErrors } from "@/ui/form";
 
 interface SettingEntry {

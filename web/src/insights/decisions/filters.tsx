@@ -5,7 +5,7 @@
 import { Search, X } from "lucide-react";
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useProjects } from "@/lib/selectors";
+import { useLookupEvenIfGone, useProjects } from "@/data/selectors";
 import { nameOf } from "@/detail/data";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Avatar } from "@/ui/avatar";

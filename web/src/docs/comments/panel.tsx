@@ -4,7 +4,7 @@
 
 import { MessageSquare, X } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useState } from "react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { addComment } from "@/docs/actions";

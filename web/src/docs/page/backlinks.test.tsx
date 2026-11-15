@@ -4,7 +4,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { type BootstrapData, clearStore, loadBootstrap } from "@/lib/store";
+import { type BootstrapData, clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { BacklinksDialog } from "@/docs/page/backlinks";
 import { useDocsStore } from "@/docs/store";

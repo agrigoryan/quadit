@@ -3,7 +3,7 @@
 // newer blocks go to its trash. Everything else stays as it is now.
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -12,7 +12,7 @@ import { useAdminWorkspaces } from "@/admin/workspaces";
 import { Segmented } from "@/settings/me/segmented";
 import { FormField, NativeSelect, Note, refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
-import { readError } from "@/lib/query";
+import { readError } from "@/data/query";
 import { Input } from "@/ui/input";
 
 type Kind = "task" | "doc";

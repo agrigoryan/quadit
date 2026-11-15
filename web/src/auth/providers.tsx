@@ -5,7 +5,7 @@ import { useState } from "react";
 import { KeyRound, LogIn } from "lucide-react";
 import { passkeySignIn } from "@/auth/session";
 import { passkeyCanceled, passkeysSupported } from "@/auth/webauthn";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 

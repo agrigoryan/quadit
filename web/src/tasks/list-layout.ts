@@ -8,7 +8,7 @@
 // group is shown above its sub-tasks there as a context row, which the
 // group does not count and which cannot be selected.
 
-import type { Dict } from "@/lib/store";
+import type { Dict } from "@/data/store";
 import type { Task } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
 

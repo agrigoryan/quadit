@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { t, tMaybe } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { useMembers, useProjects } from "@/lib/selectors";
+import { useMembers, useProjects } from "@/data/selectors";
 import { CATEGORIES } from "@/types/core";
 import { memberChoiceLabel } from "@/settings/agents/data";
-import { useListening } from "@/lib/listening";
+import { useListening } from "@/data/listening";
 import { Input } from "@/ui/input";
 import { FormField, NativeSelect, refuse, SwitchRow, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";

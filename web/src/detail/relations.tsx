@@ -5,13 +5,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { send } from "@/lib/mutate";
-import { getRows, useLookupEvenIfGone, useRow } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { send } from "@/data/mutate";
+import { getRows, useLookupEvenIfGone, useRow } from "@/data/selectors";
+import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { Relation, Task } from "@/types/core";
 import { type Side, sideOf, useEnsureTasks } from "@/detail/data";

@@ -1,5 +1,5 @@
 import { useParams } from "react-router";
-import { useLookupEvenIfGone, useProjectByKey, useViews } from "@/lib/selectors";
+import { useLookupEvenIfGone, useProjectByKey, useViews } from "@/data/selectors";
 import { NotFoundPage } from "@/ui/not-found";
 import { normalizeQuery } from "@/tasks/filters";
 import { TasksView } from "@/tasks/tasks-view";

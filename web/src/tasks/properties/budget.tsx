@@ -3,7 +3,7 @@
 // it; nothing set means no limit.
 
 import { type FormEvent, useState } from "react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/types/core";
 import { moneyMicros } from "@/insights/lib/amounts";

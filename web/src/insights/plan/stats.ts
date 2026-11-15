@@ -4,8 +4,8 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useArchived, useLookup, useRows } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { useArchived, useLookup, useRows } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import { daysUntil } from "@/lib/time";
 import { type Epic, isCanceledCategory, isDoneCategory, type Status, type Task } from "@/types/core";
 

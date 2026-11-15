@@ -3,10 +3,10 @@
 
 import { ChevronRight, Plus } from "lucide-react";
 import { NavLink, useNavigate } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMe, useSlug } from "@/lib/selectors";
+import { useMe, useSlug } from "@/data/selectors";
 import { ui } from "@/lib/ui-state";
 import { createDoc } from "@/docs/actions";
 import { docTitle, type DocTree, useDocTree } from "@/docs/data";

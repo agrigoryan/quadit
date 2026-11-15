@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

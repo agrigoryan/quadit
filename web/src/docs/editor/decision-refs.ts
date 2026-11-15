@@ -3,8 +3,8 @@
 // the questions were asked ("SVA-7#2"). These find one from the other in the
 // workspace copy.
 
-import { getRows, getTaskByKeyEvenIfGone } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { getRows, getTaskByKeyEvenIfGone } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import type { Decision, Task } from "@/types/core";
 
 export const DECISION_REF = /^([A-Z][A-Z0-9]{1,9}-\d{1,6})#(\d{1,3})$/;

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { FirstProjectNudge } from "@/auth/first-run";
 import { cx } from "@/lib/cx";
 import { formatNumber, t } from "@/lib/i18n";
-import { useLiveTasks, useLookup, useLookupEvenIfGone, useMe, useMember, useOpenDecisions } from "@/lib/selectors";
+import { useLiveTasks, useLookup, useLookupEvenIfGone, useMe, useMember, useOpenDecisions } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";

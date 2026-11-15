@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AuthLayout, FormError, TextLink } from "@/auth/auth-layout";
 import { useAuthConfig } from "@/auth/config";
-import { api, ApiError, errorMessage } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { FormField, Note, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";

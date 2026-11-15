@@ -7,9 +7,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEnsureTasks, useFindTask } from "@/detail/data";
-import { api, ApiError } from "@/lib/api";
-import { getRowEvenIfGone } from "@/lib/selectors";
-import { clearStore, useStore } from "@/lib/store";
+import { api, ApiError } from "@/data/api";
+import { getRowEvenIfGone } from "@/data/selectors";
+import { clearStore, useStore } from "@/data/store";
 import { WithQuery } from "@/test/query";
 
 beforeEach(() => {

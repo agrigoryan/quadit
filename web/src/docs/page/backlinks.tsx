@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useLookup, useLookupEvenIfGone } from "@/lib/selectors";
-import { useRestLoaded } from "@/lib/store";
+import { useLookup, useLookupEvenIfGone } from "@/data/selectors";
+import { useRestLoaded } from "@/data/store";
 import { docTitle } from "@/docs/data";
 import { openDoc, openTask } from "@/docs/nav";
 import { PageIcon } from "@/docs/page-icon";

@@ -1,4 +1,4 @@
-// Keeping the store current (lib/sync.ts): the starting copy, the live
+// Keeping the store current (data/sync.ts): the starting copy, the live
 // stream, and the tabs that share one stream. The server, the stream and
 // what the browser puts between tabs are fakes on the test's clock.
 //
@@ -9,8 +9,8 @@
 // itself (`lead`).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EventStream, EventStreamHandlers } from "@/lib/event-stream";
-import type { BootstrapData } from "@/lib/store";
+import type { EventStream, EventStreamHandlers } from "@/data/event-stream";
+import type { BootstrapData } from "@/data/store";
 import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { type FakeTabs, fakeTabs } from "@/test/fake-tabs";
@@ -94,17 +94,17 @@ const later = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 async function openTab() {
   vi.resetModules();
   const streams: FakeStream[] = [];
-  vi.doMock("@/lib/event-stream", () => ({
+  vi.doMock("@/data/event-stream", () => ({
     openEventStream(url: string, handlers: EventStreamHandlers) {
       const stream = new FakeStream(url, handlers);
       streams.push(stream);
       return stream;
     },
   }));
-  const store = await import("@/lib/store");
-  const sync = await import("@/lib/sync");
-  const { mutate, clearOutbox } = await import("@/lib/mutate");
-  const { onUnauthorized } = await import("@/lib/api");
+  const store = await import("@/data/store");
+  const sync = await import("@/data/sync");
+  const { mutate, clearOutbox } = await import("@/data/mutate");
+  const { onUnauthorized } = await import("@/data/api");
   const signedOut = vi.fn();
   onUnauthorized(signedOut);
   const tab = {
@@ -154,7 +154,7 @@ type Said = { t: string } & Record<string, unknown>;
 function lead() {
   const channel = tabs.channel(SHARED);
   const heard: Said[] = [];
-  // What the app's tabs say to each other travels inside lib/tab-share.ts's own envelope.
+  // What the app's tabs say to each other travels inside data/tab-share.ts's own envelope.
   channel.onmessage = (e) => {
     const wire = e.data as { is: string; msg: Said };
     if (wire.is === "say") heard.push(wire.msg);
@@ -179,7 +179,7 @@ function lead() {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  // Every wait before a new try is as long as it can be: lib/api.ts shortens them at random.
+  // Every wait before a new try is as long as it can be: data/api.ts shortens them at random.
   vi.spyOn(Math, "random").mockReturnValue(1);
   tabs = fakeTabs();
   server = fakeServer();
@@ -205,7 +205,7 @@ afterEach(async () => {
   }
   await settle();
   const unexpected = server.unexpected;
-  vi.doUnmock("@/lib/event-stream");
+  vi.doUnmock("@/data/event-stream");
   vi.useRealTimers();
   vi.unstubAllGlobals();
   expect(unexpected).toEqual([]);

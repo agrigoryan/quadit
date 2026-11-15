@@ -3,7 +3,7 @@
 
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useRestLoaded } from "@/lib/store";
+import { useRestLoaded } from "@/data/store";
 import { useDelayedFlag } from "@/lib/use-delayed-flag";
 import { Spinner } from "@/ui/spinner";
 

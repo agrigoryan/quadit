@@ -2,8 +2,8 @@ import { FolderPlus } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCan } from "@/lib/access";
-import { useProjects, useSlug } from "@/lib/selectors";
+import { useCan } from "@/data/access";
+import { useProjects, useSlug } from "@/data/selectors";
 
 /**
  * Shown at the top of My work while the workspace has no project: tasks

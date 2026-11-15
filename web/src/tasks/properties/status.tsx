@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { CircleDot } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
-import { getRowEvenIfGone, useRowEvenIfGone, useStatuses } from "@/lib/selectors";
+import { getRowEvenIfGone, useRowEvenIfGone, useStatuses } from "@/data/selectors";
 import { CATEGORIES } from "@/types/core";
 import { setStatus } from "@/tasks/actions";
 import { useManageLinks } from "@/tasks/manage";

@@ -6,9 +6,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { api, workspacePath } from "@/lib/api";
-import { inWorkspace, queryClient, readError } from "@/lib/query";
-import { onEvents, useStore } from "@/lib/store";
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace, queryClient, readError } from "@/data/query";
+import { onEvents, useStore } from "@/data/store";
 
 export interface Live<T> {
   data: T | undefined;

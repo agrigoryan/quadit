@@ -1,6 +1,6 @@
 // The shapes the Agents pages work with beyond the store (an agent's limits,
 // the tokens issued to it) and how their fields are written. What each agent
-// is doing right now is in lib/listening.ts.
+// is doing right now is in data/listening.ts.
 
 import { t } from "@/lib/i18n";
 import type { Member } from "@/types/core";

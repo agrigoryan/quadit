@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
 import { NotFoundPage } from "@/ui/not-found";

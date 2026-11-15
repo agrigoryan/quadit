@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef } from "react";
 import { CheckCheck, Inbox } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useCan } from "@/lib/access";
-import { getRowEvenIfGone, useMe, useRows } from "@/lib/selectors";
+import { useCan } from "@/data/access";
+import { getRowEvenIfGone, useMe, useRows } from "@/data/selectors";
 import type { Notification } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { anchorOf, archive, markAllRead, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";

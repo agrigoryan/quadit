@@ -5,7 +5,7 @@
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { Markdown } from "@/ui/markdown";
 

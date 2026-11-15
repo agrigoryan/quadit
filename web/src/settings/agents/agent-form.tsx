@@ -1,7 +1,7 @@
 // The fields of an agent, shared by "New agent" and the agent's own page.
 
 import { t } from "@/lib/i18n";
-import { useMembers, useProjects, useRowEvenIfGone } from "@/lib/selectors";
+import { useMembers, useProjects, useRowEvenIfGone } from "@/data/selectors";
 import { ASKS_FIRST, AsksBefore } from "@/settings/agents/asks-before";
 import { type AgentMember, dollars, toMicros, toMinutes } from "@/settings/agents/data";
 import { AvatarInput } from "@/settings/ui/avatar-input";

@@ -3,9 +3,9 @@
 // what the signed-in person may do.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useCan } from "@/lib/access";
-import { isImage } from "@/lib/files";
-import { useMe, useMember, useRowEvenIfGone, useRows } from "@/lib/selectors";
+import { useCan } from "@/data/access";
+import { isImage } from "@/data/files";
+import { useMe, useMember, useRowEvenIfGone, useRows } from "@/data/selectors";
 import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } from "@/types/core";
 
 const byRank = (a: { rank: string }, b: { rank: string }) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0);

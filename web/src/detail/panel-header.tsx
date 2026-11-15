@@ -16,12 +16,12 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
-import { copyText } from "@/lib/files";
+import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
-import { send } from "@/lib/mutate";
-import { useMe, useRow, useRowEvenIfGone, useSlug } from "@/lib/selectors";
+import { send } from "@/data/mutate";
+import { useMe, useRow, useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import type { Task } from "@/types/core";
 import type { TaskLayout } from "@/detail/task-body";

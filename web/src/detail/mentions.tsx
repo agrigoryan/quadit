@@ -8,8 +8,8 @@ import { useMemo } from "react";
 import { FileText } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useRow, useRowEvenIfGone, useSlug } from "@/lib/selectors";
-import { type MentionRef, useTaskMentions } from "@/lib/task-detail";
+import { useRow, useRowEvenIfGone, useSlug } from "@/data/selectors";
+import { type MentionRef, useTaskMentions } from "@/data/task-detail";
 import type { Task } from "@/types/core";
 import { Section } from "@/detail/section";
 import { PageIcon } from "@/docs/page-icon";
@@ -42,7 +42,7 @@ function read(refs: MentionRef[], taskId: string): Mention[] {
   return list;
 }
 
-/** What mentions the task, as it came with the task's detail (lib/task-detail.ts). */
+/** What mentions the task, as it came with the task's detail (data/task-detail.ts). */
 function useMentions(taskId: string): Mention[] {
   const refs = useTaskMentions(taskId);
   return useMemo(() => read(refs, taskId), [refs, taskId]);

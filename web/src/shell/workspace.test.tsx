@@ -7,15 +7,15 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSession } from "@/auth/session";
-import type { EventStreamHandlers } from "@/lib/event-stream";
-import { type BootstrapData, clearStore, getState } from "@/lib/store";
+import type { EventStreamHandlers } from "@/data/event-stream";
+import { type BootstrapData, clearStore, getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { Member, User, Workspace } from "@/types/core";
 import { WorkspaceRoute } from "@/shell/workspace";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 
 const streams = vi.hoisted(() => [] as EventStreamHandlers[]);
-vi.mock("@/lib/event-stream", () => ({
+vi.mock("@/data/event-stream", () => ({
   openEventStream(_url: string, handlers: EventStreamHandlers) {
     streams.push(handlers);
     return { close() {} };
@@ -60,7 +60,7 @@ const tryAgain = () => fireEvent.click(screen.getByRole("button", { name: "Try a
 
 beforeEach(() => {
   vi.useFakeTimers();
-  // Every wait before a new try is as long as it can be: lib/api.ts shortens them at random.
+  // Every wait before a new try is as long as it can be: data/api.ts shortens them at random.
   vi.spyOn(Math, "random").mockReturnValue(1);
   server = fakeServer();
   server.get(OPEN_PART, copy());

@@ -1,7 +1,7 @@
 import { FileText, ListTodo, MessageSquare } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
-import { useRestLoaded } from "@/lib/store";
+import { useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/data/selectors";
+import { useRestLoaded } from "@/data/store";
 import type { SearchHit } from "@/types/core";
 import { type Cmd, type CommandContext, useCommands } from "@/palette/palette-commands";
 import { Group, Item, Note } from "@/palette/palette-rows";

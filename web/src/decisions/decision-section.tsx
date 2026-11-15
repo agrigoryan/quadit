@@ -4,9 +4,9 @@
 
 import { type DragEvent, useState } from "react";
 import { MessageCircleQuestion } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { useRowEvenIfGone } from "@/lib/selectors";
+import { useRowEvenIfGone } from "@/data/selectors";
 import { Section } from "@/detail/section";
 import { Button } from "@/ui/button";
 import { useTaskDecisions } from "@/decisions/data";

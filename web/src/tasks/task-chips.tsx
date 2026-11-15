@@ -1,7 +1,7 @@
 import { CalendarDays, Globe, Hourglass, Layers } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMe, useMember, useSubtaskProgress } from "@/lib/selectors";
+import { useMe, useMember, useSubtaskProgress } from "@/data/selectors";
 import { dueLabel } from "@/lib/time";
 import type { Task } from "@/types/core";
 import { waitsOutside } from "@/tasks/actions";

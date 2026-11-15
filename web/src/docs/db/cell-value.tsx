@@ -3,7 +3,7 @@
 
 import { ArrowUpRight, Check } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { useLookup, useMember } from "@/lib/selectors";
+import { useLookup, useMember } from "@/data/selectors";
 import { isDay } from "@/lib/days";
 import { formatDay } from "@/lib/time";
 import { docTitle } from "@/docs/data";

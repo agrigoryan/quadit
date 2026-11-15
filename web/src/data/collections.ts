@@ -1,6 +1,6 @@
 // The shape of the browser's copy: every collection with the type of its
 // rows, which collection each kind of feed entity lives in, and the key a
-// row is filed under. lib/store.ts holds the copy; lib/apply.ts changes it.
+// row is filed under. data/store.ts holds the copy; data/apply.ts changes it.
 
 import type {
   AgentSession,
@@ -36,8 +36,8 @@ export type AnyRow = Record<string, unknown>;
 /**
  * Every row type here is a `type`, not an `interface`: only a type has the
  * implicit index signature that lets the code filing rows of every kind
- * (CopyOnWrite, lib/mutate.ts) see a table as Dict<AnyRow>. An interface
- * here fails the type check in lib/apply.ts.
+ * (CopyOnWrite, data/mutate.ts) see a table as Dict<AnyRow>. An interface
+ * here fails the type check in data/apply.ts.
  */
 export interface Collections {
   tasks: Dict<Task>;

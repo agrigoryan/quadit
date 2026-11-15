@@ -5,7 +5,7 @@ import { useId } from "react";
 import { ChevronDown, Users } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMe } from "@/lib/selectors";
+import { useMe } from "@/data/selectors";
 import type { Member } from "@/types/core";
 import { memberItems } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";

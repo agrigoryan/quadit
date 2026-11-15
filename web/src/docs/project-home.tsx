@@ -2,7 +2,7 @@
 // the ways to start one.
 
 import { FilePlus2, FileText } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import type { Project } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";

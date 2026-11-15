@@ -2,7 +2,7 @@
 // set converts to and from the server's TaskQuery, which is what a saved
 // view stores, so views made here work for agents and the other way round.
 
-import type { Collections, Dict } from "@/lib/store";
+import type { Collections, Dict } from "@/data/store";
 import type { SortBy, Task, TaskQuery } from "@/types/core";
 import { type FilterName, FILTERS, type Grouping, GROUPINGS } from "@/tasks/properties";
 import type { GroupHead, GroupSource, QueryContext, QuerySource } from "@/tasks/properties/property";

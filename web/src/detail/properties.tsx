@@ -4,12 +4,12 @@
 // the keys of those that have one (S, A, P, L) open their pickers.
 
 import { useRef, useState } from "react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { useHotkeys } from "@/lib/hotkeys";
-import { useNow } from "@/lib/live";
+import { useNow } from "@/data/live";
 import { t } from "@/lib/i18n";
-import { useMember } from "@/lib/selectors";
+import { useMember } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { nameOf } from "@/detail/data";
 import { KEYED, PROPERTIES, type PropertyName } from "@/tasks/properties";

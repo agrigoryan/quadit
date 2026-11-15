@@ -107,8 +107,25 @@
             "patterns": [
               { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
               {
-                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/test/**"],
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/data/**", "!@/test/**"],
                 "message": "lib knows neither the server's data, the router nor the interface: it imports only types and i18n."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/data/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/data/**", "!@/test/**"],
+                "message": "data (the workspace copy and the server) sits below hooks, nav, ui and every feature."
               }
             ]
           }
@@ -124,7 +141,7 @@
             "patterns": [
               { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
               {
-                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/ui/**", "!@/test/**"],
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/data/**", "!@/ui/**", "!@/test/**"],
                 "message": "ui sits below every feature folder."
               }
             ]

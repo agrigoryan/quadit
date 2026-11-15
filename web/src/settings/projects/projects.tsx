@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { mutate } from "@/lib/mutate";
-import { sortByRank, useArchived, useLookupEvenIfGone, useProjects } from "@/lib/selectors";
+import { mutate } from "@/data/mutate";
+import { sortByRank, useArchived, useLookupEvenIfGone, useProjects } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import type { Project } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";

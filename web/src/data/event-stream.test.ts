@@ -1,7 +1,7 @@
-// Reading the live stream (lib/event-stream.ts) from a fetch that the test feeds.
+// Reading the live stream (data/event-stream.ts) from a fetch that the test feeds.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type EventStreamHandlers, openEventStream } from "@/lib/event-stream";
+import { type EventStreamHandlers, openEventStream } from "@/data/event-stream";
 import type { FeedEvent } from "@/types/core";
 
 /** A response body the test writes to, chunk by chunk. */

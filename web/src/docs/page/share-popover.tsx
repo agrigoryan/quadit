@@ -2,11 +2,11 @@
 // owner picks.
 
 import { Check, Link2, Lock, Users } from "lucide-react";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
-import { copyText } from "@/lib/files";
+import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
-import { useMe, useMember, useMembers, useSlug } from "@/lib/selectors";
+import { useMe, useMember, useMembers, useSlug } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import { setSharing } from "@/docs/actions";
 import type { Doc } from "@/types/docs";

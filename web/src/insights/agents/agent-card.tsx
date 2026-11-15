@@ -8,7 +8,7 @@ import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { ago, exact, parseWhen, timeOfDay } from "@/lib/time";
 import type { AgentSession, Member, Task } from "@/types/core";
-import { useLookup, useRowEvenIfGone } from "@/lib/selectors";
+import { useLookup, useRowEvenIfGone } from "@/data/selectors";
 import { count } from "@/insights/lib/amounts";
 import type { AgentState } from "@/insights/lib/types";
 import type { Claim } from "@/types/agents";

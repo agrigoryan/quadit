@@ -1,13 +1,13 @@
 // Reads of the store that the tasks folder needs more than once and that
-// lib/selectors.ts does not offer, and the reads of the server it makes
+// data/selectors.ts does not offer, and the reads of the server it makes
 // with TanStack Query (their keys are here).
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useCan } from "@/lib/access";
-import { api, workspacePath } from "@/lib/api";
-import { inWorkspace } from "@/lib/query";
-import { getRows, sortByRank, useProjects, useSlug } from "@/lib/selectors";
+import { useCan } from "@/data/access";
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace } from "@/data/query";
+import { getRows, sortByRank, useProjects, useSlug } from "@/data/selectors";
 import type { Project, Status } from "@/types/core";
 
 /** statusesOf outside a component: a project's live statuses in rank order. */

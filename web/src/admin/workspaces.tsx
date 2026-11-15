@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ArrowUpRight, LogIn, Undo2 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { loadSession, useSession } from "@/auth/session";
-import { api } from "@/lib/api";
+import { api } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { exact, fullDate } from "@/lib/time";
 import { toast } from "@/lib/toast";
@@ -14,7 +14,7 @@ import { LoadGate } from "@/ui/load-gate";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
 import { adminKeys } from "@/admin/data";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 
 export interface AdminWorkspace {
   id: string;

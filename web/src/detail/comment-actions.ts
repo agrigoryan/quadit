@@ -5,8 +5,8 @@
 import type { Changes } from "@/types/changes.gen";
 import { create } from "zustand";
 import { newId } from "@/lib/ids";
-import { send } from "@/lib/mutate";
-import { getState } from "@/lib/store";
+import { send } from "@/data/mutate";
+import { getState } from "@/data/store";
 import type { Comment, FileRow, Task } from "@/types/core";
 import { uploadOrToast } from "@/detail/uploads";
 

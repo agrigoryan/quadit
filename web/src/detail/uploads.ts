@@ -3,14 +3,14 @@
 // the panel can show it as "uploading".
 
 import { create } from "zustand";
-import { errorMessage } from "@/lib/api";
-import { uploadFile, type UploadOptions } from "@/lib/files";
+import { errorMessage } from "@/data/api";
+import { uploadFile, type UploadOptions } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { send } from "@/lib/mutate";
+import { send } from "@/data/mutate";
 import { rankBetween } from "@/lib/rank";
-import { getRows } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getRows } from "@/data/selectors";
+import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { Task } from "@/types/core";
 

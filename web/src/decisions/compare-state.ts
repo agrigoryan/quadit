@@ -3,7 +3,7 @@
 // pixel edges, the videos on stage, and the pick waiting for its confirmation.
 
 import { useCallback, useRef, useState } from "react";
-import { isVideo } from "@/lib/files";
+import { isVideo } from "@/data/files";
 import type { Decision, DecisionOption } from "@/types/core";
 import { isSmallArt, type OptionFile, type OptionFiles, type Viewer } from "@/decisions/data";
 import { useSharedZoom, type Zoom } from "@/decisions/use-zoom";

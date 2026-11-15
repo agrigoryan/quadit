@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useMembers } from "@/lib/selectors";
+import { useMembers } from "@/data/selectors";
 import type { Secret } from "@/types/core";
 import { Avatar } from "@/ui/avatar";
 import { Input } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";
-import { useListening } from "@/lib/listening";
+import { useListening } from "@/data/listening";
 import { addHosts, setSecret, useSecrets, validName } from "@/settings/secrets/data";
 import { HostInput } from "@/settings/secrets/host-input";
 import { FormField, refuse, SwitchRow, useFieldErrors } from "@/ui/form";

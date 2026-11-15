@@ -4,7 +4,7 @@ import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { SidebarDocs } from "@/docs/tree/sidebar-docs";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useProjects, useSlug, useUnreadCount, useViews } from "@/lib/selectors";
+import { useProjects, useSlug, useUnreadCount, useViews } from "@/data/selectors";
 import type { Project } from "@/types/core";
 import { ui, useUi } from "@/lib/ui-state";
 import { type DestinationGroup, destinationPath, goKeys, placesIn } from "@/shell/destinations";

@@ -3,7 +3,7 @@
 // null lifts the limit. An owner always sees the whole workspace.
 
 import { t } from "@/lib/i18n";
-import { useProjects } from "@/lib/selectors";
+import { useProjects } from "@/data/selectors";
 import type { Member } from "@/types/core";
 import type { ScopedMember } from "@/settings/agents/data";
 import { FormField, SwitchRow } from "@/ui/form";

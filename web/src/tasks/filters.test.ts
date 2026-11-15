@@ -1,8 +1,8 @@
 // Filtering and grouping tasks, and filters to and from a saved view's query (tasks/filters.ts).
 
 import { describe, expect, it } from "vitest";
-import { isLive } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { isLive } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/types/core";
 import { emptyFilters, type Filters, fromQuery, groupTasks, matcher, sortFromQuery, toQuery } from "@/tasks/filters";
 

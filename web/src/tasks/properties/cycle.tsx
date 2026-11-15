@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { getRowEvenIfGone, useCycles, useRowEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone, useCycles, useRowEvenIfGone } from "@/data/selectors";
 import { formatDay, serverDay } from "@/lib/time";
 import type { Cycle } from "@/types/core";
 import { setCycle } from "@/tasks/actions";

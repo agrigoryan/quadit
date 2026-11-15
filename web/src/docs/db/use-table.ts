@@ -3,8 +3,8 @@
 
 import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useLookup, useLookupEvenIfGone, useMe, useSlug } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { useLookup, useLookupEvenIfGone, useMe, useSlug } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import { byRank, canSee } from "@/docs/data";
 import { type Cells, computeCells, type TableData, type World } from "@/docs/db/compute";
 import { pageQuery, useDocsStore } from "@/docs/store";

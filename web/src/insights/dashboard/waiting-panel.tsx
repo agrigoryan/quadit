@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { Hourglass } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useLiveTasks, useLookup, useMe, useMember, useOpenDecisions } from "@/lib/selectors";
+import { useLiveTasks, useLookup, useMe, useMember, useOpenDecisions } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import { type Decision, isOpenCategory, type Task } from "@/types/core";
 import { MoveCount, Panel, PanelEmpty } from "@/insights/ui/panel";

@@ -1,8 +1,8 @@
-// Uploading a file (lib/files.ts): what happens while the server cannot be reached.
+// Uploading a file (data/files.ts): what happens while the server cannot be reached.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, NetworkError, noteReachable } from "@/lib/api";
-import { uploadFile, useTransfers } from "@/lib/files";
+import { api, NetworkError, noteReachable } from "@/data/api";
+import { uploadFile, useTransfers } from "@/data/files";
 
 const file = new File(["hello"], "note.txt", { type: "text/plain" });
 const stored = {

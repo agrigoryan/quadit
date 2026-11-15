@@ -4,7 +4,7 @@
 
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useRowEvenIfGone } from "@/lib/selectors";
+import { useRowEvenIfGone } from "@/data/selectors";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Tooltip } from "@/ui/tooltip";
 

@@ -1,8 +1,8 @@
 import { Link, Navigate, NavLink, Route, Routes, useParams } from "react-router";
 import { cx } from "@/lib/cx";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { useArchived, useProjects } from "@/lib/selectors";
+import { useArchived, useProjects } from "@/data/selectors";
 import { useSettingsBase } from "@/settings/base";
 import { ProjectGeneral } from "@/settings/projects/general";
 import { ProjectLabels } from "@/settings/projects/labels";

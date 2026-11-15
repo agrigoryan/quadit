@@ -6,10 +6,10 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NewDecisionDialog } from "@/decisions/new-decision-dialog";
-import { api, ApiError } from "@/lib/api";
-import { clearOutbox } from "@/lib/mutate";
-import type { OutboxChange } from "@/lib/outbox";
-import { clearStore, loadBootstrap } from "@/lib/store";
+import { api, ApiError } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import type { OutboxChange } from "@/data/outbox";
+import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { TooltipProvider } from "@/ui/tooltip";
 

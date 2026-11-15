@@ -2,7 +2,7 @@
 // other side of a relation. Search matches the key and the title.
 
 import { type ReactNode, useMemo } from "react";
-import { useLookup, useRows } from "@/lib/selectors";
+import { useLookup, useRows } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { StatusIcon } from "@/ui/icons";
 import { Picker, type PickerItem } from "@/ui/picker";

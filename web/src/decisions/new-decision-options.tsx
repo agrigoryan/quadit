@@ -3,8 +3,8 @@
 // Adding, moving, removing and uploading files to an option happen here.
 
 import { Plus } from "lucide-react";
-import { errorMessage } from "@/lib/api";
-import { uploadFile } from "@/lib/files";
+import { errorMessage } from "@/data/api";
+import { uploadFile } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { Button } from "@/ui/button";

@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { createPasskey, passkeyCanceled, passkeysSupported } from "@/auth/webauthn";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { summariseAgent } from "@/settings/me/user-agent";
 import { Fact } from "@/ui/fact";

@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-// Reads kept fresh by the feed (lib/live.ts useLive): read once for every
+// Reads kept fresh by the feed (data/live.ts useLive): read once for every
 // page that shows them, and asked again when a matching event arrives.
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useLive } from "@/lib/live";
-import { applyEvents, clearStore, useStore } from "@/lib/store";
+import { useLive } from "@/data/live";
+import { applyEvents, clearStore, useStore } from "@/data/store";
 import type { FeedEvent } from "@/types/core";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { WithQuery } from "@/test/query";

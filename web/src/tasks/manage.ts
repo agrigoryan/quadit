@@ -5,9 +5,9 @@ import type { Changes } from "@/types/changes.gen";
 import { useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { send } from "@/lib/mutate";
-import { useCan } from "@/lib/access";
-import { getRows, useRowEvenIfGone, useSlug } from "@/lib/selectors";
+import { send } from "@/data/mutate";
+import { useCan } from "@/data/access";
+import { getRows, useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { SWATCHES } from "@/lib/swatches";
 
 /**

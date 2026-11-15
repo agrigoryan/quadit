@@ -15,7 +15,7 @@ import {
 } from "react";
 import { Checkbox as RCheckbox, Switch as RSwitch } from "radix-ui";
 import { Check, ChevronDown } from "lucide-react";
-import { ApiError, errorMessage } from "@/lib/api";
+import { ApiError, errorMessage } from "@/data/api";
 import { cx } from "@/lib/cx";
 
 interface FieldProps {

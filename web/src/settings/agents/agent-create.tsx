@@ -2,8 +2,8 @@ import type { Changes } from "@/types/changes.gen";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { mutate } from "@/lib/mutate";
-import { getRow, useMe } from "@/lib/selectors";
+import { mutate } from "@/data/mutate";
+import { getRow, useMe } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import {
   AGENT_FIELDS,

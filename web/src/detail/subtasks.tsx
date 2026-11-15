@@ -4,10 +4,10 @@
 import { useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router";
-import { useCan } from "@/lib/access";
+import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useRow, useSubtaskProgress } from "@/lib/selectors";
+import { useRow, useSubtaskProgress } from "@/data/selectors";
 import { isClosedCategory, type Task } from "@/types/core";
 import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";

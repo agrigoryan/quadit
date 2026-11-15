@@ -4,7 +4,7 @@
 // project a new page is tied to.
 
 import { createContext, type ReactNode, useContext, useMemo } from "react";
-import { useSlug } from "@/lib/selectors";
+import { useSlug } from "@/data/selectors";
 import type { Project } from "@/types/core";
 
 export interface DocsArea {

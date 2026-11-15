@@ -6,7 +6,7 @@ import { useEffect, useEffectEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 import { loadSession, signOut, useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { startSync, stopSync, useAvailability } from "@/lib/sync";
+import { startSync, stopSync, useAvailability } from "@/data/sync";
 import { toast } from "@/lib/toast";
 import { Offline } from "@/shell/offline";
 import { Shell } from "@/shell/shell";

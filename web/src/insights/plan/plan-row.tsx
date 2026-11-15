@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useRestLoaded } from "@/lib/store";
+import { useRestLoaded } from "@/data/store";
 import type { Task } from "@/types/core";
 import { emptyTally, type Tally } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";

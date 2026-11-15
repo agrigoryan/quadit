@@ -2,7 +2,7 @@
 
 import { type ReactNode, useState } from "react";
 import { Lock } from "lucide-react";
-import { ApiError, errorMessage } from "@/lib/api";
+import { ApiError, errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { useSetting } from "@/admin/settings";
 import { ConfirmDialog } from "@/ui/confirm-dialog";

@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Ellipsis, Search, ShieldCheck, ShieldOff, UserCheck, UserX } from "lucide-react";
 import { loadSession, useSession } from "@/auth/session";
-import { api } from "@/lib/api";
+import { api } from "@/data/api";
 import { cx } from "@/lib/cx";
 import { formatNumber, t } from "@/lib/i18n";
 import { Avatar } from "@/ui/avatar";
@@ -15,7 +15,7 @@ import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
 import { adminKeys } from "@/admin/data";
-import { queryClient } from "@/lib/query";
+import { queryClient } from "@/data/query";
 
 export interface AdminUser {
   id: string;

@@ -4,7 +4,7 @@
 // Pages written as Markdown (by agents, by import) carry these as text; the
 // server reads them the same either way, so nothing is lost by showing the chip.
 
-import { getLookupEvenIfGone, getRowEvenIfGone, getRows, getTaskByKeyEvenIfGone } from "@/lib/selectors";
+import { getLookupEvenIfGone, getRowEvenIfGone, getRows, getTaskByKeyEvenIfGone } from "@/data/selectors";
 import { findDecision } from "@/docs/editor/decision-refs";
 import type { Doc } from "@/types/docs";
 

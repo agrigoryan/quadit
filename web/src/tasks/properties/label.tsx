@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Tag } from "lucide-react";
 import { joinPhrases, t } from "@/lib/i18n";
-import { getRowEvenIfGone, useLabels, useLookupEvenIfGone, useRow } from "@/lib/selectors";
+import { getRowEvenIfGone, useLabels, useLookupEvenIfGone, useRow } from "@/data/selectors";
 import { toggleLabel } from "@/tasks/actions";
 import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { leaving, Pill, pill } from "@/tasks/properties/create-pill";

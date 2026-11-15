@@ -8,17 +8,17 @@
 // server cannot be reached the change waits and is sent again with the same
 // change id, which the server uses to apply it only once.
 //
-// Waiting changes are also kept on the device (lib/outbox.ts), so a reload
+// Waiting changes are also kept on the device (data/outbox.ts), so a reload
 // or a closed tab does not lose them: the next page of the same workspace
 // takes them over and sends them, in order, before anything new. A change
 // taken over this way has nothing on screen to undo; if the server refuses
 // it, a note says what was not saved.
 
-import { api, ApiError, errorMessage, NetworkError, whenReachable, workspacePath } from "@/lib/api";
+import { api, ApiError, errorMessage, NetworkError, whenReachable, workspacePath } from "@/data/api";
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { outbox, type OutboxChange } from "@/lib/outbox";
+import { outbox, type OutboxChange } from "@/data/outbox";
 import {
   applyOwnEvents,
   clearDrafts,
@@ -30,7 +30,7 @@ import {
   patchRow,
   removeRow,
   useStore,
-} from "@/lib/store";
+} from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { ChangeResult } from "@/types/core";
 

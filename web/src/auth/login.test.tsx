@@ -7,7 +7,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginPage } from "@/auth/login";
 import { type AuthConfig, useSession } from "@/auth/session";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError } from "@/data/api";
 
 const config: AuthConfig = {
   setup_needed: false,

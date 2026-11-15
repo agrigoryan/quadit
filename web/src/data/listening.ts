@@ -2,8 +2,8 @@
 // current, and from it whether something is listening for an agent's work.
 
 import { useMemo } from "react";
-import { useLive, useNow } from "@/lib/live";
-import { useLookup } from "@/lib/selectors";
+import { useLive, useNow } from "@/data/live";
+import { useLookup } from "@/data/selectors";
 import type { Member } from "@/types/core";
 
 export interface AgentState {

@@ -3,7 +3,7 @@
 import { Pin } from "lucide-react";
 import { Link } from "react-router";
 import { t, tMaybe } from "@/lib/i18n";
-import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
+import { useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { exact, parseWhen } from "@/lib/time";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { DecisionView } from "@/insights/lib/types";

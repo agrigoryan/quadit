@@ -3,9 +3,9 @@
 
 import { ImageIcon } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { cx } from "@/lib/cx";
-import { isImage, uploadFile } from "@/lib/files";
+import { isImage, uploadFile } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { localPath } from "@/lib/url";

@@ -6,8 +6,8 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ChevronRight, Download } from "lucide-react";
-import { api } from "@/lib/api";
-import { readError } from "@/lib/query";
+import { api } from "@/data/api";
+import { readError } from "@/data/query";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { exact, toTheSecond } from "@/lib/time";

@@ -4,7 +4,7 @@
 import { type ReactNode, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { copyText } from "@/lib/files";
+import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { Button } from "@/ui/button";

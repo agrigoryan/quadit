@@ -3,7 +3,7 @@
 // and the saved view's query (tasks/filters.ts toQuery) it stands for.
 
 import { describe, expect, it } from "vitest";
-import type { Dict } from "@/lib/store";
+import type { Dict } from "@/data/store";
 import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/types/core";
 import { matcher, toQuery } from "@/tasks/filters";
 import { filtersFromSearch, hasFilters, searchFromFilters } from "@/tasks/url-filters";

@@ -1,7 +1,7 @@
 // What a task template fills in when it is picked in the create dialog: its
 // status, priority, labels and assignee, which the template stores by name.
 
-import { getRows } from "@/lib/selectors";
+import { getRows } from "@/data/selectors";
 import type { Project, Template } from "@/types/core";
 import type { TaskFields } from "@/tasks/properties/property";
 

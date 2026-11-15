@@ -5,7 +5,7 @@ import { useCanCreateWorkspace } from "@/auth/config";
 import { CreateWorkspaceDialog } from "@/auth/create-workspace";
 import { useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { useStore } from "@/lib/store";
+import { useStore } from "@/data/store";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/ui/menu";
 
 /** The workspace's name; opens the list of the person's other workspaces. */

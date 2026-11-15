@@ -5,7 +5,7 @@ import { CornerDownRight } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/data/selectors";
 import type { Member } from "@/types/core";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { AgentState } from "@/insights/lib/types";

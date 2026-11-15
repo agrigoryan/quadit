@@ -4,8 +4,8 @@
 
 import { useHotkeys } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useTaskByKeyEvenIfGone } from "@/lib/selectors";
-import { useTaskDetail } from "@/lib/task-detail";
+import { useTaskByKeyEvenIfGone } from "@/data/selectors";
+import { useTaskDetail } from "@/data/task-detail";
 import { usePageTitle } from "@/lib/ui-state";
 import { useFindTask } from "@/detail/data";
 import { useFileDrop } from "@/detail/file-drop";

@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { statusRows, StatusStack } from "@/insights/charts/status-stack";
 import { WeeklyBars, weeklyRows } from "@/insights/charts/weekly-bars";

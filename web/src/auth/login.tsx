@@ -5,7 +5,7 @@ import { safeNext, useAuthConfig } from "@/auth/config";
 import { PasskeyButton, ProviderButtons } from "@/auth/providers";
 import { SecondStep } from "@/auth/second-step";
 import { signIn, useSession } from "@/auth/session";
-import { errorMessage } from "@/lib/api";
+import { errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 import { FormField } from "@/ui/form";

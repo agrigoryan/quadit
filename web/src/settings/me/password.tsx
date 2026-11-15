@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { api, ApiError, errorMessage } from "@/lib/api";
+import { api, ApiError, errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FormAlert, FormField, FormFoot, useFieldErrors } from "@/ui/form";

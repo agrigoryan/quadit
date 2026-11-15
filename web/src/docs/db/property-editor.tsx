@@ -5,7 +5,7 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { EyeOff, Sigma, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useRows as useLiveRows } from "@/lib/selectors";
+import { useRows as useLiveRows } from "@/data/selectors";
 import { docTitle, useProperties } from "@/docs/data";
 import { deleteProperty, freeName, setViewConfig, updateProperty } from "@/docs/db/actions";
 import { FormulaEditor } from "@/docs/db/formula-editor";

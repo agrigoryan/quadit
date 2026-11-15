@@ -17,15 +17,15 @@ import {
   X,
 } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
-import { send } from "@/lib/mutate";
-import { useCan } from "@/lib/access";
-import { useRows } from "@/lib/selectors";
+import { send } from "@/data/mutate";
+import { useCan } from "@/data/access";
+import { useRows } from "@/data/selectors";
 import type { AgentSession, Task, TaskLink } from "@/types/core";
 import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
 import { moneyMicros } from "@/insights/lib/amounts";
-import { useNow } from "@/lib/live";
+import { useNow } from "@/data/live";
 import { SessionRow } from "@/insights/agents/session-row";
 import { Badge } from "@/ui/badge";
 import { IconButton } from "@/ui/button";

@@ -6,7 +6,7 @@ import { MessageSquare, SendHorizontal } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useMember } from "@/lib/selectors";
+import { useMember } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import type { Comment, Decision } from "@/types/core";
 import { Avatar } from "@/ui/avatar";

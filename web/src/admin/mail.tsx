@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSession } from "@/auth/session";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
