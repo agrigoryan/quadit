@@ -4,7 +4,8 @@
 // shows it and writes the dates beside itself; the change is sent once, when
 // the pointer or the key is let go.
 
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef, useState } from "react";
+import { usePausedWrite } from "@/hooks/paused-write";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { formatDay } from "@/lib/time";
@@ -75,10 +76,9 @@ export function Bar({
   // The gesture under way, also kept outside state so handlers always see the latest.
   const live = useRef<Gesture | null>(null);
   const drag = useRef<{ mode: Mode; x: number; from: Range } | null>(null);
-  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Steps made with the keys are saved once they pause.
+  const settle = usePausedWrite(SETTLE_MS);
   const shown = draft?.range ?? base;
-
-  useEffect(() => () => clearTimeout(settle.current), []);
 
   /** A task has one date to change, so every gesture on it changes that one. */
   const modeFor = (mode: Mode): Mode => (edit === "end" ? "end" : mode);
@@ -95,7 +95,7 @@ export function Bar({
   }
 
   function finish(commit: boolean) {
-    clearTimeout(settle.current);
+    settle.cancel();
     const done = live.current;
     live.current = null;
     drag.current = null;
@@ -144,8 +144,7 @@ export function Bar({
     e.preventDefault();
     const mode = modeFor(e.shiftKey ? (e.altKey ? "start" : "end") : "move");
     step(mode, apply(mode, live.current?.range ?? base, by));
-    clearTimeout(settle.current);
-    settle.current = setTimeout(() => finish(true), SETTLE_MS);
+    settle.hold(() => finish(true));
   }
 
   const changing = draft !== null;
