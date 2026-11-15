@@ -40,7 +40,7 @@ interface Props {
 export function MultiCreateDialog({ draft, onSingle }: Props) {
   const { projectId, project, fields, change, changeProject } = useTaskFields(draft, { shared: true });
   const [text, setText] = useState("");
-  /** What is missing, or why the server made none of them: one line under the list. */
+  /** What is missing, or why the server made none of them: one line under the list. Editing the list or the project drops it. */
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Opened by someone who may change nothing, the dialog offers nothing to create.
@@ -115,7 +115,13 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
         className="flex flex-col gap-2.5"
       >
         <div className="flex items-center gap-2">
-          <ProjectSelect value={projectId} onPick={changeProject} />
+          <ProjectSelect
+            value={projectId}
+            onPick={(id) => {
+              changeProject(id);
+              setError("");
+            }}
+          />
           <span className="text-xs text-ink-3">{t("multi.title")}</span>
           <Button variant="ghost" size="sm" className="ml-auto" onClick={onSingle}>
             {t("multi.single")}
@@ -124,7 +130,10 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
         <Textarea
           autoFocus
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setError("");
+          }}
           placeholder={t("multi.placeholder")}
           aria-label={t("multi.label")}
           aria-invalid={!!error}

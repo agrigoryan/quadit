@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // FormDialog (ui/form-dialog.tsx): one request per submit, the button off
-// while it is out, a refusal in the dialog (on its field when it names one),
-// Cancel and Cmd/Ctrl-Enter, and closed once the request goes through.
+// while it is out, a refusal in the dialog (on its field when it names one,
+// until that field is edited), Cancel and Cmd/Ctrl-Enter, and closed once
+// the request goes through.
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -109,6 +110,31 @@ describe("FormDialog", () => {
     expect(nameBox()).toHaveAccessibleDescription("a name is needed");
     expect(onClose).not.toHaveBeenCalled();
     expect(button()).toBeEnabled();
+  });
+
+  it("drops a field's message once that field is edited, and shows it again when the next try is refused the same way", async () => {
+    const { sent } = show();
+    await act(async () => fireEvent.click(button()));
+    expect(screen.getByRole("alert")).toHaveTextContent("a name is needed");
+    fireEvent.change(screen.getByRole("textbox", { name: "Note" }), { target: { value: "x" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("a name is needed");
+    type("b");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(nameBox()).not.toBeInvalid();
+    type("");
+    await act(async () => fireEvent.click(button()));
+    expect(screen.getByRole("alert")).toHaveTextContent("a name is needed");
+    expect(nameBox()).toBeInvalid();
+    expect(sent).toHaveLength(0);
+  });
+
+  it("keeps a refusal that names no field while the fields are edited, until the next try", async () => {
+    const { sent } = show();
+    type("bug");
+    fireEvent.click(button());
+    await act(async () => sent[0]?.answer.reject(new ApiError(409, { code: "conflict", message: "out of room" })));
+    type("bugs");
+    expect(screen.getByRole("alert")).toHaveTextContent("out of room");
   });
 
   it("closes on Cancel without sending", () => {

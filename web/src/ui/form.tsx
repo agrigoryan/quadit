@@ -8,7 +8,9 @@ import {
   type SelectHTMLAttributes,
   useCallback,
   useContext,
+  useEffect,
   useId,
+  useRef,
   useState,
 } from "react";
 import { Checkbox as RCheckbox, Switch as RSwitch } from "radix-ui";
@@ -51,17 +53,42 @@ export function useFieldControl(id: string | undefined): {
   return { "aria-describedby": field.describedBy, "aria-invalid": field.invalid || undefined };
 }
 
-/** A label above a field, with a hint or an error under it. */
-export function FormField({ label, htmlFor, hint, error, children, className }: FieldProps) {
+/**
+ * A label above a field, with a hint or an error under it. The error goes
+ * once the person edits the field (types in it, picks in its select): it was
+ * about what was there before. It comes back with the form's next try if
+ * that is refused the same way.
+ */
+export function FormField({ label, htmlFor, hint, error: given, children, className }: FieldProps) {
   const own = useId();
   const labelId = `${own}-label`;
   const noteId = `${own}-note`;
+  const box = useRef<HTMLDivElement>(null);
+  /** The error the field has been edited since; a new error, or the form sent again, brings errors back. */
+  const [editedAway, setEditedAway] = useState<string>();
+  const [lastGiven, setLastGiven] = useState(given);
+  if (given !== lastGiven) {
+    setLastGiven(given);
+    setEditedAway(undefined);
+  }
+  // Sent again, the form may be refused with the very same words: they show again.
+  useEffect(() => {
+    const form = box.current?.closest("form");
+    if (!form) return;
+    const sent = () => setEditedAway(undefined);
+    form.addEventListener("submit", sent);
+    return () => form.removeEventListener("submit", sent);
+  }, []);
+  const error = given && given !== editedAway ? given : undefined;
   const describedBy = error || hint ? noteId : undefined;
   const labelClass = cx("text-xs font-medium", error ? "text-danger" : "text-ink-2");
   return (
     <div
+      ref={box}
       className={cx("flex min-w-0 flex-col gap-1", className)}
       {...(htmlFor ? {} : { role: "group", "aria-labelledby": labelId, "aria-describedby": describedBy })}
+      // A change in a control of the field bubbles up to here.
+      onChange={() => given && setEditedAway(given)}
     >
       {htmlFor ? (
         <label htmlFor={htmlFor} className={labelClass}>

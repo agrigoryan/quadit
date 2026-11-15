@@ -48,7 +48,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
   const [preview, setPreview] = useState(false);
   /** "Create more": the dialog stays for the next task. */
   const [more, setMore] = useState(false);
-  /** What is missing, found before anything is sent: the project or the title. */
+  /** What is missing, found before anything is sent: the project or the title. Editing either drops it. */
   const [error, setError] = useState("");
 
   function change(patch: Partial<TaskFields>) {
@@ -145,7 +145,13 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- keys typed in the form's fields bubble up to here; the form itself is not a control */}
       <form onSubmit={submit} onKeyDown={(e) => sendOnModEnter(e, submit)} className="flex flex-col gap-2.5">
         <div className="flex items-center gap-2">
-          <ProjectSelect value={projectId} onPick={changeProject} />
+          <ProjectSelect
+            value={projectId}
+            onPick={(id) => {
+              changeProject(id);
+              setError("");
+            }}
+          />
           <span className="text-xs text-ink-3 max-sm:hidden">{t("create.title")}</span>
           <Button variant="ghost" size="sm" className="ml-auto" onClick={onMany} aria-label={t("multi.open")}>
             <span className="max-sm:hidden">{t("multi.open")}</span>
@@ -172,7 +178,10 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
           ref={titleBox}
           autoFocus
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            setError("");
+          }}
           placeholder={t("create.titlePlaceholder")}
           aria-label={t("create.titlePlaceholder")}
           aria-invalid={!!error}

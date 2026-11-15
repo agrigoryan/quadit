@@ -116,14 +116,16 @@ describe("CreateTaskDialog, one task", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it("keeps the message while the title is typed, and drops it when the task is created", () => {
+  it("drops the message once a title is typed, and asks again when the title is emptied and sent", () => {
     open();
     fireEvent.click(screen.getByRole("checkbox", { name: "Create more" }));
     fireEvent.click(create());
     fireEvent.change(title(), { target: { value: "Fix the menu" } });
-    expect(screen.getByRole("alert")).toHaveTextContent("Give the task a title");
-    fireEvent.click(create());
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(title()).not.toBeInvalid();
+    fireEvent.change(title(), { target: { value: "" } });
+    fireEvent.click(create());
+    expect(screen.getByRole("alert")).toHaveTextContent("Give the task a title");
   });
 
   it("closes at once and sends the task once, also for a double click", async () => {
@@ -199,11 +201,10 @@ describe("CreateTaskDialog, several tasks", () => {
     expect(titles()).toHaveValue("one\ntwo");
     expect(isOpen()).toBe(true);
 
-    // Typing leaves the message; sending again takes it away.
+    // The message is about the list as it was: editing the list takes it away.
     fireEvent.change(titles(), { target: { value: "one" } });
-    expect(screen.getByRole("alert")).toHaveTextContent("title is too long");
-    fireEvent.click(create());
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(titles()).not.toBeInvalid();
   });
 
   it("asks for a title when there is none, with Cmd/Ctrl-Enter", () => {

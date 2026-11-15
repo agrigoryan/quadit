@@ -84,3 +84,21 @@ test("the import source is picked from the keyboard", async ({ page }) => {
   await expect(source("Linear")).toBeChecked();
   await expect(source("Asana")).not.toBeChecked();
 });
+
+// A field's message is about what was in the field: editing the field takes it
+// away; the next try that is refused the same way shows it again.
+test("a field's message goes once the field is edited", async ({ page }) => {
+  await page.goto("/e2e/settings/projects");
+  await page.getByRole("button", { name: "New project" }).click();
+  const dialog = page.getByRole("dialog", { name: "New project" });
+  const name = dialog.getByRole("textbox", { name: "Name" });
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("This is required");
+  await expect(name).toHaveAttribute("aria-invalid", "true");
+  await name.fill("Zeta");
+  await expect(dialog.getByRole("alert")).toBeHidden();
+  await expect(name).not.toHaveAttribute("aria-invalid", "true");
+  await name.fill("");
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("This is required");
+});
