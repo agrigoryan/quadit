@@ -1,8 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,10 +27,6 @@ func init() {
 		m.HandleFunc("POST /api/v1/w/{ws}/import", s.in(s.hImport))
 	})
 }
-
-// inProcess marks a request the server makes to itself on a caller's
-// behalf; such requests are not counted against the caller's rate limit.
-type inProcess struct{}
 
 type importBody struct {
 	Kind string `json:"kind"`
@@ -153,35 +147,16 @@ func (k selfAPI) SendFile(fileID, path string) (string, error) {
 }
 
 func (k selfAPI) do(method, path string, q url.Values, body []byte, contentType string) ([]byte, error) {
-	u := "/api/v1/w/" + k.x.ws.Slug + path
-	if len(q) > 0 {
-		u += "?" + q.Encode()
-	}
-	req, err := http.NewRequestWithContext(context.WithValue(k.x.ctx(), inProcess{}, true), method, u, bytes.NewReader(body))
+	// The same sign-in as the request that asked for the import.
+	ans, err := k.s.selfCall(callerOf(k.x), method, path, q, body, contentType)
 	if err != nil {
 		return nil, err
 	}
-	// The same sign-in as the request that asked for the import.
-	for _, h := range []string{"Authorization", "Cookie"} {
-		if v := k.x.r.Header.Get(h); v != "" {
-			req.Header.Set(h, v)
+	if ans.status >= 300 {
+		if refused := ans.refusal(); refused != nil {
+			return nil, refused
 		}
+		return nil, fmt.Errorf("%s %s: %d", method, path, ans.status)
 	}
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	req.RemoteAddr = k.x.r.RemoteAddr
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	rec := &buffer{h: http.Header{}, status: 200}
-	k.s.mux.ServeHTTP(rec, req)
-	if rec.status >= 300 {
-		var wrap struct {
-			Error engine.Error `json:"error"`
-		}
-		if json.Unmarshal(rec.body.Bytes(), &wrap) == nil && wrap.Error.Code != "" {
-			return nil, &wrap.Error
-		}
-		return nil, fmt.Errorf("%s %s: %d", method, path, rec.status)
-	}
-	return rec.body.Bytes(), nil
+	return ans.body.Bytes(), nil
 }
