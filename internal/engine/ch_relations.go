@@ -1,3 +1,5 @@
+// relation.add and relation.remove: relations between tasks.
+
 package engine
 
 import (
@@ -5,6 +7,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers relation.*.
 func init() {
 	register("relation.add", core.RoleMember, relationAdd)
 	register("relation.remove", core.RoleMember, relationRemove)
@@ -17,6 +20,8 @@ type relationArgs struct {
 	Other string `json:"other"`
 }
 
+// relationAdd relates two tasks (one blocks the other, …), and tells the
+// followers of both.
 func relationAdd(c *cx, a relationArgs) error {
 	rid, err := newID("id", a.ID)
 	if err != nil {
@@ -73,6 +78,7 @@ func (c *cx) related(t, other core.Task, r core.Relation, removed bool) error {
 	return c.emit(event{seq: c.tx.NextSeq(), typ: "task.related", entity: "task", entityID: t.ID, place: inTask(t), data: map[string]any{"id": t.ID, "key": t.Key, "other_key": other.Key, "relation": r.ID, "type": r.Type, "removed": removed}})
 }
 
+// relationRemove takes a relation between two tasks away.
 func relationRemove(c *cx, a idArgs) error {
 	r, err := loadLive[core.Relation](c, "relation", "id", a.ID)
 	if err != nil {

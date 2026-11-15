@@ -1,3 +1,5 @@
+// label.create, label.update and label.delete.
+
 package engine
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers label.*.
 func init() {
 	register("label.create", core.RoleMember, labelCreate)
 	// Anyone tags with a new label; renaming or removing one changes it for
@@ -23,6 +26,7 @@ type labelCreateArgs struct {
 	Project     string `json:"project"` // empty = shared by the whole workspace
 }
 
+// labelCreate adds a label to a project, or to the whole workspace.
 func labelCreate(c *cx, a labelCreateArgs) error {
 	lid, err := newID("id", a.ID)
 	if err != nil {
@@ -69,6 +73,7 @@ func labelUpdate(c *cx, a labelUpdateArgs) error {
 	return c.save(p, target{table: "labels", entity: "label", id: l.ID, place: c.inProjectOrWorkspace(l.ProjectID)})
 }
 
+// labelDelete puts a label in the trash and takes it off its tasks.
 func labelDelete(c *cx, a memberRefArgs) error {
 	l, err := loadLive[core.Label](c, "label", "id", a.ID)
 	if err != nil {

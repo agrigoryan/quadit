@@ -1,3 +1,5 @@
+// doc.create, doc.update, doc.delete and doc.restore: pages.
+
 package engine
 
 import (
@@ -11,6 +13,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers doc.create, doc.update, doc.delete and doc.restore.
 func init() {
 	register("doc.create", core.RoleMember, docCreate)
 	register("doc.update", core.RoleMember, docUpdate)
@@ -533,6 +536,8 @@ func docDelete(c *cx, a idArgs) error {
 	return c.emit(event{seq: seq, typ: "doc.deleted", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"ids": ids, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}}})
 }
 
+// docRestore takes a page out of the trash, with the pages that went there
+// with it.
 func docRestore(c *cx, a idArgs) error {
 	var d core.Doc
 	if err := c.tx.Get(c.ctx, &d, store.Eq("id", a.ID)); err != nil {

@@ -1,3 +1,5 @@
+// workspace.update and workspace.delete.
+
 package engine
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers workspace.*.
 func init() {
 	register("workspace.update", core.RoleAdmin, workspaceUpdate)
 	register("workspace.delete", core.RoleOwner, workspaceDelete)
@@ -18,6 +21,7 @@ type workspaceUpdateArgs struct {
 	Settings Opt[json.RawMessage] `json:"settings"`
 }
 
+// workspaceUpdate changes the workspace's name, icon and settings.
 func workspaceUpdate(c *cx, a workspaceUpdateArgs) error {
 	var w core.Workspace
 	if err := c.tx.Get(c.ctx, &w, store.Eq("id", c.ws)); err != nil {

@@ -1,3 +1,5 @@
+// attachment.*: files on tasks, comments, decisions and pages.
+
 package engine
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers attachment.*.
 func init() {
 	register("attachment.add", core.RoleMember, attachmentAdd)
 	register("attachment.remove", core.RoleMember, attachmentRemove)
@@ -63,6 +66,8 @@ func (c *cx) attach(a attachArgs, subjectType, subjectID string, t core.Task) (c
 	return at, nil
 }
 
+// attachmentAdd attaches an uploaded file to an option, a decision, a
+// comment, a page or a task.
 func attachmentAdd(c *cx, a attachArgs) error {
 	var t core.Task
 	var subjectType, subjectID, docID string
@@ -123,6 +128,8 @@ func attachmentAdd(c *cx, a attachArgs) error {
 	return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: place{scopeType: "doc", scopeID: docID}, data: map[string]any{"row": at}})
 }
 
+// attachmentRemove puts an attachment in the trash; its file stays until the
+// trash is purged.
 func attachmentRemove(c *cx, a idArgs) error {
 	at, err := loadLive[core.Attachment](c, "attachment", "id", a.ID)
 	if err != nil {

@@ -1,3 +1,5 @@
+// Refusals: Error, its codes, and saying in a caller's words what was wrong.
+
 package engine
 
 import (
@@ -37,8 +39,11 @@ type Error struct {
 	cause error
 }
 
+// Unwrap returns the store's error behind the refusal, if any.
 func (e *Error) Unwrap() error { return e.cause }
 
+// Error is the refusal in one line, with the nearest allowed value or the
+// allowed ones.
 func (e *Error) Error() string {
 	msg := e.Code + ": " + e.Message
 	if e.Nearest != "" {

@@ -1,3 +1,5 @@
+// doc.edit and doc.write: a page's blocks, by operations or as Markdown.
+
 package engine
 
 import (
@@ -12,6 +14,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers doc.edit and doc.write.
 func init() {
 	register("doc.edit", core.RoleMember, docEdit)
 	register("doc.write", core.RoleMember, docWrite)
@@ -237,7 +240,8 @@ func docWrite(c *cx, a docWriteArgs) error {
 	return c.commitEdit(d, ed, before, nil)
 }
 
-// lcs marks the blocks two versions of a page have in common, in order.
+// lcs marks the blocks two versions of a page have in common, in order:
+// their longest common subsequence, of which lcs is the textbook name.
 func lcs(a, b []md.Block) (keepA, keepB []bool) {
 	sa, sb := make([]string, len(a)), make([]string, len(b))
 	for i := range a {

@@ -1,3 +1,5 @@
+// The catalog of change types and their arguments, for callers.
+
 package engine
 
 import (

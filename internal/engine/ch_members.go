@@ -1,3 +1,5 @@
+// member.add, member.update and member.remove.
+
 package engine
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers member.*.
 func init() {
 	register("member.add", core.RoleAdmin, memberAdd)
 	register("member.update", core.RoleAdmin, memberUpdate)
@@ -51,6 +54,8 @@ func (c *cx) roleArg(s, kind string) (core.Role, error) {
 	return role, nil
 }
 
+// memberAdd makes a person with an account a member, or brings back one
+// removed earlier.
 func memberAdd(c *cx, a memberAddArgs) error {
 	role, err := c.roleArg(a.Role, core.KindPerson)
 	if err != nil {
@@ -203,6 +208,8 @@ func (c *cx) saveMember(m core.Member, p *patch) error {
 	return c.emit(event{seq: seq, typ: "member.updated", entity: "member", entityID: m.UserID, place: inWorkspace(c.ws), data: map[string]any{"id": m.UserID, "changes": p.changes}})
 }
 
+// memberUpdate changes a member's role, limits, handle, title, or suspends
+// them.
 func memberUpdate(c *cx, a memberUpdateArgs) error {
 	m, err := c.memberRef("id", a.ID)
 	if err != nil {

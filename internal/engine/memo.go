@@ -1,3 +1,5 @@
+// A transaction that remembers the small rows a write reads again and again.
+
 package engine
 
 import (
@@ -32,6 +34,8 @@ var memoTables = map[string]bool{"members": true, "statuses": true, "labels": tr
 
 func newMemoTx(tx store.Tx) *memoTx { return &memoTx{Tx: tx, rows: map[string]reflect.Value{}} }
 
+// Get loads a row, from memory when it is of a remembered table and was read
+// before.
 func (m *memoTx) Get(ctx context.Context, dst any, where ...store.Cond) error {
 	v := reflect.ValueOf(dst)
 	if v.Kind() != reflect.Pointer || !memoTypes[v.Elem().Type()] {
@@ -133,26 +137,31 @@ func (m *memoTx) forgetTable(table string) {
 	}
 }
 
+// Insert writes a row and forgets what was remembered of its table.
 func (m *memoTx) Insert(ctx context.Context, row any) error {
 	m.forgetRow(row)
 	return m.Tx.Insert(ctx, row)
 }
 
+// Upsert writes a row and forgets what was remembered of its table.
 func (m *memoTx) Upsert(ctx context.Context, row any, key ...string) error {
 	m.forgetRow(row)
 	return m.Tx.Upsert(ctx, row, key...)
 }
 
+// Update writes rows and forgets what was remembered of the table.
 func (m *memoTx) Update(ctx context.Context, table string, set map[string]any, where ...store.Cond) (int64, error) {
 	m.forgetTable(table)
 	return m.Tx.Update(ctx, table, set, where...)
 }
 
+// Delete removes rows and forgets what was remembered of the table.
 func (m *memoTx) Delete(ctx context.Context, table string, where ...store.Cond) (int64, error) {
 	m.forgetTable(table)
 	return m.Tx.Delete(ctx, table, where...)
 }
 
+// Incr counts on a row and forgets what was remembered of the table.
 func (m *memoTx) Incr(ctx context.Context, table, col string, n int64, where ...store.Cond) (int64, error) {
 	m.forgetTable(table)
 	return m.Tx.Incr(ctx, table, col, n, where...)

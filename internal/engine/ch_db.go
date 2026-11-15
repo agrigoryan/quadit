@@ -1,3 +1,5 @@
+// property.* and dbview.*: a database page's properties, views and values.
+
 package engine
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers property.* and dbview.*.
 func init() {
 	register("property.create", core.RoleMember, propertyCreate)
 	register("property.update", core.RoleMember, propertyUpdate)
@@ -55,6 +58,7 @@ type renameOption struct {
 	To   string `json:"to"`
 }
 
+// propertyCreate adds a property, a column, to a database page.
 func propertyCreate(c *cx, a propertyArgs) error {
 	pid, err := newID("id", a.ID)
 	if err != nil {
@@ -103,6 +107,8 @@ func (c *cx) propertyDoc(ref string) (core.DBProperty, core.Doc, error) {
 	return prop, d, err
 }
 
+// propertyUpdate changes a database property; renaming a select option
+// renames it in the rows and the views' filters too.
 func propertyUpdate(c *cx, a propertyArgs) error {
 	pr, d, err := c.propertyDoc(a.ID)
 	if err != nil {
@@ -304,6 +310,7 @@ type dbviewArgs struct {
 	Rank     Opt[string]          `json:"rank"`
 }
 
+// dbviewCreate adds a view (a table, a board, …) to a database page.
 func dbviewCreate(c *cx, a dbviewArgs) error {
 	vid, err := newID("id", a.ID)
 	if err != nil {
@@ -347,6 +354,7 @@ func (c *cx) dbviewDoc(ref string) (core.DBView, core.Doc, error) {
 	return v, d, err
 }
 
+// dbviewUpdate changes a database view.
 func dbviewUpdate(c *cx, a dbviewArgs) error {
 	v, d, err := c.dbviewDoc(a.ID)
 	if err != nil {

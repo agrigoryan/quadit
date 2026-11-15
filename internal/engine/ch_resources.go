@@ -1,3 +1,5 @@
+// resource.*: shared resources, and who holds or waits for them.
+
 package engine
 
 import (
@@ -9,6 +11,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers resource.*.
 func init() {
 	register("resource.create", core.RoleAdmin, resourceCreate)
 	register("resource.delete", core.RoleAdmin, resourceDelete)
@@ -38,6 +41,7 @@ func resourceCreate(c *cx, a resourceCreateArgs) error {
 	return c.created(seq, "resource", r.ID, inWorkspace(c.ws), r)
 }
 
+// loadResource loads a shared resource by its name or id.
 func (c *cx) loadResource(ref string) (core.Resource, error) {
 	var r core.Resource
 	cond := store.Eq("name", ref)
@@ -97,6 +101,7 @@ func (c *cx) activeClaims(r core.Resource) ([]core.ResourceClaim, error) {
 	return live, nil
 }
 
+// setClaim changes a hold on a resource, saying why in the feed.
 func (c *cx) setClaim(cl core.ResourceClaim, set map[string]any, why string) error {
 	if _, err := c.tx.Update(c.ctx, "resource_claims", set, store.Eq("id", cl.ID)); err != nil {
 		return err
@@ -218,6 +223,8 @@ type resourceReleaseArgs struct {
 	User     string `json:"user"` // an admin can release someone else's hold
 }
 
+// resourceRelease lets go of a hold on a resource, or of a place in its
+// queue; the next in line gets it.
 func resourceRelease(c *cx, a resourceReleaseArgs) error {
 	r, err := c.loadResource(a.Resource)
 	if err != nil {

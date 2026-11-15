@@ -1,3 +1,5 @@
+// link.set and link.remove: links from a task to elsewhere.
+
 package engine
 
 import (
@@ -9,6 +11,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers link.*.
 func init() {
 	register("link.set", core.RoleMember, linkSet)
 	register("link.remove", core.RoleMember, linkRemove)

@@ -1,3 +1,5 @@
+// Applying a change, or a batch of them, in one transaction.
+
 package engine
 
 import (

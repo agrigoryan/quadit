@@ -1,3 +1,5 @@
+// project.create, project.update and project.delete.
+
 package engine
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers project.*.
 func init() {
 	register("project.create", core.RoleAdmin, projectCreate)
 	register("project.update", core.RoleAdmin, projectUpdate)
@@ -40,6 +43,7 @@ var defaultStatuses = []struct{ name, category, color string }{
 	{"Canceled", core.CatCanceled, "#ef4444"},
 }
 
+// projectCreate makes a project with the default statuses.
 func projectCreate(c *cx, a projectCreateArgs) error {
 	pid, err := newID("id", a.ID)
 	if err != nil {
@@ -98,6 +102,7 @@ type projectUpdateArgs struct {
 	Archived    Opt[bool]                 `json:"archived"`
 }
 
+// projectUpdate changes a project; a new key gives its tasks new keys.
 func projectUpdate(c *cx, a projectUpdateArgs) error {
 	pr, err := c.project(a.ID)
 	if err != nil {

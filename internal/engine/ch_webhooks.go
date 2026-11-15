@@ -1,3 +1,5 @@
+// webhook.create, webhook.update and webhook.delete.
+
 package engine
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
+// init registers webhook.*.
 func init() {
 	register("webhook.create", core.RoleAdmin, webhookCreate)
 	register("webhook.update", core.RoleAdmin, webhookUpdate)
@@ -34,6 +37,7 @@ func checkURL(field, raw string) error {
 	return nil
 }
 
+// webhookCreate adds an address that is sent the events it asks for.
 func webhookCreate(c *cx, a webhookCreateArgs) error {
 	wid, err := newID("id", a.ID)
 	if err != nil {
@@ -80,6 +84,7 @@ type webhookUpdateArgs struct {
 	Active     Opt[bool]     `json:"active"`
 }
 
+// webhookUpdate changes a webhook.
 func webhookUpdate(c *cx, a webhookUpdateArgs) error {
 	w, err := loadLive[core.Webhook](c, "webhook", "id", a.ID)
 	if err != nil {

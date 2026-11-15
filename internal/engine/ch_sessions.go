@@ -1,3 +1,5 @@
+// session.start and session.update: an agent's work sessions.
+
 package engine
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers session.*.
 func init() {
 	register("session.start", core.RoleMember, sessionStart)
 	register("session.update", core.RoleMember, sessionUpdate)
@@ -20,6 +23,8 @@ type sessionStartArgs struct {
 	Instructions string `json:"instructions"` // what the run was asked to do
 }
 
+// sessionStart records that an agent started a run of work, on a task or
+// not.
 func sessionStart(c *cx, a sessionStartArgs) error {
 	sid, err := newID("id", a.ID)
 	if err != nil {
@@ -82,6 +87,8 @@ func appendJSON(cur json.RawMessage, add []json.RawMessage) (json.RawMessage, er
 	return json.Marshal(list)
 }
 
+// sessionUpdate records how an agent's run goes: its state, steps, links and
+// what it cost.
 func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	s, err := loadLive[core.AgentSession](c, "session", "id", a.ID)
 	if err != nil {

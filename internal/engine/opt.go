@@ -1,3 +1,5 @@
+// Opt, an optional argument that tells absent from null from a value.
+
 package engine
 
 import (
@@ -13,6 +15,7 @@ type Opt[T any] struct {
 	V    T
 }
 
+// UnmarshalJSON reads an argument that was sent: null, or a value.
 func (o *Opt[T]) UnmarshalJSON(b []byte) error {
 	o.Set = true
 	if string(bytes.TrimSpace(b)) == "null" {
@@ -26,6 +29,7 @@ func (o *Opt[T]) UnmarshalJSON(b []byte) error {
 	return dec.Decode(&o.V)
 }
 
+// MarshalJSON writes the value, or null when there is none.
 func (o Opt[T]) MarshalJSON() ([]byte, error) {
 	if !o.Set || o.Null {
 		return []byte("null"), nil

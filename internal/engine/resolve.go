@@ -1,3 +1,5 @@
+// Finding rows by what people call them: a key, a @handle, a name or an id.
+
 package engine
 
 import (
@@ -35,18 +37,32 @@ func NewResolver(ctx context.Context, db store.DB, actor core.Member, at int64) 
 	return &Resolver{ctx: ctx, db: db, actor: actor, at: at}
 }
 
-func (r *Resolver) Project(ref string) (core.Project, error)      { return r.project(ref) }
-func (r *Resolver) Task(ref string) (core.Task, error)            { return r.anyTask("task", ref) }
+// Project finds a project by its key or id.
+func (r *Resolver) Project(ref string) (core.Project, error) { return r.project(ref) }
+
+// Task finds a task by its key (SVA-12) or id, in the trash or not.
+func (r *Resolver) Task(ref string) (core.Task, error) { return r.anyTask("task", ref) }
+
+// Member finds a member by id, @handle or "me"; field names the argument in
+// a refusal.
 func (r *Resolver) Member(field, ref string) (core.Member, error) { return r.memberRef(field, ref) }
+
+// Status finds a status of the project by id, name or category.
 func (r *Resolver) Status(project core.Project, ref string) (core.Status, error) {
 	return r.status(project, "status", ref)
 }
+
+// Label finds a label usable in the project by id or name.
 func (r *Resolver) Label(project core.Project, ref string) (core.Label, error) {
 	return r.label(project, "label", ref)
 }
+
+// Epic finds an epic of the project by id or name.
 func (r *Resolver) Epic(project core.Project, ref string) (core.Epic, error) {
 	return r.epic(project, "epic", ref)
 }
+
+// Cycle finds a cycle of the project by id, number, "current" or "next".
 func (r *Resolver) Cycle(project core.Project, ref string) (core.Cycle, error) {
 	return r.cycle(project, "cycle", ref)
 }
@@ -55,6 +71,8 @@ var taskKeyRE = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{1,9}-\d+$`)
 
 func isID(s string) bool { return len(s) == 36 && id.Valid(s) }
 
+// project finds a live project by key or id, naming the keys there are when
+// it finds none.
 func (r *Resolver) project(ref string) (core.Project, error) {
 	var project core.Project
 	if ref == "" {
@@ -196,6 +214,7 @@ func (r *Resolver) status(project core.Project, field, ref string) (core.Status,
 		Allowed: names, Nearest: nearest(ref, names)}
 }
 
+// defaultStatus is the status a new task in the project takes.
 func (r *Resolver) defaultStatus(project core.Project) (core.Status, error) {
 	all, err := r.statuses(project.ID)
 	if err != nil {
@@ -416,6 +435,7 @@ func nearest(got string, allowed []string) string {
 	return best
 }
 
+// editDistance is the Levenshtein distance between two strings, in runes.
 func editDistance(a, b string) int {
 	ra, rb := []rune(a), []rune(b)
 	prev := make([]int, len(rb)+1)

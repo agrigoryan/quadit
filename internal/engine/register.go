@@ -1,3 +1,5 @@
+// The table of change types, and register, which adds one.
+
 package engine
 
 import (

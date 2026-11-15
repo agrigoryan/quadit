@@ -1,3 +1,5 @@
+// A page's blocks: the tree they make, and the editor that changes them.
+
 package engine
 
 import (
@@ -52,6 +54,7 @@ func LoadBlocks(c interface {
 
 type cxLister struct{ c *cx }
 
+// List reads rows inside the change's transaction.
 func (l cxLister) List(dst any, q store.Q) error { return l.c.tx.List(l.c.ctx, dst, q) }
 
 // BlockOp is one edit to a page: insert, update, move or delete a block.
@@ -159,6 +162,8 @@ func (e *editor) rankFor(op BlockOp, self string) (string, error) {
 	return rank.After(list[len(list)-1].Rank), nil
 }
 
+// insert adds a new block, and the blocks nested in it, under parent at rank
+// rk.
 func (e *editor) insert(b md.Block, parent, rk string) error {
 	bid, err := newID("ops.block.id", b.ID)
 	if err != nil {
@@ -206,6 +211,7 @@ func (e *editor) remove(id string) {
 	}
 }
 
+// apply makes one edit to the page's blocks.
 func (e *editor) apply(op BlockOp) error {
 	switch op.Op {
 	case "insert":

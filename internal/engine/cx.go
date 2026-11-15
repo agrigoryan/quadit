@@ -1,3 +1,5 @@
+// cx, what a handler works with, and the events it records.
+
 package engine
 
 import (

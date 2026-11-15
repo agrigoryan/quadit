@@ -1,3 +1,5 @@
+// preference.create, preference.update and preference.delete.
+
 package engine
 
 import (
@@ -6,6 +8,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
+// init registers preference.*.
 func init() {
 	register("preference.create", core.RoleAdmin, preferenceCreate)
 	register("preference.update", core.RoleAdmin, preferenceUpdate)
@@ -20,6 +23,8 @@ type preferenceCreateArgs struct {
 	Labels   []string `json:"labels"`   // shown on tasks with any of these labels; empty = all tasks
 }
 
+// preferenceCreate keeps something people want done a certain way, for
+// agents to follow.
 func preferenceCreate(c *cx, a preferenceCreateArgs) error {
 	pid, err := newID("id", a.ID)
 	if err != nil {

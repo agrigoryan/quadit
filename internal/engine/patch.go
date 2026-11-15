@@ -1,3 +1,5 @@
+// An update's changed fields, and saving or trashing one row with its event.
+
 package engine
 
 import (

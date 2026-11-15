@@ -1,3 +1,5 @@
+// Writes the engine makes itself, for background jobs.
+
 package engine
 
 import (

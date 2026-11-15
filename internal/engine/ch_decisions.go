@@ -1,3 +1,5 @@
+// decision.*: open, update, pick, unclear, delete and restore.
+
 package engine
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers decision.*.
 func init() {
 	register("decision.open", core.RoleMember, decisionOpen)
 	register("decision.update", core.RoleMember, decisionUpdate)
@@ -266,6 +269,8 @@ type decisionUpdateArgs struct {
 	Recommended    Opt[string] `json:"recommended"` // an option id
 }
 
+// decisionTask loads a decision, named by its id or by its task ("SVA-7",
+// "SVA-7#2"), and the task it is on.
 func (c *cx) decisionTask(ref string) (core.Decision, core.Task, error) {
 	if ref != "" && !looksLikeID(ref) {
 		// By its task: "SVA-7" is that task's one open decision, "SVA-7#2"
@@ -287,6 +292,7 @@ func (c *cx) decisionTask(ref string) (core.Decision, core.Task, error) {
 	return d, t, err
 }
 
+// decisionUpdate changes an open decision, by the one who asked it.
 func decisionUpdate(c *cx, a decisionUpdateArgs) error {
 	d, t, err := c.decisionTask(a.ID)
 	if err != nil {

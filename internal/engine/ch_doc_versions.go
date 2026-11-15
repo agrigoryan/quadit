@@ -1,3 +1,5 @@
+// doc.snapshot and doc.revert: a page's kept versions.
+
 package engine
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers doc.snapshot and doc.revert.
 func init() {
 	register("doc.snapshot", core.RoleMember, docSnapshot)
 	register("doc.revert", core.RoleMember, docRevert)

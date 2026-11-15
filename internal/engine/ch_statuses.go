@@ -1,3 +1,5 @@
+// status.create, status.update and status.delete.
+
 package engine
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers status.*.
 func init() {
 	register("status.create", core.RoleAdmin, statusCreate)
 	register("status.update", core.RoleAdmin, statusUpdate)
@@ -23,6 +26,7 @@ type statusCreateArgs struct {
 	Rank     string `json:"rank"`
 }
 
+// statusCreate adds a status to a project's workflow.
 func statusCreate(c *cx, a statusCreateArgs) error {
 	sid, err := newID("id", a.ID)
 	if err != nil {
@@ -79,6 +83,8 @@ type statusUpdateArgs struct {
 	IsDefault Opt[bool]   `json:"is_default"`
 }
 
+// statusUpdate changes a status; making it the default takes that from the
+// one before.
 func statusUpdate(c *cx, a statusUpdateArgs) error {
 	st, err := loadLive[core.Status](c, "status", "id", a.ID)
 	if err != nil {
@@ -123,6 +129,8 @@ type statusDeleteArgs struct {
 	MoveTo string `json:"move_to"` // where its tasks go
 }
 
+// statusDelete puts a status in the trash, once its tasks are moved to
+// another.
 func statusDelete(c *cx, a statusDeleteArgs) error {
 	st, err := loadLive[core.Status](c, "status", "id", a.ID)
 	if err != nil {

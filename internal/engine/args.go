@@ -1,3 +1,5 @@
+// Reading a change's arguments strictly, with priorities by name.
+
 package engine
 
 import (

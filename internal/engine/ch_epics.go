@@ -1,3 +1,5 @@
+// epic.create, epic.update and epic.delete.
+
 package engine
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers epic.*.
 func init() {
 	register("epic.create", core.RoleMember, epicCreate)
 	register("epic.update", core.RoleMember, epicUpdate)
@@ -28,6 +31,7 @@ type epicCreateArgs struct {
 	Rank        string `json:"rank"`
 }
 
+// epicCreate adds an epic to a project.
 func epicCreate(c *cx, a epicCreateArgs) error {
 	eid, err := newID("id", a.ID)
 	if err != nil {
@@ -94,6 +98,7 @@ type epicUpdateArgs struct {
 	Rank        Opt[string] `json:"rank"`
 }
 
+// epicUpdate changes an epic.
 func epicUpdate(c *cx, a epicUpdateArgs) error {
 	e, err := loadLive[core.Epic](c, "epic", "id", a.ID)
 	if err != nil {
@@ -145,6 +150,7 @@ func epicUpdate(c *cx, a epicUpdateArgs) error {
 	return c.index(store.SearchDoc{Kind: "epic", EntityID: e.ID, ScopeType: "epic", ScopeID: e.ID, ProjectID: e.ProjectID, Title: e.Name, Body: e.Description})
 }
 
+// epicDelete puts an epic in the trash; its tasks stay, without it.
 func epicDelete(c *cx, a idArgs) error {
 	e, err := loadLive[core.Epic](c, "epic", "id", a.ID)
 	if err != nil {

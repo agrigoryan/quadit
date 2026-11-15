@@ -1,3 +1,5 @@
+// rule.create, rule.update and rule.delete.
+
 package engine
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
+// init registers rule.*.
 func init() {
 	register("rule.create", core.RoleAdmin, ruleCreate)
 	register("rule.update", core.RoleAdmin, ruleUpdate)
@@ -77,6 +80,8 @@ func (c *cx) checkRule(m *core.RuleMatch, a *core.RuleAction) error {
 	return nil
 }
 
+// ruleCreate adds a rule: an action the engine takes when a matching event
+// happens.
 func ruleCreate(c *cx, a ruleArgs) error {
 	rid, err := newID("id", a.ID)
 	if err != nil {
@@ -100,6 +105,7 @@ func ruleCreate(c *cx, a ruleArgs) error {
 	return c.created(seq, "rule", r.ID, inWorkspace(c.ws), r)
 }
 
+// ruleUpdate changes a rule.
 func ruleUpdate(c *cx, a ruleArgs) error {
 	r, err := loadLive[core.Rule](c, "rule", "id", a.ID)
 	if err != nil {

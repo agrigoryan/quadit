@@ -1,3 +1,5 @@
+// template.create, template.update and template.delete.
+
 package engine
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers template.*.
 func init() {
 	register("template.create", core.RoleMember, templateCreate)
 	register("template.update", core.RoleMember, templateUpdate)
@@ -35,6 +38,7 @@ type templateCreateArgs struct {
 	Preset      *Preset `json:"preset"`
 }
 
+// templateCreate keeps a template for new tasks.
 func templateCreate(c *cx, a templateCreateArgs) error {
 	tid, err := newID("id", a.ID)
 	if err != nil {
@@ -70,6 +74,7 @@ type templateUpdateArgs struct {
 	Preset      Opt[Preset] `json:"preset"`
 }
 
+// templateUpdate changes a template.
 func templateUpdate(c *cx, a templateUpdateArgs) error {
 	tp, err := loadLive[core.Template](c, "template", "id", a.ID)
 	if err != nil {

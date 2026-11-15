@@ -1,3 +1,5 @@
+// What the handlers of several files use.
+
 package engine
 
 import (

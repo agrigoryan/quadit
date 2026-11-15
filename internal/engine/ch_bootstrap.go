@@ -1,3 +1,5 @@
+// Bootstrap: a new workspace and its owner, made outside any change.
+
 package engine
 
 import (

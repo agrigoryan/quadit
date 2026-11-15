@@ -1,3 +1,5 @@
+// Background upkeep: reindexing, purging the trash, announcing restores.
+
 package engine
 
 import (
@@ -37,6 +39,7 @@ type reindex struct {
 // reindexPage is how many tasks are read at a time.
 const reindexPage = 5000
 
+// indexTasks indexes every task, the archived ones too.
 func (r *reindex) indexTasks() error {
 	tasks, err := r.db.Tasks(r.ctx, store.TaskFilter{Archived: true, Limit: reindexPage})
 	for more := tasks; err == nil && len(more) == reindexPage; {
@@ -56,6 +59,7 @@ func (r *reindex) indexTasks() error {
 	return nil
 }
 
+// indexDocs indexes every live page by its text.
 func (r *reindex) indexDocs() error {
 	var docs []core.Doc
 	if err := r.db.List(r.ctx, &docs, store.Where(store.Live)); err != nil {
@@ -86,6 +90,7 @@ func writePlain(b *strings.Builder, blocks []md.Block) {
 	}
 }
 
+// indexComments indexes the comments on the tasks and pages indexed.
 func (r *reindex) indexComments() error {
 	var comments []core.Comment
 	if err := r.db.List(r.ctx, &comments, store.Where(store.Live)); err != nil {
@@ -107,6 +112,7 @@ func (r *reindex) indexComments() error {
 	return nil
 }
 
+// indexDecisions indexes the decisions on the tasks indexed.
 func (r *reindex) indexDecisions() error {
 	var decisions []core.Decision
 	if err := r.db.List(r.ctx, &decisions, store.Where(store.Live)); err != nil {
@@ -128,6 +134,7 @@ func (r *reindex) indexDecisions() error {
 	return nil
 }
 
+// indexEpics indexes every live epic.
 func (r *reindex) indexEpics() error {
 	var epics []core.Epic
 	if err := r.db.List(r.ctx, &epics, store.Where(store.Live)); err != nil {

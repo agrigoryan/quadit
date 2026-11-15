@@ -1,3 +1,5 @@
+// What agents spend: the budget checks, and warnings when one runs low.
+
 package engine
 
 import (

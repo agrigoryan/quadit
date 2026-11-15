@@ -1,3 +1,5 @@
+// agent.create and agent.update: agents, their helpers, limits and budgets.
+
 package engine
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers agent.*.
 func init() {
 	// Members may make a sub-agent for a task; a standing agent needs an admin.
 	register("agent.create", core.RoleMember, agentCreate)
@@ -266,6 +269,8 @@ type agentUpdateArgs struct {
 	Budget      Opt[core.Budget] `json:"budget"`
 }
 
+// agentUpdate changes an agent: what is shown of it, and what it may reach
+// and spend.
 func agentUpdate(c *cx, a agentUpdateArgs) error {
 	m, err := c.memberRef("id", a.ID)
 	if err != nil {

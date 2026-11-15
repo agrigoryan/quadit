@@ -1,3 +1,5 @@
+// The inbox, watchers, what a text mentions, and the search index.
+
 package engine
 
 import (

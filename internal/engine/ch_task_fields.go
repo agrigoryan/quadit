@@ -1,3 +1,5 @@
+// Checking a task's fields: priority, estimate, epic, milestone, cycle.
+
 package engine
 
 import (

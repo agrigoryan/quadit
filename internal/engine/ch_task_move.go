@@ -1,3 +1,5 @@
+// task.move: a task to another project.
+
 package engine
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers task.move.
 func init() {
 	register("task.move", core.RoleMember, taskMove)
 }

@@ -1,3 +1,5 @@
+// view.create, view.update and view.delete: saved views and their filters.
+
 package engine
 
 import (
@@ -12,6 +14,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers view.*.
 func init() {
 	register("view.create", core.RoleMember, viewCreate)
 	register("view.update", core.RoleMember, viewUpdate)
@@ -44,6 +47,8 @@ func slugify(s string) string {
 	return s
 }
 
+// viewCreate saves a view: a filter on tasks with a name, shared or the
+// owner's own.
 func viewCreate(c *cx, a viewCreateArgs) error {
 	vid, err := newID("id", a.ID)
 	if err != nil {
@@ -135,6 +140,7 @@ func (c *cx) loadView(ref string) (core.View, error) {
 	return v, nil
 }
 
+// viewUpdate changes a saved view, by its owner or an admin.
 func viewUpdate(c *cx, a viewUpdateArgs) error {
 	v, err := c.loadView(a.ID)
 	if err != nil {
@@ -275,6 +281,7 @@ func (c *cx) checkViewPeople(people []viewPeople, parent string) error {
 	return nil
 }
 
+// checkViewEpics refuses a filter on an epic that does not exist.
 func (c *cx) checkViewEpics(refs []string) error {
 	if len(refs) == 0 {
 		return nil
@@ -311,6 +318,8 @@ func checkViewSort(by string) error {
 	return nil
 }
 
+// checkViewStatuses refuses a filter on a status, or a category, that no
+// project has.
 func (c *cx) checkViewStatuses(refs []string) error {
 	if len(refs) == 0 {
 		return nil
@@ -335,6 +344,7 @@ func (c *cx) checkViewStatuses(refs []string) error {
 	return nil
 }
 
+// checkViewLabels refuses a filter on a label that does not exist.
 func (c *cx) checkViewLabels(refs []string) error {
 	if len(refs) == 0 {
 		return nil

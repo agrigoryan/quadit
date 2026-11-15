@@ -1,3 +1,5 @@
+// Who sends a change, and the person an agent works for.
+
 package engine
 
 import (

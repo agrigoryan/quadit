@@ -1,3 +1,5 @@
+// The checks on a task change: a stale base, a parent loop, hand-offs.
+
 package engine
 
 import (

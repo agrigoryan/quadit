@@ -1,3 +1,5 @@
+// comment.*: comments on tasks and pages.
+
 package engine
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers comment.*.
 func init() {
 	register("comment.create", core.RoleMember, commentCreate)
 	register("comment.update", core.RoleMember, commentUpdate)
@@ -357,6 +360,8 @@ type commentUpdateArgs struct {
 	Resolved Opt[bool]   `json:"resolved"`
 }
 
+// commentUpdate edits a comment's text, by its author, or resolves it or
+// opens it again.
 func commentUpdate(c *cx, a commentUpdateArgs) error {
 	cm, err := loadLive[core.Comment](c, "comment", "id", a.ID)
 	if err != nil {

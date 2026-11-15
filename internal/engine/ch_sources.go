@@ -1,3 +1,5 @@
+// source.*: the repositories pages are mirrored from.
+
 package engine
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers source.*.
 func init() {
 	register("source.create", core.RoleAdmin, sourceCreate)
 	register("source.update", core.RoleAdmin, sourceUpdate)
@@ -37,6 +40,7 @@ var (
 	writeModes  = []string{"commit", "propose", "none"}
 )
 
+// sourceCreate adds a repository whose files are mirrored as pages.
 func sourceCreate(c *cx, a sourceArgs) error {
 	sid, err := newID("id", a.ID)
 	if err != nil {
@@ -83,6 +87,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 	return c.created(seq, "source", src.ID, place{scopeType: "doc", scopeID: src.RootDocID}, src)
 }
 
+// sourceUpdate changes a mirrored repository.
 func sourceUpdate(c *cx, a sourceArgs) error {
 	src, err := loadLive[core.DocSource](c, "source", "id", a.ID)
 	if err != nil {

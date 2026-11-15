@@ -1,3 +1,5 @@
+// cycle.create, cycle.update and cycle.delete, and rolling cycles over.
+
 package engine
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers cycle.*.
 func init() {
 	register("cycle.create", core.RoleMember, cycleCreate)
 	register("cycle.update", core.RoleMember, cycleUpdate)
@@ -37,6 +40,8 @@ func (c *cx) cycleOverlap(projectID, skipID, starts, ends string) error {
 	return nil
 }
 
+// cycleCreate adds a cycle to a project, numbered after the last, where it
+// overlaps no other.
 func cycleCreate(c *cx, a cycleCreateArgs) error {
 	cid, err := newID("id", a.ID)
 	if err != nil {
@@ -81,6 +86,7 @@ type cycleUpdateArgs struct {
 	EndsOn   Opt[string] `json:"ends_on"`
 }
 
+// cycleUpdate changes a cycle's name or dates.
 func cycleUpdate(c *cx, a cycleUpdateArgs) error {
 	cy, err := loadLive[core.Cycle](c, "cycle", "id", a.ID)
 	if err != nil {
@@ -157,6 +163,8 @@ func (e *Engine) RollCycles(ctx context.Context) error {
 	return nil
 }
 
+// rollProject makes the cycles a project that uses cycles is missing, up to
+// one that starts after today.
 func (c *cx) rollProject(project core.Project, today string) error {
 	days := project.Settings.CycleDays
 	if days <= 0 {

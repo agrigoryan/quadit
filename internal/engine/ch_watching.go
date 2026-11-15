@@ -1,3 +1,5 @@
+// watch.set: following a task, epic, project, view or page.
+
 package engine
 
 import (
@@ -5,6 +7,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// init registers watch.set.
 func init() {
 	register("watch.set", core.RoleMember, watchSet)
 }
@@ -16,6 +19,8 @@ type watchSetArgs struct {
 	User     string `json:"user"` // default: the caller
 }
 
+// watchSet makes a member follow a task, epic, project, view or page, or
+// stop.
 func watchSet(c *cx, a watchSetArgs) error {
 	if a.Type == "" {
 		a.Type = "task"

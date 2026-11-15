@@ -1,3 +1,5 @@
+// integration.create, integration.update and integration.delete.
+
 package engine
 
 import (
@@ -7,6 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
+// init registers integration.*.
 func init() {
 	register("integration.create", core.RoleAdmin, integrationCreate)
 	register("integration.update", core.RoleAdmin, integrationUpdate)
@@ -27,6 +30,8 @@ type integrationArgs struct {
 
 var integrationKinds = []string{"github"}
 
+// integrationCreate connects the workspace, or a project, to another
+// service.
 func integrationCreate(c *cx, a integrationArgs) error {
 	iid, err := newID("id", a.ID)
 	if err != nil {
@@ -58,6 +63,8 @@ func integrationCreate(c *cx, a integrationArgs) error {
 	return c.created(seq, "integration", in.ID, inWorkspace(c.ws), in)
 }
 
+// integrationUpdate changes an integration; a new secret is sealed before it
+// is kept.
 func integrationUpdate(c *cx, a integrationArgs) error {
 	in, err := loadLive[core.Integration](c, "integration", "id", a.ID)
 	if err != nil {
