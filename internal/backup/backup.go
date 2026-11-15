@@ -46,107 +46,138 @@ var skipPrefixes = []string{"backups/", "probe/"}
 
 // Write makes an archive of everything.
 func Write(ctx context.Context, st store.Store, files blob.Store, version string, w io.Writer) (Manifest, error) {
-	m := Manifest{Format: 1, CreatedAt: time.Now().UnixMilli(), Version: version, Database: st.Dialect()}
+	aw := &archiveWriter{m: Manifest{Format: 1, CreatedAt: time.Now().UnixMilli(), Version: version, Database: st.Dialect()}}
 	gz := gzip.NewWriter(w)
-	tw := tar.NewWriter(gz)
-	add := func(name string, size int64, r io.Reader, rows int) error {
-		if err := tw.WriteHeader(&tar.Header{Name: name, Size: size, Mode: 0o600, ModTime: time.UnixMilli(m.CreatedAt)}); err != nil {
-			return err
-		}
-		h := sha256.New()
-		n, err := io.Copy(io.MultiWriter(tw, h), r)
-		if err != nil {
-			return fmt.Errorf("%s: %w", name, err)
-		}
-		if n != size {
-			return fmt.Errorf("%s: changed size while it was read (%d, then %d)", name, size, n)
-		}
-		m.Entries = append(m.Entries, Entry{Name: name, Size: n, SHA256: hex.EncodeToString(h.Sum(nil)), Rows: rows})
-		return nil
-	}
+	aw.tw = tar.NewWriter(gz)
 	// Tables first, in an order that can be loaded back.
 	for _, t := range store.Tables() {
-		tmp, err := os.CreateTemp("", "quadit-backup-*.jsonl")
-		if err != nil {
-			return m, err
-		}
-		bw := bufio.NewWriter(tmp)
-		rows := 0
-		err = st.Dump(ctx, t.Name, func(row map[string]any) error {
-			raw, err := json.Marshal(row)
-			if err != nil {
-				return err
-			}
-			rows++
-			bw.Write(raw)
-			return bw.WriteByte('\n')
-		})
-		if err == nil {
-			err = bw.Flush()
-		}
-		var size int64
-		if err == nil {
-			size, err = tmp.Seek(0, io.SeekCurrent)
-		}
-		if err == nil {
-			_, err = tmp.Seek(0, io.SeekStart)
-		}
-		if err == nil {
-			err = add("db/"+t.Name+".jsonl", size, tmp, rows)
-		}
-		tmp.Close()
-		os.Remove(tmp.Name())
-		if err != nil {
-			return m, fmt.Errorf("table %s: %w", t.Name, err)
+		if err := aw.addTable(ctx, st, t.Name); err != nil {
+			return aw.m, fmt.Errorf("table %s: %w", t.Name, err)
 		}
 	}
-	type obj struct {
+	if err := aw.addFiles(ctx, files); err != nil {
+		return aw.m, err
+	}
+	if err := aw.addManifest(); err != nil {
+		return aw.m, err
+	}
+	if err := aw.tw.Close(); err != nil {
+		return aw.m, err
+	}
+	return aw.m, gz.Close()
+}
+
+// archiveWriter is one run of Write: the archive being written and the
+// manifest of what is in it so far.
+type archiveWriter struct {
+	tw *tar.Writer
+	m  Manifest
+}
+
+// add writes one member of size bytes, read from r, and lists it in the
+// manifest with its checksum.
+func (aw *archiveWriter) add(name string, size int64, r io.Reader, rows int) error {
+	if err := aw.tw.WriteHeader(&tar.Header{Name: name, Size: size, Mode: 0o600, ModTime: time.UnixMilli(aw.m.CreatedAt)}); err != nil {
+		return err
+	}
+	h := sha256.New()
+	n, err := io.Copy(io.MultiWriter(aw.tw, h), r)
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	if n != size {
+		return fmt.Errorf("%s: changed size while it was read (%d, then %d)", name, size, n)
+	}
+	aw.m.Entries = append(aw.m.Entries, Entry{Name: name, Size: n, SHA256: hex.EncodeToString(h.Sum(nil)), Rows: rows})
+	return nil
+}
+
+// addTable writes every row of a table as JSON lines. They go to a
+// temporary file first, as a member's size is written before it.
+func (aw *archiveWriter) addTable(ctx context.Context, st store.Store, table string) error {
+	tmp, err := os.CreateTemp("", "quadit-backup-*.jsonl")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	bw := bufio.NewWriter(tmp)
+	rows := 0
+	err = st.Dump(ctx, table, func(row map[string]any) error {
+		raw, err := json.Marshal(row)
+		if err != nil {
+			return err
+		}
+		rows++
+		bw.Write(raw) // a failed write is kept by bw and returned by the next one
+		return bw.WriteByte('\n')
+	})
+	if err != nil {
+		return err
+	}
+	if err := bw.Flush(); err != nil {
+		return err
+	}
+	size, err := tmp.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	return aw.add("db/"+table+".jsonl", size, tmp, rows)
+}
+
+// addFiles writes every stored file but the ones that are not users'
+// (skipPrefixes). A file deleted while the backup runs is left out.
+func (aw *archiveWriter) addFiles(ctx context.Context, files blob.Store) error {
+	type object struct {
 		key  string
 		size int64
 	}
-	var objs []obj
+	var objects []object
 	err := files.List(ctx, "", func(k string, n int64) error {
 		for _, p := range skipPrefixes {
 			if strings.HasPrefix(k, p) {
 				return nil
 			}
 		}
-		objs = append(objs, obj{k, n})
+		objects = append(objects, object{k, n})
 		return nil
 	})
 	if err != nil {
-		return m, fmt.Errorf("listing files: %w", err)
+		return fmt.Errorf("listing files: %w", err)
 	}
-	for _, o := range objs {
+	for _, o := range objects {
 		r, _, err := files.Open(ctx, o.key)
 		if errors.Is(err, blob.ErrNotFound) {
 			continue // deleted while the backup ran
 		}
 		if err != nil {
-			return m, err
+			return err
 		}
-		err = add("files/"+o.key, o.size, r, 0)
+		err = aw.add("files/"+o.key, o.size, r, 0)
 		r.Close()
 		if err != nil {
-			return m, err
+			return err
 		}
 	}
-	raw, _ := json.MarshalIndent(m, "", " ")
-	if err := tw.WriteHeader(&tar.Header{Name: "manifest.json", Size: int64(len(raw)), Mode: 0o600, ModTime: time.UnixMilli(m.CreatedAt)}); err != nil {
-		return m, err
+	return nil
+}
+
+// addManifest writes the manifest, the archive's last member.
+func (aw *archiveWriter) addManifest() error {
+	raw, _ := json.MarshalIndent(aw.m, "", " ")
+	if err := aw.tw.WriteHeader(&tar.Header{Name: "manifest.json", Size: int64(len(raw)), Mode: 0o600, ModTime: time.UnixMilli(aw.m.CreatedAt)}); err != nil {
+		return err
 	}
-	if _, err := tw.Write(raw); err != nil {
-		return m, err
-	}
-	if err := tw.Close(); err != nil {
-		return m, err
-	}
-	return m, gz.Close()
+	_, err := aw.tw.Write(raw)
+	return err
 }
 
 // read walks an archive, handing each member to each. It returns the
 // manifest, which comes last.
-func read(r io.Reader, each func(name string, size int64, body io.Reader) error) (Manifest, error) {
+func read(r io.Reader, each func(name string, body io.Reader) error) (Manifest, error) {
 	var m Manifest
 	gz, err := gzip.NewReader(r)
 	if err != nil {
@@ -169,7 +200,7 @@ func read(r io.Reader, each func(name string, size int64, body io.Reader) error)
 			found = true
 			continue
 		}
-		if err := each(h.Name, h.Size, tr); err != nil {
+		if err := each(h.Name, tr); err != nil {
 			return m, err
 		}
 	}
@@ -183,7 +214,7 @@ func read(r io.Reader, each func(name string, size int64, body io.Reader) error)
 // manifest's checksums.
 func Verify(r io.Reader) (Manifest, error) {
 	sums := map[string]Entry{}
-	m, err := read(r, func(name string, size int64, body io.Reader) error {
+	m, err := read(r, func(name string, body io.Reader) error {
 		h := sha256.New()
 		n, err := io.Copy(h, body)
 		if err != nil {
@@ -214,6 +245,8 @@ func Verify(r io.Reader) (Manifest, error) {
 // Rows are loaded parents first.
 var selfRefs = map[string][]string{"users": {"responsible_id", "created_by"}, "tasks": {"parent_id"}, "docs": {"parent_id"}, "comments": {"parent_id"}}
 
+// parentsFirst orders rows so that each comes after the row its cols point
+// at, when that row is among them.
 func parentsFirst(rows []map[string]any, cols []string) []map[string]any {
 	byID := map[string]map[string]any{}
 	for _, r := range rows {
@@ -247,6 +280,8 @@ func parentsFirst(rows []map[string]any, cols []string) []map[string]any {
 	return out
 }
 
+// tableOf gives the table an archive member holds the rows of, if it holds
+// a table's rows.
 func tableOf(name string) (string, bool) {
 	if !strings.HasPrefix(name, "db/") || !strings.HasSuffix(name, ".jsonl") {
 		return "", false
@@ -286,7 +321,7 @@ func Restore(ctx context.Context, st store.Store, files blob.Store, r io.Reader)
 	} else if n > 0 {
 		return Manifest{}, errors.New("this database already has data; a full restore goes into an empty one (to bring back one task or page, name it)")
 	}
-	return read(r, func(name string, size int64, body io.Reader) error {
+	return read(r, func(name string, body io.Reader) error {
 		if key, ok := strings.CutPrefix(name, "files/"); ok {
 			return files.Put(ctx, key, body, "")
 		}
@@ -327,121 +362,222 @@ type Item struct {
 // blocks the archive does not know are moved to the page's trash, so the
 // page reads as it did. It returns the id of the task or page.
 func RestoreItem(ctx context.Context, st store.Store, files blob.Store, r io.Reader, it Item) (string, error) {
-	var wsID, rootID string
-	decisions, keys := map[string]bool{}, map[string]bool{}
-	var blocks []string                    // the page's blocks in the archive
-	pending := map[string]map[string]any{} // file rows seen, until we know which are wanted
-	put := func(table string, row map[string]any, cond ...store.Cond) error {
-		if n, err := st.Count(ctx, table, cond...); err != nil {
-			return err
-		} else if n > 0 {
-			// Still here: set it back. Its place in the feed, and a task's
-			// number, belong to the database as it is now.
-			return st.Overwrite(ctx, table, row, []string{"created_seq", "updated_seq", "activity_seq", "number", "key", "seq"}, cond...)
-		}
-		return st.Load(ctx, table, []map[string]any{row})
-	}
-	str := func(row map[string]any, k string) string { s, _ := row[k].(string); return s }
-	_, err := read(r, func(name string, size int64, body io.Reader) error {
-		if key, ok := strings.CutPrefix(name, "files/"); ok {
-			if keys[key] {
-				return files.Put(ctx, key, body, "")
-			}
-			return nil
-		}
-		table, ok := tableOf(name)
-		if !ok {
-			return nil
-		}
-		return lines(body, 0, func(rows []map[string]any) error {
-			if cols, self := selfRefs[table]; self {
-				rows = parentsFirst(rows, cols)
-			}
-			for _, row := range rows {
-				id := str(row, "id")
-				var err error
-				switch {
-				case table == "workspaces" && str(row, "slug") == it.Workspace:
-					wsID = id
-				case wsID == "" || (str(row, "workspace_id") != wsID && table != "files"):
-				case table == "tasks" && it.Kind == "task" && (strings.EqualFold(str(row, "key"), it.Ref) || id == it.Ref):
-					rootID = id
-					row["deleted_at"], row["deleted_by"] = nil, nil
-					if str(row, "parent_id") != "" {
-						if n, _ := st.Count(ctx, "tasks", store.Eq("id", str(row, "parent_id"))); n == 0 {
-							row["parent_id"] = nil // its parent is gone for good
-						}
-					}
-					err = put(table, row, store.Eq("id", id))
-				case table == "docs" && it.Kind == "doc" && id == it.Ref:
-					rootID = id
-					row["deleted_at"] = nil
-					if str(row, "parent_id") != "" {
-						if n, _ := st.Count(ctx, "docs", store.Eq("id", str(row, "parent_id"))); n == 0 {
-							row["parent_id"] = nil
-						}
-					}
-					err = put(table, row, store.Eq("id", id))
-				case rootID == "":
-				case table == "task_labels" && str(row, "task_id") == rootID:
-					err = put(table, row, store.Eq("task_id", rootID), store.Eq("label_id", str(row, "label_id")))
-				case table == "decisions" && str(row, "task_id") == rootID:
-					decisions[id] = true
-					err = put(table, row, store.Eq("id", id))
-				case table == "decision_options" && decisions[str(row, "decision_id")]:
-					err = put(table, row, store.Eq("id", id))
-				case (table == "comments" || table == "task_links") && (str(row, "task_id") == rootID || str(row, "doc_id") == rootID):
-					err = put(table, row, store.Eq("id", id))
-				case (table == "doc_blocks" || table == "doc_versions") && str(row, "doc_id") == rootID:
-					if table == "doc_blocks" {
-						blocks = append(blocks, id)
-					}
-					err = put(table, row, store.Eq("id", id))
-				case (table == "db_properties" || table == "db_views") && str(row, "database_id") == rootID:
-					err = put(table, row, store.Eq("id", id))
-				case table == "files":
-					// Files come before attachments in the archive, so keep
-					// them all in mind until we know which are wanted.
-					pending[id] = row
-				case table == "attachments" && (str(row, "task_id") == rootID || str(row, "subject_id") == rootID):
-					if f, ok := pending[str(row, "file_id")]; ok {
-						f["deleted_at"] = nil
-						if err = put("files", f, store.Eq("id", str(row, "file_id"))); err == nil {
-							keys[str(f, "storage_key")] = true
-							if pk := str(f, "preview_key"); pk != "" {
-								keys[pk] = true
-							}
-						}
-					}
-					if err == nil {
-						err = put(table, row, store.Eq("id", id))
-					}
-				}
-				if err != nil {
-					return fmt.Errorf("%s: %w", table, err)
-				}
-			}
-			return nil
-		})
-	})
-	if err != nil {
+	ir := &itemRestore{ctx: ctx, st: st, files: files, it: it,
+		decisions: map[string]bool{}, keys: map[string]bool{}, pending: map[string]map[string]any{}}
+	if _, err := read(r, ir.member); err != nil {
 		return "", err
 	}
-	if wsID == "" {
+	if ir.wsID == "" {
 		return "", fmt.Errorf("the archive has no workspace %q", it.Workspace)
 	}
-	if rootID == "" {
+	if ir.rootID == "" {
 		return "", fmt.Errorf("the archive has no %s %q in %s", it.Kind, it.Ref, it.Workspace)
 	}
 	if it.Kind == "doc" {
-		// Blocks written after the archive go to the page's trash.
-		conds := []store.Cond{store.Eq("doc_id", rootID), store.Null("deleted_at")}
-		if len(blocks) > 0 {
-			conds = append(conds, store.NotIn("id", blocks))
-		}
-		if _, err := st.Update(ctx, "doc_blocks", map[string]any{"deleted_at": time.Now().UnixMilli()}, conds...); err != nil {
+		if err := ir.trashNewBlocks(); err != nil {
 			return "", err
 		}
 	}
-	return rootID, nil
+	return ir.rootID, nil
+}
+
+// itemRestore is one run of RestoreItem: what it brings back, and what it
+// has learnt from the archive so far. Being one run, it holds the run's
+// context.
+type itemRestore struct {
+	ctx   context.Context
+	st    store.Store
+	files blob.Store
+	it    Item
+
+	wsID   string // the workspace's id, once its row is read
+	rootID string // the task's or page's id, once its row is read
+
+	decisions map[string]bool           // the task's decisions, by id
+	keys      map[string]bool           // the stored files to bring back
+	blocks    []string                  // the page's blocks in the archive
+	pending   map[string]map[string]any // file rows seen, until we know which are wanted
+}
+
+// partOf names, for each table whose rows are parts of a task or a page,
+// the columns that say which task or page a row is part of.
+var partOf = map[string][]string{
+	"task_labels":   {"task_id"},
+	"decisions":     {"task_id"},
+	"comments":      {"task_id", "doc_id"},
+	"task_links":    {"task_id", "doc_id"},
+	"doc_blocks":    {"doc_id"},
+	"doc_versions":  {"doc_id"},
+	"db_properties": {"database_id"},
+	"db_views":      {"database_id"},
+	"attachments":   {"task_id", "subject_id"},
+}
+
+// kept are the columns a row set back keeps as they are now: its place in
+// the feed, and a task's number, belong to the database as it is.
+var kept = []string{"created_seq", "updated_seq", "activity_seq", "number", "key", "seq"}
+
+// str is a row's text column, or "" when it is not text.
+func str(row map[string]any, k string) string { s, _ := row[k].(string); return s }
+
+// member reads one member of the archive: a stored file, brought back if
+// it is one of the item's, or a table's rows.
+func (ir *itemRestore) member(name string, body io.Reader) error {
+	if key, ok := strings.CutPrefix(name, "files/"); ok {
+		if ir.keys[key] {
+			return ir.files.Put(ir.ctx, key, body, "")
+		}
+		return nil
+	}
+	table, ok := tableOf(name)
+	if !ok {
+		return nil
+	}
+	return lines(body, 0, func(rows []map[string]any) error {
+		if cols, self := selfRefs[table]; self {
+			rows = parentsFirst(rows, cols)
+		}
+		for _, row := range rows {
+			if err := ir.row(table, row); err != nil {
+				return fmt.Errorf("%s: %w", table, err)
+			}
+		}
+		return nil
+	})
+}
+
+// row decides what one row of the archive is to the item: its workspace,
+// the item itself, a part of it, or nothing.
+func (ir *itemRestore) row(table string, row map[string]any) error {
+	switch {
+	case table == "workspaces" && str(row, "slug") == ir.it.Workspace:
+		ir.wsID = str(row, "id")
+		return nil
+	case ir.wsID == "" || (str(row, "workspace_id") != ir.wsID && table != "files"):
+		return nil // another workspace's
+	case ir.isItem(table, row):
+		return ir.restoreItem(table, row)
+	case ir.rootID == "":
+		return nil // nothing can be a part before the item is found
+	}
+	return ir.restorePart(table, row)
+}
+
+// isItem says whether a row is the task or page being brought back.
+func (ir *itemRestore) isItem(table string, row map[string]any) bool {
+	id := str(row, "id")
+	switch {
+	case table == "tasks" && ir.it.Kind == "task":
+		return strings.EqualFold(str(row, "key"), ir.it.Ref) || id == ir.it.Ref
+	case table == "docs" && ir.it.Kind == "doc":
+		return id == ir.it.Ref
+	}
+	return false
+}
+
+// restoreItem puts the task or page back, out of the trash, under its
+// parent if that is still there.
+func (ir *itemRestore) restoreItem(table string, row map[string]any) error {
+	id := str(row, "id")
+	ir.rootID = id
+	row["deleted_at"] = nil
+	if table == "tasks" {
+		row["deleted_by"] = nil
+	}
+	if parent := str(row, "parent_id"); parent != "" {
+		n, err := ir.st.Count(ir.ctx, table, store.Eq("id", parent))
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			row["parent_id"] = nil // its parent is gone for good
+		}
+	}
+	return ir.put(table, row, store.Eq("id", id))
+}
+
+// restorePart puts back a row that is part of the item: a label, decision,
+// option, comment, link, block, version, property, view or attachment. A
+// file row is kept in mind until an attachment asks for it, as files come
+// before attachments in the archive.
+func (ir *itemRestore) restorePart(table string, row map[string]any) error {
+	id := str(row, "id")
+	switch {
+	case table == "files":
+		ir.pending[id] = row
+		return nil
+	case table == "decision_options":
+		if ir.decisions[str(row, "decision_id")] {
+			return ir.put(table, row, store.Eq("id", id))
+		}
+		return nil
+	case !ir.isPart(table, row):
+		return nil
+	}
+	switch table {
+	case "task_labels":
+		return ir.put(table, row, store.Eq("task_id", ir.rootID), store.Eq("label_id", str(row, "label_id")))
+	case "decisions":
+		ir.decisions[id] = true
+	case "doc_blocks":
+		ir.blocks = append(ir.blocks, id)
+	case "attachments":
+		if err := ir.restoreFile(str(row, "file_id")); err != nil {
+			return err
+		}
+	}
+	return ir.put(table, row, store.Eq("id", id))
+}
+
+// isPart says whether a row of one of the partOf tables belongs to the
+// item.
+func (ir *itemRestore) isPart(table string, row map[string]any) bool {
+	for _, col := range partOf[table] {
+		if str(row, col) == ir.rootID {
+			return true
+		}
+	}
+	return false
+}
+
+// restoreFile puts back the file row an attachment points at, if the
+// archive has it, and marks its stored objects to be brought back.
+func (ir *itemRestore) restoreFile(fileID string) error {
+	f, ok := ir.pending[fileID]
+	if !ok {
+		return nil
+	}
+	f["deleted_at"] = nil
+	if err := ir.put("files", f, store.Eq("id", fileID)); err != nil {
+		return err
+	}
+	ir.keys[str(f, "storage_key")] = true
+	if pk := str(f, "preview_key"); pk != "" {
+		ir.keys[pk] = true
+	}
+	return nil
+}
+
+// put sets a row back as the archive has it: over the row if it is still
+// here, or in again if it is gone.
+func (ir *itemRestore) put(table string, row map[string]any, cond ...store.Cond) error {
+	n, err := ir.st.Count(ir.ctx, table, cond...)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return ir.st.Overwrite(ir.ctx, table, row, kept, cond...)
+	}
+	return ir.st.Load(ir.ctx, table, []map[string]any{row})
+}
+
+// trashNewBlocks moves the blocks written into the page after the archive
+// was made to the page's trash.
+func (ir *itemRestore) trashNewBlocks() error {
+	conds := []store.Cond{store.Eq("doc_id", ir.rootID), store.Null("deleted_at")}
+	if len(ir.blocks) > 0 {
+		conds = append(conds, store.NotIn("id", ir.blocks))
+	}
+	_, err := ir.st.Update(ir.ctx, "doc_blocks", map[string]any{"deleted_at": time.Now().UnixMilli()}, conds...)
+	return err
 }
