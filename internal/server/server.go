@@ -733,22 +733,26 @@ func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 	return nil
 }
 
-// applyTokenScopes narrows the actor and the readable projects by the
-// token's scopes: "read" makes the actor read-only, and "project:ID" limits
-// the actor to those projects, and what the caller may read to those of
-// them the membership allows.
+// applyTokenScopes narrows the actor and the viewer by the token's scopes:
+// "read" makes the actor read-only, and "project:ID" limits the actor to
+// those projects, and what the caller may read to those of them the
+// membership allows.
 func (x *c) applyTokenScopes() {
-	for sc := range strings.FieldsSeq(x.token.Scopes) {
-		switch {
-		case sc == "read":
-			x.actor.ReadOnly = true
-		case strings.HasPrefix(sc, "project:"):
-			x.actor.Projects = append(x.actor.Projects, strings.TrimPrefix(sc, "project:"))
+	x.actor.ReadOnly = slices.Contains(strings.Fields(x.token.Scopes), "read")
+	x.actor.Projects = tokenProjects(x.token)
+	x.limitTo(x.actor.Projects)
+}
+
+// tokenProjects are the ids of the projects a token is made for; none
+// means every project its member may use.
+func tokenProjects(token *core.APIToken) []string {
+	var projects []string
+	for scope := range strings.FieldsSeq(token.Scopes) {
+		if projectID, ok := strings.CutPrefix(scope, "project:"); ok {
+			projects = append(projects, projectID)
 		}
 	}
-	if len(x.actor.Projects) > 0 {
-		x.limitTo(x.actor.Projects)
-	}
+	return projects
 }
 
 // has reports whether list holds v.

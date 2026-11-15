@@ -17,7 +17,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -546,7 +545,7 @@ func (s *Server) handleShowFile(x *c) error {
 	if err := x.db.Get(x.ctx(), &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return err
 	}
-	if !s.maySeeFile(x, f) {
+	if !x.canSeeFile(x.ctx(), f) {
 		return errNotFound("file")
 	}
 	return x.ok(s.fileOut(x, f))
@@ -570,14 +569,25 @@ func (s *Server) handleServeFile(x *c) error {
 	if f.State != core.FileReady {
 		return errNotFound("file")
 	}
-	if n, err := s.st.Count(ctx, "members", store.Eq("workspace_id", f.WorkspaceID), store.Eq("user_id", x.user.ID), store.Null("removed_at"),
-		store.Null("suspended_at")); err != nil || n == 0 {
+	// The route names no workspace: the file's own is found here, and the
+	// caller read as the member of it that they are. Not a member, or not
+	// through this token, the file is not there.
+	var ws core.Workspace
+	var member core.Member
+	if there, err := store.Find(ctx, s.st, &ws, store.Eq("id", f.WorkspaceID)); err != nil || !there {
+		return errNotFound("file")
+	}
+	if there, err := store.Find(ctx, s.st.In(ws.ID), &member, store.Eq("user_id", x.user.ID), store.Null("removed_at"), store.Null("suspended_at")); err != nil || !there {
 		return errNotFound("file")
 	}
 	if x.token != nil && x.token.WorkspaceID != f.WorkspaceID {
 		return errNotFound("file")
 	}
-	if !s.maySeeFile(x, f) {
+	who := s.viewerFor(ws, member)
+	if x.token != nil {
+		who.limitTo(tokenProjects(x.token))
+	}
+	if !who.canSeeFile(ctx, f) {
 		return errNotFound("file")
 	}
 	key, ctype, name := f.StorageKey, f.ContentType, f.Name
@@ -621,74 +631,39 @@ func (s *Server) handleServeFile(x *c) error {
 	return nil
 }
 
-// maySeeFile reports whether a member limited to some projects, or to
-// reading with a token for some projects, may have a file: it is theirs, or
-// it is attached to a task of a project they are in, or to a page they can
-// see. A member with no limit sees every file of the workspace. When what
-// decides it cannot be read, the answer is no.
-func (s *Server) maySeeFile(x *c, f core.File) bool {
-	ctx := x.ctx()
-	db := s.st.In(f.WorkspaceID)
-	var m core.Member
-	if err := db.Get(ctx, &m, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
-		return false
-	}
-	allowed := filesAllowedProjects(x, m)
+// canSeeFile reports whether the viewer may have a file. A private page's
+// files are private, whoever asks, unless the viewer uploaded them. Beyond
+// that a viewer with no limit sees every file of the workspace, and one
+// limited to some projects sees a file that is its own, or attached to a
+// task of a project it may read, or to a page it may see. When what decides
+// it cannot be read, the answer is no.
+func (who *viewer) canSeeFile(ctx context.Context, f core.File) bool {
 	var atts []core.Attachment
-	if err := db.List(ctx, &atts, store.Where(store.Eq("file_id", f.ID))); err != nil {
+	if err := who.db.List(ctx, &atts, store.Where(store.Eq("file_id", f.ID))); err != nil {
 		return false
 	}
+	me := who.member.UserID
 	// A page's own files follow the page: a private page's are private.
-	if f.UploadedBy != x.user.ID && onHiddenPage(ctx, db, atts, x.user.ID) {
+	if f.UploadedBy != me && onHiddenPage(ctx, who.db, atts, me) {
 		return false
 	}
-	if len(allowed) == 0 || f.UploadedBy == x.user.ID {
+	if !who.limited() || f.UploadedBy == me {
 		return true
 	}
 	for _, a := range atts {
 		if a.TaskID != "" {
 			var t core.Task
-			if db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && slices.Contains(allowed, t.ProjectID) {
+			if who.db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && who.canProject(t.ProjectID) {
 				return true
 			}
 			continue
 		}
 		var d core.Doc
-		if db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && (d.ProjectID == "" || slices.Contains(allowed, d.ProjectID)) {
+		if who.db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && who.canProject(d.ProjectID) {
 			return true
 		}
 	}
 	return false
-}
-
-// filesAllowedProjects is the projects whose files a member sees through
-// the request's credential: the member's own limit, narrowed by a token's
-// project scopes. nil means no limit; engine.NoProjects() no project at all.
-func filesAllowedProjects(x *c, m core.Member) []string {
-	var allowed []string
-	if m.Scope != nil {
-		allowed = m.Scope.Projects
-	}
-	if x.token == nil {
-		return allowed
-	}
-	var mine []string
-	for sc := range strings.FieldsSeq(x.token.Scopes) {
-		if p, ok := strings.CutPrefix(sc, "project:"); ok {
-			mine = append(mine, p)
-		}
-	}
-	switch {
-	case len(mine) == 0:
-		return allowed
-	case len(allowed) == 0:
-		return mine
-	}
-	allowed = keep(allowed, func(p string) bool { return slices.Contains(mine, p) })
-	if len(allowed) == 0 {
-		return engine.NoProjects()
-	}
-	return allowed
 }
 
 // onHiddenPage reports whether a file is attached to a page the user

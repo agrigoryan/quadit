@@ -65,7 +65,11 @@ func (who *viewer) limited() bool { return who.projects != nil }
 
 // limitTo keeps the viewer to the projects named, of those it may read
 // already: what a token made for some projects does to its member's reach.
+// No project named limits nothing.
 func (who *viewer) limitTo(projects []string) {
+	if len(projects) == 0 {
+		return
+	}
 	if who.projects == nil {
 		who.projects = projects
 		return
