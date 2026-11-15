@@ -476,7 +476,8 @@ func unzip(src, dst string) error {
 // readOrbit reads a workspace from an Orbit server through its public API:
 // its projects with their tasks and comments, and its docs.
 func readOrbit(origin, workspace, token string) (Plan, error) {
-	plan := Plan{Source: "orbit"}
+	plan := Plan{Source: "orbit", Notes: []string{"Orbit's API does not hand out the files attached to tasks, so they are not brought over; " +
+		"pictures and links written in descriptions, comments and pages come along as they are."}}
 	if workspace == "" || token == "" {
 		return plan, fmt.Errorf("an Orbit import needs workspace=ID and token=TOKEN (an Orbit API token that can read tasks and docs)")
 	}
@@ -501,6 +502,7 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 	keyOf := map[string]string{}
 	statusOf := map[string][2]string{} // id -> name, category
 	labelOf := map[string]string{}
+	milestoneOf := map[string]string{}
 	orbitCat := map[string]string{"backlog": "backlog", "unstarted": "unstarted", "started": "started", "completed": "done", "cancelled": "canceled", "canceled": "canceled"}
 	for _, p := range projects.Items {
 		keyOf[p.ID] = p.Key
@@ -522,6 +524,13 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 				labelOf[l.ID] = l.Name
 			}
 		}
+		// Orbit's milestones are stages of a project; here they become epics.
+		var ms page[struct{ ID, Name string }]
+		if _, err := getJSON(base+"/projects/"+p.ID+"/milestones", token, &ms); err == nil {
+			for _, m := range ms.Items {
+				milestoneOf[m.ID] = m.Name
+			}
+		}
 	}
 	type orbitTask struct {
 		ID, Title, Description, Priority, Identifier, URL string
@@ -532,6 +541,7 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 		DueAt                                             string   `json:"due_at"`
 		Estimate                                          int
 		ParentTaskID                                      string `json:"parent_task_id"`
+		MilestoneID                                       string `json:"milestone_id"`
 	}
 	var all []orbitTask
 	for cursor := ""; ; {
@@ -556,7 +566,28 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 	for _, ot := range all {
 		st := statusOf[ot.StatusID]
 		t := Task{Ext: ot.ID, Project: KeyFrom(keyOf[ot.ProjectID]), Title: ot.Title, Description: ot.Description, Status: st[0], Category: st[1],
-			Priority: priorityNames[ot.Priority], DueOn: ot.DueAt, Estimate: ot.Estimate, ParentExt: ot.ParentTaskID, URL: ot.URL}
+			Priority: priorityNames[ot.Priority], DueOn: ot.DueAt, Estimate: ot.Estimate, ParentExt: ot.ParentTaskID, URL: ot.URL,
+			Epic: milestoneOf[ot.MilestoneID]}
+		// What it blocks and what it relates to. Each pair is listed on both
+		// tasks there; it is taken from the side that says "outgoing".
+		var rels page[struct {
+			Type, Direction string
+			Task            struct{ ID string }
+		}]
+		if _, err := getJSON(base+"/tasks/"+ot.Identifier+"/relations", token, &rels); err == nil {
+			for _, r := range rels.Items {
+				switch strings.ToLower(r.Type) {
+				case "blocks":
+					if r.Direction != "incoming" {
+						t.Blocks = append(t.Blocks, r.Task.ID)
+					}
+				default: // related, duplicate: one row per pair
+					if ot.ID < r.Task.ID {
+						t.Relates = append(t.Relates, r.Task.ID)
+					}
+				}
+			}
+		}
 		if len(ot.AssigneeIDs) > 0 {
 			t.Assignee = orStr(who[ot.AssigneeIDs[0]], ot.AssigneeIDs[0])
 		}

@@ -35,6 +35,9 @@ type Task struct {
 	ParentExt   string
 	URL         string // where it lived
 	Comments    []Comment
+	// Blocks and Relates name other tasks of the same import by their Ext.
+	Blocks  []string
+	Relates []string
 }
 
 type Comment struct {
@@ -73,6 +76,8 @@ type Plan struct {
 	Tasks    []Task
 	Docs     []Doc
 	Tables   []Table
+	// Notes say what the source could not give, for the one running the import.
+	Notes []string
 }
 
 // Sink is where an import writes: the API, through the command-line client.
@@ -117,6 +122,9 @@ func KeyFrom(name string) string {
 // project of their own go into.
 func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 	var sum Summary
+	for _, n := range plan.Notes {
+		sink.Logf("note: %s", n)
+	}
 	uid := func(kind, ext string) string { return id.From("import", plan.Source, kind, ext) }
 	change := func(typ string, args map[string]any) error {
 		raw, _ := json.Marshal(args)
@@ -335,6 +343,20 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		sum.Unmatched = append(sum.Unmatched, who)
 	}
 	sort.Strings(sum.Unmatched)
+
+	// How the tasks hang together, once they are all there.
+	for _, t := range plan.Tasks {
+		for typ, others := range map[string][]string{"blocks": t.Blocks, "relates": t.Relates} {
+			for _, o := range others {
+				if _, ok := byExt[o]; !ok {
+					continue
+				}
+				if err := change("relation.add", map[string]any{"id": uid("relation", t.Ext+"/"+typ+"/"+o), "task": uid("task", t.Ext), "other": uid("task", o), "type": typ}); err != nil {
+					return sum, fmt.Errorf("relation of %q: %w", t.Title, err)
+				}
+			}
+		}
+	}
 
 	// Pages: [[wiki links]] and links between files become links between
 	// pages; images beside a file are uploaded.
