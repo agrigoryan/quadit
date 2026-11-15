@@ -7,6 +7,7 @@ import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
 import { getLookupEvenIfGone, getRow, getRowEvenIfGone, getRows } from "@/lib/selectors";
+import { isNotFound, readError } from "@/lib/query";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { sameProjectBelow } from "@/docs/data";
@@ -173,8 +174,14 @@ export function restoreDoc(id: string) {
   })
     .then(() => {
       // A page the workspace copy never had (deleted before this visit) is fetched whole.
-      if (!known) void loadPage(id).catch(() => {});
+      if (known) return;
+      loadPage(id).catch((err: unknown) => {
+        // Not there for this person after all: there is nothing to show. Anything else, say.
+        const why = readError(err);
+        if (why && !isNotFound(err)) toast.error(t("docs.trash.restoredNotLoaded", { why }));
+      });
     })
+    // Refused: mutate has said why and put the page back in the trash.
     .catch(() => {});
 }
 

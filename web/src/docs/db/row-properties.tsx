@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
@@ -8,7 +8,7 @@ import { AddPropertyMenu } from "@/docs/db/add-property";
 import { SelfCell } from "@/docs/db/cell";
 import { PropIcon } from "@/docs/db/prop-meta";
 import { PropertyPopover } from "@/docs/db/property-editor";
-import { ensureDatabase, useDatabase } from "@/docs/db/use-table";
+import { useDatabase, useEnsureDatabases } from "@/docs/db/use-table";
 import type { Doc } from "@/lib/types-docs";
 
 /**
@@ -22,9 +22,7 @@ export function RowProperties({ row, readOnly }: { row: Doc; readOnly: boolean }
   const [open, setOpen] = useState<string | null>(null);
 
   // Opened by a link, the row may be here before its database's properties are.
-  useEffect(() => {
-    if (props.length === 0) ensureDatabase(databaseId);
-  }, [props.length, databaseId]);
+  useEnsureDatabases(props.length === 0 ? [databaseId] : []);
 
   if (!databaseId) return null;
   const cells = db?.cells[row.id];

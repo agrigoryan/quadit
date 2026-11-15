@@ -13,7 +13,7 @@ import { GalleryView } from "@/docs/db/gallery-view";
 import { RowPeek } from "@/docs/db/row-peek";
 import { TableView } from "@/docs/db/table-view";
 import { TimelineView } from "@/docs/db/timeline-view";
-import { defaultsFor, ensureDatabase, useDatabase, type ViewProps } from "@/docs/db/use-table";
+import { defaultsFor, useDatabase, useEnsureDatabases, type ViewProps } from "@/docs/db/use-table";
 import { ViewTabs } from "@/docs/db/view-tabs";
 import { ViewToolbar } from "@/docs/db/view-toolbar";
 import { useDocsStore } from "@/docs/store";
@@ -58,9 +58,7 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
   const view = views.find((v) => v.id === params.get("v")) ?? views[0];
   const peek = params.get("peek");
 
-  useEffect(() => {
-    if (!loaded) ensureDatabase(doc.id);
-  }, [loaded, doc.id]);
+  useEnsureDatabases(loaded ? [] : [doc.id]);
 
   // A database with no view yet gets a table, once (by one who may change it).
   const made = useRef(false);

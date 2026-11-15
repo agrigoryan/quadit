@@ -11,6 +11,7 @@ import { useDocsStore } from "@/docs/store";
 import { emptyCollections } from "@/lib/collections";
 import { useStore } from "@/lib/store";
 import type { Doc } from "@/lib/types-docs";
+import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const doc = (fields: Partial<Doc>) =>
@@ -44,6 +45,7 @@ describe("DatabaseView", () => {
           <DatabaseView doc={database} readOnly />
         </TooltipProvider>
       </MemoryRouter>,
+      { wrapper: WithQuery },
     );
     expect(screen.getByRole("grid", { name: "Table" })).toBeInTheDocument();
     expect(screen.getByText("Hammer")).toBeInTheDocument();

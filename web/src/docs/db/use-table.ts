@@ -1,45 +1,34 @@
 // A database as a view needs it: properties, rows and every cell worked out,
 // kept current as rows, properties and members change.
 
-import { useEffect, useMemo } from "react";
-import { ApiError, errorMessage } from "@/lib/api";
-import { t } from "@/lib/i18n";
-import { useLookup, useLookupEvenIfGone, useMe } from "@/lib/selectors";
-import { type Dict, useStore } from "@/lib/store";
-import { toast } from "@/lib/toast";
+import { useQueries } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useLookup, useLookupEvenIfGone, useMe, useSlug } from "@/lib/selectors";
+import type { Dict } from "@/lib/store";
 import { byRank, canSee } from "@/docs/data";
 import { type Cells, computeCells, type TableData, type World } from "@/docs/db/compute";
-import { loadPage, useDocsStore } from "@/docs/store";
+import { pageQuery, useDocsStore } from "@/docs/store";
 import type { DBProperty, DBView, Doc } from "@/lib/types-docs";
 
-/** Databases whose properties have been asked for, so each is fetched once. Written by ensureDatabase. */
-const asked = new Set<string>();
-/** Those whose fetch failed, already said once; asked for again when the stream comes back. Written by ensureDatabase. */
-const failed = new Set<string>();
-
 /**
- * Makes sure a database's properties and views are in the store. A failure
- * is said once in a toast, since what reads the database would otherwise
- * look complete without it, and the fetch is tried again when the live
- * stream comes back. One that is not there, or not for this person, is left.
+ * Makes sure these databases' properties and views are in the store, each
+ * fetched once (they follow the feed from then on). A failure is said in a
+ * toast, since what reads the database would otherwise look complete
+ * without it, and the fetch is tried again when the live stream comes back.
+ * One that is not there, or not for this person, is left.
  */
-export function ensureDatabase(databaseId: string | undefined) {
-  if (!databaseId || asked.has(databaseId)) return;
-  asked.add(databaseId);
-  loadPage(databaseId).then(
-    () => failed.delete(databaseId),
-    (err: unknown) => {
-      if (err instanceof ApiError && (err.status === 404 || err.status === 401)) return;
-      asked.delete(databaseId);
-      if (!failed.has(databaseId)) toast.error(t("db.loadFailed", { why: errorMessage(err) }));
-      failed.add(databaseId);
-    },
-  );
+export function useEnsureDatabases(databaseIds: (string | undefined)[]) {
+  const slug = useSlug();
+  useQueries({
+    queries: [...new Set(databaseIds)]
+      .filter((id) => id !== undefined)
+      .map((id) => ({
+        ...pageQuery(slug, id),
+        staleTime: Infinity,
+        meta: { failureToast: "db.loadFailed" as const },
+      })),
+  });
 }
-
-useStore.subscribe((s, prev) => {
-  if (s.stream === "live" && prev.stream !== "live") for (const id of [...failed]) ensureDatabase(id);
-});
 
 /** A database and its rows, out of the live pages. */
 function tableOf(docs: Dict<Doc>, props: Dict<DBProperty>, databaseId: string, userId: string): TableData | null {
@@ -99,9 +88,7 @@ export function useDatabase(databaseId: string | undefined): Database | null {
       ] as string[],
     [out?.table.props],
   );
-  useEffect(() => {
-    for (const id of linked) if (id !== databaseId) ensureDatabase(id);
-  }, [linked, databaseId]);
+  useEnsureDatabases(linked.filter((id) => id !== databaseId));
 
   return out;
 }

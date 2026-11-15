@@ -2,14 +2,16 @@
 // image in its page. Pages are fetched one by one, a few at a time, and the
 // answer is kept until the page's content changes.
 
-import { useEffect, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api";
-import { getState } from "@/lib/store";
+import { useSlug } from "@/lib/selectors";
 import { localPath } from "@/lib/url";
+import { docsKeys } from "@/docs/store";
 import type { BlockRow, Doc } from "@/lib/types-docs";
 
-const found = new Map<string, { seq: number; url: string | null }>();
+/** The fetches waiting for one of the few that run at once. Written by slot and release. */
 const waiting: (() => void)[] = [];
+/** How many run now. Written by slot and release. */
 let running = 0;
 
 function slot(): Promise<void> {
@@ -26,39 +28,33 @@ function release() {
   else running--;
 }
 
-async function firstImage(rowId: string): Promise<string | null> {
+async function firstImage(slug: string, rowId: string, signal: AbortSignal): Promise<string | null> {
   await slot();
   try {
-    const out = await api.get<{ blocks: BlockRow[] }>(workspacePath(getState().slug, `/docs/${rowId}`));
+    const out = await api.get<{ blocks: BlockRow[] }>(workspacePath(slug, `/docs/${rowId}`), signal);
     const images = (out.blocks ?? []).filter(
       (b) => b.type === "image" && typeof b.props?.url === "string" && b.props.url,
     );
     // Top-level blocks come in reading order; one nested deeper is second best.
     const top = images.filter((b) => !b.parent_id).sort((a, b) => (a.rank < b.rank ? -1 : 1))[0] ?? images[0];
     return top ? (localPath(String(top.props?.url)) ?? null) : null;
-  } catch {
-    return null;
   } finally {
     release();
   }
 }
 
-/** The address of a row's cover picture, or null when it has none (or while looking). */
+/** The address of a row's cover picture, or null when it has none (or while looking, or when the look failed). */
 export function useCover(row: Doc): string | null {
-  const seq = row.content_seq ?? 0;
-  const known = found.get(row.id);
-  const [, redraw] = useState(0);
-  useEffect(() => {
-    if (row.cover || found.get(row.id)?.seq === seq) return;
-    let live = true;
-    void firstImage(row.id).then((url) => {
-      found.set(row.id, { seq, url });
-      if (live) redraw((n) => n + 1);
-    });
-    return () => {
-      live = false;
-    };
-  }, [row.id, row.cover, seq]);
+  const slug = useSlug();
+  const found = useQuery({
+    queryKey: docsKeys.cover(slug, row.id, row.content_seq ?? 0),
+    queryFn: ({ signal }) => firstImage(slug, row.id, signal),
+    enabled: !row.cover,
+    // The answer for one version of the content stays right; a new version is a new key.
+    staleTime: Infinity,
+    // While a changed page is looked at again, the picture it had stays.
+    placeholderData: keepPreviousData,
+  });
   if (row.cover) return localPath(row.cover) ?? null;
-  return known?.url ?? null;
+  return found.data ?? null;
 }

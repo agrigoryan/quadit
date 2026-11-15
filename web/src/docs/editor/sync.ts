@@ -288,8 +288,8 @@ export class DocSync {
     let rows: BlockRow[];
     try {
       const data = await loadPage(this.docId);
-      rows = data.blocks ?? [];
-      this.seq = Math.max(this.seq, data.doc.content_seq ?? 0);
+      rows = data.blocks;
+      this.seq = Math.max(this.seq, data.seq);
     } catch {
       return;
     }

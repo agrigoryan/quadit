@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
-import { ApiError, errorMessage } from "@/lib/api";
-import { forgetIfUnshared, loadPage } from "@/docs/store";
+import { useQuery } from "@tanstack/react-query";
+import { retryWait } from "@/lib/api";
+import { isNotFound, readError, retryUnreachable } from "@/lib/query";
+import { useSlug } from "@/lib/selectors";
+import { pageQuery } from "@/docs/store";
 import type { BlockRow } from "@/lib/types-docs";
 
 export type PageState =
@@ -8,35 +10,23 @@ export type PageState =
   | { status: "error"; error: string; missing: boolean }
   | { status: "ready"; blocks: BlockRow[]; seq: number };
 
-const LOADING: PageState = { status: "loading" };
+/** How many times a page the server says is not there is asked for again: one made a moment ago may not be there yet. */
+const NOT_YET_RETRIES = 4;
 
-/** Fetches a page's blocks and what surrounds it (see docs/store.ts) when it is opened. */
+/**
+ * Fetches a page's blocks and what surrounds it (see docs/store.ts) when it
+ * is opened. The editor starts from a copy read for this opening, never from
+ * one cached by an earlier visit.
+ */
 export function usePage(docId: string): PageState {
-  // Tagged with the page it is about: another page is loading until its own answer comes.
-  const [result, setResult] = useState<{ docId: string; state: PageState } | null>(null);
-  useEffect(() => {
-    const ctl = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const setState = (state: PageState) => setResult({ docId, state });
-    const attempt = (n: number) =>
-      loadPage(docId, ctl.signal).then(
-        (data) => setState({ status: "ready", blocks: data.blocks ?? [], seq: data.doc.content_seq ?? 0 }),
-        (err: unknown) => {
-          if (ctl.signal.aborted) return;
-          const missing = err instanceof ApiError && err.status === 404;
-          // A page made a moment ago may be asked for before the server has it.
-          if (missing && n < 4) timer = setTimeout(() => void attempt(n + 1), 250 * (n + 1));
-          else {
-            if (missing) forgetIfUnshared(docId);
-            setState({ status: "error", error: errorMessage(err), missing });
-          }
-        },
-      );
-    void attempt(0);
-    return () => {
-      clearTimeout(timer);
-      ctl.abort();
-    };
-  }, [docId]);
-  return result?.docId === docId ? result.state : LOADING;
+  const slug = useSlug();
+  const page = useQuery({
+    ...pageQuery(slug, docId),
+    retry: (failures, err) => (isNotFound(err) ? failures < NOT_YET_RETRIES : retryUnreachable(failures, err)),
+    retryDelay: (failures, err) => (isNotFound(err) ? 250 * (failures + 1) : retryWait(failures)),
+  });
+  if (page.data && page.isFetchedAfterMount) return { status: "ready", blocks: page.data.blocks, seq: page.data.seq };
+  const error = page.isFetching ? "" : readError(page.error);
+  if (error) return { status: "error", error, missing: isNotFound(page.error) };
+  return { status: "loading" };
 }

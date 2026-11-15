@@ -1,17 +1,20 @@
 import { FileQuestion, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import { useRowEvenIfGone } from "@/lib/selectors";
+import { isNotFound, readError } from "@/lib/query";
+import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { restoreDoc } from "@/docs/actions";
 import { docTitle } from "@/docs/data";
 import { PageBody } from "@/docs/page/page-body";
 import { PageHeader } from "@/docs/page/page-header";
 import { pageUi } from "@/docs/page/state";
-import { loadPage } from "@/docs/store";
+import { pageQuery } from "@/docs/store";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
+import { LoadFailed } from "@/ui/load-gate";
 import { Loading } from "@/ui/spinner";
 
 /** One page of the docs: its header and everything under it. */
@@ -49,16 +52,17 @@ export function DocPage({ id }: { id: string }) {
   );
 }
 
-/** A page that is not in the workspace copy: ask the server once (a link to a row, a page shared a moment ago). */
+/**
+ * A page that is not in the workspace copy: ask the server (a link to a row,
+ * a page shared a moment ago). Once it answers, the page is in the copy and
+ * DocPage shows it. Only the server saying it is not there is "not found".
+ */
 function Unknown({ id }: { id: string }) {
-  const [missing, setMissing] = useState(false);
-  useEffect(() => {
-    let gone = false;
-    loadPage(id).catch(() => !gone && setMissing(true));
-    return () => {
-      gone = true;
-    };
-  }, [id]);
-  if (!missing) return <Loading />;
-  return <EmptyState icon={<FileQuestion />} title={t("docs.notFound")} hint={t("docs.notFoundHint")} />;
+  const page = useQuery(pageQuery(useSlug(), id));
+  if (!page.error || page.isFetching) return <Loading />;
+  if (isNotFound(page.error))
+    return <EmptyState icon={<FileQuestion />} title={t("docs.notFound")} hint={t("docs.notFoundHint")} />;
+  const why = readError(page.error);
+  // A 401: the person is on the way to sign in.
+  return why ? <LoadFailed error={why} onRetry={() => void page.refetch()} /> : null;
 }

@@ -83,6 +83,7 @@ export const docs = {
   "docs.trash.restore": "Restore",
   "docs.trash.note": "Restoring a page brings back the pages that were inside it.",
   "docs.trash.inTrash": "“{title}” is in the trash",
+  "docs.trash.restoredNotLoaded": "The page is restored, but it could not be loaded: {why}",
   "docs.trash.inTrashHint": "Restore it to read or edit it again. The pages inside it come back with it.",
 
   "docs.header.back": "Back",

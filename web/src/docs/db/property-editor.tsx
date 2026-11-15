@@ -2,7 +2,7 @@
 // type, set what the type needs (options, the database a relation points
 // into, a rollup's source, a formula), hide it in this view, delete it.
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { EyeOff, Sigma, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useRows as useLiveRows } from "@/lib/selectors";
@@ -11,7 +11,7 @@ import { deleteProperty, freeName, setViewConfig, updateProperty } from "@/docs/
 import { FormulaEditor } from "@/docs/db/formula-editor";
 import { OptionsEditor } from "@/docs/db/options-editor";
 import { PropIcon, propTypeName } from "@/docs/db/prop-meta";
-import { ensureDatabase } from "@/docs/db/use-table";
+import { useEnsureDatabases } from "@/docs/db/use-table";
 import { type DBProperty, type DBView, type PropConfig, PROPERTY_TYPES, type PropertyType } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { Select } from "@/ui/picker";
@@ -65,7 +65,7 @@ function RollupConfig({ prop, save }: { prop: DBProperty; save: (c: PropConfig) 
   const relations = own.filter((p) => p.type === "relation");
   const rel = relations.find((p) => p.id === prop.config?.relation || p.name === prop.config?.relation);
   const targetDb = rel?.config?.database;
-  useEffect(() => ensureDatabase(targetDb), [targetDb]);
+  useEnsureDatabases([targetDb]);
   const theirs = useProperties(targetDb);
   const cfg = prop.config ?? {};
   // A rollup made through the API may name its target instead of giving its id.

@@ -3,11 +3,14 @@
 // else shows them), and from then on the live feed keeps them current: a
 // page deleted or restored anywhere shows up or drops out here.
 
-import { useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { api, workspacePath } from "@/lib/api";
-import { getRowEvenIfGone, useLookupEvenIfGone, useMe, useTrashed as useTrashedRows } from "@/lib/selectors";
-import { getState, mergeRows, useStore } from "@/lib/store";
+import { queryClient } from "@/lib/query";
+import { getRowEvenIfGone, useLookupEvenIfGone, useMe, useSlug, useTrashed as useTrashedRows } from "@/lib/selectors";
+import { getState, mergeRows } from "@/lib/store";
 import { canSee } from "@/docs/data";
+import { docsKeys } from "@/docs/store";
 import type { Doc } from "@/lib/types-docs";
 
 export interface Trashed {
@@ -19,26 +22,16 @@ export interface Trashed {
   deleted_at: number;
 }
 
-let loading: Promise<void> | null = null;
-
 /** Fetches the deleted pages into the workspace copy. A page the copy already has is left alone: the feed is newer. */
-export function loadTrash(): Promise<void> {
-  const slug = getState().slug;
-  if (!slug) return Promise.resolve();
-  loading ??= api
-    .get<{ docs: Doc[] }>(workspacePath(slug, "/docs?trash=1"))
-    .then(({ docs }) => {
-      if (getState().slug !== slug) return;
-      mergeRows("docs", docs.filter((d) => !getRowEvenIfGone("docs", d.id)) as never[]);
-    })
-    .catch(() => {
-      // The trash then shows what the feed reported during this visit.
-    })
-    .finally(() => {
-      loading = null;
-    });
-  return loading;
+async function fetchTrash(slug: string, signal: AbortSignal): Promise<true> {
+  const { docs } = await api.get<{ docs: Doc[] }>(workspacePath(slug, "/docs?trash=1"), signal);
+  if (getState().slug === slug) mergeRows("docs", docs.filter((d) => !getRowEvenIfGone("docs", d.id)) as never[]);
+  return true;
 }
+
+/** Asks the server for the trash again (the trash is opened), sharing a fetch already on its way. */
+export const loadTrash = () =>
+  queryClient.refetchQueries({ queryKey: docsKeys.trash(getState().slug) }, { cancelRefetch: false });
 
 /** Deleted pages, newest first; with a project, those tied to it. Only the top of what went together: the pages under it come back with it. */
 export function useTrashed(projectId?: string): Trashed[] {
@@ -46,12 +39,10 @@ export function useTrashed(projectId?: string): Trashed[] {
   // To tell the top of what went together: a parent trashed in the same go.
   const docs = useLookupEvenIfGone("docs");
   const me = useMe();
-  const slug = useStore((s) => s.slug);
+  const slug = useSlug();
   // Asked again when the stream comes back: a copy fetched afresh after a long gap starts without the trash.
-  const live = useStore((s) => s.stream === "live");
-  useEffect(() => {
-    void loadTrash();
-  }, [slug, live]);
+  // A failure leaves the trash showing what the feed reported during this visit.
+  useQuery({ queryKey: docsKeys.trash(slug), queryFn: ({ signal }) => fetchTrash(slug, signal) });
   return useMemo(() => {
     const out: Trashed[] = [];
     for (const doc of trashed) {
