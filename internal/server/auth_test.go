@@ -163,51 +163,53 @@ func fakeOIDC(t *testing.T, email string) *httptest.Server {
 }
 
 func TestSingleSignOn(t *testing.T) {
-	s := newSite(t, testdb.SQLite(t))
-	idp := fakeOIDC(t, "eve@example.com")
-	s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", M{"enabled": true, "name": "Company SSO", "issuer": idp.URL,
-		"client_id": "quadit-client", "client_secret": "s3cret"}, 200, nil)
-	if out := s.call(nil, "", "GET", "/api/v1/auth/config", nil, 200, nil); !strings.Contains(out, "Company SSO") {
-		t.Fatalf("provider not offered: %s", out)
-	}
-	// A stranger with no invitation is turned away.
-	b := browser()
-	resp, err := b.Get(s.url + "/api/v1/auth/oauth/oidc/start")
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if !strings.Contains(resp.Request.URL.String(), "/login?error=") {
-		t.Fatalf("uninvited sign-in ended at %s", resp.Request.URL)
-	}
-	// With an invitation the same sign-in makes the account and comes back
-	// to the invitation.
-	var inv struct{ Link string }
-	s.call(s.owner, "", "POST", w+"/invites", M{"email": "eve@example.com"}, 201, &inv)
-	token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
-	resp, err = b.Get(s.url + "/api/v1/auth/oauth/oidc/start?invite=" + token)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if !strings.HasSuffix(resp.Request.URL.Path, "/invite/"+token) {
-		t.Fatalf("invited sign-in ended at %s", resp.Request.URL)
-	}
-	s.call(b, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
-	var me struct{ Name, Role string }
-	s.call(b, "", "GET", w+"/me", nil, 200, &me)
-	if me.Name != "Eve Example" || me.Role != "member" {
-		t.Fatalf("signed in as %+v", me)
-	}
-	// Next time the identity is known and no invitation is needed.
-	b2 := browser()
-	resp, _ = b2.Get(s.url + "/api/v1/auth/oauth/oidc/start")
-	resp.Body.Close()
-	s.call(b2, "", "GET", "/api/v1/auth/me", nil, 200, nil)
-	// It is her only way in, so it cannot be removed.
-	var ids struct {
-		Identities []struct{ ID string }
-	}
-	s.call(b2, "", "GET", "/api/v1/auth/identities", nil, 200, &ids)
-	s.call(b2, "", "DELETE", "/api/v1/auth/identities/"+ids.Identities[0].ID, nil, 409, nil)
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		idp := fakeOIDC(t, "eve@example.com")
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", M{"enabled": true, "name": "Company SSO", "issuer": idp.URL,
+			"client_id": "quadit-client", "client_secret": "s3cret"}, 200, nil)
+		if out := s.call(nil, "", "GET", "/api/v1/auth/config", nil, 200, nil); !strings.Contains(out, "Company SSO") {
+			t.Fatalf("provider not offered: %s", out)
+		}
+		// A stranger with no invitation is turned away.
+		b := browser()
+		resp, err := b.Get(s.url + "/api/v1/auth/oauth/oidc/start")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if !strings.Contains(resp.Request.URL.String(), "/login?error=") {
+			t.Fatalf("uninvited sign-in ended at %s", resp.Request.URL)
+		}
+		// With an invitation the same sign-in makes the account and comes back
+		// to the invitation.
+		var inv struct{ Link string }
+		s.call(s.owner, "", "POST", w+"/invites", M{"email": "eve@example.com"}, 201, &inv)
+		token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
+		resp, err = b.Get(s.url + "/api/v1/auth/oauth/oidc/start?invite=" + token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if !strings.HasSuffix(resp.Request.URL.Path, "/invite/"+token) {
+			t.Fatalf("invited sign-in ended at %s", resp.Request.URL)
+		}
+		s.call(b, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
+		var me struct{ Name, Role string }
+		s.call(b, "", "GET", w+"/me", nil, 200, &me)
+		if me.Name != "Eve Example" || me.Role != "member" {
+			t.Fatalf("signed in as %+v", me)
+		}
+		// Next time the identity is known and no invitation is needed.
+		b2 := browser()
+		resp, _ = b2.Get(s.url + "/api/v1/auth/oauth/oidc/start")
+		resp.Body.Close()
+		s.call(b2, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+		// It is her only way in, so it cannot be removed.
+		var ids struct {
+			Identities []struct{ ID string }
+		}
+		s.call(b2, "", "GET", "/api/v1/auth/identities", nil, 200, &ids)
+		s.call(b2, "", "DELETE", "/api/v1/auth/identities/"+ids.Identities[0].ID, nil, 409, nil)
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/auth"
@@ -104,6 +105,9 @@ func (s *Server) hRender(x *c) error {
 	if os.Geteuid() == 0 {
 		args = append(args, "--no-sandbox") // Chrome refuses to sandbox as root, as in a container
 	}
+	// Extra switches for where the server runs: a container usually cannot
+	// give Chrome its own sandbox, and says so with QUADIT_CHROME_ARGS=--no-sandbox.
+	args = append(args, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
 	if q.Get("theme") == "dark" {
 		args = append(args, "--force-dark-mode", "--enable-features=WebContentsForceDark")
 	}

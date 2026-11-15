@@ -156,55 +156,57 @@ func TestStreamsEndWithAccess(t *testing.T) {
 // TestCompression checks that text answers shrink for those who ask, and
 // that files and the live stream are left alone.
 func TestCompression(t *testing.T) {
-	s := newSite(t, testdb.SQLite(t))
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	for i := 0; i < 40; i++ {
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "A task about the boss fight, number " + strings.Repeat("x", i)})
-	}
-	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
-	get := func(path string, gz bool, hdr ...string) (*http.Response, int) {
-		req, _ := http.NewRequest("GET", s.url+path, nil)
-		req.Header.Set("Authorization", "Bearer "+tok.Token)
-		if gz {
-			req.Header.Set("Accept-Encoding", "gzip")
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		for i := 0; i < 40; i++ {
+			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "A task about the boss fight, number " + strings.Repeat("x", i)})
 		}
-		for i := 0; i+1 < len(hdr); i += 2 {
-			req.Header.Set(hdr[i], hdr[i+1])
-		}
-		resp, err := (&http.Transport{DisableCompression: true}).RoundTrip(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
-		n := 0
-		buf := make([]byte, 32<<10)
-		for {
-			k, err := resp.Body.Read(buf)
-			n += k
-			if err != nil {
-				break
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
+		get := func(path string, gz bool, hdr ...string) (*http.Response, int) {
+			req, _ := http.NewRequest("GET", s.url+path, nil)
+			req.Header.Set("Authorization", "Bearer "+tok.Token)
+			if gz {
+				req.Header.Set("Accept-Encoding", "gzip")
 			}
+			for i := 0; i+1 < len(hdr); i += 2 {
+				req.Header.Set(hdr[i], hdr[i+1])
+			}
+			resp, err := (&http.Transport{DisableCompression: true}).RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			n := 0
+			buf := make([]byte, 32<<10)
+			for {
+				k, err := resp.Body.Read(buf)
+				n += k
+				if err != nil {
+					break
+				}
+			}
+			return resp, n
 		}
-		return resp, n
-	}
-	plain, full := get("/api/v1/w/-/bootstrap", false)
-	packed, small := get("/api/v1/w/-/bootstrap", true)
-	if plain.Header.Get("Content-Encoding") != "" || packed.Header.Get("Content-Encoding") != "gzip" || small*3 > full {
-		t.Fatalf("bootstrap: %d bytes plain, %d bytes compressed (%q)", full, small, packed.Header.Get("Content-Encoding"))
-	}
-	// A file is sent as it is, and in ranges.
-	var f struct{ ID, URL string }
-	s.call(nil, tok.Token, "POST", "/api/v1/w/-/files?name=notes.txt", []byte(strings.Repeat("plain words ", 2000)), 201, &f)
-	file, _ := get(strings.TrimPrefix(f.URL, s.url), true)
-	part, n := get(strings.TrimPrefix(f.URL, s.url), true, "Range", "bytes=100-199")
-	if file.Header.Get("Content-Encoding") != "" || part.StatusCode != 206 || n != 100 {
-		t.Fatalf("file: encoding %q; range: %d, %d bytes", file.Header.Get("Content-Encoding"), part.StatusCode, n)
-	}
-	// A short answer is not worth it; a compressed one still decodes for a normal client.
-	if out := s.call(nil, tok.Token, "GET", "/api/v1/w/-/tasks?format=text", nil, 200, nil); !strings.Contains(out, "SVA-40") {
-		t.Fatalf("a normal client could not read a compressed answer: %.80s", out)
-	}
+		plain, full := get("/api/v1/w/-/bootstrap", false)
+		packed, small := get("/api/v1/w/-/bootstrap", true)
+		if plain.Header.Get("Content-Encoding") != "" || packed.Header.Get("Content-Encoding") != "gzip" || small*3 > full {
+			t.Fatalf("bootstrap: %d bytes plain, %d bytes compressed (%q)", full, small, packed.Header.Get("Content-Encoding"))
+		}
+		// A file is sent as it is, and in ranges.
+		var f struct{ ID, URL string }
+		s.call(nil, tok.Token, "POST", "/api/v1/w/-/files?name=notes.txt", []byte(strings.Repeat("plain words ", 2000)), 201, &f)
+		file, _ := get(strings.TrimPrefix(f.URL, s.url), true)
+		part, n := get(strings.TrimPrefix(f.URL, s.url), true, "Range", "bytes=100-199")
+		if file.Header.Get("Content-Encoding") != "" || part.StatusCode != 206 || n != 100 {
+			t.Fatalf("file: encoding %q; range: %d, %d bytes", file.Header.Get("Content-Encoding"), part.StatusCode, n)
+		}
+		// A short answer is not worth it; a compressed one still decodes for a normal client.
+		if out := s.call(nil, tok.Token, "GET", "/api/v1/w/-/tasks?format=text", nil, 200, nil); !strings.Contains(out, "SVA-40") {
+			t.Fatalf("a normal client could not read a compressed answer: %.80s", out)
+		}
+	})
 }
 
 // TestTwoServersOneDatabase runs two servers on one Postgres database: a
