@@ -64,6 +64,7 @@ func (s *Server) hMCP(w http.ResponseWriter, r *http.Request) {
 	}
 	var req rpcRequest
 	if err := json.Unmarshal(raw, &req); err != nil || req.JSONRPC != "2.0" {
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(rpcResponse{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{Code: -32700, Message: "send one JSON-RPC 2.0 request"}})
 		return
 	}
@@ -150,6 +151,7 @@ func (s *Server) mcpCallTool(token string, params json.RawMessage) (any, *rpcErr
 	for i := range mcpTools {
 		if mcpTools[i].Name == p.Name {
 			tool = &mcpTools[i]
+			break
 		}
 	}
 	if tool == nil {

@@ -220,3 +220,16 @@ func TestMCPToolListIsStable(t *testing.T) {
 		}
 	}
 }
+
+// TestMCPParseErrorIsJSON: a body that is not JSON-RPC is answered with the
+// parse error, as JSON.
+func TestMCPParseErrorIsJSON(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	resp, body := mcpPost(t, s, mcpAgentToken(s), `this is not json`)
+	if !strings.Contains(body, "-32700") {
+		t.Fatalf("answer = %s", body)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("the parse error came as %q", ct)
+	}
+}
