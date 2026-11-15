@@ -199,6 +199,13 @@ func (c *Client) Change(typ string, args any, approval string, dry bool) (*Resul
 
 // Upload sends a file and returns its id and address.
 func (c *Client) Upload(path string) (fileID, fileURL string, err error) {
+	return c.UploadAs("", path)
+}
+
+// UploadAs sends a file under an id of the caller's making (empty: the
+// server makes one). Sent again under the same id, a file is not stored
+// twice: an upload that stopped half way goes on from where it was.
+func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", "", err
@@ -210,6 +217,9 @@ func (c *Client) Upload(path string) (fileID, fileURL string, err error) {
 	}
 	const part = 16 << 20
 	q := url.Values{"name": {filepath.Base(path)}, "size": {fmt.Sprint(st.Size())}}
+	if id != "" {
+		q.Set("id", id)
+	}
 	var meta struct {
 		ID       string `json:"id"`
 		URL      string `json:"url"`

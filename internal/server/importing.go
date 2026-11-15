@@ -40,7 +40,7 @@ type importBody struct {
 	// the kinds that are read from a service (github: owner/repo; orbit: its URL).
 	File    string            `json:"file"`
 	Source  string            `json:"source"`
-	Options map[string]string `json:"options"` // project, token, workspace, api
+	Options map[string]string `json:"options"` // project, token, workspace, session, api
 	DryRun  bool              `json:"dry_run"`
 }
 
@@ -92,6 +92,7 @@ func (s *Server) hImport(x *c) error {
 		}
 	}
 	plan, err := importer.Read(b.Kind, source, b.Options)
+	defer plan.Close()
 	if err != nil {
 		field, what := "file", "this could not be read as a "+b.Kind+" export: "
 		if b.File == "" {
@@ -186,6 +187,25 @@ func (k *serverSink) Upload(path string) (string, error) {
 	var f struct{ URL string }
 	json.Unmarshal(out, &f)
 	return f.URL, nil
+}
+
+// UploadAs sends a file under the import's own id for it, unless an
+// earlier run of the same import has.
+func (k *serverSink) UploadAs(fileID, path string) (string, bool, error) {
+	var f struct{ URL, State string }
+	if out, err := k.do("GET", "/files/"+fileID, nil, nil, ""); err == nil && json.Unmarshal(out, &f) == nil && f.State == "ready" {
+		return f.URL, false, nil
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", false, err
+	}
+	out, err := k.do("POST", "/files", url.Values{"name": {filepath.Base(path)}, "id": {fileID}}, raw, "application/octet-stream")
+	if err != nil {
+		return "", false, err
+	}
+	json.Unmarshal(out, &f)
+	return f.URL, true, nil
 }
 
 func (k *serverSink) Logf(format string, a ...any) {

@@ -45,7 +45,7 @@ var apiOps = []op{
 	{"GET", "/integrations/{id}/webhook", "The address and secret to give the outside service so it can call in. Admins.", "", "admin"},
 	{"POST", "/webhooks/{id}/test", "Send a sample event to a webhook now and answer with what it said. Admins.", "", "admin"},
 	{"POST", "/deliveries/{id}/redeliver", "Send a webhook delivery again. Admins.", "", "admin"},
-	{"POST", "/import", "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace}, dry_run}. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
+	{"POST", "/import", "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace, session}, dry_run}. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
 	{"GET", "/audit", "This workspace's part of the audit log, newest first. Admins.", "action; actor; cursor: the last id seen; limit; format: csv", "admin"},
 	{"GET", "/secrets", "The secrets the caller may use: names, hosts and what they are for. Values are never returned.", "", "secrets"},
 	{"POST", "/secrets/{name}/request", "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; the value is blanked out of the answer.", "", "secrets"},

@@ -44,12 +44,33 @@ type Task struct {
 	// Blocks and Relates name other tasks of the same import by their Ext.
 	Blocks  []string
 	Relates []string
+	// Files names the plan's files that were attached to the task there.
+	Files []string
 }
 
 type Comment struct {
 	Author string
 	At     string
 	Body   string
+	Files  []string // the plan's files attached to the comment there
+}
+
+// File is a file that lived at the source: a copy of it on this machine,
+// and the addresses that text there used for it.
+type File struct {
+	Ext   string   // its id there
+	Path  string   // where the copy is
+	Links []string // how descriptions, comments and pages there point at it
+}
+
+// Status is a status of a project's workflow there, and Label a label:
+// they come over whether or not a task uses them, in the order they had.
+type Status struct {
+	Project, Name, Category, Color string
+}
+
+type Label struct {
+	Project, Name, Color string
 }
 
 // Doc is one page.
@@ -82,8 +103,28 @@ type Plan struct {
 	Tasks    []Task
 	Docs     []Doc
 	Tables   []Table
+	Files    []File
+	Statuses []Status
+	Labels   []Label
 	// Notes say what the source could not give, for the one running the import.
 	Notes []string
+	// Tmp is a folder of copies made while reading; Close removes it.
+	Tmp string
+}
+
+// Close removes what reading the source left on this machine.
+func (p Plan) Close() {
+	if p.Tmp != "" {
+		os.RemoveAll(p.Tmp)
+	}
+}
+
+// FileUploader is a Sink that can send a file under an id of the caller's
+// making: a file sent again under the same id is not stored twice, which is
+// what keeps a second run of an import from leaving copies behind. fresh
+// says whether the file was sent now, or was there from an earlier run.
+type FileUploader interface {
+	UploadAs(fileID, path string) (fileURL string, fresh bool, err error)
 }
 
 // Sink is where an import writes: the API, through the command-line client.
@@ -147,6 +188,13 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		if d, ok := sink.(interface{ WasDuplicate() bool }); ok && d.WasDuplicate() {
 			fresh = false
 			sum.Already++
+		}
+		// The same thing from an earlier run, but changed at the source
+		// since (an edited description, say): what is here stays as it is.
+		if err != nil && strings.Contains(err.Error(), "is already in use") {
+			fresh = false
+			sum.Already++
+			return nil
 		}
 		return err
 	}
@@ -238,9 +286,115 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 				return m.UserID
 			}
 		}
-		return ""
+		// A first name alone ("Ann" for Ann Lee), when only one member has it.
+		found := ""
+		for _, m := range members {
+			if w != "" && !strings.Contains(w, "@") && (strings.HasPrefix(strings.ToLower(m.Name), w+" ") || strings.HasPrefix(m.Handle, w+"-")) {
+				if found != "" && found != m.UserID {
+					return ""
+				}
+				found = m.UserID
+			}
+		}
+		return found
 	}
 	unmatched := map[string]bool{}
+
+	// The workflow as it was there: every status and label, used or not.
+	for _, st := range plan.Statuses {
+		key := strings.ToUpper(orStr(st.Project, project))
+		if st.Name == "" || projectID[key] == "" || has(statuses, key, st.Name) {
+			continue
+		}
+		args := map[string]any{"id": uid("status", key+"/"+strings.ToLower(st.Name)), "project": projectID[key], "name": st.Name, "category": orStr(st.Category, "unstarted")}
+		if st.Color != "" {
+			args["color"] = st.Color
+		}
+		if err := change("status.create", args); err != nil {
+			return sum, fmt.Errorf("status %q: %w", st.Name, err)
+		}
+		statuses = append(statuses, row{Name: st.Name, ProjectID: projectID[key]})
+	}
+	for _, l := range plan.Labels {
+		key := strings.ToUpper(orStr(l.Project, project))
+		if l.Name == "" || projectID[key] == "" || has(labels, key, l.Name) {
+			continue
+		}
+		args := map[string]any{"id": uid("label", key+"/"+strings.ToLower(l.Name)), "project": projectID[key], "name": l.Name}
+		if l.Color != "" {
+			args["color"] = l.Color
+		}
+		if err := change("label.create", args); err != nil {
+			return sum, fmt.Errorf("label %q: %w", l.Name, err)
+		}
+		labels = append(labels, row{Name: l.Name, ProjectID: projectID[key]})
+	}
+
+	// Files that lived at the source. Each is sent once, the first time
+	// something needs it, and text that pointed at it there points at the
+	// copy here.
+	fileOf := map[string]File{}
+	for _, f := range plan.Files {
+		fileOf[f.Ext] = f
+	}
+	sent := map[string]string{} // ext -> its address here ("" when it could not be sent)
+	send := func(ext string) string {
+		if u, ok := sent[ext]; ok {
+			return u
+		}
+		f, u, isNew := fileOf[ext], "", true
+		var err error
+		if up, ok := sink.(FileUploader); ok {
+			u, isNew, err = up.UploadAs(uid("file", ext), f.Path)
+		} else {
+			u, err = sink.Upload(f.Path)
+		}
+		if err != nil {
+			sink.Logf("note: the file %s did not come over: %v", filepath.Base(f.Path), err)
+			u = ""
+		} else if isNew {
+			sum.Files++
+		}
+		// The address without the server's name, so that it still holds
+		// when the install moves to another one.
+		if i := strings.Index(u, "/f/"); i > 0 {
+			u = u[i:]
+		}
+		sent[ext] = u
+		return u
+	}
+	type link struct{ text, ext string }
+	var links []link
+	for _, f := range plan.Files {
+		for _, l := range f.Links {
+			if l != "" {
+				links = append(links, link{l, f.Ext})
+			}
+		}
+	}
+	// Longest first: an address with the server's name before the same one without.
+	sort.SliceStable(links, func(i, j int) bool { return len(links[i].text) > len(links[j].text) })
+	here := func(text string) string {
+		for _, l := range links {
+			if strings.Contains(text, l.text) {
+				if u := send(l.ext); u != "" {
+					text = strings.ReplaceAll(text, l.text, u)
+				}
+			}
+		}
+		return text
+	}
+	attach := func(exts []string, on, subject, was string) error {
+		for _, ext := range exts {
+			if _, ok := fileOf[ext]; !ok || send(ext) == "" {
+				continue
+			}
+			if err := change("attachment.add", map[string]any{"id": uid("attachment", was+"/"+ext), "file": uid("file", ext), on: subject}); err != nil {
+				return fmt.Errorf("file %s: %w", filepath.Base(fileOf[ext].Path), err)
+			}
+		}
+		return nil
+	}
 
 	// Tasks: parents before their sub-tasks.
 	byExt := map[string]Task{}
@@ -303,7 +457,7 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 			}
 			args["epic"] = t.Epic
 		}
-		desc := t.Description
+		desc := here(t.Description)
 		var notes []string
 		if t.Assignee != "" {
 			if m := member(t.Assignee); m != "" {
@@ -313,18 +467,24 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 				notes = append(notes, "Assigned there to "+t.Assignee+".")
 			}
 		}
-		if t.WasKey != "" {
-			notes = append(notes, "Was "+t.WasKey+" there.")
+		// What it was called there is said only when it is called
+		// something else here.
+		describe := func(sameKey bool) string {
+			ns := notes
+			if t.WasKey != "" && !sameKey {
+				ns = append(ns[:len(ns):len(ns)], "Was "+t.WasKey+" there.")
+			}
+			if t.URL != "" {
+				ns = append(ns[:len(ns):len(ns)], "Imported from "+t.URL)
+			} else if t.Ext != "" {
+				ns = append(ns[:len(ns):len(ns)], "Imported from "+plan.Source+" "+t.Ext+".")
+			}
+			if len(ns) == 0 {
+				return desc
+			}
+			return strings.TrimSpace(desc + "\n\n" + strings.Join(ns, " "))
 		}
-		if t.URL != "" {
-			notes = append(notes, "Imported from "+t.URL)
-		} else if t.Ext != "" {
-			notes = append(notes, "Imported from "+plan.Source+" "+t.Ext+".")
-		}
-		if len(notes) > 0 {
-			desc = strings.TrimSpace(desc + "\n\n" + strings.Join(notes, " "))
-		}
-		args["description"] = desc
+		args["description"] = describe(t.Number > 0 && strings.EqualFold(t.WasKey, fmt.Sprintf("%s-%d", key, t.Number)))
 		if len(t.DueOn) >= 10 {
 			args["due_on"] = t.DueOn[:10]
 		}
@@ -339,6 +499,7 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 			// Someone here has that number already: it gets the next one,
 			// and its description says what it was called.
 			delete(args, "number")
+			args["description"] = describe(false)
 			err = change("task.create", args)
 		}
 		if err != nil {
@@ -347,11 +508,14 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		if fresh {
 			sum.Tasks++
 		}
+		if err := attach(t.Files, "task", uid("task", t.Ext), t.Ext); err != nil {
+			return err
+		}
 		for i, cm := range t.Comments {
-			if strings.TrimSpace(cm.Body) == "" {
+			if strings.TrimSpace(cm.Body) == "" && len(cm.Files) == 0 {
 				continue
 			}
-			body := cm.Body
+			body := here(cm.Body)
 			if cm.Author != "" {
 				head := "**" + cm.Author + "**"
 				if cm.At != "" {
@@ -364,6 +528,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 			}
 			if fresh {
 				sum.Comments++
+			}
+			if err := attach(cm.Files, "comment", uid("comment", fmt.Sprintf("%s/%d", t.Ext, i)), fmt.Sprintf("%s/%d", t.Ext, i)); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -419,7 +586,7 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 			}
 			args["parent"] = uid("doc", p.Ext)
 		}
-		body := wikiLink.ReplaceAllStringFunc(d.Markdown, func(m string) string {
+		body := wikiLink.ReplaceAllStringFunc(here(d.Markdown), func(m string) string {
 			sub := wikiLink.FindStringSubmatch(m)
 			target, label, _ := strings.Cut(sub[2], "|")
 			target = strings.TrimSpace(strings.SplitN(target, "#", 2)[0])

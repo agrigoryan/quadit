@@ -95,7 +95,8 @@ var helpTopics = map[string]string{
   import linear FILE.csv project=KEY       import trello BOARD.json project=KEY
   import asana FILE.csv project=KEY        import github OWNER/REPO project=KEY [token=…]
   import notion EXPORT.zip                 import obsidian FOLDER     import markdown FOLDER
-  import orbit https://orbit.example workspace=ID token=ORBIT_TOKEN
+  import orbit https://orbit.example workspace=ID token=ORBIT_TOKEN [session=ORBIT_SESSION]
+                                           with a signed-in session, attached files come too
 `,
 	"server": `on the server's machine
   quadit serve [--listen :4780] [--data DIR] [--db PATH|postgres://…] [--url https://…]
@@ -645,6 +646,7 @@ func (r *runner) run(cmd string, rest []string) error {
 			opts[k] = v[len(v)-1]
 		}
 		plan, err := importer.Read(pos[0], pos[1], opts)
+		defer plan.Close()
 		if err != nil {
 			return err
 		}
@@ -924,6 +926,17 @@ func (s clientSink) Get(path string, q url.Values) ([]byte, error) { return s.r.
 func (s clientSink) Upload(path string) (string, error) {
 	_, u, err := s.r.c.Upload(path)
 	return u, err
+}
+
+// UploadAs sends a file under the import's own id for it, unless an
+// earlier run of the same import has.
+func (s clientSink) UploadAs(fileID, path string) (string, bool, error) {
+	var had struct{ URL, State string }
+	if raw, err := s.r.c.JSON("/files/"+fileID, nil); err == nil && json.Unmarshal(raw, &had) == nil && had.State == "ready" {
+		return had.URL, false, nil
+	}
+	_, u, err := s.r.c.UploadAs(fileID, path)
+	return u, true, err
 }
 
 func (s clientSink) Logf(format string, a ...any) {

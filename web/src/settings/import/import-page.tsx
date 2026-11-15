@@ -59,6 +59,7 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
   const [address, setAddress] = useState("");
   const [token, setToken] = useState("");
   const [orbitWs, setOrbitWs] = useState("");
+  const [orbitSession, setOrbitSession] = useState("");
   const [project, setProject] = useState("");
   const [newKey, setNewKey] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -111,6 +112,7 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
       req.source = address.trim().replace(/\/+$/, "");
       if (orbitWs.trim()) options.workspace = orbitWs.trim();
       if (token.trim()) options.token = token.trim();
+      if (orbitSession.trim()) options.session = orbitSession.trim();
     }
     if (source.project) {
       if (!projectKey) return errors.set("project", t("import.projectMissing")), null;
@@ -191,6 +193,9 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                       <Input id="imp-token" type="password" autoComplete="off" value={token} onChange={(e) => (setToken(e.target.value), touched())} />
                     </FormField>
                   </div>
+                  <FormField label={t("import.orbitSession")} htmlFor="imp-orbit-session" hint={t("import.orbitSessionHint")} error={errors.fields.session}>
+                    <Input id="imp-orbit-session" type="password" autoComplete="off" value={orbitSession} onChange={(e) => (setOrbitSession(e.target.value), touched())} />
+                  </FormField>
                 </>
               )}
               {source.project && (

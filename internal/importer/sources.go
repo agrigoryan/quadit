@@ -52,7 +52,7 @@ func Read(kind, source string, opts map[string]string) (Plan, error) {
 	case "notion":
 		return readNotion(source)
 	case "orbit":
-		return readOrbit(source, opts["workspace"], opts["token"])
+		return readOrbit(source, opts["workspace"], opts["token"], opts["session"])
 	}
 	return Plan{}, fmt.Errorf("unknown source %q; sources are: %s", kind, strings.Join(Kinds, ", "))
 }
@@ -245,6 +245,40 @@ func getJSON(u, token string, dst any) (http.Header, error) {
 		return nil, fmt.Errorf("%s answered %s: %.200s", u, resp.Status, body)
 	}
 	return resp.Header, json.Unmarshal(body, dst)
+}
+
+// getFile fetches a file to path, making its folder.
+func getFile(u, token, path string) error {
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "quadit-import")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	hc := http.Client{Timeout: 10 * time.Minute}
+	resp, err := hc.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("%s answered %s", u, resp.Status)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		out.Close()
+		os.Remove(path)
+		return err
+	}
+	return out.Close()
 }
 
 // readGitHub reads a repository's issues (not its pull requests) with
@@ -474,14 +508,21 @@ func unzip(src, dst string) error {
 }
 
 // readOrbit reads a workspace from an Orbit server through its public API:
-// its projects with their tasks and comments, and its docs.
-func readOrbit(origin, workspace, token string) (Plan, error) {
-	plan := Plan{Source: "orbit", Notes: []string{"Orbit's API does not hand out the files attached to tasks, so they are not brought over; " +
-		"pictures and links written in descriptions, comments and pages come along as they are."}}
+// its projects with their statuses and labels, their tasks and comments,
+// and its docs. Orbit hands attached files only to a signed-in session, not
+// to an API token: with session they are fetched too.
+func readOrbit(origin, workspace, token, session string) (Plan, error) {
+	plan := Plan{Source: "orbit"}
 	if workspace == "" || token == "" {
 		return plan, fmt.Errorf("an Orbit import needs workspace=ID and token=TOKEN (an Orbit API token that can read tasks and docs)")
 	}
-	base := strings.TrimRight(origin, "/") + "/api/public/v1/workspaces/" + url.PathEscape(workspace)
+	if session == "" {
+		plan.Notes = []string{"Orbit hands attached files only to a signed-in session, not to an API token, so they are not brought over: " +
+			"pictures in descriptions and comments will point at Orbit. Give session=TOKEN to bring the files too " +
+			"(Orbit answers a sign-in sent without an Origin header, POST /api/v1/auth/login, with one)."}
+	}
+	origin = strings.TrimRight(origin, "/")
+	base := origin + "/api/public/v1/workspaces/" + url.PathEscape(workspace)
 	type page[T any] struct {
 		Items []T    `json:"items"`
 		Next  string `json:"next_cursor"`
@@ -492,36 +533,55 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 	}
 	var members page[struct {
 		ID, Name, Email string
+		DisplayName     string `json:"display_name"`
 		UserID          string `json:"user_id"`
 	}]
 	getJSON(base+"/members", token, &members) // names for assignees, when the token may read them
-	who := map[string]string{}
+	// who is matched to a member here (an email address when Orbit gives
+	// one), called is what a person reads.
+	who, called := map[string]string{}, map[string]string{}
 	for _, m := range members.Items {
-		who[m.ID], who[m.UserID] = orStr(m.Email, m.Name), orStr(m.Email, m.Name)
+		name := orStr(m.DisplayName, m.Name)
+		for _, k := range []string{m.ID, m.UserID} {
+			if k != "" {
+				who[k], called[k] = orStr(m.Email, name), orStr(name, m.Email)
+			}
+		}
 	}
 	keyOf := map[string]string{}
 	statusOf := map[string][2]string{} // id -> name, category
 	labelOf := map[string]string{}
 	milestoneOf := map[string]string{}
-	orbitCat := map[string]string{"backlog": "backlog", "unstarted": "unstarted", "started": "started", "completed": "done", "cancelled": "canceled", "canceled": "canceled"}
+	orbitCat := map[string]string{"backlog": "backlog", "unstarted": "unstarted", "started": "started", "completed": "done",
+		"cancelled": "canceled", "canceled": "canceled", "duplicate": "canceled"}
 	for _, p := range projects.Items {
 		keyOf[p.ID] = p.Key
 		plan.Projects = append(plan.Projects, Project{Key: KeyFrom(p.Key), Name: p.Name})
-		var sts page[struct{ ID, Name, Category, Type string }]
+		var sts page[struct {
+			ID, Name, Category, Type, Color string
+			Position                        int
+		}]
 		if _, err := getJSON(base+"/projects/"+p.ID+"/statuses", token, &sts); err != nil {
 			return plan, err
 		}
+		sort.SliceStable(sts.Items, func(i, j int) bool { return sts.Items[i].Position < sts.Items[j].Position })
 		for _, s := range sts.Items {
 			cat := orbitCat[strings.ToLower(orStr(s.Category, s.Type))]
-			if cat == "" {
-				cat = category(s.Name)
+			// Orbit has fewer kinds of status: its "Backlog" is a status not
+			// started, its "Waiting on you" one that is. The name says which
+			// of ours it is.
+			switch guess := category(s.Name); {
+			case cat == "", cat == "unstarted" && guess == "backlog", cat == "started" && guess == "waiting":
+				cat = guess
 			}
 			statusOf[s.ID] = [2]string{s.Name, cat}
+			plan.Statuses = append(plan.Statuses, Status{Project: KeyFrom(p.Key), Name: s.Name, Category: cat, Color: s.Color})
 		}
-		var ls page[struct{ ID, Name string }]
+		var ls page[struct{ ID, Name, Color string }]
 		if _, err := getJSON(base+"/projects/"+p.ID+"/labels", token, &ls); err == nil {
 			for _, l := range ls.Items {
 				labelOf[l.ID] = l.Name
+				plan.Labels = append(plan.Labels, Label{Project: KeyFrom(p.Key), Name: l.Name, Color: l.Color})
 			}
 		}
 		// Orbit's milestones are stages of a project; here they become epics.
@@ -602,13 +662,64 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 			}
 		}
 		var cs page[struct {
-			Body      string
+			ID, Body  string
 			AuthorID  string `json:"author_id"`
 			CreatedAt string `json:"created_at"`
 		}]
+		commentAt := map[string]int{}
 		if _, err := getJSON(base+"/tasks/"+ot.Identifier+"/comments", token, &cs); err == nil {
 			for _, c := range cs.Items {
-				t.Comments = append(t.Comments, Comment{Author: orStr(who[c.AuthorID], "someone"), At: c.CreatedAt, Body: c.Body})
+				commentAt[c.ID] = len(t.Comments)
+				t.Comments = append(t.Comments, Comment{Author: orStr(called[c.AuthorID], "someone"), At: c.CreatedAt, Body: c.Body})
+			}
+		}
+		if session != "" {
+			// The files, from the routes Orbit's own web app uses.
+			inner := "/api/v1/workspaces/" + url.PathEscape(workspace) + "/tasks/" + url.PathEscape(ot.ID) + "/attachments"
+			var raw json.RawMessage
+			if _, err := getJSON(origin+inner, session, &raw); err != nil {
+				return plan, fmt.Errorf("the files of %s: %w (session must be a signed-in Orbit session, not an API token)", ot.Identifier, err)
+			}
+			type attached struct {
+				ID        string
+				Name      string `json:"display_name"`
+				CommentID string `json:"comment_id"`
+				Deleted   bool
+			}
+			var list []attached
+			var wrapped page[attached]
+			if json.Unmarshal(raw, &wrapped) == nil && wrapped.Items != nil {
+				list = wrapped.Items
+			} else {
+				json.Unmarshal(raw, &list)
+			}
+			for _, a := range list {
+				if a.Deleted || a.ID == "" {
+					continue
+				}
+				if plan.Tmp == "" {
+					dir, err := os.MkdirTemp("", "quadit-orbit-*")
+					if err != nil {
+						return plan, err
+					}
+					plan.Tmp = dir
+				}
+				name := filepath.Base(strings.ReplaceAll(a.Name, "\\", "/"))
+				if name == "" || name == "." || name == "/" {
+					name = "file"
+				}
+				path := filepath.Join(plan.Tmp, a.ID, name)
+				link := inner + "/" + a.ID + "/download"
+				if err := getFile(origin+link, session, path); err != nil {
+					plan.Notes = append(plan.Notes, fmt.Sprintf("the file %s of %s could not be fetched: %v", a.Name, ot.Identifier, err))
+					continue
+				}
+				plan.Files = append(plan.Files, File{Ext: a.ID, Path: path, Links: []string{origin + link, link}})
+				if i, ok := commentAt[a.CommentID]; ok && a.CommentID != "" {
+					t.Comments[i].Files = append(t.Comments[i].Files, a.ID)
+				} else {
+					t.Files = append(t.Files, a.ID)
+				}
 			}
 		}
 		plan.Tasks = append(plan.Tasks, t)
