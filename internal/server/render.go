@@ -202,29 +202,31 @@ type optionView struct {
 }
 
 type decisionView struct {
-	N              int          `json:"n"`
-	ID             string       `json:"id"`
-	Task           string       `json:"task,omitempty"`
-	TaskID         string       `json:"task_id,omitempty"`
-	DeletedAt      int64        `json:"deleted_at,omitempty"`
-	Kind           string       `json:"kind"`
-	Question       string       `json:"question"`
-	Details        string       `json:"details,omitempty"`
-	Action         string       `json:"action,omitempty"`
-	State          string       `json:"state"`
-	By             string       `json:"by"`
-	Asked          string       `json:"asked,omitempty"`
-	Options        []optionView `json:"options,omitempty"`
-	Recommended    int          `json:"recommended,omitempty"`
-	Recommendation string       `json:"recommendation,omitempty"`
-	Picked         int          `json:"picked,omitempty"`
-	PickedLabel    string       `json:"picked_label,omitempty"`
-	Outcome        string       `json:"outcome,omitempty"`
-	Note           string       `json:"note,omitempty"`
-	DecidedBy      string       `json:"decided_by,omitempty"`
-	DecidedAt      string       `json:"decided_at,omitempty"`
-	UnclearNote    string       `json:"unclear_note,omitempty"`
-	AskedAt        string       `json:"asked_at,omitempty"`
+	N         int    `json:"n"`
+	ID        string `json:"id"`
+	Task      string `json:"task,omitempty"`
+	TaskID    string `json:"task_id,omitempty"`
+	DeletedAt int64  `json:"deleted_at,omitempty"`
+	Kind      string `json:"kind"`
+	Question  string `json:"question"`
+	Details   string `json:"details,omitempty"`
+	Action    string `json:"action,omitempty"`
+	State     string `json:"state"`
+	By        string `json:"by"`
+	Asked     string `json:"asked,omitempty"`
+	// Files on the question itself, shown with it before the options.
+	Attachments    []attachmentView `json:"attachments,omitempty"`
+	Options        []optionView     `json:"options,omitempty"`
+	Recommended    int              `json:"recommended,omitempty"`
+	Recommendation string           `json:"recommendation,omitempty"`
+	Picked         int              `json:"picked,omitempty"`
+	PickedLabel    string           `json:"picked_label,omitempty"`
+	Outcome        string           `json:"outcome,omitempty"`
+	Note           string           `json:"note,omitempty"`
+	DecidedBy      string           `json:"decided_by,omitempty"`
+	DecidedAt      string           `json:"decided_at,omitempty"`
+	UnclearNote    string           `json:"unclear_note,omitempty"`
+	AskedAt        string           `json:"asked_at,omitempty"`
 }
 
 func (d decisionView) text() string {
@@ -239,6 +241,9 @@ func (d decisionView) text() string {
 	}
 	if d.Action != "" {
 		b.WriteString("approval for: " + d.Action + "\n")
+	}
+	for _, a := range d.Attachments {
+		fmt.Fprintf(&b, "file: %s %s\n", a.Name, a.URL)
 	}
 	for _, o := range d.Options {
 		fmt.Fprintf(&b, "  %d) %s", o.N, o.Label)

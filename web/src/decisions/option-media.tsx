@@ -16,7 +16,7 @@ import { FileStepper } from "@/decisions/parts";
 const isSprite = (file: FileRow) => isSmallArt(file.width, file.height);
 
 /** A GIF's reduced copy is a still, so an animation is shown from the file itself. */
-const thumbOf = (file: FileRow) => (file.content_type === "image/gif" ? file.url : file.preview_url || file.url);
+export const thumbOf = (file: FileRow) => (file.content_type === "image/gif" ? file.url : file.preview_url || file.url);
 
 /** From this width a pair's two pictures fit next to each other. */
 const SIDE_BY_SIDE = 300;

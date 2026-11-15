@@ -1,5 +1,6 @@
 // What the decision views read from the store: a task's decisions, the
-// files and comments of each option, and what the signed-in person may do.
+// files on each question and option, the comments of each option, and
+// what the signed-in person may do.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isImage } from "@/lib/files";
@@ -54,6 +55,20 @@ export function useOptionFiles(decision: Decision): OptionFiles {
     }
     return out;
   }, [attachments, options]);
+}
+
+/** The files on the question itself, in order. */
+export function useQuestionFiles(decision: Decision): OptionFile[] {
+  const attachments = useCollection("attachments");
+  const id = decision.id;
+  return useMemo(
+    () =>
+      Object.values(attachments)
+        .filter((a) => a.subject_type === "decision" && a.subject_id === id && !a.deleted_at && a.file)
+        .sort(byRank)
+        .map((a) => ({ ...(a.file as FileRow), attachmentId: a.id, attachedBy: a.created_by, attachedAt: a.created_at })),
+    [attachments, id],
+  );
 }
 
 /**

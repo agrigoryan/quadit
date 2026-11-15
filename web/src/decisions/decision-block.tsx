@@ -1,6 +1,6 @@
-// One decision of a task: the question, who asked whom, the options side by
-// side with their pick buttons, and the answer once it is in. When the
-// question is asked of the viewer, this is where the highlighter goes.
+// One decision of a task: the question and its files, who asked whom, the
+// options side by side with their pick buttons, and the answer once it is in.
+// When the question is asked of the viewer, this is where the highlighter goes.
 
 import { useMemo, useState } from "react";
 import { Columns3, X } from "lucide-react";
@@ -14,10 +14,11 @@ import { Markdown } from "@/ui/markdown";
 import { deleteDecision, markUnclear, pick } from "@/decisions/actions";
 import { CompareView } from "@/decisions/compare-view";
 import { EditDecisionDialog } from "@/decisions/edit-decision-dialog";
-import { mediaAspect, type OptionFiles, optionsOf, pairUp, useMemberName, useOptionFiles, useViewer } from "@/decisions/data";
+import { mediaAspect, type OptionFiles, optionsOf, pairUp, useMemberName, useOptionFiles, useQuestionFiles, useViewer } from "@/decisions/data";
 import { ApprovalAction, ApprovalControls, DecisionHeader, DecisionResult, UnclearNote } from "@/decisions/decision-meta";
 import { NoteDialog, type NotePrompt } from "@/decisions/note-dialog";
 import { OptionCard } from "@/decisions/option-card";
+import { QuestionFiles } from "@/decisions/question-files";
 import { ThreadBody, ThreadToggle } from "@/decisions/thread";
 
 /** Splits each option's files into what can be looked at (before and after pictures joined into pairs) and everything else. */
@@ -35,6 +36,7 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
   const viewer = useViewer(decision);
   const options = optionsOf(decision);
   const files = useOptionFiles(decision);
+  const questionFiles = useQuestionFiles(decision);
   const { media, docs } = useMemo(() => splitFiles(files), [files]);
   const allMedia = options.flatMap((o) => media[o.id] ?? []);
   const aspect = allMedia.length > 0 ? mediaAspect(allMedia) : null;
@@ -114,6 +116,7 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
       <DecisionHeader decision={decision} viewer={viewer} onEdit={() => setEditing(true)} onDelete={askDelete} />
       <h3 className="mt-1.5 text-lg leading-snug font-semibold tracking-tight text-balance">{decision.question}</h3>
       {decision.details && <Markdown text={decision.details} className="mt-1.5 text-ink-2" />}
+      <QuestionFiles files={questionFiles} />
       {!choice && <ApprovalAction decision={decision} />}
       <UnclearNote decision={decision} viewer={viewer} />
       <DecisionResult decision={decision} viewer={viewer} onUnclear={askUnclear} />
