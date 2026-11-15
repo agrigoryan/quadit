@@ -27,7 +27,11 @@ export function RuleSentence({ rule, hooks }: { rule: Rule; hooks: Webhook[] }) 
     <span className="text-sm text-ink-2">
       {t("auto.rule.when")} <Strong>{what}</Strong>
       {project && <> {t("auto.rule.inProject", { key: project.key })}</>}
-      {actor ? <> {t("auto.rule.byMember", { handle: actor.handle })}</> : m.actor_kind ? <> {tMaybe(`auto.rule.by.${m.actor_kind}`)}</> : null}
+      {actor ? (
+        <> {t("auto.rule.byMember", { handle: actor.handle })}</>
+      ) : m.actor_kind ? (
+        <> {tMaybe(`auto.rule.by.${m.actor_kind}`)}</>
+      ) : null}
       {m.to_category && <> {t("auto.rule.toCategory", { category: tMaybe(`category.${m.to_category}`) })}</>}
       {m.outcome && <> {t("auto.rule.withOutcome", { outcome: tMaybe(`auto.outcome.${m.outcome}`) })}</>}
       {t("auto.rule.then")}{" "}
@@ -38,8 +42,7 @@ export function RuleSentence({ rule, hooks }: { rule: Rule; hooks: Webhook[] }) 
             ? tMaybe(`auto.rule.do.${a.kind}`).replace("{who}", who)
             : t("auto.rule.nothing")}
       </Strong>
-      {a?.message && a.kind !== "webhook" && a.kind !== "assign" && <>: “{a.message}”</>}
-      .
+      {a?.message && a.kind !== "webhook" && a.kind !== "assign" && <>: “{a.message}”</>}.
     </span>
   );
 }

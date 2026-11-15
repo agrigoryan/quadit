@@ -50,12 +50,25 @@ interface LineProps {
 /** One fact about the install: calm when fine, a warning tone when it needs attention. */
 function Line({ tone, label, value, note }: LineProps) {
   return (
-    <div className={cx("flex items-start gap-3 px-3 py-2", tone === "warn" && "bg-wait-soft/40", tone === "bad" && "bg-danger-soft/50")}>
+    <div
+      className={cx(
+        "flex items-start gap-3 px-3 py-2",
+        tone === "warn" && "bg-wait-soft/40",
+        tone === "bad" && "bg-danger-soft/50",
+      )}
+    >
       <span className="pt-0.5">{icons[tone]}</span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4">
           <span className="text-sm text-ink">{label}</span>
-          <span className={cx("text-sm font-medium tnum", tone === "warn" ? "text-wait" : tone === "bad" ? "text-danger" : "text-ink")}>{value}</span>
+          <span
+            className={cx(
+              "text-sm font-medium tnum",
+              tone === "warn" ? "text-wait" : tone === "bad" ? "text-danger" : "text-ink",
+            )}
+          >
+            {value}
+          </span>
         </div>
         {note && <p className="mt-0.5 text-xs text-ink-2">{note}</p>}
       </div>
@@ -73,18 +86,73 @@ function BackupLine({ backup }: { backup: Backup | undefined }) {
   const label = t("admin.health.lastBackup");
   const link = more("/admin/backups", t("admin.nav.backups"));
   if (!backup) {
-    return <Line tone="warn" label={label} value={t("admin.health.backupNone")} note={<>{t("admin.health.backupNoneNote")} {link}</>} />;
+    return (
+      <Line
+        tone="warn"
+        label={label}
+        value={t("admin.health.backupNone")}
+        note={
+          <>
+            {t("admin.health.backupNoneNote")} {link}
+          </>
+        }
+      />
+    );
   }
-  const when = <span title={exact(backup.started_at)}><Ago ms={backup.started_at} /></span>;
-  if (backup.error) return <Line tone="bad" label={label} value={<>{t("admin.health.backupFailed")} · {when}</>} note={<>{backup.error} {link}</>} />;
-  if (!backup.verified_at) return <Line tone="warn" label={label} value={<>{t("admin.health.backupUnverified")} · {when}</>} note={link} />;
+  const when = (
+    <span title={exact(backup.started_at)}>
+      <Ago ms={backup.started_at} />
+    </span>
+  );
+  if (backup.error)
+    return (
+      <Line
+        tone="bad"
+        label={label}
+        value={
+          <>
+            {t("admin.health.backupFailed")} · {when}
+          </>
+        }
+        note={
+          <>
+            {backup.error} {link}
+          </>
+        }
+      />
+    );
+  if (!backup.verified_at)
+    return (
+      <Line
+        tone="warn"
+        label={label}
+        value={
+          <>
+            {t("admin.health.backupUnverified")} · {when}
+          </>
+        }
+        note={link}
+      />
+    );
   const old = Date.now() - backup.started_at > 3 * 24 * 3600_000;
   return (
     <Line
       tone={old ? "warn" : "ok"}
       label={label}
-      value={<>{t("admin.health.backupVerified")} · {when}</>}
-      note={old ? <>{t("admin.health.backupOld")} {link}</> : fileSize(backup.size)}
+      value={
+        <>
+          {t("admin.health.backupVerified")} · {when}
+        </>
+      }
+      note={
+        old ? (
+          <>
+            {t("admin.health.backupOld")} {link}
+          </>
+        ) : (
+          fileSize(backup.size)
+        )
+      }
     />
   );
 }
@@ -116,7 +184,13 @@ export function HealthPage() {
                   tone={h.mail ? "ok" : "warn"}
                   label={t("admin.health.mail")}
                   value={h.mail ? t("admin.health.mailOn") : t("admin.health.mailOff")}
-                  note={h.mail ? undefined : <>{t("admin.health.mailOffNote")} {more("/admin/mail", t("admin.nav.mail"))}</>}
+                  note={
+                    h.mail ? undefined : (
+                      <>
+                        {t("admin.health.mailOffNote")} {more("/admin/mail", t("admin.nav.mail"))}
+                      </>
+                    )
+                  }
                 />
                 <Line
                   tone={h.webhooks_failing > 0 ? "warn" : "ok"}
@@ -153,19 +227,43 @@ export function HealthPage() {
 
             <Section title={t("admin.health.queues")}>
               <Rows>
-                <Line tone="plain" label={t("admin.health.jobsWaiting")} value={count(h.jobs_waiting)} note={t("admin.health.jobsWaitingNote")} />
+                <Line
+                  tone="plain"
+                  label={t("admin.health.jobsWaiting")}
+                  value={count(h.jobs_waiting)}
+                  note={t("admin.health.jobsWaitingNote")}
+                />
                 <Line tone="plain" label={t("admin.health.deliveriesPending")} value={count(h.deliveries_pending)} />
               </Rows>
             </Section>
 
             <Section title={t("admin.health.install")}>
               <Rows>
-                <Line tone="plain" label={t("admin.health.version")} value={<span className="font-mono text-xs">{h.version}</span>} />
+                <Line
+                  tone="plain"
+                  label={t("admin.health.version")}
+                  value={<span className="font-mono text-xs">{h.version}</span>}
+                />
                 {surface.data && (
-                  <Line tone="plain" label={t("admin.health.surface")} value={<span className="font-mono text-xs">{surface.data}</span>} note={t("admin.health.surfaceNote")} />
+                  <Line
+                    tone="plain"
+                    label={t("admin.health.surface")}
+                    value={<span className="font-mono text-xs">{surface.data}</span>}
+                    note={t("admin.health.surfaceNote")}
+                  />
                 )}
-                <Line tone="plain" label={t("admin.health.database")} value={t(`admin.health.database.${h.database === "postgres" ? "postgres" : "sqlite"}`)} />
-                <Line tone="plain" label={t("admin.health.files")} value={t(`admin.storage.kind.${(["s3", "gcs", "azure"] as const).find((k) => k === h.files) ?? "disk"}`)} />
+                <Line
+                  tone="plain"
+                  label={t("admin.health.database")}
+                  value={t(`admin.health.database.${h.database === "postgres" ? "postgres" : "sqlite"}`)}
+                />
+                <Line
+                  tone="plain"
+                  label={t("admin.health.files")}
+                  value={t(
+                    `admin.storage.kind.${(["s3", "gcs", "azure"] as const).find((k) => k === h.files) ?? "disk"}`,
+                  )}
+                />
               </Rows>
             </Section>
           </>

@@ -75,6 +75,12 @@ export function riskLabel(risk: Risk): string {
   return "";
 }
 
-export const epicTones = { planned: "neutral", active: "accent", paused: "wait", done: "ok", canceled: "neutral" } as const;
+export const epicTones = {
+  planned: "neutral",
+  active: "accent",
+  paused: "wait",
+  done: "ok",
+  canceled: "neutral",
+} as const;
 export const EPIC_STATES = ["planned", "active", "paused", "done", "canceled"] as const;
 export const epicStateName = (state: string) => t(`epics.state.${state}` as "epics.state.planned");

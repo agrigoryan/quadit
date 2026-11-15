@@ -5,7 +5,8 @@ export const agentsStrings = {
   "agents.workingCount": "{n} working",
   "agents.strandedCount": "{n} has work but nothing listening for it | {n} have work but nothing listening for them",
   "agents.empty": "No agents yet",
-  "agents.emptyHint": "An agent is a member with its own account and token. Add one in Settings, then assign it tasks like anyone else.",
+  "agents.emptyHint":
+    "An agent is a member with its own account and token. Add one in Settings, then assign it tasks like anyone else.",
   "agents.emptyHintMember": "An agent is a member with its own account and token. An admin adds them in Settings.",
   "agents.emptyAction": "Add an agent in Settings",
 
@@ -29,7 +30,8 @@ export const agentsStrings = {
   "agents.showLess": "Show fewer",
 
   "agents.listening": "Listening",
-  "agents.listeningHint": "A companion is holding a wait for it, or a webhook pushes to it: it will hear about new work.",
+  "agents.listeningHint":
+    "A companion is holding a wait for it, or a webhook pushes to it: it will hear about new work.",
   "agents.lastActed": "Last acted {when}",
   "agents.neverActed": "Has not acted yet",
 
@@ -66,7 +68,8 @@ export const agentsStrings = {
   "agents.res.description": "What it is",
   "agents.res.empty":
     "No shared resources yet. Add a build machine or a test device here, and agents will queue for it instead of colliding.",
-  "agents.res.emptyMember": "No shared resources yet. An admin can add a build machine or a test device for agents to queue for.",
+  "agents.res.emptyMember":
+    "No shared resources yet. An admin can add a build machine or a test device for agents to queue for.",
   "agents.res.free": "Free",
   "agents.res.inUse": "In use",
   "agents.res.waitingCount": "{n} waiting",

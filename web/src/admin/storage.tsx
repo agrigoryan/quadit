@@ -39,10 +39,24 @@ const empty: FilesSetting = {
  * empty, which tells the server to forget them (a secret left out is kept).
  */
 function toValue(v: FilesSetting): FilesSetting {
-  const base = { kind: v.kind, bucket: v.bucket.trim(), prefix: v.prefix.trim().replace(/^\/+|\/+$/g, ""), secret_key: "", credentials: "", account_key: "" };
+  const base = {
+    kind: v.kind,
+    bucket: v.bucket.trim(),
+    prefix: v.prefix.trim().replace(/^\/+|\/+$/g, ""),
+    secret_key: "",
+    credentials: "",
+    account_key: "",
+  };
   const out: Partial<FilesSetting> =
     v.kind === "s3"
-      ? { ...base, region: v.region.trim(), endpoint: v.endpoint.trim(), access_key: v.access_key.trim(), secret_key: v.secret_key, path_style: v.path_style }
+      ? {
+          ...base,
+          region: v.region.trim(),
+          endpoint: v.endpoint.trim(),
+          access_key: v.access_key.trim(),
+          secret_key: v.secret_key,
+          path_style: v.path_style,
+        }
       : v.kind === "gcs"
         ? { ...base, credentials: v.credentials }
         : v.kind === "azure"
@@ -58,7 +72,8 @@ function validate(v: FilesSetting): Record<string, string> {
   if (v.kind === "s3") {
     if (!v.access_key.trim()) wrong.access_key = t("s.required");
     if (!v.secret_key) wrong.secret_key = t("s.required");
-    if (v.endpoint.trim() && !/^https?:\/\/\S+$/.test(v.endpoint.trim())) wrong.endpoint = t("admin.storage.endpointBad");
+    if (v.endpoint.trim() && !/^https?:\/\/\S+$/.test(v.endpoint.trim()))
+      wrong.endpoint = t("admin.storage.endpointBad");
   }
   if (v.kind === "azure") {
     if (!v.account.trim()) wrong.account = t("s.required");
@@ -87,7 +102,13 @@ export function StoragePage() {
       <Section title={t("admin.storage.where")}>
         <SettingForm of={form}>
           <FormField label={t("admin.storage.kind")} htmlFor="files-kind" hint={t(`admin.storage.kindHint.${d.kind}`)}>
-            <NativeSelect id="files-kind" value={d.kind} onChange={(kind) => form.set({ kind: kind as Kind })} options={kinds} className="max-w-xs" />
+            <NativeSelect
+              id="files-kind"
+              value={d.kind}
+              onChange={(kind) => form.set({ kind: kind as Kind })}
+              options={kinds}
+              className="max-w-xs"
+            />
           </FormField>
 
           {d.kind !== "disk" && (
@@ -98,14 +119,25 @@ export function StoragePage() {
                 onChange={(bucket) => form.set({ bucket })}
                 error={e.bucket}
               />
-              <TextField label={t("admin.storage.prefix")} value={d.prefix} onChange={(prefix) => form.set({ prefix })} hint={t("admin.storage.prefixHint")} placeholder="quadit" />
+              <TextField
+                label={t("admin.storage.prefix")}
+                value={d.prefix}
+                onChange={(prefix) => form.set({ prefix })}
+                hint={t("admin.storage.prefixHint")}
+                placeholder="quadit"
+              />
             </div>
           )}
 
           {d.kind === "s3" && (
             <>
               <div className="grid gap-3.5 sm:grid-cols-2">
-                <TextField label={t("admin.storage.region")} value={d.region} onChange={(region) => form.set({ region })} placeholder="us-east-1" />
+                <TextField
+                  label={t("admin.storage.region")}
+                  value={d.region}
+                  onChange={(region) => form.set({ region })}
+                  placeholder="us-east-1"
+                />
                 <TextField
                   label={t("admin.storage.endpoint")}
                   value={d.endpoint}
@@ -116,7 +148,13 @@ export function StoragePage() {
                 />
               </div>
               <div className="grid gap-3.5 sm:grid-cols-2">
-                <TextField label={t("admin.storage.accessKey")} value={d.access_key} onChange={(access_key) => form.set({ access_key })} error={e.access_key} mono />
+                <TextField
+                  label={t("admin.storage.accessKey")}
+                  value={d.access_key}
+                  onChange={(access_key) => form.set({ access_key })}
+                  error={e.access_key}
+                  mono
+                />
                 <SecretField
                   label={t("admin.storage.secretKey")}
                   value={d.secret_key}
@@ -144,7 +182,12 @@ export function StoragePage() {
 
           {d.kind === "azure" && (
             <div className="grid gap-3.5 sm:grid-cols-2">
-              <TextField label={t("admin.storage.account")} value={d.account} onChange={(account) => form.set({ account })} error={e.account} />
+              <TextField
+                label={t("admin.storage.account")}
+                value={d.account}
+                onChange={(account) => form.set({ account })}
+                error={e.account}
+              />
               <SecretField
                 label={t("admin.storage.accountKey")}
                 value={d.account_key}

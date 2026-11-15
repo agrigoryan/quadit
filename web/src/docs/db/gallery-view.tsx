@@ -6,7 +6,17 @@ import { RowCardBody } from "@/docs/db/row-card";
 import { shownProps, type ViewProps } from "@/docs/db/use-table";
 import type { DBProperty, Doc } from "@/docs/types";
 
-function GalleryCard({ row, cells, props, onOpen }: { row: Doc; cells: Record<string, Value> | undefined; props: DBProperty[]; onOpen: (id: string) => void }) {
+function GalleryCard({
+  row,
+  cells,
+  props,
+  onOpen,
+}: {
+  row: Doc;
+  cells: Record<string, Value> | undefined;
+  props: DBProperty[];
+  onOpen: (id: string) => void;
+}) {
   const cover = useCover(row);
   return (
     <button
@@ -15,7 +25,11 @@ function GalleryCard({ row, cells, props, onOpen }: { row: Doc; cells: Record<st
       className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface text-left shadow-card transition-colors hover:border-line-strong"
     >
       <span className="flex aspect-[16/10] w-full items-center justify-center overflow-hidden bg-sunken text-ink-3">
-        {cover ? <img src={cover} alt="" loading="lazy" decoding="async" className="size-full object-cover" /> : <ImageIcon className="size-6 opacity-50" aria-hidden />}
+        {cover ? (
+          <img src={cover} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+        ) : (
+          <ImageIcon className="size-6 opacity-50" aria-hidden />
+        )}
       </span>
       <RowCardBody row={row} cells={cells} props={props} className="w-full p-2.5" />
     </button>

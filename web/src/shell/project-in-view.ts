@@ -27,7 +27,14 @@ export function projectInView(location: Location): Project | undefined {
   const task = taskKey ? findTaskByKey(c.tasks, taskKey) : undefined;
   const docId = matchPath("/:ws/docs/:id", pagePath)?.params.id;
   const doc = docId ? (c.docs[docId] as { project_id?: string } | undefined) : undefined;
-  const named = projects.find((p) => p.id === task?.project_id) ?? projects.find((p) => p.key === key) ?? projects.find((p) => p.id === doc?.project_id);
+  const named =
+    projects.find((p) => p.id === task?.project_id) ??
+    projects.find((p) => p.key === key) ??
+    projects.find((p) => p.id === doc?.project_id);
   if (named) lastId = named.id;
-  return named ?? projects.find((p) => p.id === lastId) ?? projects.sort((a, b) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1))[0];
+  return (
+    named ??
+    projects.find((p) => p.id === lastId) ??
+    projects.sort((a, b) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1))[0]
+  );
 }

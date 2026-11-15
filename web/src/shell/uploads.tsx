@@ -24,7 +24,9 @@ export function UploadsIndicator() {
     sent += it.sent;
     total += it.total;
   }
-  const label = stuck ? t("upload.waiting", { n: waiting }) : t("upload.sending", { n: items.length, percent: percent(sent, total) });
+  const label = stuck
+    ? t("upload.waiting", { n: waiting })
+    : t("upload.sending", { n: items.length, percent: percent(sent, total) });
   return (
     <div className="pointer-events-none absolute bottom-4 left-4 z-[45]">
       <Popover>
@@ -36,7 +38,11 @@ export function UploadsIndicator() {
               stuck ? "border-wait/40 text-wait" : "border-line text-ink-2",
             )}
           >
-            {stuck ? <CloudOff className="size-3.5" aria-hidden /> : <Upload className="size-3.5 text-accent-text" aria-hidden />}
+            {stuck ? (
+              <CloudOff className="size-3.5" aria-hidden />
+            ) : (
+              <Upload className="size-3.5 text-accent-text" aria-hidden />
+            )}
             <span role="status" className="tabular-nums">
               {label}
             </span>
@@ -58,7 +64,8 @@ export function UploadsIndicator() {
 
 function TransferRow({ item }: { item: Transfer }) {
   const pct = percent(item.sent, item.total);
-  const status = item.state === "waiting" ? t("upload.waitingOne") : item.state === "queued" ? t("upload.queued") : `${pct}%`;
+  const status =
+    item.state === "waiting" ? t("upload.waitingOne") : item.state === "queued" ? t("upload.queued") : `${pct}%`;
   return (
     <li className="min-w-0">
       <div className="flex items-baseline gap-2 text-sm">
@@ -73,7 +80,13 @@ function TransferRow({ item }: { item: Transfer }) {
         aria-valuenow={pct}
         className="mt-1 h-1 overflow-hidden rounded-full bg-sunken"
       >
-        <div className={cx("h-full rounded-full transition-[width] duration-200", item.state === "waiting" ? "bg-wait" : "bg-accent")} style={{ width: `${pct}%` }} />
+        <div
+          className={cx(
+            "h-full rounded-full transition-[width] duration-200",
+            item.state === "waiting" ? "bg-wait" : "bg-accent",
+          )}
+          style={{ width: `${pct}%` }}
+        />
       </div>
       <p className={cx("mt-1 text-xs tabular-nums", item.state === "waiting" ? "text-wait" : "text-ink-3")}>{status}</p>
     </li>

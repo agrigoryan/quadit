@@ -32,7 +32,11 @@ function ClaimTask({ taskId }: { taskId: string }) {
   const link = useTaskLink({ key: task?.key ?? "" });
   if (!task) return null;
   return (
-    <Link {...link} title={task.title} className="shrink-0 text-xs text-ink-3 tnum underline-offset-2 hover:text-ink hover:underline">
+    <Link
+      {...link}
+      title={task.title}
+      className="shrink-0 text-xs text-ink-3 tnum underline-offset-2 hover:text-ink hover:underline"
+    >
       {task.key}
     </Link>
   );
@@ -105,12 +109,21 @@ function ResourceCard({
   const holder = claims.find((c) => c.state === "holding");
   const waiting = claims.filter((c) => c.state === "waiting");
   return (
-    <article aria-label={resource.name} className="flex min-w-0 flex-col border-b border-line bg-surface px-4 py-3 lg:border-r">
+    <article
+      aria-label={resource.name}
+      className="flex min-w-0 flex-col border-b border-line bg-surface px-4 py-3 lg:border-r"
+    >
       <header className="flex min-w-0 items-center gap-2">
         <Server className="size-4 shrink-0 text-ink-3" aria-hidden />
         <h3 className="min-w-0 truncate text-sm font-semibold">{resource.name}</h3>
-        {holder ? <Badge tone="accent">{t("agents.res.inUse")}</Badge> : <Badge tone="ok">{t("agents.res.free")}</Badge>}
-        {waiting.length > 0 && <span className="shrink-0 text-xs text-ink-3">{t("agents.res.waitingCount", { n: waiting.length })}</span>}
+        {holder ? (
+          <Badge tone="accent">{t("agents.res.inUse")}</Badge>
+        ) : (
+          <Badge tone="ok">{t("agents.res.free")}</Badge>
+        )}
+        {waiting.length > 0 && (
+          <span className="shrink-0 text-xs text-ink-3">{t("agents.res.waitingCount", { n: waiting.length })}</span>
+        )}
         <span className="flex-1" />
         {admin && (
           <Menu>
@@ -133,7 +146,13 @@ function ResourceCard({
       ) : (
         <ol className="mt-1.5 flex flex-col" aria-label={t("agents.res.queueOf", { name: resource.name })}>
           {holder && (
-            <ClaimRow claim={holder} resource={resource.name} place={0} now={now} canRelease={admin || holder.user_id === me.user_id} />
+            <ClaimRow
+              claim={holder}
+              resource={resource.name}
+              place={0}
+              now={now}
+              canRelease={admin || holder.user_id === me.user_id}
+            />
           )}
           {waiting.map((claim, i) => (
             <ClaimRow
@@ -193,7 +212,14 @@ function AddResource({ open, onClose }: { open: boolean; onClose: () => void }) 
     >
       <form id="add-resource" onSubmit={submit} className="flex flex-col gap-3">
         <Field label={t("agents.res.name")} htmlFor="resource-name" hint={t("agents.res.nameHint")}>
-          <Input id="resource-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoComplete="off" required />
+          <Input
+            id="resource-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={60}
+            autoComplete="off"
+            required
+          />
         </Field>
         <Field label={t("agents.res.description")} htmlFor="resource-description">
           <Textarea
@@ -209,10 +235,20 @@ function AddResource({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-function ConfirmDelete({ resource, claims, onClose }: { resource: Resource | null; claims: number; onClose: () => void }) {
+function ConfirmDelete({
+  resource,
+  claims,
+  onClose,
+}: {
+  resource: Resource | null;
+  claims: number;
+  onClose: () => void;
+}) {
   function remove() {
     if (!resource) return;
-    send({ type: "resource.delete", args: { id: resource.id } }, (tx) => tx.patch("resources", resource.id, { deleted_at: Date.now() }));
+    send({ type: "resource.delete", args: { id: resource.id } }, (tx) =>
+      tx.patch("resources", resource.id, { deleted_at: Date.now() }),
+    );
     onClose();
   }
   return (
@@ -269,12 +305,23 @@ export function Resources({ resources, claims, now }: Props) {
       ) : (
         <div className="grid border-t border-line lg:grid-cols-2">
           {resources.map((r) => (
-            <ResourceCard key={r.id} resource={r} claims={of(r.id)} now={now} admin={admin} onDelete={() => setDeleting(r)} />
+            <ResourceCard
+              key={r.id}
+              resource={r}
+              claims={of(r.id)}
+              now={now}
+              admin={admin}
+              onDelete={() => setDeleting(r)}
+            />
           ))}
         </div>
       )}
       <AddResource open={adding} onClose={() => setAdding(false)} />
-      <ConfirmDelete resource={deleting} claims={deleting ? of(deleting.id).length : 0} onClose={() => setDeleting(null)} />
+      <ConfirmDelete
+        resource={deleting}
+        claims={deleting ? of(deleting.id).length : 0}
+        onClose={() => setDeleting(null)}
+      />
     </Panel>
   );
 }

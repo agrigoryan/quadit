@@ -18,7 +18,11 @@ function Standing({ c }: { c: Compare }) {
   const asked = useMemberName(decision.asked_id, t("common.someone"));
   if (decision.state === "open") {
     if (!viewer.isAsker) return null;
-    return <p className="py-2 text-center text-sm text-inverse-ink/70">{decision.asked_id ? t("decision.waiting", { name: asked }) : t("decision.waitingAnyone")}</p>;
+    return (
+      <p className="py-2 text-center text-sm text-inverse-ink/70">
+        {decision.asked_id ? t("decision.waiting", { name: asked }) : t("decision.waitingAnyone")}
+      </p>
+    );
   }
   const outcome = decision.outcome ?? (decision.state === "sent_back" ? "none" : "as_is");
   return <p className="py-2 text-center text-sm font-medium text-inverse-ink">{t(`decision.outcome.${outcome}`)}</p>;
@@ -71,7 +75,11 @@ export function ComparePhone({ c }: { c: Compare }) {
         className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain no-scrollbar"
       >
         {options.map((option) => (
-          <section key={option.id} aria-label={option.label} className="flex w-full shrink-0 snap-center snap-always flex-col">
+          <section
+            key={option.id}
+            aria-label={option.label}
+            className="flex w-full shrink-0 snap-center snap-always flex-col"
+          >
             <PaneMedia c={c} option={option} gauge={option.id === focused.id} swipeThrough />
           </section>
         ))}
@@ -107,7 +115,12 @@ export function ComparePhone({ c }: { c: Compare }) {
           ) : (
             <span />
           )}
-          <FileStepper onDark index={c.fileIndexOf(focused)} total={c.filesOf(focused).length} onStep={(delta) => c.stepFile(focused, delta)} />
+          <FileStepper
+            onDark
+            index={c.fileIndexOf(focused)}
+            total={c.filesOf(focused).length}
+            onStep={(delta) => c.stepFile(focused, delta)}
+          />
         </div>
       </div>
 

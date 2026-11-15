@@ -23,7 +23,10 @@ export function FormField({ label, htmlFor, hint, error, children, className }: 
   const labelId = useId();
   const labelClass = cx("text-xs font-medium", error ? "text-danger" : "text-ink-2");
   return (
-    <div className={cx("flex min-w-0 flex-col gap-1", className)} {...(htmlFor ? {} : { role: "group", "aria-labelledby": labelId })}>
+    <div
+      className={cx("flex min-w-0 flex-col gap-1", className)}
+      {...(htmlFor ? {} : { role: "group", "aria-labelledby": labelId })}
+    >
       {htmlFor ? (
         <label htmlFor={htmlFor} className={labelClass}>
           {label}
@@ -88,7 +91,9 @@ export function useFieldErrors(known: string[] = []): FieldErrors {
       const names = knownKey ? knownKey.split(",") : [];
       // The server may name a nested field ("match.project_id"): try the whole name, then its last part.
       const field = err instanceof ApiError ? err.field : undefined;
-      const hit = field ? [field, field.split(".").pop() as string].find((f) => names.length === 0 || names.includes(f)) : undefined;
+      const hit = field
+        ? [field, field.split(".").pop() as string].find((f) => names.length === 0 || names.includes(f))
+        : undefined;
       if (hit) {
         setFields({ [hit]: errorMessage(err) });
         setForm("");
@@ -131,7 +136,10 @@ interface Submit {
  * closes, the page moves on): `busy` then stays on, so the button cannot be
  * pressed again on the way out. A refusal turns it off either way.
  */
-export function useSubmit(errors: Pick<FieldErrors, "clear" | "fail">, { once = false }: { once?: boolean } = {}): Submit {
+export function useSubmit(
+  errors: Pick<FieldErrors, "clear" | "fail">,
+  { once = false }: { once?: boolean } = {},
+): Submit {
   const [busy, setBusy] = useState(false);
   async function run(action: () => Promise<unknown>) {
     errors.clear();
@@ -258,7 +266,10 @@ export function NativeSelect({ value, onChange, options, className, ...rest }: N
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-ink-3" aria-hidden />
+      <ChevronDown
+        className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-ink-3"
+        aria-hidden
+      />
     </span>
   );
 }

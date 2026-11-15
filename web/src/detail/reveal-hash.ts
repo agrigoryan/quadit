@@ -27,10 +27,17 @@ function highlight(decisionId: string, tries = 40) {
     return;
   }
   whenSeen(() =>
-    el.animate([{ backgroundColor: "var(--move-soft)" }, { backgroundColor: "var(--move-soft)", offset: 0.6 }, { backgroundColor: "transparent" }], {
-      duration: 2200,
-      easing: "ease-out",
-    }),
+    el.animate(
+      [
+        { backgroundColor: "var(--move-soft)" },
+        { backgroundColor: "var(--move-soft)", offset: 0.6 },
+        { backgroundColor: "transparent" },
+      ],
+      {
+        duration: 2200,
+        easing: "ease-out",
+      },
+    ),
   );
 }
 

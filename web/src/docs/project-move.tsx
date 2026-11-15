@@ -20,13 +20,25 @@ export function MovePagesHere({ project }: { project: Project }) {
         .filter((d) => !d.project_id && !d.memory_of)
         .map((d) => {
           const inside = countBelow(docs, d.id);
-          return { id: d.id, label: docTitle(d), icon: <PageIcon doc={d} />, hint: inside ? t("docs.projectEmpty.inside", { n: inside }) : undefined };
+          return {
+            id: d.id,
+            label: docTitle(d),
+            icon: <PageIcon doc={d} />,
+            hint: inside ? t("docs.projectEmpty.inside", { n: inside }) : undefined,
+          };
         }),
     [pages, docs],
   );
   if (items.length === 0) return null;
   return (
-    <ChoicePicker multiple items={items} label={t("docs.projectEmpty.movePick")} placeholder={t("docs.projectEmpty.movePick")} onPick={(id) => void setProject(id, project.id)} align="center">
+    <ChoicePicker
+      multiple
+      items={items}
+      label={t("docs.projectEmpty.movePick")}
+      placeholder={t("docs.projectEmpty.movePick")}
+      onPick={(id) => void setProject(id, project.id)}
+      align="center"
+    >
       <Button>{t("docs.projectEmpty.move")}</Button>
     </ChoicePicker>
   );

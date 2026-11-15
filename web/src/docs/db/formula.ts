@@ -33,7 +33,7 @@ const isLetter = (c: string) => (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
 
 function lex(s: string): Token[] {
   const out: Token[] = [];
-  for (let i = 0; i < s.length; ) {
+  for (let i = 0; i < s.length;) {
     const c = s.charAt(i);
     if (c === " " || c === "\t" || c === "\n") {
       i++;

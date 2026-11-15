@@ -98,7 +98,10 @@ export async function loadPage(id: string, signal?: AbortSignal): Promise<PageDa
     return {
       props,
       views,
-      meta: { ...s.meta, [id]: { mentioned_in: data.mentioned_in ?? [], mentions: data.mentions ?? [], source: data.source } },
+      meta: {
+        ...s.meta,
+        [id]: { mentioned_in: data.mentioned_in ?? [], mentions: data.mentions ?? [], source: data.source },
+      },
     };
   });
   return data;

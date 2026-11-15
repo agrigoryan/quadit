@@ -68,7 +68,10 @@ function WorkspaceMark({ name, icon }: { name: string; icon?: string }) {
     );
   }
   return (
-    <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-ink text-2xs font-bold text-surface">
+    <span
+      aria-hidden
+      className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-ink text-2xs font-bold text-surface"
+    >
       {name.slice(0, 1).toUpperCase()}
     </span>
   );

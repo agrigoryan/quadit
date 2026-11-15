@@ -72,7 +72,10 @@ export default function DatabaseView({ doc }: { doc: Doc }) {
   const openRow = useCallback((rowId: string) => setParam("peek", rowId), [setParam]);
   const closeRow = useCallback(() => setParam("peek", null), [setParam]);
 
-  const rows = useMemo(() => (db && view ? applyView(db.table, db.cells, view.config?.filters, view.config?.sorts) : []), [db, view]);
+  const rows = useMemo(
+    () => (db && view ? applyView(db.table, db.cells, view.config?.filters, view.config?.sorts) : []),
+    [db, view],
+  );
 
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -80,7 +83,11 @@ export default function DatabaseView({ doc }: { doc: Doc }) {
   propsRef.current = db?.table.props ?? [];
   const addRow = useCallback(
     (values?: Record<string, unknown>, title?: string) =>
-      createDoc({ parentId: doc.id, title: title ?? "", props: { ...defaultsFor(viewRef.current, propsRef.current), ...values } }),
+      createDoc({
+        parentId: doc.id,
+        title: title ?? "",
+        props: { ...defaultsFor(viewRef.current, propsRef.current), ...values },
+      }),
     [doc.id],
   );
 

@@ -60,6 +60,7 @@ export const planStrings = {
   "cycle.chart.scopeEnd": "Scope {n}",
   "cycle.chart.doneEnd": "Done {n}",
   "cycle.chart.bothEnd": "Done {done} of {scope}",
-  "cycle.chart.label": "Burn-up: on {day}, {done} done of {scope} in scope. Use the left and right arrow keys to read each day.",
+  "cycle.chart.label":
+    "Burn-up: on {day}, {done} done of {scope} in scope. Use the left and right arrow keys to read each day.",
   "cycle.chart.notStarted": "Burn-up: this cycle has not started.",
 } as const;

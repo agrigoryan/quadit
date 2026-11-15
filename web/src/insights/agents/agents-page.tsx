@@ -78,7 +78,12 @@ export function AgentsPage() {
     for (const { agent, depth } of placeHelpers(agents, showFinished).rows) {
       const top = out[out.length - 1];
       if (depth === 0 || !top) out.push({ member: agent, helpers: [] });
-      else top.helpers.push({ member: agent, state: states[agent.user_id], task: tasks[(agent as AgentMember).delegated_task ?? ""] });
+      else
+        top.helpers.push({
+          member: agent,
+          state: states[agent.user_id],
+          task: tasks[(agent as AgentMember).delegated_task ?? ""],
+        });
     }
     return out;
   }, [agents, showFinished, states, tasks]);
@@ -93,8 +98,12 @@ export function AgentsPage() {
       <PageBar>
         <p className="flex-1 text-xs text-ink-2 tnum">
           {t("agents.count", { n: active.length })}
-          {live.data && active.length > 0 && <span className="text-ink-3">, {t("agents.workingCount", { n: working })}</span>}
-          {stranded > 0 && <span className="ml-2 font-medium text-danger">{t("agents.strandedCount", { n: stranded })}</span>}
+          {live.data && active.length > 0 && (
+            <span className="text-ink-3">, {t("agents.workingCount", { n: working })}</span>
+          )}
+          {stranded > 0 && (
+            <span className="ml-2 font-medium text-danger">{t("agents.strandedCount", { n: stranded })}</span>
+          )}
         </p>
         {live.error && (
           <p role="alert" className="text-xs text-danger">
@@ -118,7 +127,10 @@ export function AgentsPage() {
               hint={t(me.role === "member" ? "agents.emptyHintMember" : "agents.emptyHint")}
               action={
                 me.role !== "member" && (
-                  <Link to={`/${slug}/settings/agents`} className="text-sm font-medium text-accent-text underline-offset-2 hover:underline">
+                  <Link
+                    to={`/${slug}/settings/agents`}
+                    className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
+                  >
                     {t("agents.emptyAction")}
                   </Link>
                 )

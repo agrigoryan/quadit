@@ -3,7 +3,16 @@
 // dragged to reorder them or to put one inside another. In a project's
 // Docs it is the same tree, of that project's pages.
 
-import { DndContext, type DragEndEvent, type DragMoveEvent, DragOverlay, PointerSensor, pointerWithin, useSensor, useSensors } from "@dnd-kit/core";
+import {
+  DndContext,
+  type DragEndEvent,
+  type DragMoveEvent,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Plus } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { cx } from "@/lib/cx";
@@ -46,10 +55,14 @@ function drop(tree: DocTree, movingId: string, target: DropTarget) {
     setOpen(onto.id, true);
     return;
   }
-  const parent = onto.parent_id && docs[onto.parent_id] && sectionOf(docs[onto.parent_id] as Doc) === sectionOf(onto) ? onto.parent_id : undefined;
+  const parent =
+    onto.parent_id && docs[onto.parent_id] && sectionOf(docs[onto.parent_id] as Doc) === sectionOf(onto)
+      ? onto.parent_id
+      : undefined;
   const list = (parent ? (tree.children[parent] ?? []) : tree.roots[sectionOf(onto)]).filter((d) => d.id !== movingId);
   const at = list.findIndex((d) => d.id === onto.id);
-  const rank = target.zone === "before" ? rankBetween(list[at - 1]?.rank, onto.rank) : rankBetween(onto.rank, list[at + 1]?.rank);
+  const rank =
+    target.zone === "before" ? rankBetween(list[at - 1]?.rank, onto.rank) : rankBetween(onto.rank, list[at + 1]?.rank);
   moveDoc(movingId, onto.parent_id ?? null, rank);
 }
 
@@ -88,11 +101,22 @@ export function DocsTree({ tree, className }: Props) {
   };
 
   const nodes = (list: Doc[], editable: boolean) =>
-    list.map((doc) => <TreeNode key={doc.id} doc={doc} tree={tree} depth={0} editable={editable} drop={target} parentProject={projectId} />);
+    list.map((doc) => (
+      <TreeNode
+        key={doc.id}
+        doc={doc}
+        tree={tree}
+        depth={0}
+        editable={editable}
+        drop={target}
+        parentProject={projectId}
+      />
+    ));
 
   // An agent's notes hang under one page per agent; group them by whose they are.
   const byAgent = new Map<string, Doc[]>();
-  for (const doc of tree.roots.memory) byAgent.set(doc.memory_of as string, [...(byAgent.get(doc.memory_of as string) ?? []), doc]);
+  for (const doc of tree.roots.memory)
+    byAgent.set(doc.memory_of as string, [...(byAgent.get(doc.memory_of as string) ?? []), doc]);
 
   return (
     <nav aria-label={t("docs.tree.label")} className={cx("flex min-h-0 flex-col", className)} onKeyDown={onTreeKey}>
@@ -108,10 +132,18 @@ export function DocsTree({ tree, className }: Props) {
         }}
       >
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-          <TreeSection title={t("docs.section.team")} add={<NewPageItems generated projectId={projectId} />} empty={t("docs.section.teamEmpty")}>
+          <TreeSection
+            title={t("docs.section.team")}
+            add={<NewPageItems generated projectId={projectId} />}
+            empty={t("docs.section.teamEmpty")}
+          >
             {nodes(tree.roots.team, true)}
           </TreeSection>
-          <TreeSection title={t("docs.section.private")} add={<NewPageItems private projectId={projectId} />} empty={t("docs.section.privateEmpty")}>
+          <TreeSection
+            title={t("docs.section.private")}
+            add={<NewPageItems private projectId={projectId} />}
+            empty={t("docs.section.privateEmpty")}
+          >
             {nodes(
               tree.roots.private.filter((d) => d.owner_id === me.user_id),
               true,
@@ -126,11 +158,16 @@ export function DocsTree({ tree, className }: Props) {
             </TreeSection>
           )}
           {[...byAgent].map(([agentId, docs]) => (
-            <TreeSection key={agentId} title={t("docs.section.memory", { name: members[agentId]?.name ?? t("common.agent") })}>
+            <TreeSection
+              key={agentId}
+              title={t("docs.section.memory", { name: members[agentId]?.name ?? t("common.agent") })}
+            >
               {nodes(docs, false)}
             </TreeSection>
           ))}
-          {tree.roots.generated.length > 0 && <TreeSection title={t("docs.section.generated")}>{nodes(tree.roots.generated, false)}</TreeSection>}
+          {tree.roots.generated.length > 0 && (
+            <TreeSection title={t("docs.section.generated")}>{nodes(tree.roots.generated, false)}</TreeSection>
+          )}
         </div>
         <DragOverlay dropAnimation={null}>
           {dragging && (
@@ -148,7 +185,17 @@ export function DocsTree({ tree, className }: Props) {
   );
 }
 
-function TreeSection({ title, add, empty, children }: { title: string; add?: ReactNode; empty?: string; children: ReactNode[] }) {
+function TreeSection({
+  title,
+  add,
+  empty,
+  children,
+}: {
+  title: string;
+  add?: ReactNode;
+  empty?: string;
+  children: ReactNode[];
+}) {
   return (
     <section className="mt-3 first:mt-1">
       <div className="mb-0.5 flex h-6 items-center justify-between pr-1 pl-2">
@@ -156,7 +203,11 @@ function TreeSection({ title, add, empty, children }: { title: string; add?: Rea
         {add && (
           <Menu>
             <MenuTrigger asChild>
-              <button type="button" aria-label={t("docs.new.inSection", { section: title })} className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink">
+              <button
+                type="button"
+                aria-label={t("docs.new.inSection", { section: title })}
+                className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink"
+              >
                 <Plus className="size-3.5" />
               </button>
             </MenuTrigger>
@@ -164,7 +215,13 @@ function TreeSection({ title, add, empty, children }: { title: string; add?: Rea
           </Menu>
         )}
       </div>
-      {children.length > 0 ? <ul role="tree" aria-label={title}>{children}</ul> : empty && <p className="px-2 py-1 text-xs text-ink-3">{empty}</p>}
+      {children.length > 0 ? (
+        <ul role="tree" aria-label={title}>
+          {children}
+        </ul>
+      ) : (
+        empty && <p className="px-2 py-1 text-xs text-ink-3">{empty}</p>
+      )}
     </section>
   );
 }

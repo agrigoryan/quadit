@@ -12,7 +12,15 @@ import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { type PickerItem, Select } from "@/ui/picker";
-import { countBy, type Entry, type Filters, isFiltered, noFilters, STATES, type StateFilter } from "@/insights/decisions/data";
+import {
+  countBy,
+  type Entry,
+  type Filters,
+  isFiltered,
+  noFilters,
+  STATES,
+  type StateFilter,
+} from "@/insights/decisions/data";
 
 const ANY = "any";
 
@@ -35,7 +43,11 @@ export function FilterBar({ entries, filters, onChange }: Props) {
     [entries, filters],
   );
 
-  const stateItems: PickerItem[] = STATES.map((s) => ({ id: s, label: t(`declog.state.${s}`), hint: counts.state[s] ?? 0 }));
+  const stateItems: PickerItem[] = STATES.map((s) => ({
+    id: s,
+    label: t(`declog.state.${s}`),
+    hint: counts.state[s] ?? 0,
+  }));
   const projectItems: PickerItem[] = [
     { id: ANY, label: t("ins.allProjects"), hint: counts.project.all ?? 0 },
     ...projects.map((p) => ({
@@ -74,7 +86,10 @@ export function FilterBar({ entries, filters, onChange }: Props) {
   return (
     <div role="search" aria-label={t("declog.filters")} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <div className="relative min-w-40 flex-1 basis-56 sm:max-w-80">
-        <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-ink-3" aria-hidden />
+        <Search
+          className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-ink-3"
+          aria-hidden
+        />
         <Input
           type="search"
           value={filters.q}

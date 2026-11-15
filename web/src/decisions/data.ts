@@ -51,7 +51,13 @@ export function useOptionFiles(decision: Decision): OptionFiles {
       .sort(byRank);
     for (const a of rows) {
       const role = a.role === "before" || a.role === "after" ? a.role : undefined;
-      (out[a.subject_id] ??= []).push({ ...(a.file as FileRow), attachmentId: a.id, role, attachedBy: a.created_by, attachedAt: a.created_at });
+      (out[a.subject_id] ??= []).push({
+        ...(a.file as FileRow),
+        attachmentId: a.id,
+        role,
+        attachedBy: a.created_by,
+        attachedAt: a.created_at,
+      });
     }
     return out;
   }, [attachments, options]);
@@ -66,7 +72,12 @@ export function useQuestionFiles(decision: Decision): OptionFile[] {
       Object.values(attachments)
         .filter((a) => a.subject_type === "decision" && a.subject_id === id && !a.deleted_at && a.file)
         .sort(byRank)
-        .map((a) => ({ ...(a.file as FileRow), attachmentId: a.id, attachedBy: a.created_by, attachedAt: a.created_at })),
+        .map((a) => ({
+          ...(a.file as FileRow),
+          attachmentId: a.id,
+          attachedBy: a.created_by,
+          attachedAt: a.created_at,
+        })),
     [attachments, id],
   );
 }
@@ -95,7 +106,8 @@ export function pairUp(files: OptionFile[]): OptionFile[] {
 }
 
 /** Pictures this small are sprite art: scale them up with hard pixel edges. */
-export const isSmallArt = (width: number | undefined, height: number | undefined) => !!width && !!height && Math.max(width, height) <= 256;
+export const isSmallArt = (width: number | undefined, height: number | undefined) =>
+  !!width && !!height && Math.max(width, height) <= 256;
 
 /** The shape every card of one decision gives its media (width over height), from the first file there is. */
 export function mediaAspect(files: FileRow[]): number {

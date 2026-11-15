@@ -143,12 +143,47 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
 
   const forTask: Cmd[] = task
     ? [
-        ...(expand ? [{ id: "task:page", label: t("palette.openPage"), words: "full expand view", icon: <Maximize2 />, hint: "Enter", run: () => run(expand) }] : []),
-        { id: "task:status", label: t("prop.set.status"), icon: <CircleDot />, hint: "S", run: () => openPage("status") },
-        { id: "task:assignee", label: t("prop.set.assignee"), icon: <UserRound />, hint: "A", run: () => openPage("assignee") },
-        { id: "task:priority", label: t("prop.set.priority"), icon: <SignalHigh />, hint: "P", run: () => openPage("priority") },
+        ...(expand
+          ? [
+              {
+                id: "task:page",
+                label: t("palette.openPage"),
+                words: "full expand view",
+                icon: <Maximize2 />,
+                hint: "Enter",
+                run: () => run(expand),
+              },
+            ]
+          : []),
+        {
+          id: "task:status",
+          label: t("prop.set.status"),
+          icon: <CircleDot />,
+          hint: "S",
+          run: () => openPage("status"),
+        },
+        {
+          id: "task:assignee",
+          label: t("prop.set.assignee"),
+          icon: <UserRound />,
+          hint: "A",
+          run: () => openPage("assignee"),
+        },
+        {
+          id: "task:priority",
+          label: t("prop.set.priority"),
+          icon: <SignalHigh />,
+          hint: "P",
+          run: () => openPage("priority"),
+        },
         { id: "task:labels", label: t("prop.set.labels"), icon: <Tag />, hint: "L", run: () => openPage("labels") },
-        { id: "task:copy-key", label: t("palette.copyKey"), words: task.key, icon: <Copy />, run: () => run(() => void copy(task.key)) },
+        {
+          id: "task:copy-key",
+          label: t("palette.copyKey"),
+          words: task.key,
+          icon: <Copy />,
+          run: () => run(() => void copy(task.key)),
+        },
         {
           id: "task:copy-link",
           label: t("palette.copyLink"),
@@ -181,10 +216,22 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
       words: "new add create doc document page",
       icon: <FilePlus2 />,
       // The pages' code is fetched when a page is first made or opened.
-      run: () => run(() => void import("@/docs/actions").then((docs) => go(`${docsAt}/${docs.createDoc({ projectId: docsOf?.id })}`))),
+      run: () =>
+        run(
+          () =>
+            void import("@/docs/actions").then((docs) => go(`${docsAt}/${docs.createDoc({ projectId: docsOf?.id })}`)),
+        ),
     },
     ...(project
-      ? [{ id: "new:label", label: t("palette.newLabel", { project: project.name }), words: "new add create label tag", icon: <Tag />, run: () => openPage("new-label") }]
+      ? [
+          {
+            id: "new:label",
+            label: t("palette.newLabel", { project: project.name }),
+            words: "new add create label tag",
+            icon: <Tag />,
+            run: () => openPage("new-label"),
+          },
+        ]
       : []),
     ...(project && admin
       ? [
@@ -198,7 +245,15 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
         ]
       : []),
     ...(admin
-      ? [{ id: "new:project", label: t("palette.newProject"), words: "new add create project", icon: <FolderPlus />, run: at("settings/projects?new=1") }]
+      ? [
+          {
+            id: "new:project",
+            label: t("palette.newProject"),
+            words: "new add create project",
+            icon: <FolderPlus />,
+            run: at("settings/projects?new=1"),
+          },
+        ]
       : []),
   ];
 
@@ -211,14 +266,29 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
     // "go" and "go to" find every place, as their heading says.
     const words = [t("palette.group.goto"), d.perProject && of ? of.key : "", d.words ?? ""].join(" ").trim();
     const hint = !d.perProject || of?.id === project?.id ? goKeys(d) : undefined;
-    return [{ id: of && d.perProject ? `go:${d.id}:${of.id}` : `go:${d.id}`, label, words, icon: d.icon, hint, run: () => go(path) }];
+    return [
+      {
+        id: of && d.perProject ? `go:${d.id}:${of.id}` : `go:${d.id}`,
+        label,
+        words,
+        icon: d.icon,
+        hint,
+        run: () => go(path),
+      },
+    ];
   };
   const firstOfProject = DESTINATIONS.findIndex((d) => d.perProject);
   const lastOfProject = DESTINATIONS.findLastIndex((d) => d.perProject);
   const goTo: Cmd[] = [
     ...DESTINATIONS.slice(0, firstOfProject).flatMap((d) => place(d, undefined)),
     ...projects.flatMap((p) => DESTINATIONS.filter((d) => d.perProject).flatMap((d) => place(d, p))),
-    ...views.map((v) => ({ id: `go:view:${v.id}`, label: v.name, words: "view", icon: <Bookmark />, run: at(`view/${v.slug}`) })),
+    ...views.map((v) => ({
+      id: `go:view:${v.id}`,
+      label: v.name,
+      words: "view",
+      icon: <Bookmark />,
+      run: at(`view/${v.slug}`),
+    })),
     ...DESTINATIONS.slice(lastOfProject + 1).flatMap((d) => place(d, undefined)),
   ];
 
@@ -235,8 +305,22 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
       const root = `settings/projects/${p.key}`;
       const name = { project: p.name };
       return [
-        { id: `set:statuses:${p.id}`, label: t("palette.manageStatuses", name), words: `${p.key} settings columns workflow`, icon: <Shapes />, deep: true, run: at(`${root}/statuses`) },
-        { id: `set:labels:${p.id}`, label: t("palette.manageLabels", name), words: `${p.key} settings tags`, icon: <Tags />, deep: true, run: at(`${root}/labels`) },
+        {
+          id: `set:statuses:${p.id}`,
+          label: t("palette.manageStatuses", name),
+          words: `${p.key} settings columns workflow`,
+          icon: <Shapes />,
+          deep: true,
+          run: at(`${root}/statuses`),
+        },
+        {
+          id: `set:labels:${p.id}`,
+          label: t("palette.manageLabels", name),
+          words: `${p.key} settings tags`,
+          icon: <Tags />,
+          deep: true,
+          run: at(`${root}/labels`),
+        },
         ...PROJECT_TABS.map(({ tab, icon }) => ({
           id: `set:${tab}:${p.id}`,
           label: t("palette.projectSettings", { project: p.name, page: t(`project.tab.${tab}`) }),
@@ -252,7 +336,14 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   // The theme in effect is on the page itself, whatever chose it.
   const dark = typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
   const general: Cmd[] = [
-    { id: "shortcuts", label: t("top.shortcuts"), words: "keys help", icon: <Keyboard />, hint: "?", run: () => run(() => ui.setShortcuts(true)) },
+    {
+      id: "shortcuts",
+      label: t("top.shortcuts"),
+      words: "keys help",
+      icon: <Keyboard />,
+      hint: "?",
+      run: () => run(() => ui.setShortcuts(true)),
+    },
     {
       id: "theme:toggle",
       label: dark ? t("palette.theme.toLight") : t("palette.theme.toDark"),
@@ -269,7 +360,13 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
       deep: true,
       run: () => run(() => void saveTheme(choice)),
     })),
-    { id: "sign-out", label: t("top.signOut"), words: "log out logout", icon: <LogOut />, run: () => run(() => void signOut()) },
+    {
+      id: "sign-out",
+      label: t("top.signOut"),
+      words: "log out logout",
+      icon: <LogOut />,
+      run: () => run(() => void signOut()),
+    },
   ];
 
   return { forTask, make, goTo, settings, general };

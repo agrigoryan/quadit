@@ -53,7 +53,10 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
   return (
     <div className="flex h-full flex-col">
       <PageBar>
-        <Link to={list} className="flex h-7 items-center gap-1 rounded-md pr-2 pl-1 text-sm text-ink-2 hover:bg-hover hover:text-ink">
+        <Link
+          to={list}
+          className="flex h-7 items-center gap-1 rounded-md pr-2 pl-1 text-sm text-ink-2 hover:bg-hover hover:text-ink"
+        >
           <ChevronLeft className="size-4" aria-hidden />
           {t("nav.epics")}
         </Link>
@@ -102,7 +105,12 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
               <Select
                 items={[
                   { id: NOBODY, label: t("epic.noLead"), icon: <Avatar member={undefined} size="xs" /> },
-                  ...members.map((m) => ({ id: m.user_id, label: m.name, icon: <Avatar member={m} size="xs" />, keywords: m.handle })),
+                  ...members.map((m) => ({
+                    id: m.user_id,
+                    label: m.name,
+                    icon: <Avatar member={m} size="xs" />,
+                    keywords: m.handle,
+                  })),
                 ]}
                 value={epic.lead_id ?? NOBODY}
                 onPick={(id) => updateEpic(epic, { lead: id === NOBODY ? null : id })}
@@ -115,7 +123,10 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                 type="date"
                 value={epic.start_on ?? ""}
                 max={epic.target_on}
-                onChange={(e) => !backwards(e.target.value, epic.target_on ?? "") && updateEpic(epic, { start_on: e.target.value || null })}
+                onChange={(e) =>
+                  !backwards(e.target.value, epic.target_on ?? "") &&
+                  updateEpic(epic, { start_on: e.target.value || null })
+                }
                 className="w-[9rem] tnum"
               />
             </Labelled>
@@ -124,7 +135,10 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                 type="date"
                 value={epic.target_on ?? ""}
                 min={epic.start_on}
-                onChange={(e) => !backwards(epic.start_on ?? "", e.target.value) && updateEpic(epic, { target_on: e.target.value || null })}
+                onChange={(e) =>
+                  !backwards(epic.start_on ?? "", e.target.value) &&
+                  updateEpic(epic, { target_on: e.target.value || null })
+                }
                 className="w-[9rem] tnum"
               />
             </Labelled>
@@ -137,7 +151,9 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                   ? t("ins.progress.withStarted", { done: tally.done, started: tally.started, total: tally.total })
                   : t("ins.progress", { done: tally.done, total: tally.total })}
               </span>
-              {tally.points > 0 && <span className="text-ink-3">{t("ins.points", { done: tally.pointsDone, total: tally.points })}</span>}
+              {tally.points > 0 && (
+                <span className="text-ink-3">{t("ins.points", { done: tally.pointsDone, total: tally.points })}</span>
+              )}
             </div>
             <Progress done={tally.done} started={tally.started} total={tally.total} />
             {risk && (

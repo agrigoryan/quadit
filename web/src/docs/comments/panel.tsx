@@ -26,7 +26,8 @@ export interface ThreadData {
 export function threadsOf(comments: DocComment[]): ThreadData[] {
   const byRoot = new Map<string, ThreadData>();
   for (const c of comments) {
-    if (!c.parent_id) byRoot.set(c.id, { root: c, replies: [], blockId: c.subject_type === "doc_block" ? c.subject_id : undefined });
+    if (!c.parent_id)
+      byRoot.set(c.id, { root: c, replies: [], blockId: c.subject_type === "doc_block" ? c.subject_id : undefined });
   }
   for (const c of comments) {
     if (c.parent_id) byRoot.get(c.parent_id)?.replies.push(c);
@@ -92,9 +93,13 @@ export function CommentsPanel({ docId, editor, pageOnly }: Props) {
               type="button"
               aria-pressed={showResolved === res}
               onClick={() => pageUi.setShowResolved(res)}
-              className={cx("h-5 rounded-sm px-2", showResolved === res ? "bg-surface text-ink shadow-card" : "text-ink-2 hover:text-ink")}
+              className={cx(
+                "h-5 rounded-sm px-2",
+                showResolved === res ? "bg-surface text-ink shadow-card" : "text-ink-2 hover:text-ink",
+              )}
             >
-              {t(res ? "docs.comment.resolved" : "docs.comment.open")} <span className="text-ink-3 tnum">{res ? resolved.length : open.length}</span>
+              {t(res ? "docs.comment.resolved" : "docs.comment.open")}{" "}
+              <span className="text-ink-3 tnum">{res ? resolved.length : open.length}</span>
             </button>
           ))}
         </div>
@@ -124,7 +129,13 @@ export function CommentsPanel({ docId, editor, pageOnly }: Props) {
             key={th.root.id}
             thread={th}
             docId={docId}
-            quote={<Quote text={quote(th.blockId)} gone={!!th.blockId && quote(th.blockId) === undefined} page={!th.blockId} />}
+            quote={
+              <Quote
+                text={quote(th.blockId)}
+                gone={!!th.blockId && quote(th.blockId) === undefined}
+                page={!th.blockId}
+              />
+            }
             active={!!th.blockId && th.blockId === focusBlock}
             onLocate={th.blockId ? () => editor.current?.scrollToBlock(th.blockId as string) : undefined}
           />
@@ -140,7 +151,11 @@ export function CommentsPanel({ docId, editor, pageOnly }: Props) {
 
       {!showResolved && (
         <footer className="shrink-0 border-t border-line p-2">
-          <Composer placeholder={t("docs.comment.onPage")} submitLabel={t("docs.comment.send")} onSubmit={(body) => addComment({ docId, body })} />
+          <Composer
+            placeholder={t("docs.comment.onPage")}
+            submitLabel={t("docs.comment.send")}
+            onSubmit={(body) => addComment({ docId, body })}
+          />
         </footer>
       )}
     </aside>

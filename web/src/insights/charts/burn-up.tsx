@@ -26,7 +26,9 @@ export function burnPoints(days: ChartDay[], unit: "tasks" | "points"): BurnPoin
   return days
     .filter((d) => d.scope >= 0)
     .map((d) =>
-      unit === "points" ? { date: d.date, scope: d.points, done: d.points_done } : { date: d.date, scope: d.scope, done: d.done },
+      unit === "points"
+        ? { date: d.date, scope: d.points, done: d.points_done }
+        : { date: d.date, scope: d.scope, done: d.done },
     );
 }
 
@@ -95,7 +97,9 @@ export function BurnUp({ days, unit, today }: Props) {
         tabIndex={0}
         role="group"
         aria-label={
-          end ? t("cycle.chart.label", { scope: end.scope, done: end.done, day: formatDay(end.date) }) : t("cycle.chart.notStarted")
+          end
+            ? t("cycle.chart.label", { scope: end.scope, done: end.done, day: formatDay(end.date) })
+            : t("cycle.chart.notStarted")
         }
         className="relative rounded-sm outline-offset-2"
         onPointerMove={move}
@@ -151,7 +155,11 @@ export function BurnUp({ days, unit, today }: Props) {
             )}
             {points.length > 0 && end && (
               <>
-                <path d={`${line((p) => p.done)}L${x(last)},${y(0)}L${x(0)},${y(0)}Z`} fill="var(--viz-done)" opacity={0.1} />
+                <path
+                  d={`${line((p) => p.done)}L${x(last)},${y(0)}L${x(0)},${y(0)}Z`}
+                  fill="var(--viz-done)"
+                  opacity={0.1}
+                />
                 <path
                   d={line((p) => p.scope)}
                   fill="none"
@@ -168,8 +176,22 @@ export function BurnUp({ days, unit, today }: Props) {
                   strokeLinejoin="round"
                   strokeLinecap="round"
                 />
-                <circle cx={x(last)} cy={y(end.scope)} r={5} fill="var(--viz-started)" stroke="var(--surface)" strokeWidth={2} />
-                <circle cx={x(last)} cy={y(end.done)} r={5} fill="var(--viz-done)" stroke="var(--surface)" strokeWidth={2} />
+                <circle
+                  cx={x(last)}
+                  cy={y(end.scope)}
+                  r={5}
+                  fill="var(--viz-started)"
+                  stroke="var(--surface)"
+                  strokeWidth={2}
+                />
+                <circle
+                  cx={x(last)}
+                  cy={y(end.done)}
+                  r={5}
+                  fill="var(--viz-done)"
+                  stroke="var(--surface)"
+                  strokeWidth={2}
+                />
                 {at === null &&
                   (Math.abs(apart) >= 14 ? (
                     <>
@@ -190,8 +212,22 @@ export function BurnUp({ days, unit, today }: Props) {
             {shown && at !== null && (
               <g>
                 <line x1={x(at)} x2={x(at)} y1={TOP} y2={y(0)} stroke="var(--line-strong)" strokeWidth={1} />
-                <circle cx={x(at)} cy={y(shown.scope)} r={5} fill="var(--viz-started)" stroke="var(--surface)" strokeWidth={2} />
-                <circle cx={x(at)} cy={y(shown.done)} r={5} fill="var(--viz-done)" stroke="var(--surface)" strokeWidth={2} />
+                <circle
+                  cx={x(at)}
+                  cy={y(shown.scope)}
+                  r={5}
+                  fill="var(--viz-started)"
+                  stroke="var(--surface)"
+                  strokeWidth={2}
+                />
+                <circle
+                  cx={x(at)}
+                  cy={y(shown.done)}
+                  r={5}
+                  fill="var(--viz-done)"
+                  stroke="var(--surface)"
+                  strokeWidth={2}
+                />
               </g>
             )}
           </svg>

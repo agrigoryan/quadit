@@ -40,17 +40,27 @@ function Row({ doc, tree, depth, slug, parentProject }: RowProps) {
           tabIndex={-1}
           aria-label={t(open ? "docs.tree.collapse" : "docs.tree.expand")}
           onClick={() => setOpen(doc.id, !open)}
-          className={cx("flex size-5 shrink-0 items-center justify-center rounded-sm text-ink-3 hover:bg-press", kids.length === 0 && "invisible")}
+          className={cx(
+            "flex size-5 shrink-0 items-center justify-center rounded-sm text-ink-3 hover:bg-press",
+            kids.length === 0 && "invisible",
+          )}
         >
           <ChevronRight className={cx("size-3.5 transition-transform", open && "rotate-90")} />
         </button>
-        <NavLink to={`/${slug}/docs/${doc.id}`} onClick={() => ui.setDrawer(false)} className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-2">
+        <NavLink
+          to={`/${slug}/docs/${doc.id}`}
+          onClick={() => ui.setDrawer(false)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-2"
+        >
           <PageIcon doc={doc} />
           <span className="truncate">{docTitle(doc)}</span>
           {marksProject(doc, parentProject) && <ProjectMark projectId={doc.project_id} />}
         </NavLink>
       </div>
-      {open && kids.map((kid) => <Row key={kid.id} doc={kid} tree={tree} depth={depth + 1} slug={slug} parentProject={doc.project_id} />)}
+      {open &&
+        kids.map((kid) => (
+          <Row key={kid.id} doc={kid} tree={tree} depth={depth + 1} slug={slug} parentProject={doc.project_id} />
+        ))}
     </>
   );
 }
@@ -83,7 +93,11 @@ export function SidebarDocs({ collapsed }: { collapsed: boolean }) {
           <Row key={doc.id} doc={doc} tree={tree} depth={0} slug={slug} parentProject={undefined} />
         ))}
         {roots.length > 12 && (
-          <NavLink to={`/${slug}/docs`} onClick={() => ui.setDrawer(false)} className="flex h-7 items-center rounded-md px-2 pl-7 text-sm text-ink-3 hover:bg-press/60 hover:text-ink">
+          <NavLink
+            to={`/${slug}/docs`}
+            onClick={() => ui.setDrawer(false)}
+            className="flex h-7 items-center rounded-md px-2 pl-7 text-sm text-ink-3 hover:bg-press/60 hover:text-ink"
+          >
             {t("docs.tree.all", { n: roots.length })}
           </NavLink>
         )}

@@ -41,7 +41,9 @@ interface Group {
 /** The common families first, as far as the server knows their types; then the rest by entity. */
 function groupTypes(all: string[]): { common: Group[]; rest: Group[] } {
   const known = new Set(all);
-  const common = EVENT_GROUPS.map((g) => ({ id: g.id, types: g.types.filter((type) => known.has(type)) })).filter((g) => g.types.length > 0);
+  const common = EVENT_GROUPS.map((g) => ({ id: g.id, types: g.types.filter((type) => known.has(type)) })).filter(
+    (g) => g.types.length > 0,
+  );
   const taken = new Set(common.flatMap((g) => g.types));
   const rest: Group[] = [];
   for (const type of all) {
@@ -78,7 +80,12 @@ export function EventPicker({ value, onChange }: Props) {
   };
 
   const toggle = (type: string, on: boolean) => {
-    if (!on && draft !== null) setDraft(parseOther(draft).filter((v) => v !== type).join(", "));
+    if (!on && draft !== null)
+      setDraft(
+        parseOther(draft)
+          .filter((v) => v !== type)
+          .join(", "),
+      );
     onChange(ordered(on ? [...value, type] : value.filter((v) => v !== type)));
   };
 
@@ -92,7 +99,9 @@ export function EventPicker({ value, onChange }: Props) {
     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-3">
       {list.map((group) => (
         <fieldset key={group.id} className="flex min-w-0 flex-col gap-1">
-          <legend className="mb-1 text-xs font-medium text-ink-2">{tMaybe(`auto.eventGroup.${group.id}`, group.id)}</legend>
+          <legend className="mb-1 text-xs font-medium text-ink-2">
+            {tMaybe(`auto.eventGroup.${group.id}`, group.id)}
+          </legend>
           {group.types.map((name) => (
             <Checkbox key={name} checked={value.includes(name)} onChange={(on) => toggle(name, on)}>
               {/* A long type may wrap, but only after its dot. */}
@@ -117,7 +126,9 @@ export function EventPicker({ value, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-2.5 rounded-md border border-line p-2.5">
-      <p className="text-xs text-ink-3">{value.length === 0 ? t("auto.events.allHint") : t("auto.events.someHint", { n: value.length })}</p>
+      <p className="text-xs text-ink-3">
+        {value.length === 0 ? t("auto.events.allHint") : t("auto.events.someHint", { n: value.length })}
+      </p>
       {groups(common)}
       {rest.length > 0 && (
         <>
@@ -129,7 +140,9 @@ export function EventPicker({ value, onChange }: Props) {
           >
             <ChevronRight className={cx("size-3.5 transition-transform", more && "rotate-90")} aria-hidden />
             {t("auto.events.more")}
-            {restPicked > 0 && <span className="font-normal text-ink-3">{t("auto.events.moreCount", { n: restPicked })}</span>}
+            {restPicked > 0 && (
+              <span className="font-normal text-ink-3">{t("auto.events.moreCount", { n: restPicked })}</span>
+            )}
           </button>
           {more && groups(rest)}
         </>

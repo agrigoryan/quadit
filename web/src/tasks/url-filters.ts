@@ -21,12 +21,22 @@ export const hasFilters = (search: string): boolean => {
  * The filters an address asks for, or null when it asks for none. Names are
  * looked up in the project in view when there is one.
  */
-export function filtersFromSearch(search: string, c: QuerySource, meId: string, today: string, projectKey: string | undefined): Filters | null {
+export function filtersFromSearch(
+  search: string,
+  c: QuerySource,
+  meId: string,
+  today: string,
+  projectKey: string | undefined,
+): Filters | null {
   const params = new URLSearchParams(search);
   if (!WORDS.some((word) => params.has(word))) return null;
   const raw: Record<string, unknown> = {};
   for (const word of LISTS) {
-    const values = params.getAll(word).flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
+    const values = params
+      .getAll(word)
+      .flatMap((v) => v.split(","))
+      .map((v) => v.trim())
+      .filter(Boolean);
     if (values.length) raw[word] = values;
   }
   for (const word of SINGLE) {
@@ -54,16 +64,26 @@ function nameFor<T extends { id: string; name?: string; deleted_at?: number }>(r
 export function searchFromFilters(f: Filters, c: QuerySource, projectId: string | undefined, current: string): string {
   const params = new URLSearchParams(current);
   for (const word of WORDS) params.delete(word);
-  const inProject = <T extends { project_id?: string }>(rows: T[]) => rows.filter((r) => !projectId || !r.project_id || r.project_id === projectId);
+  const inProject = <T extends { project_id?: string }>(rows: T[]) =>
+    rows.filter((r) => !projectId || !r.project_id || r.project_id === projectId);
   const member = (id: string) => (id === NONE || id === OUTSIDE ? id : c.members[id] ? `@${c.members[id].handle}` : id);
   const put = (word: string, values: string[]) => values.length > 0 && params.set(word, values.join(","));
 
   put("assignee", f.assignee.map(member));
-  put("status", f.status.map((id) => nameFor(inProject(Object.values(c.statuses)), id)));
+  put(
+    "status",
+    f.status.map((id) => nameFor(inProject(Object.values(c.statuses)), id)),
+  );
   put("category", f.category);
-  put("label", f.label.map((id) => nameFor(inProject(Object.values(c.labels)), id)));
+  put(
+    "label",
+    f.label.map((id) => nameFor(inProject(Object.values(c.labels)), id)),
+  );
   put("priority", f.priority.map(String));
-  put("epic", f.epic.map((id) => (id === NONE ? NONE : nameFor(inProject(Object.values(c.epics)), id))));
+  put(
+    "epic",
+    f.epic.map((id) => (id === NONE ? NONE : nameFor(inProject(Object.values(c.epics)), id))),
+  );
   put("cycle", f.cycle);
   if (f.waitingOn) params.set("waiting_on", member(f.waitingOn));
   if (f.openDecision) params.set("has_open_decision", "1");

@@ -23,7 +23,9 @@ export function ListeningMark({ on, withText }: { on: boolean; withText?: boolea
     <Tooltip label={on ? t("agents.listeningHint") : t("agents.notListeningHint")}>
       <span className={cx("inline-flex items-center gap-1 text-xs whitespace-nowrap", on ? "text-ok" : "text-ink-3")}>
         <Radio className="size-3.5" aria-hidden />
-        <span className={withText ? "" : "max-lg:sr-only"}>{on ? t("agents.listening") : t("agents.notListening")}</span>
+        <span className={withText ? "" : "max-lg:sr-only"}>
+          {on ? t("agents.listening") : t("agents.notListening")}
+        </span>
       </span>
     </Tooltip>
   );
@@ -35,7 +37,9 @@ export function StateBadge({ state }: { state: AgentState | undefined }) {
   return (
     <Badge tone={tone}>
       {tMaybe(`agents.state.${state.state}`, state.state)}
-      {state.task && state.state === "working" && <span className="font-normal opacity-80">{t("agents.on", { task: state.task })}</span>}
+      {state.task && state.state === "working" && (
+        <span className="font-normal opacity-80">{t("agents.on", { task: state.task })}</span>
+      )}
     </Badge>
   );
 }
@@ -89,7 +93,11 @@ export function AgentsPage() {
                   type="button"
                   onClick={() => navigate(`${base}/agents/${a.handle}`)}
                   aria-label={t("agents.open", { name: a.name })}
-                  className={cx("flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-hover/60", depth === 1 && "pl-8", depth === 2 && "pl-14")}
+                  className={cx(
+                    "flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-hover/60",
+                    depth === 1 && "pl-8",
+                    depth === 2 && "pl-14",
+                  )}
                 >
                   {depth > 0 && <CornerDownRight className="-mr-1 size-3.5 shrink-0 text-ink-3" aria-hidden />}
                   <Avatar member={a} size="lg" className={done ? "opacity-60" : undefined} />
@@ -97,13 +105,16 @@ export function AgentsPage() {
                     <span className="flex items-center gap-1.5">
                       <span className={cx("truncate text-sm font-medium", done && "text-ink-2")}>{a.name}</span>
                       {a.role === "admin" && <Badge>{t("role.admin")}</Badge>}
-                      {done ? <Badge>{t("agents.finished")}</Badge> : a.suspended_at ? <Badge tone="wait">{t("agents.suspended")}</Badge> : null}
+                      {done ? (
+                        <Badge>{t("agents.finished")}</Badge>
+                      ) : a.suspended_at ? (
+                        <Badge tone="wait">{t("agents.suspended")}</Badge>
+                      ) : null}
                       {!done && <StateBadge state={state} />}
                     </span>
                     <span className="block truncate text-xs text-ink-3">
                       {helper && <span className="text-ink-2">{helper} · </span>}
-                      {maker && <span>{t("agents.helperOf", { name: maker.name })} · </span>}
-                      @{a.handle}
+                      {maker && <span>{t("agents.helperOf", { name: maker.name })} · </span>}@{a.handle}
                       {a.title ? ` · ${a.title}` : ""}
                     </span>
                   </span>
@@ -125,7 +136,9 @@ export function AgentsPage() {
               <Checkbox checked={showFinished} onChange={setShowFinished}>
                 {t("agents.showFinished")}
               </Checkbox>
-              {!showFinished && <span className="text-xs text-ink-3">{t("agents.finishedCount", { n: finished })}</span>}
+              {!showFinished && (
+                <span className="text-xs text-ink-3">{t("agents.finishedCount", { n: finished })}</span>
+              )}
             </div>
           )}
         </>

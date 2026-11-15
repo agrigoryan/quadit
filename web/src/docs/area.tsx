@@ -21,7 +21,10 @@ export const projectDocs = (slug: string, project: Pick<Project, "key">) => `/${
 
 export function DocsAreaProvider({ project, children }: { project?: Project; children: ReactNode }) {
   const slug = useSlug();
-  const area = useMemo(() => ({ base: project ? projectDocs(slug, project) : workspaceDocs(slug), project }), [slug, project]);
+  const area = useMemo(
+    () => ({ base: project ? projectDocs(slug, project) : workspaceDocs(slug), project }),
+    [slug, project],
+  );
   return <Context value={area}>{children}</Context>;
 }
 

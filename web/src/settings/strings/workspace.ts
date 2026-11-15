@@ -18,8 +18,10 @@ export const workspaceStrings = {
   "general.delete.lead": "Everyone loses access at once. An admin of this install can restore it for 30 days.",
   "general.delete.button": "Delete workspace…",
   "general.delete.title": "Delete {name}?",
-  "general.delete.everyone": "Everyone in it, people and agents, loses access at once. Tokens, webhooks and integrations stop working.",
-  "general.delete.restore": "For 30 days an admin of this install can restore it as it was. After that it is removed for good.",
+  "general.delete.everyone":
+    "Everyone in it, people and agents, loses access at once. Tokens, webhooks and integrations stop working.",
+  "general.delete.restore":
+    "For 30 days an admin of this install can restore it as it was. After that it is removed for good.",
   "general.delete.export": "To keep a copy of your own, export the workspace first.",
   "general.delete.type": "Type the workspace's address, {slug}, to confirm",
   "general.delete.confirm": "Delete workspace",
@@ -43,7 +45,8 @@ export const workspaceStrings = {
   "members.ownerScope": "An owner sees and can change the whole workspace. To limit them, change their role first.",
   "members.add": "Add member",
   "members.byAccount": "Has an account",
-  "members.accountHint": "The address they sign in to this install with. They become a member at once, with no invitation to accept.",
+  "members.accountHint":
+    "The address they sign in to this install with. They become a member at once, with no invitation to accept.",
   "members.inviteInstead": "Invite {email} instead",
   "members.added": "{name} is now a member",
   "members.suspend": "Suspend",
@@ -56,7 +59,8 @@ export const workspaceStrings = {
   "members.titleHint": "A few words on what they do here.",
   "members.editTitle": "Edit {name}",
   "members.suspend.title": "Suspend {name}?",
-  "members.suspend.body": "They stay in the workspace and keep their history, but cannot sign in to it or change anything until the suspension is lifted.",
+  "members.suspend.body":
+    "They stay in the workspace and keep their history, but cannot sign in to it or change anything until the suspension is lifted.",
   "members.remove.title": "Remove {name}?",
   "members.remove.body":
     "They lose access to this workspace and their API tokens stop working. Their history stays under their name; open tasks they held become unassigned.",
@@ -68,7 +72,8 @@ export const workspaceStrings = {
   "invites.byEmail": "Invite by email",
   "invites.byLink": "Invite link",
   "invites.email": "Email",
-  "invites.emailHint": "Only this address can use the invitation. It is mailed if this install can send mail; either way you get the link to pass on.",
+  "invites.emailHint":
+    "Only this address can use the invitation. It is mailed if this install can send mail; either way you get the link to pass on.",
   "invites.linkHint": "Anyone with the link can join until it runs out. Share it only with the people you mean.",
   "invites.role": "Role",
   "invites.expires": "Good for",
@@ -77,7 +82,8 @@ export const workspaceStrings = {
   "invites.usesN": "once | {n} times",
   "invites.create": "Create invitation",
   "invites.created": "Invitation created",
-  "invites.mailed": "The invitation was mailed to {email}. The link is shown here only once: copy it if you want to send it yourself.",
+  "invites.mailed":
+    "The invitation was mailed to {email}. The link is shown here only once: copy it if you want to send it yourself.",
   "invites.notMailed": "This link is shown only once. Copy it now and send it to the person you are inviting.",
   "invites.link": "Invitation link",
   "invites.anyone": "Anyone with the link",

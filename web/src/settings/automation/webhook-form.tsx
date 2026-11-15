@@ -121,7 +121,10 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
               id="wh-project"
               value={projectId}
               onChange={(v) => (setProjectId(v), errors.set("project", ""))}
-              options={[{ value: "", label: t("auto.pickProject") }, ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` }))]}
+              options={[
+                { value: "", label: t("auto.pickProject") },
+                ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` })),
+              ]}
             />
           </FormField>
         )}
@@ -131,7 +134,10 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
               id="wh-for"
               value={memberId}
               onChange={(v) => (setMemberId(v), errors.set("for", ""))}
-              options={[{ value: "", label: t("auto.pickMember") }, ...inboxes.map((m) => ({ value: m.user_id, label: memberChoiceLabel(m, listening(m)) }))]}
+              options={[
+                { value: "", label: t("auto.pickMember") },
+                ...inboxes.map((m) => ({ value: m.user_id, label: memberChoiceLabel(m, listening(m)) })),
+              ]}
             />
           </FormField>
         )}

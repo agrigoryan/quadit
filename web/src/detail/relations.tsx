@@ -66,9 +66,14 @@ function RelationRow({ relation, other, readOnly }: { relation: Relation; other:
   const link = useTaskLink(other);
   return (
     <li className="group relative -mx-1.5 flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10">
-      <span className="flex size-6 shrink-0 items-center justify-center">{status && <StatusIcon category={status.category} title={status.name} />}</span>
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        {status && <StatusIcon category={status.category} title={status.name} />}
+      </span>
       <span className="shrink-0 text-xs text-ink-3 tnum">{other.key}</span>
-      <Link {...link} className="min-w-0 flex-1 truncate py-1.5 outline-none after:absolute after:inset-0 after:content-['']">
+      <Link
+        {...link}
+        className="min-w-0 flex-1 truncate py-1.5 outline-none after:absolute after:inset-0 after:content-['']"
+      >
         {other.title}
       </Link>
       {!readOnly && (
@@ -150,7 +155,12 @@ export function Relations({ task, relations, startAdding, onEmptyClose }: Props)
       action={
         !readOnly &&
         !adding && (
-          <IconButton label={t("detail.relations.add")} size="sm" className="max-md:size-9" onClick={() => setAdding(true)}>
+          <IconButton
+            label={t("detail.relations.add")}
+            size="sm"
+            className="max-md:size-9"
+            onClick={() => setAdding(true)}
+          >
             <Plus className="size-3.5" />
           </IconButton>
         )
@@ -158,7 +168,9 @@ export function Relations({ task, relations, startAdding, onEmptyClose }: Props)
     >
       {groups.map((group) => (
         <div key={group.side} className="mt-0.5 sm:flex sm:gap-2">
-          <p className="w-[5.5rem] shrink-0 py-1.5 text-xs text-ink-3 max-sm:pt-1 max-sm:pb-0">{t(`detail.relations.${group.side}`)}</p>
+          <p className="w-[5.5rem] shrink-0 py-1.5 text-xs text-ink-3 max-sm:pt-1 max-sm:pb-0">
+            {t(`detail.relations.${group.side}`)}
+          </p>
           <ul className="min-w-0 flex-1">
             {group.rows.map(({ relation, other }) => (
               <RelationRow key={relation.id} relation={relation} other={other} readOnly={readOnly} />

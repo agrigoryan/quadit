@@ -63,7 +63,9 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
   const Icon = icons[item.type] ?? MessageSquare;
   const who = actor ? `@${actor.handle}` : t("common.someone");
   // A type this version does not know yet reads as a plain comment.
-  const sentence = t(item.type in icons ? (`inbox.type.${item.type}` as "inbox.type.comment") : "inbox.type.comment", { who });
+  const sentence = t(item.type in icons ? (`inbox.type.${item.type}` as "inbox.type.comment") : "inbox.type.comment", {
+    who,
+  });
   const snippet = item.snippet ? plain(item.snippet) : "";
   // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
   const taskKey = useStore((s) => (item.task_id ? s.c.tasks[item.task_id]?.key : undefined)) ?? key;
@@ -107,7 +109,13 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
           <span className="truncate">{sentence}</span>
         </p>
         {taskKey ? (
-          <Link {...link} to={to} onClick={() => unread && markRead([item.id])} aria-label={label} className={whatStyle}>
+          <Link
+            {...link}
+            to={to}
+            onClick={() => unread && markRead([item.id])}
+            aria-label={label}
+            className={whatStyle}
+          >
             {what}
           </Link>
         ) : (
@@ -118,7 +126,11 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
         {snippet && <p className="mt-0.5 truncate text-ink-3 md:hidden">{snippet}</p>}
       </div>
 
-      <time dateTime={new Date(item.created_at).toISOString()} title={exact(item.created_at)} className="shrink-0 text-xs text-ink-3 tnum md:w-12 md:text-right">
+      <time
+        dateTime={new Date(item.created_at).toISOString()}
+        title={exact(item.created_at)}
+        className="shrink-0 text-xs text-ink-3 tnum md:w-12 md:text-right"
+      >
         <Ago ms={item.created_at} />
       </time>
       <div
@@ -137,7 +149,13 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
         >
           {unread ? <MailOpen className="size-3.5" /> : <Mail className="size-3.5" />}
         </IconButton>
-        <IconButton label={t("inbox.archive")} hint="E" size="sm" className="max-md:size-10" onClick={() => archive([item.id])}>
+        <IconButton
+          label={t("inbox.archive")}
+          hint="E"
+          size="sm"
+          className="max-md:size-10"
+          onClick={() => archive([item.id])}
+        >
           <Archive className="size-3.5 max-md:size-4" />
         </IconButton>
       </div>

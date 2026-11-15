@@ -29,14 +29,22 @@ export function Thread({ thread, docId, quote, active, onLocate }: Props) {
   const done = !!root.resolved_at;
   return (
     <article
-      className={cx("rounded-lg border bg-surface p-2 transition-colors", active ? "border-move" : "border-line", onLocate && "cursor-pointer hover:border-line-strong")}
+      className={cx(
+        "rounded-lg border bg-surface p-2 transition-colors",
+        active ? "border-move" : "border-line",
+        onLocate && "cursor-pointer hover:border-line-strong",
+      )}
       onClick={(e) => {
         if (!(e.target as HTMLElement).closest("button, a, textarea")) onLocate?.();
       }}
     >
       <div className="flex items-start gap-1">
         <div className="min-w-0 flex-1">{quote}</div>
-        <IconButton size="sm" label={t(done ? "docs.comment.reopen" : "docs.comment.resolve")} onClick={() => resolveComment(root, !done)}>
+        <IconButton
+          size="sm"
+          label={t(done ? "docs.comment.reopen" : "docs.comment.resolve")}
+          onClick={() => resolveComment(root, !done)}
+        >
           {done ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5" />}
         </IconButton>
       </div>
@@ -46,7 +54,11 @@ export function Thread({ thread, docId, quote, active, onLocate }: Props) {
       ))}
       {!done && (
         <div className="mt-2">
-          <Composer placeholder={t("docs.comment.reply")} submitLabel={t("docs.comment.replySend")} onSubmit={(body) => addComment({ docId, parentId: root.id, body })} />
+          <Composer
+            placeholder={t("docs.comment.reply")}
+            submitLabel={t("docs.comment.replySend")}
+            onSubmit={(body) => addComment({ docId, parentId: root.id, body })}
+          />
         </div>
       )}
     </article>

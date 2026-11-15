@@ -7,7 +7,14 @@ import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import type { Project, SortBy, View } from "@/lib/types";
 import { type Grouping, toQuery } from "@/tasks/filters";
-import { BOARD_GROUPS, type BoardGrouping, LIST_GROUPS, resetViewState, type StoredDisplay, type ViewState } from "@/tasks/view-state";
+import {
+  BOARD_GROUPS,
+  type BoardGrouping,
+  LIST_GROUPS,
+  resetViewState,
+  type StoredDisplay,
+  type ViewState,
+} from "@/tasks/view-state";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Field, Input } from "@/ui/input";
@@ -17,7 +24,13 @@ import { Select } from "@/ui/picker";
 const SORTS: SortBy[] = ["manual", "priority", "updated", "created", "due"];
 
 /** How the tasks are grouped and ordered. A board is always in manual order: its cards are dragged into place. */
-export function DisplayControls({ state, onChange }: { state: ViewState; onChange: (patch: Partial<ViewState>) => void }) {
+export function DisplayControls({
+  state,
+  onChange,
+}: {
+  state: ViewState;
+  onChange: (patch: Partial<ViewState>) => void;
+}) {
   if (state.layout === "board") {
     return (
       <Select
@@ -84,7 +97,13 @@ function NameDialog({ title, initial, submit, onSubmit, onClose }: NameDialogPro
     <Dialog open onOpenChange={(open) => !open && onClose()} title={title} size="sm">
       <form onSubmit={save} className="flex flex-col gap-3">
         <Field label={t("view.name")} htmlFor="view-name" hint={t("view.shared")}>
-          <Input id="view-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("view.namePlaceholder")} />
+          <Input
+            id="view-name"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("view.namePlaceholder")}
+          />
         </Field>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
@@ -118,7 +137,10 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
 
   async function create(name: string) {
     try {
-      const results = await mutate({ type: "view.create", args: { name, project: project?.id, shared: true, ...viewArgs(state, project) } });
+      const results = await mutate({
+        type: "view.create",
+        args: { name, project: project?.id, shared: true, ...viewArgs(state, project) },
+      });
       toast.info(t("view.saved"));
       const saved = results[0]?.key;
       if (saved) navigate(`/${slug}/view/${saved}`);
@@ -137,7 +159,9 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
 
   function remove() {
     if (!view) return;
-    send({ type: "view.delete", args: { id: view.id } }, (tx) => tx.patch("views", view.id, { deleted_at: Date.now() }));
+    send({ type: "view.delete", args: { id: view.id } }, (tx) =>
+      tx.patch("views", view.id, { deleted_at: Date.now() }),
+    );
     toast.info(t("view.deleted"));
     navigate(project ? `/${slug}/p/${project.key}/tasks` : `/${slug}/my-work`);
   }
@@ -177,14 +201,22 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
         </Button>
       )}
       {dialog === "save" && (
-        <NameDialog title={t("view.saveTitle")} initial="" submit={t("view.save")} onSubmit={(name) => void create(name)} onClose={() => setDialog(null)} />
+        <NameDialog
+          title={t("view.saveTitle")}
+          initial=""
+          submit={t("view.save")}
+          onSubmit={(name) => void create(name)}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "rename" && view && (
         <NameDialog
           title={t("view.rename")}
           initial={view.name}
           submit={t("common.save")}
-          onSubmit={(name) => send({ type: "view.update", args: { id: view.id, name } }, (tx) => tx.patch("views", view.id, { name }))}
+          onSubmit={(name) =>
+            send({ type: "view.update", args: { id: view.id, name } }, (tx) => tx.patch("views", view.id, { name }))
+          }
           onClose={() => setDialog(null)}
         />
       )}

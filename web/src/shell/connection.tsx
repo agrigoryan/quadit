@@ -29,8 +29,15 @@ export function ConnectionIndicator() {
   const hint = waiting > 0 ? t("conn.unsentHint") : t("conn.downHint");
   return (
     <Tooltip label={hint}>
-      <span role="status" className="flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-wait-soft px-2 text-xs font-medium text-wait animate-fade">
-        {waiting > 0 ? <CloudOff className="size-3.5" aria-hidden /> : <RefreshCw className="size-3.5 animate-spin [animation-duration:2s]" aria-hidden />}
+      <span
+        role="status"
+        className="flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-wait-soft px-2 text-xs font-medium text-wait animate-fade"
+      >
+        {waiting > 0 ? (
+          <CloudOff className="size-3.5" aria-hidden />
+        ) : (
+          <RefreshCw className="size-3.5 animate-spin [animation-duration:2s]" aria-hidden />
+        )}
         <span className="max-sm:hidden">{label}</span>
       </span>
     </Tooltip>

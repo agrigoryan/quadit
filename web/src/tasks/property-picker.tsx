@@ -31,7 +31,8 @@ import { ListeningDot } from "@/ui/listening-dot";
 import type { PickerItem } from "@/ui/picker";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
-export type TaskProperty = "status" | "assignee" | "waiting" | "priority" | "labels" | "epic" | "milestone" | "cycle" | "project";
+export type TaskProperty =
+  "status" | "assignee" | "waiting" | "priority" | "labels" | "epic" | "milestone" | "cycle" | "project";
 
 const NONE = "none";
 const noneIcon = <CircleSlash className="size-3.5 text-ink-3" aria-hidden />;
@@ -68,7 +69,11 @@ export const projectItems = (projects: Project[]): PickerItem[] =>
   projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, hint: p.key, keywords: p.key }));
 
 /** The rows a picker offers for one property, and what is picked now. */
-function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { items: PickerItem[]; value: string | string[] | undefined } {
+function useItems(
+  kind: TaskProperty,
+  tasks: Task[],
+  listening?: Listening,
+): { items: PickerItem[]; value: string | string[] | undefined } {
   const first = tasks[0];
   const projectId = first?.project_id;
   const statuses = useStatuses(kind === "status" ? projectId : undefined);
@@ -79,31 +84,50 @@ function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { i
   const cycles = useCycles(projectId);
   const milestones = useStore((s) => s.c.milestones);
   const projects = useProjects();
-  const same = <T,>(get: (task: Task) => T) => (tasks.every((task) => get(task) === get(first as Task)) ? get(first as Task) : undefined);
+  const same = <T,>(get: (task: Task) => T) =>
+    tasks.every((task) => get(task) === get(first as Task)) ? get(first as Task) : undefined;
 
   switch (kind) {
     case "status":
       return {
-        items: statuses.map((s) => ({ id: s.id, label: s.name, icon: <StatusIcon category={s.category} />, keywords: tMaybe(`category.${s.category}`) })),
+        items: statuses.map((s) => ({
+          id: s.id,
+          label: s.name,
+          icon: <StatusIcon category={s.category} />,
+          keywords: tMaybe(`category.${s.category}`),
+        })),
         value: same((task) => task.status_id),
       };
     case "assignee":
       return {
-        items: [{ id: NONE, label: t("task.unassigned"), icon: noneIcon }, ...memberItems(members, me.user_id, listening)],
+        items: [
+          { id: NONE, label: t("task.unassigned"), icon: noneIcon },
+          ...memberItems(members, me.user_id, listening),
+        ],
         value: same((task) => task.assignee_id ?? NONE),
       };
     case "waiting":
       return {
         items: [
           { id: NONE, label: t("prop.nobody"), icon: noneIcon },
-          { id: OUTSIDE, label: t("prop.outside.pick"), icon: <Globe className="size-3.5 text-ink-2" aria-hidden />, keywords: t("prop.outside.words") },
+          {
+            id: OUTSIDE,
+            label: t("prop.outside.pick"),
+            icon: <Globe className="size-3.5 text-ink-2" aria-hidden />,
+            keywords: t("prop.outside.words"),
+          },
           ...memberItems(members, me.user_id, listening),
         ],
         value: same((task) => (waitsOutside(task) ? OUTSIDE : (task.waiting_on_id ?? NONE))),
       };
     case "priority":
       return {
-        items: PRIORITIES.map((p) => ({ id: String(p), label: t(`priority.${p}` as "priority.0"), icon: <PriorityIcon priority={p} title="" />, hint: String(p) })),
+        items: PRIORITIES.map((p) => ({
+          id: String(p),
+          label: t(`priority.${p}` as "priority.0"),
+          icon: <PriorityIcon priority={p} title="" />,
+          hint: String(p),
+        })),
         value: same((task) => String(task.priority)),
       };
     case "labels":
@@ -119,7 +143,11 @@ function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { i
       return {
         items: [
           { id: NONE, label: t("task.noEpic"), icon: noneIcon },
-          ...epics.map((e) => ({ id: e.id, label: e.name, icon: <Layers className="size-3.5 text-ink-2" aria-hidden /> })),
+          ...epics.map((e) => ({
+            id: e.id,
+            label: e.name,
+            icon: <Layers className="size-3.5 text-ink-2" aria-hidden />,
+          })),
         ],
         value: same((task) => task.epic_id ?? NONE),
       };
@@ -128,7 +156,12 @@ function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { i
         items: [
           { id: NONE, label: t("task.noMilestone"), icon: noneIcon },
           ...Object.values(milestones)
-            .filter((m) => !m.deleted_at && (!first?.epic_id || m.epic_id === first.epic_id) && epics.some((e) => e.id === m.epic_id))
+            .filter(
+              (m) =>
+                !m.deleted_at &&
+                (!first?.epic_id || m.epic_id === first.epic_id) &&
+                epics.some((e) => e.id === m.epic_id),
+            )
             .map((m) => ({
               id: m.id,
               label: m.name,
@@ -270,7 +303,13 @@ function OutsideNote({ tasks, onDone }: { tasks: Task[]; onDone: () => void }) {
       <label htmlFor="outside-note" className="text-xs font-medium text-ink-2">
         {t("prop.outside.note")}
       </label>
-      <Input id="outside-note" autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("prop.outside.placeholder")} />
+      <Input
+        id="outside-note"
+        autoFocus
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={t("prop.outside.placeholder")}
+      />
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onDone}>
           {t("common.cancel")}

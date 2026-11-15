@@ -32,7 +32,9 @@ export function NavItem({ to, icon, label, count, loud, collapsed, hint, nested,
         cx(
           "group flex h-7 items-center gap-2 rounded-md text-sm transition-colors [&>svg]:size-4 [&>svg]:shrink-0",
           collapsed ? "w-8 justify-center" : nested ? "pr-2 pl-7" : "px-2",
-          isActive ? "bg-press font-medium text-ink [&>svg]:text-ink" : "text-ink-2 hover:bg-press/60 hover:text-ink [&>svg]:text-ink-3",
+          isActive
+            ? "bg-press font-medium text-ink [&>svg]:text-ink"
+            : "text-ink-2 hover:bg-press/60 hover:text-ink [&>svg]:text-ink-3",
         )
       }
     >
@@ -48,7 +50,9 @@ export function NavItem({ to, icon, label, count, loud, collapsed, hint, nested,
           {formatNumber(count)}
         </span>
       )}
-      {collapsed && !!count && loud && <span className="absolute mt-[-14px] ml-[14px] size-2 rounded-full bg-move ring-2 ring-sunken" />}
+      {collapsed && !!count && loud && (
+        <span className="absolute mt-[-14px] ml-[14px] size-2 rounded-full bg-move ring-2 ring-sunken" />
+      )}
     </NavLink>
   );
   if (!collapsed) return link;
@@ -59,10 +63,22 @@ export function NavItem({ to, icon, label, count, loud, collapsed, hint, nested,
   );
 }
 
-export function NavSection({ title, collapsed, children }: { title: string; collapsed?: boolean; children: ReactNode }) {
+export function NavSection({
+  title,
+  collapsed,
+  children,
+}: {
+  title: string;
+  collapsed?: boolean;
+  children: ReactNode;
+}) {
   return (
     <section className="mt-4">
-      {collapsed ? <div className="mx-auto mb-1.5 h-px w-5 bg-line" /> : <h2 className="mb-1 px-2 text-xs font-medium text-ink-3">{title}</h2>}
+      {collapsed ? (
+        <div className="mx-auto mb-1.5 h-px w-5 bg-line" />
+      ) : (
+        <h2 className="mb-1 px-2 text-xs font-medium text-ink-3">{title}</h2>
+      )}
       <div className={cx("flex flex-col gap-px", collapsed && "items-center")}>{children}</div>
     </section>
   );

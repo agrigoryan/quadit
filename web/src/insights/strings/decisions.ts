@@ -27,7 +27,8 @@ export const decisionsStrings = {
   "declog.answered.line": "{name} answered",
   "declog.showMore": "Show {n} more",
   "declog.empty": "No decisions yet",
-  "declog.emptyHint": "When someone asks a question on a task, with options to pick from or a yes or no, it is kept here with its answer.",
+  "declog.emptyHint":
+    "When someone asks a question on a task, with options to pick from or a yes or no, it is kept here with its answer.",
   "declog.emptyFiltered": "No decisions match",
   "declog.emptyFilteredHint": "Try other words, or clear the filters.",
   "declog.pane": "What to show",

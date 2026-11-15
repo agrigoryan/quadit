@@ -23,7 +23,15 @@ interface Passkey {
 const PASSKEYS = "/api/v1/auth/passkeys";
 
 /** Names a new passkey (or renames one). For a new one, the browser's own sheet opens on submit. */
-function NameDialog({ passkey, onClose, onDone }: { passkey: Passkey | null; onClose: () => void; onDone: () => void }) {
+function NameDialog({
+  passkey,
+  onClose,
+  onDone,
+}: {
+  passkey: Passkey | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const [name, setName] = useState(passkey?.name ?? summariseAgent(navigator.userAgent));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,7 +44,9 @@ function NameDialog({ passkey, onClose, onDone }: { passkey: Passkey | null; onC
       if (passkey) {
         await api.patch(`${PASSKEYS}/${passkey.id}`, { name: name.trim() });
       } else {
-        const start = await api.post<{ options: { publicKey: Record<string, unknown> }; state: string }>(`${PASSKEYS}/register/start`);
+        const start = await api.post<{ options: { publicKey: Record<string, unknown> }; state: string }>(
+          `${PASSKEYS}/register/start`,
+        );
         const credential = await createPasskey(start.options);
         const query = new URLSearchParams({ state: start.state, name: name.trim() });
         await api.post(`${PASSKEYS}/register/finish?${query.toString()}`, credential);
@@ -67,7 +77,11 @@ function NameDialog({ passkey, onClose, onDone }: { passkey: Passkey | null; onC
     >
       <form id="passkey-name" onSubmit={submit} className="flex flex-col gap-3.5">
         {!passkey && <p className="text-sm text-ink-2">{t("me.passkeys.addBody")}</p>}
-        <FormField label={t("s.name")} htmlFor="passkey-name-input" hint={passkey ? undefined : t("me.passkeys.nameHint")}>
+        <FormField
+          label={t("s.name")}
+          htmlFor="passkey-name-input"
+          hint={passkey ? undefined : t("me.passkeys.nameHint")}
+        >
           <Input id="passkey-name-input" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
         </FormField>
         <FormAlert>{error}</FormAlert>

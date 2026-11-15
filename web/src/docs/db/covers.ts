@@ -30,7 +30,9 @@ async function firstImage(rowId: string): Promise<string | null> {
   await slot();
   try {
     const out = await api.get<{ blocks: BlockRow[] }>(ws(getState().slug, `/docs/${rowId}`));
-    const images = (out.blocks ?? []).filter((b) => b.type === "image" && typeof b.props?.url === "string" && b.props.url);
+    const images = (out.blocks ?? []).filter(
+      (b) => b.type === "image" && typeof b.props?.url === "string" && b.props.url,
+    );
     // Top-level blocks come in reading order; one nested deeper is second best.
     const top = images.filter((b) => !b.parent_id).sort((a, b) => (a.rank < b.rank ? -1 : 1))[0] ?? images[0];
     return top ? (localPath(String(top.props?.url)) ?? null) : null;

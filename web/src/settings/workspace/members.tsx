@@ -31,7 +31,9 @@ export function MembersPage() {
   const setRole = (m: Member, role: Role) =>
     send({ type: "member.update", args: { id: m.user_id, role } }, (tx) => tx.patch("members", m.user_id, { role }));
   const resume = (m: Member) =>
-    send({ type: "member.update", args: { id: m.user_id, suspended: false } }, (tx) => tx.patch("members", m.user_id, { suspended_at: null }));
+    send({ type: "member.update", args: { id: m.user_id, suspended: false } }, (tx) =>
+      tx.patch("members", m.user_id, { suspended_at: null }),
+    );
 
   return (
     <Page title={t("members.title")} lead={t("members.lead")} back={base}>
@@ -112,7 +114,11 @@ export function MembersPage() {
         title={t("members.suspend.title", { name: ask?.member.name ?? "" })}
         body={t("members.suspend.body")}
         confirm={t("members.suspend")}
-        onConfirm={() => mutate({ type: "member.update", args: { id: ask?.member.user_id, suspended: true } }, undefined, { quiet: true })}
+        onConfirm={() =>
+          mutate({ type: "member.update", args: { id: ask?.member.user_id, suspended: true } }, undefined, {
+            quiet: true,
+          })
+        }
       />
       <ConfirmDialog
         open={ask?.kind === "remove"}
@@ -120,7 +126,9 @@ export function MembersPage() {
         title={t("members.remove.title", { name: ask?.member.name ?? "" })}
         body={t("members.remove.body")}
         confirm={t("s.remove")}
-        onConfirm={() => mutate({ type: "member.remove", args: { id: ask?.member.user_id } }, undefined, { quiet: true })}
+        onConfirm={() =>
+          mutate({ type: "member.remove", args: { id: ask?.member.user_id } }, undefined, { quiet: true })
+        }
       />
     </Page>
   );

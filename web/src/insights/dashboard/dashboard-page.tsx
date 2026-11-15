@@ -29,7 +29,9 @@ export function DashboardPage() {
   const projects = useProjects();
   const [params, setParams] = useSearchParams();
   const project = useProjectByKey(params.get("project") ?? undefined);
-  const { data, error, loading } = useLive<Dashboard>(project ? `/dashboard?project=${encodeURIComponent(project.key)}` : "/dashboard");
+  const { data, error, loading } = useLive<Dashboard>(
+    project ? `/dashboard?project=${encodeURIComponent(project.key)}` : "/dashboard",
+  );
 
   const items = [
     { id: ALL, label: t("ins.allProjects"), icon: <FolderKanban className="size-3.5 text-ink-3" /> },
@@ -43,7 +45,13 @@ export function DashboardPage() {
   return (
     <div className="flex h-full flex-col">
       <PageBar>
-        <Select items={items} value={project?.id ?? ALL} onPick={pick} label={t("ins.project")} buttonProps={{ className: "max-w-56" }} />
+        <Select
+          items={items}
+          value={project?.id ?? ALL}
+          onPick={pick}
+          label={t("ins.project")}
+          buttonProps={{ className: "max-w-56" }}
+        />
         <span className="flex-1" />
         {error && (
           <p role="alert" className="text-xs text-danger">
@@ -67,7 +75,11 @@ export function DashboardPage() {
               <WaitsPanel rows={data.flow.waiting} className="lg:col-span-5" />
               <StatusPanel rows={data.flow.by_status} className="lg:col-span-5" />
               <WeeklyPanel weeks={data.flow.weekly} className="lg:col-span-7" />
-              <DecisionsPanel decisions={data.recent_decisions} preferences={data.preferences} className="lg:col-span-7" />
+              <DecisionsPanel
+                decisions={data.recent_decisions}
+                preferences={data.preferences}
+                className="lg:col-span-7"
+              />
               <HealthPanel health={data.health} className="lg:col-span-5" />
             </>
           ) : (

@@ -125,7 +125,8 @@ export const tasks = {
   "view.gone": "This view filters by something that no longer exists",
   "view.fix": "Fix",
   "view.unreadable": "This view's filter cannot be read",
-  "view.unreadableHint": "What it stores is not a filter this page understands. Rename or delete the view from its menu, or save a new one over it from a task list.",
+  "view.unreadableHint":
+    "What it stores is not a filter this page understands. Rename or delete the view from its menu, or save a new one over it from a task list.",
 
   "bulk.selected": "{n} selected",
   "bulk.clear": "Clear selection",
@@ -154,7 +155,8 @@ export const tasks = {
   "col.moveRight": "Move right",
   "col.delete": "Delete",
   "col.delete.title": "Delete the status “{name}”?",
-  "col.delete.body": "Its column leaves the board. A status that tasks still have cannot go until they are given another.",
+  "col.delete.body":
+    "Its column leaves the board. A status that tasks still have cannot go until they are given another.",
   "col.delete.moveTo": "Move its tasks to",
   "col.delete.move": "Move tasks and delete",
   "col.add": "Add status",
@@ -177,7 +179,8 @@ export const tasks = {
   "board.add": "Add a task to {name}",
   "board.addPlaceholder": "Task title, then Enter",
   "board.empty": "Nothing here",
-  "board.dragKeys": "To move a card, press Shift and Space. Use the arrow keys to move it, Space to drop it, or Escape to put it back.",
+  "board.dragKeys":
+    "To move a card, press Shift and Space. Use the arrow keys to move it, Space to drop it, or Escape to put it back.",
 
   "create.title": "New task",
   "create.titlePlaceholder": "Task title",
@@ -197,7 +200,8 @@ export const tasks = {
   "multi.title": "New tasks",
   "multi.label": "Task titles, one per line",
   "multi.placeholder": "One task title per line. Paste a list.",
-  "multi.hint": "Bullets, numbers and check boxes at the start of a line are dropped. Everything below applies to every task.",
+  "multi.hint":
+    "Bullets, numbers and check boxes at the start of a line are dropped. Everything below applies to every task.",
   "multi.count": "{n} task | {n} tasks",
   "multi.submit": "Create {n} task | Create {n} tasks",
   "multi.needTitles": "Write at least one title",

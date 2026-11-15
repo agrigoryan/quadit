@@ -36,7 +36,8 @@ function deletedText(at: number): string {
   return `${when}, ${left === 0 ? t("admin.workspaces.goneSoon") : t("admin.workspaces.goneIn", { n: left })}`;
 }
 
-export const fetchWorkspaces = () => api.get<{ workspaces: AdminWorkspace[] }>("/api/v1/admin/workspaces").then((r) => r.workspaces);
+export const fetchWorkspaces = () =>
+  api.get<{ workspaces: AdminWorkspace[] }>("/api/v1/admin/workspaces").then((r) => r.workspaces);
 
 export function WorkspacesPage() {
   const list = useLoad(fetchWorkspaces, []);
@@ -52,7 +53,10 @@ export function WorkspacesPage() {
     // The switcher and this list both read the session's workspaces.
     await loadSession();
     void list.reload();
-    toast.info(t("admin.workspaces.joined", { name: w.name }), { label: t("admin.workspaces.open"), run: () => navigate(`/${w.slug}`) });
+    toast.info(t("admin.workspaces.joined", { name: w.name }), {
+      label: t("admin.workspaces.open"),
+      run: () => navigate(`/${w.slug}`),
+    });
   }
 
   /** Brings a deleted workspace back. The server refuses (409) when another workspace took its address meanwhile. */
@@ -80,7 +84,10 @@ export function WorkspacesPage() {
                         key={w.id}
                         className="bg-sunken/50"
                         lead={
-                          <span className="flex size-6 items-center justify-center rounded-sm bg-ink-3 text-2xs font-bold text-surface" aria-hidden>
+                          <span
+                            className="flex size-6 items-center justify-center rounded-sm bg-ink-3 text-2xs font-bold text-surface"
+                            aria-hidden
+                          >
                             {w.name.slice(0, 1).toUpperCase()}
                           </span>
                         }
@@ -92,7 +99,8 @@ export function WorkspacesPage() {
                         }
                         sub={
                           <>
-                            <span className="font-mono">/{w.slug}</span> · <span title={exact(w.deleted_at)}>{deletedText(w.deleted_at)}</span>
+                            <span className="font-mono">/{w.slug}</span> ·{" "}
+                            <span title={exact(w.deleted_at)}>{deletedText(w.deleted_at)}</span>
                           </>
                         }
                         meta={
@@ -114,7 +122,10 @@ export function WorkspacesPage() {
                     <Row
                       key={w.id}
                       lead={
-                        <span className="flex size-6 items-center justify-center rounded-sm bg-ink text-2xs font-bold text-surface" aria-hidden>
+                        <span
+                          className="flex size-6 items-center justify-center rounded-sm bg-ink text-2xs font-bold text-surface"
+                          aria-hidden
+                        >
                           {w.name.slice(0, 1).toUpperCase()}
                         </span>
                       }
@@ -124,7 +135,8 @@ export function WorkspacesPage() {
                           <span className="font-mono">/{w.slug}</span>
                           <span className="sm:hidden">
                             {" · "}
-                            {t("admin.workspaces.members", { n: w.members })} · {t("admin.workspaces.tasks", { n: w.tasks })}
+                            {t("admin.workspaces.members", { n: w.members })} ·{" "}
+                            {t("admin.workspaces.tasks", { n: w.tasks })}
                           </span>
                         </>
                       }
@@ -147,7 +159,12 @@ export function WorkspacesPage() {
                             <ArrowUpRight className="size-3.5" aria-hidden />
                           </Link>
                         ) : (
-                          <Button size="sm" onClick={() => setJoining(w)} title={t("admin.workspaces.notMemberHint")} className="max-sm:h-8 max-sm:px-2.5">
+                          <Button
+                            size="sm"
+                            onClick={() => setJoining(w)}
+                            title={t("admin.workspaces.notMemberHint")}
+                            className="max-sm:h-8 max-sm:px-2.5"
+                          >
                             <LogIn className="size-3" aria-hidden />
                             {t("admin.workspaces.join")}
                           </Button>

@@ -44,7 +44,8 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
       .replace(/\.git$/, "")
       .replace(/\/+$/, "");
     if (!/^[\w.-]+\/[\w.-]+$/.test(cleanRepo)) return errors.set("repo", t("auto.gh.repoInvalid"));
-    if (apiUrl.trim() && !/^https?:\/\/\S+$/i.test(apiUrl.trim())) return errors.set("config", t("auto.hook.urlInvalid"));
+    if (apiUrl.trim() && !/^https?:\/\/\S+$/i.test(apiUrl.trim()))
+      return errors.set("config", t("auto.hook.urlInvalid"));
 
     const config: GitHubConfig = { repo: cleanRepo };
     if (apiUrl.trim()) config.api_url = apiUrl.trim();
@@ -56,7 +57,14 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
       config.issues_label = issuesLabel.trim();
       if (issuesProject) config.issues_project = issuesProject;
     }
-    const args: Record<string, unknown> = { id: it?.id ?? newId(), kind: "github", name: name.trim() || cleanRepo, project: projectId, config, active };
+    const args: Record<string, unknown> = {
+      id: it?.id ?? newId(),
+      kind: "github",
+      name: name.trim() || cleanRepo,
+      project: projectId,
+      config,
+      active,
+    };
     // The token never comes back; an empty field keeps the one that is stored.
     if (token.trim()) args.secret = token.trim();
 
@@ -66,7 +74,10 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
     });
   }
 
-  const categories = [{ value: "", label: t("auto.gh.leaveAlone") }, ...CATEGORIES.map((c) => ({ value: c, label: tMaybe(`category.${c}`) }))];
+  const categories = [
+    { value: "", label: t("auto.gh.leaveAlone") },
+    ...CATEGORIES.map((c) => ({ value: c, label: tMaybe(`category.${c}`) })),
+  ];
 
   return (
     <Dialog
@@ -85,7 +96,12 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
     >
       <form id="integration-form" onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <FormField label={t("auto.gh.repo")} htmlFor="gh-repo" error={errors.fields.repo} hint={t("auto.gh.repoHint")}>
+          <FormField
+            label={t("auto.gh.repo")}
+            htmlFor="gh-repo"
+            error={errors.fields.repo}
+            hint={t("auto.gh.repoHint")}
+          >
             <Input
               id="gh-repo"
               autoFocus
@@ -117,12 +133,20 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
             onChange={(e) => setToken(e.target.value)}
           />
         </FormField>
-        <FormField label={t("auto.project")} htmlFor="gh-project" error={errors.fields.project} hint={t("auto.gh.projectHint")}>
+        <FormField
+          label={t("auto.project")}
+          htmlFor="gh-project"
+          error={errors.fields.project}
+          hint={t("auto.gh.projectHint")}
+        >
           <NativeSelect
             id="gh-project"
             value={projectId}
             onChange={setProjectId}
-            options={[{ value: "", label: t("s.everyProject") }, ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` }))]}
+            options={[
+              { value: "", label: t("s.everyProject") },
+              ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` })),
+            ]}
           />
         </FormField>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -133,15 +157,32 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
             <NativeSelect id="gh-merge" value={onMerge} onChange={setOnMerge} options={categories} />
           </FormField>
         </div>
-        <SwitchRow title={t("auto.gh.commentBack")} hint={t("auto.gh.commentBackHint")} checked={commentBack} onChange={setCommentBack} />
+        <SwitchRow
+          title={t("auto.gh.commentBack")}
+          hint={t("auto.gh.commentBackHint")}
+          checked={commentBack}
+          onChange={setCommentBack}
+        />
         <div className="border-t border-line pt-3.5">
           <p className="text-sm font-medium text-ink">{t("auto.gh.issues")}</p>
           <p className="mb-2.5 text-xs text-ink-3">{t("auto.gh.issuesLead")}</p>
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <FormField label={t("auto.gh.issuesLabel")} htmlFor="gh-issues-label" hint={t("auto.gh.issuesLabelHint")}>
-              <Input id="gh-issues-label" spellCheck={false} autoCapitalize="off" placeholder="quadit" value={issuesLabel} onChange={(e) => setIssuesLabel(e.target.value)} />
+              <Input
+                id="gh-issues-label"
+                spellCheck={false}
+                autoCapitalize="off"
+                placeholder="quadit"
+                value={issuesLabel}
+                onChange={(e) => setIssuesLabel(e.target.value)}
+              />
             </FormField>
-            <FormField label={t("auto.gh.issuesProject")} htmlFor="gh-issues-project" error={errors.fields.issues_project} hint={t("auto.gh.issuesProjectHint")}>
+            <FormField
+              label={t("auto.gh.issuesProject")}
+              htmlFor="gh-issues-project"
+              error={errors.fields.issues_project}
+              hint={t("auto.gh.issuesProjectHint")}
+            >
               <NativeSelect
                 id="gh-issues-project"
                 value={issuesProject}
@@ -151,14 +192,27 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
                   { value: "", label: t("auto.gh.issuesProjectSame") },
                   ...projects.map((p) => ({ value: p.key, label: `${p.key} · ${p.name}` })),
                   // A key saved earlier whose project is gone from the list: still show what is stored.
-                  ...(issuesProject && !projects.some((p) => p.key === issuesProject) ? [{ value: issuesProject, label: issuesProject }] : []),
+                  ...(issuesProject && !projects.some((p) => p.key === issuesProject)
+                    ? [{ value: issuesProject, label: issuesProject }]
+                    : []),
                 ]}
               />
             </FormField>
           </div>
         </div>
-        <FormField label={t("auto.gh.apiUrl")} htmlFor="gh-api" error={errors.fields.config} hint={t("auto.gh.apiUrlHint")}>
-          <Input id="gh-api" type="url" placeholder="https://api.github.com" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} />
+        <FormField
+          label={t("auto.gh.apiUrl")}
+          htmlFor="gh-api"
+          error={errors.fields.config}
+          hint={t("auto.gh.apiUrlHint")}
+        >
+          <Input
+            id="gh-api"
+            type="url"
+            placeholder="https://api.github.com"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
+          />
         </FormField>
         <SwitchRow title={t("auto.active")} hint={t("auto.gh.activeHint")} checked={active} onChange={setActive} />
         <FormAlert>{errors.form}</FormAlert>

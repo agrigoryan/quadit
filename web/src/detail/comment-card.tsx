@@ -229,7 +229,12 @@ export const CommentCard = memo(function CommentCard({ task, comment, replies, f
       />
       {replies.map((reply) => (
         <div key={reply.id} className="ml-7 border-t border-line">
-          <Entry comment={reply} files={files[reply.id] ?? NO_FILES} earlier={history?.[reply.id] ?? NO_EDITS} readOnly={readOnly} />
+          <Entry
+            comment={reply}
+            files={files[reply.id] ?? NO_FILES}
+            earlier={history?.[reply.id] ?? NO_EDITS}
+            readOnly={readOnly}
+          />
         </div>
       ))}
       {replying && (

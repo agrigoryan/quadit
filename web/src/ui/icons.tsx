@@ -67,7 +67,13 @@ export function StatusIcon({ category, className, title }: IconProps & { categor
       return (
         <Svg className={className} title={label}>
           <rect x="1" y="1" width="12" height="12" rx="3.5" fill={color} />
-          <path d="m4.2 7.2 1.9 1.9 3.7-4" stroke="var(--surface)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="m4.2 7.2 1.9 1.9 3.7-4"
+            stroke="var(--surface)"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </Svg>
       );
     case "canceled":

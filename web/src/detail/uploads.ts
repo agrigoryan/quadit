@@ -52,7 +52,13 @@ async function attachOne(task: Task, file: File) {
       reached = Math.max(reached, p.sent);
       const percent = p.total > 0 ? Math.min(100, Math.floor((p.sent / p.total) * 100)) : 0;
       const now = waiting;
-      setPending(task.id, (list) => list.map((it) => (it.id === pending.id && (it.percent !== percent || it.waiting !== now) ? { ...it, percent, waiting: now } : it)));
+      setPending(task.id, (list) =>
+        list.map((it) =>
+          it.id === pending.id && (it.percent !== percent || it.waiting !== now)
+            ? { ...it, percent, waiting: now }
+            : it,
+        ),
+      );
     },
   });
   if (row) {

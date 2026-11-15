@@ -24,7 +24,11 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 export const pageIdOf = (text: string): string => text.match(UUID)?.[0].toLowerCase() ?? "";
 
 /** A task's key, from the key itself ("sva-12") or from a link that ends in it. */
-export const taskKeyOf = (text: string): string => text.trim().match(/([A-Za-z][A-Za-z0-9]{1,9}-\d+)(?:[#?].*)?$/)?.[1]?.toUpperCase() ?? "";
+export const taskKeyOf = (text: string): string =>
+  text
+    .trim()
+    .match(/([A-Za-z][A-Za-z0-9]{1,9}-\d+)(?:[#?].*)?$/)?.[1]
+    ?.toUpperCase() ?? "";
 
 export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose: () => void }) {
   const workspaces = useLoad(() => fetchWorkspaces().then((rows) => rows.filter((w) => !w.deleted_at)), []);
@@ -43,7 +47,10 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
     if (kind === "task" && !key) return errors.set("ref", t("admin.restoreItem.taskBad"));
     if (kind === "doc" && !doc) return errors.set("ref", t("admin.restoreItem.pageBad"));
     await run(async () => {
-      await api.post(`/api/v1/admin/backups/${backup.id}/restore-item`, kind === "task" ? { workspace, task: key } : { workspace, doc });
+      await api.post(
+        `/api/v1/admin/backups/${backup.id}/restore-item`,
+        kind === "task" ? { workspace, task: key } : { workspace, doc },
+      );
       toast.info(kind === "task" ? t("admin.restoreItem.doneTask", { key }) : t("admin.restoreItem.donePage"));
       onClose();
     });
@@ -66,7 +73,11 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
       }
     >
       <form id="restore-item" onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
-        <FormField label={t("admin.restoreItem.workspace")} htmlFor="ri-workspace" error={workspaces.error || undefined}>
+        <FormField
+          label={t("admin.restoreItem.workspace")}
+          htmlFor="ri-workspace"
+          error={workspaces.error || undefined}
+        >
           <NativeSelect
             id="ri-workspace"
             value={workspace}

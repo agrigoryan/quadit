@@ -32,7 +32,10 @@ export function Toaster() {
               </button>
             </RToast.Action>
           )}
-          <RToast.Close aria-label={t("common.dismiss")} className="shrink-0 rounded-sm p-0.5 opacity-70 hover:opacity-100">
+          <RToast.Close
+            aria-label={t("common.dismiss")}
+            className="shrink-0 rounded-sm p-0.5 opacity-70 hover:opacity-100"
+          >
             <X className="size-3.5" />
           </RToast.Close>
         </RToast.Root>

@@ -73,7 +73,11 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
       }
     >
       <form id="create-workspace" onSubmit={submit} className="flex flex-col gap-3.5">
-        <FormField label={t("auth.setup.workspace")} htmlFor="ws-name" error={errors.fields.name || errors.fields.workspace_name}>
+        <FormField
+          label={t("auth.setup.workspace")}
+          htmlFor="ws-name"
+          error={errors.fields.name || errors.fields.workspace_name}
+        >
           <Input id="ws-name" required autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
         </FormField>
         <FormField
@@ -110,7 +114,11 @@ export function NoWorkspacePage() {
       footer={
         <p>
           {t("auth.noWorkspace.signedInAs", { email: user?.email ?? user?.name ?? "" })}{" "}
-          <button type="button" onClick={() => void signOut()} className="font-medium text-accent-text underline-offset-2 hover:underline">
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="font-medium text-accent-text underline-offset-2 hover:underline"
+          >
             {t("top.signOut")}
           </button>
         </p>

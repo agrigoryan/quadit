@@ -137,7 +137,11 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
               <MenuItem icon={<ArrowUp />} disabled={at <= 0} onSelect={() => moveMilestone(ordered, milestone, -1)}>
                 {t("epic.moveUp")}
               </MenuItem>
-              <MenuItem icon={<ArrowDown />} disabled={at >= ordered.length - 1} onSelect={() => moveMilestone(ordered, milestone, 1)}>
+              <MenuItem
+                icon={<ArrowDown />}
+                disabled={at >= ordered.length - 1}
+                onSelect={() => moveMilestone(ordered, milestone, 1)}
+              >
                 {t("epic.moveDown")}
               </MenuItem>
               <MenuSeparator />
@@ -196,7 +200,13 @@ function NewMilestone({ epic, last }: { epic: Epic; last: Milestone | undefined 
         className="h-7 min-w-40 flex-1 basis-40 sm:max-w-72"
       />
       <span className="w-36 shrink-0">
-        <Input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label={t("epic.milestoneDate")} className="h-7 tnum" />
+        <Input
+          type="date"
+          value={day}
+          onChange={(e) => setDay(e.target.value)}
+          aria-label={t("epic.milestoneDate")}
+          className="h-7 tnum"
+        />
       </span>
       <Button type="submit" disabled={!name.trim()}>
         <Plus className="size-4" aria-hidden />
@@ -208,13 +218,22 @@ function NewMilestone({ epic, last }: { epic: Epic; last: Milestone | undefined 
 
 export function EpicMilestones({ epic, tasks }: { epic: Epic; tasks: Task[] }) {
   const all = useCollection("milestones");
-  const ordered = useMemo(() => sortByRank(Object.values(all).filter((m) => m.epic_id === epic.id && !m.deleted_at)), [all, epic.id]);
+  const ordered = useMemo(
+    () => sortByRank(Object.values(all).filter((m) => m.epic_id === epic.id && !m.deleted_at)),
+    [all, epic.id],
+  );
   const known = new Set(ordered.map((m) => m.id));
   const loose = tasks.filter((task) => !task.milestone_id || !known.has(task.milestone_id));
   return (
     <div>
       {ordered.map((m) => (
-        <Group key={m.id} epic={epic} milestone={m} ordered={ordered} tasks={tasks.filter((task) => task.milestone_id === m.id)} />
+        <Group
+          key={m.id}
+          epic={epic}
+          milestone={m}
+          ordered={ordered}
+          tasks={tasks.filter((task) => task.milestone_id === m.id)}
+        />
       ))}
       {(loose.length > 0 || ordered.length === 0) && <Group epic={epic} ordered={ordered} tasks={loose} />}
       <NewMilestone epic={epic} last={ordered[ordered.length - 1]} />

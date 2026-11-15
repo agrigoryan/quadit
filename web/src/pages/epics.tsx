@@ -27,7 +27,8 @@ export function EpicsPage() {
 
 /** "Oct 20 to Dec 18", or the one date there is. */
 export function epicDates(epic: Epic): string {
-  if (epic.start_on && epic.target_on) return t("cycles.range", { from: formatDay(epic.start_on), to: formatDay(epic.target_on) });
+  if (epic.start_on && epic.target_on)
+    return t("cycles.range", { from: formatDay(epic.start_on), to: formatDay(epic.target_on) });
   if (epic.target_on) return t("epics.target", { day: formatDay(epic.target_on) });
   if (epic.start_on) return t("epic.starts", { day: formatDay(epic.start_on) });
   return "";
@@ -103,7 +104,12 @@ function Epics({ project }: { project: Project }) {
         </ul>
       )}
       {dialog && (
-        <EpicDialog projectId={project.id} epic={dialog.epic} onClose={() => setDialog(null)} onCreated={(id) => navigate(pageOf(id))} />
+        <EpicDialog
+          projectId={project.id}
+          epic={dialog.epic}
+          onClose={() => setDialog(null)}
+          onCreated={(id) => navigate(pageOf(id))}
+        />
       )}
       {deleting && <DeleteEpic epic={deleting} onClose={() => setDeleting(null)} />}
     </div>
@@ -135,7 +141,9 @@ function EpicMeta({ epic }: { epic: Epic }) {
   return (
     <>
       <span className="shrink-0 text-xs text-ink-3 tnum max-md:hidden">{epicDates(epic)}</span>
-      <span className="flex w-5 shrink-0 justify-center max-sm:hidden">{lead && <Avatar member={lead} size="sm" />}</span>
+      <span className="flex w-5 shrink-0 justify-center max-sm:hidden">
+        {lead && <Avatar member={lead} size="sm" />}
+      </span>
     </>
   );
 }

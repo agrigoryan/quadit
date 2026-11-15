@@ -14,7 +14,15 @@ import { ConfirmDialog, RevealDialog } from "@/settings/ui/dialogs";
 import { Switch } from "@/settings/ui/form";
 import { EmptyRow, Page, Rows } from "@/settings/ui/layout";
 import { useLoad } from "@/settings/ui/use-load";
-import { change, lastSent, listWebhooks, randomSecret, type TestResult, type Webhook, type WebhookRow } from "@/settings/automation/data";
+import {
+  change,
+  lastSent,
+  listWebhooks,
+  randomSecret,
+  type TestResult,
+  type Webhook,
+  type WebhookRow,
+} from "@/settings/automation/data";
 import { DeliveriesDialog } from "@/settings/automation/deliveries";
 import { EventBadges } from "@/settings/automation/event-picker";
 import { WebhookForm } from "@/settings/automation/webhook-form";
@@ -31,7 +39,10 @@ function TestLine({ test }: { test: Test }) {
   else if (ok) text = t("auto.hook.test.ok", { status: test.result.status, ms: test.result.ms });
   else text = t("auto.hook.test.bad", { status: test.result.status, ms: test.result.ms, error: test.result.error });
   return (
-    <p role="status" className={cx("rounded-md px-2 py-1 text-xs", ok ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger")}>
+    <p
+      role="status"
+      className={cx("rounded-md px-2 py-1 text-xs", ok ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger")}
+    >
       {text}
     </p>
   );
@@ -59,7 +70,9 @@ function WebhookItem({ hook, test, onTest, onToggle, onEdit, onLog, onRotate, on
       <div className="flex items-center gap-3">
         <Switch checked={hook.active} onChange={onToggle} label={t("auto.hook.activeFor", { name: hook.name })} />
         <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
-          <span className={cx("block truncate text-sm font-medium", hook.active ? "text-ink" : "text-ink-3")}>{hook.name}</span>
+          <span className={cx("block truncate text-sm font-medium", hook.active ? "text-ink" : "text-ink-3")}>
+            {hook.name}
+          </span>
           <span className="block truncate font-mono text-xs text-ink-3">{hook.url}</span>
         </button>
         <Button size="sm" onClick={onTest} disabled={test?.busy}>
@@ -101,7 +114,10 @@ function WebhookItem({ hook, test, onTest, onToggle, onEdit, onLog, onRotate, on
         {hook.failures > 0 && <Badge tone="danger">{t("auto.hook.failures", { n: hook.failures })}</Badge>}
         {last ? (
           <Fact label={t("auto.hook.last")} className="max-w-full min-w-0">
-            <span className={cx("mr-1.5 inline-block max-w-56 truncate align-bottom", last.failed && "text-danger")} title={last.result}>
+            <span
+              className={cx("mr-1.5 inline-block max-w-56 truncate align-bottom", last.failed && "text-danger")}
+              title={last.result}
+            >
               {last.result}
             </span>
             <When ms={last.at} />

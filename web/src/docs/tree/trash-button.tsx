@@ -14,7 +14,10 @@ export function TrashButton({ projectId }: { projectId?: string }) {
   return (
     <Popover onOpenChange={(open) => open && void loadTrash()}>
       <PopoverTrigger asChild>
-        <button type="button" className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-sm text-ink-2 hover:bg-press/60 hover:text-ink data-[state=open]:bg-press">
+        <button
+          type="button"
+          className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-sm text-ink-2 hover:bg-press/60 hover:text-ink data-[state=open]:bg-press"
+        >
           <Trash2 className="size-4 text-ink-3" />
           <span className="flex-1 text-left">{t("docs.trash.title")}</span>
           {trashed.length > 0 && <span className="text-xs text-ink-3 tnum">{trashed.length}</span>}
@@ -29,7 +32,9 @@ export function TrashButton({ projectId }: { projectId?: string }) {
               <li key={item.id} className="flex h-8 items-center gap-2 rounded-sm px-2 text-sm hover:bg-hover">
                 <PageIcon doc={{ icon: item.icon, kind: item.kind as "page" }} />
                 <span className="min-w-0 flex-1 truncate">{docTitle(item)}</span>
-                <span className="shrink-0 text-xs text-ink-3"><Ago ms={item.deleted_at} /></span>
+                <span className="shrink-0 text-xs text-ink-3">
+                  <Ago ms={item.deleted_at} />
+                </span>
                 <button
                   type="button"
                   aria-label={t("docs.trash.restore")}

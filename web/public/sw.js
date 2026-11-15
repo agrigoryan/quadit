@@ -21,7 +21,18 @@ const SHELL = "quadit-shell-v1";
 const MAX_ASSETS = 400;
 
 /** Never handled here: the browser asks the server as if there were no worker. */
-const NOT_OURS = ["/api/", "/f/", "/mcp", "/oauth/", "/.well-known/", "/hooks/", "/healthz", "/readyz", "/metrics", "/sw.js"];
+const NOT_OURS = [
+  "/api/",
+  "/f/",
+  "/mcp",
+  "/oauth/",
+  "/.well-known/",
+  "/hooks/",
+  "/healthz",
+  "/readyz",
+  "/metrics",
+  "/sw.js",
+];
 /** What the page names without a hash. */
 const SHELL_FILES = ["/theme.js", "/manifest.webmanifest", "/quadit.svg"];
 
@@ -125,7 +136,8 @@ self.addEventListener("notificationclick", (event) => {
       const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
       if (open) {
         await open.focus();
-        if (open.url !== href && "navigate" in open) await open.navigate(href).catch(() => self.clients.openWindow(href));
+        if (open.url !== href && "navigate" in open)
+          await open.navigate(href).catch(() => self.clients.openWindow(href));
         return;
       }
       await self.clients.openWindow(href);

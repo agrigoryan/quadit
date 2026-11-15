@@ -45,7 +45,10 @@ export function SecretForm({ secret, onClose }: Props) {
           id: m.user_id,
           label: m.name,
           icon: <Avatar member={m} size="xs" />,
-          hint: listening(m) === undefined ? `@${m.handle}` : `@${m.handle} · ${listening(m) ? t("agents.choice.listening") : t("agents.choice.notListening")}`,
+          hint:
+            listening(m) === undefined
+              ? `@${m.handle}`
+              : `@${m.handle} · ${listening(m) ? t("agents.choice.listening") : t("agents.choice.notListening")}`,
           keywords: m.handle,
         })),
     [members, agents, listening],
@@ -57,7 +60,8 @@ export function SecretForm({ secret, onClose }: Props) {
     const trimmed = name.trim();
     if (!secret) {
       if (!validName(trimmed)) return errors.set("name", t("secrets.nameInvalid"));
-      if (existing.some((s) => s.name === trimmed)) return errors.set("name", t("secrets.nameTaken", { name: trimmed }));
+      if (existing.some((s) => s.name === trimmed))
+        return errors.set("name", t("secrets.nameTaken", { name: trimmed }));
       if (!value) return errors.set("value", t("secrets.valueMissing"));
     }
     // A host typed and not yet entered counts.
@@ -66,7 +70,14 @@ export function SecretForm({ secret, onClose }: Props) {
     setHosts(all.hosts);
     setHostDraft("");
     await run(async () => {
-      await setSecret({ name: secret?.name ?? trimmed, value: value || undefined, description: description.trim(), hosts: all.hosts, agents, env });
+      await setSecret({
+        name: secret?.name ?? trimmed,
+        value: value || undefined,
+        description: description.trim(),
+        hosts: all.hosts,
+        agents,
+        env,
+      });
       onClose();
     });
   }
@@ -87,7 +98,12 @@ export function SecretForm({ secret, onClose }: Props) {
       }
     >
       <form id="secret-form" onSubmit={submit} className="flex flex-col gap-3.5" noValidate autoComplete="off">
-        <FormField label={t("secrets.name")} htmlFor="sec-name" error={errors.fields.name} hint={secret ? t("secrets.nameFixed") : t("secrets.nameHint")}>
+        <FormField
+          label={t("secrets.name")}
+          htmlFor="sec-name"
+          error={errors.fields.name}
+          hint={secret ? t("secrets.nameFixed") : t("secrets.nameHint")}
+        >
           <Input
             id="sec-name"
             value={name}
@@ -105,7 +121,12 @@ export function SecretForm({ secret, onClose }: Props) {
           />
         </FormField>
 
-        <FormField label={t("secrets.value")} htmlFor="sec-value" error={errors.fields.value} hint={secret ? t("secrets.valueKeepHint") : undefined}>
+        <FormField
+          label={t("secrets.value")}
+          htmlFor="sec-value"
+          error={errors.fields.value}
+          hint={secret ? t("secrets.valueKeepHint") : undefined}
+        >
           <div className="relative">
             <Input
               id="sec-value"
@@ -138,10 +159,20 @@ export function SecretForm({ secret, onClose }: Props) {
         </FormField>
 
         <FormField label={t("secrets.description")} htmlFor="sec-description">
-          <Input id="sec-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("secrets.descriptionPlaceholder")} />
+          <Input
+            id="sec-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={t("secrets.descriptionPlaceholder")}
+          />
         </FormField>
 
-        <FormField label={t("secrets.hosts")} htmlFor="sec-hosts" error={errors.fields.hosts} hint={t("secrets.hostsHint")}>
+        <FormField
+          label={t("secrets.hosts")}
+          htmlFor="sec-hosts"
+          error={errors.fields.hosts}
+          hint={t("secrets.hostsHint")}
+        >
           <HostInput
             id="sec-hosts"
             value={hosts}

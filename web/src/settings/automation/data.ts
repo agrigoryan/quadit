@@ -152,7 +152,9 @@ export async function listWebhooks(slug: string): Promise<WebhookRow[]> {
   return Promise.all(
     hooks.map(async (hook) => {
       // Without its log a webhook still shows, with what its own record says.
-      const log = await listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=1`).catch((): Delivery[] => []);
+      const log = await listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=1`).catch(
+        (): Delivery[] => [],
+      );
       return { ...hook, newest: log[0] };
     }),
   );
@@ -165,15 +167,18 @@ export const isTest = (d: Delivery) => d.seq < 0;
 export function lastSent(hook: WebhookRow): { at: number; result: string; failed: boolean; test: boolean } | undefined {
   const d = hook.newest;
   const at = d && d.attempts > 0 ? d.done_at || d.created_at : 0;
-  if (d && at > (hook.last_at ?? 0)) return { at, result: d.error || String(d.status_code ?? ""), failed: d.state !== "ok", test: isTest(d) };
+  if (d && at > (hook.last_at ?? 0))
+    return { at, result: d.error || String(d.status_code ?? ""), failed: d.state !== "ok", test: isTest(d) };
   if (!hook.last_at) return undefined;
   return { at: hook.last_at, result: hook.last_status ?? "", failed: hook.failures > 0, test: false };
 }
 
-export const listSources = (slug: string) => api.get<{ sources: Source[] }>(ws(slug, "/sources")).then((r) => r.sources ?? []);
+export const listSources = (slug: string) =>
+  api.get<{ sources: Source[] }>(ws(slug, "/sources")).then((r) => r.sources ?? []);
 
 /** Sends one named change. A refusal is thrown for the form to show; no toast. */
-export const change = (type: string, args: Record<string, unknown>) => mutate({ type, args }, undefined, { quiet: true });
+export const change = (type: string, args: Record<string, unknown>) =>
+  mutate({ type, args }, undefined, { quiet: true });
 
 /** A signing secret made in the browser, so it can be shown once: 32 random bytes as base64url. */
 export function randomSecret(): string {

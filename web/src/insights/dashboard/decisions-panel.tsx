@@ -27,7 +27,10 @@ function Row({ decision }: { decision: DecisionView }) {
   return (
     <li className="relative flex gap-2 border-b border-line/70 px-4 py-2 text-sm hover:bg-hover">
       <div className="min-w-0 flex-1">
-        <Link {...link} className="block truncate font-medium outline-none after:absolute after:inset-0 after:content-['']">
+        <Link
+          {...link}
+          className="block truncate font-medium outline-none after:absolute after:inset-0 after:content-['']"
+        >
           {decision.question}
         </Link>
         <p className="truncate text-ink-2">{answerOf(decision)}</p>
@@ -36,7 +39,11 @@ function Row({ decision }: { decision: DecisionView }) {
       <div className="flex shrink-0 items-start gap-2 pt-0.5">
         <span className="flex gap-2 text-xs text-ink-3 tnum">
           <span>{decision.task}</span>
-          {at > 0 && <span title={exact(at)}><Ago ms={at} /></span>}
+          {at > 0 && (
+            <span title={exact(at)}>
+              <Ago ms={at} />
+            </span>
+          )}
         </span>
         <Avatar member={by} size="sm" />
       </div>
@@ -67,7 +74,10 @@ export function DecisionsPanel({ decisions, preferences, className }: Props) {
     <Panel
       title={t("dash.decisions")}
       action={
-        <Link to={`/${slug}/decisions`} className="text-xs font-medium text-accent-text underline-offset-2 hover:underline">
+        <Link
+          to={`/${slug}/decisions`}
+          className="text-xs font-medium text-accent-text underline-offset-2 hover:underline"
+        >
           {t("dash.decisions.all")}
         </Link>
       }

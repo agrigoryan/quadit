@@ -143,7 +143,9 @@ export interface Preferences {
 export function usePreferences(): Preferences {
   const rows = useCollection("preferences");
   return useMemo(() => {
-    const all = (Object.values(rows) as unknown as Preference[]).filter((p) => !p.deleted_at).sort((a, b) => b.created_at - a.created_at);
+    const all = (Object.values(rows) as unknown as Preference[])
+      .filter((p) => !p.deleted_at)
+      .sort((a, b) => b.created_at - a.created_at);
     const byDecision: Dict<Preference> = {};
     for (const p of all) if (p.decision_id && !p.retired_at) byDecision[p.decision_id] ??= p;
     return { active: all.filter((p) => !p.retired_at), retired: all.filter((p) => p.retired_at), byDecision };

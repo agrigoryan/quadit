@@ -64,7 +64,10 @@ export function PageHeader({ doc }: { doc: Doc }) {
         {path.slice(-3).map((p) => (
           <Fragment key={p.id}>
             <ChevronRight className="size-3.5 shrink-0 text-ink-3 max-lg:hidden" />
-            <Link to={`${base}/${p.id}`} className="max-w-40 truncate rounded-sm px-1 hover:bg-hover hover:text-ink max-lg:hidden">
+            <Link
+              to={`${base}/${p.id}`}
+              className="max-w-40 truncate rounded-sm px-1 hover:bg-hover hover:text-ink max-lg:hidden"
+            >
               {docTitle(p)}
             </Link>
           </Fragment>
@@ -72,17 +75,29 @@ export function PageHeader({ doc }: { doc: Doc }) {
         <ChevronRight className="size-3.5 shrink-0 text-ink-3 max-lg:hidden" />
         <span className="min-w-0 truncate px-1 font-medium text-ink">{docTitle(doc)}</span>
         {saving && (
-          <span className={cx("ml-1 shrink-0 text-xs", saving === "saving" ? "text-ink-2" : "text-ink-3")} aria-live="polite">
+          <span
+            className={cx("ml-1 shrink-0 text-xs", saving === "saving" ? "text-ink-2" : "text-ink-3")}
+            aria-live="polite"
+          >
             {t(saving === "saving" ? "docs.header.saving" : "docs.header.saved")}
           </span>
         )}
       </nav>
 
       {others.length > 0 && (
-        <div className="flex shrink-0 items-center -space-x-1" aria-label={t("docs.header.others", { n: others.length })}>
+        <div
+          className="flex shrink-0 items-center -space-x-1"
+          aria-label={t("docs.header.others", { n: others.length })}
+        >
           {others.slice(0, 4).map((o) => (
-            <Tooltip key={o.user_id} label={t("docs.header.here", { name: members[o.user_id]?.name ?? t("common.someone") })}>
-              <span className="rounded-full bg-surface p-px ring-2" style={{ "--tw-ring-color": tintOf(o.user_id) } as React.CSSProperties}>
+            <Tooltip
+              key={o.user_id}
+              label={t("docs.header.here", { name: members[o.user_id]?.name ?? t("common.someone") })}
+            >
+              <span
+                className="rounded-full bg-surface p-px ring-2"
+                style={{ "--tw-ring-color": tintOf(o.user_id) } as React.CSSProperties}
+              >
                 <Avatar member={members[o.user_id]} size="sm" />
               </span>
             </Tooltip>
@@ -91,10 +106,19 @@ export function PageHeader({ doc }: { doc: Doc }) {
         </div>
       )}
 
-      <Button variant="ghost" aria-pressed={commentsOpen} onClick={pageUi.toggleComments} className={cx("gap-1 px-2", commentsOpen && "bg-hover text-ink")}>
+      <Button
+        variant="ghost"
+        aria-pressed={commentsOpen}
+        onClick={pageUi.toggleComments}
+        className={cx("gap-1 px-2", commentsOpen && "bg-hover text-ink")}
+      >
         <MessageSquare className="size-4" />
         <span className="max-sm:hidden">{t("docs.comment.title")}</span>
-        {threads.total > 0 && <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-move px-1 text-2xs font-semibold text-move-ink tnum">{threads.total}</span>}
+        {threads.total > 0 && (
+          <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-move px-1 text-2xs font-semibold text-move-ink tnum">
+            {threads.total}
+          </span>
+        )}
       </Button>
       {doc.kind !== "row" && !doc.memory_of && <ProjectField doc={doc} />}
       {doc.kind !== "row" && !doc.memory_of && <SharePopover doc={doc} />}

@@ -39,7 +39,9 @@ export function addDraftFiles(taskId: string, files: File[]) {
     void uploadOrToast(file).then((row) =>
       editDraft(taskId, (d) => ({
         ...d,
-        files: row ? d.files.map((f) => (f.key === key ? { ...f, file: row } : f)) : d.files.filter((f) => f.key !== key),
+        files: row
+          ? d.files.map((f) => (f.key === key ? { ...f, file: row } : f))
+          : d.files.filter((f) => f.key !== key),
       })),
     );
   }
@@ -96,9 +98,13 @@ export function createComment({ task, body, parentId, files = [], handTo }: NewC
 }
 
 export function updateComment(comment: Comment, body: string) {
-  send({ type: "comment.update", args: { id: comment.id, body } }, (tx) => tx.patch("comments", comment.id, { body, edited_at: Date.now() }));
+  send({ type: "comment.update", args: { id: comment.id, body } }, (tx) =>
+    tx.patch("comments", comment.id, { body, edited_at: Date.now() }),
+  );
 }
 
 export function deleteComment(comment: Comment) {
-  send({ type: "comment.delete", args: { id: comment.id } }, (tx) => tx.patch("comments", comment.id, { deleted_at: Date.now() }));
+  send({ type: "comment.delete", args: { id: comment.id } }, (tx) =>
+    tx.patch("comments", comment.id, { deleted_at: Date.now() }),
+  );
 }

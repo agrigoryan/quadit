@@ -50,7 +50,14 @@ function RelationConfig({ prop, save }: { prop: DBProperty; save: (c: PropConfig
   );
   return (
     <Labeled label={t("db.relation.database")}>
-      <Select label={t("db.relation.database")} placeholder={t("db.relation.pick")} items={items} value={prop.config?.database} onPick={(database) => save({ database })} buttonProps={wide} />
+      <Select
+        label={t("db.relation.database")}
+        placeholder={t("db.relation.pick")}
+        items={items}
+        value={prop.config?.database}
+        onPick={(database) => save({ database })}
+        buttonProps={wide}
+      />
     </Labeled>
   );
 }
@@ -80,14 +87,23 @@ function RollupConfig({ prop, save }: { prop: DBProperty; save: (c: PropConfig) 
       <Labeled label={t("db.rollup.target")}>
         <Select
           label={t("db.rollup.target")}
-          items={[{ id: "", label: t("db.title") }, ...theirs.map((p) => ({ id: p.id, label: p.name, icon: <PropIcon type={p.type} /> }))]}
+          items={[
+            { id: "", label: t("db.title") },
+            ...theirs.map((p) => ({ id: p.id, label: p.name, icon: <PropIcon type={p.type} /> })),
+          ]}
           value={target?.id ?? ""}
           onPick={(target) => save({ ...cfg, target: target || undefined })}
           buttonProps={wide}
         />
       </Labeled>
       <Labeled label={t("db.rollup.fn")}>
-        <Select label={t("db.rollup.fn")} items={ROLLUP_FNS.map((fn) => ({ id: fn, label: rollupName(fn) }))} value={cfg.fn || "count"} onPick={(fn) => save({ ...cfg, fn })} buttonProps={wide} />
+        <Select
+          label={t("db.rollup.fn")}
+          items={ROLLUP_FNS.map((fn) => ({ id: fn, label: rollupName(fn) }))}
+          value={cfg.fn || "count"}
+          onPick={(fn) => save({ ...cfg, fn })}
+          buttonProps={wide}
+        />
       </Labeled>
     </>
   );
@@ -124,7 +140,11 @@ function PropertyEditor({ prop, view, onClose, onFormula }: EditorProps) {
       <Labeled label={t("db.prop.type")}>
         <Select
           label={t("db.prop.type")}
-          items={PROPERTY_TYPES.map((type) => ({ id: type, label: propTypeName(type), icon: <PropIcon type={type} /> }))}
+          items={PROPERTY_TYPES.map((type) => ({
+            id: type,
+            label: propTypeName(type),
+            icon: <PropIcon type={type} />,
+          }))}
           value={prop.type}
           onPick={(type) => type !== prop.type && updateProperty(prop.id, { type: type as PropertyType })}
           buttonProps={wide}
@@ -135,7 +155,11 @@ function PropertyEditor({ prop, view, onClose, onFormula }: EditorProps) {
       {prop.type === "rollup" && <RollupConfig prop={prop} save={save} />}
       {prop.type === "formula" && (
         <div className="flex flex-col gap-1.5">
-          {prop.config?.formula && <code className="max-h-20 overflow-hidden rounded-sm bg-sunken px-2 py-1 font-mono text-xs break-words text-ink-2">{prop.config.formula}</code>}
+          {prop.config?.formula && (
+            <code className="max-h-20 overflow-hidden rounded-sm bg-sunken px-2 py-1 font-mono text-xs break-words text-ink-2">
+              {prop.config.formula}
+            </code>
+          )}
           <Button onClick={onFormula}>
             <Sigma className="size-3.5" aria-hidden />
             {t("db.formula.edit")}
@@ -189,7 +213,12 @@ export function PropertyPopover({ prop, view, open, onOpenChange, children }: Po
       <Popover open={open && !formula} onOpenChange={onOpenChange}>
         <PopoverTrigger asChild>{children}</PopoverTrigger>
         <PopoverContent className="p-0">
-          <PropertyEditor prop={prop} view={view} onClose={() => onOpenChange(false)} onFormula={() => setFormula(true)} />
+          <PropertyEditor
+            prop={prop}
+            view={view}
+            onClose={() => onOpenChange(false)}
+            onFormula={() => setFormula(true)}
+          />
         </PopoverContent>
       </Popover>
       {formula && (

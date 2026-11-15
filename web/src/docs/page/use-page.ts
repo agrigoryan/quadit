@@ -3,7 +3,10 @@ import { ApiError, errorMessage } from "@/lib/api";
 import { forgetIfUnshared, loadPage } from "@/docs/store";
 import type { BlockRow } from "@/docs/types";
 
-export type PageState = { status: "loading" } | { status: "error"; error: string; missing: boolean } | { status: "ready"; blocks: BlockRow[]; seq: number };
+export type PageState =
+  | { status: "loading" }
+  | { status: "error"; error: string; missing: boolean }
+  | { status: "ready"; blocks: BlockRow[]; seq: number };
 
 /** Fetches a page's blocks and what surrounds it (see docs/store.ts) when it is opened. */
 export function usePage(docId: string): PageState {

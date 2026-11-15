@@ -76,7 +76,11 @@ function open(): Promise<IDBDatabase | null> {
 }
 
 /** Runs one transaction; resolves with its result, or with `fallback` if the browser would not. */
-async function run<T>(mode: IDBTransactionMode, work: (store: IDBObjectStore) => IDBRequest<T> | void, fallback: T): Promise<T> {
+async function run<T>(
+  mode: IDBTransactionMode,
+  work: (store: IDBObjectStore) => IDBRequest<T> | void,
+  fallback: T,
+): Promise<T> {
   const db = await open();
   if (!db) return fallback;
   return new Promise((resolve) => {
@@ -108,7 +112,12 @@ async function livingTabs(): Promise<Set<string> | null> {
   try {
     const { held = [] } = await navigator.locks.query();
     const prefix = tabLock("");
-    return new Set(held.map((l) => l.name ?? "").filter((n) => n.startsWith(prefix)).map((n) => n.slice(prefix.length)));
+    return new Set(
+      held
+        .map((l) => l.name ?? "")
+        .filter((n) => n.startsWith(prefix))
+        .map((n) => n.slice(prefix.length)),
+    );
   } catch {
     return null;
   }
@@ -122,7 +131,8 @@ async function takeOver(slug: string, user: string): Promise<OutboxItem[]> {
   const stale: string[] = [];
   for (const item of items) {
     if (now - item.at > KEEP_MS) stale.push(item.key);
-    else if (item.slug === slug && item.user === user && item.tab !== TAB && !living?.has(item.tab)) mine.push({ ...item, tab: TAB });
+    else if (item.slug === slug && item.user === user && item.tab !== TAB && !living?.has(item.tab))
+      mine.push({ ...item, tab: TAB });
   }
   if (mine.length || stale.length) {
     await run<undefined>(

@@ -44,7 +44,9 @@ function Row({ epic, showProject }: { epic: EpicProgress; showProject: boolean }
         <span className="shrink-0 text-xs text-ink-2 tnum">
           {t("dash.epics.count", { done: epic.done, total: epic.total })}
           {!!epic.points && (
-            <span className="text-ink-3">{t("dash.epics.points", { done: epic.points_done ?? 0, total: epic.points })}</span>
+            <span className="text-ink-3">
+              {t("dash.epics.points", { done: epic.points_done ?? 0, total: epic.points })}
+            </span>
           )}
         </span>
       </div>
@@ -58,12 +60,24 @@ function Row({ epic, showProject }: { epic: EpicProgress; showProject: boolean }
   );
 }
 
-export function EpicsPanel({ epics, showProject, className }: { epics: EpicProgress[]; showProject: boolean; className?: string }) {
+export function EpicsPanel({
+  epics,
+  showProject,
+  className,
+}: {
+  epics: EpicProgress[];
+  showProject: boolean;
+  className?: string;
+}) {
   const atRisk = epics.filter((e) => e.at_risk).length;
   return (
     <Panel
       title={t("nav.epics")}
-      meta={atRisk > 0 ? <span className="text-xs font-medium text-wait">{t("dash.epics.riskCount", { n: atRisk })}</span> : undefined}
+      meta={
+        atRisk > 0 ? (
+          <span className="text-xs font-medium text-wait">{t("dash.epics.riskCount", { n: atRisk })}</span>
+        ) : undefined
+      }
       className={className}
       flush
     >

@@ -81,8 +81,19 @@ export function Properties({ task, side }: Props) {
   const taskLabels = (task.label_ids ?? []).map((id) => labels[id]).filter((l) => l !== undefined);
 
   return (
-    <section aria-label={t("detail.properties")} className={cx("border-t border-line px-4 py-2.5 md:px-6", side && "lg:sticky lg:top-0 lg:border-t-0 lg:px-5 lg:pt-6")}>
-      <dl className={cx("grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2", side && "lg:grid-cols-1 lg:gap-y-1 lg:[&>*]:col-span-1")}>
+    <section
+      aria-label={t("detail.properties")}
+      className={cx(
+        "border-t border-line px-4 py-2.5 md:px-6",
+        side && "lg:sticky lg:top-0 lg:border-t-0 lg:px-5 lg:pt-6",
+      )}
+    >
+      <dl
+        className={cx(
+          "grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2",
+          side && "lg:grid-cols-1 lg:gap-y-1 lg:[&>*]:col-span-1",
+        )}
+      >
         <PropRow label={t("prop.status")}>
           <TaskPropertyPicker {...picker("status")}>
             <PropButton {...trigger("status")} aria-label={`${t("prop.status")}: ${status?.name ?? ""}`}>
@@ -94,7 +105,11 @@ export function Properties({ task, side }: Props) {
 
         <PropRow label={t("prop.assignee")}>
           <TaskPropertyPicker {...picker("assignee")}>
-            <PropButton {...trigger("assignee")} empty={!assignee} aria-label={`${t("prop.assignee")}: ${assignee ? assignee.name : t("task.unassigned")}`}>
+            <PropButton
+              {...trigger("assignee")}
+              empty={!assignee}
+              aria-label={`${t("prop.assignee")}: ${assignee ? assignee.name : t("task.unassigned")}`}
+            >
               <Avatar member={assignee} size="xs" />
               <span className="truncate">{assignee ? assignee.name : t("task.unassigned")}</span>
             </PropButton>
@@ -104,7 +119,10 @@ export function Properties({ task, side }: Props) {
         {askedBy && assignee?.kind === "agent" && (
           <PropRow label={t("prop.workingFor")} wide>
             <Tooltip label={t("prop.workingForHint", { name: askedBy.name })}>
-              <span tabIndex={0} className="flex h-7 min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-md text-sm text-ink-2 max-md:h-9">
+              <span
+                tabIndex={0}
+                className="flex h-7 min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-md text-sm text-ink-2 max-md:h-9"
+              >
                 <Avatar member={askedBy} size="xs" />
                 <span className="truncate">{askedBy.name}</span>
               </span>
@@ -146,7 +164,11 @@ export function Properties({ task, side }: Props) {
 
         <PropRow label={t("prop.priority")}>
           <TaskPropertyPicker {...picker("priority")}>
-            <PropButton {...trigger("priority")} empty={!task.priority} aria-label={`${t("prop.priority")}: ${t(`priority.${task.priority}` as "priority.0")}`}>
+            <PropButton
+              {...trigger("priority")}
+              empty={!task.priority}
+              aria-label={`${t("prop.priority")}: ${t(`priority.${task.priority}` as "priority.0")}`}
+            >
               <PriorityIcon priority={task.priority} title="" />
               <span className="truncate">{t(`priority.${task.priority}` as "priority.0")}</span>
             </PropButton>
@@ -170,7 +192,11 @@ export function Properties({ task, side }: Props) {
 
         <PropRow label={t("prop.epic")}>
           <TaskPropertyPicker kind="epic" tasks={[task]}>
-            <PropButton empty={!epic} disabled={readOnly} aria-label={`${t("prop.epic")}: ${epic ? epic.name : t("task.noEpic")}`}>
+            <PropButton
+              empty={!epic}
+              disabled={readOnly}
+              aria-label={`${t("prop.epic")}: ${epic ? epic.name : t("task.noEpic")}`}
+            >
               <Layers className="size-3.5 shrink-0 text-ink-3" aria-hidden />
               <span className="truncate">{epic ? epic.name : t("task.noEpic")}</span>
             </PropButton>
@@ -180,7 +206,11 @@ export function Properties({ task, side }: Props) {
         {task.epic_id && (
           <PropRow label={t("prop.milestone")}>
             <TaskPropertyPicker kind="milestone" tasks={[task]}>
-              <PropButton empty={!milestone} disabled={readOnly} aria-label={`${t("prop.milestone")}: ${milestone ? milestone.name : t("task.noMilestone")}`}>
+              <PropButton
+                empty={!milestone}
+                disabled={readOnly}
+                aria-label={`${t("prop.milestone")}: ${milestone ? milestone.name : t("task.noMilestone")}`}
+              >
                 <Target className="size-3.5 shrink-0 text-ink-3" aria-hidden />
                 <span className="truncate">{milestone ? milestone.name : t("task.noMilestone")}</span>
               </PropButton>

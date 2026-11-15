@@ -74,7 +74,8 @@ export const decisions = {
   "decision.edit.reason": "Why this one",
   "decision.delete": "Delete question",
   "decision.delete.title": "Delete this question?",
-  "decision.delete.description": "It moves to the trash with its options and their comments, and can be restored from there.",
+  "decision.delete.description":
+    "It moves to the trash with its options and their comments, and can be restored from there.",
 
   "decision.changes.title": "Pick “{label}” with changes",
   "decision.changes.label": "What should change?",
@@ -125,7 +126,8 @@ export const decisions = {
   "decision.new.kind": "Answered with",
   "decision.new.choice": "One of several options",
   "decision.new.approval": "Approve or decline",
-  "decision.new.approvalHint": "An approval has no options: it is answered “Approve” or “Decline”, with an optional note.",
+  "decision.new.approvalHint":
+    "An approval has no options: it is answered “Approve” or “Decline”, with an optional note.",
   "decision.new.ask": "Who should answer",
   "decision.new.anyone": "Anyone",
   "decision.new.options": "Options",

@@ -2,7 +2,19 @@
 // lives, and what can be done to it as a whole (watch, copy its link, move
 // it to the trash, open it as a page, close or go back).
 
-import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff, Link2, Maximize2, MoreHorizontal, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Link2,
+  Maximize2,
+  MoreHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { copyText } from "@/lib/files";
@@ -30,7 +42,8 @@ interface Props {
 
 function setWatching(task: Task, userId: string, watching: boolean) {
   send({ type: "watch.set", args: { subject: task.id, watching } }, (tx) => {
-    if (watching) tx.insert("watchers", { user_id: userId, subject_type: "task", subject_id: task.id, created_at: Date.now() });
+    if (watching)
+      tx.insert("watchers", { user_id: userId, subject_type: "task", subject_id: task.id, created_at: Date.now() });
     else tx.remove("watchers", `${userId}:${task.id}`);
   });
 }
@@ -49,7 +62,12 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }:
   }
 
   return (
-    <header className={cx("flex h-11 shrink-0 items-center gap-1 border-b border-line pr-2 max-md:h-12 max-md:pl-1", page ? "md:pl-2" : "md:pl-4")}>
+    <header
+      className={cx(
+        "flex h-11 shrink-0 items-center gap-1 border-b border-line pr-2 max-md:h-12 max-md:pl-1",
+        page ? "md:pl-2" : "md:pl-4",
+      )}
+    >
       {/* On a phone the task covers the screen: the way out is an arrow. The page has it at every width. */}
       <IconButton label={t("common.back")} size="lg" className="md:hidden" onClick={onClose}>
         <ArrowLeft className="size-5" />
@@ -125,13 +143,27 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }:
 function QueueSteps({ queue }: { queue: QueuePlace }) {
   return (
     <span className="ml-3 flex shrink-0 items-center gap-0.5 border-l border-line pl-2">
-      <IconButton size="sm" label={t("detail.prevTask")} hint="K" disabled={queue.at === 0} onClick={() => queue.step(-1)}>
+      <IconButton
+        size="sm"
+        label={t("detail.prevTask")}
+        hint="K"
+        disabled={queue.at === 0}
+        onClick={() => queue.step(-1)}
+      >
         <ChevronUp className="size-3.5" />
       </IconButton>
-      <IconButton size="sm" label={t("detail.nextTask")} hint="J" disabled={queue.at >= queue.total - 1} onClick={() => queue.step(1)}>
+      <IconButton
+        size="sm"
+        label={t("detail.nextTask")}
+        hint="J"
+        disabled={queue.at >= queue.total - 1}
+        onClick={() => queue.step(1)}
+      >
         <ChevronDown className="size-3.5" />
       </IconButton>
-      <span className="ml-1 text-xs text-ink-3 tnum">{t("detail.queue", { at: queue.at + 1, total: queue.total })}</span>
+      <span className="ml-1 text-xs text-ink-3 tnum">
+        {t("detail.queue", { at: queue.at + 1, total: queue.total })}
+      </span>
     </span>
   );
 }
@@ -139,7 +171,10 @@ function QueueSteps({ queue }: { queue: QueuePlace }) {
 /** Shown under the header while the task is in the trash. */
 export function TrashBanner({ task }: { task: Task }) {
   return (
-    <div role="status" className="flex shrink-0 items-center gap-2 border-b border-line bg-danger-soft px-4 py-2 text-sm text-danger md:px-6">
+    <div
+      role="status"
+      className="flex shrink-0 items-center gap-2 border-b border-line bg-danger-soft px-4 py-2 text-sm text-danger md:px-6"
+    >
       <Trash2 className="size-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">{t("detail.inTrash")}</span>
       <Button size="sm" onClick={() => restoreTasks([task])}>

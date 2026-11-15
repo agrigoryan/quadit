@@ -6,7 +6,8 @@ export const automationMoreStrings = {
   "auto.rule.new": "New rule",
   "auto.rule.edit": "Edit rule",
   "auto.rule.create": "Create rule",
-  "auto.rule.empty": "No rules yet. A rule reads like: when a question is answered by a person, then notify @coordinator.",
+  "auto.rule.empty":
+    "No rules yet. A rule reads like: when a question is answered by a person, then notify @coordinator.",
   "auto.rule.namePlaceholder": "Tell the coordinator when a review is done",
   "auto.rule.whenTitle": "When",
   "auto.rule.thenTitle": "Then",
@@ -64,14 +65,16 @@ export const automationMoreStrings = {
   "auto.gh.newLead": "Pull requests in this repository are linked to the tasks they name.",
   "auto.gh.edit": "Edit GitHub integration",
   "auto.gh.create": "Connect",
-  "auto.gh.empty": "No repository is connected. Connect one to see pull requests and their checks on tasks, and to move tasks when a pull request opens or merges.",
+  "auto.gh.empty":
+    "No repository is connected. Connect one to see pull requests and their checks on tasks, and to move tasks when a pull request opens or merges.",
   "auto.gh.unnamed": "GitHub",
   "auto.gh.repo": "Repository",
   "auto.gh.repoHint": "As owner/name.",
   "auto.gh.repoInvalid": "Give the repository as owner/name",
   "auto.gh.nameHint": "Left empty, the repository's name is used.",
   "auto.gh.token": "Access token",
-  "auto.gh.tokenHint": "A GitHub token that can read pull requests and checks (and write comments, to comment back). Stored encrypted and never shown again. A public repository can be read without one.",
+  "auto.gh.tokenHint":
+    "A GitHub token that can read pull requests and checks (and write comments, to comment back). Stored encrypted and never shown again. A public repository can be read without one.",
   "auto.gh.tokenKept": "A token is stored. Leave this empty to keep it, or enter a new one to replace it.",
   "auto.gh.noToken": "No token",
   "auto.gh.projectHint": "Pick one to link only that project's tasks.",
@@ -86,7 +89,8 @@ export const automationMoreStrings = {
   "auto.gh.commentBackHint": "Post a link to the task on the pull request, once. Needs a token that may comment.",
   "auto.gh.commentsBack": "Comments back",
   "auto.gh.issues": "Issues as tasks",
-  "auto.gh.issuesLead": "Issues carrying a label become tasks here and stay in step: the title, the text, and whether it is closed.",
+  "auto.gh.issuesLead":
+    "Issues carrying a label become tasks here and stay in step: the title, the text, and whether it is closed.",
   "auto.gh.issuesLabel": "Label",
   "auto.gh.issuesLabelHint": "Issues with this label become tasks. Use * for every issue; leave empty to make none.",
   "auto.gh.issuesProject": "Project for those tasks",
@@ -101,12 +105,14 @@ export const automationMoreStrings = {
   "auto.gh.activeFor": "{name} is active",
   "auto.gh.synced": "Synced: {n} pull request read. | Synced: {n} pull requests read.",
   "auto.gh.hookTitle": "Webhook for GitHub",
-  "auto.gh.hookLead": "On GitHub, open {repo} → Settings → Webhooks → Add webhook, and paste these in. Changes then arrive at once instead of within a minute.",
+  "auto.gh.hookLead":
+    "On GitHub, open {repo} → Settings → Webhooks → Add webhook, and paste these in. Changes then arrive at once instead of within a minute.",
   "auto.gh.hookUrl": "Payload URL",
   "auto.gh.hookContentType": "Content type",
   "auto.gh.hookSecret": "Secret",
   "auto.gh.hookEvents": "Events to send (“Let me select individual events”)",
-  "auto.gh.hookNote": "The address must be reachable from GitHub. It is built from the address this install was started with (--url).",
+  "auto.gh.hookNote":
+    "The address must be reachable from GitHub. It is built from the address this install was started with (--url).",
   "auto.gh.deleteTitle": "Disconnect {name}?",
   "auto.gh.deleteBody": "Pull requests are no longer read. Links already on tasks stay.",
 
@@ -118,7 +124,8 @@ export const automationMoreStrings = {
   "auto.src.create": "Add",
   "auto.src.empty": "No repository is mirrored. Add one to read and edit a docs folder from git as pages.",
   "auto.src.repo": "Repository",
-  "auto.src.repoHint": "A path on the server, or an address git can clone. The server's own git and its credentials are used.",
+  "auto.src.repoHint":
+    "A path on the server, or an address git can clone. The server's own git and its credentials are used.",
   "auto.src.repoMissing": "Give the repository: a path on the server, or an address git can clone",
   "auto.src.branch": "Branch",
   "auto.src.branchHint": "Left empty, the repository's default branch.",
@@ -147,7 +154,8 @@ export const automationMoreStrings = {
   "auto.src.openPages": "Open pages",
   "auto.src.project": "Project",
   "auto.src.noProject": "none",
-  "auto.src.projectHint": "The project of the root page, which the synced pages under it share. Change it on that page.",
+  "auto.src.projectHint":
+    "The project of the root page, which the synced pages under it share. Change it on that page.",
   "auto.src.result": "Synced at {commit}: {parts}.",
   "auto.src.result.created": "{n} page created | {n} pages created",
   "auto.src.result.updated": "{n} updated",
@@ -155,6 +163,7 @@ export const automationMoreStrings = {
   "auto.src.result.written": "{n} file written | {n} files written",
   "auto.src.result.pushed": "Pushed to {branch}.",
   "auto.src.deleteTitle": "Stop mirroring {name}?",
-  "auto.src.deleteBody": "The pages stay as ordinary pages you can edit; the repository is not touched and is no longer read.",
+  "auto.src.deleteBody":
+    "The pages stay as ordinary pages you can edit; the repository is not touched and is no longer read.",
   "auto.src.deleteConfirm": "Stop mirroring",
 };

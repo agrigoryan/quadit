@@ -5,7 +5,8 @@ export const adminStrings = {
   "admin.title": "Admin",
   "admin.backToWorkspace": "Back to workspace",
   "admin.denied.title": "This is for the people who run the install",
-  "admin.denied.hint": "The admin area holds the install's settings, users and backups. Ask an install admin if you need something changed here.",
+  "admin.denied.hint":
+    "The admin area holds the install's settings, users and backups. Ask an install admin if you need something changed here.",
   "admin.locked": "Set by the environment, which wins. Change it there:",
   "admin.secret.stored": "Stored. Type to replace it",
 
@@ -45,15 +46,18 @@ export const adminStrings = {
     "Nobody will be able to sign in with a password, you included. Make sure you can get in with a passkey or a provider first.",
   "admin.signIn.turnOff": "Turn off",
   "admin.signIn.passkeys": "Passkeys",
-  "admin.signIn.passkeysHint": "Sign in with a fingerprint, a face or a security key. Needs the server to be reached by a name, not an IP address.",
+  "admin.signIn.passkeysHint":
+    "Sign in with a fingerprint, a face or a security key. Needs the server to be reached by a name, not an IP address.",
   "admin.signIn.require2fa": "Require two-step verification",
   "admin.signIn.require2faHint": "Everyone needs a second step: codes from an authenticator app, or a passkey.",
   "admin.signIn.require2faOn": "Require a second step from everyone?",
-  "admin.signIn.require2faOnBody": "People without one will be asked to set it up. Codes can then only be turned off by someone who has a passkey.",
+  "admin.signIn.require2faOnBody":
+    "People without one will be asked to set it up. Codes can then only be turned off by someone who has a passkey.",
   "admin.signIn.require": "Require it",
   "admin.signIn.accounts": "New accounts",
   "admin.signIn.registration": "Open registration",
-  "admin.signIn.registrationHint": "Anyone who finds the sign-in page can make an account. Off, people join by invitation only.",
+  "admin.signIn.registrationHint":
+    "Anyone who finds the sign-in page can make an account. Off, people join by invitation only.",
   "admin.signIn.domains": "Allowed email domains",
   "admin.signIn.domainsLead": "Limits new accounts, by registration or invitation, to addresses at these domains.",
   "admin.signIn.domainsNone": "No limit: an account can use any email address.",
@@ -85,7 +89,8 @@ export const adminStrings = {
   "admin.mail.title": "Mail",
   "admin.mail.lead": "The mail server this install sends through: invitations, password resets and notifications.",
   "admin.mail.server": "Mail server",
-  "admin.mail.notReady": "No mail server is set. Invitations are shared as links, and a forgotten password is reset from the command line.",
+  "admin.mail.notReady":
+    "No mail server is set. Invitations are shared as links, and a forgotten password is reset from the command line.",
   "admin.mail.host": "Host",
   "admin.mail.port": "Port",
   "admin.mail.portBad": "A port is between 1 and 65535",

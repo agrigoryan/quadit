@@ -65,8 +65,10 @@ const row = <T>(ev: FeedEvent) => ev.data.row as unknown as T | undefined;
 /** Where a file was put, if that is something the timeline says: on the task, a question or one of its options. */
 function placeOf(a: Attachment, taskId: string, known: Known): FilePlace | null {
   if (a.subject_type === "task") return a.subject_id === taskId ? { on: "task", id: taskId, name: "" } : null;
-  if (a.subject_type === "decision_option") return { on: "option", id: a.subject_id, name: known.options[a.subject_id] ?? "" };
-  if (a.subject_type === "decision") return { on: "decision", id: a.subject_id, name: known.questions[a.subject_id] ?? "" };
+  if (a.subject_type === "decision_option")
+    return { on: "option", id: a.subject_id, name: known.options[a.subject_id] ?? "" };
+  if (a.subject_type === "decision")
+    return { on: "decision", id: a.subject_id, name: known.questions[a.subject_id] ?? "" };
   // A comment's files are drawn with the comment.
   return null;
 }
@@ -88,7 +90,18 @@ function cameWithTheQuestion(ev: FeedEvent, place: FilePlace, known: Known): boo
 function atomsOf(ev: FeedEvent, taskId: string, known: Known, withDecision: Set<string>): Atom[] {
   const base: Base = { at: ev.at, seq: ev.seq, actorId: ev.actor_id };
   const line = (phrase: string | null, opts: { note?: string; joins?: boolean; quiet?: boolean } = {}): Atom[] =>
-    phrase ? [{ kind: "line", ...base, phrases: [phrase], note: opts.note || undefined, joins: opts.joins ?? false, quiet: opts.quiet }] : [];
+    phrase
+      ? [
+          {
+            kind: "line",
+            ...base,
+            phrases: [phrase],
+            note: opts.note || undefined,
+            joins: opts.joins ?? false,
+            quiet: opts.quiet,
+          },
+        ]
+      : [];
   const files = (list: Attachment[]): Atom[] =>
     list.flatMap((a): Atom[] => {
       const place = placeOf(a, taskId, known);
@@ -112,7 +125,9 @@ function atomsOf(ev: FeedEvent, taskId: string, known: Known, withDecision: Set<
     }
     case "task.related":
       // The relation's own event belongs to the task at the other end; this one is ours.
-      return ev.entity_id === taskId ? line(relatedPhrase(ev.data), { joins: true, quiet: ev.data.removed === true }) : [];
+      return ev.entity_id === taskId
+        ? line(relatedPhrase(ev.data), { joins: true, quiet: ev.data.removed === true })
+        : [];
     case "decision.opened": {
       const d = row<Decision>(ev);
       // Files sent with the question come inside its event.
@@ -128,7 +143,9 @@ function atomsOf(ev: FeedEvent, taskId: string, known: Known, withDecision: Set<
     }
     case "decision.deleted": {
       const question = known.questions[ev.entity_id];
-      return line(question ? t("timeline.questionDeleted", { question }) : t("timeline.questionDeletedAny"), { quiet: true });
+      return line(question ? t("timeline.questionDeleted", { question }) : t("timeline.questionDeletedAny"), {
+        quiet: true,
+      });
     }
     case "attachment.created": {
       const a = row<Attachment>(ev);
@@ -192,10 +209,25 @@ function fold(atoms: Atom[]): Atom[] {
   const out: Atom[] = [];
   for (const atom of atoms) {
     const prev = out[out.length - 1];
-    const near = prev && prev.kind !== "comment" && atom.kind !== "comment" && prev.actorId === atom.actorId && atom.at - prev.at < MERGE_WINDOW;
+    const near =
+      prev &&
+      prev.kind !== "comment" &&
+      atom.kind !== "comment" &&
+      prev.actorId === atom.actorId &&
+      atom.at - prev.at < MERGE_WINDOW;
     if (near && atom.kind === "changes" && prev.kind === "changes") {
-      out[out.length - 1] = { ...prev, changes: mergeChanges(prev.changes, atom.changes), data: { ...prev.data, ...atom.data } };
-    } else if (near && atom.kind === "files" && prev.kind === "files" && prev.place.on === atom.place.on && prev.place.id === atom.place.id) {
+      out[out.length - 1] = {
+        ...prev,
+        changes: mergeChanges(prev.changes, atom.changes),
+        data: { ...prev.data, ...atom.data },
+      };
+    } else if (
+      near &&
+      atom.kind === "files" &&
+      prev.kind === "files" &&
+      prev.place.on === atom.place.on &&
+      prev.place.id === atom.place.id
+    ) {
       out[out.length - 1] = { ...prev, names: [...prev.names, ...atom.names] };
     } else {
       out.push(atom);
@@ -230,12 +262,23 @@ export function buildTimeline(taskId: string, events: FeedEvent[], comments: Dic
       continue;
     }
     const phrases =
-      atom.kind === "changes" ? changePhrases(atom.changes, atom.actorId, atom.data) : atom.kind === "files" ? [filesPhrase(atom.place, atom.names)] : atom.phrases;
+      atom.kind === "changes"
+        ? changePhrases(atom.changes, atom.actorId, atom.data)
+        : atom.kind === "files"
+          ? [filesPhrase(atom.place, atom.names)]
+          : atom.phrases;
     if (phrases.length === 0) continue;
     const joins = atom.kind !== "line" || atom.joins;
     const quiet = atom.kind === "line" && !!atom.quiet;
     const prev = items[items.length - 1];
-    if (joins && prev?.kind === "line" && joinable.has(prev.id) && prev.actorId === atom.actorId && !!prev.quiet === quiet && atom.at - prev.at < MERGE_WINDOW) {
+    if (
+      joins &&
+      prev?.kind === "line" &&
+      joinable.has(prev.id) &&
+      prev.actorId === atom.actorId &&
+      !!prev.quiet === quiet &&
+      atom.at - prev.at < MERGE_WINDOW
+    ) {
       prev.phrases.push(...phrases);
       continue;
     }

@@ -39,7 +39,10 @@ export function PanelEmpty({ children }: { children: ReactNode }) {
 export function PageBar({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <header
-      className={cx("flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-1.5 pr-2 pl-4", className)}
+      className={cx(
+        "flex min-h-11 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-1.5 pr-2 pl-4",
+        className,
+      )}
     >
       {children}
     </header>

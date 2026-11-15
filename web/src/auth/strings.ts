@@ -12,10 +12,12 @@ export const authStrings = {
   "auth.signIn.forgot": "Forgot your password?",
   "auth.signIn.new": "New here?",
   "auth.signIn.register": "Create an account",
-  "auth.signIn.noWay": "Every way of signing in is turned off on this install. Whoever runs it can turn one back on from the server.",
+  "auth.signIn.noWay":
+    "Every way of signing in is turned off on this install. Whoever runs it can turn one back on from the server.",
 
   "auth.second.lead": "Enter the six-digit code from your authenticator app.",
-  "auth.second.recoveryLead": "Enter one of the recovery codes you saved when you turned on two-step verification. Each works once.",
+  "auth.second.recoveryLead":
+    "Enter one of the recovery codes you saved when you turned on two-step verification. Each works once.",
   "auth.second.code": "Code",
   "auth.second.recovery": "Recovery code",
   "auth.second.recoveryHint": "Ten letters and digits, with a dash in the middle.",
@@ -49,7 +51,8 @@ export const authStrings = {
   "auth.register.busy": "Creating…",
   "auth.register.have": "Already have an account?",
   "auth.register.closedTitle": "Registration is closed",
-  "auth.register.closed": "People join this install by invitation. Ask someone in the workspace to invite you; the link they send lets you make an account.",
+  "auth.register.closed":
+    "People join this install by invitation. Ask someone in the workspace to invite you; the link they send lets you make an account.",
 
   "auth.invite.title": "Join {workspace}",
   "auth.invite.lead": "{who} invited you as {role}.",
@@ -74,8 +77,10 @@ export const authStrings = {
   "auth.workspace.nameNeeded": "Give the workspace a name",
   "auth.noWorkspace.title": "You are not in a workspace yet",
   "auth.noWorkspace.lead": "Work happens in a workspace: a team's projects, people and agents.",
-  "auth.noWorkspace.invite": "To join an existing workspace, ask someone in it for an invitation and open the link they send.",
-  "auth.noWorkspace.inviteOnly": "Workspaces on this install are made by its admins. To join one, ask someone in it for an invitation and open the link they send.",
+  "auth.noWorkspace.invite":
+    "To join an existing workspace, ask someone in it for an invitation and open the link they send.",
+  "auth.noWorkspace.inviteOnly":
+    "Workspaces on this install are made by its admins. To join one, ask someone in it for an invitation and open the link they send.",
   "auth.noWorkspace.signedInAs": "Signed in as {email}.",
 
   "auth.firstRun.title": "Create your first project",
@@ -88,6 +93,7 @@ export const authStrings = {
   "auth.account.title": "Two-step verification",
   "auth.account.lead": "A second step when you sign in: a code from an authenticator app, or a passkey.",
   "auth.account.back": "Back to Quadit",
-  "auth.account.required": "This install asks everyone for a second step. Set up an authenticator app or add a passkey here; your workspaces open once one is in place.",
+  "auth.account.required":
+    "This install asks everyone for a second step. Set up an authenticator app or add a passkey here; your workspaces open once one is in place.",
   "auth.account.ready": "You have a second step. Your workspaces are open.",
 };

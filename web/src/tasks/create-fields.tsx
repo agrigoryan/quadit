@@ -75,7 +75,9 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
 
   const parentItems: PickerItem[] = [
     { id: NONE, label: t("task.noParent"), icon: noneIcon },
-    ...tasks.filter((task) => task.project_id === project.id).map((task) => ({ id: task.id, label: task.title, hint: task.key, keywords: task.key })),
+    ...tasks
+      .filter((task) => task.project_id === project.id)
+      .map((task) => ({ id: task.id, label: task.title, hint: task.key, keywords: task.key })),
   ];
 
   return (
@@ -99,11 +101,17 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
         label={t("prop.assignee")}
         placeholder={t("prop.set.assignee")}
         value={value.assigneeId || NONE}
-        items={[{ id: NONE, label: t("task.unassigned"), icon: noneIcon }, ...memberItems(members, me.user_id, listening)]}
+        items={[
+          { id: NONE, label: t("task.unassigned"), icon: noneIcon },
+          ...memberItems(members, me.user_id, listening),
+        ]}
         onPick={(id) => onChange({ assigneeId: orNone(id) })}
       >
         <button type="button" className={pill}>
-          <Pill icon={assignee ? <Avatar member={assignee} size="xs" /> : <UserRound className="size-3.5" aria-hidden />} set={!!assignee}>
+          <Pill
+            icon={assignee ? <Avatar member={assignee} size="xs" /> : <UserRound className="size-3.5" aria-hidden />}
+            set={!!assignee}
+          >
             {assignee?.name ?? t("prop.assignee")}
           </Pill>
         </button>
@@ -113,7 +121,11 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
         label={t("prop.priority")}
         placeholder={t("prop.set.priority")}
         value={String(value.priority)}
-        items={PRIORITIES.map((p) => ({ id: String(p), label: tMaybe(`priority.${p}`), icon: <PriorityIcon priority={p} title="" /> }))}
+        items={PRIORITIES.map((p) => ({
+          id: String(p),
+          label: tMaybe(`priority.${p}`),
+          icon: <PriorityIcon priority={p} title="" />,
+        }))}
         onPick={(id) => onChange({ priority: Number(id) })}
       >
         <button type="button" className={pill}>
@@ -133,12 +145,20 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
           label: l.name,
           icon: <span className="size-2.5 rounded-full" style={{ background: l.color || "var(--ink-3)" }} />,
         }))}
-        onPick={(id) => onChange({ labelIds: value.labelIds.includes(id) ? value.labelIds.filter((v) => v !== id) : [...value.labelIds, id] })}
+        onPick={(id) =>
+          onChange({
+            labelIds: value.labelIds.includes(id) ? value.labelIds.filter((v) => v !== id) : [...value.labelIds, id],
+          })
+        }
         onCreate={(name) => onChange({ labelIds: [...value.labelIds, createLabel(project.id, name)] })}
         createLabel={createLabelText}
         manage={leaving(manage.labels)}
       >
-        <button type="button" className={pill} aria-label={`${t("prop.labels")}: ${picked.map((l) => l.name).join(", ") || t("task.noLabels")}`}>
+        <button
+          type="button"
+          className={pill}
+          aria-label={`${t("prop.labels")}: ${picked.map((l) => l.name).join(", ") || t("task.noLabels")}`}
+        >
           <Pill icon={<Tag className="size-3.5" aria-hidden />} set={picked.length > 0}>
             {picked.length > 0 ? picked.map((l) => l.name).join(", ") : t("prop.labels")}
           </Pill>
@@ -150,7 +170,10 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
           label={t("prop.epic")}
           placeholder={t("prop.set.epic")}
           value={value.epicId || NONE}
-          items={[{ id: NONE, label: t("task.noEpic"), icon: noneIcon }, ...epics.map((e) => ({ id: e.id, label: e.name }))]}
+          items={[
+            { id: NONE, label: t("task.noEpic"), icon: noneIcon },
+            ...epics.map((e) => ({ id: e.id, label: e.name })),
+          ]}
           onPick={(id) => onChange({ epicId: orNone(id) })}
         >
           <button type="button" className={pill}>
@@ -162,19 +185,19 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
       )}
 
       {!shared && (
-      <Picker
-        label={t("prop.parent")}
-        placeholder={t("prop.set.parent")}
-        value={value.parentId || NONE}
-        items={parentItems}
-        onPick={(id) => onChange({ parentId: orNone(id) })}
-      >
-        <button type="button" className={pill}>
-          <Pill icon={<CornerLeftUp className="size-3.5" aria-hidden />} set={!!parent}>
-            {parent ? parent.key : t("prop.parent")}
-          </Pill>
-        </button>
-      </Picker>
+        <Picker
+          label={t("prop.parent")}
+          placeholder={t("prop.set.parent")}
+          value={value.parentId || NONE}
+          items={parentItems}
+          onPick={(id) => onChange({ parentId: orNone(id) })}
+        >
+          <button type="button" className={pill}>
+            <Pill icon={<CornerLeftUp className="size-3.5" aria-hidden />} set={!!parent}>
+              {parent ? parent.key : t("prop.parent")}
+            </Pill>
+          </button>
+        </Picker>
       )}
 
       <label className={cx(pill, "relative cursor-pointer focus-within:border-accent")}>
@@ -196,7 +219,10 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
           label={t("prop.template")}
           placeholder={t("prop.template")}
           value={value.templateId || NONE}
-          items={[{ id: NONE, label: t("common.none"), icon: noneIcon }, ...templates.map((tp) => ({ id: tp.id, label: tp.name }))]}
+          items={[
+            { id: NONE, label: t("common.none"), icon: noneIcon },
+            ...templates.map((tp) => ({ id: tp.id, label: tp.name })),
+          ]}
           onPick={(id) => onChange({ templateId: orNone(id) })}
         >
           <button type="button" className={pill}>

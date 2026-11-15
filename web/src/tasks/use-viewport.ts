@@ -11,7 +11,10 @@ export interface Viewport {
 
 /** Follows the scroll position and height of the element in `ref`. */
 export function useViewport(ref: RefObject<HTMLElement | null>): Viewport {
-  const [view, setView] = useState<Viewport>({ top: 0, height: typeof window === "undefined" ? 800 : window.innerHeight });
+  const [view, setView] = useState<Viewport>({
+    top: 0,
+    height: typeof window === "undefined" ? 800 : window.innerHeight,
+  });
 
   useEffect(() => {
     const el = ref.current;

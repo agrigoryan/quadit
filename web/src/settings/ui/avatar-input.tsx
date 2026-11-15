@@ -13,7 +13,32 @@ import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
-const EMOJI = ["🤖", "🧠", "🎨", "🛠️", "🧪", "📝", "🔍", "📦", "🚀", "🧭", "🗂️", "📊", "🧹", "🛡️", "🎧", "🧩", "⚙️", "🐛", "🦉", "🦊", "🐙", "🌱", "⭐", "🔥"];
+const EMOJI = [
+  "🤖",
+  "🧠",
+  "🎨",
+  "🛠️",
+  "🧪",
+  "📝",
+  "🔍",
+  "📦",
+  "🚀",
+  "🧭",
+  "🗂️",
+  "📊",
+  "🧹",
+  "🛡️",
+  "🎧",
+  "🧩",
+  "⚙️",
+  "🐛",
+  "🦉",
+  "🦊",
+  "🐙",
+  "🌱",
+  "⭐",
+  "🔥",
+];
 
 /** The first emoji, or the first two letters or digits, of what was typed. */
 export function shortAvatar(text: string): string {
@@ -26,7 +51,12 @@ export function shortAvatar(text: string): string {
     parts = [...trimmed];
   }
   const first = parts[0] ?? "";
-  if (/^[\p{L}\p{N}]$/u.test(first)) return parts.slice(0, 2).filter((p) => /^[\p{L}\p{N}]$/u.test(p)).join("").toUpperCase();
+  if (/^[\p{L}\p{N}]$/u.test(first))
+    return parts
+      .slice(0, 2)
+      .filter((p) => /^[\p{L}\p{N}]$/u.test(p))
+      .join("")
+      .toUpperCase();
   return first;
 }
 
@@ -70,7 +100,9 @@ export function AvatarInput({ member, value, onChange, hint, disabled }: Props) 
     setPercent(0);
     setError("");
     try {
-      const row = await uploadFile(file, { onProgress: (p) => setPercent(p.total ? Math.round((p.sent / p.total) * 100) : 0) });
+      const row = await uploadFile(file, {
+        onProgress: (p) => setPercent(p.total ? Math.round((p.sent / p.total) * 100) : 0),
+      });
       await change(row.url);
     } catch (err) {
       setError(errorMessage(err));
@@ -134,7 +166,12 @@ export function AvatarInput({ member, value, onChange, hint, disabled }: Props) 
                       maxLength={16}
                     />
                   </label>
-                  <Button variant="primary" className="h-8" disabled={!shortAvatar(text)} onClick={() => choose(shortAvatar(text))}>
+                  <Button
+                    variant="primary"
+                    className="h-8"
+                    disabled={!shortAvatar(text)}
+                    onClick={() => choose(shortAvatar(text))}
+                  >
                     {t("avatar.use")}
                   </Button>
                 </div>

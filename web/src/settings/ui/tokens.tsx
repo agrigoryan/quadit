@@ -2,7 +2,14 @@
 // on its page): the dialog that makes a token, and a token's scopes as badges.
 // Each page brings its own words and its own fields.
 
-import { type ComponentType, type Dispatch, type FormEvent, type ReactNode, type SetStateAction, useState } from "react";
+import {
+  type ComponentType,
+  type Dispatch,
+  type FormEvent,
+  type ReactNode,
+  type SetStateAction,
+  useState,
+} from "react";
 import { api, ws } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
@@ -52,7 +59,17 @@ interface CreateProps {
 }
 
 /** Makes a token for `user`. The answer holds the token itself, which the page shows once. */
-export function CreateTokenDialog({ user, title, description, create, compact, days: firstDays, fields: Fields, onClose, onCreated }: CreateProps) {
+export function CreateTokenDialog({
+  user,
+  title,
+  description,
+  create,
+  compact,
+  days: firstDays,
+  fields: Fields,
+  onClose,
+  onCreated,
+}: CreateProps) {
   const slug = useSlug();
   const [name, setName] = useState("");
   const [readOnly, setReadOnly] = useState(false);
@@ -64,7 +81,15 @@ export function CreateTokenDialog({ user, title, description, create, compact, d
   async function submit(e: FormEvent) {
     e.preventDefault();
     await run(async () => {
-      onCreated(await api.post<CreatedToken>(ws(slug, "/tokens"), { user, name: name.trim(), read_only: readOnly, projects, expires_days: days }));
+      onCreated(
+        await api.post<CreatedToken>(ws(slug, "/tokens"), {
+          user,
+          name: name.trim(),
+          read_only: readOnly,
+          projects,
+          expires_days: days,
+        }),
+      );
     });
   }
 

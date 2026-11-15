@@ -32,13 +32,25 @@ interface Props {
  * React hands up through the cell although it is drawn elsewhere), is for
  * the editor, not a new selection.
  */
-const inEditor = (e: MouseEvent<HTMLElement>) => (e.target as HTMLElement).tagName === "INPUT" || !e.currentTarget.contains(e.target as Node);
+const inEditor = (e: MouseEvent<HTMLElement>) =>
+  (e.target as HTMLElement).tagName === "INPUT" || !e.currentTarget.contains(e.target as Node);
 
 const cellBox = "relative flex shrink-0 items-stretch border-r border-line";
 const selected = "z-[1] outline outline-2 -outline-offset-2 outline-accent";
 
 /** One row of the table: the title, then a cell per property. */
-export const TableRow = memo(function TableRow({ row, cells, props, widths, activeCol, editing, seed, onActive, onEditing, onOpen }: Props) {
+export const TableRow = memo(function TableRow({
+  row,
+  cells,
+  props,
+  widths,
+  activeCol,
+  editing,
+  seed,
+  onActive,
+  onEditing,
+  onOpen,
+}: Props) {
   const slug = useSlug();
   const navigate = useNavigate();
   const titleOn = activeCol === TITLE;
@@ -48,7 +60,11 @@ export const TableRow = memo(function TableRow({ row, cells, props, widths, acti
         role="gridcell"
         data-cell={`${row.id}:${TITLE}`}
         style={{ width: `min(${widths[TITLE] ?? TITLE_WIDTH}px, 60vw)` }}
-        className={cx(cellBox, "sticky left-0 z-[2] bg-surface group-hover/row:bg-[color-mix(in_srgb,var(--hover)_40%,var(--surface))]", titleOn && selected)}
+        className={cx(
+          cellBox,
+          "sticky left-0 z-[2] bg-surface group-hover/row:bg-[color-mix(in_srgb,var(--hover)_40%,var(--surface))]",
+          titleOn && selected,
+        )}
         onMouseDown={(e) => inEditor(e) || onActive(row.id, TITLE)}
       >
         {titleOn && editing ? (
@@ -64,9 +80,14 @@ export const TableRow = memo(function TableRow({ row, cells, props, widths, acti
             }}
           />
         ) : (
-          <div className="flex min-h-8 w-full min-w-0 cursor-text items-center gap-1 pr-1 pl-2" onClick={() => onEditing(row.id, TITLE, true)}>
+          <div
+            className="flex min-h-8 w-full min-w-0 cursor-text items-center gap-1 pr-1 pl-2"
+            onClick={() => onEditing(row.id, TITLE, true)}
+          >
             {row.icon && <span className="shrink-0">{row.icon}</span>}
-            <span className={cx("min-w-0 flex-1 truncate text-sm font-medium", !row.title && "font-normal text-ink-3")}>{row.title || t("db.untitled")}</span>
+            <span className={cx("min-w-0 flex-1 truncate text-sm font-medium", !row.title && "font-normal text-ink-3")}>
+              {row.title || t("db.untitled")}
+            </span>
             <button
               type="button"
               onClick={(e) => {

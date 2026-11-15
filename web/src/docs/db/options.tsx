@@ -19,7 +19,10 @@ export const hueOf = (color: string | undefined) => HUES[color ?? "gray"] ?? (HU
 
 export function optionStyle(color: string | undefined) {
   const hue = hueOf(color);
-  return { background: `color-mix(in srgb, ${hue} 20%, transparent)`, color: `color-mix(in srgb, ${hue} 55%, var(--ink))` };
+  return {
+    background: `color-mix(in srgb, ${hue} 20%, transparent)`,
+    color: `color-mix(in srgb, ${hue} 55%, var(--ink))`,
+  };
 }
 
 export const optionsOf = (prop: Pick<DBProperty, "config">): SelectOption[] => prop.config?.options ?? [];
@@ -31,7 +34,10 @@ export function findOption(prop: Pick<DBProperty, "config">, name: string): Sele
 export function OptionChip({ option, className }: { option: SelectOption; className?: string }) {
   return (
     <span
-      className={cx("inline-flex h-5 max-w-full shrink-0 items-center rounded-sm px-1.5 text-xs font-medium whitespace-nowrap", className)}
+      className={cx(
+        "inline-flex h-5 max-w-full shrink-0 items-center rounded-sm px-1.5 text-xs font-medium whitespace-nowrap",
+        className,
+      )}
       style={optionStyle(option.color)}
     >
       <span className="truncate">{option.name}</span>
@@ -41,5 +47,11 @@ export function OptionChip({ option, className }: { option: SelectOption; classN
 
 /** A dot of an option colour, for pickers. */
 export function ColorDot({ color, className }: { color: string | undefined; className?: string }) {
-  return <span className={cx("inline-block size-2.5 shrink-0 rounded-full", className)} style={{ background: hueOf(color) }} aria-hidden />;
+  return (
+    <span
+      className={cx("inline-block size-2.5 shrink-0 rounded-full", className)}
+      style={{ background: hueOf(color) }}
+      aria-hidden
+    />
+  );
 }

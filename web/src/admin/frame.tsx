@@ -3,7 +3,20 @@
 // once for every page.
 
 import { type ReactNode, useMemo } from "react";
-import { Activity, ArrowLeft, Building2, DatabaseBackup, Gauge, HardDrive, KeyRound, Mail, ScrollText, ShieldAlert, SlidersHorizontal, Users } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  Building2,
+  DatabaseBackup,
+  Gauge,
+  HardDrive,
+  KeyRound,
+  Mail,
+  ScrollText,
+  ShieldAlert,
+  SlidersHorizontal,
+  Users,
+} from "lucide-react";
 import { Link } from "react-router";
 import { useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
@@ -57,9 +70,16 @@ function TopBar({ installName }: { installName?: string }) {
         <QuadMark size={20} />
         <span className="text-sm font-semibold">{t("admin.title")}</span>
       </Link>
-      {installName && <span className="min-w-0 truncate border-l border-line pl-2.5 text-sm text-ink-2 max-sm:hidden">{installName}</span>}
+      {installName && (
+        <span className="min-w-0 truncate border-l border-line pl-2.5 text-sm text-ink-2 max-sm:hidden">
+          {installName}
+        </span>
+      )}
       <span className="flex-1" />
-      <Link to="/" className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-ink-2 hover:bg-hover hover:text-ink">
+      <Link
+        to="/"
+        className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-ink-2 hover:bg-hover hover:text-ink"
+      >
         <ArrowLeft className="size-4" aria-hidden />
         {t("admin.backToWorkspace")}
       </Link>
@@ -97,7 +117,10 @@ export function AdminFrame({ children }: { children: ReactNode }) {
   const isAdmin = useSession((s) => !!s.user?.is_admin);
   const groups = useGroups();
   const settings = useLoad(() => (isAdmin ? fetchSettings() : Promise.resolve({} as SettingsMap)), [isAdmin]);
-  const ctx = useMemo(() => (settings.data ? { settings: settings.data, replace: settings.set } : null), [settings.data, settings.set]);
+  const ctx = useMemo(
+    () => (settings.data ? { settings: settings.data, replace: settings.set } : null),
+    [settings.data, settings.set],
+  );
 
   if (!isAdmin) return <NotForYou />;
   const name = settings.data?.["install.name"]?.value;

@@ -7,7 +7,12 @@ export const PopoverTrigger = RPopover.Trigger;
 export const PopoverAnchor = RPopover.Anchor;
 export const PopoverClose = RPopover.Close;
 
-export function PopoverContent({ className, align = "start", sideOffset = 6, ...rest }: ComponentProps<typeof RPopover.Content>) {
+export function PopoverContent({
+  className,
+  align = "start",
+  sideOffset = 6,
+  ...rest
+}: ComponentProps<typeof RPopover.Content>) {
   return (
     <RPopover.Portal>
       <RPopover.Content

@@ -15,7 +15,10 @@ import type { AgentSession } from "@/lib/types";
  * "limit=300"), newest first, kept current. `keep` picks the store rows
  * that belong to the same set.
  */
-export function useSessions(query: string | null, keep: (s: AgentSession) => boolean): { sessions: AgentSession[]; loading: boolean } {
+export function useSessions(
+  query: string | null,
+  keep: (s: AgentSession) => boolean,
+): { sessions: AgentSession[]; loading: boolean } {
   const slug = useStore((s) => s.slug);
   const live = useStore((s) => s.stream === "live");
   const [loaded, setLoaded] = useState<string | null>(null);
@@ -29,7 +32,10 @@ export function useSessions(query: string | null, keep: (s: AgentSession) => boo
         if (getState().slug !== slug) return;
         // A session the store already has is newer there: the feed has been at it.
         const have = getState().c.sessions;
-        mergeRows("sessions", out.sessions.filter((s) => !have[s.id]));
+        mergeRows(
+          "sessions",
+          out.sessions.filter((s) => !have[s.id]),
+        );
       })
       .catch(() => {})
       .finally(() => {
@@ -58,7 +64,8 @@ export function stepText(step: unknown): { text: string; tool?: string } {
   if (typeof step === "string") return { text: step };
   if (step && typeof step === "object") {
     const s = step as Record<string, unknown>;
-    const text = [s.text, s.title, s.summary, s.action, s.name].find((v) => typeof v === "string" && v) as string | undefined;
+    const text = [s.text, s.title, s.summary, s.action, s.name].find((v) => typeof v === "string" && v) as
+      string | undefined;
     const tool = typeof s.tool === "string" ? s.tool : undefined;
     return { text: text ?? JSON.stringify(step), tool };
   }
@@ -67,7 +74,8 @@ export function stepText(step: unknown): { text: string; tool?: string } {
 
 /** A link a run produced: an address with a name, a commit, a file. */
 export function sessionLink(link: unknown): { name: string; url?: string } {
-  if (typeof link === "string") return { name: link.replace(/^https?:\/\//, ""), url: /^https?:\/\//i.test(link) ? link : undefined };
+  if (typeof link === "string")
+    return { name: link.replace(/^https?:\/\//, ""), url: /^https?:\/\//i.test(link) ? link : undefined };
   const l = (link && typeof link === "object" ? link : {}) as Record<string, unknown>;
   const url = typeof l.url === "string" && /^https?:\/\//i.test(l.url) ? l.url : undefined;
   const name = [l.title, l.name, l.ref, l.url].find((v) => typeof v === "string" && v) as string | undefined;

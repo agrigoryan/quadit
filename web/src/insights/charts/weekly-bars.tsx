@@ -90,10 +90,23 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
       />
       <div ref={box} className="relative" onPointerLeave={() => setAt(null)}>
         {width > 0 && (
-          <svg width={width} height={H} role="group" aria-label={t("ins.chart.weeklyLabel", { n: weeks.length })} className="block">
+          <svg
+            width={width}
+            height={H}
+            role="group"
+            aria-label={t("ins.chart.weeklyLabel", { n: weeks.length })}
+            className="block"
+          >
             {marks.map((v) => (
               <g key={v}>
-                <line x1={left} x2={width} y1={y(v)} y2={y(v)} stroke={v === 0 ? "var(--viz-axis)" : "var(--viz-grid)"} strokeWidth={1} />
+                <line
+                  x1={left}
+                  x2={width}
+                  y1={y(v)}
+                  y2={y(v)}
+                  stroke={v === 0 ? "var(--viz-axis)" : "var(--viz-grid)"}
+                  strokeWidth={1}
+                />
                 <text x={left - 6} y={y(v) + 3.5} textAnchor="end" className="fill-ink-3 text-[10px] tnum">
                   {count(v)}
                 </text>
@@ -128,14 +141,25 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
                     numbered &&
                     at === null &&
                     fit.numbers.map((n, side) => (
-                      <text key={side} x={n.x} y={n.y} textAnchor="end" className="fill-ink text-[10px] font-medium tnum">
+                      <text
+                        key={side}
+                        x={n.x}
+                        y={n.y}
+                        textAnchor="end"
+                        className="fill-ink text-[10px] font-medium tnum"
+                      >
                         {n.text}
                       </text>
                     ))}
                   {(last - i) % every === 0 &&
                     (i === last ? (
                       // The newest date ends where the chart does when its week is too narrow to hold it.
-                      <text x={Math.min(width, cx + formatDay(w.week).length * 3)} y={H - 4} textAnchor="end" className="fill-ink-3 text-[10px] tnum">
+                      <text
+                        x={Math.min(width, cx + formatDay(w.week).length * 3)}
+                        y={H - 4}
+                        textAnchor="end"
+                        className="fill-ink-3 text-[10px] tnum"
+                      >
                         {formatDay(w.week)}
                       </text>
                     ) : (
@@ -166,5 +190,9 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
 
 /** The same numbers as rows, for the table view. */
 export function weeklyRows(weeks: WeekCount[]): (string | number)[][] {
-  return weeks.map((w) => [t("ins.chart.weekOf", { from: formatDay(w.week), to: formatDay(addDays(w.week, 6)) }), w.opened, w.closed]);
+  return weeks.map((w) => [
+    t("ins.chart.weekOf", { from: formatDay(w.week), to: formatDay(addDays(w.week, 6)) }),
+    w.opened,
+    w.closed,
+  ]);
 }

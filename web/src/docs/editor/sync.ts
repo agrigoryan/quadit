@@ -190,7 +190,8 @@ export class DocSync {
       let rows = (ev.data.blocks as BlockRow[] | undefined) ?? [];
       // A page brought back from a backup arrives whole, its blocks stamped as they were when the
       // backup was taken: older than what is on screen, yet they are what the page now is.
-      if (ev.data.from_backup) rows = rows.map((row) => ({ ...row, updated_seq: Math.max(row.updated_seq ?? 0, ev.seq) }));
+      if (ev.data.from_backup)
+        rows = rows.map((row) => ({ ...row, updated_seq: Math.max(row.updated_seq ?? 0, ev.seq) }));
       this.remote(rows, (ev.data.deleted as string[] | undefined) ?? []);
     }
   };
@@ -232,7 +233,8 @@ export class DocSync {
       for (let pass = 0; left.length && pass < 50; pass++) {
         const wait: BlockRow[] = [];
         for (const row of left) {
-          if (row.parent_id && !this.editor.getBlock(row.parent_id) && left.some((r) => r.id === row.parent_id)) wait.push(row);
+          if (row.parent_id && !this.editor.getBlock(row.parent_id) && left.some((r) => r.id === row.parent_id))
+            wait.push(row);
           else this.take(row);
         }
         if (wait.length === left.length) break;
@@ -252,7 +254,14 @@ export class DocSync {
     const cur = this.editor.getBlock(row.id) as unknown as EdBlock | undefined;
     if (cur && k && this.sigOf(cur) !== k.sig) {
       // Unsent local edits in this block: keep them; they are sent next and win.
-      this.known.set(row.id, { parent: row.parent_id ?? "", rank: row.rank, sig: STALE, type: row.type, props: row.props != null, seq: row.updated_seq });
+      this.known.set(row.id, {
+        parent: row.parent_id ?? "",
+        rank: row.rank,
+        sig: STALE,
+        type: row.type,
+        props: row.props != null,
+        seq: row.updated_seq,
+      });
       this.schedule();
       return;
     }
@@ -285,7 +294,10 @@ export class DocSync {
     if (this.dead) return;
     if (!hard) {
       const live = new Set(rows.map((r) => r.id));
-      this.remote(rows, [...this.known.keys()].filter((id) => !live.has(id) && !this.inflight.has(id)));
+      this.remote(
+        rows,
+        [...this.known.keys()].filter((id) => !live.has(id) && !this.inflight.has(id)),
+      );
       return;
     }
     clearTimeout(this.timer);
@@ -293,7 +305,9 @@ export class DocSync {
     this.held.clear();
     this.inflight.clear();
     const blocks = rowsToEditor(rows, this.schema);
-    this.quietly(() => this.editor.replaceBlocks(this.editor.document, (blocks.length ? blocks : [{ type: "paragraph" }]) as never[]));
+    this.quietly(() =>
+      this.editor.replaceBlocks(this.editor.document, (blocks.length ? blocks : [{ type: "paragraph" }]) as never[]),
+    );
     for (const row of rows) this.remember(row);
   }
 }

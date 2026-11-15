@@ -111,12 +111,19 @@ export function ShortcutsSheet() {
             {section.hint && <p className="text-xs text-ink-3">{t(section.hint)}</p>}
             <dl className="mt-1.5">
               {section.rows.map((row) => (
-                <div key={row.what} className="flex h-8 items-center justify-between gap-4 border-b border-line/70 text-sm">
+                <div
+                  key={row.what}
+                  className="flex h-8 items-center justify-between gap-4 border-b border-line/70 text-sm"
+                >
                   <dt className="truncate text-ink-2">{t(row.what)}</dt>
                   <dd className="flex shrink-0 items-center gap-1.5">
                     {row.keys.map((keys, i) => (
                       <Fragment key={keys}>
-                        {i > 0 && <span className="text-xs text-ink-3">{t(row.join === "to" ? "shortcuts.to" : "shortcuts.or")}</span>}
+                        {i > 0 && (
+                          <span className="text-xs text-ink-3">
+                            {t(row.join === "to" ? "shortcuts.to" : "shortcuts.or")}
+                          </span>
+                        )}
                         <Kbd>{keys}</Kbd>
                       </Fragment>
                     ))}

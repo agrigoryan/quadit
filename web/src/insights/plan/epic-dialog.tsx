@@ -91,7 +91,12 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
           />
         </Field>
         <Field label={t("epic.description")} htmlFor="epic-description" hint={t("epic.descriptionHint")}>
-          <Textarea id="epic-description" value={f.description} onChange={(e) => set({ description: e.target.value })} rows={4} />
+          <Textarea
+            id="epic-description"
+            value={f.description}
+            onChange={(e) => set({ description: e.target.value })}
+            rows={4}
+          />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t("epic.state")}>
@@ -107,7 +112,12 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
             <Select
               items={[
                 { id: NOBODY, label: t("epic.noLead"), icon: <Avatar member={undefined} size="xs" /> },
-                ...members.map((m) => ({ id: m.user_id, label: m.name, icon: <Avatar member={m} size="xs" />, keywords: m.handle })),
+                ...members.map((m) => ({
+                  id: m.user_id,
+                  label: m.name,
+                  icon: <Avatar member={m} size="xs" />,
+                  keywords: m.handle,
+                })),
               ]}
               value={f.leadId || NOBODY}
               onPick={(id) => set({ leadId: id === NOBODY ? "" : id })}

@@ -99,7 +99,10 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
     [heightsAt, virtual],
   );
   const items = virtual.getVirtualItems();
-  const shownIds = useMemo(() => items.map((item) => cards[item.index]?.id).filter((id): id is string => !!id), [items, cards]);
+  const shownIds = useMemo(
+    () => items.map((item) => cards[item.index]?.id).filter((id): id is string => !!id),
+    [items, cards],
+  );
 
   function add(e: FormEvent) {
     e.preventDefault();
@@ -107,12 +110,20 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
     if (!text || !project) return;
     setTitle("");
     // New cards go on top, where the box is.
-    createTask({ projectId: project.id, title: text, rank: rankBetween(undefined, cards[0]?.task.rank), ...fieldsFor(group) }).catch(() => {});
+    createTask({
+      projectId: project.id,
+      title: text,
+      rank: rankBetween(undefined, cards[0]?.task.rank),
+      ...fieldsFor(group),
+    }).catch(() => {});
     virtual.scrollToOffset(0);
   }
 
   return (
-    <section aria-label={group.title} className="flex h-full w-72 shrink-0 flex-col rounded-lg bg-sunken max-sm:w-[82vw]">
+    <section
+      aria-label={group.title}
+      className="flex h-full w-72 shrink-0 flex-col rounded-lg bg-sunken max-sm:w-[82vw]"
+    >
       <header className="flex h-9 shrink-0 items-center gap-2 pr-1.5 pl-3">
         <GroupIcon group={group} />
         {renaming && status ? (
@@ -129,9 +140,16 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
             <GroupCount group={group} count={cards.length} className="flex-1" />
           </>
         )}
-        {status && project && !renaming && <StatusMenu status={status} project={project} onRename={() => setRenaming(true)} />}
+        {status && project && !renaming && (
+          <StatusMenu status={status} project={project} onRename={() => setRenaming(true)} />
+        )}
         {project && !renaming && (
-          <IconButton size="sm" label={t("board.add", { name: group.title })} onClick={() => setAdding((v) => !v)} aria-expanded={adding}>
+          <IconButton
+            size="sm"
+            label={t("board.add", { name: group.title })}
+            onClick={() => setAdding((v) => !v)}
+            aria-expanded={adding}
+          >
             <Plus className="size-3.5" />
           </IconButton>
         )}
@@ -158,20 +176,31 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
             scroller.current = el;
             setNodeRef(el);
           }}
-          className={cx("min-h-16 flex-1 overflow-y-auto px-2 pb-2 transition-colors", isOver && cards.length === 0 && "bg-hover")}
+          className={cx(
+            "min-h-16 flex-1 overflow-y-auto px-2 pb-2 transition-colors",
+            isOver && cards.length === 0 && "bg-hover",
+          )}
         >
           <div className="relative" style={{ height: virtual.getTotalSize() }}>
             {items.map((item) => {
               const card = cards[item.index];
               if (!card) return null;
               return (
-                <div key={card.id} data-index={item.index} ref={virtual.measureElement} className="absolute inset-x-0" style={{ top: item.start }}>
+                <div
+                  key={card.id}
+                  data-index={item.index}
+                  ref={virtual.measureElement}
+                  className="absolute inset-x-0"
+                  style={{ top: item.start }}
+                >
                   <BoardCard id={card.id} task={card.task} />
                 </div>
               );
             })}
           </div>
-          {cards.length === 0 && !adding && (waitingForRest ? null : <p className="px-1 pt-1 text-xs text-ink-3">{t("board.empty")}</p>)}
+          {cards.length === 0 &&
+            !adding &&
+            (waitingForRest ? null : <p className="px-1 pt-1 text-xs text-ink-3">{t("board.empty")}</p>)}
         </div>
       </SortableContext>
     </section>

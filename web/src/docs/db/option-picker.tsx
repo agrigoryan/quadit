@@ -15,7 +15,8 @@ interface Props {
   onClose: () => void;
 }
 
-const row = "flex min-h-7 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-sm select-none data-[selected=true]:bg-hover";
+const row =
+  "flex min-h-7 cursor-default items-center gap-2 rounded-sm px-2 py-1 text-sm select-none data-[selected=true]:bg-hover";
 
 /**
  * The options of a select, with search. Typing a name that is not an option
@@ -49,7 +50,9 @@ export function OptionPicker({ prop, value, multiple, onChange, onClose }: Props
         className="h-9 w-full shrink-0 border-b border-line bg-transparent px-3 text-sm outline-none"
       />
       <Command.List className="min-h-0 flex-1 overflow-y-auto p-1">
-        {shown.length === 0 && !fresh && <p className="px-2 py-3 text-center text-sm text-ink-3">{t("db.option.none")}</p>}
+        {shown.length === 0 && !fresh && (
+          <p className="px-2 py-3 text-center text-sm text-ink-3">{t("db.option.none")}</p>
+        )}
         {shown.map((o) => (
           <Command.Item key={o.name} value={`option:${o.name}`} onSelect={() => pick(o.name)} className={row}>
             <span className="min-w-0 flex-1">

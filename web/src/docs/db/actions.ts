@@ -7,7 +7,16 @@ import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
 import { getDocs } from "@/docs/data";
 import { dropRow, patchRow, putRow, useDocsStore } from "@/docs/store";
-import type { DBProperty, DBView, Doc, PropConfig, PropertyType, SelectOption, ViewConfig, ViewType } from "@/docs/types";
+import type {
+  DBProperty,
+  DBView,
+  Doc,
+  PropConfig,
+  PropertyType,
+  SelectOption,
+  ViewConfig,
+  ViewType,
+} from "@/docs/types";
 import { OPTION_COLORS } from "@/docs/types";
 
 type Fields = Record<string, unknown>;
@@ -33,7 +42,14 @@ export function freeName(databaseId: string, base: string, exceptId?: string): s
 
 export function createProperty(databaseId: string, name: string, type: PropertyType, config?: PropConfig): string {
   const id = newId();
-  const row: DBProperty = { id, database_id: databaseId, name: freeName(databaseId, name.trim() || "Property"), type, config, rank: lastRank("props", databaseId) };
+  const row: DBProperty = {
+    id,
+    database_id: databaseId,
+    name: freeName(databaseId, name.trim() || "Property"),
+    type,
+    config,
+    rank: lastRank("props", databaseId),
+  };
   putRow("props", row);
   const args: Fields = { id, database: databaseId, name: row.name, type, rank: row.rank };
   if (config) args.config = config;
@@ -102,7 +118,9 @@ export function deleteView(id: string) {
 export function renameOption(prop: DBProperty, from: string, to: string) {
   const options = prop.config?.options ?? [];
   if (!to || from === to || options.some((o) => o.name === to)) return;
-  const before = patchRow("props", prop.id, { config: { ...prop.config, options: options.map((o) => (o.name === from ? { ...o, name: to } : o)) } });
+  const before = patchRow("props", prop.id, {
+    config: { ...prop.config, options: options.map((o) => (o.name === from ? { ...o, name: to } : o)) },
+  });
   const patches: [string, Fields][] = [];
   for (const row of Object.values(getDocs())) {
     if (row.parent_id !== prop.database_id || row.kind !== "row") continue;

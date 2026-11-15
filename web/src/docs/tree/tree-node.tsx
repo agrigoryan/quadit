@@ -70,20 +70,34 @@ export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Pr
         style={{ paddingLeft: 4 + depth * 14 }}
       >
         {zone && zone !== "inside" && (
-          <span className={cx("pointer-events-none absolute right-1 h-0.5 rounded bg-accent", zone === "before" ? "-top-px" : "-bottom-px")} style={{ left: 8 + depth * 14 }} />
+          <span
+            className={cx(
+              "pointer-events-none absolute right-1 h-0.5 rounded bg-accent",
+              zone === "before" ? "-top-px" : "-bottom-px",
+            )}
+            style={{ left: 8 + depth * 14 }}
+          />
         )}
         <button
           type="button"
           tabIndex={-1}
           aria-label={t(open ? "docs.tree.collapse" : "docs.tree.expand")}
           onClick={() => setOpen(doc.id, !open)}
-          className={cx("flex size-5 shrink-0 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink", kids.length === 0 && "invisible")}
+          className={cx(
+            "flex size-5 shrink-0 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink",
+            kids.length === 0 && "invisible",
+          )}
         >
           <ChevronRight className={cx("size-3.5 transition-transform", open && "rotate-90")} />
         </button>
         {canChange ? (
           <IconPicker docId={doc.id} current={doc.icon} open={iconOpen} onOpenChange={setIconOpen}>
-            <button type="button" tabIndex={-1} aria-label={t("docs.icon.change")} className="flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-press">
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={t("docs.icon.change")}
+              className="flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-press"
+            >
               <PageIcon doc={doc} />
             </button>
           </IconPicker>
@@ -110,7 +124,11 @@ export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Pr
           <span className="flex shrink-0 items-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 max-md:opacity-100">
             <Menu>
               <MenuTrigger asChild>
-                <button type="button" aria-label={t("docs.tree.more")} className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink">
+                <button
+                  type="button"
+                  aria-label={t("docs.tree.more")}
+                  className="flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink"
+                >
                   <MoreHorizontal className="size-3.5" />
                 </button>
               </MenuTrigger>
@@ -123,7 +141,11 @@ export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Pr
                 </MenuItem>
                 <MenuItem
                   icon={<Link2 />}
-                  onSelect={() => void copyText(`${location.origin}/${slug}/docs/${doc.id}`).then((ok) => toast.info(t(ok ? "common.copied" : "common.copyFailed")))}
+                  onSelect={() =>
+                    void copyText(`${location.origin}/${slug}/docs/${doc.id}`).then((ok) =>
+                      toast.info(t(ok ? "common.copied" : "common.copyFailed")),
+                    )
+                  }
                 >
                   {t("docs.copyLink")}
                 </MenuItem>
@@ -156,7 +178,15 @@ export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Pr
       {open && kids.length > 0 && (
         <ul role="group">
           {kids.map((kid) => (
-            <TreeNode key={kid.id} doc={kid} tree={tree} depth={depth + 1} editable={editable} drop={drop} parentProject={doc.project_id} />
+            <TreeNode
+              key={kid.id}
+              doc={kid}
+              tree={tree}
+              depth={depth + 1}
+              editable={editable}
+              drop={drop}
+              parentProject={doc.project_id}
+            />
           ))}
         </ul>
       )}

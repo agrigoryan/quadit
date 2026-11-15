@@ -43,7 +43,9 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
     (el: HTMLDivElement | null) => {
       if (!el) return undefined;
       const stopWheel = wheel(el);
-      const watcher = new ResizeObserver(([entry]) => entry && setBox({ w: entry.contentRect.width, h: entry.contentRect.height }));
+      const watcher = new ResizeObserver(
+        ([entry]) => entry && setBox({ w: entry.contentRect.width, h: entry.contentRect.height }),
+      );
       watcher.observe(el);
       return () => {
         stopWheel?.();
@@ -55,7 +57,12 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
   const video = useCallback((el: HTMLVideoElement | null) => setVideo(option.id, el), [setVideo, option.id]);
 
   // One pane says how big "fit" is, so the header can show the zoom as a percentage.
-  const natural: Size | null = file?.width && file.height ? { w: file.width, h: file.height } : loaded && loaded.id === file?.id ? loaded.size : null;
+  const natural: Size | null =
+    file?.width && file.height
+      ? { w: file.width, h: file.height }
+      : loaded && loaded.id === file?.id
+        ? loaded.size
+        : null;
   const fit = box && natural && natural.w > 0 && natural.h > 0 ? Math.min(box.w / natural.w, box.h / natural.h) : 0;
   useEffect(() => {
     if (gauge && fit > 0) setFit(fit);
@@ -79,7 +86,10 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
         isFit ? "cursor-zoom-in" : "cursor-grab active:cursor-grabbing",
       )}
     >
-      <div className="absolute inset-0" style={{ transform: `translate(${view.x * 100}%, ${view.y * 100}%) scale(${view.k})` }}>
+      <div
+        className="absolute inset-0"
+        style={{ transform: `translate(${view.x * 100}%, ${view.y * 100}%) scale(${view.k})` }}
+      >
         {isVideo(file) ? (
           <video
             key={file.id}
@@ -90,7 +100,9 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
             loop
             preload="auto"
             aria-label={file.name}
-            onLoadedMetadata={(e) => setLoaded({ id: file.id, size: { w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight } })}
+            onLoadedMetadata={(e) =>
+              setLoaded({ id: file.id, size: { w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight } })
+            }
             className={picture}
             style={{ imageRendering: rendering }}
           />
@@ -111,7 +123,9 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
               src={file.url}
               alt={file.before ? t("decision.pair.afterAlt", { name: file.name }) : file.name}
               draggable={false}
-              onLoad={(e) => setLoaded({ id: file.id, size: { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight } })}
+              onLoad={(e) =>
+                setLoaded({ id: file.id, size: { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight } })
+              }
               className={cx(picture, file.before && "absolute inset-0")}
               style={{ imageRendering: rendering, ...(file.before ? afterClip(swipe, view) : undefined) }}
             />
@@ -159,7 +173,12 @@ function Pane({ c, option, index, gauge }: { c: Compare; option: DecisionOption;
           {c.decision.picked_option_id === option.id && <PickedBadge />}
           {c.decision.recommended_option_id === option.id && <RecommendedBadge />}
           <span className="flex-1" />
-          <FileStepper onDark index={c.fileIndexOf(option)} total={files.length} onStep={(delta) => c.stepFile(option, delta)} />
+          <FileStepper
+            onDark
+            index={c.fileIndexOf(option)}
+            total={files.length}
+            onStep={(delta) => c.stepFile(option, delta)}
+          />
         </div>
         <div className="mt-1 flex h-7 items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-xs text-inverse-ink/70">{paneNote(c, option)}</p>

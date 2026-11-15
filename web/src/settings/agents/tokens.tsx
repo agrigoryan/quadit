@@ -23,7 +23,12 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
   const slug = useSlug();
   // The server lists an agent's tokens for admins only; anyone else is told so rather than shown an empty list.
   const tokens = useLoad(
-    () => (canEdit ? api.get<{ tokens: Token[] }>(ws(slug, "/tokens")).then((r) => r.tokens.filter((tk) => tk.user_id === agent.user_id)) : Promise.resolve(null)),
+    () =>
+      canEdit
+        ? api
+            .get<{ tokens: Token[] }>(ws(slug, "/tokens"))
+            .then((r) => r.tokens.filter((tk) => tk.user_id === agent.user_id))
+        : Promise.resolve(null),
     [slug, agent.user_id, canEdit],
   );
   const [creating, setCreating] = useState(false);
@@ -139,18 +144,44 @@ export function TokenReveal({ token, onClose }: { token: string; onClose: () => 
 }
 
 /** The fields of a token for an agent: its name, read-only or not, its projects, when it expires. */
-function AgentTokenFields({ name, setName, readOnly, setReadOnly, projects: picked, setProjects: setPicked, days, setDays, errors }: TokenFieldsProps) {
+function AgentTokenFields({
+  name,
+  setName,
+  readOnly,
+  setReadOnly,
+  projects: picked,
+  setProjects: setPicked,
+  days,
+  setDays,
+  errors,
+}: TokenFieldsProps) {
   const projects = useProjects();
 
   return (
     <>
       <FormField label={t("tokens.name")} htmlFor="token-name" hint={t("tokens.nameHint")} error={errors.fields.name}>
-        <Input id="token-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("tokens.namePlaceholder")} maxLength={80} />
+        <Input
+          id="token-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("tokens.namePlaceholder")}
+          maxLength={80}
+        />
       </FormField>
-      <SwitchRow title={t("tokens.readOnly")} hint={t("tokens.readOnlyHint")} checked={readOnly} onChange={setReadOnly} />
+      <SwitchRow
+        title={t("tokens.readOnly")}
+        hint={t("tokens.readOnlyHint")}
+        checked={readOnly}
+        onChange={setReadOnly}
+      />
       <FormField label={t("tokens.projects")} hint={t("tokens.projectsHint")} error={errors.fields.projects}>
         <MultiPick
-          items={projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, keywords: p.key }))}
+          items={projects.map((p) => ({
+            id: p.id,
+            label: p.name,
+            icon: <ProjectGlyph project={p} />,
+            keywords: p.key,
+          }))}
           value={picked}
           onChange={setPicked}
           addLabel={t("agent.projectsPick")}
@@ -161,7 +192,10 @@ function AgentTokenFields({ name, setName, readOnly, setReadOnly, projects: pick
         <NativeSelect
           value={String(days)}
           onChange={(v) => setDays(Number(v))}
-          options={EXPIRY.map((n) => ({ value: String(n), label: n === 0 ? t("tokens.expires.never") : t("tokens.expires.days", { n }) }))}
+          options={EXPIRY.map((n) => ({
+            value: String(n),
+            label: n === 0 ? t("tokens.expires.never") : t("tokens.expires.days", { n }),
+          }))}
         />
       </FormField>
     </>

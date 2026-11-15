@@ -38,7 +38,8 @@ export function PasswordSection({ hasPassword, onChanged }: Props) {
       onChanged();
     } catch (err) {
       // The server answers a wrong current password with a plain "forbidden": it belongs to that field.
-      if (hasPassword && err instanceof ApiError && err.status === 403 && !err.field) errors.set("current", errorMessage(err));
+      if (hasPassword && err instanceof ApiError && err.status === 403 && !err.field)
+        errors.set("current", errorMessage(err));
       else errors.fail(err);
     } finally {
       setBusy(false);
@@ -50,7 +51,12 @@ export function PasswordSection({ hasPassword, onChanged }: Props) {
       <Card>
         <form onSubmit={submit} className="flex flex-col gap-4">
           {hasPassword && (
-            <FormField label={t("me.password.current")} htmlFor="pw-current" error={errors.fields.current} className="sm:max-w-xs">
+            <FormField
+              label={t("me.password.current")}
+              htmlFor="pw-current"
+              error={errors.fields.current}
+              className="sm:max-w-xs"
+            >
               <Input
                 id="pw-current"
                 type="password"
@@ -62,11 +68,30 @@ export function PasswordSection({ hasPassword, onChanged }: Props) {
             </FormField>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label={t("me.password.new")} htmlFor="pw-new" hint={t("auth.setup.passwordHint")} error={errors.fields.new}>
-              <Input id="pw-new" type="password" autoComplete="new-password" required value={next} onChange={(e) => setNext(e.target.value)} />
+            <FormField
+              label={t("me.password.new")}
+              htmlFor="pw-new"
+              hint={t("auth.setup.passwordHint")}
+              error={errors.fields.new}
+            >
+              <Input
+                id="pw-new"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={next}
+                onChange={(e) => setNext(e.target.value)}
+              />
             </FormField>
             <FormField label={t("me.password.again")} htmlFor="pw-again" error={errors.fields.again}>
-              <Input id="pw-again" type="password" autoComplete="new-password" required value={again} onChange={(e) => setAgain(e.target.value)} />
+              <Input
+                id="pw-again"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={again}
+                onChange={(e) => setAgain(e.target.value)}
+              />
             </FormField>
           </div>
           <FormAlert>{errors.form}</FormAlert>

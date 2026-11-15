@@ -35,11 +35,17 @@ export function BudgetField({ task }: { task: Task }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <PropButton empty={!text} disabled={!!task.deleted_at} aria-label={`${t("prop.budget")}: ${text || t("prop.budget.none")}`}>
+        <PropButton
+          empty={!text}
+          disabled={!!task.deleted_at}
+          aria-label={`${t("prop.budget")}: ${text || t("prop.budget.none")}`}
+        >
           <span className="truncate tnum">{text || t("prop.budget.none")}</span>
         </PropButton>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-3">{open && <BudgetForm task={task} budget={budget} onDone={() => setOpen(false)} />}</PopoverContent>
+      <PopoverContent className="w-64 p-3">
+        {open && <BudgetForm task={task} budget={budget} onDone={() => setOpen(false)} />}
+      </PopoverContent>
     </Popover>
   );
 }
@@ -64,13 +70,32 @@ function BudgetForm({ task, budget, onDone }: { task: Task; budget: TaskBudget |
     <form onSubmit={save} className="flex flex-col gap-2.5">
       <p className="text-xs text-ink-2">{t("prop.budget.lead")}</p>
       <Field label={t("prop.budget.money")} htmlFor="budget-money">
-        <Input id="budget-money" autoFocus inputMode="decimal" value={money} onChange={(e) => setMoney(e.target.value)} placeholder="0" />
+        <Input
+          id="budget-money"
+          autoFocus
+          inputMode="decimal"
+          value={money}
+          onChange={(e) => setMoney(e.target.value)}
+          placeholder="0"
+        />
       </Field>
       <Field label={t("prop.budget.minutes")} htmlFor="budget-minutes">
-        <Input id="budget-minutes" inputMode="numeric" value={minutes} onChange={(e) => setMinutes(e.target.value)} placeholder="0" />
+        <Input
+          id="budget-minutes"
+          inputMode="numeric"
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          placeholder="0"
+        />
       </Field>
       <Field label={t("prop.budget.handoffs")} htmlFor="budget-handoffs">
-        <Input id="budget-handoffs" inputMode="numeric" value={handoffs} onChange={(e) => setHandoffs(e.target.value)} placeholder="0" />
+        <Input
+          id="budget-handoffs"
+          inputMode="numeric"
+          value={handoffs}
+          onChange={(e) => setHandoffs(e.target.value)}
+          placeholder="0"
+        />
       </Field>
       {error && (
         <p role="alert" className="text-xs text-danger">

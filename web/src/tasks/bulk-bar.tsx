@@ -1,5 +1,17 @@
 import { memo, useRef, useState } from "react";
-import { CalendarDays, CircleDot, Ellipsis, FolderInput, Gauge, Layers, RefreshCw, Tag, Trash2, UserRound, X } from "lucide-react";
+import {
+  CalendarDays,
+  CircleDot,
+  Ellipsis,
+  FolderInput,
+  Gauge,
+  Layers,
+  RefreshCw,
+  Tag,
+  Trash2,
+  UserRound,
+  X,
+} from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
@@ -100,7 +112,17 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
           </MenuItem>
         </MenuContent>
       </Menu>
-      {picker && <TaskPropertyPicker kind={picker} tasks={tasks} open onOpenChange={(next) => !next && close()} anchor={moreButton} side="top" align="end" />}
+      {picker && (
+        <TaskPropertyPicker
+          kind={picker}
+          tasks={tasks}
+          open
+          onOpenChange={(next) => !next && close()}
+          anchor={moreButton}
+          side="top"
+          align="end"
+        />
+      )}
       {(more === "due" || more === "estimate") && (
         <Popover open onOpenChange={(next) => !next && close()}>
           <PopoverAnchor virtualRef={moreButton as React.RefObject<HTMLButtonElement>} />
@@ -191,7 +213,16 @@ function EstimateForm({ tasks, onDone }: FormProps) {
       <label htmlFor="bulk-estimate" className="text-xs font-medium text-ink-2">
         {t("bulk.estimate.label", { n: tasks.length })}
       </label>
-      <Input id="bulk-estimate" type="number" inputMode="numeric" min={1} step={1} autoFocus value={points} onChange={(e) => setPoints(e.target.value)} />
+      <Input
+        id="bulk-estimate"
+        type="number"
+        inputMode="numeric"
+        min={1}
+        step={1}
+        autoFocus
+        value={points}
+        onChange={(e) => setPoints(e.target.value)}
+      />
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={() => set(null)}>
           {t("bulk.estimate.clear")}

@@ -6,7 +6,16 @@ import { useMe, useSlug } from "@/lib/selectors";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { ui } from "@/lib/ui-state";
 import { Avatar } from "@/ui/avatar";
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuTrigger,
+} from "@/ui/menu";
 
 const themes: ThemeChoice[] = ["system", "light", "dark"];
 

@@ -63,13 +63,26 @@ export function ZoomControls({ c }: { c: Compare }) {
   const percent = Math.round(c.fit * zoom.view.k * 100);
   return (
     <div role="group" aria-label={t("compare.zoom")} className="flex items-center">
-      <StageButton tip={t("compare.zoomOut")} hint="−" aria-label={t("compare.zoomOut")} onClick={() => zoom.zoomBy(1 / 1.25)}>
+      <StageButton
+        tip={t("compare.zoomOut")}
+        hint="−"
+        aria-label={t("compare.zoomOut")}
+        onClick={() => zoom.zoomBy(1 / 1.25)}
+      >
         <Minus className="size-4" aria-hidden />
       </StageButton>
-      <output aria-label={t("compare.zoomNow", { n: percent })} className="w-12 text-center text-xs text-inverse-ink tnum">
+      <output
+        aria-label={t("compare.zoomNow", { n: percent })}
+        className="w-12 text-center text-xs text-inverse-ink tnum"
+      >
         {percent}%
       </output>
-      <StageButton tip={t("compare.zoomIn")} hint="+" aria-label={t("compare.zoomIn")} onClick={() => zoom.zoomBy(1.25)}>
+      <StageButton
+        tip={t("compare.zoomIn")}
+        hint="+"
+        aria-label={t("compare.zoomIn")}
+        onClick={() => zoom.zoomBy(1.25)}
+      >
         <Plus className="size-4" aria-hidden />
       </StageButton>
       <StageButton tip={t("compare.fitHint")} hint="0" aria-pressed={zoom.isFit} onClick={zoom.fit} className="ml-1">

@@ -82,7 +82,12 @@ export function openEventStream(url: string, handlers: EventStreamHandlers): Eve
   void (async () => {
     let res: Response;
     try {
-      res = await fetch(url, { headers: { Accept: "text/event-stream" }, credentials: "same-origin", cache: "no-store", signal: abort.signal });
+      res = await fetch(url, {
+        headers: { Accept: "text/event-stream" },
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: abort.signal,
+      });
     } catch {
       return end(null);
     }

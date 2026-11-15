@@ -28,7 +28,11 @@ export function ScaleHeader({ scale, today }: { scale: Scale; today: number }) {
         {months.map((m) => {
           const narrow = m.days * scale.dayW < 96;
           return (
-            <div key={m.month} className="shrink-0 border-l border-line-strong first:border-l-0" style={{ width: m.days * scale.dayW }}>
+            <div
+              key={m.month}
+              className="shrink-0 border-l border-line-strong first:border-l-0"
+              style={{ width: m.days * scale.dayW }}
+            >
               {m.days * scale.dayW >= 44 && (
                 <span className="sticky left-[calc(var(--tl-left)+0.5rem)] inline-block px-2 pt-1 text-xs font-medium whitespace-nowrap text-ink-2">
                   {(narrow ? monthShort : monthName).format(new Date(`${m.month}-01T00:00:00Z`))}
@@ -45,7 +49,11 @@ export function ScaleHeader({ scale, today }: { scale: Scale; today: number }) {
                 key={d}
                 className={cx(
                   "absolute top-0 flex h-5 items-center justify-center tnum",
-                  d === today ? "rounded-sm bg-accent font-semibold text-accent-ink" : isWeekend(d) ? "text-ink-3/70" : "text-ink-2",
+                  d === today
+                    ? "rounded-sm bg-accent font-semibold text-accent-ink"
+                    : isWeekend(d)
+                      ? "text-ink-3/70"
+                      : "text-ink-2",
                 )}
                 style={{ left: xOf(scale, d) + 1, width: scale.dayW - 2 }}
               >
@@ -53,7 +61,11 @@ export function ScaleHeader({ scale, today }: { scale: Scale; today: number }) {
               </span>
             ))
           : weeks.map((d) => (
-              <span key={d} className="absolute top-0 flex h-5 items-center pl-1.5 tnum text-ink-2" style={{ left: xOf(scale, d) }}>
+              <span
+                key={d}
+                className="absolute top-0 flex h-5 items-center pl-1.5 tnum text-ink-2"
+                style={{ left: xOf(scale, d) }}
+              >
                 {dateOf(d)}
               </span>
             ))}
@@ -83,9 +95,16 @@ export function Backdrop({ scale, today }: { scale: Scale; today: number }) {
       style={{ width: widthOf(scale), backgroundImage: rules, backgroundSize: `${week}px 100%` }}
     >
       {months.slice(1).map((m) => (
-        <span key={m.month} className="absolute inset-y-0 w-px" style={{ left: xOf(scale, m.from), background: "var(--viz-axis)" }} />
+        <span
+          key={m.month}
+          className="absolute inset-y-0 w-px"
+          style={{ left: xOf(scale, m.from), background: "var(--viz-axis)" }}
+        />
       ))}
-      <span className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-accent" style={{ left: xOf(scale, today) + scale.dayW / 2 }} />
+      <span
+        className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-accent"
+        style={{ left: xOf(scale, today) + scale.dayW / 2 }}
+      />
     </div>
   );
 }

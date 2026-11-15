@@ -14,14 +14,27 @@ import { EmptyRow, Rows, Section } from "@/settings/ui/layout";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 
-const patch = (label: Label, fields: Partial<Label>) => send({ type: "label.update", args: { id: label.id, ...fields } }, (tx) => tx.patch("labels", label.id, fields));
+const patch = (label: Label, fields: Partial<Label>) =>
+  send({ type: "label.update", args: { id: label.id, ...fields } }, (tx) => tx.patch("labels", label.id, fields));
 
-function LabelRows({ labels, counts, onDelete }: { labels: Label[]; counts: Record<string, number>; onDelete: (label: Label) => void }) {
+function LabelRows({
+  labels,
+  counts,
+  onDelete,
+}: {
+  labels: Label[];
+  counts: Record<string, number>;
+  onDelete: (label: Label) => void;
+}) {
   return (
     <Rows>
       {labels.map((label) => (
         <div key={label.id} className="flex h-10 items-center gap-1.5 pr-1.5 pl-2">
-          <ColorButton value={label.color} onChange={(color) => patch(label, { color })} label={t("labels.color", { name: label.name })} />
+          <ColorButton
+            value={label.color}
+            onChange={(color) => patch(label, { color })}
+            label={t("labels.color", { name: label.name })}
+          />
           <InlineName value={label.name} onSave={(name) => patch(label, { name })} label={t("labels.name")} />
           <span className="shrink-0 text-xs text-ink-3 tnum">{t("statuses.count", { n: counts[label.id] ?? 0 })}</span>
           <IconButton label={`${t("s.delete")}: ${label.name}`} onClick={() => onDelete(label)}>
@@ -55,7 +68,11 @@ export function ProjectLabels({ project }: { project: Project }) {
     <div className="flex flex-col gap-6">
       <p className="max-w-prose text-sm text-ink-2">{t("labels.lead")}</p>
       <Section title={t("labels.project")}>
-        {own.length === 0 ? <EmptyRow>{t("labels.none")}</EmptyRow> : <LabelRows labels={own} counts={counts} onDelete={setDeleting} />}
+        {own.length === 0 ? (
+          <EmptyRow>{t("labels.none")}</EmptyRow>
+        ) : (
+          <LabelRows labels={own} counts={counts} onDelete={setDeleting} />
+        )}
       </Section>
       {shared.length > 0 && (
         <Section title={t("labels.workspace")}>
@@ -86,7 +103,11 @@ function AddLabel({ project, used }: { project: Project; used: number }) {
     errors.clear();
     if (!name.trim()) return errors.set("name", t("s.required"));
     await run(async () => {
-      const args: Record<string, unknown> = { id: newId(), name: name.trim(), color: SWATCHES[(used + 2) % SWATCHES.length] };
+      const args: Record<string, unknown> = {
+        id: newId(),
+        name: name.trim(),
+        color: SWATCHES[(used + 2) % SWATCHES.length],
+      };
       if (scope === "project") args.project = project.id;
       await mutate({ type: "label.create", args }, undefined, { quiet: true });
       setName("");
@@ -96,7 +117,13 @@ function AddLabel({ project, used }: { project: Project; used: number }) {
   return (
     <form onSubmit={add} className="flex flex-col gap-1.5">
       <div className="flex items-start gap-2">
-        <Input aria-label={t("labels.name")} placeholder={t("labels.name")} value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-1" />
+        <Input
+          aria-label={t("labels.name")}
+          placeholder={t("labels.name")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="min-w-0 flex-1"
+        />
         <NativeSelect
           aria-label={t("labels.scope")}
           value={scope}

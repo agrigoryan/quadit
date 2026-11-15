@@ -67,7 +67,9 @@ export interface Token {
  * "Listening" means the same thing in both places.
  */
 export function useAgentStates(): { data: Record<string, AgentState> | undefined; error: string } {
-  const live = useLive<{ agents: AgentState[] }>("/agents", { only: ["member", "task", "session", "webhook", "decision"] });
+  const live = useLive<{ agents: AgentState[] }>("/agents", {
+    only: ["member", "task", "session", "webhook", "decision"],
+  });
   const data = useMemo(() => {
     if (!live.data) return undefined;
     const out: Record<string, AgentState> = {};

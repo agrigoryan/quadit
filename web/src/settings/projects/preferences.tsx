@@ -42,7 +42,9 @@ export function ProjectPreferences({ project, admin }: { project: Project; admin
   }, [rows, project.id]);
 
   const retire = (p: Preference, on: boolean) =>
-    send({ type: "preference.update", args: { id: p.id, retired: on } }, (tx) => tx.patch("preferences", p.id, { retired_at: on ? Date.now() : null }));
+    send({ type: "preference.update", args: { id: p.id, retired: on } }, (tx) =>
+      tx.patch("preferences", p.id, { retired_at: on ? Date.now() : null }),
+    );
 
   const list = (items: Preference[]) => (
     <Rows>
@@ -51,7 +53,9 @@ export function ProjectPreferences({ project, admin }: { project: Project; admin
           <div className="min-w-0 flex-1">
             <p className={p.retired_at ? "text-sm text-ink-3 line-through" : "text-sm text-ink"}>{p.body}</p>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
-              {(p.label_ids ?? []).map((id) => labels[id] && <LabelChip key={id} name={labels[id].name} color={labels[id].color} />)}
+              {(p.label_ids ?? []).map(
+                (id) => labels[id] && <LabelChip key={id} name={labels[id].name} color={labels[id].color} />,
+              )}
               <span>{members[p.created_by]?.name ?? t("common.someone")}</span>
               <When ms={p.created_at} />
               {p.decision_id && <span>· {t("prefs.fromDecision")}</span>}
@@ -117,7 +121,11 @@ function AddPreference({ project }: { project: Project }) {
     errors.clear();
     if (!body.trim()) return errors.set("body", t("s.required"));
     await run(async () => {
-      await mutate({ type: "preference.create", args: { id: newId(), body: body.trim(), project: project.id, labels: picked } }, undefined, { quiet: true });
+      await mutate(
+        { type: "preference.create", args: { id: newId(), body: body.trim(), project: project.id, labels: picked } },
+        undefined,
+        { quiet: true },
+      );
       setBody("");
       setPicked([]);
     });
@@ -127,7 +135,14 @@ function AddPreference({ project }: { project: Project }) {
     <Card>
       <form onSubmit={add} className="flex flex-col gap-3.5">
         <FormField label={t("prefs.body")} htmlFor="pref-body" error={errors.fields.body}>
-          <Textarea id="pref-body" rows={2} autoGrow value={body} onChange={(e) => setBody(e.target.value)} placeholder={t("prefs.bodyPlaceholder")} />
+          <Textarea
+            id="pref-body"
+            rows={2}
+            autoGrow
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={t("prefs.bodyPlaceholder")}
+          />
         </FormField>
         <FormField label={t("prefs.labels")} error={errors.fields.labels}>
           <MultiPick

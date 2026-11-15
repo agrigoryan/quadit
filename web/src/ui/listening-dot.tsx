@@ -14,7 +14,11 @@ export function ListeningDot({ on, className }: { on: boolean; className?: strin
       role="img"
       aria-label={label}
       title={on ? t("agents.listeningHint") : t("agents.notListeningHint")}
-      className={cx("inline-block size-2 shrink-0 rounded-full", on ? "bg-ok" : "border border-line-strong bg-transparent", className)}
+      className={cx(
+        "inline-block size-2 shrink-0 rounded-full",
+        on ? "bg-ok" : "border border-line-strong bg-transparent",
+        className,
+      )}
     />
   );
 }

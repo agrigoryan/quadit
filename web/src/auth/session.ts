@@ -97,7 +97,9 @@ export async function secondStep(code: string): Promise<void> {
 
 /** Signs in with a passkey: the browser asks which one, and it says who this is. */
 export async function passkeySignIn(): Promise<"ok" | "second_step"> {
-  const start = await api.post<{ options: { publicKey: Record<string, unknown> }; state: string }>("/api/v1/auth/passkeys/login/start");
+  const start = await api.post<{ options: { publicKey: Record<string, unknown> }; state: string }>(
+    "/api/v1/auth/passkeys/login/start",
+  );
   const credential = await getPasskey(start.options);
   const out = await api.post<{ second_step?: boolean }>(
     `/api/v1/auth/passkeys/login/finish?state=${encodeURIComponent(start.state)}`,
@@ -120,7 +122,10 @@ export async function register(input: { name: string; email: string; password: s
 
 /** Makes another workspace, owned by the person signed in. Returns its slug. */
 export async function createWorkspace(name: string, slug?: string): Promise<string> {
-  const ws = await api.post<{ slug: string }>("/api/v1/workspaces", { name: name.trim(), slug: slug?.trim() || undefined });
+  const ws = await api.post<{ slug: string }>("/api/v1/workspaces", {
+    name: name.trim(),
+    slug: slug?.trim() || undefined,
+  });
   await loadSession();
   return ws.slug;
 }

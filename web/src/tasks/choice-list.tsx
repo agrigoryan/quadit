@@ -25,12 +25,22 @@ export interface ChoiceListProps {
   manage?: { label: string; onSelect: () => void };
 }
 
-const row = "flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm select-none data-[selected=true]:bg-hover";
+const row =
+  "flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm select-none data-[selected=true]:bg-hover";
 
 /** Plain substring search over the name and keywords: no surprises. */
 const found = (item: PickerItem, q: string) => `${item.label} ${item.keywords ?? ""}`.toLowerCase().includes(q);
 
-export function ChoiceList({ items, value, onPick, label, placeholder, onCreate, createLabel, manage }: ChoiceListProps) {
+export function ChoiceList({
+  items,
+  value,
+  onPick,
+  label,
+  placeholder,
+  onCreate,
+  createLabel,
+  manage,
+}: ChoiceListProps) {
   const [search, setSearch] = useState("");
   const picked = new Set(Array.isArray(value) ? value : value ? [value] : []);
   const typed = search.trim();
@@ -48,7 +58,9 @@ export function ChoiceList({ items, value, onPick, label, placeholder, onCreate,
         className="h-9 w-full shrink-0 border-b border-line bg-transparent px-3 text-sm outline-none"
       />
       <Command.List className="min-h-0 flex-1 overflow-y-auto p-1">
-        {shown.length === 0 && !canCreate && <p className="px-2 py-3 text-center text-sm text-ink-3">{t("common.noMatches")}</p>}
+        {shown.length === 0 && !canCreate && (
+          <p className="px-2 py-3 text-center text-sm text-ink-3">{t("common.noMatches")}</p>
+        )}
         {shown.map((item) => (
           <Command.Item key={item.id} value={item.id} onSelect={() => onPick(item.id)} className={row}>
             {item.icon && <span className="flex size-4 shrink-0 items-center justify-center">{item.icon}</span>}
@@ -101,7 +113,18 @@ interface PickerProps extends ChoiceListProps {
 }
 
 /** A ChoiceList in a popover, opened by its child. */
-export function ChoicePicker({ multiple, open, onOpenChange, children, anchor, align, side, onPick, manage, ...list }: PickerProps) {
+export function ChoicePicker({
+  multiple,
+  open,
+  onOpenChange,
+  children,
+  anchor,
+  align,
+  side,
+  onPick,
+  manage,
+  ...list
+}: PickerProps) {
   const [own, setOwn] = useState(false);
   const isOpen = open ?? own;
   const setOpen = onOpenChange ?? setOwn;

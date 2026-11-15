@@ -74,7 +74,8 @@ export function useCompare(props: CompareProps): Compare {
   const stage = useRef(new Map<string, HTMLVideoElement>());
 
   const filesOf = (option: DecisionOption) => media[option.id] ?? [];
-  const fileIndexOf = (option: DecisionOption) => Math.min(shown[option.id] ?? 0, Math.max(0, filesOf(option).length - 1));
+  const fileIndexOf = (option: DecisionOption) =>
+    Math.min(shown[option.id] ?? 0, Math.max(0, filesOf(option).length - 1));
   const fileOf = (option: DecisionOption) => filesOf(option)[fileIndexOf(option)];
 
   const setVideo = useCallback((optionId: string, el: HTMLVideoElement | null) => {

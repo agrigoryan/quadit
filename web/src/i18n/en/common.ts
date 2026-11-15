@@ -48,7 +48,8 @@ export const common = {
   "auth.signIn.busy": "Signing in…",
   "auth.secondStep.title": "One more step",
   "auth.setup.title": "Set up Quadit",
-  "auth.setup.lead": "This install is new. Make the first account and workspace; you can invite people and add agents after.",
+  "auth.setup.lead":
+    "This install is new. Make the first account and workspace; you can invite people and add agents after.",
   "auth.setup.name": "Your name",
   "auth.setup.passwordHint": "At least 10 characters.",
   "auth.setup.workspace": "Workspace name",
@@ -104,7 +105,8 @@ export const common = {
   "sync.offlineTitle": "Waiting for a connection",
   "sync.offlineHint": "The workspace opens by itself as soon as the server can be reached.",
   "sync.noAccessTitle": "You can't open this workspace",
-  "sync.noAccessHint": "You may have been removed from it, or your membership was suspended. Ask an admin of the workspace if this is a mistake.",
+  "sync.noAccessHint":
+    "You may have been removed from it, or your membership was suspended. Ask an admin of the workspace if this is a mistake.",
   "sync.removed": "You no longer have access to {name}.",
   "sync.otherWorkspaces": "Your other workspaces",
 
@@ -113,7 +115,8 @@ export const common = {
   "upload.waiting": "{n} upload waiting for a connection | {n} uploads waiting for a connection",
   "upload.waitingOne": "Waiting for a connection",
   "upload.queued": "Waiting its turn",
-  "upload.keptHint": "Files waiting to upload are kept only while this page stays open. They carry on by themselves when the connection is back.",
+  "upload.keptHint":
+    "Files waiting to upload are kept only while this page stays open. They carry on by themselves when the connection is back.",
 
   "category.backlog": "Backlog",
   "category.unstarted": "To do",

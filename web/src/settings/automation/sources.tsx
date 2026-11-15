@@ -18,7 +18,12 @@ import { SourceForm } from "@/settings/automation/source-form";
 import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
 
 /** "docs" for ".../owner/docs.git": what to call a source whose root page is not in view. */
-const repoName = (repo: string) => repo.replace(/\/+$/, "").replace(/\.git$/, "").split(/[/:]/).pop() || repo;
+const repoName = (repo: string) =>
+  repo
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "")
+    .split(/[/:]/)
+    .pop() || repo;
 
 function syncText(r: SyncResult): string {
   const parts = [
@@ -96,7 +101,11 @@ function SourceItem({ src, sync, onSync, onEdit, onDelete }: ItemProps) {
       </div>
       {(sync || src.last_error) && (
         <div className="pl-7">
-          {sync ? <SyncLine state={sync} /> : <SyncLine state={{ busy: false, ok: false, text: t("auto.lastError", { error: src.last_error ?? "" }) }} />}
+          {sync ? (
+            <SyncLine state={sync} />
+          ) : (
+            <SyncLine state={{ busy: false, ok: false, text: t("auto.lastError", { error: src.last_error ?? "" }) }} />
+          )}
         </div>
       )}
     </div>
@@ -142,7 +151,14 @@ export function SourcesPage() {
           ) : (
             <Rows>
               {rows.map((src) => (
-                <SourceItem key={src.id} src={src} sync={syncs[src.id]} onSync={() => void sync(src)} onEdit={() => setForm({ src })} onDelete={() => setRemoving(src)} />
+                <SourceItem
+                  key={src.id}
+                  src={src}
+                  sync={syncs[src.id]}
+                  onSync={() => void sync(src)}
+                  onEdit={() => setForm({ src })}
+                  onDelete={() => setRemoving(src)}
+                />
               ))}
             </Rows>
           )

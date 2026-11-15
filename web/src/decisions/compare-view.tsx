@@ -25,7 +25,9 @@ function ConfirmBar({ c, onConfirm }: { c: Compare; onConfirm: () => void }) {
       aria-label={t("compare.confirm", { label: c.pending.label })}
       className="absolute inset-x-0 bottom-24 z-10 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-2 rounded-xl bg-inverse py-2 pr-2 pl-4 shadow-pop ring-1 ring-white/20 animate-pop"
     >
-      <p className="mr-2 min-w-0 truncate text-sm font-semibold text-inverse-ink">{t("compare.confirm", { label: c.pending.label })}</p>
+      <p className="mr-2 min-w-0 truncate text-sm font-semibold text-inverse-ink">
+        {t("compare.confirm", { label: c.pending.label })}
+      </p>
       <Button autoFocus variant={c.viewer.mine ? "move" : "secondary"} onClick={onConfirm}>
         {t("compare.confirmPick")}
         <Kbd>↵</Kbd>
@@ -119,7 +121,12 @@ export function CompareView(props: CompareProps) {
             </RDialog.Title>
             {paged && (
               <div role="group" aria-label={t("compare.pages")} className="flex items-center">
-                <StageButton aria-label={t("compare.prevPage")} tip={t("compare.prevPage")} disabled={first === 0} onClick={() => c.focusOn(first - perPage)}>
+                <StageButton
+                  aria-label={t("compare.prevPage")}
+                  tip={t("compare.prevPage")}
+                  disabled={first === 0}
+                  onClick={() => c.focusOn(first - perPage)}
+                >
                   <ChevronLeft className="size-4" aria-hidden />
                 </StageButton>
                 <span className="px-1 text-xs text-inverse-ink tnum">
@@ -138,7 +145,12 @@ export function CompareView(props: CompareProps) {
             {!phone && <ZoomControls c={c} />}
             <PixelToggle c={c} compact={phone} />
             <RDialog.Close asChild>
-              <StageButton aria-label={t("common.close")} tip={t("common.close")} hint="Esc" className="max-sm:size-10!">
+              <StageButton
+                aria-label={t("common.close")}
+                tip={t("common.close")}
+                hint="Esc"
+                className="max-sm:size-10!"
+              >
                 <X className="size-4" aria-hidden />
               </StageButton>
             </RDialog.Close>

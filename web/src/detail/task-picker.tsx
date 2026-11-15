@@ -41,7 +41,15 @@ export function TaskPicker({ filter, value, onPick, label, extra, open, onOpenCh
   }, [tasks, statuses, filter, extra]);
 
   return (
-    <Picker items={items} value={value} onPick={onPick} label={label} placeholder={label} open={open} onOpenChange={onOpenChange}>
+    <Picker
+      items={items}
+      value={value}
+      onPick={onPick}
+      label={label}
+      placeholder={label}
+      open={open}
+      onOpenChange={onOpenChange}
+    >
       {children}
     </Picker>
   );

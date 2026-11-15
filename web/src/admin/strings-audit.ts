@@ -2,7 +2,8 @@
 
 export const auditStrings = {
   "audit.title": "Audit log",
-  "audit.adminLead": "Sign-ins, changes to settings, tokens, invitations and exports, across the install. Newest first.",
+  "audit.adminLead":
+    "Sign-ins, changes to settings, tokens, invitations and exports, across the install. Newest first.",
   "audit.workspaceLead": "Who did what in this workspace: invitations, tokens, exports and membership. Newest first.",
   "audit.filter.action": "Action",
   "audit.filter.actionPlaceholder": "signin* or token.created",

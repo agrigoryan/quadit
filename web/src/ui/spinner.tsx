@@ -6,7 +6,10 @@ export function Spinner({ className, label = t("common.loading") }: { className?
     <span
       role="status"
       aria-label={label}
-      className={cx("inline-block size-4 animate-spin rounded-full border-2 border-line-strong border-t-accent", className)}
+      className={cx(
+        "inline-block size-4 animate-spin rounded-full border-2 border-line-strong border-t-accent",
+        className,
+      )}
     />
   );
 }

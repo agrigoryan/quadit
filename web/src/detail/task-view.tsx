@@ -43,8 +43,12 @@ interface Props {
  * goes on to the page.
  */
 function onControl(e: KeyboardEvent): boolean {
-  const control = e.target instanceof HTMLElement ? e.target.closest("a, button, input, textarea, select, [role=button]") : null;
-  return control !== null && !(control instanceof HTMLAnchorElement && isTaskPath(control.pathname) && !control.closest("[data-task-panel]"));
+  const control =
+    e.target instanceof HTMLElement ? e.target.closest("a, button, input, textarea, select, [role=button]") : null;
+  return (
+    control !== null &&
+    !(control instanceof HTMLAnchorElement && isTaskPath(control.pathname) && !control.closest("[data-task-panel]"))
+  );
 }
 
 /** Names the browser tab after the task, for its own page: the panel leaves the name of the page under it. */

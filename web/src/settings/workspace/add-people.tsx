@@ -57,7 +57,8 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
     errors.clear();
     setUnknown("");
     const address = email.trim();
-    if (mode !== "link" && !/^\S+@\S+\.\S+$/.test(address)) return errors.set(mode === "account" ? "user" : "email", t("invites.emailBad"));
+    if (mode !== "link" && !/^\S+@\S+\.\S+$/.test(address))
+      return errors.set(mode === "account" ? "user" : "email", t("invites.emailBad"));
     setBusy(true);
     try {
       if (mode === "account") {
@@ -68,7 +69,8 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
         onAdded(address);
         return;
       }
-      const body = mode === "email" ? { email: address, role, expires_days: days } : { role, expires_days: days, max_uses: uses };
+      const body =
+        mode === "email" ? { email: address, role, expires_days: days } : { role, expires_days: days, max_uses: uses };
       onCreated(await api.post<Created>(ws(slug, "/invites"), body));
     } catch (err) {
       if (mode === "account" && err instanceof ApiError && err.status === 404) setUnknown(address);
@@ -98,7 +100,7 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
       open
       onOpenChange={(open) => !open && onClose()}
       title={t("invites.new")}
-            footer={
+      footer={
         <>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button variant="primary" type="submit" form="invite-form" disabled={busy}>
@@ -122,32 +124,59 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
             hint={mode === "account" ? t("members.accountHint") : t("invites.emailHint")}
             error={mode === "account" ? errors.fields.user : errors.fields.email}
           >
-            <Input id="inv-email" type="email" autoComplete="off" autoCapitalize="none" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+            <Input
+              id="inv-email"
+              type="email"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+            />
           </FormField>
         )}
         {unknown && (
           <p className="-mt-1.5 text-sm">
-            <button type="button" className="font-medium text-accent-text underline-offset-2 hover:underline" onClick={() => go("email")}>
+            <button
+              type="button"
+              className="font-medium text-accent-text underline-offset-2 hover:underline"
+              onClick={() => go("email")}
+            >
               {t("members.inviteInstead", { email: unknown })}
             </button>
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <FormField label={t("invites.role")} error={errors.fields.role} className={mode === "email" ? "" : "col-span-2"}>
+          <FormField
+            label={t("invites.role")}
+            error={errors.fields.role}
+            className={mode === "email" ? "" : "col-span-2"}
+          >
             <NativeSelect value={role} onChange={(v) => setRole(v as Role)} options={roleChoices(roles)} />
           </FormField>
           {mode !== "account" && (
             <FormField label={t("invites.expires")}>
-              <NativeSelect value={String(days)} onChange={(v) => setDays(Number(v))} options={DAYS.map((n) => ({ value: String(n), label: t("invites.days", { n }) }))} />
+              <NativeSelect
+                value={String(days)}
+                onChange={(v) => setDays(Number(v))}
+                options={DAYS.map((n) => ({ value: String(n), label: t("invites.days", { n }) }))}
+              />
             </FormField>
           )}
           {mode === "link" && (
             <FormField label={t("invites.uses")}>
-              <NativeSelect value={String(uses)} onChange={(v) => setUses(Number(v))} options={USES.map((n) => ({ value: String(n), label: t("invites.usesN", { n }) }))} />
+              <NativeSelect
+                value={String(uses)}
+                onChange={(v) => setUses(Number(v))}
+                options={USES.map((n) => ({ value: String(n), label: t("invites.usesN", { n }) }))}
+              />
             </FormField>
           )}
         </div>
-        {mode === "account" && role !== "owner" && <MemberScopeFields value={scope} onChange={setScope} error={errors.fields.scope} />}
+        {mode === "account" && role !== "owner" && (
+          <MemberScopeFields value={scope} onChange={setScope} error={errors.fields.scope} />
+        )}
         <FormAlert>{errors.form}</FormAlert>
       </form>
     </Dialog>

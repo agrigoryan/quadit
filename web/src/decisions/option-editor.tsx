@@ -70,7 +70,10 @@ function RolePicker({ entry, onRole }: { entry: DraftFile; onRole: (role: FileRo
         </button>
       </MenuTrigger>
       <MenuContent>
-        <MenuRadioGroup value={entry.role ?? NO_ROLE} onValueChange={(value) => onRole(value === NO_ROLE ? undefined : (value as FileRole))}>
+        <MenuRadioGroup
+          value={entry.role ?? NO_ROLE}
+          onValueChange={(value) => onRole(value === NO_ROLE ? undefined : (value as FileRole))}
+        >
           <MenuRadioItem value={NO_ROLE}>{t("decision.new.role.none")}</MenuRadioItem>
           <MenuRadioItem value="before">{t("decision.new.role.before")}</MenuRadioItem>
           <MenuRadioItem value="after">{t("decision.new.role.after")}</MenuRadioItem>
@@ -80,7 +83,15 @@ function RolePicker({ entry, onRole }: { entry: DraftFile; onRole: (role: FileRo
   );
 }
 
-function Thumb({ entry, onRemove, onRole }: { entry: DraftFile; onRemove: () => void; onRole: (role: FileRole | undefined) => void }) {
+function Thumb({
+  entry,
+  onRemove,
+  onRole,
+}: {
+  entry: DraftFile;
+  onRemove: () => void;
+  onRole: (role: FileRole | undefined) => void;
+}) {
   return (
     <li className="relative w-14 shrink-0">
       {entry.file ? (
@@ -93,7 +104,11 @@ function Thumb({ entry, onRemove, onRole }: { entry: DraftFile; onRemove: () => 
             entry.failed ? "border-danger bg-danger-soft text-danger" : "border-line bg-sunken",
           )}
         >
-          {entry.failed ? t("decision.new.uploadFailed") : <Spinner label={t("decision.new.uploading", { name: entry.name })} />}
+          {entry.failed ? (
+            t("decision.new.uploadFailed")
+          ) : (
+            <Spinner label={t("decision.new.uploading", { name: entry.name })} />
+          )}
         </span>
       )}
       <button
@@ -129,9 +144,15 @@ export function OptionEditor(props: Props) {
         setOver(false);
         if (e.dataTransfer.files.length) props.onAddFiles([...e.dataTransfer.files]);
       }}
-      className={cx("flex gap-2.5 rounded-lg border bg-surface p-3", over ? "border-accent ring-2 ring-accent/25" : "border-line")}
+      className={cx(
+        "flex gap-2.5 rounded-lg border bg-surface p-3",
+        over ? "border-accent ring-2 ring-accent/25" : "border-line",
+      )}
     >
-      <span aria-hidden className="mt-1.5 flex size-5 shrink-0 items-center justify-center rounded-sm bg-sunken text-2xs font-semibold text-ink-2 tnum">
+      <span
+        aria-hidden
+        className="mt-1.5 flex size-5 shrink-0 items-center justify-center rounded-sm bg-sunken text-2xs font-semibold text-ink-2 tnum"
+      >
         {position}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -152,13 +173,28 @@ export function OptionEditor(props: Props) {
               </p>
             )}
           </div>
-          <IconButton label={t("decision.new.moveUp")} disabled={index === 0} onClick={() => props.onMove(-1)} className="mt-0.5 max-sm:size-9">
+          <IconButton
+            label={t("decision.new.moveUp")}
+            disabled={index === 0}
+            onClick={() => props.onMove(-1)}
+            className="mt-0.5 max-sm:size-9"
+          >
             <ArrowUp className="size-4" />
           </IconButton>
-          <IconButton label={t("decision.new.moveDown")} disabled={index === total - 1} onClick={() => props.onMove(1)} className="mt-0.5 max-sm:size-9">
+          <IconButton
+            label={t("decision.new.moveDown")}
+            disabled={index === total - 1}
+            onClick={() => props.onMove(1)}
+            className="mt-0.5 max-sm:size-9"
+          >
             <ArrowDown className="size-4" />
           </IconButton>
-          <IconButton label={t("decision.new.removeOption")} disabled={total <= 2} onClick={props.onRemove} className="mt-0.5 max-sm:size-9">
+          <IconButton
+            label={t("decision.new.removeOption")}
+            disabled={total <= 2}
+            onClick={props.onRemove}
+            className="mt-0.5 max-sm:size-9"
+          >
             <Trash2 className="size-4" />
           </IconButton>
         </div>
@@ -209,9 +245,10 @@ export function OptionEditor(props: Props) {
             {recommended ? t("decision.recommended") : t("decision.new.recommend")}
           </Button>
         </div>
-        {option.files.some((f) => f.role) && !(option.files.some((f) => f.role === "before") && option.files.some((f) => f.role === "after")) && (
-          <p className="text-xs text-ink-3">{t("decision.new.pairHint")}</p>
-        )}
+        {option.files.some((f) => f.role) &&
+          !(option.files.some((f) => f.role === "before") && option.files.some((f) => f.role === "after")) && (
+            <p className="text-xs text-ink-3">{t("decision.new.pairHint")}</p>
+          )}
         {recommended && (
           <Input
             value={reason}

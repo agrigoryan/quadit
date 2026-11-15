@@ -87,7 +87,9 @@ export async function updateDecision(decision: Decision, edit: DecisionEdit): Pr
 }
 
 export function deleteDecision(decision: Decision) {
-  send({ type: "decision.delete", args: { id: decision.id } }, (tx) => tx.patch("decisions", decision.id, { deleted_at: Date.now() }));
+  send({ type: "decision.delete", args: { id: decision.id } }, (tx) =>
+    tx.patch("decisions", decision.id, { deleted_at: Date.now() }),
+  );
 }
 
 /**
@@ -101,17 +103,19 @@ export function restoreDecision(id: string): Promise<unknown> {
 /** A comment on one option, or on the decision as a whole. */
 export function addComment(decision: Decision, optionId: string | undefined, body: string) {
   const id = newId();
-  send({ type: "comment.create", args: optionId ? { id, option: optionId, body } : { id, decision: decision.id, body } }, (tx) =>
-    tx.insert("comments", {
-      id,
-      task_id: decision.task_id,
-      subject_type: optionId ? "decision_option" : "decision",
-      subject_id: optionId ?? decision.id,
-      kind: "comment",
-      author_id: meId(),
-      body,
-      created_at: Date.now(),
-    }),
+  send(
+    { type: "comment.create", args: optionId ? { id, option: optionId, body } : { id, decision: decision.id, body } },
+    (tx) =>
+      tx.insert("comments", {
+        id,
+        task_id: decision.task_id,
+        subject_type: optionId ? "decision_option" : "decision",
+        subject_id: optionId ?? decision.id,
+        kind: "comment",
+        author_id: meId(),
+        body,
+        created_at: Date.now(),
+      }),
   );
 }
 
@@ -157,7 +161,13 @@ export async function openDecision(draft: NewDecision): Promise<void> {
   const optionRanks = ranks(options.length);
   const attachments = options.flatMap((o) => {
     const fileRanks = ranks(o.files.length);
-    return o.files.map(({ file, role }, i) => ({ id: newId(), option: o.id, file, role, rank: fileRanks[i] as string }));
+    return o.files.map(({ file, role }, i) => ({
+      id: newId(),
+      option: o.id,
+      file,
+      role,
+      rank: fileRanks[i] as string,
+    }));
   });
   const siblings = Object.values(getState().c.decisions).filter((d) => d.task_id === draft.taskId);
   const lastRank = siblings.reduce((max, d) => (d.rank > max ? d.rank : max), "");
@@ -172,7 +182,9 @@ export async function openDecision(draft: NewDecision): Promise<void> {
       id: o.id,
       label: o.label.trim(),
       description: o.description.trim(),
-      attachments: attachments.filter((a) => a.option === o.id).map((a) => ({ id: a.id, file: a.file.id, ...(a.role ? { role: a.role } : {}) })),
+      attachments: attachments
+        .filter((a) => a.option === o.id)
+        .map((a) => ({ id: a.id, file: a.file.id, ...(a.role ? { role: a.role } : {}) })),
     })),
   };
   if (recommended) {

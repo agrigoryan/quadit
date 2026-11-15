@@ -38,7 +38,9 @@ export function EpicDescription({ epic }: { epic: Epic }) {
           }}
         />
         <div className="mt-2 flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-xs text-ink-3 max-sm:invisible">{t("detail.saveHint", { mod: MOD })}</span>
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-3 max-sm:invisible">
+            {t("detail.saveHint", { mod: MOD })}
+          </span>
           <Button variant="ghost" onClick={() => setDraft(null)}>
             {t("common.cancel")}
           </Button>

@@ -33,7 +33,10 @@ function connect(provider: string) {
 /** Accounts elsewhere (Google, GitHub, single sign-on) that can sign in to this one. */
 export function IdentitiesSection({ onChanged }: { onChanged: () => void }) {
   const data = useLoad(async () => {
-    const [config, ids] = await Promise.all([authConfig(), api.get<{ identities: Identity[] }>("/api/v1/auth/identities")]);
+    const [config, ids] = await Promise.all([
+      authConfig(),
+      api.get<{ identities: Identity[] }>("/api/v1/auth/identities"),
+    ]);
     return { providers: config.providers as Provider[], identities: ids.identities };
   }, []);
   const [removing, setRemoving] = useState<{ identity: Identity; name: string } | null>(null);
@@ -42,7 +45,8 @@ export function IdentitiesSection({ onChanged }: { onChanged: () => void }) {
     <Section title={t("me.identities.title")} lead={t("me.identities.lead")}>
       <LoadGate of={data}>
         {({ providers, identities }) => {
-          const nameOf = (id: string) => providers.find((p) => p.id === id)?.name ?? builtIn[id] ?? t("me.identities.sso");
+          const nameOf = (id: string) =>
+            providers.find((p) => p.id === id)?.name ?? builtIn[id] ?? t("me.identities.sso");
           const open = providers.filter((p) => !identities.some((i) => i.provider === p.id));
           if (identities.length === 0 && open.length === 0) return <EmptyRow>{t("me.identities.none")}</EmptyRow>;
           return (

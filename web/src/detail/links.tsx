@@ -21,7 +21,9 @@ function addLink(task: Task, url: string, title: string) {
   const id = newId();
   const args: Record<string, unknown> = { id, task: task.id, kind: "url", url };
   if (title) args.title = title;
-  send({ type: "link.set", args }, (tx) => tx.insert("links", { id, task_id: task.id, kind: "url", url, title: title || undefined }));
+  send({ type: "link.set", args }, (tx) =>
+    tx.insert("links", { id, task_id: task.id, kind: "url", url, title: title || undefined }),
+  );
 }
 
 function removeLink(id: string) {
@@ -44,7 +46,13 @@ function LinkChip({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
   return (
     <li className="flex max-w-full min-w-0 items-center rounded-md border border-line">
       {link.url && isWeb(link.url) ? (
-        <a href={link.url} target="_blank" rel="noreferrer noopener" title={link.url} className={`${box} rounded-l-md hover:bg-hover`}>
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          title={link.url}
+          className={`${box} rounded-l-md hover:bg-hover`}
+        >
           {body}
         </a>
       ) : (

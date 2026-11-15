@@ -26,7 +26,12 @@ function shift(offset: number, before: string, after: string): number {
   while (head < before.length && head < after.length && before[head] === after[head]) head++;
   if (offset <= head) return offset;
   let tail = 0;
-  while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
+  while (
+    tail < before.length - head &&
+    tail < after.length - head &&
+    before[before.length - 1 - tail] === after[after.length - 1 - tail]
+  )
+    tail++;
   if (offset >= before.length - tail) return offset + after.length - before.length;
   return after.length - tail;
 }

@@ -22,7 +22,8 @@ interface Props {
 
 /** What a new task in this group starts with. */
 function draftFor(group: TaskGroup): NewTaskDraft {
-  if (group.kind === "status" && group.id === group.value && group.category !== group.value) return { statusId: group.value };
+  if (group.kind === "status" && group.id === group.value && group.category !== group.value)
+    return { statusId: group.value };
   if (group.kind === "assignee" && group.value !== NONE) return { assigneeId: group.value };
   if (group.kind === "epic" && group.value !== NONE) return { epicId: group.value };
   if (group.kind === "label" && group.value !== NONE) return { labelIds: [group.value] };
@@ -63,7 +64,8 @@ interface Row {
 const rowKey = (group: TaskGroup, task: Task) => `${group.id}:${task.id}`;
 
 /** Space on a focused button presses it; anywhere else it is the list's. */
-const onButton = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("button, [role=button], summary") !== null;
+const onButton = (e: KeyboardEvent) =>
+  e.target instanceof HTMLElement && e.target.closest("button, [role=button], summary") !== null;
 
 /**
  * Tasks as dense rows under collapsible group headings, driven from the
@@ -282,7 +284,12 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
   const to = view.top + view.height + OVERSCAN;
 
   return (
-    <div ref={scroller} className="h-full overflow-y-auto" style={keyStyle} onMouseLeave={() => !picker && !peeking && setFocusKey(null)}>
+    <div
+      ref={scroller}
+      className="h-full overflow-y-auto"
+      style={keyStyle}
+      onMouseLeave={() => !picker && !peeking && setFocusKey(null)}
+    >
       <div className="relative" style={{ height: total + TAIL }}>
         {sections.map((section) => {
           if (section.top + section.height < from || section.top > to) return null;
@@ -298,7 +305,9 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
               className="absolute inset-x-0"
               style={{ top: section.top, height: section.height }}
             >
-              {section.head > 0 && <GroupHeader group={group} collapsed={collapsed.has(group.id)} onToggle={toggle} onAdd={addTo} />}
+              {section.head > 0 && (
+                <GroupHeader group={group} collapsed={collapsed.has(group.id)} onToggle={toggle} onAdd={addTo} />
+              )}
               {start > 0 && <div aria-hidden style={{ height: start * ROW }} />}
               {group.tasks.slice(start, end).map((task) => {
                 const key = rowKey(group, task);
@@ -320,7 +329,13 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
         })}
       </div>
       {picker && targets.length > 0 && (
-        <TaskPropertyPicker kind={picker} tasks={targets} open onOpenChange={(open) => !open && setPicker(null)} anchor={anchor} />
+        <TaskPropertyPicker
+          kind={picker}
+          tasks={targets}
+          open
+          onOpenChange={(open) => !open && setPicker(null)}
+          anchor={anchor}
+        />
       )}
     </div>
   );

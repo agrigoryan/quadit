@@ -50,7 +50,12 @@ function Bar({ row }: { row: ProjectRow }) {
   const [box, width] = useWidth<HTMLDivElement>();
   const summary = row.parts.map((p) => `${p.status} ${count(p.count)}`).join(", ");
   return (
-    <div ref={box} role="group" aria-label={t("ins.chart.statusLabel", { project: row.project, summary })} className="flex h-7 gap-0.5">
+    <div
+      ref={box}
+      role="group"
+      aria-label={t("ins.chart.statusLabel", { project: row.project, summary })}
+      className="flex h-7 gap-0.5"
+    >
       {row.parts.map((part) => {
         const share = part.count / row.total;
         // The count is printed only where it fits with room to spare, however many digits it has.
@@ -88,7 +93,9 @@ export function StatusStack({ rows, names }: { rows: StatusCount[]; names: Recor
             <span className="flex-1" />
             <span className={cx("shrink-0 text-ink-2 tnum")}>
               {t("ins.chart.taskCount", { n: row.total })}
-              {row.canceled > 0 && <span className="text-ink-3">{t("ins.chart.canceledMore", { n: row.canceled })}</span>}
+              {row.canceled > 0 && (
+                <span className="text-ink-3">{t("ins.chart.canceledMore", { n: row.canceled })}</span>
+              )}
             </span>
           </div>
           {row.total > 0 ? (
@@ -99,7 +106,11 @@ export function StatusStack({ rows, names }: { rows: StatusCount[]; names: Recor
         </div>
       ))}
       <Legend
-        series={STACK.filter((s) => used.has(s.category)).map((s) => ({ name: categoryName(s.category), color: s.color, mark: "bar" }))}
+        series={STACK.filter((s) => used.has(s.category)).map((s) => ({
+          name: categoryName(s.category),
+          color: s.color,
+          mark: "bar",
+        }))}
       />
     </div>
   );

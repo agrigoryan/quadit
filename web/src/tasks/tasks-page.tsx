@@ -24,6 +24,8 @@ export function ViewPage() {
   const only = keys.length === 1 ? keys[0] : undefined;
   const project =
     (view.project_id ? projects[view.project_id] : undefined) ??
-    (only ? Object.values(projects).find((p) => p.id === only || p.key.toLowerCase() === only.toLowerCase()) : undefined);
+    (only
+      ? Object.values(projects).find((p) => p.id === only || p.key.toLowerCase() === only.toLowerCase())
+      : undefined);
   return <TasksView key={view.id} project={project} view={view} />;
 }

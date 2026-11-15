@@ -28,7 +28,21 @@ function saveText(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function CodeField({ id, value, onChange, error, label, hint }: { id: string; value: string; onChange: (v: string) => void; error?: string; label: string; hint?: string }) {
+function CodeField({
+  id,
+  value,
+  onChange,
+  error,
+  label,
+  hint,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  error?: string;
+  label: string;
+  hint?: string;
+}) {
   return (
     <FormField label={label} htmlFor={id} error={error} hint={hint}>
       <Input
@@ -45,7 +59,15 @@ function CodeField({ id, value, onChange, error, label, hint }: { id: string; va
 }
 
 /** Step one and two of turning it on: add the key to an app, then prove the app works. */
-function SetupDialog({ setup, onClose, onEnabled }: { setup: { secret: string; url: string }; onClose: () => void; onEnabled: (codes: string[]) => void }) {
+function SetupDialog({
+  setup,
+  onClose,
+  onEnabled,
+}: {
+  setup: { secret: string; url: string };
+  onClose: () => void;
+  onEnabled: (codes: string[]) => void;
+}) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -99,7 +121,15 @@ function SetupDialog({ setup, onClose, onEnabled }: { setup: { secret: string; u
 }
 
 /** Asks for a code (and, to turn it off, optionally the password instead) before a change to the second step. */
-function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; onClose: () => void; onDone: (codes?: string[]) => void }) {
+function ConfirmCodeDialog({
+  mode,
+  onClose,
+  onDone,
+}: {
+  mode: "off" | "renew";
+  onClose: () => void;
+  onDone: (codes?: string[]) => void;
+}) {
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const errors = useFieldErrors(["code", "password"]);
@@ -128,7 +158,12 @@ function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; o
       footer={
         <>
           <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button type="submit" form="totp-confirm" variant={off ? "danger" : "primary"} disabled={busy || (!code.trim() && !password)}>
+          <Button
+            type="submit"
+            form="totp-confirm"
+            variant={off ? "danger" : "primary"}
+            disabled={busy || (!code.trim() && !password)}
+          >
             {off ? t("me.twoStep.turnOff") : t("me.twoStep.renew")}
           </Button>
         </>
@@ -145,7 +180,13 @@ function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; o
         />
         {off && (
           <FormField label={t("me.twoStep.orPassword")} htmlFor="totp-confirm-pw" error={errors.fields.password}>
-            <Input id="totp-confirm-pw" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <Input
+              id="totp-confirm-pw"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </FormField>
         )}
         <FormAlert>{errors.form}</FormAlert>

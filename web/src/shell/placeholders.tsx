@@ -13,7 +13,8 @@ export function ComingPage({ name }: { name: string }) {
 }
 
 /** True for a project (by its key) that the person could see until their access was narrowed while the app was open. */
-export const useLostProject = (key: string | undefined): boolean => useStore((s) => !!key && s.lostProjects.includes(key.toUpperCase()));
+export const useLostProject = (key: string | undefined): boolean =>
+  useStore((s) => !!key && s.lostProjects.includes(key.toUpperCase()));
 
 function MyWorkLink() {
   const slug = useSlug();
@@ -26,7 +27,14 @@ function MyWorkLink() {
 
 /** In place of a page or a task of a project the person has just lost. */
 export function LostProject() {
-  return <EmptyState icon={<Lock />} title={t("common.lostProject")} hint={t("common.lostProjectHint")} action={<MyWorkLink />} />;
+  return (
+    <EmptyState
+      icon={<Lock />}
+      title={t("common.lostProject")}
+      hint={t("common.lostProjectHint")}
+      action={<MyWorkLink />}
+    />
+  );
 }
 
 export function NotFoundPage() {
@@ -34,5 +42,12 @@ export function NotFoundPage() {
   const lost = useLostProject(useParams().key);
   usePageTitle(t(lost ? "common.lostProject" : "common.notFound"));
   if (lost) return <LostProject />;
-  return <EmptyState icon={<Compass />} title={t("common.notFound")} hint={t("common.notFoundHint")} action={<MyWorkLink />} />;
+  return (
+    <EmptyState
+      icon={<Compass />}
+      title={t("common.notFound")}
+      hint={t("common.notFoundHint")}
+      action={<MyWorkLink />}
+    />
+  );
 }

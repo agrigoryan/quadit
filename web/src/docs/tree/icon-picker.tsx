@@ -56,7 +56,11 @@ export function IconPicker({ docId, current, children, open, onOpenChange }: Pro
           />
           {current && (
             <PopoverClose asChild>
-              <button type="button" className="h-7 rounded-md px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink" onClick={() => set("")}>
+              <button
+                type="button"
+                className="h-7 rounded-md px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink"
+                onClick={() => set("")}
+              >
                 {t("docs.icon.remove")}
               </button>
             </PopoverClose>

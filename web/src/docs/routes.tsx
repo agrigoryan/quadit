@@ -61,7 +61,12 @@ function Area() {
   if (project && !id && treeIsEmpty(tree)) return <ProjectDocsHome project={project} empty />;
   return (
     <div className="flex h-full">
-      <aside className={cx("w-64 shrink-0 flex-col border-r border-line bg-canvas", id ? "hidden lg:flex" : "flex max-lg:w-full")}>
+      <aside
+        className={cx(
+          "w-64 shrink-0 flex-col border-r border-line bg-canvas",
+          id ? "hidden lg:flex" : "flex max-lg:w-full",
+        )}
+      >
         <div className="flex h-10 shrink-0 items-center justify-between gap-2 pr-2 pl-4">
           <h1 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
             {project && <ProjectGlyph project={project} />}

@@ -17,9 +17,17 @@ export function WaitsOnChip({ task, className }: { task: Task; className?: strin
   const member = useMember(task.waiting_on_id);
   if (waitsOutside(task)) {
     // Nobody here can move it: it waits on something outside, and the note says what.
-    const text = task.waiting_on_note ? t("task.waitsOutsideNote", { note: task.waiting_on_note }) : t("task.waitsOutside");
+    const text = task.waiting_on_note
+      ? t("task.waitsOutsideNote", { note: task.waiting_on_note })
+      : t("task.waitsOutside");
     return (
-      <span title={text} className={cx("inline-flex h-5 max-w-40 shrink-0 items-center gap-1 rounded-sm bg-wait-soft pr-1.5 pl-1 text-xs font-medium whitespace-nowrap text-wait", className)}>
+      <span
+        title={text}
+        className={cx(
+          "inline-flex h-5 max-w-40 shrink-0 items-center gap-1 rounded-sm bg-wait-soft pr-1.5 pl-1 text-xs font-medium whitespace-nowrap text-wait",
+          className,
+        )}
+      >
         <Globe className="size-3 shrink-0" aria-hidden />
         <span className="truncate">{text}</span>
       </span>
@@ -65,7 +73,12 @@ export function DueChip({ day, done, className }: { day: string; done?: boolean;
 
 export function EpicChip({ name, className }: { name: string; className?: string }) {
   return (
-    <span className={cx("inline-flex h-5 max-w-36 shrink-0 items-center gap-1 text-xs text-ink-2 whitespace-nowrap", className)}>
+    <span
+      className={cx(
+        "inline-flex h-5 max-w-36 shrink-0 items-center gap-1 text-xs text-ink-2 whitespace-nowrap",
+        className,
+      )}
+    >
       <Layers className="size-3 shrink-0 text-ink-3" aria-hidden />
       <span className="truncate">{name}</span>
     </span>

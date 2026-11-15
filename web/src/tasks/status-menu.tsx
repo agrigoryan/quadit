@@ -3,7 +3,17 @@
 // Only admins see this (the server lets nobody else change statuses).
 
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Check, ChevronRight, MoreHorizontal, Palette, Pencil, Shapes, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronRight,
+  MoreHorizontal,
+  Palette,
+  Pencil,
+  Shapes,
+  Trash2,
+} from "lucide-react";
 import { DropdownMenu as RMenu } from "radix-ui";
 import { ApiError, errorMessage } from "@/lib/api";
 import { t, tMaybe } from "@/lib/i18n";
@@ -67,7 +77,12 @@ export function StatusMenu({ status, project, onRename }: Props) {
               <ChevronRight />
             </RMenu.SubTrigger>
             <RMenu.Portal>
-              <RMenu.SubContent sideOffset={4} collisionPadding={8} aria-label={t("col.color")} className={`${subContent} grid grid-cols-6 gap-0.5`}>
+              <RMenu.SubContent
+                sideOffset={4}
+                collisionPadding={8}
+                aria-label={t("col.color")}
+                className={`${subContent} grid grid-cols-6 gap-0.5`}
+              >
                 {SWATCHES.map((color) => (
                   <RMenu.Item
                     key={color}
@@ -76,8 +91,13 @@ export function StatusMenu({ status, project, onRename }: Props) {
                     onSelect={() => patch(status, { color })}
                     className="flex size-7 cursor-default items-center justify-center rounded-sm outline-none data-[highlighted]:bg-hover"
                   >
-                    <span className="flex size-4 items-center justify-center rounded-full text-white" style={{ background: color }}>
-                      {status.color?.toLowerCase() === color && <Check className="size-3" strokeWidth={3} aria-hidden />}
+                    <span
+                      className="flex size-4 items-center justify-center rounded-full text-white"
+                      style={{ background: color }}
+                    >
+                      {status.color?.toLowerCase() === color && (
+                        <Check className="size-3" strokeWidth={3} aria-hidden />
+                      )}
                     </span>
                   </RMenu.Item>
                 ))}
@@ -93,7 +113,10 @@ export function StatusMenu({ status, project, onRename }: Props) {
             </RMenu.SubTrigger>
             <RMenu.Portal>
               <RMenu.SubContent sideOffset={4} collisionPadding={8} className={`${subContent} min-w-40`}>
-                <MenuRadioGroup value={status.category} onValueChange={(category) => patch(status, { category: category as Category })}>
+                <MenuRadioGroup
+                  value={status.category}
+                  onValueChange={(category) => patch(status, { category: category as Category })}
+                >
                   {CATEGORIES.map((category) => (
                     <MenuRadioItem key={category} value={category}>
                       <span className="flex items-center gap-2">
@@ -119,7 +142,13 @@ export function StatusMenu({ status, project, onRename }: Props) {
           </MenuItem>
         </MenuContent>
       </Menu>
-      {deleting && <DeleteStatus status={status} others={statuses.filter((s) => s.id !== status.id)} onClose={() => setDeleting(false)} />}
+      {deleting && (
+        <DeleteStatus
+          status={status}
+          others={statuses.filter((s) => s.id !== status.id)}
+          onClose={() => setDeleting(false)}
+        />
+      )}
     </>
   );
 }
@@ -132,12 +161,18 @@ function DeleteStatus({ status, others, onClose }: { status: Status; others: Sta
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState("");
   const [needsMove, setNeedsMove] = useState(false);
-  const [moveTo, setMoveTo] = useState(() => (others.find((s) => s.category === status.category) ?? others[0])?.id ?? "");
+  const [moveTo, setMoveTo] = useState(
+    () => (others.find((s) => s.category === status.category) ?? others[0])?.id ?? "",
+  );
 
   async function confirm() {
     setBusy(true);
     try {
-      await mutate({ type: "status.delete", args: { id: status.id, ...(needsMove && moveTo ? { move_to: moveTo } : {}) } }, undefined, { quiet: true });
+      await mutate(
+        { type: "status.delete", args: { id: status.id, ...(needsMove && moveTo ? { move_to: moveTo } : {}) } },
+        undefined,
+        { quiet: true },
+      );
       onClose();
     } catch (err) {
       setRefusal(errorMessage(err));

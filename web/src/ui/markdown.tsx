@@ -49,7 +49,8 @@ function walk(node: Node) {
 
 const remarkRefs = () => (tree: Node) => walk(tree);
 
-const allowRefs = (url: string) => (url.startsWith("mention:") || url.startsWith("task:") ? url : defaultUrlTransform(url));
+const allowRefs = (url: string) =>
+  url.startsWith("mention:") || url.startsWith("task:") ? url : defaultUrlTransform(url);
 
 /** A task's key in a text opens the task the way every link to a task does. */
 function TaskRef({ taskKey, children }: { taskKey: string; children?: React.ReactNode }) {

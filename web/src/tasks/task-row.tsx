@@ -24,7 +24,8 @@ export function keyColumn(keys: Iterable<string | undefined>): CSSProperties | u
     if (!key || key.length <= 8) continue;
     // In ch, erring a little wide: the digits are tabular, M and W are the wide letters.
     let width = 0.2;
-    for (const char of key) width += char >= "0" && char <= "9" ? 1.03 : /[mw]/i.test(char) ? 1.65 : /[a-z]/i.test(char) ? 1.2 : 1;
+    for (const char of key)
+      width += char >= "0" && char <= "9" ? 1.03 : /[mw]/i.test(char) ? 1.65 : /[a-z]/i.test(char) ? 1.2 : 1;
     widest = Math.max(widest, width);
   }
   return widest > 0 ? ({ "--key-col": `max(4.25rem, ${widest.toFixed(2)}ch)` } as CSSProperties) : undefined;
@@ -47,7 +48,8 @@ interface Props {
   hide?: { epic?: boolean; assignee?: boolean };
 }
 
-const iconButton = "relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-hover data-[state=open]:bg-hover";
+const iconButton =
+  "relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-hover data-[state=open]:bg-hover";
 
 /**
  * One task as a dense line: key, title, and what matters about it right now.
@@ -84,7 +86,9 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
           onClick={(e) => onSelect(task, e.shiftKey, at)}
           className={cx(
             "relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-sm",
-            selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-data-[focused]:opacity-100",
+            selected
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-data-[focused]:opacity-100",
           )}
         >
           <span
@@ -99,7 +103,11 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
       )}
 
       <TaskPropertyPicker kind="priority" tasks={[task]}>
-        <button type="button" className={iconButton} aria-label={`${t("prop.priority")}: ${t(`priority.${task.priority}` as "priority.0")}`}>
+        <button
+          type="button"
+          className={iconButton}
+          aria-label={`${t("prop.priority")}: ${t(`priority.${task.priority}` as "priority.0")}`}
+        >
           <PriorityIcon priority={task.priority} title="" />
         </button>
       </TaskPropertyPicker>
@@ -120,7 +128,10 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
         <Link
           {...link}
           aria-label={t("task.open", { key: task.key })}
-          className={cx("min-w-0 flex-1 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']", closed && "text-ink-2")}
+          className={cx(
+            "min-w-0 flex-1 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']",
+            closed && "text-ink-2",
+          )}
         >
           {task.title}
         </Link>
@@ -130,7 +141,10 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
       <div className="relative z-[1] flex shrink-0 items-center gap-2">
         {progress && <span className="text-xs text-ink-3 tnum max-md:hidden">{progress}</span>}
         {decision && (
-          <DecisionMark mine={decision === "mine"} title={decision === "mine" ? t("task.decisionYours") : t("task.decisionOpen")} />
+          <DecisionMark
+            mine={decision === "mine"}
+            title={decision === "mine" ? t("task.decisionYours") : t("task.decisionOpen")}
+          />
         )}
         <WaitsOnChip task={task} className="max-sm:max-w-28" />
         <span className="flex items-center gap-1 max-lg:hidden">

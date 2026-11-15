@@ -17,7 +17,8 @@ interface Props<T extends string> {
 /** A few choices side by side, one picked: theme, how much mail. Arrow keys move the pick. */
 export function Segmented<T extends string>({ label, value, onChange, options, disabled }: Props<T>) {
   function onKey(e: React.KeyboardEvent) {
-    const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    const step =
+      e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
     if (!step) return;
     e.preventDefault();
     const i = options.findIndex((o) => o.value === value);
@@ -27,7 +28,12 @@ export function Segmented<T extends string>({ label, value, onChange, options, d
     buttons[(i + step + options.length) % options.length]?.focus();
   }
   return (
-    <div role="radiogroup" aria-label={label} onKeyDown={onKey} className="inline-flex max-w-full rounded-md border border-line-strong bg-sunken p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      onKeyDown={onKey}
+      className="inline-flex max-w-full rounded-md border border-line-strong bg-sunken p-0.5"
+    >
       {options.map((o) => {
         const on = o.value === value;
         return (

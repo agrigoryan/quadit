@@ -53,7 +53,13 @@ function ScheduleForm() {
   const d = form.draft;
   return (
     <SettingForm of={form}>
-      <SwitchRow title={t("admin.backups.daily")} hint={t("admin.backups.dailyHint")} checked={d.enabled} disabled={form.locked} onChange={(enabled) => form.set({ enabled })} />
+      <SwitchRow
+        title={t("admin.backups.daily")}
+        hint={t("admin.backups.dailyHint")}
+        checked={d.enabled}
+        disabled={form.locked}
+        onChange={(enabled) => form.set({ enabled })}
+      />
       <div className="flex flex-wrap gap-x-6 gap-y-3.5">
         <NumberField
           label={t("admin.backups.hour")}
@@ -101,7 +107,9 @@ function BackupRow({ backup, onRestore }: { backup: Backup; onRestore: () => voi
         )
       }
       title={<span title={exact(backup.started_at)}>{exact(backup.started_at)}</span>}
-      sub={backup.error ? <span className="text-danger">{backup.error}</span> : <span className="font-mono">{file}</span>}
+      sub={
+        backup.error ? <span className="text-danger">{backup.error}</span> : <span className="font-mono">{file}</span>
+      }
       meta={
         <>
           {!backup.error && !running && <span className="tnum max-sm:hidden">{fileSize(backup.size)}</span>}

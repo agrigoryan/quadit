@@ -88,4 +88,6 @@ export function setSecret(input: SecretInput) {
 }
 
 export const deleteSecret = (id: string) =>
-  mutate({ type: "secret.delete", args: { id } }, (tx) => tx.patch("secrets", id, { deleted_at: Date.now() }), { quiet: true });
+  mutate({ type: "secret.delete", args: { id } }, (tx) => tx.patch("secrets", id, { deleted_at: Date.now() }), {
+    quiet: true,
+  });

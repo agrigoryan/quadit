@@ -18,7 +18,18 @@ import { api, ApiError, errorMessage, NetworkError, ws } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { outbox, type OutboxChange } from "@/lib/outbox";
-import { applyOwnEvents, clearDrafts, type CollectionName, getState, keyOf, markDrafts, mergeRows, patchRow, removeRow, useStore } from "@/lib/store";
+import {
+  applyOwnEvents,
+  clearDrafts,
+  type CollectionName,
+  getState,
+  keyOf,
+  markDrafts,
+  mergeRows,
+  patchRow,
+  removeRow,
+  useStore,
+} from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { ChangeResult } from "@/lib/types";
 
@@ -139,7 +150,10 @@ async function pump() {
       outbox.remove(job.key);
       attempt = 0;
       useStore.setState({ offline: false, unsent: queue.length });
-      applyOwnEvents(job.slug, out.results.flatMap((r) => r.events ?? []));
+      applyOwnEvents(
+        job.slug,
+        out.results.flatMap((r) => r.events ?? []),
+      );
       clearDrafts(job.made);
       job.resolve(out.results);
     } catch (err) {
@@ -201,20 +215,18 @@ export async function restoreQueue(slug: string): Promise<void> {
   if (!user || getState().slug !== slug) return;
   const items = await outbox.adopt(slug, user);
   if (items.length === 0) return;
-  const jobs = items.map(
-    (item): Job => ({
-      key: item.key,
-      slug: item.slug,
-      body: { changes: item.changes },
-      undos: [],
-      made: [],
-      quiet: false,
-      what: item.what,
-      restored: true,
-      resolve: () => {},
-      reject: () => {},
-    }),
-  );
+  const jobs = items.map((item): Job => ({
+    key: item.key,
+    slug: item.slug,
+    body: { changes: item.changes },
+    undos: [],
+    made: [],
+    quiet: false,
+    what: item.what,
+    restored: true,
+    resolve: () => {},
+    reject: () => {},
+  }));
   // Older than anything made on this page, but never ahead of a request already on its way.
   queue.splice(pumping && queue.length > 0 ? 1 : 0, 0, ...jobs);
   countUnsent();

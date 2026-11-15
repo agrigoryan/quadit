@@ -22,7 +22,9 @@ function ProjectNav({ project, slug, collapsed }: { project: Project; slug: stri
   });
   if (collapsed) {
     const first = pages[0];
-    return first ? <NavItem to={first.to} label={project.name} collapsed icon={<ProjectGlyph project={project} />} /> : null;
+    return first ? (
+      <NavItem to={first.to} label={project.name} collapsed icon={<ProjectGlyph project={project} />} />
+    ) : null;
   }
   return (
     <div className="mb-1.5">
@@ -96,7 +98,13 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
         {views.length > 0 && (
           <NavSection title={t("nav.views")} collapsed={collapsed}>
             {views.map((v) => (
-              <NavItem key={v.id} to={`/${slug}/view/${v.slug}`} label={v.name} icon={<Bookmark />} collapsed={collapsed} />
+              <NavItem
+                key={v.id}
+                to={`/${slug}/view/${v.slug}`}
+                label={v.name}
+                icon={<Bookmark />}
+                collapsed={collapsed}
+              />
             ))}
           </NavSection>
         )}

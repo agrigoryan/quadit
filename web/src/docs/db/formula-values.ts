@@ -100,12 +100,20 @@ export function parseDate(v: Value | undefined): FDate | null {
   for (const layout of layouts) {
     const m = layout.exec(v);
     if (!m) continue;
-    const [y, mo, d, h, mi, s] = [1, 2, 3, 4, 5, 6].map((i) => Number(m[i] ?? 0)) as [number, number, number, number, number, number];
+    const [y, mo, d, h, mi, s] = [1, 2, 3, 4, 5, 6].map((i) => Number(m[i] ?? 0)) as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
     const frac = m[7] ? Math.floor(Number(`0.${m[7].slice(1)}`) * 1000) : 0;
     const local = Date.UTC(y, mo - 1, d, h, mi, s, frac);
     const back = new Date(local);
     // Go refuses a day that is not in the month, an hour past 23 and so on.
-    if (mo < 1 || mo > 12 || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d || h > 23 || mi > 59 || s > 59) continue;
+    if (mo < 1 || mo > 12 || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d || h > 23 || mi > 59 || s > 59)
+      continue;
     let offset = 0;
     const zone = m[8];
     if (zone && zone !== "Z") {

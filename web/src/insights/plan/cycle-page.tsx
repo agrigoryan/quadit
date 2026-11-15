@@ -93,7 +93,9 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold">{name}</h1>
             <Badge tone={phase === "current" ? "accent" : "neutral"}>{t(`cycle.phase.${phase}`)}</Badge>
-            {phase === "current" && <span className="text-xs text-ink-3 tnum">{t("cycle.daysLeft", { n: left + 1 })}</span>}
+            {phase === "current" && (
+              <span className="text-xs text-ink-3 tnum">{t("cycle.daysLeft", { n: left + 1 })}</span>
+            )}
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
             <label className="flex flex-col gap-1 text-xs font-medium text-ink-3">
@@ -103,7 +105,9 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
                 required
                 value={cycle.starts_on}
                 max={cycle.ends_on}
-                onChange={(e) => e.target.value && e.target.value <= cycle.ends_on && updateCycle(cycle, { starts_on: e.target.value })}
+                onChange={(e) =>
+                  e.target.value && e.target.value <= cycle.ends_on && updateCycle(cycle, { starts_on: e.target.value })
+                }
                 className="w-[9rem] tnum"
               />
             </label>
@@ -114,14 +118,20 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
                 required
                 value={cycle.ends_on}
                 min={cycle.starts_on}
-                onChange={(e) => e.target.value && e.target.value >= cycle.starts_on && updateCycle(cycle, { ends_on: e.target.value })}
+                onChange={(e) =>
+                  e.target.value && e.target.value >= cycle.starts_on && updateCycle(cycle, { ends_on: e.target.value })
+                }
                 className="w-[9rem] tnum"
               />
             </label>
             <div className="min-w-56 flex-1 pb-1 sm:max-w-md">
               <div className="mb-1 flex flex-wrap items-baseline gap-x-3 text-xs text-ink-2 tnum">
-                <span>{t("ins.progress.withStarted", { done: tally.done, started: tally.started, total: tally.total })}</span>
-                {tally.points > 0 && <span className="text-ink-3">{t("ins.points", { done: tally.pointsDone, total: tally.points })}</span>}
+                <span>
+                  {t("ins.progress.withStarted", { done: tally.done, started: tally.started, total: tally.total })}
+                </span>
+                {tally.points > 0 && (
+                  <span className="text-ink-3">{t("ins.points", { done: tally.pointsDone, total: tally.points })}</span>
+                )}
               </div>
               <Progress done={tally.done} started={tally.started} total={tally.total} />
             </div>
@@ -157,7 +167,9 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
 function BurnPanel({ cycle, hasPoints }: { cycle: Cycle; hasPoints: boolean }) {
   const [unit, setUnit] = useState<"tasks" | "points">("tasks");
   const [table, setTable] = useState(false);
-  const { data, error, loading, refreshing } = useLive<CycleChart>(`/cycles/${cycle.id}/chart`, { only: ["task", "cycle"] });
+  const { data, error, loading, refreshing } = useLive<CycleChart>(`/cycles/${cycle.id}/chart`, {
+    only: ["task", "cycle"],
+  });
   const shown = hasPoints ? unit : "tasks";
   const units = ["tasks", "points"] as const;
   return (
@@ -167,7 +179,11 @@ function BurnPanel({ cycle, hasPoints }: { cycle: Cycle; hasPoints: boolean }) {
       action={
         <span className="flex items-center gap-2">
           {hasPoints && (
-            <span role="group" aria-label={t("cycle.chart.unit")} className="flex items-center rounded-md bg-sunken p-0.5">
+            <span
+              role="group"
+              aria-label={t("cycle.chart.unit")}
+              className="flex items-center rounded-md bg-sunken p-0.5"
+            >
               {units.map((u) => (
                 <button
                   key={u}

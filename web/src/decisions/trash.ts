@@ -88,12 +88,24 @@ export function useTrashedDecisions(): DecisionTrash {
       const here = decisions[d.id];
       // In the copy and not deleted: it was restored a moment ago.
       if (here && !here.deleted_at) continue;
-      out.push({ id: d.id, question: d.question, taskKey: d.task ?? "", taskId: here?.task_id ?? d.task_id, deletedAt: here?.deleted_at ?? d.deleted_at });
+      out.push({
+        id: d.id,
+        question: d.question,
+        taskKey: d.task ?? "",
+        taskId: here?.task_id ?? d.task_id,
+        deletedAt: here?.deleted_at ?? d.deleted_at,
+      });
     }
     // Deleted a moment ago: in the copy before the list has been asked for again.
     for (const d of Object.values(decisions)) {
       if (!d.deleted_at || seen.has(d.id)) continue;
-      out.push({ id: d.id, question: d.question, taskKey: tasks[d.task_id]?.key ?? "", taskId: d.task_id, deletedAt: d.deleted_at });
+      out.push({
+        id: d.id,
+        question: d.question,
+        taskKey: tasks[d.task_id]?.key ?? "",
+        taskId: d.task_id,
+        deletedAt: d.deleted_at,
+      });
     }
     return out.sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0));
   }, [fetched, decisions, tasks]);

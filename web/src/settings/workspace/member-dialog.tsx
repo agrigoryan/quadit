@@ -43,17 +43,37 @@ export function EditMemberDialog({ member, onClose }: { member: Member; onClose:
       }
     >
       <form id="edit-member" onSubmit={save} className="flex flex-col gap-3.5">
-        <FormField label={t("members.handle")} htmlFor="m-handle" hint={t("members.handleHint", { handle: handle || member.handle })} error={errors.fields.handle}>
-          <Input id="m-handle" value={handle} onChange={(e) => setHandle(e.target.value.toLowerCase())} autoCapitalize="none" spellCheck={false} />
+        <FormField
+          label={t("members.handle")}
+          htmlFor="m-handle"
+          hint={t("members.handleHint", { handle: handle || member.handle })}
+          error={errors.fields.handle}
+        >
+          <Input
+            id="m-handle"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value.toLowerCase())}
+            autoCapitalize="none"
+            spellCheck={false}
+          />
         </FormField>
-        <FormField label={t("members.titleField")} htmlFor="m-title" hint={t("members.titleHint")} error={errors.fields.title}>
+        <FormField
+          label={t("members.titleField")}
+          htmlFor="m-title"
+          hint={t("members.titleHint")}
+          error={errors.fields.title}
+        >
           <Input id="m-title" value={title} onChange={(e) => setTitle(e.target.value)} />
         </FormField>
         <div className="flex flex-col gap-3.5 border-t border-line pt-3.5">
           {owner ? (
             <Note>{t("members.ownerScope")}</Note>
           ) : (
-            <MemberScopeFields value={scope} onChange={setScope} error={errors.fields.scope ?? errors.fields.projects} />
+            <MemberScopeFields
+              value={scope}
+              onChange={setScope}
+              error={errors.fields.scope ?? errors.fields.projects}
+            />
           )}
         </div>
         <FormAlert>{errors.form}</FormAlert>

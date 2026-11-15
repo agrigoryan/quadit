@@ -41,7 +41,8 @@ function useCoverPage(panel: RefObject<HTMLElement | null>) {
         else p.el.setAttribute("aria-hidden", p.hidden);
       }
       // Back to the row the task was opened from, if nothing else took the focus.
-      if (before?.isConnected && (document.activeElement === document.body || el.contains(document.activeElement))) before.focus();
+      if (before?.isConnected && (document.activeElement === document.body || el.contains(document.activeElement)))
+        before.focus();
     };
   }, [covers, panel]);
 }

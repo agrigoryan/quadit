@@ -44,7 +44,12 @@ export function RecommendedBadge({ className }: { className?: string }) {
 /** The mark on the option that was picked: solid, so it cannot be mistaken for "Recommended". */
 export function PickedBadge({ className }: { className?: string }) {
   return (
-    <span className={cx("inline-flex h-5 shrink-0 items-center gap-1 rounded-sm bg-accent px-1.5 text-xs font-semibold text-accent-ink", className)}>
+    <span
+      className={cx(
+        "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm bg-accent px-1.5 text-xs font-semibold text-accent-ink",
+        className,
+      )}
+    >
       <Check className="size-3" strokeWidth={3} aria-hidden />
       {t("decision.picked")}
     </span>
@@ -68,12 +73,30 @@ export function FileStepper({ index, total, onStep, onDark, className }: Stepper
     onDark ? "text-inverse-ink hover:bg-white/15" : "text-ink-2 hover:bg-hover hover:text-ink",
   );
   return (
-    <span className={cx("inline-flex shrink-0 items-center gap-0.5 text-xs tnum", onDark ? "text-inverse-ink" : "text-ink-2", className)}>
-      <button type="button" aria-label={t("decision.file.prev")} disabled={index === 0} onClick={() => onStep(-1)} className={button}>
+    <span
+      className={cx(
+        "inline-flex shrink-0 items-center gap-0.5 text-xs tnum",
+        onDark ? "text-inverse-ink" : "text-ink-2",
+        className,
+      )}
+    >
+      <button
+        type="button"
+        aria-label={t("decision.file.prev")}
+        disabled={index === 0}
+        onClick={() => onStep(-1)}
+        className={button}
+      >
         <ChevronLeft className="size-4" aria-hidden />
       </button>
       <span aria-live="polite">{t("decision.file.count", { n: index + 1, total })}</span>
-      <button type="button" aria-label={t("decision.file.next")} disabled={index === total - 1} onClick={() => onStep(1)} className={button}>
+      <button
+        type="button"
+        aria-label={t("decision.file.next")}
+        disabled={index === total - 1}
+        onClick={() => onStep(1)}
+        className={button}
+      >
         <ChevronRight className="size-4" aria-hidden />
       </button>
     </span>

@@ -36,12 +36,16 @@ export interface ManageLink {
  * for admins, who alone may change them; without a project in view both
  * lead to the list of projects.
  */
-export function useManageLinks(projectId: string | undefined): { labels: ManageLink; statuses: ManageLink | undefined } {
+export function useManageLinks(projectId: string | undefined): {
+  labels: ManageLink;
+  statuses: ManageLink | undefined;
+} {
   const navigate = useNavigate();
   const me = useMe();
   const slug = useStore((s) => s.slug);
   const key = useStore((s) => (projectId ? s.c.projects[projectId]?.key : undefined));
-  const to = (tab: string) => () => void navigate(key ? `/${slug}/settings/projects/${key}/${tab}` : `/${slug}/settings/projects`);
+  const to = (tab: string) => () =>
+    void navigate(key ? `/${slug}/settings/projects/${key}/${tab}` : `/${slug}/settings/projects`);
   return {
     labels: { label: t("pick.manageLabels"), onSelect: to("labels") },
     statuses: me.role !== "member" && key ? { label: t("pick.manageStatuses"), onSelect: to("statuses") } : undefined,

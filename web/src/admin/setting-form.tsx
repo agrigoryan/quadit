@@ -71,7 +71,18 @@ interface TextProps {
 }
 
 /** A labelled text field. */
-export function TextField({ label, value, onChange, hint, error, placeholder, type = "text", mono, autoComplete = "off", className }: TextProps) {
+export function TextField({
+  label,
+  value,
+  onChange,
+  hint,
+  error,
+  placeholder,
+  type = "text",
+  mono,
+  autoComplete = "off",
+  className,
+}: TextProps) {
   const id = useId();
   return (
     <FormField label={label} htmlFor={id} hint={hint} error={error} className={className}>
@@ -101,7 +112,18 @@ interface NumberProps extends Omit<TextProps, "value" | "onChange" | "type" | "m
 }
 
 /** A labelled whole number. Empty means "use the default". */
-export function NumberField({ label, value, onChange, hint, error, placeholder, min, max, unit, className }: NumberProps) {
+export function NumberField({
+  label,
+  value,
+  onChange,
+  hint,
+  error,
+  placeholder,
+  min,
+  max,
+  unit,
+  className,
+}: NumberProps) {
   const id = useId();
   return (
     <FormField label={label} htmlFor={id} hint={hint} error={error} className={className}>
@@ -151,9 +173,24 @@ export function SecretField({ label, value, stored, onChange, hint, error, multi
   return (
     <FormField label={label} htmlFor={id} hint={hint} error={error} className={className}>
       {multiline ? (
-        <Textarea id={id} rows={4} value={shown} placeholder={placeholder} spellCheck={false} className="font-mono text-xs" onChange={(e) => change(e.target.value)} />
+        <Textarea
+          id={id}
+          rows={4}
+          value={shown}
+          placeholder={placeholder}
+          spellCheck={false}
+          className="font-mono text-xs"
+          onChange={(e) => change(e.target.value)}
+        />
       ) : (
-        <Input id={id} type="password" autoComplete="new-password" value={shown} placeholder={placeholder} onChange={(e) => change(e.target.value)} />
+        <Input
+          id={id}
+          type="password"
+          autoComplete="new-password"
+          value={shown}
+          placeholder={placeholder}
+          onChange={(e) => change(e.target.value)}
+        />
       )}
     </FormField>
   );

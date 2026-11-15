@@ -115,8 +115,20 @@ export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
               void keep();
             }}
           >
-            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("docs.versions.labelPlaceholder")} aria-label={t("docs.versions.labelPlaceholder")} className="h-7" />
-            <Button type="submit" disabled={busy} title={t("docs.versions.keepNow")} aria-label={t("docs.versions.keepNow")} className="px-2">
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder={t("docs.versions.labelPlaceholder")}
+              aria-label={t("docs.versions.labelPlaceholder")}
+              className="h-7"
+            />
+            <Button
+              type="submit"
+              disabled={busy}
+              title={t("docs.versions.keepNow")}
+              aria-label={t("docs.versions.keepNow")}
+              className="px-2"
+            >
               <BookmarkPlus className="size-4" />
             </Button>
           </form>
@@ -125,7 +137,11 @@ export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
           ) : versions.length === 0 ? (
             <p className="px-1 py-4 text-sm text-ink-3">{t("docs.versions.none")}</p>
           ) : (
-            <ul className="max-h-40 overflow-y-auto sm:max-h-[60vh]" role="listbox" aria-label={t("docs.menu.versions")}>
+            <ul
+              className="max-h-40 overflow-y-auto sm:max-h-[60vh]"
+              role="listbox"
+              aria-label={t("docs.menu.versions")}
+            >
               {versions.map((v) => (
                 <li key={v.id}>
                   <button
@@ -133,7 +149,10 @@ export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
                     role="option"
                     aria-selected={picked === v.id}
                     onClick={() => setPicked(v.id)}
-                    className={cx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover", picked === v.id && "bg-press")}
+                    className={cx(
+                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover",
+                      picked === v.id && "bg-press",
+                    )}
                   >
                     <Avatar member={members[v.created_by]} size="sm" />
                     <span className="min-w-0 flex-1">

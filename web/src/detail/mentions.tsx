@@ -75,7 +75,8 @@ function useLoadMentions(taskId: string) {
   }, [taskId, live]);
 }
 
-const rowStyle = "group relative -mx-1.5 flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10";
+const rowStyle =
+  "group relative -mx-1.5 flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10";
 const linkStyle = "min-w-0 flex-1 truncate py-1.5 outline-none after:absolute after:inset-0 after:content-['']";
 
 function TaskMention({ mention }: { mention: Mention }) {
@@ -85,7 +86,9 @@ function TaskMention({ mention }: { mention: Mention }) {
   const link = useTaskLink({ key });
   return (
     <li className={rowStyle}>
-      <span className="flex size-6 shrink-0 items-center justify-center">{status && <StatusIcon category={status.category} title={status.name} />}</span>
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        {status && <StatusIcon category={status.category} title={status.name} />}
+      </span>
       <span className="shrink-0 text-xs text-ink-3 tnum">{key}</span>
       <Link {...link} className={linkStyle}>
         {task?.title ?? mention.title}
@@ -99,7 +102,9 @@ function DocMention({ mention }: { mention: Mention }) {
   const doc = useStore((s) => s.c.docs[mention.id]) as unknown as Doc | undefined;
   return (
     <li className={rowStyle}>
-      <span className="flex size-6 shrink-0 items-center justify-center">{doc ? <PageIcon doc={doc} /> : <FileText className="size-4 text-ink-3" aria-hidden />}</span>
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        {doc ? <PageIcon doc={doc} /> : <FileText className="size-4 text-ink-3" aria-hidden />}
+      </span>
       <span className="shrink-0 text-xs text-ink-3">{t("detail.mentions.page")}</span>
       <Link to={`/${slug}/docs/${mention.id}`} className={linkStyle}>
         {doc?.title || mention.title || t("detail.mentions.untitled")}
@@ -111,7 +116,9 @@ function DocMention({ mention }: { mention: Mention }) {
 function Rows({ mentions }: { mentions: Mention[] }) {
   return (
     <ul>
-      {mentions.map((m) => (m.kind === "task" ? <TaskMention key={m.id} mention={m} /> : <DocMention key={m.id} mention={m} />))}
+      {mentions.map((m) =>
+        m.kind === "task" ? <TaskMention key={m.id} mention={m} /> : <DocMention key={m.id} mention={m} />,
+      )}
     </ul>
   );
 }

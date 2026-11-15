@@ -53,7 +53,10 @@ function RelationValue({ ids, wrap }: { ids: string[]; wrap?: boolean }) {
         const row = docs[id];
         if (!row || row.deleted_at) return null;
         return (
-          <span key={id} className="inline-flex h-5 max-w-full shrink-0 items-center gap-0.5 rounded-sm bg-sunken px-1.5 text-xs text-ink">
+          <span
+            key={id}
+            className="inline-flex h-5 max-w-full shrink-0 items-center gap-0.5 rounded-sm bg-sunken px-1.5 text-xs text-ink"
+          >
             <ArrowUpRight className="size-3 shrink-0 text-ink-3" aria-hidden />
             <span className="truncate">{docTitle(row)}</span>
           </span>
@@ -95,7 +98,9 @@ export function CellValue({ prop, stored, shown, wrap }: Props) {
       );
     }
     case "member":
-      return typeof stored === "string" && stored ? <MemberValue userId={stored} fallback={formulaText(shown)} /> : null;
+      return typeof stored === "string" && stored ? (
+        <MemberValue userId={stored} fallback={formulaText(shown)} />
+      ) : null;
     case "relation": {
       const ids = asList(stored);
       return ids.length ? <RelationValue ids={ids} wrap={wrap} /> : null;
@@ -109,16 +114,23 @@ export function CellValue({ prop, stored, shown, wrap }: Props) {
           target="_blank"
           rel="noreferrer noopener"
           onClick={(e) => e.stopPropagation()}
-          className={cx("text-accent-text underline decoration-line-strong underline-offset-2 hover:decoration-current", text)}
+          className={cx(
+            "text-accent-text underline decoration-line-strong underline-offset-2 hover:decoration-current",
+            text,
+          )}
         >
           {href}
         </a>
       );
     }
     case "date":
-      return shown ? <span className={cx("tnum", text)}>{isDay(shown) ? formatDay(shown) : formulaText(shown)}</span> : null;
+      return shown ? (
+        <span className={cx("tnum", text)}>{isDay(shown) ? formatDay(shown) : formulaText(shown)}</span>
+      ) : null;
     case "number":
-      return shown === undefined || shown === null ? null : <span className={cx("tnum", text)}>{formulaText(shown)}</span>;
+      return shown === undefined || shown === null ? null : (
+        <span className={cx("tnum", text)}>{formulaText(shown)}</span>
+      );
     case "rollup": {
       if (shown === undefined || shown === null) return null;
       const out = formulaText(typeof shown === "number" ? Math.round(shown * 100) / 100 : shown);

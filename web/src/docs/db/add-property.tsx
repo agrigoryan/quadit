@@ -24,7 +24,11 @@ export function AddPropertyMenu({ databaseId, children, onCreated, align = "star
   return (
     <Menu>
       <MenuTrigger asChild>{children}</MenuTrigger>
-      <MenuContent align={align} className="max-h-[70dvh] overflow-y-auto" onCloseAutoFocus={(e) => onCreated && e.preventDefault()}>
+      <MenuContent
+        align={align}
+        className="max-h-[70dvh] overflow-y-auto"
+        onCloseAutoFocus={(e) => onCreated && e.preventDefault()}
+      >
         <MenuLabel>{t("db.prop.pickType")}</MenuLabel>
         {PROPERTY_TYPES.map((type) => (
           <MenuItem key={type} icon={<PropIcon type={type} className="size-4 text-ink-2" />} onSelect={() => add(type)}>

@@ -22,7 +22,13 @@ export const useSlug = () => useStore((s) => s.slug);
 
 export function useProjects(): Project[] {
   const projects = useCollection("projects");
-  return useMemo(() => Object.values(projects).filter((p) => live(p) && !p.archived_at).sort(byRank), [projects]);
+  return useMemo(
+    () =>
+      Object.values(projects)
+        .filter((p) => live(p) && !p.archived_at)
+        .sort(byRank),
+    [projects],
+  );
 }
 
 export function useProjectByKey(key: string | undefined): Project | undefined {

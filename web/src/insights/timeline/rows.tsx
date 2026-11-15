@@ -24,7 +24,8 @@ import { Tooltip } from "@/ui/tooltip";
 export const KEYS_HINT_ID = "timeline-keys";
 
 const row = "flex h-9 border-b border-line/70";
-const nameCell = "sticky left-0 z-[3] flex w-[var(--tl-left)] shrink-0 items-center gap-1.5 border-r border-line bg-surface pr-2.5 text-sm";
+const nameCell =
+  "sticky left-0 z-[3] flex w-[var(--tl-left)] shrink-0 items-center gap-1.5 border-r border-line bg-surface pr-2.5 text-sm";
 
 const epicColor: Record<Epic["state"], string> = {
   planned: "var(--viz-todo)",
@@ -97,7 +98,11 @@ export function EpicRow({ line, projectKey, scale, today, open, onToggle }: Epic
         >
           {epic.name}
         </Link>
-        {late > 0 && <span className="shrink-0 text-xs font-medium text-danger tnum max-sm:hidden">{t("due.late", { n: late })}</span>}
+        {late > 0 && (
+          <span className="shrink-0 text-xs font-medium text-danger tnum max-sm:hidden">
+            {t("due.late", { n: late })}
+          </span>
+        )}
         <Badge tone={epicTone[epic.state] ?? "neutral"} className="max-sm:hidden">
           {state}
         </Badge>
@@ -136,7 +141,11 @@ export function EpicRow({ line, projectKey, scale, today, open, onToggle }: Epic
         ) : (
           <TrackNote>
             {t("timeline.noDates")}
-            <button type="button" className={ghostButton} onClick={() => setEpicDates(epic, { start: today, end: today + 13 })}>
+            <button
+              type="button"
+              className={ghostButton}
+              onClick={() => setEpicDates(epic, { start: today, end: today + 13 })}
+            >
               <Plus className="size-3" aria-hidden />
               {t("timeline.setDates")}
             </button>
@@ -195,7 +204,11 @@ export function TaskLineRow({ line, scale, today }: TaskProps) {
         >
           {task.title}
         </Link>
-        {late > 0 && <span className="shrink-0 text-xs font-medium text-danger tnum max-sm:hidden">{t("due.late", { n: late })}</span>}
+        {late > 0 && (
+          <span className="shrink-0 text-xs font-medium text-danger tnum max-sm:hidden">
+            {t("due.late", { n: late })}
+          </span>
+        )}
       </div>
       <div className="relative" style={{ width: widthOf(scale) }}>
         {line.due !== undefined ? (
@@ -243,7 +256,9 @@ export function TaskLineRow({ line, scale, today }: TaskProps) {
 export function NoteRow({ scale, children, strong }: { scale: Scale; children: React.ReactNode; strong?: boolean }) {
   return (
     <div className={row} style={{ width: `calc(var(--tl-left) + ${widthOf(scale)}px)` }}>
-      <div className={cx(nameCell, strong ? "pl-1 font-medium" : "pl-9 text-xs text-ink-3 max-sm:pl-3")}>{children}</div>
+      <div className={cx(nameCell, strong ? "pl-1 font-medium" : "pl-9 text-xs text-ink-3 max-sm:pl-3")}>
+        {children}
+      </div>
       <div style={{ width: widthOf(scale) }} />
     </div>
   );

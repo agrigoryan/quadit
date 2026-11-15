@@ -32,18 +32,32 @@ export function RowProperties({ row }: { row: Doc }) {
       {props.map((p) => (
         <div key={p.id} className="flex min-h-8 items-start gap-1">
           <PropertyPopover prop={p} open={open === p.id} onOpenChange={(on) => setOpen(on ? p.id : null)}>
-            <button type="button" className="flex h-8 w-36 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-left text-sm text-ink-2 hover:bg-hover data-[state=open]:bg-hover max-sm:w-28">
+            <button
+              type="button"
+              className="flex h-8 w-36 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-left text-sm text-ink-2 hover:bg-hover data-[state=open]:bg-hover max-sm:w-28"
+            >
               <PropIcon type={p.type} />
               <span className="truncate">{p.name}</span>
             </button>
           </PropertyPopover>
           <div className="min-w-0 flex-1 rounded-md hover:bg-hover">
-            <SelfCell prop={p} stored={row.props?.[p.id]} shown={cells?.[p.id]} onChange={(value) => setRowProps(row.id, { [p.id]: value })} wrap placeholder={t("db.cell.empty")} className="min-h-8" />
+            <SelfCell
+              prop={p}
+              stored={row.props?.[p.id]}
+              shown={cells?.[p.id]}
+              onChange={(value) => setRowProps(row.id, { [p.id]: value })}
+              wrap
+              placeholder={t("db.cell.empty")}
+              className="min-h-8"
+            />
           </div>
         </div>
       ))}
       <AddPropertyMenu databaseId={databaseId} onCreated={setOpen}>
-        <button type="button" className="flex h-8 w-fit items-center gap-1.5 rounded-md px-1.5 text-sm text-ink-3 hover:bg-hover hover:text-ink">
+        <button
+          type="button"
+          className="flex h-8 w-fit items-center gap-1.5 rounded-md px-1.5 text-sm text-ink-3 hover:bg-hover hover:text-ink"
+        >
           <Plus className="size-3.5" aria-hidden />
           {t("db.prop.add")}
         </button>

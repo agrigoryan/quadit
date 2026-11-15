@@ -40,10 +40,22 @@ const patches: Record<Action, { disabled?: boolean; is_admin?: boolean }> = {
   unadmin: { is_admin: false },
 };
 
-function KindTabs({ value, onChange, counts }: { value: Kind; onChange: (k: Kind) => void; counts: Record<Kind, number> }) {
+function KindTabs({
+  value,
+  onChange,
+  counts,
+}: {
+  value: Kind;
+  onChange: (k: Kind) => void;
+  counts: Record<Kind, number>;
+}) {
   const kinds: Kind[] = ["all", "person", "agent"];
   return (
-    <div role="tablist" aria-label={t("admin.users.kind")} className="inline-flex rounded-md border border-line-strong bg-surface p-0.5">
+    <div
+      role="tablist"
+      aria-label={t("admin.users.kind")}
+      className="inline-flex rounded-md border border-line-strong bg-surface p-0.5"
+    >
       {kinds.map((kind) => (
         <button
           key={kind}
@@ -51,7 +63,10 @@ function KindTabs({ value, onChange, counts }: { value: Kind; onChange: (k: Kind
           role="tab"
           aria-selected={value === kind}
           onClick={() => onChange(kind)}
-          className={cx("h-7 rounded-sm px-2 text-sm", value === kind ? "bg-press font-medium text-ink" : "text-ink-2 hover:text-ink")}
+          className={cx(
+            "h-7 rounded-sm px-2 text-sm",
+            value === kind ? "bg-press font-medium text-ink" : "text-ink-2 hover:text-ink",
+          )}
         >
           {t(`admin.users.kind.${kind}`)} <span className="text-ink-3 tnum">{formatNumber(counts[kind])}</span>
         </button>
@@ -69,13 +84,19 @@ export function UsersPage() {
 
   const all = users.data;
   const counts = useMemo(
-    () => ({ all: all?.length ?? 0, person: all?.filter((u) => u.kind === "person").length ?? 0, agent: all?.filter((u) => u.kind === "agent").length ?? 0 }),
+    () => ({
+      all: all?.length ?? 0,
+      person: all?.filter((u) => u.kind === "person").length ?? 0,
+      agent: all?.filter((u) => u.kind === "agent").length ?? 0,
+    }),
     [all],
   );
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return (all ?? []).filter(
-      (u) => (kind === "all" || u.kind === kind) && (!needle || u.name.toLowerCase().includes(needle) || (u.email ?? "").toLowerCase().includes(needle)),
+      (u) =>
+        (kind === "all" || u.kind === kind) &&
+        (!needle || u.name.toLowerCase().includes(needle) || (u.email ?? "").toLowerCase().includes(needle)),
     );
   }, [all, kind, q]);
 
@@ -95,8 +116,17 @@ export function UsersPage() {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <KindTabs value={kind} onChange={setKind} counts={counts} />
           <span className="relative min-w-40 flex-1 sm:max-w-64">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-3" aria-hidden />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("admin.users.search")} aria-label={t("admin.users.search")} className="pl-8" />
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-3"
+              aria-hidden
+            />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("admin.users.search")}
+              aria-label={t("admin.users.search")}
+              className="pl-8"
+            />
           </span>
         </div>
         <LoadGate of={users}>
@@ -136,11 +166,17 @@ export function UsersPage() {
                         <MenuContent align="end">
                           {u.kind === "person" &&
                             (u.is_admin ? (
-                              <MenuItem icon={<ShieldOff />} onSelect={() => setPending({ user: u, action: "unadmin" })}>
+                              <MenuItem
+                                icon={<ShieldOff />}
+                                onSelect={() => setPending({ user: u, action: "unadmin" })}
+                              >
                                 {t("admin.users.unadmin")}
                               </MenuItem>
                             ) : (
-                              <MenuItem icon={<ShieldCheck />} onSelect={() => setPending({ user: u, action: "admin" })}>
+                              <MenuItem
+                                icon={<ShieldCheck />}
+                                onSelect={() => setPending({ user: u, action: "admin" })}
+                              >
                                 {t("admin.users.makeAdmin")}
                               </MenuItem>
                             ))}
@@ -149,7 +185,11 @@ export function UsersPage() {
                               {t("admin.users.enable")}
                             </MenuItem>
                           ) : (
-                            <MenuItem danger icon={<UserX />} onSelect={() => setPending({ user: u, action: "disable" })}>
+                            <MenuItem
+                              danger
+                              icon={<UserX />}
+                              onSelect={() => setPending({ user: u, action: "disable" })}
+                            >
                               {t("admin.users.disable")}
                             </MenuItem>
                           )}

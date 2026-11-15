@@ -45,7 +45,8 @@ export function WorkspaceRoute() {
       (err: unknown) => {
         if (!current) return;
         // An install that requires a second step opens no workspace without one: go and set it up.
-        if (err instanceof ApiError && err.code === "second_step_required") return navigate("/account/security", { replace: true });
+        if (err instanceof ApiError && err.code === "second_step_required")
+          return navigate("/account/security", { replace: true });
         // A 401 has already sent the person to sign in.
         if (err instanceof ApiError && err.status === 401) return;
         if (err instanceof NetworkError) {
@@ -95,8 +96,10 @@ export function WorkspaceRoute() {
   }, [lost]);
 
   if (ready) return <Shell />;
-  if (failure?.kind === "offline") return <Offline slug={ws} userId={userId} onRetry={() => setAttempt((n) => n + 1)} />;
-  if (failure?.kind === "refused") return <NoAccess slug={ws} message={failure.message} onRetry={() => setAttempt((n) => n + 1)} />;
+  if (failure?.kind === "offline")
+    return <Offline slug={ws} userId={userId} onRetry={() => setAttempt((n) => n + 1)} />;
+  if (failure?.kind === "refused")
+    return <NoAccess slug={ws} message={failure.message} onRetry={() => setAttempt((n) => n + 1)} />;
   if (failure) {
     return (
       <EmptyState
@@ -119,7 +122,11 @@ function NoAccess({ slug, message, onRetry }: { slug: string; message: string; o
       title={t("sync.noAccessTitle")}
       hint={
         <>
-          {message && <span className="mb-1 block font-medium text-ink">{message.charAt(0).toUpperCase() + message.slice(1)}.</span>}
+          {message && (
+            <span className="mb-1 block font-medium text-ink">
+              {message.charAt(0).toUpperCase() + message.slice(1)}.
+            </span>
+          )}
           {t("sync.noAccessHint")}
         </>
       }

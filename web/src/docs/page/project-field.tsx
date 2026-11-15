@@ -54,7 +54,10 @@ export function ProjectField({ doc }: { doc: Doc }) {
 function ProjectChoices({ doc, close }: { doc: Doc; close: () => void }) {
   const projects = useProjects();
   const items = useMemo(
-    () => [{ id: NONE, label: t("docs.project.none"), icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden /> }, ...projectItems(projects)],
+    () => [
+      { id: NONE, label: t("docs.project.none"), icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden /> },
+      ...projectItems(projects),
+    ],
     [projects],
   );
 
@@ -67,7 +70,13 @@ function ProjectChoices({ doc, close }: { doc: Doc; close: () => void }) {
 
   return (
     <>
-      <ChoiceList items={items} value={doc.project_id ?? NONE} label={t("docs.project.set")} placeholder={t("docs.project.set")} onPick={pick} />
+      <ChoiceList
+        items={items}
+        value={doc.project_id ?? NONE}
+        label={t("docs.project.set")}
+        placeholder={t("docs.project.set")}
+        onPick={pick}
+      />
       <ProjectNotes doc={doc} />
     </>
   );
@@ -84,10 +93,21 @@ function ProjectNotes({ doc }: { doc: Doc }) {
       <p>{t("docs.project.note")}</p>
       {along > 0 && <p>{t("docs.project.along", { n: along })}</p>}
       {stay > 0 && <p>{t("docs.project.stay", { n: stay })}</p>}
-      {source && <p>{t(source.root_doc_id === doc.id ? "docs.project.sourceRoot" : "docs.project.source", { repo: repoName(source.repo) })}</p>}
+      {source && (
+        <p>
+          {t(source.root_doc_id === doc.id ? "docs.project.sourceRoot" : "docs.project.source", {
+            repo: repoName(source.repo),
+          })}
+        </p>
+      )}
     </div>
   );
 }
 
 /** "docs" for ".../owner/docs.git". */
-const repoName = (repo: string) => repo.replace(/\/+$/, "").replace(/\.git$/, "").split(/[/:]/).pop() || repo;
+const repoName = (repo: string) =>
+  repo
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "")
+    .split(/[/:]/)
+    .pop() || repo;

@@ -43,8 +43,12 @@ export function ImportOutcome({ result, project, onAgain }: Props) {
       <Note>{t("import.again")}</Note>
       {log.length > 0 && (
         <details className="text-sm">
-          <summary className="cursor-default text-ink-2 select-none hover:text-ink">{t("import.log", { n: log.length })}</summary>
-          <pre className="mt-1.5 max-h-64 overflow-auto rounded-md border border-line bg-sunken p-2.5 font-mono text-xs leading-5 whitespace-pre-wrap text-ink-2">{log.join("\n")}</pre>
+          <summary className="cursor-default text-ink-2 select-none hover:text-ink">
+            {t("import.log", { n: log.length })}
+          </summary>
+          <pre className="mt-1.5 max-h-64 overflow-auto rounded-md border border-line bg-sunken p-2.5 font-mono text-xs leading-5 whitespace-pre-wrap text-ink-2">
+            {log.join("\n")}
+          </pre>
         </details>
       )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">

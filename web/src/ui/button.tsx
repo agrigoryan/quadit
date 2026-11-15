@@ -46,7 +46,15 @@ export interface IconButtonProps extends Omit<ButtonProps, "children" | "aria-la
   children: ReactNode;
 }
 
-export function IconButton({ label, hint, variant = "ghost", size = "md", className, type = "button", ...rest }: IconButtonProps) {
+export function IconButton({
+  label,
+  hint,
+  variant = "ghost",
+  size = "md",
+  className,
+  type = "button",
+  ...rest
+}: IconButtonProps) {
   return (
     <Tooltip label={label} hint={hint}>
       <button

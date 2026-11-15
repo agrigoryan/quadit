@@ -50,7 +50,15 @@ export const plainLinks = (links: TaskLink[]) => links.filter((l) => l.kind === 
 const isWeb = (url: string | undefined): url is string => !!url && /^https?:\/\//i.test(url);
 
 /** A state or a check result as an icon and a word; an unknown value is shown as it came. */
-function Chip({ value, known, prefix }: { value: string; known: typeof states; prefix: "taskwork.state." | "taskwork.checks." }) {
+function Chip({
+  value,
+  known,
+  prefix,
+}: {
+  value: string;
+  known: typeof states;
+  prefix: "taskwork.state." | "taskwork.checks.";
+}) {
   const look = known[value];
   const Icon = look?.icon;
   return (
@@ -95,7 +103,9 @@ function CodeLink({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
             size="sm"
             className="-mr-1 text-ink-3 max-md:size-8"
             onClick={() =>
-              send({ type: "link.remove", args: { id: link.id } }, (tx) => tx.patch("links", link.id, { deleted_at: Date.now() }))
+              send({ type: "link.remove", args: { id: link.id } }, (tx) =>
+                tx.patch("links", link.id, { deleted_at: Date.now() }),
+              )
             }
           >
             <X className="size-3" />

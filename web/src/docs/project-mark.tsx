@@ -34,4 +34,5 @@ export function ProjectMark({ projectId, className }: Props) {
 }
 
 /** Whether a page shows its project in a tree: only where it differs from the page it hangs under. */
-export const marksProject = (doc: { project_id?: string }, parentProject: string | undefined) => (doc.project_id ?? "") !== (parentProject ?? "");
+export const marksProject = (doc: { project_id?: string }, parentProject: string | undefined) =>
+  (doc.project_id ?? "") !== (parentProject ?? "");

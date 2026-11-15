@@ -29,7 +29,8 @@ export const meStrings = {
   "me.profile.zoneHint": "Used for times in the mail Quadit sends you.",
   "me.profile.avatarUpload": "Upload a picture",
   "me.profile.avatarRemove": "Remove",
-  "me.profile.avatarHint": "A square image works best; or pick an emoji or a letter. Without one, your initials are shown.",
+  "me.profile.avatarHint":
+    "A square image works best; or pick an emoji or a letter. Without one, your initials are shown.",
   "me.profile.avatarNotImage": "Choose an image file: PNG, JPEG, WebP or GIF",
   "avatar.uploading": "Uploading… {percent}%",
   "avatar.emoji": "Emoji or letter",
@@ -37,7 +38,8 @@ export const meStrings = {
   "avatar.own": "Or your own",
   "avatar.ownPlaceholder": "One emoji, or up to two letters",
   "avatar.use": "Use",
-  "me.profile.themeLead": "Light or dark follows you to every browser you sign in on. System leaves each device to its own setting.",
+  "me.profile.themeLead":
+    "Light or dark follows you to every browser you sign in on. System leaves each device to its own setting.",
 
   "me.notify.lead": "Your inbox always gets everything. Choose what else should reach you when you are not looking.",
   "me.notify.email": "Email",
@@ -46,7 +48,8 @@ export const meStrings = {
   "me.notify.email.all": "Everything",
   "me.notify.email.allHint": "Every inbox item: comments, replies and status changes too.",
   "me.notify.email.important": "Important only",
-  "me.notify.email.importantHint": "Questions asked of you, answers to yours, tasks assigned to or waiting on you, mentions and results.",
+  "me.notify.email.importantHint":
+    "Questions asked of you, answers to yours, tasks assigned to or waiting on you, mentions and results.",
   "me.notify.email.none": "Nothing",
   "me.notify.email.noneHint": "No mail about work. Password resets and invitations still arrive.",
   "me.notify.push": "Push",
@@ -58,17 +61,21 @@ export const meStrings = {
   "me.notify.state.on": "On",
   "me.notify.state.onHint": "This browser receives push notifications.",
   "me.notify.state.off": "Off",
-  "me.notify.state.offHint": "Your browser will ask for permission. On an iPhone or iPad, add Quadit to the Home Screen first.",
+  "me.notify.state.offHint":
+    "Your browser will ask for permission. On an iPhone or iPad, add Quadit to the Home Screen first.",
   "me.notify.state.blocked": "Blocked",
-  "me.notify.state.blockedHint": "Notifications are blocked for this site. Allow them in the browser's site settings, then come back.",
+  "me.notify.state.blockedHint":
+    "Notifications are blocked for this site. Allow them in the browser's site settings, then come back.",
   "me.notify.state.unsupported": "Not available",
-  "me.notify.state.unsupportedHint": "This browser cannot receive push. On an iPhone or iPad, add Quadit to the Home Screen and open it from there.",
+  "me.notify.state.unsupportedHint":
+    "This browser cannot receive push. On an iPhone or iPad, add Quadit to the Home Screen and open it from there.",
   "me.notify.turnOn": "Turn on for this device",
   "me.notify.turnOff": "Turn off",
   "me.notify.test": "Send a test",
   "me.notify.testSent": "Sent to {n} device | Sent to {n} devices",
 
-  "me.tokens.lead": "Tokens let the command line and scripts act as you in this workspace. Agents have their own, under Agents.",
+  "me.tokens.lead":
+    "Tokens let the command line and scripts act as you in this workspace. Agents have their own, under Agents.",
   "me.tokens.new": "New token",
   "me.tokens.empty": "You have no tokens in this workspace.",
   "me.tokens.createTitle": "New API token",
@@ -85,13 +92,15 @@ export const meStrings = {
   "me.tokens.readOnly": "Read-only: it can look but not change anything",
   "me.tokens.readOnlyBadge": "Read-only",
   "me.tokens.projects": "Projects",
-  "me.tokens.projectsHint": "Tick projects to hold the token to them. With none ticked it reaches every project you can.",
+  "me.tokens.projectsHint":
+    "Tick projects to hold the token to them. With none ticked it reaches every project you can.",
   "me.tokens.oneProject": "One project",
   "me.tokens.created": "created",
   "me.tokens.expired": "expired",
   "me.tokens.expiresOn": "expires {when}",
   "me.tokens.revealTitle": "Token “{name}”",
-  "me.tokens.revealWarning": "Copy the token now. It is shown this once and cannot be shown again; if you lose it, revoke it and make another.",
+  "me.tokens.revealWarning":
+    "Copy the token now. It is shown this once and cannot be shown again; if you lose it, revoke it and make another.",
   "me.tokens.token": "Token",
   "me.tokens.loginLine": "Sign the command line in",
   "me.tokens.revokeTitle": "Revoke “{name}”?",

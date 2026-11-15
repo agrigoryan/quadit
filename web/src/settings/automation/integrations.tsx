@@ -22,7 +22,10 @@ import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
 /** The address and secret to paste into the repository's webhook settings on GitHub. */
 function HookDialog({ integration, onClose }: { integration: Integration; onClose: () => void }) {
   const slug = useSlug();
-  const info = useLoad(() => api.get<HookInfo>(ws(slug, `/integrations/${integration.id}/webhook`)), [slug, integration.id]);
+  const info = useLoad(
+    () => api.get<HookInfo>(ws(slug, `/integrations/${integration.id}/webhook`)),
+    [slug, integration.id],
+  );
   return (
     <Dialog
       open
@@ -70,7 +73,9 @@ function IntegrationItem({ it, sync, onSync, onToggle, onEdit, onHook, onDelete 
       <div className="flex items-center gap-3">
         <Switch checked={it.active} onChange={onToggle} label={t("auto.gh.activeFor", { name })} />
         <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
-          <span className={cx("block truncate text-sm font-medium", it.active ? "text-ink" : "text-ink-3")}>{name}</span>
+          <span className={cx("block truncate text-sm font-medium", it.active ? "text-ink" : "text-ink-3")}>
+            {name}
+          </span>
           {cfg.repo !== name && (
             <span className="flex min-w-0 items-center gap-1 font-mono text-xs text-ink-3">
               <GitPullRequest className="size-3 shrink-0" aria-hidden />
@@ -120,7 +125,11 @@ function IntegrationItem({ it, sync, onSync, onToggle, onEdit, onHook, onDelete 
       </div>
       {(sync || it.last_error) && (
         <div className="pl-11">
-          {sync ? <SyncLine state={sync} /> : <SyncLine state={{ busy: false, ok: false, text: t("auto.lastError", { error: it.last_error ?? "" }) }} />}
+          {sync ? (
+            <SyncLine state={sync} />
+          ) : (
+            <SyncLine state={{ busy: false, ok: false, text: t("auto.lastError", { error: it.last_error ?? "" }) }} />
+          )}
         </div>
       )}
     </div>
@@ -141,7 +150,10 @@ export function IntegrationsPage() {
     setSyncs((s) => ({ ...s, [it.id]: { busy: true } }));
     try {
       const out = await api.post<{ pull_requests: number }>(ws(slug, `/integrations/${it.id}/sync`));
-      setSyncs((s) => ({ ...s, [it.id]: { busy: false, ok: true, text: t("auto.gh.synced", { n: out.pull_requests }) } }));
+      setSyncs((s) => ({
+        ...s,
+        [it.id]: { busy: false, ok: true, text: t("auto.gh.synced", { n: out.pull_requests }) },
+      }));
     } catch (err) {
       setSyncs((s) => ({ ...s, [it.id]: { busy: false, ok: false, text: errorMessage(err) } }));
     }

@@ -54,7 +54,9 @@ function PreferenceItem({ pref, canEdit, onDelete }: ItemProps) {
   return (
     <li className="border-b border-line/70 py-2.5 pr-2 pl-4">
       <div className="flex items-start gap-1">
-        <p className={cx("min-w-0 flex-1 text-sm whitespace-pre-line text-pretty", retired && "text-ink-2")}>{pref.body}</p>
+        <p className={cx("min-w-0 flex-1 text-sm whitespace-pre-line text-pretty", retired && "text-ink-2")}>
+          {pref.body}
+        </p>
         {canEdit && (
           <Menu>
             <MenuTrigger asChild>
@@ -96,8 +98,12 @@ function PreferenceItem({ pref, canEdit, onDelete }: ItemProps) {
       <div className="mt-1 flex min-w-0 flex-col gap-0.5 pr-2">
         {pref.decision_id && <Source decisionId={pref.decision_id} />}
         <p className="flex flex-wrap gap-x-3 text-xs text-ink-3">
-          <span title={exact(pref.created_at)}>{t("prefs.by", { name: nameOf(author), when: ago(pref.created_at) })}</span>
-          {pref.retired_at ? <span title={exact(pref.retired_at)}>{t("prefs.retiredOn", { when: ago(pref.retired_at) })}</span> : null}
+          <span title={exact(pref.created_at)}>
+            {t("prefs.by", { name: nameOf(author), when: ago(pref.created_at) })}
+          </span>
+          {pref.retired_at ? (
+            <span title={exact(pref.retired_at)}>{t("prefs.retiredOn", { when: ago(pref.retired_at) })}</span>
+          ) : null}
         </p>
       </div>
     </li>

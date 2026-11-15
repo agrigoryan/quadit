@@ -73,7 +73,10 @@ export function SwipeHandle({ pos, onChange }: HandleProps) {
       style={{ left: `${pos}%` }}
       className="group/swipe absolute inset-y-0 z-[1] w-7 -translate-x-1/2 cursor-ew-resize touch-none outline-none max-sm:w-11"
     >
-      <span aria-hidden className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgb(0_0_0/0.35)]" />
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-white shadow-[0_0_0_1px_rgb(0_0_0/0.35)]"
+      />
       <span
         aria-hidden
         className="absolute top-1/2 left-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-pop ring-accent group-focus-visible/swipe:ring-2 max-sm:size-8"
@@ -84,7 +87,8 @@ export function SwipeHandle({ pos, onChange }: HandleProps) {
   );
 }
 
-const tag = "pointer-events-none absolute z-[1] flex h-5 items-center rounded-sm bg-black/60 px-1.5 text-2xs font-medium text-white";
+const tag =
+  "pointer-events-none absolute z-[1] flex h-5 items-center rounded-sm bg-black/60 px-1.5 text-2xs font-medium text-white";
 
 /** "Before" and "After" in the bottom corners, on the side each picture shows through. */
 export function PairLabels() {
@@ -124,7 +128,14 @@ export function SwipePair({ file, src, pixelated, onOpen, openLabel }: PairProps
   const rendering = pixelated ? ("pixelated" as const) : undefined;
   const pictures = (
     <>
-      <img src={src(before)} alt={t("decision.pair.beforeAlt", { name: before.name })} draggable={false} loading="lazy" className={layer} style={{ imageRendering: rendering }} />
+      <img
+        src={src(before)}
+        alt={t("decision.pair.beforeAlt", { name: before.name })}
+        draggable={false}
+        loading="lazy"
+        className={layer}
+        style={{ imageRendering: rendering }}
+      />
       <img
         src={src(file)}
         alt={t("decision.pair.afterAlt", { name: file.name })}

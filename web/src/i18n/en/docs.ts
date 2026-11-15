@@ -14,12 +14,15 @@ export const docs = {
   "docs.notFoundHint": "It may be private, deleted, or the link is old.",
 
   "docs.home.title": "Pages for everything that is not a task",
-  "docs.home.hint": "Specs, notes, logs and databases. People and agents write in the same pages; pick one on the left or start a new one.",
+  "docs.home.hint":
+    "Specs, notes, logs and databases. People and agents write in the same pages; pick one on the left or start a new one.",
 
   "docs.projectHome.title": "{project} docs",
-  "docs.projectHome.hint": "The specs, notes and logs of {project}, beside its tasks. Whoever can see the project can see them, and they are in the workspace's Docs too. Pick one on the left or start a new one.",
+  "docs.projectHome.hint":
+    "The specs, notes and logs of {project}, beside its tasks. Whoever can see the project can see them, and they are in the workspace's Docs too. Pick one on the left or start a new one.",
   "docs.projectEmpty.title": "{project} has no docs yet",
-  "docs.projectEmpty.hint": "A page tied to a project sits beside its tasks: the spec, the notes, the decision log. Whoever can see the project can see it, and it stays in the workspace's Docs too.",
+  "docs.projectEmpty.hint":
+    "A page tied to a project sits beside its tasks: the spec, the notes, the decision log. Whoever can see the project can see it, and it stays in the workspace's Docs too.",
   "docs.projectEmpty.move": "Move a page here…",
   "docs.projectEmpty.movePick": "Pages in no project",
   "docs.projectEmpty.inside": "+{n} inside",
@@ -30,7 +33,8 @@ export const docs = {
   "docs.project.notInParents": "In no project, unlike the page it is under",
   "docs.project.note": "The project decides who sees the page: people limited to other projects do not.",
   "docs.project.along": "The page inside it moves with it. | The {n} pages inside it move with it.",
-  "docs.project.stay": "One page inside is tied differently and stays as it is. | {n} pages inside are tied differently and stay as they are.",
+  "docs.project.stay":
+    "One page inside is tied differently and stays as it is. | {n} pages inside are tied differently and stay as they are.",
   "docs.project.source": "It mirrors a file in {repo}. The project is kept here; nothing changes in the repository.",
   "docs.project.sourceRoot": "Pages synced from {repo} appear under this one, in its project.",
   "docs.project.movedAlong": "The page inside it moved with it | The {n} pages inside it moved with it",
@@ -117,7 +121,8 @@ export const docs = {
   "docs.import.choose": "Choose a file…",
   "docs.import.done": "Markdown imported",
   "docs.import.replace": "Replace this page",
-  "docs.import.replaceHint": "Blocks that did not change stay as they are, with their comments. The page as it was is kept as a version.",
+  "docs.import.replaceHint":
+    "Blocks that did not change stay as they are, with their comments. The page as it was is kept as a version.",
   "docs.import.append": "Add to the end",
   "docs.import.appendHint": "Keep the page and put the file's content after it.",
   "docs.import.subpage": "New page inside",

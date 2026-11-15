@@ -36,7 +36,10 @@ function AllowedDomains() {
       {domains.draft.length > 0 ? (
         <ul className="flex flex-wrap gap-1.5">
           {domains.draft.map((domain) => (
-            <li key={domain} className="inline-flex h-6 items-center gap-1 rounded-full border border-line bg-sunken pr-1 pl-2.5 text-sm">
+            <li
+              key={domain}
+              className="inline-flex h-6 items-center gap-1 rounded-full border border-line bg-sunken pr-1 pl-2.5 text-sm"
+            >
               {domain}
               <button
                 type="button"
@@ -52,7 +55,12 @@ function AllowedDomains() {
       ) : (
         <p className="text-sm text-ink-2">{t("admin.signIn.domainsNone")}</p>
       )}
-      <FormField label={t("admin.signIn.domainAdd")} htmlFor="allowed-domain" error={error} hint={t("admin.signIn.domainHint")}>
+      <FormField
+        label={t("admin.signIn.domainAdd")}
+        htmlFor="allowed-domain"
+        error={error}
+        hint={t("admin.signIn.domainHint")}
+      >
         <span className="flex max-w-sm gap-2">
           <Input
             id="allowed-domain"
@@ -87,22 +95,42 @@ export function SignInPage() {
             fallback={true}
             title={t("admin.signIn.password")}
             hint={t("admin.signIn.passwordHint")}
-            confirm={{ when: false, title: t("admin.signIn.passwordOff"), body: t("admin.signIn.passwordOffBody"), action: t("admin.signIn.turnOff") }}
+            confirm={{
+              when: false,
+              title: t("admin.signIn.passwordOff"),
+              body: t("admin.signIn.passwordOffBody"),
+              action: t("admin.signIn.turnOff"),
+            }}
           />
-          <SettingSwitch name="auth.passkeys" fallback={true} title={t("admin.signIn.passkeys")} hint={t("admin.signIn.passkeysHint")} />
+          <SettingSwitch
+            name="auth.passkeys"
+            fallback={true}
+            title={t("admin.signIn.passkeys")}
+            hint={t("admin.signIn.passkeysHint")}
+          />
           <SettingSwitch
             name="auth.require_2fa"
             fallback={false}
             title={t("admin.signIn.require2fa")}
             hint={t("admin.signIn.require2faHint")}
-            confirm={{ when: true, title: t("admin.signIn.require2faOn"), body: t("admin.signIn.require2faOnBody"), action: t("admin.signIn.require") }}
+            confirm={{
+              when: true,
+              title: t("admin.signIn.require2faOn"),
+              body: t("admin.signIn.require2faOnBody"),
+              action: t("admin.signIn.require"),
+            }}
           />
         </Rows>
       </Section>
 
       <Section title={t("admin.signIn.accounts")}>
         <Rows>
-          <SettingSwitch name="auth.registration" fallback={false} title={t("admin.signIn.registration")} hint={t("admin.signIn.registrationHint")} />
+          <SettingSwitch
+            name="auth.registration"
+            fallback={false}
+            title={t("admin.signIn.registration")}
+            hint={t("admin.signIn.registrationHint")}
+          />
         </Rows>
       </Section>
 

@@ -34,7 +34,9 @@ export function useClaims(): Claim[] {
         .filter((c) => c.state !== "released")
         .sort(
           (a, b) =>
-            Number(b.state === "holding") - Number(a.state === "holding") || a.requested_at - b.requested_at || (a.id < b.id ? -1 : 1),
+            Number(b.state === "holding") - Number(a.state === "holding") ||
+            a.requested_at - b.requested_at ||
+            (a.id < b.id ? -1 : 1),
         ),
     [claims],
   );
@@ -43,7 +45,10 @@ export function useClaims(): Claim[] {
 export function useResources(): Resource[] {
   const resources = useCollection("resources");
   return useMemo(
-    () => (Object.values(resources) as unknown as Resource[]).filter((r) => !r.deleted_at).sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      (Object.values(resources) as unknown as Resource[])
+        .filter((r) => !r.deleted_at)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [resources],
   );
 }

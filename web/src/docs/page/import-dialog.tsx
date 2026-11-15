@@ -56,7 +56,10 @@ export function ImportDialog({ doc, open, onClose }: { doc: Doc; open: boolean; 
             role="radio"
             aria-checked={mode === m}
             onClick={() => setMode(m)}
-            className={cx("rounded-md border px-3 py-2 text-left", mode === m ? "border-accent bg-accent-soft" : "border-line hover:bg-hover")}
+            className={cx(
+              "rounded-md border px-3 py-2 text-left",
+              mode === m ? "border-accent bg-accent-soft" : "border-line hover:bg-hover",
+            )}
           >
             <span className="block text-sm font-medium">{t(`docs.import.${m}`)}</span>
             <span className="block text-xs text-ink-2">{t(`docs.import.${m}Hint`)}</span>

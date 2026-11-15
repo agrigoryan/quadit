@@ -59,12 +59,17 @@ export function mentionable(c: Collections): Found[] {
     list.sort(asked).forEach((decision, i) => out.push({ task, decision, ref: `${task.key}#${i + 1}` }));
   }
   return out.sort(
-    (a, b) => Number(a.decision.state !== "open") - Number(b.decision.state !== "open") || b.decision.created_at - a.decision.created_at,
+    (a, b) =>
+      Number(a.decision.state !== "open") - Number(b.decision.state !== "open") ||
+      b.decision.created_at - a.decision.created_at,
   );
 }
 
 /** What was decided, in a word or two: the picked option's label, "Approved", "Declined"; nothing while it is open. */
-export function answerOf(decision: Decision): { kind: "open" | "picked" | "approved" | "declined" | "sent_back"; label?: string } {
+export function answerOf(decision: Decision): {
+  kind: "open" | "picked" | "approved" | "declined" | "sent_back";
+  label?: string;
+} {
   if (decision.state === "open") return { kind: "open" };
   if (decision.state === "sent_back" || decision.outcome === "none") return { kind: "sent_back" };
   if (decision.outcome === "approved") return { kind: "approved" };

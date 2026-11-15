@@ -86,12 +86,15 @@ export function updateDoc(id: string, fields: Partial<Pick<Doc, "title" | "icon"
   if (!doc) return;
   const changed: Fields = {};
   for (const [key, value] of Object.entries(fields)) {
-    if ((doc as unknown as Fields)[key] !== value && !(value === "" && (doc as unknown as Fields)[key] === undefined)) changed[key] = value;
+    if ((doc as unknown as Fields)[key] !== value && !(value === "" && (doc as unknown as Fields)[key] === undefined))
+      changed[key] = value;
   }
   if (Object.keys(changed).length === 0) return;
   const local: Fields = {};
   for (const [key, value] of Object.entries(changed)) local[key] = value === "" && key !== "title" ? null : value;
-  send({ type: "doc.update", args: { id, ...changed } }, (tx) => tx.patch("docs", id, { ...local, updated_at: Date.now() }));
+  send({ type: "doc.update", args: { id, ...changed } }, (tx) =>
+    tx.patch("docs", id, { ...local, updated_at: Date.now() }),
+  );
 }
 
 /** Moves a page in the tree: under another page (or to the top), at a place among its new siblings. */
@@ -182,7 +185,10 @@ export function trashDoc(id: string) {
   send({ type: "doc.delete", args: { id } }, (tx) => {
     for (const d of all) tx.patch("docs", d.id, { deleted_at: at });
   });
-  toast.info(t(doc.kind === "row" ? "docs.rowDeleted" : "docs.deleted"), { label: t("common.undo"), run: () => restoreDoc(id) });
+  toast.info(t(doc.kind === "row" ? "docs.rowDeleted" : "docs.deleted"), {
+    label: t("common.undo"),
+    run: () => restoreDoc(id),
+  });
 }
 
 /** Sets values of a database row; null clears one. */
@@ -194,7 +200,9 @@ export function setRowProps(rowId: string, values: Fields) {
     if (value === null || value === undefined) delete next[key];
     else next[key] = value;
   }
-  send({ type: "doc.update", args: { id: rowId, props: values } }, (tx) => tx.patch("docs", rowId, { props: next, updated_at: Date.now() }));
+  send({ type: "doc.update", args: { id: rowId, props: values } }, (tx) =>
+    tx.patch("docs", rowId, { props: next, updated_at: Date.now() }),
+  );
 }
 
 /** The rank for a page dropped at `index` among `siblings` (which do not include it). */
@@ -203,9 +211,11 @@ export function rankAt(siblings: { rank: string; id: string }[], index: number):
   return rankBetween(sorted[index - 1]?.rank, sorted[index]?.rank);
 }
 
-export const keepVersion = (docId: string, label: string) => mutate({ type: "doc.snapshot", args: { doc: docId, label } });
+export const keepVersion = (docId: string, label: string) =>
+  mutate({ type: "doc.snapshot", args: { doc: docId, label } });
 
-export const revertTo = (docId: string, versionId: string) => mutate({ type: "doc.revert", args: { doc: docId, version: versionId } });
+export const revertTo = (docId: string, versionId: string) =>
+  mutate({ type: "doc.revert", args: { doc: docId, version: versionId } });
 
 /** Replaces (or adds to) a page's content from Markdown; blocks that did not change are kept. */
 export const writeMarkdown = (docId: string, markdown: string, mode: "replace" | "append" = "replace") =>
@@ -246,5 +256,7 @@ export function resolveComment(comment: DocComment, resolved: boolean) {
 }
 
 export function deleteComment(comment: DocComment) {
-  send({ type: "comment.delete", args: { id: comment.id } }, (tx) => tx.patch("comments", comment.id, { deleted_at: Date.now() }));
+  send({ type: "comment.delete", args: { id: comment.id } }, (tx) =>
+    tx.patch("comments", comment.id, { deleted_at: Date.now() }),
+  );
 }

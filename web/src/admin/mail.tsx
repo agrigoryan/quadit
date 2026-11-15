@@ -71,7 +71,13 @@ export function MailPage() {
       if (v.port !== undefined && (v.port < 1 || v.port > 65535)) wrong.port = t("admin.mail.portBad");
       return wrong;
     },
-    toValue: (v) => ({ ...v, host: v.host.trim(), username: v.username.trim(), from: v.from.trim(), port: v.port || undefined }),
+    toValue: (v) => ({
+      ...v,
+      host: v.host.trim(),
+      username: v.username.trim(),
+      from: v.from.trim(),
+      port: v.port || undefined,
+    }),
   });
   const d = form.draft;
   const e = form.errors.fields;
@@ -84,7 +90,12 @@ export function MailPage() {
           {!ready && <Note tone="wait">{t("admin.mail.notReady")}</Note>}
           <SettingForm of={form}>
             <div className="grid gap-3.5 sm:grid-cols-[1fr_auto]">
-              <TextField label={t("admin.mail.host")} value={d.host} onChange={(host) => form.set({ host })} placeholder="smtp.example.com" />
+              <TextField
+                label={t("admin.mail.host")}
+                value={d.host}
+                onChange={(host) => form.set({ host })}
+                placeholder="smtp.example.com"
+              />
               <NumberField
                 label={t("admin.mail.port")}
                 value={d.port || undefined}
@@ -96,8 +107,17 @@ export function MailPage() {
               />
             </div>
             <div className="grid gap-3.5 sm:grid-cols-2">
-              <TextField label={t("admin.mail.username")} value={d.username} onChange={(username) => form.set({ username })} />
-              <SecretField label={t("admin.mail.password")} value={d.password} stored={stored.password} onChange={(password) => form.set({ password })} />
+              <TextField
+                label={t("admin.mail.username")}
+                value={d.username}
+                onChange={(username) => form.set({ username })}
+              />
+              <SecretField
+                label={t("admin.mail.password")}
+                value={d.password}
+                stored={stored.password}
+                onChange={(password) => form.set({ password })}
+              />
             </div>
             <div className="grid gap-3.5 sm:grid-cols-2">
               <TextField

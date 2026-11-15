@@ -1,5 +1,22 @@
 import { useEffect, useState } from "react";
-import { Bell, Bot, Building2, FolderGit2, FolderKanban, Import, KeyRound, Lock, Plug, ScrollText, ShieldCheck, SquareAsterisk, UserRound, Users, Webhook, Workflow } from "lucide-react";
+import {
+  Bell,
+  Bot,
+  Building2,
+  FolderGit2,
+  FolderKanban,
+  Import,
+  KeyRound,
+  Lock,
+  Plug,
+  ScrollText,
+  ShieldCheck,
+  SquareAsterisk,
+  UserRound,
+  Users,
+  Webhook,
+  Workflow,
+} from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
@@ -34,7 +51,9 @@ function useGroups(admin: boolean): NavGroup[] {
       items: [
         ...(admin ? [item("general", "settings.nav.general", <Building2 />)] : []),
         item("members", "settings.nav.members", <Users />),
-        ...(admin ? [item("import", "settings.nav.import", <Import />), item("audit", "settings.nav.audit", <ScrollText />)] : []),
+        ...(admin
+          ? [item("import", "settings.nav.import", <Import />), item("audit", "settings.nav.audit", <ScrollText />)]
+          : []),
       ],
     },
     { title: t("settings.group.work"), items: [item("projects", "settings.nav.projects", <FolderKanban />)] },
@@ -86,7 +105,10 @@ function AdminsOnly({ base }: { base: string }) {
       title={t("settings.adminsOnly.title")}
       hint={t("settings.adminsOnly.hint")}
       action={
-        <Link to={`${base}/me/profile`} className="text-sm font-medium text-accent-text underline-offset-2 hover:underline">
+        <Link
+          to={`${base}/me/profile`}
+          className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
+        >
           {t("settings.adminsOnly.mine")}
         </Link>
       }

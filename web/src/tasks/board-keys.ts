@@ -16,15 +16,22 @@ import { usePeek, useTaskNav } from "@/tasks/task-link";
 import { takeSeen, useTaskOrder } from "@/tasks/task-queue";
 
 /** Space on a focused button presses it. A card is a link: Space is free there. */
-const onButton = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("button, summary, input, select, textarea") !== null;
+const onButton = (e: KeyboardEvent) =>
+  e.target instanceof HTMLElement && e.target.closest("button, summary, input, select, textarea") !== null;
 /** Enter on any other link or button than a card is that control's. */
-const onOtherControl = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("a:not([data-task]), button, [role=button]:not([data-task])") !== null;
+const onOtherControl = (e: KeyboardEvent) =>
+  e.target instanceof HTMLElement &&
+  e.target.closest("a:not([data-task]), button, [role=button]:not([data-task])") !== null;
 /** The id of the task whose card has the focus. */
-const focusedCard = (e: KeyboardEvent) => (e.target instanceof HTMLElement ? e.target.closest<HTMLElement>("[data-task]")?.dataset.task : undefined);
+const focusedCard = (e: KeyboardEvent) =>
+  e.target instanceof HTMLElement ? e.target.closest<HTMLElement>("[data-task]")?.dataset.task : undefined;
 
 /** The card of a task, where it is drawn. */
 const cardOf = (id: string) => document.querySelector<HTMLElement>(`main a[data-task="${CSS.escape(id)}"]`);
-const focusedId = () => (document.activeElement instanceof HTMLElement ? (document.activeElement.closest<HTMLElement>("[data-task]")?.dataset.task ?? null) : null);
+const focusedId = () =>
+  document.activeElement instanceof HTMLElement
+    ? (document.activeElement.closest<HTMLElement>("[data-task]")?.dataset.task ?? null)
+    : null;
 
 /**
  * Puts the focus on a task's card once it is drawn: a column draws its

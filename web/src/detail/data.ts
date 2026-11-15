@@ -36,7 +36,10 @@ export function useFindTask(taskKey: string, have: boolean): boolean {
 
 export function useSubtasks(taskId: string): Task[] {
   const tasks = useCollection("tasks");
-  return useMemo(() => sortByRank(Object.values(tasks).filter((tk) => tk.parent_id === taskId && !tk.deleted_at)), [tasks, taskId]);
+  return useMemo(
+    () => sortByRank(Object.values(tasks).filter((tk) => tk.parent_id === taskId && !tk.deleted_at)),
+    [tasks, taskId],
+  );
 }
 
 export function useTaskRelations(taskId: string): Relation[] {
@@ -50,7 +53,10 @@ export function useTaskRelations(taskId: string): Relation[] {
 export function useTaskLinks(taskId: string): TaskLink[] {
   const links = useCollection("links");
   return useMemo(
-    () => Object.values(links).filter((l) => l.task_id === taskId && !l.deleted_at).sort((a, b) => (a.id < b.id ? -1 : 1)),
+    () =>
+      Object.values(links)
+        .filter((l) => l.task_id === taskId && !l.deleted_at)
+        .sort((a, b) => (a.id < b.id ? -1 : 1)),
     [links, taskId],
   );
 }
@@ -87,7 +93,10 @@ export const who = (userId: string | undefined) => nameOf(userId ? getState().c.
 export type Side = "blocks" | "blockedBy" | "relates" | "duplicates" | "duplicatedBy";
 
 /** Which way a stored relation reads from `taskId`, and the task at the other end. */
-export function sideOf(r: Pick<Relation, "task_id" | "related_task_id" | "type">, taskId: string): { side: Side; otherId: string } {
+export function sideOf(
+  r: Pick<Relation, "task_id" | "related_task_id" | "type">,
+  taskId: string,
+): { side: Side; otherId: string } {
   const mine = r.task_id === taskId;
   const otherId = mine ? r.related_task_id : r.task_id;
   if (r.type === "blocks") return { side: mine ? "blocks" : "blockedBy", otherId };

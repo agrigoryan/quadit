@@ -44,7 +44,13 @@ interface Props {
   workspaces?: Named[];
 }
 
-const when = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+const when = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+});
 
 function Target({ entry, names }: { entry: AuditEntry; names: Map<string, string> }) {
   if (!entry.target_type && !entry.target_id) return <span className="text-ink-3">–</span>;
@@ -53,7 +59,12 @@ function Target({ entry, names }: { entry: AuditEntry; names: Map<string, string
   return (
     <span className="truncate">
       <span className="text-ink-3">{entry.target_type}</span>{" "}
-      {known ?? (isId ? <span className="font-mono text-xs text-ink-3">{entry.target_id?.slice(-6)}</span> : <span className="font-mono text-xs">{entry.target_id}</span>)}
+      {known ??
+        (isId ? (
+          <span className="font-mono text-xs text-ink-3">{entry.target_id?.slice(-6)}</span>
+        ) : (
+          <span className="font-mono text-xs">{entry.target_id}</span>
+        ))}
     </span>
   );
 }
@@ -77,13 +88,23 @@ function Details({ entry, names }: { entry: AuditEntry; names: Map<string, strin
         ))}
       </dl>
       {entry.data !== undefined && entry.data !== null && (
-        <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-line bg-surface p-2 font-mono text-xs text-ink-2">{JSON.stringify(entry.data, null, 2)}</pre>
+        <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-line bg-surface p-2 font-mono text-xs text-ink-2">
+          {JSON.stringify(entry.data, null, 2)}
+        </pre>
       )}
     </div>
   );
 }
 
-function EntryRow({ entry, names, showWorkspace }: { entry: AuditEntry; names: Map<string, string>; showWorkspace: boolean }) {
+function EntryRow({
+  entry,
+  names,
+  showWorkspace,
+}: {
+  entry: AuditEntry;
+  names: Map<string, string>;
+  showWorkspace: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const actor = entry.actor_name || (entry.actor_id && names.get(entry.actor_id)) || t("audit.system");
   return (
@@ -94,18 +115,31 @@ function EntryRow({ entry, names, showWorkspace }: { entry: AuditEntry; names: M
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-x-3 px-3 py-1.5 text-left text-sm hover:bg-hover/60 max-md:flex-wrap md:min-h-9"
       >
-        <ChevronRight className={cx("size-3.5 shrink-0 text-ink-3 transition-transform max-md:hidden", open && "rotate-90")} aria-hidden />
-        <time dateTime={new Date(entry.at).toISOString()} title={exact(entry.at)} className="shrink-0 text-xs text-ink-3 tnum max-md:order-3 max-md:w-full md:w-36">
+        <ChevronRight
+          className={cx("size-3.5 shrink-0 text-ink-3 transition-transform max-md:hidden", open && "rotate-90")}
+          aria-hidden
+        />
+        <time
+          dateTime={new Date(entry.at).toISOString()}
+          title={exact(entry.at)}
+          className="shrink-0 text-xs text-ink-3 tnum max-md:order-3 max-md:w-full md:w-36"
+        >
           {when.format(entry.at)}
         </time>
-        <span className="min-w-0 truncate font-medium text-ink max-md:order-1 max-md:flex-1 md:w-36 md:shrink-0">{actor}</span>
+        <span className="min-w-0 truncate font-medium text-ink max-md:order-1 max-md:flex-1 md:w-36 md:shrink-0">
+          {actor}
+        </span>
         <span className="shrink-0 rounded-sm border border-line bg-sunken px-1.5 font-mono text-xs leading-5 text-ink-2 max-md:order-2 md:w-52 md:truncate md:border-0 md:bg-transparent md:px-0 md:text-ink">
           {entry.action}
         </span>
         <span className="min-w-0 flex-1 truncate text-ink-2 max-md:hidden">
           <Target entry={entry} names={names} />
         </span>
-        {showWorkspace && <span className="w-28 shrink-0 truncate text-ink-2 max-lg:hidden">{entry.workspace_id ? (names.get(entry.workspace_id) ?? "") : ""}</span>}
+        {showWorkspace && (
+          <span className="w-28 shrink-0 truncate text-ink-2 max-lg:hidden">
+            {entry.workspace_id ? (names.get(entry.workspace_id) ?? "") : ""}
+          </span>
+        )}
         <span className="w-24 shrink-0 truncate text-right font-mono text-xs text-ink-3 max-lg:hidden">{entry.ip}</span>
       </button>
       {open && <Details entry={entry} names={names} />}
@@ -172,7 +206,11 @@ export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Pr
 
         {rows === null ? (
           error ? (
-            <EmptyState title={t("s.loadFailed")} hint={error} action={<Button onClick={() => void load(null)}>{t("common.tryAgain")}</Button>} />
+            <EmptyState
+              title={t("s.loadFailed")}
+              hint={error}
+              action={<Button onClick={() => void load(null)}>{t("common.tryAgain")}</Button>}
+            />
           ) : (
             <Loading />
           )

@@ -12,7 +12,10 @@ function read(): Record<string, true> {
   }
 }
 
-export const useTreeState = create<{ open: Record<string, true>; renaming: string | null }>(() => ({ open: read(), renaming: null }));
+export const useTreeState = create<{ open: Record<string, true>; renaming: string | null }>(() => ({
+  open: read(),
+  renaming: null,
+}));
 
 export function setOpen(id: string, open: boolean) {
   useTreeState.setState((s) => {

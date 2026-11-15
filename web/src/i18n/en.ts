@@ -11,4 +11,14 @@ import { pages } from "@/i18n/en/pages";
 import { settings } from "@/i18n/en/settings";
 import { tasks } from "@/i18n/en/tasks";
 
-export const en = { ...common, ...tasks, ...detail, ...decisions, ...pages, ...settings, ...docs, ...insights, ...admin };
+export const en = {
+  ...common,
+  ...tasks,
+  ...detail,
+  ...decisions,
+  ...pages,
+  ...settings,
+  ...docs,
+  ...insights,
+  ...admin,
+};

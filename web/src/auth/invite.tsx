@@ -60,7 +60,9 @@ export function InvitePage() {
         title={t("auth.invite.goneTitle")}
         footer={
           <p>
-            <TextLink to={status === "in" ? "/" : "/login"}>{status === "in" ? t("auth.invite.toApp") : t("auth.backToSignIn")}</TextLink>
+            <TextLink to={status === "in" ? "/" : "/login"}>
+              {status === "in" ? t("auth.invite.toApp") : t("auth.backToSignIn")}
+            </TextLink>
           </p>
         }
       >
@@ -87,7 +89,8 @@ export function InvitePage() {
 
   const signInLink = (
     <p>
-      {t("auth.register.have")} <TextLink to={`/login?next=${encodeURIComponent(here)}`}>{t("auth.invite.signIn")}</TextLink>
+      {t("auth.register.have")}{" "}
+      <TextLink to={`/login?next=${encodeURIComponent(here)}`}>{t("auth.invite.signIn")}</TextLink>
     </p>
   );
   const providers = config.providers.length > 0 && (
@@ -102,7 +105,12 @@ export function InvitePage() {
       <AuthLayout title={title} lead={lead}>
         <div className="flex flex-col gap-3.5">
           <p className="text-sm text-ink-2">{t("auth.invite.hasAccount", { email: info.email ?? "" })}</p>
-          <Button variant="primary" size="lg" className="w-full" onClick={() => navigate(`/login?next=${encodeURIComponent(here)}`)}>
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={() => navigate(`/login?next=${encodeURIComponent(here)}`)}
+          >
             {t("auth.invite.signInToJoin")}
           </Button>
           {providers}
@@ -113,7 +121,11 @@ export function InvitePage() {
 
   return (
     <AuthLayout title={title} lead={lead} footer={signInLink}>
-      {config.password ? <NewAccount path={path} email={info.email} onJoined={joined} /> : <p className="text-sm text-ink-2">{t("auth.invite.providerOnly")}</p>}
+      {config.password ? (
+        <NewAccount path={path} email={info.email} onJoined={joined} />
+      ) : (
+        <p className="text-sm text-ink-2">{t("auth.invite.providerOnly")}</p>
+      )}
       {providers && (
         <>
           {config.password && <OrLine>{t("auth.or")}</OrLine>}
@@ -168,28 +180,64 @@ function NewAccount({ path, email, onJoined }: JoinProps & { email?: string }) {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const errors = useFieldErrors(["name", "email", "password"]);
   const { busy, run } = useSubmit(errors, { once: true });
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     await run(async () => {
-      await onJoined(await api.post<Accepted>(path, { name: form.name, email: email || form.email, password: form.password }));
+      await onJoined(
+        await api.post<Accepted>(path, { name: form.name, email: email || form.email, password: form.password }),
+      );
     });
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3.5">
       <FormField label={t("auth.setup.name")} htmlFor="name" error={errors.fields.name}>
-        <Input id="name" autoComplete="name" autoFocus required className="h-10 text-base" value={form.name} onChange={set("name")} />
+        <Input
+          id="name"
+          autoComplete="name"
+          autoFocus
+          required
+          className="h-10 text-base"
+          value={form.name}
+          onChange={set("name")}
+        />
       </FormField>
-      <FormField label={t("auth.email")} htmlFor="email" error={errors.fields.email} hint={email ? t("auth.invite.emailFixed") : undefined}>
+      <FormField
+        label={t("auth.email")}
+        htmlFor="email"
+        error={errors.fields.email}
+        hint={email ? t("auth.invite.emailFixed") : undefined}
+      >
         {email ? (
-          <Input id="email" type="email" autoComplete="username" readOnly className="h-10 !bg-sunken text-base !text-ink-2" value={email} />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="username"
+            readOnly
+            className="h-10 !bg-sunken text-base !text-ink-2"
+            value={email}
+          />
         ) : (
-          <Input id="email" type="email" autoComplete="username" required className="h-10 text-base" value={form.email} onChange={set("email")} />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="username"
+            required
+            className="h-10 text-base"
+            value={form.email}
+            onChange={set("email")}
+          />
         )}
       </FormField>
-      <FormField label={t("auth.password")} htmlFor="password" hint={t("auth.setup.passwordHint")} error={errors.fields.password}>
+      <FormField
+        label={t("auth.password")}
+        htmlFor="password"
+        hint={t("auth.setup.passwordHint")}
+        error={errors.fields.password}
+      >
         <Input
           id="password"
           type="password"

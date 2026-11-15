@@ -40,7 +40,8 @@ function useWaiting(projectId: string | undefined): Item[] {
     for (const d of Object.values(decisions)) {
       if (d.state !== "open" || d.deleted_at || d.asked_id !== me.user_id) continue;
       const task = all[d.task_id];
-      if (task && !task.deleted_at && inScope(task)) out.push({ id: `d:${d.id}`, task, question: d, since: d.created_at });
+      if (task && !task.deleted_at && inScope(task))
+        out.push({ id: `d:${d.id}`, task, question: d, since: d.created_at });
     }
     return out.sort((a, b) => a.since - b.since);
   }, [tasks, all, statuses, decisions, me.user_id, projectId]);
@@ -67,7 +68,10 @@ function Row({ item }: { item: Item }) {
         )}
       </span>
       <div className="min-w-0 flex-1">
-        <Link {...link} className="block truncate font-medium outline-none after:absolute after:inset-0 after:content-['']">
+        <Link
+          {...link}
+          className="block truncate font-medium outline-none after:absolute after:inset-0 after:content-['']"
+        >
           {question ? question.question : task.title}
         </Link>
         <p className="truncate text-xs text-ink-3">
@@ -89,7 +93,11 @@ export function WaitingPanel({ projectId, className }: { projectId: string | und
     <Panel
       title={t("dash.waiting")}
       meta={items.length > 0 ? <MoveCount n={items.length} /> : undefined}
-      action={items.length > 0 ? <span className="text-xs text-ink-3 max-sm:hidden">{t("dash.waiting.hint")}</span> : undefined}
+      action={
+        items.length > 0 ? (
+          <span className="text-xs text-ink-3 max-sm:hidden">{t("dash.waiting.hint")}</span>
+        ) : undefined
+      }
       className={className}
       flush
     >

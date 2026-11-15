@@ -51,7 +51,19 @@ interface Props {
 }
 
 /** An epic or a cycle as one dense line; the arrow shows its tasks underneath. */
-export function PlanRow({ name, to, badge, meta, menu, tally = emptyTally(), tasks, open, onToggle, emptyText, hide }: Props) {
+export function PlanRow({
+  name,
+  to,
+  badge,
+  meta,
+  menu,
+  tally = emptyTally(),
+  tasks,
+  open,
+  onToggle,
+  emptyText,
+  hide,
+}: Props) {
   const restLoaded = useRestLoaded();
   return (
     <li>
@@ -63,7 +75,10 @@ export function PlanRow({ name, to, badge, meta, menu, tally = emptyTally(), tas
           onClick={onToggle}
           className="flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-press"
         >
-          <ChevronRight className={cx("size-4 text-ink-3 transition-transform duration-100", open && "rotate-90")} aria-hidden />
+          <ChevronRight
+            className={cx("size-4 text-ink-3 transition-transform duration-100", open && "rotate-90")}
+            aria-hidden
+          />
         </button>
         <Link to={to} className="min-w-0 truncate font-medium underline-offset-2 hover:underline">
           {name}
@@ -72,7 +87,11 @@ export function PlanRow({ name, to, badge, meta, menu, tally = emptyTally(), tas
         <span className="flex-1" />
         {meta}
         {/* Finished tasks arrive after the rest; a count without them would be wrong. */}
-        {restLoaded ? <ProgressCount done={tally.done} started={tally.started} total={tally.total} /> : <RestLoadingNote className="shrink-0" />}
+        {restLoaded ? (
+          <ProgressCount done={tally.done} started={tally.started} total={tally.total} />
+        ) : (
+          <RestLoadingNote className="shrink-0" />
+        )}
         {menu}
       </div>
       {open && (

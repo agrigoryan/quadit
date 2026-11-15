@@ -37,7 +37,8 @@ export function RegisterPage() {
     );
   }
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -47,15 +48,40 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthLayout title={t("auth.register.title")} lead={t("auth.register.lead", { name: config.name })} footer={signInLink}>
+    <AuthLayout
+      title={t("auth.register.title")}
+      lead={t("auth.register.lead", { name: config.name })}
+      footer={signInLink}
+    >
       <form onSubmit={submit} className="flex flex-col gap-3.5">
         <FormField label={t("auth.setup.name")} htmlFor="name" error={errors.fields.name}>
-          <Input id="name" autoComplete="name" autoFocus required className="h-10 text-base" value={form.name} onChange={set("name")} />
+          <Input
+            id="name"
+            autoComplete="name"
+            autoFocus
+            required
+            className="h-10 text-base"
+            value={form.name}
+            onChange={set("name")}
+          />
         </FormField>
         <FormField label={t("auth.email")} htmlFor="email" error={errors.fields.email}>
-          <Input id="email" type="email" autoComplete="username" required className="h-10 text-base" value={form.email} onChange={set("email")} />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="username"
+            required
+            className="h-10 text-base"
+            value={form.email}
+            onChange={set("email")}
+          />
         </FormField>
-        <FormField label={t("auth.password")} htmlFor="password" hint={t("auth.setup.passwordHint")} error={errors.fields.password}>
+        <FormField
+          label={t("auth.password")}
+          htmlFor="password"
+          hint={t("auth.setup.passwordHint")}
+          error={errors.fields.password}
+        >
           <Input
             id="password"
             type="password"

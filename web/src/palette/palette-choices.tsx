@@ -69,7 +69,10 @@ function useChoices(page: ChoicePage, task: Task): Choice[] {
             id: m.user_id,
             label: m.name,
             detail: `@${m.handle}`,
-            mark: listening(m) === undefined ? undefined : <ListeningDot on={listening(m) === true} className="ml-1.5 align-middle" />,
+            mark:
+              listening(m) === undefined ? undefined : (
+                <ListeningDot on={listening(m) === true} className="ml-1.5 align-middle" />
+              ),
             icon: <Avatar member={m} size="xs" />,
             checked: m.user_id === task.assignee_id,
             apply: () => setAssignee([task], m.user_id),
@@ -138,7 +141,11 @@ export function ChoicesPage({ page, task, query, run }: Props) {
         </Item>
       ))}
       {canCreate && (
-        <Item value="labels:create" icon={<Plus />} onSelect={() => run(() => toggleLabel([task], createLabel(task.project_id, q)))}>
+        <Item
+          value="labels:create"
+          icon={<Plus />}
+          onSelect={() => run(() => toggleLabel([task], createLabel(task.project_id, q)))}
+        >
           {createLabelText(q)}
         </Item>
       )}

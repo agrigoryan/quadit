@@ -31,7 +31,17 @@ const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const expiryChoices = ["0", "30", "90", "365"] as const;
 
 /** The fields of a token of one's own: its name beside when it expires, then what it may do and where. */
-function MyTokenFields({ name, setName, readOnly, setReadOnly, projects: keys, setProjects: setKeys, days, setDays, errors }: TokenFieldsProps) {
+function MyTokenFields({
+  name,
+  setName,
+  readOnly,
+  setReadOnly,
+  projects: keys,
+  setProjects: setKeys,
+  days,
+  setDays,
+  errors,
+}: TokenFieldsProps) {
   const projects = useProjects();
   const toggle = (key: string, on: boolean) => setKeys((list) => (on ? [...list, key] : list.filter((k) => k !== key)));
 
@@ -39,7 +49,13 @@ function MyTokenFields({ name, setName, readOnly, setReadOnly, projects: keys, s
     <>
       <div className="grid gap-4 sm:grid-cols-[1fr_11rem]">
         <FormField label={t("s.name")} htmlFor="token-name" hint={t("me.tokens.nameHint")} error={errors.fields.name}>
-          <Input id="token-name" value={name} maxLength={80} placeholder={t("me.tokens.namePlaceholder")} onChange={(e) => setName(e.target.value)} />
+          <Input
+            id="token-name"
+            value={name}
+            maxLength={80}
+            placeholder={t("me.tokens.namePlaceholder")}
+            onChange={(e) => setName(e.target.value)}
+          />
         </FormField>
         <FormField label={t("me.tokens.expires")} htmlFor="token-expiry">
           <NativeSelect
@@ -77,7 +93,8 @@ export function MyTokensPage() {
   const me = useMe();
   const projects = useCollection("projects");
   const list = useLoad(
-    () => api.get<{ tokens: Token[] }>(ws(slug, "/tokens")).then((r) => r.tokens.filter((tk) => tk.user_id === me.user_id)),
+    () =>
+      api.get<{ tokens: Token[] }>(ws(slug, "/tokens")).then((r) => r.tokens.filter((tk) => tk.user_id === me.user_id)),
     [slug, me.user_id],
   );
   const [creating, setCreating] = useState(false);
@@ -112,17 +129,22 @@ export function MyTokensPage() {
                       <ScopeBadges
                         scopes={tk.scopes}
                         readOnly={t("me.tokens.readOnlyBadge")}
-                        projects={(ids) => ids.map((id) => <Badge key={id}>{projects[id]?.key ?? t("me.tokens.oneProject")}</Badge>)}
+                        projects={(ids) =>
+                          ids.map((id) => <Badge key={id}>{projects[id]?.key ?? t("me.tokens.oneProject")}</Badge>)
+                        }
                       />
                     </span>
                   }
                   sub={
                     <>
-                      <span className="font-mono">{tk.prefix}…</span> · {t("me.tokens.created")} <When ms={tk.created_at} />
+                      <span className="font-mono">{tk.prefix}…</span> · {t("me.tokens.created")}{" "}
+                      <When ms={tk.created_at} />
                       {tk.expires_at ? (
                         <>
                           {" · "}
-                          {tk.expires_at < Date.now() ? t("me.tokens.expired") : t("me.tokens.expiresOn", { when: day.format(tk.expires_at) })}
+                          {tk.expires_at < Date.now()
+                            ? t("me.tokens.expired")
+                            : t("me.tokens.expiresOn", { when: day.format(tk.expires_at) })}
                         </>
                       ) : null}
                     </>
@@ -167,7 +189,11 @@ export function MyTokensPage() {
         warning={t("me.tokens.revealWarning")}
         items={[
           { label: t("me.tokens.token"), value: created?.token ?? "" },
-          { label: t("me.tokens.loginLine"), value: `quadit login ${window.location.origin} ${created?.token ?? ""}`, multiline: true },
+          {
+            label: t("me.tokens.loginLine"),
+            value: `quadit login ${window.location.origin} ${created?.token ?? ""}`,
+            multiline: true,
+          },
         ]}
       />
       <ConfirmDialog

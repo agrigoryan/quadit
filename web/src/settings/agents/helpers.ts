@@ -24,7 +24,10 @@ export interface Placed<M extends Member = AgentMember> {
  * removed) keeps its own place. Finished helpers are left out unless asked
  * for; `hidden` counts them.
  */
-export function placeHelpers<M extends Member>(agents: M[], showFinished: boolean): { rows: Placed<M>[]; hidden: number } {
+export function placeHelpers<M extends Member>(
+  agents: M[],
+  showFinished: boolean,
+): { rows: Placed<M>[]; hidden: number } {
   const ids = new Set(agents.map((a) => a.user_id));
   const maker = (a: M) => {
     const by = (a as AgentMember).delegated_by;

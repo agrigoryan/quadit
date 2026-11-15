@@ -18,16 +18,25 @@ interface Props {
 /** done / started / the rest, as shares of the whole. */
 export function Progress({ done, started = 0, total, className, thin }: Props) {
   const share = (n: number) => (total > 0 ? `${(Math.max(0, n) / total) * 100}%` : "0%");
-  const label = started > 0 ? t("ins.progress.withStarted", { done, started, total }) : t("ins.progress", { done, total });
+  const label =
+    started > 0 ? t("ins.progress.withStarted", { done, started, total }) : t("ins.progress", { done, total });
   return (
     <span
       role="img"
       aria-label={label}
       title={label}
-      className={cx("flex gap-0.5 overflow-hidden rounded-full bg-sunken dark:bg-press", thin ? "h-1" : "h-2", className)}
+      className={cx(
+        "flex gap-0.5 overflow-hidden rounded-full bg-sunken dark:bg-press",
+        thin ? "h-1" : "h-2",
+        className,
+      )}
     >
-      {done > 0 && <span className="h-full rounded-full" style={{ width: share(done), background: "var(--viz-done)" }} />}
-      {started > 0 && <span className="h-full rounded-full" style={{ width: share(started), background: "var(--viz-started)" }} />}
+      {done > 0 && (
+        <span className="h-full rounded-full" style={{ width: share(done), background: "var(--viz-done)" }} />
+      )}
+      {started > 0 && (
+        <span className="h-full rounded-full" style={{ width: share(started), background: "var(--viz-started)" }} />
+      )}
     </span>
   );
 }

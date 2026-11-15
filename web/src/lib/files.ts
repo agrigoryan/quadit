@@ -96,7 +96,12 @@ const aborted = () => new DOMException("aborted", "AbortError");
 const isAbort = (err: unknown) => err instanceof DOMException && err.name === "AbortError";
 const offline = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
-async function sendInParts(slug: string, file: File, report: (sent: number, state: UploadProgress["state"]) => void, signal?: AbortSignal): Promise<ServerFile> {
+async function sendInParts(
+  slug: string,
+  file: File,
+  report: (sent: number, state: UploadProgress["state"]) => void,
+  signal?: AbortSignal,
+): Promise<ServerFile> {
   const base = ws(slug, "/files");
   let row: ServerFile | null = null;
   let netTries = 0;
@@ -107,11 +112,20 @@ async function sendInParts(slug: string, file: File, report: (sent: number, stat
     try {
       if (offline()) throw new NetworkError();
       const part = file.slice(from, from + PART_BYTES);
-      const opts = { contentType: file.type, signal, onProgress: (n: number) => report(Math.min(file.size, from + n), "sending") };
+      const opts = {
+        contentType: file.type,
+        signal,
+        onProgress: (n: number) => report(Math.min(file.size, from + n), "sending"),
+      };
       report(from, "sending");
       row = row
         ? await api.send<ServerFile>("PATCH", `${base}/${row.id}?offset=${from}`, part, opts)
-        : await api.send<ServerFile>("POST", `${base}?name=${encodeURIComponent(file.name)}&size=${file.size}`, part, opts);
+        : await api.send<ServerFile>(
+            "POST",
+            `${base}?name=${encodeURIComponent(file.name)}&size=${file.size}`,
+            part,
+            opts,
+          );
       netTries = 0;
       serverTries = 0;
       if (row.state !== "uploading") return row;
@@ -163,7 +177,9 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
     useTransfers.setState((s) => ({ items: s.items.map((it) => (it.id === id ? { ...it, sent, state } : it)) }));
     opts.onProgress?.({ sent, total: file.size, state });
   };
-  useTransfers.setState((s) => ({ items: [...s.items, { id, name: file.name, sent: 0, total: file.size, state: "queued" }] }));
+  useTransfers.setState((s) => ({
+    items: [...s.items, { id, name: file.name, sent: 0, total: file.size, state: "queued" }],
+  }));
   opts.onProgress?.({ sent: 0, total: file.size, state: "queued" });
   try {
     if (active >= AT_ONCE) {

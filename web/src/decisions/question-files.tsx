@@ -22,7 +22,15 @@ function QuestionMedia({ file, aspect, onOpen }: { file: OptionFile; aspect: num
   return (
     <li className="min-w-0 overflow-hidden rounded-lg border border-line bg-sunken" style={{ aspectRatio: aspect }}>
       {isVideo(file) ? (
-        <video src={file.url} poster={file.preview_url} controls playsInline preload="metadata" aria-label={file.name} className="size-full object-contain" />
+        <video
+          src={file.url}
+          poster={file.preview_url}
+          controls
+          playsInline
+          preload="metadata"
+          aria-label={file.name}
+          className="size-full object-contain"
+        />
       ) : (
         <button
           type="button"
@@ -56,10 +64,7 @@ export function QuestionFiles({ files }: { files: OptionFile[] }) {
   return (
     <div className="mt-3">
       {media.length > 0 && (
-        <ul
-          aria-label={t("detail.files")}
-          className={cx("grid gap-3", columns(media.length))}
-        >
+        <ul aria-label={t("detail.files")} className={cx("grid gap-3", columns(media.length))}>
           {media.map((file) => (
             <QuestionMedia key={file.attachmentId} file={file} aspect={aspect} onOpen={() => setShown(file)} />
           ))}

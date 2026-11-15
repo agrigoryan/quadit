@@ -39,7 +39,8 @@ export const projectStrings = {
   "project.estimates": "Estimates",
   "project.estimatesHint": "Adds an estimate field to tasks, in points.",
   "project.archive.title": "Archive",
-  "project.archive.lead": "An archived project leaves the sidebar and takes no new tasks. Everything in it stays and it can be brought back.",
+  "project.archive.lead":
+    "An archived project leaves the sidebar and takes no new tasks. Everything in it stays and it can be brought back.",
   "project.archive": "Archive project",
   "project.unarchive": "Bring back",
   "project.archive.confirm": "Archive {name}?",
@@ -49,7 +50,8 @@ export const projectStrings = {
   "project.delete.confirm": "Delete {name}?",
   "project.delete.type": "Type the key {key} to confirm.",
 
-  "statuses.lead": "The steps a task moves through. Drag to reorder; the order is the order of the board's columns. The category tells Quadit what a status means.",
+  "statuses.lead":
+    "The steps a task moves through. Drag to reorder; the order is the order of the board's columns. The category tells Quadit what a status means.",
   "statuses.add": "Add status",
   "statuses.name": "Status name",
   "statuses.category": "Category",
@@ -76,7 +78,8 @@ export const projectStrings = {
   "labels.delete.body": "It comes off every task that has it.",
   "labels.color": "Colour of {name}",
 
-  "templates.lead": "A template starts a task with its title, description and fields filled in, and can open a question on it.",
+  "templates.lead":
+    "A template starts a task with its title, description and fields filled in, and can open a question on it.",
   "templates.new": "New template",
   "templates.edit": "Edit template",
   "templates.none": "No templates yet.",
@@ -111,7 +114,8 @@ export const projectStrings = {
   "templates.has.decision": "opens a question",
   "templates.scope.workspace": "every project",
 
-  "prefs.lead": "Standing preferences are rules the team has settled, usually from a decision. Agents read them before they work, so the same question is not asked twice.",
+  "prefs.lead":
+    "Standing preferences are rules the team has settled, usually from a decision. Agents read them before they work, so the same question is not asked twice.",
   "prefs.add": "Add preference",
   "prefs.body": "Preference",
   "prefs.bodyPlaceholder": "e.g. No rings as the main shape of an explosion.",

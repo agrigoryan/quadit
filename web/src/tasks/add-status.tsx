@@ -31,9 +31,13 @@ export function createStatus(project: Project, name: string, category: Category)
   const id = newId();
   const last = statusesOf(getState().c.statuses, project.id).at(-1)?.rank;
   const row = { name, category, color: START_COLOR[category], rank: rankBetween(last, undefined) };
-  return mutate({ type: "status.create", args: { id, project: project.id, ...row } }, (tx) => tx.insert("statuses", { id, project_id: project.id, ...row }), {
-    quiet: true,
-  });
+  return mutate(
+    { type: "status.create", args: { id, project: project.id, ...row } },
+    (tx) => tx.insert("statuses", { id, project_id: project.id, ...row }),
+    {
+      quiet: true,
+    },
+  );
 }
 
 export function AddStatusColumn({ project }: { project: Project }) {
@@ -63,7 +67,11 @@ export function AddStatusColumn({ project }: { project: Project }) {
   if (!open) {
     return (
       <section aria-label={t("col.add")} className="w-72 shrink-0 max-sm:w-[82vw]">
-        <Button variant="ghost" className="h-9 w-full justify-start border border-dashed border-line-strong" onClick={() => setOpen(true)}>
+        <Button
+          variant="ghost"
+          className="h-9 w-full justify-start border border-dashed border-line-strong"
+          onClick={() => setOpen(true)}
+        >
           <Plus className="size-3.5" aria-hidden />
           {t("col.add")}
         </Button>

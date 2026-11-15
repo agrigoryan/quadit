@@ -115,7 +115,9 @@ export function Description({ task, loading }: { task: Task; loading: boolean })
           }}
         />
         <div className="mt-2 flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-xs text-ink-3 max-sm:invisible">{t("detail.saveHint", { mod: MOD })}</span>
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-3 max-sm:invisible">
+            {t("detail.saveHint", { mod: MOD })}
+          </span>
           <Button variant="ghost" className="max-md:h-9" onClick={() => setDraft(null)}>
             {t("common.cancel")}
           </Button>
@@ -128,7 +130,12 @@ export function Description({ task, loading }: { task: Task; loading: boolean })
   }
 
   if (!text) {
-    if (loading) return <div className="mt-2"><DescriptionSkeleton /></div>;
+    if (loading)
+      return (
+        <div className="mt-2">
+          <DescriptionSkeleton />
+        </div>
+      );
     if (readOnly) return null;
     return (
       <button

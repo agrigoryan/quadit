@@ -100,8 +100,18 @@ function WaitsOnIt({ work, now }: { work: AgentWork; now: number }) {
   const [all, setAll] = useState(false);
   const statuses = useStore((s) => s.c.statuses);
   const rows = [
-    ...work.asked.map(({ decision, task }) => ({ id: decision.id, at: decision.created_at, task, question: decision.question })),
-    ...work.waiting.map((task) => ({ id: task.id, at: task.updated_at, task, question: undefined as string | undefined })),
+    ...work.asked.map(({ decision, task }) => ({
+      id: decision.id,
+      at: decision.created_at,
+      task,
+      question: decision.question,
+    })),
+    ...work.waiting.map((task) => ({
+      id: task.id,
+      at: task.updated_at,
+      task,
+      question: undefined as string | undefined,
+    })),
   ];
   if (rows.length === 0) return <p className="text-sm text-ink-3">{t("agents.waits.none")}</p>;
   const shown = all ? rows : rows.slice(0, SHOWN);
@@ -175,7 +185,9 @@ function HelperRow({ helper }: { helper: HelperOf }) {
       <CornerDownRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />
       <Avatar member={member} size="sm" className={done ? "opacity-60" : undefined} />
       <span className={done ? "shrink-0 text-ink-2" : "shrink-0 font-medium"}>{member.name}</span>
-      <span className="flex min-w-0 flex-1 text-ink-2">{task ? <TaskRef task={task} /> : <span className="truncate text-ink-3">{t("agents.helper.oneTask")}</span>}</span>
+      <span className="flex min-w-0 flex-1 text-ink-2">
+        {task ? <TaskRef task={task} /> : <span className="truncate text-ink-3">{t("agents.helper.oneTask")}</span>}
+      </span>
       {done ? <Badge>{t("agents.helper.finished")}</Badge> : state ? <AgentStateChip state={state.state} /> : null}
       {!done && state && isStranded(state) && <NotListening urgent />}
     </li>
@@ -208,7 +220,10 @@ export function AgentCard({ member, state, helpers, helperNote, work, sessions, 
   const waits = work.asked.length + work.waiting.length;
   const shown = allSessions ? sessions : sessions.slice(0, SHOWN);
   return (
-    <article aria-label={member.name} className="flex min-w-0 flex-col gap-3 border-r border-b border-line bg-surface p-4">
+    <article
+      aria-label={member.name}
+      className="flex min-w-0 flex-col gap-3 border-r border-b border-line bg-surface p-4"
+    >
       <header className="flex min-w-0 items-start gap-3">
         <Avatar member={member} size="lg" className="mt-0.5" />
         <div className="min-w-0 flex-1">
@@ -216,9 +231,15 @@ export function AgentCard({ member, state, helpers, helperNote, work, sessions, 
             <span className="truncate">{member.name}</span>
             <span className="shrink-0 text-xs font-normal text-ink-3">@{member.handle}</span>
           </h3>
-          {(helperNote || member.title) && <p className="truncate text-xs text-ink-2">{[helperNote, member.title].filter(Boolean).join(" · ")}</p>}
+          {(helperNote || member.title) && (
+            <p className="truncate text-xs text-ink-2">{[helperNote, member.title].filter(Boolean).join(" · ")}</p>
+          )}
         </div>
-        {isFinishedHelper(member) ? <Badge>{t("agents.helper.finished")}</Badge> : state && <AgentStateChip state={state.state} />}
+        {isFinishedHelper(member) ? (
+          <Badge>{t("agents.helper.finished")}</Badge>
+        ) : (
+          state && <AgentStateChip state={state.state} />
+        )}
       </header>
 
       <Doing state={state} work={work} running={running} now={now} />

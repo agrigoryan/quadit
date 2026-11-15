@@ -127,7 +127,8 @@ export const pages = {
   "shortcuts.group.goto": "Go to",
   "shortcuts.group.gotoHint": "G, then the letter. A project's pages open for the project in view.",
   "shortcuts.group.lists": "Lists",
-  "shortcuts.group.listsHint": "The task list, My work and the inbox. On a board the keys mean the card that has the focus, else the one under the pointer.",
+  "shortcuts.group.listsHint":
+    "The task list, My work and the inbox. On a board the keys mean the card that has the focus, else the one under the pointer.",
   "shortcuts.group.inbox": "Inbox",
   "shortcuts.group.panel": "A task",
   "shortcuts.group.panelHint": "In the panel over a list, and on the task's own page.",

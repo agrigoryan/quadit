@@ -26,7 +26,14 @@ const TITLE = { task: "docs.slash.task", decision: "docs.slash.decision", page: 
 
 export function ChipPicker({ kind, onClose, onPick }: Props) {
   return (
-    <Dialog open={kind !== null} onOpenChange={(open) => !open && onClose()} title={t(TITLE[kind ?? "task"])} hideTitle size="sm" className="[&_[cmdk-root]]:w-full">
+    <Dialog
+      open={kind !== null}
+      onOpenChange={(open) => !open && onClose()}
+      title={t(TITLE[kind ?? "task"])}
+      hideTitle
+      size="sm"
+      className="[&_[cmdk-root]]:w-full"
+    >
       <div className="-mx-4 -my-3">
         {kind === "task" ? (
           <TaskList onPick={(key) => onPick("task", key)} />
@@ -76,11 +83,16 @@ function DecisionList({ onPick }: { onPick: (ref: string) => void }) {
         })),
     [c, me],
   );
-  return <PickerList items={items} onPick={onPick} label={t("docs.slash.decision")} placeholder={t("docs.pick.decision")} />;
+  return (
+    <PickerList items={items} onPick={onPick} label={t("docs.slash.decision")} placeholder={t("docs.pick.decision")} />
+  );
 }
 
 function PageList({ onPick }: { onPick: (id: string) => void }) {
   const pages = useLinkablePages();
-  const items = useMemo(() => pages.map((doc) => ({ id: doc.id, label: docTitle(doc), icon: <PageIcon doc={doc} /> })), [pages]);
+  const items = useMemo(
+    () => pages.map((doc) => ({ id: doc.id, label: docTitle(doc), icon: <PageIcon doc={doc} /> })),
+    [pages],
+  );
   return <PickerList items={items} onPick={onPick} label={t("docs.slash.page")} placeholder={t("docs.pick.page")} />;
 }

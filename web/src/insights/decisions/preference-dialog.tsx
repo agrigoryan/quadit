@@ -60,7 +60,9 @@ export function setRetired(pref: Preference, retired: boolean) {
 }
 
 export function deletePreference(pref: Preference) {
-  send({ type: "preference.delete", args: { id: pref.id } }, (tx) => tx.patch("preferences", pref.id, { deleted_at: Date.now() }));
+  send({ type: "preference.delete", args: { id: pref.id } }, (tx) =>
+    tx.patch("preferences", pref.id, { deleted_at: Date.now() }),
+  );
 }
 
 interface Props {

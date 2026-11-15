@@ -44,7 +44,11 @@ function AttachedBy({ file }: { file: OptionFile }) {
 
 /** Keeps the cards of one decision level when only some of them have media. */
 export function NoMediaCaption() {
-  return <p aria-hidden className="px-3 pt-1.5 text-2xs">&nbsp;</p>;
+  return (
+    <p aria-hidden className="px-3 pt-1.5 text-2xs">
+      &nbsp;
+    </p>
+  );
 }
 
 interface Props {

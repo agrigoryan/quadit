@@ -154,8 +154,7 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }),
   del: <T>(path: string, body?: unknown) => request<T>("DELETE", path, { body }),
-  upload: <T>(path: string, file: Blob, contentType?: string) =>
-    request<T>("POST", path, { raw: file, contentType }),
+  upload: <T>(path: string, file: Blob, contentType?: string) => request<T>("POST", path, { raw: file, contentType }),
   /** Sends bytes with POST or PATCH, reporting progress (lib/files.ts sends a file in parts with it). */
   send: sendBytes,
 };

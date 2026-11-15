@@ -31,9 +31,14 @@ function inGroups(cycles: Cycle[], now: string) {
     { id: "current" as const, cycles: cycles.filter((c) => cyclePhase(c, now) === "current") },
     {
       id: "upcoming" as const,
-      cycles: cycles.filter((c) => cyclePhase(c, now) === "upcoming").sort((a, b) => a.starts_on.localeCompare(b.starts_on)),
+      cycles: cycles
+        .filter((c) => cyclePhase(c, now) === "upcoming")
+        .sort((a, b) => a.starts_on.localeCompare(b.starts_on)),
     },
-    { id: "past" as const, cycles: cycles.filter((c) => cyclePhase(c, now) === "past").sort((a, b) => b.ends_on.localeCompare(a.ends_on)) },
+    {
+      id: "past" as const,
+      cycles: cycles.filter((c) => cyclePhase(c, now) === "past").sort((a, b) => b.ends_on.localeCompare(a.ends_on)),
+    },
   ].filter((g) => g.cycles.length > 0);
 }
 
@@ -74,7 +79,9 @@ function Cycles({ project }: { project: Project }) {
                     to={`/${slug}/p/${project.key}/cycles/${cycle.id}`}
                     badge={
                       group.id === "current" ? (
-                        <Badge tone="accent">{t("cycle.daysLeft", { n: daysUntil(cycle.ends_on, serverDay()) + 1 })}</Badge>
+                        <Badge tone="accent">
+                          {t("cycle.daysLeft", { n: daysUntil(cycle.ends_on, serverDay()) + 1 })}
+                        </Badge>
                       ) : undefined
                     }
                     meta={<CycleMeta cycle={cycle} tally={tallies[cycle.id]} />}
@@ -143,7 +150,9 @@ function NewCycle({ project, cycles }: { project: Project; cycles: Cycle[] }) {
           type="date"
           required
           value={start}
-          onChange={(e) => setEdited({ start: e.target.value, end: e.target.value ? addDays(e.target.value, length - 1) : end })}
+          onChange={(e) =>
+            setEdited({ start: e.target.value, end: e.target.value ? addDays(e.target.value, length - 1) : end })
+          }
           className="h-7 w-36 tnum"
         />
       </label>

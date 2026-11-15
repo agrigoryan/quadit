@@ -1,6 +1,21 @@
 import { type FormEvent, useMemo, useState } from "react";
-import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, MoreHorizontal, Star, Trash2 } from "lucide-react";
 import { cx } from "@/lib/cx";
@@ -35,12 +50,18 @@ interface RowProps {
 }
 
 function StatusRow({ status, count, admin, onDelete, onDefault }: RowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: status.id, disabled: !admin });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: status.id,
+    disabled: !admin,
+  });
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={cx("flex h-11 items-center gap-1.5 bg-surface pr-2 pl-1 first:rounded-t-lg last:rounded-b-lg", isDragging && "relative z-10 shadow-pop")}
+      className={cx(
+        "flex h-11 items-center gap-1.5 bg-surface pr-2 pl-1 first:rounded-t-lg last:rounded-b-lg",
+        isDragging && "relative z-10 shadow-pop",
+      )}
     >
       {admin ? (
         <button
@@ -56,14 +77,26 @@ function StatusRow({ status, count, admin, onDelete, onDefault }: RowProps) {
         <span className="w-2" />
       )}
       <StatusIcon category={status.category} />
-      <ColorButton value={status.color} onChange={(color) => patch(status, { color })} label={t("statuses.color", { name: status.name })} disabled={!admin} />
-      <InlineName value={status.name} onSave={(name) => patch(status, { name })} label={t("statuses.name")} disabled={!admin} />
+      <ColorButton
+        value={status.color}
+        onChange={(color) => patch(status, { color })}
+        label={t("statuses.color", { name: status.name })}
+        disabled={!admin}
+      />
+      <InlineName
+        value={status.name}
+        onSave={(name) => patch(status, { name })}
+        label={t("statuses.name")}
+        disabled={!admin}
+      />
       {status.is_default && (
         <Badge tone="accent" title={t("statuses.defaultHint")}>
           {t("statuses.default")}
         </Badge>
       )}
-      <span className="w-14 shrink-0 text-right text-xs text-ink-3 tnum max-sm:hidden">{t("statuses.count", { n: count })}</span>
+      <span className="w-14 shrink-0 text-right text-xs text-ink-3 tnum max-sm:hidden">
+        {t("statuses.count", { n: count })}
+      </span>
       {admin ? (
         <NativeSelect
           aria-label={t("statuses.category")}
@@ -111,7 +144,8 @@ export function ProjectStatuses({ project, admin }: { project: Project; admin: b
 
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const task of Object.values(tasks)) if (task.project_id === project.id && !task.deleted_at) out[task.status_id] = (out[task.status_id] ?? 0) + 1;
+    for (const task of Object.values(tasks))
+      if (task.project_id === project.id && !task.deleted_at) out[task.status_id] = (out[task.status_id] ?? 0) + 1;
     return out;
   }, [tasks, project.id]);
 
@@ -150,7 +184,11 @@ export function ProjectStatuses({ project, admin }: { project: Project; admin: b
                 admin={admin}
                 onDefault={() => makeDefault(s)}
                 onDelete={() => {
-                  setMoveTo(others.find((o) => o.id !== s.id && o.category === s.category)?.id ?? statuses.find((o) => o.id !== s.id)?.id ?? "");
+                  setMoveTo(
+                    others.find((o) => o.id !== s.id && o.category === s.category)?.id ??
+                      statuses.find((o) => o.id !== s.id)?.id ??
+                      "",
+                  );
                   setDeleting(s);
                 }}
               />
@@ -166,11 +204,21 @@ export function ProjectStatuses({ project, admin }: { project: Project; admin: b
         title={t("statuses.delete.title", { name: deleting?.name ?? "" })}
         body={needsMove ? t("statuses.delete.body") : t("statuses.delete.empty")}
         confirm={t("s.delete")}
-        onConfirm={() => mutate({ type: "status.delete", args: { id: deleting?.id, ...(needsMove ? { move_to: moveTo } : {}) } }, undefined, { quiet: true })}
+        onConfirm={() =>
+          mutate(
+            { type: "status.delete", args: { id: deleting?.id, ...(needsMove ? { move_to: moveTo } : {}) } },
+            undefined,
+            { quiet: true },
+          )
+        }
       >
         {needsMove && (
           <FormField label={`${t("statuses.moveTo")} (${t("statuses.count", { n: counts[deleting?.id ?? ""] ?? 0 })})`}>
-            <NativeSelect value={moveTo} onChange={setMoveTo} options={others.map((s) => ({ value: s.id, label: s.name }))} />
+            <NativeSelect
+              value={moveTo}
+              onChange={setMoveTo}
+              options={others.map((s) => ({ value: s.id, label: s.name }))}
+            />
           </FormField>
         )}
       </ConfirmDialog>
@@ -189,7 +237,14 @@ function AddStatus({ project, last }: { project: Project; last: string | undefin
     errors.clear();
     if (!name.trim()) return errors.set("name", t("s.required"));
     await run(async () => {
-      await mutate({ type: "status.create", args: { id: newId(), project: project.id, name: name.trim(), category, rank: rankBetween(last, undefined) } }, undefined, { quiet: true });
+      await mutate(
+        {
+          type: "status.create",
+          args: { id: newId(), project: project.id, name: name.trim(), category, rank: rankBetween(last, undefined) },
+        },
+        undefined,
+        { quiet: true },
+      );
       setName("");
     });
   }
@@ -197,8 +252,21 @@ function AddStatus({ project, last }: { project: Project; last: string | undefin
   return (
     <form onSubmit={add} className="flex flex-col gap-1.5">
       <div className="flex items-start gap-2">
-        <Input aria-label={t("statuses.name")} placeholder={t("statuses.name")} value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-1" aria-invalid={!!errors.fields.name} />
-        <NativeSelect aria-label={t("statuses.category")} value={category} onChange={(v) => setCategory(v as Category)} options={categoryChoices()} className="w-32 shrink-0" />
+        <Input
+          aria-label={t("statuses.name")}
+          placeholder={t("statuses.name")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="min-w-0 flex-1"
+          aria-invalid={!!errors.fields.name}
+        />
+        <NativeSelect
+          aria-label={t("statuses.category")}
+          value={category}
+          onChange={(v) => setCategory(v as Category)}
+          options={categoryChoices()}
+          className="w-32 shrink-0"
+        />
         <Button type="submit" disabled={busy} className="h-8">
           {t("statuses.add")}
         </Button>

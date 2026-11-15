@@ -47,7 +47,9 @@ export function MediaThumb({ file, className, contain }: ThumbProps) {
     );
   }
   return (
-    <span className={cx("flex flex-col items-center justify-center gap-1 bg-sunken p-2 text-center text-ink-2", className)}>
+    <span
+      className={cx("flex flex-col items-center justify-center gap-1 bg-sunken p-2 text-center text-ink-2", className)}
+    >
       <FileText className="size-5" aria-hidden />
       <span className="line-clamp-2 text-2xs break-all">{file.name}</span>
       <span className="text-2xs text-ink-3">{fileSize(file.size)}</span>
@@ -58,9 +60,25 @@ export function MediaThumb({ file, className, contain }: ThumbProps) {
 /** The file itself at full size: a picture, or a video with controls. */
 export function MediaFull({ file, className }: { file: FileRow; className?: string }) {
   if (isVideo(file)) {
-    return <video src={file.url} controls playsInline preload="metadata" className={cx("max-h-full max-w-full", className)} />;
+    return (
+      <video
+        src={file.url}
+        controls
+        playsInline
+        preload="metadata"
+        className={cx("max-h-full max-w-full", className)}
+      />
+    );
   }
-  return <img src={file.url} alt={file.name} width={file.width} height={file.height} className={cx("max-h-full max-w-full object-contain", className)} />;
+  return (
+    <img
+      src={file.url}
+      alt={file.name}
+      width={file.width}
+      height={file.height}
+      className={cx("max-h-full max-w-full object-contain", className)}
+    />
+  );
 }
 
 /** One file over the whole screen. Escape or a click outside closes it. */

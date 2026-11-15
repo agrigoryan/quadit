@@ -21,10 +21,14 @@ export function toBase64Url(buf: ArrayBuffer | null | undefined): string {
 }
 
 /** Whether this browser can make or use passkeys at all. */
-export const passkeysSupported = () => typeof window !== "undefined" && "PublicKeyCredential" in window && !!navigator.credentials;
+export const passkeysSupported = () =>
+  typeof window !== "undefined" && "PublicKeyCredential" in window && !!navigator.credentials;
 
 const descriptors = (list: unknown) =>
-  ((list as { id: string }[] | undefined) ?? []).map((c) => ({ ...c, id: fromBase64Url(c.id) })) as PublicKeyCredentialDescriptor[];
+  ((list as { id: string }[] | undefined) ?? []).map((c) => ({
+    ...c,
+    id: fromBase64Url(c.id),
+  })) as PublicKeyCredentialDescriptor[];
 
 /**
  * Makes a passkey on this device from the options of
@@ -86,4 +90,5 @@ export async function getPasskey(options: { publicKey: Json }): Promise<Json> {
 }
 
 /** True when the person closed the browser's passkey sheet: not an error worth showing. */
-export const passkeyCanceled = (err: unknown) => err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "AbortError");
+export const passkeyCanceled = (err: unknown) =>
+  err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "AbortError");

@@ -78,7 +78,12 @@ function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Acco
           <FormField label={t("me.profile.name")} htmlFor="me-name" error={errors.fields.name}>
             <Input id="me-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
           </FormField>
-          <FormField label={t("me.profile.zone")} htmlFor="me-zone" hint={t("me.profile.zoneHint")} error={errors.fields.timezone}>
+          <FormField
+            label={t("me.profile.zone")}
+            htmlFor="me-zone"
+            hint={t("me.profile.zoneHint")}
+            error={errors.fields.timezone}
+          >
             <NativeSelect id="me-zone" value={zone} onChange={setZone} options={zones} />
           </FormField>
         </div>
@@ -129,7 +134,12 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
         {open ? (
           <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label={t("me.email.new")} htmlFor="me-email" hint={t("me.email.now", { email: current })} error={errors.fields.email}>
+              <FormField
+                label={t("me.email.new")}
+                htmlFor="me-email"
+                hint={t("me.email.now", { email: current })}
+                error={errors.fields.email}
+              >
                 <Input
                   id="me-email"
                   type="email"
@@ -144,7 +154,12 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
                 />
               </FormField>
               {account.has_password && (
-                <FormField label={t("me.email.password")} htmlFor="me-email-password" hint={t("me.email.passwordHint")} error={errors.fields.password}>
+                <FormField
+                  label={t("me.email.password")}
+                  htmlFor="me-email-password"
+                  hint={t("me.email.passwordHint")}
+                  error={errors.fields.password}
+                >
                   <Input
                     id="me-email-password"
                     type="password"

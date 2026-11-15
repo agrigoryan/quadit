@@ -13,7 +13,19 @@ import { usePageTitle } from "@/lib/ui-state";
 import { BulkBar } from "@/tasks/bulk-bar";
 import { FilterBar } from "@/tasks/filter-bar";
 import { type NewTaskDraft, openNewTask } from "@/tasks/draft";
-import { comparer, countFilters, emptyFilters, type Filters, fromQuery, goneFromQuery, groupTasks, matcher, normalizeQuery, sameFilters, sortFromQuery } from "@/tasks/filters";
+import {
+  comparer,
+  countFilters,
+  emptyFilters,
+  type Filters,
+  fromQuery,
+  goneFromQuery,
+  groupTasks,
+  matcher,
+  normalizeQuery,
+  sameFilters,
+  sortFromQuery,
+} from "@/tasks/filters";
 import { TaskList } from "@/tasks/task-list";
 import { filtersFromSearch, hasFilters, searchFromFilters } from "@/tasks/url-filters";
 import { DisplayControls, ViewControls } from "@/tasks/view-controls";
@@ -56,11 +68,17 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
 
   // A view written by hand or by an agent may hold a query the page cannot read; it then says so instead of failing.
   const query = useMemo(() => normalizeQuery(view?.query), [view?.query]);
-  const tables = useMemo(() => ({ projects, members, statuses, labels, epics, cycles }), [projects, members, statuses, labels, epics, cycles]);
+  const tables = useMemo(
+    () => ({ projects, members, statuses, labels, epics, cycles }),
+    [projects, members, statuses, labels, epics, cycles],
+  );
 
   // What the view stores that names something gone (a deleted label, a person removed). The page leaves
   // those values out and shows the rest; the note under the toolbar offers to save the view without them.
-  const gone = useMemo(() => (view && query ? goneFromQuery(query, tables, me.user_id, today()) : null), [view?.id, query, tables, me.user_id]);
+  const gone = useMemo(
+    () => (view && query ? goneFromQuery(query, tables, me.user_id, today()) : null),
+    [view?.id, query, tables, me.user_id],
+  );
   const goneKey = gone ? JSON.stringify(Object.entries(gone)) : "";
 
   const saved: ViewState | null = useMemo(() => {
@@ -86,7 +104,13 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
   const readAddress = () => filtersFromSearch(location.search, tables, me.user_id, today(), project?.key);
 
   const scope = view ? `view:${view.id}` : `project:${project?.id ?? ""}`;
-  const [stored, setState] = useViewState(scope, useMemo(() => ({ ...(saved ?? defaultViewState), filters: readAddress() ?? (saved ?? defaultViewState).filters }), [saved]));
+  const [stored, setState] = useViewState(
+    scope,
+    useMemo(
+      () => ({ ...(saved ?? defaultViewState), filters: readAddress() ?? (saved ?? defaultViewState).filters }),
+      [saved],
+    ),
+  );
   const state: ViewState = routeLayout ? { ...stored, layout: routeLayout } : stored;
 
   // The address changed from outside (a link, Back, a reload): take its filters.
@@ -103,7 +127,8 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
 
   function writeAddress(filters: Filters) {
     const search = searchFromFilters(filters, tables, project?.id, location.search);
-    if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
+    if (search !== location.search)
+      navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
   }
 
   /** A filter changed here: the page takes it at once, and the address follows. */
@@ -161,19 +186,26 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
   function fixView() {
     if (!view || !gone) return;
     const fixed = { ...view.query, ...gone };
-    send({ type: "view.update", args: { id: view.id, query: fixed } }, (tx) => tx.patch("views", view.id, { query: fixed }));
+    send({ type: "view.update", args: { id: view.id, query: fixed } }, (tx) =>
+      tx.patch("views", view.id, { query: fixed }),
+    );
     toast.info(t("view.updated"));
   }
 
   function setLayout(next: "list" | "board") {
-    if (routeLayout && project) navigate(`/${slug}/p/${project.key}/${next === "board" ? "board" : "tasks"}${location.search}`);
+    if (routeLayout && project)
+      navigate(`/${slug}/p/${project.key}/${next === "board" ? "board" : "tasks"}${location.search}`);
     else setState({ layout: next });
   }
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-10 shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-2 no-scrollbar md:px-3">
-        <div role="tablist" aria-label={t("list.layout")} className="flex shrink-0 items-center rounded-md bg-sunken p-0.5">
+        <div
+          role="tablist"
+          aria-label={t("list.layout")}
+          className="flex shrink-0 items-center rounded-md bg-sunken p-0.5"
+        >
           {layouts.map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -212,7 +244,10 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
       </div>
 
       {gone && (
-        <p role="status" className="flex min-h-8 shrink-0 items-center gap-2 border-b border-line bg-sunken px-3 text-xs text-ink-2 md:px-4">
+        <p
+          role="status"
+          className="flex min-h-8 shrink-0 items-center gap-2 border-b border-line bg-sunken px-3 text-xs text-ink-2 md:px-4"
+        >
           {t("view.gone")}
           <Button size="sm" onClick={fixView}>
             {t("view.fix")}

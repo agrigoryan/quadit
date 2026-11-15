@@ -32,6 +32,7 @@ export const timelineStrings = {
   "timeline.stateLate": "{state}, {late}",
 
   "timeline.empty": "Nothing to put on a timeline yet",
-  "timeline.emptyHint": "Epics with a start and a target date show here as bars, with their tasks underneath. Create an epic first.",
+  "timeline.emptyHint":
+    "Epics with a start and a target date show here as bars, with their tasks underneath. Create an epic first.",
   "timeline.goEpics": "Go to epics",
 } as const;

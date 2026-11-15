@@ -35,7 +35,11 @@ function Deleted({ at }: { at: number | undefined }) {
   // Kept as an empty column when the time is not known, so the rows line up.
   if (!at) return <span className="w-24 shrink-0 max-sm:hidden" />;
   return (
-    <time dateTime={new Date(at).toISOString()} title={exact(at)} className="w-24 shrink-0 text-right text-xs text-ink-3 tnum max-sm:hidden">
+    <time
+      dateTime={new Date(at).toISOString()}
+      title={exact(at)}
+      className="w-24 shrink-0 text-right text-xs text-ink-3 tnum max-sm:hidden"
+    >
       {t("trash.deleted", { when: ago(at) })}
     </time>
   );
@@ -65,7 +69,10 @@ export function TrashPage() {
     // has arrived and goes on reading.
     const read = async () => {
       for (let offset = 0; offset < 50_000; offset += 1000) {
-        const out = await api.get<{ tasks: Task[]; more?: boolean }>(ws(slug, `/tasks?trash=1&raw=1&limit=1000&offset=${offset}`), ctl.signal);
+        const out = await api.get<{ tasks: Task[]; more?: boolean }>(
+          ws(slug, `/tasks?trash=1&raw=1&limit=1000&offset=${offset}`),
+          ctl.signal,
+        );
         mergeRows("tasks", out.tasks ?? []);
         setState("ready");
         if (!out.more) return;
@@ -125,9 +132,16 @@ export function TrashPage() {
             <li key={task.id} className={rowClass}>
               <span className={keyCell}>{task.key}</span>
               <span className="min-w-0 flex-1 truncate text-ink-2">{task.title || t("task.untitled")}</span>
-              <span className="max-w-40 shrink-0 truncate text-xs text-ink-3 max-md:hidden">{projects[task.project_id]?.name}</span>
+              <span className="max-w-40 shrink-0 truncate text-xs text-ink-3 max-md:hidden">
+                {projects[task.project_id]?.name}
+              </span>
               <Deleted at={task.deleted_at ?? 0} />
-              <Button size="sm" aria-label={t("trash.restoreTask", { key: task.key })} onClick={() => restoreTasks([task])} className="max-sm:h-9 max-sm:px-3">
+              <Button
+                size="sm"
+                aria-label={t("trash.restoreTask", { key: task.key })}
+                onClick={() => restoreTasks([task])}
+                className="max-sm:h-9 max-sm:px-3"
+              >
                 <Undo2 className="size-3.5" aria-hidden />
                 {t("trash.restore")}
               </Button>
@@ -145,7 +159,10 @@ export function TrashPage() {
                 <MessageCircleQuestion className="size-3.5 shrink-0 text-ink-3" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-ink-2">{decision.question}</span>
                 {task?.deleted_at ? (
-                  <span className="shrink-0 text-xs text-ink-3 max-md:hidden" title={t("trash.taskInTrashHint", { key: task.key })}>
+                  <span
+                    className="shrink-0 text-xs text-ink-3 max-md:hidden"
+                    title={t("trash.taskInTrashHint", { key: task.key })}
+                  >
                     {t("trash.taskInTrash", { key: task.key })}
                   </span>
                 ) : (
@@ -169,7 +186,13 @@ export function TrashPage() {
       {removedFiles.length > 0 && (
         <Group title={t("trash.files")} count={removedFiles.length}>
           {removedFiles.map((file) => (
-            <TrashedFileRow key={file.id} row={file} rowClass={rowClass} when={<Deleted at={file.deleted_at} />} onRestore={() => files.restore(file.id)} />
+            <TrashedFileRow
+              key={file.id}
+              row={file}
+              rowClass={rowClass}
+              when={<Deleted at={file.deleted_at} />}
+              onRestore={() => files.restore(file.id)}
+            />
           ))}
         </Group>
       )}

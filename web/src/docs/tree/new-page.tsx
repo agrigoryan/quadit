@@ -59,7 +59,11 @@ export function NewPageItems({ parentId, projectId, private: isPrivate, generate
           <MenuSeparator />
           <MenuLabel>{t("docs.new.generated")}</MenuLabel>
           {GENERATED.map((g) => (
-            <MenuItem key={g.kind} icon={<Sparkles />} onSelect={() => createAndOpen({ title: t(g.key), generated: g.kind, projectId })}>
+            <MenuItem
+              key={g.kind}
+              icon={<Sparkles />}
+              onSelect={() => createAndOpen({ title: t(g.key), generated: g.kind, projectId })}
+            >
               {t(g.key)}
             </MenuItem>
           ))}

@@ -17,7 +17,10 @@ type Settings = { cycles?: boolean; cycle_days?: number; cycle_start?: number; e
 
 const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
 /** Weekday names in the person's language; 0 is Sunday, as the server counts. */
-const WEEKDAYS = Array.from({ length: 7 }, (_, i) => ({ value: String(i), label: weekday.format(new Date(2024, 0, 7 + i)) }));
+const WEEKDAYS = Array.from({ length: 7 }, (_, i) => ({
+  value: String(i),
+  label: weekday.format(new Date(2024, 0, 7 + i)),
+}));
 const WEEKS = [1, 2, 3, 4, 6];
 
 /** A project's name, key and colour, its switches, and archiving or deleting it. */
@@ -45,7 +48,17 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
     if (!KEY_RE.test(draft.key)) return errors.set("key", t("project.keyBad"));
     await run(async () => {
       await mutate(
-        { type: "project.update", args: { id: project.id, key: draft.key, name: draft.name.trim(), icon: draft.icon.trim(), color: draft.color, description: draft.description.trim() } },
+        {
+          type: "project.update",
+          args: {
+            id: project.id,
+            key: draft.key,
+            name: draft.name.trim(),
+            icon: draft.icon.trim(),
+            color: draft.color,
+            description: draft.description.trim(),
+          },
+        },
         undefined,
         { quiet: true },
       );
@@ -57,10 +70,13 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
   /** Switches save as they are flipped. */
   function setOption(patch: Settings) {
     const next = { ...settings, ...patch };
-    send({ type: "project.update", args: { id: project.id, settings: next } }, (tx) => tx.patch("projects", project.id, { settings: next }));
+    send({ type: "project.update", args: { id: project.id, settings: next } }, (tx) =>
+      tx.patch("projects", project.id, { settings: next }),
+    );
   }
 
-  const archive = (archived: boolean) => mutate({ type: "project.update", args: { id: project.id, archived } }, undefined, { quiet: true });
+  const archive = (archived: boolean) =>
+    mutate({ type: "project.update", args: { id: project.id, archived } }, undefined, { quiet: true });
 
   return (
     <div className="flex flex-col gap-8">
@@ -80,7 +96,13 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
 
       <Section title={t("project.options")}>
         <Card className="flex flex-col gap-3">
-          <SwitchRow title={t("project.cycles")} hint={t("project.cyclesHint")} checked={!!settings.cycles} disabled={!admin} onChange={(cycles) => setOption({ cycles, cycle_days: settings.cycle_days || 14 })} />
+          <SwitchRow
+            title={t("project.cycles")}
+            hint={t("project.cyclesHint")}
+            checked={!!settings.cycles}
+            disabled={!admin}
+            onChange={(cycles) => setOption({ cycles, cycle_days: settings.cycle_days || 14 })}
+          />
           {settings.cycles && (
             <div className="grid max-w-md grid-cols-2 gap-3.5 pb-1">
               <FormField label={t("project.cycleDays")}>
@@ -92,12 +114,23 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
                 />
               </FormField>
               <FormField label={t("project.cycleStart")}>
-                <NativeSelect value={String(settings.cycle_start ?? 0)} disabled={!admin} onChange={(v) => setOption({ cycle_start: Number(v) })} options={WEEKDAYS} />
+                <NativeSelect
+                  value={String(settings.cycle_start ?? 0)}
+                  disabled={!admin}
+                  onChange={(v) => setOption({ cycle_start: Number(v) })}
+                  options={WEEKDAYS}
+                />
               </FormField>
             </div>
           )}
           <div className="border-t border-line pt-3">
-            <SwitchRow title={t("project.estimates")} hint={t("project.estimatesHint")} checked={!!settings.estimates} disabled={!admin} onChange={(estimates) => setOption({ estimates })} />
+            <SwitchRow
+              title={t("project.estimates")}
+              hint={t("project.estimatesHint")}
+              checked={!!settings.estimates}
+              disabled={!admin}
+              onChange={(estimates) => setOption({ estimates })}
+            />
           </div>
         </Card>
       </Section>
@@ -108,7 +141,9 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="max-w-md text-sm text-ink-2">{t("project.archive.lead")}</p>
               {project.archived_at ? (
-                <Button onClick={() => void archive(false).catch((err: unknown) => toast.error(errorMessage(err)))}>{t("project.unarchive")}</Button>
+                <Button onClick={() => void archive(false).catch((err: unknown) => toast.error(errorMessage(err)))}>
+                  {t("project.unarchive")}
+                </Button>
               ) : (
                 <Button onClick={() => setAsk("archive")}>{t("project.archive")}</Button>
               )}
@@ -145,13 +180,21 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
         body={t("project.delete.lead")}
         confirm={t("project.delete")}
         onConfirm={async () => {
-          if (typed.trim().toUpperCase() !== project.key) throw new Error(t("project.delete.type", { key: project.key }));
+          if (typed.trim().toUpperCase() !== project.key)
+            throw new Error(t("project.delete.type", { key: project.key }));
           await mutate({ type: "project.delete", args: { id: project.id } }, undefined, { quiet: true });
           navigate(`${base}/projects`);
         }}
       >
         <FormField label={t("project.delete.type", { key: project.key })} htmlFor="delete-key">
-          <Input id="delete-key" value={typed} onChange={(e) => setTyped(e.target.value)} autoCapitalize="characters" spellCheck={false} className="font-mono" />
+          <Input
+            id="delete-key"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoCapitalize="characters"
+            spellCheck={false}
+            className="font-mono"
+          />
         </FormField>
       </ConfirmDialog>
     </div>

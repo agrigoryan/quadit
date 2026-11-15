@@ -6,7 +6,17 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useProjects, useSlug } from "@/lib/selectors";
 import { useSettingsBase } from "@/settings/base";
-import { checkImport, type Found, foundText, type ImportKind, type ImportRequest, type ImportResult, runImport, type Source, SOURCES } from "@/settings/import/data";
+import {
+  checkImport,
+  type Found,
+  foundText,
+  type ImportKind,
+  type ImportRequest,
+  type ImportResult,
+  runImport,
+  type Source,
+  SOURCES,
+} from "@/settings/import/data";
 import { ImportOutcome } from "@/settings/import/result";
 import { type Uploaded, UploadField } from "@/settings/import/upload-field";
 import { FormAlert, FormField, FormFoot, NativeSelect, Note, useFieldErrors } from "@/settings/ui/form";
@@ -20,7 +30,15 @@ const FILE_LABEL = { ".csv": "import.file.csv", ".json": "import.file.json", ".z
 const FILE_TAG: Record<string, string> = { ".csv": "CSV", ".json": "JSON", ".zip": "ZIP" };
 const ext = (s: Source) => (s.accept?.split(",")[0] ?? ".zip") as keyof typeof FILE_LABEL;
 
-function SourceCards({ value, onPick, disabled }: { value: ImportKind | null; onPick: (kind: ImportKind) => void; disabled: boolean }) {
+function SourceCards({
+  value,
+  onPick,
+  disabled,
+}: {
+  value: ImportKind | null;
+  onPick: (kind: ImportKind) => void;
+  disabled: boolean;
+}) {
   return (
     <div role="radiogroup" aria-label={t("import.from")} className="grid gap-2 sm:grid-cols-2">
       {SOURCES.map((s) => (
@@ -33,12 +51,16 @@ function SourceCards({ value, onPick, disabled }: { value: ImportKind | null; on
           onClick={() => onPick(s.kind)}
           className={cx(
             "flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-60",
-            value === s.kind ? "border-accent bg-accent-soft" : "border-line bg-surface hover:border-line-strong hover:bg-hover/60",
+            value === s.kind
+              ? "border-accent bg-accent-soft"
+              : "border-line bg-surface hover:border-line-strong hover:bg-hover/60",
           )}
         >
           <span className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-ink">{t(`import.kind.${s.kind}`)}</span>
-            {s.from === "file" && <span className="text-2xs font-medium tracking-wide text-ink-3">{FILE_TAG[ext(s)]}</span>}
+            {s.from === "file" && (
+              <span className="text-2xs font-medium tracking-wide text-ink-3">{FILE_TAG[ext(s)]}</span>
+            )}
           </span>
           <span className="text-xs text-ink-2">{t(`import.how.${s.kind}`)}</span>
         </button>
@@ -96,7 +118,7 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
     const options: Record<string, string> = {};
     const req: ImportRequest = { kind: source.kind, options };
     if (source.from === "file") {
-      if (!file) return errors.set("file", t("import.fileMissing")), null;
+      if (!file) return (errors.set("file", t("import.fileMissing")), null);
       req.file = file.id;
     } else if (source.kind === "github") {
       const repo = address
@@ -104,18 +126,18 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
         .replace(/^https?:\/\/github\.com\//i, "")
         .replace(/\.git$/, "")
         .replace(/\/+$/, "");
-      if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return errors.set("source", t("import.repoBad")), null;
+      if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return (errors.set("source", t("import.repoBad")), null);
       req.source = repo;
       if (token.trim()) options.token = token.trim();
     } else {
-      if (!/^https?:\/\/\S+$/i.test(address.trim())) return errors.set("source", t("import.addressBad")), null;
+      if (!/^https?:\/\/\S+$/i.test(address.trim())) return (errors.set("source", t("import.addressBad")), null);
       req.source = address.trim().replace(/\/+$/, "");
       if (orbitWs.trim()) options.workspace = orbitWs.trim();
       if (token.trim()) options.token = token.trim();
       if (orbitSession.trim()) options.session = orbitSession.trim();
     }
     if (source.project) {
-      if (!projectKey) return errors.set("project", t("import.projectMissing")), null;
+      if (!projectKey) return (errors.set("project", t("import.projectMissing")), null);
       options.project = projectKey;
     }
     return req;
@@ -172,35 +194,111 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
               )}
               {source.kind === "github" && (
                 <div className="grid gap-3.5 sm:grid-cols-2">
-                  <FormField label={t("import.repo")} htmlFor="imp-repo" hint={t("import.repoHint")} error={errors.fields.source}>
-                    <Input id="imp-repo" className="font-mono" placeholder="owner/name" spellCheck={false} autoCapitalize="off" value={address} onChange={(e) => (setAddress(e.target.value), touched())} />
+                  <FormField
+                    label={t("import.repo")}
+                    htmlFor="imp-repo"
+                    hint={t("import.repoHint")}
+                    error={errors.fields.source}
+                  >
+                    <Input
+                      id="imp-repo"
+                      className="font-mono"
+                      placeholder="owner/name"
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      value={address}
+                      onChange={(e) => (setAddress(e.target.value), touched())}
+                    />
                   </FormField>
-                  <FormField label={`${t("import.token")} (${t("s.optional")})`} htmlFor="imp-token" hint={t("import.tokenHintGithub")} error={errors.fields.token}>
-                    <Input id="imp-token" type="password" autoComplete="off" placeholder="github_pat_…" value={token} onChange={(e) => (setToken(e.target.value), touched())} />
+                  <FormField
+                    label={`${t("import.token")} (${t("s.optional")})`}
+                    htmlFor="imp-token"
+                    hint={t("import.tokenHintGithub")}
+                    error={errors.fields.token}
+                  >
+                    <Input
+                      id="imp-token"
+                      type="password"
+                      autoComplete="off"
+                      placeholder="github_pat_…"
+                      value={token}
+                      onChange={(e) => (setToken(e.target.value), touched())}
+                    />
                   </FormField>
                 </div>
               )}
               {source.kind === "orbit" && (
                 <>
-                  <FormField label={t("import.address")} htmlFor="imp-address" hint={t("import.addressHint")} error={errors.fields.source}>
-                    <Input id="imp-address" type="url" placeholder="https://" spellCheck={false} autoCapitalize="off" value={address} onChange={(e) => (setAddress(e.target.value), touched())} />
+                  <FormField
+                    label={t("import.address")}
+                    htmlFor="imp-address"
+                    hint={t("import.addressHint")}
+                    error={errors.fields.source}
+                  >
+                    <Input
+                      id="imp-address"
+                      type="url"
+                      placeholder="https://"
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      value={address}
+                      onChange={(e) => (setAddress(e.target.value), touched())}
+                    />
                   </FormField>
                   <div className="grid gap-3.5 sm:grid-cols-2">
-                    <FormField label={t("import.orbitWorkspace")} htmlFor="imp-orbit-ws" hint={t("import.orbitWorkspaceHint")} error={errors.fields.workspace}>
-                      <Input id="imp-orbit-ws" spellCheck={false} autoCapitalize="off" value={orbitWs} onChange={(e) => (setOrbitWs(e.target.value), touched())} />
+                    <FormField
+                      label={t("import.orbitWorkspace")}
+                      htmlFor="imp-orbit-ws"
+                      hint={t("import.orbitWorkspaceHint")}
+                      error={errors.fields.workspace}
+                    >
+                      <Input
+                        id="imp-orbit-ws"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        value={orbitWs}
+                        onChange={(e) => (setOrbitWs(e.target.value), touched())}
+                      />
                     </FormField>
-                    <FormField label={t("import.token")} htmlFor="imp-token" hint={t("import.tokenHintOrbit")} error={errors.fields.token}>
-                      <Input id="imp-token" type="password" autoComplete="off" value={token} onChange={(e) => (setToken(e.target.value), touched())} />
+                    <FormField
+                      label={t("import.token")}
+                      htmlFor="imp-token"
+                      hint={t("import.tokenHintOrbit")}
+                      error={errors.fields.token}
+                    >
+                      <Input
+                        id="imp-token"
+                        type="password"
+                        autoComplete="off"
+                        value={token}
+                        onChange={(e) => (setToken(e.target.value), touched())}
+                      />
                     </FormField>
                   </div>
-                  <FormField label={t("import.orbitSession")} htmlFor="imp-orbit-session" hint={t("import.orbitSessionHint")} error={errors.fields.session}>
-                    <Input id="imp-orbit-session" type="password" autoComplete="off" value={orbitSession} onChange={(e) => (setOrbitSession(e.target.value), touched())} />
+                  <FormField
+                    label={t("import.orbitSession")}
+                    htmlFor="imp-orbit-session"
+                    hint={t("import.orbitSessionHint")}
+                    error={errors.fields.session}
+                  >
+                    <Input
+                      id="imp-orbit-session"
+                      type="password"
+                      autoComplete="off"
+                      value={orbitSession}
+                      onChange={(e) => (setOrbitSession(e.target.value), touched())}
+                    />
                   </FormField>
                 </>
               )}
               {source.project && (
                 <div className="grid gap-3.5 sm:grid-cols-2">
-                  <FormField label={t("import.project")} htmlFor="imp-project" hint={t("import.projectHint")} error={project === NEW ? undefined : errors.fields.project}>
+                  <FormField
+                    label={t("import.project")}
+                    htmlFor="imp-project"
+                    hint={t("import.projectHint")}
+                    error={project === NEW ? undefined : errors.fields.project}
+                  >
                     <NativeSelect
                       id="imp-project"
                       value={project}
@@ -213,8 +311,20 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                     />
                   </FormField>
                   {project === NEW && (
-                    <FormField label={t("import.projectKey")} htmlFor="imp-project-key" hint={t("import.projectKeyHint")} error={errors.fields.project}>
-                      <Input id="imp-project-key" className="font-mono uppercase" maxLength={6} spellCheck={false} value={newKey} onChange={(e) => (setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")), touched())} />
+                    <FormField
+                      label={t("import.projectKey")}
+                      htmlFor="imp-project-key"
+                      hint={t("import.projectKeyHint")}
+                      error={errors.fields.project}
+                    >
+                      <Input
+                        id="imp-project-key"
+                        className="font-mono uppercase"
+                        maxLength={6}
+                        spellCheck={false}
+                        value={newKey}
+                        onChange={(e) => (setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")), touched())}
+                      />
                     </FormField>
                   )}
                 </div>
@@ -226,7 +336,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                 status={
                   busy ? (
                     <span className="flex items-center gap-2" aria-live="polite">
-                      <Spinner className="size-3.5" label={phase === "running" ? t("import.running") : t("import.checking")} />
+                      <Spinner
+                        className="size-3.5"
+                        label={phase === "running" ? t("import.running") : t("import.checking")}
+                      />
                       {phase === "running" ? t("import.runningHint") : t("import.checking")}
                     </span>
                   ) : (
@@ -237,7 +350,11 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                 <Button type="submit" variant={found ? "secondary" : "primary"} disabled={busy || uploading}>
                   {t("import.check")}
                 </Button>
-                <Button variant="primary" disabled={phase !== "checked" || nothing || uploading} onClick={() => void run()}>
+                <Button
+                  variant="primary"
+                  disabled={phase !== "checked" || nothing || uploading}
+                  onClick={() => void run()}
+                >
                   {phase === "running" ? t("import.running") : t("import.run")}
                 </Button>
               </FormFoot>

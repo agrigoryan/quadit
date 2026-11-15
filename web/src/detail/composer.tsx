@@ -79,8 +79,15 @@ export function Composer({ task }: { task: Task }) {
       {draft.files.length > 0 && (
         <ul className="flex flex-wrap gap-1.5 px-3 pb-1.5">
           {draft.files.map((f) => (
-            <li key={f.key} className="flex h-6 max-w-full items-center gap-1.5 rounded-sm border border-line bg-sunken pr-0.5 pl-1.5 text-xs text-ink-2 max-md:h-8">
-              {f.file ? <Paperclip className="size-3 shrink-0" aria-hidden /> : <Spinner className="size-3" label={t("detail.files.uploading", { name: f.name })} />}
+            <li
+              key={f.key}
+              className="flex h-6 max-w-full items-center gap-1.5 rounded-sm border border-line bg-sunken pr-0.5 pl-1.5 text-xs text-ink-2 max-md:h-8"
+            >
+              {f.file ? (
+                <Paperclip className="size-3 shrink-0" aria-hidden />
+              ) : (
+                <Spinner className="size-3" label={t("detail.files.uploading", { name: f.name })} />
+              )}
               <span className="max-w-40 truncate">{f.name}</span>
               <button
                 type="button"
@@ -114,7 +121,11 @@ export function Composer({ task }: { task: Task }) {
           placeholder={t("comment.handTo")}
           value={draft.handTo ?? NOBODY}
           items={[
-            { id: NOBODY, label: t("comment.handToNobody"), icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden /> },
+            {
+              id: NOBODY,
+              label: t("comment.handToNobody"),
+              icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden />,
+            },
             ...memberItems(members, me.user_id),
           ]}
           onPick={(id) => editDraft(task.id, (d) => ({ ...d, handTo: id === NOBODY ? null : id }))}

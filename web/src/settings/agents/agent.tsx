@@ -4,7 +4,14 @@ import { t } from "@/lib/i18n";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
 import { useMembers } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
-import { AGENT_FIELDS, type AgentDraft, AgentLimitFields, AgentProfileFields, draftOf, limitsOf } from "@/settings/agents/agent-form";
+import {
+  AGENT_FIELDS,
+  type AgentDraft,
+  AgentLimitFields,
+  AgentProfileFields,
+  draftOf,
+  limitsOf,
+} from "@/settings/agents/agent-form";
 import { ListeningMark, StateBadge } from "@/settings/agents/agents";
 import { type AgentMember, useAgentStates } from "@/settings/agents/data";
 import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helpers";
@@ -76,7 +83,8 @@ function AgentBody({ agent }: { agent: AgentMember }) {
     };
     if (draft.responsible && draft.responsible !== knownResponsible) args.responsible = draft.responsible;
     const changes: ChangeSpec[] = [{ type: "agent.update", args }];
-    if (draft.role !== agent.role) changes.push({ type: "member.update", args: { id: agent.user_id, role: draft.role } });
+    if (draft.role !== agent.role)
+      changes.push({ type: "member.update", args: { id: agent.user_id, role: draft.role } });
     await run(async () => {
       await mutate(changes, undefined, { quiet: true });
       toast.info(t("s.saved"));
@@ -84,7 +92,9 @@ function AgentBody({ agent }: { agent: AgentMember }) {
   }
 
   const resume = () =>
-    send({ type: "member.update", args: { id: agent.user_id, suspended: false } }, (tx) => tx.patch("members", agent.user_id, { suspended_at: null }));
+    send({ type: "member.update", args: { id: agent.user_id, suspended: false } }, (tx) =>
+      tx.patch("members", agent.user_id, { suspended_at: null }),
+    );
 
   return (
     <Page
@@ -96,7 +106,11 @@ function AgentBody({ agent }: { agent: AgentMember }) {
           <span>@{agent.handle}</span>
           <StateBadge state={state} />
           {state && <ListeningMark on={state.listening} withText />}
-          {isFinishedHelper(agent) ? <Badge>{t("agents.finished")}</Badge> : agent.suspended_at ? <Badge tone="wait">{t("agents.suspended")}</Badge> : null}
+          {isFinishedHelper(agent) ? (
+            <Badge>{t("agents.finished")}</Badge>
+          ) : agent.suspended_at ? (
+            <Badge tone="wait">{t("agents.suspended")}</Badge>
+          ) : null}
           {helper && <span className="text-ink-2">{helper}</span>}
         </span>
       }
@@ -144,7 +158,11 @@ function AgentBody({ agent }: { agent: AgentMember }) {
           <Card className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="max-w-md text-sm text-ink-2">{t("agent.suspendLead")}</p>
-              {agent.suspended_at ? <Button onClick={resume}>{t("agent.resume")}</Button> : <Button onClick={() => setAsk("suspend")}>{t("agent.suspend")}</Button>}
+              {agent.suspended_at ? (
+                <Button onClick={resume}>{t("agent.resume")}</Button>
+              ) : (
+                <Button onClick={() => setAsk("suspend")}>{t("agent.suspend")}</Button>
+              )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <p className="max-w-md text-sm text-ink-2">{t("agent.removeLead")}</p>
@@ -162,7 +180,9 @@ function AgentBody({ agent }: { agent: AgentMember }) {
         title={t("agent.suspend.title", { name: agent.name })}
         body={t("agent.suspendLead")}
         confirm={t("members.suspend")}
-        onConfirm={() => mutate({ type: "member.update", args: { id: agent.user_id, suspended: true } }, undefined, { quiet: true })}
+        onConfirm={() =>
+          mutate({ type: "member.update", args: { id: agent.user_id, suspended: true } }, undefined, { quiet: true })
+        }
       />
       <ConfirmDialog
         open={ask === "remove"}

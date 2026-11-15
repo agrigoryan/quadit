@@ -23,7 +23,10 @@ export function MultiPick({ items, value, onChange, addLabel, empty, disabled }:
     <div className="flex flex-wrap items-center gap-1.5">
       {value.length === 0 && <span className="text-sm text-ink-3">{empty}</span>}
       {value.map((id) => (
-        <span key={id} className="inline-flex h-6 items-center gap-1 rounded-sm border border-line bg-sunken pr-0.5 pl-2 text-xs font-medium text-ink">
+        <span
+          key={id}
+          className="inline-flex h-6 items-center gap-1 rounded-sm border border-line bg-sunken pr-0.5 pl-2 text-xs font-medium text-ink"
+        >
           {byId.get(id)?.icon}
           {byId.get(id)?.label ?? id}
           {!disabled && (

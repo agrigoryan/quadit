@@ -69,7 +69,9 @@ export function DecisionLogPage() {
       <PageBar className="pr-4 max-sm:py-2">
         <FilterBar entries={entries} filters={filters} onChange={change} />
         <p className="shrink-0 text-xs text-ink-2 tnum max-sm:hidden" aria-live="polite">
-          {filtered ? t("declog.countOf", { n: found.length, total: entries.length }) : t("declog.count", { n: entries.length })}
+          {filtered
+            ? t("declog.countOf", { n: found.length, total: entries.length })
+            : t("declog.count", { n: entries.length })}
         </p>
       </PageBar>
 
@@ -88,7 +90,9 @@ export function DecisionLogPage() {
             )}
           >
             {t(`declog.pane.${id}`)}
-            <span className="text-xs font-normal text-ink-3 tnum">{count(id === "log" ? found.length : prefs.active.length)}</span>
+            <span className="text-xs font-normal text-ink-3 tnum">
+              {count(id === "log" ? found.length : prefs.active.length)}
+            </span>
           </button>
         ))}
       </div>
@@ -135,7 +139,10 @@ export function DecisionLogPage() {
           prefs={prefs}
           canEdit={canEdit}
           onAdd={() => setMaking({})}
-          className={cx("lg:w-84 lg:shrink-0 lg:border-l lg:border-line", pane === "prefs" ? "max-lg:flex-1" : "max-lg:hidden")}
+          className={cx(
+            "lg:w-84 lg:shrink-0 lg:border-l lg:border-line",
+            pane === "prefs" ? "max-lg:flex-1" : "max-lg:hidden",
+          )}
         />
       </div>
 

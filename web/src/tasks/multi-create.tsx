@@ -105,7 +105,12 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
           <Button variant="ghost" onClick={ui.closeNewTask}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" disabled={busy || titles.length === 0} onClick={() => void submit()} className="max-sm:h-10 max-sm:px-4">
+          <Button
+            variant="primary"
+            disabled={busy || titles.length === 0}
+            onClick={() => void submit()}
+            className="max-sm:h-10 max-sm:px-4"
+          >
             {t("multi.submit", { n: titles.length })}
             <span className="max-sm:hidden">
               <Kbd onDark>{`${MOD} ↵`}</Kbd>
@@ -156,7 +161,15 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
             {error}
           </p>
         )}
-        {project && <CreateFields project={project} value={fields} onChange={(patch) => setFields((f) => ({ ...f, ...patch }))} shared onLeave={ui.closeNewTask} />}
+        {project && (
+          <CreateFields
+            project={project}
+            value={fields}
+            onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
+            shared
+            onLeave={ui.closeNewTask}
+          />
+        )}
       </form>
     </Dialog>
   );

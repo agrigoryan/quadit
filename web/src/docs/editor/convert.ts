@@ -32,14 +32,30 @@ export type BlockSchemaLike = Record<string, { propSchema: Record<string, { defa
 // Inline things that are not text have other names in the editor ("doc" is
 // taken there by the document itself).
 // A decision carries the text the server reads it by, "SVA-7#2", as its key.
-const TO_EDITOR: Record<string, string> = { mention: "mention", task: "taskChip", decision: "decisionChip", doc: "pageLink" };
-const TO_SERVER: Record<string, string> = { mention: "mention", taskChip: "task", decisionChip: "decision", pageLink: "doc" };
+const TO_EDITOR: Record<string, string> = {
+  mention: "mention",
+  task: "taskChip",
+  decision: "decisionChip",
+  doc: "pageLink",
+};
+const TO_SERVER: Record<string, string> = {
+  mention: "mention",
+  taskChip: "task",
+  decisionChip: "decision",
+  pageLink: "doc",
+};
 const CHIP_PROP: Record<string, string> = { mention: "handle", task: "key", decision: "key", doc: "doc" };
 
 /** Props a block always carries on the server, even at their default (as Markdown conversion writes them). */
 const ALWAYS: Record<string, string[]> = { heading: ["level"], checkListItem: ["checked"] };
 
-const CELL_DEFAULTS: Obj = { backgroundColor: "default", textColor: "default", textAlignment: "left", colspan: 1, rowspan: 1 };
+const CELL_DEFAULTS: Obj = {
+  backgroundColor: "default",
+  textColor: "default",
+  textAlignment: "left",
+  colspan: 1,
+  rowspan: 1,
+};
 
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -75,7 +91,13 @@ function tableIn(content: unknown): unknown {
     type: "tableContent",
     rows: rows.map((row) => ({
       cells: (isObj(row) && Array.isArray(row.cells) ? row.cells : []).map((cell) =>
-        isObj(cell) ? { type: "tableCell", props: { ...CELL_DEFAULTS, ...(isObj(cell.props) ? cell.props : {}) }, content: inlineIn(cell.content) } : inlineIn(cell),
+        isObj(cell)
+          ? {
+              type: "tableCell",
+              props: { ...CELL_DEFAULTS, ...(isObj(cell.props) ? cell.props : {}) },
+              content: inlineIn(cell.content),
+            }
+          : inlineIn(cell),
       ),
     })),
   };
@@ -88,7 +110,10 @@ function tableIn(content: unknown): unknown {
 }
 
 /** One server block as the editor takes it, without its nested blocks. */
-export function toEditor(block: Pick<BlockRow, "id" | "type" | "props" | "content">, schema: BlockSchemaLike): Omit<EdBlock, "children"> {
+export function toEditor(
+  block: Pick<BlockRow, "id" | "type" | "props" | "content">,
+  schema: BlockSchemaLike,
+): Omit<EdBlock, "children"> {
   const spec = schema[block.type];
   if (!spec) {
     // A kind of block this editor does not know: show its text.
@@ -174,11 +199,14 @@ function tableOut(content: unknown): unknown {
         for (const [key, value] of Object.entries(isObj(cell.props) ? cell.props : {})) {
           if (value !== undefined && value !== CELL_DEFAULTS[key]) props[key] = value;
         }
-        return Object.keys(props).length ? { type: "tableCell", props, content: inlineOut(cell.content) } : inlineOut(cell.content);
+        return Object.keys(props).length
+          ? { type: "tableCell", props, content: inlineOut(cell.content) }
+          : inlineOut(cell.content);
       }),
     })),
   };
-  if (Array.isArray(content.columnWidths) && content.columnWidths.some((w) => w != null)) out.columnWidths = content.columnWidths;
+  if (Array.isArray(content.columnWidths) && content.columnWidths.some((w) => w != null))
+    out.columnWidths = content.columnWidths;
   if (typeof content.headerRows === "number") out.headerRows = content.headerRows;
   if (typeof content.headerCols === "number") out.headerCols = content.headerCols;
   return out;
@@ -219,7 +247,13 @@ export const signature = (wire: Wire) => stable(wire);
 export function plainText(content: unknown): string {
   if (typeof content === "string") return content;
   if (isObj(content) && Array.isArray(content.rows)) {
-    return content.rows.map((row) => (isObj(row) && Array.isArray(row.cells) ? row.cells.map((c) => plainText(isObj(c) ? c.content : c)).join(" ") : "")).join(" ");
+    return content.rows
+      .map((row) =>
+        isObj(row) && Array.isArray(row.cells)
+          ? row.cells.map((c) => plainText(isObj(c) ? c.content : c)).join(" ")
+          : "",
+      )
+      .join(" ");
   }
   if (!Array.isArray(content)) return "";
   let out = "";

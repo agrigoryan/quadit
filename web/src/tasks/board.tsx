@@ -69,7 +69,10 @@ function changeFor(task: Task, from: TaskGroup, to: TaskGroup): CardMove | null 
   if (to.kind === "label") {
     if (from.id === to.id) return {};
     // The label of the column it left is swapped for the label of the column it lands in.
-    return { removeLabel: from.value === NONE ? undefined : from.value, addLabel: to.value === NONE ? undefined : to.value };
+    return {
+      removeLabel: from.value === NONE ? undefined : from.value,
+      addLabel: to.value === NONE ? undefined : to.value,
+    };
   }
   return {};
 }
@@ -126,7 +129,11 @@ export function Board({ groups, project }: Props) {
     // Crossing into another column: put the card where the pointer is.
     const target = order[to] ?? [];
     const at = overId === to ? target.length : Math.max(0, target.indexOf(overId));
-    setOrder({ ...order, [from]: (order[from] ?? []).filter((v) => v !== id), [to]: [...target.slice(0, at), id, ...target.slice(at)] });
+    setOrder({
+      ...order,
+      [from]: (order[from] ?? []).filter((v) => v !== id),
+      [to]: [...target.slice(0, at), id, ...target.slice(at)],
+    });
   }
 
   function end(e: DragEndEvent) {
@@ -175,9 +182,15 @@ export function Board({ groups, project }: Props) {
         setOrder(null);
       }}
     >
-      <div ref={scroller} {...pointer} className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3">
+      <div
+        ref={scroller}
+        {...pointer}
+        className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3"
+      >
         {groups.map((group) => {
-          const list = order ? ((order[group.id] ?? []).map((id) => cards.get(id)).filter(Boolean) as Card[]) : (byGroup.get(group.id) ?? []);
+          const list = order
+            ? ((order[group.id] ?? []).map((id) => cards.get(id)).filter(Boolean) as Card[])
+            : (byGroup.get(group.id) ?? []);
           return (
             <div key={group.id} className="h-full max-sm:snap-center">
               <BoardColumn group={group} cards={list} project={project} activeId={activeId} editable={editable} />
@@ -190,7 +203,9 @@ export function Board({ groups, project }: Props) {
           </div>
         )}
       </div>
-      <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>{active && <CardOverlay task={active} />}</DragOverlay>
+      <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>
+        {active && <CardOverlay task={active} />}
+      </DragOverlay>
     </DndContext>
   );
 }

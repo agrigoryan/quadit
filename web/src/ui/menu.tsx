@@ -13,14 +13,22 @@ const item =
   "flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm text-ink outline-none select-none " +
   "data-[highlighted]:bg-hover data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-ink-2";
 
-export function MenuContent({ className, align = "start", sideOffset = 6, ...rest }: ComponentProps<typeof RMenu.Content>) {
+export function MenuContent({
+  className,
+  align = "start",
+  sideOffset = 6,
+  ...rest
+}: ComponentProps<typeof RMenu.Content>) {
   return (
     <RMenu.Portal>
       <RMenu.Content
         align={align}
         sideOffset={sideOffset}
         collisionPadding={8}
-        className={cx("z-[60] min-w-44 rounded-lg bg-surface p-1 text-ink shadow-pop outline-none animate-pop", className)}
+        className={cx(
+          "z-[60] min-w-44 rounded-lg bg-surface p-1 text-ink shadow-pop outline-none animate-pop",
+          className,
+        )}
         {...rest}
       />
     </RMenu.Portal>

@@ -18,6 +18,12 @@ export function WorkspaceAuditPage() {
     [members],
   );
   return (
-    <AuditLog title={t("audit.title")} lead={t("audit.workspaceLead")} back={base} endpoint={ws(slug, "/audit")} actors={actors} />
+    <AuditLog
+      title={t("audit.title")}
+      lead={t("audit.workspaceLead")}
+      back={base}
+      endpoint={ws(slug, "/audit")}
+      actors={actors}
+    />
   );
 }

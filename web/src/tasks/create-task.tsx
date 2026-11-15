@@ -29,13 +29,20 @@ function presetOf(template: Template | undefined, project: Project): Partial<Tas
   const out: Partial<TaskFields> = {};
   if (preset.priority) out.priority = preset.priority;
   if (preset.status) {
-    const status = Object.values(c.statuses).find((s) => s.project_id === project.id && low(s.name) === low(preset.status as string));
+    const status = Object.values(c.statuses).find(
+      (s) => s.project_id === project.id && low(s.name) === low(preset.status as string),
+    );
     if (status) out.statusId = status.id;
   }
   if (preset.labels?.length) {
     const names = preset.labels.map(low);
     out.labelIds = Object.values(c.labels)
-      .filter((l) => !l.deleted_at && (!l.project_id || l.project_id === project.id) && (names.includes(low(l.name)) || names.includes(l.id)))
+      .filter(
+        (l) =>
+          !l.deleted_at &&
+          (!l.project_id || l.project_id === project.id) &&
+          (names.includes(low(l.name)) || names.includes(l.id)),
+      )
       .map((l) => l.id);
   }
   if (preset.assignee) {
@@ -49,7 +56,11 @@ function presetOf(template: Template | undefined, project: Project): Partial<Tas
 /** The "new task" dialog (C), for one task or, on request, for several at once. */
 export function CreateTaskDialog({ draft }: { draft: NewTaskDraft }) {
   const [many, setMany] = useState(!!draft.many);
-  return many ? <MultiCreateDialog draft={draft} onSingle={() => setMany(false)} /> : <SingleDialog draft={draft} onMany={() => setMany(true)} />;
+  return many ? (
+    <MultiCreateDialog draft={draft} onSingle={() => setMany(false)} />
+  ) : (
+    <SingleDialog draft={draft} onMany={() => setMany(true)} />
+  );
 }
 
 /** One task. Cmd/Ctrl-Enter creates; "Create more" keeps it open for the next one. */
@@ -141,7 +152,12 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
       footer={
         <>
           <label className="mr-auto flex cursor-pointer items-center gap-2 text-xs text-ink-2 select-none">
-            <input type="checkbox" checked={more} onChange={(e) => setMore(e.target.checked)} className="size-3.5 accent-(--accent)" />
+            <input
+              type="checkbox"
+              checked={more}
+              onChange={(e) => setMore(e.target.checked)}
+              className="size-3.5 accent-(--accent)"
+            />
             {t("create.more")}
           </label>
           <Button variant="ghost" onClick={ui.closeNewTask}>

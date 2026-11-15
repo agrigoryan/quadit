@@ -46,7 +46,9 @@ export function MyWorkPage() {
 
   const { waiting, questions, assigned } = useMemo(() => {
     const open = tasks.filter((task) => isOpenCategory(statuses[task.status_id]?.category));
-    const waiting = open.filter((task) => task.waiting_on_id === me.user_id).sort((a, b) => b.updated_at - a.updated_at);
+    const waiting = open
+      .filter((task) => task.waiting_on_id === me.user_id)
+      .sort((a, b) => b.updated_at - a.updated_at);
     const questions: Question[] = [];
     for (const decision of Object.values(decisions)) {
       if (decision.state !== "open" || decision.deleted_at || decision.asked_id !== me.user_id) continue;
@@ -73,7 +75,13 @@ export function MyWorkPage() {
     ],
     [waiting, questions, assigned],
   );
-  const focusId = useListKeys({ rows, idOf: (row) => row.id, onOpen: (row, as) => open[as](row.task.key), taskKeyOf: (row) => row.task.key, scroller });
+  const focusId = useListKeys({
+    rows,
+    idOf: (row) => row.id,
+    onOpen: (row, as) => open[as](row.task.key),
+    taskKeyOf: (row) => row.task.key,
+    scroller,
+  });
   const yours = waiting.length + questions.length;
   const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 
@@ -92,12 +100,19 @@ export function MyWorkPage() {
           )}
           {yours > 0 && <p className="text-xs text-ink-3 max-sm:hidden">{t("mywork.waitingHint")}</p>}
         </header>
-        {yours === 0 && <p className="border-b border-line/70 px-4 py-2 text-sm text-ink-2">{t("mywork.waitingEmpty")}</p>}
+        {yours === 0 && (
+          <p className="border-b border-line/70 px-4 py-2 text-sm text-ink-2">{t("mywork.waitingEmpty")}</p>
+        )}
         {waiting.map((task) => (
           <TaskRow key={task.id} task={task} focused={focusId === `w:${task.id}`} />
         ))}
         {questions.map((q) => (
-          <QuestionRow key={q.decision.id} decision={q.decision} task={q.task} focused={focusId === `q:${q.decision.id}`} />
+          <QuestionRow
+            key={q.decision.id}
+            decision={q.decision}
+            task={q.task}
+            focused={focusId === `q:${q.decision.id}`}
+          />
         ))}
       </section>
 
@@ -140,14 +155,20 @@ function QuestionRow({ decision, task, focused }: { decision: Decision; task: Ta
       <span className="flex size-6 shrink-0 items-center justify-center">
         <DecisionMark mine title={t("task.decisionYours")} />
       </span>
-      <Link {...link} className="min-w-0 shrink truncate py-2 font-medium outline-none after:absolute after:inset-0 after:content-['']">
+      <Link
+        {...link}
+        className="min-w-0 shrink truncate py-2 font-medium outline-none after:absolute after:inset-0 after:content-['']"
+      >
         {decision.question}
       </Link>
       <span className="min-w-0 flex-1 basis-0 truncate text-ink-3">
         <span className="tnum sm:hidden">{task.key}</span>
         <span className="max-md:hidden">{task.title}</span>
       </span>
-      <span className="relative z-[1] flex shrink-0 items-center gap-2" title={asker ? t("mywork.askedBy", { name: asker.name }) : undefined}>
+      <span
+        className="relative z-[1] flex shrink-0 items-center gap-2"
+        title={asker ? t("mywork.askedBy", { name: asker.name }) : undefined}
+      >
         <span className="text-xs text-ink-3 tnum" title={exact(decision.created_at)}>
           <Ago ms={decision.created_at} />
         </span>

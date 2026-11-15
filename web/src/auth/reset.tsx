@@ -144,7 +144,12 @@ export function ResetConfirmPage() {
   return (
     <AuthLayout title={t("auth.reset.newTitle")} lead={t("auth.reset.newLead")} footer={backToSignIn()}>
       <form onSubmit={submit} className="flex flex-col gap-3.5">
-        <FormField label={t("auth.newPassword")} htmlFor="password" hint={t("auth.setup.passwordHint")} error={fieldError}>
+        <FormField
+          label={t("auth.newPassword")}
+          htmlFor="password"
+          hint={t("auth.setup.passwordHint")}
+          error={fieldError}
+        >
           <Input
             id="password"
             type="password"

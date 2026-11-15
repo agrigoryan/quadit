@@ -97,7 +97,12 @@ export function AsksBefore({ value, onChange, disabled }: Props) {
     <div className="flex flex-col gap-3">
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
         {GROUPS.map((group) => (
-          <div key={group.key} role="group" aria-label={t(`agent.asks.group.${group.key}`)} className="flex flex-col gap-1.5">
+          <div
+            key={group.key}
+            role="group"
+            aria-label={t(`agent.asks.group.${group.key}`)}
+            className="flex flex-col gap-1.5"
+          >
             <p className="text-xs font-medium text-ink-3">{t(`agent.asks.group.${group.key}`)}</p>
             {group.asks.map((ask) => (
               <Checkbox key={ask.key} checked={has(ask)} onChange={(on) => toggle(ask, on)} disabled={disabled}>
@@ -110,7 +115,9 @@ export function AsksBefore({ value, onChange, disabled }: Props) {
       <div className="flex flex-col gap-1.5">
         <p className="text-xs font-medium text-ink-3">{t("agent.asks.else")}</p>
         <MultiPick
-          items={types.filter((type) => !LISTED.has(type) || others.includes(type)).map((type) => ({ id: type, label: type }))}
+          items={types
+            .filter((type) => !LISTED.has(type) || others.includes(type))
+            .map((type) => ({ id: type, label: type }))}
           value={others}
           onChange={setOthers}
           addLabel={t("agent.approvalPick")}

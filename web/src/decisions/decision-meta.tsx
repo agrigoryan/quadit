@@ -20,9 +20,14 @@ import { Ago } from "@/ui/ago";
 function StateBadge({ decision, viewer }: { decision: Decision; viewer: Viewer }) {
   const approval = decision.kind === "approval";
   if (decision.state === "open") {
-    return viewer.mine ? <Badge tone="move">{t("decision.state.yours")}</Badge> : <Badge tone="wait">{t("decision.state.open")}</Badge>;
+    return viewer.mine ? (
+      <Badge tone="move">{t("decision.state.yours")}</Badge>
+    ) : (
+      <Badge tone="wait">{t("decision.state.open")}</Badge>
+    );
   }
-  if (decision.state === "picked") return <Badge tone="ok">{approval ? t("decision.state.approved") : t("decision.state.picked")}</Badge>;
+  if (decision.state === "picked")
+    return <Badge tone="ok">{approval ? t("decision.state.approved") : t("decision.state.picked")}</Badge>;
   return <Badge tone="danger">{approval ? t("decision.state.declined") : t("decision.state.sentBack")}</Badge>;
 }
 
@@ -82,7 +87,9 @@ export function UnclearNote({ decision, viewer }: { decision: Decision; viewer: 
         {viewer.isAsker ? t("decision.unclearNoteMine") : t("decision.unclearNote", { name: asker })}
       </p>
       <p className="mt-0.5 whitespace-pre-line text-ink">{decision.unclear_note}</p>
-      {decision.outcome_note && <p className="mt-1.5 text-xs text-ink-2">{t("decision.unclearEarlier", { note: decision.outcome_note })}</p>}
+      {decision.outcome_note && (
+        <p className="mt-1.5 text-xs text-ink-2">{t("decision.unclearEarlier", { note: decision.outcome_note })}</p>
+      )}
     </div>
   );
 }
@@ -149,14 +156,19 @@ export function ApprovalAction({ decision }: { decision: Decision }) {
   const asker = useMemberName(decision.created_by, t("common.someone"));
   if (!decision.action) return null;
   // The exact arguments approved, and when the approval was spent on them.
-  const { action_args: args, action_used_at: usedAt } = decision as Decision & { action_args?: unknown; action_used_at?: number };
+  const { action_args: args, action_used_at: usedAt } = decision as Decision & {
+    action_args?: unknown;
+    action_used_at?: number;
+  };
   const action = tMaybe(`decision.action.${decision.action}`, t("decision.action.other", { type: decision.action }));
   return (
     <div className="mt-2">
       <p className="text-sm text-ink-2">{t("decision.actionLine", { name: asker, action })}</p>
       <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-xs text-ink-2">
         <span className="shrink-0 text-ink-3">{t("decision.change")}</span>
-        <code className="min-w-0 rounded-sm bg-sunken px-1 py-0.5 font-mono text-2xs [overflow-wrap:anywhere]">{changeText(decision.action, args)}</code>
+        <code className="min-w-0 rounded-sm bg-sunken px-1 py-0.5 font-mono text-2xs [overflow-wrap:anywhere]">
+          {changeText(decision.action, args)}
+        </code>
         {!!usedAt && (
           <Badge tone="ok" title={exact(usedAt)}>
             {t("decision.changeUsed")}

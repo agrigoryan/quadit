@@ -30,7 +30,8 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
   const restLoaded = useRestLoaded();
   const q = query.trim();
 
-  const show = (cmds: Cmd[]) => (q ? cmds.filter((c) => matches(q, `${c.label} ${c.words ?? ""}`)) : cmds.filter((c) => !c.deep));
+  const show = (cmds: Cmd[]) =>
+    q ? cmds.filter((c) => matches(q, `${c.label} ${c.words ?? ""}`)) : cmds.filter((c) => !c.deep);
   const row = (c: Cmd) => (
     <Item key={c.id} value={c.id} icon={c.icon} hint={c.hint} checked={c.checked} onSelect={c.run}>
       {c.label}
@@ -40,17 +41,30 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
   const foundTasks = searchTasks(tasks, q);
   const listed = new Set(foundTasks.map((tk) => tk.key));
   // What the server found that is not already a row above; only things inside a task or a page can be opened.
-  const inText = hits.filter((h) => (h.task && !(h.kind === "task" && listed.has(h.task))) || h.scope_type === "doc").slice(0, 8);
+  const inText = hits
+    .filter((h) => (h.task && !(h.kind === "task" && listed.has(h.task))) || h.scope_type === "doc")
+    .slice(0, 8);
 
   const taskRows = show(commands.forTask);
   const makeRows = show(commands.make);
   const goRows = show(commands.goTo);
   const settingsRows = show(commands.settings);
   const generalRows = show(commands.general);
-  const nothing = taskRows.length + makeRows.length + goRows.length + settingsRows.length + generalRows.length + foundTasks.length + inText.length === 0;
+  const nothing =
+    taskRows.length +
+      makeRows.length +
+      goRows.length +
+      settingsRows.length +
+      generalRows.length +
+      foundTasks.length +
+      inText.length ===
+    0;
 
   // Finished tasks arrive after the rest: until they have, "nothing matches" may only mean "not here yet".
-  if (nothing) return <Note>{searching ? t("palette.searching") : restLoaded ? t("palette.empty", { q }) : t("sync.loadingRest")}</Note>;
+  if (nothing)
+    return (
+      <Note>{searching ? t("palette.searching") : restLoaded ? t("palette.empty", { q }) : t("sync.loadingRest")}</Note>
+    );
 
   return (
     <>
@@ -74,7 +88,13 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
       </Group>
       <Group heading={t("palette.group.found")}>
         {inText.map((hit) => (
-          <HitRow key={`${hit.kind}:${hit.entity_id}`} hit={hit} onSelect={() => (hit.scope_type === "doc" ? go(`/${slug}/docs/${hit.scope_id}`) : openTask(hit.task as string))} />
+          <HitRow
+            key={`${hit.kind}:${hit.entity_id}`}
+            hit={hit}
+            onSelect={() =>
+              hit.scope_type === "doc" ? go(`/${slug}/docs/${hit.scope_id}`) : openTask(hit.task as string)
+            }
+          />
         ))}
       </Group>
     </>
@@ -83,17 +103,39 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
 
 /** Something the server found inside a task or a page: where it is (the task's key, the page's project), and the words around the match. */
 function HitRow({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
-  const project = useStore((s) => (hit.scope_type === "doc" && hit.project_id ? s.c.projects[hit.project_id] : undefined));
+  const project = useStore((s) =>
+    hit.scope_type === "doc" && hit.project_id ? s.c.projects[hit.project_id] : undefined,
+  );
   const key = hit.task ?? "";
   const title = hit.title.startsWith(`${key} `) ? hit.title.slice(key.length + 1) : hit.title;
   const icon =
-    hit.scope_type === "doc" ? <FileText /> : hit.kind === "decision" ? <DecisionMark mine={false} /> : hit.kind === "task" ? <ListTodo /> : <MessageSquare />;
+    hit.scope_type === "doc" ? (
+      <FileText />
+    ) : hit.kind === "decision" ? (
+      <DecisionMark mine={false} />
+    ) : hit.kind === "task" ? (
+      <ListTodo />
+    ) : (
+      <MessageSquare />
+    );
   return (
     <Item
       value={`hit:${hit.kind}:${hit.entity_id}`}
       icon={icon}
       onSelect={onSelect}
-      detail={hit.snippet ? snippetParts(hit.snippet).map((part, i) => (part.hit ? <b key={i} className="font-semibold text-ink-2">{part.text}</b> : part.text)) : undefined}
+      detail={
+        hit.snippet
+          ? snippetParts(hit.snippet).map((part, i) =>
+              part.hit ? (
+                <b key={i} className="font-semibold text-ink-2">
+                  {part.text}
+                </b>
+              ) : (
+                part.text
+              ),
+            )
+          : undefined
+      }
     >
       <span className="mr-2.5 text-xs text-ink-3 tnum">{key}</span>
       {project ? (

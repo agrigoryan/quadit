@@ -62,7 +62,12 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
       }
     >
       <form id="source-form" onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
-        <FormField label={t("auto.src.repo")} htmlFor="src-repo" error={errors.fields.repo} hint={t("auto.src.repoHint")}>
+        <FormField
+          label={t("auto.src.repo")}
+          htmlFor="src-repo"
+          error={errors.fields.repo}
+          hint={t("auto.src.repoHint")}
+        >
           <Input
             id="src-repo"
             autoFocus
@@ -76,10 +81,27 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
           />
         </FormField>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <FormField label={t("auto.src.branch")} htmlFor="src-branch" error={errors.fields.branch} hint={t("auto.src.branchHint")}>
-            <Input id="src-branch" spellCheck={false} autoCapitalize="off" className="font-mono" value={branch} onChange={(e) => setBranch(e.target.value)} />
+          <FormField
+            label={t("auto.src.branch")}
+            htmlFor="src-branch"
+            error={errors.fields.branch}
+            hint={t("auto.src.branchHint")}
+          >
+            <Input
+              id="src-branch"
+              spellCheck={false}
+              autoCapitalize="off"
+              className="font-mono"
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+            />
           </FormField>
-          <FormField label={t("auto.src.subdir")} htmlFor="src-subdir" error={errors.fields.subdir} hint={t("auto.src.subdirHint")}>
+          <FormField
+            label={t("auto.src.subdir")}
+            htmlFor="src-subdir"
+            error={errors.fields.subdir}
+            hint={t("auto.src.subdirHint")}
+          >
             <Input
               id="src-subdir"
               spellCheck={false}
@@ -91,7 +113,12 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
             />
           </FormField>
         </div>
-        <FormField label={t("auto.src.authority")} htmlFor="src-authority" error={errors.fields.authority} hint={t(`auto.src.authority.${authority}.hint`)}>
+        <FormField
+          label={t("auto.src.authority")}
+          htmlFor="src-authority"
+          error={errors.fields.authority}
+          hint={t(`auto.src.authority.${authority}.hint`)}
+        >
           <NativeSelect
             id="src-authority"
             value={authority}
@@ -99,7 +126,12 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
             options={AUTHORITIES.map((a) => ({ value: a, label: t(`auto.src.authority.${a}`) }))}
           />
         </FormField>
-        <FormField label={t("auto.src.writeMode")} htmlFor="src-write" error={errors.fields.write_mode} hint={t(`auto.src.write.${writeMode}.hint`)}>
+        <FormField
+          label={t("auto.src.writeMode")}
+          htmlFor="src-write"
+          error={errors.fields.write_mode}
+          hint={t(`auto.src.write.${writeMode}.hint`)}
+        >
           <NativeSelect
             id="src-write"
             value={writeMode}
@@ -108,7 +140,12 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
           />
         </FormField>
         {!source && (
-          <FormField label={t("auto.src.title")} htmlFor="src-title" error={errors.fields.title ?? errors.fields.root} hint={t("auto.src.titleHint")}>
+          <FormField
+            label={t("auto.src.title")}
+            htmlFor="src-title"
+            error={errors.fields.title ?? errors.fields.root}
+            hint={t("auto.src.titleHint")}
+          >
             <Input id="src-title" value={title} onChange={(e) => setTitle(e.target.value)} />
           </FormField>
         )}

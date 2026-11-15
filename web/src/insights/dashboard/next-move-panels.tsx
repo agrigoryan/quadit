@@ -22,7 +22,10 @@ function useOpenTasks(projectId: string | undefined): Waiting[] {
   const tasks = useLiveTasks();
   const statuses = useCollection("statuses");
   return useMemo(
-    () => tasks.filter((task) => (!projectId || task.project_id === projectId) && isOpenCategory(statuses[task.status_id]?.category)),
+    () =>
+      tasks.filter(
+        (task) => (!projectId || task.project_id === projectId) && isOpenCategory(statuses[task.status_id]?.category),
+      ),
     [tasks, statuses, projectId],
   );
 }
@@ -33,7 +36,10 @@ function OutsideRow({ task }: { task: Waiting }) {
     <li className="relative flex min-h-9 items-center gap-2 border-b border-line/70 px-4 py-1.5 text-sm hover:bg-hover">
       <Globe className="size-4 shrink-0 text-ink-3" aria-hidden />
       <div className="min-w-0 flex-1">
-        <Link {...link} className="block truncate font-medium outline-none after:absolute after:inset-0 after:content-['']">
+        <Link
+          {...link}
+          className="block truncate font-medium outline-none after:absolute after:inset-0 after:content-['']"
+        >
           {task.waiting_on_note || task.title}
         </Link>
         <p className="truncate text-xs text-ink-3">
@@ -50,12 +56,17 @@ function OutsideRow({ task }: { task: Waiting }) {
 /** Tasks that wait on an outside event, the longest wait first. */
 export function OutsidePanel({ projectId, className }: { projectId: string | undefined; className?: string }) {
   const open = useOpenTasks(projectId);
-  const rows = useMemo(() => open.filter((task) => task.waiting_outside === true).sort((a, b) => a.updated_at - b.updated_at), [open]);
+  const rows = useMemo(
+    () => open.filter((task) => task.waiting_outside === true).sort((a, b) => a.updated_at - b.updated_at),
+    [open],
+  );
   return (
     <Panel
       title={t("dash.outside")}
       meta={rows.length > 0 ? <span className="text-xs text-ink-3 tnum">{count(rows.length)}</span> : undefined}
-      action={rows.length > 0 ? <span className="text-xs text-ink-3 max-sm:hidden">{t("dash.outside.hint")}</span> : undefined}
+      action={
+        rows.length > 0 ? <span className="text-xs text-ink-3 max-sm:hidden">{t("dash.outside.hint")}</span> : undefined
+      }
       className={className}
       flush
     >
@@ -101,7 +112,10 @@ export function NobodyPanel({ projectId, className }: { projectId: string | unde
             <CircleHelp className="mt-0.5 size-4 shrink-0 text-wait" aria-hidden />
             <span className="min-w-0">
               {only ? (
-                <Link to={nobodyPath(slug, only.key)} className="font-medium text-accent-text underline-offset-2 hover:underline">
+                <Link
+                  to={nobodyPath(slug, only.key)}
+                  className="font-medium text-accent-text underline-offset-2 hover:underline"
+                >
                   {t("dash.nobody.count", { n: total })}
                 </Link>
               ) : (
@@ -114,7 +128,10 @@ export function NobodyPanel({ projectId, className }: { projectId: string | unde
             <ul className="flex flex-wrap gap-x-4 gap-y-1 pl-6 text-sm">
               {rows.map((p) => (
                 <li key={p.id}>
-                  <Link to={nobodyPath(slug, p.key)} className="inline-flex items-center gap-1.5 text-accent-text underline-offset-2 hover:underline">
+                  <Link
+                    to={nobodyPath(slug, p.key)}
+                    className="inline-flex items-center gap-1.5 text-accent-text underline-offset-2 hover:underline"
+                  >
                     <ProjectGlyph project={p} />
                     {p.name}
                     <span className="text-ink-2 tnum">{count(counts.get(p.id))}</span>

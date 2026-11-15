@@ -71,7 +71,19 @@ async function upload(file: File) {
   return { props: { url: row.url, name: row.name } };
 }
 
-export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState, onFocusBlock, onComment, threads, onOpenThread, others }: Props) {
+export default function Editor({
+  docId,
+  rows,
+  seq,
+  readOnly,
+  handle,
+  onSaveState,
+  onFocusBlock,
+  onComment,
+  threads,
+  onOpenThread,
+  others,
+}: Props) {
   const theme = useThemeName();
   const wrap = useRef<HTMLDivElement | null>(null);
   const [picking, setPicking] = useState<ChipKind | null>(null);
@@ -184,26 +196,49 @@ export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState
   return (
     <div ref={wrap} className="qd-editor relative">
       <ActionsContext.Provider value={actions}>
-        <BlockNoteView editor={editor} editable={!readOnly} theme={theme} slashMenu={false} formattingToolbar={false} sideMenu={false}>
+        <BlockNoteView
+          editor={editor}
+          editable={!readOnly}
+          theme={theme}
+          slashMenu={false}
+          formattingToolbar={false}
+          sideMenu={false}
+        >
           <SuggestionMenuController
             triggerCharacter="/"
             getItems={async (query) =>
               filterSuggestionItems(
-                [...getDefaultReactSlashMenuItems(editor).filter((item) => !/^toggle/.test((item as { key?: string }).key ?? "")), ...extraSlashItems(actions)],
+                [
+                  ...getDefaultReactSlashMenuItems(editor).filter(
+                    (item) => !/^toggle/.test((item as { key?: string }).key ?? ""),
+                  ),
+                  ...extraSlashItems(actions),
+                ],
                 query,
               )
             }
           />
-          <SuggestionMenuController triggerCharacter="@" getItems={async (query) => filterSuggestionItems(mentionItems(editor), query)} />
+          <SuggestionMenuController
+            triggerCharacter="@"
+            getItems={async (query) => filterSuggestionItems(mentionItems(editor), query)}
+          />
           <SuggestionMenuController
             triggerCharacter="#"
             shouldOpen={() => hashOpensDecisions(editor)}
             getItems={async (query) => decisionItems(editor, query)}
             suggestionMenuComponent={QuietMenu}
           />
-          <SuggestionMenuController triggerCharacter="[[" getItems={async (query) => pageTitleItems(editor, query, docId)} suggestionMenuComponent={QuietMenu} />
+          <SuggestionMenuController
+            triggerCharacter="[["
+            getItems={async (query) => pageTitleItems(editor, query, docId)}
+            suggestionMenuComponent={QuietMenu}
+          />
           <FormattingToolbarController
-            formattingToolbar={() => <FormattingToolbar>{[...getFormattingToolbarItems(), ...(onComment ? [<CommentButton key="qdComment" />] : [])]}</FormattingToolbar>}
+            formattingToolbar={() => (
+              <FormattingToolbar>
+                {[...getFormattingToolbarItems(), ...(onComment ? [<CommentButton key="qdComment" />] : [])]}
+              </FormattingToolbar>
+            )}
           />
           <SideMenuController sideMenu={(props) => <SideMenu {...props} dragHandleMenu={BlockMenu} />} />
         </BlockNoteView>

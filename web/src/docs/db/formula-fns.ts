@@ -2,12 +2,40 @@
 // internal/formula/formula.go, with the helpers only it uses.
 
 import type { Env, Value } from "@/docs/db/formula";
-import { type FDate, formatDay, formatRFC3339, formulaText, isEmpty, num, parseDate, truthy } from "@/docs/db/formula-values";
+import {
+  type FDate,
+  formatDay,
+  formatRFC3339,
+  formulaText,
+  isEmpty,
+  num,
+  parseDate,
+  truthy,
+} from "@/docs/db/formula-values";
 
 /** What a formula can call, for the editor's help. */
 export const FUNCTIONS = [
-  "prop", "if", "concat", "length", "lower", "upper", "contains", "empty", "round", "floor", "ceil", "abs", "min", "max", "sum",
-  "toNumber", "format", "now", "today", "dateAdd", "dateDiff",
+  "prop",
+  "if",
+  "concat",
+  "length",
+  "lower",
+  "upper",
+  "contains",
+  "empty",
+  "round",
+  "floor",
+  "ceil",
+  "abs",
+  "min",
+  "max",
+  "sum",
+  "toNumber",
+  "format",
+  "now",
+  "today",
+  "dateAdd",
+  "dateDiff",
 ] as const;
 
 /** Calls one function with its arguments already worked out. Throws what the cell should say when it cannot. */
@@ -71,7 +99,14 @@ export function callFunction(name: string, a: Value[], env: Env, now: Date): Val
       if (!d) return null;
       const n = Math.trunc(num(arg(1)));
       const u = unit(a, 2);
-      return formatDay(addDate(d, u === "years" ? n : 0, u === "months" ? n : 0, u === "weeks" ? 7 * n : u === "months" || u === "years" ? 0 : n));
+      return formatDay(
+        addDate(
+          d,
+          u === "years" ? n : 0,
+          u === "months" ? n : 0,
+          u === "weeks" ? 7 * n : u === "months" || u === "years" ? 0 : n,
+        ),
+      );
     }
     case "dateDiff": {
       const x = parseDate(arg(0));

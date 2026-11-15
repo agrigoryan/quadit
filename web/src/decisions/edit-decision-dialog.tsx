@@ -106,7 +106,10 @@ export function EditDecisionDialog({ decision, onClose }: { decision: Decision; 
                 id={`${id}-r`}
                 value={recommended}
                 onChange={setRecommended}
-                options={[{ value: NONE, label: t("decision.edit.noRecommendation") }, ...options.map((o) => ({ value: o.id, label: o.label }))]}
+                options={[
+                  { value: NONE, label: t("decision.edit.noRecommendation") },
+                  ...options.map((o) => ({ value: o.id, label: o.label })),
+                ]}
                 className="max-sm:[&>select]:h-10 sm:max-w-xs"
               />
             </FormField>

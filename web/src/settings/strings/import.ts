@@ -4,7 +4,8 @@ export const importStrings = {
   "settings.nav.import": "Import",
 
   "import.title": "Import",
-  "import.lead": "Bring tasks and pages in from another tool. Everything is added as you, and running the same import again adds nothing twice.",
+  "import.lead":
+    "Bring tasks and pages in from another tool. Everything is added as you, and running the same import again adds nothing twice.",
   "import.from": "Where from",
   "import.kind.linear": "Linear",
   "import.kind.asana": "Asana",
@@ -21,7 +22,8 @@ export const importStrings = {
   "import.how.notion": "Settings → Export all workspace content, as Markdown & CSV. Upload the zip.",
   "import.how.obsidian": "Zip the vault's folder and upload it. Notes become pages; links between them are kept.",
   "import.how.markdown": "Zip a folder of .md files. Each file becomes a page, folders become parent pages.",
-  "import.how.orbit": "Reads statuses, labels, tasks, comments, milestones and pages from an Orbit install over its API.",
+  "import.how.orbit":
+    "Reads statuses, labels, tasks, comments, milestones and pages from an Orbit install over its API.",
   "import.source": "The export",
   "import.sourceAddress": "Where to read it",
   "import.file": "File",
@@ -45,7 +47,8 @@ export const importStrings = {
   "import.orbitWorkspace": "Workspace",
   "import.orbitWorkspaceHint": "The Orbit workspace to read.",
   "import.orbitSession": "Sign-in session (optional)",
-  "import.orbitSessionHint": "Orbit hands attached files only to a signed-in session, not to an API token. With one, the files come too; without, pictures keep pointing at Orbit.",
+  "import.orbitSessionHint":
+    "Orbit hands attached files only to a signed-in session, not to an API token. With one, the files come too; without, pictures keep pointing at Orbit.",
   "import.project": "Project for the tasks",
   "import.projectHint": "Where the tasks go. A key that is not a project yet makes one.",
   "import.projectNew": "A new project…",
@@ -71,8 +74,10 @@ export const importStrings = {
   "import.made": "Imported {list}.",
   "import.madeNothing": "Nothing was imported.",
   "import.unmatched": "No account here for",
-  "import.unmatchedHint": "These assignees have no account in this workspace. Their tasks came in unassigned and say who had them; add the people and assign the tasks, or leave them.",
-  "import.again": "Running the same import again adds nothing twice: what is already here is left as it is, though the counts above include it.",
+  "import.unmatchedHint":
+    "These assignees have no account in this workspace. Their tasks came in unassigned and say who had them; add the people and assign the tasks, or leave them.",
+  "import.again":
+    "Running the same import again adds nothing twice: what is already here is left as it is, though the counts above include it.",
   "import.log": "What was done ({n} line) | What was done ({n} lines)",
   "import.another": "Import something else",
   "import.seeTasks": "See the tasks",

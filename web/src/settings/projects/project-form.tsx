@@ -16,7 +16,11 @@ export const KEY_RE = /^[A-Z][A-Z0-9]{1,9}$/;
 
 /** A key made from a name: the first letters of its words, or its first three letters. */
 export function keyFrom(name: string): string {
-  const words = name.toUpperCase().replace(/[^A-Z0-9 ]/g, "").split(/\s+/).filter(Boolean);
+  const words = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
   const key = words.length > 1 ? words.map((w) => w[0]).join("") : (words[0] ?? "").slice(0, 3);
   return key.replace(/^[0-9]+/, "").slice(0, 10);
 }
@@ -35,7 +39,12 @@ export function ProjectFields({ draft, set, errors, currentKey, disabled }: Prop
   return (
     <div className="flex flex-col gap-3.5">
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-[1fr_8rem_5rem]">
-        <FormField label={t("project.name")} htmlFor="project-name" error={errors.fields.name} className="max-sm:col-span-2">
+        <FormField
+          label={t("project.name")}
+          htmlFor="project-name"
+          error={errors.fields.name}
+          className="max-sm:col-span-2"
+        >
           <Input
             id="project-name"
             value={draft.name}
@@ -61,7 +70,13 @@ export function ProjectFields({ draft, set, errors, currentKey, disabled }: Prop
           />
         </FormField>
         <FormField label={t("project.icon")} htmlFor="project-icon" error={errors.fields.icon}>
-          <Input id="project-icon" value={draft.icon} disabled={disabled} maxLength={4} onChange={(e) => set({ icon: e.target.value })} />
+          <Input
+            id="project-icon"
+            value={draft.icon}
+            disabled={disabled}
+            maxLength={4}
+            onChange={(e) => set({ icon: e.target.value })}
+          />
         </FormField>
       </div>
       {!errors.fields.key && (
@@ -73,7 +88,13 @@ export function ProjectFields({ draft, set, errors, currentKey, disabled }: Prop
         <ColorPicker value={draft.color} onChange={(color) => set({ color })} label={t("project.color")} />
       </FormField>
       <FormField label={t("project.description")} htmlFor="project-desc" error={errors.fields.description}>
-        <Textarea id="project-desc" rows={2} value={draft.description} disabled={disabled} onChange={(e) => set({ description: e.target.value })} />
+        <Textarea
+          id="project-desc"
+          rows={2}
+          value={draft.description}
+          disabled={disabled}
+          onChange={(e) => set({ description: e.target.value })}
+        />
       </FormField>
     </div>
   );

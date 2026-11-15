@@ -37,7 +37,11 @@ function StateMark({ session }: { session: AgentSession }) {
   const label = t(`agents.session.${state}`);
   return (
     <span className={cx("flex size-4 shrink-0 items-center justify-center", tone)} title={label}>
-      <Icon className={cx("size-3.5", state === "running" && "animate-spin [animation-duration:2.4s]")} strokeWidth={2.4} aria-hidden />
+      <Icon
+        className={cx("size-3.5", state === "running" && "animate-spin [animation-duration:2.4s]")}
+        strokeWidth={2.4}
+        aria-hidden
+      />
       <span className="sr-only">{label}</span>
     </span>
   );
@@ -137,7 +141,9 @@ function SessionBody({ session, now }: { session: AgentSession; now: number }) {
         <Fact label={t("agents.session.tokensIn")}>{short(session.tokens_in)}</Fact>
         <Fact label={t("agents.session.tokensOut")}>{short(session.tokens_out)}</Fact>
         <Fact label={t("agents.session.started")}>{exact(session.started_at)}</Fact>
-        <Fact label={t(session.ended_at ? "agents.session.took" : "agents.session.runningFor")}>{sessionLength(session, now)}</Fact>
+        <Fact label={t(session.ended_at ? "agents.session.took" : "agents.session.runningFor")}>
+          {sessionLength(session, now)}
+        </Fact>
       </dl>
     </div>
   );
@@ -173,7 +179,9 @@ export function SessionRow({ session, now, showAgent, showTask }: Props) {
           <span className="min-w-0 truncate">{title}</span>
         </button>
         {showTask && session.task_id && <TaskKey taskId={session.task_id} />}
-        {!!session.cost_micros && <span className="shrink-0 text-xs text-ink-2 tnum">{moneyMicros(session.cost_micros)}</span>}
+        {!!session.cost_micros && (
+          <span className="shrink-0 text-xs text-ink-2 tnum">{moneyMicros(session.cost_micros)}</span>
+        )}
         <span className="shrink-0 text-xs text-ink-3 tnum" title={exact(session.started_at)}>
           {running ? t("agents.session.elapsed", { time: sessionLength(session, now) }) : ago(session.started_at, now)}
         </span>

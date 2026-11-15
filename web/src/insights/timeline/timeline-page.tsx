@@ -55,7 +55,8 @@ function Timeline({ project }: { project: Project }) {
 
   const scroller = useRef<HTMLDivElement>(null);
   const seen = useRef<{ start: number; dayW: number; left: number } | null>(null);
-  const trackView = (el: HTMLElement) => el.clientWidth - (el.querySelector<HTMLElement>("[data-names]")?.offsetWidth ?? 0);
+  const trackView = (el: HTMLElement) =>
+    el.clientWidth - (el.querySelector<HTMLElement>("[data-names]")?.offsetWidth ?? 0);
   const todayLeft = (el: HTMLElement) => Math.max(0, xOf(scale, now) - trackView(el) * 0.3);
 
   // Start with today in view; after that, keep the same day at the left edge when the zoom or the first day changes.
@@ -101,7 +102,11 @@ function Timeline({ project }: { project: Project }) {
     <div className="flex h-full flex-col">
       <div className="flex h-10 shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-2 no-scrollbar md:px-3">
         <LayoutTabs projectKey={project.key} />
-        <div role="radiogroup" aria-label={t("timeline.zoom")} className="flex shrink-0 items-center rounded-md border border-line p-0.5">
+        <div
+          role="radiogroup"
+          aria-label={t("timeline.zoom")}
+          className="flex shrink-0 items-center rounded-md border border-line p-0.5"
+        >
           {(["weeks", "months"] as const).map((z) => (
             <button
               key={z}
@@ -109,7 +114,10 @@ function Timeline({ project }: { project: Project }) {
               role="radio"
               aria-checked={zoom === z}
               onClick={() => pickZoom(z)}
-              className={cx("h-5.5 rounded-sm px-2 text-xs font-medium", zoom === z ? "bg-press text-ink" : "text-ink-2 hover:text-ink")}
+              className={cx(
+                "h-5.5 rounded-sm px-2 text-xs font-medium",
+                zoom === z ? "bg-press text-ink" : "text-ink-2 hover:text-ink",
+              )}
             >
               {t(`timeline.zoom.${z}`)}
             </button>
@@ -151,7 +159,10 @@ function Timeline({ project }: { project: Project }) {
           onScroll={(e) => seen.current && (seen.current.left = e.currentTarget.scrollLeft)}
           className="min-h-0 flex-1 overflow-auto overscroll-contain [--tl-left:9.5rem] sm:[--tl-left:17rem] lg:[--tl-left:22rem]"
         >
-          <div className="relative flex min-h-full flex-col" style={{ width: `calc(var(--tl-left) + ${widthOf(scale)}px)` }}>
+          <div
+            className="relative flex min-h-full flex-col"
+            style={{ width: `calc(var(--tl-left) + ${widthOf(scale)}px)` }}
+          >
             <div className="sticky top-0 z-[5] flex h-11 border-b border-line bg-surface">
               <div
                 data-names
@@ -205,11 +216,15 @@ function Timeline({ project }: { project: Project }) {
                   </span>
                   <span className="text-xs font-normal text-ink-3 tnum">{count(data.loose.length)}</span>
                 </NoteRow>
-                {open.has(LOOSE) && data.loose.map((task) => <TaskLineRow key={task.task.id} line={task} scale={scale} today={now} />)}
+                {open.has(LOOSE) &&
+                  data.loose.map((task) => <TaskLineRow key={task.task.id} line={task} scale={scale} today={now} />)}
               </section>
             )}
             {/* The names column runs to the bottom, so the rules behind the rows never show through it. */}
-            <div aria-hidden className="sticky left-0 z-[3] w-[var(--tl-left)] flex-1 border-r border-line bg-surface" />
+            <div
+              aria-hidden
+              className="sticky left-0 z-[3] w-[var(--tl-left)] flex-1 border-r border-line bg-surface"
+            />
           </div>
         </div>
       )}

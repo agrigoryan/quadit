@@ -24,7 +24,12 @@ export const CardBody = memo(function CardBody({ task }: { task: Task }) {
       <div className="flex items-center gap-1.5">
         <PriorityIcon priority={task.priority} />
         <span className="flex-1 text-xs text-ink-3 tnum">{task.key}</span>
-        {decision && <DecisionMark mine={decision === "mine"} title={decision === "mine" ? t("task.decisionYours") : t("task.decisionOpen")} />}
+        {decision && (
+          <DecisionMark
+            mine={decision === "mine"}
+            title={decision === "mine" ? t("task.decisionYours") : t("task.decisionOpen")}
+          />
+        )}
         <AssigneeAvatar userId={task.assignee_id} />
       </div>
       <p className="mt-1.5 line-clamp-3 text-sm leading-[1.35]">{task.title}</p>

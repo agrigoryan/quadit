@@ -45,7 +45,8 @@ function Palette() {
 
   // A page that needs the open task or a project falls back to the first page without one.
   const making: MakePage | null = (page === "new-label" || page === "new-status") && project ? page : null;
-  const choosing: ChoicePage | null = page !== "root" && page !== "new-label" && page !== "new-status" && openTask ? page : null;
+  const choosing: ChoicePage | null =
+    page !== "root" && page !== "new-label" && page !== "new-status" && openTask ? page : null;
   const onRoot = !making && !choosing;
   const search = useServerSearch(onRoot ? query : "");
 
@@ -110,7 +111,9 @@ function Palette() {
                 autoFocus
                 value={query}
                 onValueChange={setQuery}
-                placeholder={making ? makeTitle[making]() : choosing ? choiceTitle[choosing]() : t("palette.placeholder")}
+                placeholder={
+                  making ? makeTitle[making]() : choosing ? choiceTitle[choosing]() : t("palette.placeholder")
+                }
                 className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-3 max-sm:text-[16px]"
               />
               <span className="flex size-4 shrink-0 items-center justify-center">

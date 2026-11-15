@@ -37,11 +37,21 @@ export function FileGrid({ files, pending = [], canRemove, onRemove, small, clas
         {files.map((a) => (
           <li key={a.id} className={cx("group", tile)}>
             {isMedia(a.file) ? (
-              <button type="button" aria-label={t("detail.files.open", { name: a.file.name })} onClick={() => setShown(a.file)} className="block size-full">
+              <button
+                type="button"
+                aria-label={t("detail.files.open", { name: a.file.name })}
+                onClick={() => setShown(a.file)}
+                className="block size-full"
+              >
                 <MediaThumb file={a.file} className="size-full" />
               </button>
             ) : (
-              <a href={a.file.url} download={a.file.name} aria-label={t("detail.files.download", { name: a.file.name })} className="block size-full hover:bg-hover">
+              <a
+                href={a.file.url}
+                download={a.file.name}
+                aria-label={t("detail.files.download", { name: a.file.name })}
+                className="block size-full hover:bg-hover"
+              >
                 <MediaThumb file={a.file} className="size-full bg-transparent" />
               </a>
             )}

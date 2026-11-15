@@ -66,7 +66,10 @@ export function HeaderCell({ prop, view, width, open, onOpenChange, onResize }: 
         aria-orientation="vertical"
         aria-label={t("db.table.resize", { name: prop.name })}
         onPointerDown={startResize}
-        className={cx("absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 hover:after:bg-accent", resizing && "after:bg-accent")}
+        className={cx(
+          "absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 hover:after:bg-accent",
+          resizing && "after:bg-accent",
+        )}
       />
     </div>
   );

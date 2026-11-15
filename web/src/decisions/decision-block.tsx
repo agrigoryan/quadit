@@ -14,8 +14,23 @@ import { Markdown } from "@/ui/markdown";
 import { deleteDecision, markUnclear, pick } from "@/decisions/actions";
 import { CompareView } from "@/decisions/compare-view";
 import { EditDecisionDialog } from "@/decisions/edit-decision-dialog";
-import { mediaAspect, type OptionFiles, optionsOf, pairUp, useMemberName, useOptionFiles, useQuestionFiles, useViewer } from "@/decisions/data";
-import { ApprovalAction, ApprovalControls, DecisionHeader, DecisionResult, UnclearNote } from "@/decisions/decision-meta";
+import {
+  mediaAspect,
+  type OptionFiles,
+  optionsOf,
+  pairUp,
+  useMemberName,
+  useOptionFiles,
+  useQuestionFiles,
+  useViewer,
+} from "@/decisions/data";
+import {
+  ApprovalAction,
+  ApprovalControls,
+  DecisionHeader,
+  DecisionResult,
+  UnclearNote,
+} from "@/decisions/decision-meta";
 import { NoteDialog, type NotePrompt } from "@/decisions/note-dialog";
 import { OptionCard } from "@/decisions/option-card";
 import { QuestionFiles } from "@/decisions/question-files";
@@ -108,10 +123,17 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
   }
 
   return (
-    <article id={`decision-${decision.id}`} aria-label={decision.question} className="@container relative pl-4 max-sm:pl-3.5">
+    <article
+      id={`decision-${decision.id}`}
+      aria-label={decision.question}
+      className="@container relative pl-4 max-sm:pl-3.5"
+    >
       <span
         aria-hidden
-        className={cx("absolute inset-y-0 left-0 w-1 rounded-full", viewer.mine ? "bg-move" : open ? "bg-line-strong" : "bg-line")}
+        className={cx(
+          "absolute inset-y-0 left-0 w-1 rounded-full",
+          viewer.mine ? "bg-move" : open ? "bg-line-strong" : "bg-line",
+        )}
       />
       <DecisionHeader decision={decision} viewer={viewer} onEdit={() => setEditing(true)} onDelete={askDelete} />
       <h3 className="mt-1.5 text-lg leading-snug font-semibold tracking-tight text-balance">{decision.question}</h3>
@@ -157,14 +179,30 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
       )}
 
       {thread && (
-        <section aria-label={t("decision.commentsOn", { label: thread.label })} className="mt-2 rounded-lg border border-line p-3">
+        <section
+          aria-label={t("decision.commentsOn", { label: thread.label })}
+          className="mt-2 rounded-lg border border-line p-3"
+        >
           <div className="mb-2 flex h-6 items-center justify-between gap-2">
-            <h4 className="min-w-0 truncate text-xs font-medium text-ink-2">{t("decision.commentsOn", { label: thread.label })}</h4>
-            <IconButton label={t("decision.hideComments")} size="sm" className="max-sm:size-9!" onClick={() => setThreadOf(null)}>
+            <h4 className="min-w-0 truncate text-xs font-medium text-ink-2">
+              {t("decision.commentsOn", { label: thread.label })}
+            </h4>
+            <IconButton
+              label={t("decision.hideComments")}
+              size="sm"
+              className="max-sm:size-9!"
+              onClick={() => setThreadOf(null)}
+            >
               <X className="size-4" />
             </IconButton>
           </div>
-          <ThreadBody key={thread.id} decision={decision} optionId={thread.id} autoFocus placeholder={t("decision.commentOn", { label: thread.label })} />
+          <ThreadBody
+            key={thread.id}
+            decision={decision}
+            optionId={thread.id}
+            autoFocus
+            placeholder={t("decision.commentOn", { label: thread.label })}
+          />
         </section>
       )}
 
@@ -176,7 +214,11 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
             </Button>
           )}
           {allMedia.length > 0 && (
-            <Button variant="ghost" className={cx("max-sm:h-10", !viewer.canAnswer && "-ml-2")} onClick={() => setCompare({ option: 0, file: 0 })}>
+            <Button
+              variant="ghost"
+              className={cx("max-sm:h-10", !viewer.canAnswer && "-ml-2")}
+              onClick={() => setCompare({ option: 0, file: 0 })}
+            >
               <Columns3 className="size-4" aria-hidden />
               {t("decision.compare")}
             </Button>
@@ -192,7 +234,9 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
           </div>
         </>
       )}
-      {talk && <ThreadBody decision={decision} autoFocus placeholder={t("decision.commentOnQuestion")} className="mt-1.5" />}
+      {talk && (
+        <ThreadBody decision={decision} autoFocus placeholder={t("decision.commentOnQuestion")} className="mt-1.5" />
+      )}
       <DecisionMentions taskId={decision.task_id} decisionId={decision.id} />
 
       {prompt && <NoteDialog prompt={prompt} onClose={() => setPrompt(null)} />}

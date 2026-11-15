@@ -79,7 +79,12 @@ export function TaskBody({ task, status, layout }: Props) {
         }}
       />
       {/* One column; on a wide page two, the properties in the second from top to bottom. */}
-      <div className={cx(page && "mx-auto max-w-[78rem] lg:grid lg:min-h-full lg:grid-cols-[minmax(0,1fr)_19rem] lg:grid-rows-[auto_1fr]")}>
+      <div
+        className={cx(
+          page &&
+            "mx-auto max-w-[78rem] lg:grid lg:min-h-full lg:grid-cols-[minmax(0,1fr)_19rem] lg:grid-rows-[auto_1fr]",
+        )}
+      >
         <div className={cx("px-4 pt-4 pb-3 md:px-6", page && "lg:px-10 lg:pt-7 lg:pb-5")}>
           <EditableTitle task={task} large={page} />
           <Description task={task} loading={loading} />
@@ -110,11 +115,20 @@ export function TaskBody({ task, status, layout }: Props) {
             <DecisionSection taskId={task.id} />
           </div>
 
-          {show.subtasks && <Subtasks task={task} subtasks={subtasks} focusAdd={!!opened.subtasks && subtasks.length === 0} />}
-          {show.relations && (
-            <Relations task={task} relations={relations} startAdding={!!opened.relations} onEmptyClose={() => close("relations")} />
+          {show.subtasks && (
+            <Subtasks task={task} subtasks={subtasks} focusAdd={!!opened.subtasks && subtasks.length === 0} />
           )}
-          {show.links && <Links task={task} links={links} startAdding={!!opened.links} onEmptyClose={() => close("links")} />}
+          {show.relations && (
+            <Relations
+              task={task}
+              relations={relations}
+              startAdding={!!opened.relations}
+              onEmptyClose={() => close("relations")}
+            />
+          )}
+          {show.links && (
+            <Links task={task} links={links} startAdding={!!opened.links} onEmptyClose={() => close("links")} />
+          )}
           <TaskWork task={task} />
           {show.files && <Attachments task={task} files={files} pending={pending} onAttach={attach} />}
           <MentionedIn task={task} />

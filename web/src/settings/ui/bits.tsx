@@ -34,7 +34,13 @@ export function Fact({ label, children, className }: { label: string; children: 
 export function LoadGate<T>({ of, children }: { of: Loaded<T>; children: (data: T) => ReactNode }) {
   if (of.data !== undefined) return <>{children(of.data)}</>;
   if (of.error) {
-    return <EmptyState title={t("s.loadFailed")} hint={of.error} action={<Button onClick={() => void of.reload()}>{t("common.tryAgain")}</Button>} />;
+    return (
+      <EmptyState
+        title={t("s.loadFailed")}
+        hint={of.error}
+        action={<Button onClick={() => void of.reload()}>{t("common.tryAgain")}</Button>}
+      />
+    );
   }
   return <Loading />;
 }
@@ -52,7 +58,20 @@ export function download(url: string) {
 
 // The colours offered for projects, statuses and labels: calm, and readable
 // with white text in both themes.
-export const SWATCHES = ["#6b7183", "#3451e0", "#3b82f6", "#0f8a8a", "#10b981", "#16874a", "#b7791f", "#c26a00", "#ef4444", "#d1343b", "#ec4899", "#7a6ad8"];
+export const SWATCHES = [
+  "#6b7183",
+  "#3451e0",
+  "#3b82f6",
+  "#0f8a8a",
+  "#10b981",
+  "#16874a",
+  "#b7791f",
+  "#c26a00",
+  "#ef4444",
+  "#d1343b",
+  "#ec4899",
+  "#7a6ad8",
+];
 
 interface ColorProps {
   value: string;
@@ -103,5 +122,11 @@ export function ColorPicker({ value, onChange, label }: ColorProps) {
 
 /** A small round dot of a row's colour. */
 export function Dot({ color, className }: { color?: string; className?: string }) {
-  return <span className={cx("inline-block size-2.5 shrink-0 rounded-full", className)} style={{ background: color || "var(--ink-3)" }} aria-hidden />;
+  return (
+    <span
+      className={cx("inline-block size-2.5 shrink-0 rounded-full", className)}
+      style={{ background: color || "var(--ink-3)" }}
+      aria-hidden
+    />
+  );
 }

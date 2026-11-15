@@ -13,7 +13,8 @@ import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 
 /** The task an item is about: by the task itself, or by the key its title starts with. */
-const taskKeyOf = (item: Notification) => (item.task_id && getState().c.tasks[item.task_id]?.key) || splitTitle(item.title).key || undefined;
+const taskKeyOf = (item: Notification) =>
+  (item.task_id && getState().c.tasks[item.task_id]?.key) || splitTitle(item.title).key || undefined;
 
 const toggleRead = (item: Notification) => (item.read_at ? markUnread([item.id]) : markRead([item.id]));
 

@@ -25,14 +25,44 @@ function Field({ prop, value, onChange }: { prop: DBProperty; value: unknown; on
   const id = `form-${prop.id}`;
   let control: React.ReactNode;
   if (prop.type === "text" || prop.type === "url") {
-    control = <Input id={id} type={prop.type === "url" ? "url" : "text"} value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value || null)} />;
+    control = (
+      <Input
+        id={id}
+        type={prop.type === "url" ? "url" : "text"}
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value || null)}
+      />
+    );
   } else if (prop.type === "number") {
-    control = <Input id={id} type="number" step="any" value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} />;
+    control = (
+      <Input
+        id={id}
+        type="number"
+        step="any"
+        value={typeof value === "number" ? value : ""}
+        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+      />
+    );
   } else if (prop.type === "date") {
-    control = <Input id={id} type="date" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value || null)} />;
+    control = (
+      <Input
+        id={id}
+        type="date"
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value || null)}
+      />
+    );
   } else {
     control = (
-      <SelfCell prop={prop} stored={value} shown={(value ?? undefined) as Value | undefined} onChange={onChange} wrap placeholder={t("db.form.choose")} className={prop.type === "checkbox" ? "w-auto" : `min-h-8 ${boxed}`} />
+      <SelfCell
+        prop={prop}
+        stored={value}
+        shown={(value ?? undefined) as Value | undefined}
+        onChange={onChange}
+        wrap
+        placeholder={t("db.form.choose")}
+        className={prop.type === "checkbox" ? "w-auto" : `min-h-8 ${boxed}`}
+      />
     );
   }
   return (
@@ -75,7 +105,10 @@ export function FormView({ db, view, onAdd }: ViewProps) {
         <textarea
           key={view.id}
           defaultValue={view.config?.form_intro ?? ""}
-          onBlur={(e) => e.target.value !== (view.config?.form_intro ?? "") && setViewConfig(view, { form_intro: e.target.value || undefined })}
+          onBlur={(e) =>
+            e.target.value !== (view.config?.form_intro ?? "") &&
+            setViewConfig(view, { form_intro: e.target.value || undefined })
+          }
           placeholder={t("db.form.intro")}
           aria-label={t("db.form.intro")}
           rows={1}
@@ -98,7 +131,12 @@ export function FormView({ db, view, onAdd }: ViewProps) {
               <Input ref={first} id="form-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
             </div>
             {fields.map((p) => (
-              <Field key={p.id} prop={p} value={values[p.id]} onChange={(v) => setValues((cur) => ({ ...cur, [p.id]: v }))} />
+              <Field
+                key={p.id}
+                prop={p}
+                value={values[p.id]}
+                onChange={(v) => setValues((cur) => ({ ...cur, [p.id]: v }))}
+              />
             ))}
             <div>
               <Button type="submit" variant="primary">
@@ -111,4 +149,3 @@ export function FormView({ db, view, onAdd }: ViewProps) {
     </div>
   );
 }
-

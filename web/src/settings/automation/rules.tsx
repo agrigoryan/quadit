@@ -20,13 +20,10 @@ import { RuleSentence } from "@/settings/automation/rule-text";
 export function RulesPage() {
   const slug = useSlug();
   const base = useSettingsBase();
-  const data = useLoad(
-    async () => {
-      const [rules, hooks] = await Promise.all([listRows<Rule>(slug, "rules"), listRows<Webhook>(slug, "webhooks")]);
-      return { rules, hooks };
-    },
-    [slug],
-  );
+  const data = useLoad(async () => {
+    const [rules, hooks] = await Promise.all([listRows<Rule>(slug, "rules"), listRows<Webhook>(slug, "webhooks")]);
+    return { rules, hooks };
+  }, [slug]);
   const [form, setForm] = useState<{ rule?: Rule } | null>(null);
   const [removing, setRemoving] = useState<Rule | null>(null);
 
@@ -61,10 +58,16 @@ export function RulesPage() {
               {rules.map((rule) => (
                 <div key={rule.id} className="flex items-start gap-3 px-3 py-2.5">
                   <span className="pt-0.5">
-                    <Switch checked={rule.active} onChange={(on) => void toggle(rule, on)} label={t("auto.rule.activeFor", { name: rule.name })} />
+                    <Switch
+                      checked={rule.active}
+                      onChange={(on) => void toggle(rule, on)}
+                      label={t("auto.rule.activeFor", { name: rule.name })}
+                    />
                   </span>
                   <button type="button" onClick={() => setForm({ rule })} className="min-w-0 flex-1 text-left">
-                    <span className={cx("block truncate text-sm font-medium", rule.active ? "text-ink" : "text-ink-3")}>{rule.name}</span>
+                    <span className={cx("block truncate text-sm font-medium", rule.active ? "text-ink" : "text-ink-3")}>
+                      {rule.name}
+                    </span>
                     <span className={cx("block", !rule.active && "opacity-60")}>
                       <RuleSentence rule={rule} hooks={hooks} />
                     </span>

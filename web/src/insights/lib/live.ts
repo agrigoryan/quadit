@@ -25,7 +25,13 @@ export interface Live<T> {
 export function useLive<T>(path: string | null, opts: { throttleMs?: number; only?: string[] } = {}): Live<T> {
   const slug = useStore((s) => s.slug);
   const live = useStore((s) => s.stream === "live");
-  const [state, setState] = useState<{ path: string | null; data?: T; error: string; loading: boolean; refreshing: boolean }>({
+  const [state, setState] = useState<{
+    path: string | null;
+    data?: T;
+    error: string;
+    loading: boolean;
+    refreshing: boolean;
+  }>({
     path,
     error: "",
     loading: path !== null,
@@ -50,7 +56,9 @@ export function useLive<T>(path: string | null, opts: { throttleMs?: number; onl
       }
       busy = true;
       last = Date.now();
-      setState((s) => (s.path === path ? { ...s, refreshing: !s.loading } : { path, error: "", loading: true, refreshing: false }));
+      setState((s) =>
+        s.path === path ? { ...s, refreshing: !s.loading } : { path, error: "", loading: true, refreshing: false },
+      );
       try {
         const data = await api.get<T>(ws(slug, path as string));
         if (current) setState({ path, data, error: "", loading: false, refreshing: false });

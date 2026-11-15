@@ -34,7 +34,9 @@ export function GeneralPage() {
     errors.clear();
     if (!name.trim()) return errors.set("name", t("s.required"));
     await run(async () => {
-      await mutate({ type: "workspace.update", args: { name: name.trim(), icon: icon.trim() } }, undefined, { quiet: true });
+      await mutate({ type: "workspace.update", args: { name: name.trim(), icon: icon.trim() } }, undefined, {
+        quiet: true,
+      });
       // The list of workspaces in the switcher comes with the session.
       await loadSession();
       toast.info(t("s.saved"));
@@ -56,7 +58,13 @@ export function GeneralPage() {
                 <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
               </FormField>
               <FormField label={t("general.icon")} htmlFor="ws-icon" error={errors.fields.icon}>
-                <Input id="ws-icon" value={icon} onChange={(e) => setIcon(e.target.value)} maxLength={4} placeholder={name.slice(0, 1).toUpperCase()} />
+                <Input
+                  id="ws-icon"
+                  value={icon}
+                  onChange={(e) => setIcon(e.target.value)}
+                  maxLength={4}
+                  placeholder={name.slice(0, 1).toUpperCase()}
+                />
               </FormField>
             </div>
             <p className="-mt-2 text-xs text-ink-3">{t("general.iconHint")}</p>

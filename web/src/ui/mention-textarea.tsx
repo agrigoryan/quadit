@@ -28,14 +28,26 @@ function mentionAt(text: string, caret: number): { start: number; query: string 
  * A growing text box for Markdown. Typing @ offers the people and agents of
  * the workspace; arrows move, Enter or Tab picks.
  */
-export function MentionTextarea({ value, onChange, onSubmit, onFiles, className, bare, ref, onKeyDown, ...rest }: Props) {
+export function MentionTextarea({
+  value,
+  onChange,
+  onSubmit,
+  onFiles,
+  className,
+  bare,
+  ref,
+  onKeyDown,
+  ...rest
+}: Props) {
   const box = useRef<HTMLTextAreaElement | null>(null);
   const members = useMembers();
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [active, setActive] = useState(0);
 
   const options: Member[] = mention
-    ? members.filter((m) => m.handle.startsWith(mention.query) || m.name.toLowerCase().includes(mention.query)).slice(0, 6)
+    ? members
+        .filter((m) => m.handle.startsWith(mention.query) || m.name.toLowerCase().includes(mention.query))
+        .slice(0, 6)
     : [];
   const open = options.length > 0;
 
@@ -145,7 +157,10 @@ function MentionOptions({ options, active, onActive, onPick }: OptionsProps) {
             aria-selected={i === active}
             onMouseEnter={() => onActive(i)}
             onClick={() => onPick(m)}
-            className={cx("flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm", i === active && "bg-hover")}
+            className={cx(
+              "flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm",
+              i === active && "bg-hover",
+            )}
           >
             <Avatar member={m} size="sm" />
             <span className="min-w-0 flex-1 truncate">{m.name}</span>

@@ -54,11 +54,17 @@ export function ProjectTemplates({ project }: { project: Project }) {
               <Row
                 key={tp.id}
                 title={tp.name}
-                sub={[tp.title && `“${tp.title}”`, !tp.project_id && t("templates.scope.workspace")].filter(Boolean).join(" · ") || undefined}
+                sub={
+                  [tp.title && `“${tp.title}”`, !tp.project_id && t("templates.scope.workspace")]
+                    .filter(Boolean)
+                    .join(" · ") || undefined
+                }
                 onClick={() => setEditing(tp)}
                 meta={
                   <span className="flex items-center gap-1.5 max-sm:hidden">
-                    {!!preset.priority && <PriorityIcon priority={preset.priority} title={tMaybe(`priority.${preset.priority}`)} />}
+                    {!!preset.priority && (
+                      <PriorityIcon priority={preset.priority} title={tMaybe(`priority.${preset.priority}`)} />
+                    )}
                     {preset.status && <Badge>{preset.status}</Badge>}
                     {(preset.labels ?? []).slice(0, 3).map((name) => (
                       <Badge key={name}>{name}</Badge>
@@ -86,7 +92,13 @@ export function ProjectTemplates({ project }: { project: Project }) {
           })}
         </Rows>
       )}
-      {editing && <TemplateDialog project={project} template={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <TemplateDialog
+          project={project}
+          template={editing === "new" ? undefined : editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}

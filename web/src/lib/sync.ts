@@ -418,7 +418,9 @@ function standForLeader(s: Session, take: boolean) {
     });
   };
   // "steal" and "signal" cannot be given together.
-  const asking = take ? navigator.locks.request(lockName(s.slug), { steal: true }, granted) : navigator.locks.request(lockName(s.slug), { signal: wait.signal }, granted);
+  const asking = take
+    ? navigator.locks.request(lockName(s.slug), { steal: true }, granted)
+    : navigator.locks.request(lockName(s.slug), { signal: wait.signal }, granted);
   asking.catch(() => {
     // Either this tab stopped waiting, or another tab took the lock from it.
     if (s !== cur || s.role !== "leader" || s.lockWait !== wait) return;
@@ -493,7 +495,9 @@ async function catchUp(s: Session) {
   let ok = true;
   try {
     for (let page = 0; ; page++) {
-      const out = await api.get<{ events: FeedEvent[]; seq: number; more: boolean }>(ws(s.slug, `/events?after=${getState().seq}&limit=2000`));
+      const out = await api.get<{ events: FeedEvent[]; seq: number; more: boolean }>(
+        ws(s.slug, `/events?after=${getState().seq}&limit=2000`),
+      );
       if (s !== cur) return;
       applyEvents(out.events, true);
       if (out.seq > getState().seq) useStore.setState({ seq: out.seq });

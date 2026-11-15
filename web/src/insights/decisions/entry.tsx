@@ -31,9 +31,14 @@ const SHOWN_OPTIONS = 4;
 function StateBadge({ decision, mine }: { decision: Decision; mine: boolean }) {
   const approval = decision.kind === "approval";
   if (decision.state === "open") {
-    return mine ? <Badge tone="move">{t("decision.state.yours")}</Badge> : <Badge tone="wait">{t("decision.state.open")}</Badge>;
+    return mine ? (
+      <Badge tone="move">{t("decision.state.yours")}</Badge>
+    ) : (
+      <Badge tone="wait">{t("decision.state.open")}</Badge>
+    );
   }
-  if (decision.state === "picked") return <Badge tone="ok">{approval ? t("decision.state.approved") : t("decision.state.picked")}</Badge>;
+  if (decision.state === "picked")
+    return <Badge tone="ok">{approval ? t("decision.state.approved") : t("decision.state.picked")}</Badge>;
   return <Badge tone="danger">{approval ? t("decision.state.declined") : t("decision.state.sentBack")}</Badge>;
 }
 
@@ -113,7 +118,9 @@ function Answer({ decision }: { decision: Decision }) {
         {option && <span className="text-ink-2">{option.label}</span>}
       </p>
       {decision.outcome_note && (
-        <p className="mt-1 line-clamp-3 border-l-2 border-line-strong pl-2.5 whitespace-pre-line text-ink-2">{decision.outcome_note}</p>
+        <p className="mt-1 line-clamp-3 border-l-2 border-line-strong pl-2.5 whitespace-pre-line text-ink-2">
+          {decision.outcome_note}
+        </p>
       )}
     </div>
   );
@@ -228,7 +235,12 @@ export const DecisionEntry = memo(function DecisionEntry({ entry, meId, files, p
           ) : (
             canMake &&
             !open && (
-              <Button variant="ghost" size="sm" className="relative z-[1] -mr-2 ml-auto max-sm:h-9" onClick={() => onMake(entry)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="relative z-[1] -mr-2 ml-auto max-sm:h-9"
+                onClick={() => onMake(entry)}
+              >
                 <Pin className="size-3.5" aria-hidden />
                 <span className="max-sm:hidden">{t("prefs.make")}</span>
                 <span className="sm:hidden">{t("prefs.makeShort")}</span>

@@ -39,12 +39,19 @@ export function OptionsEditor({ prop }: { prop: DBProperty }) {
       {options.map((o) => (
         <div key={o.name} className="group flex h-7 items-center gap-1 rounded-sm px-1 hover:bg-hover">
           <Menu>
-            <MenuTrigger aria-label={t("db.option.color", { name: o.name })} className="flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-press">
+            <MenuTrigger
+              aria-label={t("db.option.color", { name: o.name })}
+              className="flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-press"
+            >
               <ColorDot color={o.color} />
             </MenuTrigger>
             <MenuContent className="min-w-32">
               {OPTION_COLORS.map((color) => (
-                <MenuItem key={color} icon={<ColorDot color={color} />} onSelect={() => save(options.map((x) => (x.name === o.name ? { ...x, color } : x)))}>
+                <MenuItem
+                  key={color}
+                  icon={<ColorDot color={color} />}
+                  onSelect={() => save(options.map((x) => (x.name === o.name ? { ...x, color } : x)))}
+                >
                   {colorName(color)}
                 </MenuItem>
               ))}

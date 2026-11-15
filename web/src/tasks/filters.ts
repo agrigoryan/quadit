@@ -56,7 +56,11 @@ export const sameFilters = (a: Filters, b: Filters) => JSON.stringify(a) === JSO
 const anyOf = (picked: string[], value: string | undefined) => picked.length === 0 || picked.includes(value ?? NONE);
 
 /** Builds the test a task must pass. `openDecisionTasks` holds the ids of tasks with an open question. */
-export function matcher(f: Filters, c: Pick<Collections, "statuses">, openDecisionTasks: Dict<unknown>): (task: Task) => boolean {
+export function matcher(
+  f: Filters,
+  c: Pick<Collections, "statuses">,
+  openDecisionTasks: Dict<unknown>,
+): (task: Task) => boolean {
   const text = f.text.trim().toLowerCase();
   return (task) => {
     if (!anyOf(f.assignee, task.assignee_id)) return false;
@@ -68,7 +72,14 @@ export function matcher(f: Filters, c: Pick<Collections, "statuses">, openDecisi
     if (!anyOf(f.cycle, task.cycle_id)) return false;
     if (f.waitingOn) {
       const outside = task.waiting_outside === true;
-      if (f.waitingOn === OUTSIDE ? !outside : f.waitingOn === NONE ? outside || !!task.waiting_on_id : task.waiting_on_id !== f.waitingOn) return false;
+      if (
+        f.waitingOn === OUTSIDE
+          ? !outside
+          : f.waitingOn === NONE
+            ? outside || !!task.waiting_on_id
+            : task.waiting_on_id !== f.waitingOn
+      )
+        return false;
     }
     if (f.openDecision && !openDecisionTasks[task.id]) return false;
     if (text && !task.title.toLowerCase().includes(text) && !task.key.toLowerCase().includes(text)) return false;
@@ -115,7 +126,13 @@ export type GroupSource = Pick<Collections, "statuses" | "members" | "epics" | "
  * the empty ones, so there is always a column to drop a card in. Grouped by
  * label, a task with several labels is in each of their groups.
  */
-export function groupTasks(tasks: Task[], by: Grouping, c: GroupSource, projectId: string | undefined, keepEmpty = false): TaskGroup[] {
+export function groupTasks(
+  tasks: Task[],
+  by: Grouping,
+  c: GroupSource,
+  projectId: string | undefined,
+  keepEmpty = false,
+): TaskGroup[] {
   if (by === "none") return [{ id: "all", title: "", kind: "none", value: "", tasks }];
   const groups = new Map<string, TaskGroup>();
   /** Groups that are shown only when they hold a task: someone removed, a deleted epic. */
@@ -167,7 +184,9 @@ export function groupTasks(tasks: Task[], by: Grouping, c: GroupSource, projectI
   }
 
   if (by === "assignee") {
-    const members = Object.values(c.members).sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "person" ? -1 : 1));
+    const members = Object.values(c.members).sort((a, b) =>
+      a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "person" ? -1 : 1,
+    );
     for (const m of members) {
       add({ id: m.user_id, title: m.name, value: m.user_id });
       if (m.removed_at || m.suspended_at) quiet.add(m.user_id);
@@ -190,7 +209,13 @@ export function groupTasks(tasks: Task[], by: Grouping, c: GroupSource, projectI
 /** The tables a stored query's names are looked up in. */
 export type QuerySource = Pick<Collections, "projects" | "members" | "statuses" | "labels" | "epics" | "cycles">;
 
-const SORT_TO_QUERY: Record<SortBy, string> = { manual: "rank", priority: "priority", updated: "-updated", created: "-created", due: "due" };
+const SORT_TO_QUERY: Record<SortBy, string> = {
+  manual: "rank",
+  priority: "priority",
+  updated: "-updated",
+  created: "-created",
+  due: "due",
+};
 
 /** The filters as the server's TaskQuery, for a saved view. Everything is sent as ids. */
 export function toQuery(f: Filters, projectKey: string | undefined, sort: SortBy): TaskQuery {
@@ -265,16 +290,21 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
   const projectIds = (q.project ?? [])
     .map((ref) => Object.values(c.projects).find((p) => p.id === ref || low(p.key) === low(ref))?.id)
     .filter(Boolean) as string[];
-  const inScope = (projectId: string | undefined) => projectIds.length === 0 || !projectId || projectIds.includes(projectId);
+  const inScope = (projectId: string | undefined) =>
+    projectIds.length === 0 || !projectId || projectIds.includes(projectId);
 
   const member = (ref: string): string | undefined => {
     if (ref === NONE) return NONE;
     if (ref === OUTSIDE) return OUTSIDE;
     if (ref === "me") return meId;
     const handle = low(ref.replace(/^@/, ""));
-    return Object.values(c.members).find((m) => !m.removed_at && (m.user_id === ref || low(m.handle) === handle))?.user_id;
+    return Object.values(c.members).find((m) => !m.removed_at && (m.user_id === ref || low(m.handle) === handle))
+      ?.user_id;
   };
-  const byName = <T extends { id: string; name: string; project_id?: string; deleted_at?: number }>(table: Dict<T>, ref: string): string[] =>
+  const byName = <T extends { id: string; name: string; project_id?: string; deleted_at?: number }>(
+    table: Dict<T>,
+    ref: string,
+  ): string[] =>
     Object.values(table)
       .filter((row) => !row.deleted_at && (row.id === ref || low(row.name) === low(ref)) && inScope(row.project_id))
       .map((row) => row.id);
@@ -288,8 +318,15 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
     // server answers too. Dropping it would show every task.
     const orWord = (ids: string[]) => (ids.length ? ids : [ref]);
     const day = serverDay(); // a cycle's days are the server's, not this browser's
-    if (ref === "current") return orWord(rows.filter((cy) => cy.starts_on <= day && day <= cy.ends_on).map((cy) => cy.id));
-    if (ref === "next") return orWord(rows.filter((cy) => cy.starts_on > day).slice(0, 1).map((cy) => cy.id));
+    if (ref === "current")
+      return orWord(rows.filter((cy) => cy.starts_on <= day && day <= cy.ends_on).map((cy) => cy.id));
+    if (ref === "next")
+      return orWord(
+        rows
+          .filter((cy) => cy.starts_on > day)
+          .slice(0, 1)
+          .map((cy) => cy.id),
+      );
     return rows.filter((cy) => cy.id === ref || String(cy.number) === ref).map((cy) => cy.id);
   };
 

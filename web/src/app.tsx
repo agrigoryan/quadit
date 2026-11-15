@@ -15,7 +15,9 @@ import { Toaster } from "@/ui/toast";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const AdminRoutes = lazy(() => import("@/admin/routes"));
-const AccountSecurityPage = lazy(() => import("@/auth/account-security").then((m) => ({ default: m.AccountSecurityPage })));
+const AccountSecurityPage = lazy(() =>
+  import("@/auth/account-security").then((m) => ({ default: m.AccountSecurityPage })),
+);
 
 /** Shows its children only to someone signed in; everyone else goes to /login. */
 function RequireSession({ children }: { children: ReactNode }) {

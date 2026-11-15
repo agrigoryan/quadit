@@ -65,10 +65,18 @@ export function SecondStep() {
       lead={recovery ? t("auth.second.recoveryLead") : t("auth.second.lead")}
       footer={
         <>
-          <button type="button" onClick={swap} className="self-start font-medium text-accent-text underline-offset-2 hover:underline">
+          <button
+            type="button"
+            onClick={swap}
+            className="self-start font-medium text-accent-text underline-offset-2 hover:underline"
+          >
             {recovery ? t("auth.second.useCode") : t("auth.second.useRecovery")}
           </button>
-          <button type="button" onClick={() => void signOut()} className="self-start text-ink-2 underline-offset-2 hover:text-ink hover:underline">
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="self-start text-ink-2 underline-offset-2 hover:text-ink hover:underline"
+          >
             {t("auth.second.back")}
           </button>
         </>
@@ -76,7 +84,12 @@ export function SecondStep() {
     >
       <form onSubmit={submit} className="flex flex-col gap-3.5">
         {recovery ? (
-          <FormField label={t("auth.second.recovery")} htmlFor="recovery" hint={t("auth.second.recoveryHint")} error={codeError}>
+          <FormField
+            label={t("auth.second.recovery")}
+            htmlFor="recovery"
+            hint={t("auth.second.recoveryHint")}
+            error={codeError}
+          >
             <Input
               key="recovery"
               id="recovery"

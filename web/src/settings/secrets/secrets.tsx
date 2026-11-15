@@ -79,7 +79,10 @@ function SecretItem({ secret, onEdit, onDelete }: { secret: Secret; onEdit: () =
         ) : (
           <span className="flex min-w-0 flex-wrap items-center gap-1">
             {hosts.map((host) => (
-              <span key={host} className="inline-flex h-5 max-w-full items-center rounded-sm border border-line bg-sunken px-1.5 font-mono text-xs text-ink-2">
+              <span
+                key={host}
+                className="inline-flex h-5 max-w-full items-center rounded-sm border border-line bg-sunken px-1.5 font-mono text-xs text-ink-2"
+              >
                 <span className="truncate">{host}</span>
               </span>
             ))}
@@ -130,7 +133,12 @@ export function SecretsPage() {
           ) : (
             <Rows>
               {secrets.map((secret) => (
-                <SecretItem key={secret.id} secret={secret} onEdit={() => setForm({ secret })} onDelete={() => setRemoving(secret)} />
+                <SecretItem
+                  key={secret.id}
+                  secret={secret}
+                  onEdit={() => setForm({ secret })}
+                  onDelete={() => setRemoving(secret)}
+                />
               ))}
             </Rows>
           )

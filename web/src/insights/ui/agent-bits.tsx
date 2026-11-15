@@ -56,7 +56,8 @@ export function NotListening({ urgent, className }: { urgent?: boolean; classNam
 }
 
 /** An agent that has work queued but would not hear about it. */
-export const isStranded = (a: AgentState) => !a.listening && a.state !== "working" && (a.waiting_on_it > 0 || a.state === "has_work");
+export const isStranded = (a: AgentState) =>
+  !a.listening && a.state !== "working" && (a.waiting_on_it > 0 || a.state === "has_work");
 
 interface BudgetProps {
   agent: Pick<AgentState, "cost_week" | "minutes_week" | "budget">;

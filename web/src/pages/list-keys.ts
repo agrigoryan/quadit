@@ -50,7 +50,8 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
 
   let index = focusId === null ? -1 : rows.findIndex((row) => idOf(row) === focusId);
   // The focused row left the list (archived, answered): stay where it was.
-  if (focusId !== null && index < 0 && rows.length > 0) index = Math.min(Math.max(lastIndex.current, 0), rows.length - 1);
+  if (focusId !== null && index < 0 && rows.length > 0)
+    index = Math.min(Math.max(lastIndex.current, 0), rows.length - 1);
   lastIndex.current = index;
   const current = rows[index];
   const currentId = current ? idOf(current) : null;

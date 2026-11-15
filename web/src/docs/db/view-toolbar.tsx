@@ -18,11 +18,26 @@ interface Props {
   props: DBProperty[];
 }
 
-function ToolButton({ icon, label, count, children }: { icon: ReactNode; label: string; count?: number; children: ReactNode }) {
+function ToolButton({
+  icon,
+  label,
+  count,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  count?: number;
+  children: ReactNode;
+}) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={label} className={cx("max-md:px-1.5", !!count && "text-accent-text")}>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={label}
+          className={cx("max-md:px-1.5", !!count && "text-accent-text")}
+        >
           {icon}
           <span className="max-lg:hidden">{label}</span>
           {!!count && <span className="tnum">{formatNumber(count)}</span>}
@@ -61,7 +76,10 @@ function PropertyList({ view, props }: Props) {
           role="switch"
           aria-checked={isOn(p)}
           onClick={() => toggle(p)}
-          className={cx("flex h-7 items-center gap-2 rounded-sm px-2 text-left text-sm hover:bg-hover", !isOn(p) && "text-ink-3")}
+          className={cx(
+            "flex h-7 items-center gap-2 rounded-sm px-2 text-left text-sm hover:bg-hover",
+            !isOn(p) && "text-ink-3",
+          )}
         >
           <PropIcon type={p.type} />
           <span className="min-w-0 flex-1 truncate">{p.name}</span>
@@ -70,7 +88,10 @@ function PropertyList({ view, props }: Props) {
       ))}
       <div className="-mx-1 mt-1 -mb-1 border-t border-line p-1">
         <AddPropertyMenu databaseId={view.database_id}>
-          <button type="button" className="flex h-7 w-full items-center gap-2 rounded-sm px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink">
+          <button
+            type="button"
+            className="flex h-7 w-full items-center gap-2 rounded-sm px-2 text-sm text-ink-2 hover:bg-hover hover:text-ink"
+          >
             <Plus className="size-4" aria-hidden />
             {t("db.prop.add")}
           </button>
@@ -81,7 +102,14 @@ function PropertyList({ view, props }: Props) {
 }
 
 /** A picker for the property a view is laid out by: the board's columns, the calendar's date. */
-function LayoutPick({ view, props, field, type, label, fallback = 0 }: Props & { field: keyof ViewConfig; type: string; label: string; fallback?: number }) {
+function LayoutPick({
+  view,
+  props,
+  field,
+  type,
+  label,
+  fallback = 0,
+}: Props & { field: keyof ViewConfig; type: string; label: string; fallback?: number }) {
   const options = props.filter((p) => p.type === type);
   if (options.length === 0) return null;
   // Until one is chosen the view goes by the first that fits (the second, for a timeline's end).
@@ -106,12 +134,23 @@ export function ViewToolbar({ view, props }: Props) {
   const sorts = view.config?.sorts?.length ?? 0;
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {view.type === "board" && <LayoutPick view={view} props={props} field="group_by" type="select" label={t("db.board.groupBy")} />}
-      {view.type === "calendar" && <LayoutPick view={view} props={props} field="date_prop" type="date" label={t("db.calendar.by")} />}
+      {view.type === "board" && (
+        <LayoutPick view={view} props={props} field="group_by" type="select" label={t("db.board.groupBy")} />
+      )}
+      {view.type === "calendar" && (
+        <LayoutPick view={view} props={props} field="date_prop" type="date" label={t("db.calendar.by")} />
+      )}
       {view.type === "timeline" && (
         <>
           <LayoutPick view={view} props={props} field="date_prop" type="date" label={t("db.timeline.start")} />
-          <LayoutPick view={view} props={props} field="end_prop" type="date" label={t("db.timeline.end")} fallback={1} />
+          <LayoutPick
+            view={view}
+            props={props}
+            field="end_prop"
+            type="date"
+            label={t("db.timeline.end")}
+            fallback={1}
+          />
         </>
       )}
       {view.type !== "form" && (
@@ -125,7 +164,10 @@ export function ViewToolbar({ view, props }: Props) {
         </>
       )}
       {view.type !== "timeline" && view.type !== "calendar" && (
-        <ToolButton icon={<SlidersHorizontal className="size-3.5" aria-hidden />} label={view.type === "form" ? t("db.form.fields") : t("db.props")}>
+        <ToolButton
+          icon={<SlidersHorizontal className="size-3.5" aria-hidden />}
+          label={view.type === "form" ? t("db.form.fields") : t("db.props")}
+        >
           <PropertyList view={view} props={props} />
         </ToolButton>
       )}

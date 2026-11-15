@@ -70,7 +70,11 @@ export function GoHint() {
           <Kbd onDark>G</Kbd>
         </span>
         {t("goto.title")}
-        {at.project && <span className="ml-auto truncate font-normal opacity-70">{t("goto.project", { project: at.project.name })}</span>}
+        {at.project && (
+          <span className="ml-auto truncate font-normal opacity-70">
+            {t("goto.project", { project: at.project.name })}
+          </span>
+        )}
       </p>
       <ul className="mt-2.5 grid grid-cols-2 gap-x-5 gap-y-1.5 border-t border-white/10 pt-2.5 sm:grid-cols-3">
         {places.map((place) => (

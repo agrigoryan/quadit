@@ -12,7 +12,15 @@ import { parseWhen } from "@/insights/lib/format";
 import type { Health } from "@/insights/lib/types";
 import { Panel } from "@/insights/ui/panel";
 
-function Line({ tone, icon, children }: { tone: "bad" | "warn" | "ok" | "quiet"; icon: ReactNode; children: ReactNode }) {
+function Line({
+  tone,
+  icon,
+  children,
+}: {
+  tone: "bad" | "warn" | "ok" | "quiet";
+  icon: ReactNode;
+  children: ReactNode;
+}) {
   const colors = { bad: "text-danger", warn: "text-wait", ok: "text-ok", quiet: "text-ink-3" };
   return (
     <li className="flex items-start gap-2 text-sm">
@@ -34,7 +42,8 @@ export function HealthPanel({ health, className }: { health: Health; className?:
     problems.push({ key: "retry", tone: "warn", text: t("dash.health.retrying", { n: n(health.deliveries_pending) }) });
   if (n(health.sources_failing) > 0)
     problems.push({ key: "sync", tone: "bad", text: t("dash.health.sources", { n: n(health.sources_failing) }) });
-  if (health.last_backup_ok === false) problems.push({ key: "backup", tone: "bad", text: t("dash.health.backupFailed") });
+  if (health.last_backup_ok === false)
+    problems.push({ key: "backup", tone: "bad", text: t("dash.health.backupFailed") });
   const backupAt = parseWhen(health.last_backup);
 
   return (
@@ -62,7 +71,9 @@ export function HealthPanel({ health, className }: { health: Health; className?:
         <Line tone="quiet" icon={<DatabaseBackup aria-hidden />}>
           {backupAt > 0 ? (
             <span title={exact(backupAt)}>
-              {t(health.last_backup_ok === false ? "dash.health.backupTried" : "dash.health.backup", { when: ago(backupAt) })}
+              {t(health.last_backup_ok === false ? "dash.health.backupTried" : "dash.health.backup", {
+                when: ago(backupAt),
+              })}
             </span>
           ) : (
             <span className="text-ink-2">{t("dash.health.noBackup")}</span>

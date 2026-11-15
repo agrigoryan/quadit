@@ -111,7 +111,11 @@ export function CopyField({ label, value, multiline, className }: CopyFieldProps
         >
           {value}
         </code>
-        <Button onClick={() => void copy()} className="h-auto min-h-8 self-start" aria-label={label ? `${t("s.copy")}: ${label}` : t("s.copy")}>
+        <Button
+          onClick={() => void copy()}
+          className="h-auto min-h-8 self-start"
+          aria-label={label ? `${t("s.copy")}: ${label}` : t("s.copy")}
+        >
           {done ? <Check className="size-3.5 text-ok" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
           {done ? t("common.copied") : t("s.copy")}
         </Button>

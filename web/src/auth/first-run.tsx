@@ -17,9 +17,17 @@ export function FirstProjectNudge() {
   const canCreate = me.role !== "member";
   return (
     // The highlighter means "your move": only for someone who can make the project.
-    <section aria-labelledby="first-project" className={cx("border-b border-line px-4 py-4", canCreate ? "bg-move-soft/50" : "bg-sunken")}>
+    <section
+      aria-labelledby="first-project"
+      className={cx("border-b border-line px-4 py-4", canCreate ? "bg-move-soft/50" : "bg-sunken")}
+    >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <span className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", canCreate ? "bg-move text-move-ink" : "bg-press text-ink-2")}>
+        <span
+          className={cx(
+            "flex size-9 shrink-0 items-center justify-center rounded-lg",
+            canCreate ? "bg-move text-move-ink" : "bg-press text-ink-2",
+          )}
+        >
           <FolderPlus className="size-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1 basis-56">

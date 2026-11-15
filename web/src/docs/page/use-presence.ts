@@ -28,7 +28,14 @@ export function usePresence(docId: string, block: string | null, enabled = true)
     };
     say.current();
     const timer = setInterval(() => say.current(), EVERY_MS);
-    const leave = () => void fetch(path, { method: "POST", body: JSON.stringify({ leave: true }), headers: { "Content-Type": "application/json" }, keepalive: true, credentials: "same-origin" }).catch(() => {});
+    const leave = () =>
+      void fetch(path, {
+        method: "POST",
+        body: JSON.stringify({ leave: true }),
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        credentials: "same-origin",
+      }).catch(() => {});
     window.addEventListener("pagehide", leave);
     return () => {
       gone = true;

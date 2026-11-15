@@ -39,7 +39,10 @@ export function UploadField({ accept, label, value, onChange, onBusy, error }: P
     onBusy(true);
     setSending({ name: file.name, progress: { sent: 0, total: file.size, state: "queued" } });
     try {
-      const row = await uploadFile(file, { signal: mine.signal, onProgress: (progress) => run.current === mine && setSending({ name: file.name, progress }) });
+      const row = await uploadFile(file, {
+        signal: mine.signal,
+        onProgress: (progress) => run.current === mine && setSending({ name: file.name, progress }),
+      });
       if (run.current !== mine) return;
       onChange({ id: row.id, name: row.name || file.name, size: row.size ?? file.size });
     } catch (err) {
@@ -54,7 +57,8 @@ export function UploadField({ accept, label, value, onChange, onBusy, error }: P
     }
   }
 
-  const percent = sending && sending.progress.total > 0 ? Math.round((sending.progress.sent / sending.progress.total) * 100) : 0;
+  const percent =
+    sending && sending.progress.total > 0 ? Math.round((sending.progress.sent / sending.progress.total) * 100) : 0;
   const shown = failed || error;
   return (
     <div className="flex flex-col gap-1.5">
@@ -68,7 +72,8 @@ export function UploadField({ accept, label, value, onChange, onBusy, error }: P
           <span className="min-w-0 flex-1 text-sm" aria-live="polite">
             <span className="block truncate text-ink">{sending.name}</span>
             <span className="block text-xs text-ink-3 tnum">
-              {sending.progress.state === "waiting" ? t("import.uploadWaiting") : t("import.uploading", { percent })} · {fileSize(sending.progress.total)}
+              {sending.progress.state === "waiting" ? t("import.uploadWaiting") : t("import.uploading", { percent })} ·{" "}
+              {fileSize(sending.progress.total)}
             </span>
           </span>
         )}
@@ -83,8 +88,18 @@ export function UploadField({ accept, label, value, onChange, onBusy, error }: P
         )}
       </div>
       {sending && (
-        <div role="progressbar" aria-label={sending.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1 overflow-hidden rounded-full bg-sunken">
-          <div className="h-full rounded-full bg-accent transition-[width] duration-150" style={{ width: `${percent}%` }} />
+        <div
+          role="progressbar"
+          aria-label={sending.name}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          className="h-1 overflow-hidden rounded-full bg-sunken"
+        >
+          <div
+            className="h-full rounded-full bg-accent transition-[width] duration-150"
+            style={{ width: `${percent}%` }}
+          />
         </div>
       )}
       {shown && (

@@ -23,7 +23,11 @@ const byRank = (a: Project, b: Project) => ((a.rank ?? "") < (b.rank ?? "") ? -1
 function ProjectRow({ project, tasks }: { project: Project; tasks: number }) {
   const base = useSettingsBase();
   return (
-    <Link to={`${base}/projects/${project.key}`} aria-label={t("projects.open", { name: project.name })} className="flex min-h-11 items-center gap-3 px-3 py-1.5 hover:bg-hover/60">
+    <Link
+      to={`${base}/projects/${project.key}`}
+      aria-label={t("projects.open", { name: project.name })}
+      className="flex min-h-11 items-center gap-3 px-3 py-1.5 hover:bg-hover/60"
+    >
       <ProjectGlyph project={project} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
@@ -36,7 +40,9 @@ function ProjectRow({ project, tasks }: { project: Project; tasks: number }) {
         {project.description && <span className="block truncate text-xs text-ink-3">{project.description}</span>}
       </span>
       <span className="shrink-0 font-mono text-xs text-ink-3">{project.key}</span>
-      <span className="w-16 shrink-0 text-right text-xs text-ink-2 tnum max-sm:hidden">{t("projects.tasks", { n: tasks })}</span>
+      <span className="w-16 shrink-0 text-right text-xs text-ink-2 tnum max-sm:hidden">
+        {t("projects.tasks", { n: tasks })}
+      </span>
       <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
     </Link>
   );
@@ -60,9 +66,12 @@ export function ProjectsPage() {
   }, [params, setParams, admin]);
 
   const { active, archived, counts } = useMemo(() => {
-    const live = Object.values(projects).filter((p) => !p.deleted_at).sort(byRank);
+    const live = Object.values(projects)
+      .filter((p) => !p.deleted_at)
+      .sort(byRank);
     const counts: Record<string, number> = {};
-    for (const task of Object.values(tasks)) if (!task.deleted_at) counts[task.project_id] = (counts[task.project_id] ?? 0) + 1;
+    for (const task of Object.values(tasks))
+      if (!task.deleted_at) counts[task.project_id] = (counts[task.project_id] ?? 0) + 1;
     return { active: live.filter((p) => !p.archived_at), archived: live.filter((p) => p.archived_at), counts };
   }, [projects, tasks]);
 
@@ -77,7 +86,11 @@ export function ProjectsPage() {
     <Page title={t("projects.title")} lead={t("projects.lead")} back={base} actions={active.length > 0 && newButton}>
       {active.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line-strong">
-          <EmptyState title={t("projects.none")} hint={admin ? t("projects.noneHint") : t("projects.noneMember")} action={newButton} />
+          <EmptyState
+            title={t("projects.none")}
+            hint={admin ? t("projects.noneHint") : t("projects.noneMember")}
+            action={newButton}
+          />
         </div>
       ) : (
         <Rows>
@@ -103,7 +116,13 @@ export function ProjectsPage() {
 function CreateProjectDialog({ used, onClose }: { used: number; onClose: () => void }) {
   const base = useSettingsBase();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<ProjectDraft>({ key: "", name: "", icon: "", color: SWATCHES[(used + 1) % SWATCHES.length] ?? "", description: "" });
+  const [draft, setDraft] = useState<ProjectDraft>({
+    key: "",
+    name: "",
+    icon: "",
+    color: SWATCHES[(used + 1) % SWATCHES.length] ?? "",
+    description: "",
+  });
   const errors = useFieldErrors(PROJECT_FIELDS);
   const { busy, run } = useSubmit(errors, { once: true });
   const set = (patch: Partial<ProjectDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -115,7 +134,17 @@ function CreateProjectDialog({ used, onClose }: { used: number; onClose: () => v
     if (!KEY_RE.test(draft.key)) return errors.set("key", t("project.keyBad"));
     await run(async () => {
       await mutate(
-        { type: "project.create", args: { id: newId(), key: draft.key, name: draft.name.trim(), icon: draft.icon.trim(), color: draft.color, description: draft.description.trim() } },
+        {
+          type: "project.create",
+          args: {
+            id: newId(),
+            key: draft.key,
+            name: draft.name.trim(),
+            icon: draft.icon.trim(),
+            color: draft.color,
+            description: draft.description.trim(),
+          },
+        },
         undefined,
         { quiet: true },
       );

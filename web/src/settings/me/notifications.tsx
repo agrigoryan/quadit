@@ -16,7 +16,10 @@ import { Button } from "@/ui/button";
 const emailChoices: EmailChoice[] = ["all", "important", "none"];
 
 /** Both fields are always sent, so changing one never forgets the other. */
-const prefsOf = (a: Account): Required<NotifyPrefs> => ({ email: a.user.notify?.email ?? "important", push: a.user.notify?.push ?? true });
+const prefsOf = (a: Account): Required<NotifyPrefs> => ({
+  email: a.user.notify?.email ?? "important",
+  push: a.user.notify?.push ?? true,
+});
 
 function useSavePrefs(account: Account, onSaved: (a: Account) => void) {
   const [error, setError] = useState("");
@@ -47,7 +50,10 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
         <Rows>
           <div role="radiogroup" aria-label={t("me.notify.email")} className="divide-y divide-line">
             {emailChoices.map((choice) => (
-              <label key={choice} className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-hover/60">
+              <label
+                key={choice}
+                className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-hover/60"
+              >
                 <input
                   type="radio"
                   name="notify-email"
@@ -56,7 +62,9 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
                   onChange={() => void save({ email: choice })}
                 />
                 <span className="min-w-0">
-                  <span className={cx("block text-sm text-ink", value === choice && "font-medium")}>{t(`me.notify.email.${choice}`)}</span>
+                  <span className={cx("block text-sm text-ink", value === choice && "font-medium")}>
+                    {t(`me.notify.email.${choice}`)}
+                  </span>
                   <span className="block text-xs text-ink-3">{t(`me.notify.email.${choice}Hint`)}</span>
                 </span>
               </label>
@@ -69,7 +77,12 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
   );
 }
 
-const stateTone: Record<PushState, "ok" | "neutral" | "danger" | "wait"> = { on: "ok", off: "neutral", blocked: "danger", unsupported: "wait" };
+const stateTone: Record<PushState, "ok" | "neutral" | "danger" | "wait"> = {
+  on: "ok",
+  off: "neutral",
+  blocked: "danger",
+  unsupported: "wait",
+};
 
 function PushSection({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
   const { save, error: saveError } = useSavePrefs(account, onSaved);
@@ -115,7 +128,12 @@ function PushSection({ account, onSaved }: { account: Account; onSaved: (a: Acco
   return (
     <Section title={t("me.notify.push")} lead={t("me.notify.pushLead")}>
       <Card className="flex flex-col gap-3.5">
-        <SwitchRow title={t("me.notify.pushAll")} hint={t("me.notify.pushAllHint")} checked={wanted} onChange={(push) => void save({ push })} />
+        <SwitchRow
+          title={t("me.notify.pushAll")}
+          hint={t("me.notify.pushAllHint")}
+          checked={wanted}
+          onChange={(push) => void save({ push })}
+        />
         <div className="border-t border-line pt-3.5">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
             <div className="min-w-0">
@@ -123,7 +141,9 @@ function PushSection({ account, onSaved }: { account: Account; onSaved: (a: Acco
                 {t("me.notify.device")}
                 {state && <Badge tone={stateTone[state]}>{t(`me.notify.state.${state}`)}</Badge>}
               </p>
-              <p className="mt-0.5 max-w-prose text-xs text-ink-3">{state ? t(`me.notify.state.${state}Hint`) : t("common.loading")}</p>
+              <p className="mt-0.5 max-w-prose text-xs text-ink-3">
+                {state ? t(`me.notify.state.${state}Hint`) : t("common.loading")}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {state === "on" && (

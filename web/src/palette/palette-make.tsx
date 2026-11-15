@@ -27,7 +27,12 @@ interface Props {
 
 export function MakePageRows({ page, project, query, run }: Props) {
   const name = query.trim();
-  if (!name) return <Note>{t(page === "new-label" ? "palette.make.labelHint" : "palette.make.statusHint", { project: project.name })}</Note>;
+  if (!name)
+    return (
+      <Note>
+        {t(page === "new-label" ? "palette.make.labelHint" : "palette.make.statusHint", { project: project.name })}
+      </Note>
+    );
 
   if (page === "new-label") {
     return (

@@ -118,7 +118,7 @@ export function diff(flat: Flat[], known: Map<string, Known>): Diff {
   const rankOf = new Map<string, string>();
   for (const [parent, ids] of lists) {
     const keep = settled(ids, parent, known);
-    for (let i = 0; i < ids.length; ) {
+    for (let i = 0; i < ids.length;) {
       const id = ids[i] as string;
       if (keep.has(id)) {
         i++;
@@ -159,7 +159,14 @@ export function diff(flat: Flat[], known: Map<string, Known>): Diff {
       ops.push(op);
       touched = true;
     }
-    if (touched) next.set(f.id, { parent: f.parent, rank: rank ?? k.rank, sig: f.sig, type: f.wire.type, props: hasProps || k.props });
+    if (touched)
+      next.set(f.id, {
+        parent: f.parent,
+        rank: rank ?? k.rank,
+        sig: f.sig,
+        type: f.wire.type,
+        props: hasProps || k.props,
+      });
   }
 
   const deleted: string[] = [];

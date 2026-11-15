@@ -44,7 +44,8 @@ export const adminMoreStrings = {
   "admin.limits.tooLow": "At least 10, or nothing works",
 
   "admin.backups.title": "Backups",
-  "admin.backups.lead": "One archive holds the database and every file. Each backup is read back and checked before it counts.",
+  "admin.backups.lead":
+    "One archive holds the database and every file. Each backup is read back and checked before it counts.",
   "admin.backups.schedule": "Schedule",
   "admin.backups.daily": "Back up every day",
   "admin.backups.dailyHint": "One backup a day, at the hour below.",
@@ -55,7 +56,8 @@ export const adminMoreStrings = {
   "admin.backups.keepHint": "How many to keep. Empty keeps 14.",
   "admin.backups.keepBad": "Keep at least 1",
   "admin.backups.copy": "Copy to file storage",
-  "admin.backups.copyHint": "Also puts each archive in file storage. With cloud storage, this is how a backup leaves the machine.",
+  "admin.backups.copyHint":
+    "Also puts each archive in file storage. With cloud storage, this is how a backup leaves the machine.",
   "admin.backups.list": "Archives",
   "admin.backups.directory": "On the server in {dir}",
   "admin.backups.now": "Back up now",
@@ -66,7 +68,8 @@ export const adminMoreStrings = {
   "admin.backups.unverified": "Not verified",
   "admin.backups.failed": "Failed",
   "admin.backups.running": "Running",
-  "admin.backups.restoreHint": "To restore into an empty install, run: quadit restore FILE. Keep the install secret with your backups.",
+  "admin.backups.restoreHint":
+    "To restore into an empty install, run: quadit restore FILE. Keep the install secret with your backups.",
 
   "admin.users.title": "Users",
   "admin.users.lead": "Every person and agent on this install, across all workspaces.",
@@ -85,26 +88,32 @@ export const adminMoreStrings = {
   "admin.users.disable": "Disable account",
   "admin.users.enable": "Enable account",
   "admin.users.confirm.disable.title": "Disable {name}?",
-  "admin.users.confirm.disable.body": "{name} is signed out everywhere and their API tokens stop working. Their work stays. You can enable the account again.",
+  "admin.users.confirm.disable.body":
+    "{name} is signed out everywhere and their API tokens stop working. Their work stays. You can enable the account again.",
   "admin.users.confirm.disable.action": "Disable",
   "admin.users.confirm.enable.title": "Enable {name}?",
-  "admin.users.confirm.enable.body": "{name} can sign in again. Tokens revoked when the account was disabled stay revoked.",
+  "admin.users.confirm.enable.body":
+    "{name} can sign in again. Tokens revoked when the account was disabled stay revoked.",
   "admin.users.confirm.enable.action": "Enable",
   "admin.users.confirm.admin.title": "Make {name} an install admin?",
-  "admin.users.confirm.admin.body": "{name} will be able to change every setting here, read the audit log and download backups.",
+  "admin.users.confirm.admin.body":
+    "{name} will be able to change every setting here, read the audit log and download backups.",
   "admin.users.confirm.admin.action": "Make admin",
   "admin.users.confirm.unadmin.title": "Remove {name} as install admin?",
-  "admin.users.confirm.unadmin.body": "{name} keeps their account and workspaces but can no longer open the admin area.",
+  "admin.users.confirm.unadmin.body":
+    "{name} keeps their account and workspaces but can no longer open the admin area.",
   "admin.users.confirm.unadmin.action": "Remove admin",
 
   "admin.workspaces.title": "Workspaces",
-  "admin.workspaces.lead": "Every workspace on this install. A deleted one is kept for 30 days and can be restored until then.",
+  "admin.workspaces.lead":
+    "Every workspace on this install. A deleted one is kept for 30 days and can be restored until then.",
   "admin.workspaces.none": "No workspaces.",
   "admin.workspaces.members": "{n} member | {n} members",
   "admin.workspaces.tasks": "{n} task | {n} tasks",
   "admin.workspaces.created": "Created",
   "admin.workspaces.open": "Open",
-  "admin.workspaces.notMemberHint": "You are not a member of this workspace. Running the install lets you join it as an admin; its members will see that you did.",
+  "admin.workspaces.notMemberHint":
+    "You are not a member of this workspace. Running the install lets you join it as an admin; its members will see that you did.",
   "admin.workspaces.join": "Join as admin",
   "admin.workspaces.joinTitle": "Join {name} as an admin?",
   "admin.workspaces.joinBody":
@@ -117,7 +126,8 @@ export const adminMoreStrings = {
   "admin.workspaces.goneSoon": "about to be removed for good",
   "admin.workspaces.restore": "Restore",
   "admin.workspaces.restoreTitle": "Restore {name}?",
-  "admin.workspaces.restoreBody": "It comes back as it was at /{slug}: its members can open it again, and its tokens, webhooks and integrations work again.",
+  "admin.workspaces.restoreBody":
+    "It comes back as it was at /{slug}: its members can open it again, and its tokens, webhooks and integrations work again.",
   "admin.workspaces.restored": "{name} is restored",
   "admin.restoreItem.open": "Restore one thing…",
   "admin.restoreItem.title": "Restore one thing",
@@ -132,8 +142,10 @@ export const adminMoreStrings = {
   "admin.restoreItem.pageLink": "Page",
   "admin.restoreItem.pageHint": "Paste a link to the page, or its id.",
   "admin.restoreItem.pageBad": "Paste a link to the page, or its id",
-  "admin.restoreItem.noteTask": "The task comes back as it was in this backup: if it was deleted since, it returns; if it was changed, it is set back. Everything else stays as it is now.",
-  "admin.restoreItem.notePage": "The page comes back as it was in this backup: if it was deleted since, it returns; if it was changed, it is set back, and blocks added since go to its trash. Everything else stays as it is now.",
+  "admin.restoreItem.noteTask":
+    "The task comes back as it was in this backup: if it was deleted since, it returns; if it was changed, it is set back. Everything else stays as it is now.",
+  "admin.restoreItem.notePage":
+    "The page comes back as it was in this backup: if it was deleted since, it returns; if it was changed, it is set back, and blocks added since go to its trash. Everything else stays as it is now.",
   "admin.restoreItem.restore": "Restore",
   "admin.restoreItem.busy": "Restoring…",
   "admin.restoreItem.doneTask": "{key} is back as it was in the backup",
@@ -157,14 +169,18 @@ export const adminMoreStrings = {
   "admin.health.mailOff": "Not configured",
   "admin.health.mailOffNote": "Invitations and password resets cannot be mailed.",
   "admin.health.webhooksFailing": "Failing webhooks",
-  "admin.health.webhooksFailingNote": "Their receivers are not answering. Each workspace sees its own under Settings, Webhooks.",
+  "admin.health.webhooksFailingNote":
+    "Their receivers are not answering. Each workspace sees its own under Settings, Webhooks.",
   "admin.health.deliveriesDead": "Dead deliveries",
-  "admin.health.deliveriesDeadNote": "Given up after repeated failures. They can be sent again from the workspace's webhook page.",
+  "admin.health.deliveriesDeadNote":
+    "Given up after repeated failures. They can be sent again from the workspace's webhook page.",
   "admin.health.deliveriesPending": "Deliveries waiting to go out",
   "admin.health.sourcesFailing": "Repository syncs with errors",
-  "admin.health.sourcesFailingNote": "Pages mirrored from a repository are not being updated. Each workspace sees the error under Settings, Docs sources.",
+  "admin.health.sourcesFailingNote":
+    "Pages mirrored from a repository are not being updated. Each workspace sees the error under Settings, Docs sources.",
   "admin.health.integrationsFailing": "Integrations with errors",
-  "admin.health.integrationsFailingNote": "A connection to an outside service (such as GitHub) reported an error. Each workspace sees it under Settings, Integrations.",
+  "admin.health.integrationsFailingNote":
+    "A connection to an outside service (such as GitHub) reported an error. Each workspace sees it under Settings, Integrations.",
   "admin.health.jobsFailing": "Background jobs failing",
   "admin.health.jobsFailingNote": "Tried more than twice without success. The server log says why.",
   "admin.health.jobsWaiting": "Background jobs waiting",

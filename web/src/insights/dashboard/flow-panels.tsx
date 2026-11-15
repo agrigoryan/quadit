@@ -20,11 +20,19 @@ export function StatusPanel({ rows, className }: { rows: StatusCount[]; classNam
   for (const p of Object.values(projects)) names[p.key] = p.name;
   const total = rows.reduce((sum, r) => sum + r.count, 0);
   return (
-    <Panel title={t("dash.status")} action={total > 0 && <TableSwitch on={table} onChange={setTable} />} className={className}>
+    <Panel
+      title={t("dash.status")}
+      action={total > 0 && <TableSwitch on={table} onChange={setTable} />}
+      className={className}
+    >
       {total === 0 ? (
         <p className="text-sm text-ink-2">{t("dash.status.empty")}</p>
       ) : table ? (
-        <DataTable caption={t("dash.status")} head={[t("dash.status.col"), t("dash.col.tasks")]} rows={statusRows(rows)} />
+        <DataTable
+          caption={t("dash.status")}
+          head={[t("dash.status.col"), t("dash.col.tasks")]}
+          rows={statusRows(rows)}
+        />
       ) : (
         <StatusStack rows={rows} names={names} />
       )}
@@ -39,7 +47,11 @@ export function WeeklyPanel({ weeks, className }: { weeks: WeekCount[]; classNam
   return (
     <Panel
       title={t("dash.weekly")}
-      meta={<span className="text-xs text-ink-3 tnum max-sm:hidden">{t("dash.weekly.totals", { opened, closed, n: weeks.length })}</span>}
+      meta={
+        <span className="text-xs text-ink-3 tnum max-sm:hidden">
+          {t("dash.weekly.totals", { opened, closed, n: weeks.length })}
+        </span>
+      }
       action={<TableSwitch on={table} onChange={setTable} />}
       className={className}
     >
@@ -90,17 +102,24 @@ export function WaitsPanel({ rows, className }: { rows: WaitRow[]; className?: s
                   <th scope="row" className="border-b border-line/70 py-1.5 pl-4 text-left font-normal">
                     <span className="flex min-w-0 items-center gap-2">
                       <Avatar member={member} size="sm" />
-                      <span className="truncate">{row.kind === "agent" ? row.member : (member?.name ?? row.member)}</span>
+                      <span className="truncate">
+                        {row.kind === "agent" ? row.member : (member?.name ?? row.member)}
+                      </span>
                       <span className="shrink-0 text-xs text-ink-3">
                         {t(row.kind === "agent" ? "dash.waits.agent" : "dash.waits.person")}
                       </span>
                     </span>
                   </th>
                   <td className="border-b border-line/70 px-2 py-1.5 text-right tnum">{count(row.tasks)}</td>
-                  <td className="border-b border-line/70 px-2 py-1.5 text-right text-ink-2 tnum max-sm:hidden">{hours(row.avg_hours)}</td>
+                  <td className="border-b border-line/70 px-2 py-1.5 text-right text-ink-2 tnum max-sm:hidden">
+                    {hours(row.avg_hours)}
+                  </td>
                   <td className="border-b border-line/70 py-1.5 pr-4 pl-2 text-right tnum">
                     <span className="inline-flex items-center justify-end gap-2">
-                      <span aria-hidden className="h-1 w-12 overflow-hidden rounded-full bg-sunken dark:bg-press max-sm:hidden">
+                      <span
+                        aria-hidden
+                        className="h-1 w-12 overflow-hidden rounded-full bg-sunken dark:bg-press max-sm:hidden"
+                      >
                         <span
                           className="block h-full rounded-full"
                           style={{ width: `${(row.oldest_hours / longest) * 100}%`, background: "var(--viz-waiting)" }}

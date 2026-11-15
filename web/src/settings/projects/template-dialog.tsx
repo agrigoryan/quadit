@@ -24,7 +24,15 @@ const blankOptions = (): Option[] => [
 ];
 
 /** Makes or edits a task template: what the task starts with, and the question it may open. */
-export function TemplateDialog({ project, template, onClose }: { project: Project; template?: Template; onClose: () => void }) {
+export function TemplateDialog({
+  project,
+  template,
+  onClose,
+}: {
+  project: Project;
+  template?: Template;
+  onClose: () => void;
+}) {
   const preset = (template?.preset ?? {}) as Preset;
   const statuses = useStatuses(project.id);
   const labels = useLabels(project.id);
@@ -39,13 +47,18 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
   const [question, setQuestion] = useState(preset.decision?.question ?? "");
   const [details, setDetails] = useState(preset.decision?.details ?? "");
   const [options, setOptions] = useState<Option[]>(
-    preset.decision?.options?.length ? preset.decision.options.map((o) => ({ label: o.label, description: o.description ?? "" })) : blankOptions(),
+    preset.decision?.options?.length
+      ? preset.decision.options.map((o) => ({ label: o.label, description: o.description ?? "" }))
+      : blankOptions(),
   );
   const errors = useFieldErrors(["name", "title", "description", "question", "options"]);
   const { busy, run } = useSubmit(errors, { once: true });
 
   // A preset names its status and labels, so the same template works when they are renamed back or shared.
-  const statusChoices = [{ value: "", label: t("templates.statusDefault") }, ...statuses.map((s) => ({ value: s.name, label: s.name }))];
+  const statusChoices = [
+    { value: "", label: t("templates.statusDefault") },
+    ...statuses.map((s) => ({ value: s.name, label: s.name })),
+  ];
   if (status && !statuses.some((s) => s.name === status)) statusChoices.push({ value: status, label: status });
   const labelItems = [...new Set([...labels.map((l) => l.name), ...picked])].map((n) => ({
     id: n,
@@ -53,7 +66,8 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
     icon: <Dot color={labels.find((l) => l.name === n)?.color} />,
   }));
 
-  const setOption = (i: number, patch: Partial<Option>) => setOptions((list) => list.map((o, at) => (at === i ? { ...o, ...patch } : o)));
+  const setOption = (i: number, patch: Partial<Option>) =>
+    setOptions((list) => list.map((o, at) => (at === i ? { ...o, ...patch } : o)));
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -72,14 +86,19 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
       if (kind === "choice") {
         const named = options.filter((o) => o.label.trim());
         if (named.length < 2) return errors.set("options", t("templates.optionsNeed"));
-        decision.options = named.map((o) => ({ label: o.label.trim(), ...(o.description.trim() ? { description: o.description.trim() } : {}) }));
+        decision.options = named.map((o) => ({
+          label: o.label.trim(),
+          ...(o.description.trim() ? { description: o.description.trim() } : {}),
+        }));
       }
       next.decision = decision;
     }
     const fields = { name: name.trim(), title, description, preset: next };
     await run(async () => {
       await mutate(
-        template ? { type: "template.update", args: { id: template.id, ...fields } } : { type: "template.create", args: { id: newId(), project: project.id, ...fields } },
+        template
+          ? { type: "template.update", args: { id: template.id, ...fields } }
+          : { type: "template.create", args: { id: newId(), project: project.id, ...fields } },
         undefined,
         { quiet: true },
       );
@@ -103,28 +122,68 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
     >
       <form id="template-form" onSubmit={save} className="flex flex-col gap-3.5">
         <FormField label={t("templates.name")} htmlFor="tpl-name" error={errors.fields.name}>
-          <Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("templates.namePlaceholder")} maxLength={80} />
+          <Input
+            id="tpl-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("templates.namePlaceholder")}
+            maxLength={80}
+          />
         </FormField>
-        <FormField label={t("templates.taskTitle")} htmlFor="tpl-title" hint={t("templates.taskTitleHint")} error={errors.fields.title}>
+        <FormField
+          label={t("templates.taskTitle")}
+          htmlFor="tpl-title"
+          hint={t("templates.taskTitleHint")}
+          error={errors.fields.title}
+        >
           <Input id="tpl-title" value={title} onChange={(e) => setTitle(e.target.value)} />
         </FormField>
-        <FormField label={t("templates.description")} htmlFor="tpl-desc" hint={t("templates.descriptionHint")} error={errors.fields.description}>
-          <Textarea id="tpl-desc" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} className="font-mono text-xs" />
+        <FormField
+          label={t("templates.description")}
+          htmlFor="tpl-desc"
+          hint={t("templates.descriptionHint")}
+          error={errors.fields.description}
+        >
+          <Textarea
+            id="tpl-desc"
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="font-mono text-xs"
+          />
         </FormField>
         <div className="grid grid-cols-2 gap-3.5">
           <FormField label={t("templates.status")}>
             <NativeSelect value={status} onChange={setStatus} options={statusChoices} />
           </FormField>
           <FormField label={t("templates.priority")}>
-            <NativeSelect value={String(priority)} onChange={(v) => setPriority(Number(v))} options={[0, 1, 2, 3, 4].map((p) => ({ value: String(p), label: t(`priority.${p as 0 | 1 | 2 | 3 | 4}`) }))} />
+            <NativeSelect
+              value={String(priority)}
+              onChange={(v) => setPriority(Number(v))}
+              options={[0, 1, 2, 3, 4].map((p) => ({
+                value: String(p),
+                label: t(`priority.${p as 0 | 1 | 2 | 3 | 4}`),
+              }))}
+            />
           </FormField>
         </div>
         <FormField label={t("templates.labels")}>
-          <MultiPick items={labelItems} value={picked} onChange={setPicked} addLabel={t("templates.labelsAdd")} empty={t("templates.labelsNone")} />
+          <MultiPick
+            items={labelItems}
+            value={picked}
+            onChange={setPicked}
+            addLabel={t("templates.labelsAdd")}
+            empty={t("templates.labelsNone")}
+          />
         </FormField>
 
         <div className="border-t border-line pt-3">
-          <SwitchRow title={t("templates.decision")} hint={t("templates.decisionHint")} checked={asks} onChange={setAsks} />
+          <SwitchRow
+            title={t("templates.decision")}
+            hint={t("templates.decisionHint")}
+            checked={asks}
+            onChange={setAsks}
+          />
         </div>
         {asks && (
           <div className="flex flex-col gap-3.5 rounded-lg border border-line bg-sunken/50 p-3">
@@ -139,7 +198,12 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
               />
             </FormField>
             <FormField label={t("templates.question")} htmlFor="tpl-question" error={errors.fields.question}>
-              <Input id="tpl-question" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t("templates.questionPlaceholder")} />
+              <Input
+                id="tpl-question"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder={t("templates.questionPlaceholder")}
+              />
             </FormField>
             <FormField label={`${t("templates.details")} (${t("s.optional")})`} htmlFor="tpl-details">
               <Textarea id="tpl-details" rows={2} value={details} onChange={(e) => setDetails(e.target.value)} />
@@ -150,15 +214,35 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
                   {options.map((o, i) => (
                     <div key={i} className="flex items-start gap-1.5">
                       <div className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-[10rem_1fr]">
-                        <Input aria-label={t("templates.optionLabel", { n: i + 1 })} placeholder={t("templates.optionLabel", { n: i + 1 })} value={o.label} onChange={(e) => setOption(i, { label: e.target.value })} />
-                        <Input aria-label={t("templates.description")} placeholder={`${t("templates.description")} (${t("s.optional")})`} value={o.description} onChange={(e) => setOption(i, { description: e.target.value })} />
+                        <Input
+                          aria-label={t("templates.optionLabel", { n: i + 1 })}
+                          placeholder={t("templates.optionLabel", { n: i + 1 })}
+                          value={o.label}
+                          onChange={(e) => setOption(i, { label: e.target.value })}
+                        />
+                        <Input
+                          aria-label={t("templates.description")}
+                          placeholder={`${t("templates.description")} (${t("s.optional")})`}
+                          value={o.description}
+                          onChange={(e) => setOption(i, { description: e.target.value })}
+                        />
                       </div>
-                      <IconButton label={t("templates.optionRemove", { n: i + 1 })} disabled={options.length <= 2} onClick={() => setOptions((list) => list.filter((_, at) => at !== i))} className="mt-0.5">
+                      <IconButton
+                        label={t("templates.optionRemove", { n: i + 1 })}
+                        disabled={options.length <= 2}
+                        onClick={() => setOptions((list) => list.filter((_, at) => at !== i))}
+                        className="mt-0.5"
+                      >
                         <X className="size-3.5" />
                       </IconButton>
                     </div>
                   ))}
-                  <Button variant="ghost" size="sm" className="self-start" onClick={() => setOptions((list) => [...list, { label: "", description: "" }])}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="self-start"
+                    onClick={() => setOptions((list) => [...list, { label: "", description: "" }])}
+                  >
                     <Plus className="size-3" aria-hidden />
                     {t("templates.optionAdd")}
                   </Button>

@@ -44,7 +44,8 @@ export function TaskChip({ taskKey }: { taskKey: string }) {
 /** How a decision stands, in the fewest words: "Open", "Picked: B: burst", "Approved". */
 export function decisionStateText(decision: Decision): string {
   const answer = answerOf(decision);
-  if (answer.kind === "picked") return answer.label ? t("docs.decision.pickedLabel", { label: answer.label }) : t("docs.decision.picked");
+  if (answer.kind === "picked")
+    return answer.label ? t("docs.decision.pickedLabel", { label: answer.label }) : t("docs.decision.picked");
   return t(`docs.decision.${answer.kind}`);
 }
 

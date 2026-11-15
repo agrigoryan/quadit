@@ -100,7 +100,9 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
     } catch {
       // The pointer is already gone: the drag ends with the next event.
     }
-    (e.currentTarget.closest("[data-bar]")?.querySelector("[role=slider]") as HTMLElement | null)?.focus({ preventScroll: true });
+    (e.currentTarget.closest("[data-bar]")?.querySelector("[role=slider]") as HTMLElement | null)?.focus({
+      preventScroll: true,
+    });
     drag.current = { mode: modeFor(asked), x: e.clientX, from: base };
   }
 
@@ -119,7 +121,8 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
       finish(false);
       return;
     }
-    const by = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : e.key === "PageUp" ? -7 : e.key === "PageDown" ? 7 : 0;
+    const by =
+      e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : e.key === "PageUp" ? -7 : e.key === "PageDown" ? 7 : 0;
     if (by === 0 || e.metaKey || e.ctrlKey) return;
     e.preventDefault();
     const mode = modeFor(e.shiftKey ? (e.altKey ? "start" : "end") : "move");
@@ -188,13 +191,27 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
         )}
       </div>
       {edit === "both" && (
-        <span aria-hidden className={cx(handle, "-left-2 after:left-2")} onPointerDown={(e) => down(e, "start")} {...handlers} />
+        <span
+          aria-hidden
+          className={cx(handle, "-left-2 after:left-2")}
+          onPointerDown={(e) => down(e, "start")}
+          {...handlers}
+        />
       )}
-      <span aria-hidden className={cx(handle, "-right-2 after:right-2")} onPointerDown={(e) => down(e, "end")} {...handlers} />
+      <span
+        aria-hidden
+        className={cx(handle, "-right-2 after:right-2")}
+        onPointerDown={(e) => down(e, "end")}
+        {...handlers}
+      />
       <span
         className={cx(
           "pointer-events-none absolute top-1/2 left-full ml-2.5 -translate-y-1/2 text-2xs whitespace-nowrap tnum",
-          changing ? "rounded-xs bg-inverse px-1.5 py-0.5 font-medium text-inverse-ink" : late ? "text-danger" : "text-ink-3",
+          changing
+            ? "rounded-xs bg-inverse px-1.5 py-0.5 font-medium text-inverse-ink"
+            : late
+              ? "text-danger"
+              : "text-ink-3",
         )}
       >
         {changing ? text : label}

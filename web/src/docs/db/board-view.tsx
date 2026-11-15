@@ -12,7 +12,13 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, SquareKanban } from "lucide-react";
 import { cx } from "@/lib/cx";
@@ -47,7 +53,11 @@ function Card({ row, cells, props, onOpen }: CardProps) {
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={cx(shell, "cursor-default touch-manipulation outline-offset-2 hover:border-line-strong", isDragging && "opacity-35")}
+      className={cx(
+        shell,
+        "cursor-default touch-manipulation outline-offset-2 hover:border-line-strong",
+        isDragging && "opacity-35",
+      )}
       {...attributes}
       {...listeners}
       onClick={() => onOpen(row.id)}
@@ -83,7 +93,10 @@ function Column({ id, option, rows, allCells, props, onOpen, onAdd }: ColumnProp
   }
 
   return (
-    <section aria-label={name} className="flex w-68 shrink-0 flex-col rounded-lg bg-sunken max-sm:w-[78vw] max-sm:snap-center">
+    <section
+      aria-label={name}
+      className="flex w-68 shrink-0 flex-col rounded-lg bg-sunken max-sm:w-[78vw] max-sm:snap-center"
+    >
       <header className="flex h-9 shrink-0 items-center gap-2 pr-1.5 pl-2.5">
         {option ? <OptionChip option={option} /> : <span className="text-sm font-medium text-ink-2">{name}</span>}
         <span className="flex-1 text-xs text-ink-3 tnum">{formatNumber(rows.length)}</span>
@@ -112,7 +125,13 @@ function Column({ id, option, rows, allCells, props, onOpen, onAdd }: ColumnProp
         </form>
       )}
       <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className={cx("flex min-h-16 flex-1 flex-col gap-1.5 px-2 pb-2 transition-colors", isOver && rows.length === 0 && "rounded-b-lg bg-hover")}>
+        <div
+          ref={setNodeRef}
+          className={cx(
+            "flex min-h-16 flex-1 flex-col gap-1.5 px-2 pb-2 transition-colors",
+            isOver && rows.length === 0 && "rounded-b-lg bg-hover",
+          )}
+        >
           {rows.map((row) => (
             <Card key={row.id} row={row} cells={allCells[row.id]} props={props} onOpen={onOpen} />
           ))}
@@ -135,7 +154,10 @@ export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
+    }),
   );
 
   const byId = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
@@ -161,7 +183,14 @@ export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
       });
       setViewConfig(view, { group_by: id });
     };
-    return <EmptyState icon={<SquareKanban />} title={t("db.board.needsSelect")} hint={t("db.board.needsSelectHint")} action={<Button onClick={make}>{t("db.board.addStatus")}</Button>} />;
+    return (
+      <EmptyState
+        icon={<SquareKanban />}
+        title={t("db.board.needsSelect")}
+        hint={t("db.board.needsSelectHint")}
+        action={<Button onClick={make}>{t("db.board.addStatus")}</Button>}
+      />
+    );
   }
 
   const cardProps = shownProps(db.table.props, view).filter((p) => p.id !== group.id);
@@ -176,7 +205,11 @@ export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
     if (!from || !to || from === to) return;
     const target = order[to] ?? [];
     const at = overId === to ? target.length : Math.max(0, target.indexOf(overId));
-    setOrder({ ...order, [from]: (order[from] ?? []).filter((v) => v !== id), [to]: [...target.slice(0, at), id, ...target.slice(at)] });
+    setOrder({
+      ...order,
+      [from]: (order[from] ?? []).filter((v) => v !== id),
+      [to]: [...target.slice(0, at), id, ...target.slice(at)],
+    });
   }
 
   function end(e: DragEndEvent) {
@@ -199,7 +232,11 @@ export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
     const name = col.slice(NONE.length);
     const moved = col !== columnOf(grouped, id);
     const inPlace = (!above || above.rank < row.rank) && (!below || row.rank < below.rank);
-    moveRow(row, inPlace ? row.rank : rankBetween(above?.rank, below?.rank), moved ? { [group.id]: name || null } : undefined);
+    moveRow(
+      row,
+      inPlace ? row.rank : rankBetween(above?.rank, below?.rank),
+      moved ? { [group.id]: name || null } : undefined,
+    );
   }
 
   const shown = order ?? grouped;
@@ -238,7 +275,14 @@ export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
         })}
       </div>
       <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>
-        {active && <RowCardBody row={active} cells={db.cells[active.id]} props={cardProps} className={cx(shell, "rotate-[1.5deg] cursor-grabbing shadow-pop")} />}
+        {active && (
+          <RowCardBody
+            row={active}
+            cells={db.cells[active.id]}
+            props={cardProps}
+            className={cx(shell, "rotate-[1.5deg] cursor-grabbing shadow-pop")}
+          />
+        )}
       </DragOverlay>
     </DndContext>
   );

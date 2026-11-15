@@ -4,7 +4,12 @@ import type { Member } from "@/lib/types";
 
 type Size = "xs" | "sm" | "md" | "lg";
 
-const boxes: Record<Size, string> = { xs: "size-4 text-[8px]", sm: "size-5 text-[9px]", md: "size-6 text-2xs", lg: "size-8 text-xs" };
+const boxes: Record<Size, string> = {
+  xs: "size-4 text-[8px]",
+  sm: "size-5 text-[9px]",
+  md: "size-6 text-2xs",
+  lg: "size-8 text-xs",
+};
 const badges: Record<Size, string> = { xs: "size-2", sm: "size-2.5", md: "size-3", lg: "size-3.5" };
 
 // A calm tint per person, picked from their id so it never changes.
@@ -24,7 +29,8 @@ function initials(name: string): string {
 }
 
 /** An avatar is a picture's address, or a short text shown in its place: an emoji, or a letter or two. */
-export const isPictureAvatar = (avatar: string | undefined): boolean => !!avatar && /^(\/|https?:|data:|blob:)/.test(avatar);
+export const isPictureAvatar = (avatar: string | undefined): boolean =>
+  !!avatar && /^(\/|https?:|data:|blob:)/.test(avatar);
 
 interface Props {
   member: Pick<Member, "user_id" | "name" | "kind" | "avatar"> | undefined;
@@ -38,7 +44,15 @@ interface Props {
  */
 export function Avatar({ member, size = "sm", className }: Props) {
   if (!member) {
-    return <span className={cx("inline-block shrink-0 rounded-full border border-dashed border-line-strong", boxes[size], className)} />;
+    return (
+      <span
+        className={cx(
+          "inline-block shrink-0 rounded-full border border-dashed border-line-strong",
+          boxes[size],
+          className,
+        )}
+      />
+    );
   }
   const agent = member.kind === "agent";
   const picture = isPictureAvatar(member.avatar);
@@ -47,7 +61,11 @@ export function Avatar({ member, size = "sm", className }: Props) {
   return (
     <span className={cx("relative inline-flex shrink-0", className)} title={member.name}>
       {picture ? (
-        <img src={member.avatar} alt="" className={cx("object-cover", boxes[size], agent ? "rounded-[28%]" : "rounded-full")} />
+        <img
+          src={member.avatar}
+          alt=""
+          className={cx("object-cover", boxes[size], agent ? "rounded-[28%]" : "rounded-full")}
+        />
       ) : (
         <span
           aria-hidden

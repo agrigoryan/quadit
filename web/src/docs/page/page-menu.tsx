@@ -1,7 +1,17 @@
 // The "more" menu of a page: versions, Markdown in and out, what links
 // here, the repository file it mirrors, and delete.
 
-import { BookmarkPlus, Download, FileUp, GitBranch, History, Link2, MoreHorizontal, Spline, Trash2 } from "lucide-react";
+import {
+  BookmarkPlus,
+  Download,
+  FileUp,
+  GitBranch,
+  History,
+  Link2,
+  MoreHorizontal,
+  Spline,
+  Trash2,
+} from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router";
 import { errorMessage, ws } from "@/lib/api";
@@ -83,11 +93,19 @@ export function PageMenu({ doc }: { doc: Doc }) {
           )}
           <MenuItem
             icon={<Link2 />}
-            onSelect={() => void copyText(`${location.origin}/${slug}/docs/${doc.id}`).then((ok) => toast.info(t(ok ? "common.copied" : "common.copyFailed")))}
+            onSelect={() =>
+              void copyText(`${location.origin}/${slug}/docs/${doc.id}`).then((ok) =>
+                toast.info(t(ok ? "common.copied" : "common.copyFailed")),
+              )
+            }
           >
             {t("docs.copyLink")}
           </MenuItem>
-          <MenuItem icon={<Spline />} hint={backlinks.length ? String(backlinks.length) : undefined} onSelect={later("backlinks")}>
+          <MenuItem
+            icon={<Spline />}
+            hint={backlinks.length ? String(backlinks.length) : undefined}
+            onSelect={later("backlinks")}
+          >
             {t("docs.backlinks.title")}
           </MenuItem>
           {source && (
@@ -97,7 +115,8 @@ export function PageMenu({ doc }: { doc: Doc }) {
               <MenuItem icon={<GitBranch />} disabled className="h-auto py-1 opacity-100!">
                 <span className="block truncate">{source.repo}</span>
                 <span className="block truncate text-xs text-ink-3">
-                  {[source.branch, doc.source_path ?? source.subdir].filter(Boolean).join(" · ") || t(`docs.source.${source.write_mode}`)}
+                  {[source.branch, doc.source_path ?? source.subdir].filter(Boolean).join(" · ") ||
+                    t(`docs.source.${source.write_mode}`)}
                 </span>
               </MenuItem>
             </>

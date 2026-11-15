@@ -72,7 +72,10 @@ export function HostInput({ id, value, onChange, draft, onDraft, onError, invali
       )}
     >
       {value.map((host) => (
-        <span key={host} className="inline-flex h-5.5 max-w-full items-center gap-0.5 rounded-sm border border-line bg-sunken pr-0.5 pl-1.5 font-mono text-xs text-ink">
+        <span
+          key={host}
+          className="inline-flex h-5.5 max-w-full items-center gap-0.5 rounded-sm border border-line bg-sunken pr-0.5 pl-1.5 font-mono text-xs text-ink"
+        >
           <span className="truncate">{host}</span>
           <button
             type="button"

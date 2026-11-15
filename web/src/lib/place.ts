@@ -64,7 +64,11 @@ export function nameFirstStep() {
  * the page is reloaded. A page with several scrolling parts (a board and
  * each of its columns) names each one with `part`.
  */
-export function usePlace(scroller: RefObject<HTMLElement | null>, now: () => Omit<Place, "top" | "left">, part = ""): Place | undefined {
+export function usePlace(
+  scroller: RefObject<HTMLElement | null>,
+  now: () => Omit<Place, "top" | "left">,
+  part = "",
+): Place | undefined {
   const step = useLocation().key;
   const name = part ? `${step}#${part}` : step;
   const [saved] = useState(() => places.get(name));

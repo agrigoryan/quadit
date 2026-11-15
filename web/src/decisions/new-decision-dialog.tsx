@@ -50,7 +50,9 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
   const [recommended, setRecommended] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   // Whoever works on the task is the likely one to ask.
-  const [ask, setAsk] = useState<string | null>(() => (task?.assignee_id && task.assignee_id !== me.user_id ? task.assignee_id : null));
+  const [ask, setAsk] = useState<string | null>(() =>
+    task?.assignee_id && task.assignee_id !== me.user_id ? task.assignee_id : null,
+  );
   const [problems, setProblems] = useState<Problems>({ unlabelled: [] });
   const [refused, setRefused] = useState("");
   const [sending, setSending] = useState(false);
@@ -61,7 +63,8 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
   const optionsError = options.filter((o) => o.label.trim()).length < 2 ? problems.options : undefined;
   const uploading = kind === "choice" && options.some((o) => o.files.some((f) => !f.file && !f.failed));
 
-  const patchOption = (id: string, change: (o: DraftOption) => DraftOption) => setOptions((list) => list.map((o) => (o.id === id ? change(o) : o)));
+  const patchOption = (id: string, change: (o: DraftOption) => DraftOption) =>
+    setOptions((list) => list.map((o) => (o.id === id ? change(o) : o)));
   const patchFile = (id: string, key: string, fields: Partial<DraftFile>) =>
     patchOption(id, (o) => ({ ...o, files: o.files.map((f) => (f.key === key ? { ...f, ...fields } : f)) }));
 
@@ -90,7 +93,8 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
     const kept = kind === "choice" ? options.filter(hasContent) : [];
     const found: Problems = { unlabelled: kept.filter((o) => !o.label.trim()).map((o) => o.id) };
     if (!question.trim()) found.question = t("decision.new.needQuestion");
-    if (kind === "choice" && kept.filter((o) => o.label.trim()).length < 2) found.options = t("decision.new.needOptions");
+    if (kind === "choice" && kept.filter((o) => o.label.trim()).length < 2)
+      found.options = t("decision.new.needOptions");
     setProblems(found);
     setRefused("");
     if (found.question || found.options || found.unlabelled.length > 0) {
@@ -106,7 +110,10 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
         kind,
         question,
         details,
-        options: kept.map((o) => ({ ...o, files: o.files.flatMap((f): NewOptionFile[] => (f.file ? [{ file: f.file, role: f.role }] : [])) })),
+        options: kept.map((o) => ({
+          ...o,
+          files: o.files.flatMap((f): NewOptionFile[] => (f.file ? [{ file: f.file, role: f.role }] : [])),
+        })),
         recommended: kept.some((o) => o.id === recommended) ? (recommended ?? undefined) : undefined,
         recommendation: reason,
         ask: ask ?? undefined,
@@ -150,8 +157,17 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
           <Button variant="ghost" className="max-sm:h-10" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" className="max-sm:h-10 max-sm:flex-1" disabled={sending || uploading} onClick={() => void submit()}>
-            {uploading ? t("decision.new.waitUploads") : asked ? t("decision.new.submitTo", { name: asked.name }) : t("decision.new.submit")}
+          <Button
+            variant="primary"
+            className="max-sm:h-10 max-sm:flex-1"
+            disabled={sending || uploading}
+            onClick={() => void submit()}
+          >
+            {uploading
+              ? t("decision.new.waitUploads")
+              : asked
+                ? t("decision.new.submitTo", { name: asked.name })
+                : t("decision.new.submit")}
           </Button>
         </>
       }
@@ -183,7 +199,11 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
           )}
         </Field>
 
-        <Field label={t("decision.new.details")} htmlFor={ids.details} hint={t("decision.new.detailsHint", { mod: MOD })}>
+        <Field
+          label={t("decision.new.details")}
+          htmlFor={ids.details}
+          hint={t("decision.new.detailsHint", { mod: MOD })}
+        >
           <MentionTextarea
             id={ids.details}
             value={details}
@@ -199,7 +219,11 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
             <span id={`${ids.question}-kind`} className="text-xs font-medium text-ink-2">
               {t("decision.new.kind")}
             </span>
-            <div role="radiogroup" aria-labelledby={`${ids.question}-kind`} className="inline-flex gap-0.5 rounded-md bg-sunken p-0.5">
+            <div
+              role="radiogroup"
+              aria-labelledby={`${ids.question}-kind`}
+              className="inline-flex gap-0.5 rounded-md bg-sunken p-0.5"
+            >
               {kindButton("choice", t("decision.new.choice"))}
               {kindButton("approval", t("decision.new.approval"))}
             </div>
@@ -211,7 +235,11 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
               value={ask ?? ANYONE}
               onPick={(id) => setAsk(id === ANYONE ? null : id)}
               items={[
-                { id: ANYONE, label: t("decision.new.anyone"), icon: <Users className="size-3.5 text-ink-3" aria-hidden /> },
+                {
+                  id: ANYONE,
+                  label: t("decision.new.anyone"),
+                  icon: <Users className="size-3.5 text-ink-3" aria-hidden />,
+                },
                 ...memberItems(others, me.user_id),
               ]}
             >
@@ -239,7 +267,11 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
                   option={option}
                   index={index}
                   total={options.length}
-                  labelError={problems.unlabelled.includes(option.id) && !option.label.trim() ? t("decision.new.needLabel") : undefined}
+                  labelError={
+                    problems.unlabelled.includes(option.id) && !option.label.trim()
+                      ? t("decision.new.needLabel")
+                      : undefined
+                  }
                   recommended={recommended === option.id}
                   reason={reason}
                   onChange={(fields) => patchOption(option.id, (o) => ({ ...o, ...fields }))}
@@ -248,7 +280,9 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
                   onRecommend={(on) => setRecommended(on ? option.id : null)}
                   onReason={setReason}
                   onAddFiles={(files) => addFiles(option.id, files)}
-                  onRemoveFile={(key) => patchOption(option.id, (o) => ({ ...o, files: o.files.filter((f) => f.key !== key) }))}
+                  onRemoveFile={(key) =>
+                    patchOption(option.id, (o) => ({ ...o, files: o.files.filter((f) => f.key !== key) }))
+                  }
                   onFileRole={(key, role) => patchFile(option.id, key, { role })}
                 />
               ))}
@@ -258,7 +292,11 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
                 {optionsError}
               </p>
             )}
-            <Button variant="ghost" className="self-start max-sm:h-10" onClick={() => setOptions((list) => [...list, blank()])}>
+            <Button
+              variant="ghost"
+              className="self-start max-sm:h-10"
+              onClick={() => setOptions((list) => [...list, blank()])}
+            >
               <Plus className="size-4" aria-hidden />
               {t("decision.new.addOption")}
             </Button>

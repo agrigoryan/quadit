@@ -36,7 +36,8 @@ export function ProviderForm({ provider, name }: Props) {
       const wrong: Record<string, string> = {};
       if (v.enabled && !v.client_id.trim()) wrong.client_id = t("admin.provider.needId");
       if (v.enabled && !v.client_secret) wrong.client_secret = t("admin.provider.needSecret");
-      if (v.enabled && oidc && !/^https?:\/\/\S+$/.test((v.issuer ?? "").trim())) wrong.issuer = t("admin.provider.needIssuer");
+      if (v.enabled && oidc && !/^https?:\/\/\S+$/.test((v.issuer ?? "").trim()))
+        wrong.issuer = t("admin.provider.needIssuer");
       return wrong;
     },
     toValue: (v) => ({ ...v, client_id: v.client_id.trim(), issuer: v.issuer?.trim(), name: v.name?.trim() }),
@@ -56,8 +57,21 @@ export function ProviderForm({ provider, name }: Props) {
       />
       {oidc && (
         <div className="grid gap-3.5 sm:grid-cols-2">
-          <TextField label={t("admin.provider.issuer")} value={d.issuer ?? ""} onChange={(issuer) => form.set({ issuer })} error={e.issuer} placeholder="https://id.example.com" hint={t("admin.provider.issuerHint")} />
-          <TextField label={t("admin.provider.button")} value={d.name ?? ""} onChange={(v) => form.set({ name: v })} placeholder={t("admin.provider.buttonDefault")} hint={t("admin.provider.buttonHint")} />
+          <TextField
+            label={t("admin.provider.issuer")}
+            value={d.issuer ?? ""}
+            onChange={(issuer) => form.set({ issuer })}
+            error={e.issuer}
+            placeholder="https://id.example.com"
+            hint={t("admin.provider.issuerHint")}
+          />
+          <TextField
+            label={t("admin.provider.button")}
+            value={d.name ?? ""}
+            onChange={(v) => form.set({ name: v })}
+            placeholder={t("admin.provider.buttonDefault")}
+            hint={t("admin.provider.buttonHint")}
+          />
         </div>
       )}
       {oidc && (
@@ -70,7 +84,13 @@ export function ProviderForm({ provider, name }: Props) {
         />
       )}
       <div className="grid gap-3.5 sm:grid-cols-2">
-        <TextField label={t("admin.provider.clientId")} value={d.client_id} onChange={(client_id) => form.set({ client_id })} error={e.client_id} mono />
+        <TextField
+          label={t("admin.provider.clientId")}
+          value={d.client_id}
+          onChange={(client_id) => form.set({ client_id })}
+          error={e.client_id}
+          mono
+        />
         <SecretField
           label={t("admin.provider.clientSecret")}
           value={d.client_secret}

@@ -8,7 +8,11 @@ import { useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { SearchHit, Task } from "@/lib/types";
 
-const words = (text: string) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+const words = (text: string) =>
+  text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
 
 /**
  * True when every word of the query starts a word of the text ("ke sh"

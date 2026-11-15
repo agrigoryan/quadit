@@ -43,7 +43,10 @@ export async function turnPushOn(): Promise<PushState> {
   const reg = await registerServiceWorker();
   if (!reg) return "unsupported";
   const { public_key } = await api.get<{ public_key: string }>("/api/v1/push/key");
-  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: new Uint8Array(fromBase64Url(public_key)) });
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: new Uint8Array(fromBase64Url(public_key)),
+  });
   await api.post(SUBSCRIPTIONS, wire(sub));
   return "on";
 }

@@ -15,7 +15,8 @@ interface Props {
   onPick: (viewId: string) => void;
 }
 
-const tabBase = "flex h-8 shrink-0 items-center gap-1.5 border-b-2 px-2 text-sm font-medium transition-colors [&>svg]:size-3.5";
+const tabBase =
+  "flex h-8 shrink-0 items-center gap-1.5 border-b-2 px-2 text-sm font-medium transition-colors [&>svg]:size-3.5";
 const tab = `${tabBase} border-transparent text-ink-2 hover:text-ink`;
 const tabOn = `${tabBase} border-accent text-ink`;
 
@@ -44,77 +45,100 @@ export function ViewTabs({ databaseId, views, active, onPick }: Props) {
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-0.5">
-      <div role="tablist" aria-label={t("db.views")} className="flex min-w-0 items-center gap-0.5 overflow-x-auto no-scrollbar">
-      {views.map((view) => {
-        const Icon = VIEW_ICONS[view.type] ?? VIEW_ICONS.table;
-        const on = view.id === active?.id;
-        if (renaming === view.id) {
+      <div
+        role="tablist"
+        aria-label={t("db.views")}
+        className="flex min-w-0 items-center gap-0.5 overflow-x-auto no-scrollbar"
+      >
+        {views.map((view) => {
+          const Icon = VIEW_ICONS[view.type] ?? VIEW_ICONS.table;
+          const on = view.id === active?.id;
+          if (renaming === view.id) {
+            return (
+              <input
+                key={view.id}
+                autoFocus
+                defaultValue={view.name}
+                aria-label={t("db.view.rename")}
+                onFocus={(e) => e.target.select()}
+                onBlur={(e) => {
+                  const name = e.target.value.trim();
+                  if (name && name !== view.name) updateView(view.id, { name });
+                  setRenaming(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") setRenaming(null);
+                }}
+                className="h-7 w-32 shrink-0 rounded-md border border-accent bg-surface px-2 text-sm outline-none ring-2 ring-accent/25"
+              />
+            );
+          }
+          if (!on) {
+            return (
+              <button
+                key={view.id}
+                type="button"
+                role="tab"
+                aria-selected={false}
+                className={tab}
+                onClick={() => onPick(view.id)}
+              >
+                <Icon aria-hidden />
+                {view.name}
+              </button>
+            );
+          }
           return (
-            <input
-              key={view.id}
-              autoFocus
-              defaultValue={view.name}
-              aria-label={t("db.view.rename")}
-              onFocus={(e) => e.target.select()}
-              onBlur={(e) => {
-                const name = e.target.value.trim();
-                if (name && name !== view.name) updateView(view.id, { name });
-                setRenaming(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") setRenaming(null);
-              }}
-              className="h-7 w-32 shrink-0 rounded-md border border-accent bg-surface px-2 text-sm outline-none ring-2 ring-accent/25"
-            />
+            <Menu key={view.id}>
+              <MenuTrigger role="tab" aria-selected className={tabOn}>
+                <Icon aria-hidden />
+                {view.name}
+              </MenuTrigger>
+              <MenuContent>
+                <MenuItem icon={<Pencil />} onSelect={() => setRenaming(view.id)}>
+                  {t("db.view.rename")}
+                </MenuItem>
+                <MenuSeparator />
+                <MenuLabel>{t("db.view.showAs")}</MenuLabel>
+                {VIEW_TYPES.map((type) => {
+                  const TypeIcon = VIEW_ICONS[type];
+                  return (
+                    <MenuItem
+                      key={type}
+                      icon={<TypeIcon />}
+                      onSelect={() => type !== view.type && updateView(view.id, { type })}
+                      className={cx(type === view.type && "bg-hover")}
+                    >
+                      {viewTypeName(type)}
+                    </MenuItem>
+                  );
+                })}
+                <MenuSeparator />
+                <MenuItem icon={<ArrowLeft />} disabled={views[0]?.id === view.id} onSelect={() => shift(view, -1)}>
+                  {t("db.view.moveLeft")}
+                </MenuItem>
+                <MenuItem
+                  icon={<ArrowRight />}
+                  disabled={views[views.length - 1]?.id === view.id}
+                  onSelect={() => shift(view, 1)}
+                >
+                  {t("db.view.moveRight")}
+                </MenuItem>
+                <MenuSeparator />
+                <MenuItem danger icon={<Trash2 />} disabled={views.length < 2} onSelect={() => deleteView(view.id)}>
+                  {t("db.view.delete")}
+                </MenuItem>
+              </MenuContent>
+            </Menu>
           );
-        }
-        if (!on) {
-          return (
-            <button key={view.id} type="button" role="tab" aria-selected={false} className={tab} onClick={() => onPick(view.id)}>
-              <Icon aria-hidden />
-              {view.name}
-            </button>
-          );
-        }
-        return (
-          <Menu key={view.id}>
-            <MenuTrigger role="tab" aria-selected className={tabOn}>
-              <Icon aria-hidden />
-              {view.name}
-            </MenuTrigger>
-            <MenuContent>
-              <MenuItem icon={<Pencil />} onSelect={() => setRenaming(view.id)}>
-                {t("db.view.rename")}
-              </MenuItem>
-              <MenuSeparator />
-              <MenuLabel>{t("db.view.showAs")}</MenuLabel>
-              {VIEW_TYPES.map((type) => {
-                const TypeIcon = VIEW_ICONS[type];
-                return (
-                  <MenuItem key={type} icon={<TypeIcon />} onSelect={() => type !== view.type && updateView(view.id, { type })} className={cx(type === view.type && "bg-hover")}>
-                    {viewTypeName(type)}
-                  </MenuItem>
-                );
-              })}
-              <MenuSeparator />
-              <MenuItem icon={<ArrowLeft />} disabled={views[0]?.id === view.id} onSelect={() => shift(view, -1)}>
-                {t("db.view.moveLeft")}
-              </MenuItem>
-              <MenuItem icon={<ArrowRight />} disabled={views[views.length - 1]?.id === view.id} onSelect={() => shift(view, 1)}>
-                {t("db.view.moveRight")}
-              </MenuItem>
-              <MenuSeparator />
-              <MenuItem danger icon={<Trash2 />} disabled={views.length < 2} onSelect={() => deleteView(view.id)}>
-                {t("db.view.delete")}
-              </MenuItem>
-            </MenuContent>
-          </Menu>
-        );
-      })}
+        })}
       </div>
       <Menu>
-        <MenuTrigger aria-label={t("db.view.add")} className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover">
+        <MenuTrigger
+          aria-label={t("db.view.add")}
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover"
+        >
           <Plus className="size-4" aria-hidden />
         </MenuTrigger>
         <MenuContent>

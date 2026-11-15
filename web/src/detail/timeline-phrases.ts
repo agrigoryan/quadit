@@ -14,7 +14,10 @@ const str = (v: unknown): string => (typeof v === "string" ? v : "");
 const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
 /** The order phrases are said in when one line carries several. */
-type Writer = (change: FieldChange, ctx: { changes: Changes; actorId: string; data: FeedEvent["data"] }) => string | string[] | null;
+type Writer = (
+  change: FieldChange,
+  ctx: { changes: Changes; actorId: string; data: FeedEvent["data"] },
+) => string | string[] | null;
 
 const writers: [string, Writer][] = [
   ["title", (c) => t("timeline.renamed", { from: str(c.from), to: str(c.to) })],
@@ -122,7 +125,10 @@ const writers: [string, Writer][] = [
       return key ? t("timeline.parent", { key }) : c.to ? null : t("timeline.parentCleared");
     },
   ],
-  ["project_id", (_c, { data }) => (data.moved_from ? t("timeline.movedProject", { key: str(data.moved_from) }) : null)],
+  [
+    "project_id",
+    (_c, { data }) => (data.moved_from ? t("timeline.movedProject", { key: str(data.moved_from) }) : null),
+  ],
   ["archived_at", (c) => (c.to ? t("timeline.archived") : t("timeline.unarchived"))],
   ["deleted_at", (c) => (c.to ? t("timeline.trashed") : t("timeline.restored"))],
 ];
@@ -146,7 +152,9 @@ const listed = new Intl.ListFormat(undefined, { style: "long", type: "conjunctio
 export const joinPhrases = (parts: string[]): string => listed.format(parts);
 
 export function askedPhrase(d: Decision): string {
-  return d.asked_id ? t("timeline.asked", { name: who(d.asked_id), question: d.question }) : t("timeline.askedAnyone", { question: d.question });
+  return d.asked_id
+    ? t("timeline.asked", { name: who(d.asked_id), question: d.question })
+    : t("timeline.askedAnyone", { question: d.question });
 }
 
 export function pickedPhrase(d: Decision): string {
@@ -211,7 +219,8 @@ export interface FilePlace {
 export function filesPhrase(place: FilePlace, names: string[]): string {
   const list = joinPhrases(names);
   if (place.on === "option" && place.name) return t("timeline.attachedOption", { names: list, option: place.name });
-  if (place.on === "decision" && place.name) return t("timeline.attachedQuestion", { names: list, question: place.name });
+  if (place.on === "decision" && place.name)
+    return t("timeline.attachedQuestion", { names: list, question: place.name });
   if (place.on !== "task") return t("timeline.attachedAnyOption", { names: list });
   return t("timeline.attached", { names: list });
 }

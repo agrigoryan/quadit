@@ -27,7 +27,17 @@ interface Props {
  * A modal dialog. It traps focus, closes on Escape, and on a phone becomes
  * a sheet that rises from the bottom so its buttons sit under the thumb.
  */
-export function Dialog({ open, onOpenChange, title, hideTitle, description, size = "md", footer, children, className }: Props) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  hideTitle,
+  description,
+  size = "md",
+  footer,
+  children,
+  className,
+}: Props) {
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
@@ -56,7 +66,9 @@ export function Dialog({ open, onOpenChange, title, hideTitle, description, size
             <header className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-1">
               <div>
                 <RDialog.Title className="text-base font-semibold">{title}</RDialog.Title>
-                {description && <RDialog.Description className="mt-0.5 text-sm text-ink-2">{description}</RDialog.Description>}
+                {description && (
+                  <RDialog.Description className="mt-0.5 text-sm text-ink-2">{description}</RDialog.Description>
+                )}
               </div>
               <RDialog.Close asChild>
                 <IconButton label={t("common.close")} className="-mr-1.5">
@@ -66,7 +78,11 @@ export function Dialog({ open, onOpenChange, title, hideTitle, description, size
             </header>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
-          {footer && <footer className="flex items-center justify-end gap-2 border-t border-line px-4 py-3 pb-safe sm:pb-3">{footer}</footer>}
+          {footer && (
+            <footer className="flex items-center justify-end gap-2 border-t border-line px-4 py-3 pb-safe sm:pb-3">
+              {footer}
+            </footer>
+          )}
         </RDialog.Content>
       </RDialog.Portal>
     </RDialog.Root>

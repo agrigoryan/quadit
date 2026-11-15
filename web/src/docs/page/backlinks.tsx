@@ -26,7 +26,8 @@ export function useBacklinks(docId: string): Backlink[] {
     for (const ref of refs) {
       const kind = ref.from_scope_type === "task" ? "task" : ref.from_scope_type === "doc" ? "doc" : null;
       if (!kind || ref.from_scope_id === docId) continue;
-      const where = kind === "task" && (ref.from_type === "comment" || ref.from_type === "decision") ? ref.from_type : undefined;
+      const where =
+        kind === "task" && (ref.from_type === "comment" || ref.from_type === "decision") ? ref.from_type : undefined;
       const had = seen.get(ref.from_scope_id);
       // The task's own text mentioning the page says more than a comment on it doing so.
       if (!had) seen.set(ref.from_scope_id, { kind, id: ref.from_scope_id, where });
@@ -45,7 +46,9 @@ export function BacklinksDialog({ docId, open, onClose }: { docId: string; open:
   const row = "flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-sm hover:bg-hover";
   // A task that is not in the copy: finished and still on its way, or in a project this person cannot see.
   const unknown = links.filter((l) => l.kind === "task" && !tasks[l.id]).length;
-  const shown = links.filter((l) => (l.kind === "task" ? !!tasks[l.id] && !tasks[l.id]?.deleted_at : !!docs[l.id] && !docs[l.id]?.deleted_at));
+  const shown = links.filter((l) =>
+    l.kind === "task" ? !!tasks[l.id] && !tasks[l.id]?.deleted_at : !!docs[l.id] && !docs[l.id]?.deleted_at,
+  );
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()} title={t("docs.backlinks.title")} size="sm">
       {shown.length === 0 && unknown === 0 ? (
@@ -62,7 +65,11 @@ export function BacklinksDialog({ docId, open, onClose }: { docId: string; open:
                     <StatusIcon category={statuses[task.status_id]?.category ?? "backlog"} />
                     <span className="shrink-0 text-xs font-medium text-ink-2 tnum">{task.key}</span>
                     <span className="min-w-0 flex-1 truncate">{task.title}</span>
-                    {link.where && <span className="shrink-0 text-xs text-ink-3">{t(link.where === "comment" ? "docs.backlinks.inComment" : "docs.backlinks.inDecision")}</span>}
+                    {link.where && (
+                      <span className="shrink-0 text-xs text-ink-3">
+                        {t(link.where === "comment" ? "docs.backlinks.inComment" : "docs.backlinks.inDecision")}
+                      </span>
+                    )}
                   </button>
                 </li>
               );
@@ -78,7 +85,11 @@ export function BacklinksDialog({ docId, open, onClose }: { docId: string; open:
               </li>
             );
           })}
-          {unknown > 0 && <li className="px-2 py-1.5 text-xs text-ink-3">{restLoaded ? t("docs.backlinks.hidden", { n: unknown }) : t("docs.backlinks.loading")}</li>}
+          {unknown > 0 && (
+            <li className="px-2 py-1.5 text-xs text-ink-3">
+              {restLoaded ? t("docs.backlinks.hidden", { n: unknown }) : t("docs.backlinks.loading")}
+            </li>
+          )}
         </ul>
       )}
     </Dialog>

@@ -35,7 +35,8 @@ const Line = memo(function Line({ actorId, at, text, note, quiet }: LineProps) {
       </span>
       <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         <p>
-          <span className={cx("font-medium", quiet ? "text-ink-2" : "text-ink")}>{nameOf(actor)}</span> {text} <When at={at} />
+          <span className={cx("font-medium", quiet ? "text-ink-2" : "text-ink")}>{nameOf(actor)}</span> {text}{" "}
+          <When at={at} />
         </p>
         {note && <p className="mt-0.5 border-l-2 border-line pl-2 text-ink-2">{note}</p>}
       </div>
@@ -60,10 +61,23 @@ export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
         <ol className="mt-1 flex flex-col gap-2.5">
           {items.map((item) =>
             item.kind === "line" ? (
-              <Line key={item.id} actorId={item.actorId} at={item.at} text={lineText(item)} note={item.note} quiet={item.quiet} />
+              <Line
+                key={item.id}
+                actorId={item.actorId}
+                at={item.at}
+                text={lineText(item)}
+                note={item.note}
+                quiet={item.quiet}
+              />
             ) : (
               <li key={item.id}>
-                <CommentCard task={task} comment={item.comment} replies={item.replies} files={files} history={history} />
+                <CommentCard
+                  task={task}
+                  comment={item.comment}
+                  replies={item.replies}
+                  files={files}
+                  history={history}
+                />
               </li>
             ),
           )}

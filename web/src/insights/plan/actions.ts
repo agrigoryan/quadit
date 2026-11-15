@@ -28,7 +28,10 @@ export async function createEpic(projectId: string, f: EpicFields): Promise<stri
   if (f.leadId) args.lead = f.leadId;
   if (f.startOn) args.start_on = f.startOn;
   if (f.targetOn) args.target_on = f.targetOn;
-  const lastRank = Object.values(getState().c.epics).reduce((max, e) => (e.project_id === projectId && e.rank > max ? e.rank : max), "");
+  const lastRank = Object.values(getState().c.epics).reduce(
+    (max, e) => (e.project_id === projectId && e.rank > max ? e.rank : max),
+    "",
+  );
   await mutate({ type: "epic.create", args }, (tx) =>
     tx.insert("epics", {
       id,
@@ -72,7 +75,8 @@ export function deleteEpic(epic: Epic) {
 
 export function setWatchingEpic(epic: Epic, userId: string, watching: boolean) {
   send({ type: "watch.set", args: { type: "epic", subject: epic.id, watching } }, (tx) => {
-    if (watching) tx.insert("watchers", { user_id: userId, subject_type: "epic", subject_id: epic.id, created_at: Date.now() });
+    if (watching)
+      tx.insert("watchers", { user_id: userId, subject_type: "epic", subject_id: epic.id, created_at: Date.now() });
     else tx.remove("watchers", `${userId}:${epic.id}`);
   });
 }
@@ -87,10 +91,15 @@ export function createMilestone(epic: Epic, name: string, targetOn: string, afte
   );
 }
 
-export function updateMilestone(milestone: Milestone, args: Partial<Record<"name" | "target_on" | "rank", string | null>>) {
+export function updateMilestone(
+  milestone: Milestone,
+  args: Partial<Record<"name" | "target_on" | "rank", string | null>>,
+) {
   const local: Fields = {};
   for (const [arg, value] of Object.entries(args)) local[arg] = value === "" ? null : value;
-  send({ type: "milestone.update", args: { id: milestone.id, ...args } }, (tx) => tx.patch("milestones", milestone.id, local));
+  send({ type: "milestone.update", args: { id: milestone.id, ...args } }, (tx) =>
+    tx.patch("milestones", milestone.id, local),
+  );
 }
 
 /** Moves a milestone one place up or down among its epic's milestones (already in order). */
@@ -98,7 +107,10 @@ export function moveMilestone(ordered: Milestone[], milestone: Milestone, step: 
   const i = ordered.findIndex((m) => m.id === milestone.id);
   const j = i + step;
   if (i < 0 || j < 0 || j >= ordered.length) return;
-  const rank = step < 0 ? rankBetween(ordered[j - 1]?.rank, ordered[j]?.rank) : rankBetween(ordered[j]?.rank, ordered[j + 1]?.rank);
+  const rank =
+    step < 0
+      ? rankBetween(ordered[j - 1]?.rank, ordered[j]?.rank)
+      : rankBetween(ordered[j]?.rank, ordered[j + 1]?.rank);
   updateMilestone(milestone, { rank });
 }
 

@@ -100,7 +100,10 @@ export function decisionItems(editor: AnyEditor, query: string): DefaultReactSug
   const key = keyBeforeHash(editor, query);
   const q = query.trim().toLowerCase();
   let found = mentionable(c);
-  if (key) found = found.filter((f) => f.task.key === key).sort((a, b) => (a.ref.length - b.ref.length) || (a.ref < b.ref ? -1 : 1));
+  if (key)
+    found = found
+      .filter((f) => f.task.key === key)
+      .sort((a, b) => a.ref.length - b.ref.length || (a.ref < b.ref ? -1 : 1));
   if (q) {
     found = found.filter(
       (f) =>
@@ -120,7 +123,8 @@ export function decisionItems(editor: AnyEditor, query: string): DefaultReactSug
       // "SVA-12#" was typed as text: the chip takes the key's place too.
       const sel = editor.prosemirrorState.selection;
       const before = textBefore(editor, 20);
-      if (KEY_BEFORE.exec(before)?.[1] === f.task.key) editor.transact((tr) => tr.delete(sel.from - f.task.key.length, sel.from));
+      if (KEY_BEFORE.exec(before)?.[1] === f.task.key)
+        editor.transact((tr) => tr.delete(sel.from - f.task.key.length, sel.from));
       editor.insertInlineContent([{ type: "decisionChip", props: { key: f.ref } }, " "] as never);
     },
   }));
@@ -135,14 +139,29 @@ export function pageTitleItems(editor: AnyEditor, query: string, self?: string):
   const docs = c.docs as unknown as Record<string, Doc>;
   const q = query.trim().toLowerCase();
   const pages = Object.values(docs)
-    .filter((d) => d.id !== self && !d.deleted_at && !d.archived_at && d.kind !== "row" && (!me || canSee(d, me.user_id)) && !!d.title.trim())
+    .filter(
+      (d) =>
+        d.id !== self &&
+        !d.deleted_at &&
+        !d.archived_at &&
+        d.kind !== "row" &&
+        (!me || canSee(d, me.user_id)) &&
+        !!d.title.trim(),
+    )
     .filter((d) => !q || d.title.toLowerCase().includes(q))
     // Titles that start with what was typed come first.
-    .sort((a, b) => Number(!a.title.toLowerCase().startsWith(q)) - Number(!b.title.toLowerCase().startsWith(q)) || a.title.localeCompare(b.title))
+    .sort(
+      (a, b) =>
+        Number(!a.title.toLowerCase().startsWith(q)) - Number(!b.title.toLowerCase().startsWith(q)) ||
+        a.title.localeCompare(b.title),
+    )
     .slice(0, MENU_MAX);
   const items = pages.map((doc) => ({
     title: docTitle(doc),
-    subtext: pathTo(docs, doc.id).map((d) => docTitle(d)).join(" / ") || undefined,
+    subtext:
+      pathTo(docs, doc.id)
+        .map((d) => docTitle(d))
+        .join(" / ") || undefined,
     group: t("docs.mention.pages"),
     icon: <PageIcon doc={doc} />,
     size: "small" as const,
@@ -152,7 +171,12 @@ export function pageTitleItems(editor: AnyEditor, query: string, self?: string):
 }
 
 /** A menu that opens while typing and says nothing when there is nothing to offer, so "#" and "[[" stay ordinary text. */
-export function QuietMenu({ items, loadingState, selectedIndex, onItemClick }: SuggestionMenuProps<DefaultReactSuggestionItem>) {
+export function QuietMenu({
+  items,
+  loadingState,
+  selectedIndex,
+  onItemClick,
+}: SuggestionMenuProps<DefaultReactSuggestionItem>) {
   const Components = useComponentsContext();
   const editor = useBlockNoteEditor();
   // An open menu takes Enter and the arrow keys; one with nothing in it must not, so it closes.
@@ -174,7 +198,9 @@ export function QuietMenu({ items, loadingState, selectedIndex, onItemClick }: S
     }
     out.push(
       <Components.SuggestionMenu.Item
-        className={item.size === "small" ? "bn-suggestion-menu-item bn-suggestion-menu-item-small" : "bn-suggestion-menu-item"}
+        className={
+          item.size === "small" ? "bn-suggestion-menu-item bn-suggestion-menu-item-small" : "bn-suggestion-menu-item"
+        }
         item={item}
         id={`bn-suggestion-menu-item-${i}`}
         isSelected={i === selectedIndex}

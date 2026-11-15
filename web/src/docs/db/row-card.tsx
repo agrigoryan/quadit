@@ -5,11 +5,13 @@ import type { Value } from "@/docs/db/formula";
 import { PropIcon } from "@/docs/db/prop-meta";
 import type { DBProperty, Doc } from "@/docs/types";
 
-const isBlank = (v: Value | undefined) => v === undefined || v === null || v === "" || v === false || (Array.isArray(v) && v.length === 0);
+const isBlank = (v: Value | undefined) =>
+  v === undefined || v === null || v === "" || v === false || (Array.isArray(v) && v.length === 0);
 
 /** Kinds that say little on a card: who made the row and when, and formulas that failed. */
 const QUIET = ["created_at", "updated_at", "created_by"];
-const worthShowing = (p: DBProperty, v: Value | undefined) => !isBlank(v) && !QUIET.includes(p.type) && !(typeof v === "string" && v.startsWith("#error"));
+const worthShowing = (p: DBProperty, v: Value | undefined) =>
+  !isBlank(v) && !QUIET.includes(p.type) && !(typeof v === "string" && v.startsWith("#error"));
 /** Kinds whose value explains itself; the rest get their property's icon in front. */
 const SELF_EVIDENT = ["select", "multi_select", "member", "relation"];
 

@@ -50,7 +50,17 @@ export function Textarea({ className, autoGrow = false, bare = false, ref, value
 }
 
 /** A label above a field. */
-export function Field({ label, htmlFor, children, hint }: { label: string; htmlFor?: string; children: React.ReactNode; hint?: string }) {
+export function Field({
+  label,
+  htmlFor,
+  children,
+  hint,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+  hint?: string;
+}) {
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={htmlFor} className="text-xs font-medium text-ink-2">

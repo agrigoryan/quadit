@@ -44,7 +44,22 @@ export function auditQuery(f: AuditFilters, extra: Record<string, string | numbe
 }
 
 // Patterns worth offering: the families of actions the server records.
-const SUGGESTED = ["signin*", "password.*", "second_step.*", "passkey.*", "identity.*", "token.*", "invite.*", "account.registered", "user.changed", "setting.changed", "backup.*", "workspace.*", "secret.*", "audit.exported"];
+const SUGGESTED = [
+  "signin*",
+  "password.*",
+  "second_step.*",
+  "passkey.*",
+  "identity.*",
+  "token.*",
+  "invite.*",
+  "account.registered",
+  "user.changed",
+  "setting.changed",
+  "backup.*",
+  "workspace.*",
+  "secret.*",
+  "audit.exported",
+];
 
 interface Props {
   value: AuditFilters;
@@ -91,15 +106,32 @@ export function AuditFilterBar({ value, onChange, actors, workspaces }: Props) {
             id={`${id}-ws`}
             value={value.workspace}
             onChange={(workspace) => set({ workspace })}
-            options={[{ value: "", label: t("audit.filter.anyWorkspace") }, ...workspaces.map((w) => ({ value: w.id, label: w.name }))]}
+            options={[
+              { value: "", label: t("audit.filter.anyWorkspace") },
+              ...workspaces.map((w) => ({ value: w.id, label: w.name })),
+            ]}
           />
         </FormField>
       )}
       <FormField label={t("audit.filter.from")} htmlFor={`${id}-from`} className="min-w-0">
-        <Input id={`${id}-from`} type="date" value={value.from} max={value.to || undefined} onChange={(e) => set({ from: e.target.value })} className="tnum" />
+        <Input
+          id={`${id}-from`}
+          type="date"
+          value={value.from}
+          max={value.to || undefined}
+          onChange={(e) => set({ from: e.target.value })}
+          className="tnum"
+        />
       </FormField>
       <FormField label={t("audit.filter.to")} htmlFor={`${id}-to`} className="min-w-0">
-        <Input id={`${id}-to`} type="date" value={value.to} min={value.from || undefined} onChange={(e) => set({ to: e.target.value })} className="tnum" />
+        <Input
+          id={`${id}-to`}
+          type="date"
+          value={value.to}
+          min={value.from || undefined}
+          onChange={(e) => set({ to: e.target.value })}
+          className="tnum"
+        />
       </FormField>
       {anyFilter(value) && (
         <Button variant="ghost" className="h-8 justify-self-start" onClick={() => onChange(noFilters)}>

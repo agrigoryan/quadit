@@ -26,7 +26,12 @@ export function chipTyped(editor: AnyEditor) {
   if (!$from.parent.isTextblock || $from.parent.type.spec.code) return;
   if ($from.marks().some((mark) => mark.type.name === "code" || mark.type.name === "link")) return;
   // One character per position: a chip already in the line counts as one.
-  const before = $from.parent.textBetween(Math.max(0, $from.parentOffset - LOOK_BACK), $from.parentOffset, undefined, "￼");
+  const before = $from.parent.textBetween(
+    Math.max(0, $from.parentOffset - LOOK_BACK),
+    $from.parentOffset,
+    undefined,
+    "￼",
+  );
   const { c } = getState();
 
   const put = (from: number, to: number, type: string, props: Record<string, string>) => {

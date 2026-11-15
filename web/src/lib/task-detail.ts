@@ -48,7 +48,11 @@ export async function loadTask(taskId: string): Promise<void> {
     // Rows that were deleted while nobody was looking are not in the answer.
     const { comments, attachments, links } = getState().c;
     const fresh = new Set([...raw.comments, ...raw.attachments, ...raw.links].map((r) => r.id));
-    for (const [name, table] of [["comments", comments], ["attachments", attachments], ["links", links]] as const) {
+    for (const [name, table] of [
+      ["comments", comments],
+      ["attachments", attachments],
+      ["links", links],
+    ] as const) {
       for (const row of Object.values(table)) {
         if (row.task_id === taskId && !fresh.has(row.id)) removeRow(name, row.id);
       }

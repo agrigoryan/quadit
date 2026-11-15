@@ -41,7 +41,10 @@ export function useTrashedFiles(): TrashedFiles {
         const found = (out.attachments ?? []).filter((a): a is TrashedFile => !!a.file);
         setRows(
           found
-            .map((a) => ({ ...a, file: { ...a.file, url: localPath(a.file.url) as string, preview_url: localPath(a.file.preview_url) } }))
+            .map((a) => ({
+              ...a,
+              file: { ...a.file, url: localPath(a.file.url) as string, preview_url: localPath(a.file.preview_url) },
+            }))
             .sort((a, b) => (b.deleted_at ?? 0) - (a.deleted_at ?? 0)),
         );
         setState("ready");
@@ -53,7 +56,10 @@ export function useTrashedFiles(): TrashedFiles {
   }, [slug, round]);
 
   // A file removed or put back anywhere changes this list.
-  useEffect(() => onEvents((events) => events.some((ev) => ev.entity_type === "attachment") && setRound((n) => n + 1)), []);
+  useEffect(
+    () => onEvents((events) => events.some((ev) => ev.entity_type === "attachment") && setRound((n) => n + 1)),
+    [],
+  );
 
   function restore(id: string) {
     const row = rows.find((r) => r.id === id);
@@ -68,7 +74,17 @@ export function useTrashedFiles(): TrashedFiles {
 }
 
 /** One removed file: what it is, what it was attached to, and the way back. */
-export function TrashedFileRow({ row, onRestore, rowClass, when }: { row: TrashedFile; onRestore: () => void; rowClass: string; when: React.ReactNode }) {
+export function TrashedFileRow({
+  row,
+  onRestore,
+  rowClass,
+  when,
+}: {
+  row: TrashedFile;
+  onRestore: () => void;
+  rowClass: string;
+  when: React.ReactNode;
+}) {
   const tasks = useCollection("tasks");
   const task = row.task_id ? tasks[row.task_id] : undefined;
   // The server does not serve a file that is in the trash, so there is no picture to show: its kind, as an icon.
@@ -81,9 +97,16 @@ export function TrashedFileRow({ row, onRestore, rowClass, when }: { row: Trashe
       </span>
       <span className="min-w-0 flex-1 truncate text-ink-2">{row.file.name}</span>
       <span className="shrink-0 text-xs text-ink-3 tnum max-md:hidden">{fileSize(row.file.size)}</span>
-      <span className="max-w-40 shrink-0 truncate text-xs text-ink-3 max-md:hidden">{tMaybe(`trash.fileOn.${row.subject_type}`, t("trash.fileOn.task"))}</span>
+      <span className="max-w-40 shrink-0 truncate text-xs text-ink-3 max-md:hidden">
+        {tMaybe(`trash.fileOn.${row.subject_type}`, t("trash.fileOn.task"))}
+      </span>
       {when}
-      <Button size="sm" aria-label={t("trash.restoreFile", { name: row.file.name })} onClick={onRestore} className="max-sm:h-9 max-sm:px-3">
+      <Button
+        size="sm"
+        aria-label={t("trash.restoreFile", { name: row.file.name })}
+        onClick={onRestore}
+        className="max-sm:h-9 max-sm:px-3"
+      >
         <Undo2 className="size-3.5" aria-hidden />
         {t("trash.restore")}
       </Button>

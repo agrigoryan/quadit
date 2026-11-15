@@ -49,7 +49,19 @@ interface Extra {
 }
 
 /** An active filter: what it is set to, a click to change it, a cross to drop it. */
-function FilterChip({ kind, items, filters, onChange, extra }: { kind: FilterKind; items: PickerItem[]; filters: Filters; onChange: (f: Filters) => void; extra?: Extra }) {
+function FilterChip({
+  kind,
+  items,
+  filters,
+  onChange,
+  extra,
+}: {
+  kind: FilterKind;
+  items: PickerItem[];
+  filters: Filters;
+  onChange: (f: Filters) => void;
+  extra?: Extra;
+}) {
   const values = picked(filters, kind);
   const first = items.find((i) => i.id === values[0]);
   const name = t(FILTER_LABEL[kind]);
@@ -72,11 +84,16 @@ function FilterChip({ kind, items, filters, onChange, extra }: { kind: FilterKin
         onPick={(id) => onChange(toggle(filters, kind, id))}
         {...extra}
       >
-        <button type="button" className="flex h-full min-w-0 items-center gap-1.5 rounded-l-sm pr-1 pl-2 hover:bg-hover">
+        <button
+          type="button"
+          className="flex h-full min-w-0 items-center gap-1.5 rounded-l-sm pr-1 pl-2 hover:bg-hover"
+        >
           <span className="text-ink-3">{name}</span>
           <span className="flex min-w-0 items-center gap-1 font-medium text-ink">
             {values.length === 1 && first?.icon}
-            <span className="max-w-32 truncate">{values.length === 1 ? (first?.label ?? "") : t("filter.any", { n: values.length })}</span>
+            <span className="max-w-32 truncate">
+              {values.length === 1 ? (first?.label ?? "") : t("filter.any", { n: values.length })}
+            </span>
           </span>
         </button>
       </ChoicePicker>
@@ -148,7 +165,14 @@ export function FilterBar({ filters, onChange, project }: Props) {
       </label>
 
       {active.map((kind) => (
-        <FilterChip key={kind} kind={kind} items={kind === "openDecision" ? [] : options[kind]} filters={filters} onChange={onChange} extra={extras[kind]} />
+        <FilterChip
+          key={kind}
+          kind={kind}
+          items={kind === "openDecision" ? [] : options[kind]}
+          filters={filters}
+          onChange={onChange}
+          extra={extras[kind]}
+        />
       ))}
 
       <Popover

@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { DndContext, type DragEndEvent, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
+import {
+  DndContext,
+  type DragEndEvent,
+  MouseSensor,
+  TouchSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
@@ -36,17 +45,40 @@ function Chip({ row, onOpen }: { row: Doc; onOpen: (id: string) => void }) {
   );
 }
 
-function DayCell({ day, dim, isToday, rows, onOpen, onAdd }: { day: string; dim: boolean; isToday: boolean; rows: Doc[]; onOpen: (id: string) => void; onAdd: () => void }) {
+function DayCell({
+  day,
+  dim,
+  isToday,
+  rows,
+  onOpen,
+  onAdd,
+}: {
+  day: string;
+  dim: boolean;
+  isToday: boolean;
+  rows: Doc[];
+  onOpen: (id: string) => void;
+  onAdd: () => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: day });
   return (
     <div
       ref={setNodeRef}
       onClick={onAdd}
-      className={cx("group/day flex min-h-24 min-w-0 cursor-default flex-col gap-1 border-r border-b border-line p-1 max-sm:min-h-20 max-sm:p-0.5", dim && "bg-sunken/60", isOver && "bg-accent-soft")}
+      className={cx(
+        "group/day flex min-h-24 min-w-0 cursor-default flex-col gap-1 border-r border-b border-line p-1 max-sm:min-h-20 max-sm:p-0.5",
+        dim && "bg-sunken/60",
+        isOver && "bg-accent-soft",
+      )}
     >
       <div className="flex h-5 items-center justify-between">
         <Plus className="size-3.5 text-ink-3 opacity-0 group-hover/day:opacity-100 max-sm:hidden" aria-hidden />
-        <span className={cx("flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs tnum", isToday ? "bg-accent font-semibold text-accent-ink" : dim ? "text-ink-3" : "text-ink-2")}>
+        <span
+          className={cx(
+            "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs tnum",
+            isToday ? "bg-accent font-semibold text-accent-ink" : dim ? "text-ink-3" : "text-ink-2",
+          )}
+        >
           {Number(day.slice(8))}
         </span>
       </div>
@@ -62,7 +94,10 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
   const dates = db.table.props.filter((p) => p.type === "date");
   const dateProp = dates.find((p) => p.id === view.config?.date_prop) ?? dates[0];
   const [month, setMonth] = useState(() => monthStart(today()));
-  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 5 } }), useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }));
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+  );
 
   const byDay = useMemo(() => {
     const out = new Map<string, Doc[]>();
@@ -75,8 +110,16 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
   }, [rows, dateProp]);
 
   if (!dateProp) {
-    const make = () => setViewConfig(view, { date_prop: createProperty(db.table.doc.id, t("db.calendar.date"), "date") });
-    return <EmptyState icon={<CalendarDays />} title={t("db.calendar.needsDate")} hint={t("db.calendar.needsDateHint")} action={<Button onClick={make}>{t("db.calendar.addDate")}</Button>} />;
+    const make = () =>
+      setViewConfig(view, { date_prop: createProperty(db.table.doc.id, t("db.calendar.date"), "date") });
+    return (
+      <EmptyState
+        icon={<CalendarDays />}
+        title={t("db.calendar.needsDate")}
+        hint={t("db.calendar.needsDateHint")}
+        action={<Button onClick={make}>{t("db.calendar.addDate")}</Button>}
+      />
+    );
   }
 
   const first = addDays(month, -weekday(month));
@@ -110,7 +153,10 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
       <DndContext sensors={sensors} onDragEnd={drop}>
         <div className="grid grid-cols-7 overflow-hidden rounded-lg border-t border-l border-line">
           {WEEKDAYS.map((name) => (
-            <div key={name} className="border-r border-b border-line bg-sunken px-1.5 py-1 text-xs font-medium text-ink-3 max-sm:px-0.5 max-sm:text-center max-sm:text-2xs">
+            <div
+              key={name}
+              className="border-r border-b border-line bg-sunken px-1.5 py-1 text-xs font-medium text-ink-3 max-sm:px-0.5 max-sm:text-center max-sm:text-2xs"
+            >
               {name}
             </div>
           ))}

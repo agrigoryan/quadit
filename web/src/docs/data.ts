@@ -58,7 +58,8 @@ export interface DocTree {
 export function buildTree(docs: Dict<Doc>, userId: string): DocTree {
   const roots: DocTree["roots"] = { team: [], private: [], memory: [], generated: [] };
   const children: Dict<Doc[]> = {};
-  const shown = (d: Doc | undefined): d is Doc => !!d && !d.deleted_at && !d.archived_at && d.kind !== "row" && canSee(d, userId);
+  const shown = (d: Doc | undefined): d is Doc =>
+    !!d && !d.deleted_at && !d.archived_at && d.kind !== "row" && canSee(d, userId);
   for (const doc of Object.values(docs)) {
     if (!shown(doc)) continue;
     const parent = doc.parent_id ? docs[doc.parent_id] : undefined;

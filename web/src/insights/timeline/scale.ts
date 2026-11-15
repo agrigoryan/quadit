@@ -42,7 +42,11 @@ export function frame(extent: Extent | null, today: number): { start: number; en
 }
 
 /** The same frame, widened if a date has moved close to an edge. It never shrinks while the page is open. */
-export function grow(now: { start: number; end: number }, extent: Extent | null, today: number): { start: number; end: number } {
+export function grow(
+  now: { start: number; end: number },
+  extent: Extent | null,
+  today: number,
+): { start: number; end: number } {
   const want = frame(extent, today);
   const min = extent?.min ?? today;
   const max = extent?.max ?? today;

@@ -10,9 +10,23 @@ export function AdminAuditPage() {
   // The filters work without these lists; they only add names to pick from.
   const users = useLoad(fetchUsers, []);
   const workspaces = useLoad(fetchWorkspaces, []);
-  const actors = useMemo(() => (users.data ?? []).map((u) => ({ id: u.id, name: u.kind === "agent" ? `${u.name} (${t("common.agent").toLowerCase()})` : u.name })), [users.data]);
+  const actors = useMemo(
+    () =>
+      (users.data ?? []).map((u) => ({
+        id: u.id,
+        name: u.kind === "agent" ? `${u.name} (${t("common.agent").toLowerCase()})` : u.name,
+      })),
+    [users.data],
+  );
   const spaces = useMemo(() => (workspaces.data ?? []).map((w) => ({ id: w.id, name: w.name })), [workspaces.data]);
   return (
-    <AuditLog title={t("audit.title")} lead={t("audit.adminLead")} back="/admin" endpoint="/api/v1/admin/audit" actors={actors} workspaces={spaces} />
+    <AuditLog
+      title={t("audit.title")}
+      lead={t("audit.adminLead")}
+      back="/admin"
+      endpoint="/api/v1/admin/audit"
+      actors={actors}
+      workspaces={spaces}
+    />
   );
 }

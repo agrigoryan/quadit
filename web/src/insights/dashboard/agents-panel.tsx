@@ -28,11 +28,16 @@ function TaskRef({ taskKey, title }: { taskKey: string; title?: string }) {
 /** One line of plain words for what the agent is doing. */
 function Doing({ agent }: { agent: AgentState }) {
   if (agent.state === "working") {
-    return agent.task ? <TaskRef taskKey={agent.task} title={agent.doing} /> : <span className="truncate text-ink-2">{agent.doing}</span>;
+    return agent.task ? (
+      <TaskRef taskKey={agent.task} title={agent.doing} />
+    ) : (
+      <span className="truncate text-ink-2">{agent.doing}</span>
+    );
   }
   if (agent.state === "waiting")
     return <span className="truncate text-ink-2">{t("dash.agents.waitsOn", { who: agent.waits_on ?? "" })}</span>;
-  if (agent.state === "has_work") return <span className="truncate text-ink-2">{t("dash.agents.queue", { n: agent.waiting_on_it })}</span>;
+  if (agent.state === "has_work")
+    return <span className="truncate text-ink-2">{t("dash.agents.queue", { n: agent.waiting_on_it })}</span>;
   return (
     <span className="truncate text-ink-3">
       {agent.open_tasks > 0 ? t("dash.agents.open", { n: agent.open_tasks }) : t("dash.agents.nothing")}
@@ -40,7 +45,17 @@ function Doing({ agent }: { agent: AgentState }) {
   );
 }
 
-function Row({ agent, member, depth, helper }: { agent: AgentState; member: Member | undefined; depth: number; helper: string }) {
+function Row({
+  agent,
+  member,
+  depth,
+  helper,
+}: {
+  agent: AgentState;
+  member: Member | undefined;
+  depth: number;
+  helper: string;
+}) {
   const stranded = isStranded(agent);
   return (
     <li className={cx("border-b border-line/70 py-2 pr-4", depth > 0 ? "pl-9" : "pl-4")}>
@@ -84,10 +99,15 @@ export function AgentsPanel({ agents: all, className }: { agents: AgentState[]; 
     <Panel
       title={t("nav.agents")}
       meta={
-        stranded > 0 ? <span className="text-xs font-medium text-danger">{t("dash.agents.stranded", { n: stranded })}</span> : undefined
+        stranded > 0 ? (
+          <span className="text-xs font-medium text-danger">{t("dash.agents.stranded", { n: stranded })}</span>
+        ) : undefined
       }
       action={
-        <Link to={`/${slug}/agents`} className="text-xs font-medium text-accent-text underline-offset-2 hover:underline">
+        <Link
+          to={`/${slug}/agents`}
+          className="text-xs font-medium text-accent-text underline-offset-2 hover:underline"
+        >
           {t("dash.agents.all")}
         </Link>
       }
@@ -100,7 +120,9 @@ export function AgentsPanel({ agents: all, className }: { agents: AgentState[]; 
         <ul className="border-t border-line/70">
           {placed.map(({ agent: member, depth }) => {
             const state = stateOf.get(member.user_id);
-            return state ? <Row key={member.user_id} agent={state} member={member} depth={depth} helper={helperLabel(member)} /> : null;
+            return state ? (
+              <Row key={member.user_id} agent={state} member={member} depth={depth} helper={helperLabel(member)} />
+            ) : null;
           })}
           {unknown.map((agent) => (
             <Row key={agent.user_id} agent={agent} member={undefined} depth={0} helper="" />

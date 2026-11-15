@@ -12,7 +12,10 @@ import { StageButton } from "@/decisions/stage-ui";
 const lengthOf = (v: HTMLVideoElement) => (Number.isFinite(v.duration) ? v.duration : 0);
 
 function leaderOf(videos: HTMLVideoElement[]): HTMLVideoElement | undefined {
-  return videos.reduce<HTMLVideoElement | undefined>((best, v) => (!best || lengthOf(v) > lengthOf(best) ? v : best), undefined);
+  return videos.reduce<HTMLVideoElement | undefined>(
+    (best, v) => (!best || lengthOf(v) > lengthOf(best) ? v : best),
+    undefined,
+  );
 }
 
 /** Puts every video at the same moment (a shorter one wraps around). */
@@ -58,7 +61,11 @@ export function Transport({ c }: { c: Compare }) {
   }, [playing, videos]);
 
   return (
-    <div role="group" aria-label={t("compare.transport")} className="flex h-11 shrink-0 items-center gap-2 border-t border-white/10 bg-inverse px-3">
+    <div
+      role="group"
+      aria-label={t("compare.transport")}
+      className="flex h-11 shrink-0 items-center gap-2 border-t border-white/10 bg-inverse px-3"
+    >
       <StageButton
         tip={playing ? t("compare.pause") : t("compare.play")}
         hint="Space"
@@ -66,7 +73,11 @@ export function Transport({ c }: { c: Compare }) {
         onClick={() => c.setPlaying(!playing)}
         className="max-sm:size-10"
       >
-        {playing ? <Pause className="size-4 fill-current" aria-hidden /> : <Play className="size-4 fill-current" aria-hidden />}
+        {playing ? (
+          <Pause className="size-4 fill-current" aria-hidden />
+        ) : (
+          <Play className="size-4 fill-current" aria-hidden />
+        )}
       </StageButton>
       <input
         type="range"

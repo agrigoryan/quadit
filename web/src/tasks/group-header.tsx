@@ -16,7 +16,13 @@ export function GroupIcon({ group }: { group: TaskGroup }) {
   const member = useMember(group.kind === "assignee" && group.value !== NONE ? group.value : undefined);
   const color = useStore((s) => (group.kind === "label" ? s.c.labels[group.value]?.color : undefined));
   if (group.kind === "label") {
-    return <span className="mx-0.5 size-2.5 shrink-0 rounded-full" style={{ background: group.value === NONE ? "var(--line-strong)" : color || "var(--ink-3)" }} aria-hidden />;
+    return (
+      <span
+        className="mx-0.5 size-2.5 shrink-0 rounded-full"
+        style={{ background: group.value === NONE ? "var(--line-strong)" : color || "var(--ink-3)" }}
+        aria-hidden
+      />
+    );
   }
   if (group.kind === "status" && group.category) return <StatusIcon category={group.category} />;
   if (group.kind === "assignee") return <Avatar member={member} size="xs" />;
@@ -30,9 +36,18 @@ export function GroupIcon({ group }: { group: TaskGroup }) {
  * until it has, a Done or Canceled group says it is loading: a count then
  * would be wrong.
  */
-export function GroupCount({ group, count = group.tasks.length, className }: { group: TaskGroup; count?: number; className?: string }) {
+export function GroupCount({
+  group,
+  count = group.tasks.length,
+  className,
+}: {
+  group: TaskGroup;
+  count?: number;
+  className?: string;
+}) {
   const loaded = useRestLoaded();
-  if (!loaded && group.kind === "status" && !isOpenCategory(group.category)) return <RestLoadingNote className={className} />;
+  if (!loaded && group.kind === "status" && !isOpenCategory(group.category))
+    return <RestLoadingNote className={className} />;
   return <span className={cx("text-xs text-ink-3 tnum", className)}>{formatNumber(count)}</span>;
 }
 
@@ -55,7 +70,10 @@ export const GroupHeader = memo(function GroupHeader({ group, collapsed, onToggl
         aria-label={collapsed ? t("list.expand", { name: group.title }) : t("list.collapse", { name: group.title })}
         className="flex h-6 min-w-0 flex-1 items-center gap-2 rounded-sm px-1 text-left"
       >
-        <ChevronDown className={cx("size-3.5 shrink-0 text-ink-3 transition-transform duration-100", collapsed && "-rotate-90")} aria-hidden />
+        <ChevronDown
+          className={cx("size-3.5 shrink-0 text-ink-3 transition-transform duration-100", collapsed && "-rotate-90")}
+          aria-hidden
+        />
         <GroupIcon group={group} />
         <span className="truncate text-sm font-medium">{group.title}</span>
         <GroupCount group={group} />

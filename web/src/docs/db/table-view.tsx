@@ -1,5 +1,13 @@
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { closestCenter, DndContext, type DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { arrayMove, horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { Plus, Type } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -29,7 +37,10 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
   const [openProp, setOpenProp] = useState<string | null>(null);
   const [resize, setResize] = useState<{ id: string; width: number } | null>(null);
   const grid = useRef<HTMLDivElement>(null);
-  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }));
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
 
   const widths = useMemo(() => {
     const out: Record<string, number> = { [TITLE]: view.config?.widths?.[TITLE] ?? TITLE_WIDTH };
@@ -58,7 +69,8 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
     if (!cell || !box) return;
     cell.scrollIntoView({ block: "nearest", inline: "nearest" });
     // The title column stays put while the rest scrolls: a cell must clear it to be seen.
-    const pinned = grid.current?.querySelector(`[data-cell="${active.row}:${TITLE}"]`)?.getBoundingClientRect().right ?? 0;
+    const pinned =
+      grid.current?.querySelector(`[data-cell="${active.row}:${TITLE}"]`)?.getBoundingClientRect().right ?? 0;
     const left = cell.getBoundingClientRect().left;
     if (active.col !== TITLE && left < pinned) box.scrollLeft -= pinned - left;
   }, [active]);
@@ -103,14 +115,20 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
     }
     if (editing || !active || target !== grid.current) return;
     const prop = props.find((p) => p.id === active.col);
-    const arrows: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    const arrows: Record<string, [number, number]> = {
+      ArrowUp: [-1, 0],
+      ArrowDown: [1, 0],
+      ArrowLeft: [0, -1],
+      ArrowRight: [0, 1],
+    };
     const arrow = arrows[e.key];
     if (arrow) {
       e.preventDefault();
       move(arrow[0], arrow[1]);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (prop?.type === "checkbox") setRowProps(active.row, { [prop.id]: rows.find((r) => r.id === active.row)?.props?.[prop.id] !== true });
+      if (prop?.type === "checkbox")
+        setRowProps(active.row, { [prop.id]: rows.find((r) => r.id === active.row)?.props?.[prop.id] !== true });
       else if (!prop || !isComputed(prop)) setEditing({});
     } else if (e.key === "Escape") {
       setActive(null);
@@ -186,7 +204,11 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
             </SortableContext>
           </DndContext>
           <AddPropertyMenu databaseId={db.table.doc.id} onCreated={setOpenProp} align="end">
-            <button type="button" aria-label={t("db.prop.add")} className="flex h-8 w-10 shrink-0 items-center justify-center text-ink-3 hover:bg-hover hover:text-ink">
+            <button
+              type="button"
+              aria-label={t("db.prop.add")}
+              className="flex h-8 w-10 shrink-0 items-center justify-center text-ink-3 hover:bg-hover hover:text-ink"
+            >
               <Plus className="size-4" aria-hidden />
             </button>
           </AddPropertyMenu>
@@ -212,7 +234,11 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
           );
         })}
       </div>
-      <button type="button" onClick={addRow} className="sticky left-0 flex h-8 w-full items-center gap-1.5 px-2 text-sm text-ink-3 hover:bg-hover hover:text-ink">
+      <button
+        type="button"
+        onClick={addRow}
+        className="sticky left-0 flex h-8 w-full items-center gap-1.5 px-2 text-sm text-ink-3 hover:bg-hover hover:text-ink"
+      >
         <Plus className="size-4" aria-hidden />
         {t("db.newRow")}
       </button>

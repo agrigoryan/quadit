@@ -51,7 +51,9 @@ export function setStatus(tasks: Task[], statusId: string) {
     (task) => {
       const s = target(task) as Status;
       // A closed task waits on nobody; the server clears it too.
-      return isOpenCategory(s.category) ? { status_id: s.id } : { status_id: s.id, waiting_on_id: null, waiting_outside: null, waiting_on_note: null };
+      return isOpenCategory(s.category)
+        ? { status_id: s.id }
+        : { status_id: s.id, waiting_on_id: null, waiting_outside: null, waiting_on_note: null };
     },
   );
 }

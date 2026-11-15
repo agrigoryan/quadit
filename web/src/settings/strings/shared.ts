@@ -31,7 +31,8 @@ export const sharedStrings = {
 
   "settings.title": "Settings",
   "settings.adminsOnly.title": "This page is for admins",
-  "settings.adminsOnly.hint": "Only owners and admins of this workspace can see and change what is here. Ask one of them if something needs changing.",
+  "settings.adminsOnly.hint":
+    "Only owners and admins of this workspace can see and change what is here. Ask one of them if something needs changing.",
   "settings.adminsOnly.mine": "Go to your own settings",
   "settings.group.workspace": "Workspace",
   "settings.group.work": "Work",

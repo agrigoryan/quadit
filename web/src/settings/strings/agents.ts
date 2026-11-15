@@ -2,14 +2,17 @@
 
 export const agentStrings = {
   "agents.title": "Agents",
-  "agents.lead": "An agent is a member with its own account, role and tokens. People assign it tasks and mention it like anyone else.",
+  "agents.lead":
+    "An agent is a member with its own account, role and tokens. People assign it tasks and mention it like anyone else.",
   "agents.new": "New agent",
   "agents.none": "No agents yet.",
   "agents.noneHint": "Create one, issue it a token, and give the token to the program that will do the work.",
   "agents.listening": "Listening",
-  "agents.listeningHint": "Something is waiting for this agent's work right now: a held request, or a webhook for its inbox.",
+  "agents.listeningHint":
+    "Something is waiting for this agent's work right now: a held request, or a webhook for its inbox.",
   "agents.notListening": "Nothing is listening",
-  "agents.notListeningHint": "No program is waiting for this agent's work. Tasks given to it will sit until one connects with its token.",
+  "agents.notListeningHint":
+    "No program is waiting for this agent's work. Tasks given to it will sit until one connects with its token.",
   "agents.state.working": "Working",
   "agents.state.waiting": "Waiting on someone",
   "agents.state.has_work": "Has work",
@@ -40,7 +43,8 @@ export const agentStrings = {
   "agent.role": "Role",
   "agent.roleHint": "An admin agent can manage projects, members and automation. Most agents are members.",
   "agent.responsibleField": "Responsible person",
-  "agent.responsibleHint": "Who answers for this agent. Its questions go to them when it names nobody, and they hear when its budget runs low.",
+  "agent.responsibleHint":
+    "Who answers for this agent. Its questions go to them when it names nobody, and they hear when its budget runs low.",
   "agent.responsibleNone": "No one",
   "agent.limits": "Limits",
   "agent.limitsLead": "Narrow what this agent may do below its role.",
@@ -69,7 +73,8 @@ export const agentStrings = {
   "agent.asks.else": "Anything else",
   "agent.asks.elseNone": "Nothing else",
   "agent.budget": "Weekly budget",
-  "agent.budgetLead": "When a limit is reached the agent can only finish or hand over what is open. Empty means no limit.",
+  "agent.budgetLead":
+    "When a limit is reached the agent can only finish or hand over what is open. Empty means no limit.",
   "agent.budgetMoney": "Money per week",
   "agent.budgetMinutes": "Minutes per week",
   "agent.budgetHandoffs": "Hand-offs per week",
@@ -81,7 +86,8 @@ export const agentStrings = {
   "agent.seen": "Last seen",
   "agent.danger": "Suspend or remove",
   "agent.suspend": "Suspend agent",
-  "agent.suspendLead": "A suspended agent keeps its history and tokens but can do nothing until the suspension is lifted.",
+  "agent.suspendLead":
+    "A suspended agent keeps its history and tokens but can do nothing until the suspension is lifted.",
   "agent.resume": "Lift suspension",
   "agent.remove": "Remove agent",
   "agent.removeLead": "Its tokens stop working and its open tasks become unassigned. Its history stays under its name.",
@@ -105,7 +111,8 @@ export const agentStrings = {
   "tokens.expires.days": "In {n} days",
   "tokens.create": "Create token",
   "tokens.created": "Token created",
-  "tokens.once": "This is the only time the token is shown. Copy it now and keep it somewhere safe; if it is lost, revoke it and make another.",
+  "tokens.once":
+    "This is the only time the token is shown. Copy it now and keep it somewhere safe; if it is lost, revoke it and make another.",
   "tokens.token": "Token",
   "tokens.login": "Sign in the command-line tool",
   "tokens.env": "Or as environment variables",

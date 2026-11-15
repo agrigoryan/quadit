@@ -195,9 +195,14 @@ export function ParentField({ task }: { task: Task }) {
     return out;
   }, [tasks, task.id]);
 
-  const filter = useCallback((tk: Task) => tk.project_id === task.project_id && !below.has(tk.id), [task.project_id, below]);
+  const filter = useCallback(
+    (tk: Task) => tk.project_id === task.project_id && !below.has(tk.id),
+    [task.project_id, below],
+  );
   const extra = useMemo(
-    () => [{ id: NO_PARENT, label: t("task.noParent"), icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden /> }],
+    () => [
+      { id: NO_PARENT, label: t("task.noParent"), icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden /> },
+    ],
     [],
   );
 

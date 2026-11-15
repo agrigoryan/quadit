@@ -70,10 +70,12 @@ export const automationStrings = {
   "auto.hook.lead":
     "A webhook is an address Quadit calls when something happens: every event, the events of one project, or only what lands in one agent's inbox, which is how an agent gets woken up.",
   "auto.hook.new": "New webhook",
-  "auto.hook.newLead": "Quadit will POST each event to this address as JSON, signed with a secret you see once after creating it.",
+  "auto.hook.newLead":
+    "Quadit will POST each event to this address as JSON, signed with a secret you see once after creating it.",
   "auto.hook.edit": "Edit webhook",
   "auto.hook.create": "Create webhook",
-  "auto.hook.empty": "No webhooks yet. Add one to send events to another system, or to wake an agent when something lands in its inbox.",
+  "auto.hook.empty":
+    "No webhooks yet. Add one to send events to another system, or to wake an agent when something lands in its inbox.",
   "auto.hook.url": "Address",
   "auto.hook.urlHint": "An http or https address that answers a POST with a 2xx status.",
   "auto.hook.urlInvalid": "Give an http:// or https:// address",
@@ -82,11 +84,13 @@ export const automationStrings = {
   "auto.hook.scope.all": "Events from the whole workspace",
   "auto.hook.scope.project": "Events from one project",
   "auto.hook.scope.member": "Only what lands in one member's inbox",
-  "auto.hook.scope.memberHint": "Gets that member's inbox items (assigned, mentioned, asked, waiting on) and nothing else: the push way to wake an agent.",
+  "auto.hook.scope.memberHint":
+    "Gets that member's inbox items (assigned, mentioned, asked, waiting on) and nothing else: the push way to wake an agent.",
   "auto.hook.for": "Whose inbox",
   "auto.hook.projectMissing": "Pick the project",
   "auto.hook.memberMissing": "Pick whose inbox it follows",
-  "auto.hook.activeHint": "Turned off, nothing is sent and nothing queues up. Turning it back on clears its count of failures.",
+  "auto.hook.activeHint":
+    "Turned off, nothing is sent and nothing queues up. Turning it back on clears its count of failures.",
   "auto.hook.activeFor": "{name} is active",
   "auto.hook.inboxOf": "Inbox of @{handle}",
   "auto.hook.failures": "{n} failure in a row | {n} failures in a row",
@@ -101,19 +105,25 @@ export const automationStrings = {
   "auto.hook.test.noAnswer": "No answer: {error}",
   "auto.hook.secret": "Signing secret",
   "auto.hook.secretTitle": "Signing secret for {name}",
-  "auto.hook.secretWarning": "Copy the secret now. It is not shown again; if it is lost, make a new one from the webhook's menu.",
+  "auto.hook.secretWarning":
+    "Copy the secret now. It is not shown again; if it is lost, make a new one from the webhook's menu.",
   "auto.hook.secretHow":
     "Every delivery carries the header X-Quadit-Signature: sha256=<hex>, the HMAC-SHA256 of the request body made with this secret. Compute the same on your side and compare before trusting a call. X-Quadit-Event names the event type and X-Quadit-Delivery the delivery.",
   "auto.hook.newSecret": "New signing secret",
-  "auto.hook.newSecretBody": "Deliveries to {name} will be signed with a new secret from now on. The receiver must be given the new one, or its signature checks will fail.",
+  "auto.hook.newSecretBody":
+    "Deliveries to {name} will be signed with a new secret from now on. The receiver must be given the new one, or its signature checks will fail.",
   "auto.hook.newSecretConfirm": "Make a new secret",
   "auto.hook.deleteTitle": "Delete {name}?",
-  "auto.hook.deleteBody": "Nothing more is sent to it, and deliveries still waiting are dropped. Rules that call it stop doing anything.",
+  "auto.hook.deleteBody":
+    "Nothing more is sent to it, and deliveries still waiting are dropped. Rules that call it stop doing anything.",
 
   "auto.delivery.title": "Deliveries to {name}",
-  "auto.delivery.lead": "The last 100 events sent to this webhook. A delivery is tried again with longer and longer waits, then given up as dead.",
-  "auto.delivery.empty": "Nothing has been sent yet. A delivery appears here when an event matches, or when you send a test.",
-  "auto.delivery.emptyInbox": "Nothing has been sent yet. A delivery appears here when something lands in this member's inbox.",
+  "auto.delivery.lead":
+    "The last 100 events sent to this webhook. A delivery is tried again with longer and longer waits, then given up as dead.",
+  "auto.delivery.empty":
+    "Nothing has been sent yet. A delivery appears here when an event matches, or when you send a test.",
+  "auto.delivery.emptyInbox":
+    "Nothing has been sent yet. A delivery appears here when something lands in this member's inbox.",
   "auto.delivery.state.pending": "Pending",
   "auto.delivery.state.ok": "Sent",
   "auto.delivery.state.dead": "Dead",
@@ -123,7 +133,8 @@ export const automationStrings = {
   "auto.delivery.attempts": "{n} try | {n} tries",
   "auto.delivery.redeliver": "Redeliver",
   "auto.delivery.test": "Test",
-  "auto.delivery.testHint": "A sample sent with the Test button, not an event from the feed. Send another with the Test button.",
+  "auto.delivery.testHint":
+    "A sample sent with the Test button, not an event from the feed. Send another with the Test button.",
   "auto.delivery.seqHint": "The event's position in the workspace's feed",
   "auto.delivery.queued": "Queued to send again",
 

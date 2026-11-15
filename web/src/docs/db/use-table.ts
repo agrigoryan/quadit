@@ -67,7 +67,12 @@ export function useDatabase(databaseId: string | undefined): Database | null {
 
   // Relations and rollups read other databases: fetch their properties once.
   const linked = useMemo(
-    () => [...new Set((out?.table.props ?? []).map((p) => (p.type === "relation" ? p.config?.database : undefined)).filter(Boolean))] as string[],
+    () =>
+      [
+        ...new Set(
+          (out?.table.props ?? []).map((p) => (p.type === "relation" ? p.config?.database : undefined)).filter(Boolean),
+        ),
+      ] as string[],
     [out?.table.props],
   );
   useEffect(() => {

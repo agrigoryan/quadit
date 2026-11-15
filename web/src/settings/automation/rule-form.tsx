@@ -8,7 +8,17 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
-import { ACTION_KINDS, type ActionKind, change, OUTCOMES, type Rule, type RuleAction, type RuleMatch, typeMatches, type Webhook } from "@/settings/automation/data";
+import {
+  ACTION_KINDS,
+  type ActionKind,
+  change,
+  OUTCOMES,
+  type Rule,
+  type RuleAction,
+  type RuleMatch,
+  typeMatches,
+  type Webhook,
+} from "@/settings/automation/data";
 import { EventPicker } from "@/settings/automation/event-picker";
 
 interface Props {
@@ -20,7 +30,17 @@ interface Props {
   onSaved: () => void;
 }
 
-const FIELDS = ["name", "project", "project_id", "actor_kind", "outcome", "to_category", "kind", "user_id", "webhook_id"];
+const FIELDS = [
+  "name",
+  "project",
+  "project_id",
+  "actor_kind",
+  "outcome",
+  "to_category",
+  "kind",
+  "user_id",
+  "webhook_id",
+];
 
 export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
   const projects = useProjects();
@@ -65,13 +85,22 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
     if (message.trim() && (kind === "notify" || kind === "wait_on")) action.message = message.trim();
 
     await run(async () => {
-      await change(rule ? "rule.update" : "rule.create", { id: rule?.id ?? newId(), name: name.trim(), active, match, action });
+      await change(rule ? "rule.update" : "rule.create", {
+        id: rule?.id ?? newId(),
+        name: name.trim(),
+        active,
+        match,
+        action,
+      });
       onSaved();
     });
   }
 
   const any = { value: "", label: t("auto.any") };
-  const memberChoices = [{ value: "", label: t("auto.pickMember") }, ...members.map((mb) => ({ value: mb.user_id, label: memberChoiceLabel(mb, listening(mb)) }))];
+  const memberChoices = [
+    { value: "", label: t("auto.pickMember") },
+    ...members.map((mb) => ({ value: mb.user_id, label: memberChoiceLabel(mb, listening(mb)) })),
+  ];
 
   return (
     <Dialog
@@ -89,7 +118,13 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
     >
       <form id="rule-form" onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
         <FormField label={t("s.name")} htmlFor="rule-name" error={errors.fields.name}>
-          <Input id="rule-name" autoFocus value={name} onChange={(e) => (setName(e.target.value), errors.set("name", ""))} placeholder={t("auto.rule.namePlaceholder")} />
+          <Input
+            id="rule-name"
+            autoFocus
+            value={name}
+            onChange={(e) => (setName(e.target.value), errors.set("name", ""))}
+            placeholder={t("auto.rule.namePlaceholder")}
+          />
         </FormField>
 
         <h3 className="mt-1 text-xs font-semibold tracking-wide text-ink-3 uppercase">{t("auto.rule.whenTitle")}</h3>
@@ -97,12 +132,19 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
           <EventPicker value={events} onChange={setEvents} />
         </FormField>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <FormField label={t("auto.project")} htmlFor="rule-project" error={errors.fields.project_id ?? errors.fields.project}>
+          <FormField
+            label={t("auto.project")}
+            htmlFor="rule-project"
+            error={errors.fields.project_id ?? errors.fields.project}
+          >
             <NativeSelect
               id="rule-project"
               value={projectId}
               onChange={setProjectId}
-              options={[{ value: "", label: t("s.everyProject") }, ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` }))]}
+              options={[
+                { value: "", label: t("s.everyProject") },
+                ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` })),
+              ]}
             />
           </FormField>
           <FormField label={t("auto.rule.actorKind")} htmlFor="rule-actor" error={errors.fields.actor_kind}>
@@ -118,7 +160,12 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
             />
           </FormField>
           {canCategory && (
-            <FormField label={t("auto.rule.toCategoryLabel")} htmlFor="rule-cat" error={errors.fields.to_category} hint={t("auto.rule.toCategoryHint")}>
+            <FormField
+              label={t("auto.rule.toCategoryLabel")}
+              htmlFor="rule-cat"
+              error={errors.fields.to_category}
+              hint={t("auto.rule.toCategoryHint")}
+            >
               <NativeSelect
                 id="rule-cat"
                 value={toCategory}
@@ -128,7 +175,12 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
             </FormField>
           )}
           {canOutcome && (
-            <FormField label={t("auto.rule.outcomeLabel")} htmlFor="rule-outcome" error={errors.fields.outcome} hint={t("auto.rule.outcomeHint")}>
+            <FormField
+              label={t("auto.rule.outcomeLabel")}
+              htmlFor="rule-outcome"
+              error={errors.fields.outcome}
+              hint={t("auto.rule.outcomeHint")}
+            >
               <NativeSelect
                 id="rule-outcome"
                 value={outcome}
@@ -160,12 +212,20 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
                 id="rule-hook"
                 value={webhookId}
                 onChange={(v) => (setWebhookId(v), errors.set("webhook_id", ""))}
-                options={[{ value: "", label: t("auto.pickWebhook") }, ...hooks.map((h) => ({ value: h.id, label: h.name }))]}
+                options={[
+                  { value: "", label: t("auto.pickWebhook") },
+                  ...hooks.map((h) => ({ value: h.id, label: h.name })),
+                ]}
               />
             </FormField>
           ) : (
             <FormField label={tMaybe(`auto.rule.who.${kind}`)} htmlFor="rule-user" error={errors.fields.user_id}>
-              <NativeSelect id="rule-user" value={userId} onChange={(v) => (setUserId(v), errors.set("user_id", ""))} options={memberChoices} />
+              <NativeSelect
+                id="rule-user"
+                value={userId}
+                onChange={(v) => (setUserId(v), errors.set("user_id", ""))}
+                options={memberChoices}
+              />
             </FormField>
           )}
         </div>

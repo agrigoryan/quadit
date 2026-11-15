@@ -17,7 +17,8 @@ interface Props {
   onEnter?: () => void;
 }
 
-const ADD = "flex h-6 items-center gap-1 rounded-md px-1.5 text-xs text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-60";
+const ADD =
+  "flex h-6 items-center gap-1 rounded-md px-1.5 text-xs text-ink-3 hover:bg-hover hover:text-ink disabled:opacity-60";
 
 /** A page's icon and title, edited in place. */
 export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
@@ -45,7 +46,14 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
     <div className={cx("group/title", compact ? "pt-2" : doc.cover ? "pt-5" : "pt-8 sm:pt-12")}>
       {!readOnly && doc.icon && (
         <IconPicker docId={doc.id} current={doc.icon}>
-          <button type="button" aria-label={t("docs.icon.change")} className={cx("-ml-1 mb-1 flex items-center justify-center rounded-md hover:bg-hover", compact ? "size-9 [&>*]:size-6 [&>*]:text-2xl" : "size-12 [&>*]:size-9 [&>*]:text-4xl")}>
+          <button
+            type="button"
+            aria-label={t("docs.icon.change")}
+            className={cx(
+              "-ml-1 mb-1 flex items-center justify-center rounded-md hover:bg-hover",
+              compact ? "size-9 [&>*]:size-6 [&>*]:text-2xl" : "size-12 [&>*]:size-9 [&>*]:text-4xl",
+            )}
+          >
             <PageIcon doc={doc} />
           </button>
         </IconPicker>
@@ -78,7 +86,10 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
         value={value}
         aria-label={t("docs.title.label")}
         placeholder={t("docs.untitled")}
-        className={cx("font-bold tracking-tight placeholder:text-ink-3/70", compact ? "text-xl leading-7" : "text-[1.75rem] leading-9 sm:text-[2rem] sm:leading-10")}
+        className={cx(
+          "font-bold tracking-tight placeholder:text-ink-3/70",
+          compact ? "text-xl leading-7" : "text-[1.75rem] leading-9 sm:text-[2rem] sm:leading-10",
+        )}
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);

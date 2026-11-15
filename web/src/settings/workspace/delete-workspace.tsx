@@ -62,7 +62,11 @@ export function DeleteWorkspaceDialog({ workspace, onClose }: { workspace: Works
           <li>{t("general.delete.restore")}</li>
           <li>{t("general.delete.export")}</li>
         </ul>
-        <FormField label={t("general.delete.type", { slug: workspace.slug })} htmlFor="ws-delete-confirm" error={errors.fields.confirm}>
+        <FormField
+          label={t("general.delete.type", { slug: workspace.slug })}
+          htmlFor="ws-delete-confirm"
+          error={errors.fields.confirm}
+        >
           <Input
             id="ws-delete-confirm"
             value={typed}

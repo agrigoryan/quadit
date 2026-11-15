@@ -5,13 +5,26 @@ import { mutate } from "@/lib/mutate";
 import { useMe } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { AGENT_FIELDS, type AgentDraft, AgentLimitFields, AgentProfileFields, draftOf, limitsOf } from "@/settings/agents/agent-form";
+import {
+  AGENT_FIELDS,
+  type AgentDraft,
+  AgentLimitFields,
+  AgentProfileFields,
+  draftOf,
+  limitsOf,
+} from "@/settings/agents/agent-form";
 import { FormAlert, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 
 /** Makes an agent. Answers with its handle, so the page can open it to issue a token. */
-export function CreateAgentDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (handle: string) => void }) {
+export function CreateAgentDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (handle: string) => void;
+}) {
   const me = useMe();
   // Whoever makes an agent answers for it unless they name someone else.
   const [draft, setDraft] = useState<AgentDraft>(() => draftOf(undefined, me.user_id));
@@ -26,7 +39,12 @@ export function CreateAgentDialog({ onClose, onCreated }: { onClose: () => void;
     if (!draft.name.trim()) return errors.set("name", t("s.required"));
     const limits = limitsOf(draft, true);
     if ("bad" in limits) return errors.set(limits.bad, t("agent.budgetBad"));
-    const args: Record<string, unknown> = { id, name: draft.name.trim(), description: draft.description.trim(), role: draft.role };
+    const args: Record<string, unknown> = {
+      id,
+      name: draft.name.trim(),
+      description: draft.description.trim(),
+      role: draft.role,
+    };
     if (draft.handle.trim()) args.handle = draft.handle.trim();
     if (draft.avatar) args.avatar = draft.avatar;
     if (draft.responsible) args.responsible = draft.responsible;

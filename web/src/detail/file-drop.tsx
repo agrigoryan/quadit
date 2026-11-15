@@ -51,7 +51,9 @@ export function useFileDrop(task: Task | undefined): FileDrop {
     },
     note: dragging && (
       <div className="pointer-events-none absolute inset-1 z-10 flex items-start justify-center rounded-lg border-2 border-dashed border-accent pt-14">
-        <span className="rounded-md bg-accent px-2.5 py-1 text-sm font-medium text-accent-ink shadow-pop">{t("detail.files.drop")}</span>
+        <span className="rounded-md bg-accent px-2.5 py-1 text-sm font-medium text-accent-ink shadow-pop">
+          {t("detail.files.drop")}
+        </span>
       </div>
     ),
   };

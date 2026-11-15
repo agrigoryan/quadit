@@ -59,16 +59,23 @@ export function InvitesSection() {
           {invites.data.map((inv) => (
             <Row
               key={inv.id}
-              lead={<span className="flex size-8 items-center justify-center rounded-full bg-sunken text-ink-2">{inv.email ? <Mail className="size-4" /> : <Link2 className="size-4" />}</span>}
+              lead={
+                <span className="flex size-8 items-center justify-center rounded-full bg-sunken text-ink-2">
+                  {inv.email ? <Mail className="size-4" /> : <Link2 className="size-4" />}
+                </span>
+              }
               title={inv.email || t("invites.anyone")}
               sub={
                 <>
-                  {t("invites.by", { name: members[inv.created_by]?.name ?? t("common.someone") })} · <When ms={inv.created_at} />
+                  {t("invites.by", { name: members[inv.created_by]?.name ?? t("common.someone") })} ·{" "}
+                  <When ms={inv.created_at} />
                 </>
               }
               meta={
                 <>
-                  {inv.max_uses > 1 && <span className="max-sm:hidden">{t("invites.used", { uses: inv.uses, max: inv.max_uses })}</span>}
+                  {inv.max_uses > 1 && (
+                    <span className="max-sm:hidden">{t("invites.used", { uses: inv.uses, max: inv.max_uses })}</span>
+                  )}
                   <Fact label={t("invites.expiresIn")} className="max-sm:hidden">
                     {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(inv.expires_at)}
                   </Fact>

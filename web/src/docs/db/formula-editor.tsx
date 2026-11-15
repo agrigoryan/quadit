@@ -51,14 +51,17 @@ export function FormulaEditor({ prop, onClose }: { prop: DBProperty; onClose: ()
   // The database as it would be with this formula: the same code that fills the cells.
   const preview = useMemo(() => {
     if (!db) return [];
-    const props = db.table.props.map((p) => (p.id === prop.id ? { ...p, type: "formula" as const, config: { ...p.config, formula: draft } } : p));
+    const props = db.table.props.map((p) =>
+      p.id === prop.id ? { ...p, type: "formula" as const, config: { ...p.config, formula: draft } } : p,
+    );
     const rows = db.table.rows.slice(0, 4);
     const cells = computeCells({ ...db.table, props, rows }, db.world);
     return rows.map((r) => ({ id: r.id, title: docTitle(r), text: formulaText(cells[r.id]?.[prop.id]) }));
   }, [db, draft, prop.id]);
 
   const syntax = draft.trim() ? evalFormula(draft, { prop: () => null }).error : undefined;
-  const failed = preview.find((p) => p.text.startsWith("#error: "))?.text.slice(8) ?? (preview.length === 0 ? syntax : undefined);
+  const failed =
+    preview.find((p) => p.text.startsWith("#error: "))?.text.slice(8) ?? (preview.length === 0 ? syntax : undefined);
   const others = (db?.table.props ?? []).filter((p) => p.id !== prop.id);
 
   /** Puts text where the caret is; `inside` leaves the caret between a function's brackets. */
@@ -132,7 +135,12 @@ export function FormulaEditor({ prop, onClose }: { prop: DBProperty; onClose: ()
             <h3 className="mb-1.5 text-xs font-medium text-ink-3">{t("db.formula.props")}</h3>
             <div className="flex flex-wrap gap-1">
               {others.map((p) => (
-                <button key={p.id} type="button" className={`${chip} inline-flex items-center gap-1 font-sans`} onClick={() => insert(`prop("${p.name}")`)}>
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`${chip} inline-flex items-center gap-1 font-sans`}
+                  onClick={() => insert(`prop("${p.name}")`)}
+                >
                   <PropIcon type={p.type} className="size-3 text-ink-3" />
                   {p.name}
                 </button>
@@ -145,7 +153,11 @@ export function FormulaEditor({ prop, onClose }: { prop: DBProperty; onClose: ()
           <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
             {FUNCTIONS.map((name) => (
               <li key={name} className="flex items-baseline gap-2">
-                <button type="button" className={`${chip} shrink-0`} onClick={() => insert(`${name}()`, name !== "now" && name !== "today")}>
+                <button
+                  type="button"
+                  className={`${chip} shrink-0`}
+                  onClick={() => insert(`${name}()`, name !== "now" && name !== "today")}
+                >
                   {HELP[name][0]}
                 </button>
                 <span className="min-w-0 truncate text-xs text-ink-2" title={HELP[name][1]}>

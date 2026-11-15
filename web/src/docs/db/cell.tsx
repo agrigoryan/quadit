@@ -102,13 +102,23 @@ function parseInput(prop: DBProperty, text: string): unknown {
   return prop.type === "text" ? text : s;
 }
 
-function ListEditor({ prop, stored, onChange, onClose }: Pick<CellProps, "prop" | "stored" | "onChange"> & { onClose: () => void }) {
+function ListEditor({
+  prop,
+  stored,
+  onChange,
+  onClose,
+}: Pick<CellProps, "prop" | "stored" | "onChange"> & { onClose: () => void }) {
   const members = useMembers();
   const rows = useRows(prop.type === "relation" ? prop.config?.database : undefined);
   const items = useMemo(
     () =>
       prop.type === "member"
-        ? members.map((m) => ({ id: m.user_id, label: m.name, keywords: m.handle, icon: <Avatar member={m} size="xs" /> }))
+        ? members.map((m) => ({
+            id: m.user_id,
+            label: m.name,
+            keywords: m.handle,
+            icon: <Avatar member={m} size="xs" />,
+          }))
         : rows.map((r) => ({ id: r.id, label: docTitle(r) })),
     [prop.type, members, rows],
   );
@@ -150,7 +160,18 @@ function ListEditor({ prop, stored, onChange, onClose }: Pick<CellProps, "prop" 
 }
 
 /** One value of a row, to read and to change. */
-export function Cell({ prop, stored, shown, editing, onEditing, onChange, seed, wrap, placeholder, className }: CellProps) {
+export function Cell({
+  prop,
+  stored,
+  shown,
+  editing,
+  onEditing,
+  onChange,
+  seed,
+  wrap,
+  placeholder,
+  className,
+}: CellProps) {
   const anchor = useRef<HTMLDivElement>(null);
   const box = cx("flex min-h-7 w-full min-w-0 items-center px-2 text-sm", wrap && "py-1", className);
   const value = <CellValue prop={prop} stored={stored} shown={shown} wrap={wrap} />;
@@ -161,7 +182,15 @@ export function Cell({ prop, stored, shown, editing, onEditing, onChange, seed, 
 
   if (prop.type === "checkbox") {
     return (
-      <button type="button" role="checkbox" aria-checked={stored === true} aria-label={prop.name} className={box} onMouseDown={(e) => e.preventDefault()} onClick={() => onChange(stored !== true)}>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={stored === true}
+        aria-label={prop.name}
+        className={box}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => onChange(stored !== true)}
+      >
         <CheckMark on={stored === true} />
       </button>
     );

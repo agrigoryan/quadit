@@ -97,7 +97,9 @@ export function ChartTip({ x, width, title, rows }: TipProps) {
       <p className="mb-0.5 opacity-70">{title}</p>
       {rows.map((row) => (
         <p key={row.name} className="flex items-center gap-1.5">
-          {row.color && <span aria-hidden className="h-0.5 w-2.5 shrink-0 rounded-full" style={{ background: row.color }} />}
+          {row.color && (
+            <span aria-hidden className="h-0.5 w-2.5 shrink-0 rounded-full" style={{ background: row.color }} />
+          )}
           <span className="font-semibold tnum">{row.value}</span>
           <span className="truncate opacity-80">{row.name}</span>
         </p>
@@ -109,7 +111,12 @@ export function ChartTip({ x, width, title, rows }: TipProps) {
 /** The button that swaps a chart for a table of its numbers, and back. */
 export function TableSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
-    <IconButton label={on ? t("ins.chart.showChart") : t("ins.chart.showTable")} size="sm" aria-pressed={on} onClick={() => onChange(!on)}>
+    <IconButton
+      label={on ? t("ins.chart.showChart") : t("ins.chart.showTable")}
+      size="sm"
+      aria-pressed={on}
+      onClick={() => onChange(!on)}
+    >
       {on ? <ChartNoAxesColumn className="size-3.5" /> : <Table2 className="size-3.5" />}
     </IconButton>
   );
@@ -133,7 +140,10 @@ export function DataTable({ caption, head, rows }: TableProps) {
               <th
                 key={h}
                 scope="col"
-                className={cx("border-b border-line py-1 font-medium text-ink-3", i === 0 ? "text-left" : "pl-3 text-right")}
+                className={cx(
+                  "border-b border-line py-1 font-medium text-ink-3",
+                  i === 0 ? "text-left" : "pl-3 text-right",
+                )}
               >
                 {h}
               </th>

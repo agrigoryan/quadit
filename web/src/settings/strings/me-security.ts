@@ -22,7 +22,8 @@ export const meSecurityStrings = {
   "me.twoStep.setUp": "Set up",
   "me.twoStep.setupTitle": "Set up two-step verification",
   "me.twoStep.step1": "1. Add Quadit to your authenticator app",
-  "me.twoStep.step1Hint": "Scan the code with an app such as 1Password, Google Authenticator or Authy. If you cannot scan, type the key in instead.",
+  "me.twoStep.step1Hint":
+    "Scan the code with an app such as 1Password, Google Authenticator or Authy. If you cannot scan, type the key in instead.",
   "me.twoStep.qrLabel": "QR code to scan with an authenticator app",
   "me.twoStep.secret": "Key",
   "me.twoStep.step2": "2. Enter the code the app shows",
@@ -33,7 +34,8 @@ export const meSecurityStrings = {
   "me.twoStep.turnOff": "Turn off",
   "me.twoStep.turnedOff": "Two-step verification is off",
   "me.twoStep.offTitle": "Turn off two-step verification?",
-  "me.twoStep.offBody": "Your password alone will sign you in, and your recovery codes stop working. Confirm with a current code or your password.",
+  "me.twoStep.offBody":
+    "Your password alone will sign you in, and your recovery codes stop working. Confirm with a current code or your password.",
   "me.twoStep.renew": "New recovery codes",
   "me.twoStep.renewTitle": "Make new recovery codes",
   "me.twoStep.renewBody": "The ten old codes stop working at once. Confirm with a current code from your app.",
@@ -44,7 +46,8 @@ export const meSecurityStrings = {
   "me.twoStep.codesDownload": "Download as a text file",
 
   "me.passkeys.title": "Passkeys",
-  "me.passkeys.lead": "Sign in with your fingerprint, face or a security key. A passkey needs no password and no second step.",
+  "me.passkeys.lead":
+    "Sign in with your fingerprint, face or a security key. A passkey needs no password and no second step.",
   "me.passkeys.add": "Add a passkey",
   "me.passkeys.addTitle": "Add a passkey",
   "me.passkeys.addBody": "Your browser will ask where to keep it: this device, your phone or a security key.",
@@ -56,7 +59,8 @@ export const meSecurityStrings = {
   "me.passkeys.added": "Added",
   "me.passkeys.unsupported": "This browser cannot make passkeys.",
   "me.passkeys.removeTitle": "Remove “{name}”?",
-  "me.passkeys.removeBody": "It will no longer sign you in. The passkey stays on your device until you delete it there too.",
+  "me.passkeys.removeBody":
+    "It will no longer sign you in. The passkey stays on your device until you delete it there too.",
 
   "me.identities.title": "Connected accounts",
   "me.identities.lead": "Accounts elsewhere that sign you in here.",

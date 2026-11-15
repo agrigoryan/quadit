@@ -35,7 +35,13 @@ function SubtaskRow({ task }: { task: Task }) {
         </TaskPropertyPicker>
       )}
       <span className="shrink-0 text-xs text-ink-3 tnum">{task.key}</span>
-      <Link {...link} className={cx("min-w-0 flex-1 truncate py-1.5 outline-none after:absolute after:inset-0 after:content-['']", closed && "text-ink-2")}>
+      <Link
+        {...link}
+        className={cx(
+          "min-w-0 flex-1 truncate py-1.5 outline-none after:absolute after:inset-0 after:content-['']",
+          closed && "text-ink-2",
+        )}
+      >
         {task.title}
       </Link>
       <IconButton
@@ -122,7 +128,10 @@ export function Subtasks({ task, subtasks, focusAdd }: Props) {
               aria-label={t("task.subtasks", { done, total })}
               className="block h-1 w-16 overflow-hidden rounded-full bg-sunken"
             >
-              <span className="block h-full rounded-full bg-ok transition-[width] duration-150" style={{ width: `${(done / total) * 100}%` }} />
+              <span
+                className="block h-full rounded-full bg-ok transition-[width] duration-150"
+                style={{ width: `${(done / total) * 100}%` }}
+              />
             </span>
             {t("detail.subtasks.progress", { done, total })}
           </span>

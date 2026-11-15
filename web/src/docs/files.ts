@@ -33,7 +33,12 @@ export function saveText(fileName: string, text: string, type = "text/markdown")
 }
 
 /** A page title as a safe file name. */
-export const fileNameOf = (title: string) => (title.trim().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").slice(0, 80) || "page") + ".md";
+export const fileNameOf = (title: string) =>
+  (title
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 80) || "page") + ".md";
 
 /** A Markdown file's title: its first heading, else the file's name. */
 export function titleOf(markdown: string, fileName: string): { title: string; body: string } {

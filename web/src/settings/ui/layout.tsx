@@ -99,7 +99,10 @@ export function Page({ title, lead, actions, back, backLabel, wide, children }: 
     <div className={cx("mx-auto w-full px-4 pt-4 pb-16 md:px-8 md:pt-7", wide ? "max-w-5xl" : "max-w-3xl")}>
       <Link
         to={back}
-        className={cx("mb-2 -ml-1 inline-flex h-7 items-center gap-0.5 rounded-md pr-2 text-sm text-ink-2 hover:text-ink", !backLabel && "md:hidden")}
+        className={cx(
+          "mb-2 -ml-1 inline-flex h-7 items-center gap-0.5 rounded-md pr-2 text-sm text-ink-2 hover:text-ink",
+          !backLabel && "md:hidden",
+        )}
       >
         <ChevronLeft className="size-4" aria-hidden />
         {backLabel ?? t("common.back")}
@@ -149,7 +152,11 @@ export function Card({ children, className }: { children: ReactNode; className?:
 
 /** A bordered list: each child is one row, with a line between rows. */
 export function Rows({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface", className)}>{children}</div>;
+  return (
+    <div className={cx("divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface", className)}>
+      {children}
+    </div>
+  );
 }
 
 interface RowProps {
@@ -193,5 +200,9 @@ export function Row({ lead, title, sub, meta, actions, onClick, className }: Row
 
 /** What a list says when it has nothing in it. */
 export function EmptyRow({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-dashed border-line-strong px-4 py-6 text-center text-sm text-ink-2">{children}</div>;
+  return (
+    <div className="rounded-lg border border-dashed border-line-strong px-4 py-6 text-center text-sm text-ink-2">
+      {children}
+    </div>
+  );
 }
