@@ -9,7 +9,6 @@ import {
   Bookmark,
   Bot,
   Building2,
-  ChartGantt,
   CircleDot,
   Copy,
   FilePlus2,
@@ -17,24 +16,16 @@ import {
   FolderGit2,
   FolderKanban,
   FolderPlus,
-  Inbox,
-  Kanban,
   Keyboard,
   KeyRound,
-  Layers,
-  LayoutDashboard,
   Link2,
   ListPlus,
-  ListTodo,
   LogOut,
-  MessageCircleQuestion,
   Monitor,
   Moon,
   Plug,
   Plus,
-  RefreshCw,
   ScrollText,
-  Settings,
   Shapes,
   ShieldCheck,
   SignalHigh,
@@ -44,7 +35,6 @@ import {
   SunMoon,
   Tag,
   Tags,
-  Trash2,
   UserRound,
   Users,
   Webhook,
@@ -60,6 +50,7 @@ import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import type { Project, Task } from "@/lib/types";
 import { ui } from "@/lib/ui-state";
+import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";
 import { openNewTask } from "@/tasks/draft";
 
 export type ChoicePage = "status" | "assignee" | "priority" | "labels";
@@ -201,30 +192,23 @@ export function useCommands({ slug, task, project, run, go, openPage }: CommandC
       : []),
   ];
 
+  // The places are one table (shell/destinations.tsx). A project's pages are listed for every project;
+  // the letters after G go to those of the project in view, so only its rows carry the hint.
+  const place = (d: Destination, of: Project | undefined): Cmd[] => {
+    const path = destinationPath(d, { slug, project: of, installAdmin });
+    if (!path) return [];
+    const label = d.perProject && of ? t(d.perProject, { project: of.name }) : t(d.label);
+    const words = [d.perProject && of ? of.key : "", d.words ?? ""].join(" ").trim();
+    const hint = !d.perProject || of?.id === project?.id ? goKeys(d) : undefined;
+    return [{ id: of && d.perProject ? `go:${d.id}:${of.id}` : `go:${d.id}`, label, words, icon: d.icon, hint, run: () => go(path) }];
+  };
+  const firstOfProject = DESTINATIONS.findIndex((d) => d.perProject);
+  const lastOfProject = DESTINATIONS.findLastIndex((d) => d.perProject);
   const goTo: Cmd[] = [
-    { id: "go:my-work", label: t("nav.myWork"), words: "home assigned", icon: <UserRound />, run: at("my-work") },
-    { id: "go:inbox", label: t("nav.inbox"), words: "notifications", icon: <Inbox />, run: at("inbox") },
-    ...projects.flatMap((p) => {
-      const name = { project: p.name };
-      const base = `p/${p.key}`;
-      return [
-        { id: `go:tasks:${p.id}`, label: t("palette.projectTasks", name), words: `${p.key} list`, icon: <ListTodo />, run: at(`${base}/tasks`) },
-        { id: `go:board:${p.id}`, label: t("palette.projectBoard", name), words: `${p.key} kanban`, icon: <Kanban />, run: at(`${base}/board`) },
-        { id: `go:timeline:${p.id}`, label: t("palette.projectTimeline", name), words: `${p.key} gantt roadmap`, icon: <ChartGantt />, run: at(`${base}/timeline`) },
-        { id: `go:epics:${p.id}`, label: t("palette.projectEpics", name), words: p.key, icon: <Layers />, run: at(`${base}/epics`) },
-        ...(p.settings?.cycles
-          ? [{ id: `go:cycles:${p.id}`, label: t("palette.projectCycles", name), words: `${p.key} sprints`, icon: <RefreshCw />, run: at(`${base}/cycles`) }]
-          : []),
-      ];
-    }),
+    ...DESTINATIONS.slice(0, firstOfProject).flatMap((d) => place(d, undefined)),
+    ...projects.flatMap((p) => DESTINATIONS.filter((d) => d.perProject).flatMap((d) => place(d, p))),
     ...views.map((v) => ({ id: `go:view:${v.id}`, label: v.name, words: "view", icon: <Bookmark />, run: at(`view/${v.slug}`) })),
-    { id: "go:docs", label: t("nav.docs"), words: "pages documents wiki", icon: <FileText />, run: at("docs") },
-    { id: "go:dashboard", label: t("nav.dashboard"), words: "overview charts", icon: <LayoutDashboard />, run: at("dashboard") },
-    { id: "go:agents", label: t("nav.agents"), words: "sessions", icon: <Bot />, run: at("agents") },
-    { id: "go:decisions", label: t("nav.decisions"), words: "questions log", icon: <MessageCircleQuestion />, run: at("decisions") },
-    { id: "go:trash", label: t("nav.trash"), words: "deleted", icon: <Trash2 />, run: at("trash") },
-    { id: "go:settings", label: t("nav.settings"), words: "preferences", icon: <Settings />, run: at("settings") },
-    ...(installAdmin ? [{ id: "go:admin", label: t("palette.admin"), words: "install server instance", icon: <Wrench />, run: () => go("/admin") }] : []),
+    ...DESTINATIONS.slice(lastOfProject + 1).flatMap((d) => place(d, undefined)),
   ];
 
   const settings: Cmd[] = [

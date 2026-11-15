@@ -117,7 +117,12 @@ export const pages = {
   "palette.empty": "Nothing matches “{q}”",
   "palette.noLabels": "This project has no labels yet",
 
+  "goto.title": "Go to…",
+  "goto.project": "Project pages: {project}",
+
   "shortcuts.group.anywhere": "Anywhere",
+  "shortcuts.group.goto": "Go to",
+  "shortcuts.group.gotoHint": "G, then the letter. A project's pages open for the project in view.",
   "shortcuts.group.lists": "Lists",
   "shortcuts.group.listsHint": "The task list, My work and the inbox.",
   "shortcuts.group.inbox": "Inbox",

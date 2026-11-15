@@ -2,15 +2,16 @@ import { lazy, type ReactNode, Suspense, useEffect } from "react";
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { ShortcutsSheet } from "@/palette/shortcuts";
 import { useHotkeys } from "@/lib/hotkeys";
-import { findTaskByKey } from "@/lib/selectors";
-import { getState, useStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { ui, useUi } from "@/lib/ui-state";
 import { InboxPage } from "@/pages/inbox";
 import { MyWorkPage } from "@/pages/my-work";
 import { TrashPage } from "@/pages/trash";
 import { insightPaths } from "@/insights/paths";
 import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
+import { GoHint, useGoKeys } from "@/shell/go-keys";
 import { NotFoundPage } from "@/shell/placeholders";
+import { projectInView } from "@/shell/project-in-view";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
@@ -51,18 +52,6 @@ function Part({ on, children }: { on: string | boolean; children: ReactNode }) {
   );
 }
 
-/** The project a new task should default to, given what is on screen. */
-function projectInView(pagePath: string, taskKey: string | undefined): string | undefined {
-  const { c } = getState();
-  if (taskKey) {
-    const task = findTaskByKey(c.tasks, taskKey);
-    if (task) return task.project_id;
-  }
-  const key = matchPath("/:ws/p/:key/*", pagePath)?.params.key;
-  const projects = Object.values(c.projects).filter((p) => !p.deleted_at && !p.archived_at);
-  return (projects.find((p) => p.key === key) ?? projects.sort((a, b) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1))[0])?.id;
-}
-
 /**
  * The frame of a workspace: sidebar, top bar, the page, and the task panel.
  *
@@ -89,7 +78,7 @@ export function Shell() {
   const page: Location | string = taskKey ? (background ?? fallback) : location;
   const pagePath = typeof page === "string" ? page : page.pathname;
 
-  const openNewTask = () => ui.newTask({ projectId: projectInView(pagePath, taskKey) });
+  const openNewTask = () => ui.newTask({ projectId: projectInView(location)?.id });
   const closePanel = () => navigate(typeof page === "string" ? page : page.pathname + page.search);
 
   useHotkeys(
@@ -106,6 +95,7 @@ export function Shell() {
     },
     { layer: "global" },
   );
+  useGoKeys();
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -139,6 +129,7 @@ export function Shell() {
       <Part on={paletteOpen}>{paletteOpen && <CommandPalette />}</Part>
       <Part on={!!newTask}>{newTask && <CreateTaskDialog draft={newTask} />}</Part>
       <ShortcutsSheet />
+      <GoHint />
     </div>
   );
 }

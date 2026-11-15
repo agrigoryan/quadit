@@ -1,5 +1,6 @@
 // Single-key shortcuts ("j", "c", "?") and combinations ("mod+k"). A key
 // typed into a field, or while a dialog or menu is open, is left alone.
+// Two keys in a row ("g" then "i") are in lib/key-sequence.ts.
 
 import { useEffect, useRef } from "react";
 
@@ -11,13 +12,13 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 /** The modifier shown in hints: the command key on a Mac, Ctrl elsewhere. */
 export const MOD = isMac ? "⌘" : "Ctrl";
 
-function isTyping(target: EventTarget | null): boolean {
+export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 /** True while a dialog, menu or picker is open above the page. */
-function overlayOpen(): boolean {
+export function overlayOpen(): boolean {
   return document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-overlay]') !== null;
 }
 

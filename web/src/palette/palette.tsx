@@ -4,13 +4,14 @@ import { Search } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { type Location, matchPath, useLocation, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
-import { useProjects, useSlug, useTaskByKey } from "@/lib/selectors";
+import { useSlug, useTaskByKey } from "@/lib/selectors";
 import { ui, useUi } from "@/lib/ui-state";
 import { choiceTitle, ChoicesPage } from "@/palette/palette-choices";
 import type { ChoicePage, MakePage, PalettePage } from "@/palette/palette-commands";
 import { makeTitle, MakePageRows } from "@/palette/palette-make";
 import { RootPage } from "@/palette/palette-root";
 import { useServerSearch } from "@/palette/palette-search";
+import { projectInView } from "@/shell/project-in-view";
 import { Spinner } from "@/ui/spinner";
 
 /**
@@ -27,7 +28,6 @@ function Palette() {
   const slug = useSlug();
   const location = useLocation();
   const navigate = useNavigate();
-  const projects = useProjects();
   const [page, setPage] = useState<"root" | PalettePage>("root");
   const [query, setQuery] = useState("");
   const box = useRef<HTMLInputElement>(null);
@@ -36,11 +36,8 @@ function Palette() {
   const task = useTaskByKey(taskKey);
   const openTask = task && !task.deleted_at ? task : undefined;
   const background = (location.state as { background?: Location } | null)?.background;
-  // The page under the task panel, or the page itself, says which project is in view.
-  const pagePath = taskKey ? (background?.pathname ?? "") : location.pathname;
-  const projectKey = matchPath("/:ws/p/:key/*", pagePath)?.params.key;
-  const project =
-    projects.find((p) => p.id === openTask?.project_id) ?? projects.find((p) => p.key === projectKey?.toUpperCase()) ?? projects[0];
+  // Where a new task, label or status goes, and whose pages the letters after G open.
+  const project = projectInView(location);
 
   // A page that needs the open task or a project falls back to the first page without one.
   const making: MakePage | null = (page === "new-label" || page === "new-status") && project ? page : null;

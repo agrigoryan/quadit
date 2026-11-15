@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { MOD } from "@/lib/hotkeys";
 import { type Key, t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
+import { DESTINATIONS, goKeys } from "@/shell/destinations";
 import { Dialog } from "@/ui/dialog";
 import { Kbd } from "@/ui/kbd";
 
@@ -43,6 +44,15 @@ const sections: Section[] = [
       { what: "shortcuts.labels", keys: ["L"] },
       { what: "shortcuts.clear", keys: ["Esc"] },
     ],
+  },
+  {
+    // The places and their letters are the table the sequences themselves read.
+    title: "shortcuts.group.goto",
+    hint: "shortcuts.group.gotoHint",
+    rows: DESTINATIONS.flatMap((place) => {
+      const keys = goKeys(place);
+      return keys ? [{ what: place.label, keys: [keys] }] : [];
+    }),
   },
   {
     title: "shortcuts.group.inbox",
