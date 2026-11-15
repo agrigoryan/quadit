@@ -15,6 +15,7 @@
 // it, a note says what was not saved.
 
 import { api, ApiError, errorMessage, NetworkError, workspacePath } from "@/lib/api";
+import type { Changes } from "@/lib/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { outbox, type OutboxChange } from "@/lib/outbox";
@@ -35,12 +36,21 @@ import type { ChangeResult } from "@/lib/types";
 
 type Row = Record<string, unknown>;
 
-export interface ChangeSpec {
-  type: string;
-  args: Row;
-  /** The change id, when the caller needs to recognise its own events in the feed. Made here when left out. */
-  id?: string;
-}
+export type ChangeType = keyof Changes;
+
+/**
+ * One change: its name and the arguments the server takes for it (generated
+ * from the engine, see lib/changes.gen.ts), so a misspelt name or argument
+ * fails the type check, not the request.
+ */
+export type ChangeSpec<K extends ChangeType = ChangeType> = {
+  [P in K]: {
+    type: P;
+    args: Changes[P];
+    /** The change id, when the caller needs to recognise its own events in the feed. Made here when left out. */
+    id?: string;
+  };
+}[K];
 
 /** What an edit does to the local copy before the server answers. */
 export interface Tx {
@@ -237,11 +247,11 @@ export async function restoreQueue(slug: string): Promise<void> {
 function describe(changes: OutboxChange[]): string {
   const first = changes[0] as OutboxChange;
   const { tasks } = getState().collections;
-  const ref = [first.args.task, first.args.id].find((v): v is string => typeof v === "string" && v in tasks);
+  const args: Row = first.args;
+  const ref = [args.task, args.id].find((v): v is string => typeof v === "string" && v in tasks);
   const key = ref ? tasks[ref]?.key : undefined;
   let what: string;
-  if (first.type === "task.create")
-    what = t("sync.what.newTask", { title: typeof first.args.title === "string" ? first.args.title : "" });
+  if (first.type === "task.create") what = t("sync.what.newTask", { title: first.args.title ?? "" });
   else if (key && first.type.startsWith("task.")) what = t("sync.what.task", { key });
   else if (key && first.type.startsWith("comment.")) what = t("sync.what.comment", { key });
   else if (key && first.type.startsWith("attachment.")) what = t("sync.what.file", { key });
@@ -259,6 +269,11 @@ export interface MutateOptions {
  * the server's results; rejects (after undoing the optimistic update and
  * showing the server's message) if the change is refused.
  */
+export function mutate<K extends ChangeType>(
+  changes: ChangeSpec<K> | ChangeSpec<K>[],
+  optimistic?: (tx: Tx) => void,
+  opts?: MutateOptions,
+): Promise<ChangeResult[]>;
 export function mutate(
   changes: ChangeSpec | ChangeSpec[],
   optimistic?: (tx: Tx) => void,
@@ -267,7 +282,7 @@ export function mutate(
   const list = Array.isArray(changes) ? changes : [changes];
   if (list.length === 0) return Promise.resolve([]);
   const { slug, me } = getState();
-  const body = { changes: list.map((c) => ({ id: c.id ?? newId(), type: c.type, args: c.args })) };
+  const body = { changes: list.map((c): OutboxChange => ({ ...c, id: c.id ?? newId() })) };
   // Named before the edit shows, while the rows still read as the person saw them.
   const what = describe(body.changes);
   const undos: Undo[] = [];
@@ -283,7 +298,10 @@ export function mutate(
 }
 
 /** mutate() for callers that do not need the result: a refusal is already shown. */
-export function send(changes: ChangeSpec | ChangeSpec[], optimistic?: (tx: Tx) => void): void {
+export function send<K extends ChangeType>(
+  changes: ChangeSpec<K> | ChangeSpec<K>[],
+  optimistic?: (tx: Tx) => void,
+): void {
   mutate(changes, optimistic).catch(() => {});
 }
 

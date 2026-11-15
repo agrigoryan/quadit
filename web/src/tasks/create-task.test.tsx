@@ -8,15 +8,17 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
-import type { OutboxChange } from "@/lib/outbox";
 import { clearStore, loadBootstrap } from "@/lib/store";
 import type { Member, User, Workspace } from "@/lib/types";
 import { ui, useUi } from "@/lib/ui-state";
 import { CreateTaskDialog } from "@/tasks/create-task";
 import { TooltipProvider } from "@/ui/tooltip";
 
+/** A change as the server receives it: JSON, read field by field. */
+type Sent = { id: string; type: string; args: Record<string, unknown> };
+
 interface Call {
-  changes: OutboxChange[];
+  changes: Sent[];
   answer: () => void;
   fail: (err: unknown) => void;
 }
@@ -29,7 +31,7 @@ beforeEach(() => {
   vi.spyOn(api, "post").mockImplementation(
     (_path: string, body?: unknown) =>
       new Promise((resolve, reject) => {
-        const changes = (body as { changes: OutboxChange[] }).changes;
+        const changes = (body as { changes: Sent[] }).changes;
         calls.push({
           changes,
           answer: () => resolve({ results: changes.map((_, i) => ({ key: `SVA-${i + 1}` })) }),

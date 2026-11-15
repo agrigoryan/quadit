@@ -3,7 +3,8 @@
 // the store: each page fetches its own and fetches again after a change.
 
 import { api, workspacePath } from "@/lib/api";
-import { mutate } from "@/lib/mutate";
+import type { Changes } from "@/lib/changes.gen";
+import { type ChangeSpec, type ChangeType, mutate } from "@/lib/mutate";
 import type { Outcome } from "@/lib/types";
 import type { ActionKind, Delivery, Webhook } from "@/lib/types-automation";
 
@@ -92,8 +93,10 @@ export const listSources = (slug: string) =>
   api.get<{ sources: Source[] }>(workspacePath(slug, "/sources")).then((r) => r.sources ?? []);
 
 /** Sends one named change. A refusal is thrown for the form to show; no toast. */
-export const change = (type: string, args: Record<string, unknown>) =>
-  mutate({ type, args }, undefined, { quiet: true });
+export function change<K extends ChangeType>(type: K, args: Changes[K]) {
+  const spec: ChangeSpec<K> = { type, args };
+  return mutate(spec, undefined, { quiet: true });
+}
 
 /** A signing secret made in the browser, so it can be shown once: 32 random bytes as base64url. */
 export function randomSecret(): string {

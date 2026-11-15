@@ -4,12 +4,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, NetworkError } from "@/lib/api";
 import { clearOutbox, mutate } from "@/lib/mutate";
-import type { OutboxChange } from "@/lib/outbox";
 import { applyEvents, clearStore, getState, loadBootstrap } from "@/lib/store";
 import type { ChangeResult, FeedEvent, Member, User, Workspace } from "@/lib/types";
 
+/** A change as the server receives it: JSON, read field by field. */
+type Sent = { id: string; type: string; args: Record<string, unknown> };
+
 interface Call {
-  changes: OutboxChange[];
+  changes: Sent[];
   answer: (results: ChangeResult[]) => void;
   fail: (err: unknown) => void;
 }
@@ -21,7 +23,7 @@ function fakeServer(): Call[] {
     (_path: string, body?: unknown) =>
       new Promise((resolve, reject) => {
         calls.push({
-          changes: (body as { changes: OutboxChange[] }).changes,
+          changes: (body as { changes: Sent[] }).changes,
           answer: (results) => resolve({ results }),
           fail: reject,
         });

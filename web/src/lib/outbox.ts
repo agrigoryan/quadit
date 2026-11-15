@@ -7,13 +7,13 @@
 // refuses it, as some private windows do) every call quietly does nothing
 // and the queue lives in memory only, as it did before.
 
+import type { Changes } from "@/lib/changes.gen";
 import { newId } from "@/lib/ids";
 
-export interface OutboxChange {
-  id: string;
-  type: string;
-  args: Record<string, unknown>;
-}
+/** A change as it is sent: its id, its name and its arguments. */
+export type OutboxChange = {
+  [K in keyof Changes]: { id: string; type: K; args: Changes[K] };
+}[keyof Changes];
 
 export interface OutboxItem {
   /** Sorts by the time the change was made: the order to send in. */
