@@ -1,8 +1,7 @@
 // The fields of an agent, shared by "New agent" and the agent's own page.
 
 import { t } from "@/lib/i18n";
-import { useMembers, useProjects } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useMembers, useProjects, useRowEvenIfGone } from "@/lib/selectors";
 import { ASKS_FIRST, AsksBefore } from "@/settings/agents/asks-before";
 import { type AgentMember, dollars, toMicros, toMinutes } from "@/settings/agents/data";
 import { AvatarInput } from "@/settings/ui/avatar-input";
@@ -97,7 +96,7 @@ interface Props {
 export function AgentProfileFields({ draft, set, errors, creating, disabled, seed }: Props) {
   const people = useMembers().filter((m) => m.kind === "person" && !m.suspended_at);
   // The one responsible now may no longer be among those who can be chosen (suspended, say): still name them.
-  const current = useStore((s) => (draft.responsible ? s.collections.members[draft.responsible] : undefined));
+  const current = useRowEvenIfGone("members", draft.responsible || undefined);
   const listed = people.some((p) => p.user_id === draft.responsible);
   const responsibleChoices = [
     ...(listed

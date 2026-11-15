@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
 import { NotFoundPage } from "@/ui/not-found";
@@ -11,7 +12,7 @@ import { IntegrationsPage } from "@/settings/automation/integrations";
 import { RulesPage } from "@/settings/automation/rules";
 import { SourcesPage } from "@/settings/automation/sources";
 import { WebhooksPage } from "@/settings/automation/webhooks";
-import { useIsAdmin, useSettingsBase } from "@/settings/base";
+import { useSettingsBase } from "@/settings/base";
 import { ImportPage } from "@/settings/import/import-page";
 import { NotificationsPage } from "@/settings/me/notifications";
 import { ProfilePage } from "@/settings/me/profile";
@@ -62,7 +63,7 @@ function AdminsOnly({ base }: { base: string }) {
 export default function SettingsRoutes() {
   usePageTitle(t("settings.title"));
   const base = useSettingsBase();
-  const admin = useIsAdmin();
+  const admin = useCan().administer;
   const groups = settingsGroups(admin).map((group) => ({
     title: t(group.title),
     items: group.pages.map((page) => ({ to: page.path, label: t(page.label), icon: page.icon })),

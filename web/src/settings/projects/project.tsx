@@ -1,8 +1,9 @@
 import { Link, Navigate, NavLink, Route, Routes, useParams } from "react-router";
 import { cx } from "@/lib/cx";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
-import { useIsAdmin, useSettingsBase } from "@/settings/base";
+import { useArchived, useProjects } from "@/lib/selectors";
+import { useSettingsBase } from "@/settings/base";
 import { ProjectGeneral } from "@/settings/projects/general";
 import { ProjectLabels } from "@/settings/projects/labels";
 import { ProjectPreferences } from "@/settings/projects/preferences";
@@ -19,9 +20,12 @@ const TABS = ["general", "statuses", "labels", "templates", "preferences"] as co
 export function ProjectPage() {
   const { key = "" } = useParams();
   const base = useSettingsBase();
-  const admin = useIsAdmin();
-  const projects = useCollection("projects");
-  const project = Object.values(projects).find((p) => p.key.toLowerCase() === key.toLowerCase() && !p.deleted_at);
+  const admin = useCan().administer;
+  // An archived project's settings still open; a trashed one's do not.
+  const live = useProjects();
+  const archived = useArchived("projects");
+  const low = key.toLowerCase();
+  const project = live.find((p) => p.key.toLowerCase() === low) ?? archived.find((p) => p.key.toLowerCase() === low);
 
   if (!project) {
     return (

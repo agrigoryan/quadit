@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useLookup, useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { Secret } from "@/lib/types";
 import { Avatar } from "@/ui/avatar";
@@ -22,7 +22,7 @@ import { useLoad } from "@/lib/use-load";
 
 /** Who may use a secret: everyone, or the few it names. */
 function UsedBy({ ids }: { ids: string[] }) {
-  const members = useCollection("members");
+  const members = useLookup("members");
   if (ids.length === 0) return <>{t("secrets.everyMember")}</>;
   const known = ids.map((id) => members[id]).filter((m) => m !== undefined);
   return (

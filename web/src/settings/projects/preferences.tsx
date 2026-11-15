@@ -3,7 +3,7 @@ import { MoreHorizontal, RotateCcw, Trash2, Archive } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
-import { useCollection, useLabels } from "@/lib/selectors";
+import { useLabels, useLookup, useLookupEvenIfGone, useRows } from "@/lib/selectors";
 import type { Project } from "@/lib/types";
 import type { Preference } from "@/lib/types-plan";
 import { MultiPick } from "@/settings/ui/multi-pick";
@@ -19,14 +19,15 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/me
 
 /** The standing preferences of a project: what the team has settled, for agents to read before they work. */
 export function ProjectPreferences({ project, admin }: { project: Project; admin: boolean }) {
-  const rows = useCollection("preferences");
-  const members = useCollection("members");
-  const labels = useCollection("labels");
+  const rows = useRows("preferences");
+  // Who wrote a preference, one since removed included.
+  const members = useLookupEvenIfGone("members");
+  const labels = useLookup("labels");
   const [deleting, setDeleting] = useState<Preference | null>(null);
 
   const { active, retired } = useMemo(() => {
-    const mine = Object.values(rows)
-      .filter((p) => !p.deleted_at && (!p.project_id || p.project_id === project.id))
+    const mine = rows
+      .filter((p) => !p.project_id || p.project_id === project.id)
       .sort((a, b) => b.created_at - a.created_at);
     return { active: mine.filter((p) => !p.retired_at), retired: mine.filter((p) => p.retired_at) };
   }, [rows, project.id]);

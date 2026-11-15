@@ -7,7 +7,7 @@ import type { Changes } from "@/lib/changes.gen";
 import { useMemo } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { mutate } from "@/lib/mutate";
-import { useCollection } from "@/lib/selectors";
+import { useRows } from "@/lib/selectors";
 import { getState, mergeRows } from "@/lib/store";
 import type { Secret } from "@/lib/types";
 
@@ -20,14 +20,8 @@ export async function loadSecrets(slug: string): Promise<true> {
 
 /** The secrets that exist, by name. */
 export function useSecrets(): Secret[] {
-  const secrets = useCollection("secrets");
-  return useMemo(
-    () =>
-      Object.values(secrets)
-        .filter((s) => !s.deleted_at)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [secrets],
-  );
+  const secrets = useRows("secrets");
+  return useMemo(() => [...secrets].sort((a, b) => a.name.localeCompare(b.name)), [secrets]);
 }
 
 // The same shapes the server checks (internal/engine/ch_secret.go).

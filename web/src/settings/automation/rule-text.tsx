@@ -3,15 +3,15 @@
 
 import type { ReactNode } from "react";
 import { t, tMaybe } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/lib/selectors";
 import type { Rule, Webhook } from "@/lib/types-automation";
 import { eventName } from "@/settings/automation/event-picker";
 
 const Strong = ({ children }: { children: ReactNode }) => <span className="font-medium text-ink">{children}</span>;
 
 export function RuleSentence({ rule, hooks }: { rule: Rule; hooks: Webhook[] }) {
-  const projects = useCollection("projects");
-  const members = useCollection("members");
+  const projects = useLookupEvenIfGone("projects");
+  const members = useLookupEvenIfGone("members");
   const m = rule.match ?? {};
   const a = rule.action;
 

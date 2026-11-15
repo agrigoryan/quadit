@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { HelpCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { t, tMaybe } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
-import { useCollection } from "@/lib/selectors";
+import { useTemplates } from "@/lib/selectors";
 import type { Project, Template } from "@/lib/types";
 import { TemplateDialog } from "@/settings/projects/template-dialog";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -23,26 +24,21 @@ export type Preset = NonNullable<Template["preset"]> & { decision?: DecisionSkel
 
 /** A project's task templates. */
 export function ProjectTemplates({ project }: { project: Project }) {
-  const all = useCollection("templates");
+  const templates = useTemplates(project.id);
+  const can = useCan();
   const [editing, setEditing] = useState<Template | "new" | null>(null);
   const [deleting, setDeleting] = useState<Template | null>(null);
-
-  const templates = useMemo(
-    () =>
-      Object.values(all)
-        .filter((tp) => !tp.deleted_at && (!tp.project_id || tp.project_id === project.id))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [all, project.id],
-  );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-prose text-sm text-ink-2">{t("templates.lead")}</p>
-        <Button onClick={() => setEditing("new")}>
-          <Plus className="size-3.5" aria-hidden />
-          {t("templates.new")}
-        </Button>
+        {can.write && (
+          <Button onClick={() => setEditing("new")}>
+            <Plus className="size-3.5" aria-hidden />
+            {t("templates.new")}
+          </Button>
+        )}
       </div>
       {templates.length === 0 ? (
         <EmptyRow>{t("templates.none")}</EmptyRow>
@@ -50,6 +46,7 @@ export function ProjectTemplates({ project }: { project: Project }) {
         <Rows>
           {templates.map((tp) => {
             const preset = (tp.preset ?? {}) as Preset;
+            const editable = can.edit(tp.project_id);
             return (
               <Row
                 key={tp.id}
@@ -59,7 +56,7 @@ export function ProjectTemplates({ project }: { project: Project }) {
                     .filter(Boolean)
                     .join(" · ") || undefined
                 }
-                onClick={() => setEditing(tp)}
+                onClick={editable ? () => setEditing(tp) : undefined}
                 meta={
                   <span className="flex items-center gap-1.5 max-sm:hidden">
                     {!!preset.priority && (
@@ -78,14 +75,16 @@ export function ProjectTemplates({ project }: { project: Project }) {
                   </span>
                 }
                 actions={
-                  <>
-                    <IconButton label={`${t("common.edit")}: ${tp.name}`} onClick={() => setEditing(tp)}>
-                      <Pencil className="size-3.5" />
-                    </IconButton>
-                    <IconButton label={`${t("s.delete")}: ${tp.name}`} onClick={() => setDeleting(tp)}>
-                      <Trash2 className="size-3.5" />
-                    </IconButton>
-                  </>
+                  editable && (
+                    <>
+                      <IconButton label={`${t("common.edit")}: ${tp.name}`} onClick={() => setEditing(tp)}>
+                        <Pencil className="size-3.5" />
+                      </IconButton>
+                      <IconButton label={`${t("s.delete")}: ${tp.name}`} onClick={() => setDeleting(tp)}>
+                        <Trash2 className="size-3.5" />
+                      </IconButton>
+                    </>
+                  )
                 }
               />
             );

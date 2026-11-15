@@ -3,8 +3,7 @@ import { Link2, Mail, UserPlus } from "lucide-react";
 import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { dayAndMonth } from "@/lib/time";
-import { useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import type { Role } from "@/lib/types";
 import { Fact } from "@/ui/fact";
@@ -38,7 +37,7 @@ export interface Created {
 /** Invitations that are still good, and the way to make one. */
 export function InvitesSection() {
   const slug = useSlug();
-  const members = useStore((s) => s.collections.members);
+  const members = useLookupEvenIfGone("members");
   const invites = useLoad(
     () => api.get<{ invites: Invite[] }>(workspacePath(slug, "/invites")).then((r) => r.invites),
     [slug],

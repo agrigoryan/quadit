@@ -3,13 +3,13 @@ import { ChevronRight, CornerDownRight, Plus, Radio } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
-import { useMembers } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { useLookupEvenIfGone, useMembers } from "@/lib/selectors";
 import { CreateAgentDialog } from "@/settings/agents/agent-create";
 import { type AgentMember } from "@/settings/agents/data";
 import { type AgentState, useAgentStates } from "@/lib/listening";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
-import { useIsAdmin, useSettingsBase } from "@/settings/base";
+import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { When } from "@/ui/when";
 import { Checkbox } from "@/ui/form";
@@ -49,10 +49,11 @@ export function StateBadge({ state }: { state: AgentState | undefined }) {
 /** Every agent in the workspace: what it is, what it is doing, and whether anything is listening for it. */
 export function AgentsPage() {
   const base = useSettingsBase();
-  const admin = useIsAdmin();
+  const admin = useCan().administer;
   const navigate = useNavigate();
   const agents = useMembers().filter((m) => m.kind === "agent") as AgentMember[];
-  const members = useStore((s) => s.collections.members);
+  // Names of who answers for an agent and who made a helper, a removed one included.
+  const members = useLookupEvenIfGone("members");
   const states = useAgentStates();
   const [creating, setCreating] = useState(false);
   const [showFinished, setShowFinished] = useState(false);

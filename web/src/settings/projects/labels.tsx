@@ -1,11 +1,13 @@
 import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
-import { useCollection } from "@/lib/selectors";
+import { useRows } from "@/lib/selectors";
 import type { Label, Project } from "@/lib/types";
+import { useTasksOutOfTrash } from "@/settings/projects/data";
 import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";
 import { SWATCHES } from "@/lib/swatches";
@@ -21,10 +23,13 @@ const patch = (label: Label, fields: Partial<Label>) =>
 function LabelRows({
   labels,
   counts,
+  admin,
   onDelete,
 }: {
   labels: Label[];
   counts: Record<string, number>;
+  /** Renaming, recolouring and deleting a label is an admin's call (label.update, label.delete). */
+  admin: boolean;
   onDelete: (label: Label) => void;
 }) {
   return (
@@ -35,12 +40,20 @@ function LabelRows({
             value={label.color}
             onChange={(color) => patch(label, { color })}
             label={t("labels.color", { name: label.name })}
+            disabled={!admin}
           />
-          <InlineName value={label.name} onSave={(name) => patch(label, { name })} label={t("labels.name")} />
+          <InlineName
+            value={label.name}
+            onSave={(name) => patch(label, { name })}
+            label={t("labels.name")}
+            disabled={!admin}
+          />
           <span className="shrink-0 text-xs text-ink-3 tnum">{t("statuses.count", { n: counts[label.id] ?? 0 })}</span>
-          <IconButton label={`${t("s.delete")}: ${label.name}`} onClick={() => onDelete(label)}>
-            <Trash2 className="size-3.5" />
-          </IconButton>
+          {admin && (
+            <IconButton label={`${t("s.delete")}: ${label.name}`} onClick={() => onDelete(label)}>
+              <Trash2 className="size-3.5" />
+            </IconButton>
+          )}
         </div>
       ))}
     </Rows>
@@ -49,17 +62,15 @@ function LabelRows({
 
 /** The labels tasks in this project can carry: its own, and the workspace's. */
 export function ProjectLabels({ project }: { project: Project }) {
-  const all = useCollection("labels");
-  const tasks = useCollection("tasks");
+  const all = useRows("labels");
+  const tasks = useTasksOutOfTrash();
+  const can = useCan();
   const [deleting, setDeleting] = useState<Label | null>(null);
 
   const { own, shared, counts } = useMemo(() => {
-    const live = Object.values(all)
-      .filter((l) => !l.deleted_at)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const live = [...all].sort((a, b) => a.name.localeCompare(b.name));
     const counts: Record<string, number> = {};
-    for (const task of Object.values(tasks)) {
-      if (task.deleted_at) continue;
+    for (const task of tasks) {
       for (const id of task.label_ids ?? []) counts[id] = (counts[id] ?? 0) + 1;
     }
     return { own: live.filter((l) => l.project_id === project.id), shared: live.filter((l) => !l.project_id), counts };
@@ -72,15 +83,15 @@ export function ProjectLabels({ project }: { project: Project }) {
         {own.length === 0 ? (
           <EmptyRow>{t("labels.none")}</EmptyRow>
         ) : (
-          <LabelRows labels={own} counts={counts} onDelete={setDeleting} />
+          <LabelRows labels={own} counts={counts} admin={can.administer} onDelete={setDeleting} />
         )}
       </Section>
       {shared.length > 0 && (
         <Section title={t("labels.workspace")}>
-          <LabelRows labels={shared} counts={counts} onDelete={setDeleting} />
+          <LabelRows labels={shared} counts={counts} admin={can.administer} onDelete={setDeleting} />
         </Section>
       )}
-      <AddLabel project={project} used={own.length + shared.length} />
+      {can.write && <AddLabel project={project} used={own.length + shared.length} />}
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}

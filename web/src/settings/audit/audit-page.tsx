@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
 import { AuditLog } from "@/admin/audit-log";
 import { useSettingsBase } from "@/settings/base";
 
@@ -9,7 +9,8 @@ import { useSettingsBase } from "@/settings/base";
 export function WorkspaceAuditPage() {
   const slug = useSlug();
   const base = useSettingsBase();
-  const members = useCollection("members");
+  // Removed members too: what they did is still in the log.
+  const members = useLookupEvenIfGone("members");
   const actors = useMemo(
     () =>
       Object.values(members)

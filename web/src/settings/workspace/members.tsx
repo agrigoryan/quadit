@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { MoreHorizontal, Pause, Pencil, Play, UserMinus } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { mutate, send } from "@/lib/mutate";
 import { useMe, useMembers } from "@/lib/selectors";
 import type { Member, Role } from "@/lib/types";
-import { useIsAdmin, useSettingsBase } from "@/settings/base";
+import { useSettingsBase } from "@/settings/base";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { NativeSelect } from "@/ui/form";
@@ -23,7 +24,7 @@ type Ask = { kind: "edit" | "suspend" | "remove"; member: Member } | null;
 /** The people of the workspace, their roles, and the invitations that are out. */
 export function MembersPage() {
   const base = useSettingsBase();
-  const admin = useIsAdmin();
+  const admin = useCan().administer;
   const me = useMe();
   const people = useMembers().filter((m) => m.kind === "person");
   const [ask, setAsk] = useState<Ask>(null);

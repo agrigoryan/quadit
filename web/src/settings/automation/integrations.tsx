@@ -3,7 +3,7 @@ import { GitPullRequest, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2, Webhoo
 import { api, errorMessage, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
@@ -68,7 +68,7 @@ interface ItemProps {
 }
 
 function IntegrationItem({ it, sync, onSync, onToggle, onEdit, onHook, onDelete }: ItemProps) {
-  const projects = useCollection("projects");
+  const projects = useLookupEvenIfGone("projects");
   const project = it.project_id ? projects[it.project_id] : undefined;
   const cfg = it.config ?? {};
   const name = it.name || cfg.repo || t("auto.gh.unnamed");

@@ -3,7 +3,7 @@ import { KeyRound, Plus } from "lucide-react";
 import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { fullDate } from "@/lib/time";
-import { useCollection, useMe, useProjects, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useMe, useProjects, useSlug } from "@/lib/selectors";
 import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";
@@ -94,7 +94,8 @@ export function MyTokensPage() {
   const base = useSettingsBase();
   const slug = useSlug();
   const me = useMe();
-  const projects = useCollection("projects");
+  // A token may name a project since archived: still show its key.
+  const projects = useLookupEvenIfGone("projects");
   const list = useLoad(
     () =>
       api

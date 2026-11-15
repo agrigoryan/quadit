@@ -5,10 +5,11 @@ import type { Changes } from "@/lib/changes.gen";
 import { type ReactNode, useState } from "react";
 import { Link2, Mail, UserCheck } from "lucide-react";
 import { api, ApiError, workspacePath } from "@/lib/api";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
-import { useMe, useSlug } from "@/lib/selectors";
+import { useSlug } from "@/lib/selectors";
 import type { Role } from "@/lib/types";
 import { FormField, NativeSelect, refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
@@ -32,7 +33,7 @@ interface Props {
 
 export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
   const slug = useSlug();
-  const me = useMe();
+  const can = useCan();
   const [mode, setMode] = useState<Mode>("email");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
@@ -43,7 +44,7 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
   const [unknown, setUnknown] = useState("");
   const errors = useFieldErrors(["email", "role", "user", "scope"]);
   // Nobody can invite above their own role.
-  const roles = me.role === "owner" ? ROLES : ROLES.filter((r) => r !== "owner");
+  const roles = can.own ? ROLES : ROLES.filter((r) => r !== "owner");
 
   function go(next: Mode) {
     setMode(next);

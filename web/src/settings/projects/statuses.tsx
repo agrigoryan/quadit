@@ -23,7 +23,8 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
-import { useCollection, useStatuses } from "@/lib/selectors";
+import { useStatuses } from "@/lib/selectors";
+import { useTasksOutOfTrash } from "@/settings/projects/data";
 import { CATEGORIES, type Category, type Project, type Status } from "@/lib/types";
 import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";
@@ -133,7 +134,7 @@ function StatusRow({ status, count, admin, onDelete, onDefault }: RowProps) {
 /** A project's statuses: rename, recolour, set what each means, reorder by dragging, add and delete. */
 export function ProjectStatuses({ project, admin }: { project: Project; admin: boolean }) {
   const statuses = useStatuses(project.id);
-  const tasks = useCollection("tasks");
+  const tasks = useTasksOutOfTrash();
   const [deleting, setDeleting] = useState<Status | null>(null);
   const [moveTo, setMoveTo] = useState("");
   const sensors = useSensors(
@@ -144,8 +145,7 @@ export function ProjectStatuses({ project, admin }: { project: Project; admin: b
 
   const counts = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const task of Object.values(tasks))
-      if (task.project_id === project.id && !task.deleted_at) out[task.status_id] = (out[task.status_id] ?? 0) + 1;
+    for (const task of tasks) if (task.project_id === project.id) out[task.status_id] = (out[task.status_id] ?? 0) + 1;
     return out;
   }, [tasks, project.id]);
 

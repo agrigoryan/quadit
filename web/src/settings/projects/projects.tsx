@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
-import { useCollection } from "@/lib/selectors";
+import { sortByRank, useArchived, useLookupEvenIfGone, useProjects } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import type { Project } from "@/lib/types";
-import { useIsAdmin, useSettingsBase } from "@/settings/base";
+import { useSettingsBase } from "@/settings/base";
+import { useTasksOutOfTrash } from "@/settings/projects/data";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";
 import { SWATCHES } from "@/lib/swatches";
 import { refuse, useFieldErrors } from "@/ui/form";
@@ -17,8 +19,6 @@ import { ProjectGlyph } from "@/ui/project-glyph";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
-
-const byRank = (a: Project, b: Project) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1);
 
 function ProjectRow({ project, tasks }: { project: Project; tasks: number }) {
   const base = useSettingsBase();
@@ -51,9 +51,12 @@ function ProjectRow({ project, tasks }: { project: Project; tasks: number }) {
 /** Every project of the workspace, and the way to make one. */
 export function ProjectsPage() {
   const base = useSettingsBase();
-  const admin = useIsAdmin();
-  const projects = useCollection("projects");
-  const tasks = useCollection("tasks");
+  const admin = useCan().administer;
+  const active = useProjects();
+  const archivedRows = useArchived("projects");
+  // Trashed ones too: the colour of a new project follows how many were ever made.
+  const everyProject = useLookupEvenIfGone("projects");
+  const tasks = useTasksOutOfTrash();
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
 
@@ -65,15 +68,12 @@ export function ProjectsPage() {
     }
   }, [params, setParams, admin]);
 
-  const { active, archived, counts } = useMemo(() => {
-    const live = Object.values(projects)
-      .filter((p) => !p.deleted_at)
-      .sort(byRank);
+  const archived = useMemo(() => sortByRank(archivedRows), [archivedRows]);
+  const counts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const task of Object.values(tasks))
-      if (!task.deleted_at) counts[task.project_id] = (counts[task.project_id] ?? 0) + 1;
-    return { active: live.filter((p) => !p.archived_at), archived: live.filter((p) => p.archived_at), counts };
-  }, [projects, tasks]);
+    for (const task of tasks) counts[task.project_id] = (counts[task.project_id] ?? 0) + 1;
+    return counts;
+  }, [tasks]);
 
   const newButton = admin && (
     <Button variant="primary" onClick={() => setCreating(true)}>
@@ -108,7 +108,7 @@ export function ProjectsPage() {
           </Rows>
         </Section>
       )}
-      {creating && <CreateProjectDialog used={Object.values(projects).length} onClose={() => setCreating(false)} />}
+      {creating && <CreateProjectDialog used={Object.keys(everyProject).length} onClose={() => setCreating(false)} />}
     </Page>
   );
 }

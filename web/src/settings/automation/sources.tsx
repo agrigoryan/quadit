@@ -3,8 +3,7 @@ import { FolderGit2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 import { api, errorMessage, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { ProjectGlyph } from "@/ui/project-glyph";
@@ -51,9 +50,8 @@ interface ItemProps {
 
 function SourceItem({ src, sync, onSync, onEdit, onDelete }: ItemProps) {
   const slug = useSlug();
-  const docs = useCollection("docs");
-  const root = docs[src.root_doc_id] as { title?: string; project_id?: string } | undefined;
-  const project = useStore((s) => (root?.project_id ? s.collections.projects[root.project_id] : undefined));
+  const root = useRowEvenIfGone("docs", src.root_doc_id) as { title?: string; project_id?: string } | undefined;
+  const project = useRowEvenIfGone("projects", root?.project_id);
   return (
     <div className="flex flex-col gap-1.5 px-3 py-2.5">
       <div className="flex items-center gap-3">

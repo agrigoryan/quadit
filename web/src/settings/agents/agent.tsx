@@ -1,6 +1,7 @@
 import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
 import { useMembers } from "@/lib/selectors";
@@ -18,7 +19,7 @@ import { type AgentMember } from "@/settings/agents/data";
 import { useAgentStates } from "@/lib/listening";
 import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helper-agents";
 import { AgentTokens } from "@/settings/agents/tokens";
-import { useIsAdmin, useSettingsBase } from "@/settings/base";
+import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -51,7 +52,7 @@ export function AgentPage() {
 
 function AgentBody({ agent }: { agent: AgentMember }) {
   const base = useSettingsBase();
-  const admin = useIsAdmin();
+  const admin = useCan().administer;
   const navigate = useNavigate();
   const states = useAgentStates();
   const knownResponsible = agent.responsible_id ?? "";

@@ -3,8 +3,7 @@ import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
-import { useMe } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getRow, useMe } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import {
   AGENT_FIELDS,
@@ -49,7 +48,7 @@ export function CreateAgentDialog({
     if (limits.budget) args.budget = limits.budget;
     await mutate({ type: "agent.create", args }, undefined, { quiet: true });
     toast.info(t("agent.created", { name: draft.name.trim() }));
-    onCreated(getState().collections.members[id]?.handle ?? draft.handle.trim());
+    onCreated(getRow("members", id)?.handle ?? draft.handle.trim());
   }
 
   return (

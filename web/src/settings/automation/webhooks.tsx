@@ -3,7 +3,7 @@ import { KeyRound, MoreHorizontal, Pencil, Plus, ScrollText, Send, Trash2 } from
 import { api, errorMessage, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useRows, useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
@@ -63,8 +63,8 @@ interface ItemProps {
 }
 
 function WebhookItem({ hook, test, onTest, onToggle, onEdit, onLog, onRotate, onDelete }: ItemProps) {
-  const projects = useCollection("projects");
-  const members = useCollection("members");
+  const projects = useLookupEvenIfGone("projects");
+  const members = useLookupEvenIfGone("members");
   const project = hook.project_id ? projects[hook.project_id] : undefined;
   const member = hook.user_id ? members[hook.user_id] : undefined;
   const last = lastSent(hook);
@@ -160,7 +160,7 @@ export function WebhooksPage() {
   // A webhook made or removed somewhere else is heard through the feed.
   // What it last sent is not an event, so the list is read again now and
   // then while the page is in view and nothing is open over it.
-  const known = useCollection("webhooks");
+  const known = useRows("webhooks");
   const reload = hooks.reload;
   const busy = !!(form || log || removing || rotating);
   useEffect(() => {

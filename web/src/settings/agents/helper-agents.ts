@@ -3,7 +3,7 @@
 // it when that task closes. Lists show a helper under its maker.
 
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 import type { AgentMember } from "@/settings/agents/data";
 
@@ -56,7 +56,8 @@ export function placeHelpers<M extends Member>(
 
 /** "Helper for SVA-12", for a helper's row; "" for any other member. */
 export function useHelperLabel(): (m: Member) => string {
-  const tasks = useCollection("tasks");
+  // The helper's task may be closed and archived, or in the trash: still name it.
+  const tasks = useLookupEvenIfGone("tasks");
   return (m) => {
     const id = m.delegated_task;
     if (!id) return "";
