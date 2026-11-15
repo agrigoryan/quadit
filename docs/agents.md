@@ -70,7 +70,7 @@ quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 
 - `--dry-run` checks a change without making it.
 - `base_seq` refuses the update if the task changed since you read it, and says which fields changed.
-- A batch (`POST /changes {"changes": […]}`) applies all of its changes or none. An admin bringing in history may mark a change in it `"quiet": true`: it reaches no inbox and wakes nobody, and its events say `"quiet": true`. `quadit import` does this for an admin; a member or a member-role agent is refused.
+- A batch (`POST /changes {"changes": […]}`) applies all of its changes or none. An admin bringing in history may mark a change, alone or in a batch, `"quiet": true`: it reaches no inbox and wakes nobody, and its events say `"quiet": true`. `quadit import` does this for an admin; a member or a member-role agent is refused.
 - `quadit changes` lists every change type with its arguments, and the surface version (within one major version nothing an agent relies on is removed or renamed).
 - `--id=UUID` gives a change its id yourself: after a crash, sending it again with the same id does nothing twice. `--for=@member` makes a change for someone: it then runs with their access.
 - `quadit assign SVA-12 none` (or `update SVA-12 assignee=none`) leaves a task with nobody; the API takes `"assignee": null`.

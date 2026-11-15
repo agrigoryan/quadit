@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -160,6 +161,39 @@ func TestMCPAsk(t *testing.T) {
 		text := s.call(nil, token, "GET", "/api/v1/w/-/tasks/SVA-2?format=text", nil, 200, nil)
 		if !strings.Contains(text, "approval for: task.delete") || !strings.Contains(text, "file: context.png") {
 			t.Fatalf("approval as read back:\n%s", text)
+		}
+	})
+}
+
+// TestQuietInBothForms: a change sent bare is read as one in a list is:
+// quiet from an admin, refused from anyone else, in either form.
+func TestQuietInBothForms(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
+		member := s.agentToken("coder")
+		bare := func(body string) M {
+			return M{"id": id.New(), "type": "comment.create", "args": M{"task": "SVA-1", "body": body}, "quiet": true}
+		}
+		forms := map[string]func(string) M{
+			"bare":  bare,
+			"batch": func(body string) M { return M{"changes": []M{bare(body)}} },
+		}
+		for name, form := range forms {
+			s.call(nil, member, "POST", w+"/changes", form("psst from a member "+name), 403, nil)
+			s.call(s.owner, "", "POST", w+"/changes", form("history "+name), 200, nil)
+			var page struct {
+				Events []struct{ Data map[string]any }
+			}
+			s.call(s.owner, "", "GET", w+"/events?task=SVA-1&types=comment.created&limit=500", nil, 200, &page)
+			last := page.Events[len(page.Events)-1].Data
+			if last["quiet"] != true {
+				t.Fatalf("%s: an admin's quiet comment is not marked quiet: %v", name, last)
+			}
+		}
+		if text := s.call(nil, member, "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); strings.Contains(text, "psst") {
+			t.Fatalf("a member's quiet change went in:\n%s", text)
 		}
 	})
 }

@@ -11,12 +11,9 @@ import (
 type changesBody struct {
 	Changes []engine.Change `json:"changes"`
 	DryRun  bool            `json:"dry_run"`
-	// A single change may be sent bare, without the changes list.
-	ID       string          `json:"id"`
-	Type     string          `json:"type"`
-	Args     json.RawMessage `json:"args"`
-	Approval string          `json:"approval"`
-	For      string          `json:"for"`
+	// A single change may be sent bare, without the changes list: it is
+	// read as one, with every field a change in the list has.
+	engine.Change
 }
 
 var auditedPrefixes = []string{"member.", "agent.", "project.delete", "webhook.", "rule.", "integration.", "secret.", "workspace.update", "workspace.delete"}
@@ -43,7 +40,7 @@ func (s *Server) handleApplyChanges(x *c) error {
 		return err
 	}
 	if len(b.Changes) == 0 && b.Type != "" {
-		b.Changes = []engine.Change{{ID: b.ID, Type: b.Type, Args: b.Args, Approval: b.Approval, For: b.For}}
+		b.Changes = []engine.Change{b.Change}
 	}
 	dry := b.DryRun || truthyParam(x.r.URL.Query(), "dry_run")
 	res, err := s.eng.Batch(x.ctx(), x.ws.ID, x.actor, b.Changes, dry)
