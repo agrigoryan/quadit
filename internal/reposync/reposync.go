@@ -83,7 +83,7 @@ func (s *Syncer) Run(ctx context.Context) {
 				continue
 			}
 			if _, err := s.Sync(ctx, src); err != nil {
-				s.Log.Warn("repository sync", "repo", src.Repo, "err", err)
+				s.Log.Error("repository sync", "repo", src.Repo, "err", err)
 			}
 		}
 	}
