@@ -212,12 +212,26 @@ func (s *Server) handleDescribeAPI(w http.ResponseWriter, _ *http.Request) {
 	enc.Encode(doc)
 }
 
+// pathParamWords says what goes in each {name} part of a path, by its name.
+var pathParamWords = map[string]string{
+	"id":         "The id of the thing the path names: the word before it says what that is (a page, a webhook, a backup…).",
+	"name":       "The name of the thing the path names: a cursor's or a secret's own name, a setting's key, or a file's name (for the reader; the id decides).",
+	"token":      "The invitation's token: the last part of the link it was sent as.",
+	"provider":   "The sign-in provider: google, github or oidc.",
+	"collection": "The kind of rows: one of those the summary lists.",
+	"key":        "A project's key, such as SVA.",
+	"ref":        "A task's key (SVA-12) or id.",
+	"version":    "The id of one of the page's kept versions.",
+}
+
 // pathParams describes the {name} parts of a path.
 func pathParams(path string) []map[string]any {
 	params := []map[string]any{}
 	for seg := range strings.SplitSeq(path, "/") {
 		if strings.HasPrefix(seg, "{") {
-			params = append(params, map[string]any{"name": strings.Trim(seg, "{}"), "in": "path", "required": true, "schema": map[string]string{"type": "string"}})
+			name := strings.Trim(seg, "{}")
+			params = append(params, map[string]any{"name": name, "in": "path", "required": true, "schema": map[string]string{"type": "string"},
+				"description": pathParamWords[name]})
 		}
 	}
 	return params

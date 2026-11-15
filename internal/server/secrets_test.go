@@ -759,17 +759,25 @@ func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
 }
 
 // TestEveryRouteIsDescribed checks that the API description leaves no route
-// out: every address the server answers is in openapi.json.
+// out: every address the server answers is in openapi.json, and every part
+// of an address that is filled in says what goes there.
 func TestEveryRouteIsDescribed(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
 	var spec struct {
-		Paths map[string]map[string]any
+		Paths map[string]map[string]struct {
+			Parameters []struct{ Name, In, Description string }
+		}
 	}
 	s.call(nil, "", "GET", "/api/v1/openapi.json", nil, 200, &spec)
 	described := map[string]bool{}
 	for path, methods := range spec.Paths {
-		for method := range methods {
+		for method, op := range methods {
 			described[strings.ToUpper(method)+" "+regexp.MustCompile(`\{[^}]+\}`).ReplaceAllString(path, "{}")] = true
+			for _, p := range op.Parameters {
+				if p.In == "path" && p.Description == "" {
+					t.Errorf("%s %s: the path parameter {%s} has no description", strings.ToUpper(method), path, p.Name)
+				}
+			}
 		}
 	}
 	files, _ := filepath.Glob("*.go")
