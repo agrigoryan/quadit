@@ -351,6 +351,11 @@ with 10,000 tasks: built for the filter asked, the plan is
 `SEARCH t USING INDEX tasks_assignee (workspace_id=? AND assignee_id=?)`; with optional
 arguments it is `SCAN t`, the whole table. (Not measured on Postgres.) The builder also
 gives "has every one of these labels", one EXISTS per label, which a static query cannot.
+"After this row" passes each value once on SQLite and names it by number where it repeats
+(`t.activity_seq < ?2 OR (t.activity_seq = ?2 AND t.id < ?3)`): only then does SQLite search
+`tasks_activity (workspace_id=? AND activity_seq<?)` from where the page starts instead of
+reading the workspace's whole index (a page past row 5,000 of 10,000: 1.2 ms, was 4.3 ms).
+Postgres plans both forms alike, so it gets the value once per mention, as before.
 
 **8. Read, check, write inside one write** — `internal/engine/ch_task.go:234`
 

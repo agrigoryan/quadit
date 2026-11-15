@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -212,25 +213,7 @@ func (c conn) Tasks(ctx context.Context, f store.TaskFilter) ([]core.Task, error
 	}
 	w := c.taskWhere(f)
 	if len(f.After) == len(keys) && len(keys) > 0 {
-		// Past the last row read: later in the first key, or equal there and
-		// later in the next, and so on.
-		var alts []string
-		var args []any
-		for i, k := range keys {
-			var parts []string
-			for j := 0; j < i; j++ {
-				parts = append(parts, keys[j].Expr+" = ?")
-				args = append(args, f.After[j])
-			}
-			op := " > ?"
-			if k.Desc {
-				op = " < ?"
-			}
-			parts = append(parts, k.Expr+op)
-			args = append(args, f.After[i])
-			alts = append(alts, "("+strings.Join(parts, " AND ")+")")
-		}
-		w.add("("+strings.Join(alts, " OR ")+")", args...)
+		c.afterRow(w, keys, f.After)
 	}
 	query := "SELECT t." + strings.ReplaceAll(m.cols, ", ", ", t.") + " FROM tasks t WHERE " + w.sql() +
 		" ORDER BY " + order + fmt.Sprintf(" LIMIT %d", limit)
@@ -248,6 +231,41 @@ func (c conn) Tasks(ctx context.Context, f store.TaskFilter) ([]core.Task, error
 		return nil, err
 	}
 	return out, nil
+}
+
+// afterRow adds "past the last row read" to w: later in the first key, or
+// equal there and later in the next, and so on. w must be the first clause
+// of its query, since a value named by number (see Dialect.NamesRepeats) is
+// counted from the start of the query.
+func (c conn) afterRow(w *clause, keys []store.SortKey, after []any) {
+	var args []any
+	named := map[int]string{}
+	param := func(i int) string {
+		if !c.d.NamesRepeats {
+			args = append(args, after[i])
+			return "?"
+		}
+		if p, ok := named[i]; ok {
+			return p
+		}
+		args = append(args, after[i])
+		named[i] = "?" + strconv.Itoa(len(w.args)+len(args))
+		return named[i]
+	}
+	var alts []string
+	for i, k := range keys {
+		var parts []string
+		for j := 0; j < i; j++ {
+			parts = append(parts, keys[j].Expr+" = "+param(j))
+		}
+		op := " > "
+		if k.Desc {
+			op = " < "
+		}
+		parts = append(parts, k.Expr+op+param(i))
+		alts = append(alts, "("+strings.Join(parts, " AND ")+")")
+	}
+	w.add("("+strings.Join(alts, " OR ")+")", args...)
 }
 
 func (c conn) CountTasks(ctx context.Context, f store.TaskFilter) (int, error) {

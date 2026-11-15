@@ -22,6 +22,12 @@ type Dialect struct {
 	// Numbered is true when placeholders are $1, $2, ... instead of ?.
 	Numbered bool
 
+	// NamesRepeats is true when a value a query uses more than once is
+	// passed once and named by its number (?N) wherever it repeats. SQLite
+	// reads "a < X OR (a = X AND b < Y)" as a range of an index on a only
+	// when both X are the same parameter; Postgres plans it alike either way.
+	NamesRepeats bool
+
 	// SingleWriter is true when the database allows one write transaction
 	// at a time. Writers then queue in this process instead of retrying
 	// against the database's lock.
@@ -59,6 +65,7 @@ var SQLite = Dialect{
 		"JSON":   "TEXT",
 		"BYTES":  "BLOB",
 	},
+	NamesRepeats: true,
 	SingleWriter: true,
 	search:       ftsSearch{},
 	goose:        goose.DialectSQLite3,
