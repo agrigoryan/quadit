@@ -580,6 +580,9 @@ func (s *Server) identifyByToken(x *c, header string, now int64) error {
 	tok := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
 	var t core.APIToken
 	if err := s.st.Get(ctx, &t, store.Eq("token_hash", auth.Hash(tok)), store.Null("revoked_at")); err != nil {
+		if !errors.Is(err, store.ErrNotFound) {
+			return err
+		}
 		// Guesses are counted by where they come from.
 		if lerr := s.limits.check("bad:"+clientIP(x.r), limitBadTokens); lerr != nil && x.r.RemoteAddr != selfCallAddr {
 			return lerr
@@ -616,6 +619,9 @@ func (s *Server) identifyBySession(x *c, now int64) error {
 	}
 	var sess core.Session
 	err = s.st.Get(ctx, &sess, store.Eq("token_hash", auth.Hash(ck.Value)), store.Null("revoked_at"))
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	if err != nil || sess.ExpiresAt < now {
 		return errUnauthorized("your session has ended; sign in again")
 	}
@@ -662,6 +668,9 @@ func (x *c) sessionMayAct(sess core.Session) error {
 // disabledMsg when it is disabled or gone.
 func (s *Server) loadAccount(ctx context.Context, x *c, userID, disabledMsg string) error {
 	err := s.st.Get(ctx, &x.user, store.Eq("id", userID), store.Live)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	if err != nil || x.user.DisabledAt != 0 {
 		return errUnauthorized(disabledMsg)
 	}
@@ -705,19 +714,28 @@ func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 		cond = store.Eq("id", x.token.WorkspaceID)
 	}
 	if err := s.st.Get(ctx, &x.ws, cond, store.Live); err != nil {
-		return errNotFound("workspace " + ref)
+		return notFoundOr(err, "workspace "+ref)
 	}
 	if x.token != nil && x.token.WorkspaceID != x.ws.ID {
 		return errForbidden("this token belongs to another workspace")
 	}
 	x.db = s.st.In(x.ws.ID)
 	if err := x.db.Get(ctx, &x.member, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
-		return errNotFound("workspace " + ref) // not a member: it does not exist for them
+		return notFoundOr(err, "workspace "+ref) // not a member: it does not exist for them
 	}
 	if x.member.SuspendedAt != 0 {
 		return errForbidden("your membership in this workspace is suspended")
 	}
 	return nil
+}
+
+// notFoundOr is the refusal for a row that is not there, or err itself
+// when the store failed in another way.
+func notFoundOr(err error, what string) error {
+	if errors.Is(err, store.ErrNotFound) {
+		return errNotFound(what)
+	}
+	return err
 }
 
 // applyTokenScopes narrows the actor and the readable projects by the
