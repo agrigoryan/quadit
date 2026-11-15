@@ -109,11 +109,17 @@ export class DocSync {
     this.onState(this.pending > 0 ? "saving" : "saved");
   }
 
-  /** Sends the difference between the editor and the known server state, now. */
+  /**
+   * Sends the difference between the editor and the known server state, now.
+   * A page that cannot be edited has nothing of its own to send, except what
+   * was typed before it stopped being editable while open: a send is then
+   * still waiting, and it goes.
+   */
   flush = () => {
+    const waiting = this.timer !== undefined;
     clearTimeout(this.timer);
     this.timer = undefined;
-    if (this.dead || !this.editor.isEditable) return;
+    if (this.dead || (!waiting && !this.editor.isEditable)) return;
     this.rehome();
     const flat = flatten(this.doc(), (b) => toWire(b, this.schema), this.known);
     const d = diff(flat, this.known);

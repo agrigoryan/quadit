@@ -116,7 +116,10 @@ export default function Editor({
   callbacks.current = { onSaveState, onFocusBlock, onComment };
 
   useEffect(() => {
-    // A page that cannot be edited here still follows what others (or the server) write in it.
+    // A page that cannot be edited here still follows what others (or the server) write in it. One
+    // sync lasts as long as the page is open: the page turning read-only or editable again does not
+    // start another from the blocks first fetched, which the editor has moved on from (sync.ts sends
+    // what was typed before the turn).
     const sync = new DocSync(editor, docId, rows, seq, (state) => callbacks.current.onSaveState?.(state));
     const dom = editor.domElement;
     const onBlur = () => sync.flush();
@@ -129,7 +132,7 @@ export default function Editor({
       sync.destroy();
     };
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- the editor is made once per mounted page; rows and seq are its starting point
-  }, [editor, docId, readOnly]);
+  }, [editor, docId]);
 
   // Which block the caret is in, for presence.
   useEffect(() => {
