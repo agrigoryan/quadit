@@ -363,6 +363,24 @@ func TestAccountChecksFailWhenTheyCannotCount(t *testing.T) {
 	})
 }
 
+func TestAnInvitationDoesNotSayNoAccountWhenItCannotLook(t *testing.T) {
+	fs := newFaultyStore(testdb.SQLite(t))
+	s := newSite(t, fs)
+	var inv struct{ Link string }
+	s.call(s.owner, "", "POST", w+"/invites", M{"email": "eve@example.com"}, 201, &inv)
+	path := "/api/v1/auth/invite/" + inv.Link[strings.LastIndex(inv.Link, "/")+1:]
+	var shown struct {
+		HasAccount *bool `json:"has_account"`
+	}
+	s.call(&http.Client{}, "", "GET", path, nil, 200, &shown)
+	if shown.HasAccount == nil || *shown.HasAccount {
+		t.Fatalf("has_account = %v; want false for an address with no account", shown.HasAccount)
+	}
+	fs.faults.arm(fault{op: "get", table: "users", match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "email", "eve@example.com") }})
+	defer fs.faults.clear()
+	s.call(&http.Client{}, "", "GET", path, nil, 500, nil)
+}
+
 func TestASecretRequestWhoseAnswerBreaksOffIsNotOK(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)

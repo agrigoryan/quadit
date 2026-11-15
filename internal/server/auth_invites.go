@@ -232,7 +232,11 @@ func (s *Server) handleShowInvite(x *c) error {
 	out := map[string]any{"workspace": map[string]string{"name": ws.Name, "slug": ws.Slug}, "role": inv.Role, "email": inv.Email, "invited_by": inviter.Name}
 	if inv.Email != "" {
 		var u core.User
-		out["has_account"] = s.st.Get(x.ctx(), &u, store.Eq("email", inv.Email), store.Live) == nil
+		there, err := rowFound(s.st.Get(x.ctx(), &u, store.Eq("email", inv.Email), store.Live))
+		if err != nil {
+			return err
+		}
+		out["has_account"] = there
 	}
 	return x.ok(out)
 }
