@@ -3,6 +3,9 @@ package sqlstore
 import (
 	"strconv"
 	"strings"
+
+	"github.com/pressly/goose/v3"
+	"github.com/pressly/goose/v3/lock"
 )
 
 // Dialect holds what differs between the databases the SQL store runs on.
@@ -30,6 +33,18 @@ type Dialect struct {
 	// notify tells other servers sharing the database that a feed moved;
 	// nil when only one server uses the database.
 	notify notifier
+
+	// goose is goose's name for the database: it picks the SQL goose keeps
+	// its record of applied schema versions with.
+	goose goose.Dialect
+
+	// hasTable counts the tables of a name in the schema in use (0 or 1).
+	hasTable string
+
+	// migrationLock makes the lock a server holds on the database while it
+	// brings the schema up to date, so that servers starting together take
+	// turns; nil when only one server uses the database.
+	migrationLock func() (lock.SessionLocker, error)
 }
 
 // SQLite is the dialect for the default single-file install.
@@ -46,6 +61,8 @@ var SQLite = Dialect{
 	},
 	SingleWriter: true,
 	search:       ftsSearch{},
+	goose:        goose.DialectSQLite3,
+	hasTable:     `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`,
 }
 
 // Postgres is the dialect for larger installs.
@@ -60,9 +77,19 @@ var Postgres = Dialect{
 		"JSON":   "JSONB",
 		"BYTES":  "BYTEA",
 	},
-	Numbered: true,
-	search:   tsvSearch{},
-	notify:   pgNotify{},
+	Numbered:      true,
+	search:        tsvSearch{},
+	notify:        pgNotify{},
+	goose:         goose.DialectPostgres,
+	hasTable:      `SELECT COUNT(*) FROM pg_tables WHERE schemaname = current_schema() AND tablename = ?`,
+	migrationLock: postgresMigrationLock,
+}
+
+// postgresMigrationLock is goose's lock on a Postgres database (an advisory
+// lock, which ends with the connection that took it). A server that finds
+// it taken looks again every second, for up to five minutes.
+func postgresMigrationLock() (lock.SessionLocker, error) {
+	return lock.NewPostgresSessionLocker(lock.WithLockTimeout(1, 300))
 }
 
 // Rebind turns the ? placeholders every query is written with into the
