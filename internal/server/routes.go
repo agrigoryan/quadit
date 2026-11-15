@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -106,7 +107,7 @@ func (s *Server) handleShowMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the metrics token cannot be read", http.StatusInternalServerError)
 		return
 	}
-	if tok != "" && r.Header.Get("Authorization") != "Bearer "+tok {
+	if tok != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+tok)) != 1 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}

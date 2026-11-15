@@ -249,6 +249,10 @@ func TestSmallGuards(t *testing.T) {
 		if strings.Count(m, "# TYPE quadit_rows ") != 1 {
 			t.Fatalf("metrics: %s", m)
 		}
+		// With a token set, the page takes that token and no other.
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/metrics.token", "scrape-secret", 200, nil)
+		s.call(&http.Client{}, "scrape-secre", "GET", "/metrics", nil, 401, nil)
+		s.call(&http.Client{}, "scrape-secret", "GET", "/metrics", nil, 200, nil)
 	})
 }
 
