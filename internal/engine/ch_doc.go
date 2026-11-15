@@ -189,9 +189,9 @@ func (c *cx) insertDoc(d core.Doc, a docCreateArgs) error {
 		return err
 	}
 	c.ref = d.ID
-	data := map[string]any{"row": d}
+	data := core.EventData{Row: d}
 	if len(rows) > 0 {
-		data["blocks"] = rows
+		data.Blocks = &rows
 	}
 	if err := c.emit(event{seq: seq, typ: "doc.created", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: data}); err != nil {
 		return err
@@ -447,14 +447,14 @@ func (u *pageEdit) save() error {
 	if u.wasAudience == "" {
 		audience = ""
 	}
-	data := map[string]any{"id": d.ID, "changes": p.changes}
+	data := core.EventData{ID: d.ID, Changes: p.changes}
 	if _, sharing := p.set["shared_with"]; sharing || u.wasAudience != docAudience(d) {
 		// Someone may be seeing this page for the first time: send all of it.
 		var now core.Doc
 		if err := c.tx.Get(c.ctx, &now, store.Eq("id", d.ID)); err != nil {
 			return err
 		}
-		data["row"] = now
+		data.Row = now
 	}
 	if err := c.emit(event{seq: seq, typ: "doc.updated", entity: "doc", entityID: d.ID, place: inDoc(d), audience: audience, data: data}); err != nil {
 		return err
@@ -463,7 +463,7 @@ func (u *pageEdit) save() error {
 		// Someone the page is no longer shared with stops getting its events:
 		// tell each of them, alone, to let go of their copy.
 		for _, uid := range u.unshared {
-			if err := c.emit(event{seq: c.tx.NextSeq(), typ: "doc.unshared", entity: "doc", entityID: d.ID, place: place{scopeType: "user", scopeID: uid, projectID: d.ProjectID}, audience: uid, data: map[string]any{"id": d.ID, "gone": true}}); err != nil {
+			if err := c.emit(event{seq: c.tx.NextSeq(), typ: "doc.unshared", entity: "doc", entityID: d.ID, place: place{scopeType: "user", scopeID: uid, projectID: d.ProjectID}, audience: uid, data: core.EventData{ID: d.ID, Gone: true}}); err != nil {
 				return err
 			}
 		}
@@ -535,7 +535,7 @@ func docDelete(c *cx, a idArgs) error {
 		return err
 	}
 	c.ref = d.ID
-	return c.emit(event{seq: seq, typ: "doc.deleted", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"ids": ids, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}}})
+	return c.emit(event{seq: seq, typ: "doc.deleted", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: core.EventData{IDs: ids, Changes: map[string]core.FieldChange{"deleted_at": {To: c.at}}}})
 }
 
 // docRestore takes a page out of the trash, with the pages that went there
@@ -582,7 +582,7 @@ func docRestore(c *cx, a idArgs) error {
 	if _, err := c.tx.Update(c.ctx, "docs", set, store.In("id", ids)); err != nil {
 		return err
 	}
-	if err := c.emit(event{seq: seq, typ: "doc.restored", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"ids": ids, "changes": map[string]core.FieldChange{"deleted_at": {To: nil}}}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "doc.restored", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: core.EventData{IDs: ids, Changes: map[string]core.FieldChange{"deleted_at": {To: nil}}}}); err != nil {
 		return err
 	}
 	for _, x := range all {

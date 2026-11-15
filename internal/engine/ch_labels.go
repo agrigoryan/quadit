@@ -89,7 +89,7 @@ func labelDelete(c *cx, a memberRefArgs) error {
 		if err := c.setLabels(tp, &t, without(t.LabelIDs, l.ID)); err != nil {
 			return err
 		}
-		if err := c.saveOther(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
 			return err
 		}
 	}

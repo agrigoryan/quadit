@@ -205,7 +205,7 @@ func (c *cx) saveMember(m core.Member, p *patch) error {
 		}
 		return err
 	}
-	return c.emit(event{seq: seq, typ: "member.updated", entity: "member", entityID: m.UserID, place: inWorkspace(c.ws), data: map[string]any{"id": m.UserID, "changes": p.changes}})
+	return c.emit(event{seq: seq, typ: "member.updated", entity: "member", entityID: m.UserID, place: inWorkspace(c.ws), data: core.EventData{ID: m.UserID, Changes: p.changes}})
 }
 
 // memberUpdate changes a member's role, limits, handle, title, or suspends
@@ -345,7 +345,7 @@ func memberRemove(c *cx, a memberRefArgs) error {
 	for _, t := range open {
 		tp := newPatch()
 		tp.put("assignee_id", t.AssigneeID, "")
-		if err := c.saveOther(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
 			return err
 		}
 	}

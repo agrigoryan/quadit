@@ -123,9 +123,9 @@ func attachmentAdd(c *cx, a attachArgs) error {
 		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
-		return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: inTask(t), data: map[string]any{"row": at, "key": t.Key}})
+		return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: inTask(t), data: core.EventData{Row: at, Key: &t.Key}})
 	}
-	return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: place{scopeType: "doc", scopeID: docID}, data: map[string]any{"row": at}})
+	return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: place{scopeType: "doc", scopeID: docID}, data: core.EventData{Row: at}})
 }
 
 // attachmentRemove puts an attachment in the trash; its file stays until the
@@ -209,5 +209,5 @@ func attachmentRestore(c *cx, a idArgs) error {
 			return err
 		}
 	}
-	return c.emit(event{seq: seq, typ: "attachment.restored", entity: "attachment", entityID: at.ID, place: where, data: map[string]any{"row": at}})
+	return c.emit(event{seq: seq, typ: "attachment.restored", entity: "attachment", entityID: at.ID, place: where, data: core.EventData{Row: at}})
 }

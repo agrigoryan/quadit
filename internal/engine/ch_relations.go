@@ -65,7 +65,7 @@ func relationAdd(c *cx, a relationArgs) error {
 			return err
 		}
 	}
-	if err := c.emit(event{seq: seq, typ: "relation.created", entity: "relation", entityID: r.ID, place: inTask(t), data: map[string]any{"row": r, "key": t.Key, "other_key": o.Key}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "relation.created", entity: "relation", entityID: r.ID, place: inTask(t), data: core.EventData{Row: r, Key: &t.Key, OtherKey: o.Key}}); err != nil {
 		return err
 	}
 	return c.related(o, t, r, false)
@@ -75,7 +75,7 @@ func relationAdd(c *cx, a relationArgs) error {
 // own event belongs to one task; this one belongs to the other, so a feed
 // narrowed to either task has it.
 func (c *cx) related(t, other core.Task, r core.Relation, removed bool) error {
-	return c.emit(event{seq: c.tx.NextSeq(), typ: "task.related", entity: "task", entityID: t.ID, place: inTask(t), data: map[string]any{"id": t.ID, "key": t.Key, "other_key": other.Key, "relation": r.ID, "type": r.Type, "removed": removed}})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: "task.related", entity: "task", entityID: t.ID, place: inTask(t), data: core.EventData{ID: t.ID, Key: &t.Key, OtherKey: other.Key, Relation: r.ID, RelationType: r.Type, Removed: &removed}})
 }
 
 // relationRemove takes a relation between two tasks away.

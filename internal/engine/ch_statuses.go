@@ -173,7 +173,7 @@ func (c *cx) moveOffStatus(st core.Status, pr core.Project, moveTo string, tasks
 	for _, t := range tasks {
 		tp := newPatch()
 		c.setStatus(tp, &t, to)
-		if err := c.saveOther(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
 			return err
 		}
 	}

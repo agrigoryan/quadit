@@ -425,6 +425,105 @@ type Event struct {
 	Data        json.RawMessage `json:"data" db:"data,json"`
 }
 
+// EventData is an event's data: what the web app, agents and integrations
+// read to follow a change. Most events carry a new Row, or the ID of the
+// row and its Changes; the other fields are facts some events add. A field
+// left at its zero value is not written, except where a pointer is set: the
+// events that write those keys write them even when empty. The fields are
+// in the order of their keys, which is the order they have always been
+// written in.
+type EventData struct {
+	Attachments []Attachment `json:"attachments,omitempty"` // the files a new comment or decision came with
+	// Blocks are the blocks a new page came with (set only when it has
+	// some), or those an edit wrote (set always: null when none).
+	Blocks  *[]Block               `json:"blocks,omitempty"`
+	Changes map[string]FieldChange `json:"changes,omitempty"`
+	// Deleted is a key with two meanings, so it has no one type: true on a
+	// task.updated that put the task in the trash, and on doc.edited the
+	// ids of the blocks taken out ([]string, null when none).
+	Deleted       any      `json:"deleted,omitempty"`
+	FromBackup    bool     `json:"from_backup,omitempty"`     // a restore from a backup brought it back
+	FromProjectID string   `json:"from_project_id,omitempty"` // a moved task's project before
+	Gone          bool     `json:"gone,omitempty"`            // the row was removed outright, or is no longer the reader's to see
+	ID            string   `json:"id,omitempty"`
+	IDs           []string `json:"ids,omitempty"` // the rows one change touched together
+	// Key is the key of the task the event is in, or of a project deleted.
+	// The events about a comment or a session write it also when there is
+	// no task: as "".
+	Key       *string `json:"key,omitempty"`
+	LinkKind  string  `json:"kind,omitempty"`
+	MovedFrom string  `json:"moved_from,omitempty"` // a moved task's key before
+	Name      string  `json:"name,omitempty"`       // a deleted secret's name
+	OtherKey  string  `json:"other_key,omitempty"`  // the key of the task at the other end of a relation
+	Previous  *Answer `json:"previous,omitempty"`   // a decision's answer before it was marked unclear
+	// Quiet marks history brought in (an import), not done now: it notifies
+	// nobody and sets off nothing. The engine sets it on every event of a
+	// quiet change.
+	Quiet      bool    `json:"quiet,omitempty"`
+	Reason     string  `json:"reason,omitempty"` // why the engine changed a member
+	LinkRef    *string `json:"ref,omitempty"`    // an updated link's ref, written even when it has none
+	Relation   string  `json:"relation,omitempty"`
+	Removed    *bool   `json:"removed,omitempty"`  // on task.related: the relation was taken away, not added
+	Resource   string  `json:"resource,omitempty"` // the name of the resource a new hold is on
+	ResourceID string  `json:"resource_id,omitempty"`
+	Restored   bool    `json:"restored,omitempty"`
+	RevertedTo string  `json:"reverted_to,omitempty"` // the version a page was put back to
+	Rolled     *int    `json:"rolled,omitempty"`      // how many open tasks a closed cycle passed on
+	RolledOver bool    `json:"rolled_over,omitempty"` // the task was passed on to the next cycle
+	// Row is the whole row, for an event that makes or brings one back.
+	// Written, it is the row itself; read with Payload, it is the JSON as
+	// written (a json.RawMessage), for ReadRow.
+	Row          any     `json:"row,omitempty"`
+	Rule         string  `json:"rule,omitempty"` // the rule that caused the change; the engine sets it
+	Slug         string  `json:"slug,omitempty"`
+	TaskID       *string `json:"task_id,omitempty"` // on claim.updated: the task the hold is for, or ""
+	RelationType string  `json:"type,omitempty"`
+	UserID       string  `json:"user_id,omitempty"`
+	Why          string  `json:"why,omitempty"` // what happened to a hold: acquired, renewed, released, expired
+}
+
+// Answer is the answer a decision had.
+type Answer struct {
+	DecidedBy      string `json:"decided_by"`
+	Outcome        string `json:"outcome"`
+	OutcomeNote    string `json:"outcome_note"`
+	PickedOptionID string `json:"picked_option_id"`
+}
+
+// Payload reads the event's data. A key that does not read as its field's
+// type is left at the zero value and reported in the error, the rest is
+// read; data that is not JSON reads as nothing.
+func (ev Event) Payload() (EventData, error) {
+	var row json.RawMessage
+	// Decoding into an interface that holds a pointer fills what it points
+	// to: the row stays as written, for ReadRow to decode into its type.
+	d := EventData{Row: &row}
+	err := json.Unmarshal(ev.Data, &d)
+	d.Row = nil
+	if len(row) > 0 {
+		d.Row = row
+	}
+	return d, err
+}
+
+// ReadRow decodes the row of data read with Payload into dst, and reports
+// whether there was one that reads as dst.
+func (d EventData) ReadRow(dst any) bool {
+	raw, ok := d.Row.(json.RawMessage)
+	return ok && json.Unmarshal(raw, dst) == nil
+}
+
+// Sets reports whether the event gave a field a value: an update that
+// changed it, or a new row that has it. A row leaves out its empty fields,
+// so a new row "has" only the ones set.
+func (d EventData) Sets(field string) bool {
+	if _, ok := d.Changes[field]; ok {
+		return true
+	}
+	var row map[string]json.RawMessage
+	return d.ReadRow(&row) && len(row[field]) > 0 && string(row[field]) != "null"
+}
+
 // FieldChange is one field's old and new value inside an update event.
 type FieldChange struct {
 	From any `json:"from"`

@@ -3,7 +3,6 @@
 package engine
 
 import (
-	"maps"
 	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -128,9 +127,10 @@ func (c *cx) setLabels(p *patch, t *core.Task, ids []string) error {
 	return nil
 }
 
-// saveTask writes a task patch and emits task.updated. A task's own fields
+// saveTask writes a task patch and emits task.updated, with extra as the
+// event's data beside the task's id, key and changes. A task's own fields
 // changing also counts as activity in it.
-func (c *cx) saveTask(t core.Task, p *patch, extra map[string]any) error {
+func (c *cx) saveTask(t core.Task, p *patch, extra core.EventData) error {
 	c.ref, c.key = t.ID, t.Key
 	if p.empty() {
 		return nil
@@ -147,8 +147,8 @@ func (c *cx) saveTask(t core.Task, p *patch, extra map[string]any) error {
 	if _, err := c.tx.Update(c.ctx, "tasks", p.set, store.Eq("id", t.ID)); err != nil {
 		return err
 	}
-	data := map[string]any{"id": t.ID, "key": t.Key, "changes": p.changes}
-	maps.Copy(data, extra)
+	data := extra
+	data.ID, data.Key, data.Changes = t.ID, &t.Key, p.changes
 	if err := c.emit(event{seq: seq, typ: "task.updated", entity: "task", entityID: t.ID, place: inTask(t), data: data}); err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (c *cx) touchTask(taskID string, seq int64) error {
 // saveOther saves a task changed as a side effect of a change to something
 // else (its label was deleted, its epic removed): the change's answer still
 // names what was asked for, not the last task it touched.
-func (c *cx) saveOther(t core.Task, p *patch, extra map[string]any) error {
+func (c *cx) saveOther(t core.Task, p *patch, extra core.EventData) error {
 	ref, key := c.ref, c.key
 	err := c.saveTask(t, p, extra)
 	c.ref, c.key = ref, key
@@ -185,7 +185,7 @@ func (c *cx) setWaitingOutside(t core.Task, note string) error {
 	p.put("waiting_on_note", t.WaitingOnNote, note)
 	p.put("waiting_outside", t.WaitingOutside, true)
 	ref, key := c.ref, c.key
-	err := c.saveTask(t, p, nil)
+	err := c.saveTask(t, p, core.EventData{})
 	c.ref, c.key = ref, key
 	return err
 }
@@ -198,7 +198,7 @@ func (c *cx) setWaitingOn(t core.Task, userID, note string) error {
 	p.put("waiting_on_note", t.WaitingOnNote, note)
 	p.put("waiting_outside", t.WaitingOutside, false)
 	ref, key := c.ref, c.key
-	err := c.saveTask(t, p, nil)
+	err := c.saveTask(t, p, core.EventData{})
 	c.ref, c.key = ref, key
 	return err
 }

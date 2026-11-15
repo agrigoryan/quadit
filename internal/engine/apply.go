@@ -313,7 +313,7 @@ func (c *cx) checkApproval() error {
 		if err := c.tx.Get(c.ctx, &t, store.Eq("id", approval.TaskID)); err != nil {
 			return err
 		}
-		return c.emit(event{seq: seq, typ: "decision.updated", entity: "decision", entityID: approval.ID, place: inTask(t), data: map[string]any{"id": approval.ID, "changes": map[string]core.FieldChange{"action_used_at": {To: c.at}}}})
+		return c.emit(event{seq: seq, typ: "decision.updated", entity: "decision", entityID: approval.ID, place: inTask(t), data: core.EventData{ID: approval.ID, Changes: map[string]core.FieldChange{"action_used_at": {To: c.at}}}})
 	}
 	return need
 }

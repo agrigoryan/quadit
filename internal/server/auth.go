@@ -467,7 +467,7 @@ func (s *Server) copyToMemberships(ctx context.Context, userID string, memberSet
 			for k, v := range memberSet {
 				changes[k] = core.FieldChange{To: v}
 			}
-			return sys.Emit("member.updated", "member", userID, "workspace", m.ID, "", map[string]any{"id": userID, "changes": changes})
+			return sys.Emit("member.updated", "member", userID, "workspace", m.ID, "", core.EventData{ID: userID, Changes: changes})
 		})
 		if err != nil {
 			return err

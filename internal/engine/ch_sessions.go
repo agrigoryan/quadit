@@ -55,7 +55,7 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 		return alreadyInUse(err, "id", sid)
 	}
 	c.ref = s.ID
-	return c.emit(event{seq: seq, typ: "session.created", entity: "session", entityID: s.ID, place: where, data: map[string]any{"row": s, "key": key}})
+	return c.emit(event{seq: seq, typ: "session.created", entity: "session", entityID: s.ID, place: where, data: core.EventData{Row: s, Key: &key}})
 }
 
 type sessionUpdateArgs struct {

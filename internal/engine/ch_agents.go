@@ -220,8 +220,8 @@ func (c *cx) endDelegates(t core.Task) error {
 		if _, err := c.tx.Update(c.ctx, "api_tokens", map[string]any{"revoked_at": c.at}, store.Eq("user_id", m.UserID), store.Null("revoked_at")); err != nil {
 			return err
 		}
-		if err := c.emit(event{seq: seq, typ: "member.updated", entity: "member", entityID: m.UserID, place: inWorkspace(c.ws), data: map[string]any{"id": m.UserID, "user_id": m.UserID,
-			"changes": map[string]core.FieldChange{"suspended_at": {To: c.at}}, "reason": "its task " + t.Key + " is closed"}}); err != nil {
+		if err := c.emit(event{seq: seq, typ: "member.updated", entity: "member", entityID: m.UserID, place: inWorkspace(c.ws), data: core.EventData{ID: m.UserID, UserID: m.UserID,
+			Changes: map[string]core.FieldChange{"suspended_at": {To: c.at}}, Reason: "its task " + t.Key + " is closed"}}); err != nil {
 			return err
 		}
 	}

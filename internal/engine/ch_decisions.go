@@ -225,10 +225,7 @@ func (c *cx) insertDecision(d *core.Decision, t core.Task, a decisionOpenArgs) e
 	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
-	data := map[string]any{"row": *d, "key": t.Key}
-	if len(atts) > 0 {
-		data["attachments"] = atts
-	}
+	data := core.EventData{Row: *d, Key: &t.Key, Attachments: atts}
 	c.ref, c.key = d.ID, t.Key
 	if err := c.emit(event{seq: seq, typ: "decision.opened", entity: "decision", entityID: d.ID, place: inTask(t), data: data}); err != nil {
 		return err
@@ -319,7 +316,7 @@ func decisionUpdate(c *cx, a decisionUpdateArgs) error {
 	if !p.empty() {
 		p.set["updated_at"] = c.at
 	}
-	if err := c.save(p, target{table: "decisions", entity: "decision", id: d.ID, place: inTask(t), extra: map[string]any{"key": t.Key}}); err != nil {
+	if err := c.save(p, target{table: "decisions", entity: "decision", id: d.ID, place: inTask(t), extra: core.EventData{Key: &t.Key}}); err != nil {
 		return err
 	}
 	return c.touchTask(t.ID, c.tx.Seq())
@@ -364,7 +361,7 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 		return err
 	}
 	c.ref, c.key = d.ID, t.Key
-	if err := c.emit(event{seq: seq, typ: "decision.picked", entity: "decision", entityID: d.ID, place: inTask(t), data: map[string]any{"row": d, "key": t.Key}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "decision.picked", entity: "decision", entityID: d.ID, place: inTask(t), data: core.EventData{Row: d, Key: &t.Key}}); err != nil {
 		return err
 	}
 	if err := c.watch(c.actor.UserID, "task", t.ID); err != nil {
@@ -529,13 +526,13 @@ func decisionUnclear(c *cx, a decisionUnclearArgs) error {
 		"picked_option_id": "", "outcome": "", "outcome_note": "", "decided_by": "", "decided_at": 0, "updated_at": c.at, "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {
 		return err
 	}
-	prev := map[string]any{"picked_option_id": d.PickedOptionID, "outcome": d.Outcome, "outcome_note": d.OutcomeNote, "decided_by": d.DecidedBy}
+	prev := core.Answer{PickedOptionID: d.PickedOptionID, Outcome: d.Outcome, OutcomeNote: d.OutcomeNote, DecidedBy: d.DecidedBy}
 	d.State, d.UnclearNote, d.AskedID, d.PickedOptionID, d.Outcome, d.OutcomeNote, d.DecidedBy, d.DecidedAt, d.UpdatedSeq = core.StateOpen, a.Note, answerer, "", "", "", "", 0, seq
 	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
 	c.ref, c.key = d.ID, t.Key
-	if err := c.emit(event{seq: seq, typ: "decision.unclear", entity: "decision", entityID: d.ID, place: inTask(t), data: map[string]any{"row": d, "key": t.Key, "previous": prev}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "decision.unclear", entity: "decision", entityID: d.ID, place: inTask(t), data: core.EventData{Row: d, Key: &t.Key, Previous: &prev}}); err != nil {
 		return err
 	}
 	if err := c.notifyTask(answerer, core.NoteUnclear, t, about{entity: "decision", id: d.ID, text: a.Note}); err != nil {
@@ -555,7 +552,7 @@ func decisionDelete(c *cx, a idArgs) error {
 	if err := c.tx.Unindex(c.ctx, d.ID); err != nil {
 		return err
 	}
-	if err := c.trash(target{table: "decisions", entity: "decision", id: d.ID, place: inTask(t), extra: map[string]any{"key": t.Key}}); err != nil {
+	if err := c.trash(target{table: "decisions", entity: "decision", id: d.ID, place: inTask(t), extra: core.EventData{Key: &t.Key}}); err != nil {
 		return err
 	}
 	return c.touchTask(t.ID, c.tx.Seq())
@@ -599,7 +596,7 @@ func decisionRestore(c *cx, a idArgs) error {
 		return err
 	}
 	// The whole decision goes out again: a copy that dropped it has it back.
-	return c.emit(event{seq: seq, typ: "decision.restored", entity: "decision", entityID: d.ID, place: inTask(t), data: map[string]any{"row": d, "key": t.Key}})
+	return c.emit(event{seq: seq, typ: "decision.restored", entity: "decision", entityID: d.ID, place: inTask(t), data: core.EventData{Row: d, Key: &t.Key}})
 }
 
 func hasOption(d core.Decision, optionID string) bool {

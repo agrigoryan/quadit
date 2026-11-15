@@ -259,7 +259,7 @@ func (run *purge) docs() error {
 			rowsOf{"watchers", store.Eq("subject_id", doc.ID)}, rowsOf{"refs", store.Eq("from_scope_id", doc.ID)}, rowsOf{"refs", store.Eq("to_id", doc.ID)}, rowsOf{"docs", store.Eq("id", doc.ID)}); err != nil {
 			return err
 		}
-		if err := run.c.emit(event{seq: tx.NextSeq(), typ: "doc.deleted", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: doc.OwnerID, data: map[string]any{"id": doc.ID, "gone": true}}); err != nil {
+		if err := run.c.emit(event{seq: tx.NextSeq(), typ: "doc.deleted", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: doc.OwnerID, data: core.EventData{ID: doc.ID, Gone: true}}); err != nil {
 			return err
 		}
 		run.purged++
@@ -351,7 +351,7 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 			if err := tx.Get(ctx, &t, store.Eq("id", id)); err != nil {
 				return err
 			}
-			if err := sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, map[string]any{"row": t, "key": t.Key, "from_backup": true}); err != nil {
+			if err := sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, core.EventData{Row: t, Key: &t.Key, FromBackup: true}); err != nil {
 				return err
 			}
 			_, err := sys.c.link("task", t.ID, "task", t.ID, t.Title+"\n"+t.Description)
@@ -367,7 +367,7 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 		if err := tx.Get(ctx, &doc, store.Eq("id", id)); err != nil {
 			return err
 		}
-		if err := sys.Emit("doc.restored", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, map[string]any{"row": doc, "from_backup": true}); err != nil {
+		if err := sys.Emit("doc.restored", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, core.EventData{Row: doc, FromBackup: true}); err != nil {
 			return err
 		}
 		var all []core.Block
@@ -382,8 +382,8 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 				live = append(live, b)
 			}
 		}
-		if err := sys.Emit("doc.edited", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, map[string]any{"id": doc.ID, "blocks": live, "deleted": gone, "from_backup": true,
-			"changes": map[string]core.FieldChange{"content_seq": {To: next + 1}}}); err != nil {
+		if err := sys.Emit("doc.edited", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, core.EventData{ID: doc.ID, Blocks: &live, Deleted: gone, FromBackup: true,
+			Changes: map[string]core.FieldChange{"content_seq": {To: next + 1}}}); err != nil {
 			return err
 		}
 		// What the page mentions is worked out again from its text as it stands.

@@ -165,7 +165,7 @@ func epicDelete(c *cx, a idArgs) error {
 		tp := newPatch()
 		tp.put("epic_id", t.EpicID, "")
 		tp.put("milestone_id", t.MilestoneID, "")
-		if err := c.saveOther(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
 			return err
 		}
 	}

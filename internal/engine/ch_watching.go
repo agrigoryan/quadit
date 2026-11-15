@@ -43,7 +43,7 @@ func watchSet(c *cx, a watchSetArgs) error {
 			return err
 		}
 		return c.emit(event{seq: c.tx.NextSeq(), typ: "watcher.deleted", entity: "watcher", entityID: subjectID, place: where, audience: userID,
-			data: map[string]any{"id": subjectID, "gone": true, "user_id": userID}})
+			data: core.EventData{ID: subjectID, Gone: true, UserID: userID}})
 	}
 	if n, err := c.tx.Count(c.ctx, "watchers", store.Eq("subject_id", subjectID), store.Eq("user_id", userID)); err != nil || n > 0 {
 		return err
@@ -52,7 +52,7 @@ func watchSet(c *cx, a watchSetArgs) error {
 	if err := c.tx.Insert(c.ctx, w); err != nil {
 		return err
 	}
-	return c.emit(event{seq: c.tx.NextSeq(), typ: "watcher.created", entity: "watcher", entityID: subjectID, place: where, audience: userID, data: map[string]any{"row": w}})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: "watcher.created", entity: "watcher", entityID: subjectID, place: where, audience: userID, data: core.EventData{Row: w}})
 }
 
 // watchSubject finds what is to be watched, and where the watcher's events

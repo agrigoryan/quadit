@@ -149,5 +149,5 @@ func secretDelete(c *cx, a idArgs) error {
 	if _, err := c.tx.Update(c.ctx, "secrets", map[string]any{"value": ""}, store.Eq("id", s.ID)); err != nil {
 		return err
 	}
-	return c.trash(target{table: "secrets", entity: "secret", id: s.ID, place: inWorkspace(c.ws), extra: map[string]any{"name": s.Name}})
+	return c.trash(target{table: "secrets", entity: "secret", id: s.ID, place: inWorkspace(c.ws), extra: core.EventData{Name: s.Name}})
 }

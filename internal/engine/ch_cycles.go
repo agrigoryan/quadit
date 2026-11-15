@@ -121,7 +121,7 @@ func cycleDelete(c *cx, a idArgs) error {
 	for _, t := range tasks {
 		tp := newPatch()
 		tp.put("cycle_id", t.CycleID, "")
-		if err := c.saveOther(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
 			return err
 		}
 	}
@@ -224,13 +224,14 @@ func (c *cx) rollProject(project core.Project, today string) error {
 		for _, t := range open {
 			tp := newPatch()
 			tp.put("cycle_id", t.CycleID, next)
-			if err := c.saveOther(t, tp, map[string]any{"rolled_over": true}); err != nil {
+			if err := c.saveOther(t, tp, core.EventData{RolledOver: true}); err != nil {
 				return err
 			}
 		}
+		rolled := len(open)
 		cp := newPatch()
 		cp.put("closed_at", int64(0), c.at)
-		if err := c.save(cp, target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(project.ID), extra: map[string]any{"rolled": len(open)}}); err != nil {
+		if err := c.save(cp, target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(project.ID), extra: core.EventData{Rolled: &rolled}}); err != nil {
 			return err
 		}
 	}

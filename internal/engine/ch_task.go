@@ -316,7 +316,7 @@ func taskDelete(c *cx, a idArgs) error {
 	p := newPatch()
 	p.put("deleted_at", int64(0), c.at)
 	p.set["deleted_by"] = c.actor.UserID
-	if err := c.saveTask(t, p, map[string]any{"deleted": true}); err != nil {
+	if err := c.saveTask(t, p, core.EventData{Deleted: true}); err != nil {
 		return err
 	}
 	if err := c.endDelegates(t); err != nil {
@@ -337,7 +337,7 @@ func taskRestore(c *cx, a idArgs) error {
 	p := newPatch()
 	p.put("deleted_at", t.DeletedAt, int64(0))
 	p.set["deleted_by"] = ""
-	if err := c.saveTask(t, p, map[string]any{"restored": true}); err != nil {
+	if err := c.saveTask(t, p, core.EventData{Restored: true}); err != nil {
 		return err
 	}
 	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})

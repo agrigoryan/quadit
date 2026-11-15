@@ -4,7 +4,6 @@ package engine
 
 import (
 	"encoding/json"
-	"maps"
 	"slices"
 	"strings"
 
@@ -22,7 +21,7 @@ func init() {
 
 // commitEdit writes an edit, keeps a version of the page as it was if the
 // last one is old, and tells everyone looking at the page.
-func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block, extra map[string]any) error {
+func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block) error {
 	if len(ed.touched) == 0 {
 		c.ref = d.ID
 		return nil
@@ -51,9 +50,8 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block, extra map[s
 		return err
 	}
 	c.ref = d.ID
-	data := map[string]any{"id": d.ID, "blocks": rows, "deleted": gone,
-		"changes": map[string]core.FieldChange{"content_seq": {To: seq}, "updated_at": {To: c.at}, "updated_by": {To: c.actor.UserID}}}
-	maps.Copy(data, extra)
+	data := core.EventData{ID: d.ID, Blocks: &rows, Deleted: gone,
+		Changes: map[string]core.FieldChange{"content_seq": {To: seq}, "updated_at": {To: c.at}, "updated_by": {To: c.actor.UserID}}}
 	if err := c.emit(event{seq: seq, typ: "doc.edited", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: data}); err != nil {
 		return err
 	}
@@ -134,7 +132,7 @@ func docEdit(c *cx, a docEditArgs) error {
 			return err
 		}
 	}
-	return c.commitEdit(d, ed, before, nil)
+	return c.commitEdit(d, ed, before)
 }
 
 type docWriteArgs struct {
@@ -237,7 +235,7 @@ func docWrite(c *cx, a docWriteArgs) error {
 	default:
 		return oneOf("mode", "mode", a.Mode, []string{"replace", "append", "prepend"})
 	}
-	return c.commitEdit(d, ed, before, nil)
+	return c.commitEdit(d, ed, before)
 }
 
 // lcs marks the blocks two versions of a page have in common, in order:

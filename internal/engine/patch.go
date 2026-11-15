@@ -3,7 +3,6 @@
 package engine
 
 import (
-	"maps"
 	"reflect"
 	"strings"
 
@@ -114,13 +113,13 @@ func (p *patch) date(col string, o Opt[string], cur *string) error {
 }
 
 // target names the row a save or a trash writes, and where its event
-// belongs. extra is added to the event's data.
+// belongs. extra is the event's data beside the id and the changes.
 type target struct {
 	table  string
 	entity string // the kind of thing the row is, in events: "project"
 	id     string
 	place  place
-	extra  map[string]any
+	extra  core.EventData
 }
 
 // save writes the patch to one row and emits "<entity>.updated" with the
@@ -139,8 +138,8 @@ func (c *cx) save(p *patch, row target) error {
 	if n != 1 {
 		return notFound(row.entity, row.id)
 	}
-	data := map[string]any{"id": row.id, "changes": p.changes}
-	maps.Copy(data, row.extra)
+	data := row.extra
+	data.ID, data.Changes = row.id, p.changes
 	return c.emit(event{seq: seq, typ: row.entity + ".updated", entity: row.entity, entityID: row.id, place: row.place, data: data})
 }
 
@@ -161,12 +160,12 @@ func (c *cx) trash(row target) error {
 	if n != 1 {
 		return notFound(row.entity, row.id)
 	}
-	data := map[string]any{"id": row.id, "changes": map[string]core.FieldChange{"deleted_at": {From: nil, To: c.at}}}
-	maps.Copy(data, row.extra)
+	data := row.extra
+	data.ID, data.Changes = row.id, map[string]core.FieldChange{"deleted_at": {From: nil, To: c.at}}
 	return c.emit(event{seq: seq, typ: row.entity + ".deleted", entity: row.entity, entityID: row.id, place: row.place, data: data})
 }
 
 // emitDeleted emits "<entity>.deleted" for a row that was removed outright.
 func (c *cx) emitDeleted(entity, rowID string, where place) error {
-	return c.emit(event{seq: c.tx.NextSeq(), typ: entity + ".deleted", entity: entity, entityID: rowID, place: where, data: map[string]any{"id": rowID, "gone": true}})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: entity + ".deleted", entity: entity, entityID: rowID, place: where, data: core.EventData{ID: rowID, Gone: true}})
 }

@@ -81,7 +81,7 @@ func projectCreate(c *cx, a projectCreateArgs) error {
 		if err := c.tx.Insert(c.ctx, st); err != nil {
 			return err
 		}
-		if err := c.emit(event{seq: seq, typ: "status.created", entity: "status", entityID: st.ID, place: inProject(project.ID), data: map[string]any{"row": st}}); err != nil {
+		if err := c.emit(event{seq: seq, typ: "status.created", entity: "status", entityID: st.ID, place: inProject(project.ID), data: core.EventData{Row: st}}); err != nil {
 			return err
 		}
 	}
@@ -225,5 +225,5 @@ func projectDelete(c *cx, a memberRefArgs) error {
 	if err != nil {
 		return err
 	}
-	return c.trash(target{table: "projects", entity: "project", id: pr.ID, place: inProject(pr.ID), extra: map[string]any{"key": pr.Key}})
+	return c.trash(target{table: "projects", entity: "project", id: pr.ID, place: inProject(pr.ID), extra: core.EventData{Key: &pr.Key}})
 }

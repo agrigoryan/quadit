@@ -118,7 +118,7 @@ func (c *cx) setClaim(cl core.ResourceClaim, set map[string]any, why string) err
 	}
 	was := c.system
 	c.system = true
-	err = c.emit(event{seq: c.tx.NextSeq(), typ: "claim.updated", entity: "claim", entityID: cl.ID, place: place{scopeType: "workspace", scopeID: c.ws, projectID: projectID}, data: map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource_id": cl.ResourceID, "user_id": cl.UserID, "task_id": cl.TaskID}})
+	err = c.emit(event{seq: c.tx.NextSeq(), typ: "claim.updated", entity: "claim", entityID: cl.ID, place: place{scopeType: "workspace", scopeID: c.ws, projectID: projectID}, data: core.EventData{ID: cl.ID, Changes: changes, Why: why, ResourceID: cl.ResourceID, UserID: cl.UserID, TaskID: &cl.TaskID}})
 	c.system = was
 	return err
 }
@@ -209,7 +209,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 	if err != nil {
 		return err
 	}
-	if err := c.emit(event{seq: c.tx.NextSeq(), typ: "claim.created", entity: "claim", entityID: cl.ID, place: place{scopeType: "workspace", scopeID: c.ws, projectID: projectID}, data: map[string]any{"row": cl, "resource": r.Name}}); err != nil {
+	if err := c.emit(event{seq: c.tx.NextSeq(), typ: "claim.created", entity: "claim", entityID: cl.ID, place: place{scopeType: "workspace", scopeID: c.ws, projectID: projectID}, data: core.EventData{Row: cl, Resource: r.Name}}); err != nil {
 		return err
 	}
 	if cl.State == "waiting" {

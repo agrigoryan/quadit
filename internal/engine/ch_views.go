@@ -107,7 +107,7 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 	if !v.Shared {
 		audience = v.OwnerID
 	}
-	return c.emit(event{seq: seq, typ: "view.created", entity: "view", entityID: v.ID, place: c.inProjectOrWorkspace(v.ProjectID), audience: audience, data: map[string]any{"row": v}})
+	return c.emit(event{seq: seq, typ: "view.created", entity: "view", entityID: v.ID, place: c.inProjectOrWorkspace(v.ProjectID), audience: audience, data: core.EventData{Row: v}})
 }
 
 type viewUpdateArgs struct {

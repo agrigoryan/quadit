@@ -63,7 +63,7 @@ func taskMove(c *cx, a taskMoveArgs) error {
 		return err
 	}
 	t.ProjectID, t.Number, t.Key = to.ID, int(n), to.Key+"-"+itoa(int(n))
-	if err := c.saveTask(t, p, map[string]any{"moved_from": oldKey, "from_project_id": oldProject}); err != nil {
+	if err := c.saveTask(t, p, core.EventData{MovedFrom: oldKey, FromProjectID: oldProject}); err != nil {
 		return err
 	}
 	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})

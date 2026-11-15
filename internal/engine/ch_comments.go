@@ -131,10 +131,7 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
-	data := map[string]any{"row": cm, "key": t.Key}
-	if len(atts) > 0 {
-		data["attachments"] = atts
-	}
+	data := core.EventData{Row: cm, Key: &t.Key, Attachments: atts}
 	c.ref, c.key = cm.ID, t.Key
 	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inTask(t), data: data}); err != nil {
 		return err
@@ -301,7 +298,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 		return alreadyInUse(err, "id", cm.ID)
 	}
 	c.ref = cm.ID
-	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(doc), audience: doc.OwnerID, data: map[string]any{"row": cm}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(doc), audience: doc.OwnerID, data: core.EventData{Row: cm}}); err != nil {
 		return err
 	}
 	if err := c.watch(c.actor.UserID, "doc", doc.ID); err != nil {
@@ -386,7 +383,7 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 	if err != nil {
 		return err
 	}
-	if err := c.save(p, target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: map[string]any{"key": key}}); err != nil {
+	if err := c.save(p, target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: core.EventData{Key: &key}}); err != nil {
 		return err
 	}
 	if _, ok := p.set["body"]; ok {
@@ -412,5 +409,5 @@ func commentDelete(c *cx, a idArgs) error {
 	if err := c.tx.Unindex(c.ctx, cm.ID); err != nil {
 		return err
 	}
-	return c.trash(target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: map[string]any{"key": key}})
+	return c.trash(target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: core.EventData{Key: &key}})
 }

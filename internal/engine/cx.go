@@ -79,7 +79,7 @@ type event struct {
 	entityID string
 	place    place
 	audience string // the one member who may see it; "" for all who may see its place
-	data     any
+	data     core.EventData
 }
 
 // emit records an event, after checking that the actor may write where it
@@ -93,12 +93,7 @@ func (c *cx) emit(e event) error {
 			return err
 		}
 	}
-	if m, ok := e.data.(map[string]any); ok && c.origin != "" {
-		m["rule"] = c.origin
-	}
-	if m, ok := e.data.(map[string]any); ok && c.quiet {
-		m["quiet"] = true // the feed shows it was brought in, not done now
-	}
+	e.data.Rule, e.data.Quiet = c.origin, c.quiet // every event says which rule caused it, and whether it was only brought in
 	raw, err := json.Marshal(e.data)
 	if err != nil {
 		return err
@@ -118,7 +113,7 @@ func (c *cx) emit(e event) error {
 // created emits "<entity>.created" carrying the whole new row.
 func (c *cx) created(seq int64, entity, entityID string, where place, row any) error {
 	c.ref = entityID
-	return c.emit(event{seq: seq, typ: entity + ".created", entity: entity, entityID: entityID, place: where, data: map[string]any{"row": row}})
+	return c.emit(event{seq: seq, typ: entity + ".created", entity: entity, entityID: entityID, place: where, data: core.EventData{Row: row}})
 }
 
 // newID returns given if the caller made an id, else a fresh one.

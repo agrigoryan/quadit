@@ -41,7 +41,7 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 	} else if n.DocID != "" {
 		where = place{scopeType: "doc", scopeID: n.DocID}
 	}
-	return c.emit(event{seq: seq, typ: "notification.created", entity: "notification", entityID: n.ID, place: where, audience: userID, data: map[string]any{"row": n}})
+	return c.emit(event{seq: seq, typ: "notification.created", entity: "notification", entityID: n.ID, place: where, audience: userID, data: core.EventData{Row: n}})
 }
 
 // about is what in a task a notification is about: a comment, a decision,

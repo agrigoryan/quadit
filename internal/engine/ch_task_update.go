@@ -75,7 +75,7 @@ func taskUpdate(c *cx, a taskUpdateArgs) error {
 			return err
 		}
 	}
-	if err := c.saveTask(u.t, u.p, nil); err != nil {
+	if err := c.saveTask(u.t, u.p, core.EventData{}); err != nil {
 		return err
 	}
 	if u.p.empty() {

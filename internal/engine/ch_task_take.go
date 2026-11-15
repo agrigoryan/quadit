@@ -75,7 +75,7 @@ func taskTake(c *cx, a taskTakeArgs) error {
 	if err := c.markStarted(p, &t, pr, cur); err != nil {
 		return err
 	}
-	if err := c.saveTask(t, p, nil); err != nil {
+	if err := c.saveTask(t, p, core.EventData{}); err != nil {
 		return err
 	}
 	return c.afterTaskPeople(t, newAssignee, "")
@@ -130,5 +130,5 @@ func taskRelease(c *cx, a idArgs) error {
 	p := newPatch()
 	p.put("lease_holder_id", t.LeaseHolderID, "")
 	p.put("lease_until", t.LeaseUntil, int64(0))
-	return c.saveTask(t, p, nil)
+	return c.saveTask(t, p, core.EventData{})
 }

@@ -77,7 +77,7 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 	for k, v := range set {
 		changes[k] = core.FieldChange{To: v}
 	}
-	return c.emit(event{seq: c.tx.NextSeq(), typ: "notification.updated", entity: "notification", entityID: ids[0], place: inWorkspace(c.ws), audience: c.actor.UserID, data: map[string]any{"ids": ids, "changes": changes}})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: "notification.updated", entity: "notification", entityID: ids[0], place: inWorkspace(c.ws), audience: c.actor.UserID, data: core.EventData{IDs: ids, Changes: changes}})
 }
 
 type notifyArgs struct {
