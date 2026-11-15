@@ -445,8 +445,8 @@ func rowType(dst any) (reflect.Value, *meta, error) {
 	return v.Elem(), m, err
 }
 
-// Get loads the first row matching where into dst, or returns
-// store.ErrNotFound.
+// Get loads the first row matching where into dst, or returns a
+// store.NotFoundError naming the row's table.
 func (c conn) Get(ctx context.Context, dst any, where ...store.Cond) error {
 	v, m, err := rowType(dst)
 	if err != nil {
@@ -458,10 +458,13 @@ func (c conn) Get(ctx context.Context, dst any, where ...store.Cond) error {
 	}
 	err = c.row(ctx, "SELECT "+m.cols+" FROM "+m.name+" WHERE "+whereSQL+" LIMIT 1", args...).Scan(m.dests(v)...)
 	if errors.Is(err, sql.ErrNoRows) {
-		return store.ErrNotFound
+		return m.notFound()
 	}
 	return err
 }
+
+// notFound is the error for a row of m's table that is not there.
+func (m *meta) notFound() error { return &store.NotFoundError{What: m.table.Noun} }
 
 // List loads the rows a Q selects into dst, a pointer to a slice of row
 // structs.

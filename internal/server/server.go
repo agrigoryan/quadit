@@ -440,6 +440,7 @@ func (x *c) admin() error {
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var he *httpError
 	var ee *engine.Error
+	var missing *store.NotFoundError
 	status := 500
 	body := map[string]any{"code": "internal", "message": "something went wrong on the server; the log has the details"}
 	switch {
@@ -459,6 +460,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(map[string]any{"error": ee})
 		return
+	case errors.As(err, &missing):
+		status, body = 404, map[string]any{"code": engine.CodeNotFound, "message": missing.Error()}
 	case errors.Is(err, store.ErrNotFound):
 		status, body = 404, map[string]any{"code": engine.CodeNotFound, "message": "not found"}
 	case errors.Is(err, context.Canceled):

@@ -35,8 +35,33 @@ import (
 )
 
 // ErrNotFound is returned when the row asked for does not exist, or is not
-// in the workspace it was asked for in.
+// in the workspace it was asked for in. Get returns it as a NotFoundError,
+// which names the row; match it with errors.Is.
 var ErrNotFound = errors.New("not found")
+
+// NotFoundError is the ErrNotFound of a row type: its message, "task not
+// found", names the row as a person would.
+type NotFoundError struct {
+	What string // the registered Noun of the row's table
+}
+
+func (e *NotFoundError) Error() string { return e.What + " not found" }
+
+// Is makes a NotFoundError match ErrNotFound.
+func (e *NotFoundError) Is(target error) bool { return target == ErrNotFound }
+
+// Find asks whether a row is there: it loads the first row matching where
+// into dst and returns true, or returns false when none matches. An error
+// is a failure to read, never the row's absence, so a database that is not
+// answering is never taken for a row that does not exist. Use Get when the
+// row must be there.
+func Find(ctx context.Context, db DB, dst any, where ...Cond) (bool, error) {
+	err := db.Get(ctx, dst, where...)
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	return err == nil, err
+}
 
 // ErrConflict is returned when a unique rule would be broken, for example a
 // second project with the same key.
@@ -115,7 +140,8 @@ func Where(c ...Cond) Q { return Q{Where: c} }
 // in another workspace is ErrNotFound.
 type DB interface {
 	// Get loads the first row matching where into dst, a pointer to a
-	// registered struct.
+	// registered struct. No such row is a NotFoundError; to ask whether
+	// the row is there, use Find.
 	Get(ctx context.Context, dst any, where ...Cond) error
 	// List loads the matching rows into dst, a pointer to a slice.
 	List(ctx context.Context, dst any, q Q) error

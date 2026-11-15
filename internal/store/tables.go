@@ -11,7 +11,7 @@
 //     internal/store/sqlstore/record.go). A table of a workspace has a
 //     workspace_id column.
 //  3. An entry in the list in init below: register[core.Thing]("things",
-//     ws), or global for a table outside workspaces.
+//     "thing", ws), or global for a table outside workspaces.
 //  4. The entry's place in that list: it is the order a backup is loaded
 //     back in (and the reverse is the order a workspace is purged in), so
 //     a table goes after every table it refers to.
@@ -31,6 +31,9 @@ import (
 type Table struct {
 	Name string       // the table's name in the database
 	Type reflect.Type // the row struct of package core
+	// Noun is what a person calls one row ("task", "invitation"): the
+	// words of the error when one is not found.
+	Noun string
 	// Global tables sit outside workspaces: a workspace-bound DB does not
 	// limit them.
 	Global bool
@@ -44,8 +47,8 @@ var (
 
 // register adds the table of row type T. Tables are registered parents
 // first, which makes the order they are registered in the load order.
-func register[T any](name string, global bool) {
-	t := &Table{Name: name, Type: reflect.TypeFor[T](), Global: global}
+func register[T any](name, noun string, global bool) {
+	t := &Table{Name: name, Type: reflect.TypeFor[T](), Noun: noun, Global: global}
 	byType[t.Type] = t
 	byName[name] = t
 	loadOrder[name] = len(loadOrder)
@@ -70,61 +73,61 @@ func Tables() []*Table {
 
 func init() {
 	const ws, global = false, true
-	register[core.Workspace]("workspaces", global)
-	register[core.User]("users", global)
-	register[core.Member]("members", ws)
-	register[core.APIToken]("api_tokens", ws)
-	register[core.Project]("projects", ws)
-	register[core.Status]("statuses", ws)
-	register[core.Label]("labels", ws)
-	register[core.Epic]("epics", ws)
-	register[core.Milestone]("milestones", ws)
-	register[core.Cycle]("cycles", ws)
-	register[core.Task]("tasks", ws)
-	register[core.TaskLabel]("task_labels", ws)
-	register[core.Relation]("task_relations", ws)
-	register[core.Decision]("decisions", ws)
-	register[core.Option]("decision_options", ws)
-	register[core.Doc]("docs", ws)
-	register[core.Block]("doc_blocks", ws)
-	register[core.DocVersion]("doc_versions", ws)
-	register[core.DBProperty]("db_properties", ws)
-	register[core.DBView]("db_views", ws)
-	register[core.DocSource]("doc_sources", ws)
-	register[core.Comment]("comments", ws)
-	register[core.Event]("events", ws)
-	register[core.AppliedChange]("changes", ws)
-	register[core.Cursor]("cursors", ws)
-	register[core.View]("views", ws)
-	register[core.Watcher]("watchers", ws)
-	register[core.Notification]("notifications", ws)
-	register[core.TaskLink]("task_links", ws)
-	register[core.Ref]("refs", ws)
-	register[core.Template]("templates", ws)
-	register[core.Preference]("preferences", ws)
-	register[core.File]("files", ws)
-	register[core.Attachment]("attachments", ws)
-	register[core.Session]("sessions", global)
-	register[core.Identity]("identities", global)
-	register[core.Passkey]("passkeys", global)
-	register[core.RecoveryCode]("recovery_codes", global)
-	register[core.Invite]("invites", global)
-	register[core.OneTimeToken]("one_time_tokens", global)
-	register[core.Setting]("settings", global)
-	register[core.AuditEntry]("audit_log", global)
-	register[core.RateCounter]("rate_counters", global)
-	register[core.PushSubscription]("push_subscriptions", global)
-	register[core.OAuthClient]("oauth_clients", global)
-	register[core.Backup]("backups", global)
-	register[core.Webhook]("webhooks", ws)
-	register[core.WebhookDelivery]("webhook_deliveries", ws)
-	register[core.Rule]("rules", ws)
-	register[core.Job]("jobs", global)
-	register[core.AgentSession]("agent_sessions", ws)
-	register[core.Resource]("resources", ws)
-	register[core.ResourceClaim]("resource_claims", ws)
-	register[core.Integration]("integrations", ws)
-	register[core.Secret]("secrets", ws)
-	register[core.Presence]("doc_presence", ws)
-	register[core.TaskKey]("task_keys", ws)
+	register[core.Workspace]("workspaces", "workspace", global)
+	register[core.User]("users", "user", global)
+	register[core.Member]("members", "member", ws)
+	register[core.APIToken]("api_tokens", "token", ws)
+	register[core.Project]("projects", "project", ws)
+	register[core.Status]("statuses", "status", ws)
+	register[core.Label]("labels", "label", ws)
+	register[core.Epic]("epics", "epic", ws)
+	register[core.Milestone]("milestones", "milestone", ws)
+	register[core.Cycle]("cycles", "cycle", ws)
+	register[core.Task]("tasks", "task", ws)
+	register[core.TaskLabel]("task_labels", "task label", ws)
+	register[core.Relation]("task_relations", "relation", ws)
+	register[core.Decision]("decisions", "decision", ws)
+	register[core.Option]("decision_options", "option", ws)
+	register[core.Doc]("docs", "page", ws)
+	register[core.Block]("doc_blocks", "block", ws)
+	register[core.DocVersion]("doc_versions", "version", ws)
+	register[core.DBProperty]("db_properties", "property", ws)
+	register[core.DBView]("db_views", "database view", ws)
+	register[core.DocSource]("doc_sources", "source", ws)
+	register[core.Comment]("comments", "comment", ws)
+	register[core.Event]("events", "event", ws)
+	register[core.AppliedChange]("changes", "change", ws)
+	register[core.Cursor]("cursors", "cursor", ws)
+	register[core.View]("views", "view", ws)
+	register[core.Watcher]("watchers", "watcher", ws)
+	register[core.Notification]("notifications", "notification", ws)
+	register[core.TaskLink]("task_links", "link", ws)
+	register[core.Ref]("refs", "reference", ws)
+	register[core.Template]("templates", "template", ws)
+	register[core.Preference]("preferences", "preference", ws)
+	register[core.File]("files", "file", ws)
+	register[core.Attachment]("attachments", "attachment", ws)
+	register[core.Session]("sessions", "session", global)
+	register[core.Identity]("identities", "connected account", global)
+	register[core.Passkey]("passkeys", "passkey", global)
+	register[core.RecoveryCode]("recovery_codes", "recovery code", global)
+	register[core.Invite]("invites", "invitation", global)
+	register[core.OneTimeToken]("one_time_tokens", "one-time link", global)
+	register[core.Setting]("settings", "setting", global)
+	register[core.AuditEntry]("audit_log", "audit entry", global)
+	register[core.RateCounter]("rate_counters", "rate counter", global)
+	register[core.PushSubscription]("push_subscriptions", "push subscription", global)
+	register[core.OAuthClient]("oauth_clients", "OAuth client", global)
+	register[core.Backup]("backups", "backup", global)
+	register[core.Webhook]("webhooks", "webhook", ws)
+	register[core.WebhookDelivery]("webhook_deliveries", "delivery", ws)
+	register[core.Rule]("rules", "rule", ws)
+	register[core.Job]("jobs", "job", global)
+	register[core.AgentSession]("agent_sessions", "agent session", ws)
+	register[core.Resource]("resources", "resource", ws)
+	register[core.ResourceClaim]("resource_claims", "claim", ws)
+	register[core.Integration]("integrations", "integration", ws)
+	register[core.Secret]("secrets", "secret", ws)
+	register[core.Presence]("doc_presence", "presence", ws)
+	register[core.TaskKey]("task_keys", "task key", ws)
 }
