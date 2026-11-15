@@ -1,8 +1,8 @@
 // The changes kept on the device (lib/outbox.ts), on an IndexedDB in memory.
 
 import "fake-indexeddb/auto";
-import { beforeEach, describe, expect, it } from "vitest";
-import { outbox, type OutboxItem } from "@/lib/outbox";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { outbox, type OutboxChange, type OutboxItem } from "@/lib/outbox";
 
 const DAY = 24 * 3600_000;
 
@@ -47,6 +47,8 @@ beforeEach(async () => {
   await outbox.clear();
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("outbox.adopt", () => {
   it("takes the items of tabs that are gone, for this workspace and person only, oldest first", async () => {
     const closeTab = await openTab("open-tab");
@@ -84,5 +86,66 @@ describe("outbox.adopt", () => {
     expect(taken.map((i) => i.key)).toEqual(["k3"]);
     expect(await outbox.count("acme", "u1")).toBe(1);
     expect(await outbox.count("other", "u1")).toBe(0);
+  });
+});
+
+describe("outbox.count", () => {
+  it("counts what is kept for one workspace and person, whichever tab holds it, a batch once", async () => {
+    const closeTab = await openTab("open-tab");
+    const batch: OutboxChange[] = [
+      { id: "c1", type: "task.update", args: {} },
+      { id: "c2", type: "task.update", args: {} },
+    ];
+    await leave([
+      item("k1"),
+      item("k2", { tab: "open-tab", changes: batch }),
+      item("k3", { slug: "other" }),
+      item("k4", { user: "u2" }),
+    ]);
+    outbox.put({ key: "k5", slug: "acme", user: "u1", changes: batch.slice(0, 1), what: "", at: Date.now() });
+
+    expect(await outbox.count("acme", "u1")).toBe(3);
+    expect(await outbox.count("other", "u1")).toBe(1);
+    expect(await outbox.count("acme", "u2")).toBe(1);
+    expect(await outbox.count("acme", "nobody")).toBe(0);
+    closeTab();
+  });
+});
+
+describe("outbox.clear", () => {
+  it("forgets everything kept on the device, for every workspace and person, and who queued last", async () => {
+    const kept = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => kept.get(key) ?? null,
+      setItem: (key: string, value: string) => void kept.set(key, value),
+      removeItem: (key: string) => void kept.delete(key),
+    });
+    await leave([item("k1"), item("k2", { slug: "other", user: "u2" })]);
+    outbox.put({ key: "k3", slug: "acme", user: "u1", changes: [], what: "", at: Date.now() });
+    expect(outbox.lastUser()).toBe("u1");
+
+    await outbox.clear();
+    expect(await outbox.count("acme", "u1")).toBe(0);
+    expect(await outbox.count("other", "u2")).toBe(0);
+    expect(await outbox.adopt("acme", "u1")).toEqual([]);
+    expect(outbox.lastUser()).toBeUndefined();
+  });
+});
+
+describe("where the browser has no locks", () => {
+  it("takes over what any other tab left, open or not, since it cannot tell which are open", async () => {
+    const closeTab = await openTab("open-tab");
+    await leave([item("k2", { tab: "open-tab" }), item("k1"), item("k3", { user: "u2" })]);
+    // The outbox looks for locks once, as it loads: load it anew in a browser without them.
+    vi.stubGlobal("navigator", {});
+    vi.resetModules();
+    const { outbox: withoutLocks } = await import("@/lib/outbox");
+
+    const taken = await withoutLocks.adopt("acme", "u1");
+    expect(taken.map((i) => i.key)).toEqual(["k1", "k2"]);
+    // They are this tab's now.
+    expect(await withoutLocks.adopt("acme", "u1")).toEqual([]);
+    expect(await withoutLocks.count("acme", "u1")).toBe(2);
+    closeTab();
   });
 });

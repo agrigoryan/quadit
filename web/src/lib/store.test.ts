@@ -1,7 +1,7 @@
 // The browser's copy of a workspace (lib/store.ts): feed events, the starting
 // copy and its second part.
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyEvents,
   type BootstrapData,
@@ -12,6 +12,7 @@ import {
   markOpened,
   mergeRest,
   mergeRows,
+  onReplaced,
 } from "@/lib/store";
 import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
 
@@ -154,6 +155,14 @@ describe("loadBootstrap", () => {
     expect(getState().lostProjects).toEqual([]);
   });
 
+  it("starts holding events anew: a second part is not patched with what was held for the copy before", () => {
+    loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
+    applyEvents([retitle(11, "t9", "held for the copy before")], true);
+    loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
+    mergeRest("acme", { seq: 10, tasks: [{ id: "t9", title: "as the server has it", updated_seq: 3 }] });
+    expect(getState().collections.tasks.t9?.title).toBe("as the server has it");
+  });
+
   it("says the finished work is still on its way when only the open part came", () => {
     loadBootstrap("acme", boot({ part: "open", rest: 3 }));
     expect(getState().restLoaded).toBe(false);
@@ -240,5 +249,54 @@ describe("mergeRows", () => {
       description: "whole",
       updated_seq: 12,
     });
+  });
+});
+
+describe("clearStore", () => {
+  it("empties the copy and everything known about it", () => {
+    loadBootstrap(
+      "acme",
+      boot({ part: "open", rest: 1, tasks: [{ id: "t1", title: "a" }], projects: [{ id: "p1", key: "SVA" }] }),
+    );
+    markOpened("t1");
+    markDrafts("tasks", ["t5"]);
+    loadBootstrap("acme", boot({ tasks: [] }), { fresh: true });
+    expect(getState().lostProjects).toEqual(["SVA"]);
+
+    clearStore();
+    expect(getState()).toMatchObject({
+      slug: "",
+      ready: false,
+      seq: 0,
+      me: null,
+      user: null,
+      workspace: null,
+      opened: {},
+      drafts: {},
+      lostProjects: [],
+      restLoaded: false,
+      stream: "connecting",
+    });
+    expect(Object.values(getState().collections).every((table) => Object.keys(table).length === 0)).toBe(true);
+  });
+});
+
+describe("onReplaced", () => {
+  it("hears a copy thrown away, not one read again for the same workspace", () => {
+    const heard = vi.fn();
+    const off = onReplaced(heard);
+    loadBootstrap("acme", boot());
+    expect(heard).toHaveBeenCalledTimes(1);
+    loadBootstrap("acme", boot({ seq: 20 }));
+    expect(heard).toHaveBeenCalledTimes(1);
+    loadBootstrap("acme", boot({ seq: 30 }), { fresh: true });
+    expect(heard).toHaveBeenCalledTimes(2);
+    loadBootstrap("other", boot());
+    expect(heard).toHaveBeenCalledTimes(3);
+    clearStore();
+    expect(heard).toHaveBeenCalledTimes(4);
+    off();
+    clearStore();
+    expect(heard).toHaveBeenCalledTimes(4);
   });
 });

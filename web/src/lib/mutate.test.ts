@@ -3,8 +3,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, NetworkError } from "@/lib/api";
-import { clearOutbox, mutate } from "@/lib/mutate";
+import { clearOutbox, mutate, restoreQueue } from "@/lib/mutate";
+import { outbox, type OutboxItem } from "@/lib/outbox";
 import { applyEvents, clearStore, getState, loadBootstrap } from "@/lib/store";
+import { toast } from "@/lib/toast";
 import type { ChangeResult, FeedEvent, Member, User, Workspace } from "@/lib/types";
 
 /** A change as the server receives it: JSON, read field by field. */
@@ -146,5 +148,109 @@ describe("mutate", () => {
     expect(getState().collections.tasks.t3?.title).toBe("made");
     expect(getState().drafts).toEqual({});
     expect(getState().unsent).toBe(0);
+  });
+
+  it("keeps a row made here as a draft until the server answers for it", async () => {
+    const done = mutate({ type: "task.create", args: { id: "t2" } }, (tx) =>
+      tx.insert("tasks", { id: "t2", title: "new" }),
+    );
+    await settle();
+    expect(getState().drafts).toEqual({ t2: "tasks" });
+    calls[0]?.answer([]);
+    await done;
+    expect(getState().drafts).toEqual({});
+    expect(getState().collections.tasks.t2?.title).toBe("new");
+  });
+
+  it("when refused, takes an inserted row out again and puts a removed row back", async () => {
+    const done = mutate({ type: "task.delete", args: { id: "t1" } }, (tx) => {
+      tx.insert("tasks", { id: "t2", title: "new" });
+      tx.remove("tasks", "t1");
+    }).catch((err: unknown) => err);
+    expect(getState().collections.tasks.t1).toBeUndefined();
+    await settle();
+    calls[0]?.fail(new ApiError(400, { message: "no" }));
+    await done;
+    expect(getState().collections.tasks.t1).toMatchObject({ title: "a", priority: 1 });
+    expect(getState().collections.tasks.t2).toBeUndefined();
+  });
+
+  it("does not put a removed row back over one that has come back by itself meanwhile", async () => {
+    const done = mutate({ type: "task.delete", args: { id: "t1" } }, (tx) => tx.remove("tasks", "t1")).catch(
+      (err: unknown) => err,
+    );
+    await settle();
+    applyEvents([{ ...retitle(11, "t1", ""), data: { row: { id: "t1", title: "theirs" } } }], true);
+    calls[0]?.fail(new ApiError(400, { message: "no" }));
+    await done;
+    expect(getState().collections.tasks.t1).toEqual({ id: "t1", title: "theirs" });
+  });
+});
+
+describe("restoreQueue", () => {
+  /** A change an earlier page of this workspace made and could not send. */
+  const leftBehind = (key: string, title: string): OutboxItem => ({
+    key,
+    slug: "acme",
+    user: "u1",
+    tab: "a-page-that-is-gone",
+    changes: [{ id: `change-${key}`, type: "task.update", args: { id: "t1", title } }],
+    what: `the change ${key}`,
+    at: 0,
+  });
+  const sentTitles = () => calls.map((call) => call.changes[0]?.args.title);
+
+  it("sends what an earlier page left behind before the changes waiting here, but never ahead of the request on its way", async () => {
+    vi.spyOn(outbox, "adopt").mockResolvedValue([leftBehind("k1", "left first"), leftBehind("k2", "left second")]);
+    const here = [
+      mutate({ type: "task.update", args: { id: "t1", title: "on its way" } }),
+      mutate({ type: "task.update", args: { id: "t1", title: "waiting here" } }),
+    ];
+    await settle();
+    expect(calls).toHaveLength(1);
+
+    await restoreQueue("acme");
+    expect(getState().unsent).toBe(4);
+    for (let i = 0; i < 4; i++) {
+      calls[i]?.answer([]);
+      await settle();
+    }
+    await Promise.all(here);
+    expect(sentTitles()).toEqual(["on its way", "left first", "left second", "waiting here"]);
+    expect(calls[1]?.changes[0]?.id).toBe("change-k1");
+    expect(getState().unsent).toBe(0);
+  });
+
+  it("sends them at once when nothing is on its way, ahead of what is made after", async () => {
+    vi.spyOn(outbox, "adopt").mockResolvedValue([leftBehind("k1", "left behind")]);
+    await restoreQueue("acme");
+    await settle();
+    expect(sentTitles()).toEqual(["left behind"]);
+    const here = mutate({ type: "task.update", args: { id: "t1", title: "made after" } });
+    calls[0]?.answer([]);
+    await settle();
+    calls[1]?.answer([]);
+    await here;
+    expect(sentTitles()).toEqual(["left behind", "made after"]);
+  });
+
+  it("takes nothing over for a workspace other than the one on screen", async () => {
+    const adopt = vi.spyOn(outbox, "adopt").mockResolvedValue([leftBehind("k1", "left behind")]);
+    await restoreQueue("other");
+    await settle();
+    expect(adopt).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("says what was not saved when the server refuses a change taken over: nothing on screen can be undone", async () => {
+    vi.spyOn(outbox, "adopt").mockResolvedValue([leftBehind("k1", "left behind")]);
+    const said = vi.spyOn(toast, "error").mockImplementation(() => {});
+    await restoreQueue("acme");
+    await settle();
+    calls[0]?.fail(new ApiError(400, { message: "no such task" }));
+    await settle();
+    expect(said).toHaveBeenCalledWith("Not saved: the change k1. no such task");
+    expect(getState().unsent).toBe(0);
+    expect(getState().collections.tasks.t1?.title).toBe("a");
   });
 });

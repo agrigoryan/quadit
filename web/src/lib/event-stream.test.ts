@@ -109,6 +109,23 @@ describe("openEventStream", () => {
     expect(ended.heard).toMatchObject({ opened: 1, closed: [null] });
   });
 
+  it("reports a stream the server will not give (204) with that status, and one without a body as dropped", async () => {
+    serve(204);
+    const declined = listen();
+    openEventStream("/events", declined.handlers);
+    await flush();
+    expect(declined.heard).toMatchObject({ opened: 0, closed: [204] });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))),
+    );
+    const empty = listen();
+    openEventStream("/events", empty.handlers);
+    await flush();
+    expect(empty.heard).toMatchObject({ opened: 0, closed: [null] });
+  });
+
   it("calls nothing after close()", async () => {
     const server = serve();
     const { heard, handlers } = listen();
