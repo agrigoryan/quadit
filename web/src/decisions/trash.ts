@@ -3,10 +3,12 @@
 // while the app is open is in the copy and shows up or drops out at once,
 // and the list is asked for again.
 
-import { useEffect, useMemo, useState } from "react";
-import { api, ApiError, errorMessage, workspacePath } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { api, workspacePath } from "@/lib/api";
+import { inWorkspace, queryClient, readError } from "@/lib/query";
 import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
-import { onEvents, useStore } from "@/lib/store";
+import { onEvents } from "@/lib/store";
 
 interface TrashedDecision {
   id: string;
@@ -30,6 +32,8 @@ interface Fetched {
   listed: Listed[];
 }
 
+const trashKey = (slug: string) => [...inWorkspace(slug), "decisions-trash"] as const;
+
 async function fetchTrash(slug: string, signal: AbortSignal): Promise<Fetched> {
   const list = await api.get<{ decisions?: Listed[] }>(workspacePath(slug, "/decisions?trash=1&limit=500"), signal);
   return { listed: list.decisions ?? [] };
@@ -48,38 +52,18 @@ export function useTrashedDecisions(): DecisionTrash {
   // The trash: the deleted questions themselves, and the tasks they were on, which may be gone too.
   const decisions = useLookupEvenIfGone("decisions");
   const tasks = useLookupEvenIfGone("tasks");
-  // Asked again when the stream comes back: deletions made meanwhile were missed.
-  const live = useStore((s) => s.stream === "live");
-  const [fetched, setFetched] = useState<Fetched | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    const ctl = new AbortController();
-    // Only the last load's answer is used; a cleanup makes every earlier one stale.
-    let run = 0;
-    const load = () => {
-      const mine = ++run;
-      fetchTrash(slug, ctl.signal).then(
-        (out) => {
-          if (mine !== run) return;
-          setFetched(out);
-          setError("");
-        },
-        (err: unknown) => {
-          if (mine !== run || ctl.signal.aborted) return;
-          if (!(err instanceof ApiError && err.status === 401)) setError(errorMessage(err));
-        },
-      );
-    };
-    load();
-    const off = onEvents((events) => {
-      if (events.some((ev) => ev.type === "decision.deleted" || ev.type === "decision.restored")) load();
-    });
-    return () => {
-      off();
-      ctl.abort();
-      run++;
-    };
-  }, [slug, live]);
+  // Asked again when the stream comes back (deletions made meanwhile were missed) and when a question is deleted or restored.
+  const query = useQuery({ queryKey: trashKey(slug), queryFn: ({ signal }) => fetchTrash(slug, signal) });
+  const fetched = query.data;
+  useEffect(
+    () =>
+      onEvents((events) => {
+        if (events.some((ev) => ev.type === "decision.deleted" || ev.type === "decision.restored"))
+          void queryClient.invalidateQueries({ queryKey: trashKey(slug) });
+      }),
+    [slug],
+  );
+  const error = readError(query.error);
 
   const rows = useMemo(() => {
     const out: TrashedDecision[] = [];
@@ -111,5 +95,6 @@ export function useTrashedDecisions(): DecisionTrash {
     return out.sort((a, b) => (b.deletedAt ?? 0) - (a.deletedAt ?? 0));
   }, [fetched, decisions, tasks]);
 
-  return { rows, loading: fetched === null && !error, error };
+  // A 401 is no answer: the person is on the way to sign in.
+  return { rows, loading: query.isPending || (!!query.error && !error), error };
 }

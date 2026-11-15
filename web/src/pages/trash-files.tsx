@@ -3,9 +3,11 @@
 // of the workspace leaves them out, so they are asked for here, and again
 // whenever a file is removed or restored while the page is open.
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { FileImage, FileText, FileVideo, Undo2 } from "lucide-react";
-import { api, errorMessage, workspacePath } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
+import { inWorkspace, queryClient, readError } from "@/lib/query";
 import { fileSize, isImage, isVideo } from "@/lib/files";
 import { t, tMaybe } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
@@ -27,51 +29,49 @@ export interface TrashedFiles {
   restore: (id: string) => void;
 }
 
+const filesKey = (slug: string) => [...inWorkspace(slug), "files-trash"] as const;
+
+/** Removed files, newest removal first; their rows are not in the store, so they are this read's own data. */
+async function fetchTrashedFiles(slug: string, signal: AbortSignal): Promise<TrashedFile[]> {
+  const out = await api.get<{ attachments?: Attachment[] }>(workspacePath(slug, "/list/attachments?trash=1"), signal);
+  return (out.attachments ?? [])
+    .filter((a): a is TrashedFile => !!a.file)
+    .map((a) => ({
+      ...a,
+      file: { ...a.file, url: localPath(a.file.url) as string, preview_url: localPath(a.file.preview_url) },
+    }))
+    .sort((a, b) => (b.deleted_at ?? 0) - (a.deleted_at ?? 0));
+}
+
+const NO_FILES: TrashedFile[] = [];
+
 export function useTrashedFiles(): TrashedFiles {
   const slug = useSlug();
-  const [rows, setRows] = useState<TrashedFile[]>([]);
-  const [state, setState] = useState<"loading" | "ready" | { error: string }>("loading");
-  /** Counts up to ask again. */
-  const [round, setRound] = useState(0);
-
-  useEffect(() => {
-    const ctl = new AbortController();
-    api
-      .get<{ attachments?: Attachment[] }>(workspacePath(slug, "/list/attachments?trash=1"), ctl.signal)
-      .then((out) => {
-        const found = (out.attachments ?? []).filter((a): a is TrashedFile => !!a.file);
-        setRows(
-          found
-            .map((a) => ({
-              ...a,
-              file: { ...a.file, url: localPath(a.file.url) as string, preview_url: localPath(a.file.preview_url) },
-            }))
-            .sort((a, b) => (b.deleted_at ?? 0) - (a.deleted_at ?? 0)),
-        );
-        setState("ready");
-      })
-      .catch((err: unknown) => {
-        if (!ctl.signal.aborted) setState({ error: errorMessage(err) });
-      });
-    return () => ctl.abort();
-  }, [slug, round]);
+  const read = useQuery({ queryKey: filesKey(slug), queryFn: ({ signal }) => fetchTrashedFiles(slug, signal) });
+  const rows = read.data ?? NO_FILES;
 
   // A file removed or put back anywhere changes this list.
   useEffect(
-    () => onEvents((events) => events.some((ev) => ev.entity_type === "attachment") && setRound((n) => n + 1)),
-    [],
+    () =>
+      onEvents((events) => {
+        if (events.some((ev) => ev.entity_type === "attachment"))
+          void queryClient.invalidateQueries({ queryKey: filesKey(slug) });
+      }),
+    [slug],
   );
 
   function restore(id: string) {
     const row = rows.find((r) => r.id === id);
-    setRows((list) => list.filter((r) => r.id !== id));
+    queryClient.setQueryData<TrashedFile[]>(filesKey(slug), (list) => list?.filter((r) => r.id !== id));
     mutate({ type: "attachment.restore", args: { id } })
       .then(() => row && toast.info(t("trash.fileRestored", { name: row.file.name })))
       // Refused: the reason is shown, and the list is asked for again so the row comes back.
-      .catch(() => setRound((n) => n + 1));
+      .catch(() => queryClient.invalidateQueries({ queryKey: filesKey(slug) }));
   }
 
-  return { rows, loading: state === "loading", error: typeof state === "object" ? state.error : "", restore };
+  const error = readError(read.error);
+  // A 401 is no answer: the person is on the way to sign in.
+  return { rows, loading: read.isPending || (!!read.error && !error), error, restore };
 }
 
 /** One removed file: what it is, what it was attached to, and the way back. */

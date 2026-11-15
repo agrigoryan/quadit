@@ -171,8 +171,7 @@ export function WebhooksPage() {
   // A webhook made or removed somewhere else is heard through the feed: read the list again (once, if a read is on its way).
   const known = useRows("webhooks");
   useEffect(() => {
-    void queryClient.invalidateQueries({ queryKey: key }, { cancelRefetch: false });
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `key` is a new array each render; what it names is `slug`
+    void queryClient.invalidateQueries({ queryKey: automationKeys.webhooks(slug) }, { cancelRefetch: false });
   }, [known, slug]);
 
   const testing = useMutation({

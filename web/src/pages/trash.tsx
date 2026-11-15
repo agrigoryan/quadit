@@ -1,6 +1,8 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
 import { MessageCircleQuestion, Trash2, Undo2 } from "lucide-react";
-import { api, errorMessage, workspacePath } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
+import { inWorkspace, readError } from "@/lib/query";
 import { formatNumber, t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { useLookupEvenIfGone, useSlug, useTrashedTasks } from "@/lib/selectors";
@@ -64,30 +66,25 @@ export function TrashPage() {
   const can = useCan();
   const questions = useTrashedDecisions();
   const files = useTrashedFiles();
-  const [state, setState] = useState<"loading" | "ready" | { error: string }>("loading");
   /** Questions on their way back: hidden until the server has said yes or no. */
   const [restoring, setRestoring] = useState<Record<string, true>>({});
 
-  useEffect(() => {
-    const ctl = new AbortController();
-    // Everything in the trash, a thousand at a time: the page shows what
-    // has arrived and goes on reading.
-    const read = async () => {
+  // Everything in the trash, a thousand at a time, into the store: the page
+  // shows what has arrived and goes on reading.
+  const read = useQuery({
+    queryKey: [...inWorkspace(slug), "tasks-trash"],
+    queryFn: async ({ signal }) => {
       for (let offset = 0; offset < 50_000; offset += 1000) {
         const out = await api.get<{ tasks: Task[]; more?: boolean }>(
           workspacePath(slug, `/tasks?trash=1&raw=1&limit=1000&offset=${offset}`),
-          ctl.signal,
+          signal,
         );
         mergeRows("tasks", out.tasks ?? []);
-        setState("ready");
-        if (!out.more) return;
+        if (!out.more) break;
       }
-    };
-    read().catch((err: unknown) => {
-      if (!ctl.signal.aborted) setState({ error: errorMessage(err) });
-    });
-    return () => ctl.abort();
-  }, [slug]);
+      return true;
+    },
+  });
 
   function restoreQuestion(id: string) {
     setRestoring((r) => ({ ...r, [id]: true }));
@@ -113,8 +110,8 @@ export function TrashPage() {
   ]);
 
   if (total === 0) {
-    if (state === "loading" || questions.loading || files.loading) return <Loading />;
-    const error = state !== "ready" ? state.error : questions.error || files.error;
+    const error = readError(read.error) || questions.error || files.error;
+    if (!error && (!read.data || questions.loading || files.loading)) return <Loading />;
     if (error) return <EmptyState icon={<Trash2 />} title={t("trash.loadFailed")} hint={error} />;
     return <EmptyState icon={<Trash2 />} title={t("trash.empty")} hint={t("trash.emptyHint")} />;
   }
