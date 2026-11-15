@@ -423,6 +423,9 @@ func (s *Server) hMemory(x *c) error {
 	}
 	root, ok := x.memoryRoot(m.UserID)
 	if !ok {
+		if !x.wantText() {
+			return x.ok(map[string]any{"pages": []any{}})
+		}
 		return x.text("no notes yet; write one with POST /memory {title, markdown}\n")
 	}
 	var pages []core.Doc

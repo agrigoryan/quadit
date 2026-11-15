@@ -84,21 +84,8 @@ func sessionStart(c *cx) error {
 			s.Title = t.Title
 		}
 		// A task can carry its own limit on what may be spent on it.
-		if b := t.Budget; b != nil && !c.system {
-			var spent []core.AgentSession
-			if err := c.tx.List(c.ctx, &spent, store.Where(store.Eq("task_id", t.ID))); err != nil {
-				return err
-			}
-			var cost, minutes int64
-			for _, sp := range spent {
-				cost += sp.CostMicros
-				if sp.EndedAt != 0 {
-					minutes += (sp.EndedAt - sp.StartedAt) / 60_000
-				}
-			}
-			if b.CostMicros > 0 && cost >= b.CostMicros || b.Minutes > 0 && minutes >= b.Minutes {
-				return &Error{Code: CodeBudget, Message: "the budget set for " + t.Key + " is used up; say so on the task and ask for more before going on"}
-			}
+		if err := c.checkTaskBudget(t); err != nil {
+			return err
 		}
 	}
 	if err := c.tx.Insert(c.ctx, s); err != nil {
@@ -192,20 +179,96 @@ func sessionUpdate(c *cx) error {
 	if err := c.save(p, "agent_sessions", "session", s.ID, scopeType, scopeID, projectID, nil); err != nil {
 		return err
 	}
-	// Warn the person responsible once the agent passes 80% of its week.
-	if b := c.actor.Budget; b != nil && b.CostMicros > 0 && s.CostMicros > before {
-		cost, _, err := c.e.Usage(c.ctx, c.tx, c.actor.UserID, weekStart(c.at))
+	_ = before
+	return c.budgetWarnings(s)
+}
+
+// taskSpend adds up what agents have spent on a task: cost, and minutes of
+// work, the running sessions included.
+func (c *cx) taskSpend(taskID string) (cost, minutes int64, err error) {
+	var spent []core.AgentSession
+	if err := c.tx.List(c.ctx, &spent, store.Where(store.Eq("task_id", taskID))); err != nil {
+		return 0, 0, err
+	}
+	for _, sp := range spent {
+		cost += sp.CostMicros
+		end := sp.EndedAt
+		if end == 0 {
+			end = c.at
+		}
+		minutes += (end - sp.StartedAt) / 60_000
+	}
+	return cost, minutes, nil
+}
+
+// checkTaskBudget refuses new work on a task whose own budget is used up.
+// Saying so on the task, and handing it back, stay possible: a clean stop.
+func (c *cx) checkTaskBudget(t core.Task) error {
+	b := t.Budget
+	if b == nil || c.system || c.actor.Kind != core.KindAgent {
+		return nil
+	}
+	cost, minutes, err := c.taskSpend(t.ID)
+	if err != nil {
+		return err
+	}
+	if b.CostMicros > 0 && cost >= b.CostMicros || b.Minutes > 0 && minutes >= b.Minutes {
+		return &Error{Code: CodeBudget, Message: "the budget set for " + t.Key + " is used up; say so on the task and ask for more before going on"}
+	}
+	return nil
+}
+
+// budgetWarnings tells the people concerned, once, when an agent's week or
+// a task's own budget is four-fifths used: in cost or in time.
+func (c *cx) budgetWarnings(s core.AgentSession) error {
+	near := func(used, limit int64) bool { return limit > 0 && used*10 >= limit*8 }
+	once := func(userID, entityType, entityID, title string, since int64) error {
+		if userID == "" {
+			return nil
+		}
+		n, err := c.tx.Count(c.ctx, "notifications", store.Eq("user_id", userID), store.Eq("type", core.NoteBudget),
+			store.Eq("entity_id", entityID), store.Eq("title", title), store.Gte("created_at", since))
+		if err != nil || n > 0 {
+			return err
+		}
+		return c.notify(userID, core.NoteBudget, core.Notification{EntityType: entityType, EntityID: entityID, Title: title, TaskID: s.TaskID})
+	}
+	var self core.User
+	if err := c.tx.Get(c.ctx, &self, store.Eq("id", s.AgentID)); err != nil {
+		return nil
+	}
+	if b := c.actor.Budget; b != nil && c.actor.UserID == s.AgentID {
+		cost, minutes, err := c.e.Usage(c.ctx, c.tx, s.AgentID, weekStart(c.at))
 		if err != nil {
 			return err
 		}
-		warnAt := b.CostMicros * 8 / 10
-		if cost >= warnAt && cost-(s.CostMicros-before) < warnAt {
-			var self core.User
-			if err := c.tx.Get(c.ctx, &self, store.Eq("id", c.actor.UserID)); err == nil {
-				return c.notify(self.ResponsibleID, core.NoteBudget, core.Notification{EntityType: "member", EntityID: c.actor.UserID,
-					Title: c.actor.Name + " has used 80% of its weekly budget", TaskID: s.TaskID})
+		if near(cost, b.CostMicros) || near(minutes, b.Minutes) {
+			if err := once(self.ResponsibleID, "member", s.AgentID, c.actor.Name+" has used 80% of its weekly budget", weekStart(c.at)); err != nil {
+				return err
 			}
 		}
+	}
+	if s.TaskID == "" {
+		return nil
+	}
+	var t core.Task
+	if err := c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)); err != nil || t.Budget == nil {
+		return nil
+	}
+	cost, minutes, err := c.taskSpend(t.ID)
+	if err != nil {
+		return err
+	}
+	if near(cost, t.Budget.CostMicros) || near(minutes, t.Budget.Minutes) {
+		who := t.AskedBy
+		if who == "" {
+			who = self.ResponsibleID
+		}
+		title := t.Key + " has used 80% of its budget"
+		if cost >= t.Budget.CostMicros && t.Budget.CostMicros > 0 || minutes >= t.Budget.Minutes && t.Budget.Minutes > 0 {
+			title = t.Key + " has used up its budget"
+		}
+		return once(who, "task", t.ID, title, 0)
 	}
 	return nil
 }

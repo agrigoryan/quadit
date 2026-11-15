@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -200,5 +201,55 @@ func TestNewAgentsAskFirst(t *testing.T) {
 		}
 		w.do(careful, "task.create", M{"project": "SVA", "title": "ordinary work needs no approval"})
 		w.do(trusted, "webhook.create", hook)
+	})
+}
+
+// TestBudgets checks the warnings before a limit and the clean stop at it,
+// for a task's own budget and for hand-offs.
+func TestBudgets(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		a, b := w.agent("alpha"), w.agent("beta")
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Draw the boss", "assignee": "@alpha", "budget": M{"cost_micros": 1_000_000}})
+		inbox := func() string {
+			var ns []core.Notification
+			st.In(w.ws.ID).List(context.Background(), &ns, store.Q{Where: []store.Cond{store.Eq("user_id", w.owner.ID), store.Eq("type", core.NoteBudget)}, Order: "seq"})
+			var out []string
+			for _, n := range ns {
+				out = append(out, n.Title)
+			}
+			return strings.Join(out, " | ")
+		}
+		run := w.do(a, "session.start", M{"task": "SVA-1"}).Ref
+		w.do(a, "session.update", M{"id": run, "cost_micros": 500_000})
+		if got := inbox(); got != "" {
+			t.Fatalf("a warning at half the budget: %s", got)
+		}
+		w.do(a, "session.update", M{"id": run, "cost_micros": 850_000})
+		w.do(a, "session.update", M{"id": run, "cost_micros": 900_000})
+		if got := inbox(); got != "SVA-1 has used 80% of its budget" {
+			t.Fatalf("warnings at 85%% and 90%%: %q", got)
+		}
+		w.do(a, "session.update", M{"id": run, "cost_micros": 1_200_000, "state": "done"})
+		if got := inbox(); !strings.HasSuffix(got, "SVA-1 has used up its budget") {
+			t.Fatalf("the budget ran out: %q", got)
+		}
+		// A clean stop: no new run and no taking it, but it can be said and handed back.
+		w.refused(engine.CodeBudget, a, "session.start", M{"task": "SVA-1"})
+		w.refused(engine.CodeBudget, b, "task.take", M{"id": "SVA-1"})
+		w.do(a, "comment.create", M{"task": "SVA-1", "body": "Out of budget; half done.", "waiting_on": "@aram"})
+
+		// Hand-offs count against an agent's budget.
+		w.do(w.owner.ID, "agent.update", M{"id": "@alpha", "budget": M{"handoffs": 2}})
+		for i := 0; i < 2; i++ {
+			w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Pass along", "assignee": "@alpha"})
+			w.do(a, "task.update", M{"id": fmt.Sprintf("SVA-%d", i+2), "assignee": "@beta"})
+		}
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "One too many", "assignee": "@alpha"})
+		if e := w.refused(engine.CodeBudget, a, "task.update", M{"id": "SVA-4", "assignee": "@beta"}); !strings.Contains(e.Message, "hand the task to a person") {
+			t.Fatalf("a third hand-off: %v", e)
+		}
+		w.do(a, "task.update", M{"id": "SVA-4", "assignee": "@aram"})
 	})
 }

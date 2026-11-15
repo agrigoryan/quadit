@@ -525,7 +525,7 @@ func taskUpdate(c *cx) error {
 	}
 	if a.Budget.Set {
 		var b *core.Budget
-		if !a.Budget.Null && (a.Budget.V.CostMicros > 0 || a.Budget.V.Minutes > 0) {
+		if !a.Budget.Null && (a.Budget.V.CostMicros > 0 || a.Budget.V.Minutes > 0 || a.Budget.V.Handoffs > 0) {
 			b = &a.Budget.V
 		}
 		p.set["budget"] = b
@@ -697,6 +697,9 @@ func taskTake(c *cx) error {
 	}
 	t, err := c.task("id", a.ID)
 	if err != nil {
+		return err
+	}
+	if err := c.checkTaskBudget(t); err != nil {
 		return err
 	}
 	if a.Minutes <= 0 {
@@ -1178,6 +1181,38 @@ func (c *cx) checkHandoff(t core.Task) error {
 			break // a person assigned it: the chain starts over
 		}
 		chain++
+	}
+	// A hand-off counts against a budget: the agent's for the week, and the
+	// task's own.
+	if b := c.actor.Budget; b != nil && b.Handoffs > 0 {
+		mine, err := c.tx.Events(c.ctx, store.EventFilter{ActorID: c.actor.UserID, Types: []string{"task.updated"}, Desc: true, Limit: 2000})
+		if err != nil {
+			return err
+		}
+		var n int64
+		for _, ev := range mine {
+			if ev.At < weekStart(c.at) {
+				break
+			}
+			if strings.Contains(string(ev.Data), `"assignee_id"`) {
+				n++
+			}
+		}
+		if n >= b.Handoffs {
+			return &Error{Code: CodeBudget, Message: "this agent has passed work on " + itoa(int(n)) + " times this week, which is its limit; hand the task to a person"}
+		}
+	}
+	if b := t.Budget; b != nil && b.Handoffs > 0 {
+		var n int64
+		for _, ev := range evs {
+			var actor core.Member
+			if strings.Contains(string(ev.Data), `"assignee_id"`) && c.tx.Get(c.ctx, &actor, store.Eq("user_id", ev.ActorID)) == nil && actor.Kind == core.KindAgent {
+				n++
+			}
+		}
+		if n >= b.Handoffs {
+			return &Error{Code: CodeBudget, Message: t.Key + " has been passed between agents " + itoa(int(n)) + " times, which is its limit; hand it to a person"}
+		}
 	}
 	if chain >= maxHandoffs {
 		return &Error{Code: CodeConflict, Message: "this task has been handed from agent to agent " + itoa(chain) +

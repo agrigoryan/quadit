@@ -109,6 +109,9 @@ type Scope struct {
 type Budget struct {
 	CostMicros int64 `json:"cost_micros,omitempty"` // per week for an agent, in total for a task
 	Minutes    int64 `json:"minutes,omitempty"`
+	// Handoffs is how many times work may be passed from agent to agent:
+	// per week for an agent, in total for a task.
+	Handoffs int64 `json:"handoffs,omitempty"`
 }
 
 // Member is a user's place in one workspace.

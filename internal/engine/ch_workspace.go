@@ -696,7 +696,7 @@ func agentUpdate(c *cx) error {
 	}
 	if a.Budget.Set {
 		var b *core.Budget
-		if !a.Budget.Null && (a.Budget.V.CostMicros > 0 || a.Budget.V.Minutes > 0) {
+		if !a.Budget.Null && (a.Budget.V.CostMicros > 0 || a.Budget.V.Minutes > 0 || a.Budget.V.Handoffs > 0) {
 			b = &a.Budget.V
 		}
 		p.set["budget"] = b

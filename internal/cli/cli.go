@@ -54,6 +54,8 @@ more      quadit help secrets        using keys without holding them
           quadit help server         serve, admin, backup, restore
 
 Every command takes --json for full data and --dry-run to check a write.
+A write takes --id=UUID (send it again with the same id and it happens once)
+and --for=@WHO (it runs with that member's access).
 Connect with QUADIT_URL and QUADIT_TOKEN, or: quadit login URL TOKEN
 `
 
@@ -176,13 +178,23 @@ func query(fields map[string][]string) url.Values {
 // Run runs a client command and returns the process exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
 	var asJSON, dry bool
+	var changeID, actFor string
 	var rest []string
-	for _, a := range args {
-		switch a {
-		case "--json":
+	for i, a := range args {
+		// After "--" (run --secret X -- command) everything is the command's.
+		if a == "--" {
+			rest = append(rest, args[i:]...)
+			break
+		}
+		switch {
+		case a == "--json":
 			asJSON = true
-		case "--dry-run":
+		case a == "--dry-run":
 			dry = true
+		case strings.HasPrefix(a, "--id="):
+			changeID = strings.TrimPrefix(a, "--id=")
+		case strings.HasPrefix(a, "--for="):
+			actFor = strings.TrimPrefix(a, "--for=")
 		default:
 			rest = append(rest, a)
 		}
@@ -206,6 +218,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+	c.ChangeID, c.For = changeID, actFor
 	r := &runner{c: c, out: stdout, json: asJSON, dry: dry}
 	if err := r.run(cmd, rest); err != nil {
 		fmt.Fprintln(stderr, err)
@@ -664,6 +677,11 @@ func (r *runner) run(cmd string, rest []string) error {
 			fid, furl, err := r.c.Upload(p)
 			if err != nil {
 				return err
+			}
+			if r.json {
+				raw, _ := json.Marshal(map[string]string{"id": fid, "url": furl})
+				fmt.Fprintln(r.out, string(raw))
+				continue
 			}
 			fmt.Fprintf(r.out, "%s id=%s\n", furl, fid)
 		}

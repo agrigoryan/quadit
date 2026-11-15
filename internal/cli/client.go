@@ -20,6 +20,11 @@ import (
 
 // Client talks to a server as one member.
 type Client struct {
+	// ChangeID, when set, is the id the next change is sent with; sending
+	// the same change with the same id twice applies it once.
+	ChangeID string
+	// For names the member a change is made for; it then runs with their access.
+	For   string
 	URL   string
 	Token string
 	HTTP  *http.Client
@@ -150,7 +155,15 @@ type Result struct {
 // Change applies one change. The id is made here, so a retry after a
 // network failure cannot apply it twice.
 func (c *Client) Change(typ string, args any, approval string, dry bool) (*Result, error) {
-	body := map[string]any{"id": id.New(), "type": typ, "args": args}
+	cid := c.ChangeID // one given by the caller makes its own retries safe too
+	if cid == "" {
+		cid = id.New()
+	}
+	c.ChangeID = "" // an id is for one change
+	body := map[string]any{"id": cid, "type": typ, "args": args}
+	if c.For != "" {
+		body["for"] = c.For
+	}
 	if approval != "" {
 		body["approval"] = approval
 	}
