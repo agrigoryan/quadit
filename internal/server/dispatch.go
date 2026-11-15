@@ -88,6 +88,7 @@ func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error)
 		return 0, err
 	}
 	for _, ev := range evs {
+		// Webhooks mirror the feed, history too: its payload says quiet.
 		for _, h := range hooks {
 			if hookWants(h, ev) {
 				if err := s.queueDelivery(ctx, db, h, ev); err != nil {
@@ -95,36 +96,57 @@ func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error)
 				}
 			}
 		}
-		if len(viewWatchers) > 0 && ev.AudienceID == "" && ev.ScopeType == "task" && (ev.Type == "task.created" || ev.Type == "task.updated") {
-			for _, vw := range viewWatchers {
-				if vw.UserID == ev.ActorID {
-					continue
-				}
-				if err := s.viewNews(ctx, ws, vw, ev); err != nil {
-					s.log.Error("watched view", "view", vw.SubjectID, "seq", ev.Seq, "err", err)
-				}
-			}
-		}
-		if len(rules) > 0 && ev.AudienceID == "" && !strings.Contains(string(ev.Data), `"rule":`) {
-			for _, r := range rules {
-				if err := s.runRule(ctx, ws, db, r, hooks, ev); err != nil {
-					s.log.Error("rule", "rule", r.Name, "seq", ev.Seq, "err", err)
-				}
-			}
-		}
-		if ev.Type == "notification.created" {
-			var d struct {
-				Row core.Notification `json:"row"`
-			}
-			if json.Unmarshal(ev.Data, &d) == nil && d.Row.ID != "" {
-				// Give the person a moment to see it in an open window first.
-				s.enqueue(ctx, "notify", ws.ID, "notify:"+d.Row.ID, map[string]string{"id": d.Row.ID}, time.Now().Add(20*time.Second))
-			}
+		if isNews(ev) {
+			s.reactToNews(ctx, ws, db, ev, hooks, rules, viewWatchers)
 		}
 	}
 	last := evs[len(evs)-1].Seq
 	_, err = s.st.Update(ctx, "workspaces", map[string]any{"dispatched_seq": last}, store.Eq("id", ws.ID), store.Lt("dispatched_seq", last))
 	return last, err
+}
+
+// isNews says whether an event is something happening now, which rules,
+// watched views and wake-ups react to. History brought in quietly (an
+// import) is not: it goes only to the feed, the search, local copies and
+// webhooks. This is the one place that tells the two apart.
+func isNews(ev core.Event) bool {
+	var d struct {
+		Quiet bool `json:"quiet"`
+	}
+	json.Unmarshal(ev.Data, &d)
+	return !d.Quiet
+}
+
+// reactToNews does what one event of news sets off: alerts for the saved
+// views it brings a task into, the rules it matches, and a wake-up (push or
+// mail) for an inbox item.
+func (s *Server) reactToNews(ctx context.Context, ws core.Workspace, db store.DB, ev core.Event, hooks []core.Webhook, rules []core.Rule, viewWatchers []core.Watcher) {
+	if len(viewWatchers) > 0 && ev.AudienceID == "" && ev.ScopeType == "task" && (ev.Type == "task.created" || ev.Type == "task.updated") {
+		for _, vw := range viewWatchers {
+			if vw.UserID == ev.ActorID {
+				continue
+			}
+			if err := s.viewNews(ctx, ws, vw, ev); err != nil {
+				s.log.Error("watched view", "view", vw.SubjectID, "seq", ev.Seq, "err", err)
+			}
+		}
+	}
+	if len(rules) > 0 && ev.AudienceID == "" && !strings.Contains(string(ev.Data), `"rule":`) {
+		for _, r := range rules {
+			if err := s.runRule(ctx, ws, db, r, hooks, ev); err != nil {
+				s.log.Error("rule", "rule", r.Name, "seq", ev.Seq, "err", err)
+			}
+		}
+	}
+	if ev.Type == "notification.created" {
+		var d struct {
+			Row core.Notification `json:"row"`
+		}
+		if json.Unmarshal(ev.Data, &d) == nil && d.Row.ID != "" {
+			// Give the person a moment to see it in an open window first.
+			s.enqueue(ctx, "notify", ws.ID, "notify:"+d.Row.ID, map[string]string{"id": d.Row.ID}, time.Now().Add(20*time.Second))
+		}
+	}
 }
 
 // viewNews tells the watcher of a saved view when a change leaves a task in

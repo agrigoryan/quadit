@@ -197,3 +197,50 @@ func TestQuietInBothForms(t *testing.T) {
 		}
 	})
 }
+
+// TestQuietHistorySetsNothingOff: tasks an admin brings in quietly start no
+// rule and raise no watched-view alert, though they are in the feed and the
+// search; webhooks, which mirror the feed, still get them, marked quiet. A
+// change made afterwards sets all three off as before.
+func TestQuietHistorySetsNothingOff(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
+		coordinator := s.agentToken("coordinator")
+		artist := s.agentToken("artist")
+		s.change(s.owner, "", "rule.create", M{"name": "a new task to plan", "match": M{"event_types": []string{"task.created"}},
+			"action": M{"kind": "notify", "user_id": "@coordinator"}})
+		view := s.change(nil, artist, "view.create", M{"name": "Art", "query": M{"label": []string{"art"}}})
+		s.change(nil, artist, "watch.set", M{"type": "view", "subject": view["ref"]})
+		hook := newReceiver(t, "")
+		s.change(s.owner, "", "webhook.create", M{"name": "mirror", "url": hook.srv.URL, "event_types": []string{"task.created"}})
+
+		quiet := M{"changes": []M{{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": "Imported sprites", "labels": []string{"art"}}, "quiet": true}}}
+		s.call(s.owner, "", "POST", w+"/changes", quiet, 200, nil)
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "New sprites", "labels": []string{"art"}})
+
+		inbox := func(token string) string {
+			return s.call(nil, token, "GET", "/api/v1/w/-/inbox?format=text&all=1", nil, 200, nil)
+		}
+		// The task made afterwards is news: rule, view alert and webhook.
+		eventually(t, "the rule and the view alert for the new task", func() bool {
+			return strings.Contains(inbox(coordinator), "SVA-2") && strings.Contains(inbox(artist), "SVA-2")
+		})
+		eventually(t, "the webhook to get both tasks", func() bool { return strings.Count(hook.types(), "task.created") == 2 })
+		// Events are handled in order, so the imported one is done with by now.
+		if a, b := inbox(coordinator), inbox(artist); strings.Contains(a, "SVA-1") || strings.Contains(b, "SVA-1") {
+			t.Fatalf("the imported task set off a rule or a view alert:\ncoordinator: %s\nartist: %s", a, b)
+		}
+		hook.mu.Lock()
+		first, second := hook.got[0], hook.got[1]
+		hook.mu.Unlock()
+		if first["quiet"] != true || second["quiet"] != nil {
+			t.Fatalf("the webhook's quiet marks: imported %v, new %v", first["quiet"], second["quiet"])
+		}
+		// History is still in the search.
+		if out := s.call(nil, artist, "GET", "/api/v1/w/-/search?q=Imported&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+			t.Fatalf("search: %s", out)
+		}
+	})
+}

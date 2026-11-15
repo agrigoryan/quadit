@@ -156,8 +156,12 @@ func (s *Server) sendDelivery(ctx context.Context, h core.Webhook, deliveryID st
 	if names, err := x.names(); err == nil {
 		line = x.eventLine(ev, names)
 	}
-	body, _ := json.Marshal(map[string]any{"delivery": deliveryID, "workspace": ws.Slug, "seq": ev.Seq, "type": ev.Type, "text": line, "event": ev,
-		"url": s.cfg.BaseURL})
+	payload := map[string]any{"delivery": deliveryID, "workspace": ws.Slug, "seq": ev.Seq, "type": ev.Type, "text": line, "event": ev,
+		"url": s.cfg.BaseURL}
+	if !isNews(ev) {
+		payload["quiet"] = true // history brought in, not done now: the receiver may want to hold back
+	}
+	body, _ := json.Marshal(payload)
 	rctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(rctx, "POST", h.URL, bytes.NewReader(body))
