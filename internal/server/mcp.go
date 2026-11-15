@@ -157,7 +157,7 @@ func (s *Server) mcpCallTool(token string, params json.RawMessage) (any, *rpcErr
 		Arguments map[string]any `json:"arguments"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, &rpcError{Code: -32602, Message: "the params do not read: " + err.Error()}
+		return nil, &rpcError{Code: -32602, Message: "the params do not read: give an object with name and arguments"} // the decoder's own words name Go types
 	}
 	var tool *mcpTool
 	for i := range mcpTools {
