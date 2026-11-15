@@ -1,6 +1,6 @@
 import { type InputHTMLAttributes, type Ref, type TextareaHTMLAttributes, useLayoutEffect, useRef } from "react";
 import { cx } from "@/lib/cx";
-import { FormField, useFieldControl } from "@/ui/form";
+import { useFieldControl } from "@/ui/form";
 
 const field =
   "w-full rounded-md border border-line-strong bg-surface px-2.5 text-sm text-ink outline-none transition-colors " +
@@ -51,9 +51,3 @@ export function Textarea({ className, autoGrow = false, bare = false, ref, value
     />
   );
 }
-
-/**
- * The old name of FormField, kept only until tasks/view-controls.tsx (being
- * changed in another branch) imports FormField; remove it then.
- */
-export const Field = FormField;

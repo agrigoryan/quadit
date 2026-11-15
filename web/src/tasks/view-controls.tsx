@@ -19,7 +19,8 @@ import {
 } from "@/tasks/view-state";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { Field, Input } from "@/ui/input";
+import { FormField } from "@/ui/form";
+import { Input } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Select } from "@/ui/picker";
 
@@ -112,7 +113,7 @@ function NameDialog({ title, initial, submit, onSubmit, onClose }: NameDialogPro
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} title={title} size="sm">
       <form onSubmit={save} className="flex flex-col gap-3">
-        <Field label={t("view.name")} htmlFor="view-name" hint={t("view.shared")}>
+        <FormField label={t("view.name")} htmlFor="view-name" hint={t("view.shared")}>
           <Input
             id="view-name"
             autoFocus
@@ -120,7 +121,7 @@ function NameDialog({ title, initial, submit, onSubmit, onClose }: NameDialogPro
             onChange={(e) => setName(e.target.value)}
             placeholder={t("view.namePlaceholder")}
           />
-        </Field>
+        </FormField>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             {t("common.cancel")}
