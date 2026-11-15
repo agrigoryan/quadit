@@ -4,8 +4,10 @@ import { Link } from "react-router";
 import { api, errorMessage, ws } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { useSettingsBase } from "@/settings/base";
 import { Fact, LoadGate, When } from "@/settings/ui/bits";
 import { ConfirmDialog } from "@/settings/ui/dialogs";
@@ -42,7 +44,8 @@ interface ItemProps {
 function SourceItem({ src, sync, onSync, onEdit, onDelete }: ItemProps) {
   const slug = useSlug();
   const docs = useCollection("docs");
-  const root = docs[src.root_doc_id] as { title?: string } | undefined;
+  const root = docs[src.root_doc_id] as { title?: string; project_id?: string } | undefined;
+  const project = useStore((s) => (root?.project_id ? s.c.projects[root.project_id] : undefined));
   return (
     <div className="flex flex-col gap-1.5 px-3 py-2.5">
       <div className="flex items-center gap-3">
@@ -77,6 +80,14 @@ function SourceItem({ src, sync, onSync, onEdit, onDelete }: ItemProps) {
         {src.last_commit && (
           <Fact label={t("auto.src.commit")}>
             <span className="font-mono">{src.last_commit.slice(0, 8)}</span>
+          </Fact>
+        )}
+        {root && (
+          <Fact label={t("auto.src.project")}>
+            <span className="inline-flex items-center gap-1 align-bottom" title={t("auto.src.projectHint")}>
+              {project && <ProjectGlyph project={project} />}
+              {project ? project.name : t("auto.src.noProject")}
+            </span>
           </Fact>
         )}
         <Link to={`/${slug}/docs/${src.root_doc_id}`} className="text-accent-text underline-offset-2 hover:underline">
