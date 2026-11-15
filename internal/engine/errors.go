@@ -25,6 +25,17 @@ const (
 	CodeBudget        = "budget_exceeded"
 )
 
+// Reasons. A few refusals that share a code say which they are, for a
+// caller that acts on the difference.
+const (
+	// ReasonInUse: a value that is unique here (an id, a key, a name) is
+	// already someone else's.
+	ReasonInUse = "in_use"
+	// ReasonNumberTaken: the task number asked for is another task's, or
+	// was one's before it moved.
+	ReasonNumberTaken = "number_taken"
+)
+
 // Error is a refusal that tells the caller how to fix the change.
 type Error struct {
 	Code    string   `json:"code"`
@@ -34,6 +45,9 @@ type Error struct {
 	Nearest string   `json:"nearest,omitempty"` // the allowed value closest to what was sent
 	// Index is the position of the refused change in a batch.
 	Index int `json:"index,omitempty"`
+	// Reason tells some refusals of the same code apart (Reason*); most
+	// have none.
+	Reason string `json:"reason,omitempty"`
 	// cause is the store's error behind the refusal, so that a caller who
 	// knows better what was taken can still say so.
 	cause error
@@ -41,6 +55,10 @@ type Error struct {
 
 // Unwrap returns the store's error behind the refusal, if any.
 func (e *Error) Unwrap() error { return e.cause }
+
+// RefusalReason is the refusal's Reason, for a caller that matches it on
+// an interface without importing this package.
+func (e *Error) RefusalReason() string { return e.Reason }
 
 // Error is the refusal in one line, with the nearest allowed value or the
 // allowed ones.
@@ -99,7 +117,7 @@ func isRefusal(err error) bool {
 func alreadyInUse(err error, what, value string) error {
 	if errors.Is(err, store.ErrConflict) {
 		e := conflictErr("%s %q is already in use", what, value)
-		e.cause = err
+		e.cause, e.Reason = err, ReasonInUse
 		return e
 	}
 	return err

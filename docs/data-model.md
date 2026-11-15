@@ -15,7 +15,7 @@ The engine (`internal/engine`) applies it in one transaction:
 
 1. Take the workspace's row lock. Writes to one workspace run one at a time on every database.
 2. If the change id was used before, return the first answer and write nothing.
-3. Check the actor's role, scope and the arguments. A refusal has a code, a message, the allowed values and the nearest match.
+3. Check the actor's role, scope and the arguments. A refusal has a code, a message, the allowed values and the nearest match, and a few a reason that tells them apart from others of the same code (`in_use`, `number_taken`).
 4. Write the rows.
 5. Write one **event** per changed row, each with the next number in the workspace's sequence.
 6. Write what follows from it in the same transaction: inbox items, watchers, mentions, the search index.

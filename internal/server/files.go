@@ -223,7 +223,7 @@ func (s *Server) startedUpload(x *c, fid string) (core.File, bool, error) {
 		return had, false, err
 	}
 	if had.UploadedBy != x.member.UserID {
-		return had, false, &engine.Error{Code: engine.CodeConflict, Message: "that file id is taken"}
+		return had, false, &engine.Error{Code: engine.CodeConflict, Message: "that file id is taken", Reason: engine.ReasonInUse}
 	}
 	return had, true, nil
 }

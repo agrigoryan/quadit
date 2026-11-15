@@ -213,7 +213,9 @@ func (c *cx) newTaskNumber(project core.Project, asked int) (int, error) {
 			return 0, err
 		}
 		if taken+was > 0 {
-			return 0, conflictErr("%s is taken; leave number out and the task gets the next one", key)
+			e := conflictErr("%s is taken; leave number out and the task gets the next one", key)
+			e.Reason = ReasonNumberTaken
+			return 0, e
 		}
 		// The project's own count moves past it, so the next task made the
 		// usual way does not land on it.

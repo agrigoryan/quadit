@@ -51,3 +51,19 @@ func TestTaskCreateNamesTheFirstThingWrong(t *testing.T) {
 		w.do(w.owner.ID, "task.create", args)
 	})
 }
+
+// TestATakenNumberAndAnIDInUseSayWhichTheyAre: two refusals with the code
+// conflict give a reason a caller can act on without reading the message.
+func TestATakenNumberAndAnIDInUseSayWhichTheyAre(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		made := w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss design", "number": 3}).Ref
+		if e := w.refused(engine.CodeConflict, w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss art", "number": 3}); e.Reason != engine.ReasonNumberTaken {
+			t.Fatalf("a number taken gives the reason %q, want %q", e.Reason, engine.ReasonNumberTaken)
+		}
+		if e := w.refused(engine.CodeConflict, w.owner.ID, "task.create", M{"id": made, "project": "SVA", "title": "Boss art"}); e.Reason != engine.ReasonInUse {
+			t.Fatalf("an id in use gives the reason %q, want %q", e.Reason, engine.ReasonInUse)
+		}
+	})
+}

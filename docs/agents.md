@@ -40,6 +40,8 @@ invalid: project SVA has no status "In Progres"
   allowed: Backlog, Todo, In Progress, Waiting, Done, Canceled
 ```
 
+- A few refusals of the same code say which they are in `reason`, beside `code`, `message` and `field` in the error's JSON: `in_use` (an id, key or name asked for is already someone else's) and `number_taken` (the task number asked for is another task's). Act on the reason, not on the words of the message.
+
 ## Following changes
 
 Everything that changes is one event in one ordered feed per workspace. A comment, a pick and a status change are all there, in order, with their new values.

@@ -90,7 +90,12 @@ type APIError struct {
 	Field   string   `json:"field"`
 	Allowed []string `json:"allowed"`
 	Nearest string   `json:"nearest"`
+	Reason  string   `json:"reason"` // tells some refusals of one code apart: in_use, number_taken
 }
+
+// RefusalReason is the refusal's Reason, for a caller that matches it on
+// an interface without importing this package.
+func (e *APIError) RefusalReason() string { return e.Reason }
 
 // Error gives the code and message, with the nearest allowed value and
 // the allowed ones when the server named them.

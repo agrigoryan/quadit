@@ -138,7 +138,9 @@ func apiComponents() map[string]any {
 				"code":    map[string]any{"enum": []string{"invalid", "forbidden", "not_found", "conflict", "stale", "needs_approval", "budget_exceeded", "unauthorized", "rate_limited"}},
 				"message": map[string]string{"type": "string"}, "field": map[string]string{"type": "string"},
 				"allowed": map[string]any{"type": "array", "items": map[string]string{"type": "string"}}, "nearest": map[string]string{"type": "string"},
-				"index": map[string]string{"type": "integer", "description": "Which change of a batch was refused."}}}}},
+				"index": map[string]string{"type": "integer", "description": "Which change of a batch was refused."},
+				"reason": map[string]any{"type": "string", "enum": []string{"in_use", "number_taken"},
+					"description": "Tells some refusals of one code apart: in_use, an id, key or name asked for is already someone else's; number_taken, the task number asked for is another task's."}}}}},
 		},
 	}
 }
