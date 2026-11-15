@@ -13,10 +13,24 @@ import (
 
 // TestUpgradeAndBack upgrades a database made by an "older binary" (one
 // that stops a schema version short), checks that a copy of it as it was
-// is left beside it, and goes back to that copy.
+// is left beside it, and goes back to that copy. It does so in a plain data
+// folder and in one whose name has the characters a file pattern gives
+// meaning to.
 func TestUpgradeAndBack(t *testing.T) {
+	for _, folder := range []string{"data", "data [1] *?"} {
+		t.Run(folder, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), folder)
+			if err := os.Mkdir(dir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			upgradeAndBack(t, filepath.Join(dir, "quadit.sqlite"))
+		})
+	}
+}
+
+func upgradeAndBack(t *testing.T, path string) {
+	t.Helper()
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "quadit.sqlite")
 	old, err := OpenAt(ctx, path, 1)
 	if err != nil {
 		t.Fatal(err)

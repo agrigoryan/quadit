@@ -60,9 +60,18 @@ func UndoUpgrade(ctx context.Context, path string) (from, to string, err error) 
 // newestCopy finds the copy made before the last upgrade: of the files
 // "<path>.before-vN", the one with the largest N.
 func newestCopy(path string) (string, error) {
-	copies, err := filepath.Glob(path + ".before-v*")
+	// The folder is listed and the names compared, rather than globbed: a
+	// path is not a pattern, and a folder named with [, * or ? is not one.
+	dir, base := filepath.Split(path)
+	entries, err := os.ReadDir(filepath.Clean(dir))
 	if err != nil {
 		return "", fmt.Errorf("looking for a copy from before an upgrade beside %s: %w", path, err)
+	}
+	var copies []string
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), base+".before-v") {
+			copies = append(copies, filepath.Join(dir, e.Name()))
+		}
 	}
 	if len(copies) == 0 {
 		return "", fmt.Errorf("there is no copy from before an upgrade beside %s", path)
@@ -162,7 +171,7 @@ func OpenAt(ctx context.Context, path string, upTo int) (*sqlstore.Store, error)
 	params.Add("_pragma", "foreign_keys(1)")
 	params.Add("_pragma", "busy_timeout(10000)")
 	params.Set("_txlock", "immediate")
-	db, err := sql.Open("sqlite", "file:"+path+"?"+params.Encode())
+	db, err := sql.Open("sqlite", fileURI(path, params.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: %w", err)
 	}
@@ -201,6 +210,12 @@ func copyBeforeUpgrade(ctx context.Context, st *sqlstore.Store, path string, cur
 	return nil
 }
 
+// fileURI is the SQLite URI of the database file at path, with a query. The
+// path is escaped, so a ?, # or % in a folder's name is part of the name.
+func fileURI(path, query string) string {
+	return "file:" + (&url.URL{Path: path}).EscapedPath() + "?" + query
+}
+
 // looksLikeOurs checks that a file is a database of ours with data in it.
 func looksLikeOurs(ctx context.Context, path string) error {
 	info, err := os.Stat(path)
@@ -210,7 +225,7 @@ func looksLikeOurs(ctx context.Context, path string) error {
 	if info.Size() == 0 {
 		return fmt.Errorf("the file is empty")
 	}
-	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	db, err := sql.Open("sqlite", fileURI(path, "mode=ro"))
 	if err != nil {
 		return err
 	}
