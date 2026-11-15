@@ -82,7 +82,8 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
 
   function rename(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const next = new FormData(e.currentTarget).get("name")?.toString().trim();
+    const typed = new FormData(e.currentTarget).get("name");
+    const next = typeof typed === "string" ? typed.trim() : undefined;
     if (milestone && next && next !== milestone.name) updateMilestone(milestone, { name: next });
     setRenaming(false);
   }

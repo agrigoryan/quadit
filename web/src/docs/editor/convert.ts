@@ -59,6 +59,10 @@ const CELL_DEFAULTS: Obj = {
 
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 
+/** A string, number or boolean from the JSON as text; anything else (missing, null, an object) is `fallback`. */
+const scalarText = (v: unknown, fallback = ""): string =>
+  typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : fallback;
+
 // ---- server -> editor ----
 
 /** Inline content for the editor. `rich` text also gets chips for the things it names (editor/refs.ts). */
@@ -68,18 +72,18 @@ function inlineIn(content: unknown, rich = true): unknown {
   const out: unknown[] = [];
   for (const raw of content) {
     if (!isObj(raw)) continue;
-    const type = String(raw.type ?? "text");
+    const type = scalarText(raw.type, "text");
     if (type === "text") {
       const styles = isObj(raw.styles) ? raw.styles : {};
-      if (rich) out.push(...chipify(String(raw.text ?? ""), styles));
-      else out.push({ type: "text", text: String(raw.text ?? ""), styles });
+      if (rich) out.push(...chipify(scalarText(raw.text), styles));
+      else out.push({ type: "text", text: scalarText(raw.text), styles });
     } else if (type === "link") {
-      out.push({ type: "link", href: String(raw.href ?? ""), content: inlineIn(raw.content, false) });
+      out.push({ type: "link", href: scalarText(raw.href), content: inlineIn(raw.content, false) });
     } else if (TO_EDITOR[type] && isObj(raw.props)) {
       const prop = CHIP_PROP[type] as string;
-      out.push({ type: TO_EDITOR[type], props: { [prop]: String(raw.props[prop] ?? "").replace(/^@/, "") } });
+      out.push({ type: TO_EDITOR[type], props: { [prop]: scalarText(raw.props[prop]).replace(/^@/, "") } });
     } else if (raw.text) {
-      out.push({ type: "text", text: String(raw.text), styles: {} });
+      out.push({ type: "text", text: scalarText(raw.text), styles: {} });
     }
   }
   return out;
@@ -261,7 +265,7 @@ export function plainText(content: unknown): string {
     if (!isObj(raw)) continue;
     if (typeof raw.text === "string") out += raw.text;
     else if (raw.type === "link") out += plainText(raw.content);
-    else if (isObj(raw.props)) out += String(raw.props.handle ? `@${String(raw.props.handle)}` : (raw.props.key ?? ""));
+    else if (isObj(raw.props)) out += raw.props.handle ? `@${scalarText(raw.props.handle)}` : scalarText(raw.props.key);
   }
   return out;
 }

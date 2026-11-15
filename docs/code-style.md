@@ -97,7 +97,6 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 | `react-hooks/exhaustive-deps` | 21 |
 | `react/set-state-in-effect` | 16 |
 | `jsx-a11y/click-events-have-key-events` | 11 |
-| `typescript/no-base-to-string` | 11 |
 | `jsx-a11y/no-static-element-interactions` | 9 |
 | `jsx-a11y/no-noninteractive-element-interactions` | 8 |
 | `jsx-a11y/no-noninteractive-tabindex` | 6 |

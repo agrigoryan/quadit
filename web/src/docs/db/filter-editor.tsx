@@ -117,7 +117,10 @@ function ValueInput({
   }
   const numeric = prop?.type === "number" || prop?.type === "rollup";
   const type = numeric ? "number" : prop?.type === "date" ? "date" : "text";
-  const text = filter.value === undefined || filter.value === null ? "" : String(filter.value);
+  // A value typed or picked here is a string; one read back from the page may be a number or a boolean.
+  const value = filter.value;
+  const text =
+    typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : "";
   return (
     <LazyInput
       key={`${filter.prop}:${type}`}

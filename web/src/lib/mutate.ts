@@ -240,7 +240,8 @@ function describe(changes: OutboxChange[]): string {
   const ref = [first.args.task, first.args.id].find((v): v is string => typeof v === "string" && v in tasks);
   const key = ref ? tasks[ref]?.key : undefined;
   let what: string;
-  if (first.type === "task.create") what = t("sync.what.newTask", { title: String(first.args.title ?? "") });
+  if (first.type === "task.create")
+    what = t("sync.what.newTask", { title: typeof first.args.title === "string" ? first.args.title : "" });
   else if (key && first.type.startsWith("task.")) what = t("sync.what.task", { key });
   else if (key && first.type.startsWith("comment.")) what = t("sync.what.comment", { key });
   else if (key && first.type.startsWith("attachment.")) what = t("sync.what.file", { key });
