@@ -36,7 +36,7 @@ export function AgentsPage() {
   const members = useMembers();
   const now = useNow(15_000);
   const live = useLive<{ agents: AgentState[] }>("/agents");
-  const { sessions } = useSessions("limit=300", everySession);
+  const { sessions, error: sessionsError } = useSessions("limit=300", everySession);
   const claims = useClaims();
   const resources = useResources();
   const work = useAgentWork(claims);
@@ -104,9 +104,9 @@ export function AgentsPage() {
             <span className="ml-2 font-medium text-danger">{t("agents.strandedCount", { n: stranded })}</span>
           )}
         </p>
-        {live.error && (
+        {(live.error || sessionsError) && (
           <p role="alert" className="text-xs text-danger">
-            {t("ins.loadFailed", { why: live.error })}
+            {t("ins.loadFailed", { why: live.error || sessionsError })}
           </p>
         )}
         {finished > 0 && (

@@ -5,7 +5,7 @@
 // like the rest.
 
 import { useEffect, useMemo, useState } from "react";
-import { api, workspacePath } from "@/lib/api";
+import { api, ApiError, errorMessage, workspacePath } from "@/lib/api";
 import { useCollection } from "@/lib/selectors";
 import { getState, mergeRows, useStore } from "@/lib/store";
 import type { AgentSession } from "@/lib/types";
@@ -13,15 +13,17 @@ import type { AgentSession } from "@/lib/types";
 /**
  * Sessions matching a /list/sessions query ("agent=ID", "task=KEY",
  * "limit=300"), newest first, kept current. `keep` picks the store rows
- * that belong to the same set.
+ * that belong to the same set. When the fetch fails, `error` says why: the
+ * sessions shown are then only the recent ones the store had.
  */
 export function useSessions(
   query: string | null,
   keep: (s: AgentSession) => boolean,
-): { sessions: AgentSession[]; loading: boolean } {
+): { sessions: AgentSession[]; loading: boolean; error: string } {
   const slug = useStore((s) => s.slug);
   const live = useStore((s) => s.stream === "live");
   const [loaded, setLoaded] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (query === null) return;
@@ -36,8 +38,12 @@ export function useSessions(
           "sessions",
           out.sessions.filter((s) => !have[s.id]),
         );
+        if (current) setError("");
       })
-      .catch(() => {})
+      .catch((err: unknown) => {
+        // A 401 has already sent the person to sign in.
+        if (current && !(err instanceof ApiError && err.status === 401)) setError(errorMessage(err));
+      })
       .finally(() => {
         if (current) setLoaded(query);
       });
@@ -56,7 +62,7 @@ export function useSessions(
     // `keep` is a new function each render; what it selects by is in `query`.
     [stored, query],
   );
-  return { sessions, loading: query !== null && loaded !== query };
+  return { sessions, loading: query !== null && loaded !== query, error };
 }
 
 /** What one recorded step says: its text, and the tool it used when it names one. */
