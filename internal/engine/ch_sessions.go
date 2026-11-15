@@ -58,7 +58,7 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 }
 
 type sessionUpdateArgs struct {
-	ID      string      `json:"id"`
+	ID      string      `json:"id" quadit:"required"`
 	Title   Opt[string] `json:"title"`
 	Summary Opt[string] `json:"summary"`
 	// State: running, done, failed or stopped. Anything but running ends

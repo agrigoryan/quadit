@@ -18,9 +18,9 @@ func init() {
 
 type statusCreateArgs struct {
 	ID       string `json:"id"`
-	Project  string `json:"project"`
-	Name     string `json:"name"`
-	Category string `json:"category"`
+	Project  string `json:"project" quadit:"required,handler"`
+	Name     string `json:"name" quadit:"required,handler"`
+	Category string `json:"category" quadit:"required,handler"`
 	Color    string `json:"color"`
 	Rank     string `json:"rank"`
 }
@@ -74,7 +74,7 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 }
 
 type statusUpdateArgs struct {
-	ID        string      `json:"id"`
+	ID        string      `json:"id" quadit:"required"`
 	Name      Opt[string] `json:"name"`
 	Category  Opt[string] `json:"category"`
 	Color     Opt[string] `json:"color"`
@@ -124,7 +124,7 @@ func statusUpdate(c *cx, a statusUpdateArgs) error {
 }
 
 type statusDeleteArgs struct {
-	ID     string `json:"id"`
+	ID     string `json:"id" quadit:"required"`
 	MoveTo string `json:"move_to"` // where its tasks go
 }
 

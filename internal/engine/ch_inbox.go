@@ -80,9 +80,9 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 }
 
 type notifyArgs struct {
-	User    string `json:"user"`
+	User    string `json:"user" quadit:"required,handler"`
 	Task    string `json:"task"`
-	Message string `json:"message"`
+	Message string `json:"message" quadit:"required,handler"`
 }
 
 // notifyMember puts a plain message in a member's inbox. Rules use it.

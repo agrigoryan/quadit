@@ -19,7 +19,7 @@ func init() {
 
 type labelCreateArgs struct {
 	ID          string `json:"id"`
-	Name        string `json:"name"`
+	Name        string `json:"name" quadit:"required,handler"`
 	Color       string `json:"color"`
 	Description string `json:"description"`
 	Project     string `json:"project"` // empty = shared by the whole workspace
@@ -52,7 +52,7 @@ func labelCreate(c *cx, a labelCreateArgs) error {
 }
 
 type labelUpdateArgs struct {
-	ID          string      `json:"id"`
+	ID          string      `json:"id" quadit:"required"`
 	Name        Opt[string] `json:"name"`
 	Color       Opt[string] `json:"color"`
 	Description Opt[string] `json:"description"`

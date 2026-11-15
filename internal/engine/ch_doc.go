@@ -226,7 +226,7 @@ func (c *cx) afterDocText(d core.Doc, ed *editor) error {
 }
 
 type docUpdateArgs struct {
-	ID         string        `json:"id"`
+	ID         string        `json:"id" quadit:"required"`
 	Title      Opt[string]   `json:"title"`
 	Icon       Opt[string]   `json:"icon"`
 	Cover      Opt[string]   `json:"cover"`

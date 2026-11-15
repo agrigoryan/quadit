@@ -18,8 +18,8 @@ func init() {
 
 type epicCreateArgs struct {
 	ID          string `json:"id"`
-	Project     string `json:"project"`
-	Name        string `json:"name"`
+	Project     string `json:"project" quadit:"required,handler"`
+	Name        string `json:"name" quadit:"required,handler"`
 	Description string `json:"description"`
 	State       string `json:"state"`
 	Lead        string `json:"lead"`
@@ -85,7 +85,7 @@ func epicCreate(c *cx, a epicCreateArgs) error {
 }
 
 type epicUpdateArgs struct {
-	ID          string      `json:"id"`
+	ID          string      `json:"id" quadit:"required"`
 	Name        Opt[string] `json:"name"`
 	Description Opt[string] `json:"description"`
 	State       Opt[string] `json:"state"`

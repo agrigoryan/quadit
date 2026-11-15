@@ -20,10 +20,10 @@ func init() {
 
 type cycleCreateArgs struct {
 	ID       string `json:"id"`
-	Project  string `json:"project"`
+	Project  string `json:"project" quadit:"required,handler"`
 	Name     string `json:"name"`
-	StartsOn string `json:"starts_on"`
-	EndsOn   string `json:"ends_on"`
+	StartsOn string `json:"starts_on" quadit:"required,handler"`
+	EndsOn   string `json:"ends_on" quadit:"required,handler"`
 }
 
 func (c *cx) cycleOverlap(projectID, skipID, starts, ends string) error {
@@ -79,7 +79,7 @@ func cycleCreate(c *cx, a cycleCreateArgs) error {
 }
 
 type cycleUpdateArgs struct {
-	ID       string      `json:"id"`
+	ID       string      `json:"id" quadit:"required"`
 	Name     Opt[string] `json:"name"`
 	StartsOn Opt[string] `json:"starts_on"`
 	EndsOn   Opt[string] `json:"ends_on"`

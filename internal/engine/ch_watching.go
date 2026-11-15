@@ -12,8 +12,8 @@ func init() {
 }
 
 type watchSetArgs struct {
-	Type     string `json:"type"`    // task (default), epic, project, view, doc
-	Subject  string `json:"subject"` // its id, or a task key
+	Type     string `json:"type"`                              // task (default), epic, project, view, doc
+	Subject  string `json:"subject" quadit:"required,handler"` // its id, or a task key
 	Watching *bool  `json:"watching"`
 	User     string `json:"user"` // default: the caller
 }

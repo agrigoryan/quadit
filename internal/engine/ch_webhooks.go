@@ -18,7 +18,7 @@ func init() {
 type webhookCreateArgs struct {
 	ID         string   `json:"id"`
 	Name       string   `json:"name"`
-	URL        string   `json:"url"`
+	URL        string   `json:"url" quadit:"required,handler"`
 	Secret     string   `json:"secret"`      // signs each delivery; made by the caller so it can be shown once
 	EventTypes []string `json:"event_types"` // empty = every event
 	Project    string   `json:"project"`
@@ -73,7 +73,7 @@ func webhookCreate(c *cx, a webhookCreateArgs) error {
 }
 
 type webhookUpdateArgs struct {
-	ID         string        `json:"id"`
+	ID         string        `json:"id" quadit:"required"`
 	Name       Opt[string]   `json:"name"`
 	URL        Opt[string]   `json:"url"`
 	Secret     Opt[string]   `json:"secret"`

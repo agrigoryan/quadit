@@ -7,12 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
 
-// args decodes the change's arguments into v. Unknown fields are refused, so
-// a misspelled field is an error and not a silent no-op.
+// args decodes the change's arguments into v, a pointer to the change's
+// argument struct. Unknown fields are refused, so a misspelled field is an
+// error and not a silent no-op; so is a required argument left out (see
+// Required).
 func (c *cx) args(v any) error {
 	raw := c.change.Args
 	if len(bytes.TrimSpace(raw)) == 0 {
@@ -27,7 +31,33 @@ func (c *cx) args(v any) error {
 	if err := dec.Decode(v); err != nil {
 		return c.argsRefusal(v, err)
 	}
+	s := reflect.ValueOf(v).Elem()
+	for i := range s.NumField() {
+		f := s.Type().Field(i)
+		if required, byHandler := requiredTag(f); required && !byHandler && s.Field(i).IsZero() {
+			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			return invalid(name, "%s is required", name)
+		}
+	}
 	return nil
+}
+
+// Required reports whether a change's argument must be sent: whether a
+// change without it is always refused. Its struct field is tagged
+// quadit:"required", and the engine then refuses the change before its
+// handler runs, with "<name> is required". A field tagged
+// quadit:"required,handler" is just as required, but its handler refuses it
+// itself: in words of its own ("a label needs a name"), or after checks that
+// come first, whose order callers see. An argument needed only sometimes
+// (one of two, or only with another) is not tagged.
+func Required(f reflect.StructField) bool {
+	required, _ := requiredTag(f)
+	return required
+}
+
+func requiredTag(f reflect.StructField) (required, byHandler bool) {
+	opts := strings.Split(f.Tag.Get("quadit"), ",")
+	return opts[0] == "required", slices.Contains(opts[1:], "handler")
 }
 
 // argsRefusal says in a caller's words what was wrong with the arguments:

@@ -78,8 +78,8 @@ func (c *cx) overwritesOthers(d core.Doc, ed *editor, before []core.Block) (bool
 }
 
 type docEditArgs struct {
-	Doc string    `json:"doc"`
-	Ops []BlockOp `json:"ops"`
+	Doc string    `json:"doc" quadit:"required"`
+	Ops []BlockOp `json:"ops" quadit:"required,handler"`
 }
 
 // docEdit applies block edits to a page. Two people in one page each send
@@ -136,7 +136,7 @@ func docEdit(c *cx, a docEditArgs) error {
 }
 
 type docWriteArgs struct {
-	Doc      string `json:"doc"`
+	Doc      string `json:"doc" quadit:"required"`
 	Markdown string `json:"markdown"`
 	// Mode: replace (default) rewrites the page, keeping the blocks that did
 	// not change; append and prepend add to it.

@@ -17,8 +17,8 @@ func init() {
 
 type milestoneCreateArgs struct {
 	ID          string `json:"id"`
-	Epic        string `json:"epic"`
-	Name        string `json:"name"`
+	Epic        string `json:"epic" quadit:"required,handler"`
+	Name        string `json:"name" quadit:"required,handler"`
 	Description string `json:"description"`
 	TargetOn    string `json:"target_on"`
 	Rank        string `json:"rank"`
@@ -56,7 +56,7 @@ func milestoneCreate(c *cx, a milestoneCreateArgs) error {
 }
 
 type milestoneUpdateArgs struct {
-	ID          string      `json:"id"`
+	ID          string      `json:"id" quadit:"required"`
 	Name        Opt[string] `json:"name"`
 	Description Opt[string] `json:"description"`
 	TargetOn    Opt[string] `json:"target_on"`

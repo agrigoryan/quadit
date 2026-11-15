@@ -12,8 +12,9 @@ import (
 
 // ArgInfo describes one argument of a change.
 type ArgInfo struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Required bool   `json:"required,omitempty"` // the change is always refused without it
 }
 
 // ChangeInfo describes one change type.
@@ -51,7 +52,7 @@ func argsAt(t reflect.Type, depth int) []ArgInfo {
 		if name == "" || name == "-" {
 			continue
 		}
-		out = append(out, ArgInfo{Name: name, Type: typeAt(f.Type, depth)})
+		out = append(out, ArgInfo{Name: name, Type: typeAt(f.Type, depth), Required: Required(f)})
 	}
 	return out
 }

@@ -19,7 +19,7 @@ func init() {
 
 type resourceCreateArgs struct {
 	ID          string `json:"id"`
-	Name        string `json:"name"`
+	Name        string `json:"name" quadit:"required,handler"`
 	Description string `json:"description"`
 }
 
@@ -76,7 +76,7 @@ func resourceDelete(c *cx, a idArgs) error {
 
 type resourceAcquireArgs struct {
 	ID       string `json:"id"`
-	Resource string `json:"resource"` // name or id
+	Resource string `json:"resource" quadit:"required,handler"` // name or id
 	Task     string `json:"task"`
 	Note     string `json:"note"`
 	Minutes  int    `json:"minutes"` // how long the hold lasts without renewing; default 30
@@ -220,7 +220,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 }
 
 type resourceReleaseArgs struct {
-	Resource string `json:"resource"`
+	Resource string `json:"resource" quadit:"required,handler"`
 	User     string `json:"user"` // an admin can release someone else's hold
 }
 

@@ -19,7 +19,7 @@ type secretArgs struct {
 	ID string `json:"id"`
 	// Name is how the secret is asked for, e.g. GITHUB_TOKEN. Setting a name
 	// that exists changes that secret.
-	Name        string      `json:"name"`
+	Name        string      `json:"name" quadit:"required,handler"`
 	Description Opt[string] `json:"description"`
 	// Value is the secret itself. It is stored encrypted and is never
 	// returned by anything; leave it out to keep the one there.

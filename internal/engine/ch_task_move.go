@@ -14,8 +14,8 @@ func init() {
 }
 
 type taskMoveArgs struct {
-	ID      string `json:"id"`
-	Project string `json:"project"`
+	ID      string `json:"id" quadit:"required,handler"`
+	Project string `json:"project" quadit:"required,handler"`
 }
 
 // taskMove moves a task to another project. It gets a new number there; its

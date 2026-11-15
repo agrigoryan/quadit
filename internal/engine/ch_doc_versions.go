@@ -41,7 +41,7 @@ func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string) error {
 }
 
 type docSnapshotArgs struct {
-	Doc   string `json:"doc"`
+	Doc   string `json:"doc" quadit:"required"`
 	Label string `json:"label"`
 }
 
@@ -61,8 +61,8 @@ func docSnapshot(c *cx, a docSnapshotArgs) error {
 }
 
 type docRevertArgs struct {
-	Doc     string `json:"doc"`
-	Version string `json:"version"`
+	Doc     string `json:"doc" quadit:"required"`
+	Version string `json:"version" quadit:"required,handler"`
 }
 
 // docRevert puts a page back to a kept version. What it was just before is

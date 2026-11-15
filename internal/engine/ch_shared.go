@@ -25,7 +25,7 @@ const (
 )
 
 type idArgs struct {
-	ID string `json:"id"`
+	ID string `json:"id" quadit:"required,handler"`
 }
 
 // applyNested runs another change type inside this one, as the same actor.

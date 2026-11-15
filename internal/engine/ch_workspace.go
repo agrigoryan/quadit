@@ -49,7 +49,7 @@ func workspaceUpdate(c *cx, a workspaceUpdateArgs) error {
 
 type workspaceDeleteArgs struct {
 	// Confirm must be the workspace's slug, so nothing deletes one by accident.
-	Confirm string `json:"confirm"`
+	Confirm string `json:"confirm" quadit:"required,handler"`
 }
 
 // workspaceDelete puts the whole workspace in the trash. Nobody can enter

@@ -30,9 +30,9 @@ type optionArgs struct {
 
 type decisionOpenArgs struct {
 	ID       string       `json:"id"`
-	Task     string       `json:"task"`
+	Task     string       `json:"task" quadit:"required,handler"`
 	Kind     string       `json:"kind"` // choice (default when options are given) or approval
-	Question string       `json:"question"`
+	Question string       `json:"question" quadit:"required,handler"`
 	Details  string       `json:"details"`
 	Options  []optionArgs `json:"options"`
 	// Recommended is the option the asker would pick: its position in
@@ -258,7 +258,7 @@ func (c *cx) putQuestion(d core.Decision, t core.Task) error {
 }
 
 type decisionUpdateArgs struct {
-	ID             string      `json:"id"`
+	ID             string      `json:"id" quadit:"required"`
 	Question       Opt[string] `json:"question"`
 	Details        Opt[string] `json:"details"`
 	Recommendation Opt[string] `json:"recommendation"`
@@ -322,7 +322,7 @@ func decisionUpdate(c *cx, a decisionUpdateArgs) error {
 }
 
 type decisionPickArgs struct {
-	ID string `json:"id"`
+	ID string `json:"id" quadit:"required"`
 	// Option is the option picked: its id, its position starting at 1, or
 	// its label.
 	Option  any    `json:"option"`
@@ -499,8 +499,8 @@ func choiceOutcome(d core.Decision, a decisionPickArgs, optionID string) (string
 }
 
 type decisionUnclearArgs struct {
-	ID   string `json:"id"`
-	Note string `json:"note"` // what is unclear, in one line
+	ID   string `json:"id" quadit:"required"`
+	Note string `json:"note" quadit:"required,handler"` // what is unclear, in one line
 }
 
 // decisionUnclear is the asker saying the answer does not settle the

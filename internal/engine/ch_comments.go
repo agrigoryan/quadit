@@ -19,7 +19,7 @@ type commentCreateArgs struct {
 	ID   string `json:"id"`
 	Task string `json:"task"`
 	Doc  string `json:"doc"`
-	Body string `json:"body"`
+	Body string `json:"body" quadit:"required,handler"`
 	// What the comment is about, when it is not the task or doc as a whole.
 	Decision string `json:"decision"`
 	Option   string `json:"option"`
@@ -351,7 +351,7 @@ func (c *cx) commentPlace(cm core.Comment) (where place, key string, err error) 
 }
 
 type commentUpdateArgs struct {
-	ID       string      `json:"id"`
+	ID       string      `json:"id" quadit:"required"`
 	Body     Opt[string] `json:"body"`
 	Resolved Opt[bool]   `json:"resolved"`
 }

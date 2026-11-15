@@ -32,7 +32,7 @@ type Preset struct {
 type templateCreateArgs struct {
 	ID          string  `json:"id"`
 	Project     string  `json:"project"`
-	Name        string  `json:"name"`
+	Name        string  `json:"name" quadit:"required,handler"`
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
 	Preset      *Preset `json:"preset"`
@@ -67,7 +67,7 @@ func templateCreate(c *cx, a templateCreateArgs) error {
 }
 
 type templateUpdateArgs struct {
-	ID          string      `json:"id"`
+	ID          string      `json:"id" quadit:"required"`
 	Name        Opt[string] `json:"name"`
 	Title       Opt[string] `json:"title"`
 	Description Opt[string] `json:"description"`

@@ -15,7 +15,7 @@ func init() {
 }
 
 type taskTakeArgs struct {
-	ID string `json:"id"`
+	ID string `json:"id" quadit:"required,handler"`
 	// Minutes is how long the lease lasts without being renewed. Taking a
 	// task you already hold renews it.
 	Minutes int `json:"minutes"`

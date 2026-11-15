@@ -18,7 +18,7 @@ func init() {
 
 type attachArgs struct {
 	ID      string `json:"id"`
-	File    string `json:"file"`
+	File    string `json:"file" quadit:"required,handler"`
 	Role    string `json:"role"` // "", before, after
 	Caption string `json:"caption"`
 	// One of these says what the file is shown on.

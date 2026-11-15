@@ -12,7 +12,7 @@ func init() {
 }
 
 type taskUpdateArgs struct {
-	ID string `json:"id"`
+	ID string `json:"id" quadit:"required,handler"`
 	// BaseSeq, when given, is the task's updated_seq the caller last saw. If
 	// the task has changed since, the update is refused instead of applied
 	// over the newer values.

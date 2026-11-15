@@ -19,7 +19,7 @@ func init() {
 }
 
 type memberAddArgs struct {
-	User   string `json:"user"` // an existing person: their id or their email
+	User   string `json:"user" quadit:"required,handler"` // an existing person: their id or their email
 	Handle string `json:"handle"`
 	Role   string `json:"role"`
 	Title  string `json:"title"`
@@ -162,7 +162,7 @@ func (c *cx) freeHandle(want string) (string, error) {
 }
 
 type memberUpdateArgs struct {
-	ID        string      `json:"id"` // id or @handle
+	ID        string      `json:"id" quadit:"required,handler"` // id or @handle
 	Role      Opt[string] `json:"role"`
 	Handle    Opt[string] `json:"handle"`
 	Title     Opt[string] `json:"title"`
@@ -313,7 +313,7 @@ func (c *cx) memberSuspended(p *patch, a memberUpdateArgs, m core.Member) error 
 }
 
 type memberRefArgs struct {
-	ID string `json:"id"`
+	ID string `json:"id" quadit:"required,handler"`
 }
 
 // memberRemove takes a member out of the workspace. Their history stays

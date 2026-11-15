@@ -51,6 +51,60 @@ func TestRefusalsOfMissingArguments(t *testing.T) {
 	})
 }
 
+// TestRequiredArgumentsAreTheOnesRefused holds the catalog's "required" (the
+// quadit:"required" tags) to what the changes do. A required argument left
+// out of an otherwise accepted request is refused, naming it. An argument
+// that is not required either was not needed by the scenario's accepted
+// request, or could be left out of it, or is needed only sometimes: those
+// are listed here with the reason.
+func TestRequiredArgumentsAreTheOnesRefused(t *testing.T) {
+	sometimes := map[string]string{
+		"task.create project":      "or the parent's project",
+		"task.create title":        "or the template's title",
+		"comment.create task":      "or doc, block, decision or option",
+		"attachment.add task":      "or comment, decision, option or doc",
+		"decision.pick option":     "not when the outcome sends the question back",
+		"notification.read all":    "or ids, or task",
+		"link.set url":             "only for a url link; the others need ref",
+		"secret.set value":         "only for a new secret",
+		"view.create name":         "required; its tag waits for a change of ch_views.go",
+		"view.update id":           "required; its tag waits for a change of ch_views.go",
+		"integration.create kind":  "integration.update reads the same arguments, where it may be left out",
+		"rule.create name":         "rule.update reads the same arguments, where it may be left out",
+		"rule.create action":       "rule.update reads the same arguments, where it may be left out",
+		"rule.update id":           "rule.create reads the same arguments, where it is made up when left out",
+		"integration.update id":    "integration.create reads the same arguments, where it is made up when left out",
+		"source.create repo":       "source.update reads the same arguments, where it may be left out",
+		"source.update id":         "source.create reads the same arguments, where it is made up when left out",
+		"property.create database": "property.update reads the same arguments, where it may be left out",
+		"property.create name":     "property.update reads the same arguments, where it may be left out",
+		"property.update id":       "property.create reads the same arguments, where it is made up when left out",
+		"dbview.create database":   "dbview.update reads the same arguments, where it may be left out",
+		"dbview.update id":         "dbview.create reads the same arguments, where it is made up when left out",
+	}
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := missingScenario(t, st)
+		for _, ci := range engine.Catalog() {
+			for _, a := range ci.Args {
+				key := ci.Type + " " + a.Name
+				sent := slices.Contains(p.sent[ci.Type], a.Name)
+				switch reason, listed := sometimes[key]; {
+				case a.Required && !sent:
+					t.Errorf("%s is required, yet the scenario's request did without it", key)
+				case a.Required && !p.refused[ci.Type][a.Name]:
+					t.Errorf("%s is required, yet a request without it is accepted", key)
+				case a.Required && listed:
+					t.Errorf("%s is required, and also listed as needed only sometimes (%s)", key, reason)
+				case !a.Required && p.refused[ci.Type][a.Name] && !listed:
+					t.Errorf("%s is refused when left out: tag it required, or list here why it is needed only sometimes", key)
+				case !a.Required && listed && !p.refused[ci.Type][a.Name]:
+					t.Errorf("%s is listed as needed sometimes, yet the scenario does without it: take it off the list", key)
+				}
+			}
+		}
+	})
+}
+
 func lineOf(lines []string, i int) string {
 	if i < len(lines) {
 		return lines[i]

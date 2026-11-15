@@ -14,9 +14,9 @@ func init() {
 
 type relationArgs struct {
 	ID    string `json:"id"`
-	Task  string `json:"task"`
+	Task  string `json:"task" quadit:"required,handler"`
 	Type  string `json:"type"` // blocks, blocked_by, relates, duplicates
-	Other string `json:"other"`
+	Other string `json:"other" quadit:"required,handler"`
 }
 
 // relationAdd relates two tasks (one blocks the other, …), and tells the

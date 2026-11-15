@@ -16,7 +16,7 @@ func init() {
 
 type preferenceCreateArgs struct {
 	ID       string   `json:"id"`
-	Body     string   `json:"body"`
+	Body     string   `json:"body" quadit:"required,handler"`
 	Project  string   `json:"project"`  // empty = the whole workspace
 	Decision string   `json:"decision"` // the decision it came from
 	Labels   []string `json:"labels"`   // shown on tasks with any of these labels; empty = all tasks
@@ -64,7 +64,7 @@ func preferenceCreate(c *cx, a preferenceCreateArgs) error {
 }
 
 type preferenceUpdateArgs struct {
-	ID      string      `json:"id"`
+	ID      string      `json:"id" quadit:"required"`
 	Body    Opt[string] `json:"body"`
 	Retired Opt[bool]   `json:"retired"`
 }

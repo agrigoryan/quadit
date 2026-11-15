@@ -18,7 +18,7 @@ func init() {
 
 type agentCreateArgs struct {
 	ID          string       `json:"id"`
-	Name        string       `json:"name"`
+	Name        string       `json:"name" quadit:"required,handler"`
 	Handle      string       `json:"handle"`
 	Description string       `json:"description"`
 	Avatar      string       `json:"avatar"`
@@ -259,7 +259,7 @@ func ifEmpty(list, instead []string) []string {
 }
 
 type agentUpdateArgs struct {
-	ID          string           `json:"id"`
+	ID          string           `json:"id" quadit:"required,handler"`
 	Name        Opt[string]      `json:"name"`
 	Description Opt[string]      `json:"description"`
 	Avatar      Opt[string]      `json:"avatar"`

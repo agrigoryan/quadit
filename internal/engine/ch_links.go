@@ -17,8 +17,8 @@ func init() {
 
 type linkSetArgs struct {
 	ID     string          `json:"id"`
-	Task   string          `json:"task"`
-	Kind   string          `json:"kind"` // branch, commit, pr, url
+	Task   string          `json:"task" quadit:"required,handler"`
+	Kind   string          `json:"kind" quadit:"required,handler"` // branch, commit, pr, url
 	URL    string          `json:"url"`
 	Title  string          `json:"title"`
 	Repo   string          `json:"repo"`
