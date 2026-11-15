@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+// room is one workspace's place in the hub: how far its feed is, and the
+// channel its waiters block on.
 type room struct {
 	seq   int64
 	pokes int           // times waiters were woken with no news
@@ -23,10 +25,13 @@ type Hub struct {
 	pokes int           // times everyone was woken with no news
 }
 
+// New makes an empty hub; a workspace's room is made the first time it is
+// named.
 func New() *Hub {
 	return &Hub{rooms: map[string]*room{}, any: make(chan struct{})}
 }
 
+// room gives the workspace's room, making it if needed. The caller holds mu.
 func (h *Hub) room(ws string) *room {
 	r := h.rooms[ws]
 	if r == nil {
@@ -70,6 +75,8 @@ func (h *Hub) Pokes(ws string) int {
 // WaitSince is Wait that also returns at once when there has been a poke
 // since the count the caller read (see Pokes); -1 counts from now.
 func (h *Hub) WaitSince(ctx context.Context, ws string, after int64, started int) bool {
+	// Each pass reads the room's state and its wake channel together, so a
+	// move or a poke after the read closes the channel waited on.
 	for {
 		h.mu.Lock()
 		r := h.room(ws)
