@@ -117,12 +117,16 @@ async function openTab() {
     state: store.getState,
     title: (id: string) => store.getState().collections.tasks[id]?.title,
     /** What the app says when the person may no longer see the workspace; null while they may. */
-    lost: () => sync.useAccess.getState().lost,
+    lost() {
+      const now = sync.availability("acme");
+      return now.is === "lost" ? { slug: "acme", message: now.message } : null;
+    },
+    availability: () => sync.availability("acme"),
     signedOut,
     mutate,
     onEvents: store.onEvents,
     async start() {
-      await sync.startSync("acme");
+      sync.startSync("acme");
       await settle();
     },
     /** The tab goes away. Closing a real tab lets go of the same things: the lock, the channel, the stream. */
@@ -765,6 +769,98 @@ describe("the connection", () => {
       a.stream.open();
       expect(a.state().stream).toBe("live");
     });
+  });
+});
+
+describe("opening the workspace", () => {
+  it("says it is loading until the copy arrives, then that it is ready", async () => {
+    const first = server.hold(OPEN_PART);
+    const a = await openTab();
+    await a.start();
+    expect(a.availability()).toEqual({ is: "loading" });
+    first.calls[0]?.answer(copy());
+    await settle();
+    expect(a.availability()).toEqual({ is: "ready" });
+    expect(a.streams).toHaveLength(1);
+  });
+
+  it("while the server cannot be reached says so and keeps asking, with longer waits, until the copy comes", async () => {
+    server.down = true;
+    const a = await openTab();
+    await a.start();
+    expect(a.availability()).toEqual({ is: "offline" });
+    expect(a.state().stream).toBe("down");
+    await later(999);
+    expect(server.count(OPEN_PART)).toBe(1);
+    await later(1);
+    expect(server.count(OPEN_PART)).toBe(2);
+    await later(2000);
+    expect(server.count(OPEN_PART)).toBe(3);
+    expect(a.availability()).toEqual({ is: "offline" });
+    expect(a.streams).toHaveLength(0);
+
+    server.down = false;
+    await later(4000);
+    expect(a.availability()).toEqual({ is: "ready" });
+    expect(a.state().stream).toBe("connecting");
+    expect(a.streams).toHaveLength(1);
+  });
+
+  it("says why when the server will not give the copy, and does not ask again", async () => {
+    const reasons: [unknown, unknown][] = [
+      [refuse(404, "no such workspace"), { is: "refused", message: "no such workspace" }],
+      [refuse(403, "your membership is suspended"), { is: "refused", message: "your membership is suspended" }],
+      [refuse(403, "set it up first", "second_step_required"), { is: "second-step-needed" }],
+      [refuse(500, "the database is busy"), { is: "failed", message: "the database is busy" }],
+    ];
+    for (const [answer, availability] of reasons) {
+      server.get(OPEN_PART, answer);
+      const a = await openTab();
+      await a.start();
+      expect(a.availability()).toEqual(availability);
+      const asked = server.count(OPEN_PART);
+      await later(60_000);
+      expect(server.count(OPEN_PART)).toBe(asked);
+      expect(a.streams).toHaveLength(0);
+      expect(tabs.locks.isHeld(SHARED)).toBe(false);
+    }
+  });
+
+  it("says nothing when the session has ended: the sign-in page takes over", async () => {
+    server.get(OPEN_PART, refuse(401, "sign in"));
+    const a = await openTab();
+    await a.start();
+    await later(60_000);
+    expect(a.signedOut).toHaveBeenCalled();
+    expect(a.availability()).toEqual({ is: "loading" });
+    expect(server.count(OPEN_PART)).toBe(1);
+  });
+
+  it("starts over when opened again, and nothing of the try before arrives late", async () => {
+    const first = server.hold(OPEN_PART);
+    const a = await openTab();
+    await a.start();
+    await a.start();
+    expect(first.calls).toHaveLength(2);
+    expect(first.calls[0]?.aborted).toBe(true);
+    first.calls[0]?.answer(copy({ seq: 5 }));
+    await settle();
+    expect(a.availability()).toEqual({ is: "loading" });
+
+    first.calls[1]?.answer(copy({ seq: 10 }));
+    await settle();
+    expect(a.availability()).toEqual({ is: "ready" });
+    expect(a.state().seq).toBe(10);
+    expect(a.streams).toHaveLength(1);
+  });
+
+  it("stops asking when it is stopped", async () => {
+    server.down = true;
+    const a = await openTab();
+    await a.start();
+    a.close();
+    await later(60_000);
+    expect(server.count(OPEN_PART)).toBe(1);
   });
 });
 

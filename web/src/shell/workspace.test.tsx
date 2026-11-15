@@ -60,6 +60,8 @@ const tryAgain = () => fireEvent.click(screen.getByRole("button", { name: "Try a
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Every wait before a new try is as long as it can be: lib/api.ts shortens them at random.
+  vi.spyOn(Math, "random").mockReturnValue(1);
   server = fakeServer();
   server.get(OPEN_PART, copy());
   server.get(WHO_AM_I, { user, workspaces: [membership] });

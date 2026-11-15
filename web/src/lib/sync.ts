@@ -15,15 +15,27 @@
 // If the stream drops it is reopened from the last position applied; after a
 // long gap, or when the server says "reset" (the person's role or projects
 // changed), the whole copy is fetched again. When the server says "gone", or
-// refuses the workspace on reconnect, the copy is emptied and `useAccess`
-// says so; the shell then shows the way out.
+// refuses the workspace on reconnect, the copy is emptied.
+//
+// Whether the workspace can be shown, and if not why (still loading, the
+// server out of reach, refused, lost while open), is one value,
+// `useAvailability`. The shell draws it and decides nothing.
 //
 // One run of startSync is a session. Everything a session asks the server
 // or waits for is given the session's abort signal, so when the session ends
 // nothing of it arrives late: the request or the wait rejects instead.
 
 import { create } from "zustand";
-import { api, ApiError, NetworkError, noteReachable, onReachableAgain, whenReachable, workspacePath } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  errorMessage,
+  NetworkError,
+  noteReachable,
+  onReachableAgain,
+  whenReachable,
+  workspacePath,
+} from "@/lib/api";
 import { openEventStream } from "@/lib/event-stream";
 import { restoreQueue } from "@/lib/mutate";
 import {
@@ -50,19 +62,53 @@ const CATCH_UP_PAGES = 3;
 /** Past this many events applied while the finished work was on its way, patching it is not worth it: the whole copy is fetched again. */
 const MEANWHILE_MAX = 20_000;
 
-/** Why the workspace on screen had to be left. */
-export interface LostAccess {
-  slug: string;
-  /** The server's words for it, when it gave any. */
-  message: string;
-}
+/** Whether a workspace can be shown and, if not, why. A `message` is the server's own words. */
+export type Availability =
+  /** Its copy is on its way. */
+  | { is: "loading" }
+  /** Its copy is in the store. How current it is kept is another matter: store.stream says. */
+  | { is: "ready" }
+  /** The server cannot be reached. It is asked again without anyone's help. */
+  | { is: "offline" }
+  /** The person may not open it: it is not theirs, or there is no such workspace. */
+  | { is: "refused"; message: string }
+  /**
+   * They had it open and were removed from it or suspended in it; the copy
+   * has been emptied. (Someone signed out goes to the sign-in page through
+   * api.onUnauthorized instead.)
+   */
+  | { is: "lost"; message: string }
+  /** The install requires a second sign-in step and the person has not set one up. */
+  | { is: "second-step-needed" }
+  /** The server answered with a failure of its own. It is not asked again until startSync is called again. */
+  | { is: "failed"; message: string };
+
+type Unavailable = Exclude<Availability, { is: "loading" } | { is: "ready" }>;
+
+const LOADING: Availability = { is: "loading" };
+const READY: Availability = { is: "ready" };
+
+/** Why the workspace last asked for is not on screen, when there is more to say than "loading". Written only by this file. */
+const whyNot = create<{ slug: string; why: Unavailable | null }>(() => ({ slug: "", why: null }));
 
 /**
- * Set when the person may no longer see the workspace they had open: they
- * were removed or suspended. (Someone signed out goes to the sign-in page
- * through api.onUnauthorized instead.) The store is already empty by then.
+ * How it stands with showing the workspace `slug`. A copy in the store
+ * counts before anything else: one kept from an earlier visit stays on
+ * screen while a newer one is fetched.
  */
-export const useAccess = create<{ lost: LostAccess | null }>(() => ({ lost: null }));
+export function availability(slug: string): Availability {
+  const copy = getState();
+  if (copy.ready && copy.slug === slug) return READY;
+  const asked = whyNot.getState();
+  return (asked.slug === slug && asked.why) || LOADING;
+}
+
+/** `availability` for components: re-renders when it changes. */
+export function useAvailability(slug: string): Availability {
+  const ready = useStore((s) => s.ready && s.slug === slug);
+  const why = whyNot((s) => (s.slug === slug ? s.why : null));
+  return ready ? READY : (why ?? LOADING);
+}
 
 /** What the tabs say to each other. */
 type Message =
@@ -253,8 +299,12 @@ async function reloadCopy(s: Session, fresh: boolean) {
   else askState(s);
 }
 
-/** Loads the workspace and follows it. Throws if the first load fails. */
-export async function startSync(slug: string) {
+/**
+ * Opens the workspace: loads its copy and keeps it current, until stopSync.
+ * Throws nothing and returns at once: `useAvailability(slug)` says how it
+ * goes. Calling it again starts over, which is what "try again" does.
+ */
+export function startSync(slug: string) {
   stopSync();
   const s: Session = {
     slug,
@@ -270,15 +320,37 @@ export async function startSync(slug: string) {
     passedOn: [],
   };
   cur = s;
-  if (useAccess.getState().lost) useAccess.setState({ lost: null });
+  whyNot.setState({ slug, why: null });
   useStore.setState({ stream: "connecting" });
   listen(s);
-  try {
-    await fetchCopy(s, false, s.ending.signal);
-  } catch (err) {
-    // Stopped while the copy was on its way: nothing failed.
-    if (isAbort(err)) return;
-    throw err;
+  run(open(s));
+}
+
+/**
+ * Loads the session's first copy, asking again for as long as the server
+ * cannot be reached, then joins the tabs of the workspace. Anything but
+ * "cannot be reached" ends it there, with the reason in `availability`.
+ */
+async function open(s: Session) {
+  const { slug } = s;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fetchCopy(s, false, s.ending.signal);
+      break;
+    } catch (err) {
+      if (isAbort(err)) throw err;
+      // Signed out: api.onUnauthorized has taken over.
+      if (err instanceof ApiError && err.status === 401) return;
+      if (!(err instanceof NetworkError)) return whyNot.setState({ slug, why: whyNotOpened(err) });
+      whyNot.setState({ slug, why: { is: "offline" } });
+      // A copy from an earlier visit may be on screen meanwhile: say that it is not being kept current.
+      showStream("down");
+      await whenReachable(attempt, s.ending.signal);
+    }
+  }
+  if (whyNot.getState().why) {
+    whyNot.setState({ slug, why: null });
+    useStore.setState({ stream: "connecting" });
   }
   // What an earlier page left unsent goes out first.
   void restoreQueue(slug);
@@ -301,6 +373,14 @@ export async function startSync(slug: string) {
   askState(s);
 }
 
+/** Why a first copy that the server was asked for did not come. */
+function whyNotOpened(err: unknown): Unavailable {
+  if (err instanceof ApiError && err.code === "second_step_required") return { is: "second-step-needed" };
+  const refused = err instanceof ApiError && (err.status === 403 || err.status === 404);
+  return { is: refused ? "refused" : "failed", message: errorMessage(err) };
+}
+
+/** Ends the session: nothing more of it reaches the store. The copy stays where it is. */
 export function stopSync() {
   const s = cur;
   cur = null;
@@ -491,7 +571,7 @@ async function checkAccess(slug: string, signal: AbortSignal): Promise<Access> {
 function loseAccess(s: Session, message: string) {
   stopSync();
   clearStore();
-  useAccess.setState({ lost: { slug: s.slug, message } });
+  whyNot.setState({ slug: s.slug, why: { is: "lost", message } });
 }
 
 /** The server said "gone": find out where the person stands now, and act on it. */
@@ -591,12 +671,12 @@ async function catchUp(s: Session) {
 }
 
 // In development the moving parts can be looked at from the console:
-// __quadit.store.getState(), __quadit.leads(), __quadit.access.getState().
+// __quadit.store.getState(), __quadit.leads(), __quadit.availability("games").
 if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as { __quadit?: unknown }).__quadit = {
     store: useStore,
     leads: () => cur?.leads ?? false,
-    access: useAccess,
+    availability,
   };
 }
 
