@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { MOD } from "@/lib/hotkeys";
+import { useFocusReturn } from "@/palette/focus-return";
 import { type Key, t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
 import { DESTINATIONS, goKeys, listedName } from "@/shell/destinations";
@@ -100,6 +101,7 @@ const focusOnOpen = (el: HTMLElement | null) => el?.focus();
 /** The sheet that lists every keyboard shortcut; opened with "?". */
 export function ShortcutsSheet() {
   const open = useUi((s) => s.shortcutsOpen);
+  useFocusReturn(open);
   return (
     <Dialog open={open} onOpenChange={ui.setShortcuts} title={t("top.shortcuts")} size="lg">
       <div ref={focusOnOpen} tabIndex={-1} className="gap-x-10 pb-2 outline-none sm:columns-2">

@@ -10,6 +10,7 @@ import { choiceTitle, ChoicesPage } from "@/palette/palette-choices";
 import type { ChoicePage, MakePage, PalettePage } from "@/palette/palette-commands";
 import { makeTitle, MakePageRows } from "@/palette/palette-make";
 import { RootPage } from "@/palette/palette-root";
+import { useFocusReturn } from "@/palette/focus-return";
 import { useServerSearch } from "@/palette/palette-search";
 import { focusPage } from "@/shell/page-focus";
 import { pageUnder, projectInView } from "@/shell/project-in-view";
@@ -27,6 +28,7 @@ export function CommandPalette() {
 }
 
 function Palette() {
+  useFocusReturn(true);
   const slug = useSlug();
   const location = useLocation();
   const navigate = useNavigate();
