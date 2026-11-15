@@ -9,6 +9,7 @@ import { t } from "@/lib/i18n";
 import { useCollection, useLiveTasks, useProjects, useSlug } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { isOpenCategory, type Task } from "@/lib/types";
+import { count } from "@/insights/lib/format";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { ProjectGlyph } from "@/shell/sidebar";
 import { useTaskLink } from "@/tasks/task-row";
@@ -53,7 +54,7 @@ export function OutsidePanel({ projectId, className }: { projectId: string | und
   return (
     <Panel
       title={t("dash.outside")}
-      meta={rows.length > 0 ? <span className="text-xs text-ink-3 tnum">{rows.length}</span> : undefined}
+      meta={rows.length > 0 ? <span className="text-xs text-ink-3 tnum">{count(rows.length)}</span> : undefined}
       action={rows.length > 0 ? <span className="text-xs text-ink-3 max-sm:hidden">{t("dash.outside.hint")}</span> : undefined}
       className={className}
       flush
@@ -116,7 +117,7 @@ export function NobodyPanel({ projectId, className }: { projectId: string | unde
                   <Link to={nobodyPath(slug, p.key)} className="inline-flex items-center gap-1.5 text-accent-text underline-offset-2 hover:underline">
                     <ProjectGlyph project={p} />
                     {p.name}
-                    <span className="text-ink-2 tnum">{counts.get(p.id)}</span>
+                    <span className="text-ink-2 tnum">{count(counts.get(p.id))}</span>
                   </Link>
                 </li>
               ))}

@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
 import type { Category, Epic } from "@/lib/types";
-import { dayOf } from "@/insights/lib/format";
+import { count, dayOf } from "@/insights/lib/format";
 import { Bar } from "@/insights/timeline/bar";
 import { type EpicLine, setEpicDates, type TaskLine } from "@/insights/timeline/data";
 import { type Scale, widthOf, xOf } from "@/insights/timeline/scale";
@@ -105,7 +105,7 @@ export function EpicRow({ line, projectKey, scale, today, open, onToggle }: Epic
           className="w-8 shrink-0 text-right text-xs text-ink-3 tnum max-lg:hidden"
           title={t("ins.progress", { done: line.done, total: line.total })}
         >
-          {line.done}/{line.total}
+          {count(line.done)}/{count(line.total)}
         </span>
       </div>
       <div className="relative" style={{ width: widthOf(scale) }}>

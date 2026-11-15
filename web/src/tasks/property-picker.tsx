@@ -140,7 +140,7 @@ function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { i
           { id: NONE, label: t("task.noCycle"), icon: noneIcon },
           ...cycles.map((c) => ({
             id: c.id,
-            label: c.name || t("prop.cycleName", { n: c.number }),
+            label: c.name || t("prop.cycleName", { n: String(c.number) }),
             icon: <RefreshCw className="size-3.5 text-ink-2" aria-hidden />,
             hint: `${formatDay(c.starts_on)} – ${formatDay(c.ends_on)}`,
           })),

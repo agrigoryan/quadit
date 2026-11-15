@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 import { cx } from "@/lib/cx";
+import { formatNumber } from "@/lib/i18n";
 import { ui } from "@/lib/ui-state";
 import { Tooltip } from "@/ui/tooltip";
 
@@ -42,7 +43,7 @@ export function NavItem({ to, icon, label, count, loud, collapsed, nested, end }
             loud ? "bg-move text-move-ink" : "text-ink-3",
           )}
         >
-          {count}
+          {formatNumber(count)}
         </span>
       )}
       {collapsed && !!count && loud && <span className="absolute mt-[-14px] ml-[14px] size-2 rounded-full bg-move ring-2 ring-sunken" />}

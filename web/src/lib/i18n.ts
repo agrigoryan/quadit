@@ -5,6 +5,9 @@
 //
 // A value may hold {name} placeholders. A value written as "one | other" is
 // a plural: the first form is used when the `n` parameter is 1.
+//
+// A number is written the way people write it ("116,445 tasks"). Give a
+// string for a number that is a name and not an amount, like a cycle's.
 
 import { en } from "@/i18n/en";
 
@@ -13,6 +16,12 @@ type Params = Record<string, string | number>;
 
 const current: Record<Key, string> = en;
 
+// The browser's language decides how numbers are grouped.
+const grouped = new Intl.NumberFormat();
+
+/** A number as people write it: 116445 as "116,445". */
+export const formatNumber = (n: number) => grouped.format(n);
+
 export function t(key: Key, params?: Params): string {
   let text: string = current[key] ?? key;
   if (text.includes(" | ")) {
@@ -20,7 +29,11 @@ export function t(key: Key, params?: Params): string {
     text = (params?.n === 1 ? one : other) ?? text;
   }
   if (!params) return text;
-  return text.replace(/\{(\w+)\}/g, (whole, name: string) => (name in params ? String(params[name]) : whole));
+  return text.replace(/\{(\w+)\}/g, (whole, name: string) => {
+    if (!(name in params)) return whole;
+    const value = params[name];
+    return typeof value === "number" ? formatNumber(value) : String(value);
+  });
 }
 
 /** For keys built at run time ("category." + c). Falls back to the fallback text, or the key. */

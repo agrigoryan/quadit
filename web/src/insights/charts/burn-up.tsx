@@ -6,13 +6,13 @@
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { formatDay } from "@/lib/time";
-import { ChartTip, Legend, ticks, useWidth } from "@/insights/charts/base";
+import { ChartTip, Legend, numberWidth, ticks, useWidth } from "@/insights/charts/base";
+import { count } from "@/insights/lib/format";
 import type { ChartDay } from "@/insights/lib/types";
 
 const H = 200;
 const TOP = 18;
 const AXIS = 20;
-const LEFT = 26;
 const RIGHT = 14;
 
 export interface BurnPoint {
@@ -43,10 +43,12 @@ export function BurnUp({ days, unit, today }: Props) {
   const points = burnPoints(days, unit);
   const marks = ticks(Math.max(1, ...points.map((p) => p.scope)), 4);
   const top = marks[marks.length - 1] ?? 1;
-  const plotW = Math.max(1, width - LEFT - RIGHT);
+  // Room for the numbers on the axis: three digits, or as many as a big cycle has.
+  const gutter = Math.max(26, 8 + numberWidth(count(top)));
+  const plotW = Math.max(1, width - gutter - RIGHT);
   const plotH = H - TOP - AXIS;
   const n = Math.max(1, days.length - 1);
-  const x = (i: number) => LEFT + (i / n) * plotW;
+  const x = (i: number) => gutter + (i / n) * plotW;
   const y = (v: number) => TOP + plotH - (v / top) * plotH;
   const line = (pick: (p: BurnPoint) => number) =>
     points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(pick(p)).toFixed(1)}`).join("");
@@ -69,7 +71,7 @@ export function BurnUp({ days, unit, today }: Props) {
 
   function move(e: React.PointerEvent) {
     const left = e.currentTarget.getBoundingClientRect().left;
-    const i = Math.round(((e.clientX - left - LEFT) / plotW) * n);
+    const i = Math.round(((e.clientX - left - gutter) / plotW) * n);
     setAt(points.length ? Math.min(last, Math.max(0, i)) : null);
   }
   function key(e: React.KeyboardEvent) {
@@ -107,15 +109,15 @@ export function BurnUp({ days, unit, today }: Props) {
             {marks.map((v) => (
               <g key={v}>
                 <line
-                  x1={LEFT}
+                  x1={gutter}
                   x2={width - RIGHT}
                   y1={y(v)}
                   y2={y(v)}
                   stroke={v === 0 ? "var(--viz-axis)" : "var(--viz-grid)"}
                   strokeWidth={1}
                 />
-                <text x={LEFT - 6} y={y(v) + 3.5} textAnchor="end" className="fill-ink-3 text-[10px] tnum">
-                  {v}
+                <text x={gutter - 6} y={y(v) + 3.5} textAnchor="end" className="fill-ink-3 text-[10px] tnum">
+                  {count(v)}
                 </text>
               </g>
             ))}
@@ -200,8 +202,8 @@ export function BurnUp({ days, unit, today }: Props) {
             width={width}
             title={formatDay(shown.date)}
             rows={[
-              { ...scope, value: shown.scope },
-              { ...done, value: shown.done },
+              { ...scope, value: count(shown.scope) },
+              { ...done, value: count(shown.done) },
             ]}
           />
         )}

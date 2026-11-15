@@ -142,6 +142,32 @@ export async function listRows<T>(slug: string, name: string, query = ""): Promi
   return out[name] ?? [];
 }
 
+/** A webhook with the newest entry of its delivery log. A test is logged there and nowhere else. */
+export type WebhookRow = Webhook & { newest?: Delivery };
+
+export async function listWebhooks(slug: string): Promise<WebhookRow[]> {
+  const hooks = await listRows<Webhook>(slug, "webhooks");
+  return Promise.all(
+    hooks.map(async (hook) => {
+      // Without its log a webhook still shows, with what its own record says.
+      const log = await listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=1`).catch((): Delivery[] => []);
+      return { ...hook, newest: log[0] };
+    }),
+  );
+}
+
+/** A sample sent with the Test button, not an event from the feed: it has no place in the feed. */
+export const isTest = (d: Delivery) => d.seq < 0;
+
+/** When a webhook was last sent to and what came back: its own record, or its log when that has something newer. */
+export function lastSent(hook: WebhookRow): { at: number; result: string; failed: boolean; test: boolean } | undefined {
+  const d = hook.newest;
+  const at = d && d.attempts > 0 ? d.done_at || d.created_at : 0;
+  if (d && at > (hook.last_at ?? 0)) return { at, result: d.error || String(d.status_code ?? ""), failed: d.state !== "ok", test: isTest(d) };
+  if (!hook.last_at) return undefined;
+  return { at: hook.last_at, result: hook.last_status ?? "", failed: hook.failures > 0, test: false };
+}
+
 export const listSources = (slug: string) => api.get<{ sources: Source[] }>(ws(slug, "/sources")).then((r) => r.sources ?? []);
 
 /** Sends one named change. A refusal is thrown for the form to show; no toast. */

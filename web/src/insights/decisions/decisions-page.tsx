@@ -28,6 +28,7 @@ import { DecisionEntry } from "@/insights/decisions/entry";
 import { FilterBar } from "@/insights/decisions/filters";
 import { PreferenceDialog } from "@/insights/decisions/preference-dialog";
 import { PreferenceList } from "@/insights/decisions/preferences";
+import { count } from "@/insights/lib/format";
 import { PageBar } from "@/insights/ui/panel";
 
 const PAGE = 50;
@@ -87,7 +88,7 @@ export function DecisionLogPage() {
             )}
           >
             {t(`declog.pane.${id}`)}
-            <span className="text-xs font-normal text-ink-3 tnum">{id === "log" ? found.length : prefs.active.length}</span>
+            <span className="text-xs font-normal text-ink-3 tnum">{count(id === "log" ? found.length : prefs.active.length)}</span>
           </button>
         ))}
       </div>

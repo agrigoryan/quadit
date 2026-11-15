@@ -10,6 +10,7 @@ import { t } from "@/lib/i18n";
 import { findTaskByKey, sortByRank, useCollection } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import type { Epic, Milestone, Task } from "@/lib/types";
+import { count } from "@/insights/lib/format";
 import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from "@/insights/plan/actions";
 import { tallyOf } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";
@@ -102,7 +103,7 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
           ) : (
             <h3 className="min-w-0 flex-1 truncate text-sm font-medium">
               {name}
-              <span className="ml-2 text-xs font-normal text-ink-3 tnum">{tasks.length}</span>
+              <span className="ml-2 text-xs font-normal text-ink-3 tnum">{count(tasks.length)}</span>
             </h3>
           )}
         </div>

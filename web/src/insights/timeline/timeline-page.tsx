@@ -11,7 +11,7 @@ import { useProjectByKey, useSlug } from "@/lib/selectors";
 import { today } from "@/lib/time";
 import type { Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
-import { dayNumber } from "@/insights/lib/format";
+import { count, dayNumber } from "@/insights/lib/format";
 import { useTimeline } from "@/insights/timeline/data";
 import { Backdrop, ScaleHeader } from "@/insights/timeline/header";
 import { LayoutTabs } from "@/insights/timeline/layout-tabs";
@@ -203,7 +203,7 @@ function Timeline({ project }: { project: Project }) {
                   <span className="min-w-0 flex-1 truncate text-ink-2" title={t("timeline.noEpicLong")}>
                     {t("timeline.noEpic")}
                   </span>
-                  <span className="text-xs font-normal text-ink-3 tnum">{data.loose.length}</span>
+                  <span className="text-xs font-normal text-ink-3 tnum">{count(data.loose.length)}</span>
                 </NoteRow>
                 {open.has(LOOSE) && data.loose.map((task) => <TaskLineRow key={task.task.id} line={task} scale={scale} today={now} />)}
               </section>

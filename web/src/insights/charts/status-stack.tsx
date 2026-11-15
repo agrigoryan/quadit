@@ -6,6 +6,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { Category } from "@/lib/types";
 import { Legend, useWidth } from "@/insights/charts/base";
+import { count } from "@/insights/lib/format";
 import type { StatusCount } from "@/insights/lib/types";
 import { Tooltip } from "@/ui/tooltip";
 
@@ -47,13 +48,14 @@ export function byProject(rows: StatusCount[]): ProjectRow[] {
 
 function Bar({ row }: { row: ProjectRow }) {
   const [box, width] = useWidth<HTMLDivElement>();
-  const summary = row.parts.map((p) => `${p.status} ${p.count}`).join(", ");
+  const summary = row.parts.map((p) => `${p.status} ${count(p.count)}`).join(", ");
   return (
     <div ref={box} role="group" aria-label={t("ins.chart.statusLabel", { project: row.project, summary })} className="flex h-7 gap-0.5">
       {row.parts.map((part) => {
         const share = part.count / row.total;
         // The count is printed only where it fits with room to spare, however many digits it has.
-        const fits = share * width >= Math.max(26, 10 + String(part.count).length * 8);
+        const written = count(part.count);
+        const fits = share * width >= Math.max(26, 10 + written.length * 8);
         const tip = t("ins.chart.statusTip", { status: part.status, n: part.count, share: Math.round(share * 100) });
         return (
           <Tooltip key={part.status} label={tip} side="top">
@@ -63,7 +65,7 @@ function Bar({ row }: { row: ProjectRow }) {
               className="flex h-full min-w-1 items-center rounded-[4px] pl-1.5 text-xs font-semibold tnum outline-offset-2 hover:brightness-110"
               style={{ width: `${share * 100}%`, background: part.color, color: part.ink }}
             >
-              {fits && part.count}
+              {fits && written}
             </span>
           </Tooltip>
         );

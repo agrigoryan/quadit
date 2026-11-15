@@ -21,7 +21,17 @@ export async function pushState(): Promise<PushState> {
   const reg = await registerServiceWorker();
   if (!reg) return "unsupported";
   const sub = await reg.pushManager.getSubscription();
-  return sub && Notification.permission === "granted" ? "on" : "off";
+  if (!sub || Notification.permission !== "granted") return "off";
+  // The server may not have it (a failed save, a restored backup): sending
+  // it again is harmless and keeps the two in step.
+  void api.post(SUBSCRIPTIONS, wire(sub)).catch(() => undefined);
+  return "on";
+}
+
+/** What the server keeps of a subscription: its address and keys. */
+function wire(sub: PushSubscription) {
+  const { endpoint, keys } = sub.toJSON();
+  return { endpoint, keys };
 }
 
 /** Asks the person, subscribes this browser and tells the server. Returns the new state. */
@@ -34,7 +44,7 @@ export async function turnPushOn(): Promise<PushState> {
   if (!reg) return "unsupported";
   const { public_key } = await api.get<{ public_key: string }>("/api/v1/push/key");
   const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: new Uint8Array(fromBase64Url(public_key)) });
-  await api.post(SUBSCRIPTIONS, sub.toJSON());
+  await api.post(SUBSCRIPTIONS, wire(sub));
   return "on";
 }
 

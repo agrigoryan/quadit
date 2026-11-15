@@ -6,7 +6,7 @@ export const pages = {
   "mywork.waitingEmpty": "Nothing is waiting on you",
   "mywork.assigned": "Assigned to me",
   "mywork.assignedEmpty": "No open tasks are assigned to you",
-  "mywork.assignedEmptyHint": "Pick one up from a project's task list, or press C to create one.",
+  "mywork.assignedEmptyHint": "Pick one up from a project's task list, or create one with + (C on a keyboard).",
   "mywork.askedBy": "Asked by {name}",
 
   "inbox.type.assigned": "{who} assigned this to you",

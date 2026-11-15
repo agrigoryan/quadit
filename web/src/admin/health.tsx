@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { api } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { fileSize } from "@/lib/files";
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import { Button } from "@/ui/button";
 import type { Backup } from "@/admin/backups";
@@ -93,7 +93,7 @@ export function HealthPage() {
   const health = useLoad(() => api.get<Health>("/api/v1/admin/health"), []);
   // What agents can call has a version of its own, apart from the server's.
   const surface = useLoad(() => loadChangeCatalog().then((c) => c.surface), []);
-  const count = (n: number) => (n === 0 ? t("admin.health.zero") : String(n));
+  const count = (n: number) => (n === 0 ? t("admin.health.zero") : formatNumber(n));
   return (
     <Page
       title={t("admin.health.title")}

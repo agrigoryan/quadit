@@ -3,7 +3,7 @@ import { Ellipsis, Search, ShieldCheck, ShieldOff, UserCheck, UserX } from "luci
 import { loadSession, useSession } from "@/auth/session";
 import { api } from "@/lib/api";
 import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { IconButton } from "@/ui/button";
@@ -53,7 +53,7 @@ function KindTabs({ value, onChange, counts }: { value: Kind; onChange: (k: Kind
           onClick={() => onChange(kind)}
           className={cx("h-7 rounded-sm px-2 text-sm", value === kind ? "bg-press font-medium text-ink" : "text-ink-2 hover:text-ink")}
         >
-          {t(`admin.users.kind.${kind}`)} <span className="text-ink-3 tnum">{counts[kind]}</span>
+          {t(`admin.users.kind.${kind}`)} <span className="text-ink-3 tnum">{formatNumber(counts[kind])}</span>
         </button>
       ))}
     </div>

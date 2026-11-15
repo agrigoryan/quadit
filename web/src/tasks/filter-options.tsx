@@ -55,7 +55,7 @@ export function useFilterOptions(project: Project | undefined): Record<Exclude<F
         none(t("task.noCycle")),
         ...cycles.map((cy) => ({
           id: cy.id,
-          label: cy.name || t("prop.cycleName", { n: cy.number }),
+          label: cy.name || t("prop.cycleName", { n: String(cy.number) }),
           icon: <RefreshCw className="size-3.5 text-ink-2" aria-hidden />,
         })),
       ],

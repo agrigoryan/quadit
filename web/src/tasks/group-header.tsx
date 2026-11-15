@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { ChevronDown, Layers, Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
 import { useRestLoaded, useStore } from "@/lib/store";
 import { isOpenCategory } from "@/lib/types";
@@ -33,7 +33,7 @@ export function GroupIcon({ group }: { group: TaskGroup }) {
 export function GroupCount({ group, count = group.tasks.length, className }: { group: TaskGroup; count?: number; className?: string }) {
   const loaded = useRestLoaded();
   if (!loaded && group.kind === "status" && !isOpenCategory(group.category)) return <RestLoadingNote className={className} />;
-  return <span className={cx("text-xs text-ink-3 tnum", className)}>{count}</span>;
+  return <span className={cx("text-xs text-ink-3 tnum", className)}>{formatNumber(count)}</span>;
 }
 
 interface Props {

@@ -131,6 +131,16 @@ export const useIsDraft = (id: string | undefined): boolean => useStore((s) => !
 /** How a draft task's key reads until the server numbers it: "SVA-…". */
 export const draftKey = (projectKey: string) => `${projectKey}-…`;
 
+// A mark for the server's picture-taking browser: the page has all its
+// data. It follows the store, whichever way the data arrived (in one part,
+// or open work first and the rest after).
+if (typeof document !== "undefined") {
+  useStore.subscribe((s) => {
+    const mark = s.restLoaded ? "1" : "";
+    if (document.documentElement.dataset.loaded !== mark) document.documentElement.dataset.loaded = mark;
+  });
+}
+
 /** False until the finished work has arrived (see StoreState.restLoaded). */
 export const useRestLoaded = (): boolean => useStore((s) => s.restLoaded);
 
@@ -365,8 +375,6 @@ export function mergeRest(slug: string, data: RestData): string[] | null {
     for (const id of target.keys) if (!next.tasks[id]) missing.add(id);
   }
   useStore.setState({ c: next, restLoaded: true });
-  // A mark for the server's picture-taking browser: the page has its data.
-  document.documentElement.dataset.loaded = "1";
   return [...missing];
 }
 

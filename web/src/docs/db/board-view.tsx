@@ -16,7 +16,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { Plus, SquareKanban } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
 import { createProperty, moveRow, setViewConfig } from "@/docs/db/actions";
 import { asList } from "@/docs/db/cell-value";
@@ -86,7 +86,7 @@ function Column({ id, option, rows, allCells, props, onOpen, onAdd }: ColumnProp
     <section aria-label={name} className="flex w-68 shrink-0 flex-col rounded-lg bg-sunken max-sm:w-[78vw] max-sm:snap-center">
       <header className="flex h-9 shrink-0 items-center gap-2 pr-1.5 pl-2.5">
         {option ? <OptionChip option={option} /> : <span className="text-sm font-medium text-ink-2">{name}</span>}
-        <span className="flex-1 text-xs text-ink-3 tnum">{rows.length}</span>
+        <span className="flex-1 text-xs text-ink-3 tnum">{formatNumber(rows.length)}</span>
         <button
           type="button"
           aria-label={t("db.board.add", { name })}

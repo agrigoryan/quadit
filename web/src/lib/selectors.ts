@@ -145,7 +145,12 @@ export function useOpenDecisions(): Dict<Decision[]> {
 
 export function useUnreadCount(): number {
   const notifications = useCollection("notifications");
-  return useMemo(() => Object.values(notifications).filter((n) => !n.read_at && !n.archived_at).length, [notifications]);
+  const me = useMe();
+  // Only the viewer's own: the page can hold a notice written for someone else.
+  return useMemo(
+    () => Object.values(notifications).filter((n) => n.user_id === me.user_id && !n.read_at && !n.archived_at).length,
+    [notifications, me.user_id],
+  );
 }
 
 /** "@handle" for a user id, for messages built outside components. */

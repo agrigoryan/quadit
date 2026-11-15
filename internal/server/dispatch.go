@@ -491,6 +491,15 @@ func (s *Server) hWebhookTest(x *c) error {
 	if err := x.db.Insert(x.ctx(), d); err != nil {
 		s.log.Error("webhook test: delivery log", "err", err)
 	}
+	// The webhook's own record says when it last answered and how. A test
+	// does not count for or against it as a run of failures.
+	last := fmt.Sprint(status)
+	if d.State != "ok" {
+		last = orText(errText, last)
+	}
+	if _, err := x.db.Update(x.ctx(), "webhooks", map[string]any{"last_at": now, "last_status": last}, store.Eq("id", h.ID)); err != nil {
+		s.log.Error("webhook test: last result", "err", err)
+	}
 	return x.ok(map[string]any{"status": status, "error": errText, "ms": took.Milliseconds(), "ok": status >= 200 && status < 300})
 }
 

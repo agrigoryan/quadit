@@ -103,7 +103,7 @@ const writers: [string, Writer][] = [
     "cycle_id",
     (c) => {
       const cycle = getState().c.cycles[str(c.to)];
-      if (cycle) return t("timeline.cycle", { name: cycle.name || t("prop.cycleName", { n: cycle.number }) });
+      if (cycle) return t("timeline.cycle", { name: cycle.name || t("prop.cycleName", { n: String(cycle.number) }) });
       return c.to ? null : t("timeline.cycleCleared");
     },
   ],

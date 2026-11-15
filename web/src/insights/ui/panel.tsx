@@ -3,6 +3,7 @@
 
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
+import { count } from "@/insights/lib/format";
 
 interface Props {
   title: string;
@@ -49,7 +50,7 @@ export function PageBar({ children, className }: { children: ReactNode; classNam
 export function MoveCount({ n }: { n: number }) {
   return (
     <span className="flex h-5 min-w-5 items-center justify-center rounded-sm bg-move px-1.5 text-xs font-semibold text-move-ink tnum">
-      {n}
+      {count(n)}
     </span>
   );
 }

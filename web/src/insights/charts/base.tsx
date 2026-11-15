@@ -7,6 +7,7 @@ import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } fro
 import { ChartNoAxesColumn, Table2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { count } from "@/insights/lib/format";
 import { IconButton } from "@/ui/button";
 
 /** The width of an element in CSS pixels, followed as it changes. */
@@ -33,6 +34,13 @@ export function ticks(max: number, count = 3): number[] {
   const out: number[] = [];
   for (let v = 0; v < max + step; v += step) out.push(v);
   return out;
+}
+
+/** About how wide a written number is in the 10px figures the charts use: enough to make room for it. */
+export function numberWidth(text: string): number {
+  let width = 0;
+  for (const ch of text) width += /[\s.,'’]/.test(ch) ? 3.5 : 6.5;
+  return width;
 }
 
 export interface Series {
@@ -142,7 +150,7 @@ export function DataTable({ caption, head, rows }: TableProps) {
                   </th>
                 ) : (
                   <td key={i} className="border-b border-line/70 py-1 pl-3 text-right tnum">
-                    {cell}
+                    {typeof cell === "number" ? count(cell) : cell}
                   </td>
                 ),
               )}

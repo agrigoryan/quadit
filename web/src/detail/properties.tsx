@@ -69,7 +69,7 @@ export function Properties({ task }: { task: Task }) {
     disabled: readOnly,
   });
 
-  const cycleName = cycle ? cycle.name || t("prop.cycleName", { n: cycle.number }) : t("task.noCycle");
+  const cycleName = cycle ? cycle.name || t("prop.cycleName", { n: String(cycle.number) }) : t("task.noCycle");
   const taskLabels = (task.label_ids ?? []).map((id) => labels[id]).filter((l) => l !== undefined);
 
   return (

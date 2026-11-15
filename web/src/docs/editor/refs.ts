@@ -19,14 +19,14 @@ const REF =
 export function pageByTitle(c: Collections, title: string): Doc | undefined {
   const want = title.trim();
   if (!want) return undefined;
-  let found: Doc | undefined;
-  for (const row of Object.values(c.docs)) {
-    const doc = row as unknown as Doc;
-    if (doc.deleted_at || doc.title !== want) continue;
-    if (found) return undefined;
-    found = doc;
-  }
-  return found;
+  // The exact title first; then, as the server does, the same title in
+  // another case. Several pages either way and it stays text.
+  const docs = Object.values(c.docs).map((row) => row as unknown as Doc).filter((doc) => !doc.deleted_at);
+  const exact = docs.filter((doc) => doc.title === want);
+  if (exact.length > 0) return exact.length === 1 ? exact[0] : undefined;
+  const lower = want.toLowerCase();
+  const loose = docs.filter((doc) => doc.kind !== "row" && (doc.title ?? "").toLowerCase() === lower);
+  return loose.length === 1 ? loose[0] : undefined;
 }
 
 type Styles = Record<string, unknown>;

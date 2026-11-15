@@ -1,6 +1,6 @@
 // How the insight pages write amounts, lengths of time and calendar days.
 
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -15,6 +15,9 @@ export function money(value: string | number | undefined): string {
 
 /** Money from millionths of a dollar, as sessions record cost. */
 export const moneyMicros = (micros: number | undefined) => amount.format((micros ?? 0) / 1e6);
+
+/** A count as people read it: 116445 as "116,445". Not for keys, ids or what goes in a field. */
+export const count = (n: number | undefined) => formatNumber(n ?? 0);
 
 /** 182000 as "182K". */
 export const short = (n: number | undefined) => compact.format(n ?? 0);

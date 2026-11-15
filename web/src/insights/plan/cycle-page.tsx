@@ -14,6 +14,7 @@ import { type Cycle, isOpenCategory, type Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { BurnUp, burnRows } from "@/insights/charts/burn-up";
+import { count } from "@/insights/lib/format";
 import { useLive } from "@/insights/lib/live";
 import type { CycleChart } from "@/insights/lib/types";
 import { moveToCycle, updateCycle } from "@/insights/plan/actions";
@@ -29,7 +30,7 @@ import { StatusIcon } from "@/ui/icons";
 import { Input } from "@/ui/input";
 import { Spinner } from "@/ui/spinner";
 
-export const cycleName = (cycle: Cycle) => cycle.name || t("prop.cycleName", { n: cycle.number });
+export const cycleName = (cycle: Cycle) => cycle.name || t("prop.cycleName", { n: String(cycle.number) });
 
 /** Where a cycle stands against today. */
 export function cyclePhase(cycle: Cycle, now = today()): "current" | "upcoming" | "past" {
@@ -140,7 +141,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
               <h2 className="sticky top-0 z-[2] flex h-8 items-center gap-2 border-b border-line bg-sunken px-3 text-sm font-medium">
                 <StatusIcon category={status.category} />
                 {status.name}
-                <span className="text-xs font-normal text-ink-3 tnum">{list.length}</span>
+                <span className="text-xs font-normal text-ink-3 tnum">{count(list.length)}</span>
               </h2>
               {list.map((task) => (
                 <TaskRow key={task.id} task={task} />

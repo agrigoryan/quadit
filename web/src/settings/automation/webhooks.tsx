@@ -14,7 +14,7 @@ import { ConfirmDialog, RevealDialog } from "@/settings/ui/dialogs";
 import { Switch } from "@/settings/ui/form";
 import { EmptyRow, Page, Rows } from "@/settings/ui/layout";
 import { useLoad } from "@/settings/ui/use-load";
-import { change, listRows, randomSecret, type TestResult, type Webhook } from "@/settings/automation/data";
+import { change, lastSent, listWebhooks, randomSecret, type TestResult, type Webhook, type WebhookRow } from "@/settings/automation/data";
 import { DeliveriesDialog } from "@/settings/automation/deliveries";
 import { EventBadges } from "@/settings/automation/event-picker";
 import { WebhookForm } from "@/settings/automation/webhook-form";
@@ -38,7 +38,7 @@ function TestLine({ test }: { test: Test }) {
 }
 
 interface ItemProps {
-  hook: Webhook;
+  hook: WebhookRow;
   test: Test | undefined;
   onTest: () => void;
   onToggle: (active: boolean) => void;
@@ -53,6 +53,7 @@ function WebhookItem({ hook, test, onTest, onToggle, onEdit, onLog, onRotate, on
   const members = useCollection("members");
   const project = hook.project_id ? projects[hook.project_id] : undefined;
   const member = hook.user_id ? members[hook.user_id] : undefined;
+  const last = lastSent(hook);
   return (
     <div className="flex flex-col gap-1.5 px-3 py-2.5">
       <div className="flex items-center gap-3">
@@ -98,12 +99,17 @@ function WebhookItem({ hook, test, onTest, onToggle, onEdit, onLog, onRotate, on
           </>
         )}
         {hook.failures > 0 && <Badge tone="danger">{t("auto.hook.failures", { n: hook.failures })}</Badge>}
-        {hook.last_at ? (
+        {last ? (
           <Fact label={t("auto.hook.last")} className="max-w-full min-w-0">
-            <span className={cx("mr-1.5 inline-block max-w-56 truncate align-bottom", hook.failures > 0 && "text-danger")} title={hook.last_status}>
-              {hook.last_status}
+            <span className={cx("mr-1.5 inline-block max-w-56 truncate align-bottom", last.failed && "text-danger")} title={last.result}>
+              {last.result}
             </span>
-            <When ms={hook.last_at} />
+            <When ms={last.at} />
+            {last.test && (
+              <Badge tone="accent" title={t("auto.delivery.testHint")} className="ml-1.5">
+                {t("auto.delivery.test")}
+              </Badge>
+            )}
           </Fact>
         ) : (
           <span className="text-ink-3">{t("auto.hook.neverSent")}</span>
@@ -124,7 +130,7 @@ function WebhookItem({ hook, test, onTest, onToggle, onEdit, onLog, onRotate, on
 /** Webhooks: addresses the workspace calls when something happens. */
 export function WebhooksPage() {
   const slug = useSlug();
-  const hooks = useLoad(() => listRows<Webhook>(slug, "webhooks"), [slug]);
+  const hooks = useLoad(() => listWebhooks(slug), [slug]);
   const [form, setForm] = useState<{ hook?: Webhook } | null>(null);
   const [secret, setSecret] = useState<{ name: string; value: string } | null>(null);
   const [log, setLog] = useState<Webhook | null>(null);

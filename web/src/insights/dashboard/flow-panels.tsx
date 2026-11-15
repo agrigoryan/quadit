@@ -7,7 +7,7 @@ import { useCollection } from "@/lib/selectors";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { statusRows, StatusStack } from "@/insights/charts/status-stack";
 import { WeeklyBars, weeklyRows } from "@/insights/charts/weekly-bars";
-import { hours } from "@/insights/lib/format";
+import { count, hours } from "@/insights/lib/format";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { StatusCount, WaitRow, WeekCount } from "@/insights/lib/types";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
@@ -96,7 +96,7 @@ export function WaitsPanel({ rows, className }: { rows: WaitRow[]; className?: s
                       </span>
                     </span>
                   </th>
-                  <td className="border-b border-line/70 px-2 py-1.5 text-right tnum">{row.tasks}</td>
+                  <td className="border-b border-line/70 px-2 py-1.5 text-right tnum">{count(row.tasks)}</td>
                   <td className="border-b border-line/70 px-2 py-1.5 text-right text-ink-2 tnum max-sm:hidden">{hours(row.avg_hours)}</td>
                   <td className="border-b border-line/70 py-1.5 pr-4 pl-2 text-right tnum">
                     <span className="inline-flex items-center justify-end gap-2">

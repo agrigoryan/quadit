@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { ago, exact, timeOfDay } from "@/lib/time";
 import type { AgentSession, Member, Task } from "@/lib/types";
 import { useStore } from "@/lib/store";
-import { parseWhen } from "@/insights/lib/format";
+import { count, parseWhen } from "@/insights/lib/format";
 import type { AgentState, Claim } from "@/insights/lib/types";
 import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-bits";
 import type { AgentWork } from "@/insights/agents/agent-data";
@@ -247,7 +247,7 @@ export function AgentCard({ member, state, helpers, helperNote, work, sessions, 
       <section>
         <h4 className={label}>
           {t("agents.waits")}
-          {waits > 0 && <span className="ml-1.5 font-normal text-ink-3 tnum">{waits}</span>}
+          {waits > 0 && <span className="ml-1.5 font-normal text-ink-3 tnum">{count(waits)}</span>}
         </h4>
         <WaitsOnIt work={work} now={now} />
       </section>

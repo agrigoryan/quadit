@@ -4,6 +4,7 @@
 import "@/insights/viz.css";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { count } from "@/insights/lib/format";
 
 interface Props {
   done: number;
@@ -36,7 +37,7 @@ export function ProgressCount({ done, started, total, className }: Props) {
   return (
     <span className={cx("flex shrink-0 items-center gap-2", className)}>
       <span className="min-w-9 text-right text-xs text-ink-3 tnum" aria-hidden>
-        {done}/{total}
+        {count(done)}/{count(total)}
       </span>
       <Progress done={done} started={started} total={total} thin className="w-20 max-sm:w-12" />
     </span>

@@ -347,3 +347,10 @@
     right: 0;
   }
 }
+
+/* iPhone Safari zooms in on an editable area whose text is under 16px. */
+@media (pointer: coarse) {
+  .qd-editor .bn-editor {
+    font-size: 1rem;
+  }
+}

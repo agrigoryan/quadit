@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router";
 import { FirstProjectNudge } from "@/auth/first-run";
 import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 import { useCollection, useLiveTasks, useMe, useMember } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } from "@/lib/types";
@@ -86,7 +86,7 @@ export function MyWorkPage() {
           </h2>
           {yours > 0 && (
             <span className="flex h-5 min-w-5 items-center justify-center rounded-sm bg-move px-1.5 text-xs font-semibold text-move-ink tnum">
-              {yours}
+              {formatNumber(yours)}
             </span>
           )}
           {yours > 0 && <p className="text-xs text-ink-3 max-sm:hidden">{t("mywork.waitingHint")}</p>}
@@ -105,7 +105,7 @@ export function MyWorkPage() {
           <h2 id="mywork-assigned" className="text-sm font-semibold">
             {t("mywork.assigned")}
           </h2>
-          {assigned.length > 0 && <span className="text-xs text-ink-3 tnum">{assigned.length}</span>}
+          {assigned.length > 0 && <span className="text-xs text-ink-3 tnum">{formatNumber(assigned.length)}</span>}
         </header>
         {assigned.length === 0 && (
           <div className="px-4 py-2 text-sm">

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowUpDown, Eye, EyeOff, ListFilter, Plus, SlidersHorizontal } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 import { setViewConfig } from "@/docs/db/actions";
 import { AddPropertyMenu } from "@/docs/db/add-property";
 import { FilterEditor, SortEditor } from "@/docs/db/filter-editor";
@@ -25,7 +25,7 @@ function ToolButton({ icon, label, count, children }: { icon: ReactNode; label: 
         <Button variant="ghost" size="sm" aria-label={label} className={cx("max-md:px-1.5", !!count && "text-accent-text")}>
           {icon}
           <span className="max-lg:hidden">{label}</span>
-          {!!count && <span className="tnum">{count}</span>}
+          {!!count && <span className="tnum">{formatNumber(count)}</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="p-0">

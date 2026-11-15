@@ -68,7 +68,7 @@ export const tasks = {
   "prop.points": "{n} pt | {n} pts",
 
   "list.empty": "No tasks here yet",
-  "list.emptyHint": "Create the first one with the button below, or press C anywhere.",
+  "list.emptyHint": "Create the first one with the button below (C on a keyboard).",
   "list.emptyFiltered": "No tasks match these filters",
   "list.emptyFilteredHint": "Loosen or clear the filters to see more.",
   "list.clearFilters": "Clear filters",

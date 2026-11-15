@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { MessageCircleQuestion, Trash2, Undo2 } from "lucide-react";
 import { api, errorMessage, ws } from "@/lib/api";
-import { t } from "@/lib/i18n";
+import { formatNumber, t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
 import { mergeRows } from "@/lib/store";
 import { ago, exact } from "@/lib/time";
@@ -22,7 +22,7 @@ function Group({ title, count, children }: { title: string; count: number; child
     <section aria-label={title}>
       <h2 className="flex h-8 items-center gap-2 border-b border-line bg-sunken px-4 text-sm font-medium">
         {title}
-        <span className="text-xs font-normal text-ink-3 tnum">{count}</span>
+        <span className="text-xs font-normal text-ink-3 tnum">{formatNumber(count)}</span>
       </h2>
       <ul>{children}</ul>
     </section>
