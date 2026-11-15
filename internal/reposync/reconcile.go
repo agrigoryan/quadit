@@ -225,7 +225,7 @@ func reconcile(src core.DocSource, f folder, pages []syncedPage) plan {
 		if parent, ok := byID[page.ParentID]; ok && strings.HasSuffix(parent.SourcePath, "/") {
 			dirOf = parent.SourcePath
 		}
-		filePath := dirOf + fileSlug(cmp.Or(page.Title, "untitled")) + ".md"
+		filePath := dirOf + fileSlug(page.Title) + ".md"
 
 		// The file by its name is about to be removed, because the page
 		// that had it went to the trash: this page takes the file over
@@ -310,7 +310,8 @@ func agreed(file, pageSide string) string {
 	return shortHash(file) + ":" + shortHash(pageSide)
 }
 
-// fileSlug is the name of a page's file, without ".md".
+// fileSlug is the name of a page's file, without ".md": its title in
+// lower-case Latin letters and digits, or "untitled" when that leaves none.
 func fileSlug(title string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(strings.TrimSpace(title)) {
@@ -325,8 +326,5 @@ func fileSlug(title string) string {
 	if len(out) > 40 {
 		out = strings.Trim(out[:40], "-")
 	}
-	if len(out) < 2 {
-		out = "team"
-	}
-	return out
+	return cmp.Or(out, "untitled")
 }
