@@ -166,7 +166,7 @@ func (s *Server) hAgents(x *c) error {
 	if err != nil {
 		return err
 	}
-	tasks, err := x.db.Tasks(x.ctx(), store.TaskFilter{Open: true, ProjectIDs: x.projects, Limit: 5000})
+	tasks, err := x.everyTask(store.TaskFilter{Open: true, ProjectIDs: x.projects})
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (s *Server) hDashboard(x *c) error {
 		}
 		projects = []string{p.ID}
 	}
-	tasks, err := x.db.Tasks(ctx, store.TaskFilter{ProjectIDs: projects, Archived: true, Limit: 5000})
+	tasks, err := x.everyTask(store.TaskFilter{ProjectIDs: projects, Archived: true})
 	if err != nil {
 		return err
 	}
@@ -543,4 +543,22 @@ func (s *Server) hCycleChart(x *c) error {
 		}
 	}
 	return x.ok(map[string]any{"cycle": cy, "days": days, "total": total, "done": done})
+}
+
+// everyTask reads all the tasks a filter matches, however many there are.
+func (x *c) everyTask(f store.TaskFilter) ([]core.Task, error) {
+	f.Sort, f.Limit = "created", 5000
+	var all []core.Task
+	for {
+		page, err := x.db.Tasks(x.ctx(), f)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, page...)
+		if len(page) < f.Limit {
+			return all, nil
+		}
+		// Past the last one read, in the order they were made.
+		f.After = []any{page[len(page)-1].ID}
+	}
 }

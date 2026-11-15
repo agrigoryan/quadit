@@ -865,8 +865,24 @@ func taskMove(c *cx) error {
 	var keep []string
 	for _, lid := range t.LabelIDs {
 		var l core.Label
-		if err := c.tx.Get(c.ctx, &l, store.Eq("id", lid)); err == nil && l.ProjectID == "" {
+		if err := c.tx.Get(c.ctx, &l, store.Eq("id", lid)); err != nil {
+			continue
+		}
+		if l.ProjectID == "" {
 			keep = append(keep, lid)
+			continue
+		}
+		// A label of the old project: the new project's label of the same
+		// name takes its place, when it has one.
+		var same []core.Label
+		if err := c.tx.List(c.ctx, &same, store.Where(store.Eq("project_id", to.ID), store.Live)); err != nil {
+			return err
+		}
+		for _, s := range same {
+			if strings.EqualFold(s.Name, l.Name) {
+				keep = append(keep, s.ID)
+				break
+			}
 		}
 	}
 	if err := c.setLabels(p, &t, keep); err != nil {

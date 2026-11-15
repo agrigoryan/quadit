@@ -806,3 +806,99 @@ func TestEveryRouteIsDescribed(t *testing.T) {
 		t.Fatalf("found only %d routes in the source; the check is not reading them", n)
 	}
 }
+
+// TestSecondAuditFindings pins what a second independent check found.
+func TestSecondAuditFindings(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
+		for _, h := range []string{"asker", "judge", "narrow"} {
+			s.change(s.owner, "", "agent.create", M{"name": h, "handle": h, "role": "admin"})
+		}
+		tok := func(h string) string {
+			var out struct{ Token string }
+			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + h}, 201, &out)
+			return out.Token
+		}
+		asker, judge := tok("asker"), tok("judge")
+		do := func(token, typ string, args M, want int) string {
+			return s.call(nil, token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
+		}
+		// An approval for a change is asked of a person and given by one.
+		hook := M{"name": "out", "url": "https://example.com/hook"}
+		do(asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "webhook.create", "args": hook, "question": "Add the hook?", "ask": "@judge"}, 400)
+		ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "webhook.create", "args": hook, "question": "Add the hook?"})["ref"].(string)
+		do(judge, "decision.pick", M{"id": ask, "outcome": "approved"}, 403)
+		s.change(s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
+
+		// Narrowing an agent's projects keeps what it must ask for.
+		s.change(s.owner, "", "agent.update", M{"id": "@narrow", "scope": M{"projects": []string{"OPS"}}})
+		narrow := tok("narrow")
+		if out := do(narrow, "webhook.create", hook, 403); !strings.Contains(out, "needs_approval") {
+			t.Fatalf("a narrowed agent lost its approvals: %s", out)
+		}
+		// A file on another project's task is not for a member limited to one.
+		var f struct{ ID, URL string }
+		s.call(s.owner, "", "POST", w+"/files?name=secret.txt", []byte("for SVA eyes"), 201, &f)
+		s.change(s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})
+		path := strings.TrimPrefix(f.URL, s.url)
+		s.call(nil, narrow, "GET", path, nil, 404, nil)
+		s.call(nil, asker, "GET", path, nil, 200, nil)
+		if out := s.call(nil, narrow, "GET", "/api/v1/w/-/list/projects", nil, 200, nil); strings.Contains(out, "Samurai") {
+			t.Fatalf("a limited agent is shown the other project: %s", out)
+		}
+		// Helpers: at most three at work on a task, and gone with a deleted task.
+		for i := 0; i < 3; i++ {
+			do(asker, "agent.create", M{"name": fmt.Sprintf("Helper %d", i), "handle": fmt.Sprintf("helper%d", i), "task": "OPS-1"}, 200)
+		}
+		do(asker, "agent.create", M{"name": "One more", "handle": "helper9", "task": "OPS-1"}, 409)
+		s.change(s.owner, "", "task.delete", M{"id": "OPS-1"})
+		if out := s.call(s.owner, "", "GET", w+"/list/members", nil, 200, nil); strings.Count(out, `"suspended_at"`) < 3 {
+			t.Fatalf("helpers of a deleted task are still at work: %s", out)
+		}
+		// Waiting on an outside event from a comment, and letting go of it.
+		do(asker, "comment.create", M{"task": "SVA-1", "body": "Sent for review.", "waiting_on": "outside", "waiting_on_note": "the store's review"}, 200)
+		if out := s.call(s.owner, "", "GET", w+"/tasks?waiting_on=outside&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+			t.Fatalf("waiting on the outside after a comment: %s", out)
+		}
+		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "waiting_on": nil})
+		if out := s.call(s.owner, "", "GET", w+"/tasks?waiting_on=outside&format=text", nil, 200, nil); strings.Contains(out, "SVA-1") {
+			t.Fatalf("an outside wait could not be cleared: %s", out)
+		}
+		// Settings: a value of another shape is refused; null resets.
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"value": M{"host": "x", "password": "p-123456"}}, 400, nil)
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"host": "smtp.example.com", "from": "q@example.com", "password": "p-123456"}, 200, nil)
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", json.RawMessage("null"), 200, nil)
+		if out := s.call(s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, nil); strings.Contains(out, "smtp.example.com") || strings.Contains(out, "p-123456") {
+			t.Fatalf("a setting reset with null is still there: %s", out)
+		}
+		// A wrong kind of value is explained.
+		if out := do(asker, "task.update", M{"id": "SVA-1", "estimate": "lots"}, 400); !strings.Contains(out, "estimate takes a number") {
+			t.Fatalf("a wrong kind of value: %s", out)
+		}
+		// The same change sent again says what it made.
+		body := M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": "Made once"}}
+		s.call(nil, asker, "POST", "/api/v1/w/-/changes", body, 200, nil)
+		if out := s.call(nil, asker, "POST", "/api/v1/w/-/changes", body, 200, nil); !strings.Contains(out, `"duplicate":true`) || !strings.Contains(out, `"key":"SVA-`) {
+			t.Fatalf("a repeated change does not say what it made: %s", out)
+		}
+		// Guessing tokens is slowed down.
+		limited := false
+		for i := 0; i < 140 && !limited; i++ {
+			req, _ := http.NewRequest("GET", s.url+"/api/v1/w/-/me", nil)
+			req.Header.Set("Authorization", "Bearer qd_not_a_token")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			limited = resp.StatusCode == 429
+			resp.Body.Close()
+		}
+		if !limited {
+			t.Fatal("140 wrong tokens in a row were never slowed down")
+		}
+	})
+}

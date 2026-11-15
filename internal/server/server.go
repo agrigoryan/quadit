@@ -719,6 +719,17 @@ func (l *limiter) share(ctx context.Context, st store.Store) {
 	if len(mine) > 0 {
 		st.Delete(ctx, "rate_counters", store.Like("name", "api:%"), store.Lt("bucket", window-1))
 	}
+	// And what the other servers counted this minute, for every caller: a
+	// caller this server has not seen lately may be busy on another.
+	var rows []core.RateCounter
+	if err := st.List(ctx, &rows, store.Q{Where: []store.Cond{store.Like("name", "api:%"), store.Eq("bucket", window)}, Limit: 5000}); err == nil {
+		for _, r := range rows {
+			key := strings.TrimPrefix(r.Name, "api:")
+			if _, flushed := totals[key]; !flushed {
+				totals[key] = r.Hits
+			}
+		}
+	}
 	l.mu.Lock()
 	if l.window == window {
 		for key, total := range totals {

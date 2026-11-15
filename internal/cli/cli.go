@@ -646,6 +646,12 @@ func (r *runner) run(cmd string, rest []string) error {
 			return nil
 		}
 		sum, err := importer.Apply(clientSink{r, new(bool)}, plan, opts["project"])
+		if r.json {
+			raw, _ := json.Marshal(map[string]any{"made": map[string]int{"tasks": sum.Tasks, "comments": sum.Comments, "pages": sum.Docs, "rows": sum.Rows, "files": sum.Files},
+				"already_there": sum.Already, "unmatched_people": sum.Unmatched})
+			fmt.Fprintln(r.out, string(raw))
+			return err
+		}
 		fmt.Fprintln(r.out, sum)
 		return err
 	case "link":
@@ -864,8 +870,8 @@ func (r *runner) link(pos []string, approval string) error {
 			}
 		}
 	}
-	title, _ := gitOut("log", "-1", "--format=%s")
-	args := map[string]any{"task": key, "kind": "branch", "repo": repo, "ref": branch, "state": state, "title": title}
+	// The link is called by its branch; what was committed is in its commits.
+	args := map[string]any{"task": key, "kind": "branch", "repo": repo, "ref": branch, "state": state, "title": branch}
 	if state != "merged" {
 		// Once merged nothing is ahead any more: the commits listed while
 		// the branch was open stay on the link as they were.

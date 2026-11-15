@@ -1,0 +1,27 @@
+# The default install served over HTTPS, with a certificate the server gets
+# and renews by itself from Let's Encrypt. The name must point at this
+# machine, and ports 443 and 80 must reach it from the internet.
+#
+#   QUADIT_DOMAIN=quadit.example.com docker compose -f deploy/docker-compose.https.yml up -d
+
+services:
+  quadit:
+    build: ..
+    image: quadit
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    environment:
+      QUADIT_TLS_DOMAIN: ${QUADIT_DOMAIN:?set QUADIT_DOMAIN to the name people will use}
+      QUADIT_LISTEN: ":443"
+      QUADIT_BASE_URL: https://${QUADIT_DOMAIN}
+    # The image runs as an ordinary user, which may not open ports below 1024
+    # without this.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    volumes:
+      - quadit-data:/data
+
+volumes:
+  quadit-data:

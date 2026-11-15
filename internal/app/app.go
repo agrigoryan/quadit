@@ -139,6 +139,16 @@ func Serve(args []string, version string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// One server per data directory: a second one, or an upgrade being
+	// undone, must not run beside it.
+	if strings.HasPrefix(o.DB, "postgres") {
+		// Several servers may share a Postgres database; each has its own directory or none to guard.
+	} else if release, lerr := lockData(o.Data); lerr != nil {
+		log.Error("cannot start", "err", lerr)
+		return 1
+	} else {
+		defer release()
+	}
 	st, sealer, err := o.Open(ctx)
 	if err != nil {
 		log.Error("cannot start", "err", err)

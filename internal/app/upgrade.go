@@ -32,6 +32,14 @@ func Upgrade(args []string, version string) int {
 		path = filepath.Join(o.Data, "quadit.sqlite")
 	}
 	if *undo {
+		// Not under a running server: it would go on writing to the
+		// database that is being put aside.
+		release, lerr := lockData(o.Data)
+		if lerr != nil {
+			fmt.Fprintln(os.Stderr, "could not go back:", lerr)
+			return 1
+		}
+		defer release()
 		var from, aside string
 		var err error
 		if isPostgres {

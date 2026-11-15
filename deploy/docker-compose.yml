@@ -13,6 +13,20 @@ services:
     environment:
       # The address people use to reach it. Passkeys and links in mail need it.
       QUADIT_BASE_URL: http://localhost:4780
+    # HTTPS (needed for passkeys and phone notifications anywhere but
+    # localhost). With a name that points at this machine, replace the ports
+    # and environment above with:
+    #
+    #   ports:
+    #     - "443:443"
+    #     - "80:80"
+    #   environment:
+    #     QUADIT_TLS_DOMAIN: quadit.example.com
+    #     QUADIT_LISTEN: ":443"
+    #     QUADIT_BASE_URL: https://quadit.example.com
+    #
+    # The server then gets its own certificate from Let's Encrypt and renews
+    # it. See deploy/docker-compose.https.yml for the whole file.
     volumes:
       - quadit-data:/data
 

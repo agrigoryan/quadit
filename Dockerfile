@@ -30,6 +30,7 @@ USER quadit
 ENV QUADIT_DATA=/data QUADIT_LISTEN=:4780 QUADIT_CHROME=/usr/bin/chromium QUADIT_CHROME_ARGS="--no-sandbox --disable-dev-shm-usage"
 VOLUME /data
 EXPOSE 4780
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:4780/healthz || exit 1
+# Plain HTTP on 4780, or with HTTPS on, the server's own plain door on 4781.
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:4780/healthz || wget -qO- http://127.0.0.1:4781/healthz || exit 1
 ENTRYPOINT ["quadit"]
 CMD ["serve"]

@@ -38,6 +38,11 @@ func UndoUpgrade(ctx context.Context, path string) (from, to string, err error) 
 		return a > b
 	})
 	newest := copies[0]
+	// Only a real database goes back in place: a file of that name that is
+	// empty or something else would replace the live one with nothing.
+	if err := looksLikeOurs(ctx, newest); err != nil {
+		return "", "", fmt.Errorf("%s is not a copy of the database (%w); nothing was changed", newest, err)
+	}
 	aside := strings.Replace(newest, ".before-v", ".after-v", 1)
 	for _, suffix := range []string{"-wal", "-shm"} {
 		os.Remove(path + suffix) // the upgraded database's side files do not belong to the copy
@@ -91,4 +96,28 @@ func OpenAt(ctx context.Context, path string, upTo int) (*sqlstore.Store, error)
 		return nil, err
 	}
 	return s, nil
+}
+
+// looksLikeOurs checks that a file is a database of ours with data in it.
+func looksLikeOurs(ctx context.Context, path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Size() == 0 {
+		return fmt.Errorf("the file is empty")
+	}
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	var version, workspaces int
+	if err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&version); err != nil || version == 0 {
+		return fmt.Errorf("it has no schema of ours")
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM workspaces`).Scan(&workspaces); err != nil {
+		return err
+	}
+	return nil
 }
