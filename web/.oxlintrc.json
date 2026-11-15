@@ -1,0 +1,168 @@
+// The rules of docs/code-style.md (web) that a tool can check. Run: pnpm lint.
+// A rule set to "warn" has findings today; docs/code-style.md lists them with
+// their counts. Fix one rule's findings, then turn it into "error" here.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jsx-a11y", "import"],
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "es2023": true },
+  "ignorePatterns": ["dist"],
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "react/rules-of-hooks": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/ban-ts-comment": "error",
+    "import/no-cycle": "error",
+    "no-console": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+          {
+            "group": ["@/shell/**", "@/pages/**", "@/palette/**"],
+            "message": "Feature folders do not import from shell, pages or palette."
+          }
+        ]
+      }
+    ],
+
+    "jsx-a11y/no-autofocus": "off",
+    "jsx-a11y/media-has-caption": "off",
+
+    // Warnings: findings today, to be fixed one rule at a time.
+    "no-sequences": "warn",
+    "no-unused-vars": "warn",
+    "typescript/no-unnecessary-type-assertion": "warn",
+    "typescript/no-floating-promises": "warn",
+    "typescript/no-base-to-string": "warn",
+    "typescript/no-misused-promises": ["warn", { "checksVoidReturn": { "attributes": false } }],
+    "typescript/no-misused-spread": "warn",
+    "react-hooks/exhaustive-deps": "warn",
+    "react/refs": "warn",
+    "react/set-state-in-effect": "warn",
+    "react/immutability": "warn",
+    "react/purity": "warn",
+    "react/preserve-manual-memoization": "warn",
+    "react/no-did-update-set-state": "warn",
+    "react/incompatible-library": "warn",
+    "jsx-a11y/prefer-tag-over-role": "warn",
+    "jsx-a11y/click-events-have-key-events": "warn",
+    "jsx-a11y/no-static-element-interactions": "warn",
+    "jsx-a11y/no-noninteractive-element-interactions": "warn",
+    "jsx-a11y/no-noninteractive-tabindex": "warn",
+    "jsx-a11y/no-noninteractive-element-to-interactive-role": "warn",
+    "jsx-a11y/interactive-supports-focus": "warn",
+    "jsx-a11y/control-has-associated-label": "warn",
+    "jsx-a11y/label-has-associated-control": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["src/lib/**", "src/ui/**", "src/i18n/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": [
+                  "@/admin/**",
+                  "@/auth/**",
+                  "@/decisions/**",
+                  "@/detail/**",
+                  "@/docs/**",
+                  "@/insights/**",
+                  "@/pages/**",
+                  "@/palette/**",
+                  "@/settings/**",
+                  "@/shell/**",
+                  "@/tasks/**"
+                ],
+                "message": "lib, ui and i18n sit below every feature folder."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/shell/**", "src/pages/**", "src/palette/**", "src/app.tsx", "src/main.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          { "patterns": [{ "group": ["./*", "../*"], "message": "Import through the @/ alias." }] }
+        ]
+      }
+    },
+    { "files": ["src/**/*.test.{ts,tsx}", "src/test/**"], "rules": { "typescript/no-non-null-assertion": "off" } },
+
+    // Warnings: the files that break the layering today. One rule covers both
+    // relative imports and layers, so these files warn on both; take a file
+    // off its list once it imports only what its layer allows.
+    {
+      "files": [
+        "src/ui/markdown.tsx",
+        "src/ui/mention-textarea.tsx",
+        "src/i18n/en/admin.ts",
+        "src/i18n/en/insights.ts",
+        "src/i18n/en/settings.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": [
+                  "@/admin/**",
+                  "@/auth/**",
+                  "@/decisions/**",
+                  "@/detail/**",
+                  "@/docs/**",
+                  "@/insights/**",
+                  "@/pages/**",
+                  "@/palette/**",
+                  "@/settings/**",
+                  "@/shell/**",
+                  "@/tasks/**"
+                ],
+                "message": "lib, ui and i18n sit below every feature folder."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/detail/task-view.tsx",
+        "src/docs/routes.tsx",
+        "src/docs/tree/sidebar-docs.tsx",
+        "src/insights/plan/cycle-page.tsx",
+        "src/insights/plan/epic-page.tsx",
+        "src/insights/timeline/timeline-page.tsx",
+        "src/settings/routes.tsx",
+        "src/tasks/group-header.tsx",
+        "src/tasks/task-link.ts",
+        "src/tasks/tasks-page.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": ["@/shell/**", "@/pages/**", "@/palette/**"],
+                "message": "Feature folders do not import from shell, pages or palette."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

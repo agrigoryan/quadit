@@ -24,12 +24,14 @@ test:
 # Both databases. Needs Postgres: docker start quadit-pg
 test-all:
 	QUADIT_TEST_POSTGRES='postgres://postgres:quadit@127.0.0.1:54329/quadit' go test -race ./...
-	cd web && pnpm typecheck
+	cd web && pnpm typecheck && pnpm test
 
-# The rules of docs/code-style.md that a tool can check (.golangci.yml).
+# The rules of docs/code-style.md that a tool can check: .golangci.yml for
+# Go, web/.oxlintrc.json and Prettier for the web app.
 GOLANGCI ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 lint:
 	$(GOLANGCI) run ./...
+	cd web && pnpm lint && pnpm format:check
 
 # A local server on :4780 with data in ./data.
 dev: server

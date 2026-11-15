@@ -47,6 +47,9 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm typecheck
+          pnpm lint
+          pnpm format:check
+          pnpm test
           pnpm build
       - name: The whole binary
         run: go build -tags web -o bin/quadit ./cmd/quadit
