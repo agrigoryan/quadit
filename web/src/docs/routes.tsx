@@ -11,6 +11,7 @@ import { inProject, treeIsEmpty, useDocTree } from "@/docs/data";
 import { setNavigator } from "@/docs/nav";
 import { DocPage } from "@/docs/page/doc-page";
 import { ProjectDocsHome } from "@/docs/project-home";
+import { MovePagesHere } from "@/docs/project-move";
 import { DocsTree } from "@/docs/tree/docs-tree";
 import { createAndOpen } from "@/docs/tree/new-page";
 import { NotFoundPage } from "@/ui/not-found";
@@ -76,15 +77,23 @@ function Area() {
             <span className="truncate">{t("docs.title")}</span>
           </h1>
           {can.edit(project?.id) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => createAndOpen({ projectId: project?.id })}
-              className="gap-1"
-            >
-              <FilePlus2 className="size-3.5" />
-              {t("docs.new.page")}
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              {/* On a narrow screen the tree is all there is: the project's home, which offers this beside it, does not show. */}
+              {project && !id && (
+                <span className="lg:hidden">
+                  <MovePagesHere project={project} compact />
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => createAndOpen({ projectId: project?.id })}
+                className="gap-1"
+              >
+                <FilePlus2 className="size-3.5" />
+                {t("docs.new.page")}
+              </Button>
+            </div>
           )}
         </div>
         <DocsTree tree={tree} className="flex-1" />

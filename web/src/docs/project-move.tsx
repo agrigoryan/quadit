@@ -11,8 +11,12 @@ import { PageIcon } from "@/docs/page-icon";
 import { Picker } from "@/ui/picker";
 import { Button } from "@/ui/button";
 
-/** A button that lists the pages in no project; each pick moves one into the project. Nothing when every page has one. */
-export function MovePagesHere({ project }: { project: Project }) {
+/**
+ * A button that lists the pages in no project; each pick moves one into the
+ * project. Nothing when every page has one. `compact` draws it to sit in a
+ * header beside the tree's other buttons.
+ */
+export function MovePagesHere({ project, compact }: { project: Project; compact?: boolean }) {
   // Counted as the project field counts them: through trashed pages too, the trash itself left out (countBelow).
   const docs = useLookupEvenIfGone("docs");
   const pages = useLinkablePages();
@@ -41,7 +45,7 @@ export function MovePagesHere({ project }: { project: Project }) {
       onPick={(id) => void setProject(id, project.id)}
       align="center"
     >
-      <Button>{t("docs.projectEmpty.move")}</Button>
+      <Button {...(compact ? { variant: "ghost", size: "sm" } : {})}>{t("docs.projectEmpty.move")}</Button>
     </Picker>
   );
 }
