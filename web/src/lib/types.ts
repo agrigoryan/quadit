@@ -5,6 +5,12 @@
 export type Category = "backlog" | "unstarted" | "started" | "waiting" | "done" | "canceled";
 export const CATEGORIES: Category[] = ["backlog", "unstarted", "started", "waiting", "done", "canceled"];
 export const isOpenCategory = (c: Category | undefined) => c !== "done" && c !== "canceled";
+/** A task in a status of this category is finished, one way or the other. */
+export const isClosedCategory = (c: Category | undefined) => !isOpenCategory(c);
+/** A task in a status of this category was done; a canceled one was not. */
+export const isDoneCategory = (c: Category | undefined) => c === "done";
+/** A task in a status of this category was dropped: it counts as neither work left nor work done. */
+export const isCanceledCategory = (c: Category | undefined) => c === "canceled";
 
 export type Role = "owner" | "admin" | "member";
 
