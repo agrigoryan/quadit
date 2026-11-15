@@ -525,7 +525,9 @@ func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
 	s.change(s.owner, "", "doc.write", M{"doc": pages[0].ID, "markdown": "# Design\n\nThe boss has four phases.\n"})
 
 	fired := st.faults.arm(bgFault{op: "Update", table: "docs", times: 1,
-		match: func(set map[string]any, _ []store.Cond) bool { return set["source_hash"] != nil && set["source_hash"] != "" }})
+		match: func(set map[string]any, _ []store.Cond) bool {
+			return set["source_hash"] != nil && set["source_hash"] != ""
+		}})
 	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 409, nil)
 	if fired() != 1 {
 		t.Fatalf("the fault fired %d times", fired())
