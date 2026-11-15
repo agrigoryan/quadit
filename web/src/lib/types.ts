@@ -151,6 +151,9 @@ export type Comment = {
   body: string;
   created_at: number;
   edited_at?: number;
+  /** The feed position at which it was written, and at which it last changed. */
+  created_seq: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -171,6 +174,10 @@ export type Decision = {
   question: string;
   details?: string;
   action?: string;
+  /** The arguments of the change an approval is for; the approval covers that change and no other. */
+  action_args?: Record<string, unknown>;
+  /** When the approved change ran. */
+  action_used_at?: number;
   state: "open" | "picked" | "sent_back";
   asked_id?: string;
   unclear_note?: string;
@@ -184,6 +191,8 @@ export type Decision = {
   rank: string;
   created_by: string;
   created_at: number;
+  updated_at: number;
+  updated_seq: number;
   deleted_at?: number;
   options?: DecisionOption[];
 };
