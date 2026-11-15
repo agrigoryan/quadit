@@ -5,8 +5,8 @@ import { safeNext, useAuthConfig } from "@/auth/config";
 import { PasskeyButton, ProviderButtons } from "@/auth/providers";
 import { SecondStep } from "@/auth/second-step";
 import { signIn, useSession } from "@/auth/session";
-import { errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { useFieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Field, Input } from "@/ui/input";
 
@@ -25,8 +25,18 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // The server sends people back here with ?error= when an outside account did not work out.
-  const [error, setError] = useState(params.get("error") ?? "");
-  const [busy, setBusy] = useState(false);
+  const [fromProvider, setFromProvider] = useState(params.get("error") ?? "");
+  // One message for the whole form: a refusal never says which of the address and the password was wrong.
+  const refusal = useFieldErrors([], { wholeForm: true });
+  const errors = {
+    clear: () => {
+      setFromProvider("");
+      refusal.clear();
+    },
+    fail: refusal.fail,
+  };
+  const error = refusal.form || fromProvider;
+  const { busy, run } = useSubmit(errors);
   const next = safeNext(params.get("next"));
   const notice = (location.state as { notice?: string } | null)?.notice;
 
@@ -40,15 +50,7 @@ export function LoginPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      await signIn(email, password);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
+    await run(() => signIn(email, password));
   }
 
   const providers = config?.providers ?? [];
@@ -112,7 +114,7 @@ export function LoginPage() {
         {others && (
           <div className="flex flex-col gap-2">
             {withPassword && <OrLine>{t("auth.or")}</OrLine>}
-            {passkeys && <PasskeyButton onError={setError} />}
+            {passkeys && <PasskeyButton errors={errors} />}
             <ProviderButtons providers={providers} query={`next=${encodeURIComponent(next)}`} />
           </div>
         )}

@@ -1,9 +1,8 @@
 import { type FormEvent, useState } from "react";
 import { AuthLayout, FormError } from "@/auth/auth-layout";
 import { secondStep, signOut } from "@/auth/session";
-import { ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FormField } from "@/ui/form";
+import { FormField, useFieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
@@ -16,24 +15,23 @@ export function SecondStep() {
   const [recovery, setRecovery] = useState(false);
   const [code, setCode] = useState("");
   /** A refusal about the code itself goes under the field; anything else above the button. */
-  const [codeError, setCodeError] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const errors = useFieldErrors(["code"]);
+  // On success the session is whole and the sign-in page moves on by itself; a refused code is cleared for the next try.
+  const { busy, run } = useSubmit(
+    {
+      clear: errors.clear,
+      fail: (err) => {
+        errors.fail(err);
+        setCode("");
+      },
+    },
+    { once: true },
+  );
+  const codeError = errors.fields.code;
 
   async function send(value: string) {
     if (busy || !value.trim()) return;
-    setBusy(true);
-    setError("");
-    setCodeError("");
-    try {
-      // On success the session is whole and the sign-in page moves on by itself.
-      await secondStep(value);
-    } catch (err) {
-      if (err instanceof ApiError && err.field === "code") setCodeError(err.message);
-      else setError(errorMessage(err));
-      setCode("");
-      setBusy(false);
-    }
+    await run(() => secondStep(value));
   }
 
   function submit(e: FormEvent) {
@@ -55,8 +53,7 @@ export function SecondStep() {
   function swap() {
     setRecovery((r) => !r);
     setCode("");
-    setError("");
-    setCodeError("");
+    errors.clear();
   }
 
   return (
@@ -124,7 +121,7 @@ export function SecondStep() {
             />
           </FormField>
         )}
-        <FormError>{error}</FormError>
+        <FormError>{errors.form}</FormError>
         <Button type="submit" variant="primary" size="lg" disabled={busy} className="mt-1 w-full">
           {busy ? t("auth.second.busy") : t("auth.second.submit")}
         </Button>

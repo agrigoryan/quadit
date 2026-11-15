@@ -143,24 +143,17 @@ interface JoinProps {
 
 /** Signed in already: one button, and a way out for someone on the wrong account. */
 function JoinAsMe({ path, name, email, onJoined }: JoinProps & { name: string; email?: string }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const errors = useFieldErrors([], { wholeForm: true });
+  const { busy, run } = useSubmit(errors, { once: true });
 
   async function join() {
-    setBusy(true);
-    setError("");
-    try {
-      await onJoined(await api.post<Accepted>(path));
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
+    await run(async () => onJoined(await api.post<Accepted>(path)));
   }
 
   return (
     <div className="flex flex-col gap-3.5">
       <p className="text-sm text-ink-2">{t("auth.invite.signedInAs", { name, email: email ?? "" })}</p>
-      <FormError>{error}</FormError>
+      <FormError>{errors.form}</FormError>
       <Button variant="primary" size="lg" className="w-full" disabled={busy} onClick={() => void join()}>
         {busy ? t("auth.invite.joining") : t("auth.invite.joinAs", { name })}
       </Button>
