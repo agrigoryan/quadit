@@ -11,6 +11,7 @@ import { restoreDecision } from "@/decisions/actions";
 import { useTrashedDecisions } from "@/decisions/trash";
 import { TrashedFileRow, useTrashedFiles } from "@/pages/trash-files";
 import { restoreTasks } from "@/tasks/actions";
+import { keyCell, keyColumn } from "@/tasks/task-row";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
@@ -95,6 +96,12 @@ export function TrashPage() {
   // A file whose task is in the trash comes back with the task; it is not listed twice.
   const removedFiles = files.rows.filter((f) => !(f.task_id && tasks[f.task_id]?.deleted_at));
   const total = deletedTasks.length + deletedDecisions.length + removedFiles.length;
+  // One key column down the whole page, as wide as its longest key.
+  const keyStyle = keyColumn([
+    ...deletedTasks.map((task) => task.key),
+    ...deletedDecisions.map((d) => d.taskKey),
+    ...removedFiles.map((f) => (f.task_id ? tasks[f.task_id]?.key : undefined)),
+  ]);
 
   if (total === 0) {
     if (state === "loading" || questions.loading || files.loading) return <Loading />;
@@ -104,7 +111,7 @@ export function TrashPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto pb-10">
+    <div className="h-full overflow-y-auto pb-10" style={keyStyle}>
       <header className="sticky top-0 z-[2] flex h-10 items-center border-b border-line bg-surface px-4">
         <p className="text-xs text-ink-2 tnum">{t("trash.count", { n: total })}</p>
       </header>
@@ -112,7 +119,7 @@ export function TrashPage() {
         <Group title={t("trash.tasks")} count={deletedTasks.length}>
           {deletedTasks.map((task) => (
             <li key={task.id} className={rowClass}>
-              <span className="w-[4.25rem] shrink-0 truncate text-xs text-ink-3 tnum">{task.key}</span>
+              <span className={keyCell}>{task.key}</span>
               <span className="min-w-0 flex-1 truncate text-ink-2">{task.title || t("task.untitled")}</span>
               <span className="max-w-40 shrink-0 truncate text-xs text-ink-3 max-md:hidden">{projects[task.project_id]?.name}</span>
               <Deleted at={task.deleted_at ?? 0} />
@@ -130,7 +137,7 @@ export function TrashPage() {
             const task = decision.taskId ? tasks[decision.taskId] : undefined;
             return (
               <li key={decision.id} className={rowClass}>
-                <span className="w-[4.25rem] shrink-0 truncate text-xs text-ink-3 tnum">{decision.taskKey}</span>
+                <span className={keyCell}>{decision.taskKey}</span>
                 <MessageCircleQuestion className="size-3.5 shrink-0 text-ink-3" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-ink-2">{decision.question}</span>
                 {task?.deleted_at ? (

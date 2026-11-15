@@ -7,7 +7,7 @@ import type { NewTaskDraft } from "@/tasks/draft";
 import { NONE, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";
 import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
-import { TaskRow } from "@/tasks/task-row";
+import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { useViewport } from "@/tasks/use-viewport";
 
 interface Props {
@@ -100,6 +100,8 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
     }
     return { sections, rows, indexOf, total: top };
   }, [groups, collapsed]);
+
+  const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 
   const focusAt = focusKey === null ? -1 : (indexOf.get(focusKey) ?? -1);
   const focused = rows[focusAt]?.task;
@@ -206,7 +208,7 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
   const to = view.top + view.height + OVERSCAN;
 
   return (
-    <div ref={scroller} className="h-full overflow-y-auto" onMouseLeave={() => !picker && setFocusKey(null)}>
+    <div ref={scroller} className="h-full overflow-y-auto" style={keyStyle} onMouseLeave={() => !picker && setFocusKey(null)}>
       <div className="relative" style={{ height: total + TAIL }}>
         {sections.map((section) => {
           if (section.top + section.height < from || section.top > to) return null;

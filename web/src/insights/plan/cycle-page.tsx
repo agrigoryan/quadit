@@ -22,7 +22,7 @@ import { PageBar, Panel } from "@/insights/ui/panel";
 import { Progress } from "@/insights/ui/progress";
 import { useTasksBy } from "@/pages/plan-parts";
 import { NotFoundPage } from "@/shell/placeholders";
-import { TaskRow } from "@/tasks/task-row";
+import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
@@ -129,7 +129,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
 
         <BurnPanel cycle={cycle} hasPoints={tally.points > 0} />
 
-        <div className="border-t border-line">
+        <div className="border-t border-line" style={keyColumn(groups.flatMap((g) => g.tasks.map((task) => task.key)))}>
           {groups.length === 0 && (
             <p className="px-4 py-3 text-sm text-ink-2 md:px-6">
               {t("cycles.noTasks")} <span className="text-ink-3">{formatDay(cycle.starts_on)}</span>

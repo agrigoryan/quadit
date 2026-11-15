@@ -122,6 +122,8 @@ export const tasks = {
   "view.shared": "Everyone in the workspace sees it",
   "view.saveTitle": "Save these filters as a view",
   "view.menu": "View options",
+  "view.gone": "This view filters by something that no longer exists",
+  "view.fix": "Fix",
   "view.unreadable": "This view's filter cannot be read",
   "view.unreadableHint": "What it stores is not a filter this page understands. Rename or delete the view from its menu, or save a new one over it from a task list.",
 

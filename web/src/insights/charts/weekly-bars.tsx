@@ -12,7 +12,6 @@ import type { WeekCount } from "@/insights/lib/types";
 const H = 132;
 const TOP = 14;
 const AXIS = 18;
-const LEFT = 22;
 const BAR = 9;
 
 const opened = () => ({ name: t("ins.chart.opened"), color: "var(--viz-started)" });
@@ -31,7 +30,9 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
   const max = Math.max(1, ...weeks.map((w) => Math.max(w.opened, w.closed)));
   const marks = ticks(max);
   const top = marks[marks.length - 1] ?? 1;
-  const plotW = Math.max(0, width - LEFT);
+  // Room for the numbers on the axis: two digits, or as many as a busy week has.
+  const left = Math.max(22, 10 + String(top).length * 6);
+  const plotW = Math.max(0, width - left);
   const band = weeks.length ? plotW / weeks.length : 0;
   const plotH = H - TOP - AXIS;
   const y = (v: number) => TOP + plotH - (v / top) * plotH;
@@ -55,14 +56,14 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
           <svg width={width} height={H} role="group" aria-label={t("ins.chart.weeklyLabel", { n: weeks.length })} className="block">
             {marks.map((v) => (
               <g key={v}>
-                <line x1={LEFT} x2={width} y1={y(v)} y2={y(v)} stroke={v === 0 ? "var(--viz-axis)" : "var(--viz-grid)"} strokeWidth={1} />
-                <text x={LEFT - 6} y={y(v) + 3.5} textAnchor="end" className="fill-ink-3 text-[10px] tnum">
+                <line x1={left} x2={width} y1={y(v)} y2={y(v)} stroke={v === 0 ? "var(--viz-axis)" : "var(--viz-grid)"} strokeWidth={1} />
+                <text x={left - 6} y={y(v) + 3.5} textAnchor="end" className="fill-ink-3 text-[10px] tnum">
                   {v}
                 </text>
               </g>
             ))}
             {weeks.map((w, i) => {
-              const cx = LEFT + band * i + band / 2;
+              const cx = left + band * i + band / 2;
               const label = t("ins.chart.weekTip", { day: formatDay(w.week), opened: w.opened, closed: w.closed });
               return (
                 <g
@@ -76,7 +77,7 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
                   className="outline-none [&:focus-visible>rect]:stroke-accent"
                 >
                   <rect
-                    x={LEFT + band * i}
+                    x={left + band * i}
                     y={0}
                     width={band}
                     height={H - AXIS}
@@ -108,7 +109,7 @@ export function WeeklyBars({ weeks }: { weeks: WeekCount[] }) {
         )}
         {hovered && at !== null && (
           <ChartTip
-            x={LEFT + band * at + band / 2}
+            x={left + band * at + band / 2}
             width={width}
             title={t("ins.chart.weekOf", { from: formatDay(hovered.week), to: formatDay(addDays(hovered.week, 6)) })}
             rows={[

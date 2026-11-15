@@ -59,6 +59,7 @@ export const detail = {
 
   "detail.commits.ahead": "{n} commit ahead of {base} | {n} commits ahead of {base}",
   "detail.commits.count": "{n} commit | {n} commits",
+  "detail.commits.merged": "{n} commit, merged | {n} commits, merged",
   "detail.commits.on": "Commits on {name}",
   "detail.commits.all": "Show all {n}",
   "detail.commits.fewer": "Show fewer",

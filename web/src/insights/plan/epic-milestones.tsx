@@ -15,7 +15,7 @@ import { tallyOf } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";
 import { createTask, setMilestone } from "@/tasks/actions";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
-import { TaskRow } from "@/tasks/task-row";
+import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
@@ -82,7 +82,7 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
   }
 
   return (
-    <section aria-label={name}>
+    <section aria-label={name} style={keyColumn(tasks.map((task) => task.key))}>
       <div className="sticky top-0 z-[2] flex min-h-9 flex-wrap items-center gap-x-2 border-b border-line bg-sunken py-1 pr-2 pl-3">
         <div className={cx("flex min-w-0 flex-1 items-center gap-2", milestone && "max-sm:min-h-7 max-sm:basis-full")}>
           <Diamond className="size-3.5 shrink-0 text-ink-3" aria-hidden />

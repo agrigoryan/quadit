@@ -187,7 +187,7 @@ export function TaskLineRow({ line, scale, today }: TaskProps) {
     <div className={cx(row, "group/row")} style={{ width: `calc(var(--tl-left) + ${widthOf(scale)}px)` }}>
       <div className={cx(nameCell, "pl-9 max-sm:pl-3")}>
         <StatusIcon category={category} title={t(`category.${category}` as "category.done")} />
-        <span className="w-14 shrink-0 truncate text-xs text-ink-3 tnum max-lg:hidden">{task.key}</span>
+        <span className="min-w-14 shrink-0 whitespace-nowrap text-xs text-ink-3 tnum max-lg:hidden">{task.key}</span>
         <Link
           {...link}
           title={`${task.key} ${task.title}`}

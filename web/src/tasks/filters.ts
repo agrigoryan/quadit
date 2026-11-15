@@ -254,7 +254,9 @@ export function normalizeQuery(raw: unknown): TaskQuery | null {
  * Reads a saved view's query (one that normalizeQuery has been over). A view
  * may have been made by an agent with names instead of ids ("@coder", "me",
  * "In Progress", "art", "current"), so every reference is looked up both
- * ways; one that matches nothing is dropped.
+ * ways; one that matches nothing is dropped. So is one that names something
+ * gone (a deleted label, status or epic, a person removed): the server
+ * refuses those, and no task can match them.
  */
 export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string, today: string): Filters {
   if (!q) return emptyFilters;
@@ -269,11 +271,11 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
     if (ref === OUTSIDE) return OUTSIDE;
     if (ref === "me") return meId;
     const handle = low(ref.replace(/^@/, ""));
-    return Object.values(c.members).find((m) => m.user_id === ref || low(m.handle) === handle)?.user_id;
+    return Object.values(c.members).find((m) => !m.removed_at && (m.user_id === ref || low(m.handle) === handle))?.user_id;
   };
-  const byName = <T extends { id: string; name: string; project_id?: string }>(table: Dict<T>, ref: string): string[] =>
+  const byName = <T extends { id: string; name: string; project_id?: string; deleted_at?: number }>(table: Dict<T>, ref: string): string[] =>
     Object.values(table)
-      .filter((row) => (row.id === ref || low(row.name) === low(ref)) && inScope(row.project_id))
+      .filter((row) => !row.deleted_at && (row.id === ref || low(row.name) === low(ref)) && inScope(row.project_id))
       .map((row) => row.id);
   const cycle = (ref: string): string[] => {
     if (ref === NONE) return [NONE];
@@ -305,4 +307,41 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
     openDecision: !!q.has_open_decision,
     text: q.q ?? "",
   };
+}
+
+/**
+ * What a stored query (one that normalizeQuery has been over) has to lose to
+ * be good again: the values fromQuery finds nothing for, because the label,
+ * status, epic or cycle was deleted or the person is no longer here. The
+ * server refuses a list for a view that names one. Returns the fields to
+ * write over the query, each with the values that are left (undefined when
+ * none is), or null when nothing is gone.
+ */
+export function goneFromQuery(q: TaskQuery, c: QuerySource, meId: string, today: string): Partial<TaskQuery> | null {
+  const read = (one: TaskQuery) => fromQuery({ project: q.project, ...one }, c, meId, today);
+  const found = {
+    assignee: (ref: string) => read({ assignee: [ref] }).assignee.length > 0,
+    status: (ref: string) => {
+      const f = read({ status: [ref] });
+      return f.status.length > 0 || f.category.length > 0;
+    },
+    label: (ref: string) => read({ label: [ref] }).label.length > 0,
+    epic: (ref: string) => read({ epic: [ref] }).epic.length > 0,
+    // "current" and "next" name no cycle on some days; nothing is gone then.
+    cycle: (ref: string) => ref === "current" || ref === "next" || read({ cycle: [ref] }).cycle.length > 0,
+  };
+  const patch: Partial<TaskQuery> = {};
+  let gone = false;
+  for (const field of Object.keys(found) as (keyof typeof found)[]) {
+    const values = q[field] ?? [];
+    const left = values.filter(found[field]);
+    if (left.length === values.length) continue;
+    patch[field] = left.length > 0 ? left : undefined;
+    gone = true;
+  }
+  if (q.waiting_on && !read({ waiting_on: q.waiting_on }).waitingOn) {
+    patch.waiting_on = undefined;
+    gone = true;
+  }
+  return gone ? patch : null;
 }

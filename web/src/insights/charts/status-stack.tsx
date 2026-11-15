@@ -52,8 +52,8 @@ function Bar({ row }: { row: ProjectRow }) {
     <div ref={box} role="group" aria-label={t("ins.chart.statusLabel", { project: row.project, summary })} className="flex h-7 gap-0.5">
       {row.parts.map((part) => {
         const share = part.count / row.total;
-        // The count is printed only where it fits with room to spare.
-        const fits = share * width >= 26;
+        // The count is printed only where it fits with room to spare, however many digits it has.
+        const fits = share * width >= Math.max(26, 10 + String(part.count).length * 8);
         const tip = t("ins.chart.statusTip", { status: part.status, n: part.count, share: Math.round(share * 100) });
         return (
           <Tooltip key={part.status} label={tip} side="top">

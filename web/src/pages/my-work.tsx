@@ -9,7 +9,7 @@ import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } f
 import { usePageTitle } from "@/lib/ui-state";
 import { useListKeys } from "@/pages/list-keys";
 import { useOpenTask } from "@/pages/open-task";
-import { TaskRow, useTaskLink } from "@/tasks/task-row";
+import { keyCell, keyColumn, TaskRow, useTaskLink } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
 import { Ago } from "@/ui/ago";
@@ -74,9 +74,10 @@ export function MyWorkPage() {
   );
   const focusId = useListKeys({ rows, idOf: (row) => row.id, onOpen: (row) => openTask(row.task.key) });
   const yours = waiting.length + questions.length;
+  const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 
   return (
-    <div className="h-full overflow-y-auto pb-10">
+    <div className="h-full overflow-y-auto pb-10" style={keyStyle}>
       <FirstProjectNudge />
       <section aria-labelledby="mywork-waiting">
         <header className="flex min-h-12 flex-wrap items-center gap-x-2.5 border-b border-line px-4 pt-3 pb-2">
@@ -134,7 +135,7 @@ function QuestionRow({ decision, task, focused }: { decision: Decision; task: Ta
     >
       {focused && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />}
       <span className="size-6 shrink-0 max-sm:hidden" aria-hidden />
-      <span className="w-[4.25rem] shrink-0 truncate text-xs text-ink-3 tnum max-sm:hidden">{task.key}</span>
+      <span className={cx(keyCell, "max-sm:hidden")}>{task.key}</span>
       <span className="flex size-6 shrink-0 items-center justify-center">
         <DecisionMark mine title={t("task.decisionYours")} />
       </span>

@@ -95,6 +95,12 @@ export interface StoreState {
    * is the collection). A task in here is a draft: it has no number yet.
    */
   drafts: Dict<CollectionName>;
+  /**
+   * Keys of projects the person could see until their access was narrowed
+   * while the app was open. A page or task of one of them says so instead
+   * of "there is nothing at this address".
+   */
+  lostProjects: string[];
 }
 
 export const useStore = create<StoreState>(() => ({
@@ -111,6 +117,7 @@ export const useStore = create<StoreState>(() => ({
   offline: false,
   restLoaded: false,
   drafts: {},
+  lostProjects: [],
 }));
 
 export const getState = useStore.getState;
@@ -282,6 +289,14 @@ export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptio
       if (row && !table[id]) table[id] = row;
     }
   }
+  // The copy read again because the person's access changed: the projects that were here and are not now are lost to them.
+  const keys = new Set(Object.values(c.projects).map((p) => p.key));
+  const lostProjects = prev.slug === slug ? prev.lostProjects.filter((key) => !keys.has(key)) : [];
+  if (opts.fresh && prev.slug === slug) {
+    for (const p of Object.values(prev.c.projects)) {
+      if (!p.deleted_at && !keys.has(p.key) && !lostProjects.includes(p.key)) lostProjects.push(p.key);
+    }
+  }
   held = [];
   useStore.setState({
     slug,
@@ -294,6 +309,7 @@ export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptio
     opened: keep?.opened ?? {},
     restLoaded: !(data.part === "open" && (data.rest ?? 0) > 0),
     drafts: keep?.drafts ?? {},
+    lostProjects,
   });
   if (!keep) for (const listener of replacedListeners) listener();
 }
@@ -410,6 +426,7 @@ export function clearStore() {
     stream: "connecting",
     restLoaded: false,
     drafts: {},
+    lostProjects: [],
   });
   for (const listener of replacedListeners) listener();
 }

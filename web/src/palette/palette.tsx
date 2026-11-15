@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
@@ -30,6 +30,7 @@ function Palette() {
   const projects = useProjects();
   const [page, setPage] = useState<"root" | PalettePage>("root");
   const [query, setQuery] = useState("");
+  const box = useRef<HTMLInputElement>(null);
 
   const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
   const task = useTaskByKey(taskKey);
@@ -55,6 +56,8 @@ function Palette() {
   const toPage = (next: "root" | PalettePage) => {
     setPage(next);
     setQuery("");
+    // A row chosen with the mouse leaves the focus on the list; what is typed next belongs in the box.
+    box.current?.focus();
   };
 
   return (
@@ -94,6 +97,7 @@ function Palette() {
                 </span>
               )}
               <Command.Input
+                ref={box}
                 autoFocus
                 value={query}
                 onValueChange={setQuery}

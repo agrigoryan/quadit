@@ -29,6 +29,8 @@ export const common = {
   "common.comingHint": "This part of Quadit is not built yet. Tasks and decisions are ready to use.",
   "common.notFound": "There is nothing at this address",
   "common.notFoundHint": "The link may be old, or the item was moved to the trash.",
+  "common.lostProject": "You no longer have access to this project",
+  "common.lostProjectHint": "Your access to this workspace was changed while you had it open.",
   "common.loadFailed": "Could not load the workspace",
 
   "time.now": "just now",

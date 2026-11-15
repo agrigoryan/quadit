@@ -46,7 +46,13 @@ export function BranchCommits({ link }: { link: TaskLink }) {
   const count = data.ahead ?? commits.length;
   const folded = commits.length > SHOWN && !all;
   const shown = folded ? commits.slice(0, SHOWN) : commits;
-  const summary = data.base ? t("detail.commits.ahead", { n: count, base: data.base }) : t("detail.commits.count", { n: count });
+  // Once merged nothing is ahead any more; the commits listed are the ones that went in.
+  const summary =
+    link.state === "merged"
+      ? t("detail.commits.merged", { n: count })
+      : data.base
+        ? t("detail.commits.ahead", { n: count, base: data.base })
+        : t("detail.commits.count", { n: count });
 
   return (
     <div className="basis-full pb-1 pl-6">

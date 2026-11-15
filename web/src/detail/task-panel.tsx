@@ -25,6 +25,7 @@ import { Timeline } from "@/detail/timeline";
 import { Description, EditableTitle } from "@/detail/title-description";
 import { attachToTask, carriesFiles, type PendingUpload, useUploads } from "@/detail/uploads";
 import { plainLinks, TaskWork } from "@/insights/task-work";
+import { LostProject, useLostProject } from "@/shell/placeholders";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
@@ -74,6 +75,7 @@ export function TaskPanel({ taskKey, onClose }: Props) {
   useCoverPage(panel);
   const task = useTaskByKey(taskKey);
   const looking = useFindTask(taskKey, !!task);
+  const lost = useLostProject(taskKey.split("-")[0]);
   const status = useTaskDetail(task?.id);
   useRevealFromHash(!!task);
   const [dragging, setDragging] = useState(false);
@@ -112,6 +114,8 @@ export function TaskPanel({ taskKey, onClose }: Props) {
       {!task ? (
         looking ? (
           <Loading />
+        ) : lost ? (
+          <LostProject />
         ) : (
           <EmptyState title={t("common.notFound")} hint={t("common.notFoundHint")} />
         )

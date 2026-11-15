@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { type CSSProperties, memo } from "react";
 import { Check } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { cx } from "@/lib/cx";
@@ -21,6 +21,27 @@ export function useTaskLink(task: Pick<Task, "key">) {
   const background = under ?? (/\/task\/[^/]+\/?$/.test(location.pathname) ? undefined : location);
   return { to: `/${slug}/task/${task.key}`, state: background ? { background } : undefined };
 }
+
+/**
+ * The key column is 4.25rem wide, which holds "SVA-9999". Where a list has
+ * a longer key ("SVA-10012") the column is made to fit the longest: put
+ * this style on the element that holds the rows. It is undefined when every
+ * key fits as it is.
+ */
+export function keyColumn(keys: Iterable<string | undefined>): CSSProperties | undefined {
+  let widest = 0;
+  for (const key of keys) {
+    if (!key || key.length <= 8) continue;
+    // In ch, erring a little wide: the digits are tabular, M and W are the wide letters.
+    let width = 0.2;
+    for (const char of key) width += char >= "0" && char <= "9" ? 1.03 : /[mw]/i.test(char) ? 1.65 : /[a-z]/i.test(char) ? 1.2 : 1;
+    widest = Math.max(widest, width);
+  }
+  return widest > 0 ? ({ "--key-col": `max(4.25rem, ${widest.toFixed(2)}ch)` } as CSSProperties) : undefined;
+}
+
+/** The key column of a row; see keyColumn. */
+export const keyCell = "w-[var(--key-col,4.25rem)] shrink-0 truncate text-xs text-ink-3 tnum";
 
 interface Props {
   task: Task;
@@ -93,7 +114,7 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
         </button>
       </TaskPropertyPicker>
 
-      <span className="w-[4.25rem] shrink-0 truncate text-xs text-ink-3 tnum max-sm:hidden">{task.key}</span>
+      <span className={cx(keyCell, "max-sm:hidden")}>{task.key}</span>
 
       {status && (
         <TaskPropertyPicker kind="status" tasks={[task]}>

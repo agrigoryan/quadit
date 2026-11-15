@@ -4,14 +4,16 @@ import { useLocation, useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useLiveTasks, useMe, useOpenDecisions, useSlug } from "@/lib/selectors";
+import { send } from "@/lib/mutate";
 import { useRestLoaded } from "@/lib/store";
 import { today } from "@/lib/time";
+import { toast } from "@/lib/toast";
 import { isOpenCategory, type Project, type View } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { BulkBar } from "@/tasks/bulk-bar";
 import { FilterBar } from "@/tasks/filter-bar";
 import { type NewTaskDraft, openNewTask } from "@/tasks/draft";
-import { comparer, countFilters, emptyFilters, type Filters, fromQuery, groupTasks, matcher, normalizeQuery, sameFilters, sortFromQuery } from "@/tasks/filters";
+import { comparer, countFilters, emptyFilters, type Filters, fromQuery, goneFromQuery, groupTasks, matcher, normalizeQuery, sameFilters, sortFromQuery } from "@/tasks/filters";
 import { TaskList } from "@/tasks/task-list";
 import { filtersFromSearch, hasFilters, searchFromFilters } from "@/tasks/url-filters";
 import { DisplayControls, ViewControls } from "@/tasks/view-controls";
@@ -54,6 +56,12 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
 
   // A view written by hand or by an agent may hold a query the page cannot read; it then says so instead of failing.
   const query = useMemo(() => normalizeQuery(view?.query), [view?.query]);
+  const tables = useMemo(() => ({ projects, members, statuses, labels, epics, cycles }), [projects, members, statuses, labels, epics, cycles]);
+
+  // What the view stores that names something gone (a deleted label, a person removed). The page leaves
+  // those values out and shows the rest; the note under the toolbar offers to save the view without them.
+  const gone = useMemo(() => (view && query ? goneFromQuery(query, tables, me.user_id, today()) : null), [view?.id, query, tables, me.user_id]);
+  const goneKey = gone ? JSON.stringify(Object.entries(gone)) : "";
 
   const saved: ViewState | null = useMemo(() => {
     if (!view) return defaultViewState;
@@ -70,12 +78,11 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
     } catch {
       return null;
     }
-    // Recomputed when the view's stored fields change, not on every change to the workspace.
-  }, [view?.id, query, view?.display, view?.layout, me.user_id]);
+    // Recomputed when the view's stored fields change (or something they name goes), not on every change to the workspace.
+  }, [view?.id, query, view?.display, view?.layout, me.user_id, goneKey]);
 
   // The address can carry filters (a link from the dashboard, a reload): they win over what the page had.
   const location = useLocation();
-  const tables = useMemo(() => ({ projects, members, statuses, labels, epics, cycles }), [projects, members, statuses, labels, epics, cycles]);
   const readAddress = () => filtersFromSearch(location.search, tables, me.user_id, today(), project?.key);
 
   const scope = view ? `view:${view.id}` : `project:${project?.id ?? ""}`;
@@ -150,6 +157,14 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
 
   if (view && !saved) return <UnreadableView view={view} scope={scope} project={project} />;
 
+  /** Saves the view without the values that name something gone. */
+  function fixView() {
+    if (!view || !gone) return;
+    const fixed = { ...view.query, ...gone };
+    send({ type: "view.update", args: { id: view.id, query: fixed } }, (tx) => tx.patch("views", view.id, { query: fixed }));
+    toast.info(t("view.updated"));
+  }
+
   function setLayout(next: "list" | "board") {
     if (routeLayout && project) navigate(`/${slug}/p/${project.key}/${next === "board" ? "board" : "tasks"}${location.search}`);
     else setState({ layout: next });
@@ -195,6 +210,15 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
           <ViewControls state={state} scope={scope} project={project} view={view} changed={changed} />
         </div>
       </div>
+
+      {gone && (
+        <p role="status" className="flex min-h-8 shrink-0 items-center gap-2 border-b border-line bg-sunken px-3 text-xs text-ink-2 md:px-4">
+          {t("view.gone")}
+          <Button size="sm" onClick={fixView}>
+            {t("view.fix")}
+          </Button>
+        </p>
+      )}
 
       <div className="relative min-h-0 flex-1">
         {tasks.length === 0 && !board && restLoaded ? (

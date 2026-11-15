@@ -3,7 +3,7 @@
 // it, or move it with the arrow keys.
 
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, useState } from "react";
-import { ChevronsLeftRight } from "lucide-react";
+import { ChevronsLeftRight, Maximize2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { OptionFile } from "@/decisions/data";
@@ -106,7 +106,10 @@ interface PairProps {
   file: OptionFile;
   src: (file: OptionFile) => string;
   pixelated?: boolean;
-  /** Makes the pictures a button (the divider stays its own control). */
+  /**
+   * Opens the compare view. Side by side, the pictures are the button; with
+   * the divider it is a button of its own in a corner, clear of the grip.
+   */
   onOpen?: () => void;
   openLabel?: string;
 }
@@ -134,15 +137,21 @@ export function SwipePair({ file, src, pixelated, onOpen, openLabel }: PairProps
   );
   return (
     <div className="relative size-full overflow-hidden select-none">
-      {onOpen ? (
-        <button type="button" aria-label={openLabel} onClick={onOpen} className="absolute inset-0 cursor-zoom-in focus-visible:-outline-offset-2">
-          {pictures}
-        </button>
-      ) : (
-        pictures
-      )}
+      {pictures}
       <PairLabels />
       <SwipeHandle pos={pos} onChange={setPos} />
+      {/* Not the whole picture: the grip sits in its middle. Over the divider when that is dragged under it. */}
+      {onOpen && (
+        <button
+          type="button"
+          aria-label={openLabel}
+          title={openLabel}
+          onClick={onOpen}
+          className="absolute top-1.5 right-1.5 z-[2] flex size-7 items-center justify-center rounded-md bg-black/55 text-white hover:bg-black/70 max-sm:size-9"
+        >
+          <Maximize2 className="size-3.5" aria-hidden />
+        </button>
+      )}
     </div>
   );
 }

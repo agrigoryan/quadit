@@ -6,7 +6,7 @@
 // While there is no connection an upload simply waits; the change that
 // attaches the file is made by the caller after uploadFile resolves, so it
 // can never be sent ahead of its file. A waiting file is held in memory
-// only: reloading the page drops it.
+// only: reloading the page drops it, so the browser asks before leaving.
 
 import { create } from "zustand";
 import { api, ApiError, NetworkError, ws } from "@/lib/api";
@@ -44,6 +44,20 @@ export interface Transfer extends UploadProgress {
 
 /** Every upload under way on this page, oldest first. */
 export const useTransfers = create<{ items: Transfer[] }>(() => ({ items: [] }));
+
+// An upload is held in memory only, so leaving the page drops it: while one
+// is queued, waiting or being sent, the browser asks before it lets go.
+function warnBeforeLeaving(e: BeforeUnloadEvent) {
+  e.preventDefault();
+  // Older browsers ask only when this is set.
+  e.returnValue = "";
+}
+if (typeof window !== "undefined") {
+  useTransfers.subscribe((s) => {
+    if (s.items.length > 0) window.addEventListener("beforeunload", warnBeforeLeaving);
+    else window.removeEventListener("beforeunload", warnBeforeLeaving);
+  });
+}
 
 /** A file as the server describes it while its parts arrive. */
 interface ServerFile extends FileRow {

@@ -4,9 +4,9 @@
 // whenever a file is removed or restored while the page is open.
 
 import { useEffect, useState } from "react";
-import { Undo2 } from "lucide-react";
+import { FileImage, FileText, FileVideo, Undo2 } from "lucide-react";
 import { api, errorMessage, ws } from "@/lib/api";
-import { fileSize } from "@/lib/files";
+import { fileSize, isImage, isVideo } from "@/lib/files";
 import { t, tMaybe } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import { useCollection, useSlug } from "@/lib/selectors";
@@ -14,8 +14,8 @@ import { onEvents } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Attachment, FileRow } from "@/lib/types";
 import { localPath } from "@/lib/url";
+import { keyCell } from "@/tasks/task-row";
 import { Button } from "@/ui/button";
-import { MediaThumb } from "@/ui/media";
 
 export type TrashedFile = Attachment & { file: FileRow };
 
@@ -71,10 +71,14 @@ export function useTrashedFiles(): TrashedFiles {
 export function TrashedFileRow({ row, onRestore, rowClass, when }: { row: TrashedFile; onRestore: () => void; rowClass: string; when: React.ReactNode }) {
   const tasks = useCollection("tasks");
   const task = row.task_id ? tasks[row.task_id] : undefined;
+  // The server does not serve a file that is in the trash, so there is no picture to show: its kind, as an icon.
+  const Icon = isImage(row.file) ? FileImage : isVideo(row.file) ? FileVideo : FileText;
   return (
     <li className={rowClass}>
-      <span className="w-[4.25rem] shrink-0 truncate text-xs text-ink-3 tnum">{task?.key}</span>
-      <MediaThumb file={row.file} className="size-6 shrink-0 rounded-xs [&>svg]:size-3.5 [&>span]:hidden" />
+      <span className={keyCell}>{task?.key}</span>
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-xs bg-sunken text-ink-2">
+        <Icon className="size-3.5" aria-hidden />
+      </span>
       <span className="min-w-0 flex-1 truncate text-ink-2">{row.file.name}</span>
       <span className="shrink-0 text-xs text-ink-3 tnum max-md:hidden">{fileSize(row.file.size)}</span>
       <span className="max-w-40 shrink-0 truncate text-xs text-ink-3 max-md:hidden">{tMaybe(`trash.fileOn.${row.subject_type}`, t("trash.fileOn.task"))}</span>
