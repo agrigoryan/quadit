@@ -9,7 +9,7 @@ import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import type { Backup } from "@/admin/backups";
 import { useAdminWorkspaces } from "@/admin/workspaces";
-import { Segmented } from "@/settings/me/segmented";
+import { Segmented } from "@/ui/segmented";
 import { FormField, NativeSelect, Note, refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { readError } from "@/data/query";

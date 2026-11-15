@@ -7,7 +7,7 @@ import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import { useSettingsBase } from "@/settings/base";
 import { type Account, useAccount, useSaveAccount } from "@/settings/me/account";
-import { Segmented } from "@/settings/me/segmented";
+import { Segmented } from "@/ui/segmented";
 import { AvatarInput } from "@/settings/ui/avatar-input";
 import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, FormField, FormFoot, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
