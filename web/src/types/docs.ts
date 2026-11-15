@@ -116,7 +116,7 @@ export interface PropConfig {
 }
 
 /** A column of a database (core.DBProperty). */
-export interface DBProperty {
+export type DBProperty = {
   id: string;
   database_id: string;
   name: string;
@@ -126,7 +126,7 @@ export interface DBProperty {
   /** Absent on one made here until the server's row arrives. */
   updated_seq?: number;
   deleted_at?: number;
-}
+};
 
 export const VIEW_TYPES = ["table", "board", "calendar", "gallery", "timeline", "form"] as const;
 export type ViewType = (typeof VIEW_TYPES)[number];
@@ -167,7 +167,7 @@ export interface ViewConfig {
 }
 
 /** A saved way to show a database (core.DBView). */
-export interface DBView {
+export type DBView = {
   id: string;
   database_id: string;
   name: string;
@@ -177,7 +177,7 @@ export interface DBView {
   /** Absent on one made here until the server's row arrives. */
   updated_seq?: number;
   deleted_at?: number;
-}
+};
 
 /** A mention or link between two things (core.Ref). */
 export interface DocRef {

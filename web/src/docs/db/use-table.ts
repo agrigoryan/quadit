@@ -7,7 +7,7 @@ import { useLookup, useLookupEvenIfGone, useMe, useSlug } from "@/data/selectors
 import type { Dict } from "@/data/store";
 import { byRank, canSee } from "@/docs/data";
 import { type Cells, computeCells, type TableData, type World } from "@/docs/db/compute";
-import { pageQuery, useDocsStore } from "@/docs/store";
+import { pageQuery } from "@/docs/store";
 import type { DBProperty, DBView, Doc } from "@/types/docs";
 
 /**
@@ -37,7 +37,7 @@ function tableOf(docs: Dict<Doc>, props: Dict<DBProperty>, databaseId: string, u
   return {
     doc,
     props: Object.values(props)
-      .filter((p) => p.database_id === databaseId && !p.deleted_at)
+      .filter((p) => p.database_id === databaseId)
       .sort(byRank),
     rows: Object.values(docs)
       .filter((d) => d.parent_id === databaseId && d.kind === "row")
@@ -54,7 +54,7 @@ export interface Database {
 /** The database with every cell computed, or null while it is not in the workspace copy. */
 export function useDatabase(databaseId: string | undefined): Database | null {
   const docs = useLookup("docs");
-  const props = useDocsStore((s) => s.props);
+  const props = useLookup("properties");
   // A removed member's handle stays on the rows they made.
   const members = useLookupEvenIfGone("members");
   const me = useMe();

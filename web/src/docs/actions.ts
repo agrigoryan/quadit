@@ -12,7 +12,7 @@ import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import { sameProjectBelow } from "@/docs/data";
 import { loadPage } from "@/docs/store";
-import type { Doc, DocComment, DocKind } from "@/types/docs";
+import { type Doc, type DocComment, type DocKind, OPTION_COLORS } from "@/types/docs";
 
 type Fields = Record<string, unknown>;
 
@@ -200,7 +200,11 @@ export function trashDoc(id: string) {
   });
 }
 
-/** Sets values of a database row; null clears one. */
+/**
+ * Sets values of a database row; null clears one. A select's value may name
+ * an option the property does not have yet: the server adds it to the
+ * property, so it shows there at once too, in the next colour.
+ */
 export function setRowProps(rowId: string, values: Fields) {
   const row = getRow("docs", rowId);
   if (!row) return;
@@ -209,9 +213,20 @@ export function setRowProps(rowId: string, values: Fields) {
     if (value === null || value === undefined) delete next[key];
     else next[key] = value;
   }
-  send({ type: "doc.update", args: { id: rowId, props: values } }, (tx) =>
-    tx.patch("docs", rowId, { props: next, updated_at: Date.now() }),
-  );
+  send({ type: "doc.update", args: { id: rowId, props: values } }, (tx) => {
+    tx.patch("docs", rowId, { props: next, updated_at: Date.now() });
+    for (const [key, value] of Object.entries(values)) {
+      const prop = getRow("properties", key);
+      if (prop?.type !== "select" && prop?.type !== "multi_select") continue;
+      const options = [...(prop.config?.options ?? [])];
+      for (const name of Array.isArray(value) ? value : [value]) {
+        if (typeof name === "string" && name && !options.some((o) => o.name === name))
+          options.push({ name, color: OPTION_COLORS[options.length % OPTION_COLORS.length] });
+      }
+      if (options.length > (prop.config?.options?.length ?? 0))
+        tx.patch("properties", prop.id, { config: { ...prop.config, options } });
+    }
+  });
 }
 
 export const keepVersion = (docId: string, label: string) =>

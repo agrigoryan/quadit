@@ -8,7 +8,6 @@ import { isDay } from "@/lib/days";
 import { t } from "@/lib/i18n";
 import { useMembers } from "@/data/selectors";
 import { docTitle, useRows } from "@/docs/data";
-import { addOption } from "@/docs/db/actions";
 import { asList, CellValue, CheckMark } from "@/docs/db/cell-value";
 import type { Value } from "@/docs/db/formula";
 import { formulaText } from "@/docs/db/formula-values";
@@ -133,10 +132,7 @@ function ListEditor({
         value={asList(stored)}
         multiple={multiple}
         onClose={onClose}
-        onChange={(names) => {
-          for (const name of names) addOption(prop, name);
-          onChange(multiple ? (names.length ? names : null) : (names[0] ?? null));
-        }}
+        onChange={(names) => onChange(multiple ? (names.length ? names : null) : (names[0] ?? null))}
       />
     );
   }

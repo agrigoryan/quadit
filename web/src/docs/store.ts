@@ -1,18 +1,18 @@
 // What the docs part keeps beside the workspace copy (data/store.ts). Pages
-// themselves live there, in `docs`; here are the things only an opened page
-// brings: a database's properties and views, what links to a page, and who
-// else is in it. Properties and views follow the live feed like any row.
-// Also the keys the docs part's reads are cached under, and the read of one
-// page, which files what it brings in both stores.
+// themselves live there, in `docs`, and so do a database's properties and
+// views (`properties`, `dbviews`), which follow the feed like any row; here
+// are the things only an opened page brings that are no rows: what links to
+// a page, and who else is in it. Also the keys the docs part's reads are
+// cached under, and the read of one page, which files what it brings in
+// both stores.
 
 import { queryOptions } from "@tanstack/react-query";
 import { create } from "zustand";
 import { api, workspacePath } from "@/data/api";
 import { inWorkspace, isNotFound, queryClient } from "@/data/query";
 import { getRowEvenIfGone } from "@/data/selectors";
-import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/data/store";
-import type { FeedEvent } from "@/types/core";
-import type { BlockRow, DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/types/docs";
+import { type Dict, getState, mergeRows, removeRow, useStore } from "@/data/store";
+import type { BlockRow, DocRef, DocSource, PageData, PresenceEntry } from "@/types/docs";
 
 interface PageMeta {
   mentioned_in: DocRef[];
@@ -21,61 +21,18 @@ interface PageMeta {
 }
 
 interface DocsState {
-  props: Dict<DBProperty>;
-  views: Dict<DBView>;
   meta: Dict<PageMeta>;
   /** Who else has each page open, by page id. */
   presence: Dict<PresenceEntry[]>;
 }
 
-const empty = (): DocsState => ({ props: {}, views: {}, meta: {}, presence: {} });
+const empty = (): DocsState => ({ meta: {}, presence: {} });
 
 export const useDocsStore = create<DocsState>(empty);
-
-type Table = "props" | "views";
-
-/** Adds or replaces a property or view. */
-export function putRow<K extends Table>(table: K, row: DocsState[K][string]) {
-  useDocsStore.setState((s) => ({ [table]: { ...s[table], [row.id]: row } }));
-}
-
-/** Sets fields on a property or view; returns the row as it was, to put back if the server refuses. */
-export function patchRow<K extends Table>(table: K, id: string, fields: Partial<DocsState[K][string]>) {
-  const before = useDocsStore.getState()[table][id];
-  if (before) putRow(table, { ...before, ...fields } as DocsState[K][string]);
-  return before;
-}
-
-export function dropRow(table: Table, id: string) {
-  useDocsStore.setState((s) => {
-    const next = { ...s[table] };
-    delete next[id];
-    return { [table]: next };
-  });
-}
 
 export function setPresence(docId: string, others: PresenceEntry[]) {
   useDocsStore.setState((s) => ({ presence: { ...s.presence, [docId]: others } }));
 }
-
-const TABLE_OF: Record<string, Table> = { property: "props", dbview: "views" };
-
-function applyDocEvents(events: FeedEvent[]) {
-  for (const ev of events) {
-    const table = TABLE_OF[ev.entity_type];
-    if (!table) continue;
-    const data = ev.data ?? {};
-    if (data.row) {
-      putRow(table, data.row as DBProperty & DBView); // a feed row is JSON, unchecked
-    } else if (data.changes) {
-      const fields: Record<string, unknown> = {};
-      for (const [field, change] of Object.entries(data.changes)) fields[field] = change.to ?? undefined;
-      patchRow(table, ev.entity_id, fields);
-    }
-  }
-}
-
-onEvents(applyDocEvents);
 
 // Another workspace: nothing kept here belongs to it.
 let lastSlug = getState().slug;
@@ -121,20 +78,14 @@ async function fetchPage(slug: string, id: string, signal: AbortSignal): Promise
   if (getState().slug !== slug) return { blocks: data.blocks ?? [], seq: data.doc.content_seq ?? 0 };
   mergeRows("docs", [data.doc, ...(data.children ?? []), ...(data.rows ?? [])] as never[]);
   mergeRows("comments", (data.comments ?? []) as never[]);
-  useDocsStore.setState((s) => {
-    const props = { ...s.props };
-    const views = { ...s.views };
-    for (const p of data.properties ?? []) props[p.id] = p;
-    for (const v of data.views ?? []) views[v.id] = v;
-    return {
-      props,
-      views,
-      meta: {
-        ...s.meta,
-        [id]: { mentioned_in: data.mentioned_in ?? [], mentions: data.mentions ?? [], source: data.source },
-      },
-    };
-  });
+  mergeRows("properties", data.properties ?? []);
+  mergeRows("dbviews", data.views ?? []);
+  useDocsStore.setState((s) => ({
+    meta: {
+      ...s.meta,
+      [id]: { mentioned_in: data.mentioned_in ?? [], mentions: data.mentions ?? [], source: data.source },
+    },
+  }));
   return { blocks: data.blocks ?? [], seq: data.doc.content_seq ?? 0 };
 }
 

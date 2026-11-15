@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import { t } from "@/lib/i18n";
 import { useLookup, useMe, useRows as useLiveRows } from "@/data/selectors";
 import { type Dict, getState } from "@/data/store";
-import { useDocsStore } from "@/docs/store";
 import type { DBProperty, DBView, Doc, DocComment } from "@/types/docs";
 
 export const byRank = (a: { rank: string; id: string }, b: { rank: string; id: string }) =>
@@ -157,27 +156,17 @@ export function useRows(databaseId: string | undefined): Doc[] {
 }
 
 export function useProperties(databaseId: string | undefined): DBProperty[] {
-  const props = useDocsStore((s) => s.props);
+  const props = useLiveRows("properties");
   return useMemo(
-    () =>
-      databaseId
-        ? Object.values(props)
-            .filter((p) => p.database_id === databaseId && !p.deleted_at)
-            .sort(byRank)
-        : [],
+    () => (databaseId ? props.filter((p) => p.database_id === databaseId).sort(byRank) : []),
     [props, databaseId],
   );
 }
 
 export function useViews(databaseId: string | undefined): DBView[] {
-  const views = useDocsStore((s) => s.views);
+  const views = useLiveRows("dbviews");
   return useMemo(
-    () =>
-      databaseId
-        ? Object.values(views)
-            .filter((v) => v.database_id === databaseId && !v.deleted_at)
-            .sort(byRank)
-        : [],
+    () => (databaseId ? views.filter((v) => v.database_id === databaseId).sort(byRank) : []),
     [views, databaseId],
   );
 }

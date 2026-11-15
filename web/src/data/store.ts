@@ -249,7 +249,8 @@ export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptio
       const task = c.tasks[id];
       if (old?.description && task) c.tasks[id] = { ...task, description: old.description };
     }
-    for (const name of ["comments", "attachments", "links"] as const) {
+    // Nor what an opened task or page brought: its comments, files and links, a database's properties and views.
+    for (const name of ["comments", "attachments", "links", "properties", "dbviews"] as const) {
       Object.assign(c[name], keep.collections[name]);
     }
     // Watchers of opened tasks other than me, and deleted tasks and questions shown in the trash.

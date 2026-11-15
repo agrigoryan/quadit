@@ -25,7 +25,7 @@ import type {
 } from "@/types/core";
 import type { Claim, Resource } from "@/types/agents";
 import type { Integration, Rule, Webhook } from "@/types/automation";
-import type { BlockRow, Doc } from "@/types/docs";
+import type { BlockRow, DBProperty, DBView, Doc } from "@/types/docs";
 import type { Preference } from "@/types/plan";
 
 export type Dict<T> = Record<string, T>;
@@ -63,6 +63,9 @@ export interface Collections {
   claims: Dict<Claim>;
   docs: Dict<Doc>;
   blocks: Dict<BlockRow>;
+  /** Not in the starting copy: a database's properties and views come with its page (docs/store.ts). */
+  properties: Dict<DBProperty>;
+  dbviews: Dict<DBView>;
   webhooks: Dict<Webhook>;
   rules: Dict<Rule>;
   integrations: Dict<Integration>;
@@ -97,6 +100,8 @@ export const COLLECTION_OF: Record<string, CollectionName> = {
   claim: "claims",
   doc: "docs",
   block: "blocks",
+  property: "properties",
+  dbview: "dbviews",
   webhook: "webhooks",
   rule: "rules",
   integration: "integrations",

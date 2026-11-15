@@ -7,9 +7,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEnsureDatabases } from "@/docs/db/use-table";
-import { useDocsStore } from "@/docs/store";
 import { api, ApiError } from "@/data/api";
 import { clearStore, useStore } from "@/data/store";
+import { getRow } from "@/data/selectors";
 import { useToasts } from "@/lib/toast";
 import { WithQuery } from "@/test/query";
 
@@ -37,7 +37,7 @@ describe("useEnsureDatabases", () => {
     get.mockResolvedValue(page("db-fail"));
     act(() => useStore.setState({ stream: "down" }));
     act(() => useStore.setState({ stream: "live" }));
-    await waitFor(() => expect(useDocsStore.getState().props.p1?.name).toBe("Status"));
+    await waitFor(() => expect(getRow("properties", "p1")?.name).toBe("Status"));
     expect(get).toHaveBeenCalledTimes(2);
   });
 

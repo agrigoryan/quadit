@@ -19,6 +19,8 @@ interface Props {
  */
 export function OptionPicker({ prop, value, multiple, onChange, onClose }: Props) {
   const options = optionsOf(prop);
+  // A name made here is an option once the value is saved; until then (a form not yet sent) it is listed as picked.
+  const names = [...options.map((o) => o.name), ...value.filter((v) => !options.some((o) => o.name === v))];
 
   function pick(name: string) {
     const has = value.includes(name);
@@ -35,7 +37,7 @@ export function OptionPicker({ prop, value, multiple, onChange, onClose }: Props
       label={prop.name}
       placeholder={t("db.option.search")}
       empty={t("db.option.none")}
-      items={options.map((o) => ({ id: o.name, label: o.name }))}
+      items={names.map((name) => ({ id: name, label: name }))}
       value={value}
       row={(item) => <OptionChip option={options.find((o) => o.name === item.id) ?? { name: item.id }} />}
       onPick={pick}
