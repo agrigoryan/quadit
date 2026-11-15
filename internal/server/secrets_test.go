@@ -2,14 +2,19 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"regexp"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
@@ -465,4 +470,129 @@ func TestSubAgents(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestSurfaceOnlyGrows holds the agent-facing surface to its promise: what
+// an agent was built against yesterday still works today. The change types
+// with their arguments, the API's paths and the MCP tools with theirs are
+// written in testdata/surface.txt; anything there that the code no longer
+// has fails the test. Something new is added to the file by running the
+// test with QUADIT_UPDATE_SURFACE=1, which never removes a line: taking one
+// out is a breaking change, made by hand together with a new major version
+// of engine.Surface.
+func TestSurfaceOnlyGrows(t *testing.T) {
+	var now []string
+	for _, ci := range engine.Catalog() {
+		now = append(now, "change "+ci.Type)
+		for _, a := range ci.Args {
+			now = append(now, "change "+ci.Type+" arg "+a.Name)
+		}
+	}
+	s := newSite(t, testdb.SQLite(t))
+	var spec struct {
+		Paths map[string]map[string]any
+	}
+	s.call(nil, "", "GET", "/api/v1/openapi.json", nil, 200, &spec)
+	for path, methods := range spec.Paths {
+		for method := range methods {
+			now = append(now, "api "+strings.ToUpper(method)+" "+path)
+		}
+	}
+	resp, err := http.Post(s.url+"/mcp", "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tools struct {
+		Result struct {
+			Tools []struct {
+				Name        string
+				InputSchema struct {
+					Properties map[string]any
+				} `json:"inputSchema"`
+			}
+		}
+		Error any
+	}
+	json.NewDecoder(resp.Body).Decode(&tools)
+	resp.Body.Close()
+	if len(tools.Result.Tools) == 0 {
+		// The list needs a token; ask with one.
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
+		req, _ := http.NewRequest("POST", s.url+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+		req.Header.Set("Authorization", "Bearer "+tok.Token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		json.NewDecoder(resp.Body).Decode(&tools)
+		resp.Body.Close()
+	}
+	for _, tool := range tools.Result.Tools {
+		now = append(now, "mcp "+tool.Name)
+		for arg := range tool.InputSchema.Properties {
+			now = append(now, "mcp "+tool.Name+" arg "+arg)
+		}
+	}
+	// The command-line tool's commands, read from its source.
+	src, err := os.ReadFile("../cli/cli.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(src)
+	body = body[strings.Index(body, "func (r *runner) run("):]
+	body = body[:strings.Index(body[1:], "\nfunc ")+1]
+	cmds := 0
+	for _, m := range regexp.MustCompile(`(?m)^\tcase ((?:"[a-z-]+"(?:, )?)+):`).FindAllStringSubmatch(body, -1) {
+		for _, name := range strings.Split(m[1], ", ") {
+			now = append(now, "cli "+strings.Trim(name, `"`))
+			cmds++
+		}
+	}
+	if cmds < 20 {
+		t.Fatalf("could not read the command-line tool's commands: %d", cmds)
+	}
+	if len(tools.Result.Tools) < 10 || len(spec.Paths) < 10 {
+		t.Fatalf("could not read the surface: %d tools, %d paths", len(tools.Result.Tools), len(spec.Paths))
+	}
+	sort.Strings(now)
+	have := map[string]bool{}
+	for _, l := range now {
+		have[l] = true
+	}
+	const file = "testdata/surface.txt"
+	raw, _ := os.ReadFile(file)
+	var kept, missing []string
+	known := map[string]bool{}
+	for _, l := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		if l == "" || strings.HasPrefix(l, "#") {
+			continue
+		}
+		kept, known[l] = append(kept, l), true
+		if !have[l] {
+			missing = append(missing, l)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("the agent surface lost %d things it promised (surface %s):\n  %s\nPut them back, or make it a new major version on purpose.", len(missing), engine.Surface, strings.Join(missing, "\n  "))
+	}
+	var added []string
+	for _, l := range now {
+		if !known[l] {
+			added = append(added, l)
+		}
+	}
+	if len(added) == 0 {
+		return
+	}
+	if os.Getenv("QUADIT_UPDATE_SURFACE") == "" {
+		t.Fatalf("the agent surface gained %d things not yet written down:\n  %s\nRun the test once with QUADIT_UPDATE_SURFACE=1 to record them.", len(added), strings.Join(added, "\n  "))
+	}
+	all := append(kept, added...)
+	sort.Strings(all)
+	head := "# What agents are built against, surface " + strings.Split(engine.Surface, ".")[0] + ".x. Lines are only ever added here.\n"
+	if err := os.WriteFile(file, []byte(head+strings.Join(all, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

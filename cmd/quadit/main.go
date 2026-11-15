@@ -8,6 +8,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/app"
 	"github.com/agrigoryan/quadit/internal/cli"
+	"github.com/agrigoryan/quadit/internal/engine"
 )
 
 // version is set when a release is built.
@@ -22,7 +23,7 @@ func main() {
 		case "admin":
 			os.Exit(app.Admin(args[1:], version))
 		case "version", "--version", "-v":
-			fmt.Println("quadit", version)
+			fmt.Println("quadit", version, "(agent surface "+engine.Surface+")")
 			return
 		}
 		if run, ok := app.Commands[args[0]]; ok {

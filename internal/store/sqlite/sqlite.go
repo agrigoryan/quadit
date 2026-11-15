@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	_ "modernc.org/sqlite" // pure-Go driver: the binary needs no C toolchain
@@ -16,7 +19,42 @@ import (
 
 // Open opens (and creates if missing) the database file at path and brings
 // its schema up to date.
-func Open(ctx context.Context, path string) (*sqlstore.Store, error) {
+func Open(ctx context.Context, path string) (*sqlstore.Store, error) { return OpenAt(ctx, path, 0) }
+
+// Before names the copy of the database made before it was upgraded to a
+// schema version.
+func Before(path string, version int) string { return fmt.Sprintf("%s.before-v%d", path, version) }
+
+// UndoUpgrade puts back the copy made before the last upgrade, and keeps
+// the upgraded database beside it. The older binary then runs as before.
+func UndoUpgrade(ctx context.Context, path string) (from, to string, err error) {
+	copies, _ := filepath.Glob(path + ".before-v*")
+	if len(copies) == 0 {
+		return "", "", fmt.Errorf("there is no copy from before an upgrade beside %s", path)
+	}
+	sort.Slice(copies, func(i, j int) bool {
+		a, _ := strconv.Atoi(copies[i][strings.LastIndex(copies[i], "-v")+2:])
+		b, _ := strconv.Atoi(copies[j][strings.LastIndex(copies[j], "-v")+2:])
+		return a > b
+	})
+	newest := copies[0]
+	aside := strings.Replace(newest, ".before-v", ".after-v", 1)
+	for _, suffix := range []string{"-wal", "-shm"} {
+		os.Remove(path + suffix) // the upgraded database's side files do not belong to the copy
+	}
+	if err := os.Rename(path, aside); err != nil {
+		return "", "", err
+	}
+	if err := os.Rename(newest, path); err != nil {
+		os.Rename(aside, path)
+		return "", "", err
+	}
+	return newest, aside, nil
+}
+
+// OpenAt is Open stopping at a schema version (0 = the newest), which
+// stands in for an older binary.
+func OpenAt(ctx context.Context, path string, upTo int) (*sqlstore.Store, error) {
 	// WAL lets readers run while one writer writes. Write transactions take
 	// the write lock when they begin, so two writers queue instead of one
 	// failing halfway with "database is locked".
@@ -39,7 +77,7 @@ func Open(ctx context.Context, path string) (*sqlstore.Store, error) {
 	// as it was, beside it. Going back is: stop, put the copy in place, run
 	// the old binary.
 	if cur, latest, err := s.Pending(ctx); err == nil && cur > 0 && cur < latest {
-		snapshot := fmt.Sprintf("%s.before-v%d", path, latest)
+		snapshot := Before(path, latest)
 		if _, serr := os.Stat(snapshot); serr != nil {
 			if err := s.Exec(ctx, "VACUUM INTO '"+strings.ReplaceAll(snapshot, "'", "''")+"'"); err != nil {
 				db.Close()
@@ -48,7 +86,7 @@ func Open(ctx context.Context, path string) (*sqlstore.Store, error) {
 			fmt.Fprintf(os.Stderr, "quadit: upgrading the database from version %d to %d; a copy of it as it was is at %s\n", cur, latest, snapshot)
 		}
 	}
-	if err := s.Migrate(ctx); err != nil {
+	if err := s.MigrateTo(ctx, upTo); err != nil {
 		db.Close()
 		return nil, err
 	}

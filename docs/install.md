@@ -74,10 +74,26 @@ Scheduled backups are a switch in the admin area. Each one is read back and chec
 
 ## Upgrades
 
-Replace the binary and start it. If the new version changes the schema:
+Replace the binary and start it; or, to do the database step by itself first, run `quadit upgrade`. If the new version changes the schema, a copy of the database as it was is made before anything is changed:
 
-- on SQLite it first writes a copy of the database beside it (`quadit.sqlite.before-vN`). To go back: stop, put the copy in place, start the old binary;
-- on Postgres it says so at start; take a backup with the old binary before starting the new one.
+- on SQLite, a file beside it (`quadit.sqlite.before-vN`);
+- on Postgres, a database beside it on the same server (`<name>_before_vN`). This needs the database to itself for a moment and a role allowed to create databases; if the copy cannot be made, nothing is changed and the server says why. With several servers on one database, stop them all first.
+
+To go back: stop the server, run `quadit upgrade --undo` (it puts the copy in place and keeps the upgraded database beside it), and start the older binary.
+
+Agents are not broken by an upgrade: the API stays at `/api/v1`, and the list of changes, their arguments, the MCP tools and the command-line tool's commands only ever gain things within a major version. `GET /api/v1/changes` says which surface version a server speaks.
+
+## HTTPS
+
+Passkeys and phone notifications need HTTPS. Three ways:
+
+- `quadit serve --tls-domain quadit.example.com` gets a certificate from Let's Encrypt and renews it by itself. Ports 443 and 80 must reach the server.
+- `quadit serve --tls-cert cert.pem --tls-key key.pem` uses a certificate of your own.
+- or keep plain HTTP on `:4780` behind a proxy that terminates HTTPS (Caddy, nginx, a tunnel), and set `--url https://…`.
+
+## Several servers
+
+More than one copy of the server can share a Postgres database and a cloud file store (not SQLite, and not files on local disk). Sessions, cursors, task leases, job claims, rate counts, page presence and uploads in progress are all in the database or the file store, and a write taken by one server wakes the live connections held by the others.
 
 ## Accounts with no mail server
 

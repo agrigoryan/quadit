@@ -122,9 +122,10 @@ func (s *Server) hCatalog(x *c) error {
 			}
 			fmt.Fprintf(&b, "%s (%s): %s\n", ci.Type, ci.Role, strings.Join(args, ", "))
 		}
+		fmt.Fprintf(&b, "surface: %s (within %s.x nothing is removed or renamed)\n", engine.Surface, strings.Split(engine.Surface, ".")[0])
 		return x.text(b.String())
 	}
-	return x.ok(map[string]any{"changes": cat})
+	return x.ok(map[string]any{"changes": cat, "surface": engine.Surface})
 }
 
 // collection is one kind of row a caller can list as stored.

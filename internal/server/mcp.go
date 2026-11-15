@@ -492,7 +492,7 @@ func (s *Server) hMCP(w http.ResponseWriter, r *http.Request) {
 			version = p.ProtocolVersion
 		}
 		resp.Result = map[string]any{"protocolVersion": version, "capabilities": map[string]any{"tools": map[string]any{}},
-			"serverInfo": map[string]any{"name": "quadit", "version": s.cfg.Version},
+			"serverInfo": map[string]any{"name": "quadit", "version": s.cfg.Version, "surface": engine.Surface},
 			"instructions": "Tasks, decisions and docs shared by people and agents. Start with whoami and my_work. Follow changes with events (wait=N holds the call) and ack. " +
 				"Write with change; a refusal says how to fix the call."}
 	case "ping":

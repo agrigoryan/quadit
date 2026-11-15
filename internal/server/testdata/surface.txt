@@ -1,0 +1,736 @@
+# What agents are built against, surface 1.x. Lines are only ever added here.
+api DELETE /api/v1/w/{workspace}/tokens/{id}
+api GET /api/v1/w/{workspace}/agents
+api GET /api/v1/w/{workspace}/audit
+api GET /api/v1/w/{workspace}/bootstrap
+api GET /api/v1/w/{workspace}/cursors/{name}
+api GET /api/v1/w/{workspace}/cycles/{id}/chart
+api GET /api/v1/w/{workspace}/dashboard
+api GET /api/v1/w/{workspace}/decisions
+api GET /api/v1/w/{workspace}/docs
+api GET /api/v1/w/{workspace}/docs/{id}
+api GET /api/v1/w/{workspace}/docs/{id}/rows
+api GET /api/v1/w/{workspace}/docs/{id}/versions
+api GET /api/v1/w/{workspace}/docs/{id}/versions/{version}
+api GET /api/v1/w/{workspace}/events
+api GET /api/v1/w/{workspace}/events/stream
+api GET /api/v1/w/{workspace}/export
+api GET /api/v1/w/{workspace}/files/{id}
+api GET /api/v1/w/{workspace}/inbox
+api GET /api/v1/w/{workspace}/invites
+api GET /api/v1/w/{workspace}/list/{collection}
+api GET /api/v1/w/{workspace}/me
+api GET /api/v1/w/{workspace}/memory
+api GET /api/v1/w/{workspace}/my-work
+api GET /api/v1/w/{workspace}/projects/{key}/layout
+api GET /api/v1/w/{workspace}/render
+api GET /api/v1/w/{workspace}/search
+api GET /api/v1/w/{workspace}/secrets
+api GET /api/v1/w/{workspace}/tasks
+api GET /api/v1/w/{workspace}/tasks/{ref}
+api GET /api/v1/w/{workspace}/tasks/{ref}/context
+api GET /api/v1/w/{workspace}/tokens
+api PATCH /api/v1/w/{workspace}/files/{id}
+api POST /api/v1/w/{workspace}/changes
+api POST /api/v1/w/{workspace}/docs/{id}/presence
+api POST /api/v1/w/{workspace}/files
+api POST /api/v1/w/{workspace}/invites
+api POST /api/v1/w/{workspace}/memory
+api POST /api/v1/w/{workspace}/secrets/env
+api POST /api/v1/w/{workspace}/secrets/{name}/request
+api POST /api/v1/w/{workspace}/tokens
+api PUT /api/v1/w/{workspace}/cursors/{name}
+change agent.create
+change agent.create arg avatar
+change agent.create arg budget
+change agent.create arg description
+change agent.create arg handle
+change agent.create arg id
+change agent.create arg name
+change agent.create arg responsible
+change agent.create arg role
+change agent.create arg scope
+change agent.create arg task
+change agent.update
+change agent.update arg avatar
+change agent.update arg budget
+change agent.update arg description
+change agent.update arg id
+change agent.update arg name
+change agent.update arg responsible
+change agent.update arg scope
+change attachment.add
+change attachment.add arg caption
+change attachment.add arg comment
+change attachment.add arg decision
+change attachment.add arg doc
+change attachment.add arg file
+change attachment.add arg id
+change attachment.add arg option
+change attachment.add arg role
+change attachment.add arg task
+change attachment.remove
+change attachment.remove arg id
+change attachment.restore
+change attachment.restore arg id
+change comment.create
+change comment.create arg attachments
+change comment.create arg block
+change comment.create arg body
+change comment.create arg decision
+change comment.create arg doc
+change comment.create arg evidence
+change comment.create arg id
+change comment.create arg kind
+change comment.create arg option
+change comment.create arg parent
+change comment.create arg task
+change comment.create arg waiting_on
+change comment.create arg waiting_on_note
+change comment.delete
+change comment.delete arg id
+change comment.update
+change comment.update arg body
+change comment.update arg id
+change comment.update arg resolved
+change cycle.create
+change cycle.create arg ends_on
+change cycle.create arg id
+change cycle.create arg name
+change cycle.create arg project
+change cycle.create arg starts_on
+change cycle.delete
+change cycle.delete arg id
+change cycle.update
+change cycle.update arg ends_on
+change cycle.update arg id
+change cycle.update arg name
+change cycle.update arg starts_on
+change dbview.create
+change dbview.create arg config
+change dbview.create arg database
+change dbview.create arg id
+change dbview.create arg name
+change dbview.create arg rank
+change dbview.create arg type
+change dbview.delete
+change dbview.delete arg id
+change dbview.update
+change dbview.update arg config
+change dbview.update arg database
+change dbview.update arg id
+change dbview.update arg name
+change dbview.update arg rank
+change dbview.update arg type
+change decision.delete
+change decision.delete arg id
+change decision.open
+change decision.open arg action
+change decision.open arg args
+change decision.open arg ask
+change decision.open arg details
+change decision.open arg id
+change decision.open arg kind
+change decision.open arg options
+change decision.open arg question
+change decision.open arg recommendation
+change decision.open arg recommended
+change decision.open arg task
+change decision.pick
+change decision.pick arg id
+change decision.pick arg note
+change decision.pick arg option
+change decision.pick arg outcome
+change decision.restore
+change decision.restore arg id
+change decision.unclear
+change decision.unclear arg id
+change decision.unclear arg note
+change decision.update
+change decision.update arg details
+change decision.update arg id
+change decision.update arg question
+change decision.update arg recommendation
+change decision.update arg recommended
+change doc.create
+change doc.create arg blocks
+change doc.create arg generated
+change doc.create arg icon
+change doc.create arg id
+change doc.create arg kind
+change doc.create arg markdown
+change doc.create arg memory_of
+change doc.create arg parent
+change doc.create arg private
+change doc.create arg project
+change doc.create arg props
+change doc.create arg rank
+change doc.create arg shared_with
+change doc.create arg title
+change doc.delete
+change doc.delete arg id
+change doc.edit
+change doc.edit arg doc
+change doc.edit arg ops
+change doc.restore
+change doc.restore arg id
+change doc.revert
+change doc.revert arg doc
+change doc.revert arg version
+change doc.snapshot
+change doc.snapshot arg doc
+change doc.snapshot arg label
+change doc.update
+change doc.update arg archived
+change doc.update arg cover
+change doc.update arg icon
+change doc.update arg id
+change doc.update arg parent
+change doc.update arg private
+change doc.update arg project
+change doc.update arg props
+change doc.update arg rank
+change doc.update arg shared_with
+change doc.update arg title
+change doc.write
+change doc.write arg doc
+change doc.write arg markdown
+change doc.write arg mode
+change epic.create
+change epic.create arg color
+change epic.create arg description
+change epic.create arg icon
+change epic.create arg id
+change epic.create arg lead
+change epic.create arg name
+change epic.create arg project
+change epic.create arg rank
+change epic.create arg start_on
+change epic.create arg state
+change epic.create arg target_on
+change epic.delete
+change epic.delete arg id
+change epic.update
+change epic.update arg color
+change epic.update arg description
+change epic.update arg icon
+change epic.update arg id
+change epic.update arg lead
+change epic.update arg name
+change epic.update arg rank
+change epic.update arg start_on
+change epic.update arg state
+change epic.update arg target_on
+change integration.create
+change integration.create arg active
+change integration.create arg config
+change integration.create arg id
+change integration.create arg kind
+change integration.create arg name
+change integration.create arg project
+change integration.create arg secret
+change integration.delete
+change integration.delete arg id
+change integration.update
+change integration.update arg active
+change integration.update arg config
+change integration.update arg id
+change integration.update arg kind
+change integration.update arg name
+change integration.update arg project
+change integration.update arg secret
+change label.create
+change label.create arg color
+change label.create arg description
+change label.create arg id
+change label.create arg name
+change label.create arg project
+change label.delete
+change label.delete arg id
+change label.update
+change label.update arg color
+change label.update arg description
+change label.update arg id
+change label.update arg name
+change link.remove
+change link.remove arg id
+change link.set
+change link.set arg checks
+change link.set arg data
+change link.set arg id
+change link.set arg kind
+change link.set arg ref
+change link.set arg repo
+change link.set arg state
+change link.set arg task
+change link.set arg title
+change link.set arg url
+change member.add
+change member.add arg handle
+change member.add arg role
+change member.add arg scope
+change member.add arg title
+change member.add arg user
+change member.remove
+change member.remove arg id
+change member.update
+change member.update arg handle
+change member.update arg id
+change member.update arg role
+change member.update arg scope
+change member.update arg suspended
+change member.update arg title
+change milestone.create
+change milestone.create arg description
+change milestone.create arg epic
+change milestone.create arg id
+change milestone.create arg name
+change milestone.create arg rank
+change milestone.create arg target_on
+change milestone.delete
+change milestone.delete arg id
+change milestone.update
+change milestone.update arg description
+change milestone.update arg id
+change milestone.update arg name
+change milestone.update arg rank
+change milestone.update arg target_on
+change notification.read
+change notification.read arg all
+change notification.read arg archive
+change notification.read arg ids
+change notification.read arg task
+change notification.read arg unread
+change notification.read arg up_to
+change notify
+change notify arg message
+change notify arg task
+change notify arg user
+change preference.create
+change preference.create arg body
+change preference.create arg decision
+change preference.create arg id
+change preference.create arg labels
+change preference.create arg project
+change preference.delete
+change preference.delete arg id
+change preference.update
+change preference.update arg body
+change preference.update arg id
+change preference.update arg retired
+change project.create
+change project.create arg color
+change project.create arg description
+change project.create arg icon
+change project.create arg id
+change project.create arg key
+change project.create arg lead
+change project.create arg name
+change project.create arg settings
+change project.delete
+change project.delete arg id
+change project.update
+change project.update arg archived
+change project.update arg color
+change project.update arg description
+change project.update arg icon
+change project.update arg id
+change project.update arg key
+change project.update arg lead
+change project.update arg name
+change project.update arg rank
+change project.update arg settings
+change property.create
+change property.create arg config
+change property.create arg database
+change property.create arg id
+change property.create arg name
+change property.create arg rank
+change property.create arg rename_option
+change property.create arg type
+change property.delete
+change property.delete arg id
+change property.update
+change property.update arg config
+change property.update arg database
+change property.update arg id
+change property.update arg name
+change property.update arg rank
+change property.update arg rename_option
+change property.update arg type
+change relation.add
+change relation.add arg id
+change relation.add arg other
+change relation.add arg task
+change relation.add arg type
+change relation.remove
+change relation.remove arg id
+change resource.acquire
+change resource.acquire arg id
+change resource.acquire arg minutes
+change resource.acquire arg note
+change resource.acquire arg resource
+change resource.acquire arg task
+change resource.create
+change resource.create arg description
+change resource.create arg id
+change resource.create arg name
+change resource.delete
+change resource.delete arg id
+change resource.release
+change resource.release arg resource
+change resource.release arg user
+change rule.create
+change rule.create arg action
+change rule.create arg active
+change rule.create arg id
+change rule.create arg match
+change rule.create arg name
+change rule.delete
+change rule.delete arg id
+change rule.update
+change rule.update arg action
+change rule.update arg active
+change rule.update arg id
+change rule.update arg match
+change rule.update arg name
+change secret.delete
+change secret.delete arg id
+change secret.set
+change secret.set arg agents
+change secret.set arg description
+change secret.set arg env
+change secret.set arg hosts
+change secret.set arg id
+change secret.set arg name
+change secret.set arg value
+change session.start
+change session.start arg id
+change session.start arg instructions
+change session.start arg task
+change session.start arg title
+change session.update
+change session.update arg add_links
+change session.update arg add_steps
+change session.update arg cost_micros
+change session.update arg id
+change session.update arg state
+change session.update arg summary
+change session.update arg title
+change session.update arg tokens_in
+change session.update arg tokens_out
+change source.create
+change source.create arg authority
+change source.create arg branch
+change source.create arg id
+change source.create arg repo
+change source.create arg root
+change source.create arg subdir
+change source.create arg title
+change source.create arg write_mode
+change source.delete
+change source.delete arg id
+change source.update
+change source.update arg authority
+change source.update arg branch
+change source.update arg id
+change source.update arg repo
+change source.update arg root
+change source.update arg subdir
+change source.update arg title
+change source.update arg write_mode
+change status.create
+change status.create arg category
+change status.create arg color
+change status.create arg id
+change status.create arg name
+change status.create arg project
+change status.create arg rank
+change status.delete
+change status.delete arg id
+change status.delete arg move_to
+change status.update
+change status.update arg category
+change status.update arg color
+change status.update arg id
+change status.update arg is_default
+change status.update arg name
+change status.update arg rank
+change task.create
+change task.create arg assignee
+change task.create arg budget
+change task.create arg cycle
+change task.create arg description
+change task.create arg due_on
+change task.create arg epic
+change task.create arg estimate
+change task.create arg id
+change task.create arg labels
+change task.create arg milestone
+change task.create arg parent
+change task.create arg priority
+change task.create arg project
+change task.create arg rank
+change task.create arg status
+change task.create arg template
+change task.create arg title
+change task.create arg waiting_on
+change task.create arg waiting_on_note
+change task.delete
+change task.delete arg id
+change task.move
+change task.move arg id
+change task.move arg project
+change task.release
+change task.release arg id
+change task.restore
+change task.restore arg id
+change task.take
+change task.take arg id
+change task.take arg minutes
+change task.update
+change task.update arg add_labels
+change task.update arg archived
+change task.update arg assignee
+change task.update arg base_seq
+change task.update arg budget
+change task.update arg cycle
+change task.update arg description
+change task.update arg due_on
+change task.update arg epic
+change task.update arg estimate
+change task.update arg id
+change task.update arg labels
+change task.update arg milestone
+change task.update arg parent
+change task.update arg priority
+change task.update arg rank
+change task.update arg remove_labels
+change task.update arg status
+change task.update arg title
+change task.update arg waiting_on
+change task.update arg waiting_on_note
+change template.create
+change template.create arg description
+change template.create arg id
+change template.create arg name
+change template.create arg preset
+change template.create arg project
+change template.create arg title
+change template.delete
+change template.delete arg id
+change template.update
+change template.update arg description
+change template.update arg id
+change template.update arg name
+change template.update arg preset
+change template.update arg title
+change view.create
+change view.create arg description
+change view.create arg display
+change view.create arg icon
+change view.create arg id
+change view.create arg layout
+change view.create arg name
+change view.create arg project
+change view.create arg query
+change view.create arg rank
+change view.create arg shared
+change view.delete
+change view.delete arg id
+change view.update
+change view.update arg description
+change view.update arg display
+change view.update arg icon
+change view.update arg id
+change view.update arg layout
+change view.update arg name
+change view.update arg query
+change view.update arg rank
+change view.update arg shared
+change watch.set
+change watch.set arg subject
+change watch.set arg type
+change watch.set arg user
+change watch.set arg watching
+change webhook.create
+change webhook.create arg active
+change webhook.create arg event_types
+change webhook.create arg for
+change webhook.create arg id
+change webhook.create arg name
+change webhook.create arg project
+change webhook.create arg secret
+change webhook.create arg url
+change webhook.delete
+change webhook.delete arg id
+change webhook.update
+change webhook.update arg active
+change webhook.update arg event_types
+change webhook.update arg for
+change webhook.update arg id
+change webhook.update arg name
+change webhook.update arg project
+change webhook.update arg secret
+change webhook.update arg url
+change workspace.delete
+change workspace.delete arg confirm
+change workspace.update
+change workspace.update arg icon
+change workspace.update arg name
+change workspace.update arg settings
+cli ack
+cli agents
+cli approval
+cli ask
+cli assign
+cli attach
+cli changes
+cli comment
+cli context
+cli create
+cli dashboard
+cli decisions
+cli delete
+cli do
+cli doc
+cli docs
+cli events
+cli import
+cli inbox
+cli layout
+cli link
+cli listen
+cli ls
+cli me
+cli memory
+cli new
+cli pick
+cli read
+cli release
+cli remember
+cli render
+cli request
+cli restore
+cli result
+cli row
+cli rows
+cli run
+cli search
+cli secrets
+cli show
+cli status
+cli take
+cli tasks
+cli unclear
+cli update
+cli upload
+cli whoami
+cli work
+cli write
+mcp ack
+mcp ack arg cursor
+mcp ack arg seq
+mcp agents
+mcp change
+mcp change arg approval
+mcp change arg args
+mcp change arg changes
+mcp change arg dry_run
+mcp change arg for
+mcp change arg id
+mcp change arg type
+mcp changes
+mcp context
+mcp context arg key
+mcp dashboard
+mcp dashboard arg project
+mcp decisions
+mcp decisions arg asked
+mcp decisions arg project
+mcp decisions arg q
+mcp decisions arg state
+mcp doc
+mcp doc arg full
+mcp doc arg id
+mcp docs
+mcp events
+mcp events arg after
+mcp events arg cursor
+mcp events arg inbox
+mcp events arg limit
+mcp events arg mine
+mcp events arg others
+mcp events arg task
+mcp events arg types
+mcp events arg wait
+mcp file
+mcp file arg id
+mcp inbox
+mcp inbox arg all
+mcp layout
+mcp layout arg project
+mcp memory
+mcp my_work
+mcp remember
+mcp remember arg markdown
+mcp remember arg mode
+mcp remember arg title
+mcp render
+mcp render arg doc
+mcp render arg task
+mcp render arg theme
+mcp render arg width
+mcp rows
+mcp rows arg filter
+mcp rows arg id
+mcp rows arg sort
+mcp rows arg view
+mcp search
+mcp search arg kind
+mcp search arg q
+mcp secret_request
+mcp secret_request arg body
+mcp secret_request arg headers
+mcp secret_request arg method
+mcp secret_request arg name
+mcp secret_request arg url
+mcp secrets
+mcp task
+mcp task arg full
+mcp task arg key
+mcp task arg since
+mcp tasks
+mcp tasks arg asked
+mcp tasks arg assignee
+mcp tasks arg changed_since
+mcp tasks arg count
+mcp tasks arg creator
+mcp tasks arg cycle
+mcp tasks arg due_after
+mcp tasks arg due_before
+mcp tasks arg epic
+mcp tasks arg fields
+mcp tasks arg has_open_decision
+mcp tasks arg held_by
+mcp tasks arg label
+mcp tasks arg limit
+mcp tasks arg mentions
+mcp tasks arg offset
+mcp tasks arg open
+mcp tasks arg parent
+mcp tasks arg priority
+mcp tasks arg project
+mcp tasks arg q
+mcp tasks arg sort
+mcp tasks arg status
+mcp tasks arg view
+mcp tasks arg waiting_on
+mcp upload
+mcp upload arg base64
+mcp upload arg id
+mcp upload arg name
+mcp upload arg offset
+mcp upload arg size
+mcp upload arg text
+mcp whoami

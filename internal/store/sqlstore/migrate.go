@@ -91,10 +91,17 @@ func isShared(name string) bool {
 // Migrate brings the schema up to date. Each version runs in its own
 // transaction and is recorded, so a failed upgrade leaves the last good
 // version in place.
-func (s *Store) Migrate(ctx context.Context) error {
+func (s *Store) Migrate(ctx context.Context) error { return s.MigrateTo(ctx, 0) }
+
+// MigrateTo brings the schema up to a version, or to the newest when upTo
+// is 0. Stopping short stands in for an older binary, to try an upgrade.
+func (s *Store) MigrateTo(ctx context.Context, upTo int) error {
 	migs, err := loadMigrations(s.d)
 	if err != nil {
 		return err
+	}
+	if upTo > 0 && upTo < len(migs) {
+		migs = migs[:upTo]
 	}
 	if _, err := s.db.ExecContext(ctx, s.d.expand(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version {{INT}} PRIMARY KEY,
@@ -108,6 +115,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return fmt.Errorf("migrate: %w", err)
 	}
 	if current > len(migs) {
+		if upTo > 0 {
+			return nil
+		}
 		return fmt.Errorf("migrate: database is at version %d, this binary knows %d: use a newer binary", current, len(migs))
 	}
 	for _, m := range migs[current:] {
