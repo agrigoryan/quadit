@@ -9,9 +9,9 @@
 // only: reloading the page drops it, so the browser asks before leaving.
 
 import { create } from "zustand";
-import { api, ApiError, NetworkError, workspacePath } from "@/lib/api";
+import { api, ApiError, NetworkError, whenReachable, workspacePath } from "@/lib/api";
 import { newId } from "@/lib/ids";
-import { getState, useStore } from "@/lib/store";
+import { getState } from "@/lib/store";
 import type { FileRow } from "@/lib/types";
 import { localPath } from "@/lib/url";
 
@@ -66,31 +66,6 @@ interface ServerFile extends FileRow {
 
 let active = 0;
 const turns: (() => void)[] = [];
-const waiters = new Set<() => void>();
-
-function wakeAll() {
-  for (const wake of [...waiters]) wake();
-}
-if (typeof window !== "undefined") window.addEventListener("online", wakeAll);
-// The live stream coming back is the surest sign the server can be reached again.
-useStore.subscribe((s, prev) => {
-  if (s.stream === "live" && prev.stream !== "live") wakeAll();
-});
-
-/** Waits before a retry; the connection coming back, or giving up, ends the wait early. */
-function pause(ms: number, signal?: AbortSignal) {
-  return new Promise<void>((resolve) => {
-    const done = () => {
-      clearTimeout(timer);
-      waiters.delete(done);
-      signal?.removeEventListener("abort", done);
-      resolve();
-    };
-    const timer = setTimeout(done, ms);
-    waiters.add(done);
-    signal?.addEventListener("abort", done);
-  });
-}
 
 const aborted = () => new DOMException("aborted", "AbortError");
 const isAbort = (err: unknown) => err instanceof DOMException && err.name === "AbortError";
@@ -137,10 +112,9 @@ async function sendInParts(
       if (!lost && !serverFault && !moved) throw err;
       if ((serverFault || moved) && ++serverTries >= SERVER_TRIES) throw err;
       if (lost || serverFault) {
-        if (lost) netTries++;
         report(from, lost ? "waiting" : "sending");
-        await pause(Math.min(1000 * 2 ** Math.min(lost ? netTries : serverTries, 4), 15_000), signal);
-        if (signal?.aborted) throw aborted();
+        // Longer after each failure in a row; given up (it rejects) when the upload is.
+        await whenReachable(lost ? netTries++ : serverTries - 1, signal);
       }
       // Ask how much arrived: the part may have landed although its answer did not.
       if (row) row = await whereItStands(base, row, signal);
