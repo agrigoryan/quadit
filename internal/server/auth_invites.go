@@ -35,7 +35,9 @@ func (s *Server) emailAllowed(ctx context.Context, email string) (bool, error) {
 	return false, nil
 }
 
-// newPerson makes a person's account.
+// newPerson makes a person's account, with a password when one is given
+// (held to the password rules). The email is kept in lower case; one that
+// has an account already is refused.
 func (s *Server) newPerson(ctx context.Context, name, email, password string) (core.User, error) {
 	var u core.User
 	email = strings.ToLower(strings.TrimSpace(email))

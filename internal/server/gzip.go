@@ -94,7 +94,8 @@ func (g *gzipWriter) Flush() {
 
 func (g *gzipWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }
 
-// finish ends the compressed body.
+// finish ends the compressed body and gives the compressor back to the
+// pool; a writer that never compressed has nothing to end.
 func (g *gzipWriter) finish() {
 	if g.gz != nil {
 		g.gz.Close()
