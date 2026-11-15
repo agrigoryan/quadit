@@ -4,7 +4,7 @@
 // Wheel and pinch zoom around the pointer, a drag pans, a double click (or
 // double tap) switches between fit and actual size.
 
-import { type PointerEvent, type MouseEvent, useCallback, useMemo, useRef, useState } from "react";
+import { type PointerEvent, type MouseEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export interface View {
   /** 1 is "fit the pane". */
@@ -43,7 +43,9 @@ export interface Zoom {
 export function useSharedZoom(actual: number): Zoom {
   const [view, setView] = useState<View>(FIT);
   const actualRef = useRef(actual);
-  actualRef.current = actual;
+  useLayoutEffect(() => {
+    actualRef.current = actual;
+  });
   const pointers = useRef(new Map<number, Point>());
   const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
   const travelled = useRef(0);

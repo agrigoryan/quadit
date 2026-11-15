@@ -50,6 +50,7 @@ export function useLoad<T>(fetcher: () => Promise<T>, deps: unknown[]): Loaded<T
   useEffect(() => {
     void reload();
     return () => {
+      // oxlint-disable-next-line react-hooks/exhaustive-deps -- a counter, not an element: the cleanup means to see its latest value, making loads still out stale
       run.current++;
     };
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- the caller passes the dependencies, as with useEffect itself

@@ -69,10 +69,11 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
     if (gauge && fit > 0) setFit(fit);
   }, [gauge, fit, setFit]);
   const sharp = c.sharp(natural?.w, natural?.h);
+  const known = natural !== null;
   const small = !!natural && isSmall(natural);
   useEffect(() => {
-    if (gauge && natural) setSmallArt(small);
-  }, [gauge, natural, small, setSmallArt]);
+    if (gauge && known) setSmallArt(small);
+  }, [gauge, known, small, setSmallArt]);
 
   if (!file) return <NoMedia />;
   const rendering = sharp ? ("pixelated" as const) : undefined;

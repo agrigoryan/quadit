@@ -3,7 +3,7 @@
 // while the app is open is in the copy and shows up or drops out at once,
 // and the list is asked for again.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, errorMessage, workspacePath } from "@/lib/api";
 import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
 import { onEvents, useStore } from "@/lib/store";
@@ -52,20 +52,20 @@ export function useTrashedDecisions(): DecisionTrash {
   const live = useStore((s) => s.stream === "live");
   const [fetched, setFetched] = useState<Fetched | null>(null);
   const [error, setError] = useState("");
-  const run = useRef(0);
-
   useEffect(() => {
     const ctl = new AbortController();
+    // Only the last load's answer is used; a cleanup makes every earlier one stale.
+    let run = 0;
     const load = () => {
-      const mine = ++run.current;
+      const mine = ++run;
       fetchTrash(slug, ctl.signal).then(
         (out) => {
-          if (mine !== run.current) return;
+          if (mine !== run) return;
           setFetched(out);
           setError("");
         },
         (err: unknown) => {
-          if (mine !== run.current || ctl.signal.aborted) return;
+          if (mine !== run || ctl.signal.aborted) return;
           if (!(err instanceof ApiError && err.status === 401)) setError(errorMessage(err));
         },
       );
@@ -77,7 +77,7 @@ export function useTrashedDecisions(): DecisionTrash {
     return () => {
       off();
       ctl.abort();
-      run.current++;
+      run++;
     };
   }, [slug, live]);
 

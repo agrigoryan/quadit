@@ -1,7 +1,7 @@
 // The compare view on a phone: one option per screen, swiped through with
 // a thumb, and the pick buttons fixed at the bottom where the thumb rests.
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
@@ -35,14 +35,16 @@ export function ComparePhone({ c }: { c: Compare }) {
   /** The slide a tap or key is scrolling to; scroll positions on the way there are not swipes. */
   const heading = useRef<{ to: number; timer: number } | null>(null);
 
-  useLayoutEffect(() => {
+  // Only where the view opens: the option it opened on.
+  const scrollToStart = useEffectEvent(() => {
     const el = scroller.current;
     if (el) el.scrollLeft = c.start.option * el.clientWidth;
-    // Only where the view opens.
-  }, []);
+  });
+  useLayoutEffect(() => scrollToStart(), []);
 
+  const fitZoom = useEffectEvent(() => zoom.fit());
   useEffect(() => {
-    zoom.fit();
+    fitZoom();
     const el = scroller.current;
     if (!el || Math.round(el.scrollLeft / el.clientWidth) === focus) return;
     if (heading.current) clearTimeout(heading.current.timer);

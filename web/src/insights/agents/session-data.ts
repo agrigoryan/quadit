@@ -13,7 +13,8 @@ import type { AgentSession } from "@/lib/types";
 /**
  * Sessions matching a /list/sessions query ("agent=ID", "task=KEY",
  * "limit=300"), newest first, kept current. `keep` picks the store rows
- * that belong to the same set. When the fetch fails, `error` says why: the
+ * that belong to the same set; give the same function each render (one at
+ * module level, or memoized), or the list is sorted afresh each time. When the fetch fails, `error` says why: the
  * sessions shown are then only the recent ones the store had.
  */
 export function useSessions(
@@ -55,8 +56,7 @@ export function useSessions(
   const stored = useRows("sessions");
   const sessions = useMemo(
     () => stored.filter(keep).sort((a, b) => b.started_at - a.started_at),
-    // `keep` is a new function each render; what it selects by is in `query`.
-    [stored, query],
+    [stored, keep],
   );
   return { sessions, loading: query !== null && loaded !== query, error };
 }
