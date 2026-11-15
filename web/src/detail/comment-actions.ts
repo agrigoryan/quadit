@@ -9,7 +9,7 @@ import { getState } from "@/lib/store";
 import type { Comment, FileRow, Task } from "@/lib/types";
 import { uploadOrToast } from "@/detail/uploads";
 
-export interface DraftFile {
+interface DraftFile {
   key: string;
   name: string;
   /** Missing while the file is still uploading. */

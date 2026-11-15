@@ -37,7 +37,7 @@ function findProp(props: DBProperty[], ref: string | undefined): DBProperty | un
   return found;
 }
 
-export function rollup(fn: string | undefined, vals: Value[], related: number): Value {
+function rollup(fn: string | undefined, vals: Value[], related: number): Value {
   const nums = () => {
     const out: number[] = [];
     for (const v of vals) {
@@ -143,7 +143,7 @@ export function computeCells(t: TableData, world: World): Cells {
 }
 
 /** Whether a value passes one condition of a view. */
-export function matchRow(f: Pick<RowFilter, "op" | "value">, v: Value): boolean {
+function matchRow(f: Pick<RowFilter, "op" | "value">, v: Value): boolean {
   const text = lower(formulaText(v));
   const want = lower(formulaText((f.value ?? null) as Value));
   switch (f.op as string) {

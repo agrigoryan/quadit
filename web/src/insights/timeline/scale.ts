@@ -23,7 +23,7 @@ export const xOf = (scale: Scale, day: number) => (day - scale.start) * scale.da
 export const widthOf = (scale: Scale) => (scale.end - scale.start + 1) * scale.dayW;
 
 /** The Monday on or before a day. Day 0 (1 Jan 1970) was a Thursday. */
-export const monday = (day: number) => day - ((((day + 3) % 7) + 7) % 7);
+const monday = (day: number) => day - ((((day + 3) % 7) + 7) % 7);
 
 /** Room left before the first date and after the last, so bars can be dragged outwards. */
 const BEFORE = 21;

@@ -6,7 +6,6 @@ import { Kbd } from "@/ui/kbd";
 
 export const Menu = RMenu.Root;
 export const MenuTrigger = RMenu.Trigger;
-export const MenuGroup = RMenu.Group;
 export const MenuRadioGroup = RMenu.RadioGroup;
 
 const item =

@@ -15,7 +15,7 @@ export const PROJECT_FIELDS = ["key", "name", "icon", "color", "description"];
 export const KEY_RE = /^[A-Z][A-Z0-9]{1,9}$/;
 
 /** A key made from a name: the first letters of its words, or its first three letters. */
-export function keyFrom(name: string): string {
+function keyFrom(name: string): string {
   const words = name
     .toUpperCase()
     .replace(/[^A-Z0-9 ]/g, "")

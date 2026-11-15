@@ -23,7 +23,7 @@ export interface FieldChange {
   to: unknown;
 }
 
-export interface EventData {
+interface EventData {
   row?: Record<string, unknown>;
   changes?: Record<string, FieldChange>;
   ids?: string[];

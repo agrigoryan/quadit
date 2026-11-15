@@ -13,8 +13,6 @@ import { compareText, formulaText, isEmpty, num, quote, truthy } from "@/docs/db
 
 export { FUNCTIONS } from "@/docs/db/formula-fns";
 
-export { formulaText } from "@/docs/db/formula-values";
-
 export type Value = number | string | boolean | null | Value[] | { [key: string]: unknown };
 
 export interface Env {

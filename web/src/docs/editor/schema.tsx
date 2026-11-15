@@ -40,5 +40,3 @@ const pageLink = createReactInlineContentSpec(
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: { ...defaultInlineContentSpecs, mention, taskChip, decisionChip, pageLink },
 });
-
-export type DocEditor = typeof schema.BlockNoteEditor;

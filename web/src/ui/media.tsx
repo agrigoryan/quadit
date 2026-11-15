@@ -58,7 +58,7 @@ export function MediaThumb({ file, className, contain }: ThumbProps) {
 }
 
 /** The file itself at full size: a picture, or a video with controls. */
-export function MediaFull({ file, className }: { file: FileRow; className?: string }) {
+function MediaFull({ file, className }: { file: FileRow; className?: string }) {
   if (isVideo(file)) {
     return (
       <video

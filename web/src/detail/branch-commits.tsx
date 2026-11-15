@@ -21,7 +21,7 @@ interface BranchData {
 const SHOWN = 5;
 
 /** Reads the link's free-form `data`, keeping only what is well formed. */
-export function branchData(link: TaskLink): BranchData | null {
+function branchData(link: TaskLink): BranchData | null {
   const data = (link as TaskLink & { data?: unknown }).data;
   if (!data || typeof data !== "object") return null;
   const { commits, ahead, base } = data as Record<string, unknown>;

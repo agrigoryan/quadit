@@ -22,7 +22,7 @@ export interface Tally {
 
 export const emptyTally = (): Tally => ({ total: 0, done: 0, started: 0, points: 0, pointsDone: 0, lastMove: 0 });
 
-export function addTo(tally: Tally, task: Task, statuses: Dict<Status>) {
+function addTo(tally: Tally, task: Task, statuses: Dict<Status>) {
   const category = statuses[task.status_id]?.category;
   if (category === "canceled") return;
   tally.total++;

@@ -13,7 +13,7 @@ export function fromBase64Url(text: string): ArrayBuffer {
   return out.buffer;
 }
 
-export function toBase64Url(buf: ArrayBuffer | null | undefined): string {
+function toBase64Url(buf: ArrayBuffer | null | undefined): string {
   if (!buf) return "";
   let bin = "";
   for (const byte of new Uint8Array(buf)) bin += String.fromCharCode(byte);

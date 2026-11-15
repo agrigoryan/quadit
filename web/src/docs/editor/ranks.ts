@@ -21,7 +21,7 @@ function encode(v: number): string {
 }
 
 /** A rank after `a` with nothing above it: the next step of the number line when there is room. */
-export function append(a: string): string {
+function append(a: string): string {
   let v = 0;
   for (let i = 0; i < WIDTH; i++) {
     const d = i < a.length ? DIGITS.indexOf(a.charAt(i)) : 0;

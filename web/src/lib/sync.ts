@@ -118,7 +118,7 @@ const canShare = typeof BroadcastChannel !== "undefined" && typeof navigator !==
 const lockName = (slug: string) => `quadit-stream-${slug}`;
 
 /** Which part this tab plays for the workspace it has open: for tests and for looking into trouble. */
-export const syncRole = (): Role | "none" => cur?.role ?? "none";
+const syncRole = (): Role | "none" => cur?.role ?? "none";
 
 function post(s: Session, msg: Message) {
   try {

@@ -7,7 +7,7 @@ export const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{
 /** A day as a moment at UTC midnight, for arithmetic that no clock change can upset. */
 const utc = (day: string) => Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)));
 
-export const fromUTC = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const fromUTC = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 export const addDays = (day: string, n: number) => fromUTC(utc(day) + n * DAY);
 

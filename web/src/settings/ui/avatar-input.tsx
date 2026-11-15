@@ -41,7 +41,7 @@ const EMOJI = [
 ];
 
 /** The first emoji, or the first two letters or digits, of what was typed. */
-export function shortAvatar(text: string): string {
+function shortAvatar(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
   let parts: string[];

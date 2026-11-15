@@ -1,16 +1,10 @@
-import { Compass, Hammer, Lock } from "lucide-react";
+import { Compass, Lock } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { usePageTitle } from "@/lib/ui-state";
 import { EmptyState } from "@/ui/empty";
-
-/** A page for a part of the product that a later wave builds. */
-export function ComingPage({ name }: { name: string }) {
-  usePageTitle(name);
-  return <EmptyState icon={<Hammer />} title={t("common.comingTitle", { name })} hint={t("common.comingHint")} />;
-}
 
 /** True for a project (by its key) that the person could see until their access was narrowed while the app was open. */
 export const useLostProject = (key: string | undefined): boolean =>

@@ -126,7 +126,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
 }
 
 /** Shows a new token the one time it can be shown, with the lines to paste into a terminal. */
-export function TokenReveal({ token, onClose }: { token: string; onClose: () => void }) {
+function TokenReveal({ token, onClose }: { token: string; onClose: () => void }) {
   const url = location.origin;
   return (
     <RevealDialog

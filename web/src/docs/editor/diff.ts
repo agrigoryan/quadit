@@ -19,7 +19,7 @@ export interface Known {
   seq: number;
 }
 
-export interface Op {
+interface Op {
   op: "insert" | "update" | "move" | "delete";
   id?: string;
   block?: { id: string } & Wire;

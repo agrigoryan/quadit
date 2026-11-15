@@ -35,14 +35,6 @@ export function findDecision(c: Collections, ref: string): Found | undefined {
   return decision ? { task, decision, ref: `${task.key}#${m[2]}` } : undefined;
 }
 
-/** How a decision is written in a page: its task's key and its number there. */
-export function refOf(c: Collections, decision: Decision): string | undefined {
-  const task = c.tasks[decision.task_id];
-  if (!task || task.deleted_at) return undefined;
-  const n = decisionsOf(c, task.id).findIndex((d) => d.id === decision.id);
-  return n < 0 ? undefined : `${task.key}#${n + 1}`;
-}
-
 /** Every decision that can be mentioned, the open ones first, then the latest asked. */
 export function mentionable(c: Collections): Found[] {
   const byTask = new Map<string, Decision[]>();

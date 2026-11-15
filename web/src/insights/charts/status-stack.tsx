@@ -11,7 +11,7 @@ import type { StatusCount } from "@/insights/lib/types";
 import { Tooltip } from "@/ui/tooltip";
 
 /** The order parts are drawn in, and the colour of each kind of status. */
-export const STACK: { category: Category; color: string; ink: string }[] = [
+const STACK: { category: Category; color: string; ink: string }[] = [
   { category: "done", color: "var(--viz-done)", ink: "var(--viz-on)" },
   { category: "started", color: "var(--viz-started)", ink: "var(--viz-on)" },
   { category: "waiting", color: "var(--viz-waiting)", ink: "var(--viz-on)" },
@@ -19,7 +19,7 @@ export const STACK: { category: Category; color: string; ink: string }[] = [
   { category: "backlog", color: "var(--viz-backlog)", ink: "var(--viz-on-backlog)" },
 ];
 
-export const categoryName = (c: Category) => t(`category.${c}` as "category.done");
+const categoryName = (c: Category) => t(`category.${c}` as "category.done");
 
 interface ProjectRow {
   project: string;
@@ -29,7 +29,7 @@ interface ProjectRow {
 }
 
 /** The counts grouped by project, parts in drawing order, statuses with no tasks left out. */
-export function byProject(rows: StatusCount[]): ProjectRow[] {
+function byProject(rows: StatusCount[]): ProjectRow[] {
   const out = new Map<string, ProjectRow>();
   for (const row of rows) {
     if (!out.has(row.project)) out.set(row.project, { project: row.project, parts: [], total: 0, canceled: 0 });

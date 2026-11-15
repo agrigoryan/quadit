@@ -10,7 +10,7 @@ import { stopSync } from "@/lib/sync";
 import { adoptAccountTheme, applyTheme, type ThemeChoice } from "@/lib/theme";
 import type { Role, User } from "@/lib/types";
 
-export interface Membership {
+interface Membership {
   id: string;
   slug: string;
   name: string;

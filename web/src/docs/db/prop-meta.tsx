@@ -26,7 +26,7 @@ import {
 import { t } from "@/lib/i18n";
 import { COMPUTED_TYPES, type DBProperty, type PropertyType, type ViewType } from "@/docs/types";
 
-export const PROP_ICONS: Record<PropertyType, LucideIcon> = {
+const PROP_ICONS: Record<PropertyType, LucideIcon> = {
   text: Type,
   number: Hash,
   select: CircleChevronDown,

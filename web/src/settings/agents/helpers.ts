@@ -7,7 +7,7 @@ import { useCollection } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 import type { AgentMember } from "@/settings/agents/data";
 
-export const isHelper = (m: Member): boolean => !!m.delegated_task;
+const isHelper = (m: Member): boolean => !!m.delegated_task;
 
 /** A helper whose task has closed: the server suspended it and ended its tokens. */
 export const isFinishedHelper = (m: Member): boolean => isHelper(m) && !!m.suspended_at;

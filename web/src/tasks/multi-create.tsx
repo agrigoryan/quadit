@@ -23,7 +23,7 @@ import { Select } from "@/ui/picker";
 const MARKER = /^\s*(?:[-*+•–]\s+|\d+[.)]\s+)?(?:\[[ xX]?\]\s+)?/;
 
 /** The titles in the text: one per line, list markers and blank lines dropped. */
-export function titlesOf(text: string): string[] {
+function titlesOf(text: string): string[] {
   return text
     .split(/\r?\n/)
     .map((line) => line.replace(MARKER, "").trim())

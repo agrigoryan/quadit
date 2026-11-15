@@ -23,7 +23,7 @@ export interface ThreadData {
 }
 
 /** Comments grouped into threads: each top-level comment with its replies. */
-export function threadsOf(comments: DocComment[]): ThreadData[] {
+function threadsOf(comments: DocComment[]): ThreadData[] {
   const byRoot = new Map<string, ThreadData>();
   for (const c of comments) {
     if (!c.parent_id)

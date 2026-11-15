@@ -11,7 +11,7 @@ import { FormAlert, FormField, FormFoot } from "@/settings/ui/form";
 import { Card } from "@/settings/ui/layout";
 
 /** Says a setting comes from the environment and names the variable to change. */
-export function LockNote({ env }: { env: string }) {
+function LockNote({ env }: { env: string }) {
   return (
     <p className="flex items-start gap-2 rounded-md bg-sunken px-2.5 py-2 text-sm text-ink-2">
       <Lock className="mt-0.5 size-3.5 shrink-0 text-ink-3" aria-hidden />

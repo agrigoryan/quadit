@@ -19,12 +19,12 @@ const dark = typeof matchMedia === "function" ? matchMedia("(prefers-color-schem
 
 const resolve = (c: ThemeChoice) => (c === "system" ? (dark?.matches ? "dark" : "light") : c);
 
-export function toThemeChoice(value: string | undefined | null): ThemeChoice {
+function toThemeChoice(value: string | undefined | null): ThemeChoice {
   return value === "light" || value === "dark" ? value : "system";
 }
 
 /** This device's own choice, as last made on it. */
-export function storedTheme(): ThemeChoice {
+function storedTheme(): ThemeChoice {
   try {
     return toThemeChoice(localStorage.getItem(KEY));
   } catch {

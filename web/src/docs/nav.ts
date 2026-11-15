@@ -23,7 +23,7 @@ function projectOnScreen() {
 }
 
 /** A page's address: in the Docs of the project on screen when it is one of that project's pages, else in the workspace's. */
-export function docPath(id: string): string {
+function docPath(id: string): string {
   const slug = getState().slug;
   const project = projectOnScreen();
   return `${project && inProject(getDocs(), id, project.id) ? projectDocs(slug, project) : workspaceDocs(slug)}/${id}`;

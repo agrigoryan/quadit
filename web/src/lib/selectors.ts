@@ -2,7 +2,7 @@
 // the rows it depends on change, so a list re-renders only when it must.
 
 import { useMemo } from "react";
-import { type Collections, type Dict, getState, useStore } from "@/lib/store";
+import { type Collections, type Dict, useStore } from "@/lib/store";
 import type { Cycle, Decision, Epic, Label, Member, Project, Status, Task, Template, View } from "@/lib/types";
 
 const byRank = (a: { rank?: string }, b: { rank?: string }) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1);
@@ -157,12 +157,6 @@ export function useUnreadCount(): number {
     () => Object.values(notifications).filter((n) => n.user_id === me.user_id && !n.read_at && !n.archived_at).length,
     [notifications, me.user_id],
   );
-}
-
-/** "@handle" for a user id, for messages built outside components. */
-export function handleOf(userId: string | undefined): string {
-  const m = userId ? getState().c.members[userId] : undefined;
-  return m ? `@${m.handle}` : "";
 }
 
 export const sortByRank = <T extends { rank?: string }>(rows: T[]): T[] => [...rows].sort(byRank);

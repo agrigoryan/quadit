@@ -74,12 +74,6 @@ export function ConfirmDialog({ open, onOpenChange, title, body, confirm, safe, 
   );
 }
 
-/** Copies text and says so. */
-export async function copyWithToast(text: string) {
-  if (await copyText(text)) toast.info(t("common.copied"));
-  else toast.error(t("common.copyFailed"));
-}
-
 interface CopyFieldProps {
   label?: string;
   value: string;

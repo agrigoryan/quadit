@@ -15,9 +15,9 @@ const HUES: Record<string, string> = {
   pink: "#db2777",
 };
 
-export const hueOf = (color: string | undefined) => HUES[color ?? "gray"] ?? HUES.gray;
+const hueOf = (color: string | undefined) => HUES[color ?? "gray"] ?? HUES.gray;
 
-export function optionStyle(color: string | undefined) {
+function optionStyle(color: string | undefined) {
   const hue = hueOf(color);
   return {
     background: `color-mix(in srgb, ${hue} 20%, transparent)`,

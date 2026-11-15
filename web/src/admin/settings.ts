@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api } from "@/lib/api";
 import { type FieldErrors, useFieldErrors } from "@/settings/ui/form";
 
-export interface SettingEntry {
+interface SettingEntry {
   value?: unknown;
   /** Set by an environment variable, which wins: shown locked. */
   from_env: boolean;
@@ -23,7 +23,7 @@ const PATH = "/api/v1/admin/settings";
 export const fetchSettings = () => api.get<{ settings: SettingsMap }>(PATH).then((r) => r.settings);
 
 /** The environment variable that sets a setting: "auth.google" is QUADIT_SETTING_AUTH_GOOGLE. */
-export const envName = (setting: string) => `QUADIT_SETTING_${setting.replace(/\./g, "_").toUpperCase()}`;
+const envName = (setting: string) => `QUADIT_SETTING_${setting.replace(/\./g, "_").toUpperCase()}`;
 
 interface Ctx {
   settings: SettingsMap;

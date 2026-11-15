@@ -57,7 +57,6 @@ export function dayOf(n: number): string {
 }
 
 export const addDays = (day: string, days: number) => dayOf(dayNumber(day) + days);
-export const daysBetween = (from: string, to: string) => dayNumber(to) - dayNumber(from);
 
 /** The calendar day a moment falls on, in the person's own time zone. */
 export function dayOfMs(ms: number): string {

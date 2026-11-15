@@ -24,7 +24,7 @@ interface DetailState {
   status: Record<string, string>;
 }
 
-export const useTaskDetailStore = create<DetailState>(() => ({ events: {}, status: {} }));
+const useTaskDetailStore = create<DetailState>(() => ({ events: {}, status: {} }));
 
 // A history belongs to the copy it was fetched for: at sign-out, in another
 // workspace, or once the person's access changed, none of it may remain.
@@ -35,7 +35,7 @@ function setStatus(taskId: string, status: string) {
 }
 
 /** Fetches everything in a task and merges it into the store. */
-export async function loadTask(taskId: string): Promise<void> {
+async function loadTask(taskId: string): Promise<void> {
   const { slug } = getState();
   if (!useTaskDetailStore.getState().events[taskId]) setStatus(taskId, "loading");
   try {

@@ -40,7 +40,7 @@ export const validName = (name: string) => NAME.test(name);
  * slash at the end. Null when it is not a host ("api.example.com",
  * "*.example.com", or "http://host:port" for one without TLS).
  */
-export function cleanHost(text: string): string | null {
+function cleanHost(text: string): string | null {
   const host = text
     .trim()
     .replace(/^https:\/\//i, "")

@@ -118,7 +118,7 @@ export function outcomeOf(decision: Decision): Outcome {
 }
 
 /** The answer as a short phrase: the option picked, "Approved", "None of the options". */
-export function answerText(decision: Decision): string {
+function answerText(decision: Decision): string {
   const outcome = outcomeOf(decision);
   if (outcome === "approved" || outcome === "declined") return t(`decision.outcome.${outcome}`);
   return pickedOption(decision)?.label ?? t("prefs.prefill.none");

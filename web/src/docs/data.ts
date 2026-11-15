@@ -55,7 +55,7 @@ export interface DocTree {
 }
 
 /** The page tree as the person may see it, without the trash, the archive and database rows. */
-export function buildTree(docs: Dict<Doc>, userId: string): DocTree {
+function buildTree(docs: Dict<Doc>, userId: string): DocTree {
   const roots: DocTree["roots"] = { team: [], private: [], memory: [], generated: [] };
   const children: Dict<Doc[]> = {};
   const shown = (d: Doc | undefined): d is Doc =>
@@ -76,7 +76,7 @@ export function buildTree(docs: Dict<Doc>, userId: string): DocTree {
  * with everything under it. A page under one of them that is tied elsewhere
  * stays in its place there, and says so (docs/project-mark.tsx).
  */
-export function projectTree(tree: DocTree, projectId: string): DocTree {
+function projectTree(tree: DocTree, projectId: string): DocTree {
   const roots: DocTree["roots"] = { team: [], private: [], memory: [], generated: [] };
   const collect = (list: Doc[], into: Doc[]) => {
     for (const doc of list) {

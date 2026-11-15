@@ -16,7 +16,7 @@ import type { FileRow } from "@/lib/types";
 import { localPath } from "@/lib/url";
 
 /** Files larger than this go in parts of this size. */
-export const PART_BYTES = 8 * 1024 * 1024;
+const PART_BYTES = 8 * 1024 * 1024;
 /** Uploads sent at the same time; the rest wait their turn. */
 const AT_ONCE = 3;
 /** Times in a row the server may fail on one part (answering, but with an error of its own) before the upload gives up. */

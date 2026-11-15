@@ -7,7 +7,7 @@ import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { byRank, getDoc, getDocs, sameProjectBelow } from "@/docs/data";
+import { getDoc, getDocs, sameProjectBelow } from "@/docs/data";
 import { loadPage } from "@/docs/store";
 import type { Doc, DocComment, DocKind } from "@/docs/types";
 
@@ -203,12 +203,6 @@ export function setRowProps(rowId: string, values: Fields) {
   send({ type: "doc.update", args: { id: rowId, props: values } }, (tx) =>
     tx.patch("docs", rowId, { props: next, updated_at: Date.now() }),
   );
-}
-
-/** The rank for a page dropped at `index` among `siblings` (which do not include it). */
-export function rankAt(siblings: { rank: string; id: string }[], index: number): string {
-  const sorted = [...siblings].sort(byRank);
-  return rankBetween(sorted[index - 1]?.rank, sorted[index]?.rank);
 }
 
 export const keepVersion = (docId: string, label: string) =>

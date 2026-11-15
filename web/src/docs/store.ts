@@ -9,7 +9,7 @@ import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@
 import type { FeedEvent } from "@/lib/types";
 import type { DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/docs/types";
 
-export interface PageMeta {
+interface PageMeta {
   mentioned_in: DocRef[];
   mentions: DocRef[];
   source?: DocSource;

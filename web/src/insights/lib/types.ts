@@ -4,7 +4,7 @@
 import type { Category } from "@/lib/types";
 
 /** A task as the server lists it: names instead of ids. */
-export interface TaskView {
+interface TaskView {
   key: string;
   title: string;
   status: string;

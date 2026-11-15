@@ -22,7 +22,7 @@ export interface BurnPoint {
 }
 
 /** The days so far, in tasks or in points. */
-export function burnPoints(days: ChartDay[], unit: "tasks" | "points"): BurnPoint[] {
+function burnPoints(days: ChartDay[], unit: "tasks" | "points"): BurnPoint[] {
   return days
     .filter((d) => d.scope >= 0)
     .map((d) =>

@@ -125,7 +125,7 @@ export interface NewOptionFile {
   role?: FileRole;
 }
 
-export interface NewOption {
+interface NewOption {
   id: string;
   label: string;
   description: string;

@@ -100,7 +100,7 @@ function answer<T>(status: number, text: string, quiet401?: boolean): T {
   return data as T;
 }
 
-export interface SendOptions {
+interface SendOptions {
   contentType?: string;
   signal?: AbortSignal;
   /** Called as the bytes leave, with how many of this request's have gone. */

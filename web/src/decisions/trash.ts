@@ -8,7 +8,7 @@ import { api, ApiError, errorMessage, ws } from "@/lib/api";
 import { useCollection, useSlug } from "@/lib/selectors";
 import { onEvents, useStore } from "@/lib/store";
 
-export interface TrashedDecision {
+interface TrashedDecision {
   id: string;
   question: string;
   /** The key of the task it was asked on: "SVA-1". */

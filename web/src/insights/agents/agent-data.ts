@@ -7,7 +7,7 @@ import type { Dict } from "@/lib/store";
 import { type Decision, isOpenCategory, type Task } from "@/lib/types";
 import type { Claim, Resource } from "@/insights/lib/types";
 
-export interface Asked {
+interface Asked {
   decision: Decision;
   task: Task;
 }

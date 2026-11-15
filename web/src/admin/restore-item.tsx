@@ -21,10 +21,10 @@ type Kind = "task" | "doc";
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /** A page's id, from the id itself or from a link to the page pasted whole. */
-export const pageIdOf = (text: string): string => text.match(UUID)?.[0].toLowerCase() ?? "";
+const pageIdOf = (text: string): string => text.match(UUID)?.[0].toLowerCase() ?? "";
 
 /** A task's key, from the key itself ("sva-12") or from a link that ends in it. */
-export const taskKeyOf = (text: string): string =>
+const taskKeyOf = (text: string): string =>
   text
     .trim()
     .match(/([A-Za-z][A-Za-z0-9]{1,9}-\d+)(?:[#?].*)?$/)?.[1]

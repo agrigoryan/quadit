@@ -236,7 +236,7 @@ export function Checkbox({ checked, onChange, children, disabled }: CheckProps) 
   );
 }
 
-export interface Choice {
+interface Choice {
   value: string;
   label: string;
 }

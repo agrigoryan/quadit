@@ -17,7 +17,7 @@ export function createAndOpen(input: NewDoc): string {
   return id;
 }
 
-export async function createFromMarkdown(base: NewDoc) {
+async function createFromMarkdown(base: NewDoc) {
   const file = await pickMarkdown();
   if (!file) return;
   const { title, body } = titleOf(file.text, file.name);

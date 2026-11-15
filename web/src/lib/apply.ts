@@ -8,7 +8,7 @@ import { localPath } from "@/lib/url";
 export type AnyRow = Record<string, unknown>;
 
 /** Which collection an event's entity_type lives in. */
-export const COLLECTION_OF: Record<string, CollectionName> = {
+const COLLECTION_OF: Record<string, CollectionName> = {
   task: "tasks",
   comment: "comments",
   decision: "decisions",

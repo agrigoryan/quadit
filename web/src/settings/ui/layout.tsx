@@ -8,7 +8,7 @@ import { Link, NavLink, useLocation } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 
-export interface NavEntry {
+interface NavEntry {
   /** Path under the base, e.g. "members". */
   to: string;
   label: string;

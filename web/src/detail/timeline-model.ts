@@ -35,7 +35,7 @@ export interface LineItem {
   quiet?: boolean;
 }
 
-export interface CommentItem {
+interface CommentItem {
   kind: "comment";
   id: string;
   at: number;

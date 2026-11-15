@@ -32,7 +32,7 @@ function updateAll(tasks: Task[], args: (task: Task) => Fields | null, local: (t
  * The status to use for a task when the one picked belongs to another
  * project: the same name there, else the first of the same category.
  */
-export function statusFor(task: Task, status: Status): Status | undefined {
+function statusFor(task: Task, status: Status): Status | undefined {
   if (status.project_id === task.project_id) return status;
   const own = statusesOf(getState().c.statuses, task.project_id);
   return own.find((s) => s.name === status.name) ?? own.find((s) => s.category === status.category);

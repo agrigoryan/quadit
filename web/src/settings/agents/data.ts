@@ -7,13 +7,13 @@ import { t } from "@/lib/i18n";
 import { useCollection } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 
-export interface Scope {
+interface Scope {
   projects?: string[];
   read_only?: boolean;
   needs_approval?: string[];
 }
 
-export interface Budget {
+interface Budget {
   cost_micros?: number;
   minutes?: number;
   /** How many times a week it may pass work on to another agent. */

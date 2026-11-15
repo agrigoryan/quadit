@@ -29,8 +29,7 @@ function initials(name: string): string {
 }
 
 /** An avatar is a picture's address, or a short text shown in its place: an emoji, or a letter or two. */
-export const isPictureAvatar = (avatar: string | undefined): boolean =>
-  !!avatar && /^(\/|https?:|data:|blob:)/.test(avatar);
+const isPictureAvatar = (avatar: string | undefined): boolean => !!avatar && /^(\/|https?:|data:|blob:)/.test(avatar);
 
 interface Props {
   member: Pick<Member, "user_id" | "name" | "kind" | "avatar"> | undefined;

@@ -69,7 +69,7 @@ export function Legend({ series, className }: { series: (Series & { value?: Reac
   );
 }
 
-export interface TipRow {
+interface TipRow {
   name: string;
   color?: string;
   value: ReactNode;

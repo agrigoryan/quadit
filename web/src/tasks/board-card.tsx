@@ -14,7 +14,7 @@ import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon } from "@/ui/icons";
 
 /** What a card shows; shared by the card in its column and the copy that follows the pointer. */
-export const CardBody = memo(function CardBody({ task }: { task: Task }) {
+const CardBody = memo(function CardBody({ task }: { task: Task }) {
   const labels = useStore((s) => s.c.labels);
   const decision = useDecisionFlag(task.id);
   const progress = useSubtaskProgress(task.id);

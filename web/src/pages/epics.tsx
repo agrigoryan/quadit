@@ -26,7 +26,7 @@ export function EpicsPage() {
 }
 
 /** "Oct 20 to Dec 18", or the one date there is. */
-export function epicDates(epic: Epic): string {
+function epicDates(epic: Epic): string {
   if (epic.start_on && epic.target_on)
     return t("cycles.range", { from: formatDay(epic.start_on), to: formatDay(epic.target_on) });
   if (epic.target_on) return t("epics.target", { day: formatDay(epic.target_on) });
