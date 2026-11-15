@@ -5,10 +5,12 @@ import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
+import { who } from "@/detail/data";
 import { setAssignee } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow, PropRow } from "@/tasks/properties/panel-row";
 import {
+  asText,
   type Choice,
   type CreateProps,
   NONE,
@@ -129,4 +131,13 @@ export const assignee = {
   Create: AssigneePill,
   palette: { icon: <UserRound />, useChoices },
   bulk: { place: "bar", icon: <UserRound className="size-3.5" aria-hidden /> },
+  timeline: [
+    {
+      field: "assignee_id",
+      say: (c, { actorId }) => {
+        if (!c.to) return t("timeline.unassigned");
+        return c.to === actorId ? t("timeline.took") : t("timeline.assigned", { name: who(asText(c.to)) });
+      },
+    },
+  ],
 } satisfies TaskProperty<"assignee">;

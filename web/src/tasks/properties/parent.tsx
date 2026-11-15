@@ -6,14 +6,14 @@ import { ArrowUpRight, CircleSlash, CornerLeftUp } from "lucide-react";
 import { Link } from "react-router";
 import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import { useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone, useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
 import { useTaskLink } from "@/lib/task-link";
 import type { Task } from "@/lib/types";
 import { TaskPicker } from "@/detail/task-picker";
 import { setParent } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PropButton, PropRow } from "@/tasks/properties/panel-row";
-import type { CreateProps, PanelProps, TaskProperty } from "@/tasks/properties/property";
+import { asText, type CreateProps, type PanelProps, type TaskProperty } from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
 import { Picker } from "@/ui/picker";
 import { Tooltip } from "@/ui/tooltip";
@@ -143,4 +143,13 @@ export const parent = {
   title: () => t("prop.parent"),
   Panel: ParentRow,
   Create: ParentPill,
+  timeline: [
+    {
+      field: "parent_id",
+      say: (c) => {
+        const key = getRowEvenIfGone("tasks", asText(c.to))?.key;
+        return key ? t("timeline.parent", { key }) : c.to ? null : t("timeline.parentCleared");
+      },
+    },
+  ],
 } satisfies TaskProperty<"parent">;

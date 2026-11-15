@@ -2,153 +2,38 @@
 // reads: "moved this from Todo to In progress". Always names, never ids. A
 // phrase is the part after the actor's name, so several can share one line.
 
-import { t } from "@/lib/i18n";
+import { joinPhrases, t } from "@/lib/i18n";
 import { getRowEvenIfGone } from "@/lib/selectors";
-import { formatDay } from "@/lib/time";
-import type { Attachment, Comment, Decision, FeedEvent, FieldChange, Relation, TaskLink } from "@/lib/types";
+import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/lib/types";
 import { linkName, type Side, sideOf, who } from "@/detail/data";
+import { TIMELINE } from "@/tasks/properties";
+import { asText, type Changes, type Phrase } from "@/tasks/properties/property";
 
-export type Changes = Record<string, FieldChange>;
-
-const str = (v: unknown): string => (typeof v === "string" ? v : "");
-const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
-
-/** The order phrases are said in when one line carries several. */
-type Writer = (
-  change: FieldChange,
-  ctx: { changes: Changes; actorId: string; data: FeedEvent["data"] },
-) => string | string[] | null;
-
-const writers: [string, Writer][] = [
-  ["title", (c) => t("timeline.renamed", { from: str(c.from), to: str(c.to) })],
-  ["description", () => t("timeline.description")],
-  [
-    "status_id",
-    (c) => {
-      const to = getRowEvenIfGone("statuses", str(c.to))?.name;
-      const from = getRowEvenIfGone("statuses", str(c.from))?.name;
-      if (!to) return null;
-      return from ? t("timeline.status", { from, to }) : t("timeline.statusTo", { to });
-    },
-  ],
-  [
-    "assignee_id",
-    (c, { actorId }) => {
-      if (!c.to) return t("timeline.unassigned");
-      return c.to === actorId ? t("timeline.took") : t("timeline.assigned", { name: who(str(c.to)) });
-    },
-  ],
-  [
-    "waiting_on_id",
-    (c, { changes }) => {
-      // Handed from someone to an outside event: the outside wait says it.
-      if (!c.to) return changes.waiting_outside?.to ? null : t("timeline.waitingCleared");
-      const note = str(changes.waiting_on_note?.to);
-      const name = who(str(c.to));
-      return note ? t("timeline.waitingNote", { name, note }) : t("timeline.waiting", { name });
-    },
-  ],
-  [
-    "waiting_outside",
-    (c, { changes }) => {
-      if (!c.to) return changes.waiting_on_id ? null : t("timeline.waitingCleared");
-      const note = str(changes.waiting_on_note?.to);
-      return note ? t("timeline.waitingOutsideNote", { note }) : t("timeline.waitingOutside");
-    },
-  ],
-  [
-    "waiting_on_note",
-    (c, { changes }) => {
-      // Said together with who or what it is for, when that changed too.
-      if (changes.waiting_on_id || changes.waiting_outside) return null;
-      return c.to ? t("timeline.noteSet", { note: str(c.to) }) : t("timeline.noteCleared");
-    },
-  ],
-  ["budget", (c) => (c.to ? t("timeline.budgetSet") : t("timeline.budgetCleared"))],
-  [
-    "priority",
-    (c) => {
-      const p = Number(c.to) || 0;
-      return p ? t("timeline.priority", { name: t(`priority.${p}` as "priority.1") }) : t("timeline.priorityCleared");
-    },
-  ],
-  [
-    "label_ids",
-    (c) => {
-      const before = ids(c.from);
-      const after = ids(c.to);
-      const names = (list: string[]) =>
-        list.map((id) => getRowEvenIfGone("labels", id)?.name).filter((n): n is string => !!n);
-      const added = names(after.filter((id) => !before.includes(id)));
-      const removed = names(before.filter((id) => !after.includes(id)));
-      const out: string[] = [];
-      if (added.length) out.push(t("timeline.labelAdded", { n: added.length, names: joinPhrases(added) }));
-      if (removed.length) out.push(t("timeline.labelRemoved", { n: removed.length, names: joinPhrases(removed) }));
-      return out;
-    },
-  ],
-  [
-    "epic_id",
-    (c) => {
-      const name = getRowEvenIfGone("epics", str(c.to))?.name;
-      return name ? t("timeline.epic", { name }) : c.to ? null : t("timeline.epicCleared");
-    },
-  ],
-  [
-    "milestone_id",
-    (c) => {
-      const name = getRowEvenIfGone("milestones", str(c.to))?.name;
-      return name ? t("timeline.milestone", { name }) : c.to ? null : t("timeline.milestoneCleared");
-    },
-  ],
-  [
-    "cycle_id",
-    (c) => {
-      const cycle = getRowEvenIfGone("cycles", str(c.to));
-      if (cycle) return t("timeline.cycle", { name: cycle.name || t("prop.cycleName", { n: String(cycle.number) }) });
-      return c.to ? null : t("timeline.cycleCleared");
-    },
-  ],
-  [
-    "estimate",
-    (c) => {
-      const n = Number(c.to) || 0;
-      return n ? t("timeline.estimate", { points: t("prop.points", { n }) }) : t("timeline.estimateCleared");
-    },
-  ],
-  ["due_on", (c) => (c.to ? t("timeline.due", { day: formatDay(str(c.to)) }) : t("timeline.dueCleared"))],
-  [
-    "parent_id",
-    (c) => {
-      const key = getRowEvenIfGone("tasks", str(c.to))?.key;
-      return key ? t("timeline.parent", { key }) : c.to ? null : t("timeline.parentCleared");
-    },
-  ],
-  [
-    "project_id",
-    (_c, { data }) => (data.moved_from ? t("timeline.movedProject", { key: str(data.moved_from) }) : null),
-  ],
-  ["archived_at", (c) => (c.to ? t("timeline.archived") : t("timeline.unarchived"))],
-  ["deleted_at", (c) => (c.to ? t("timeline.trashed") : t("timeline.restored"))],
+/** What a change to the task itself says, around what its properties say (tasks/properties). */
+const before: Phrase[] = [
+  { field: "title", say: (c) => t("timeline.renamed", { from: asText(c.from), to: asText(c.to) }) },
+  { field: "description", say: () => t("timeline.description") },
 ];
+const after: Phrase[] = [
+  { field: "archived_at", say: (c) => (c.to ? t("timeline.archived") : t("timeline.unarchived")) },
+  { field: "deleted_at", say: (c) => (c.to ? t("timeline.trashed") : t("timeline.restored")) },
+];
+
+/** Every field's phrase, in the order they are said in when one line carries several. */
+const phrases: Phrase[] = [...before, ...TIMELINE.flatMap((p) => p.timeline ?? []), ...after];
 
 /** The phrases for a set of field changes. Bookkeeping fields have no writer and say nothing. */
 export function changePhrases(changes: Changes, actorId: string, data: FeedEvent["data"]): string[] {
   const out: string[] = [];
-  for (const [field, write] of writers) {
+  for (const { field, say } of phrases) {
     const change = changes[field];
     if (!change) continue;
-    const said = write(change, { changes, actorId, data });
+    const said = say(change, { changes, actorId, data });
     if (Array.isArray(said)) out.push(...said);
     else if (said) out.push(said);
   }
   return out;
 }
-
-const listed = new Intl.ListFormat(undefined, { style: "long", type: "conjunction" });
-
-/** "a", "a and b", "a, b, and c", as the reader's language lists things. */
-export const joinPhrases = (parts: string[]): string => listed.format(parts);
 
 export function askedPhrase(d: Decision): string {
   return d.asked_id
@@ -200,7 +85,7 @@ export function linkRemovedPhrase(link: TaskLink | undefined): string {
  * original of a duplicate.
  */
 export function relatedPhrase(data: FeedEvent["data"]): string | null {
-  const key = str(data.other_key);
+  const key = asText(data.other_key);
   if (!key) return null;
   if (data.removed === true) return t("timeline.relationRemoved", { key });
   const side: Side = data.type === "blocks" ? "blockedBy" : data.type === "duplicates" ? "duplicatedBy" : "relates";

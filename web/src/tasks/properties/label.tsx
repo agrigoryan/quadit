@@ -1,13 +1,13 @@
 // A task's labels: any number of its project's (or the workspace's) labels.
 
 import { Tag } from "lucide-react";
-import { t } from "@/lib/i18n";
-import { useLabels, useLookupEvenIfGone } from "@/lib/selectors";
+import { joinPhrases, t } from "@/lib/i18n";
+import { getRowEvenIfGone, useLabels, useLookupEvenIfGone } from "@/lib/selectors";
 import { toggleLabel } from "@/tasks/actions";
 import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { leaving, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import type { CreateProps, PanelProps, TaskProperty } from "@/tasks/properties/property";
+import { asIds, type CreateProps, type PanelProps, type TaskProperty } from "@/tasks/properties/property";
 import { LabelChip } from "@/ui/badge";
 import { Picker } from "@/ui/picker";
 
@@ -102,4 +102,21 @@ export const label = {
     empty: () => t("palette.noLabels"),
   },
   bulk: { place: "bar", icon: <Tag className="size-3.5" aria-hidden /> },
+  timeline: [
+    {
+      field: "label_ids",
+      say: (c) => {
+        const before = asIds(c.from);
+        const after = asIds(c.to);
+        const names = (list: string[]) =>
+          list.map((id) => getRowEvenIfGone("labels", id)?.name).filter((n): n is string => !!n);
+        const added = names(after.filter((id) => !before.includes(id)));
+        const removed = names(before.filter((id) => !after.includes(id)));
+        const out: string[] = [];
+        if (added.length) out.push(t("timeline.labelAdded", { n: added.length, names: joinPhrases(added) }));
+        if (removed.length) out.push(t("timeline.labelRemoved", { n: removed.length, names: joinPhrases(removed) }));
+        return out;
+      },
+    },
+  ],
 } satisfies TaskProperty<"label">;

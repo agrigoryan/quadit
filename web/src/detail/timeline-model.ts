@@ -9,7 +9,6 @@ import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } fro
 import { type Known, knownRows, type StoredRows } from "@/detail/timeline-known";
 import {
   askedPhrase,
-  type Changes,
   changePhrases,
   commentDeletedPhrase,
   fileRemovedPhrase,
@@ -22,6 +21,7 @@ import {
   relationPhrase,
   relationRemovedPhrase,
 } from "@/detail/timeline-phrases";
+import type { Changes } from "@/tasks/properties/property";
 
 export interface LineItem {
   kind: "line";

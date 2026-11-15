@@ -2,12 +2,12 @@
 
 import { RefreshCw } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useCycles, useRowEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone, useCycles, useRowEvenIfGone } from "@/lib/selectors";
 import { formatDay } from "@/lib/time";
 import type { Cycle } from "@/lib/types";
 import { setCycle } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import { NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import { asText, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
 
 /** "Cycle 4", where it has no name of its own. */
@@ -53,4 +53,14 @@ export const cycle = {
     label: () => t("prop.set.cycle"),
     offered: (project) => !!project?.settings?.cycles,
   },
+  timeline: [
+    {
+      field: "cycle_id",
+      say: (c) => {
+        const row = getRowEvenIfGone("cycles", asText(c.to));
+        if (row) return t("timeline.cycle", { name: cycleName(row) });
+        return c.to ? null : t("timeline.cycleCleared");
+      },
+    },
+  ],
 } satisfies TaskProperty<"cycle">;

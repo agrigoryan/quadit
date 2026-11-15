@@ -115,4 +115,13 @@ export const estimate = {
     offered: (project) => project?.settings?.estimates !== false,
     Form: EstimateForm,
   },
+  timeline: [
+    {
+      field: "estimate",
+      say: (c) => {
+        const n = Number(c.to) || 0;
+        return n ? t("timeline.estimate", { points: t("prop.points", { n }) }) : t("timeline.estimateCleared");
+      },
+    },
+  ],
 } satisfies TaskProperty<"estimate">;

@@ -4,7 +4,7 @@ import { FolderInput } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useProjects } from "@/lib/selectors";
 import { moveToProject } from "@/tasks/actions";
-import { shared, type TaskProperty } from "@/tasks/properties/property";
+import { asText, shared, type TaskProperty } from "@/tasks/properties/property";
 import { projectItems } from "@/tasks/property-picker";
 
 export const project = {
@@ -19,4 +19,10 @@ export const project = {
     pick: moveToProject,
   },
   bulk: { place: "move", icon: <FolderInput />, label: () => t("bulk.move") },
+  timeline: [
+    {
+      field: "project_id",
+      say: (_c, { data }) => (data.moved_from ? t("timeline.movedProject", { key: asText(data.moved_from) }) : null),
+    },
+  ],
 } satisfies TaskProperty<"project">;

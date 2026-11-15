@@ -2,13 +2,13 @@
 
 import { CircleDot } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
-import { useRowEvenIfGone, useStatuses } from "@/lib/selectors";
+import { getRowEvenIfGone, useRowEvenIfGone, useStatuses } from "@/lib/selectors";
 import { useManageLinks } from "@/tasks/manage";
 import { leaving, Pill, pill } from "@/tasks/properties/create-pill";
 import { Picker } from "@/ui/picker";
 import { setStatus } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import { type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import { asText, type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { StatusIcon } from "@/ui/icons";
 
 function StatusRow(panel: PanelProps) {
@@ -78,4 +78,15 @@ export const status = {
       })),
   },
   bulk: { place: "bar", icon: <CircleDot className="size-3.5" aria-hidden /> },
+  timeline: [
+    {
+      field: "status_id",
+      say: (c) => {
+        const to = getRowEvenIfGone("statuses", asText(c.to))?.name;
+        const from = getRowEvenIfGone("statuses", asText(c.from))?.name;
+        if (!to) return null;
+        return from ? t("timeline.status", { from, to }) : t("timeline.statusTo", { to });
+      },
+    },
+  ],
 } satisfies TaskProperty<"status">;

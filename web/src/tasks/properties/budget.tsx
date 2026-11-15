@@ -145,4 +145,5 @@ export const budget = {
   name: "budget",
   title: () => t("prop.budget"),
   Panel: BudgetRow,
+  timeline: [{ field: "budget", say: (c) => (c.to ? t("timeline.budgetSet") : t("timeline.budgetCleared")) }],
 } satisfies TaskProperty<"budget">;

@@ -22,6 +22,11 @@ const grouped = new Intl.NumberFormat();
 /** A number as people write it: 116445 as "116,445". */
 export const formatNumber = (n: number) => grouped.format(n);
 
+const listed = new Intl.ListFormat(undefined, { style: "long", type: "conjunction" });
+
+/** "a", "a and b", "a, b, and c", as the reader's language lists things. */
+export const joinPhrases = (parts: string[]): string => listed.format(parts);
+
 export function t(key: Key, params?: Params): string {
   let text: string = current[key] ?? key;
   if (text.includes(" | ")) {

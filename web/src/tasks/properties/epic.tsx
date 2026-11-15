@@ -2,11 +2,18 @@
 
 import { Layers } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useEpics, useRowEvenIfGone } from "@/lib/selectors";
+import { getRowEvenIfGone, useEpics, useRowEvenIfGone } from "@/lib/selectors";
 import { setEpic } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import { type CreateProps, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import {
+  asText,
+  type CreateProps,
+  NONE,
+  type PanelProps,
+  shared,
+  type TaskProperty,
+} from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
 import { Picker } from "@/ui/picker";
 
@@ -64,4 +71,13 @@ export const epic = {
   Panel: EpicRow,
   Create: EpicPill,
   bulk: { place: "menu", icon: <Layers />, label: () => t("prop.set.epic") },
+  timeline: [
+    {
+      field: "epic_id",
+      say: (c) => {
+        const name = getRowEvenIfGone("epics", asText(c.to))?.name;
+        return name ? t("timeline.epic", { name }) : c.to ? null : t("timeline.epicCleared");
+      },
+    },
+  ],
 } satisfies TaskProperty<"epic">;

@@ -4,7 +4,7 @@
 import { memo, useMemo } from "react";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
+import { joinPhrases, t } from "@/lib/i18n";
 import { useLookup, useMember } from "@/lib/selectors";
 import { useTaskEvents } from "@/lib/task-detail";
 import type { Task } from "@/lib/types";
@@ -14,7 +14,6 @@ import { nameOf, useAttachmentsBySubject } from "@/detail/data";
 import { Section } from "@/detail/section";
 import { buildTimeline, commentHistory, type LineItem } from "@/detail/timeline-model";
 import { useStoredRows } from "@/detail/timeline-known";
-import { joinPhrases } from "@/detail/timeline-phrases";
 import { Avatar } from "@/ui/avatar";
 import { Loading } from "@/ui/spinner";
 

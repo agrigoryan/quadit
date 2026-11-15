@@ -2,11 +2,11 @@
 
 import { Target } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useEpics, useRowEvenIfGone, useRows } from "@/lib/selectors";
+import { getRowEvenIfGone, useEpics, useRowEvenIfGone, useRows } from "@/lib/selectors";
 import { formatDay } from "@/lib/time";
 import { setMilestone } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import { NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import { asText, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
 
 /** Shown for a task in an epic: milestones belong to epics. */
@@ -49,4 +49,13 @@ export const milestone = {
     pick: (tasks, id) => setMilestone(tasks, id === NONE ? null : id),
   },
   Panel: MilestoneRow,
+  timeline: [
+    {
+      field: "milestone_id",
+      say: (c) => {
+        const name = getRowEvenIfGone("milestones", asText(c.to))?.name;
+        return name ? t("timeline.milestone", { name }) : c.to ? null : t("timeline.milestoneCleared");
+      },
+    },
+  ],
 } satisfies TaskProperty<"milestone">;

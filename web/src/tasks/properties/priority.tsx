@@ -77,4 +77,13 @@ export const priority = {
       })),
   },
   bulk: { place: "bar", icon: <PriorityIcon priority={2} title="" /> },
+  timeline: [
+    {
+      field: "priority",
+      say: (c) => {
+        const p = Number(c.to) || 0;
+        return p ? t("timeline.priority", { name: t(`priority.${p}` as "priority.1") }) : t("timeline.priorityCleared");
+      },
+    },
+  ],
 } satisfies TaskProperty<"priority">;

@@ -10,10 +10,11 @@ import { t } from "@/lib/i18n";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
-import { nameOf } from "@/detail/data";
+import { nameOf, who } from "@/detail/data";
 import { setWaitingOn, setWaitingOutside, waitsOutside } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
 import {
+  asText,
   NONE,
   OUTSIDE,
   type PanelProps,
@@ -202,4 +203,32 @@ export const waiting = {
     List: WaitingList,
   },
   Panel: WaitingRow,
+  timeline: [
+    {
+      field: "waiting_on_id",
+      say: (c, { changes }) => {
+        // Handed from someone to an outside event: the outside wait says it.
+        if (!c.to) return changes.waiting_outside?.to ? null : t("timeline.waitingCleared");
+        const note = asText(changes.waiting_on_note?.to);
+        const name = who(asText(c.to));
+        return note ? t("timeline.waitingNote", { name, note }) : t("timeline.waiting", { name });
+      },
+    },
+    {
+      field: "waiting_outside",
+      say: (c, { changes }) => {
+        if (!c.to) return changes.waiting_on_id ? null : t("timeline.waitingCleared");
+        const note = asText(changes.waiting_on_note?.to);
+        return note ? t("timeline.waitingOutsideNote", { note }) : t("timeline.waitingOutside");
+      },
+    },
+    {
+      field: "waiting_on_note",
+      say: (c, { changes }) => {
+        // Said together with who or what it is for, when that changed too.
+        if (changes.waiting_on_id || changes.waiting_outside) return null;
+        return c.to ? t("timeline.noteSet", { note: asText(c.to) }) : t("timeline.noteCleared");
+      },
+    },
+  ],
 } satisfies TaskProperty<"waiting">;

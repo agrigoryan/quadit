@@ -8,7 +8,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import type { Key } from "@/lib/i18n";
-import type { Project, Task } from "@/lib/types";
+import type { FeedEvent, FieldChange, Project, Task } from "@/lib/types";
 import type { PickerItem } from "@/ui/picker";
 
 /** "Nothing set", where an id would be: in a picker, a filter, a group. */
@@ -37,7 +37,31 @@ export interface TaskProperty<Name extends string = string> {
   palette?: PalettePart;
   /** Changing it on every task of a selection, from the bulk bar. */
   bulk?: BulkPart;
+  /** How the timeline says it changed: the task's fields it is stored in, each with its phrase. */
+  timeline?: Phrase[];
 }
+
+/** The fields one change to a task changed, by name. */
+export type Changes = Record<string, FieldChange>;
+
+/**
+ * What the timeline says, after the actor's name, for one field that
+ * changed: "moved this from Todo to Doing". Nothing (null or []) when there
+ * is nothing worth saying, or when another field of the same change says it.
+ */
+export interface Phrase {
+  field: string;
+  say: (
+    change: FieldChange,
+    ctx: { changes: Changes; actorId: string; data: FeedEvent["data"] },
+  ) => string | string[] | null;
+}
+
+/** A field's value as text, or "" when it is not one. */
+export const asText = (v: unknown): string => (typeof v === "string" ? v : "");
+/** A field's value as a list of ids, or [] when it is not one. */
+export const asIds = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
 export interface PalettePart {
   icon: ReactNode;

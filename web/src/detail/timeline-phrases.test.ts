@@ -3,7 +3,8 @@
 // order the phrases are said in when one change carries several.
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { changePhrases, type Changes } from "@/detail/timeline-phrases";
+import { changePhrases } from "@/detail/timeline-phrases";
+import type { Changes } from "@/tasks/properties/property";
 import { clearStore, loadBootstrap } from "@/lib/store";
 import type { Member, User, Workspace } from "@/lib/types";
 

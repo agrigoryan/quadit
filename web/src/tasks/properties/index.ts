@@ -67,6 +67,26 @@ export const CREATE: (TaskProperty<PropertyName> & { Create: ComponentType<Creat
   due,
 ];
 
+/**
+ * The order the timeline says what changed in, when one change carries
+ * several: the budget straight after the wait, where the panel shows it last.
+ */
+export const TIMELINE: TaskProperty<PropertyName>[] = [
+  status,
+  assignee,
+  waiting,
+  budget,
+  priority,
+  label,
+  epic,
+  milestone,
+  cycle,
+  estimate,
+  due,
+  parent,
+  project,
+];
+
 /** The ones the command palette changes on the open task, in the table's order. */
 export const PALETTE = PROPERTIES.filter(
   (p): p is TaskProperty<PropertyName> & PickerProperty & { palette: PalettePart } => !!p.picker && !!p.palette,

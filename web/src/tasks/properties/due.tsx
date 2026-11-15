@@ -10,7 +10,7 @@ import type { Task } from "@/lib/types";
 import { setDue } from "@/tasks/actions";
 import { Pill, pill } from "@/tasks/properties/create-pill";
 import { inlineField, PropRow } from "@/tasks/properties/panel-row";
-import { type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import { asText, type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";
@@ -109,4 +109,10 @@ export const due = {
   Panel: DueRow,
   Create: DuePill,
   bulk: { place: "menu", icon: <CalendarDays />, label: () => t("bulk.due"), Form: DueForm },
+  timeline: [
+    {
+      field: "due_on",
+      say: (c) => (c.to ? t("timeline.due", { day: formatDay(asText(c.to)) }) : t("timeline.dueCleared")),
+    },
+  ],
 } satisfies TaskProperty<"due">;
