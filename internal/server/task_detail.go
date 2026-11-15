@@ -142,7 +142,7 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 
 	// Its links: branches, pull requests, addresses.
 	var links []core.TaskLink
-	if err := who.db.List(ctx, &links, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
+	if err := who.db.List(ctx, &links, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_at,id"}); err != nil {
 		return d, err
 	}
 	for _, l := range links {
@@ -228,13 +228,13 @@ func (who *viewer) taskRows(ctx context.Context, t core.Task) (map[string]any, e
 	if err := who.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_seq"}); err != nil {
 		return nil, err
 	}
-	if err := who.db.List(ctx, &links, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
+	if err := who.db.List(ctx, &links, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_at,id"}); err != nil {
 		return nil, err
 	}
 	if err := who.db.List(ctx, &watchers, store.Where(store.Eq("subject_id", t.ID))); err != nil {
 		return nil, err
 	}
-	if err := who.db.List(ctx, &sessions, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID)}, Order: "-started_at", Limit: 50}); err != nil {
+	if err := who.db.List(ctx, &sessions, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID)}, Order: "-started_at,id", Limit: 50}); err != nil {
 		return nil, err
 	}
 	_, atts, err := who.attachments(ctx, store.Eq("task_id", t.ID))
@@ -252,7 +252,7 @@ func (who *viewer) taskRows(ctx context.Context, t core.Task) (map[string]any, e
 		targets = append(targets, decision.ID)
 	}
 	var refs []core.Ref
-	if err := who.db.List(ctx, &refs, store.Where(store.In("to_id", targets))); err != nil {
+	if err := who.db.List(ctx, &refs, store.Q{Where: []store.Cond{store.In("to_id", targets)}, Order: "from_id,to_id"}); err != nil {
 		return nil, err
 	}
 	mentioned, err := who.namedRefs(ctx, refs)

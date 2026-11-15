@@ -247,7 +247,7 @@ func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.
 	out["comments"] = comments
 	// What mentions this page, of what the viewer may see, and what it mentions.
 	var refs, back, fwd []core.Ref
-	if err := who.db.List(ctx, &refs, store.Where(store.Eq("to_id", page.ID))); err != nil {
+	if err := who.db.List(ctx, &refs, store.Q{Where: []store.Cond{store.Eq("to_id", page.ID)}, Order: "from_id"}); err != nil {
 		return nil, err
 	}
 	seen, err := who.namedRefs(ctx, refs)
@@ -257,7 +257,7 @@ func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.
 	for _, ref := range seen {
 		back = append(back, ref.Ref)
 	}
-	if err := who.db.List(ctx, &fwd, store.Where(store.Eq("from_scope_id", page.ID))); err != nil {
+	if err := who.db.List(ctx, &fwd, store.Q{Where: []store.Cond{store.Eq("from_scope_id", page.ID)}, Order: "from_id,to_id"}); err != nil {
 		return nil, err
 	}
 	out["mentioned_in"], out["mentions"] = back, fwd

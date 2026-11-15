@@ -256,9 +256,9 @@ var rowKinds = []rowKind{
 	kindOf("decision_options", wholeOnly[core.Option]()).exported(live("rank")),
 	kindOf("comments", wholeOnly[core.Comment]()).exported(live("created_seq")),
 	kindOf("relations", onTask(func(r core.Relation) string { return r.TaskID })).
-		listed("created_at").copied(toEveryone(store.Q{})).exported(store.Q{}),
+		listed("created_at,id").copied(toEveryone(store.Q{})).exported(store.Q{}),
 	kindOf("links", onTask(func(l core.TaskLink) string { return l.TaskID })).
-		listed("created_at").exported(live("")),
+		listed("created_at,id").exported(live("")),
 	filled(kindOf("attachments", rule[core.Attachment](visibleAttachments)), fillAttachments).
 		listedBy(attachmentsQuery).exported(live("")),
 	kindOf("files", wholeOnly[core.File]()).exported(live("")),
@@ -278,8 +278,8 @@ var rowKinds = []rowKind{
 	kindOf("claims", onTask(func(cl core.ResourceClaim) string { return cl.TaskID })).
 		listed("requested_at", store.Ne("state", core.ClaimReleased)).copied(toEveryone(store.Where(store.Ne("state", core.ClaimReleased)))),
 	kindOf("sessions", onTask(func(s core.AgentSession) string { return s.TaskID })).
-		listed("-started_at").copied(func(*viewer) store.Q {
-		return store.Q{Where: []store.Cond{store.Gte("started_at", time.Now().Add(-copySessionsFor).UnixMilli())}, Order: "-started_at", Limit: copyLatest}
+		listed("-started_at,id").copied(func(*viewer) store.Q {
+		return store.Q{Where: []store.Cond{store.Gte("started_at", time.Now().Add(-copySessionsFor).UnixMilli())}, Order: "-started_at,id", Limit: copyLatest}
 	}),
 	kindOf("notifications", ownOnly(func(n core.Notification) string { return n.UserID })).
 		copied(func(who *viewer) store.Q {

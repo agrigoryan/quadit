@@ -164,7 +164,7 @@ func (s *Server) handleListTokens(x *c) error {
 		conds = append(conds, store.Eq("user_id", x.member.UserID))
 	}
 	var ts []core.APIToken
-	if err := x.db.List(x.ctx(), &ts, store.Q{Where: conds, Order: "-created_at"}); err != nil {
+	if err := x.db.List(x.ctx(), &ts, store.Q{Where: conds, Order: "-created_at,id"}); err != nil {
 		return err
 	}
 	return x.ok(map[string]any{"tokens": ts})

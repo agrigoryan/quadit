@@ -82,7 +82,7 @@ type agentWork struct {
 func (who *viewer) agentWork(ctx context.Context, tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
 	w := &agentWork{who: who, ctx: ctx, names: names, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
 	if err := who.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", core.AgentSessionRunning), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
-		Order: "-started_at"}); err != nil {
+		Order: "-started_at,id"}); err != nil {
 		return nil, err
 	}
 	w.sessions = onTask(func(session core.AgentSession) string { return session.TaskID })(ctx, who, w.sessions)
