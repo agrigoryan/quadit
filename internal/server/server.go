@@ -242,7 +242,8 @@ type c struct {
 	// projects by the token's scopes (enterWorkspace).
 	actor engine.Actor
 	// projects, when not nil, are the only projects this caller may read:
-	// the membership's scope, narrowed by the token's (enterWorkspace).
+	// the membership's scope, narrowed by the token's (enterWorkspace). nil
+	// lets in every project; engine.NoProjects() lets in none.
 	projects  []string
 	db        store.DB    // bound to ws (enterWorkspace)
 	nameCache *nameLookup // the workspace's names, loaded once per request (query.go)
@@ -771,7 +772,7 @@ func (x *c) applyTokenScopes() {
 		}
 	}
 	if both == nil {
-		both = []string{"none"} // no project in both: a list that matches none
+		both = engine.NoProjects() // no project in both
 	}
 	x.projects = both
 }

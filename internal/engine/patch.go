@@ -123,7 +123,8 @@ type target struct {
 }
 
 // save writes the patch to one row and emits "<entity>.updated" with the
-// changes.
+// changes, and makes the row the change's answer (c.ref), even when the
+// patch is empty and nothing is written.
 func (c *cx) save(p *patch, row target) error {
 	c.ref = row.id
 	if p.empty() {
@@ -143,7 +144,8 @@ func (c *cx) save(p *patch, row target) error {
 	return c.emit(event{seq: seq, typ: row.entity + ".updated", entity: row.entity, entityID: row.id, place: row.place, data: data})
 }
 
-// trash moves a row to the trash and emits "<entity>.deleted".
+// trash moves a row to the trash and emits "<entity>.deleted", and makes
+// the row the change's answer (c.ref).
 func (c *cx) trash(row target) error {
 	c.ref = row.id
 	seq := c.tx.NextSeq()

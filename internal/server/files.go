@@ -664,7 +664,7 @@ func (s *Server) maySeeFile(x *c, f core.File) bool {
 
 // filesAllowedProjects is the projects whose files a member sees through
 // the request's credential: the member's own limit, narrowed by a token's
-// project scopes. None means no limit; "none" means no project at all.
+// project scopes. nil means no limit; engine.NoProjects() no project at all.
 func filesAllowedProjects(x *c, m core.Member) []string {
 	var allowed []string
 	if m.Scope != nil {
@@ -687,7 +687,7 @@ func filesAllowedProjects(x *c, m core.Member) []string {
 	}
 	allowed = keep(allowed, func(p string) bool { return slices.Contains(mine, p) })
 	if len(allowed) == 0 {
-		return []string{"none"}
+		return engine.NoProjects()
 	}
 	return allowed
 }

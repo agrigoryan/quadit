@@ -100,7 +100,9 @@ type Q struct {
 	Where []Cond
 	// Order is a comma-separated list of columns; a leading "-" sorts
 	// descending: "rank", "-created_at,id".
-	Order  string
+	Order string
+	// Limit is the most rows to load; 0 loads every matching row. Offset
+	// skips that many first, and is used only with a Limit.
 	Limit  int
 	Offset int
 }
@@ -117,13 +119,20 @@ type DB interface {
 	Get(ctx context.Context, dst any, where ...Cond) error
 	// List loads the matching rows into dst, a pointer to a slice.
 	List(ctx context.Context, dst any, q Q) error
+	// Count counts the rows of the named table ("tasks") that match where.
 	Count(ctx context.Context, table string, where ...Cond) (int, error)
+	// Insert adds row, a registered struct or a pointer to one. In a DB
+	// bound to a workspace, the row's workspace_id is that workspace,
+	// whatever the row says. A row that breaks a unique rule (an id or a
+	// name already taken) is ErrConflict, and nothing is written.
 	Insert(ctx context.Context, row any) error
 	// Upsert inserts row, or updates every non-key column if a row with the
 	// same key columns exists.
 	Upsert(ctx context.Context, row any, key ...string) error
 	// Update sets columns on the matching rows and returns how many changed.
 	Update(ctx context.Context, table string, set map[string]any, where ...Cond) (int64, error)
+	// Delete removes the matching rows for good, and returns how many there
+	// were. It is not the trash: that is deleted_at, set with Update.
 	Delete(ctx context.Context, table string, where ...Cond) (int64, error)
 	// Incr adds n to a counter column on one row and returns the new value.
 	Incr(ctx context.Context, table, col string, n int64, where ...Cond) (int64, error)
@@ -231,7 +240,9 @@ type TaskFilter struct {
 	Archived      bool   // include archived tasks
 	// Sort is one of: created (default), -created, rank, priority, due,
 	// -activity, -updated, key.
-	Sort   string
+	Sort string
+	// Limit is the most tasks to return: 0, or more than 5000, gives 100,
+	// unlike Q.Limit, where 0 is every row.
 	Limit  int
 	Offset int
 }

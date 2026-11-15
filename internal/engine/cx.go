@@ -20,9 +20,11 @@ type cx struct {
 	scope     core.Scope
 	change    Change
 	events    []core.Event
-	ref, key  string
-	subRef    string // the ref of the last change run with sub
-	notified  map[string]bool
+	// ref and key are the change's answer (Result.Ref, Result.Key): created,
+	// save and trash set ref to the row they write; a handler sets key.
+	ref, key string
+	subRef   string // the ref of the last change run with sub
+	notified map[string]bool
 	// system is set while the engine itself acts (rules, roll-overs): role
 	// and scope checks are skipped.
 	system bool
@@ -110,7 +112,8 @@ func (c *cx) emit(e event) error {
 	return nil
 }
 
-// created emits "<entity>.created" carrying the whole new row.
+// created emits "<entity>.created" carrying the whole new row, and makes
+// the row the change's answer (c.ref).
 func (c *cx) created(seq int64, entity, entityID string, where place, row any) error {
 	c.ref = entityID
 	return c.emit(event{seq: seq, typ: entity + ".created", entity: entity, entityID: entityID, place: where, data: core.EventData{Row: row}})

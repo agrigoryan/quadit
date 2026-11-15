@@ -52,7 +52,9 @@ type Engine struct {
 	// seal encrypts a secret before it is stored; nil keeps none.
 	seal func(plain string) (string, error)
 	// OnCommit, when set, is called after a write commits with the
-	// workspace and its new position in the feed.
+	// workspace and its new position in the feed. It runs on the goroutine
+	// that made the write, before Apply, Batch or System returns, so it
+	// must not block; it is not called for a dry run or a write that failed.
 	OnCommit func(workspaceID string, seq int64)
 }
 

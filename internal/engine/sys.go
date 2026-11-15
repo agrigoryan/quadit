@@ -40,7 +40,9 @@ func (e *Engine) System(ctx context.Context, workspaceID, actorID string, fn fun
 // Sys is what a system write may do.
 type Sys struct{ c *cx }
 
-// Do runs one change type with the given arguments, skipping role checks.
+// Do runs one change type with the given arguments as the engine itself:
+// with no role, scope, project or approval checks, and without recording it
+// as applied, so a Do run twice does its work twice (Once guards that).
 func (s *Sys) Do(changeType string, args any) error {
 	h, ok := handlers[changeType]
 	if !ok {

@@ -30,10 +30,14 @@ func intersectProjects(a, b []string) []string {
 		}
 	}
 	if len(out) == 0 {
-		out = []string{"none"} // both lists exist but share nothing
+		out = NoProjects() // both lists exist but share nothing
 	}
 	return out
 }
+
+// NoProjects is a project limit that lets in no project. It is a list that
+// matches none, because an empty limit lets in every project.
+func NoProjects() []string { return []string{"none"} }
 
 // checkAsker holds an agent, on a task a person gave to an agent, to that
 // person's access: the work runs as the one who asked for it, not with the
