@@ -1,9 +1,11 @@
 package engine_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
@@ -61,5 +63,35 @@ func TestStaleUpdateListsTheChangedFieldsInOneOrder(t *testing.T) {
 		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "title": "Big explosion", "description": "boom", "priority": 2})
 		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "estimate": 3, "due_on": "2030-01-02"})
 		w.sameRefusal(engine.CodeStale, w.owner.ID, "task.update", M{"id": "SVA-1", "title": "Mine", "base_seq": base})
+	})
+}
+
+// A change that would break a uniqueness rule names the value asked for,
+// the same as when the thing is created with it.
+func TestTakenUpdateNamesTheValue(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "ALP", "name": "Alpha"})
+		beta := w.do(w.owner.ID, "project.create", M{"key": "BET", "name": "Beta"}).Ref
+		created := w.refused(engine.CodeConflict, w.owner.ID, "project.create", M{"key": "ALP", "name": "Again"})
+		updated := w.refused(engine.CodeConflict, w.owner.ID, "project.update", M{"id": beta, "key": "alp"})
+		if want := `project key "ALP" is already in use`; created.Message != want || updated.Message != want {
+			t.Errorf("create said %q, update said %q; both should say %q", created.Message, updated.Message, want)
+		}
+
+		var done core.Status
+		if err := w.db().Get(context.Background(), &done, store.Eq("project_id", beta), store.Eq("name", "Done")); err != nil {
+			t.Fatal(err)
+		}
+		e := w.refused(engine.CodeConflict, w.owner.ID, "status.update", M{"id": done.ID, "name": "Canceled"})
+		if want := `status name "Canceled" is already in use`; e.Message != want {
+			t.Errorf("status.update said %q, want %q", e.Message, want)
+		}
+
+		w.agent("artist")
+		e = w.refused(engine.CodeConflict, w.owner.ID, "member.update", M{"id": w.owner.ID, "handle": "artist"})
+		if want := "the handle @artist is taken"; e.Message != want {
+			t.Errorf("member.update said %q, want %q", e.Message, want)
+		}
 	})
 }

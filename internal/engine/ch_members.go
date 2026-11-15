@@ -184,8 +184,8 @@ func (c *cx) saveMember(m core.Member, p *patch) error {
 	seq := c.tx.NextSeq()
 	p.set["updated_seq"] = seq
 	if _, err := c.tx.Update(c.ctx, "members", p.set, store.Eq("user_id", m.UserID)); err != nil {
-		if errors.Is(err, store.ErrConflict) {
-			return conflictErr("that handle is taken")
+		if h, ok := p.set["handle"].(string); ok && errors.Is(err, store.ErrConflict) {
+			return conflictErr("the handle @%s is taken", h)
 		}
 		return err
 	}

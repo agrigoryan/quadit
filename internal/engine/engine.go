@@ -93,7 +93,12 @@ type Error struct {
 	Nearest string   `json:"nearest,omitempty"` // the allowed value closest to what was sent
 	// Index is the position of the refused change in a batch.
 	Index int `json:"index,omitempty"`
+	// cause is the store's error behind the refusal, so that a caller who
+	// knows better what was taken can still say so.
+	cause error
 }
+
+func (e *Error) Unwrap() error { return e.cause }
 
 func (e *Error) Error() string {
 	msg := e.Code + ": " + e.Message
@@ -136,9 +141,15 @@ func missing(err error, what, ref string) error {
 	return err
 }
 
+// taken turns a broken uniqueness rule into a refusal naming what was
+// asked for. The refusal still is the store's conflict underneath, so a
+// handler around a generic write (save names only the row) can name the
+// value instead.
 func taken(err error, what, value string) error {
 	if errors.Is(err, store.ErrConflict) {
-		return conflictErr("%s %q is already in use", what, value)
+		e := conflictErr("%s %q is already in use", what, value)
+		e.cause = err
+		return e
 	}
 	return err
 }
