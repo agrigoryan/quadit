@@ -74,6 +74,7 @@ export const docs = {
   "docs.cover.notImage": "Choose an image file: PNG, JPEG, WebP or GIF",
   "docs.icon.add": "Add icon",
   "docs.icon.change": "Change icon",
+  "docs.icon.changeOf": "Change icon of {title}",
   "docs.icon.pick": "Pick an icon",
   "docs.icon.type": "Or type an emoji",
   "docs.icon.remove": "Remove",

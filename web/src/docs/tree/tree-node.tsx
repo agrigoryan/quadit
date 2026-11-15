@@ -98,8 +98,7 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
           <IconPicker docId={doc.id} current={doc.icon} open={iconOpen} onOpenChange={setIconOpen}>
             <button
               type="button"
-              tabIndex={-1}
-              aria-label={t("docs.icon.change")}
+              aria-label={t("docs.icon.changeOf", { title })}
               className="flex size-5 shrink-0 items-center justify-center rounded-sm hover:bg-press"
             >
               <PageIcon doc={doc} />
