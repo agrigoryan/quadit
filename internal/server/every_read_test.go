@@ -438,6 +438,14 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	do("comment OPS runbook", "comment.create", M{"doc": rw.id("doc OPS runbook"), "body": "The cellar floods."})
 	s.call(nil, rw.artist, "POST", w+"/memory", M{"title": "Palette", "markdown": "Reds and golds."}, 201, nil)
 	s.call(nil, rw.ops, "POST", w+"/memory", M{"title": "Vault", "markdown": "Third shelf."}, 201, nil)
+	// A page made private after it had a sub-page, and one under that: they
+	// are private with it.
+	do("doc Plans", "doc.create", M{"title": "Plans", "markdown": "Where we go next.\n"})
+	do("doc Plans sub-page", "doc.create", M{"parent": rw.id("doc Plans"), "title": "Quarter one", "markdown": "Ship the boss. See SVA-1.\n"})
+	do("doc Plans sub-sub-page", "doc.create", M{"parent": rw.id("doc Plans sub-page"), "title": "Week one", "markdown": "Draw phase one, as the [[Handbook]] says.\n"})
+	do("comment Week one", "comment.create", M{"doc": rw.id("doc Plans sub-sub-page"), "body": "Phase one first."})
+	do("attachment Week one", "attachment.add", M{"doc": rw.id("doc Plans sub-sub-page"), "file": file("week.txt", "the week's plan")})
+	change(owner, "", "doc.update", M{"id": rw.id("doc Plans"), "private": true})
 
 	// The pages built from data are built on their first read; that is done
 	// here, so that no read of the recording writes.
@@ -690,7 +698,7 @@ func (rw *richWorkspace) reads() []read {
 		"/docs?since=0&format=text", "/docs?since=99999&format=text")...)
 	for _, name := range []string{"doc Handbook", "doc Release notes", "doc Salary notes", "doc For Bea", "doc Bea's own", "doc SVA design", "doc SVA sub-page", "doc OPS runbook",
 		"doc OPS sub-page", "doc OPS private", "doc Sprites", "row Boss attack", "doc Servers", "row cellar", "doc Decision log", "doc Open questions", "doc Changelog",
-		"doc archived", "doc removed", "doc OPS removed", "doc mirrored"} {
+		"doc archived", "doc removed", "doc OPS removed", "doc mirrored", "doc Plans", "doc Plans sub-page", "doc Plans sub-sub-page"} {
 		add(inWS("/docs/{id}", "/docs/"+id(name), "/docs/"+id(name)+"?format=md", "/docs/"+id(name)+"?format=text")...)
 		add(inWS("/docs/{id}/versions", "/docs/"+id(name)+"/versions")...)
 	}
@@ -713,7 +721,7 @@ func (rw *richWorkspace) reads() []read {
 
 	// Files, tokens, secrets and the rest.
 	for _, name := range []string{"file notes.txt", "file vault.txt", "file ring.txt", "file nights.txt", "file gone.txt", "file ops-gone.txt", "file burst.txt", "file loose.txt",
-		"file handbook.txt", "file runbook.txt", "file salaries.txt"} {
+		"file handbook.txt", "file runbook.txt", "file salaries.txt", "file week.txt"} {
 		add(inWS("/files/{id}", "/files/"+id(name))...)
 		add(read{route: "GET /f/{id}/{name...}", path: "/f/" + id(name) + "/" + strings.TrimPrefix(name, "file ")})
 	}

@@ -224,6 +224,7 @@ func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.
 	if err := who.db.List(ctx, &children, store.Q{Where: []store.Cond{store.Eq("parent_id", page.ID), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
+	children = keep(children, who.canSeeDoc) // someone may keep a sub-page private
 	if page.Kind == core.DocDatabase {
 		// A database's children are its rows; any others are its sub-pages.
 		var props []core.DBProperty
@@ -244,10 +245,17 @@ func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.
 		return nil, err
 	}
 	out["comments"] = comments
-	// What mentions this page, and what it mentions.
-	var back, fwd []core.Ref
-	if err := who.db.List(ctx, &back, store.Where(store.Eq("to_id", page.ID))); err != nil {
+	// What mentions this page, of what the viewer may see, and what it mentions.
+	var refs, back, fwd []core.Ref
+	if err := who.db.List(ctx, &refs, store.Where(store.Eq("to_id", page.ID))); err != nil {
 		return nil, err
+	}
+	seen, err := who.namedRefs(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+	for _, ref := range seen {
+		back = append(back, ref.Ref)
 	}
 	if err := who.db.List(ctx, &fwd, store.Where(store.Eq("from_scope_id", page.ID))); err != nil {
 		return nil, err

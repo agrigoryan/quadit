@@ -1,6 +1,9 @@
 package server_test
 
 import (
+	"archive/zip"
+	"io"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -139,4 +142,105 @@ func TestAnExportIsNotForATokenLimitedToSomeProjects(t *testing.T) {
 			t.Fatalf("the refusal: %s", out)
 		}
 	})
+}
+
+// TestAPrivatePagesSubPagesAreNotSeenByOthers: a page made private after
+// it had sub-pages takes them along. Another member, an admin even, does
+// not get the sub-page or the one under it in the page list, cannot open
+// them, does not find them or what is on them by search, in the starting
+// copy, the list of files or an export, is not told of what happens to
+// them afterwards, and does not see them among what mentions a page or a
+// task, or among a page's sub-pages.
+func TestAPrivatePagesSubPagesAreNotSeenByOthers(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &tok)
+		other := tok.Token
+		page := func(args M) string { return s.change(s.owner, "", "doc.create", args)["ref"].(string) }
+		handbook := page(M{"title": "Handbook"})
+		plans := page(M{"title": "Plans"})
+		q1 := page(M{"parent": plans, "title": "Quarter one", "markdown": "quokka\n"})
+		week := page(M{"parent": q1, "title": "Week one", "markdown": "quokka, see SVA-1 and [[Handbook]]\n"})
+		s.change(s.owner, "", "comment.create", M{"doc": week, "body": "wombat"})
+		var f struct{ ID string }
+		s.call(s.owner, "", "POST", w+"/files?name=week.txt", []byte("x"), 201, &f)
+		s.change(s.owner, "", "attachment.add", M{"doc": week, "file": f.ID})
+
+		s.change(s.owner, "", "doc.update", M{"id": plans, "private": true})
+		var at struct{ Seq int64 }
+		s.call(nil, other, "GET", w+"/events?after=0&limit=2000", nil, 200, &at)
+		s.change(s.owner, "", "doc.write", M{"doc": week, "markdown": "quokka, rewritten; see SVA-1 and [[Handbook]]\n"})
+
+		hidden := []string{plans, q1, week}
+		leaks := func(what, answer string) {
+			t.Helper()
+			for _, id := range hidden {
+				if i := strings.Index(answer, id); i >= 0 {
+					t.Errorf("%s shows another member the private page %s: …%s…", what, id, answer[max(0, i-300):min(len(answer), i+100)])
+				}
+			}
+		}
+		leaks("the page list", s.call(nil, other, "GET", w+"/docs", nil, 200, nil))
+		for _, id := range hidden {
+			s.call(nil, other, "GET", w+"/docs/"+id, nil, 404, nil)
+		}
+		leaks("search", s.call(nil, other, "GET", w+"/search?q=quokka", nil, 200, nil))
+		leaks("search of comments", s.call(nil, other, "GET", w+"/search?q=wombat", nil, 200, nil))
+		leaks("the feed after the page went private", s.call(nil, other, "GET", w+"/events?after="+strconv.FormatInt(at.Seq, 10), nil, 200, nil))
+		leaks("the starting copy", s.call(nil, other, "GET", w+"/bootstrap", nil, 200, nil))
+		if out := s.call(nil, other, "GET", w+"/list/attachments", nil, 200, nil); strings.Contains(out, f.ID) {
+			t.Errorf("the list of files shows the file on a private sub-page: %s", out)
+		}
+		leaks("what mentions a task", s.call(nil, other, "GET", w+"/tasks/SVA-1", nil, 200, nil))
+		leaks("what mentions a page", s.call(nil, other, "GET", w+"/docs/"+handbook, nil, 200, nil))
+		// An export's data/ is every row of the workspace, for the admin who
+		// keeps it; its docs/ is the pages as the admin may read them.
+		if pages := unzipped(t, s.call(nil, other, "GET", w+"/export", nil, 200, nil), "docs/"); strings.Contains(pages, "quokka") || !strings.Contains(pages, "docs/Handbook.md") {
+			t.Errorf("an export's pages hold the private sub-pages, or not the page that is everyone's: %s", pages)
+		}
+
+		// A sub-page someone keeps private under a page others see is not
+		// among that page's sub-pages for them.
+		open := page(M{"title": "Open"})
+		mine := page(M{"parent": open, "title": "Mine", "private": true})
+		if out := s.call(nil, other, "GET", w+"/docs/"+open, nil, 200, nil); strings.Contains(out, mine) {
+			t.Errorf("a page's sub-pages show another member a private one: %s", out)
+		}
+
+		// The owner still has all of it.
+		for _, id := range hidden {
+			s.call(s.owner, "", "GET", w+"/docs/"+id, nil, 200, nil)
+		}
+	})
+}
+
+// unzipped is the text of the files in a zip archive whose names start
+// with prefix, one after another, each under its name.
+func unzipped(t *testing.T, archive, prefix string) string {
+	t.Helper()
+	zr, err := zip.NewReader(strings.NewReader(archive), int64(len(archive)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var all strings.Builder
+	for _, f := range zr.File {
+		if !strings.HasPrefix(f.Name, prefix) {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		all.WriteString("=== " + f.Name + "\n" + string(body) + "\n")
+	}
+	return all.String()
 }
