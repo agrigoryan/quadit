@@ -42,7 +42,9 @@ import {
   Workflow,
   Wrench,
 } from "lucide-react";
+import { matchPath, useLocation } from "react-router";
 import { saveTheme, signOut } from "@/auth/session";
+import { projectDocs, workspaceDocs } from "@/docs/area";
 import { copyText } from "@/lib/files";
 import { type Key, t } from "@/lib/i18n";
 import { useMe, useProjects, useViews } from "@/lib/selectors";
@@ -135,6 +137,9 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   const theme = useThemeChoice();
   const admin = me.role !== "member";
   const at = (path: string) => () => go(`/${slug}/${path}`);
+  // On a project's Docs a new page is that project's; anywhere else it is tied to none.
+  const docsOf = matchPath("/:ws/p/:key/docs/*", useLocation().pathname) ? project : undefined;
+  const docsAt = docsOf ? projectDocs(slug, docsOf) : workspaceDocs(slug);
 
   const forTask: Cmd[] = task
     ? [
@@ -172,11 +177,11 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
     },
     {
       id: "new:page",
-      label: t("palette.newPage"),
+      label: docsOf ? t("palette.newPageIn", { project: docsOf.name }) : t("palette.newPage"),
       words: "new add create doc document page",
       icon: <FilePlus2 />,
       // The pages' code is fetched when a page is first made or opened.
-      run: () => run(() => void import("@/docs/actions").then((docs) => go(`/${slug}/docs/${docs.createDoc({})}`))),
+      run: () => run(() => void import("@/docs/actions").then((docs) => go(`${docsAt}/${docs.createDoc({ projectId: docsOf?.id })}`))),
     },
     ...(project
       ? [{ id: "new:label", label: t("palette.newLabel", { project: project.name }), words: "new add create label tag", icon: <Tag />, run: () => openPage("new-label") }]

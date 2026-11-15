@@ -49,6 +49,8 @@ export interface SearchHit {
   entity_id: string;
   scope_type: string;
   scope_id: string;
+  /** The project of what was found: a task's, or the one a page is tied to. */
+  project_id?: string;
   title: string;
   snippet: string;
   task?: string;

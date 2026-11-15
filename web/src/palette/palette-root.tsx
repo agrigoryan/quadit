@@ -1,12 +1,13 @@
 import { FileText, ListTodo, MessageSquare } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useCollection } from "@/lib/selectors";
-import { useRestLoaded } from "@/lib/store";
+import { useRestLoaded, useStore } from "@/lib/store";
 import type { SearchHit } from "@/lib/types";
 import { type Cmd, type CommandContext, useCommands } from "@/palette/palette-commands";
 import { Group, Item, Note } from "@/palette/palette-parts";
 import { matches, searchTasks, snippetParts } from "@/palette/palette-search";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
+import { ProjectGlyph } from "@/ui/project-glyph";
 
 interface Props extends CommandContext {
   query: string;
@@ -80,8 +81,9 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
   );
 }
 
-/** Something the server found inside a task: where it is, and the words around the match. */
+/** Something the server found inside a task or a page: where it is (the task's key, the page's project), and the words around the match. */
 function HitRow({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
+  const project = useStore((s) => (hit.scope_type === "doc" && hit.project_id ? s.c.projects[hit.project_id] : undefined));
   const key = hit.task ?? "";
   const title = hit.title.startsWith(`${key} `) ? hit.title.slice(key.length + 1) : hit.title;
   const icon =
@@ -94,7 +96,15 @@ function HitRow({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
       detail={hit.snippet ? snippetParts(hit.snippet).map((part, i) => (part.hit ? <b key={i} className="font-semibold text-ink-2">{part.text}</b> : part.text)) : undefined}
     >
       <span className="mr-2.5 text-xs text-ink-3 tnum">{key}</span>
-      {title}
+      {project ? (
+        // A page of a project carries the project's mark after its title, as it does in the page tree.
+        <span className="inline-flex max-w-full items-center gap-1.5 align-bottom" title={project.name}>
+          <span className="truncate">{title}</span>
+          <ProjectGlyph project={project} />
+        </span>
+      ) : (
+        title
+      )}
     </Item>
   );
 }
