@@ -203,7 +203,8 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
     const path = destinationPath(d, { slug, project: of, installAdmin });
     if (!path) return [];
     const label = d.perProject && of ? t(d.perProject, { project: of.name }) : t(d.label);
-    const words = [d.perProject && of ? of.key : "", d.words ?? ""].join(" ").trim();
+    // "go" and "go to" find every place, as their heading says.
+    const words = [t("palette.group.goto"), d.perProject && of ? of.key : "", d.words ?? ""].join(" ").trim();
     const hint = !d.perProject || of?.id === project?.id ? goKeys(d) : undefined;
     return [{ id: of && d.perProject ? `go:${d.id}:${of.id}` : `go:${d.id}`, label, words, icon: d.icon, hint, run: () => go(path) }];
   };
