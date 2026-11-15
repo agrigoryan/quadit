@@ -67,13 +67,24 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
   const draftBlock = usePageUi((s) => s.draftBlock);
   const focusBlock = usePageUi((s) => s.focusBlock);
   const showResolved = usePageUi((s) => s.showResolved);
-  const [order, setOrder] = useState<string[]>([]);
-
-  // The blocks' order, to list threads the way the page reads.
+  /**
+   * What the editor shows: the blocks' order, to list threads the way the
+   * page reads, and the text of each block a thread is on (undefined: the
+   * block is gone). Read once the editor has drawn, never while rendering.
+   */
+  const [page, setPage] = useState<{ order: string[]; texts: Map<string, string | undefined> }>(() => ({
+    order: [],
+    texts: new Map(),
+  }));
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- the order is read from the editor, outside React, once it has drawn
-    setOrder(editor.current?.order() ?? []);
+    const handle = editor.current;
+    const blocks = [draftBlock, ...comments.map((c) => (c.subject_type === "doc_block" ? c.subject_id : null))];
+    const texts = new Map<string, string | undefined>();
+    for (const id of blocks) if (id) texts.set(id, handle?.blockText(id));
+    // oxlint-disable-next-line react/set-state-in-effect -- the order and the text are read from the editor, outside React, once it has drawn
+    setPage({ order: handle?.order() ?? [], texts });
   }, [editor, comments, draftBlock, focusBlock]);
+  const { order } = page;
 
   const { open, resolved } = useMemo(() => {
     const place = new Map(order.map((id, i) => [id, i]));
@@ -83,7 +94,9 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
   }, [comments, order]);
 
   const shown = showResolved ? resolved : open;
-  const quote = (blockId: string | undefined) => (blockId ? editor.current?.blockText(blockId) : undefined);
+  const quote = (blockId: string | undefined) => (blockId ? page.texts.get(blockId) : undefined);
+  // A block not read yet is not called gone.
+  const gone = (blockId: string | undefined) => !!blockId && page.texts.has(blockId) && quote(blockId) === undefined;
 
   return (
     <aside
@@ -141,13 +154,7 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
             thread={th}
             docId={docId}
             projectId={projectId}
-            quote={
-              <Quote
-                text={quote(th.blockId)}
-                gone={!!th.blockId && quote(th.blockId) === undefined}
-                page={!th.blockId}
-              />
-            }
+            quote={<Quote text={quote(th.blockId)} gone={gone(th.blockId)} page={!th.blockId} />}
             active={!!th.blockId && th.blockId === focusBlock}
             onLocate={th.blockId ? () => editor.current?.scrollToBlock(th.blockId as string) : undefined}
           />
