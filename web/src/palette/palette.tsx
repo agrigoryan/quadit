@@ -11,6 +11,7 @@ import type { ChoicePage, MakePage, PalettePage } from "@/palette/palette-comman
 import { makeTitle, MakePageRows } from "@/palette/palette-make";
 import { RootPage } from "@/palette/palette-root";
 import { useServerSearch } from "@/palette/palette-search";
+import { focusPage } from "@/shell/page-focus";
 import { pageUnder, projectInView } from "@/shell/project-in-view";
 import { useTaskNav } from "@/tasks/task-link";
 import { Spinner } from "@/ui/spinner";
@@ -47,7 +48,10 @@ function Palette() {
   const search = useServerSearch(onRoot ? query : "");
 
   const close = () => ui.setPalette(false);
+  /** True once a command has run: the keyboard then goes to the page, not back to what opened the palette. */
+  const ran = useRef(false);
   const run = (action: () => void) => {
+    ran.current = true;
     close();
     action();
   };
@@ -64,6 +68,11 @@ function Palette() {
         <RDialog.Overlay className="fixed inset-0 z-[70] bg-overlay animate-fade" />
         <RDialog.Content
           aria-describedby={undefined}
+          onCloseAutoFocus={(e) => {
+            if (!ran.current) return;
+            e.preventDefault();
+            focusPage();
+          }}
           onEscapeKeyDown={(e) => {
             if (onRoot) return;
             e.preventDefault();

@@ -59,9 +59,10 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
     const next = rows[Math.min(Math.max(index + by, 0), rows.length - 1)];
     if (!next) return;
     setFocusId(idOf(next));
-    // One marker at a time: a row left focused by the mouse or Tab gives way.
+    // One marker at a time: a row left focused by the mouse or Tab gives way. The focus stays in the page, so Tab goes on from it.
     const active = document.activeElement;
-    if (active instanceof HTMLElement && active.closest("main")) active.blur();
+    const main = active instanceof HTMLElement ? active.closest("main") : null;
+    if (main && active !== main) main.focus({ preventScroll: true });
     return next;
   };
 

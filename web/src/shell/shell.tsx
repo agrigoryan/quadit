@@ -12,6 +12,7 @@ import { TrashPage } from "@/pages/trash";
 import { insightPaths } from "@/insights/paths";
 import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
 import { GoHint, useGoKeys } from "@/shell/go-keys";
+import { usePageFocus } from "@/shell/page-focus";
 import { NotFoundPage } from "@/shell/placeholders";
 import { pageUnder, projectInView } from "@/shell/project-in-view";
 import { Loading } from "@/ui/spinner";
@@ -117,6 +118,7 @@ export function Shell() {
     { layer: "global" },
   );
   useGoKeys();
+  usePageFocus(location.key);
 
   return (
     <PeekContext value={peek}>
@@ -124,7 +126,8 @@ export function Shell() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onNewTask={openNewTask} />
-        <main className="relative min-h-0 flex-1 overflow-hidden bg-surface">
+        {/* It takes the focus after each move (shell/page-focus.ts); what looks focused is then the page's own current row. */}
+        <main data-page tabIndex={-1} className="relative min-h-0 flex-1 overflow-hidden bg-surface outline-none">
           <PageBoundary resetKey={pagePath}>
           <Routes location={page}>
             <Route index element={<Navigate to="my-work" replace />} />
