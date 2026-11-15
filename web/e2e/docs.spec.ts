@@ -36,3 +36,35 @@ test("a project page keeps what was typed, gets a sub-page, and is listed with t
   await expect(tree.getByRole("link", { name: "Release plan" })).toBeVisible();
   await expect(tree.getByRole("link", { name: "Launch checklist" })).toBeVisible();
 });
+
+// A column's resize handle is a window splitter: a Tab stop that says the
+// column's width, moved with Left and Right (Shift for bigger steps).
+test("a database column is resized from the keyboard and keeps its width", async ({ page, project, quadit }) => {
+  const made = JSON.parse(
+    await quadit.cli(
+      "--json",
+      "do",
+      "doc.create",
+      JSON.stringify({ kind: "database", title: "Vendors", project: project.key }),
+    ),
+  ) as { ref: string };
+  await quadit.cli("do", "property.create", JSON.stringify({ database: made.ref, name: "Owner", type: "text" }));
+  await quadit.cli("row", made.ref, "Acme paints");
+  await page.goto(`/e2e/docs/${made.ref}`);
+
+  const handle = page.getByRole("separator", { name: "Resize Owner" });
+  await expect(handle).toHaveAttribute("aria-orientation", "vertical");
+  const start = Number(await handle.getAttribute("aria-valuenow"));
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(handle).toHaveAttribute("aria-valuenow", String(start + 10));
+  await page.keyboard.press("Shift+ArrowRight");
+  await expect(handle).toHaveAttribute("aria-valuenow", String(start + 60));
+  await page.keyboard.press("ArrowLeft");
+  await expect(handle).toHaveAttribute("aria-valuenow", String(start + 50));
+
+  await expect(async () => {
+    await page.reload();
+    await expect(handle).toHaveAttribute("aria-valuenow", String(start + 50), { timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
+});
