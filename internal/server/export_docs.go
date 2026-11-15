@@ -69,19 +69,18 @@ func (e *exporter) databaseCSV(name string, d core.Doc) error {
 	if err != nil {
 		return err
 	}
-	cw := csv.NewWriter(w)
 	head := []string{"Title"}
 	for _, p := range t.props {
 		head = append(head, p.Name)
 	}
-	cw.Write(head)
+	records := [][]string{head}
 	for _, r := range t.rows {
 		row := []string{r.Title}
 		for _, p := range t.props {
 			row = append(row, formula.Text(cells[r.ID][p.ID]))
 		}
-		cw.Write(row)
+		records = append(records, row)
 	}
-	cw.Flush()
-	return nil
+	// A database the export could not write in full fails the export.
+	return csv.NewWriter(w).WriteAll(records)
 }

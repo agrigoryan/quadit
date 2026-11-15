@@ -1,7 +1,12 @@
 package server_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,5 +138,70 @@ func TestDashboardSameEveryTime(t *testing.T) {
 		if got := order(); got != first {
 			t.Fatalf("call %d answered in another order:\n%s\nthan the first:\n%s", i+2, got, first)
 		}
+	}
+}
+
+// TestExportNamesWhatItLeftOut: an uploaded file whose stored bytes are
+// gone is named in files/NOT-INCLUDED.txt, and the rest of the export is
+// still written.
+func TestExportNamesWhatItLeftOut(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	upload := func(name, body string) string {
+		var f struct{ ID, State string }
+		s.call(s.owner, "", "POST", fmt.Sprintf(w+"/files?name=%s&size=%d", name, len(body)), []byte(body), 201, &f)
+		if f.State != "ready" {
+			t.Fatalf("upload = %+v", f)
+		}
+		return f.ID
+	}
+	lost := upload("lost.txt", "the bytes that will be gone")
+	kept := upload("kept.txt", "the bytes that stay")
+	// The site keeps uploaded files under files/ in its data directory.
+	removed := 0
+	filepath.WalkDir(filepath.Join(s.dir, "files"), func(p string, e fs.DirEntry, err error) error {
+		if err == nil && !e.IsDir() {
+			if raw, _ := os.ReadFile(p); string(raw) == "the bytes that will be gone" {
+				removed++
+				return os.Remove(p)
+			}
+		}
+		return nil
+	})
+	if removed != 1 {
+		t.Fatalf("removed %d stored files, want 1", removed)
+	}
+
+	resp, err := s.owner.Get(s.url + w + "/export")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("export: status %d: %s", resp.StatusCode, raw)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		t.Fatalf("the export is not a whole archive: %v", err)
+	}
+	entries := map[string]string{}
+	for _, zf := range zr.File {
+		rc, err := zf.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(rc)
+		rc.Close()
+		entries[zf.Name] = string(body)
+	}
+	note, ok := entries["files/NOT-INCLUDED.txt"]
+	if !ok {
+		t.Fatalf("the export does not say a file was left out; it holds %d entries", len(entries))
+	}
+	if !strings.Contains(note, "files/"+lost+"/lost.txt: its stored bytes are missing") || strings.Contains(note, kept) || strings.Contains(note, s.dir) {
+		t.Fatalf("files/NOT-INCLUDED.txt says:\n%s", note)
+	}
+	if entries["files/"+kept+"/kept.txt"] != "the bytes that stay" || entries["data/files.json"] == "" || !strings.Contains(entries["README.txt"], "NOT-INCLUDED.txt") {
+		t.Fatalf("the rest of the export is not all there: %d entries", len(entries))
 	}
 }

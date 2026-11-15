@@ -2,21 +2,34 @@ package server
 
 import (
 	"archive/zip"
+	"errors"
 	"io"
+	"strings"
 	"time"
+
+	"github.com/agrigoryan/quadit/internal/blob"
 )
 
-// files writes files/: as uploaded.
+// notIncludedName is the entry of files/ that names the uploaded files the
+// export could not include, so whoever opens it knows it is incomplete.
+const notIncludedName = "files/NOT-INCLUDED.txt"
+
+// files writes files/: as uploaded. A file whose stored bytes cannot be
+// opened is left out, named in notIncludedName, and the rest still go in.
 func (e *exporter) files() error {
+	var missing []string
 	for _, f := range e.rows.files {
 		if f.State != "ready" {
 			continue
 		}
+		name := "files/" + f.ID + "/" + fileSafe(f.Name)
 		r, _, err := e.x.s.fileStore().Open(e.x.ctx(), f.StorageKey)
 		if err != nil {
+			e.x.s.log.Warn("export: a file was not included", "file", f.ID, "err", err)
+			missing = append(missing, name+": "+notIncludedWhy(err))
 			continue
 		}
-		w, err := e.zw.CreateHeader(&zip.FileHeader{Name: "files/" + f.ID + "/" + fileSafe(f.Name), Method: zip.Store, Modified: time.UnixMilli(f.CreatedAt)})
+		w, err := e.zw.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store, Modified: time.UnixMilli(f.CreatedAt)})
 		if err == nil {
 			_, err = io.Copy(w, r)
 		}
@@ -25,5 +38,17 @@ func (e *exporter) files() error {
 			return err
 		}
 	}
-	return nil
+	if len(missing) == 0 {
+		return nil
+	}
+	return e.put(notIncludedName, "These uploaded files are not in this export:\n\n"+strings.Join(missing, "\n")+"\n")
+}
+
+// notIncludedWhy says, without naming anything on the server, why a file's
+// stored bytes could not be opened.
+func notIncludedWhy(err error) string {
+	if errors.Is(err, blob.ErrNotFound) {
+		return "its stored bytes are missing"
+	}
+	return "its stored bytes could not be read"
 }

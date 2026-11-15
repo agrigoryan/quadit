@@ -23,7 +23,8 @@ tasks/   one Markdown file per task: its fields, description, decisions and comm
 docs/    one Markdown file per page, in folders that follow the page tree;
          a database is a CSV file beside a folder of its rows
 data/    every row of the workspace as JSON, one file per kind, for programs
-files/   the uploaded files, as they were uploaded
+files/   the uploaded files, as they were uploaded; any that could not be
+         included are named, with the reason, in files/NOT-INCLUDED.txt
 
 Nothing here needs this product to be read.
 `
