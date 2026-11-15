@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"golang.org/x/oauth2"
 )
@@ -17,8 +18,9 @@ import (
 //	signin_github.go    GitHub
 
 // signInProvider is one outside service people can sign in with. Each kind
-// is in its own file; adding one means writing that file and naming it in
-// signInProviders below.
+// is in its own file; adding one means writing that file, naming it in
+// signInProviders below, and adding its setting to the tables of settings
+// (settingSecrets and settingShapes).
 type signInProvider interface {
 	// ID is the name the provider goes by: its setting is "auth.<id>", its
 	// routes are under /api/v1/auth/oauth/<id>/, and a connected account
@@ -50,6 +52,12 @@ func signInProviderFor(provider string) signInProvider {
 		}
 	}
 	return nil
+}
+
+// signInSetting reports whether a setting is that of a sign-in provider.
+func signInSetting(name string) bool {
+	id, ok := strings.CutPrefix(name, "auth.")
+	return ok && signInProviderFor(id) != nil
 }
 
 // oauthSetting is one outside sign-in provider as set in the admin area.

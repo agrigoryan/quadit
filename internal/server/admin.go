@@ -329,13 +329,13 @@ func (s *Server) keepsADoor(x *c, name string, value json.RawMessage) error {
 			}
 			return false
 		}
-		if strings.HasPrefix(setting, "auth.") && setting != "auth.password" && setting != "auth.passkeys" {
+		if signInSetting(setting) {
 			cfg, ok := s.oauthConfig(ctx, strings.TrimPrefix(setting, "auth."))
 			return ok && cfg.Enabled
 		}
 		return s.settingBool(ctx, setting, def)
 	}
-	if name != "auth.password" && name != "auth.passkeys" && name != "auth.google" && name != "auth.github" && name != "auth.oidc" {
+	if name != "auth.password" && name != "auth.passkeys" && !signInSetting(name) {
 		return nil
 	}
 	if on("auth.password", true) && x.user.PasswordHash != "" {
