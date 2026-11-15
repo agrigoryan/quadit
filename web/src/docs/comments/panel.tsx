@@ -70,6 +70,7 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
 
   // The blocks' order, to list threads the way the page reads.
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- the order is read from the editor, outside React, once it has drawn
     setOrder(editor.current?.order() ?? []);
   }, [editor, comments, draftBlock, focusBlock]);
 

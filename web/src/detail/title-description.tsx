@@ -1,6 +1,6 @@
 // The task's title and description, both edited in place.
 
-import { type MouseEvent, useEffect, useState } from "react";
+import { type MouseEvent, useState } from "react";
 import { Pencil } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
@@ -80,9 +80,7 @@ export function Description({ task, loading }: { task: Task; loading: boolean })
   const readOnly = !can.editTask(task);
 
   // Leaving the task for the trash ends the edit.
-  useEffect(() => {
-    if (readOnly) setDraft(null);
-  }, [readOnly]);
+  if (readOnly && draft !== null) setDraft(null);
 
   function save() {
     if (draft === null) return;

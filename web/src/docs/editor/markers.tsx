@@ -32,10 +32,8 @@ export function Markers({ editor, wrap, others, threads, onOpenThread }: Props) 
 
   useEffect(() => {
     const root = wrap.current;
-    if (!root || !ids) {
-      setBoxes({});
-      return;
-    }
+    // Nothing to mark: what was measured before is not looked up, so it can stay.
+    if (!root || !ids) return;
     let frame = 0;
     const measure = () => {
       cancelAnimationFrame(frame);

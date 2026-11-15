@@ -24,7 +24,7 @@ export function DocPage({ id }: { id: string }) {
   // Comments of another page are not this page's.
   useEffect(() => pageUi.closeComments, [id]);
 
-  if (!doc) return <Unknown id={id} />;
+  if (!doc) return <Unknown key={id} id={id} />;
   if (doc.deleted_at) {
     return (
       <EmptyState
@@ -54,7 +54,6 @@ function Unknown({ id }: { id: string }) {
   const [missing, setMissing] = useState(false);
   useEffect(() => {
     let gone = false;
-    setMissing(false);
     loadPage(id).catch(() => !gone && setMissing(true));
     return () => {
       gone = true;

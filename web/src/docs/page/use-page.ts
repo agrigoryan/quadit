@@ -8,13 +8,16 @@ export type PageState =
   | { status: "error"; error: string; missing: boolean }
   | { status: "ready"; blocks: BlockRow[]; seq: number };
 
+const LOADING: PageState = { status: "loading" };
+
 /** Fetches a page's blocks and what surrounds it (see docs/store.ts) when it is opened. */
 export function usePage(docId: string): PageState {
-  const [state, setState] = useState<PageState>({ status: "loading" });
+  // Tagged with the page it is about: another page is loading until its own answer comes.
+  const [result, setResult] = useState<{ docId: string; state: PageState } | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    setState({ status: "loading" });
+    const setState = (state: PageState) => setResult({ docId, state });
     const attempt = (n: number) =>
       loadPage(docId, ctl.signal).then(
         (data) => setState({ status: "ready", blocks: data.blocks ?? [], seq: data.doc.content_seq ?? 0 }),
@@ -35,5 +38,5 @@ export function usePage(docId: string): PageState {
       ctl.abort();
     };
   }, [docId]);
-  return state;
+  return result?.docId === docId ? result.state : LOADING;
 }
