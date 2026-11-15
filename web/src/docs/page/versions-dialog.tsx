@@ -4,7 +4,7 @@
 
 import { BookmarkPlus, History } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
@@ -39,7 +39,7 @@ export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
 
   const load = useCallback(
     () =>
-      api.get<{ versions: DocVersion[] }>(ws(slug, `/docs/${doc.id}/versions`)).then(
+      api.get<{ versions: DocVersion[] }>(workspacePath(slug, `/docs/${doc.id}/versions`)).then(
         (out) => {
           setVersions(out.versions ?? []);
           setPicked((cur) => cur ?? out.versions?.[0]?.id ?? null);
@@ -55,7 +55,7 @@ export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
     if (!picked) return;
     const ctl = new AbortController();
     api
-      .get<{ blocks: BlockTree[] | null }>(ws(slug, `/docs/${doc.id}/versions/${picked}`), ctl.signal)
+      .get<{ blocks: BlockTree[] | null }>(workspacePath(slug, `/docs/${doc.id}/versions/${picked}`), ctl.signal)
       .then((out) => setShown({ id: picked, blocks: out.blocks ?? [] }))
       .catch(() => {});
     return () => ctl.abort();

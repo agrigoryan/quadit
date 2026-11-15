@@ -3,7 +3,7 @@
 // server's full-text search finds words inside comments and questions.
 
 import { useEffect, useState } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { SearchHit, Task } from "@/lib/types";
@@ -63,7 +63,7 @@ export function useServerSearch(query: string): { hits: SearchHit[]; busy: boole
     const ctl = new AbortController();
     const timer = setTimeout(() => {
       api
-        .get<{ hits: SearchHit[] }>(ws(slug, `/search?q=${encodeURIComponent(q)}`), ctl.signal)
+        .get<{ hits: SearchHit[] }>(workspacePath(slug, `/search?q=${encodeURIComponent(q)}`), ctl.signal)
         .then((out) => setAnswer({ q, hits: out.hits ?? [] }))
         .catch(() => {
           // A failed search just finds nothing; a cancelled one is replaced by the next.

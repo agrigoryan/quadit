@@ -4,7 +4,7 @@
 // and the list is asked for again.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, ApiError, errorMessage, ws } from "@/lib/api";
+import { api, ApiError, errorMessage, workspacePath } from "@/lib/api";
 import { useCollection, useSlug } from "@/lib/selectors";
 import { onEvents, useStore } from "@/lib/store";
 
@@ -31,7 +31,7 @@ interface Fetched {
 }
 
 async function fetchTrash(slug: string, signal: AbortSignal): Promise<Fetched> {
-  const list = await api.get<{ decisions?: Listed[] }>(ws(slug, "/decisions?trash=1&limit=500"), signal);
+  const list = await api.get<{ decisions?: Listed[] }>(workspacePath(slug, "/decisions?trash=1&limit=500"), signal);
   return { listed: list.decisions ?? [] };
 }
 

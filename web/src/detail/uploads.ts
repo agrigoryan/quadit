@@ -62,7 +62,7 @@ async function attachOne(task: Task, file: File) {
     },
   });
   if (row) {
-    const { c, me } = getState();
+    const { collections: c, me } = getState();
     let last = "";
     for (const a of Object.values(c.attachments)) {
       if (a.subject_type === "task" && a.subject_id === task.id && a.rank > last) last = a.rank;

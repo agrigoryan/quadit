@@ -4,7 +4,7 @@
 // page deleted or restored anywhere shows up or drops out here.
 
 import { useEffect, useMemo } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { useMe } from "@/lib/selectors";
 import { getState, mergeRows, useStore } from "@/lib/store";
 import { canSee, useDocs } from "@/docs/data";
@@ -25,10 +25,10 @@ export function loadTrash(): Promise<void> {
   const slug = getState().slug;
   if (!slug) return Promise.resolve();
   loading ??= api
-    .get<{ docs: Doc[] }>(ws(slug, "/docs?trash=1"))
+    .get<{ docs: Doc[] }>(workspacePath(slug, "/docs?trash=1"))
     .then(({ docs }) => {
       if (getState().slug !== slug) return;
-      const have = getState().c.docs;
+      const have = getState().collections.docs;
       mergeRows("docs", docs.filter((d) => !have[d.id]) as never[]);
     })
     .catch(() => {

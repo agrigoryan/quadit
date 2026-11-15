@@ -97,7 +97,7 @@ interface Props {
 export function AgentProfileFields({ draft, set, errors, creating, disabled, seed }: Props) {
   const people = useMembers().filter((m) => m.kind === "person" && !m.suspended_at);
   // The one responsible now may no longer be among those who can be chosen (suspended, say): still name them.
-  const current = useStore((s) => (draft.responsible ? s.c.members[draft.responsible] : undefined));
+  const current = useStore((s) => (draft.responsible ? s.collections.members[draft.responsible] : undefined));
   const listed = people.some((p) => p.user_id === draft.responsible);
   const responsibleChoices = [
     ...(listed

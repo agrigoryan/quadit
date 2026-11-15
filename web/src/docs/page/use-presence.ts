@@ -4,7 +4,7 @@
 // marks beside blocks).
 
 import { useEffect, useRef } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { getState } from "@/lib/store";
 import { setPresence } from "@/docs/store";
 import type { PresenceEntry } from "@/docs/types";
@@ -18,7 +18,7 @@ export function usePresence(docId: string, block: string | null, enabled = true)
 
   useEffect(() => {
     if (!enabled) return;
-    const path = ws(getState().slug, `/docs/${docId}/presence`);
+    const path = workspacePath(getState().slug, `/docs/${docId}/presence`);
     let gone = false;
     say.current = () => {
       api

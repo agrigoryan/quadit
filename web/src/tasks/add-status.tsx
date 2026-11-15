@@ -29,7 +29,7 @@ const START_COLOR: Record<Category, string> = {
 /** Creates a status at the end of the project's list. Rejects with the server's reason if it is refused. */
 export function createStatus(project: Project, name: string, category: Category): Promise<unknown> {
   const id = newId();
-  const last = statusesOf(getState().c.statuses, project.id).at(-1)?.rank;
+  const last = statusesOf(getState().collections.statuses, project.id).at(-1)?.rank;
   const row = { name, category, color: START_COLOR[category], rank: rankBetween(last, undefined) };
   return mutate(
     { type: "status.create", args: { id, project: project.id, ...row } },

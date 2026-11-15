@@ -16,7 +16,7 @@ import { SWATCHES } from "@/lib/swatches";
  */
 export function createLabel(projectId: string | undefined, name: string): string {
   const id = newId();
-  const used = Object.values(getState().c.labels).filter((l) => !l.deleted_at).length;
+  const used = Object.values(getState().collections.labels).filter((l) => !l.deleted_at).length;
   const color = SWATCHES[(used + 2) % SWATCHES.length];
   const args: Record<string, unknown> = { id, name, color };
   if (projectId) args.project = projectId;
@@ -43,7 +43,7 @@ export function useManageLinks(projectId: string | undefined): {
   const navigate = useNavigate();
   const me = useMe();
   const slug = useStore((s) => s.slug);
-  const key = useStore((s) => (projectId ? s.c.projects[projectId]?.key : undefined));
+  const key = useStore((s) => (projectId ? s.collections.projects[projectId]?.key : undefined));
   const to = (tab: string) => () =>
     void navigate(key ? `/${slug}/settings/projects/${key}/${tab}` : `/${slug}/settings/projects`);
   return {

@@ -68,7 +68,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
   });
   const snippet = item.snippet ? plain(item.snippet) : "";
   // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
-  const taskKey = useStore((s) => (item.task_id ? s.c.tasks[item.task_id]?.key : undefined)) ?? key;
+  const taskKey = useStore((s) => (item.task_id ? s.collections.tasks[item.task_id]?.key : undefined)) ?? key;
   const link = useTaskLink({ key: taskKey ?? "" });
   const anchor = anchorOf(item);
   const to = anchor ? `${link.to}#${anchor}` : link.to;

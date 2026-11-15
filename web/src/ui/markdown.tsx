@@ -23,7 +23,7 @@ function splitText(value: string): Node[] {
   const out: Node[] = [];
   let last = 0;
   // Only a key of a project there is: "UTF-8" and "SHA-256" are words.
-  const projects = new Set(Object.values(useStore.getState().c.projects).map((p) => p.key));
+  const projects = new Set(Object.values(useStore.getState().collections.projects).map((p) => p.key));
   for (const m of value.matchAll(refPattern)) {
     const ref = m[2] as string;
     if (!ref.startsWith("@") && !projects.has(ref.slice(0, ref.lastIndexOf("-")))) continue;
@@ -63,7 +63,9 @@ function TaskRef({ taskKey, children }: { taskKey: string; children?: React.Reac
 
 function RefLink({ href, children }: { href?: string; children?: React.ReactNode }) {
   const handle = href?.startsWith("mention:") ? href.slice(8) : undefined;
-  const member = useStore((s) => (handle ? Object.values(s.c.members).find((m) => m.handle === handle) : undefined));
+  const member = useStore((s) =>
+    handle ? Object.values(s.collections.members).find((m) => m.handle === handle) : undefined,
+  );
   const meId = useStore((s) => s.me?.user_id);
   if (handle) {
     if (!member) return <>{children}</>;

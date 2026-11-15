@@ -75,7 +75,7 @@ describe("mutate", () => {
       tx.patch("tasks", "t1", { title: "b", priority: 3 });
       tx.insert("tasks", { id: "t2", title: "new" });
     }).catch((err: unknown) => err);
-    expect(getState().c.tasks.t1).toMatchObject({ title: "b", priority: 3 });
+    expect(getState().collections.tasks.t1).toMatchObject({ title: "b", priority: 3 });
     expect(getState().drafts).toEqual({ t2: "tasks" });
     await settle();
 
@@ -84,8 +84,8 @@ describe("mutate", () => {
     calls[0]?.fail(new ApiError(400, { message: "no" }));
     expect(await done).toBeInstanceOf(ApiError);
 
-    expect(getState().c.tasks.t1).toMatchObject({ title: "c", priority: 1 });
-    expect(getState().c.tasks.t2).toBeUndefined();
+    expect(getState().collections.tasks.t1).toMatchObject({ title: "c", priority: 1 });
+    expect(getState().collections.tasks.t2).toBeUndefined();
     expect(getState().drafts).toEqual({});
     expect(getState().unsent).toBe(0);
   });
@@ -114,7 +114,7 @@ describe("mutate", () => {
     calls[0]?.fail(new NetworkError());
     await settle();
     expect(getState().offline).toBe(true);
-    expect(getState().c.tasks.t1?.priority).toBe(2);
+    expect(getState().collections.tasks.t1?.priority).toBe(2);
     expect(calls).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(2000);
@@ -123,7 +123,7 @@ describe("mutate", () => {
     calls[1]?.answer([]);
     await done;
     expect(getState().offline).toBe(false);
-    expect(getState().c.tasks.t1?.priority).toBe(2);
+    expect(getState().collections.tasks.t1?.priority).toBe(2);
   });
 
   it("forgets the whole queue on a 401 without undoing anything", async () => {
@@ -140,8 +140,8 @@ describe("mutate", () => {
     expect(await second).toBeInstanceOf(ApiError);
     await settle();
     expect(calls).toHaveLength(1);
-    expect(getState().c.tasks.t1?.title).toBe("b");
-    expect(getState().c.tasks.t3?.title).toBe("made");
+    expect(getState().collections.tasks.t1?.title).toBe("b");
+    expect(getState().collections.tasks.t3?.title).toBe("made");
     expect(getState().drafts).toEqual({});
     expect(getState().unsent).toBe(0);
   });

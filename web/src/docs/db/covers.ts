@@ -3,7 +3,7 @@
 // answer is kept until the page's content changes.
 
 import { useEffect, useState } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { getState } from "@/lib/store";
 import { localPath } from "@/lib/url";
 import type { BlockRow, Doc } from "@/docs/types";
@@ -29,7 +29,7 @@ function release() {
 async function firstImage(rowId: string): Promise<string | null> {
   await slot();
   try {
-    const out = await api.get<{ blocks: BlockRow[] }>(ws(getState().slug, `/docs/${rowId}`));
+    const out = await api.get<{ blocks: BlockRow[] }>(workspacePath(getState().slug, `/docs/${rowId}`));
     const images = (out.blocks ?? []).filter(
       (b) => b.type === "image" && typeof b.props?.url === "string" && b.props.url,
     );

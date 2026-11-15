@@ -18,7 +18,7 @@ import { IconButton } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
 
 function SubtaskRow({ task }: { task: Task }) {
-  const status = useStore((s) => s.c.statuses[task.status_id]);
+  const status = useStore((s) => s.collections.statuses[task.status_id]);
   const link = useTaskLink(task);
   const closed = status?.category === "done" || status?.category === "canceled";
   return (
@@ -107,7 +107,7 @@ interface Props {
 }
 
 export function Subtasks({ task, subtasks, focusAdd }: Props) {
-  const statuses = useStore((s) => s.c.statuses);
+  const statuses = useStore((s) => s.collections.statuses);
   const total = subtasks.length;
   const done = subtasks.filter((tk) => {
     const category = statuses[tk.status_id]?.category;

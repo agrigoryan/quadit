@@ -164,7 +164,7 @@ export function nameOf(member: Member | undefined, fallback: string): string {
 }
 
 export function useMemberName(userId: string | undefined, fallback: string): string {
-  return useStore((s) => nameOf(userId ? s.c.members[userId] : undefined, fallback));
+  return useStore((s) => nameOf(userId ? s.collections.members[userId] : undefined, fallback));
 }
 
 /** Follows a media query, for the few places where layout cannot be done in CSS. */

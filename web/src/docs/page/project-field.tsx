@@ -27,7 +27,7 @@ const NONE = "none";
 const counted = (pages: Doc[]) => pages.filter((d) => d.kind !== "row" && !d.deleted_at).length;
 
 export function ProjectField({ doc }: { doc: Doc }) {
-  const project = useStore((s) => (doc.project_id ? s.c.projects[doc.project_id] : undefined));
+  const project = useStore((s) => (doc.project_id ? s.collections.projects[doc.project_id] : undefined));
   const [open, setOpen] = useState(false);
   const name = project?.name ?? t("docs.project.none");
   const label = project ? `${t("prop.project")}: ${name}` : name;

@@ -46,7 +46,7 @@ function Doing({
   running: AgentSession | undefined;
   now: number;
 }) {
-  const tasks = useStore((s) => s.c.tasks);
+  const tasks = useStore((s) => s.collections.tasks);
   const held = work.held.filter((task) => (task.lease_until ?? 0) > now);
   const sessionTask = running?.task_id ? tasks[running.task_id] : undefined;
   const lines: React.ReactNode[] = [];
@@ -98,7 +98,7 @@ function Doing({
 /** Tasks handed to the agent and questions asked of it, oldest first. */
 function WaitsOnIt({ work, now }: { work: AgentWork; now: number }) {
   const [all, setAll] = useState(false);
-  const statuses = useStore((s) => s.c.statuses);
+  const statuses = useStore((s) => s.collections.statuses);
   const rows = [
     ...work.asked.map(({ decision, task }) => ({
       id: decision.id,

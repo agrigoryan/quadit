@@ -19,7 +19,7 @@ export interface Known {
 }
 
 export function knownRows(events: FeedEvent[]): Known {
-  const { c } = getState();
+  const { collections: c } = getState();
   const known: Known = {
     comments: { ...c.comments },
     attachments: { ...c.attachments },

@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { Download } from "lucide-react";
 import { loadSession } from "@/auth/session";
-import { ws } from "@/lib/api";
+import { workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import { useMe } from "@/lib/selectors";
@@ -44,7 +44,7 @@ export function GeneralPage() {
   }
 
   function exportAll() {
-    download(ws(slug, "/export"));
+    download(workspacePath(slug, "/export"));
     toast.info(t("general.export.started"));
   }
 

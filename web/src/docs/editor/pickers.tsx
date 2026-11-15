@@ -49,7 +49,7 @@ export function ChipPicker({ kind, onClose, onPick }: Props) {
 
 function TaskList({ onPick }: { onPick: (key: string) => void }) {
   const tasks = useLiveTasks();
-  const statuses = useStore((s) => s.c.statuses);
+  const statuses = useStore((s) => s.collections.statuses);
   const items = useMemo(
     () =>
       [...tasks]
@@ -68,7 +68,7 @@ function TaskList({ onPick }: { onPick: (key: string) => void }) {
 }
 
 function DecisionList({ onPick }: { onPick: (ref: string) => void }) {
-  const c = useStore((s) => s.c);
+  const c = useStore((s) => s.collections);
   const me = useStore((s) => s.me?.user_id);
   const items = useMemo(
     () =>

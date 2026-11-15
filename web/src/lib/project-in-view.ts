@@ -19,7 +19,7 @@ export const pageUnder = (location: Location) => (location.state as { background
  * page of the docs, else the last one that was in view, else the first.
  */
 export function projectInView(location: Location): Project | undefined {
-  const { c } = getState();
+  const { collections: c } = getState();
   const projects = Object.values(c.projects).filter((p) => !p.deleted_at && !p.archived_at);
   const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
   const pagePath = taskKey ? (pageUnder(location)?.pathname ?? "") : location.pathname;

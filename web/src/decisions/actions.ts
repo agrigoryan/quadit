@@ -169,7 +169,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
       rank: fileRanks[i] as string,
     }));
   });
-  const siblings = Object.values(getState().c.decisions).filter((d) => d.task_id === draft.taskId);
+  const siblings = Object.values(getState().collections.decisions).filter((d) => d.task_id === draft.taskId);
   const lastRank = siblings.reduce((max, d) => (d.rank > max ? d.rank : max), "");
 
   const args: Record<string, unknown> = {
@@ -240,7 +240,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
 export function attachToOption(decision: Decision, optionId: string, file: FileRow, role?: FileRole) {
   const id = newId();
   let last = "";
-  for (const a of Object.values(getState().c.attachments)) {
+  for (const a of Object.values(getState().collections.attachments)) {
     if (a.subject_id === optionId && a.rank > last) last = a.rank;
   }
   const args: Record<string, unknown> = { id, file: file.id, option: optionId };

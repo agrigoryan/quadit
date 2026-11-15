@@ -51,8 +51,8 @@ function setWatching(task: Task, userId: string, watching: boolean) {
 export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }: Props) {
   const me = useMe();
   const slug = useSlug();
-  const project = useStore((s) => (task ? s.c.projects[task.project_id] : undefined));
-  const watching = useStore((s) => (task ? !!s.c.watchers[`${me.user_id}:${task.id}`] : false));
+  const project = useStore((s) => (task ? s.collections.projects[task.project_id] : undefined));
+  const watching = useStore((s) => (task ? !!s.collections.watchers[`${me.user_id}:${task.id}`] : false));
   const page = layout === "page";
 
   async function copyLink() {

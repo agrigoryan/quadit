@@ -42,7 +42,7 @@ function storedRow(taskId: string, type: AddType, otherId: string) {
 }
 
 function addRelation(task: Task, type: AddType, otherId: string) {
-  const { c, me } = getState();
+  const { collections: c, me } = getState();
   const row = storedRow(task.id, type, otherId);
   const exists = Object.values(c.relations).some(
     (r) => r.task_id === row.task_id && r.related_task_id === row.related_task_id && r.type === row.type,
@@ -62,7 +62,7 @@ function removeRelation(id: string) {
 }
 
 function RelationRow({ relation, other, readOnly }: { relation: Relation; other: Task; readOnly: boolean }) {
-  const status = useStore((s) => s.c.statuses[other.status_id]);
+  const status = useStore((s) => s.collections.statuses[other.status_id]);
   const link = useTaskLink(other);
   return (
     <li className="group relative -mx-1.5 flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10">
@@ -129,7 +129,7 @@ interface Props {
 }
 
 export function Relations({ task, relations, startAdding, onEmptyClose }: Props) {
-  const tasks = useStore((s) => s.c.tasks);
+  const tasks = useStore((s) => s.collections.tasks);
   const [adding, setAdding] = useState(!!startAdding);
   const readOnly = !!task.deleted_at;
   // The task at the other end may not be in the local copy yet; the relation is shown once it is.

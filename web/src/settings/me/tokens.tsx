@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useCollection, useMe, useProjects, useSlug } from "@/lib/selectors";
 import { useSettingsBase } from "@/settings/base";
@@ -96,7 +96,9 @@ export function MyTokensPage() {
   const projects = useCollection("projects");
   const list = useLoad(
     () =>
-      api.get<{ tokens: Token[] }>(ws(slug, "/tokens")).then((r) => r.tokens.filter((tk) => tk.user_id === me.user_id)),
+      api
+        .get<{ tokens: Token[] }>(workspacePath(slug, "/tokens"))
+        .then((r) => r.tokens.filter((tk) => tk.user_id === me.user_id)),
     [slug, me.user_id],
   );
   const [creating, setCreating] = useState(false);
@@ -205,7 +207,7 @@ export function MyTokensPage() {
         body={t("me.tokens.revokeBody")}
         confirm={t("s.revoke")}
         onConfirm={async () => {
-          await api.del(ws(slug, `/tokens/${revoking?.id}`));
+          await api.del(workspacePath(slug, `/tokens/${revoking?.id}`));
           await list.reload();
         }}
       />

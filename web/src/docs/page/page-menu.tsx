@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router";
-import { errorMessage, ws } from "@/lib/api";
+import { errorMessage, workspacePath } from "@/lib/api";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
@@ -35,7 +35,7 @@ const VersionsDialog = lazy(() => import("@/docs/page/versions-dialog"));
 /** Downloads a page as the Markdown the server renders for it. */
 async function exportMarkdown(slug: string, doc: Doc) {
   try {
-    const res = await fetch(ws(slug, `/docs/${doc.id}?format=md&full=1`), { credentials: "same-origin" });
+    const res = await fetch(workspacePath(slug, `/docs/${doc.id}?format=md&full=1`), { credentials: "same-origin" });
     if (!res.ok) throw new Error(res.statusText);
     saveText(fileNameOf(docTitle(doc)), `# ${docTitle(doc)}\n\n${await res.text()}`);
   } catch (err) {

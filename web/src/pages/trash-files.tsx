@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { FileImage, FileText, FileVideo, Undo2 } from "lucide-react";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { fileSize, isImage, isVideo } from "@/lib/files";
 import { t, tMaybe } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
@@ -36,7 +36,7 @@ export function useTrashedFiles(): TrashedFiles {
   useEffect(() => {
     const ctl = new AbortController();
     api
-      .get<{ attachments?: Attachment[] }>(ws(slug, "/list/attachments?trash=1"), ctl.signal)
+      .get<{ attachments?: Attachment[] }>(workspacePath(slug, "/list/attachments?trash=1"), ctl.signal)
       .then((out) => {
         const found = (out.attachments ?? []).filter((a): a is TrashedFile => !!a.file);
         setRows(

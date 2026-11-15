@@ -23,7 +23,7 @@ interface Props {
 }
 
 export function Markers({ editor, wrap, others, threads, onOpenThread }: Props) {
-  const members = useStore((s) => s.c.members);
+  const members = useStore((s) => s.collections.members);
   const [boxes, setBoxes] = useState<Record<string, Box>>({});
   const ids = [...new Set([...others.map((o) => o.block ?? ""), ...Object.keys(threads)])]
     .filter(Boolean)

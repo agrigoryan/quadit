@@ -2,7 +2,7 @@
 // call that reads it (POST /import). The server reads an uploaded export or
 // an address, and writes what it finds as the person who asked.
 
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 
 export type ImportKind = "linear" | "asana" | "trello" | "notion" | "obsidian" | "markdown" | "github" | "orbit";
@@ -54,9 +54,10 @@ export interface ImportResult {
 
 /** Reads the source and says what is in it, without writing anything. */
 export const checkImport = (slug: string, req: ImportRequest) =>
-  api.post<{ found: Found }>(ws(slug, "/import"), { ...req, dry_run: true }).then((r) => r.found);
+  api.post<{ found: Found }>(workspacePath(slug, "/import"), { ...req, dry_run: true }).then((r) => r.found);
 
-export const runImport = (slug: string, req: ImportRequest) => api.post<ImportResult>(ws(slug, "/import"), req);
+export const runImport = (slug: string, req: ImportRequest) =>
+  api.post<ImportResult>(workspacePath(slug, "/import"), req);
 
 type CountKey = "tasks" | "pages" | "databases" | "comments" | "rows" | "files";
 

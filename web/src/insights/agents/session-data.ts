@@ -5,7 +5,7 @@
 // like the rest.
 
 import { useEffect, useMemo, useState } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { useCollection } from "@/lib/selectors";
 import { getState, mergeRows, useStore } from "@/lib/store";
 import type { AgentSession } from "@/lib/types";
@@ -27,11 +27,11 @@ export function useSessions(
     if (query === null) return;
     let current = true;
     api
-      .get<{ sessions: AgentSession[] }>(ws(slug, `/list/sessions?${query}`))
+      .get<{ sessions: AgentSession[] }>(workspacePath(slug, `/list/sessions?${query}`))
       .then((out) => {
         if (getState().slug !== slug) return;
         // A session the store already has is newer there: the feed has been at it.
-        const have = getState().c.sessions;
+        const have = getState().collections.sessions;
         mergeRows(
           "sessions",
           out.sessions.filter((s) => !have[s.id]),

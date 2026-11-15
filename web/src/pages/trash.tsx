@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { MessageCircleQuestion, Trash2, Undo2 } from "lucide-react";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { formatNumber, t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
 import { mergeRows } from "@/lib/store";
@@ -70,7 +70,7 @@ export function TrashPage() {
     const read = async () => {
       for (let offset = 0; offset < 50_000; offset += 1000) {
         const out = await api.get<{ tasks: Task[]; more?: boolean }>(
-          ws(slug, `/tasks?trash=1&raw=1&limit=1000&offset=${offset}`),
+          workspacePath(slug, `/tasks?trash=1&raw=1&limit=1000&offset=${offset}`),
           ctl.signal,
         );
         mergeRows("tasks", out.tasks ?? []);

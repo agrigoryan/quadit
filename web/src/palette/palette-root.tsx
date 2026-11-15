@@ -104,7 +104,7 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
 /** Something the server found inside a task or a page: where it is (the task's key, the page's project), and the words around the match. */
 function HitRow({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
   const project = useStore((s) =>
-    hit.scope_type === "doc" && hit.project_id ? s.c.projects[hit.project_id] : undefined,
+    hit.scope_type === "doc" && hit.project_id ? s.collections.projects[hit.project_id] : undefined,
   );
   const key = hit.task ?? "";
   const title = hit.title.startsWith(`${key} `) ? hit.title.slice(key.length + 1) : hit.title;

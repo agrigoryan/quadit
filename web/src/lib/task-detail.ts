@@ -4,7 +4,7 @@
 
 import { useEffect } from "react";
 import { create } from "zustand";
-import { api, ApiError, ws } from "@/lib/api";
+import { api, ApiError, workspacePath } from "@/lib/api";
 import { getState, markOpened, mergeRows, onEvents, onReplaced, removeRow, useStore } from "@/lib/store";
 import type { AgentSession, Attachment, Comment, FeedEvent, Task, TaskLink, Watcher } from "@/lib/types";
 
@@ -40,13 +40,13 @@ async function loadTask(taskId: string): Promise<void> {
   if (!useTaskDetailStore.getState().events[taskId]) setStatus(taskId, "loading");
   try {
     const [raw, feed] = await Promise.all([
-      api.get<RawTask>(ws(slug, `/tasks/${taskId}?raw=1`)),
-      api.get<{ events: FeedEvent[] }>(ws(slug, `/events?task=${taskId}&limit=500`)),
+      api.get<RawTask>(workspacePath(slug, `/tasks/${taskId}?raw=1`)),
+      api.get<{ events: FeedEvent[] }>(workspacePath(slug, `/events?task=${taskId}&limit=500`)),
     ]);
     // The copy was replaced while this was on its way: the answer is for the old one.
     if (getState().slug !== slug) return;
     // Rows that were deleted while nobody was looking are not in the answer.
-    const { comments, attachments, links } = getState().c;
+    const { comments, attachments, links } = getState().collections;
     const fresh = new Set([...raw.comments, ...raw.attachments, ...raw.links].map((r) => r.id));
     for (const [name, table] of [
       ["comments", comments],

@@ -25,7 +25,7 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/me
 async function addTask(epic: Epic, milestone: Milestone | undefined, title: string) {
   try {
     const key = await createTask({ projectId: epic.project_id, title, epicId: epic.id });
-    const task = findTaskByKey(getState().c.tasks, key);
+    const task = findTaskByKey(getState().collections.tasks, key);
     if (task && milestone) setMilestone([task], milestone.id);
   } catch {
     // The server's reason is already shown.

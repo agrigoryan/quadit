@@ -42,7 +42,7 @@ export const ActionsContext = createContext<EditorActions | null>(null);
 
 /** People first, then agents: whoever can be mentioned. */
 export function mentionItems(editor: AnyEditor): DefaultReactSuggestionItem[] {
-  const members = Object.values(getState().c.members)
+  const members = Object.values(getState().collections.members)
     .filter((m) => !m.removed_at && !m.suspended_at)
     .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "person" ? -1 : 1));
   return members.map((m) => ({
@@ -96,7 +96,7 @@ function distinct<T extends DefaultReactSuggestionItem>(items: T[], more: (item:
 export function decisionItems(editor: AnyEditor, query: string): DefaultReactSuggestionItem[] {
   // A space right after "#" is a heading or a plain hash, not a search.
   if (/^\s/.test(query)) return [];
-  const { c } = getState();
+  const { collections: c } = getState();
   const key = keyBeforeHash(editor, query);
   const q = query.trim().toLowerCase();
   let found = mentionable(c);
@@ -135,7 +135,7 @@ export function decisionItems(editor: AnyEditor, query: string): DefaultReactSug
 export function pageTitleItems(editor: AnyEditor, query: string, self?: string): DefaultReactSuggestionItem[] {
   // Still typing inside the brackets: what follows a closing bracket is not part of a title.
   if (query.includes("]") || query.includes("\uFFFC")) return [];
-  const { c, me } = getState();
+  const { collections: c, me } = getState();
   const docs = c.docs as unknown as Record<string, Doc>;
   const q = query.trim().toLowerCase();
   const pages = Object.values(docs)

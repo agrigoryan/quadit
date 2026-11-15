@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RefreshCw, RotateCw, Send } from "lucide-react";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
@@ -79,7 +79,7 @@ export function DeliveriesDialog({ hook, onClose }: { hook: Webhook; onClose: ()
   async function sendTest() {
     setTesting(true);
     try {
-      await api.post(ws(slug, `/webhooks/${hook.id}/test`));
+      await api.post(workspacePath(slug, `/webhooks/${hook.id}/test`));
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -90,7 +90,7 @@ export function DeliveriesDialog({ hook, onClose }: { hook: Webhook; onClose: ()
 
   async function redeliver(id: string) {
     try {
-      await api.post(ws(slug, `/deliveries/${id}/redeliver`));
+      await api.post(workspacePath(slug, `/deliveries/${id}/redeliver`));
       toast.info(t("auto.delivery.queued"));
       // The sender picks it up within a couple of seconds.
       setTimeout(() => void log.reload(), 2500);

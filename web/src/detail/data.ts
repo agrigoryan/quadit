@@ -3,7 +3,7 @@
 // in a sentence.
 
 import { useEffect, useMemo, useState } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { sortByRank, useCollection } from "@/lib/selectors";
 import { type Dict, getState, mergeRows, useStore } from "@/lib/store";
@@ -23,7 +23,7 @@ export function useFindTask(taskKey: string, have: boolean): boolean {
     let current = true;
     setLooking(true);
     api
-      .get<{ task: Task }>(ws(getState().slug, `/tasks/${encodeURIComponent(taskKey)}?raw=1`))
+      .get<{ task: Task }>(workspacePath(getState().slug, `/tasks/${encodeURIComponent(taskKey)}?raw=1`))
       .then((raw) => mergeRows("tasks", [raw.task]))
       .catch(() => {})
       .finally(() => current && setLooking(false));
@@ -87,7 +87,7 @@ export function nameOf(member: Member | undefined): string {
   return member.kind === "agent" ? `@${member.handle}` : member.name;
 }
 
-export const who = (userId: string | undefined) => nameOf(userId ? getState().c.members[userId] : undefined);
+export const who = (userId: string | undefined) => nameOf(userId ? getState().collections.members[userId] : undefined);
 
 /** A relation as seen from one task. */
 export type Side = "blocks" | "blockedBy" | "relates" | "duplicates" | "duplicatedBy";
@@ -120,13 +120,13 @@ const asked = new Set<string>();
  * the rest; one may be in the trash), so a row that names one can be drawn.
  */
 export function useEnsureTasks(ids: string[]) {
-  const missing = useStore((s) => ids.filter((id) => !s.c.tasks[id]).join(","));
+  const missing = useStore((s) => ids.filter((id) => !s.collections.tasks[id]).join(","));
   useEffect(() => {
     for (const id of missing ? missing.split(",") : []) {
       if (asked.has(id)) continue;
       asked.add(id);
       api
-        .get<{ task: Task }>(ws(getState().slug, `/tasks/${id}?raw=1`))
+        .get<{ task: Task }>(workspacePath(getState().slug, `/tasks/${id}?raw=1`))
         .then((raw) => mergeRows("tasks", [raw.task]))
         .catch(() => {});
     }

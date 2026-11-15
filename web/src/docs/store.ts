@@ -4,7 +4,7 @@
 // else is in it. Properties and views follow the live feed like any row.
 
 import { create } from "zustand";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
 import type { FeedEvent } from "@/lib/types";
 import type { DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/docs/types";
@@ -87,7 +87,7 @@ useStore.subscribe((s) => {
  */
 export async function loadPage(id: string, signal?: AbortSignal): Promise<PageData> {
   const slug = getState().slug;
-  const data = await api.get<PageData>(ws(slug, `/docs/${id}`), signal);
+  const data = await api.get<PageData>(workspacePath(slug, `/docs/${id}`), signal);
   mergeRows("docs", [data.doc, ...(data.children ?? []), ...(data.rows ?? [])] as never[]);
   mergeRows("comments", (data.comments ?? []) as never[]);
   useDocsStore.setState((s) => {
@@ -113,7 +113,7 @@ export async function loadPage(id: string, signal?: AbortSignal): Promise<PageDa
  * one who lost it, so the refusal does: take the page out of the copy.
  */
 export function forgetIfUnshared(id: string) {
-  const { c, me } = getState();
+  const { collections: c, me } = getState();
   const owner = (c.docs[id] as { owner_id?: string } | undefined)?.owner_id;
   if (owner && owner !== me?.user_id) removeRow("docs", id);
 }

@@ -1,7 +1,7 @@
 // How one feed event changes the browser's copy (lib/apply.ts).
 
 import { describe, expect, it } from "vitest";
-import { type AnyRow, applyEvent, Draft, emptyCollections } from "@/lib/apply";
+import { type AnyRow, applyEvent, CopyOnWrite, emptyCollections } from "@/lib/apply";
 import type { Collections } from "@/lib/store";
 import type { FeedEvent } from "@/lib/types";
 
@@ -29,7 +29,7 @@ function withRows(rows: Partial<Record<keyof Collections, AnyRow[]>>): Collectio
 }
 
 function apply(c: Collections, ...events: FeedEvent[]): Collections {
-  const d = new Draft(c);
+  const d = new CopyOnWrite(c);
   for (const ev of events) applyEvent(d, ev);
   return d.done();
 }
@@ -115,7 +115,7 @@ describe("applyEvent", () => {
         { id: "t2", status_id: "a" },
       ],
     });
-    const d = new Draft(c);
+    const d = new CopyOnWrite(c);
     const batch = event(9, { data: { ids: ["t1", "t2"], changes: { status_id: { from: "a", to: "b" } } } });
     applyEvent(d, batch, (collection, key) => collection === "tasks" && key === "t2");
     applyEvent(d, event(10, { entity_id: "t1", data: { gone: true } }), () => false);

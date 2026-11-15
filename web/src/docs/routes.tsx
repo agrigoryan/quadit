@@ -51,9 +51,9 @@ function Area() {
   // A page that is not one of this project's (its project was just changed, or the address is old)
   // goes on where it is now: in its own project's Docs, or in the workspace's.
   const elsewhere = useStore((s) => {
-    const doc = id ? (s.c.docs[id] as unknown as Doc | undefined) : undefined;
-    if (!project || !doc || inProject(s.c.docs as unknown as Dict<Doc>, doc.id, project.id)) return undefined;
-    const own = doc.project_id ? s.c.projects[doc.project_id] : undefined;
+    const doc = id ? (s.collections.docs[id] as unknown as Doc | undefined) : undefined;
+    if (!project || !doc || inProject(s.collections.docs as unknown as Dict<Doc>, doc.id, project.id)) return undefined;
+    const own = doc.project_id ? s.collections.projects[doc.project_id] : undefined;
     return own ? projectDocs(slug, own) : workspaceDocs(slug);
   });
 

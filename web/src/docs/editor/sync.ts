@@ -200,7 +200,7 @@ export class DocSync {
   private onStore = () => {
     if (this.dead) return;
     setTimeout(() => {
-      const doc = useStore.getState().c.docs[this.docId] as unknown as Doc | undefined;
+      const doc = useStore.getState().collections.docs[this.docId] as unknown as Doc | undefined;
       if (this.dead || this.pending > 0 || !doc || (doc.content_seq ?? 0) <= this.seq) return;
       this.seq = doc.content_seq ?? 0;
       void this.resync(false);

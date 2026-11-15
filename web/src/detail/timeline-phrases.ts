@@ -25,7 +25,7 @@ const writers: [string, Writer][] = [
   [
     "status_id",
     (c) => {
-      const { statuses } = getState().c;
+      const { statuses } = getState().collections;
       const to = statuses[str(c.to)]?.name;
       const from = statuses[str(c.from)]?.name;
       if (!to) return null;
@@ -76,7 +76,7 @@ const writers: [string, Writer][] = [
   [
     "label_ids",
     (c) => {
-      const { labels } = getState().c;
+      const { labels } = getState().collections;
       const before = ids(c.from);
       const after = ids(c.to);
       const names = (list: string[]) => list.map((id) => labels[id]?.name).filter((n): n is string => !!n);
@@ -91,21 +91,21 @@ const writers: [string, Writer][] = [
   [
     "epic_id",
     (c) => {
-      const name = getState().c.epics[str(c.to)]?.name;
+      const name = getState().collections.epics[str(c.to)]?.name;
       return name ? t("timeline.epic", { name }) : c.to ? null : t("timeline.epicCleared");
     },
   ],
   [
     "milestone_id",
     (c) => {
-      const name = getState().c.milestones[str(c.to)]?.name;
+      const name = getState().collections.milestones[str(c.to)]?.name;
       return name ? t("timeline.milestone", { name }) : c.to ? null : t("timeline.milestoneCleared");
     },
   ],
   [
     "cycle_id",
     (c) => {
-      const cycle = getState().c.cycles[str(c.to)];
+      const cycle = getState().collections.cycles[str(c.to)];
       if (cycle) return t("timeline.cycle", { name: cycle.name || t("prop.cycleName", { n: String(cycle.number) }) });
       return c.to ? null : t("timeline.cycleCleared");
     },
@@ -121,7 +121,7 @@ const writers: [string, Writer][] = [
   [
     "parent_id",
     (c) => {
-      const key = getState().c.tasks[str(c.to)]?.key;
+      const key = getState().collections.tasks[str(c.to)]?.key;
       return key ? t("timeline.parent", { key }) : c.to ? null : t("timeline.parentCleared");
     },
   ],
@@ -158,7 +158,7 @@ export function askedPhrase(d: Decision): string {
 }
 
 export function pickedPhrase(d: Decision): string {
-  const options = d.options ?? getState().c.decisions[d.id]?.options ?? [];
+  const options = d.options ?? getState().collections.decisions[d.id]?.options ?? [];
   const option = options.find((o) => o.id === d.picked_option_id);
   const question = d.question;
   switch (d.outcome) {
@@ -177,12 +177,12 @@ export function pickedPhrase(d: Decision): string {
 
 export function relationPhrase(r: Relation, taskId: string): string | null {
   const { side, otherId } = sideOf(r, taskId);
-  const key = getState().c.tasks[otherId]?.key;
+  const key = getState().collections.tasks[otherId]?.key;
   return key ? t(`timeline.relation.${side}`, { key }) : null;
 }
 
 export function relationRemovedPhrase(r: Relation | undefined, taskId: string): string {
-  const key = r ? getState().c.tasks[sideOf(r, taskId).otherId]?.key : undefined;
+  const key = r ? getState().collections.tasks[sideOf(r, taskId).otherId]?.key : undefined;
   return key ? t("timeline.relationRemoved", { key }) : t("timeline.relationRemovedAny");
 }
 

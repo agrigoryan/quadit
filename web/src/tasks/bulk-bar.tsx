@@ -44,8 +44,8 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
   const moreButton = useRef<HTMLButtonElement>(null);
   /** Set when a menu entry opens something of its own, so the closing menu does not take the focus back. */
   const handingOver = useRef(false);
-  const cycles = useStore((s) => !!s.c.projects[tasks[0]?.project_id ?? ""]?.settings?.cycles);
-  const estimates = useStore((s) => s.c.projects[tasks[0]?.project_id ?? ""]?.settings?.estimates !== false);
+  const cycles = useStore((s) => !!s.collections.projects[tasks[0]?.project_id ?? ""]?.settings?.cycles);
+  const estimates = useStore((s) => s.collections.projects[tasks[0]?.project_id ?? ""]?.settings?.estimates !== false);
   if (tasks.length === 0) return null;
 
   const open = (what: More) => () => {

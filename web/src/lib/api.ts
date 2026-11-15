@@ -159,8 +159,8 @@ export const api = {
   send: sendBytes,
 };
 
-/** The API path for a workspace: ws("games", "/bootstrap"). */
-export const ws = (slug: string, path: string) => `/api/v1/w/${encodeURIComponent(slug)}${path}`;
+/** The API path for a workspace: workspacePath("games", "/bootstrap"). */
+export const workspacePath = (slug: string, path: string) => `/api/v1/w/${encodeURIComponent(slug)}${path}`;
 
 /** The message to show for anything a call can throw. */
 export function errorMessage(err: unknown): string {

@@ -32,12 +32,12 @@ interface Props {
 
 export function Properties({ task, side }: Props) {
   const me = useMe();
-  const project = useStore((s) => s.c.projects[task.project_id]);
-  const status = useStore((s) => s.c.statuses[task.status_id]);
-  const labels = useStore((s) => s.c.labels);
-  const epic = useStore((s) => (task.epic_id ? s.c.epics[task.epic_id] : undefined));
-  const milestone = useStore((s) => (task.milestone_id ? s.c.milestones[task.milestone_id] : undefined));
-  const cycle = useStore((s) => (task.cycle_id ? s.c.cycles[task.cycle_id] : undefined));
+  const project = useStore((s) => s.collections.projects[task.project_id]);
+  const status = useStore((s) => s.collections.statuses[task.status_id]);
+  const labels = useStore((s) => s.collections.labels);
+  const epic = useStore((s) => (task.epic_id ? s.collections.epics[task.epic_id] : undefined));
+  const milestone = useStore((s) => (task.milestone_id ? s.collections.milestones[task.milestone_id] : undefined));
+  const cycle = useStore((s) => (task.cycle_id ? s.collections.cycles[task.cycle_id] : undefined));
   const assignee = useMember(task.assignee_id);
   const askedBy = useMember(task.asked_by);
   const waitingOn = useMember(task.waiting_on_id);

@@ -56,9 +56,9 @@ const iconButton =
  * The status, priority and assignee can be changed in place.
  */
 export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect, onHover, at, hide }: Props) {
-  const status = useStore((s) => s.c.statuses[task.status_id]);
-  const epic = useStore((s) => (task.epic_id ? s.c.epics[task.epic_id] : undefined));
-  const labels = useStore((s) => s.c.labels);
+  const status = useStore((s) => s.collections.statuses[task.status_id]);
+  const epic = useStore((s) => (task.epic_id ? s.collections.epics[task.epic_id] : undefined));
+  const labels = useStore((s) => s.collections.labels);
   const decision = useDecisionFlag(task.id);
   const progress = useSubtaskProgress(task.id);
   const link = useTaskLink(task);

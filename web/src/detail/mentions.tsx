@@ -8,7 +8,7 @@ import { useEffect } from "react";
 import { FileText } from "lucide-react";
 import { Link } from "react-router";
 import { create } from "zustand";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { getState, useStore } from "@/lib/store";
@@ -68,7 +68,7 @@ function useLoadMentions(taskId: string) {
   useEffect(() => {
     const ctl = new AbortController();
     api
-      .get<{ mentioned_in?: Ref[] }>(ws(getState().slug, `/tasks/${taskId}?raw=1`), ctl.signal)
+      .get<{ mentioned_in?: Ref[] }>(workspacePath(getState().slug, `/tasks/${taskId}?raw=1`), ctl.signal)
       .then((raw) => useMentions.setState({ [taskId]: read(raw.mentioned_in ?? [], taskId) }))
       .catch(() => {});
     return () => ctl.abort();
@@ -80,8 +80,8 @@ const rowStyle =
 const linkStyle = "min-w-0 flex-1 truncate py-1.5 outline-none after:absolute after:inset-0 after:content-['']";
 
 function TaskMention({ mention }: { mention: Mention }) {
-  const task = useStore((s) => s.c.tasks[mention.id]);
-  const status = useStore((s) => (task ? s.c.statuses[task.status_id] : undefined));
+  const task = useStore((s) => s.collections.tasks[mention.id]);
+  const status = useStore((s) => (task ? s.collections.statuses[task.status_id] : undefined));
   const key = task?.key ?? mention.key ?? "";
   const link = useTaskLink({ key });
   return (
@@ -99,7 +99,7 @@ function TaskMention({ mention }: { mention: Mention }) {
 
 function DocMention({ mention }: { mention: Mention }) {
   const slug = useSlug();
-  const doc = useStore((s) => s.c.docs[mention.id]) as unknown as Doc | undefined;
+  const doc = useStore((s) => s.collections.docs[mention.id]) as unknown as Doc | undefined;
   return (
     <li className={rowStyle}>
       <span className="flex size-6 shrink-0 items-center justify-center">

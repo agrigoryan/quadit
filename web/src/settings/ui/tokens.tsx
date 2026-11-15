@@ -10,7 +10,7 @@ import {
   type SetStateAction,
   useState,
 } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
@@ -82,7 +82,7 @@ export function CreateTokenDialog({
     e.preventDefault();
     await run(async () => {
       onCreated(
-        await api.post<CreatedToken>(ws(slug, "/tokens"), {
+        await api.post<CreatedToken>(workspacePath(slug, "/tokens"), {
           user,
           name: name.trim(),
           read_only: readOnly,

@@ -4,7 +4,7 @@
 // server and never comes back.
 
 import { useMemo } from "react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { mutate } from "@/lib/mutate";
 import { useCollection } from "@/lib/selectors";
 import { getState, mergeRows } from "@/lib/store";
@@ -12,7 +12,7 @@ import type { Secret } from "@/lib/types";
 
 /** Fetches every secret into the store. "Last used" is only as fresh as this call: using a secret is not an event. */
 export async function loadSecrets(slug: string): Promise<true> {
-  const out = await api.get<{ secrets?: Secret[] }>(ws(slug, "/list/secrets"));
+  const out = await api.get<{ secrets?: Secret[] }>(workspacePath(slug, "/list/secrets"));
   if (getState().slug === slug) mergeRows("secrets", out.secrets ?? []);
   return true;
 }

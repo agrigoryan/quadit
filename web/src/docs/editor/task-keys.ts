@@ -32,7 +32,7 @@ export function chipTyped(editor: AnyEditor) {
     undefined,
     "￼",
   );
-  const { c } = getState();
+  const { collections: c } = getState();
 
   const put = (from: number, to: number, type: string, props: Record<string, string>) => {
     const node = nodes[type];

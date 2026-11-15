@@ -2,7 +2,7 @@
 // calls that read and change them. None of these lists is in the store:
 // each page fetches its own and fetches again after a change.
 
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { mutate } from "@/lib/mutate";
 import type { Category, Outcome } from "@/lib/types";
 
@@ -140,7 +140,7 @@ export interface SyncResult {
 
 /** One of the lists the server keeps for admins: webhooks, rules, integrations, deliveries. */
 export async function listRows<T>(slug: string, name: string, query = ""): Promise<T[]> {
-  const out = await api.get<Record<string, T[]>>(ws(slug, `/list/${name}${query}`));
+  const out = await api.get<Record<string, T[]>>(workspacePath(slug, `/list/${name}${query}`));
   return out[name] ?? [];
 }
 
@@ -174,7 +174,7 @@ export function lastSent(hook: WebhookRow): { at: number; result: string; failed
 }
 
 export const listSources = (slug: string) =>
-  api.get<{ sources: Source[] }>(ws(slug, "/sources")).then((r) => r.sources ?? []);
+  api.get<{ sources: Source[] }>(workspacePath(slug, "/sources")).then((r) => r.sources ?? []);
 
 /** Sends one named change. A refusal is thrown for the form to show; no toast. */
 export const change = (type: string, args: Record<string, unknown>) =>

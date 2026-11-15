@@ -9,7 +9,7 @@
 // only: reloading the page drops it, so the browser asks before leaving.
 
 import { create } from "zustand";
-import { api, ApiError, NetworkError, ws } from "@/lib/api";
+import { api, ApiError, NetworkError, workspacePath } from "@/lib/api";
 import { newId } from "@/lib/ids";
 import { getState, useStore } from "@/lib/store";
 import type { FileRow } from "@/lib/types";
@@ -102,7 +102,7 @@ async function sendInParts(
   report: (sent: number, state: UploadProgress["state"]) => void,
   signal?: AbortSignal,
 ): Promise<ServerFile> {
-  const base = ws(slug, "/files");
+  const base = workspacePath(slug, "/files");
   let row: ServerFile | null = null;
   let netTries = 0;
   let serverTries = 0;

@@ -14,7 +14,7 @@ import { PriorityIcon, StatusIcon } from "@/ui/icons";
 /** The mark that goes with a group's name: a status quad, an avatar, a priority, a label's colour. */
 export function GroupIcon({ group }: { group: TaskGroup }) {
   const member = useMember(group.kind === "assignee" && group.value !== NONE ? group.value : undefined);
-  const color = useStore((s) => (group.kind === "label" ? s.c.labels[group.value]?.color : undefined));
+  const color = useStore((s) => (group.kind === "label" ? s.collections.labels[group.value]?.color : undefined));
   if (group.kind === "label") {
     return (
       <span

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link2, Mail, UserPlus } from "lucide-react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
@@ -36,8 +36,11 @@ export interface Created {
 /** Invitations that are still good, and the way to make one. */
 export function InvitesSection() {
   const slug = useSlug();
-  const members = useStore((s) => s.c.members);
-  const invites = useLoad(() => api.get<{ invites: Invite[] }>(ws(slug, "/invites")).then((r) => r.invites), [slug]);
+  const members = useStore((s) => s.collections.members);
+  const invites = useLoad(
+    () => api.get<{ invites: Invite[] }>(workspacePath(slug, "/invites")).then((r) => r.invites),
+    [slug],
+  );
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
   const [revoke, setRevoke] = useState<Invite | null>(null);
@@ -121,7 +124,7 @@ export function InvitesSection() {
         body={t("invites.revoke.body")}
         confirm={t("s.revoke")}
         onConfirm={async () => {
-          await api.del(ws(slug, `/invites/${revoke?.id}`));
+          await api.del(workspacePath(slug, `/invites/${revoke?.id}`));
           await invites.reload();
         }}
       />

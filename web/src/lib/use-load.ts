@@ -17,7 +17,7 @@ export interface Loaded<T> {
 }
 
 /**
- *   const tokens = useLoad(() => api.get<{ tokens: Token[] }>(ws(slug, "/tokens")).then((r) => r.tokens), [slug]);
+ *   const tokens = useLoad(() => api.get<{ tokens: Token[] }>(workspacePath(slug, "/tokens")).then((r) => r.tokens), [slug]);
  *
  * Runs `fetcher` when the page opens and whenever `deps` change.
  */

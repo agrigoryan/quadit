@@ -14,7 +14,7 @@ import { PageIcon } from "@/docs/page-icon";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 
 export function MentionChip({ handle }: { handle: string }) {
-  const member = useStore((s) => Object.values(s.c.members).find((m) => m.handle === handle));
+  const member = useStore((s) => Object.values(s.collections.members).find((m) => m.handle === handle));
   const isMe = useStore((s) => !!member && s.me?.user_id === member.user_id);
   return (
     <span className={cx("qd-chip qd-mention", isMe && "is-me")} data-handle={handle}>
@@ -25,7 +25,7 @@ export function MentionChip({ handle }: { handle: string }) {
 
 export function TaskChip({ taskKey }: { taskKey: string }) {
   const task = useTaskByKey(taskKey);
-  const category = useStore((s) => (task ? s.c.statuses[task.status_id]?.category : undefined));
+  const category = useStore((s) => (task ? s.collections.statuses[task.status_id]?.category : undefined));
   return (
     <span
       className={cx("qd-chip qd-task", (!task || !!task.deleted_at) && "is-missing")}
@@ -55,7 +55,7 @@ export function DecisionChip({ decisionRef }: { decisionRef: string }) {
   const task = useTaskByKey(m?.[1]);
   const live = !!task && !task.deleted_at;
   // Its number counts the task's questions in the order asked, as the server does.
-  const decision = useStore((s) => (live && m ? decisionsOf(s.c, task.id)[Number(m[2]) - 1] : undefined));
+  const decision = useStore((s) => (live && m ? decisionsOf(s.collections, task.id)[Number(m[2]) - 1] : undefined));
   const mine = useStore((s) => !!decision && decision.state === "open" && decision.asked_id === s.me?.user_id);
   const open = decision?.state === "open";
   return (

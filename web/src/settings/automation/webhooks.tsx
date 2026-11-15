@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, ScrollText, Send, Trash2 } from "lucide-react";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
@@ -176,7 +176,7 @@ export function WebhooksPage() {
   async function test(hook: Webhook) {
     setTests((s) => ({ ...s, [hook.id]: { busy: true } }));
     try {
-      const result = await api.post<TestResult>(ws(slug, `/webhooks/${hook.id}/test`));
+      const result = await api.post<TestResult>(workspacePath(slug, `/webhooks/${hook.id}/test`));
       setTests((s) => ({ ...s, [hook.id]: { busy: false, result } }));
     } catch (err) {
       setTests((s) => ({ ...s, [hook.id]: { busy: false, failed: errorMessage(err) } }));

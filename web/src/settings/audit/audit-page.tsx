@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ws } from "@/lib/api";
+import { workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
 import { AuditLog } from "@/admin/audit-log";
@@ -22,7 +22,7 @@ export function WorkspaceAuditPage() {
       title={t("audit.title")}
       lead={t("audit.workspaceLead")}
       back={base}
-      endpoint={ws(slug, "/audit")}
+      endpoint={workspacePath(slug, "/audit")}
       actors={actors}
     />
   );

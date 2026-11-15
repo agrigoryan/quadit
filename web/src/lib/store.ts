@@ -5,7 +5,7 @@
 // the server for a list.
 
 import { create } from "zustand";
-import { type AnyRow, applyEvent, Draft, emptyCollections, keyOf, normalize, targetsOf } from "@/lib/apply";
+import { type AnyRow, applyEvent, CopyOnWrite, emptyCollections, keyOf, normalize, targetsOf } from "@/lib/apply";
 import type {
   AgentSession,
   Attachment,
@@ -76,7 +76,7 @@ export interface StoreState {
   me: Member | null;
   user: User | null;
   workspace: Workspace | null;
-  c: Collections;
+  collections: Collections;
   /** Tasks whose description, comments and files have been fetched. */
   opened: Dict<true>;
   stream: StreamState;
@@ -110,7 +110,7 @@ export const useStore = create<StoreState>(() => ({
   me: null,
   user: null,
   workspace: null,
-  c: emptyCollections(),
+  collections: emptyCollections(),
   opened: {},
   stream: "connecting",
   unsent: 0,
@@ -164,10 +164,10 @@ const HELD_MAX = 20_000;
  * the stream will deliver them again in their place.
  */
 export function applyEvents(events: FeedEvent[], fromStream: boolean) {
-  const { seq, c, drafts, restLoaded } = getState();
+  const { seq, collections: c, drafts, restLoaded } = getState();
   const fresh = events.filter((ev) => ev.seq > seq);
   if (fresh.length === 0) return;
-  const d = new Draft(c);
+  const d = new CopyOnWrite(c);
   let last = seq;
   let confirmed: Dict<CollectionName> | null = null;
   for (const ev of fresh) {
@@ -186,7 +186,7 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
   const workspacePatch = workspaceChanges(fresh);
   const next = d.done();
   useStore.setState((s) => ({
-    c: next,
+    collections: next,
     // The signed-in member is a row like any other: follow its role, name and avatar.
     me: (s.me && next.members[s.me.user_id]) || s.me,
     seq: fromStream ? last : s.seq,
@@ -277,25 +277,25 @@ export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptio
   if (keep) {
     // The starting copy leaves out what a task carries once opened; keep it.
     for (const id of Object.keys(keep.opened)) {
-      const old = keep.c.tasks[id];
+      const old = keep.collections.tasks[id];
       const task = c.tasks[id];
       if (old?.description && task) c.tasks[id] = { ...task, description: old.description };
     }
     for (const name of ["comments", "attachments", "links"] as const) {
-      Object.assign(c[name], keep.c[name]);
+      Object.assign(c[name], keep.collections[name]);
     }
     // Watchers of opened tasks other than me, and deleted tasks and questions shown in the trash.
-    c.watchers = { ...keep.c.watchers, ...c.watchers };
-    for (const task of Object.values(keep.c.tasks)) {
+    c.watchers = { ...keep.collections.watchers, ...c.watchers };
+    for (const task of Object.values(keep.collections.tasks)) {
       if (task.deleted_at && !c.tasks[task.id]) c.tasks[task.id] = task;
     }
-    for (const decision of Object.values(keep.c.decisions)) {
+    for (const decision of Object.values(keep.collections.decisions)) {
       if (decision.deleted_at && !c.decisions[decision.id]) c.decisions[decision.id] = decision;
     }
     // Rows made here and not yet confirmed are in no answer from the server; they stay on screen.
     for (const [id, name] of Object.entries(keep.drafts)) {
       const table = c[name] as Dict<AnyRow>;
-      const row = (keep.c[name] as Dict<AnyRow>)[id];
+      const row = (keep.collections[name] as Dict<AnyRow>)[id];
       if (row && !table[id]) table[id] = row;
     }
   }
@@ -303,7 +303,7 @@ export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptio
   const keys = new Set(Object.values(c.projects).map((p) => p.key));
   const lostProjects = prev.slug === slug ? prev.lostProjects.filter((key) => !keys.has(key)) : [];
   if (opts.fresh && prev.slug === slug) {
-    for (const p of Object.values(prev.c.projects)) {
+    for (const p of Object.values(prev.collections.projects)) {
       if (!p.deleted_at && !keys.has(p.key) && !lostProjects.includes(p.key)) lostProjects.push(p.key);
     }
   }
@@ -315,7 +315,7 @@ export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptio
     me: data.me,
     user: data.user,
     workspace: data.workspace,
-    c,
+    collections: c,
     opened: keep?.opened ?? {},
     restLoaded: !(data.part === "open" && (data.rest ?? 0) > 0),
     drafts: keep?.drafts ?? {},
@@ -344,7 +344,7 @@ export function mergeRest(slug: string, data: RestData): string[] | null {
     held = [];
     return null;
   }
-  const d = new Draft(s.c);
+  const d = new CopyOnWrite(s.collections);
   const added = new Set<string>();
   for (const name of REST_PARTS) {
     for (const row of data[name] ?? []) {
@@ -374,7 +374,7 @@ export function mergeRest(slug: string, data: RestData): string[] | null {
     if (target?.collection !== "tasks" || target.gone) continue;
     for (const id of target.keys) if (!next.tasks[id]) missing.add(id);
   }
-  useStore.setState({ c: next, restLoaded: true });
+  useStore.setState({ collections: next, restLoaded: true });
   return [...missing];
 }
 
@@ -400,21 +400,21 @@ export function clearDrafts(ids: string[]) {
 /** Adds or replaces rows fetched outside the feed (an opened task, the trash). */
 export function mergeRows<K extends CollectionName>(name: K, rows: Collections[K][string][]) {
   if (rows.length === 0) return;
-  const d = new Draft(getState().c);
+  const d = new CopyOnWrite(getState().collections);
   for (const row of rows) d.put(name, row as unknown as AnyRow);
-  useStore.setState({ c: d.done() });
+  useStore.setState({ collections: d.done() });
 }
 
 export function patchRow(name: CollectionName, id: string, fields: AnyRow) {
-  const d = new Draft(getState().c);
+  const d = new CopyOnWrite(getState().collections);
   d.patch(name, id, fields);
-  useStore.setState({ c: d.done() });
+  useStore.setState({ collections: d.done() });
 }
 
 export function removeRow(name: CollectionName, id: string) {
-  const d = new Draft(getState().c);
+  const d = new CopyOnWrite(getState().collections);
   d.drop(name, id);
-  useStore.setState({ c: d.done() });
+  useStore.setState({ collections: d.done() });
 }
 
 export function markOpened(taskId: string) {
@@ -431,7 +431,7 @@ export function clearStore() {
     me: null,
     user: null,
     workspace: null,
-    c: emptyCollections(),
+    collections: emptyCollections(),
     opened: {},
     stream: "connecting",
     restLoaded: false,

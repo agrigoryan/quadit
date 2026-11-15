@@ -24,7 +24,7 @@ import { Select } from "@/ui/picker";
 function presetOf(template: Template | undefined, project: Project): Partial<TaskFields> {
   const preset = template?.preset;
   if (!preset) return {};
-  const { c } = getState();
+  const { collections: c } = getState();
   const low = (s: string) => s.toLowerCase();
   const out: Partial<TaskFields> = {};
   if (preset.priority) out.priority = preset.priority;
@@ -91,7 +91,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
   function change(patch: Partial<TaskFields>) {
     if (patch.templateId !== undefined && project) {
       // Picking a template fills what is still empty, so its effect is visible before creating.
-      const template = getState().c.templates[patch.templateId];
+      const template = getState().collections.templates[patch.templateId];
       if (template?.title && !title.trim()) setTitle(template.title);
       if (template?.description && !description.trim()) setDescription(template.description);
       patch = { ...presetOf(template, project), ...patch };

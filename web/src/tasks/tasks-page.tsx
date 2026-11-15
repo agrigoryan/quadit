@@ -17,7 +17,7 @@ export function ProjectTasksPage({ layout }: { layout: "list" | "board" }) {
 export function ViewPage() {
   const { slug } = useParams();
   const view = useViews().find((v) => v.slug === slug);
-  const projects = useStore((s) => s.c.projects);
+  const projects = useStore((s) => s.collections.projects);
   if (!view) return <NotFoundPage />;
   // The query may be anything a person or an agent stored; read it carefully.
   const keys = normalizeQuery(view.query)?.project ?? [];

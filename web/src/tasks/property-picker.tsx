@@ -82,7 +82,7 @@ function useItems(
   const labels = useLabels(projectId);
   const epics = useEpics(projectId);
   const cycles = useCycles(projectId);
-  const milestones = useStore((s) => s.c.milestones);
+  const milestones = useStore((s) => s.collections.milestones);
   const projects = useProjects();
   const same = <T,>(get: (task: Task) => T) =>
     tasks.every((task) => get(task) === get(first as Task)) ? get(first as Task) : undefined;

@@ -37,7 +37,7 @@ function useWidth(): [(el: HTMLElement | null) => (() => void) | undefined, numb
 function AttachedBy({ file }: { file: OptionFile }) {
   const names = useStore((s) => {
     const ids = [...new Set([file.before?.attachedBy, file.attachedBy].filter((id): id is string => !!id))];
-    return ids.map((id) => nameOf(s.c.members[id], t("common.someone"))).join(", ");
+    return ids.map((id) => nameOf(s.collections.members[id], t("common.someone"))).join(", ");
   });
   return <p className="truncate px-3 pt-1.5 text-2xs text-ink-3">{t("decision.file.by", { name: names })}</p>;
 }
@@ -156,6 +156,6 @@ export function OptionDocs({ files }: { files: OptionFile[] }) {
 }
 
 function DocBy({ file }: { file: OptionFile }) {
-  const name = useStore((s) => nameOf(s.c.members[file.attachedBy], t("common.someone")));
+  const name = useStore((s) => nameOf(s.collections.members[file.attachedBy], t("common.someone")));
   return <span className="ml-1.5 shrink-0 text-2xs text-ink-3">{t("decision.file.by", { name })}</span>;
 }

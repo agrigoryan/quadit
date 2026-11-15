@@ -40,7 +40,7 @@ export function cyclePhase(cycle: Cycle, now = serverDay()): "current" | "upcomi
 export function CyclePage() {
   const { key, id } = useParams();
   const project = useProjectByKey(key);
-  const cycle = useStore((s) => (id ? s.c.cycles[id] : undefined));
+  const cycle = useStore((s) => (id ? s.collections.cycles[id] : undefined));
   if (!project || !cycle || cycle.deleted_at || cycle.project_id !== project.id) return <NotFoundPage />;
   return <CycleView project={project} cycle={cycle} />;
 }

@@ -3,7 +3,7 @@
 // every couple of seconds, whenever the feed moves.
 
 import { useEffect, useRef, useState } from "react";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { onEvents, useStore } from "@/lib/store";
 
 export interface Live<T> {
@@ -60,7 +60,7 @@ export function useLive<T>(path: string | null, opts: { throttleMs?: number; onl
         s.path === path ? { ...s, refreshing: !s.loading } : { path, error: "", loading: true, refreshing: false },
       );
       try {
-        const data = await api.get<T>(ws(slug, path as string));
+        const data = await api.get<T>(workspacePath(slug, path as string));
         if (current) setState({ path, data, error: "", loading: false, refreshing: false });
       } catch (err) {
         if (current) setState((s) => ({ ...s, path, error: errorMessage(err), loading: false, refreshing: false }));

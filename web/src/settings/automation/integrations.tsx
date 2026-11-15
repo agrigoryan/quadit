@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { GitPullRequest, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2, Webhook as WebhookIcon } from "lucide-react";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
@@ -25,7 +25,7 @@ import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
 function HookDialog({ integration, onClose }: { integration: Integration; onClose: () => void }) {
   const slug = useSlug();
   const info = useLoad(
-    () => api.get<HookInfo>(ws(slug, `/integrations/${integration.id}/webhook`)),
+    () => api.get<HookInfo>(workspacePath(slug, `/integrations/${integration.id}/webhook`)),
     [slug, integration.id],
   );
   return (
@@ -151,7 +151,7 @@ export function IntegrationsPage() {
   async function sync(it: Integration) {
     setSyncs((s) => ({ ...s, [it.id]: { busy: true } }));
     try {
-      const out = await api.post<{ pull_requests: number }>(ws(slug, `/integrations/${it.id}/sync`));
+      const out = await api.post<{ pull_requests: number }>(workspacePath(slug, `/integrations/${it.id}/sync`));
       setSyncs((s) => ({
         ...s,
         [it.id]: { busy: false, ok: true, text: t("auto.gh.synced", { n: out.pull_requests }) },

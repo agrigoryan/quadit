@@ -53,7 +53,7 @@ export function CreateAgentDialog({
     await run(async () => {
       await mutate({ type: "agent.create", args }, undefined, { quiet: true });
       toast.info(t("agent.created", { name: draft.name.trim() }));
-      onCreated(getState().c.members[id]?.handle ?? draft.handle.trim());
+      onCreated(getState().collections.members[id]?.handle ?? draft.handle.trim());
     });
   }
 

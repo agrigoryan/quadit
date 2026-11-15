@@ -22,7 +22,7 @@
 // says so; the shell then shows the way out.
 
 import { create } from "zustand";
-import { api, ApiError, ws } from "@/lib/api";
+import { api, ApiError, workspacePath } from "@/lib/api";
 import { type EventStream, openEventStream } from "@/lib/event-stream";
 import { restoreQueue } from "@/lib/mutate";
 import {
@@ -144,7 +144,7 @@ function setStream(s: Session, state: StreamState) {
 async function bootstrap(s: Session, fresh: boolean) {
   const { slug } = s;
   const whole = !fresh && getState().ready && getState().slug === slug;
-  const data = await api.get<BootstrapData>(ws(slug, whole ? "/bootstrap" : "/bootstrap?part=open"));
+  const data = await api.get<BootstrapData>(workspacePath(slug, whole ? "/bootstrap" : "/bootstrap?part=open"));
   if (s !== cur) return;
   s.copy++;
   clearTimeout(s.restTimer);
@@ -156,7 +156,7 @@ async function bootstrap(s: Session, fresh: boolean) {
 async function loadRest(s: Session, copy: number, attempt: number) {
   let data: RestData;
   try {
-    data = await api.get<RestData>(ws(s.slug, "/bootstrap?part=rest"));
+    data = await api.get<RestData>(workspacePath(s.slug, "/bootstrap?part=rest"));
   } catch (err) {
     if (s !== cur || s.copy !== copy) return;
     // Refused: the stream is refused too, and that is where leaving is handled.
@@ -172,9 +172,9 @@ async function loadRest(s: Session, copy: number, attempt: number) {
   }
   // Tasks that were closed when the first part was read and open again by the second are in neither.
   for (const id of missing.slice(0, 50)) {
-    api.get<{ task: Task }>(ws(s.slug, `/tasks/${id}?raw=1`)).then(
+    api.get<{ task: Task }>(workspacePath(s.slug, `/tasks/${id}?raw=1`)).then(
       (raw) => {
-        if (s === cur && s.copy === copy && !getState().c.tasks[id]) mergeRows("tasks", [raw.task]);
+        if (s === cur && s.copy === copy && !getState().collections.tasks[id]) mergeRows("tasks", [raw.task]);
       },
       () => {},
     );
@@ -236,7 +236,7 @@ function openStream(s: Session) {
   s.source?.close();
   clearTimeout(s.retryTimer);
   const mine = () => s === cur && s.source === stream;
-  const stream: EventStream = openEventStream(ws(s.slug, `/events/stream?after=${getState().seq}`), {
+  const stream: EventStream = openEventStream(workspacePath(s.slug, `/events/stream?after=${getState().seq}`), {
     onOpen() {
       if (!mine()) return;
       s.tries = 0;
@@ -303,7 +303,7 @@ async function checkAccess(slug: string): Promise<Access> {
     const me = await api.get<{ workspaces: { slug: string }[] }>("/api/v1/auth/me");
     if (!me.workspaces.some((w) => w.slug === slug)) return { is: "lost", message: "" };
     // Still listed: a suspended member is, and the workspace itself says so.
-    await api.get(ws(slug, "/me"));
+    await api.get(workspacePath(slug, "/me"));
     return { is: "ok" };
   } catch (err) {
     if (!(err instanceof ApiError)) return { is: "unknown" };
@@ -496,7 +496,7 @@ async function catchUp(s: Session) {
   try {
     for (let page = 0; ; page++) {
       const out = await api.get<{ events: FeedEvent[]; seq: number; more: boolean }>(
-        ws(s.slug, `/events?after=${getState().seq}&limit=2000`),
+        workspacePath(s.slug, `/events?after=${getState().seq}&limit=2000`),
       );
       if (s !== cur) return;
       applyEvents(out.events, true);

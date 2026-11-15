@@ -36,7 +36,7 @@ type Styles = Record<string, unknown>;
 /** Splits a run of text around the things it names. Text that names nothing known comes back whole. */
 export function chipify(text: string, styles: Styles): unknown[] {
   if (styles.code || !/[@-]|doc:|\[\[/.test(text)) return [{ type: "text", text, styles }];
-  const { c } = getState();
+  const { collections: c } = getState();
   const out: unknown[] = [];
   let last = 0;
   const push = (upTo: number) => {

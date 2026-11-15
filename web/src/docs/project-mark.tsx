@@ -21,7 +21,7 @@ interface Props {
 
 /** A project's mark with its name on hover. Nothing for a project the person cannot see. */
 export function ProjectMark({ projectId, className }: Props) {
-  const project = useStore((s) => (projectId ? s.c.projects[projectId] : undefined));
+  const project = useStore((s) => (projectId ? s.collections.projects[projectId] : undefined));
   if (projectId && !project) return null;
   const label = project ? t("docs.project.in", { project: project.name }) : t("docs.project.notInParents");
   return (

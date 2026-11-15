@@ -54,7 +54,7 @@ const cardId = (group: TaskGroup, task: Task) => `${group.id}|${task.id}`;
 
 /** The status a task takes when dropped in a column. A category column maps to the task's own project. */
 function statusOf(group: TaskGroup, task: Task): string | undefined {
-  const { statuses } = getState().c;
+  const { statuses } = getState().collections;
   if (statuses[group.value]) return group.value;
   return statusesOf(statuses, task.project_id).find((s) => s.category === group.value)?.id;
 }

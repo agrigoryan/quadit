@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FolderGit2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Link } from "react-router";
-import { api, errorMessage, ws } from "@/lib/api";
+import { api, errorMessage, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useCollection, useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
@@ -52,7 +52,7 @@ function SourceItem({ src, sync, onSync, onEdit, onDelete }: ItemProps) {
   const slug = useSlug();
   const docs = useCollection("docs");
   const root = docs[src.root_doc_id] as { title?: string; project_id?: string } | undefined;
-  const project = useStore((s) => (root?.project_id ? s.c.projects[root.project_id] : undefined));
+  const project = useStore((s) => (root?.project_id ? s.collections.projects[root.project_id] : undefined));
   return (
     <div className="flex flex-col gap-1.5 px-3 py-2.5">
       <div className="flex items-center gap-3">
@@ -126,7 +126,7 @@ export function SourcesPage() {
   async function sync(src: Source) {
     setSyncs((s) => ({ ...s, [src.id]: { busy: true } }));
     try {
-      const out = await api.post<SyncResult>(ws(slug, `/sources/${src.id}/sync`));
+      const out = await api.post<SyncResult>(workspacePath(slug, `/sources/${src.id}/sync`));
       setSyncs((s) => ({ ...s, [src.id]: { busy: false, ok: true, text: syncText(out) } }));
     } catch (err) {
       setSyncs((s) => ({ ...s, [src.id]: { busy: false, ok: false, text: errorMessage(err) } }));

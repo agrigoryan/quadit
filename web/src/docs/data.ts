@@ -18,11 +18,11 @@ export function useDocs(): Dict<Doc> {
 }
 
 export function useDoc(id: string | undefined): Doc | undefined {
-  return useStore((s) => (id ? (s.c.docs[id] as unknown as Doc | undefined) : undefined));
+  return useStore((s) => (id ? (s.collections.docs[id] as unknown as Doc | undefined) : undefined));
 }
 
-export const getDoc = (id: string) => getState().c.docs[id] as unknown as Doc | undefined;
-export const getDocs = () => getState().c.docs as unknown as Dict<Doc>;
+export const getDoc = (id: string) => getState().collections.docs[id] as unknown as Doc | undefined;
+export const getDocs = () => getState().collections.docs as unknown as Dict<Doc>;
 
 /**
  * True unless the person is limited to some projects and the page is tied

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
-import { api, ws } from "@/lib/api";
+import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useProjects, useSlug } from "@/lib/selectors";
 import type { AgentMember, Token } from "@/settings/agents/data";
@@ -27,7 +27,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
     () =>
       canEdit
         ? api
-            .get<{ tokens: Token[] }>(ws(slug, "/tokens"))
+            .get<{ tokens: Token[] }>(workspacePath(slug, "/tokens"))
             .then((r) => r.tokens.filter((tk) => tk.user_id === agent.user_id))
         : Promise.resolve(null),
     [slug, agent.user_id, canEdit],
@@ -118,7 +118,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
         body={t("tokens.revoke.body")}
         confirm={t("s.revoke")}
         onConfirm={async () => {
-          await api.del(ws(slug, `/tokens/${revoke?.id}`));
+          await api.del(workspacePath(slug, `/tokens/${revoke?.id}`));
           await tokens.reload();
         }}
       />

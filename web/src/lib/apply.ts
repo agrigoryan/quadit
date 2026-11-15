@@ -63,7 +63,7 @@ export function normalize(collection: CollectionName, row: AnyRow): AnyRow {
 }
 
 /** Copy-on-write over the collections: only tables that change are copied. */
-export class Draft {
+export class CopyOnWrite {
   private next: Partial<Record<CollectionName, Dict<AnyRow>>> = {};
   constructor(private base: Collections) {}
 
@@ -102,7 +102,7 @@ const TRACKED: ReadonlySet<CollectionName> = new Set<CollectionName>(["tasks", "
  * With `only`, the event touches just the rows it names (used to replay
  * events over rows that arrived after them).
  */
-export function applyEvent(d: Draft, ev: FeedEvent, only?: (collection: CollectionName, key: string) => boolean) {
+export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: CollectionName, key: string) => boolean) {
   const name = COLLECTION_OF[ev.entity_type];
   const data = ev.data ?? {};
   if (!name) return;

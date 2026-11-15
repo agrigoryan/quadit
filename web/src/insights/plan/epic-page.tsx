@@ -30,7 +30,7 @@ const NOBODY = "none";
 export function EpicPage() {
   const { key, id } = useParams();
   const project = useProjectByKey(key);
-  const epic = useStore((s) => (id ? s.c.epics[id] : undefined));
+  const epic = useStore((s) => (id ? s.collections.epics[id] : undefined));
   if (!project || !epic || epic.deleted_at || epic.project_id !== project.id) return <NotFoundPage />;
   return <EpicView project={project} epic={epic} />;
 }
@@ -43,7 +43,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
   const members = useMembers();
   const tasks = useTasksBy(project.id, "epic_id")[epic.id] ?? [];
   const tally = useTallies("epic_id")[epic.id] ?? emptyTally();
-  const watching = useStore((s) => !!s.c.watchers[`${me.user_id}:${epic.id}`]);
+  const watching = useStore((s) => !!s.collections.watchers[`${me.user_id}:${epic.id}`]);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const risk = riskOf(epic, tally);

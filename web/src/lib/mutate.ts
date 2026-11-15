@@ -14,7 +14,7 @@
 // taken over this way has nothing on screen to undo; if the server refuses
 // it, a note says what was not saved.
 
-import { api, ApiError, errorMessage, NetworkError, ws } from "@/lib/api";
+import { api, ApiError, errorMessage, NetworkError, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { outbox, type OutboxChange } from "@/lib/outbox";
@@ -55,7 +55,7 @@ type Undo = () => void;
 const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 function optimisticTx(undos: Undo[], made: string[]): Tx {
-  const table = (name: CollectionName) => getState().c[name] as Record<string, Row>;
+  const table = (name: CollectionName) => getState().collections[name] as Record<string, Row>;
   return {
     patch(collection, id, fields) {
       const cur = table(collection)[id];
@@ -143,7 +143,7 @@ async function pump() {
   while (queue.length > 0) {
     const job = queue[0] as Job;
     try {
-      const out = await api.post<{ results: ChangeResult[] }>(ws(job.slug, "/changes?events=1"), job.body);
+      const out = await api.post<{ results: ChangeResult[] }>(workspacePath(job.slug, "/changes?events=1"), job.body);
       // The queue was emptied while this was on its way (sign-out): nothing more to do with it.
       if (queue[0] !== job) continue;
       queue.shift();
@@ -236,7 +236,7 @@ export async function restoreQueue(slug: string): Promise<void> {
 /** A few words for a change, for the note shown if it cannot be saved after a reload. */
 function describe(changes: OutboxChange[]): string {
   const first = changes[0] as OutboxChange;
-  const { tasks } = getState().c;
+  const { tasks } = getState().collections;
   const ref = [first.args.task, first.args.id].find((v): v is string => typeof v === "string" && v in tasks);
   const key = ref ? tasks[ref]?.key : undefined;
   let what: string;

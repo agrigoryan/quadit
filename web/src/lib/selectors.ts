@@ -10,7 +10,7 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
 const live = (row: { deleted_at?: number }) => !row.deleted_at;
 
 export function useCollection<K extends keyof Collections>(name: K): Collections[K] {
-  return useStore((s) => s.c[name]);
+  return useStore((s) => s.collections[name]);
 }
 
 /** The signed-in member. Pages render only once the store is ready, so it is there. */
@@ -75,7 +75,7 @@ export function useMembers(): Member[] {
 }
 
 export function useMember(userId: string | undefined): Member | undefined {
-  return useStore((s) => (userId ? s.c.members[userId] : undefined));
+  return useStore((s) => (userId ? s.collections.members[userId] : undefined));
 }
 
 export function useEpics(projectId: string | undefined): Epic[] {
@@ -117,7 +117,7 @@ export function useViews(): View[] {
 }
 
 export function useTask(id: string | undefined): Task | undefined {
-  return useStore((s) => (id ? s.c.tasks[id] : undefined));
+  return useStore((s) => (id ? s.collections.tasks[id] : undefined));
 }
 
 export function findTaskByKey(tasks: Dict<Task>, key: string): Task | undefined {
@@ -185,7 +185,7 @@ const openDecisionAsked = memoLast((decisions: Dict<Decision>) => {
 /** Whether a task has an open question: "mine" when one is asked of me, "open", or "". */
 export function useDecisionFlag(taskId: string): "" | "open" | "mine" {
   return useStore((s) => {
-    const asked = openDecisionAsked(s.c.decisions)[taskId];
+    const asked = openDecisionAsked(s.collections.decisions)[taskId];
     if (!asked) return "";
     return asked.includes(s.me?.user_id ?? "-") ? "mine" : "open";
   });
@@ -208,8 +208,12 @@ let progressInput: { tasks: Dict<Task>; statuses: Dict<Status> } | undefined;
 /** Sub-task progress of a task as "done/total", or "" when it has none. */
 export function useSubtaskProgress(taskId: string): string {
   return useStore((s) => {
-    if (!progressInput || progressInput.tasks !== s.c.tasks || progressInput.statuses !== s.c.statuses) {
-      progressInput = { tasks: s.c.tasks, statuses: s.c.statuses };
+    if (
+      !progressInput ||
+      progressInput.tasks !== s.collections.tasks ||
+      progressInput.statuses !== s.collections.statuses
+    ) {
+      progressInput = { tasks: s.collections.tasks, statuses: s.collections.statuses };
     }
     const p = childProgress(progressInput)[taskId];
     return p ? `${p.done}/${p.total}` : "";

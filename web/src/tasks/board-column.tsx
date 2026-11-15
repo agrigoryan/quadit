@@ -63,7 +63,7 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState("");
   const scroller = useRef<HTMLDivElement | null>(null);
-  const status = useStore((s) => (editable ? s.c.statuses[group.value] : undefined));
+  const status = useStore((s) => (editable ? s.collections.statuses[group.value] : undefined));
   // A Done or Canceled column is not empty while the finished work is still on its way; its header says so.
   const waitingForRest = !useRestLoaded() && group.kind === "status" && !isOpenCategory(group.category);
 

@@ -3,7 +3,7 @@
 
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Link2, Mail, UserCheck } from "lucide-react";
-import { api, ApiError, ws } from "@/lib/api";
+import { api, ApiError, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
@@ -71,7 +71,7 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
       }
       const body =
         mode === "email" ? { email: address, role, expires_days: days } : { role, expires_days: days, max_uses: uses };
-      onCreated(await api.post<Created>(ws(slug, "/invites"), body));
+      onCreated(await api.post<Created>(workspacePath(slug, "/invites"), body));
     } catch (err) {
       if (mode === "account" && err instanceof ApiError && err.status === 404) setUnknown(address);
       errors.fail(err);

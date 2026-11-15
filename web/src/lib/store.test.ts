@@ -45,7 +45,7 @@ describe("applyEvents", () => {
   it("moves seq only for events from the stream", () => {
     loadBootstrap("acme", boot({ tasks: [{ id: "t1", title: "a" }] }));
     applyEvents([retitle(11, "t1", "b")], false);
-    expect(getState().c.tasks.t1?.title).toBe("b");
+    expect(getState().collections.tasks.t1?.title).toBe("b");
     expect(getState().seq).toBe(10);
     applyEvents([retitle(13, "t1", "d"), retitle(12, "t1", "c")], true);
     expect(getState().seq).toBe(13);
@@ -54,10 +54,10 @@ describe("applyEvents", () => {
   it("drops events at or below the position already applied", () => {
     loadBootstrap("acme", boot({ tasks: [{ id: "t1", title: "a" }] }));
     applyEvents([event(10, { data: { gone: true } }), retitle(9, "t1", "old"), retitle(11, "t1", "b")], true);
-    expect(getState().c.tasks.t1?.title).toBe("b");
-    const before = getState().c;
+    expect(getState().collections.tasks.t1?.title).toBe("b");
+    const before = getState().collections;
     applyEvents([retitle(11, "t1", "again")], true);
-    expect(getState().c).toBe(before);
+    expect(getState().collections).toBe(before);
   });
 
   it("confirms a draft when the server's row for it arrives, and only that draft", () => {
@@ -65,7 +65,7 @@ describe("applyEvents", () => {
     markDrafts("tasks", ["t5", "t6"]);
     applyEvents([event(11, { entity_id: "t5", data: { row: { id: "t5", number: 7 } } })], true);
     expect(getState().drafts).toEqual({ t6: "tasks" });
-    expect(getState().c.tasks.t5?.number).toBe(7);
+    expect(getState().collections.tasks.t5?.number).toBe(7);
   });
 
   it("follows the signed-in member's own row, and no one else's", () => {
@@ -128,7 +128,7 @@ describe("loadBootstrap", () => {
     markDrafts("tasks", ["t8"]);
 
     loadBootstrap("acme", boot({ seq: 20, tasks: [{ id: "t1", title: "open" }] }));
-    const { c, drafts, opened, seq } = getState();
+    const { collections: c, drafts, opened, seq } = getState();
     expect(seq).toBe(20);
     expect(c.tasks.t1?.description).toBe("long text");
     expect(c.comments.k1).toBeDefined();
@@ -144,8 +144,8 @@ describe("loadBootstrap", () => {
     first();
     markOpened("t1");
     loadBootstrap("acme", boot({ tasks: [], projects: [{ id: "p1", key: "SVA" }] }), { fresh: true });
-    expect(getState().c.tasks).toEqual({});
-    expect(getState().c.comments).toEqual({});
+    expect(getState().collections.tasks).toEqual({});
+    expect(getState().collections.comments).toEqual({});
     expect(getState().opened).toEqual({});
     expect(getState().lostProjects).toEqual(["OPS"]);
 
@@ -184,7 +184,7 @@ describe("mergeRest", () => {
         { id: "t4", title: "finished" },
       ],
     });
-    const { tasks } = getState().c;
+    const { tasks } = getState().collections;
     expect(tasks.t1?.title).toBe("changed by the feed");
     expect(tasks.t2).toMatchObject({ title: "newer", description: "fetched" });
     expect(tasks.t3?.title).toBe("no stamp");
@@ -203,8 +203,8 @@ describe("mergeRest", () => {
         { id: "t8", title: "before", updated_seq: 3 },
       ],
     });
-    expect(getState().c.tasks.t9?.title).toBe("c");
-    expect(getState().c.tasks.t8?.title).toBe("after");
+    expect(getState().collections.tasks.t9?.title).toBe("c");
+    expect(getState().collections.tasks.t8?.title).toBe("after");
     expect(missing).toEqual([]);
   });
 
@@ -217,7 +217,7 @@ describe("mergeRest", () => {
   it("does nothing for another workspace", () => {
     loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
     expect(mergeRest("other", { seq: 10, tasks: [{ id: "t1" }] })).toEqual([]);
-    expect(getState().c.tasks).toEqual({});
+    expect(getState().collections.tasks).toEqual({});
     expect(getState().restLoaded).toBe(false);
   });
 });

@@ -52,7 +52,7 @@ export function AgentsPage() {
   const admin = useIsAdmin();
   const navigate = useNavigate();
   const agents = useMembers().filter((m) => m.kind === "agent") as AgentMember[];
-  const members = useStore((s) => s.c.members);
+  const members = useStore((s) => s.collections.members);
   const states = useAgentStates();
   const [creating, setCreating] = useState(false);
   const [showFinished, setShowFinished] = useState(false);

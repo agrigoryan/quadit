@@ -19,7 +19,7 @@ export function setNavigator(nav: NavigateFunction | null, at: Location | null) 
 /** The project whose Docs are on screen, going by the address. */
 function projectOnScreen() {
   const key = matchPath("/:ws/p/:key/docs/*", window.location.pathname)?.params.key?.toLowerCase();
-  return key ? Object.values(getState().c.projects).find((p) => p.key.toLowerCase() === key) : undefined;
+  return key ? Object.values(getState().collections.projects).find((p) => p.key.toLowerCase() === key) : undefined;
 }
 
 /** A page's address: in the Docs of the project on screen when it is one of that project's pages, else in the workspace's. */
