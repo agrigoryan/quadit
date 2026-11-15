@@ -1,19 +1,67 @@
 # Code style
 
-What "readable" means in this repository, as rules a reviewer can check. `make lint` checks the ones a tool can; the rest are for the person (or agent) writing and the one reviewing. `internal/importer` is the model to copy: an interface with an explicit list of implementations, one run of work as a struct with small named methods, and a package comment that says how the package is laid out.
+How code in this repository is designed and written. The first part is the thinking, taken from John Ousterhout's *A Philosophy of Software Design*, which is the reference for every judgement call here; read the book for the argument behind each point. The second and third parts are this repository's own conventions for Go and for the web app. Where a convention and a principle disagree, the principle wins and the convention gets fixed.
 
-## Go
+There are no numeric limits in this document: no maximum length for a function, a file or a component, no maximum nesting, no maximum number of parameters. Size is never the reason to split something.
+
+## Principles
+
+**Complexity is the thing we fight.** Complexity is whatever makes the system hard to understand or to change. It shows up three ways: one change needs edits in many places; a reader must hold a lot in their head to do anything; and, worst, it is not clear what must be known or changed at all. It has two causes, dependencies and obscurity, and it grows in small steps, each of which looked harmless. So every change is judged by whether it leaves the whole simpler, not by whether it works.
+
+**Working code is not enough.** The fastest way to finish the task at hand usually adds a little complexity. Take the time to find the design that keeps the system simple, and when touching existing code leave its design better than it was; do not patch around it.
+
+**Modules should be deep.** A module (a package, a type, a function) is worth what it hides behind its interface. The best give a lot of behaviour through a small, simple interface. A shallow one, whose interface is nearly as complicated as what it does, costs its callers more to learn than it saves them. Many small functions or types that each do little are not simpler than one that does the whole job: the complexity has moved into how they fit together.
+
+**Hide information.** Each design decision (a file format, a protocol, how rows are stored, a retry rule) should be known in one place. If changing it means touching several modules, it has leaked. A common cause is shaping code by the order things happen in (read, then process, then write) instead of by what each part needs to know: steps that share knowledge belong together.
+
+**Make interfaces somewhat general.** Shape an interface around what the module is, not around the one caller that exists today. The general form is usually simpler and deeper. Keep the special cases above it or below it, not mixed in.
+
+**Each layer is a different abstraction.** A function that only passes its arguments to another with the same shape adds an interface and no value. So does a value threaded through many layers that do not use it. If two adjacent layers say the same thing, one of them should not be there.
+
+**Pull complexity downward.** When something is hard, the module should take the difficulty on so that its callers do not have to. A simple interface matters more than a simple implementation. A configuration knob or a flag pushed up to the caller is a decision the module declined to make.
+
+**Together or apart is decided by meaning.** Put things together when they share knowledge, when one cannot be understood without the other, or when joining them makes the interface simpler. Split them when they are truly separate concerns. For functions in particular: each should do one thing and do it completely, and a long function is fine when it reads as one story with a simple signature. Splitting one creates new interfaces to learn; if the pieces can only be understood by reading them together, they were one function.
+
+**Define errors out of existence.** Every error a caller has to handle is complexity. First try to design the operation so the situation is not an error (asking to delete what is already gone is a success). Then try to handle it inside, where the knowledge is. Then gather what must be handled in one place high up, so that most code does not deal with it at all. The exception is anything that decides access: there, when in doubt, the answer is no.
+
+**Design it twice.** For anything that matters (a package boundary, an interface many callers will use) sketch at least two different designs and compare them before building one. The first idea is rarely the best.
+
+**Comments say what the code cannot.** Code shows how; a comment gives what a reader cannot get from the code: what a thing is for and what it promises (so callers need not read its body), and why something is done the way it is. A comment that repeats the code or the name next to it is noise. Write the interface comment before the body: if it is hard to describe simply, the design is not right yet.
+
+**Names are precise, and consistent.** A name should give a reader a clear picture of the thing without reading further, and the same word should mean the same thing everywhere. A name that is hard to choose usually marks a thing that is not one thing.
+
+**Be consistent and obvious.** Do similar things the same way throughout, and follow the conventions already here even where another would be as good. Code is obvious when a reader's first guess about what it does is right; anything surprising needs either a redesign or a comment.
+
+### Red flags
+
+Signs, when reading or reviewing, that a design needs another look:
+
+- **Shallow module:** its interface is not much simpler than its body.
+- **Information leakage:** the same decision shows up in more than one module.
+- **Temporal decomposition:** the structure follows the order of execution, not the knowledge each part holds.
+- **Pass-through:** a function that only forwards, or a value handed down through layers that ignore it.
+- **Repetition:** the same piece of non-trivial code in more than one place.
+- **Special-general mixture:** a general mechanism that contains code for one particular use of it.
+- **Conjoined functions:** one cannot be understood without reading the other.
+- **Overexposure:** using the common case requires knowing about the rare ones.
+- **Comment repeats code**, or a name so vague that a comment has to rescue it.
+- **Hard to name or hard to describe:** usually the thing is doing more than one job, or half of one.
+- **Non-obvious code:** its behaviour cannot be understood by a quick read.
+
+## Go conventions
+
+`make lint` checks what a tool can; the rest is for whoever writes and whoever reviews.
 
 ### Packages and files
-1. Every package has one doc comment saying what it is for and how its files are laid out.
-2. Every file other than the package's doc file opens with one line saying what is in it. One topic per file; the file's name is the topic. There is no limit on a file's length: a file is split when it holds more than one topic, never because it is long. A long file about one thing stays one file.
+1. Every package has one doc comment saying what it is for, what it hides from the rest of the program, and how its files are laid out.
+2. One topic per file; the file's name is the topic. A file is split when it holds more than one topic, never because it is long. A file opens with a comment when its name does not say enough.
 3. Packages below `server` never import it. `server` holds routing, the request context, sign-in and thin handlers; a feature with logic of its own is a package.
 
 ### Functions
-4. A function does one thing a reader can name. There are no limits on its length, its nesting or its number of branches: a long function that reads top to bottom as one story is fine, and so is deep nesting that follows the shape of the data. Split a function when a part of it has a name of its own and the whole reads better with that name in its place; when work has many steps that share state, a struct for one run with named methods is the usual form (see `internal/importer`). Never split only to make something shorter or flatter.
-5. A call should read as what it says. When a function's parameters are hard to tell apart at the call site (several of the same type in a row, or bare `true, false`), pass a struct with named fields instead.
-6. Every exported name, and every function whose purpose is not plain from its name, has a comment saying what it is for, starting with its name. A comment sits on the declaration it describes: moving code moves its comment.
-7. Comments say what a thing is for, in plain words. They do not restate the code, and they do not tell the history of a change.
+4. A function does one thing and does it completely. A long function that reads top to bottom as one story, with a blank line and a short comment between its parts, is good code. Take a part out only when it is a thing of its own: it has a clear name, a simple interface, and can be understood without reading its caller. A group of functions or methods that hand state to each other through parameters or struct fields, and that only make sense read together, is one function in disguise: write it as one.
+5. A call should read as what it says. When arguments are hard to tell apart at the call site (several of the same type in a row, or bare `true, false`), give them names: a struct with named fields, or separate functions. Do not make a struct only to carry a list of arguments around.
+6. An exported name has a comment that tells a caller what they need and cannot see from the signature: what it promises, what it changes, what the units and the edge cases are. A comment that only restates the name is worse than none: leave it out or say something. A comment sits on the declaration it describes: moving code moves its comment.
+7. Inside a function, comment the why and the non-obvious, in plain words. Comments do not restate the code, and they do not tell the history of a change.
 
 ### Wiring and state
 8. No `init()` for registration. A feature is named in an explicit list (routes, background loops, job kinds, change types, import sources).
@@ -21,13 +69,16 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 10. Every goroutine has an owner that can wait for it. `ctx` is the first parameter and is not stored in a struct, except in a struct that is one run of work and says so. `context.Background()` appears only in `main`, in tests, and in detached work that says why it is detached.
 
 ### Errors
+
+The aim is few places that deal with errors (see "Define errors out of existence"): operations defined so the common odd case is not an error, failures handled where the knowledge is, and the rest gathered at one place per entry point (the HTTP error path, a job's retry). Within that:
+
 11. An error is returned, logged with `slog`, or discarded with `_ =` and the reason on the same line. Nothing else.
 12. A store `Get` used to ask "is it there?" checks `errors.Is(err, store.ErrNotFound)`; any other error is returned. A database outage is never answered as "not found".
 13. A count, a limit or a setting that decides access fails closed: when it cannot be read, the answer is no.
 14. Errors are matched with `errors.Is` or `errors.As`, never by their text. Wrapping uses `%w`.
 
 ### Handlers, reads and writes
-15. An HTTP handler is `func(x *c) error` named `handle<Verb><Object>` and does three things: parse the request, call, write the answer.
+15. An HTTP handler is `func(x *c) error` named `handle<Verb><Object>`. Its job is the HTTP side: read the request, call what does the work, write the answer. The work itself lives where it can be used without a request.
 16. Every write is a change, handled in `internal/engine`. Read logic takes a viewer (who is asking, in which workspace, limited to which projects) and a `ctx`. Neither builds an `http.Request` to reach the other.
 
 ### Names
@@ -45,13 +96,13 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 24. `gofmt`, `go vet` and `make lint` are clean. A `//nolint` names the linter and gives the reason.
 25. `make test-all` (SQLite and Postgres, with the race detector) passes before anything is released.
 
-## Web app
+## Web app conventions
 
 `pnpm check` checks the rules a tool can (types, lint, format, tests). The folders under `web/src` are layers: `lib`, `i18n` and `ui` at the bottom; the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`) above them; `shell`, `pages` and `palette` on top.
 
 ### Files and layers
 1. One topic per file, and the file's name is the topic. No `bits`, `parts`, `more`, `helpers` or `utils`. A file is split when it holds more than one topic, never because it is long.
-2. Every file opens with a comment saying what it is for.
+2. A file opens with a comment saying what it is for when its name and its exports do not already say it.
 3. `lib`, `i18n` and `ui` import no feature folder; features do not import `shell`, `pages` or `palette`. Lint enforces it.
 4. Imports go through `@/`. No relative imports, no barrel files. Default exports only for lazy routes.
 
@@ -63,9 +114,9 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 9. No `Date.now()` or `Math.random()` in render. Use `useNow`, `useMinute` or an event handler.
 
 ### Shape
-10. A component does one thing a reader can name. There are no limits on its length, its props or its state. Extract a hook or a child when that part has a name of its own; when several pieces of state always change together (the fields of one form), hold them as one state object.
-11. The same goes for plain functions: split by meaning, never by length.
-12. A form uses `useSubmit` and `useFieldErrors`. No hand-rolled busy flag.
+10. A component does one thing and does it completely. Take a hook or a child out when it is a thing of its own: a clear name, a small interface, understandable without reading the component it came from. A hook with one user that hands back a dozen values is the component's own state moved to another file: keep it in the component. State that always changes together (the fields of one form) can be one object.
+11. The same goes for plain functions: together or apart by meaning, never by length.
+12. A form that follows the usual pattern (clear errors, mark busy, send, show a refusal, unmark) uses `useSubmit` and `useFieldErrors`. A form whose submit does something different writes it out plainly; do not bend it to fit the hook, and do not give the hook an option for one caller.
 
 ### Types
 13. No `any`, no `!`, no `@ts-ignore`. `as unknown as` only at a third-party boundary, with the reason on the line.
