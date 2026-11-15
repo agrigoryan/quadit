@@ -27,6 +27,7 @@ func TestGitHub(t *testing.T) {
 			"updated_at": "2026-11-14T10:00:00Z", "merged_at": nil, "head": M{"ref": "sva-1-jump", "sha": "abc123"}, "user": M{"login": "coder"}}
 		checks := []M{{"status": "in_progress", "conclusion": nil}}
 		var comments []string
+		issues := []M{}
 		gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -35,6 +36,12 @@ func TestGitHub(t *testing.T) {
 				return
 			}
 			switch {
+			case strings.HasSuffix(r.URL.Path, "/issues") && r.Method == "GET":
+				if r.URL.Query().Get("labels") != "quadit" {
+					w.WriteHeader(422)
+					return
+				}
+				json.NewEncoder(w).Encode(issues)
 			case strings.HasSuffix(r.URL.Path, "/pulls"):
 				json.NewEncoder(w).Encode([]M{pull})
 			case strings.HasSuffix(r.URL.Path, "/check-runs"):
@@ -117,9 +124,38 @@ func TestGitHub(t *testing.T) {
 			return status == "Done" && l.State == "merged"
 		})
 		mu.Lock()
-		defer mu.Unlock()
-		if len(comments) != 1 {
-			t.Fatalf("the pull request was commented on %d times", len(comments))
+		said := len(comments)
+		mu.Unlock()
+		if said != 1 {
+			t.Fatalf("the pull request was commented on %d times", said)
+		}
+
+		// Issues with the label become tasks, and stay in step with the issue.
+		s.change(s.owner, "", "integration.update", M{"id": in, "config": M{"repo": "acme/game", "api_url": gh.URL, "on_open": "started", "on_merge": "done",
+			"issues_label": "quadit", "issues_project": "SVA"}})
+		mu.Lock()
+		issues = []M{
+			{"number": 12, "title": "Crash on the title screen", "body": "Steps: start, wait.", "state": "open", "html_url": "https://github.example/acme/game/issues/12", "updated_at": "2026-11-14T12:00:00Z"},
+			{"number": 13, "title": "A pull request, not an issue", "state": "open", "html_url": "x", "updated_at": "2026-11-14T12:00:01Z", "pull_request": M{"url": "x"}},
+		}
+		mu.Unlock()
+		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil) // twice: still one task
+		list := s.call(s.owner, "", "GET", w+"/tasks?q=Crash&format=text", nil, 200, nil)
+		if strings.Count(list, "Crash on the title screen") != 1 || strings.Contains(s.call(s.owner, "", "GET", w+"/tasks?format=text", nil, 200, nil), "A pull request") {
+			t.Fatalf("tasks from issues: %s", list)
+		}
+		key := strings.Fields(list)[0]
+		if out := s.call(s.owner, "", "GET", w+"/tasks/"+key+"?format=text", nil, 200, nil); !strings.Contains(out, "Steps: start, wait.") || !strings.Contains(out, "acme/game#12") {
+			t.Fatalf("the task made from an issue: %s", out)
+		}
+		// The issue is renamed and closed there: the task follows.
+		mu.Lock()
+		issues[0]["title"], issues[0]["state"], issues[0]["updated_at"] = "Crash on the title screen (fixed)", "closed", "2026-11-14T13:00:00Z"
+		mu.Unlock()
+		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		if out := s.call(s.owner, "", "GET", w+"/tasks/"+key+"?format=text", nil, 200, nil); !strings.Contains(out, "(fixed)") || !strings.Contains(out, "status: Done") {
+			t.Fatalf("the task after the issue closed: %s", out)
 		}
 	})
 }

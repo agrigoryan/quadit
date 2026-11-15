@@ -6,10 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -45,6 +49,13 @@ type githubConfig struct {
 	OnMerge string `json:"on_merge"`
 	// CommentBack posts a link to the task on the pull request, once.
 	CommentBack bool `json:"comment_back"`
+	// IssuesLabel turns the repository's issues carrying this label into
+	// tasks and keeps them up to date: title, text, and closed or open.
+	// "*" takes every issue. Empty leaves issues alone.
+	IssuesLabel string `json:"issues_label"`
+	// IssuesProject is the key of the project the tasks are made in; the
+	// integration's own project when empty.
+	IssuesProject string `json:"issues_project"`
 }
 
 // githubState is what the server remembers between polls.
@@ -54,6 +65,8 @@ type githubState struct {
 	Heads         map[string]string `json:"heads"`          // pull request number -> head commit whose checks were read
 	Commented     map[string]bool   `json:"commented"`      // pull request number + task key
 	PendingChecks map[string]bool   `json:"pending_checks"` // pull requests whose checks have not finished
+	IssuesSince   string            `json:"issues_since"`   // newest issue update seen
+	IssueTasks    map[string]string `json:"issue_tasks"`    // issue number -> the task made from it
 }
 
 var ghLocks sync.Map
@@ -350,5 +363,115 @@ func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integratio
 		handled++
 	}
 	st.Since = newest
+	n, err := s.githubIssues(ctx, db, in, cfg, st, call)
+	return handled + n, err
+}
+
+type ghIssue struct {
+	Number      int    `json:"number"`
+	Title       string `json:"title"`
+	Body        string `json:"body"`
+	State       string `json:"state"`
+	HTMLURL     string `json:"html_url"`
+	UpdatedAt   string `json:"updated_at"`
+	PullRequest any    `json:"pull_request"` // set when the "issue" is a pull request
+}
+
+// githubIssues makes a task of each labelled issue and keeps it in step
+// with the issue: its title and text, and whether it is closed.
+func (s *Server) githubIssues(ctx context.Context, db store.DB, in core.Integration, cfg githubConfig, st *githubState,
+	call func(method, path string, body any, dst any) error) (int, error) {
+	if cfg.IssuesLabel == "" {
+		return 0, nil
+	}
+	project := cfg.IssuesProject
+	if project == "" {
+		var p core.Project
+		if in.ProjectID == "" || db.Get(ctx, &p, store.Eq("id", in.ProjectID), store.Live) != nil {
+			return 0, errors.New("issues are turned into tasks in a project: set issues_project to its key")
+		}
+		project = p.Key
+	}
+	if st.IssueTasks == nil {
+		st.IssueTasks = map[string]string{}
+	}
+	q := "/repos/" + cfg.Repo + "/issues?state=all&sort=updated&direction=desc&per_page=50"
+	if cfg.IssuesLabel != "*" {
+		q += "&labels=" + url.QueryEscape(cfg.IssuesLabel)
+	}
+	if st.IssuesSince != "" {
+		q += "&since=" + url.QueryEscape(st.IssuesSince)
+	}
+	var issues []ghIssue
+	if err := call("GET", q, nil, &issues); err != nil {
+		return 0, err
+	}
+	newest, handled := st.IssuesSince, 0
+	// Oldest first, so tasks are numbered in the order the issues changed.
+	for i := len(issues) - 1; i >= 0; i-- {
+		is := issues[i]
+		if is.PullRequest != nil || is.UpdatedAt <= st.IssuesSince {
+			continue
+		}
+		if is.UpdatedAt > newest {
+			newest = is.UpdatedAt
+		}
+		num := strconv.Itoa(is.Number)
+		text := strings.TrimSpace(is.Body)
+		if text != "" {
+			text += "\n\n"
+		}
+		text += fmt.Sprintf("From GitHub issue [%s#%d](%s).", cfg.Repo, is.Number, is.HTMLURL)
+		err := s.eng.System(ctx, in.WorkspaceID, in.CreatedBy, func(sys *engine.Sys) error {
+			var t core.Task
+			known := st.IssueTasks[num] != "" && sys.Tx().Get(ctx, &t, store.Eq("id", st.IssueTasks[num])) == nil
+			if !known {
+				tid := id.From("github-issue", in.ID, num) // the same issue is the same task, whatever happens between
+				if sys.Tx().Get(ctx, &t, store.Eq("id", tid)) != nil {
+					if err := sys.Do("task.create", map[string]any{"id": tid, "project": project, "title": is.Title, "description": text}); err != nil {
+						return err
+					}
+					if err := sys.Do("link.set", map[string]any{"task": tid, "kind": "issue", "repo": cfg.Repo, "ref": num, "url": is.HTMLURL, "title": is.Title, "state": is.State}); err != nil {
+						return err
+					}
+					if err := sys.Tx().Get(ctx, &t, store.Eq("id", tid)); err != nil {
+						return err
+					}
+				}
+				st.IssueTasks[num] = t.ID
+			}
+			if t.DeletedAt != 0 {
+				return nil // deleted here on purpose: the issue does not bring it back
+			}
+			set := map[string]any{"id": t.ID}
+			if t.Title != is.Title {
+				set["title"] = is.Title
+			}
+			if t.Description != text {
+				set["description"] = text
+			}
+			var cur core.Status
+			if err := sys.Tx().Get(ctx, &cur, store.Eq("id", t.StatusID)); err != nil {
+				return err
+			}
+			switch open := core.OpenCategory(cur.Category); {
+			case is.State == "closed" && open:
+				set["status"] = core.CatDone
+			case is.State == "open" && !open:
+				set["status"] = core.CatUnstarted
+			}
+			if len(set) > 1 {
+				if err := sys.Do("task.update", set); err != nil {
+					return err
+				}
+			}
+			return sys.Do("link.set", map[string]any{"task": t.ID, "kind": "issue", "repo": cfg.Repo, "ref": num, "url": is.HTMLURL, "title": is.Title, "state": is.State})
+		})
+		if err != nil {
+			return handled, fmt.Errorf("issue #%d: %w", is.Number, err)
+		}
+		handled++
+	}
+	st.IssuesSince = newest
 	return handled, nil
 }

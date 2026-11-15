@@ -113,7 +113,7 @@ CREATE TABLE task_links (
     id            {{ID}} PRIMARY KEY,
     workspace_id  {{ID}} NOT NULL REFERENCES workspaces (id),
     task_id       {{ID}} NOT NULL REFERENCES tasks (id),
-    kind          TEXT NOT NULL CHECK (kind IN ('branch', 'commit', 'pr', 'url')),
+    kind          TEXT NOT NULL CHECK (kind IN ('branch', 'commit', 'pr', 'issue', 'url')),
     url           TEXT NOT NULL DEFAULT '',
     title         TEXT NOT NULL DEFAULT '',
     repo          TEXT NOT NULL DEFAULT '',

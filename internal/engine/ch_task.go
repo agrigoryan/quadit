@@ -983,7 +983,7 @@ func linkSet(c *cx) error {
 	if err != nil {
 		return err
 	}
-	kinds := []string{"branch", "commit", "pr", "url"}
+	kinds := []string{"branch", "commit", "pr", "issue", "url"}
 	if !contains(kinds, a.Kind) {
 		return oneOf("kind", "link kind", a.Kind, kinds)
 	}
