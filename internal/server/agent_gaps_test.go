@@ -372,3 +372,67 @@ func TestSyncTitleFromHeading(t *testing.T) {
 		t.Fatalf("the old page's file: %q", got)
 	}
 }
+
+// TestSyncClonesOnlyWhatItNeeds: a source with a folder gets a working copy
+// with the last commit and that folder only, and still commits and proposes
+// from it. A working copy made whole before stays whole and keeps working.
+func TestSyncClonesOnlyWhatItNeeds(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	r := newSyncedRepo(t, s, map[string]string{"docs/plan.md": "Plan.\n", "assets/big.bin": "pretend this is 420 MB\n", "README.md": "readme\n"})
+	r.write("assets/more.bin", "and more\n")
+	r.push("second")
+	r.src = s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": "file://" + r.origin, "subdir": "docs"})["ref"].(string)
+	if res := r.sync(); res.PagesCreated != 1 {
+		t.Fatalf("first sync: %+v", res)
+	}
+	copyDir := filepath.Join(s.dir, "repos", r.src)
+	if n := gitIn(t, copyDir, "rev-list", "--count", "HEAD"); n != "1" {
+		t.Fatalf("the working copy holds %s commits", n)
+	}
+	if _, err := os.Stat(filepath.Join(copyDir, "assets", "big.bin")); err == nil {
+		t.Fatal("the working copy checked out more than the folder")
+	}
+	if _, err := os.Stat(filepath.Join(copyDir, "docs", "plan.md")); err != nil {
+		t.Fatalf("the folder is not checked out: %v", err)
+	}
+
+	// Commits go out from it, and a change there comes in.
+	plan := s.pageID("plan")
+	s.change(s.owner, "", "doc.write", M{"doc": plan, "markdown": "Plan two.\n"})
+	if res := r.sync(); res.FilesWritten != 1 || res.Pushed != "main" {
+		t.Fatalf("commit: %+v", res)
+	}
+	if got := r.read("main", "docs/plan.md"); got != "Plan two.\n" || r.read("main", "assets/big.bin") != "pretend this is 420 MB\n" {
+		t.Fatalf("after the commit: plan %q", got)
+	}
+	gitIn(t, r.work, "pull", "--quiet", "origin", "main")
+	r.write("docs/plan.md", "Plan three.\n")
+	r.push("from there")
+	if res := r.sync(); res.PagesUpdated != 1 {
+		t.Fatalf("a change there: %+v", res)
+	}
+	r.idle("after a change there")
+
+	// Proposed, twice: the second goes over the first.
+	s.change(s.owner, "", "source.update", M{"id": r.src, "write_mode": "propose"})
+	for _, text := range []string{"Proposal one.\n", "Proposal two.\n"} {
+		s.change(s.owner, "", "doc.write", M{"doc": plan, "markdown": text})
+		if res := r.sync(); res.Pushed != "quadit/docs" {
+			t.Fatalf("propose: %+v", res)
+		}
+		if got := r.read("quadit/docs", "docs/plan.md"); got != text {
+			t.Fatalf("the proposal holds %q", got)
+		}
+	}
+
+	// A working copy made whole, the way it was before, keeps working.
+	whole := s.change(s.owner, "", "source.create", M{"title": "Whole", "repo": r.origin, "subdir": "docs"})["ref"].(string)
+	gitIn(t, s.dir, "clone", "--quiet", "--no-checkout", r.origin, filepath.Join(s.dir, "repos", whole))
+	r.src = whole
+	if res := r.sync(); res.PagesCreated != 1 {
+		t.Fatalf("the whole working copy: %+v", res)
+	}
+	if n := gitIn(t, filepath.Join(s.dir, "repos", whole), "rev-list", "--count", "HEAD"); n == "1" {
+		t.Fatal("the whole working copy was made shallow")
+	}
+}

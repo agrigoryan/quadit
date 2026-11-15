@@ -57,21 +57,79 @@ func (r *syncRun) resetToBranch() error {
 }
 
 // clone makes the working copy if the server has none yet, and points it at
-// the source's repository.
+// the source's repository. A working copy holds the branch's last commit
+// and, for a source with a folder, only that folder: a few pages should not
+// cost the whole history of a large repository.
 func (r *syncRun) clone() error {
 	if _, serr := os.Stat(filepath.Join(r.dir, ".git")); serr != nil {
 		if err := os.MkdirAll(filepath.Dir(r.dir), 0o750); err != nil {
 			return err
 		}
-		// The branch is fetched below: naming it here would fail on a
-		// repository that does not have it yet.
-		if _, err := git(r.ctx, "", "clone", "--quiet", "--no-checkout", r.src.Repo, r.dir); err != nil {
-			return err
+		if err := r.cloneShallow(); err != nil {
+			// A remote that cannot be cloned shallow is cloned whole.
+			os.RemoveAll(r.dir)
+			// The branch is fetched below: naming it here would fail on a
+			// repository that does not have it yet.
+			if _, err := git(r.ctx, "", "clone", "--quiet", "--no-checkout", r.src.Repo, r.dir); err != nil {
+				return err
+			}
 		}
 	}
 	// The source may have been pointed at another repository since the clone.
-	_, err := r.git("remote", "set-url", "origin", r.src.Repo)
+	if _, err := r.git("remote", "set-url", "origin", r.src.Repo); err != nil {
+		return err
+	}
+	r.keepToFolder()
+	return nil
+}
+
+// cloneShallow clones the last commit only. Any branch can still be
+// fetched by name afterwards, as from a whole clone.
+func (r *syncRun) cloneShallow() error {
+	if _, err := git(r.ctx, "", "clone", "--quiet", "--no-checkout", "--depth", "1", r.src.Repo, r.dir); err != nil {
+		return err
+	}
+	_, err := r.git("config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")
 	return err
+}
+
+// shallow reports whether the working copy holds only the last commits.
+// One made whole, before working copies were shallow, stays whole.
+func (r *syncRun) shallow() bool {
+	_, err := os.Stat(filepath.Join(r.dir, ".git", "shallow"))
+	return err == nil
+}
+
+// keepToFolder checks out only the source's folder (a sparse checkout), or
+// everything again for a source that has none now. A git too old for it
+// checks out everything, as before.
+func (r *syncRun) keepToFolder() {
+	if r.src.Subdir == "" {
+		if on, _ := r.git("config", "--bool", "core.sparseCheckout"); on == "true" {
+			r.git("sparse-checkout", "disable")
+		}
+		return
+	}
+	if _, err := r.git("sparse-checkout", "set", "--cone", r.src.Subdir); err != nil {
+		r.s.log.Info("repository sync: the whole repository is checked out", "source", r.src.ID, "why", err)
+	}
+}
+
+// fetch brings the branch from the repository: its last commit only, into a
+// shallow working copy. A source that proposes also needs to know where its
+// proposal branch is, to push over it.
+func (r *syncRun) fetch() error {
+	if !r.shallow() {
+		_, err := r.git("fetch", "--quiet", "origin", r.branch)
+		return err
+	}
+	if _, err := r.git("fetch", "--quiet", "--depth", "1", "origin", r.branch); err != nil {
+		return err
+	}
+	if r.src.WriteMode == "propose" {
+		r.git("fetch", "--quiet", "--depth", "1", "origin", "quadit/docs") // none yet is fine
+	}
+	return nil
 }
 
 // findBranch settles which branch is synced: the source's, or else the one
@@ -102,7 +160,7 @@ func (r *syncRun) findBranch() error {
 // checkout brings the working copy to what the branch holds in the
 // repository now.
 func (r *syncRun) checkout() error {
-	if _, err := r.git("fetch", "--quiet", "origin", r.branch); err != nil {
+	if err := r.fetch(); err != nil {
 		if strings.Contains(err.Error(), "couldn't find remote ref") {
 			r.res.Note = "the repository has no branch " + r.branch + " yet; pages will sync once it has"
 			r.done = true
