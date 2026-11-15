@@ -133,7 +133,11 @@ func (c *cx) link(fromType, fromID, scopeType, scopeID, text string) ([]core.Mem
 		}
 		add("member", mem.UserID)
 	}
-	for _, m := range keyRE.FindAllStringSubmatch(text, -1) {
+	for _, loc := range keyRE.FindAllStringSubmatchIndex(text, -1) {
+		m := []string{text[loc[0]:loc[1]], text[loc[2]:loc[3]]}
+		if rest := text[loc[1]:]; len(rest) > 1 && rest[0] == '#' && rest[1] >= '0' && rest[1] <= '9' {
+			continue // "SVA-7#2" names a decision, taken below
+		}
 		var t core.Task
 		if err := c.tx.Get(c.ctx, &t, store.Eq("key", m[1])); err == nil {
 			add("task", t.ID)

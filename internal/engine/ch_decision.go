@@ -529,6 +529,7 @@ func commentUpdate(c *cx) error {
 		p.str("body", a.Body, &cm.Body)
 		if !p.empty() {
 			p.set["edited_at"] = c.at
+			p.changes["edited_at"] = core.FieldChange{From: zeroNil(cm.EditedAt), To: c.at}
 		}
 	}
 	if a.Resolved.Set {

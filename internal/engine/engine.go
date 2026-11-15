@@ -498,9 +498,18 @@ func (c *cx) checkApproval() error {
 	case !sameArgs(d.ActionArgs, c.change.Args):
 		need.Message = "that approval was given for different arguments (" + string(d.ActionArgs) + "); it covers that change and no other. Ask again for this one"
 	default:
-		// Used up, in the same write as the change it allows.
-		_, err := c.tx.Update(c.ctx, "decisions", map[string]any{"action_used_at": c.at}, store.Eq("id", d.ID))
-		return err
+		// Used up, in the same write as the change it allows; and said in
+		// the feed, so the approval shows as used wherever it is open.
+		seq := c.tx.NextSeq()
+		if _, err := c.tx.Update(c.ctx, "decisions", map[string]any{"action_used_at": c.at, "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {
+			return err
+		}
+		var t core.Task
+		if err := c.tx.Get(c.ctx, &t, store.Eq("id", d.TaskID)); err != nil {
+			return err
+		}
+		return c.emit(seq, "decision.updated", "decision", d.ID, "task", t.ID, t.ProjectID,
+			map[string]any{"id": d.ID, "changes": map[string]core.FieldChange{"action_used_at": {To: c.at}}})
 	}
 	return need
 }

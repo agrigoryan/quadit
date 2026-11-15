@@ -111,6 +111,28 @@ Another database is another implementation of `store.Store` that passes the same
 
 A backup is every table as JSON lines plus every file, so an archive made on one database restores onto the other.
 
+## The browser's copy: the trial of ready-made stores
+
+The requirements ask that client-side stores get a trial before one is written by hand. It was run on 2026-11-14 with the product's own shapes: 10,000 tasks, 2,000 decisions, 500 pages; 1,000 feed events one at a time; one filtered and sorted query; an optimistic write with undo; saving the whole copy to the device and a cold start; two tabs. Production builds, headless Chrome 157, an M4 Pro.
+
+| | Hand-written (Zustand) | TanStack DB 1.0-rc | RxDB 17 | TinyBase 10 |
+| --- | --- | --- | --- | --- |
+| Load 12,580 rows | 3 ms | 20 ms | 8 ms in memory, 789 ms on IndexedDB | 108 ms |
+| One feed event with 200 rows and a list on screen | 2.2 ms | 0.06 ms | 0.3 ms | 0.01 ms |
+| Query re-read after an unrelated change | 1 ms, recomputed | incremental | incremental | incremental |
+| Optimistic write with undo | ours, 40 lines | built in | by hand | by hand |
+| Cold start from the device | 93 ms (a 90-line layer of our own) | 134 ms | 104 ms, rows stay on disk | 137 ms |
+| Added to the first download, gzipped | 0 | 84 kB | 45 kB | 15 kB |
+| Licence | MIT | MIT | Apache-2.0, with paid storages | MIT |
+
+What decided it:
+
+- **RxDB**'s free build opens at most 13 collections, and the product has about 27; every read is asynchronous; each collection needs a versioned schema.
+- **TinyBase** has no optimistic layer; its tab sync needs its CRDT store, which is the opposite of a server-ordered copy, and its stock tab channel lost the 10,000-task table.
+- **TanStack DB** fits the model best, but is a release candidate, costs 84 kB, and while one of a person's own changes waits for the server it hides incoming feed events for that whole collection.
+
+So the copy stays hand-written, and the on-device copy planned after 1.0 gets a persistence layer of its own on top of it. The trial also showed where the hand-written store was slow (every subscriber ran on every event); the task list and board were then windowed and their subscriptions narrowed, which took one event on a 10,000-task list from 1.7 s of blocking to under 50 ms. The trial's code and raw numbers were kept outside the repository; TanStack DB is worth a second look once it is released as 1.0.
+
 ## Where the ideas came from
 
 | Idea | From | What we changed |

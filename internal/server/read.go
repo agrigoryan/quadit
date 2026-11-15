@@ -915,7 +915,15 @@ func (s *Server) rawTask(x *c, t core.Task) error {
 		return err
 	}
 	mentioned := x.namedRefs(refs)
-	return x.ok(map[string]any{"task": t, "comments": cms, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions, "mentioned_in": mentioned})
+	var rels, relsIn []core.Relation
+	if err := x.db.List(ctx, &rels, store.Where(store.Eq("task_id", t.ID))); err != nil {
+		return err
+	}
+	if err := x.db.List(ctx, &relsIn, store.Where(store.Eq("related_task_id", t.ID))); err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"task": t, "comments": cms, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions,
+		"mentioned_in": mentioned, "relations": append(rels, relsIn...)})
 }
 
 // hContext is the context pack: one call with everything an agent needs to
