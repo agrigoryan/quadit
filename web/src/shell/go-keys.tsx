@@ -2,11 +2,11 @@
 // tasks of the project in view. The places are the table in
 // shell/destinations.tsx. After G, a small card lists what can follow.
 
-import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { useKeySequences, usePendingKey } from "@/lib/key-sequence";
 import { useStore } from "@/lib/store";
+import { useDelayedFlag } from "@/lib/use-delayed-flag";
 import { DESTINATIONS, destinationPath, listedName, type Where } from "@/shell/destinations";
 import { projectInView } from "@/lib/project-in-view";
 import { Kbd } from "@/ui/kbd";
@@ -20,11 +20,9 @@ const keyed = DESTINATIONS.filter((place) => place.key);
 /** Where the places are, for the page that is showing now. */
 function useWhere(): () => Where {
   const location = useLocation();
-  const latest = useRef(location);
-  latest.current = location;
   return () => {
     const { slug, user } = useStore.getState();
-    return { slug, project: projectInView(latest.current), installAdmin: !!user?.is_admin };
+    return { slug, project: projectInView(location), installAdmin: !!user?.is_admin };
   };
 }
 
@@ -47,20 +45,14 @@ export function useGoKeys() {
 /** The card shown a moment after G: every letter that can follow, and where it goes. */
 export function GoHint() {
   const waiting = usePendingKey((s) => s.prefix === PREFIX);
+  const shown = useDelayedFlag(waiting, HINT_AFTER_MS);
   const where = useWhere();
-  const [shown, setShown] = useState(false);
-
-  useEffect(() => {
-    if (!waiting) return setShown(false);
-    const timer = setTimeout(() => setShown(true), HINT_AFTER_MS);
-    return () => clearTimeout(timer);
-  }, [waiting]);
-
-  if (!waiting || !shown) return null;
+  if (!shown) return null;
   const at = where();
   const places = keyed.filter((place) => destinationPath(place, at));
   return (
     <div
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the card holds a heading line and a list, which an <output> may not hold
       role="status"
       aria-label={t("goto.title")}
       className="pointer-events-none fixed bottom-6 left-1/2 z-[60] w-[min(31rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-white/10 bg-inverse px-4 pt-3 pb-3.5 text-inverse-ink shadow-pop animate-pop"

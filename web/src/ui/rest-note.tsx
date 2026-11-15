@@ -1,10 +1,10 @@
 // A note shown while finished tasks are still loading, so an empty list is
 // not read as "none".
 
-import { useEffect, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useRestLoaded } from "@/lib/store";
+import { useDelayedFlag } from "@/lib/use-delayed-flag";
 import { Spinner } from "@/ui/spinner";
 
 /**
@@ -19,25 +19,16 @@ export function RestLoadingNote({ className }: { className?: string }) {
   const loaded = useRestLoaded();
   if (loaded) return null;
   return (
-    <p role="status" className={cx("flex items-center gap-2 text-xs text-ink-3", className)}>
+    <output className={cx("flex items-center gap-2 text-xs text-ink-3", className)}>
       <Spinner className="size-3 border-[1.5px]" label={t("sync.loadingRest")} />
       {t("sync.loadingRest")}
-    </p>
+    </output>
   );
 }
 
 /** The same note for the top bar: only when the finished work takes more than a moment. */
 export function RestLoadingHint() {
-  const loaded = useRestLoaded();
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    if (loaded) {
-      setVisible(false);
-      return;
-    }
-    const timer = setTimeout(() => setVisible(true), 900);
-    return () => clearTimeout(timer);
-  }, [loaded]);
+  const visible = useDelayedFlag(!useRestLoaded(), 900);
   if (!visible) return null;
   return <RestLoadingNote className="shrink-0 animate-fade max-sm:hidden" />;
 }
