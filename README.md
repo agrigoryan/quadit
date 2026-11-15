@@ -71,6 +71,8 @@ See [docs/agents.md](docs/agents.md). The same surface is an MCP server at `/mcp
 make test        # SQLite
 make test-all    # SQLite and Postgres, with the race detector (needs Postgres: see docs/install.md)
 make server      # the binary without the web app, for API work
+make lint        # the Go linter, then the web app's lint and format check
+cd web && pnpm check   # the web app: types, lint, format, tests
 ```
 
 Every test that touches data runs on both databases. Dependencies are permissively licensed only.

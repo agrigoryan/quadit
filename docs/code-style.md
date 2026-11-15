@@ -44,3 +44,75 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 ### The gate
 24. `gofmt`, `go vet` and `make lint` are clean. A `//nolint` names the linter and gives the reason.
 25. `make test-all` (SQLite and Postgres, with the race detector) passes before anything is released.
+
+## Web app
+
+`pnpm check` checks the rules a tool can (types, lint, format, tests). The folders under `web/src` are layers: `lib`, `i18n` and `ui` at the bottom; the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`) above them; `shell`, `pages` and `palette` on top.
+
+### Files and layers
+1. One topic per file, and the file's name is the topic. No `bits`, `parts`, `more`, `helpers` or `utils`.
+2. Every file opens with a comment saying what it is for.
+3. `lib`, `i18n` and `ui` import no feature folder; features do not import `shell`, `pages` or `palette`. Lint enforces it.
+4. Imports go through `@/`. No relative imports, no barrel files. Default exports only for lazy routes.
+
+### Data and views
+5. A view file (`.tsx`) calls neither `api.*` nor `mutate` with an inline payload. Reads live in the folder's `data.ts`, writes in `actions.ts`.
+6. Every write is a named change through `mutate` or `send`. Nothing else writes the store.
+7. Data that is not in the store is read with `useLoad` or `useLive`, never in a component's own effect.
+8. An effect synchronises with something outside React, has a complete dependency array and cleans up. State derived from props is computed in render or reset with `key`.
+9. No `Date.now()` or `Math.random()` in render. Use `useNow`, `useMinute` or an event handler.
+
+### Size
+10. A component stays under 150 lines, 8 props and 5 `useState`. Beyond that, extract a hook or a child, or use one state object.
+11. A function stays under 80 lines.
+12. A form uses `useSubmit` and `useFieldErrors`. No hand-rolled busy flag.
+
+### Types
+13. No `any`, no `!`, no `@ts-ignore`. `as unknown as` only at a third-party boundary, with the reason on the line.
+14. Wire types are declared once in `lib/types*.ts`, named after the Go type they mirror. A response shape used twice has a name.
+15. Promises are awaited, returned, or marked `void`. Event handlers contain no comma operator.
+
+### Words, dates, controls
+16. Every word shown goes through `t()`. Strings live in `i18n/en/`.
+17. Dates are `YYYY-MM-DD` strings handled only by `lib/days.ts`; times are milliseconds formatted only by `lib/time.ts`.
+18. Clickable things are `<button>` or `<a>`, or `ui/` components. An icon-only button has a label. Dialogs use `ui/dialog`.
+
+### Names and state
+19. Names are words. One letter is allowed for the parameter of a one-expression callback, plus `e` (event), `t` (translate), `s` (store state) and `i`.
+20. Module state outside a store is a constant, or carries a comment saying who writes it.
+
+### Tests and the gate
+21. A test file sits beside the file it checks (`store.test.ts`) and is named after the behaviour. A fix comes with a test that fails without it.
+22. `pnpm check` is clean. A disable comment names the rule and the reason.
+
+### Lint warnings still to fix
+
+These rules are warnings in `web/.oxlintrc.json` because the code breaks them today; `pnpm lint` passes with them. Fix one rule's findings, make the rule an `"error"`, and take its line off this list. Counts as of the commit that brought the linter in.
+
+| Rule | Findings |
+| --- | ---: |
+| `jsx-a11y/prefer-tag-over-role` | 67 |
+| `no-sequences` (also in parentheses) | 38 |
+| `no-restricted-imports` (layers; the files are listed in `.oxlintrc.json`) | 33 |
+| `typescript/no-unnecessary-type-assertion` | 26 |
+| `react/refs` | 22 |
+| `react-hooks/exhaustive-deps` | 21 |
+| `typescript/no-floating-promises` | 17 |
+| `react/set-state-in-effect` | 16 |
+| `jsx-a11y/click-events-have-key-events` | 11 |
+| `typescript/no-base-to-string` | 11 |
+| `jsx-a11y/no-static-element-interactions` | 9 |
+| `jsx-a11y/no-noninteractive-element-interactions` | 8 |
+| `jsx-a11y/no-noninteractive-tabindex` | 6 |
+| `react/immutability` | 4 |
+| `jsx-a11y/no-noninteractive-element-to-interactive-role` | 3 |
+| `jsx-a11y/interactive-supports-focus` | 3 |
+| `react/purity` | 3 |
+| `typescript/no-misused-promises` | 3 |
+| `react/preserve-manual-memoization` | 2 |
+| `react/no-did-update-set-state` | 2 |
+| `jsx-a11y/control-has-associated-label` | 2 |
+| `typescript/no-misused-spread` | 2 |
+| `no-unused-vars` (`public/theme.js`) | 2 |
+| `jsx-a11y/label-has-associated-control` | 1 |
+| `react/incompatible-library` | 1 |
