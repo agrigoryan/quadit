@@ -187,7 +187,7 @@ func TestTaskPagesSearchTheIndex(t *testing.T) {
 	ctx := context.Background()
 	for _, sort := range TaskSorts() {
 		rec := &recorder{querier: s.db}
-		db := conn{q: q{c: rec, d: s.d}, ws: ws}
+		db := conn{runner: runner{handle: rec, dialect: s.d}, workspaceID: ws}
 		first, err := db.Tasks(ctx, store.TaskFilter{Sort: sort, Limit: 20})
 		if err != nil {
 			t.Fatal(err)
@@ -269,7 +269,7 @@ func TestNamesOutsideTheSchemaAreRefused(t *testing.T) {
 	ws := fillTasks(t, s, 3)
 	ctx := context.Background()
 	rec := &recorder{querier: s.db}
-	db := conn{q: q{c: rec, d: s.d}, ws: ws}
+	db := conn{runner: runner{handle: rec, dialect: s.d}, workspaceID: ws}
 	var some core.Task
 	if err := db.Get(ctx, &some); err != nil {
 		t.Fatal(err)

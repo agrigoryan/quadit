@@ -1,3 +1,23 @@
+// The registry of tables, which row struct is stored in which
+// table, and the order tables are loaded in.
+//
+// Adding a table takes four steps:
+//
+//  1. A migration that creates it: a new file with the next number in
+//     internal/store/sqlstore/migrations (docs/store.md; released files
+//     are never edited).
+//  2. Its row struct in package core, one field per column, tagged
+//     `db:"col"`, `db:"col,null"` or `db:"col,json"` (the rules are in
+//     internal/store/sqlstore/record.go). A table of a workspace has a
+//     workspace_id column.
+//  3. An entry in the list in init below: register[core.Thing]("things",
+//     ws), or global for a table outside workspaces.
+//  4. The entry's place in that list: it is the order a backup is loaded
+//     back in (and the reverse is the order a workspace is purged in), so
+//     a table goes after every table it refers to.
+//
+// A backup takes every registered table; nothing else lists them.
+
 package store
 
 import (
@@ -7,24 +27,28 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
-// Table describes where a row type is stored.
+// Table is one registry entry: where a row type is stored.
 type Table struct {
-	Name string
-	Type reflect.Type
+	Name string       // the table's name in the database
+	Type reflect.Type // the row struct of package core
 	// Global tables sit outside workspaces: a workspace-bound DB does not
 	// limit them.
 	Global bool
 }
 
 var (
-	byType = map[reflect.Type]*Table{}
-	byName = map[string]*Table{}
+	byType    = map[reflect.Type]*Table{}
+	byName    = map[string]*Table{}
+	loadOrder = map[string]int{} // table name -> its place in the registry
 )
 
-func reg[T any](name string, global bool) {
+// register adds the table of row type T. Tables are registered parents
+// first, which makes the order they are registered in the load order.
+func register[T any](name string, global bool) {
 	t := &Table{Name: name, Type: reflect.TypeFor[T](), Global: global}
 	byType[t.Type] = t
 	byName[name] = t
+	loadOrder[name] = len(loadOrder)
 }
 
 // TableOf returns the table of a registered row type.
@@ -33,8 +57,8 @@ func TableOf(t reflect.Type) (*Table, bool) { tb, ok := byType[t]; return tb, ok
 // TableNamed returns a registered table by name.
 func TableNamed(name string) (*Table, bool) { tb, ok := byName[name]; return tb, ok }
 
-// Tables lists every registered table by name, in an order that is safe to
-// load (a table comes after the tables it refers to).
+// Tables lists every registered table, in an order that is safe to load (a
+// table comes after the tables it refers to).
 func Tables() []*Table {
 	out := make([]*Table, 0, len(byName))
 	for _, t := range byName {
@@ -44,76 +68,63 @@ func Tables() []*Table {
 	return out
 }
 
-var loadOrder = map[string]int{}
-
 func init() {
 	const ws, global = false, true
-	reg[core.Workspace]("workspaces", global)
-	reg[core.User]("users", global)
-	reg[core.Member]("members", ws)
-	reg[core.APIToken]("api_tokens", ws)
-	reg[core.Project]("projects", ws)
-	reg[core.Status]("statuses", ws)
-	reg[core.Label]("labels", ws)
-	reg[core.Epic]("epics", ws)
-	reg[core.Milestone]("milestones", ws)
-	reg[core.Cycle]("cycles", ws)
-	reg[core.Task]("tasks", ws)
-	reg[core.TaskLabel]("task_labels", ws)
-	reg[core.Relation]("task_relations", ws)
-	reg[core.Decision]("decisions", ws)
-	reg[core.Option]("decision_options", ws)
-	reg[core.Doc]("docs", ws)
-	reg[core.Block]("doc_blocks", ws)
-	reg[core.DocVersion]("doc_versions", ws)
-	reg[core.DBProperty]("db_properties", ws)
-	reg[core.DBView]("db_views", ws)
-	reg[core.DocSource]("doc_sources", ws)
-	reg[core.Comment]("comments", ws)
-	reg[core.Event]("events", ws)
-	reg[core.AppliedChange]("changes", ws)
-	reg[core.Cursor]("cursors", ws)
-	reg[core.View]("views", ws)
-	reg[core.Watcher]("watchers", ws)
-	reg[core.Notification]("notifications", ws)
-	reg[core.TaskLink]("task_links", ws)
-	reg[core.Ref]("refs", ws)
-	reg[core.Template]("templates", ws)
-	reg[core.Preference]("preferences", ws)
-	reg[core.File]("files", ws)
-	reg[core.Attachment]("attachments", ws)
-	reg[core.Session]("sessions", global)
-	reg[core.Identity]("identities", global)
-	reg[core.Passkey]("passkeys", global)
-	reg[core.RecoveryCode]("recovery_codes", global)
-	reg[core.Invite]("invites", global)
-	reg[core.OneTimeToken]("one_time_tokens", global)
-	reg[core.Setting]("settings", global)
-	reg[core.AuditEntry]("audit_log", global)
-	reg[core.RateCounter]("rate_counters", global)
-	reg[core.PushSubscription]("push_subscriptions", global)
-	reg[core.OAuthClient]("oauth_clients", global)
-	reg[core.Backup]("backups", global)
-	reg[core.Webhook]("webhooks", ws)
-	reg[core.WebhookDelivery]("webhook_deliveries", ws)
-	reg[core.Rule]("rules", ws)
-	reg[core.Job]("jobs", global)
-	reg[core.AgentSession]("agent_sessions", ws)
-	reg[core.Resource]("resources", ws)
-	reg[core.ResourceClaim]("resource_claims", ws)
-	reg[core.Integration]("integrations", ws)
-	reg[core.Secret]("secrets", ws)
-	reg[core.Presence]("doc_presence", ws)
-	reg[core.TaskKey]("task_keys", ws)
-
-	// Load order for restores: parents before children.
-	for i, n := range []string{"workspaces", "users", "members", "api_tokens", "projects", "statuses", "labels",
-		"epics", "milestones", "cycles", "tasks", "task_labels", "task_relations", "decisions", "decision_options",
-		"docs", "doc_blocks", "doc_versions", "db_properties", "db_views", "doc_sources", "comments", "events",
-		"changes", "cursors", "views", "watchers", "notifications", "task_links", "refs", "templates", "preferences",
-		"files", "attachments", "sessions", "identities", "passkeys", "recovery_codes", "invites", "one_time_tokens",
-		"settings", "audit_log", "rate_counters", "push_subscriptions", "oauth_clients", "backups", "webhooks",
-		"webhook_deliveries", "rules", "jobs", "agent_sessions", "resources", "resource_claims", "integrations", "secrets", "doc_presence", "task_keys"} {
-		loadOrder[n] = i
-	}
+	register[core.Workspace]("workspaces", global)
+	register[core.User]("users", global)
+	register[core.Member]("members", ws)
+	register[core.APIToken]("api_tokens", ws)
+	register[core.Project]("projects", ws)
+	register[core.Status]("statuses", ws)
+	register[core.Label]("labels", ws)
+	register[core.Epic]("epics", ws)
+	register[core.Milestone]("milestones", ws)
+	register[core.Cycle]("cycles", ws)
+	register[core.Task]("tasks", ws)
+	register[core.TaskLabel]("task_labels", ws)
+	register[core.Relation]("task_relations", ws)
+	register[core.Decision]("decisions", ws)
+	register[core.Option]("decision_options", ws)
+	register[core.Doc]("docs", ws)
+	register[core.Block]("doc_blocks", ws)
+	register[core.DocVersion]("doc_versions", ws)
+	register[core.DBProperty]("db_properties", ws)
+	register[core.DBView]("db_views", ws)
+	register[core.DocSource]("doc_sources", ws)
+	register[core.Comment]("comments", ws)
+	register[core.Event]("events", ws)
+	register[core.AppliedChange]("changes", ws)
+	register[core.Cursor]("cursors", ws)
+	register[core.View]("views", ws)
+	register[core.Watcher]("watchers", ws)
+	register[core.Notification]("notifications", ws)
+	register[core.TaskLink]("task_links", ws)
+	register[core.Ref]("refs", ws)
+	register[core.Template]("templates", ws)
+	register[core.Preference]("preferences", ws)
+	register[core.File]("files", ws)
+	register[core.Attachment]("attachments", ws)
+	register[core.Session]("sessions", global)
+	register[core.Identity]("identities", global)
+	register[core.Passkey]("passkeys", global)
+	register[core.RecoveryCode]("recovery_codes", global)
+	register[core.Invite]("invites", global)
+	register[core.OneTimeToken]("one_time_tokens", global)
+	register[core.Setting]("settings", global)
+	register[core.AuditEntry]("audit_log", global)
+	register[core.RateCounter]("rate_counters", global)
+	register[core.PushSubscription]("push_subscriptions", global)
+	register[core.OAuthClient]("oauth_clients", global)
+	register[core.Backup]("backups", global)
+	register[core.Webhook]("webhooks", ws)
+	register[core.WebhookDelivery]("webhook_deliveries", ws)
+	register[core.Rule]("rules", ws)
+	register[core.Job]("jobs", global)
+	register[core.AgentSession]("agent_sessions", ws)
+	register[core.Resource]("resources", ws)
+	register[core.ResourceClaim]("resource_claims", ws)
+	register[core.Integration]("integrations", ws)
+	register[core.Secret]("secrets", ws)
+	register[core.Presence]("doc_presence", ws)
+	register[core.TaskKey]("task_keys", ws)
 }

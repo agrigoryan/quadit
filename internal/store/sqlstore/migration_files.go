@@ -1,3 +1,6 @@
+// The migration files, made into the files goose reads
+// for one database.
+
 package sqlstore
 
 import (
@@ -67,19 +70,19 @@ func schemaVersions(d Dialect) ([]schemaVersion, error) {
 	}
 	var out []schemaVersion
 	for _, name := range names {
-		number, title, only, err := parseMigrationName(name)
+		file, err := parseMigrationName(name)
 		if err != nil {
 			return nil, err
 		}
-		if only != "" && only != d.Name {
+		if file.only != "" && file.only != d.Name {
 			continue // another database's file
 		}
 		body, err := migrationFiles.ReadFile("migrations/" + name)
 		if err != nil {
 			return nil, err
 		}
-		if len(out) == 0 || out[len(out)-1].number != number {
-			out = append(out, schemaVersion{number: number, name: title})
+		if len(out) == 0 || out[len(out)-1].number != file.number {
+			out = append(out, schemaVersion{number: file.number, name: file.title})
 		}
 		out[len(out)-1].sql += statementLines(d.expand(string(body)))
 	}
@@ -114,21 +117,33 @@ func migrationNames() ([]string, error) {
 	return names, nil
 }
 
+// isShared tells whether a migration file is for every database: it has no
+// ".<database>" before ".sql".
 func isShared(name string) bool { return strings.Count(name, ".") == 1 }
 
+// migrationName is what a migration file's name, NNNN_name[.database].sql,
+// says.
+type migrationName struct {
+	number int    // the schema version
+	title  string // the name after the number
+	only   string // the one database the file is for; "" for every one
+}
+
 // parseMigrationName reads NNNN_name[.database].sql.
-func parseMigrationName(file string) (number int, name, only string, err error) {
+func parseMigrationName(file string) (migrationName, error) {
 	parts := strings.Split(strings.TrimSuffix(file, ".sql"), ".")
 	if len(parts) > 2 || len(parts[0]) < 6 || parts[0][4] != '_' {
-		return 0, "", "", fmt.Errorf("migration %q: want NNNN_name[.database].sql", file)
+		return migrationName{}, fmt.Errorf("migration %q: want NNNN_name[.database].sql", file)
 	}
-	if number, err = strconv.Atoi(parts[0][:4]); err != nil {
-		return 0, "", "", fmt.Errorf("migration %q: bad version: %w", file, err)
+	number, err := strconv.Atoi(parts[0][:4])
+	if err != nil {
+		return migrationName{}, fmt.Errorf("migration %q: bad version: %w", file, err)
 	}
+	parsed := migrationName{number: number, title: parts[0][5:]}
 	if len(parts) == 2 {
-		only = parts[1]
+		parsed.only = parts[1]
 	}
-	return number, parts[0][5:], only, nil
+	return parsed, nil
 }
 
 // statementLines drops blank lines and lines that are only a comment.
@@ -136,7 +151,7 @@ func parseMigrationName(file string) (number int, name, only string, err error) 
 // a line, which is where goose cuts.
 func statementLines(sqlText string) string {
 	var b strings.Builder
-	for _, line := range strings.Split(sqlText, "\n") {
+	for line := range strings.SplitSeq(sqlText, "\n") {
 		if trimmed := strings.TrimSpace(line); trimmed == "" || strings.HasPrefix(trimmed, "--") {
 			continue
 		}

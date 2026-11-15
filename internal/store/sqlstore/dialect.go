@@ -1,3 +1,6 @@
+// What differs between SQLite and Postgres, in one value per
+// database.
+
 package sqlstore
 
 import (
@@ -101,21 +104,21 @@ func postgresMigrationLock() (lock.SessionLocker, error) {
 
 // Rebind turns the ? placeholders every query is written with into the
 // dialect's own form. Queries never contain a literal question mark.
-func (d Dialect) Rebind(q string) string {
-	if !d.Numbered || !strings.Contains(q, "?") {
-		return q
+func (d Dialect) Rebind(query string) string {
+	if !d.Numbered || !strings.Contains(query, "?") {
+		return query
 	}
 	var b strings.Builder
-	b.Grow(len(q) + 8)
+	b.Grow(len(query) + 8)
 	n := 0
-	for i := 0; i < len(q); i++ {
-		if q[i] == '?' {
+	for i := range len(query) {
+		if query[i] == '?' {
 			n++
 			b.WriteByte('$')
 			b.WriteString(strconv.Itoa(n))
 			continue
 		}
-		b.WriteByte(q[i])
+		b.WriteByte(query[i])
 	}
 	return b.String()
 }

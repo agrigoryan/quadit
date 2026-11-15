@@ -1,7 +1,12 @@
+// Full-text search, the part every database shares; each one's
+// own index is in search_sqlite.go and search_postgres.go.
+
 package sqlstore
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -20,4 +25,83 @@ type searcher interface {
 	// rank adds the audience condition for viewer to w, and returns the
 	// ORDER BY that follows the WHERE.
 	rank(w *clause, viewer string) string
+}
+
+// The number of hits a search returns when it asks for none, or for more
+// than the most it may have; and the most words of its text it looks for.
+const (
+	defaultSearchLimit = 20
+	maxSearchLimit     = 100
+	maxSearchTerms     = 12
+)
+
+// searchTerms cuts free text into lowercase words safe to hand to either
+// database: letters a-z, digits and anything beyond ASCII. Only the first
+// maxSearchTerms count.
+func searchTerms(text string) []string {
+	var out []string
+	for _, word := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !isWordRune(r) }) {
+		if len(out) == maxSearchTerms {
+			break
+		}
+		out = append(out, word)
+	}
+	return out
+}
+
+// isWordRune tells whether r can be part of a search term.
+func isWordRune(r rune) bool {
+	return r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r > 127
+}
+
+// Index puts one searchable thing in the workspace's index, replacing any
+// earlier entry for the same entity.
+func (c conn) Index(ctx context.Context, d store.SearchDoc) error {
+	if c.workspaceID == "" {
+		return fmt.Errorf("store: Index needs a workspace-bound DB")
+	}
+	return c.dialect.search.index(ctx, c, d)
+}
+
+// Unindex removes an entity from the index; one that is not there, or is
+// not an id, is no error.
+func (c conn) Unindex(ctx context.Context, entityID string) error {
+	if !looksUUID(entityID) {
+		return nil
+	}
+	return c.dialect.search.unindex(ctx, c, entityID)
+}
+
+// Search finds the entries of the workspace that hold every word of the
+// text, best first. A DB bound to no workspace, or text with no words,
+// finds nothing.
+func (c conn) Search(ctx context.Context, sq store.SearchQuery) ([]store.SearchHit, error) {
+	terms := searchTerms(sq.Text)
+	if len(terms) == 0 || c.workspaceID == "" {
+		return nil, nil
+	}
+	where := &clause{}
+	query := c.dialect.search.match(where, terms, c.workspaceID)
+	if len(sq.Kinds) > 0 {
+		where.in(`kind`, sq.Kinds)
+	}
+	if len(sq.ProjectIDs) > 0 {
+		where.inIDs(`project_id`, sq.ProjectIDs)
+	}
+	order := c.dialect.search.rank(where, sq.Viewer)
+	query += where.sql() + order
+	rows, err := c.query(ctx, query+fmt.Sprintf(" LIMIT %d", limitOr(sq.Limit, defaultSearchLimit, maxSearchLimit)), where.args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() // rows.Err below reports what went wrong while reading
+	var out []store.SearchHit
+	for rows.Next() {
+		var hit store.SearchHit
+		if err := rows.Scan(&hit.Kind, &hit.EntityID, &hit.ScopeType, &hit.ScopeID, &hit.ProjectID, &hit.Title, &hit.Snippet); err != nil {
+			return nil, err
+		}
+		out = append(out, hit)
+	}
+	return out, rows.Err()
 }

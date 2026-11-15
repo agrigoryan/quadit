@@ -1,3 +1,5 @@
+// Bringing a database's schema up to date, with goose.
+
 package sqlstore
 
 import (
@@ -33,11 +35,11 @@ func (s *Store) MigrateTo(ctx context.Context, upTo int) error {
 	if err := s.adopt(ctx); err != nil {
 		return fmt.Errorf("migrate: taking over the record of applied versions: %w", err)
 	}
-	runner, err := s.migrator()
+	provider, err := s.migrator()
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
-	if _, err := runner.UpTo(ctx, int64(target)); err != nil {
+	if _, err := provider.UpTo(ctx, int64(target)); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
 	return nil

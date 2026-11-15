@@ -1,3 +1,6 @@
+// Telling every server that shares the database that a feed
+// moved.
+
 package sqlstore
 
 import (
@@ -13,7 +16,7 @@ type notifier interface {
 	// feedMoved says workspaceID's feed is now at seq. It runs inside the
 	// write's transaction, so the database delivers it when, and only if,
 	// that write commits.
-	feedMoved(ctx context.Context, x q, workspaceID string, seq int64) error
+	feedMoved(ctx context.Context, r runner, workspaceID string, seq int64) error
 }
 
 // pgNotify notifies through Postgres's pg_notify on FeedChannel.
@@ -24,7 +27,7 @@ func (pgNotify) poke(ctx context.Context, db querier) error {
 	return err
 }
 
-func (pgNotify) feedMoved(ctx context.Context, x q, workspaceID string, seq int64) error {
-	_, err := x.exec(ctx, `SELECT pg_notify('`+FeedChannel+`', ?)`, workspaceID+":"+strconv.FormatInt(seq, 10))
+func (pgNotify) feedMoved(ctx context.Context, r runner, workspaceID string, seq int64) error {
+	_, err := r.exec(ctx, `SELECT pg_notify('`+FeedChannel+`', ?)`, workspaceID+":"+strconv.FormatInt(seq, 10))
 	return err
 }

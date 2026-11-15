@@ -1,3 +1,29 @@
+// The row mapper, which turns the structs of package core into
+// columns and back, and the generic operations of store.DB built on it.
+//
+// A row struct is registered with its table in store/tables.go. Each field
+// tagged `db:"col"` is the column col; `db:"col,null"` stores the field's
+// zero value ("" or 0) as NULL; `db:"col,json"` stores the field as JSON
+// text (JSONB on Postgres), and its zero value as NULL. Reading, NULL is
+// always the zero value. A field without a tag, or tagged "-", is not
+// stored. metaOf reads the tags once per type, checks that every name is
+// plain (so that quoting it with ident is safe) and keeps the result.
+//
+// A column named id or ending in _id holds a UUID, unless textIDs says
+// otherwise. Postgres refuses to compare a UUID column with text that is
+// not one, so a condition on such a column with a value that cannot be an
+// id selects nothing instead of failing: "=" becomes "1 = 0" and a list
+// drops the value.
+//
+// conn.where turns conditions (store.Cond) into a WHERE: each column is
+// checked against the table's, each value is a placeholder. meta.order
+// turns a Q's Order into an ORDER BY of the table's own columns. Statements
+// are written with "?" and rebound to the dialect's placeholders as they
+// run (runner). Workspace scoping is added here, in one place: a conn bound
+// to a workspace puts "workspace_id = ?" first in every WHERE on a table
+// that is not Global, and Insert and Upsert write that workspace into the
+// row's workspace_id, whatever the row says.
+
 package sqlstore
 
 import (
@@ -6,8 +32,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -16,45 +43,47 @@ import (
 
 // field is one column of a row struct.
 type field struct {
-	idx  int
-	col  string
-	null bool // the zero value is stored as NULL
-	json bool // stored as JSON
-	isID bool // holds a UUID
+	idx  int    // the struct field's index
+	col  string // the column's name, unquoted
+	null bool   // the zero value is stored as NULL
+	json bool   // stored as JSON
+	isID bool   // holds a UUID
 }
 
-// meta is what the mapper knows about one row type.
+// meta is what the mapper knows about one row type: its table and columns.
 type meta struct {
 	table  *store.Table
 	name   string // the table's name, quoted
 	fields []field
 	byCol  map[string]*field
-	cols   string // `"a", "b", "c"`
+	cols   string // every column, quoted, in field order: `"a", "b", "c"`
 }
 
-var metas sync.Map // reflect.Type -> *meta
+var metaCache sync.Map // reflect.Type -> *meta
 
+// metaOf returns the meta of a registered row type, reading its tags the
+// first time it is asked for.
 func metaOf(t reflect.Type) (*meta, error) {
-	if m, ok := metas.Load(t); ok {
+	if m, ok := metaCache.Load(t); ok {
 		return m.(*meta), nil
 	}
-	tb, ok := store.TableOf(t)
+	table, ok := store.TableOf(t)
 	if !ok {
 		return nil, fmt.Errorf("store: %s is not a registered row type", t)
 	}
-	if !plainName(tb.Name) {
-		return nil, fmt.Errorf("store: table name %q is not a plain name", tb.Name)
+	if !plainName(table.Name) {
+		return nil, fmt.Errorf("store: table name %q is not a plain name", table.Name)
 	}
-	m := &meta{table: tb, name: ident(tb.Name), byCol: map[string]*field{}}
+	m := &meta{table: table, name: ident(table.Name), byCol: map[string]*field{}}
 	var cols []string
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		tag := t.Field(i).Tag.Get("db")
 		if tag == "" || tag == "-" {
 			continue
 		}
 		parts := strings.Split(tag, ",")
 		if !plainName(parts[0]) {
-			return nil, fmt.Errorf("store: %s column %q is not a plain name", tb.Name, parts[0])
+			return nil, fmt.Errorf("store: %s column %q is not a plain name", table.Name, parts[0])
 		}
 		f := field{idx: i, col: parts[0]}
 		for _, opt := range parts[1:] {
@@ -65,7 +94,7 @@ func metaOf(t reflect.Type) (*meta, error) {
 				f.json = true
 			}
 		}
-		f.isID = (f.col == "id" || strings.HasSuffix(f.col, "_id")) && !textIDs[tb.Name+"."+f.col]
+		f.isID = (f.col == "id" || strings.HasSuffix(f.col, "_id")) && !textIDs[table.Name+"."+f.col]
 		m.fields = append(m.fields, f)
 		cols = append(cols, ident(f.col))
 	}
@@ -73,23 +102,42 @@ func metaOf(t reflect.Type) (*meta, error) {
 		m.byCol[m.fields[i].col] = &m.fields[i]
 	}
 	m.cols = strings.Join(cols, ", ")
-	metas.Store(t, m)
+	metaCache.Store(t, m)
 	return m, nil
+}
+
+// textIDs are the *_id columns that do not hold UUIDs.
+var textIDs = map[string]bool{"oauth_clients.id": true, "audit_log.target_id": true, "api_tokens.client_id": true}
+
+// metaNamed returns the meta of a registered table, by its name.
+func metaNamed(table string) (*meta, error) {
+	tb, ok := store.TableNamed(table)
+	if !ok {
+		return nil, fmt.Errorf("store: unknown table %q", table)
+	}
+	return metaOf(tb.Type)
 }
 
 // plainName tells whether s can name a table or a column: lowercase
 // letters, digits and underscores, not starting with a digit.
 func plainName(s string) bool {
-	if s == "" || s[0] >= '0' && s[0] <= '9' {
+	if s == "" || isDigit(s[0]) {
 		return false
 	}
-	for i := 0; i < len(s); i++ {
-		if c := s[i]; !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_') {
+	for i := range len(s) {
+		if !isDigit(s[i]) && !isLower(s[i]) && s[i] != '_' {
 			return false
 		}
 	}
 	return true
 }
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+func isLower(c byte) bool { return c >= 'a' && c <= 'z' }
+
+// isHexDigit accepts either case, as Postgres writes UUIDs in lowercase and
+// a caller may not.
+func isHexDigit(c byte) bool { return isDigit(c) || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' }
 
 // ident quotes a table or column name the way both databases read it. Only
 // plain names reach it (metaOf and column check them), so it cannot be
@@ -106,37 +154,32 @@ func (m *meta) column(name string) (string, error) {
 	return ident(name), nil
 }
 
-// textIDs are the *_id columns that do not hold UUIDs.
-var textIDs = map[string]bool{"oauth_clients.id": true, "audit_log.target_id": true, "api_tokens.client_id": true}
+// uuidLength is the length of a UUID in text: 32 hex digits and 4 dashes.
+const uuidLength = 36
 
-func metaNamed(table string) (*meta, error) {
-	tb, ok := store.TableNamed(table)
-	if !ok {
-		return nil, fmt.Errorf("store: unknown table %q", table)
-	}
-	return metaOf(tb.Type)
-}
-
+// looksUUID tells whether s is a UUID in text, 8-4-4-4-12 hex digits.
 func looksUUID(s string) bool {
-	if len(s) != 36 {
+	if len(s) != uuidLength {
 		return false
 	}
-	for i := 0; i < 36; i++ {
-		c := s[i]
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			if c != '-' {
+	for i := range len(s) {
+		switch i {
+		case 8, 13, 18, 23:
+			if s[i] != '-' {
 				return false
 			}
-			continue
-		}
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
-			return false
+		default:
+			if !isHexDigit(s[i]) {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-// toDB turns a Go value into what is stored in f's column.
+// toDB turns a Go value into what is stored in f's column: nil for NULL
+// (see the null rule above), JSON text for a JSON column, else a string, an
+// int64, a bool or a float64.
 func toDB(f *field, v reflect.Value) (any, error) {
 	if !v.IsValid() {
 		return nil, nil
@@ -148,22 +191,7 @@ func toDB(f *field, v reflect.Value) (any, error) {
 		v = v.Elem()
 	}
 	if f.json {
-		if v.IsZero() {
-			return nil, nil
-		}
-		switch x := v.Interface().(type) {
-		case json.RawMessage:
-			return string(x), nil
-		case []byte:
-			return string(x), nil
-		case string:
-			return x, nil
-		}
-		b, err := json.Marshal(v.Interface())
-		if err != nil {
-			return nil, err
-		}
-		return string(b), nil
+		return jsonToDB(v)
 	}
 	switch v.Kind() {
 	case reflect.String:
@@ -179,14 +207,7 @@ func toDB(f *field, v reflect.Value) (any, error) {
 	case reflect.Bool:
 		return v.Bool(), nil
 	case reflect.Float64:
-		// JSON numbers arrive as floats when a row is loaded from a backup.
-		if v.Float() == float64(int64(v.Float())) {
-			if f.null && v.Float() == 0 {
-				return nil, nil
-			}
-			return int64(v.Float()), nil
-		}
-		return v.Float(), nil
+		return floatToDB(f, v.Float()), nil
 	case reflect.Pointer:
 		if v.IsNil() {
 			return nil, nil
@@ -196,12 +217,48 @@ func toDB(f *field, v reflect.Value) (any, error) {
 	return nil, fmt.Errorf("store: column %s: cannot store a %s", f.col, v.Type())
 }
 
+// jsonToDB is the text a JSON column stores for v, nil for its zero value.
+// Raw JSON, bytes and strings are taken to be JSON already.
+func jsonToDB(v reflect.Value) (any, error) {
+	if v.IsZero() {
+		return nil, nil
+	}
+	switch raw := v.Interface().(type) {
+	case json.RawMessage:
+		return string(raw), nil
+	case []byte:
+		return string(raw), nil
+	case string:
+		return raw, nil
+	}
+	b, err := json.Marshal(v.Interface())
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
+}
+
+// floatToDB stores a whole number as an integer: JSON numbers arrive as
+// floats when a row is loaded from a backup, into integer columns.
+func floatToDB(f *field, n float64) any {
+	if n != float64(int64(n)) {
+		return n
+	}
+	if f.null && n == 0 {
+		return nil
+	}
+	return int64(n)
+}
+
 // dest is a scan target that fills a struct field from a nullable column.
 type dest struct {
 	f *field
 	v reflect.Value
 }
 
+// Scan fills the field from a column's value: NULL is the zero value, a
+// JSON column is decoded, other kinds go through database/sql's own
+// conversions.
 func (d dest) Scan(src any) error {
 	if src == nil {
 		// NULL is the zero value. Set it, in case the struct held something:
@@ -210,20 +267,7 @@ func (d dest) Scan(src any) error {
 		return nil
 	}
 	if d.f.json {
-		var b []byte
-		switch x := src.(type) {
-		case []byte:
-			b = x
-		case string:
-			b = []byte(x)
-		default:
-			return fmt.Errorf("store: column %s: unexpected %T", d.f.col, src)
-		}
-		if d.v.Type() == reflect.TypeFor[json.RawMessage]() {
-			d.v.SetBytes(append([]byte(nil), b...))
-			return nil
-		}
-		return json.Unmarshal(b, d.v.Addr().Interface())
+		return d.scanJSON(src)
 	}
 	switch d.v.Kind() {
 	case reflect.String:
@@ -256,6 +300,26 @@ func (d dest) Scan(src any) error {
 	return nil
 }
 
+// scanJSON decodes a JSON column into the field; a json.RawMessage field
+// gets a copy of the text as it is.
+func (d dest) scanJSON(src any) error {
+	var b []byte
+	switch text := src.(type) {
+	case []byte:
+		b = text
+	case string:
+		b = []byte(text)
+	default:
+		return fmt.Errorf("store: column %s: unexpected %T", d.f.col, src)
+	}
+	if d.v.Type() == reflect.TypeFor[json.RawMessage]() {
+		d.v.SetBytes(append([]byte(nil), b...))
+		return nil
+	}
+	return json.Unmarshal(b, d.v.Addr().Interface())
+}
+
+// dests is the scan targets of a row struct's fields, in column order.
 func (m *meta) dests(v reflect.Value) []any {
 	out := make([]any, len(m.fields))
 	for i := range m.fields {
@@ -264,88 +328,87 @@ func (m *meta) dests(v reflect.Value) []any {
 	return out
 }
 
-// conn runs the generic operations against a database or a transaction.
-// When ws is set, queries on workspace tables are limited to it.
+// conn is a store.DB: the generic operations, run against a database or a
+// transaction. With workspaceID set, it is bound to that workspace.
 type conn struct {
-	q
-	ws string
+	runner
+	workspaceID string
 }
 
-// where builds the WHERE clause. prefix is a table alias with its dot, or "".
-// Every column is one of the table's, quoted.
-func (c conn) where(m *meta, prefix string, conds []store.Cond) (string, []any, error) {
-	var parts []string
-	var args []any
-	if c.ws != "" && !m.table.Global {
-		parts = append(parts, prefix+ident("workspace_id")+" = ?")
-		args = append(args, c.ws)
+// where builds the WHERE of a statement on m's table: the workspace first
+// (see the file comment), then each condition. No condition is "1 = 1".
+func (c conn) where(m *meta, conds []store.Cond) (string, []any, error) {
+	where := &clause{}
+	if c.workspaceID != "" && !m.table.Global {
+		where.add(ident("workspace_id")+" = ?", c.workspaceID)
 	}
-	for _, cd := range conds {
-		f, ok := m.byCol[cd.Col]
-		if !ok {
-			return "", nil, fmt.Errorf("store: table %s has no column %q", m.table.Name, cd.Col)
-		}
-		col := prefix + ident(cd.Col)
-		switch cd.Op {
-		case "null":
-			parts = append(parts, col+" IS NULL")
-		case "notnull":
-			parts = append(parts, col+" IS NOT NULL")
-		case "in", "notin":
-			vals, _ := cd.Val.([]string)
-			var keep []string
-			for _, v := range vals {
-				if !f.isID || looksUUID(v) {
-					keep = append(keep, v)
-				}
-			}
-			if len(keep) == 0 {
-				if cd.Op == "in" {
-					parts = append(parts, "1 = 0")
-				}
-				continue
-			}
-			in, a := marks(keep)
-			op := " IN ("
-			if cd.Op == "notin" {
-				op = " NOT IN ("
-			}
-			parts = append(parts, col+op+in+")")
-			args = append(args, a...)
-		case "like":
-			parts = append(parts, "LOWER("+col+") LIKE ?")
-			args = append(args, strings.ToLower(fmt.Sprint(cd.Val)))
-		case "=", "!=", ">", ">=", "<", "<=":
-			v, err := toDB(&field{col: f.col, json: false}, reflect.ValueOf(cd.Val))
-			if err != nil {
-				return "", nil, err
-			}
-			if s, isStr := v.(string); isStr && f.isID && !looksUUID(s) {
-				// Not an id, so nothing can match; asking the database
-				// would be an error on Postgres.
-				if cd.Op == "=" {
-					parts = append(parts, "1 = 0")
-				}
-				continue
-			}
-			if v == nil {
-				if cd.Op == "=" {
-					parts = append(parts, col+" IS NULL")
-				} else {
-					parts = append(parts, col+" IS NOT NULL")
-				}
-				continue
-			}
-			parts = append(parts, col+" "+cd.Op+" ?")
-			args = append(args, v)
-		default:
-			return "", nil, fmt.Errorf("store: unknown operator %q", cd.Op)
+	for _, cond := range conds {
+		if err := where.addCond(m, cond); err != nil {
+			return "", nil, err
 		}
 	}
-	if len(parts) == 0 {
-		return "1 = 1", nil, nil
+	return where.sql(), where.args, nil
+}
+
+// addCond adds one condition on a column of m's table.
+func (w *clause) addCond(m *meta, cond store.Cond) error {
+	f, ok := m.byCol[cond.Col]
+	if !ok {
+		return fmt.Errorf("store: table %s has no column %q", m.table.Name, cond.Col)
 	}
-	return strings.Join(parts, " AND "), args, nil
+	col := ident(cond.Col)
+	switch cond.Op {
+	case "null":
+		w.add(col + " IS NULL")
+	case "notnull":
+		w.add(col + " IS NOT NULL")
+	case "in", "notin":
+		vals, _ := cond.Val.([]string) // anything but a list of strings is an empty list
+		if f.isID {
+			vals = onlyIDs(vals)
+		}
+		if cond.Op == "in" {
+			w.in(col, vals)
+		} else {
+			w.notIn(col, vals)
+		}
+	case "like":
+		w.add("LOWER("+col+") LIKE ?", strings.ToLower(fmt.Sprint(cond.Val)))
+	case "=", "!=", ">", ">=", "<", "<=":
+		return w.addComparison(f, col, cond)
+	default:
+		return fmt.Errorf("store: unknown operator %q", cond.Op)
+	}
+	return nil
+}
+
+// addComparison adds "col op ?". A nil value makes "=" IS NULL and any
+// other operator IS NOT NULL. Text that cannot be an id, against an id
+// column, matches nothing: "=" becomes "1 = 0" and the others are left
+// out, as asking Postgres would be an error.
+func (w *clause) addComparison(f *field, col string, cond store.Cond) error {
+	// The value is compared as given: the column's null and JSON rules are
+	// for storing.
+	v, err := toDB(&field{col: f.col}, reflect.ValueOf(cond.Val))
+	if err != nil {
+		return err
+	}
+	if s, isStr := v.(string); isStr && f.isID && !looksUUID(s) {
+		if cond.Op == "=" {
+			w.add("1 = 0")
+		}
+		return nil
+	}
+	if v == nil {
+		if cond.Op == "=" {
+			w.add(col + " IS NULL")
+		} else {
+			w.add(col + " IS NOT NULL")
+		}
+		return nil
+	}
+	w.add(col+" "+cond.Op+" ?", v)
+	return nil
 }
 
 // order turns a Q's Order, "a" or "-a,b", into an ORDER BY of the table's
@@ -356,21 +419,23 @@ func (m *meta) order(spec string) (string, error) {
 		return "", nil
 	}
 	var parts []string
-	for _, c := range strings.Split(spec, ",") {
-		c = strings.TrimSpace(c)
+	for name := range strings.SplitSeq(spec, ",") {
+		name = strings.TrimSpace(name)
 		dir := ""
-		if strings.HasPrefix(c, "-") {
-			c, dir = c[1:], " DESC"
+		if strings.HasPrefix(name, "-") {
+			name, dir = name[1:], " DESC"
 		}
-		col, err := m.column(c)
+		col, err := m.column(name)
 		if err != nil {
-			return "", fmt.Errorf("store: table %s has no column %q to order by", m.table.Name, c)
+			return "", fmt.Errorf("store: table %s has no column %q to order by", m.table.Name, name)
 		}
 		parts = append(parts, col+dir)
 	}
 	return " ORDER BY " + strings.Join(parts, ", "), nil
 }
 
+// rowType checks that dst points to a registered row struct, and returns
+// the struct and its meta.
 func rowType(dst any) (reflect.Value, *meta, error) {
 	v := reflect.ValueOf(dst)
 	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
@@ -380,33 +445,37 @@ func rowType(dst any) (reflect.Value, *meta, error) {
 	return v.Elem(), m, err
 }
 
+// Get loads the first row matching where into dst, or returns
+// store.ErrNotFound.
 func (c conn) Get(ctx context.Context, dst any, where ...store.Cond) error {
 	v, m, err := rowType(dst)
 	if err != nil {
 		return err
 	}
-	w, args, err := c.where(m, "", where)
+	whereSQL, args, err := c.where(m, where)
 	if err != nil {
 		return err
 	}
-	err = c.row(ctx, "SELECT "+m.cols+" FROM "+m.name+" WHERE "+w+" LIMIT 1", args...).Scan(m.dests(v)...)
+	err = c.row(ctx, "SELECT "+m.cols+" FROM "+m.name+" WHERE "+whereSQL+" LIMIT 1", args...).Scan(m.dests(v)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return store.ErrNotFound
 	}
 	return err
 }
 
+// List loads the rows a Q selects into dst, a pointer to a slice of row
+// structs.
 func (c conn) List(ctx context.Context, dst any, q store.Q) error {
-	sv := reflect.ValueOf(dst)
-	if sv.Kind() != reflect.Pointer || sv.Elem().Kind() != reflect.Slice {
+	slice := reflect.ValueOf(dst)
+	if slice.Kind() != reflect.Pointer || slice.Elem().Kind() != reflect.Slice {
 		return fmt.Errorf("store: want a pointer to a slice, got %T", dst)
 	}
-	sv = sv.Elem()
-	m, err := metaOf(sv.Type().Elem())
+	slice = slice.Elem()
+	m, err := metaOf(slice.Type().Elem())
 	if err != nil {
 		return err
 	}
-	w, args, err := c.where(m, "", q.Where)
+	whereSQL, args, err := c.where(m, q.Where)
 	if err != nil {
 		return err
 	}
@@ -414,7 +483,7 @@ func (c conn) List(ctx context.Context, dst any, q store.Q) error {
 	if err != nil {
 		return err
 	}
-	query := "SELECT " + m.cols + " FROM " + m.name + " WHERE " + w + order
+	query := "SELECT " + m.cols + " FROM " + m.name + " WHERE " + whereSQL + order
 	if q.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", q.Limit)
 		if q.Offset > 0 {
@@ -425,55 +494,59 @@ func (c conn) List(ctx context.Context, dst any, q store.Q) error {
 	if err != nil {
 		return err
 	}
-	return scanAll(rows, m, sv)
+	return scanAll(rows, m, slice)
 }
 
-// scanAll appends every row to the slice sv and closes rows.
-func scanAll(rows *sql.Rows, m *meta, sv reflect.Value) error {
-	defer rows.Close()
-	sv.Set(reflect.MakeSlice(sv.Type(), 0, 0)) // never nil: an empty list is [] in JSON
+// scanAll appends every row to slice and closes rows.
+func scanAll(rows *sql.Rows, m *meta, slice reflect.Value) error {
+	defer rows.Close()                               // rows.Err below reports what went wrong while reading
+	slice.Set(reflect.MakeSlice(slice.Type(), 0, 0)) // never nil: an empty list is [] in JSON
 	for rows.Next() {
-		el := reflect.New(sv.Type().Elem()).Elem()
-		if err := rows.Scan(m.dests(el)...); err != nil {
+		record := reflect.New(slice.Type().Elem()).Elem()
+		if err := rows.Scan(m.dests(record)...); err != nil {
 			return err
 		}
-		sv.Set(reflect.Append(sv, el))
+		slice.Set(reflect.Append(slice, record))
 	}
 	return rows.Err()
 }
 
+// Count counts the rows of a table that match where.
 func (c conn) Count(ctx context.Context, table string, where ...store.Cond) (int, error) {
 	m, err := metaNamed(table)
 	if err != nil {
 		return 0, err
 	}
-	w, args, err := c.where(m, "", where)
+	whereSQL, args, err := c.where(m, where)
 	if err != nil {
 		return 0, err
 	}
 	var n int
-	err = c.row(ctx, "SELECT COUNT(*) FROM "+m.name+" WHERE "+w, args...).Scan(&n)
+	err = c.row(ctx, "SELECT COUNT(*) FROM "+m.name+" WHERE "+whereSQL, args...).Scan(&n)
 	return n, err
 }
 
-// insertArgs returns the values of row in column order.
+// insertArgs returns the values of row in column order, with c's workspace
+// in workspace_id.
 func (c conn) insertArgs(m *meta, v reflect.Value) ([]any, error) {
 	args := make([]any, len(m.fields))
 	for i := range m.fields {
 		f := &m.fields[i]
-		if f.col == "workspace_id" && c.ws != "" && !m.table.Global {
-			args[i] = c.ws
+		if f.col == "workspace_id" && c.workspaceID != "" && !m.table.Global {
+			args[i] = c.workspaceID
 			continue
 		}
-		a, err := toDB(f, v.Field(f.idx))
+		arg, err := toDB(f, v.Field(f.idx))
 		if err != nil {
 			return nil, err
 		}
-		args[i] = a
+		args[i] = arg
 	}
 	return args, nil
 }
 
+// structOf checks that row is a registered row struct, or a pointer to
+// one, and returns the struct and its meta.
 func structOf(row any) (reflect.Value, *meta, error) {
 	v := reflect.ValueOf(row)
 	if v.Kind() == reflect.Pointer {
@@ -486,6 +559,7 @@ func structOf(row any) (reflect.Value, *meta, error) {
 	return v, m, err
 }
 
+// Insert adds a row; a broken unique rule is store.ErrConflict.
 func (c conn) Insert(ctx context.Context, row any) error {
 	v, m, err := structOf(row)
 	if err != nil {
@@ -499,6 +573,8 @@ func (c conn) Insert(ctx context.Context, row any) error {
 	return conflict(err)
 }
 
+// Upsert inserts row, or updates every non-key column if a row with the
+// same key columns exists.
 func (c conn) Upsert(ctx context.Context, row any, key ...string) error {
 	v, m, err := structOf(row)
 	if err != nil {
@@ -510,12 +586,12 @@ func (c conn) Upsert(ctx context.Context, row any, key ...string) error {
 	}
 	isKey := map[string]bool{}
 	var keys []string
-	for _, k := range key {
-		col, err := m.column(k)
+	for _, name := range key {
+		col, err := m.column(name)
 		if err != nil {
 			return err
 		}
-		isKey[k] = true
+		isKey[name] = true
 		keys = append(keys, col)
 	}
 	var sets []string
@@ -533,6 +609,8 @@ func (c conn) Upsert(ctx context.Context, row any, key ...string) error {
 	return conflict(err)
 }
 
+// Update sets columns on the matching rows and returns how many changed.
+// The columns are set in name order, so one change is one statement.
 func (c conn) Update(ctx context.Context, table string, set map[string]any, where ...store.Cond) (int64, error) {
 	m, err := metaNamed(table)
 	if err != nil {
@@ -541,92 +619,91 @@ func (c conn) Update(ctx context.Context, table string, set map[string]any, wher
 	if len(set) == 0 {
 		return 0, nil
 	}
-	cols := make([]string, 0, len(set))
-	for k := range set {
-		cols = append(cols, k)
-	}
-	sort.Strings(cols)
 	var sets []string
 	var args []any
-	for _, col := range cols {
+	for _, col := range slices.Sorted(maps.Keys(set)) {
 		f, ok := m.byCol[col]
 		if !ok {
 			return 0, fmt.Errorf("store: table %s has no column %q", table, col)
 		}
-		a, err := toDB(f, reflect.ValueOf(set[col]))
+		arg, err := toDB(f, reflect.ValueOf(set[col]))
 		if err != nil {
 			return 0, err
 		}
 		sets = append(sets, ident(col)+" = ?")
-		args = append(args, a)
+		args = append(args, arg)
 	}
-	w, wargs, err := c.where(m, "", where)
+	whereSQL, whereArgs, err := c.where(m, where)
 	if err != nil {
 		return 0, err
 	}
-	res, err := c.exec(ctx, "UPDATE "+m.name+" SET "+strings.Join(sets, ", ")+" WHERE "+w, append(args, wargs...)...)
+	res, err := c.exec(ctx, "UPDATE "+m.name+" SET "+strings.Join(sets, ", ")+" WHERE "+whereSQL, append(args, whereArgs...)...)
 	if err != nil {
 		return 0, conflict(err)
 	}
 	return res.RowsAffected()
 }
 
+// Delete removes the matching rows and returns how many there were.
 func (c conn) Delete(ctx context.Context, table string, where ...store.Cond) (int64, error) {
 	m, err := metaNamed(table)
 	if err != nil {
 		return 0, err
 	}
-	w, args, err := c.where(m, "", where)
+	whereSQL, args, err := c.where(m, where)
 	if err != nil {
 		return 0, err
 	}
-	res, err := c.exec(ctx, "DELETE FROM "+m.name+" WHERE "+w, args...)
+	res, err := c.exec(ctx, "DELETE FROM "+m.name+" WHERE "+whereSQL, args...)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
+// Incr adds n to a counter column on one row and returns the new value.
 func (c conn) Incr(ctx context.Context, table, col string, n int64, where ...store.Cond) (int64, error) {
 	m, err := metaNamed(table)
 	if err != nil {
 		return 0, err
 	}
-	qc, err := m.column(col)
+	counter, err := m.column(col)
 	if err != nil {
 		return 0, err
 	}
-	w, args, err := c.where(m, "", where)
+	whereSQL, args, err := c.where(m, where)
 	if err != nil {
 		return 0, err
 	}
 	var out int64
-	err = c.row(ctx, "UPDATE "+m.name+" SET "+qc+" = "+qc+" + ? WHERE "+w+" RETURNING "+qc, append([]any{n}, args...)...).Scan(&out)
+	err = c.row(ctx, "UPDATE "+m.name+" SET "+counter+" = "+counter+" + ? WHERE "+whereSQL+" RETURNING "+counter, append([]any{n}, args...)...).Scan(&out)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, store.ErrNotFound
 	}
 	return out, err
 }
 
+// Tally counts the matching rows of a table grouped by the given columns,
+// each group's values as text ("" for NULL).
 func (c conn) Tally(ctx context.Context, table string, groupBy []string, where ...store.Cond) ([]store.TallyRow, error) {
 	m, err := metaNamed(table)
 	if err != nil {
 		return nil, err
 	}
-	var sel, groups []string
-	for _, g := range groupBy {
-		qg, err := m.column(g)
+	var selected, groups []string
+	for _, name := range groupBy {
+		col, err := m.column(name)
 		if err != nil {
 			return nil, err
 		}
-		sel = append(sel, "COALESCE(CAST("+qg+" AS TEXT), '')")
-		groups = append(groups, qg)
+		selected = append(selected, "COALESCE(CAST("+col+" AS TEXT), '')")
+		groups = append(groups, col)
 	}
-	w, args, err := c.where(m, "", where)
+	whereSQL, args, err := c.where(m, where)
 	if err != nil {
 		return nil, err
 	}
-	query := "SELECT " + strings.Join(append(sel, "COUNT(*)"), ", ") + " FROM " + m.name + " WHERE " + w
+	query := "SELECT " + strings.Join(append(selected, "COUNT(*)"), ", ") + " FROM " + m.name + " WHERE " + whereSQL
 	if len(groupBy) > 0 {
 		query += " GROUP BY " + strings.Join(groups, ", ")
 	}
@@ -634,43 +711,31 @@ func (c conn) Tally(ctx context.Context, table string, groupBy []string, where .
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() // rows.Err below reports what went wrong while reading
 	var out []store.TallyRow
 	for rows.Next() {
-		r := store.TallyRow{Keys: make([]string, len(groupBy))}
-		dst := make([]any, 0, len(groupBy)+1)
-		for i := range r.Keys {
-			dst = append(dst, &r.Keys[i])
+		group := store.TallyRow{Keys: make([]string, len(groupBy))}
+		targets := make([]any, 0, len(groupBy)+1)
+		for i := range group.Keys {
+			targets = append(targets, &group.Keys[i])
 		}
-		if err := rows.Scan(append(dst, &r.Count)...); err != nil {
+		if err := rows.Scan(append(targets, &group.Count)...); err != nil {
 			return nil, err
 		}
-		out = append(out, r)
+		out = append(out, group)
 	}
 	return out, rows.Err()
 }
 
-func placeholders(n int) string {
-	return strings.TrimSuffix(strings.Repeat("?, ", n), ", ")
-}
-
-// marks returns "?, ?, ?" for n values, and the values as arguments.
-func marks(vals []string) (string, []any) {
-	args := make([]any, len(vals))
-	for i, v := range vals {
-		args[i] = v
-	}
-	return placeholders(len(vals)), args
-}
-
-// conflict maps a broken unique rule to store.ErrConflict on either database.
+// conflict maps a broken unique rule to store.ErrConflict on either
+// database, keeping the database's error inside it.
 func conflict(err error) error {
 	if err == nil {
 		return nil
 	}
 	msg := err.Error()
 	if strings.Contains(msg, "UNIQUE constraint failed") || strings.Contains(msg, "SQLSTATE 23505") {
-		return fmt.Errorf("%w: %v", store.ErrConflict, err)
+		return fmt.Errorf("%w: %w", store.ErrConflict, err)
 	}
 	return err
 }

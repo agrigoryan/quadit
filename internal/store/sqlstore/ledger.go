@@ -1,3 +1,6 @@
+// The record of applied schema versions, goose's table and the
+// one kept from before goose.
+
 package sqlstore
 
 import (
@@ -34,6 +37,8 @@ type ledger struct {
 
 var _ database.StoreExtender = (*ledger)(nil)
 
+// newLedger is the record goose keeps for d, with versions' names for the
+// old table.
 func newLedger(d Dialect, versions []schemaVersion) (*ledger, error) {
 	own, err := gooseRecord(d)
 	if err != nil {
@@ -118,6 +123,7 @@ func appliedVersion(ctx context.Context, db database.DBTxConn, d Dialect) (int64
 	return oldVersion(ctx, db)
 }
 
+// gooseVersion is the newest version in goose's table, 0 when it has none.
 func gooseVersion(ctx context.Context, db database.DBTxConn, d Dialect) (int64, error) {
 	own, err := gooseRecord(d)
 	if err != nil {
@@ -130,6 +136,7 @@ func gooseVersion(ctx context.Context, db database.DBTxConn, d Dialect) (int64, 
 	return v, err
 }
 
+// oldVersion is the newest version in the table from before goose.
 func oldVersion(ctx context.Context, db database.DBTxConn) (int64, error) {
 	var v int64
 	err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&v)
