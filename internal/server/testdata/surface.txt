@@ -708,17 +708,9 @@ mcp ack
 mcp ack arg cursor
 mcp ack arg seq
 mcp agents
-mcp approval
-mcp approval arg action
-mcp approval arg args
-mcp approval arg ask
-mcp approval arg details
-mcp approval arg dry_run
-mcp approval arg files
-mcp approval arg id
-mcp approval arg question
-mcp approval arg task
 mcp ask
+mcp ask arg action
+mcp ask arg args
 mcp ask arg ask
 mcp ask arg details
 mcp ask arg dry_run

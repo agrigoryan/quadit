@@ -10,8 +10,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/id"
 )
 
-// The ask and approval tools: a question to a person in one call, as
-// quadit ask and quadit approval are on the command line. Files are ids of
+// The ask tool: a question to a person in one call, as quadit ask and
+// quadit approval are on the command line: a choice when it has options,
+// a yes or no when it has none. Files are ids of
 // files already stored with the upload tool; they go on the question or on
 // an option, and the decision opens with them in one batch, so it is never
 // seen without its pictures.
@@ -24,11 +25,29 @@ type askOption struct {
 }
 
 func toolAsk(s *Server, token string, a map[string]any) (string, bool) {
-	open := askOpenArgs(a)
+	open := map[string]any{"task": argText(a, "task"), "question": argText(a, "question")}
+	for _, k := range []string{"details", "ask"} {
+		if v := argText(a, k); v != "" {
+			open[k] = v
+		}
+	}
 	var opts []askOption
 	if err := objectArg(a, "options", &opts); err != nil {
 		return err.Error(), false
 	}
+	var onOptions [][]string
+	var err error
+	if len(opts) > 0 {
+		onOptions = choiceArgs(a, open, opts)
+	} else if err = approvalArgs(a, open); err != nil {
+		return err.Error(), false
+	}
+	return s.askWithFiles(token, a, open, onOptions)
+}
+
+// choiceArgs adds a choice's options and recommendation to open, and gives
+// each option's file ids in order.
+func choiceArgs(a, open map[string]any, opts []askOption) [][]string {
 	var onOptions [][]string
 	var list []map[string]any
 	for _, o := range opts {
@@ -39,44 +58,33 @@ func toolAsk(s *Server, token string, a map[string]any) (string, bool) {
 		list = append(list, opt)
 		onOptions = append(onOptions, idList(o.Files))
 	}
-	if len(list) > 0 {
-		open["options"] = list
-	}
-	if v, ok := a["recommended"]; ok && v != nil && argText(a, "recommended") != "" {
-		open["recommended"] = v
+	open["options"] = list
+	if argText(a, "recommended") != "" {
+		open["recommended"] = a["recommended"]
 	}
 	if v := argText(a, "why"); v != "" {
 		open["recommendation"] = v
 	}
-	return s.askWithFiles(token, a, open, onOptions)
+	return onOptions
 }
 
-func toolApproval(s *Server, token string, a map[string]any) (string, bool) {
-	open := askOpenArgs(a)
+// approvalArgs makes open a yes or no, to an exact change when action names one.
+func approvalArgs(a, open map[string]any) error {
 	open["kind"] = "approval"
-	if action := argText(a, "action"); action != "" {
-		open["action"] = action
-		var args map[string]any
-		if err := objectArg(a, "args", &args); err != nil {
-			return err.Error(), false
-		}
-		if args == nil {
-			args = map[string]any{"id": argText(a, "task")} // the usual case: the action is on this task
-		}
-		open["args"] = args
+	action := argText(a, "action")
+	if action == "" {
+		return nil
 	}
-	return s.askWithFiles(token, a, open, nil)
-}
-
-// askOpenArgs are the arguments of decision.open that both tools take.
-func askOpenArgs(a map[string]any) map[string]any {
-	open := map[string]any{"task": argText(a, "task"), "question": argText(a, "question")}
-	for _, k := range []string{"details", "ask"} {
-		if v := argText(a, k); v != "" {
-			open[k] = v
-		}
+	open["action"] = action
+	var args map[string]any
+	if err := objectArg(a, "args", &args); err != nil {
+		return err
 	}
-	return open
+	if args == nil {
+		args = map[string]any{"id": argText(a, "task")} // the usual case: the action is on this task
+	}
+	open["args"] = args
+	return nil
 }
 
 // askWithFiles opens the decision with each option's files on it and the

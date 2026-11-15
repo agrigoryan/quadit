@@ -63,7 +63,7 @@ var mcpTools = []mcpTool{
 	{Name: "changes", Desc: "Every change type with its arguments. Read once to learn what change can do.", Run: readPathTool("/api/v1/changes")},
 	{Name: "change", Desc: "Make one change. Common types: task.create {project, title, description, assignee, labels, parent}; task.update {id, status, assignee, waiting_on, priority, add_labels}; " +
 		"task.take {id}; comment.create {task, body, waiting_on} (add evidence {checked, measured, not_verified} to post a result); " +
-		"decision.open {task, question, options:[{label, description, attachments:[{file}]}], recommended, recommendation, ask} (the ask tool does this with files in one call); decision.pick {id, option, note}; " +
+		"decision.open {task, question, options:[{label, description, attachments:[{file}]}], recommended, recommendation, ask} (the ask tool does this, with files, in one call); decision.pick {id, option, note}; " +
 		"doc.create {title, markdown, parent}; doc.write {doc, markdown, mode}. Names work wherever ids do (SVA-12, @handle, status and label names). " +
 		"Every change type with all of its arguments is listed by the changes tool (GET /api/v1/changes). " +
 		"A refusal says what was wrong and lists what would have been accepted. dry_run=true checks without writing.",
@@ -71,22 +71,18 @@ var mcpTools = []mcpTool{
 			"id": "a UUID you make for this change; sending the same id again does nothing, so a retry is safe", "for": "@handle of the member this is done for; it then runs with their access",
 			"changes": "instead of type and args: a list of {type, args} applied together, all or nothing"},
 		Run: toolChange},
-	{Name: "ask", Desc: "Ask a person to choose: a question on a task with two or more options, each with its own files, and the files on the question itself. " +
-		"Store each file first with upload and give its id here. The task then waits on the person asked; their answer comes in the feed and inbox.",
+	{Name: "ask", Desc: "Ask a person: a choice (two or more options, each with its own files) or, with no options, a plain yes or no. " +
+		"Files are ids of files stored first with upload; files gives the question's own, shown before the options. " +
+		"For a change refused with needs_approval, give no options and action (and args): once approved, send that change with approval set to the decision's id. " +
+		"The task then waits on the person asked; the answer comes in the feed and inbox.",
 		Props: map[string]string{"!task": "task key", "!question": "the question, one line", "details": "more about it, Markdown",
-			"options":     "the choices: [{label, description, files: [file ids]}], two or more",
+			"options":     "the choices: [{label, description, files: [file ids]}], two or more; none for a yes or no",
 			"files":       "ids of files shown with the question itself, before the options",
 			"recommended": "the option you recommend, by number from 1 or by label", "why": "why you recommend it",
+			"action": "yes or no only: the change type to be approved, e.g. task.delete", "args": "with action: the arguments that change will be sent with, an object; default {id: task}",
 			"ask": "@handle of whom to ask; by default the person responsible for me", "dry_run": "true",
 			"id": "a UUID you make for this question; sending the same id again does nothing twice"},
 		Run: toolAsk},
-	{Name: "approval", Desc: "Ask a person for a plain yes or no. With action (and args), it is the approval a refused change asked for (needs_approval): " +
-		"once approved, send that change with approval set to the decision's id. Files are ids from upload, shown with the question.",
-		Props: map[string]string{"!task": "task key", "!question": "the question, one line", "details": "more about it, Markdown",
-			"action": "the change type to be approved, e.g. task.delete", "args": "the arguments that change will be sent with, an object; default {id: task}",
-			"files": "ids of files shown with the question", "ask": "@handle of whom to ask; by default the person responsible for me", "dry_run": "true",
-			"id": "a UUID you make for this question; sending the same id again does nothing twice"},
-		Run: toolApproval},
 	{Name: "dashboard", Desc: "Where everything stands: what waits on me, epics with progress, flow, agents, recent decisions, health.", Props: map[string]string{"project": "project key"}, Run: readPathTool("/dashboard")},
 	{Name: "agents", Desc: "What every agent is doing now, what it holds, and whether anything is listening for it.", Run: readPathTool("/agents")},
 	{Name: "render", Desc: "A picture of a task or a page as a person sees it, to check how work looks. Give task or doc.",

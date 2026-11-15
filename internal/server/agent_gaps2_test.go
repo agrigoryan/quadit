@@ -94,8 +94,8 @@ func mcpTool(t *testing.T, s *site, token, name string, args M) (string, bool) {
 }
 
 // TestMCPAsk: over MCP, a question with files on its options and on itself
-// is one call to ask, with files stored first by upload; an approval is
-// one call too.
+// is one call to ask, with files stored first by upload; so is a yes or no
+// to an exact change.
 func TestMCPAsk(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
@@ -153,7 +153,7 @@ func TestMCPAsk(t *testing.T) {
 
 		// An approval of an exact change, with a file on the question.
 		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Cut the intro"})
-		out, failed = mcpTool(t, s, token, "approval", M{"task": "SVA-2", "question": "Delete it?", "action": "task.delete", "files": []string{ctx}})
+		out, failed = mcpTool(t, s, token, "ask", M{"task": "SVA-2", "question": "Delete it?", "action": "task.delete", "files": []string{ctx}})
 		if failed || !strings.HasPrefix(out, "ok decision.open SVA-2") {
 			t.Fatalf("approval: %s", out)
 		}
