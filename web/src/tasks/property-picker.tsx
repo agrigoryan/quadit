@@ -3,7 +3,7 @@ import { CircleSlash, Globe, Layers, RefreshCw, Target } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { useCycles, useEpics, useLabels, useMe, useMembers, useProjects, useStatuses } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import type { Member, Task } from "@/lib/types";
+import type { Member, Project, Task } from "@/lib/types";
 import { formatDay } from "@/lib/time";
 import { useListening } from "@/settings/agents/data";
 import { ProjectGlyph } from "@/ui/project-glyph";
@@ -62,6 +62,10 @@ export function memberItems(members: Member[], meId: string | undefined, listeni
       };
     });
 }
+
+/** Projects as picker rows: the mark, the name, the key. */
+export const projectItems = (projects: Project[]): PickerItem[] =>
+  projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, hint: p.key, keywords: p.key }));
 
 /** The rows a picker offers for one property, and what is picked now. */
 function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { items: PickerItem[]; value: string | string[] | undefined } {
@@ -149,7 +153,7 @@ function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { i
       };
     case "project":
       return {
-        items: projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, hint: p.key, keywords: p.key })),
+        items: projectItems(projects),
         value: same((task) => task.project_id),
       };
   }

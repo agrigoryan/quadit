@@ -7,26 +7,36 @@ import { Fragment } from "react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useCollection } from "@/lib/selectors";
+import { useDocsArea } from "@/docs/area";
 import { useOpenThreads } from "@/docs/comments/panel";
 import { docTitle, pathTo, useDocs } from "@/docs/data";
 import { tintOf } from "@/docs/presence-tint";
 import { PageMenu } from "@/docs/page/page-menu";
+import { ProjectField } from "@/docs/page/project-field";
 import { SharePopover } from "@/docs/page/share-popover";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { useDocsStore } from "@/docs/store";
 import type { Doc } from "@/docs/types";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { Tooltip } from "@/ui/tooltip";
 
 const NO_OTHERS: never[] = [];
 
+/** The pages above a page that the area lists: all of them, or in a project's Docs those from the project's own page down. */
+function pathIn(above: Doc[], projectId: string | undefined): Doc[] {
+  if (!projectId) return above;
+  const top = above.findIndex((p) => p.project_id === projectId);
+  return top < 0 ? [] : above.slice(top);
+}
+
 export function PageHeader({ doc }: { doc: Doc }) {
-  const slug = useSlug();
+  const { base, project } = useDocsArea();
   const docs = useDocs();
   const members = useCollection("members");
-  const path = pathTo(docs, doc.id);
+  const path = pathIn(pathTo(docs, doc.id), project?.id);
   const others = useDocsStore((s) => s.presence[doc.id]) ?? NO_OTHERS;
   const saving = usePageUi((s) => s.saving[doc.id]);
   const commentsOpen = usePageUi((s) => s.commentsOpen);
@@ -36,20 +46,25 @@ export function PageHeader({ doc }: { doc: Doc }) {
   return (
     <header className="flex h-10 shrink-0 items-center gap-2 border-b border-line pr-2 pl-2 sm:pl-4">
       <Link
-        to={parent ? `/${slug}/docs/${parent.id}` : `/${slug}/docs`}
+        to={parent ? `${base}/${parent.id}` : base}
         aria-label={t("docs.header.back")}
         className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-2 hover:bg-hover hover:text-ink lg:hidden"
       >
         <ChevronLeft className="size-4" />
       </Link>
       <nav aria-label={t("docs.header.path")} className="flex min-w-0 flex-1 items-center gap-0.5 text-sm text-ink-2">
-        <Link to={`/${slug}/docs`} className="shrink-0 rounded-sm px-1 hover:bg-hover hover:text-ink max-lg:hidden">
+        <Link
+          to={base}
+          aria-label={project ? t("docs.header.projectDocs", { project: project.name }) : undefined}
+          className="flex shrink-0 items-center gap-1.5 rounded-sm px-1 hover:bg-hover hover:text-ink max-lg:hidden"
+        >
+          {project && <ProjectGlyph project={project} />}
           {t("docs.title")}
         </Link>
         {path.slice(-3).map((p) => (
           <Fragment key={p.id}>
             <ChevronRight className="size-3.5 shrink-0 text-ink-3 max-lg:hidden" />
-            <Link to={`/${slug}/docs/${p.id}`} className="max-w-40 truncate rounded-sm px-1 hover:bg-hover hover:text-ink max-lg:hidden">
+            <Link to={`${base}/${p.id}`} className="max-w-40 truncate rounded-sm px-1 hover:bg-hover hover:text-ink max-lg:hidden">
               {docTitle(p)}
             </Link>
           </Fragment>
@@ -81,6 +96,7 @@ export function PageHeader({ doc }: { doc: Doc }) {
         <span className="max-sm:hidden">{t("docs.comment.title")}</span>
         {threads.total > 0 && <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-move px-1 text-2xs font-semibold text-move-ink tnum">{threads.total}</span>}
       </Button>
+      {doc.kind !== "row" && !doc.memory_of && <ProjectField doc={doc} />}
       {doc.kind !== "row" && !doc.memory_of && <SharePopover doc={doc} />}
       <PageMenu doc={doc} />
     </header>
