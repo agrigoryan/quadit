@@ -72,12 +72,6 @@ type orbitList[T any] struct {
 var orbitCategory = map[string]string{"backlog": "backlog", "unstarted": "unstarted", "started": "started", "completed": "done",
 	"cancelled": "canceled", "canceled": "canceled", "duplicate": "canceled"} //nolint:misspell // "cancelled" is how Orbit may spell it
 
-// orbitOptional reads an answer the import can do without, which the
-// token may not be allowed to get: false when it could not be read.
-func orbitOptional(u, token string, dst any) bool {
-	return getJSON(u, token, dst) == nil
-}
-
 // members learns people's names and addresses, when the token may read
 // them; without them people are known by their ids.
 func (r *orbitReader) members() error {
@@ -86,8 +80,8 @@ func (r *orbitReader) members() error {
 		DisplayName     string `json:"display_name"`
 		UserID          string `json:"user_id"`
 	}]
-	if !orbitOptional(r.base+"/members", r.token, &members) {
-		return nil
+	if getJSON(r.base+"/members", r.token, &members) != nil {
+		return nil // the token may not read members: people are known by their ids
 	}
 	for _, m := range members.Items {
 		name := orStr(m.DisplayName, m.Name)
@@ -280,13 +274,13 @@ func (r *orbitReader) docs() error {
 		ID, Title string
 		ParentID  string `json:"parent_id"`
 	}]
-	if !orbitOptional(r.base+"/docs", r.token, &docs) {
-		return nil
+	if getJSON(r.base+"/docs", r.token, &docs) != nil {
+		return nil // docs need a scope the token may not have
 	}
 	for _, d := range docs.Items {
 		var full struct{ Markdown string }
-		if !orbitOptional(r.base+"/docs/"+d.ID, r.token, &full) {
-			continue
+		if getJSON(r.base+"/docs/"+d.ID, r.token, &full) != nil {
+			continue // a doc the token may not read is left out
 		}
 		r.plan.Docs = append(r.plan.Docs, Doc{Ext: d.ID, ParentExt: d.ParentID, Title: d.Title, Markdown: full.Markdown})
 	}
