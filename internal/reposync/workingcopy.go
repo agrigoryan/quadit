@@ -41,7 +41,7 @@ type workingCopy struct {
 // points it at repo, whose address may have changed since.
 func openWorkingCopy(ctx context.Context, dir, repo, folder string, log *slog.Logger) (*workingCopy, error) {
 	if _, err := exec.LookPath("git"); err != nil {
-		return nil, errors.New("git is not installed on the server")
+		return nil, &conflict{"git is not installed on the server"}
 	}
 	w := &workingCopy{dir: dir, folder: folder, log: log}
 	if _, serr := os.Stat(filepath.Join(dir, ".git")); serr != nil {
@@ -160,11 +160,11 @@ const maxPageFile = 2 << 20
 func (w *workingCopy) read() (folder, error) {
 	root := filepath.Join(w.dir, filepath.FromSlash(w.folder))
 	if !staysInside(w.dir, root) {
-		return folder{}, errors.New("the source's folder leads out of its repository, or goes through a link in it; set it to a real folder inside, such as docs")
+		return folder{}, &conflict{"the source's folder leads out of its repository, or goes through a link in it; set it to a real folder inside, such as docs"}
 	}
 	info, serr := os.Stat(root)
 	if w.folder != "" && serr == nil && !info.IsDir() {
-		return folder{}, errors.New("the source's folder " + w.folder + " is a file in the repository; set it to a folder")
+		return folder{}, &conflict{"the source's folder " + w.folder + " is a file in the repository; set it to a folder"}
 	}
 	f := folder{files: map[string]string{}, taken: map[string]bool{}, missing: w.folder != "" && serr != nil}
 	err := filepath.WalkDir(root, func(p string, e os.DirEntry, werr error) error {

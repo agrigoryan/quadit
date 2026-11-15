@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/reposync"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -35,8 +36,11 @@ func (s *Server) handleSyncSource(x *c) error {
 		return err
 	}
 	res, err := s.repos.Sync(x.ctx(), src)
-	if err != nil {
+	if reposync.Conflict(err) {
 		return &engine.Error{Code: engine.CodeConflict, Message: err.Error()}
+	}
+	if err != nil {
+		return err
 	}
 	return x.ok(res)
 }

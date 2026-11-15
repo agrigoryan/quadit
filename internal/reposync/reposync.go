@@ -90,7 +90,8 @@ func (s *Syncer) Run(ctx context.Context) {
 }
 
 // Sync brings one repository and its pages in line, and records on the
-// source when it did and how it went. The error is in words for a person.
+// source when it did and how it went. The error is in words for a person;
+// Conflict tells one that is about the source from one of the server's own.
 func (s *Syncer) Sync(ctx context.Context, src core.DocSource) (res Result, err error) {
 	mu, _ := s.locks.LoadOrStore(src.ID, &sync.Mutex{})
 	mu.(*sync.Mutex).Lock()
@@ -205,7 +206,7 @@ func (s *Syncer) Sync(ctx context.Context, src core.DocSource) (res Result, err 
 	}
 	commit, err := wc.commitAndPush(ctx, message, author, pushTo)
 	if errors.Is(err, errCheckedOut) {
-		return Result{}, fmt.Errorf("the repository is a working copy with %s checked out, and git lets nobody push to that. Sync with a bare repository or a hosted one, or set write_mode to \"propose\" so page edits go to the branch quadit/docs", pushTo)
+		return Result{}, &conflict{fmt.Sprintf("the repository is a working copy with %s checked out, and git lets nobody push to that. Sync with a bare repository or a hosted one, or set write_mode to \"propose\" so page edits go to the branch quadit/docs", pushTo)}
 	}
 	if err != nil {
 		return Result{}, err
@@ -223,6 +224,24 @@ func (s *Syncer) Sync(ctx context.Context, src core.DocSource) (res Result, err 
 
 	// What was pushed is now the common ground for those pages.
 	return res, rememberWritten(ctx, db, src, written, p.removals)
+}
+
+// conflict is a sync that cannot go as the source or its repository is
+// set up, in words for a person.
+type conflict struct{ msg string }
+
+func (e *conflict) Error() string { return e.msg }
+
+// Conflict reports whether a sync failed for what the source or its
+// repository is, not for the server: its folder is not a folder there, its
+// branch cannot be pushed to, the server has no git, or the repository
+// cannot be reached or refuses the server. Syncing again without a change
+// there fails the same way. Any other error is the server's own, such as
+// its database not answering.
+func Conflict(err error) bool {
+	var c *conflict
+	var g *gitFailure
+	return errors.As(err, &c) || errors.As(err, &g)
 }
 
 // commitAuthor names the member who changed the pages last as a git author

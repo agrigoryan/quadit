@@ -395,7 +395,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { os.Chmod(sub, 0o755) })
-			r.syncAnswering(409)
+			r.syncAnswering(500) // the server's own disk, not the source's setup
 			s.pageID("b")
 		}},
 	}
@@ -428,9 +428,9 @@ func TestARepositorySyncFailsWhenItCannotReadWhoEditedThePages(t *testing.T) {
 		match: func(_ map[string]any, where []store.Cond) bool {
 			return len(where) == 1 && whereHas(where, "id", owner)
 		}})
-	if _, raw := r.syncAnswering(409); !strings.Contains(raw, errOutage.Error()) {
-		t.Fatalf("the sync answered %s; want it to fail on the outage", raw)
-	}
+	// A database that does not answer is the server's failure, not a
+	// conflict with what the source asks.
+	r.syncAnswering(500)
 	if fired() != 1 {
 		t.Fatalf("fault fired %d times", fired())
 	}

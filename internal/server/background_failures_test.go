@@ -383,7 +383,7 @@ func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
 		match: func(set map[string]any, _ []store.Cond) bool {
 			return set["source_hash"] != nil && set["source_hash"] != ""
 		}})
-	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 409, nil)
+	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 500, nil) // the database's failure, not the source's
 	if fired() != 1 {
 		t.Fatalf("the fault fired %d times", fired())
 	}
