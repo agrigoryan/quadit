@@ -13,6 +13,8 @@ import {
   LIST_GROUPS,
   resetViewState,
   type StoredDisplay,
+  SUBTASKS,
+  type Subtasks,
   type ViewState,
 } from "@/tasks/view-state";
 import { Button, IconButton } from "@/ui/button";
@@ -23,7 +25,7 @@ import { Select } from "@/ui/picker";
 
 const SORTS: SortBy[] = ["manual", "priority", "updated", "created", "due"];
 
-/** How the tasks are grouped and ordered. A board is always in manual order: its cards are dragged into place. */
+/** How the tasks are grouped and ordered, and the list's sub-tasks shown. A board is always in manual order: its cards are dragged into place. */
 export function DisplayControls({
   state,
   onChange,
@@ -64,6 +66,15 @@ export function DisplayControls({
         align="end"
         buttonProps={{ variant: "ghost", size: "sm" }}
       />
+      <Select
+        label={t("subtasks.label")}
+        prefix={t("subtasks.label")}
+        value={state.subtasks}
+        items={SUBTASKS.map((s) => ({ id: s, label: t(`subtasks.${s}`) }))}
+        onPick={(id) => onChange({ subtasks: id as Subtasks })}
+        align="end"
+        buttonProps={{ variant: "ghost", size: "sm" }}
+      />
     </>
   );
 }
@@ -73,7 +84,12 @@ function viewArgs(state: ViewState, project: Project | undefined) {
   return {
     query: toQuery(state.filters, project?.key, state.sort),
     layout: state.layout,
-    display: { group: state.group, board_group: state.boardGroup, sort: state.sort } satisfies StoredDisplay,
+    display: {
+      group: state.group,
+      board_group: state.boardGroup,
+      sort: state.sort,
+      subtasks: state.subtasks,
+    } satisfies StoredDisplay,
   };
 }
 

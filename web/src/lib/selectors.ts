@@ -195,31 +195,40 @@ export function useDecisionFlag(taskId: string): "" | "open" | "mine" {
   });
 }
 
+/** Per parent, how many of its sub-tasks are done of those that count: a canceled one is not work left, nor work done. */
 const childProgress = memoLast((input: { tasks: Dict<Task>; statuses: Dict<Status> }) => {
   const out: Dict<{ done: number; total: number }> = {};
   for (const task of Object.values(input.tasks)) {
     if (!task.parent_id || task.deleted_at) continue;
+    const category = input.statuses[task.status_id]?.category;
+    if (category === "canceled") continue;
     const p = (out[task.parent_id] ??= { done: 0, total: 0 });
     p.total++;
-    const category = input.statuses[task.status_id]?.category;
-    if (category === "done" || category === "canceled") p.done++;
+    if (category === "done") p.done++;
   }
   return out;
 });
 
 let progressInput: { tasks: Dict<Task>; statuses: Dict<Status> } | undefined;
 
-/** Sub-task progress of a task as "done/total", or "" when it has none. */
-export function useSubtaskProgress(taskId: string): string {
-  return useStore((s) => {
-    if (
-      !progressInput ||
-      progressInput.tasks !== s.collections.tasks ||
-      progressInput.statuses !== s.collections.statuses
-    ) {
-      progressInput = { tasks: s.collections.tasks, statuses: s.collections.statuses };
-    }
-    const p = childProgress(progressInput)[taskId];
-    return p ? `${p.done}/${p.total}` : "";
-  });
+function progressOf(s: { collections: { tasks: Dict<Task>; statuses: Dict<Status> } }, taskId: string) {
+  if (
+    !progressInput ||
+    progressInput.tasks !== s.collections.tasks ||
+    progressInput.statuses !== s.collections.statuses
+  ) {
+    progressInput = { tasks: s.collections.tasks, statuses: s.collections.statuses };
+  }
+  return childProgress(progressInput)[taskId];
+}
+
+/**
+ * How many of a task's sub-tasks are done, of how many; undefined when it
+ * has none that count. Canceled sub-tasks are left out of both. A row
+ * redraws only when one of the two numbers changes.
+ */
+export function useSubtaskProgress(taskId: string): { done: number; total: number } | undefined {
+  const done = useStore((s) => progressOf(s, taskId)?.done ?? 0);
+  const total = useStore((s) => progressOf(s, taskId)?.total ?? 0);
+  return total > 0 ? { done, total } : undefined;
 }

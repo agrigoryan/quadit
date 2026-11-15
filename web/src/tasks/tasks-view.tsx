@@ -99,6 +99,7 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
       state.group !== saved.group ||
       state.boardGroup !== saved.boardGroup ||
       state.sort !== saved.sort ||
+      state.subtasks !== saved.subtasks ||
       state.layout !== saved.layout);
   const chosen = useMemo(() => tasks.filter((task) => selected.has(task.id)), [tasks, selected]);
   const add = useCallback(
@@ -154,7 +155,14 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
             <Board groups={groups} project={project} />
           </Suspense>
         ) : (
-          <TaskList groups={groups} selected={selected} onSelectedChange={setSelected} onAdd={add} />
+          <TaskList
+            groups={groups}
+            nested={state.subtasks === "nested"}
+            sort={state.sort}
+            selected={selected}
+            onSelectedChange={setSelected}
+            onAdd={add}
+          />
         )}
         {!board && <BulkBar tasks={chosen} onClear={clearSelection} />}
       </div>

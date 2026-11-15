@@ -1,7 +1,7 @@
 import { CalendarDays, Globe, Hourglass, Layers } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMe, useMember } from "@/lib/selectors";
+import { useMe, useMember, useSubtaskProgress } from "@/lib/selectors";
 import { dueLabel } from "@/lib/time";
 import type { Task } from "@/lib/types";
 import { waitsOutside } from "@/tasks/actions";
@@ -89,4 +89,45 @@ export function EpicChip({ name, className }: { name: string; className?: string
 export function AssigneeAvatar({ userId, size = "sm" }: { userId: string | undefined; size?: "xs" | "sm" | "md" }) {
   const member = useMember(userId);
   return <Avatar member={member} size={size} />;
+}
+
+/**
+ * How far a task's sub-tasks have got: a ring that fills with the share
+ * done, then "done/total". Nothing for a task without sub-tasks.
+ */
+export function SubtaskPill({ taskId, className }: { taskId: string; className?: string }) {
+  const progress = useSubtaskProgress(taskId);
+  if (!progress) return null;
+  const { done, total } = progress;
+  const label = t("task.subtasks", { done, total });
+  // A circle of radius 5 is 31.4 long around: the dash is the done share of it.
+  const around = 2 * Math.PI * 5;
+  return (
+    <span
+      title={label}
+      className={cx(
+        "inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-line px-1.5 text-xs text-ink-2 tnum whitespace-nowrap",
+        className,
+      )}
+    >
+      <svg viewBox="0 0 14 14" className="size-3 shrink-0 -rotate-90" aria-hidden>
+        <circle cx="7" cy="7" r="5" fill="none" stroke="var(--line-strong)" strokeWidth="2" />
+        {done > 0 && (
+          <circle
+            cx="7"
+            cy="7"
+            r="5"
+            fill="none"
+            stroke="var(--cat-done)"
+            strokeWidth="2"
+            strokeDasharray={`${(done / total) * around} ${around}`}
+          />
+        )}
+      </svg>
+      <span aria-hidden>
+        {done}/{total}
+      </span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
 }

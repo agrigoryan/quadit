@@ -35,6 +35,7 @@ function readSaved(view: View | undefined, query: TaskQuery | null, tables: Quer
       group: display.group,
       boardGroup: display.boardGroup,
       sort: display.sort ?? sortFromQuery(query) ?? "manual",
+      subtasks: display.subtasks,
       layout: view.layout === "board" ? "board" : "list",
     } satisfies ViewState;
   } catch {
@@ -50,6 +51,7 @@ const sameViewState = (a: ViewState | null, b: ViewState | null) =>
     a.group === b.group &&
     a.boardGroup === b.boardGroup &&
     a.sort === b.sort &&
+    a.subtasks === b.subtasks &&
     a.layout === b.layout);
 
 /**

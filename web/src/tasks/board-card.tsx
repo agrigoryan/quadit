@@ -8,7 +8,7 @@ import { useDecisionFlag, useSubtaskProgress } from "@/lib/selectors";
 import { useIsDraft, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { waitsOutside } from "@/tasks/actions";
-import { AssigneeAvatar, DueChip, WaitsOnChip } from "@/tasks/task-chips";
+import { AssigneeAvatar, DueChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
 import { useTaskLink } from "@/lib/task-link";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon } from "@/ui/icons";
@@ -40,7 +40,7 @@ const CardBody = memo(function CardBody({ task }: { task: Task }) {
             <LabelChip key={l.id} name={l.name} color={l.color} />
           ))}
           {task.due_on && <DueChip day={task.due_on} />}
-          {progress && <span className="text-xs text-ink-3 tnum">{progress}</span>}
+          <SubtaskPill taskId={task.id} />
         </div>
       )}
     </>

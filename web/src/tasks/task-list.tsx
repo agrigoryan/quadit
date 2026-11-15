@@ -1,19 +1,21 @@
 // The list layout of a task page: rows under collapsible group headings,
-// driven from the keyboard. Where the groups and rows sit is worked out in
+// sub-tasks nested under their parents, driven from the keyboard. Where the
+// groups and rows sit, and how a group's rows nest, is worked out in
 // tasks/list-layout.ts; the keys shared with the board and the other lists
 // are in tasks/panel-keys.ts.
 
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
+import { useCollection } from "@/lib/selectors";
 import { isDraft } from "@/lib/store";
 import { usePeek, useTaskNav } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";
-import type { Task } from "@/lib/types";
+import type { SortBy, Task } from "@/lib/types";
 import type { NewTaskDraft } from "@/tasks/draft";
-import { NONE, type TaskGroup } from "@/tasks/filters";
+import { comparer, NONE, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";
-import { layOut, OVERSCAN, ROW, type Row, rowKey, rowPlace, rowsBetween, stepFrom, TAIL } from "@/tasks/list-layout";
+import { layOut, OVERSCAN, ROW, type Row, rowPlace, rowsBetween, stepFrom, TAIL, treeStep } from "@/tasks/list-layout";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
@@ -21,6 +23,9 @@ import { useViewport } from "@/tasks/use-viewport";
 
 interface Props {
   groups: TaskGroup[];
+  /** Sub-tasks under their parents, in the order `sort` gives; or every task a row of its group, in the groups' order. */
+  nested: boolean;
+  sort: SortBy;
   selected: Set<string>;
   onSelectedChange: (next: Set<string>) => void;
   /** Opens the create dialog with these values filled in. */
@@ -47,12 +52,14 @@ const KEY_TO_PROPERTY: Record<string, TaskProperty> = { s: "status", a: "assigne
  * Tasks as dense rows under collapsible group headings, driven from the
  * keyboard: J/K move, Space shows the focused task in the panel, Enter
  * opens its page, X selects, S/A/P/L change the focused row or the whole
- * selection. While the panel is open J/K move it to the next task, and
+ * selection, Left and Right fold and unfold a parent's sub-tasks. A parent
+ * shown only for context (tasks/list-layout.ts) is walked and opened like
+ * any row, but is never selected. While the panel is open J/K move it to the next task, and
  * Space or Escape closes it with the focus still on the row. Only the rows
  * on screen are drawn, so the list stays quick at any length. Left for a
  * task's page and come back to, it is where it was (lib/place.ts).
  */
-export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
+export function TaskList({ groups, nested, sort, selected, onSelectedChange, onAdd }: Props) {
   const open = useTaskNav();
   const peek = usePeek();
   const peeking = peek.key !== undefined;
@@ -66,12 +73,18 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
   const anchor = useRef<Element | null>(null);
   const lastPicked = useRef<string | null>(null);
   const view = useViewport(scroller);
+  const tasks = useCollection("tasks");
 
-  const { sections, rows, indexOf, total } = useMemo(() => layOut(groups, collapsed), [groups, collapsed]);
+  // `collapsed` holds the groups folded, by id, and the parents folded, by row key.
+  const { sections, rows, indexOf, total } = useMemo(
+    () => layOut(groups, collapsed, nested ? { tasks, compare: comparer(sort) } : undefined),
+    [groups, collapsed, nested, tasks, sort],
+  );
   const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 
   const focusAt = focusKey === null ? -1 : (indexOf.get(focusKey) ?? -1);
-  const focused = rows[focusAt]?.task;
+  const focusedRow = rows[focusAt];
+  const focused = focusedRow?.task;
   const targets = useMemo(() => {
     if (selected.size === 0) return focused ? [focused] : [];
     // Grouped by label a task can show twice; it is changed once.
@@ -83,7 +96,7 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
   // A selection only ever holds rows that are still on screen.
   useEffect(() => {
     if (selected.size === 0) return;
-    const ids = new Set(rows.map((row) => row.task.id));
+    const ids = new Set(rows.filter((row) => !row.branch?.context).map((row) => row.task.id));
     const kept = [...selected].filter((id) => ids.has(id));
     if (kept.length !== selected.size) onSelectedChange(new Set(kept));
   }, [rows, selected, onSelectedChange]);
@@ -147,7 +160,8 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
       const a = from ? indexOf.get(from) : undefined;
       const b = indexOf.get(key);
       if (range && a !== undefined && b !== undefined) {
-        for (const row of rows.slice(Math.min(a, b), Math.max(a, b) + 1)) next.add(row.task.id);
+        for (const row of rows.slice(Math.min(a, b), Math.max(a, b) + 1))
+          if (!row.branch?.context) next.add(row.task.id);
       } else if (next.has(task.id)) next.delete(task.id);
       else next.add(task.id);
       lastPicked.current = key;
@@ -158,15 +172,25 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
 
   const hover = useCallback((task: Task, at?: string) => setFocusKey(at ?? task.id), []);
 
-  const toggle = useCallback(
-    (group: TaskGroup) =>
+  /** Folds or unfolds a group, by its id, or a parent's sub-tasks, by its row key. */
+  const fold = useCallback(
+    (key: string) =>
       setCollapsed((prev) => {
         const next = new Set(prev);
-        if (!next.delete(group.id)) next.add(group.id);
+        if (!next.delete(key)) next.add(key);
         return next;
       }),
     [],
   );
+  const toggle = useCallback((group: TaskGroup) => fold(group.id), [fold]);
+
+  function stepTree(e: KeyboardEvent, by: number) {
+    const to = treeStep(rows, focusAt, by);
+    if (!to) return;
+    e.preventDefault();
+    if ("toggle" in to) fold(to.toggle);
+    else focusRow(to.focus);
+  }
   const addTo = useCallback((group: TaskGroup) => onAdd(draftFor(group)), [onAdd]);
 
   function openPicker(kind: TaskProperty) {
@@ -197,8 +221,11 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
       e.preventDefault(); // or the list scrolls a screen down
       showInPanel(focused);
     },
+    ArrowLeft: (e) => stepTree(e, -1),
+    ArrowRight: (e) => stepTree(e, 1),
     x: () => {
-      if (focused) select(focused, false, focusKey ?? undefined);
+      // A parent shown only for context is not one of the list's tasks to select.
+      if (focused && !focusedRow?.branch?.context) select(focused, false, focusKey ?? undefined);
     },
     Escape: () => {
       if (selected.size > 0) onSelectedChange(new Set());
@@ -248,22 +275,24 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
               {section.head > 0 && (
                 <GroupHeader group={group} collapsed={collapsed.has(group.id)} onToggle={toggle} onAdd={addTo} />
               )}
-              {start > 0 && <div aria-hidden style={{ height: start * ROW }} />}
-              {group.tasks.slice(start, end).map((task) => {
-                const key = rowKey(group, task);
-                return (
+              {/* Nested, the rows are announced as a list whose items carry their level in the tree. */}
+              <div role={rows[section.first]?.branch ? "list" : undefined}>
+                {start > 0 && <div aria-hidden style={{ height: start * ROW }} />}
+                {rows.slice(section.first + start, section.first + end).map(({ key, task, branch }) => (
                   <TaskRow
                     key={key}
                     at={key}
                     task={task}
+                    branch={branch}
                     focused={key === focusKey}
-                    selected={selected.has(task.id)}
+                    selected={!branch?.context && selected.has(task.id)}
                     onSelect={select}
                     onHover={hover}
+                    onFold={fold}
                     hide={hide}
                   />
-                );
-              })}
+                ))}
+              </div>
             </section>
           );
         })}

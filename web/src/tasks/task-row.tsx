@@ -1,14 +1,15 @@
 import { type CSSProperties, memo } from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useDecisionFlag, useSubtaskProgress } from "@/lib/selectors";
+import { useDecisionFlag } from "@/lib/selectors";
 import { useIsDraft, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
-import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { useTaskLink } from "@/lib/task-link";
-import { AssigneeAvatar, DueChip, EpicChip, WaitsOnChip } from "@/tasks/task-chips";
+import type { Branch } from "@/tasks/list-layout";
+import { TaskPropertyPicker } from "@/tasks/property-picker";
+import { AssigneeAvatar, DueChip, EpicChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon, StatusIcon } from "@/ui/icons";
 
@@ -46,6 +47,10 @@ interface Props {
   at?: string;
   /** Hide the columns that the grouping already says. */
   hide?: { epic?: boolean; assignee?: boolean };
+  /** Its place in a tree of sub-tasks (tasks/list-layout.ts): drawn indented, with the tree's lines; a context row cannot be selected. */
+  branch?: Branch;
+  /** Folds or unfolds the rows nested under this one; handed `at`. */
+  onFold?: (at: string) => void;
 }
 
 const iconButton =
@@ -55,21 +60,35 @@ const iconButton =
  * One task as a dense line: key, title, and what matters about it right now.
  * The status, priority and assignee can be changed in place.
  */
-export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect, onHover, at, hide }: Props) {
+export const TaskRow = memo(function TaskRow({
+  task,
+  focused,
+  selected,
+  onSelect,
+  onHover,
+  at,
+  hide,
+  branch,
+  onFold,
+}: Props) {
   const status = useStore((s) => s.collections.statuses[task.status_id]);
   const epic = useStore((s) => (task.epic_id ? s.collections.epics[task.epic_id] : undefined));
   const labels = useStore((s) => s.collections.labels);
   const decision = useDecisionFlag(task.id);
-  const progress = useSubtaskProgress(task.id);
   const link = useTaskLink(task);
   // Just made here and not yet numbered by the server: there is no address to open it at.
   const draft = useIsDraft(task.id);
   const closed = status?.category === "done" || status?.category === "canceled";
+  const context = branch?.context ?? false;
 
   return (
     <div
       data-task={task.id}
       data-focused={focused || undefined}
+      role={branch && "listitem"}
+      aria-level={branch && branch.depth + 1}
+      aria-posinset={branch?.position}
+      aria-setsize={branch?.siblings}
       onMouseMove={onHover && !focused ? () => onHover(task, at) : undefined}
       className={cx(
         "group relative flex h-9 items-center gap-1.5 border-b border-line/70 pr-3 pl-1.5 text-sm [contain-intrinsic-size:auto_36px] [content-visibility:auto]",
@@ -77,7 +96,8 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
       )}
     >
       {focused && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />}
-      {onSelect && (
+      {onSelect && context && <span className="size-6 shrink-0" aria-hidden />}
+      {onSelect && !context && (
         <button
           type="button"
           role="checkbox"
@@ -101,6 +121,8 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
           </span>
         </button>
       )}
+
+      {branch && <TreeGutter branch={branch} label={task.key} onFold={onFold && (() => onFold(at ?? task.id))} />}
 
       <TaskPropertyPicker kind="priority" tasks={[task]}>
         <button
@@ -127,10 +149,10 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
       ) : (
         <Link
           {...link}
-          aria-label={t("task.open", { key: task.key })}
+          aria-label={context ? t("list.openContext", { key: task.key }) : t("task.open", { key: task.key })}
           className={cx(
             "min-w-0 flex-1 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']",
-            closed && "text-ink-2",
+            (closed || context) && "text-ink-2",
           )}
         >
           {task.title}
@@ -139,7 +161,7 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
 
       {/* Everything right of the title sits above the row-wide link. */}
       <div className="relative z-[1] flex shrink-0 items-center gap-2">
-        {progress && <span className="text-xs text-ink-3 tnum max-md:hidden">{progress}</span>}
+        <SubtaskPill taskId={task.id} />
         {decision && (
           <DecisionMark
             mine={decision === "mine"}
@@ -166,3 +188,50 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
     </div>
   );
 });
+
+/** How far one level of the tree indents, in pixels: the width of the fold control. */
+const STEP = 16;
+
+/**
+ * The room left of a nested row: one column per level above it and one for
+ * its own fold control. The tree's lines run through the middle of the
+ * columns: an elbow from the parent's column into this row, and a line on
+ * down wherever more rows of that level follow.
+ */
+function TreeGutter({ branch, label, onFold }: { branch: Branch; label: string; onFold?: () => void }) {
+  const { depth, rails, children, folded } = branch;
+  const mid = (level: number) => level * STEP + STEP / 2;
+  const line = "absolute w-px bg-line-strong";
+  return (
+    <span className="relative -mb-px shrink-0 self-stretch" style={{ width: (depth + 1) * STEP }}>
+      {rails.map((on, level) =>
+        on ? <span key={level} className={cx(line, "inset-y-0")} style={{ left: mid(level) }} aria-hidden /> : null,
+      )}
+      {depth > 0 && (
+        <span
+          className="absolute top-0 h-1/2 rounded-bl-[5px] border-b border-l border-line-strong"
+          style={{ left: mid(depth - 1), width: depth * STEP - mid(depth - 1) + (children > 0 ? 1 : STEP - 3) }}
+          aria-hidden
+        />
+      )}
+      {children > 0 && !folded && (
+        <span className={cx(line, "top-[calc(50%+8px)] bottom-0")} style={{ left: mid(depth) }} aria-hidden />
+      )}
+      {children > 0 && (
+        <button
+          type="button"
+          aria-expanded={!folded}
+          aria-label={folded ? t("list.unfold", { key: label }) : t("list.fold", { key: label })}
+          onClick={onFold}
+          className="absolute top-1/2 z-[1] flex size-4 -translate-y-1/2 items-center justify-center rounded-sm text-ink-3 hover:bg-hover hover:text-ink"
+          style={{ left: depth * STEP }}
+        >
+          <ChevronDown
+            className={cx("size-3.5 transition-transform duration-100", folded && "-rotate-90")}
+            aria-hidden
+          />
+        </button>
+      )}
+    </span>
+  );
+}

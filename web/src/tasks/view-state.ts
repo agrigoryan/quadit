@@ -10,6 +10,9 @@ import { emptyFilters, type Filters, type Grouping } from "@/tasks/filters";
 export type BoardGrouping = "status" | "assignee" | "label";
 export const BOARD_GROUPS: BoardGrouping[] = ["status", "assignee", "label"];
 export const LIST_GROUPS: Grouping[] = ["status", "assignee", "label", "epic", "priority", "none"];
+/** How the list shows sub-tasks: under their parents, or as rows like any other. */
+export type Subtasks = "nested" | "flat";
+export const SUBTASKS: Subtasks[] = ["nested", "flat"];
 
 export interface ViewState {
   filters: Filters;
@@ -18,6 +21,7 @@ export interface ViewState {
   /** What the board's columns are. */
   boardGroup: BoardGrouping;
   sort: SortBy;
+  subtasks: Subtasks;
   layout: "list" | "board";
 }
 
@@ -26,23 +30,30 @@ export const defaultViewState: ViewState = {
   group: "status",
   boardGroup: "status",
   sort: "manual",
+  subtasks: "nested",
   layout: "list",
 };
 
 /** A saved view's display, as stored: the server's fields, with the list grouped by label and the board's own grouping. */
-export type StoredDisplay = Omit<ViewDisplay, "group"> & { group?: Grouping; board_group?: BoardGrouping };
+export type StoredDisplay = Omit<ViewDisplay, "group"> & {
+  group?: Grouping;
+  board_group?: BoardGrouping;
+  subtasks?: Subtasks;
+};
 
-/** The grouping a stored display asks for; anything unknown falls back to status. */
+/** The grouping, sorting and sub-tasks a stored display asks for; anything unknown falls back to the default. */
 export function readDisplay(display: unknown): {
   group: Grouping;
   boardGroup: BoardGrouping;
   sort: SortBy | undefined;
+  subtasks: Subtasks;
 } {
   const d = (display && typeof display === "object" ? display : {}) as Record<string, unknown>;
   const group = LIST_GROUPS.find((g) => g === d.group) ?? "status";
   const boardGroup = BOARD_GROUPS.find((g) => g === d.board_group) ?? "status";
   const sort = (["manual", "priority", "updated", "created", "due"] as const).find((v) => v === d.sort);
-  return { group, boardGroup, sort };
+  const subtasks = SUBTASKS.find((s) => s === d.subtasks) ?? "nested";
+  return { group, boardGroup, sort, subtasks };
 }
 
 const useStates = create<Record<string, ViewState>>(() => ({}));

@@ -1,16 +1,20 @@
 // @vitest-environment jsdom
-// The task list's keys (tasks/task-list.tsx), on a small list rendered with a
-// stand-in for the panel: the panel is open while the address is a task's.
+// The task list (tasks/task-list.tsx): its keys, on a small list rendered
+// with a stand-in for the panel (the panel is open while the address is a
+// task's), and its sub-tasks nested under their parents.
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useMemo, useState } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { emptyCollections } from "@/lib/collections";
 import { useStore } from "@/lib/store";
 import { PeekContext } from "@/lib/task-link";
 import type { Task } from "@/lib/types";
 import type { TaskGroup } from "@/tasks/filters";
 import { TaskList } from "@/tasks/task-list";
+import { DisplayControls } from "@/tasks/view-controls";
+import { defaultViewState } from "@/tasks/view-state";
 import { TooltipProvider } from "@/ui/tooltip";
 
 beforeAll(() => {
@@ -21,15 +25,18 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   };
+  // Nor any scrolling, which the pickers' lists ask for.
+  Element.prototype.scrollIntoView = () => {};
 });
 
-const task = (n: number): Task => ({
+const task = (n: number, parent?: number, status = "s"): Task => ({
   id: `t${n}`,
   project_id: "p",
   number: n,
   key: `SVA-${n}`,
   title: `Task ${n}`,
-  status_id: "s",
+  status_id: status,
+  parent_id: parent === undefined ? undefined : `t${parent}`,
   priority: 0,
   rank: String(n),
   created_by: "u",
@@ -38,19 +45,19 @@ const task = (n: number): Task => ({
   updated_seq: 0,
 });
 
-const group = (id: string, numbers: number[]): TaskGroup => ({
+const group = (id: string, tasks: (number | Task)[]): TaskGroup => ({
   id,
   title: id,
   kind: "status",
   value: id,
   category: "unstarted",
-  tasks: numbers.map(task),
+  tasks: tasks.map((n) => (typeof n === "number" ? task(n) : n)),
 });
 
 const GROUPS = [group("Todo", [1, 2]), group("Doing", [3, 4]), group("Done", [5])];
 
 /** The list with a panel that is open while the address is a task's, as the shell has it. */
-function Page({ groups }: { groups: TaskGroup[] }) {
+function Page({ groups, nested }: { groups: TaskGroup[]; nested: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -59,7 +66,14 @@ function Page({ groups }: { groups: TaskGroup[] }) {
   return (
     <PeekContext.Provider value={peek}>
       <input aria-label="field" />
-      <TaskList groups={groups} selected={selected} onSelectedChange={setSelected} onAdd={() => {}} />
+      <TaskList
+        groups={groups}
+        nested={nested}
+        sort="manual"
+        selected={selected}
+        onSelectedChange={setSelected}
+        onAdd={() => {}}
+      />
       {key && <div data-task-panel />}
       <output aria-label="address">{location.pathname}</output>
       <output aria-label="shown as">
@@ -73,12 +87,12 @@ function Page({ groups }: { groups: TaskGroup[] }) {
 /** Each test is a new step of the history, so none finds the place another left (lib/place.ts). */
 let step = 0;
 
-function renderList(groups = GROUPS) {
+function renderList(groups = GROUPS, nested = true) {
   step += 1;
   render(
     <MemoryRouter initialEntries={[{ pathname: "/test/p/SVA/tasks", key: `step${step}` }]}>
       <TooltipProvider>
-        <Page groups={groups} />
+        <Page groups={groups} nested={nested} />
       </TooltipProvider>
     </MemoryRouter>,
   );
@@ -173,5 +187,95 @@ describe("TaskList keys", () => {
     press("j");
     press(" ", screen.getByRole("button", { name: /Todo/, expanded: true }));
     expect(address()).toBe("/test/p/SVA/tasks");
+  });
+});
+
+describe("TaskList sub-tasks", () => {
+  // SVA-10 is in Doing; its sub-task SVA-11 (done) is in Todo, so Todo shows SVA-10 above it for context.
+  const parent = task(10);
+  const child = task(11, 10, "d");
+  const NESTED = [group("Todo", [1, child]), group("Doing", [parent])];
+
+  beforeAll(() => {
+    const statuses = {
+      s: { id: "s", project_id: "p", name: "Todo", category: "unstarted", rank: "a" },
+      d: { id: "d", project_id: "p", name: "Done", category: "done", rank: "b" },
+    } as unknown as ReturnType<typeof emptyCollections>["statuses"]; // only the fields a row reads
+    useStore.setState({
+      collections: { ...emptyCollections(), statuses, tasks: { t1: task(1), t10: parent, t11: child } },
+    });
+  });
+
+  it("shows the parent's progress as a pill wherever the parent is listed", () => {
+    renderList(NESTED);
+    expect(screen.getAllByText("1 of 1 sub-tasks done")).toHaveLength(2);
+  });
+
+  it("nests the sub-task under a context row that says what it is and cannot be selected", () => {
+    renderList(NESTED);
+    expect(screen.getByRole("link", { name: "Open SVA-10, shown as the parent of tasks in this group" })).toBeTruthy();
+    expect(screen.getAllByRole("checkbox", { name: "Select SVA-10" })).toHaveLength(1);
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((item) => [item.getAttribute("data-task"), item.getAttribute("aria-level")])).toEqual([
+      ["t1", "1"],
+      ["t10", "1"],
+      ["t11", "2"],
+      ["t10", "1"],
+    ]);
+  });
+
+  it("walks onto the context row with J, skips it with X, and opens the parent on Enter", () => {
+    renderList(NESTED);
+    press("j");
+    press("j");
+    expect(current()).toBe("t10");
+    press("x");
+    expect(screen.getByLabelText("selected").textContent).toBe("");
+    press("Enter");
+    expect(address()).toBe("/test/task/SVA-10");
+  });
+
+  it("leaves the context row out of a Shift range", () => {
+    renderList(NESTED);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select SVA-1" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select SVA-11" }), { shiftKey: true });
+    expect(screen.getByLabelText("selected").textContent).toBe("t1,t11");
+  });
+
+  it("folds a parent's sub-tasks with its control, and with Left and Right on the focused row", () => {
+    renderList(NESTED);
+    fireEvent.click(screen.getByRole("button", { name: "Hide the sub-tasks of SVA-10", expanded: true }));
+    expect(screen.queryByRole("link", { name: "Open SVA-11" })).toBeNull();
+    press("j");
+    press("j");
+    press("ArrowRight");
+    expect(screen.getByRole("link", { name: "Open SVA-11" })).toBeTruthy();
+    press("ArrowRight");
+    expect(current()).toBe("t11");
+    press("ArrowLeft");
+    expect(current()).toBe("t10");
+    press("ArrowLeft");
+    expect(screen.getByRole("button", { name: "Show the sub-tasks of SVA-10", expanded: false })).toBeTruthy();
+  });
+
+  it("lists every task as its own row when flat", () => {
+    renderList(NESTED, false);
+    expect(screen.queryByRole("listitem")).toBeNull();
+    expect(screen.queryByRole("button", { name: /sub-tasks of/ })).toBeNull();
+    expect(screen.getAllByText("1 of 1 sub-tasks done")).toHaveLength(1);
+  });
+});
+
+describe("DisplayControls", () => {
+  it("offers sub-tasks nested or flat, nested to start with", () => {
+    const onChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <DisplayControls state={defaultViewState} onChange={onChange} />
+      </TooltipProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Sub-tasks\s*Nested/ }));
+    fireEvent.click(screen.getByRole("option", { name: "Flat" }));
+    expect(onChange).toHaveBeenCalledWith({ subtasks: "flat" });
   });
 });
