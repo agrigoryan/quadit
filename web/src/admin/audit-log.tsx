@@ -2,9 +2,11 @@
 // whole install's; workspace settings show one workspace's. Both read the
 // same shape with the same filters, newest first, a page at a time.
 
-import { useEffect, useRef, useState } from "react";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { ChevronRight, Download } from "lucide-react";
-import { api, ApiError, errorMessage } from "@/lib/api";
+import { api } from "@/lib/api";
+import { readError } from "@/lib/query";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { exact, toTheSecond } from "@/lib/time";
@@ -142,43 +144,35 @@ function EntryRow({
 /** A whole page: the filters, the export button in the page's corner, and the log. */
 export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Props) {
   const [filters, setFilters] = useState<AuditFilters>(noFilters);
-  const [rows, setRows] = useState<AuditEntry[] | null>(null);
-  /** Where the next page starts: the server's `next`, sent back as `cursor`. Empty when everything is shown. */
-  const [next, setNext] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const run = useRef(0);
+  // The filters the log is read with: those typed, a moment after the typing stops.
+  const [applied, setApplied] = useState(filters);
+  useEffect(() => {
+    if (applied === filters) return;
+    const timer = setTimeout(() => setApplied(filters), 250);
+    return () => clearTimeout(timer);
+  }, [filters, applied]);
+
+  const query = auditQuery(applied);
+  const log = useInfiniteQuery({
+    // The admin area's log and a workspace's differ by endpoint; the filters are compared by their text.
+    queryKey: ["audit", endpoint, query],
+    queryFn: ({ pageParam, signal }) =>
+      api.get<{ audit?: AuditEntry[]; next?: string }>(
+        `${endpoint}?${auditQuery(applied, pageParam ? { limit: PAGE, cursor: pageParam } : { limit: PAGE })}`,
+        signal,
+      ),
+    initialPageParam: "",
+    // The server's `next`, sent back as `cursor`; none when everything is shown.
+    getNextPageParam: (last) => last.next || undefined,
+    // Other filters keep the rows on screen, dimmed, until their own answer comes.
+    placeholderData: keepPreviousData,
+  });
+  const rows = log.data ? log.data.pages.flatMap((page) => page.audit ?? []) : null;
+  const busy = log.isFetching;
+  const error = readError(log.error);
 
   const names = new Map<string, string>();
   for (const n of [...(actors ?? []), ...(workspaces ?? [])]) names.set(n.id, n.name);
-
-  /** Loads the first page, or with `from` and its cursor the page after what is shown. */
-  async function load(from: AuditEntry[] | null, cursor = "") {
-    const mine = ++run.current;
-    setBusy(true);
-    try {
-      const extra: Record<string, string | number> = { limit: PAGE };
-      if (from && cursor) extra.cursor = cursor;
-      const out = await api.get<{ audit: AuditEntry[]; next?: string }>(`${endpoint}?${auditQuery(filters, extra)}`);
-      if (mine !== run.current) return;
-      setRows([...(from ?? []), ...(out.audit ?? [])]);
-      setNext(out.next ?? "");
-      setError("");
-    } catch (err) {
-      if (mine !== run.current) return;
-      if (!(err instanceof ApiError && err.status === 401)) setError(errorMessage(err));
-    } finally {
-      if (mine === run.current) setBusy(false);
-    }
-  }
-
-  // A change of filters starts over, a moment after the typing stops.
-  const key = JSON.stringify(filters) + endpoint;
-  useEffect(() => {
-    const timer = setTimeout(() => void load(null), rows === null ? 0 : 250);
-    return () => clearTimeout(timer);
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the filters are compared by their text (key), not by identity
-  }, [key]);
 
   return (
     <Page
@@ -201,7 +195,7 @@ export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Pr
             <EmptyState
               title={t("s.loadFailed")}
               hint={error}
-              action={<Button onClick={() => void load(null)}>{t("common.tryAgain")}</Button>}
+              action={<Button onClick={() => void log.refetch()}>{t("common.tryAgain")}</Button>}
             />
           ) : (
             <Loading />
@@ -235,8 +229,8 @@ export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Pr
         {rows !== null && rows.length > 0 && (
           <div className="flex items-center justify-between gap-3 text-xs text-ink-3">
             <span>{t("audit.shown", { n: rows.length })}</span>
-            {next ? (
-              <Button onClick={() => void load(rows, next)} disabled={busy}>
+            {log.hasNextPage ? (
+              <Button onClick={() => void log.fetchNextPage()} disabled={busy}>
                 {busy && <Spinner className="size-3" />}
                 {t("audit.more")}
               </Button>
