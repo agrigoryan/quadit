@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"golang.org/x/oauth2"
+
+	"github.com/agrigoryan/quadit/internal/github"
 )
 
 // LimitFactor is how far the request limits are scaled from their defaults
@@ -25,7 +27,7 @@ func (s *Server) RoutePatterns() []string {
 }
 
 // GitHubTimeout is how long one request to GitHub may take, for tests to shorten.
-var GitHubTimeout = &githubTimeout
+var GitHubTimeout = &github.Timeout
 
 // GitHubIdentity reads who a GitHub token belongs to, the way sign-in with
 // GitHub does, for a test against the real service.

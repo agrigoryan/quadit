@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"golang.org/x/oauth2"
+
+	"github.com/agrigoryan/quadit/internal/github"
 )
 
 // githubSignIn is sign-in with GitHub, which is OAuth 2 without an identity
@@ -37,13 +39,13 @@ func (githubSignIn) Identity(ctx context.Context, cfg oauthSetting, oc *oauth2.C
 // address GitHub has verified for it. version is this server's.
 func githubIdentity(ctx context.Context, hc *http.Client, api, version string) (outsider, error) {
 	var who outsider
-	gh := newGitHubClient(hc, api, version)
+	gh := github.NewClient(hc, api, version)
 	var u struct {
 		ID    int64  `json:"id"`
 		Login string `json:"login"`
 		Name  string `json:"name"`
 	}
-	if err := gh.call(ctx, "GET", "/user", nil, &u); err != nil {
+	if err := gh.Call(ctx, "GET", "/user", nil, &u); err != nil {
 		return who, err
 	}
 	var emails []struct {
@@ -55,7 +57,7 @@ func githubIdentity(ctx context.Context, hc *http.Client, api, version string) (
 	if who.Name == "" {
 		who.Name = u.Login
 	}
-	if err := gh.call(ctx, "GET", "/user/emails", nil, &emails); err != nil {
+	if err := gh.Call(ctx, "GET", "/user/emails", nil, &emails); err != nil {
 		// GitHub hides the list from a sign-in that was not given the
 		// "user:email" permission, and says "not found".
 		return who, fmt.Errorf("GitHub did not give this account's email addresses (%w); the sign-in must be allowed to read them (the user:email permission)", err)

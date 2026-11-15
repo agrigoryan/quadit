@@ -10,6 +10,8 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
+
+	"github.com/agrigoryan/quadit/internal/github"
 )
 
 // Sign-in with an outside provider is laid out like this:
@@ -130,7 +132,7 @@ func (s *Server) providerList(ctx context.Context) []map[string]string {
 // GitHub has, so a provider that never answers cannot hold a sign-in open.
 // An OpenID Connect provider keeps the client for reading its keys later.
 func providerCalls(ctx context.Context) context.Context {
-	return oidc.ClientContext(ctx, &http.Client{Timeout: githubTimeout})
+	return oidc.ClientContext(ctx, &http.Client{Timeout: github.Timeout})
 }
 
 // oauth2Config is this server as a client of the provider: who it says it

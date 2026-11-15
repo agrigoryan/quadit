@@ -1,4 +1,4 @@
-package server
+package github
 
 import (
 	"context"
@@ -30,7 +30,7 @@ type ghIssue struct {
 
 // syncIssues makes a task of each labeled issue and keeps it in step
 // with the issue: its title and text, and whether it is closed.
-func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
+func (g *pass) syncIssues(ctx context.Context) (int, error) {
 	if g.cfg.IssuesLabel == "" {
 		return 0, nil
 	}
@@ -60,7 +60,7 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 		q += "&since=" + url.QueryEscape(g.state.IssuesSince)
 	}
 	var issues []ghIssue
-	if err := g.gh.call(ctx, "GET", q, nil, &issues); err != nil {
+	if err := g.gh.Call(ctx, "GET", q, nil, &issues); err != nil {
 		return 0, err
 	}
 	newest, handled := g.state.IssuesSince, 0
@@ -72,7 +72,7 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 		if is.UpdatedAt > newest {
 			newest = is.UpdatedAt
 		}
-		err := g.s.eng.System(ctx, g.in.WorkspaceID, g.in.CreatedBy, func(sys *engine.Sys) error {
+		err := g.sy.Engine.System(ctx, g.in.WorkspaceID, g.in.CreatedBy, func(sys *engine.Sys) error {
 			return g.issueTask(ctx, sys, project, is)
 		})
 		if err != nil {
@@ -86,7 +86,7 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 
 // taskOfIssue finds the task made from an issue, or makes it, in the given
 // project, with the issue's text and a link to it.
-func (g *githubSync) taskOfIssue(ctx context.Context, sys *engine.Sys, project string, is ghIssue, text string) (core.Task, error) {
+func (g *pass) taskOfIssue(ctx context.Context, sys *engine.Sys, project string, is ghIssue, text string) (core.Task, error) {
 	num := strconv.Itoa(is.Number)
 	var t core.Task
 	if known := g.state.IssueTasks[num]; known != "" {
@@ -117,7 +117,7 @@ func (g *githubSync) taskOfIssue(ctx context.Context, sys *engine.Sys, project s
 
 // issueTask makes the task of one issue, in the given project, when the
 // issue has none yet, and brings a task it has up to date with the issue.
-func (g *githubSync) issueTask(ctx context.Context, sys *engine.Sys, project string, is ghIssue) error {
+func (g *pass) issueTask(ctx context.Context, sys *engine.Sys, project string, is ghIssue) error {
 	num := strconv.Itoa(is.Number)
 	text := strings.TrimSpace(is.Body)
 	if text != "" {

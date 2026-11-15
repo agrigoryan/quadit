@@ -46,7 +46,8 @@
 //	  push.go        browser push: the key and the browsers (package webpush
 //	                 sends)
 //	Integrations
-//	  github*.go, reposync.go (routes of package reposync: pages kept in a git repository), secrets.go
+//	  github.go (when integrations sync; package github does a pass),
+//	  reposync.go (routes of package reposync: pages kept in a git repository), secrets.go
 //	MCP
 //	  mcp.go         signing an MCP client in and the call its tools make;
 //	                 the protocol and the tools are package mcp
@@ -76,6 +77,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/github"
 	"github.com/agrigoryan/quadit/internal/hub"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/mcp"
@@ -126,6 +128,8 @@ type Server struct {
 	repos *reposync.Syncer
 	// mcp answers MCP clients once they are signed in (mcp.go).
 	mcp *mcp.Server
+	// github runs the passes of GitHub integrations (github.go).
+	github *github.Syncer
 }
 
 // Stop ends the connections the server holds open for its callers, so a
@@ -156,6 +160,7 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 	s.eng.OnCommit = s.hub.Notify
 	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}
 	s.mcp = mcp.New(s.callAsToken, cfg.Version)
+	s.github = &github.Syncer{Store: st, Engine: s.eng, Sealer: sealer, BaseURL: cfg.BaseURL, Version: cfg.Version}
 	s.routes()
 	return s
 }

@@ -1,4 +1,4 @@
-package server
+package github
 
 import (
 	"context"
@@ -40,9 +40,9 @@ var ghKeyRE = regexp.MustCompile(`(?i)\b([A-Z][A-Z0-9]{1,9})-(\d+)\b`)
 // syncPulls goes through the pull requests that changed since the last
 // pass, or whose checks had not finished then, and brings the link on each
 // task they name up to date.
-func (g *githubSync) syncPulls(ctx context.Context) (int, error) {
+func (g *pass) syncPulls(ctx context.Context) (int, error) {
 	var pulls []ghPull
-	if err := g.gh.call(ctx, "GET", "/repos/"+g.cfg.Repo+"/pulls?state=all&sort=updated&direction=desc&per_page=50", nil, &pulls); err != nil {
+	if err := g.gh.Call(ctx, "GET", "/repos/"+g.cfg.Repo+"/pulls?state=all&sort=updated&direction=desc&per_page=50", nil, &pulls); err != nil {
 		return 0, err
 	}
 	isKey, err := g.projectKeys(ctx)
@@ -80,7 +80,7 @@ func (g *githubSync) syncPulls(ctx context.Context) (int, error) {
 
 // projectKeys says which keys are real: the workspace's project keys, or
 // the key of the integration's own project when it has one.
-func (g *githubSync) projectKeys(ctx context.Context) (map[string]bool, error) {
+func (g *pass) projectKeys(ctx context.Context) (map[string]bool, error) {
 	var projects []core.Project
 	if err := g.db.List(ctx, &projects, store.Where(store.Live)); err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func (pr ghPull) state() string {
 // passing, failing, pending, or nothing when there are none or they could
 // not be read. Only a pull request that is still open is asked about; one
 // whose checks are pending is remembered, to be looked at again next time.
-func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) string {
+func (g *pass) checksOf(ctx context.Context, pr ghPull, state string) string {
 	num := fmt.Sprint(pr.Number)
 	if state != "open" && state != "draft" {
 		delete(g.state.PendingChecks, num)
@@ -134,7 +134,7 @@ func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) stri
 			Conclusion string `json:"conclusion"`
 		} `json:"check_runs"`
 	}
-	if err := g.gh.call(ctx, "GET", "/repos/"+g.cfg.Repo+"/commits/"+pr.Head.SHA+"/check-runs?per_page=100", nil, &runs); err == nil && len(runs.CheckRuns) > 0 {
+	if err := g.gh.Call(ctx, "GET", "/repos/"+g.cfg.Repo+"/commits/"+pr.Head.SHA+"/check-runs?per_page=100", nil, &runs); err == nil && len(runs.CheckRuns) > 0 {
 		checks = "passing"
 		for _, r := range runs.CheckRuns {
 			switch {
@@ -153,14 +153,14 @@ func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) stri
 
 // linkPull puts the pull request on the task with this key, as a link that
 // says how it and its checks stand. A key with no task is passed over.
-func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks string) error {
+func (g *pass) linkPull(ctx context.Context, pr ghPull, key, state, checks string) error {
 	var t core.Task
 	if there, err := store.Find(ctx, g.db, &t, store.Eq("key", key), store.Live); err != nil || !there {
 		return err
 	}
 	num := fmt.Sprint(pr.Number)
 	data := plainjson.Marshal(map[string]any{"branch": pr.Head.Ref, "author": pr.User.Login, "sha": pr.Head.SHA})
-	err := g.s.eng.System(ctx, g.in.WorkspaceID, g.in.CreatedBy, func(sys *engine.Sys) error {
+	err := g.sy.Engine.System(ctx, g.in.WorkspaceID, g.in.CreatedBy, func(sys *engine.Sys) error {
 		if err := sys.Do("link.set", map[string]any{"task": t.ID, "kind": "pr", "repo": g.cfg.Repo, "ref": num, "url": pr.HTMLURL, "title": pr.Title,
 			"state": state, "checks": checks, "data": json.RawMessage(data)}); err != nil {
 			return err
@@ -196,17 +196,17 @@ func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks
 // cannot be read there is no link to give: that is an error, and the pass
 // is done again. A comment GitHub does not take is tried again on the next
 // pass that looks at the pull request.
-func (g *githubSync) commentBack(ctx context.Context, pr ghPull, key string, t core.Task) error {
+func (g *pass) commentBack(ctx context.Context, pr ghPull, key string, t core.Task) error {
 	mark := fmt.Sprint(pr.Number) + " " + key
 	if !g.cfg.CommentBack || g.state.Commented[mark] || g.token == "" {
 		return nil
 	}
 	var ws core.Workspace
-	if err := g.s.st.Get(ctx, &ws, store.Eq("id", g.in.WorkspaceID)); err != nil {
+	if err := g.sy.Store.Get(ctx, &ws, store.Eq("id", g.in.WorkspaceID)); err != nil {
 		return fmt.Errorf("%s: commenting on #%d: %w", key, pr.Number, err)
 	}
-	body := fmt.Sprintf("Linked to **%s** %s — %s/%s/task/%s", key, t.Title, g.s.cfg.BaseURL, ws.Slug, key)
-	if err := g.gh.call(ctx, "POST", fmt.Sprintf("/repos/%s/issues/%d/comments", g.cfg.Repo, pr.Number), map[string]string{"body": body}, nil); err == nil {
+	body := fmt.Sprintf("Linked to **%s** %s — %s/%s/task/%s", key, t.Title, g.sy.BaseURL, ws.Slug, key)
+	if err := g.gh.Call(ctx, "POST", fmt.Sprintf("/repos/%s/issues/%d/comments", g.cfg.Repo, pr.Number), map[string]string{"body": body}, nil); err == nil {
 		g.state.Commented[mark] = true
 	}
 	return nil

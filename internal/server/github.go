@@ -10,14 +10,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/github"
 	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -28,13 +27,9 @@ import (
 // news once a minute, so it works on a machine GitHub cannot reach; where
 // GitHub can reach it, a webhook makes the same thing immediate.
 //
-// How it is laid out:
-//
-//	github.go         what an integration is set to do and remembers, when
-//	                  it syncs (the timer, the button, the webhook), one pass
-//	github_pulls.go   pull requests and their checks, onto the tasks they name
-//	github_issues.go  labeled issues, made into tasks
-//	github_client.go  asking GitHub's REST API; sign-in with GitHub uses it too
+// This file is when an integration syncs (the timer, the button, the
+// webhook), one integration at a time, and what each sync is remembered
+// as. One pass over the repository is package github.
 
 // githubRoutes are the routes of GitHub integrations: GitHub's calls in, and syncing by hand.
 func (s *Server) githubRoutes() []route {
@@ -43,36 +38,6 @@ func (s *Server) githubRoutes() []route {
 		{"POST /api/v1/w/{ws}/integrations/{id}/sync", s.workspaceMember(s.handleSyncIntegration), "Sync one integration now. Admins.", "", "admin"},
 		{"GET /api/v1/w/{ws}/integrations/{id}/webhook", s.workspaceMember(s.handleShowIntegrationWebhook), "The address and secret to give the outside service so it can call in. Admins.", "", "admin"},
 	}
-}
-
-// githubConfig is what an admin sets on a GitHub integration.
-type githubConfig struct {
-	Repo   string `json:"repo"`    // owner/name
-	APIURL string `json:"api_url"` // for GitHub Enterprise; default api.github.com
-	// OnOpen and OnMerge name the status category a task moves to when its
-	// pull request opens or merges; empty leaves the task alone.
-	OnOpen  string `json:"on_open"`
-	OnMerge string `json:"on_merge"`
-	// CommentBack posts a link to the task on the pull request, once.
-	CommentBack bool `json:"comment_back"`
-	// IssuesLabel turns the repository's issues carrying this label into
-	// tasks and keeps them up to date: title, text, and closed or open.
-	// "*" takes every issue. Empty leaves issues alone.
-	IssuesLabel string `json:"issues_label"`
-	// IssuesProject is the key of the project the tasks are made in; the
-	// integration's own project when empty.
-	IssuesProject string `json:"issues_project"`
-}
-
-// githubState is what the server remembers between polls.
-type githubState struct {
-	Since         string            `json:"since"`          // newest pull request update seen
-	HookSecret    string            `json:"hook_secret"`    // signs webhook calls
-	Heads         map[string]string `json:"heads"`          // pull request number -> head commit whose checks were read
-	Commented     map[string]bool   `json:"commented"`      // pull request number + task key
-	PendingChecks map[string]bool   `json:"pending_checks"` // pull requests whose checks have not finished
-	IssuesSince   string            `json:"issues_since"`   // newest issue update seen
-	IssueTasks    map[string]string `json:"issue_tasks"`    // issue number -> the task made from it
 }
 
 // ghLocks holds a mutex for each integration, so one integration is
@@ -114,10 +79,10 @@ func (s *Server) runGitHub(ctx context.Context) {
 
 // githubStateOf reads what an integration remembers. State that does not
 // read is taken as nothing remembered: the next pass starts afresh.
-func githubStateOf(raw json.RawMessage) githubState {
-	var state githubState
+func githubStateOf(raw json.RawMessage) github.State {
+	var state github.State
 	if len(raw) > 0 && json.Unmarshal(raw, &state) != nil {
-		return githubState{}
+		return github.State{}
 	}
 	return state
 }
@@ -222,7 +187,7 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 		state.PendingChecks = map[string]bool{}
 	}
 	n := 0
-	var cfg githubConfig
+	var cfg github.Config
 	var err error
 	if len(in.Config) > 0 {
 		err = json.Unmarshal(in.Config, &cfg)
@@ -230,7 +195,7 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 	if err != nil {
 		err = fmt.Errorf("the integration's settings do not read: %w", err)
 	} else {
-		n, err = s.githubPass(ctx, db, in, cfg, &state)
+		n, err = s.github.Pass(ctx, db, in, cfg, &state)
 	}
 	set := map[string]any{"last_sync_at": time.Now().UnixMilli(), "last_error": ""}
 	if err != nil {
@@ -249,42 +214,4 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 		err = errors.New("what was synced could not be remembered; it is done again on the next pass")
 	}
 	return n, err
-}
-
-// githubSync is one pass over one integration's repository: what the
-// integration is set to do, what it remembers between passes, and the
-// client it asks GitHub with.
-type githubSync struct {
-	s     *Server
-	db    store.DB
-	in    core.Integration
-	cfg   githubConfig
-	state *githubState
-	gh    *githubClient
-	// token is the integration's own; without one nothing is written on GitHub.
-	token string
-}
-
-// ghRepoRE is the shape of a repository's name: owner/name.
-var ghRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
-
-// githubPass looks at the repository once: its pull requests
-// (github_pulls.go), then its issues (github_issues.go). It returns how
-// many of them it handled.
-func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integration, cfg githubConfig, state *githubState) (int, error) {
-	if !ghRepoRE.MatchString(cfg.Repo) {
-		return 0, fmt.Errorf("the repository must be given as owner/name, got %q", cfg.Repo)
-	}
-	token, err := s.sealer.Open(in.Secret)
-	if err != nil {
-		return 0, err
-	}
-	api := strings.TrimRight(firstNonEmpty(cfg.APIURL, "https://api.github.com"), "/")
-	g := &githubSync{s: s, db: db, in: in, cfg: cfg, state: state, gh: s.githubAPI(api, token), token: token}
-	handled, err := g.syncPulls(ctx)
-	if err != nil {
-		return handled, err
-	}
-	n, err := g.syncIssues(ctx)
-	return handled + n, err
 }
