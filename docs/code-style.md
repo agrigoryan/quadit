@@ -12,7 +12,7 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 ### Functions
 4. A function does one thing a reader can name. There are no limits on its length, its nesting or its number of branches: a long function that reads top to bottom as one story is fine, and so is deep nesting that follows the shape of the data. Split a function when a part of it has a name of its own and the whole reads better with that name in its place; when work has many steps that share state, a struct for one run with named methods is the usual form (see `internal/importer`). Never split only to make something shorter or flatter.
 5. A call should read as what it says. When a function's parameters are hard to tell apart at the call site (several of the same type in a row, or bare `true, false`), pass a struct with named fields instead.
-6. Every exported name, and every function of 20 lines or more, has a comment saying what it is for, starting with its name. A comment sits on the declaration it describes: moving code moves its comment.
+6. Every exported name, and every function whose purpose is not plain from its name, has a comment saying what it is for, starting with its name. A comment sits on the declaration it describes: moving code moves its comment.
 7. Comments say what a thing is for, in plain words. They do not restate the code, and they do not tell the history of a change.
 
 ### Wiring and state
