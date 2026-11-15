@@ -73,6 +73,7 @@ quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 - A batch (`POST /changes {"changes": […]}`) applies all of its changes or none.
 - `quadit changes` lists every change type with its arguments, and the surface version (within one major version nothing an agent relies on is removed or renamed).
 - `--id=UUID` gives a change its id yourself: after a crash, sending it again with the same id does nothing twice. `--for=@member` makes a change for someone: it then runs with their access.
+- `quadit assign SVA-12 none` (or `update SVA-12 assignee=none`) leaves a task with nobody; the API takes `"assignee": null`.
 - A task can wait on something that is not a member: `quadit update SVA-12 waiting_on=outside waiting_on_note="the certificate from Apple"`. `quadit tasks waiting_on=outside` and `waiting_on=none` find those, and the ones nobody has.
 
 ## Decisions

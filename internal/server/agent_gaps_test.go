@@ -183,3 +183,31 @@ func TestAskWithFiles(t *testing.T) {
 		}
 	})
 }
+
+// TestUnassign: "none", "nobody", "-" and nothing at all clear the
+// assignee, with assign and with update alike.
+func TestUnassign(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
+		agent := s.agentToken("coder")
+		assignee := func() any {
+			var d struct{ Task struct{ Assignee any } }
+			s.call(nil, agent, "GET", "/api/v1/w/-/tasks/SVA-1", nil, 200, &d)
+			return d.Task.Assignee
+		}
+		for _, cmd := range [][]string{{"assign", "SVA-1", "none"}, {"assign", "SVA-1", "nobody"}, {"assign", "SVA-1", "-"},
+			{"assign", "SVA-1", ""}, {"update", "SVA-1", "assignee="}, {"update", "SVA-1", "assignee=none"}} {
+			if out, code := s.quadit(agent, "assign", "SVA-1", "@aram"); code != 0 || assignee() != "@aram" {
+				t.Fatalf("assign: %d %s", code, out)
+			}
+			if out, code := s.quadit(agent, cmd...); code != 0 {
+				t.Fatalf("%q: %d %s", cmd, code, out)
+			}
+			if a := assignee(); a != nil && a != "" {
+				t.Fatalf("%q left the task with %v", cmd, a)
+			}
+		}
+	})
+}

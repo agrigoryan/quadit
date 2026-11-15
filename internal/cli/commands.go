@@ -44,7 +44,7 @@ var commands = []command{
 	{names: []string{"new", "create"}, args: 2, usage: "new PROJECT TITLE [field=value ...]", run: (*runner).newTask},
 	{names: []string{"update"}, args: 1, usage: "update KEY field=value ...", run: (*runner).update},
 	{names: []string{"status"}, args: 2, usage: "status KEY NAME", run: (*runner).status},
-	{names: []string{"assign"}, args: 2, usage: "assign KEY @WHO", run: (*runner).assign},
+	{names: []string{"assign"}, args: 2, usage: "assign KEY @WHO|none", run: (*runner).assign},
 	{names: []string{"take"}, args: 1, usage: "take KEY", run: (*runner).changeNamed},
 	{names: []string{"release"}, args: 1, usage: "release KEY", run: (*runner).changeNamed},
 	{names: []string{"delete"}, args: 1, usage: "delete KEY", run: (*runner).changeNamed},
