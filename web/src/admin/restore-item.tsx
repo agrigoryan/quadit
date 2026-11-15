@@ -39,6 +39,12 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
   const { busy, run } = useSubmit(errors, { once: true });
   const workspace = slug || workspaces.data?.[0]?.slug || "";
 
+  function pickKind(next: Kind) {
+    setKind(next);
+    setRef("");
+    errors.clear();
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     errors.clear();
@@ -88,7 +94,7 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
         <Segmented
           label={t("admin.restoreItem.what")}
           value={kind}
-          onChange={(next) => (setKind(next), setRef(""), errors.clear())}
+          onChange={pickKind}
           options={[
             { value: "task", label: t("admin.restoreItem.task") },
             { value: "doc", label: t("admin.restoreItem.page") },
@@ -104,7 +110,10 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
             id="ri-ref"
             autoFocus
             value={ref}
-            onChange={(e) => (setRef(e.target.value), errors.clear())}
+            onChange={(e) => {
+              setRef(e.target.value);
+              errors.clear();
+            }}
             placeholder={kind === "task" ? "SVA-12" : "https://…/docs/…"}
             spellCheck={false}
             autoCapitalize="none"

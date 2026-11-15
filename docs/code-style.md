@@ -92,7 +92,6 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 | Rule | Findings |
 | --- | ---: |
 | `jsx-a11y/prefer-tag-over-role` | 67 |
-| `no-sequences` (also in parentheses) | 38 |
 | `no-restricted-imports` (layers; the files are listed in `.oxlintrc.json`) | 33 |
 | `typescript/no-unnecessary-type-assertion` | 26 |
 | `react/refs` | 22 |

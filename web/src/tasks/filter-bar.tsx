@@ -217,7 +217,15 @@ export function FilterBar({ filters, onChange, project }: Props) {
               {...extras[stage]}
               manage={(() => {
                 const link = extras[stage]?.manage;
-                return link && { label: link.label, onSelect: () => (setOpen(false), link.onSelect()) };
+                return (
+                  link && {
+                    label: link.label,
+                    onSelect: () => {
+                      setOpen(false);
+                      link.onSelect();
+                    },
+                  }
+                );
               })()}
             />
           )}

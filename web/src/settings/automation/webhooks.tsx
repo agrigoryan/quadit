@@ -246,7 +246,15 @@ export function WebhooksPage() {
           }}
         />
       )}
-      {log && <DeliveriesDialog hook={log} onClose={() => (setLog(null), void hooks.reload())} />}
+      {log && (
+        <DeliveriesDialog
+          hook={log}
+          onClose={() => {
+            setLog(null);
+            void hooks.reload();
+          }}
+        />
+      )}
       <RevealDialog
         open={!!secret}
         onClose={() => setSecret(null)}

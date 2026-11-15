@@ -61,7 +61,14 @@ export function BacklinksDialog({ docId, open, onClose }: { docId: string; open:
               if (!task) return null;
               return (
                 <li key={link.id}>
-                  <button type="button" className={row} onClick={() => (onClose(), openTask(task.key))}>
+                  <button
+                    type="button"
+                    className={row}
+                    onClick={() => {
+                      onClose();
+                      openTask(task.key);
+                    }}
+                  >
                     <StatusIcon category={statuses[task.status_id]?.category ?? "backlog"} />
                     <span className="shrink-0 text-xs font-medium text-ink-2 tnum">{task.key}</span>
                     <span className="min-w-0 flex-1 truncate">{task.title}</span>
@@ -78,7 +85,14 @@ export function BacklinksDialog({ docId, open, onClose }: { docId: string; open:
             if (!doc) return null;
             return (
               <li key={link.id}>
-                <button type="button" className={row} onClick={() => (onClose(), openDoc(doc.id))}>
+                <button
+                  type="button"
+                  className={row}
+                  onClick={() => {
+                    onClose();
+                    openDoc(doc.id);
+                  }}
+                >
                   <PageIcon doc={doc} />
                   <span className="min-w-0 flex-1 truncate">{docTitle(doc)}</span>
                 </button>

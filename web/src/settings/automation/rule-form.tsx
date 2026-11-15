@@ -122,7 +122,10 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
             id="rule-name"
             autoFocus
             value={name}
-            onChange={(e) => (setName(e.target.value), errors.set("name", ""))}
+            onChange={(e) => {
+              setName(e.target.value);
+              errors.set("name", "");
+            }}
             placeholder={t("auto.rule.namePlaceholder")}
           />
         </FormField>
@@ -211,7 +214,10 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
               <NativeSelect
                 id="rule-hook"
                 value={webhookId}
-                onChange={(v) => (setWebhookId(v), errors.set("webhook_id", ""))}
+                onChange={(v) => {
+                  setWebhookId(v);
+                  errors.set("webhook_id", "");
+                }}
                 options={[
                   { value: "", label: t("auto.pickWebhook") },
                   ...hooks.map((h) => ({ value: h.id, label: h.name })),
@@ -223,7 +229,10 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
               <NativeSelect
                 id="rule-user"
                 value={userId}
-                onChange={(v) => (setUserId(v), errors.set("user_id", ""))}
+                onChange={(v) => {
+                  setUserId(v);
+                  errors.set("user_id", "");
+                }}
                 options={memberChoices}
               />
             </FormField>

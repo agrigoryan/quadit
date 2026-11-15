@@ -107,7 +107,10 @@ export function SecretForm({ secret, onClose }: Props) {
           <Input
             id="sec-name"
             value={name}
-            onChange={(e) => (setName(e.target.value), errors.set("name", ""))}
+            onChange={(e) => {
+              setName(e.target.value);
+              errors.set("name", "");
+            }}
             disabled={!!secret}
             autoFocus={!secret}
             required
@@ -132,7 +135,10 @@ export function SecretForm({ secret, onClose }: Props) {
               id="sec-value"
               type={shown ? "text" : "password"}
               value={value}
-              onChange={(e) => (setValue(e.target.value), errors.set("value", ""))}
+              onChange={(e) => {
+                setValue(e.target.value);
+                errors.set("value", "");
+              }}
               autoFocus={!!secret}
               placeholder={secret ? t("secrets.valueKeep") : undefined}
               // Not a sign-in: keep the browser from offering its own passwords here.
@@ -188,7 +194,10 @@ export function SecretForm({ secret, onClose }: Props) {
           <MultiPick
             items={choices}
             value={agents}
-            onChange={(next) => (setAgents(next), errors.set("agents", ""))}
+            onChange={(next) => {
+              setAgents(next);
+              errors.set("agents", "");
+            }}
             addLabel={t("secrets.agentsAdd")}
             empty={t("secrets.everyMember")}
           />

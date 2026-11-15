@@ -118,7 +118,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
     const options: Record<string, string> = {};
     const req: ImportRequest = { kind: source.kind, options };
     if (source.from === "file") {
-      if (!file) return (errors.set("file", t("import.fileMissing")), null);
+      if (!file) {
+        errors.set("file", t("import.fileMissing"));
+        return null;
+      }
       req.file = file.id;
     } else if (source.kind === "github") {
       const repo = address
@@ -126,18 +129,27 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
         .replace(/^https?:\/\/github\.com\//i, "")
         .replace(/\.git$/, "")
         .replace(/\/+$/, "");
-      if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return (errors.set("source", t("import.repoBad")), null);
+      if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+        errors.set("source", t("import.repoBad"));
+        return null;
+      }
       req.source = repo;
       if (token.trim()) options.token = token.trim();
     } else {
-      if (!/^https?:\/\/\S+$/i.test(address.trim())) return (errors.set("source", t("import.addressBad")), null);
+      if (!/^https?:\/\/\S+$/i.test(address.trim())) {
+        errors.set("source", t("import.addressBad"));
+        return null;
+      }
       req.source = address.trim().replace(/\/+$/, "");
       if (orbitWs.trim()) options.workspace = orbitWs.trim();
       if (token.trim()) options.token = token.trim();
       if (orbitSession.trim()) options.session = orbitSession.trim();
     }
     if (source.project) {
-      if (!projectKey) return (errors.set("project", t("import.projectMissing")), null);
+      if (!projectKey) {
+        errors.set("project", t("import.projectMissing"));
+        return null;
+      }
       options.project = projectKey;
     }
     return req;
@@ -187,7 +199,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                   accept={source.accept}
                   label={t(FILE_LABEL[ext(source)])}
                   value={file}
-                  onChange={(f) => (setFile(f), touched())}
+                  onChange={(f) => {
+                    setFile(f);
+                    touched();
+                  }}
                   onBusy={setUploading}
                   error={errors.fields.file}
                 />
@@ -207,7 +222,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                       spellCheck={false}
                       autoCapitalize="off"
                       value={address}
-                      onChange={(e) => (setAddress(e.target.value), touched())}
+                      onChange={(e) => {
+                        setAddress(e.target.value);
+                        touched();
+                      }}
                     />
                   </FormField>
                   <FormField
@@ -222,7 +240,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                       autoComplete="off"
                       placeholder="github_pat_…"
                       value={token}
-                      onChange={(e) => (setToken(e.target.value), touched())}
+                      onChange={(e) => {
+                        setToken(e.target.value);
+                        touched();
+                      }}
                     />
                   </FormField>
                 </div>
@@ -242,7 +263,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                       spellCheck={false}
                       autoCapitalize="off"
                       value={address}
-                      onChange={(e) => (setAddress(e.target.value), touched())}
+                      onChange={(e) => {
+                        setAddress(e.target.value);
+                        touched();
+                      }}
                     />
                   </FormField>
                   <div className="grid gap-3.5 sm:grid-cols-2">
@@ -257,7 +281,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                         spellCheck={false}
                         autoCapitalize="off"
                         value={orbitWs}
-                        onChange={(e) => (setOrbitWs(e.target.value), touched())}
+                        onChange={(e) => {
+                          setOrbitWs(e.target.value);
+                          touched();
+                        }}
                       />
                     </FormField>
                     <FormField
@@ -271,7 +298,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                         type="password"
                         autoComplete="off"
                         value={token}
-                        onChange={(e) => (setToken(e.target.value), touched())}
+                        onChange={(e) => {
+                          setToken(e.target.value);
+                          touched();
+                        }}
                       />
                     </FormField>
                   </div>
@@ -286,7 +316,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                       type="password"
                       autoComplete="off"
                       value={orbitSession}
-                      onChange={(e) => (setOrbitSession(e.target.value), touched())}
+                      onChange={(e) => {
+                        setOrbitSession(e.target.value);
+                        touched();
+                      }}
                     />
                   </FormField>
                 </>
@@ -302,7 +335,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                     <NativeSelect
                       id="imp-project"
                       value={project}
-                      onChange={(v) => (setProject(v), touched())}
+                      onChange={(v) => {
+                        setProject(v);
+                        touched();
+                      }}
                       options={[
                         { value: "", label: "—" },
                         ...projects.map((p) => ({ value: p.key, label: `${p.key} · ${p.name}` })),
@@ -323,7 +359,10 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                         maxLength={6}
                         spellCheck={false}
                         value={newKey}
-                        onChange={(e) => (setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")), touched())}
+                        onChange={(e) => {
+                          setNewKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+                          touched();
+                        }}
                       />
                     </FormField>
                   )}

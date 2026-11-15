@@ -150,7 +150,10 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
                   autoFocus
                   aria-invalid={!!errors.fields.email}
                   value={email}
-                  onChange={(e) => (setEmail(e.target.value), errors.set("email", ""))}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    errors.set("email", "");
+                  }}
                 />
               </FormField>
               {account.has_password && (
@@ -166,7 +169,10 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
                     autoComplete="current-password"
                     aria-invalid={!!errors.fields.password}
                     value={password}
-                    onChange={(e) => (setPassword(e.target.value), errors.set("password", ""))}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      errors.set("password", "");
+                    }}
                   />
                 </FormField>
               )}

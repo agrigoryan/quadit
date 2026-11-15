@@ -111,7 +111,10 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
               autoCapitalize="off"
               className="font-mono"
               value={repo}
-              onChange={(e) => (setRepo(e.target.value), errors.set("repo", ""))}
+              onChange={(e) => {
+                setRepo(e.target.value);
+                errors.set("repo", "");
+              }}
             />
           </FormField>
           <FormField label={t("s.name")} htmlFor="gh-name" error={errors.fields.name} hint={t("auto.gh.nameHint")}>
@@ -186,7 +189,10 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
               <NativeSelect
                 id="gh-issues-project"
                 value={issuesProject}
-                onChange={(v) => (setIssuesProject(v), errors.set("issues_project", ""))}
+                onChange={(v) => {
+                  setIssuesProject(v);
+                  errors.set("issues_project", "");
+                }}
                 disabled={!issuesLabel.trim()}
                 options={[
                   { value: "", label: t("auto.gh.issuesProjectSame") },

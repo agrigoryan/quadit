@@ -56,7 +56,13 @@ export function CreateFields({ project, value, onChange, shared, onLeave }: Prop
   const manage = useManageLinks(project.id);
   const listening = useListening();
   const leaving = (link: { label: string; onSelect: () => void } | undefined) =>
-    link && { label: link.label, onSelect: () => (onLeave?.(), link.onSelect()) };
+    link && {
+      label: link.label,
+      onSelect: () => {
+        onLeave?.();
+        link.onSelect();
+      },
+    };
   const statuses = useStatuses(project.id);
   const members = useMembers();
   const me = useMe();

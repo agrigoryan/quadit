@@ -3,7 +3,7 @@
 // tasks in no milestone. Milestones can be added, renamed, dated, moved up
 // or down and deleted; a task changes milestone from the mark at its right.
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Diamond, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
@@ -41,13 +41,18 @@ function QuickAdd({ epic, milestone, onDone }: { epic: Epic; milestone?: Milesto
     void addTask(epic, milestone, trimmed);
     setTitle("");
   };
+  const closeOnEscape = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    e.stopPropagation();
+    onDone();
+  };
   return (
     <form onSubmit={submit} className="flex h-9 items-center gap-2 border-b border-line/70 pr-3 pl-9">
       <Input
         autoFocus
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onDone())}
+        onKeyDown={closeOnEscape}
         onBlur={() => !title.trim() && onDone()}
         placeholder={t("epic.taskPlaceholder")}
         aria-label={t("epic.taskPlaceholder")}
@@ -82,6 +87,12 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
     setRenaming(false);
   }
 
+  function stopRenamingOnEscape(e: KeyboardEvent) {
+    if (e.key !== "Escape") return;
+    e.stopPropagation();
+    setRenaming(false);
+  }
+
   return (
     <section aria-label={name} style={keyColumn(tasks.map((task) => task.key))}>
       <div className="sticky top-0 z-[2] flex min-h-9 flex-wrap items-center gap-x-2 border-b border-line bg-sunken py-1 pr-2 pl-3">
@@ -97,7 +108,7 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
                 aria-label={t("epic.milestoneName")}
                 className="h-7 max-w-80"
                 onBlur={(e) => e.currentTarget.form?.requestSubmit()}
-                onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), setRenaming(false))}
+                onKeyDown={stopRenamingOnEscape}
               />
             </form>
           ) : (

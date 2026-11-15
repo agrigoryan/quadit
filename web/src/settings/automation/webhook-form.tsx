@@ -101,7 +101,10 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
             required
             placeholder="https://example.com/hooks/quadit"
             value={url}
-            onChange={(e) => (setUrl(e.target.value), errors.set("url", ""))}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              errors.set("url", "");
+            }}
           />
         </FormField>
         <FormField label={t("s.name")} htmlFor="wh-name" error={errors.fields.name} hint={t("auto.hook.nameHint")}>
@@ -120,7 +123,10 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
             <NativeSelect
               id="wh-project"
               value={projectId}
-              onChange={(v) => (setProjectId(v), errors.set("project", ""))}
+              onChange={(v) => {
+                setProjectId(v);
+                errors.set("project", "");
+              }}
               options={[
                 { value: "", label: t("auto.pickProject") },
                 ...projects.map((p) => ({ value: p.id, label: `${p.key} · ${p.name}` })),
@@ -133,7 +139,10 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
             <NativeSelect
               id="wh-for"
               value={memberId}
-              onChange={(v) => (setMemberId(v), errors.set("for", ""))}
+              onChange={(v) => {
+                setMemberId(v);
+                errors.set("for", "");
+              }}
               options={[
                 { value: "", label: t("auto.pickMember") },
                 ...inboxes.map((m) => ({ value: m.user_id, label: memberChoiceLabel(m, listening(m)) })),

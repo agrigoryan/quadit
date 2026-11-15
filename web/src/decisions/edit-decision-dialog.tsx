@@ -79,7 +79,10 @@ export function EditDecisionDialog({ decision, onClose }: { decision: Decision; 
             id={`${id}-q`}
             autoFocus
             value={question}
-            onChange={(e) => (setQuestion(e.target.value), errors.set("question", ""))}
+            onChange={(e) => {
+              setQuestion(e.target.value);
+              errors.set("question", "");
+            }}
             aria-invalid={!!errors.fields.question}
             className="h-9! text-base! font-medium max-sm:h-10!"
           />

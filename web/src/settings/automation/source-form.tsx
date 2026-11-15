@@ -77,7 +77,10 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
             className="font-mono"
             placeholder="https://github.com/owner/docs.git"
             value={repo}
-            onChange={(e) => (setRepo(e.target.value), errors.set("repo", ""))}
+            onChange={(e) => {
+              setRepo(e.target.value);
+              errors.set("repo", "");
+            }}
           />
         </FormField>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">

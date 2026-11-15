@@ -279,7 +279,15 @@ function Choices({ kind, tasks, close, listening }: ChoicesProps) {
         kind === "labels" || kind === "status"
           ? (() => {
               const link = kind === "labels" ? manage.labels : manage.statuses;
-              return link && { label: link.label, onSelect: () => (close(), link.onSelect()) };
+              return (
+                link && {
+                  label: link.label,
+                  onSelect: () => {
+                    close();
+                    link.onSelect();
+                  },
+                }
+              );
             })()
           : undefined
       }
