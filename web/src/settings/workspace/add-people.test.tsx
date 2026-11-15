@@ -7,6 +7,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { useStore } from "@/lib/store";
 import type { Member } from "@/lib/types";
 import { AddPeopleDialog } from "@/settings/workspace/add-people";
+import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";
 
 beforeAll(() => {
@@ -19,6 +20,7 @@ describe("AddPeopleDialog", () => {
       <TooltipProvider>
         <AddPeopleDialog onClose={() => {}} onCreated={() => {}} onAdded={() => {}} />
       </TooltipProvider>,
+      { wrapper: WithQuery },
     );
     expect(screen.getByRole("tablist", { name: "How to add them" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();

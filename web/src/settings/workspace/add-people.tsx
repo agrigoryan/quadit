@@ -1,6 +1,7 @@
 // "Add people": invite someone by mail or by a link, or add someone who
 // already has an account on this install by their email address.
 
+import { useMutation } from "@tanstack/react-query";
 import type { Changes } from "@/lib/changes.gen";
 import { type ReactNode, useState } from "react";
 import { Link2, Mail, UserCheck } from "lucide-react";
@@ -9,11 +10,12 @@ import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
+import { queryClient } from "@/lib/query";
 import { useSlug } from "@/lib/selectors";
 import type { Role } from "@/lib/types";
 import { FormField, NativeSelect, refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
-import type { Created } from "@/settings/workspace/invites";
+import { type Created, invitesKey } from "@/settings/workspace/data";
 import { roleChoices, ROLES } from "@/settings/workspace/roles";
 import { MemberScopeFields, scopeArg, type ScopeDraft } from "@/settings/workspace/scope-fields";
 import { Input } from "@/ui/input";
@@ -43,6 +45,11 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
   /** The address nobody has an account with: offer to invite it instead. */
   const [unknown, setUnknown] = useState("");
   const errors = useFieldErrors(["email", "role", "user", "scope"]);
+  // A refusal is thrown for the form to show; one made is in the list, which is asked again.
+  const invite = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.post<Created>(workspacePath(slug, "/invites"), body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: invitesKey(slug) }),
+  });
   // Nobody can invite above their own role.
   const roles = can.own ? ROLES : ROLES.filter((r) => r !== "owner");
 
@@ -72,7 +79,7 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
     }
     const body =
       mode === "email" ? { email: address, role, expires_days: days } : { role, expires_days: days, max_uses: uses };
-    onCreated(await api.post<Created>(workspacePath(slug, "/invites"), body));
+    onCreated(await invite.mutateAsync(body));
   }
 
   const tab = (value: Mode, label: string, icon: ReactNode) => (
