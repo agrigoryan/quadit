@@ -83,6 +83,10 @@ func TestProjectPages(t *testing.T) {
 			}
 		}
 		s.call(nil, narrow, "GET", "/api/v1/w/-/docs/"+art, nil, 200, nil)
+		// Their feed brought each page whole, so a browser shows them without asking again.
+		if feed := s.call(nil, narrow, "GET", "/api/v1/w/-/events?limit=2000&types=doc.updated", nil, 200, nil); !strings.Contains(feed, `"title":"Palette"`) {
+			t.Fatalf("the feed of a member limited to OPS does not bring the pages that moved into it: %s", feed)
+		}
 		if found := s.call(nil, narrow, "GET", "/api/v1/w/-/search?q=vermilion", nil, 200, nil); !strings.Contains(found, "Palette") {
 			t.Fatalf("search does not find a page that moved into the member's project: %s", found)
 		}

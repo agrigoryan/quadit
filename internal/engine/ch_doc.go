@@ -460,6 +460,9 @@ func (u *pageEdit) save() error {
 		}
 	}
 	if u.moved {
+		if err := c.tellNewProject(d); err != nil {
+			return err
+		}
 		// The pages under it that are in the project because it is go with it.
 		if err := c.moveSubPages(d, u.toProject); err != nil {
 			return err

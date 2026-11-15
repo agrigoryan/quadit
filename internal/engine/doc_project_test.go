@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -104,7 +105,24 @@ func TestPageProjectTakesItsSubPages(t *testing.T) {
 		}
 
 		// Cleared, the same pages go back to no project; the ones apart stay.
-		w.do(me, "doc.update", M{"id": root, "project": nil})
+		res = w.do(me, "doc.update", M{"id": root, "project": nil})
+		// Leaving a project is told twice: the change to those who see the
+		// project, and the whole page to those who now see it and did not.
+		var toOld, toNew int
+		for _, ev := range res.Events {
+			if ev.EntityID != grand {
+				continue
+			}
+			if ev.ProjectID == sva && strings.Contains(string(ev.Data), `"changes"`) {
+				toOld++
+			}
+			if ev.ProjectID == "" && strings.Contains(string(ev.Data), `"row"`) {
+				toNew++
+			}
+		}
+		if toOld != 1 || toNew != 1 {
+			t.Fatalf("a sub-page that left SVA was told %d times to SVA and %d times, whole, to everyone; want once each", toOld, toNew)
+		}
 		for _, id := range []string{root, child, grand, table, row, gone} {
 			if got := w.doc(id).ProjectID; got != "" {
 				t.Fatalf("%s is still in project %q after its top page left it", w.doc(id).Title, got)

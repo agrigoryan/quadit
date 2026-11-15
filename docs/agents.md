@@ -144,7 +144,7 @@ quadit do doc.update '{"id":"PAGE_ID","project":"SVA"}'   # tie a page to a proj
 quadit rows DATABASE_ID filter=State:is:todo sort=-Frames
 ```
 
-A page belongs to the workspace and may be tied to one project. The project decides who sees it: a member limited to some projects sees those projects' pages and the pages of no project. A page made under another is in its parent's project, and the tree says a page's project (`[SVA]`) only where it is not its parent's. Changing a page's project takes along the pages under it that are in the same project, down to the first that is not: a sub-page tied elsewhere on purpose stays where it is, with what is under it. Nobody can move a page into a project they do not see.
+A page belongs to the workspace and may be tied to one project. The project decides who sees it: a member limited to some projects sees those projects' pages and the pages of no project. A page made under another is in its parent's project, and the tree says a page's project (`[SVA]`) only where it is not its parent's. Changing a page's project takes along the pages under it that are in the same project, down to the first that is not: a sub-page tied elsewhere on purpose stays where it is, with what is under it. Nobody can move a page into a project they do not see. A page that leaves a project is in the feed twice: the change, for those who see the project it left, and the whole page, for those who see where it went.
 
 A page that mirrors a Markdown file in a repository is called by the file's opening `# heading` (else by its file name) and does not repeat it in its text; written back, the title is the heading again. Renaming the page changes the heading, not the file name.
 

@@ -68,6 +68,9 @@ func (c *cx) moveSubPages(root core.Doc, toProject string) error {
 		if err := c.emitTo(docAudience(d), seq, "doc.updated", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "changes": change}); err != nil {
 			return err
 		}
+		if err := c.tellNewProject(d); err != nil {
+			return err
+		}
 		if d.DeletedAt != 0 {
 			continue // not in search while it is in the trash
 		}
@@ -77,4 +80,20 @@ func (c *cx) moveSubPages(root core.Doc, toProject string) error {
 		}
 	}
 	return nil
+}
+
+// tellNewProject says a page has come into a project to those who see that
+// project and not the one it left. The change itself is told to those who
+// see the old project; these hear nothing addressed to it and may be seeing
+// the page for the first time, so they get all of it. Nobody is missed when
+// the page had no project: it was everyone's already.
+func (c *cx) tellNewProject(was core.Doc) error {
+	if was.ProjectID == "" {
+		return nil
+	}
+	var now core.Doc
+	if err := c.tx.Get(c.ctx, &now, store.Eq("id", was.ID)); err != nil {
+		return err
+	}
+	return c.emitTo(docAudience(now), c.tx.NextSeq(), "doc.updated", "doc", now.ID, "doc", now.ID, now.ProjectID, map[string]any{"row": now})
 }
