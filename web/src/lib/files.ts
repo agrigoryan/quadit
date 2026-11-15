@@ -9,7 +9,7 @@
 // only: reloading the page drops it, so the browser asks before leaving.
 
 import { create } from "zustand";
-import { api, ApiError, NetworkError, whenReachable, workspacePath } from "@/lib/api";
+import { api, ApiError, calledOff, NetworkError, whenReachable, workspacePath } from "@/lib/api";
 import { newId } from "@/lib/ids";
 import { getState } from "@/lib/store";
 import type { FileRow } from "@/lib/types";
@@ -68,7 +68,6 @@ let active = 0;
 const turns: (() => void)[] = [];
 
 const aborted = () => new DOMException("aborted", "AbortError");
-const isAbort = (err: unknown) => err instanceof DOMException && err.name === "AbortError";
 const offline = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
 async function sendInParts(
@@ -105,7 +104,7 @@ async function sendInParts(
       serverTries = 0;
       if (row.state !== "uploading") return row;
     } catch (err) {
-      if (isAbort(err)) throw err;
+      if (calledOff(err, signal)) throw err;
       const lost = err instanceof NetworkError;
       const serverFault = err instanceof ApiError && err.status >= 500;
       const moved = err instanceof ApiError && err.status === 409 && row;
@@ -129,7 +128,7 @@ async function whereItStands(base: string, row: ServerFile, signal?: AbortSignal
   try {
     return await api.get<ServerFile>(`${base}/${row.id}`, signal);
   } catch (err) {
-    if (isAbort(err)) throw err;
+    if (calledOff(err, signal)) throw err;
     // Gone on the server (cleaned up after a long wait): start the file again.
     if (err instanceof ApiError && err.status === 404) return null;
     if (err instanceof ApiError && err.status < 500) throw err;

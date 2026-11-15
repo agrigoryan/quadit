@@ -70,7 +70,7 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
   try {
     res = await fetch(path, { method, headers, body, signal: opts.signal, credentials: "same-origin" });
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    if (calledOff(err, opts.signal)) throw err;
     throw new NetworkError(err);
   }
 
@@ -82,11 +82,19 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
     text = await res.text();
   } catch (err) {
     // The connection went away while the answer was arriving.
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    if (calledOff(err, opts.signal)) throw err;
     throw new NetworkError(err);
   }
   return answer<T>(res.status, text, opts.quiet401);
 }
+
+/**
+ * Whether a failed request was called off by its signal, which is no sign
+ * of the network. Known by its name, not by `instanceof DOMException`: an abort
+ * from another realm (an iframe, jsdom) is another realm's DOMException.
+ */
+export const calledOff = (err: unknown, signal?: AbortSignal) =>
+  !!signal?.aborted || (err instanceof Object && "name" in err && err.name === "AbortError");
 
 /** Turns a status and a body into the result, or throws the error they mean. */
 function answer<T>(status: number, text: string, quiet401?: boolean): T {

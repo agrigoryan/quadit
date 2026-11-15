@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Check, FileUp } from "lucide-react";
-import { errorMessage } from "@/lib/api";
+import { calledOff, errorMessage } from "@/lib/api";
 import { fileSize, uploadFile, type UploadProgress } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
@@ -47,7 +47,7 @@ export function UploadField({ accept, label, value, onChange, onBusy, error }: P
       onChange({ id: row.id, name: row.name || file.name, size: row.size ?? file.size });
     } catch (err) {
       if (run.current !== mine) return;
-      if (!(err instanceof DOMException && err.name === "AbortError")) setFailed(errorMessage(err));
+      if (!calledOff(err, mine.signal)) setFailed(errorMessage(err));
     } finally {
       if (run.current === mine) {
         run.current = null;

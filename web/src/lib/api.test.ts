@@ -1,4 +1,5 @@
-// When to try again (lib/api.ts): whenReachable's waits, and what ends them early.
+// When to try again (lib/api.ts): whenReachable's waits, and what ends them early; and a
+// request called off is not a network failure.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, NetworkError, noteReachable, onReachableAgain, whenReachable } from "@/lib/api";
@@ -154,5 +155,22 @@ describe("onReachableAgain", () => {
     await api.get("/ok");
     expect(heard).not.toHaveBeenCalled();
     stop();
+  });
+});
+
+describe("a request called off", () => {
+  it("fails as called off, not as unreachable, also when the abort comes from another realm", async () => {
+    // jsdom, an iframe: the error is named AbortError but is not this realm's DOMException.
+    const foreign = Object.assign(new Error("The operation was aborted."), { name: "AbortError" });
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(foreign);
+    await expect(api.get("/ok")).rejects.toBe(foreign);
+  });
+
+  it("fails as called off when its signal was, whatever the error says", async () => {
+    const stop = new AbortController();
+    stop.abort();
+    const reason = new Error("left the page");
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(reason);
+    await expect(api.get("/ok", stop.signal)).rejects.toBe(reason);
   });
 });
