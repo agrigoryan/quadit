@@ -168,6 +168,13 @@ func (d faultDB) Delete(ctx context.Context, table string, where ...store.Cond) 
 	return d.DB.Delete(ctx, table, where...)
 }
 
+func (d faultDB) Tasks(ctx context.Context, f store.TaskFilter) ([]core.Task, error) {
+	if err := d.faults.check("Tasks", "tasks", nil, nil); err != nil {
+		return nil, err
+	}
+	return d.DB.Tasks(ctx, f)
+}
+
 func (d faultDB) Events(ctx context.Context, f store.EventFilter) ([]core.Event, error) {
 	if err := d.faults.check("Events", "events", nil, nil); err != nil {
 		return nil, err
@@ -309,4 +316,86 @@ func TestAJobOutlivesABriefOutage(t *testing.T) {
 		}
 		eventually(t, "the job to be done on its second try", func() bool { return jobOf(t, st.Store, job).DoneAt != 0 })
 	})
+}
+
+// idIs matches the calls about one row.
+func idIs(rowID string) func(map[string]any, []store.Cond) bool {
+	return func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "id", rowID) }
+}
+
+func TestAReadThatFailsIsNotAnsweredAsNotFound(t *testing.T) {
+	logs := captureLogs(t)
+	st := newFaultStore(t)
+	s := newSite(t, st)
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	var ready, started struct{ ID string }
+	s.call(s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, &ready)
+	s.call(s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("1234"), 201, &started)
+	var made struct{ ID string }
+	s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
+	rcv := newReceiver(t, "")
+	hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"never.matches"}})["ref"].(string)
+	repeat := id.New()
+
+	cases := []struct {
+		name         string
+		method, path string
+		body         any
+		fault        fault
+	}{
+		{"the next part of an upload", "PATCH", w + "/files/" + started.ID + "?offset=4", []byte("567890"),
+			fault{op: "Get", table: "File", match: idIs(started.ID)}},
+		{"an upload started again with its own id", "POST", w + "/files?name=again.txt&id=" + repeat, []byte("x"),
+			fault{op: "Get", table: "File", match: idIs(repeat)}},
+		{"an import of an uploaded file", "POST", w + "/import", M{"kind": "markdown", "file": ready.ID},
+			fault{op: "Get", table: "File", match: idIs(ready.ID)}},
+		{"a backup's download", "GET", "/api/v1/admin/backups/" + made.ID + "/download", nil,
+			fault{op: "Get", table: "Backup", match: idIs(made.ID)}},
+		{"a restore from a backup", "POST", "/api/v1/admin/backups/" + made.ID + "/restore-item", M{"workspace": "games", "task": "SVA-1"},
+			fault{op: "Get", table: "Backup", match: idIs(made.ID)}},
+		{"a webhook's test", "POST", w + "/webhooks/" + hook + "/test", nil,
+			fault{op: "Get", table: "Webhook", match: idIs(hook)}},
+		{"a delivery sent again", "POST", w + "/deliveries/" + id.New() + "/redeliver", nil,
+			fault{op: "Count", table: "webhook_deliveries"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.fault.times = 1
+			fired := st.faults.arm(tc.fault)
+			s.t = t
+			s.call(s.owner, "", tc.method, tc.path, tc.body, 500, nil)
+			if fired() != 1 {
+				t.Fatalf("the fault fired %d times", fired())
+			}
+		})
+	}
+
+	t.Run("a restored item whose reindex fails is still restored, and the failure is logged", func(t *testing.T) {
+		st.faults.arm(fault{op: "Tasks", table: "tasks", times: 1})
+		s.t = t
+		s.call(s.owner, "", "POST", "/api/v1/admin/backups/"+made.ID+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 200, nil)
+		if !logs.has("restore from backup: reindexing") {
+			t.Fatal("the failed reindex was not logged")
+		}
+	})
+}
+
+func TestAFileOnAPageThatCannotBeReadIsNotShown(t *testing.T) {
+	st := newFaultStore(t)
+	s := newSite(t, st)
+	var file struct{ ID string }
+	s.call(s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, &file)
+	page := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "How we work."})["ref"].(string)
+	s.change(s.owner, "", "attachment.add", M{"file": file.ID, "doc": page})
+	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	var tok struct{ Token string }
+	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+	s.call(nil, tok.Token, "GET", w+"/files/"+file.ID, nil, 200, nil)
+
+	fired := st.faults.arm(fault{op: "Get", table: "Doc", times: 1, match: idIs(page)})
+	s.call(nil, tok.Token, "GET", w+"/files/"+file.ID, nil, 404, nil)
+	if fired() != 1 {
+		t.Fatalf("the fault fired %d times", fired())
+	}
 }

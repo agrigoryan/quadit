@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,12 +23,17 @@ import (
 // Markdown folder), or an address (a GitHub repository, an Orbit install).
 // Everything is written as the one who asks, through the same changes as
 // any other work, and running the same import twice adds nothing twice.
+
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork))
 	})
 }
 
+// importLogSize is how many lines of an import's log are kept for the answer.
+const importLogSize = 500
+
+// importBody is the request to import.
 type importBody struct {
 	Kind string `json:"kind"`
 	// File is the id of an uploaded file; Source an address instead, for
@@ -38,6 +44,8 @@ type importBody struct {
 	DryRun  bool              `json:"dry_run"`
 }
 
+// handleImportWork reads a source and makes what it holds, or with
+// dry_run only says what it found.
 func (s *Server) handleImportWork(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
@@ -49,58 +57,28 @@ func (s *Server) handleImportWork(x *c) error {
 	if !has(importer.Kinds, b.Kind) {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "kind", Message: "unknown source " + b.Kind, Allowed: importer.Kinds, Nearest: nearestOf(b.Kind, importer.Kinds)}
 	}
-	ctx := x.ctx()
-	source := b.Source
-	switch {
-	case b.Kind == "github" || b.Kind == "orbit":
-		if source == "" {
-			return errBad("%s is read from its service: give source (github: owner/repo; orbit: the install's address)", b.Kind)
-		}
-	case b.File == "":
-		return errBad("upload the export first and give its file id as file")
-	default:
-		var f core.File
-		if err := x.db.Get(ctx, &f, store.Eq("id", b.File), store.Live); err != nil || f.State != "ready" {
-			return errNotFound("file")
-		}
-		dir, err := os.MkdirTemp("", "quadit-import-*")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(dir)
-		in, _, err := s.fileStore().Open(ctx, f.StorageKey)
-		if err != nil {
-			return err
-		}
-		source = filepath.Join(dir, filepath.Base(f.Name))
-		out, err := os.Create(source)
-		if err != nil {
-			in.Close()
-			return err
-		}
-		_, err = io.Copy(out, in)
-		in.Close()
-		out.Close()
-		if err != nil {
-			return err
-		}
-	}
-	plan, err := importer.Read(b.Kind, source, b.Options)
-	defer plan.Close()
+	source, cleanup, err := s.importSource(x, b)
 	if err != nil {
+		return err
+	}
+	defer cleanup()
+	plan, err := importer.Read(b.Kind, source, b.Options)
+	if err != nil {
+		plan.Close() // a source that failed may have unpacked files first
 		field, what := "file", "this could not be read as a "+b.Kind+" export: "
 		if b.File == "" {
 			field, what = "source", "could not read from "+b.Kind+": "
 		}
 		return &engine.Error{Code: engine.CodeInvalid, Field: field, Message: what + err.Error()}
 	}
+	defer plan.Close()
 	found := map[string]int{"tasks": len(plan.Tasks), "pages": len(plan.Docs), "databases": len(plan.Tables)}
 	if b.DryRun {
 		return x.ok(map[string]any{"found": found, "dry_run": true})
 	}
 	var log []string
 	sink := importer.NewSink(selfAPI{s: s, x: x}, func(format string, a ...any) {
-		if len(log) < 500 {
+		if len(log) < importLogSize {
 			log = append(log, strings.TrimSpace(fmt.Sprintf(format, a...)))
 		}
 	})
@@ -113,6 +91,61 @@ func (s *Server) handleImportWork(x *c) error {
 		"already_there": sum.Already, "unmatched_people": sum.Unmatched, "summary": sum.String(), "log": log})
 }
 
+// importSource says where an import reads from: the address given, for
+// the kinds read from a service, or else a copy of the uploaded file in a
+// temporary folder, which cleanup removes.
+func (s *Server) importSource(x *c, b importBody) (source string, cleanup func(), err error) {
+	cleanup = func() {}
+	switch {
+	case b.Kind == "github" || b.Kind == "orbit":
+		if b.Source == "" {
+			return "", cleanup, errBad("%s is read from its service: give source (github: owner/repo; orbit: the install's address)", b.Kind)
+		}
+		return b.Source, cleanup, nil
+	case b.File == "":
+		return "", cleanup, errBad("upload the export first and give its file id as file")
+	}
+	ctx := x.ctx()
+	var f core.File
+	there, err := rowFound(x.db.Get(ctx, &f, store.Eq("id", b.File), store.Live))
+	if err != nil {
+		return "", cleanup, err
+	}
+	if !there || f.State != "ready" {
+		return "", cleanup, errNotFound("file")
+	}
+	dir, err := os.MkdirTemp("", "quadit-import-*")
+	if err != nil {
+		return "", cleanup, err
+	}
+	cleanup = func() { os.RemoveAll(dir) }
+	source = filepath.Join(dir, filepath.Base(f.Name))
+	if err := s.copyFileOut(ctx, f, source); err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	return source, cleanup, nil
+}
+
+// copyFileOut copies a stored file to path. A write that fails only when
+// the copy is closed is an error like any other: the copy is short.
+func (s *Server) copyFileOut(ctx context.Context, f core.File, path string) error {
+	in, _, err := s.fileStore().Open(ctx, f.StorageKey)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
 // selfAPI is the server's own API as an import writes through it: with
 // the sign-in of the request that asked for the import.
 type selfAPI struct {
@@ -120,6 +153,7 @@ type selfAPI struct {
 	x *c
 }
 
+// Call sends one API request.
 func (k selfAPI) Call(method, path string, q url.Values, body []byte) ([]byte, error) {
 	contentType := ""
 	if body != nil {
@@ -128,6 +162,8 @@ func (k selfAPI) Call(method, path string, q url.Values, body []byte) ([]byte, e
 	return k.do(method, path, q, body, contentType)
 }
 
+// SendFile stores a file, under the id given if there is one, and returns
+// its address.
 func (k selfAPI) SendFile(fileID, path string) (string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -142,7 +178,9 @@ func (k selfAPI) SendFile(fileID, path string) (string, error) {
 		return "", err
 	}
 	var f struct{ URL string }
-	json.Unmarshal(out, &f)
+	if err := json.Unmarshal(out, &f); err != nil {
+		return "", fmt.Errorf("the answer to storing %s: %w", filepath.Base(path), err)
+	}
 	return f.URL, nil
 }
 

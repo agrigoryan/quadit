@@ -20,45 +20,79 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// Backups on a schedule and on request, restoring one item from a backup,
+// and the daily emptying of the trash.
+
 func init() {
 	runners = append(runners, (*Server).runSchedule)
-	jobKinds["backup"] = func(s *Server, ctx context.Context, j core.Job) error {
-		_, err := s.runBackup(ctx)
-		return err
-	}
-	jobKinds["trash.purge"] = func(s *Server, ctx context.Context, j core.Job) error {
-		n, keys, err := s.eng.PurgeTrash(ctx, 30*24*time.Hour)
-		for _, k := range keys {
-			s.fileStore().Delete(ctx, k)
-		}
-		if n > 0 {
-			s.log.Info("emptied the trash", "items", n)
-		}
-		// Workspaces deleted a month ago go for good, with their files.
-		prefixes, werr := s.eng.PurgeWorkspaces(ctx, 30*24*time.Hour)
-		for _, prefix := range prefixes {
-			var keys []string
-			s.fileStore().List(ctx, prefix, func(key string, _ int64) error { keys = append(keys, key); return nil })
-			for _, k := range keys {
-				s.fileStore().Delete(ctx, k)
-			}
-			s.log.Info("removed a deleted workspace for good", "files", len(keys))
-		}
-		if err == nil {
-			err = werr
-		}
-		// Old one-time secrets and ended sessions go too.
-		now := time.Now().UnixMilli()
-		s.st.Delete(ctx, "one_time_tokens", store.Lt("expires_at", now-24*3600_000))
-		s.st.Delete(ctx, "sessions", store.Lt("expires_at", now-7*24*3600_000))
-		return err
-	}
+	jobKinds["backup"] = (*Server).jobBackup
+	jobKinds["trash.purge"] = (*Server).jobPurgeTrash
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("GET /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleListBackups)))
 		m.HandleFunc("POST /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleCreateBackup)))
 		m.HandleFunc("POST /api/v1/admin/backups/{id}/restore-item", s.signedIn(s.installAdmin(s.handleRestoreItemFromBackup)))
 		m.HandleFunc("GET /api/v1/admin/backups/{id}/download", s.signedIn(s.installAdmin(s.handleDownloadBackup)))
 	})
+}
+
+// How long what is thrown away is kept.
+const (
+	trashKeep          = 30 * 24 * time.Hour // the trash, and deleted workspaces
+	oneTimeTokenKeep   = 24 * time.Hour      // one-time secrets, after they expire
+	endedSessionKeep   = 7 * 24 * time.Hour  // sessions, after they end
+	defaultBackupsKept = 14
+)
+
+// jobBackup writes the scheduled backup.
+func (s *Server) jobBackup(ctx context.Context, _ core.Job) error {
+	_, err := s.runBackup(ctx)
+	return err
+}
+
+// jobPurgeTrash empties the trash of what is over 30 days old, removes the
+// workspaces deleted that long ago with their files, and drops old
+// one-time secrets and ended sessions. The rows are gone before their files
+// are removed, so a file that cannot be removed is logged: nothing would
+// find it again.
+func (s *Server) jobPurgeTrash(ctx context.Context, _ core.Job) error {
+	n, keys, err := s.eng.PurgeTrash(ctx, trashKeep)
+	for _, k := range keys {
+		s.removeStoredFile(ctx, k)
+	}
+	if n > 0 {
+		s.log.Info("emptied the trash", "items", n)
+	}
+	// Workspaces deleted a month ago go for good, with their files.
+	prefixes, werr := s.eng.PurgeWorkspaces(ctx, trashKeep)
+	for _, prefix := range prefixes {
+		var keys []string
+		if lerr := s.fileStore().List(ctx, prefix, func(key string, _ int64) error { keys = append(keys, key); return nil }); lerr != nil {
+			s.log.Error("listing the files of a deleted workspace; they are left behind", "prefix", prefix, "err", lerr)
+		}
+		for _, k := range keys {
+			s.removeStoredFile(ctx, k)
+		}
+		s.log.Info("removed a deleted workspace for good", "files", len(keys))
+	}
+	if err == nil {
+		err = werr
+	}
+	// Old one-time secrets and ended sessions go too.
+	now := time.Now().UnixMilli()
+	if _, derr := s.st.Delete(ctx, "one_time_tokens", store.Lt("expires_at", now-oneTimeTokenKeep.Milliseconds())); derr != nil {
+		s.log.Warn("dropping old one-time secrets; tried again tomorrow", "err", derr)
+	}
+	if _, derr := s.st.Delete(ctx, "sessions", store.Lt("expires_at", now-endedSessionKeep.Milliseconds())); derr != nil {
+		s.log.Warn("dropping ended sessions; tried again tomorrow", "err", derr)
+	}
+	return err
+}
+
+// removeStoredFile removes a file whose row is gone, logging a failure.
+func (s *Server) removeStoredFile(ctx context.Context, key string) {
+	if err := s.fileStore().Delete(ctx, key); err != nil {
+		s.log.Error("removing a file that was purged; it is left behind", "key", key, "err", err)
+	}
 }
 
 // backupSetting is the "backup" setting of the admin area.
@@ -96,77 +130,113 @@ func (s *Server) runSchedule(ctx context.Context) {
 	}
 }
 
+// backupDir is where archives are written.
 func (s *Server) backupDir() string { return filepath.Join(s.cfg.DataDir, "backups") }
+
+// backupRun is one backup being written: its record, where it goes and
+// the setting it follows.
+type backupRun struct {
+	s       *Server
+	b       core.Backup
+	name    string
+	path    string
+	setting backupSetting
+}
 
 // runBackup writes an archive, reads it back to verify it, records it, and
 // drops the oldest beyond the number to keep.
 func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
-	b := core.Backup{ID: id.New(), StartedAt: time.Now().UnixMilli()}
+	r := &backupRun{s: s, b: core.Backup{ID: id.New(), StartedAt: time.Now().UnixMilli()}}
 	if err := os.MkdirAll(s.backupDir(), 0o750); err != nil {
-		return b, err
+		return r.b, err
 	}
-	name := "quadit-" + time.Now().UTC().Format("20060102-150405") + ".tar.gz"
-	path := filepath.Join(s.backupDir(), name)
-	b.Location = path
-	if err := s.st.Insert(ctx, b); err != nil {
-		return b, err
+	r.name = "quadit-" + time.Now().UTC().Format("20060102-150405") + ".tar.gz"
+	r.path = filepath.Join(s.backupDir(), r.name)
+	r.b.Location = r.path
+	if err := s.st.Insert(ctx, r.b); err != nil {
+		return r.b, err
 	}
-	finish := func(err error) (core.Backup, error) {
-		b.FinishedAt = time.Now().UnixMilli()
-		set := map[string]any{"finished_at": b.FinishedAt, "size": b.Size, "sha256": b.SHA256, "verified_at": b.VerifiedAt, "location": b.Location}
-		if err != nil {
-			b.Error = oneLine(err.Error(), 400)
-			set["error"] = b.Error
-			os.Remove(path)
-			s.log.Error("backup failed", "err", err)
+	for _, step := range []func(context.Context) error{r.write, r.verify, r.copyToFiles} {
+		if err := step(ctx); err != nil {
+			return r.finish(ctx, err)
 		}
-		s.st.Update(context.WithoutCancel(ctx), "backups", set, store.Eq("id", b.ID))
-		return b, err
 	}
-	out, err := os.Create(path)
+	r.dropOldest(ctx)
+	s.log.Info("backup written and verified", "file", r.path, "bytes", r.b.Size)
+	return r.finish(ctx, nil)
+}
+
+// write writes the archive and notes its size and checksum.
+func (r *backupRun) write(ctx context.Context) error {
+	out, err := os.Create(r.path)
 	if err != nil {
-		return finish(err)
+		return err
 	}
 	h := sha256.New()
-	_, err = backup.Write(ctx, s.st, s.fileStore(), s.cfg.Version, io.MultiWriter(out, h))
+	_, err = backup.Write(ctx, r.s.st, r.s.fileStore(), r.s.cfg.Version, io.MultiWriter(out, h))
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
-		return finish(err)
+		return err
 	}
-	st, _ := os.Stat(path)
-	b.Size, b.SHA256 = st.Size(), hex.EncodeToString(h.Sum(nil))
-	// A backup that cannot be read back is not a backup.
-	in, err := os.Open(path)
+	st, err := os.Stat(r.path)
 	if err != nil {
-		return finish(err)
+		return err
+	}
+	r.b.Size, r.b.SHA256 = st.Size(), hex.EncodeToString(h.Sum(nil))
+	return nil
+}
+
+// verify reads the archive back: a backup that cannot be read back is not
+// a backup.
+func (r *backupRun) verify(context.Context) error {
+	in, err := os.Open(r.path)
+	if err != nil {
+		return err
 	}
 	_, err = backup.Verify(in)
 	in.Close()
 	if err != nil {
-		return finish(fmt.Errorf("the archive did not verify: %w", err))
+		return fmt.Errorf("the archive did not verify: %w", err)
 	}
-	b.VerifiedAt = time.Now().UnixMilli()
-	var bs backupSetting
-	s.setting(ctx, "backup", &bs)
-	if bs.CopyToFiles {
-		in, err := os.Open(path)
-		if err != nil {
-			return finish(err)
-		}
-		err = s.fileStore().Put(ctx, "backups/"+name, in, "application/gzip")
-		in.Close()
-		if err != nil {
-			return finish(fmt.Errorf("copying the archive to file storage: %w", err))
-		}
+	r.b.VerifiedAt = time.Now().UnixMilli()
+	return nil
+}
+
+// copyToFiles puts the archive in file storage too, when the setting says
+// so, which is how a backup gets off the machine.
+func (r *backupRun) copyToFiles(ctx context.Context) error {
+	r.s.setting(ctx, "backup", &r.setting)
+	if !r.setting.CopyToFiles {
+		return nil
 	}
-	// Keep the newest few.
-	keep := bs.Keep
+	in, err := os.Open(r.path)
+	if err != nil {
+		return err
+	}
+	err = r.s.fileStore().Put(ctx, "backups/"+r.name, in, "application/gzip")
+	in.Close()
+	if err != nil {
+		return fmt.Errorf("copying the archive to file storage: %w", err)
+	}
+	return nil
+}
+
+// dropOldest keeps the newest few archives and removes the rest, with
+// their copies and records. What cannot be removed is logged and tried
+// again after the next backup.
+func (r *backupRun) dropOldest(ctx context.Context) {
+	keep := r.setting.Keep
 	if keep <= 0 {
-		keep = 14
+		keep = defaultBackupsKept
 	}
-	entries, _ := os.ReadDir(s.backupDir())
+	dir := r.s.backupDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		r.s.log.Warn("listing old backups to drop", "err", err)
+		return
+	}
 	var names []string
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), "quadit-") && strings.HasSuffix(e.Name(), ".tar.gz") {
@@ -174,18 +244,43 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 		}
 	}
 	sort.Strings(names)
-	for len(names) > keep {
-		os.Remove(filepath.Join(s.backupDir(), names[0]))
-		if bs.CopyToFiles {
-			s.fileStore().Delete(ctx, "backups/"+names[0])
+	for ; len(names) > keep; names = names[1:] {
+		old := filepath.Join(dir, names[0])
+		if err := os.Remove(old); err != nil {
+			r.s.log.Warn("dropping an old backup", "file", old, "err", err)
+			continue
 		}
-		s.st.Delete(ctx, "backups", store.Eq("location", filepath.Join(s.backupDir(), names[0])))
-		names = names[1:]
+		if r.setting.CopyToFiles {
+			if err := r.s.fileStore().Delete(ctx, "backups/"+names[0]); err != nil {
+				r.s.log.Warn("dropping the copy of an old backup", "file", names[0], "err", err)
+			}
+		}
+		if _, err := r.s.st.Delete(ctx, "backups", store.Eq("location", old)); err != nil {
+			r.s.log.Warn("dropping the record of an old backup", "file", old, "err", err)
+		}
 	}
-	s.log.Info("backup written and verified", "file", path, "bytes", b.Size)
-	return finish(nil)
 }
 
+// finish records how the backup ended. A failed one's archive is removed.
+// The record is written even when ctx has ended, so it does not stay
+// unfinished.
+func (r *backupRun) finish(ctx context.Context, err error) (core.Backup, error) {
+	b := &r.b
+	b.FinishedAt = time.Now().UnixMilli()
+	set := map[string]any{"finished_at": b.FinishedAt, "size": b.Size, "sha256": b.SHA256, "verified_at": b.VerifiedAt, "location": b.Location}
+	if err != nil {
+		b.Error = oneLine(err.Error(), 400)
+		set["error"] = b.Error
+		os.Remove(r.path)
+		r.s.log.Error("backup failed", "err", err)
+	}
+	if _, uerr := r.s.st.Update(context.WithoutCancel(ctx), "backups", set, store.Eq("id", b.ID)); uerr != nil {
+		r.s.log.Error("recording how a backup ended", "backup", b.ID, "err", uerr)
+	}
+	return *b, err
+}
+
+// handleListBackups lists the newest backups, with the schedule.
 func (s *Server) handleListBackups(x *c) error {
 	var list []core.Backup
 	if err := s.st.List(x.ctx(), &list, store.Q{Order: "-started_at", Limit: 100}); err != nil {
@@ -206,10 +301,11 @@ func (s *Server) handleCreateBackup(x *c) error {
 	return x.json(201, b)
 }
 
+// handleDownloadBackup sends a finished backup's archive.
 func (s *Server) handleDownloadBackup(x *c) error {
-	var b core.Backup
-	if err := s.st.Get(x.ctx(), &b, store.Eq("id", x.r.PathValue("id"))); err != nil || b.FinishedAt == 0 || b.Error != "" {
-		return errNotFound("backup")
+	b, err := s.finishedBackup(x.ctx(), x.r.PathValue("id"))
+	if err != nil {
+		return err
 	}
 	f, err := os.Open(b.Location)
 	if err != nil {
@@ -221,6 +317,20 @@ func (s *Server) handleDownloadBackup(x *c) error {
 	x.w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(b.Location)+`"`)
 	http.ServeContent(x.w, x.r, "", time.UnixMilli(b.FinishedAt), f)
 	return nil
+}
+
+// finishedBackup reads a backup that finished without an error; any
+// other is not found.
+func (s *Server) finishedBackup(ctx context.Context, backupID string) (core.Backup, error) {
+	var b core.Backup
+	there, err := rowFound(s.st.Get(ctx, &b, store.Eq("id", backupID)))
+	if err != nil {
+		return b, err
+	}
+	if !there || b.FinishedAt == 0 || b.Error != "" {
+		return b, errNotFound("backup")
+	}
+	return b, nil
 }
 
 // handleRestoreItemFromBackup brings one task or one page back from a backup, as it
@@ -236,9 +346,9 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
-	var bk core.Backup
-	if err := s.st.Get(ctx, &bk, store.Eq("id", x.r.PathValue("id"))); err != nil || bk.FinishedAt == 0 || bk.Error != "" {
-		return errNotFound("backup")
+	bk, err := s.finishedBackup(ctx, x.r.PathValue("id"))
+	if err != nil {
+		return err
 	}
 	it := backup.Item{Workspace: b.Workspace, Kind: "task", Ref: b.Task}
 	if b.Doc != "" {
@@ -257,14 +367,21 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 		return &engine.Error{Code: engine.CodeNotFound, Message: err.Error()}
 	}
 	var ws core.Workspace
-	if err := s.st.Get(ctx, &ws, store.Eq("slug", it.Workspace), store.Live); err != nil {
+	there, err := rowFound(s.st.Get(ctx, &ws, store.Eq("slug", it.Workspace), store.Live))
+	if err != nil {
+		return err
+	}
+	if !there {
 		return errNotFound("workspace " + it.Workspace)
 	}
 	// Tell open browsers, and put the text back in the search index.
 	if err := s.eng.AnnounceRestored(ctx, ws.ID, it.Kind, rid); err != nil {
 		return err
 	}
-	s.eng.Reindex(ctx, ws.ID)
+	if err := s.eng.Reindex(ctx, ws.ID); err != nil {
+		// The item is back; only searching for it waits for the next reindex.
+		s.log.Error("restore from backup: reindexing", "workspace", ws.Slug, "err", err)
+	}
 	s.audit(x.r, ws.ID, x.user, it.Kind+".restored_from_backup", it.Kind, rid, map[string]string{"backup": bk.ID, "ref": it.Ref})
 	return x.ok(map[string]any{"restored": it.Kind, "id": rid, "workspace": ws.Slug})
 }

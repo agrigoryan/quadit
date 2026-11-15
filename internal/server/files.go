@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	_ "image/gif"
+	_ "image/gif" // lets image.Decode read GIFs, for sizes and previews
 	"image/jpeg"
 	"image/png"
 	"io"
@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"golang.org/x/image/draw"
-	_ "golang.org/x/image/webp"
+	_ "golang.org/x/image/webp" // lets image.Decode read WebP, for sizes and previews
 
 	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
@@ -32,8 +32,15 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// Uploads: a file sent in one request or in parts, made ready with its
+// checksum, type and preview, and served back to those who may see it.
+
 const defaultMaxUpload = 250 << 20 // clips up to 100 MB fit with room to spare
 
+// sniffSize is how much of a file is read to tell its type.
+const sniffSize = 512
+
+// maxUpload is the largest file the install takes, from the "files.max_mb" setting.
 func (s *Server) maxUpload(ctx context.Context) int64 {
 	if n := s.settingInt(ctx, "files.max_mb", 0); n > 0 {
 		return int64(n) << 20
@@ -41,6 +48,7 @@ func (s *Server) maxUpload(ctx context.Context) int64 {
 	return defaultMaxUpload
 }
 
+// partPath is where an upload is put together on this machine.
 func (s *Server) partPath(fileID string) string {
 	return filepath.Join(s.cfg.DataDir, "uploads", fileID+".part")
 }
@@ -64,7 +72,7 @@ func (c *counter) Read(p []byte) (int, error) {
 }
 
 // joinUploadParts puts the parts of an upload together into one local file, in
-// order, and removes them from file storage.
+// order, and removes them from file storage once the file is complete.
 func (s *Server) joinUploadParts(ctx context.Context, f core.File) error {
 	var keys []string
 	if err := s.fileStore().List(ctx, f.StorageKey+".parts/", func(key string, _ int64) error { keys = append(keys, key); return nil }); err != nil {
@@ -81,7 +89,25 @@ func (s *Server) joinUploadParts(ctx context.Context, f core.File) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	if err := s.appendParts(ctx, out, keys); err != nil {
+		out.Close()
+		return err
+	}
+	// A write that fails only when the file is closed leaves it short: the
+	// parts are kept until it is whole.
+	if err := out.Close(); err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err := s.fileStore().Delete(ctx, key); err != nil {
+			s.log.Warn("upload: removing a part that was put together", "key", key, "err", err)
+		}
+	}
+	return nil
+}
+
+// appendParts copies the parts named by keys, in order, to out.
+func (s *Server) appendParts(ctx context.Context, out io.Writer, keys []string) error {
 	for _, key := range keys {
 		in, _, err := s.fileStore().Open(ctx, key)
 		if err != nil {
@@ -93,10 +119,45 @@ func (s *Server) joinUploadParts(ctx context.Context, f core.File) error {
 			return err
 		}
 	}
-	for _, key := range keys {
-		s.fileStore().Delete(ctx, key)
-	}
 	return nil
+}
+
+// uploadStart is the first request of an upload: the file's bytes, or the
+// first part of them, its name and its type as the caller gave them.
+type uploadStart struct {
+	src   io.Reader
+	name  string
+	ctype string
+}
+
+// readUploadStart finds the file in an upload request: the body itself,
+// or the "file" field of a multipart form.
+func readUploadStart(x *c) (uploadStart, error) {
+	up := uploadStart{src: x.r.Body, name: x.r.URL.Query().Get("name"), ctype: x.r.Header.Get("Content-Type")}
+	if strings.HasPrefix(up.ctype, "multipart/form-data") {
+		mr, err := x.r.MultipartReader()
+		if err != nil {
+			return up, errBad("multipart: %v", err)
+		}
+		for {
+			part, err := mr.NextPart()
+			if err != nil {
+				return up, errBad("the form has no \"file\" field")
+			}
+			if part.FormName() == "file" {
+				if up.name == "" {
+					up.name = part.FileName()
+				}
+				up.src, up.ctype = part, part.Header.Get("Content-Type")
+				break
+			}
+		}
+	}
+	up.name = filepath.Base(strings.ReplaceAll(up.name, "\\", "/"))
+	if up.name == "" || up.name == "." || up.name == "/" {
+		return up, errBad("give the file a name: ?name=clip.mp4")
+	}
+	return up, nil
 }
 
 // handleUploadFile stores a file. The body is the file itself (name it with ?name=),
@@ -108,31 +169,9 @@ func (s *Server) handleUploadFile(x *c) error {
 	}
 	ctx := x.ctx()
 	maxSize := s.maxUpload(ctx)
-	v := x.r.URL.Query()
-	name, ctype := v.Get("name"), x.r.Header.Get("Content-Type")
-	var src io.Reader = x.r.Body
-	if strings.HasPrefix(ctype, "multipart/form-data") {
-		mr, err := x.r.MultipartReader()
-		if err != nil {
-			return errBad("multipart: %v", err)
-		}
-		for {
-			part, err := mr.NextPart()
-			if err != nil {
-				return errBad("the form has no \"file\" field")
-			}
-			if part.FormName() == "file" {
-				if name == "" {
-					name = part.FileName()
-				}
-				src, ctype = part, part.Header.Get("Content-Type")
-				break
-			}
-		}
-	}
-	name = filepath.Base(strings.ReplaceAll(name, "\\", "/"))
-	if name == "" || name == "." || name == "/" {
-		return errBad("give the file a name: ?name=clip.mp4")
+	up, err := readUploadStart(x)
+	if err != nil {
+		return err
 	}
 	size := int64(x.intParam("size", 0))
 	if size > maxSize {
@@ -141,58 +180,23 @@ func (s *Server) handleUploadFile(x *c) error {
 	// The caller may name the file's id itself (?id=): if the answer to this
 	// first request is lost, asking for that file says how far it got, and
 	// starting again with the same id does not make a second one.
-	fid := v.Get("id")
-	if fid != "" {
-		if !looksUUID(fid) {
-			return errBad("id must be a UUID made by the caller")
-		}
-		var had core.File
-		if err := x.db.Get(ctx, &had, store.Eq("id", fid)); err == nil {
-			if had.UploadedBy != x.member.UserID {
-				return &engine.Error{Code: engine.CodeConflict, Message: "that file id is taken"}
-			}
-			return x.ok(s.fileOut(x, had))
-		}
-	} else {
+	fid := x.r.URL.Query().Get("id")
+	if fid == "" {
 		fid = id.New()
-	}
-	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: name, ContentType: ctype, Size: size, State: "uploading",
-		UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
-	f.StorageKey = x.ws.ID + "/" + f.ID
-	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
-		return err
-	}
-	out, err := os.Create(s.partPath(f.ID))
-	if err != nil {
-		return err
-	}
-	n, err := io.Copy(out, io.LimitReader(src, maxSize+1))
-	out.Close()
-	if err != nil {
-		os.Remove(s.partPath(f.ID))
-		return errBad("upload interrupted: %v", err)
-	}
-	if n > maxSize {
-		os.Remove(s.partPath(f.ID))
-		return errBad("files can be up to %d MB", maxSize>>20)
-	}
-	f.Received = n
-	if size == 0 {
-		f.Size = n
-	}
-	if f.Received < f.Size {
-		// More is to come, perhaps to another server: the first part waits
-		// in file storage, not on this machine.
-		in, err := os.Open(s.partPath(f.ID))
+	} else {
+		had, there, err := s.startedUpload(x, fid)
 		if err != nil {
 			return err
 		}
-		err = s.fileStore().Put(ctx, partKey(f, 0), in, "application/octet-stream")
-		in.Close()
-		os.Remove(s.partPath(f.ID))
-		if err != nil {
-			return fmt.Errorf("file storage: %w", err)
+		if there {
+			return x.ok(s.fileOut(x, had))
 		}
+	}
+	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, State: "uploading",
+		UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
+	f.StorageKey = x.ws.ID + "/" + f.ID
+	if err := s.receiveFirstPart(ctx, &f, up.src, maxSize); err != nil {
+		return err
 	}
 	if err := x.db.Insert(ctx, f); err != nil {
 		return err
@@ -205,13 +209,81 @@ func (s *Server) handleUploadFile(x *c) error {
 	return x.json(201, s.fileOut(x, f))
 }
 
+// startedUpload finds the file a caller named by its own id, when a first
+// request with that id came before; it is the caller's own or the id is
+// taken.
+func (s *Server) startedUpload(x *c, fid string) (core.File, bool, error) {
+	var had core.File
+	if !looksUUID(fid) {
+		return had, false, errBad("id must be a UUID made by the caller")
+	}
+	there, err := rowFound(x.db.Get(x.ctx(), &had, store.Eq("id", fid)))
+	if err != nil || !there {
+		return had, false, err
+	}
+	if had.UploadedBy != x.member.UserID {
+		return had, false, &engine.Error{Code: engine.CodeConflict, Message: "that file id is taken"}
+	}
+	return had, true, nil
+}
+
+// receiveFirstPart writes what the first request of an upload carries to
+// this machine and sets how much arrived. When more is to come, perhaps to
+// another server, the part waits in file storage instead.
+func (s *Server) receiveFirstPart(ctx context.Context, f *core.File, src io.Reader, maxSize int64) error {
+	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
+		return err
+	}
+	out, err := os.Create(s.partPath(f.ID))
+	if err != nil {
+		return err
+	}
+	n, err := io.Copy(out, io.LimitReader(src, maxSize+1))
+	cerr := out.Close()
+	if err != nil {
+		os.Remove(s.partPath(f.ID))
+		return errBad("upload interrupted: %v", err)
+	}
+	if cerr != nil {
+		// What was received did not all reach the disk.
+		os.Remove(s.partPath(f.ID))
+		return fmt.Errorf("saving the upload: %w", cerr)
+	}
+	if n > maxSize {
+		os.Remove(s.partPath(f.ID))
+		return errBad("files can be up to %d MB", maxSize>>20)
+	}
+	f.Received = n
+	if f.Size == 0 {
+		f.Size = n
+	}
+	if f.Received >= f.Size {
+		return nil
+	}
+	in, err := os.Open(s.partPath(f.ID))
+	if err != nil {
+		return err
+	}
+	err = s.fileStore().Put(ctx, partKey(*f, 0), in, "application/octet-stream")
+	in.Close()
+	os.Remove(s.partPath(f.ID))
+	if err != nil {
+		return fmt.Errorf("file storage: %w", err)
+	}
+	return nil
+}
+
 // handleUploadFilePart appends the next part of a file. offset must be where the
 // last part ended; the answer says how much has arrived, so a broken upload
 // resumes from there.
 func (s *Server) handleUploadFilePart(x *c) error {
 	ctx := x.ctx()
 	var f core.File
-	if err := x.db.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+	there, err := rowFound(x.db.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live))
+	if err != nil {
+		return err
+	}
+	if !there {
 		return errNotFound("file")
 	}
 	if f.State != "uploading" {
@@ -225,16 +297,16 @@ func (s *Server) handleUploadFilePart(x *c) error {
 		return &httpError{Status: 409, Code: "conflict", Message: fmt.Sprintf("offset %d does not match the %d bytes received; continue from %d", offset, f.Received, f.Received)}
 	}
 	body := &counter{r: io.LimitReader(x.r.Body, f.Size-f.Received+1)}
-	err := s.fileStore().Put(ctx, partKey(f, offset), body, "application/octet-stream")
+	err = s.fileStore().Put(ctx, partKey(f, offset), body, "application/octet-stream")
 	n := body.n
 	if err != nil {
 		// A part cut short is not kept: the caller sends it again from the
 		// same place, which is what the answer tells it.
-		s.fileStore().Delete(ctx, partKey(f, offset))
+		s.dropPart(ctx, f, offset)
 		return errBad("upload interrupted after %d bytes; continue from %d: %v", f.Received, f.Received, err)
 	}
 	if f.Received+n > f.Size {
-		s.fileStore().Delete(ctx, partKey(f, offset))
+		s.dropPart(ctx, f, offset)
 		return errBad("more bytes than the size given when the upload started")
 	}
 	f.Received += n
@@ -249,6 +321,15 @@ func (s *Server) handleUploadFilePart(x *c) error {
 	return x.ok(s.fileOut(x, f))
 }
 
+// dropPart removes a part that is not kept. One left behind is written over
+// when the part is sent again.
+func (s *Server) dropPart(ctx context.Context, f core.File, offset int64) {
+	if err := s.fileStore().Delete(ctx, partKey(f, offset)); err != nil {
+		s.log.Warn("upload: removing a part that is not kept", "file", f.ID, "err", err)
+	}
+}
+
+// fileOut is a file as the API shows it: with its addresses once it is ready.
 func (s *Server) fileOut(x *c, f core.File) core.File {
 	if f.State == "ready" {
 		f.URL, f.PreviewURL = x.fileURL(f)
@@ -269,18 +350,11 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 		return err
 	}
 	defer in.Close()
-	head := make([]byte, 512)
-	n, _ := io.ReadFull(in, head)
-	sniffed := http.DetectContentType(head[:n])
-	if f.ContentType == "" || f.ContentType == "application/octet-stream" || strings.HasPrefix(f.ContentType, "multipart/") {
-		f.ContentType = sniffed
-		if byExt := mime.TypeByExtension(filepath.Ext(f.Name)); byExt != "" && (sniffed == "application/octet-stream" || strings.HasPrefix(sniffed, "text/plain")) {
-			f.ContentType = byExt
-		}
+	sniffed, err := sniffType(in)
+	if err != nil {
+		return err
 	}
-	if i := strings.Index(f.ContentType, ";"); i > 0 && !strings.HasPrefix(f.ContentType, "text/") {
-		f.ContentType = f.ContentType[:i]
-	}
+	f.ContentType = settleType(f.ContentType, sniffed, f.Name)
 	if _, err := in.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
@@ -290,36 +364,71 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	}
 	f.SHA256, f.State = hex.EncodeToString(h.Sum(nil)), "ready"
 	set := map[string]any{"state": "ready", "sha256": f.SHA256, "content_type": f.ContentType, "size": f.Size, "received": f.Size}
-	switch {
-	case strings.HasPrefix(f.ContentType, "image/") && f.ContentType != "image/svg+xml":
-		if w, hgt, prev := imagePreview(path); w > 0 {
-			f.Width, f.Height = w, hgt
-			set["width"], set["height"] = w, hgt
-			if prev != nil {
-				f.PreviewKey = f.StorageKey + ".preview"
-				if err := s.fileStore().Put(ctx, f.PreviewKey, bytes.NewReader(prev), http.DetectContentType(prev)); err == nil {
-					set["preview_key"] = f.PreviewKey
-				} else {
-					f.PreviewKey = ""
-				}
-			}
-		}
-	case strings.HasPrefix(f.ContentType, "video/"):
-		if w, hgt, ms, sheet := videoSheet(ctx, path); ms > 0 {
-			f.Width, f.Height, f.DurationMS = w, hgt, ms
-			set["width"], set["height"], set["duration_ms"] = w, hgt, ms
-			if sheet != nil {
-				f.PreviewKey = f.StorageKey + ".preview"
-				if err := s.fileStore().Put(ctx, f.PreviewKey, bytes.NewReader(sheet), "image/jpeg"); err == nil {
-					set["preview_key"] = f.PreviewKey
-				} else {
-					f.PreviewKey = ""
-				}
-			}
-		}
-	}
+	s.addPreview(ctx, f, path, set)
 	_, err = x.db.Update(ctx, "files", set, store.Eq("id", f.ID))
 	return err
+}
+
+// sniffType reads the start of r and says what type of content it holds.
+func sniffType(r io.Reader) (string, error) {
+	head := make([]byte, sniffSize)
+	n, err := io.ReadFull(r, head)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	return http.DetectContentType(head[:n]), nil
+}
+
+// settleType decides a file's type: the one the caller gave, unless it says
+// nothing, in which case what the bytes look like, or failing that what the
+// name's extension says. Parameters are dropped except for text.
+func settleType(given, sniffed, name string) string {
+	ctype := given
+	if ctype == "" || ctype == "application/octet-stream" || strings.HasPrefix(ctype, "multipart/") {
+		ctype = sniffed
+		if byExt := mime.TypeByExtension(filepath.Ext(name)); byExt != "" && (sniffed == "application/octet-stream" || strings.HasPrefix(sniffed, "text/plain")) {
+			ctype = byExt
+		}
+	}
+	if i := strings.Index(ctype, ";"); i > 0 && !strings.HasPrefix(ctype, "text/") {
+		ctype = ctype[:i]
+	}
+	return ctype
+}
+
+// addPreview reads an image's or a clip's size, and length, and stores a
+// reduced copy or a sheet of stills when there is one. What it finds goes
+// on f and into set, the columns to write.
+func (s *Server) addPreview(ctx context.Context, f *core.File, path string, set map[string]any) {
+	var preview []byte
+	var previewType string
+	switch {
+	case strings.HasPrefix(f.ContentType, "image/") && f.ContentType != "image/svg+xml":
+		w, hgt, prev := imagePreview(path)
+		if w <= 0 {
+			return
+		}
+		f.Width, f.Height = w, hgt
+		set["width"], set["height"] = w, hgt
+		preview, previewType = prev, http.DetectContentType(prev)
+	case strings.HasPrefix(f.ContentType, "video/"):
+		v := videoSheet(ctx, path)
+		if v.durationMS <= 0 {
+			return
+		}
+		f.Width, f.Height, f.DurationMS = v.width, v.height, v.durationMS
+		set["width"], set["height"], set["duration_ms"] = v.width, v.height, v.durationMS
+		preview, previewType = v.sheet, "image/jpeg"
+	}
+	if preview == nil {
+		return
+	}
+	f.PreviewKey = f.StorageKey + ".preview"
+	if err := s.fileStore().Put(ctx, f.PreviewKey, bytes.NewReader(preview), previewType); err == nil {
+		set["preview_key"] = f.PreviewKey
+	} else {
+		f.PreviewKey = ""
+	}
 }
 
 const previewEdge = 720
@@ -363,41 +472,52 @@ func imagePreview(path string) (w, h int, preview []byte) {
 	return w, h, buf.Bytes()
 }
 
+// clipFacts is what videoSheet finds out about a clip.
+type clipFacts struct {
+	width, height int
+	durationMS    int64
+	sheet         []byte // nine stills on one image; nil without ffmpeg
+}
+
 // videoSheet returns a clip's size and length and a sheet of nine stills,
 // so an agent can look at a clip as one small image. It needs ffmpeg on the
 // server; without it a clip simply has no sheet.
-func videoSheet(ctx context.Context, path string) (w, h int, durationMS int64, sheet []byte) {
+func videoSheet(ctx context.Context, path string) clipFacts {
+	var v clipFacts
 	ffprobe, err1 := exec.LookPath("ffprobe")
 	ffmpeg, err2 := exec.LookPath("ffmpeg")
 	if err1 != nil || err2 != nil {
-		return 0, 0, 0, nil
+		return v
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, ffprobe, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration",
 		"-of", "default=noprint_wrappers=1", path).Output()
 	if err != nil {
-		return 0, 0, 0, nil
+		return v
 	}
+	// A value ffprobe gives that does not read counts as zero.
 	var seconds float64
-	for _, line := range strings.Split(string(out), "\n") {
-		k, v, _ := strings.Cut(strings.TrimSpace(line), "=")
+	for line := range strings.SplitSeq(string(out), "\n") {
+		k, val, _ := strings.Cut(strings.TrimSpace(line), "=")
 		switch k {
 		case "width":
-			w, _ = strconv.Atoi(v)
+			v.width = atoiOrZero(val)
 		case "height":
-			h, _ = strconv.Atoi(v)
+			v.height = atoiOrZero(val)
 		case "duration":
-			seconds, _ = strconv.ParseFloat(v, 64)
+			if f, err := strconv.ParseFloat(val, 64); err == nil {
+				seconds = f
+			}
 		}
 	}
 	if seconds <= 0 {
-		return w, h, 0, nil
+		return v
 	}
-	durationMS = int64(seconds * 1000)
+	v.durationMS = int64(seconds * 1000)
 	tmp, err := os.CreateTemp("", "quadit-sheet-*.jpg")
 	if err != nil {
-		return w, h, durationMS, nil
+		return v
 	}
 	tmp.Close()
 	defer os.Remove(tmp.Name())
@@ -405,12 +525,24 @@ func videoSheet(ctx context.Context, path string) (w, h int, durationMS int64, s
 	err = exec.CommandContext(ctx, ffmpeg, "-y", "-v", "error", "-i", path, "-vf", fmt.Sprintf("fps=%.6f,scale=360:-2,tile=3x3", fps),
 		"-frames:v", "1", "-q:v", "4", tmp.Name()).Run()
 	if err != nil {
-		return w, h, durationMS, nil
+		return v
 	}
-	sheet, _ = os.ReadFile(tmp.Name())
-	return w, h, durationMS, sheet
+	if sheet, err := os.ReadFile(tmp.Name()); err == nil {
+		v.sheet = sheet
+	}
+	return v
 }
 
+// atoiOrZero reads a whole number, or zero when s is not one.
+func atoiOrZero(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// handleShowFile answers with a file's record, to those who may see it.
 func (s *Server) handleShowFile(x *c) error {
 	var f core.File
 	if err := x.db.Get(x.ctx(), &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
@@ -466,10 +598,12 @@ func (s *Server) handleServeFile(x *c) error {
 	}
 	defer rd.Close()
 	if ctype == "" {
-		head := make([]byte, 512)
-		n, _ := io.ReadFull(rd, head)
-		ctype = http.DetectContentType(head[:n])
-		rd.Seek(0, io.SeekStart)
+		if ctype, err = sniffType(rd); err != nil {
+			return err
+		}
+		if _, err := rd.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
 	}
 	h := x.w.Header()
 	h.Set("Content-Type", ctype)
@@ -507,7 +641,8 @@ func looksUUID(s string) bool {
 // maySeeFile reports whether a member limited to some projects, or to
 // reading with a token for some projects, may have a file: it is theirs, or
 // it is attached to a task of a project they are in, or to a page they can
-// see. A member with no limit sees every file of the workspace.
+// see. A member with no limit sees every file of the workspace. When what
+// decides it cannot be read, the answer is no.
 func (s *Server) maySeeFile(x *c, f core.File) bool {
 	ctx := x.ctx()
 	db := s.st.In(f.WorkspaceID)
@@ -515,40 +650,14 @@ func (s *Server) maySeeFile(x *c, f core.File) bool {
 	if err := db.Get(ctx, &m, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
 		return false
 	}
-	var allowed []string
-	if m.Scope != nil {
-		allowed = m.Scope.Projects
-	}
-	if x.token != nil {
-		var mine []string
-		for _, sc := range strings.Fields(x.token.Scopes) {
-			if p, ok := strings.CutPrefix(sc, "project:"); ok {
-				mine = append(mine, p)
-			}
-		}
-		if len(mine) > 0 {
-			if len(allowed) == 0 {
-				allowed = mine
-			} else {
-				allowed = keep(allowed, func(p string) bool { return has(mine, p) })
-				if len(allowed) == 0 {
-					allowed = []string{"none"}
-				}
-			}
-		}
-	}
+	allowed := filesAllowedProjects(x, m)
 	var atts []core.Attachment
 	if err := db.List(ctx, &atts, store.Where(store.Eq("file_id", f.ID))); err != nil {
 		return false
 	}
 	// A page's own files follow the page: a private page's are private.
-	for _, a := range atts {
-		if a.TaskID == "" && a.SubjectID != "" {
-			var d core.Doc
-			if db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && !engine.CanSeeDoc(d, x.user.ID) && f.UploadedBy != x.user.ID {
-				return false
-			}
-		}
+	if f.UploadedBy != x.user.ID && onHiddenPage(ctx, db, atts, x.user.ID) {
+		return false
 	}
 	if len(allowed) == 0 || f.UploadedBy == x.user.ID {
 		return true
@@ -564,6 +673,51 @@ func (s *Server) maySeeFile(x *c, f core.File) bool {
 		var d core.Doc
 		if db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && (d.ProjectID == "" || has(allowed, d.ProjectID)) {
 			return true
+		}
+	}
+	return false
+}
+
+// filesAllowedProjects is the projects whose files a member sees through
+// the request's credential: the member's own limit, narrowed by a token's
+// project scopes. None means no limit; "none" means no project at all.
+func filesAllowedProjects(x *c, m core.Member) []string {
+	var allowed []string
+	if m.Scope != nil {
+		allowed = m.Scope.Projects
+	}
+	if x.token == nil {
+		return allowed
+	}
+	var mine []string
+	for sc := range strings.FieldsSeq(x.token.Scopes) {
+		if p, ok := strings.CutPrefix(sc, "project:"); ok {
+			mine = append(mine, p)
+		}
+	}
+	switch {
+	case len(mine) == 0:
+		return allowed
+	case len(allowed) == 0:
+		return mine
+	}
+	allowed = keep(allowed, func(p string) bool { return has(mine, p) })
+	if len(allowed) == 0 {
+		return []string{"none"}
+	}
+	return allowed
+}
+
+// onHiddenPage reports whether a file is attached to a page the user
+// cannot see, or to one that cannot be read.
+func onHiddenPage(ctx context.Context, db store.DB, atts []core.Attachment, userID string) bool {
+	for _, a := range atts {
+		if a.TaskID == "" && a.SubjectID != "" {
+			var d core.Doc
+			there, err := rowFound(db.Get(ctx, &d, store.Eq("id", a.SubjectID)))
+			if err != nil || (there && !engine.CanSeeDoc(d, userID)) {
+				return true // a page that cannot be read is taken to be one the user cannot see
+			}
 		}
 	}
 	return false
