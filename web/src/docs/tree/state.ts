@@ -1,19 +1,12 @@
 // Which pages are open in the tree. Remembered in this browser.
 
 import { create } from "zustand";
+import { keep, readKept } from "@/lib/kept";
 
 const KEY = "quadit.docs.open";
 
-function read(): Record<string, true> {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Record<string, true>;
-  } catch {
-    return {};
-  }
-}
-
 export const useTreeState = create<{ open: Record<string, true>; renaming: string | null }>(() => ({
-  open: read(),
+  open: readKept<Record<string, true>>(KEY, {}),
   renaming: null,
 }));
 
@@ -23,11 +16,7 @@ export function setOpen(id: string, open: boolean) {
     const next = { ...s.open };
     if (open) next[id] = true;
     else delete next[id];
-    try {
-      localStorage.setItem(KEY, JSON.stringify(next));
-    } catch {
-      // Private mode: the tree still opens for this visit.
-    }
+    keep(KEY, next);
     return { open: next };
   });
 }

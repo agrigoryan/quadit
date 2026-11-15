@@ -7,6 +7,7 @@ import { ChartGantt, ChevronRight, ChevronsDownUp, ChevronsUpDown, Keyboard } fr
 import { Link, useParams } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { keep, readKept } from "@/lib/kept";
 import { useProjectByKey, useSlug } from "@/lib/selectors";
 import { today } from "@/lib/time";
 import type { Project } from "@/lib/types";
@@ -25,13 +26,7 @@ import { EmptyState } from "@/ui/empty";
 const ZOOM_KEY = "quadit.timeline.zoom";
 const LOOSE = "no-epic";
 
-function storedZoom(): Zoom {
-  try {
-    return localStorage.getItem(ZOOM_KEY) === "months" ? "months" : "weeks";
-  } catch {
-    return "weeks";
-  }
-}
+const storedZoom = (): Zoom => (readKept<Zoom>(ZOOM_KEY, "weeks") === "months" ? "months" : "weeks");
 
 /** /:ws/p/:key/timeline */
 export function TimelinePage() {
@@ -74,11 +69,7 @@ function Timeline({ project }: { project: Project }) {
 
   function pickZoom(next: Zoom) {
     setZoom(next);
-    try {
-      localStorage.setItem(ZOOM_KEY, next);
-    } catch {
-      // Private mode: the choice lasts for this visit.
-    }
+    keep(ZOOM_KEY, next);
   }
 
   function goToday() {

@@ -3,6 +3,7 @@
 
 import { useEffect } from "react";
 import { create } from "zustand";
+import { keep, readKept } from "@/lib/kept";
 
 /** Values a new task starts with when the dialog opens. */
 export interface TaskDraft {
@@ -29,17 +30,9 @@ interface UiState {
 
 const COLLAPSED_KEY = "quadit.sidebar";
 
-function readCollapsed(): boolean {
-  try {
-    return localStorage.getItem(COLLAPSED_KEY) === "collapsed";
-  } catch {
-    return false;
-  }
-}
-
 export const useUi = create<UiState>(() => ({
   drawerOpen: false,
-  sidebarCollapsed: readCollapsed(),
+  sidebarCollapsed: readKept<boolean>(COLLAPSED_KEY, false) === true,
   paletteOpen: false,
   shortcutsOpen: false,
   newTask: null,
@@ -64,10 +57,6 @@ export const ui = {
   toggleSidebar: () => {
     const sidebarCollapsed = !useUi.getState().sidebarCollapsed;
     useUi.setState({ sidebarCollapsed });
-    try {
-      localStorage.setItem(COLLAPSED_KEY, sidebarCollapsed ? "collapsed" : "open");
-    } catch {
-      // Private mode: the choice lasts for this visit.
-    }
+    keep(COLLAPSED_KEY, sidebarCollapsed);
   },
 };
