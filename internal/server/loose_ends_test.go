@@ -186,3 +186,39 @@ func TestSignInGivesUpOnASilentProvider(t *testing.T) {
 		}
 	})
 }
+
+// TestSyncKeepsFrontMatter: a page whose file opens with front matter is
+// edited here, below the front matter; written back, the file changes in
+// that line only, and its front matter comes back byte for byte, in each
+// of three styles.
+func TestSyncKeepsFrontMatter(t *testing.T) {
+	files := map[string]string{
+		"docs/plain.md":  "---\nowner: aram\nstatus:   draft\n---\n\n# Plain\n\nText.\n",
+		"docs/quoted.md": "---\ntitle: \"Boss: the return\"\nwhen: '10:30'\nnote: \"*not* emphasis\"\n---\nText.\n",
+		"docs/list.md":   "---\ntags:\n  - vfx\n  - boss_fight\nweight: 2\n---\n\n# Listed\n\nText.\n",
+	}
+	s := newSite(t, testdb.SQLite(t))
+	r := newSyncedRepo(t, s, files)
+	r.src = s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": r.origin, "subdir": "docs"})["ref"].(string)
+	if res := r.sync(); res.PagesCreated != 3 {
+		t.Fatalf("first sync: %+v", res)
+	}
+	r.idle("after the first sync")
+	for _, title := range []string{"Plain", "quoted", "Listed"} {
+		page := s.pageID(title)
+		text := s.call(s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil)
+		if !strings.Contains(text, "Text.") {
+			t.Fatalf("page %s: %q", title, text)
+		}
+		s.change(s.owner, "", "doc.write", M{"doc": page, "markdown": strings.Replace(text, "Text.", "Text two.", 1)})
+	}
+	if res := r.sync(); res.FilesWritten != 3 {
+		t.Fatalf("page edits: %+v", res)
+	}
+	for path, was := range files {
+		if got, want := r.read("main", path), strings.Replace(was, "Text.", "Text two.", 1); got != want {
+			t.Errorf("%s after its page was edited:\n%q\nwant\n%q", path, got, want)
+		}
+	}
+	r.idle("after the page edits")
+}

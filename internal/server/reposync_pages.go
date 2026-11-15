@@ -73,9 +73,11 @@ func pageSideInTx(ctx context.Context, tx store.Tx, docID, file string) (string,
 	return pageSide(d.Title, file, body), nil
 }
 
-// queue notes that a page's text is to be written to a file.
+// queue notes that a page's text is to be written to a file. The file
+// keeps its own front matter while the page says the same (see
+// keepFrontMatter); the page is remembered by its own text.
 func (r *syncRun) queue(path, docID, body string) {
-	r.toWrite[path] = body
+	r.toWrite[path] = keepFrontMatter(r.files[path], body)
 	r.written[docID] = shortHash(body)
 }
 

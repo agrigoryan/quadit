@@ -3,6 +3,8 @@ package server
 import (
 	"regexp"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/md"
 )
 
 // A file that opens with a level-1 heading (after front matter, if any) is
@@ -30,6 +32,21 @@ func frontMatter(text string) (fm, rest string) {
 	}
 	cut := 4 + end + len("\n---\n")
 	return text[:cut], text[cut:]
+}
+
+// keepFrontMatter is text, to be written to file, with the front matter
+// file has, byte for byte and with the blank lines after it, when the page's
+// says the same. A page holds front matter as Markdown blocks, which spell
+// it their own way (blank lines, list indents), so the two are compared as
+// those blocks render; a page whose front matter was edited writes its own.
+func keepFrontMatter(file, text string) string {
+	fileFM, fileRest := frontMatter(file)
+	pageFM, pageRest := frontMatter(text)
+	if fileFM == "" || pageFM == "" || md.Render(md.Parse(fileFM)) != md.Render(md.Parse(pageFM)) {
+		return text
+	}
+	gap := fileRest[:len(fileRest)-len(strings.TrimLeft(fileRest, "\n"))]
+	return fileFM + gap + strings.TrimLeft(pageRest, "\n")
 }
 
 // openingHeading is the text of the level-1 heading a file or a page opens
