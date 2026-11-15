@@ -111,10 +111,11 @@ export function TaskPropertyPicker({ property, tasks, open, onOpenChange, childr
       {anchor && <PopoverAnchor virtualRef={anchor} />}
       {isOpen && (
         <PopoverContent align={align} side={side} aria-label={property.picker.title()} className="p-0">
+          {/* Keyed by the property: each kind's list reads different tables. */}
           {List ? (
-            <List tasks={tasks} close={() => setOpen(false)} />
+            <List key={property.name} tasks={tasks} close={() => setOpen(false)} />
           ) : (
-            <Choices property={property} tasks={tasks} close={() => setOpen(false)} />
+            <Choices key={property.name} property={property} tasks={tasks} close={() => setOpen(false)} />
           )}
         </PopoverContent>
       )}

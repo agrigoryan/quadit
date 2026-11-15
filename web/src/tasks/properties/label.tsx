@@ -72,7 +72,7 @@ export const label = {
   manage: "labels",
   picker: {
     title: () => t("prop.set.labels"),
-    hotkey: "l",
+    hotkey: { key: "l", shortcut: "shortcuts.labels" },
     multiple: true,
     useItems: (tasks) => {
       const labels = useLabels(tasks[0]?.project_id);
@@ -89,5 +89,17 @@ export const label = {
   },
   Panel: LabelRow,
   Create: LabelPill,
+  palette: {
+    icon: <Tag />,
+    useChoices: (task) =>
+      useLabels(task.project_id).map((l) => ({
+        id: l.id,
+        label: l.name,
+        icon: <span className="size-2.5 rounded-full" style={{ background: l.color || "var(--ink-3)" }} />,
+        checked: task.label_ids?.includes(l.id) ?? false,
+        apply: () => toggleLabel([task], l.id),
+      })),
+    empty: () => t("palette.noLabels"),
+  },
   bulk: { place: "bar", icon: <Tag className="size-3.5" aria-hidden /> },
 } satisfies TaskProperty<"label">;

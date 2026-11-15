@@ -4,6 +4,7 @@ import { useFocusReturn } from "@/palette/focus-return";
 import { type Key, t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
 import { DESTINATIONS, goKeys, listedName } from "@/shell/destinations";
+import { KEYED } from "@/tasks/properties";
 import { Dialog } from "@/ui/dialog";
 import { Kbd } from "@/ui/kbd";
 
@@ -20,6 +21,11 @@ interface Section {
   hint?: Key;
   rows: Shortcut[];
 }
+
+/** The keys that open a task property's picker, on a list's row and on the open task alike (tasks/properties). */
+const propertyKeys: Shortcut[] = KEYED.flatMap(({ picker }) =>
+  picker.hotkey ? [{ what: picker.hotkey.shortcut, keys: [picker.hotkey.key.toUpperCase()] }] : [],
+);
 
 const sections: Section[] = [
   {
@@ -42,10 +48,7 @@ const sections: Section[] = [
       { what: "shortcuts.newTab", keys: [`${MOD} Click`] },
       { what: "shortcuts.select", keys: ["X"] },
       { what: "shortcuts.fold", keys: ["←", "→"], join: "or" },
-      { what: "shortcuts.status", keys: ["S"] },
-      { what: "shortcuts.assignee", keys: ["A"] },
-      { what: "shortcuts.priority", keys: ["P"] },
-      { what: "shortcuts.labels", keys: ["L"] },
+      ...propertyKeys,
       { what: "shortcuts.clear", keys: ["Esc"] },
       { what: "shortcuts.lift", keys: ["Shift Space"] },
     ],
@@ -59,10 +62,7 @@ const sections: Section[] = [
       { what: "shortcuts.peekClose", keys: ["Space", "Esc"], join: "or" },
       { what: "shortcuts.pageNext", keys: ["J", "K"], join: "or" },
       { what: "shortcuts.back", keys: ["Esc"] },
-      { what: "shortcuts.status", keys: ["S"] },
-      { what: "shortcuts.assignee", keys: ["A"] },
-      { what: "shortcuts.priority", keys: ["P"] },
-      { what: "shortcuts.labels", keys: ["L"] },
+      ...propertyKeys,
       { what: "shortcuts.send", keys: [`${MOD} Enter`] },
     ],
   },

@@ -15,7 +15,7 @@ import { milestone } from "@/tasks/properties/milestone";
 import { parent } from "@/tasks/properties/parent";
 import { priority } from "@/tasks/properties/priority";
 import { project } from "@/tasks/properties/project";
-import type { BulkPart, CreateProps, PickerProperty, TaskProperty } from "@/tasks/properties/property";
+import type { BulkPart, CreateProps, PalettePart, PickerProperty, TaskProperty } from "@/tasks/properties/property";
 import { status } from "@/tasks/properties/status";
 import { waiting } from "@/tasks/properties/waiting";
 
@@ -66,6 +66,11 @@ export const CREATE: (TaskProperty<PropertyName> & { Create: ComponentType<Creat
   parent,
   due,
 ];
+
+/** The ones the command palette changes on the open task, in the table's order. */
+export const PALETTE = PROPERTIES.filter(
+  (p): p is TaskProperty<PropertyName> & PickerProperty & { palette: PalettePart } => !!p.picker && !!p.palette,
+);
 
 /** The properties a key opens the picker of (S, A, P, L), in the table's order. */
 export const KEYED = PROPERTIES.filter((p): p is TaskProperty<PropertyName> & PickerProperty => !!p.picker?.hotkey);

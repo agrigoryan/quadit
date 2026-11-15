@@ -254,7 +254,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     },
     ...Object.fromEntries(
       KEYED.map((property) => [
-        property.picker.hotkey,
+        property.picker.hotkey?.key,
         (e: KeyboardEvent) => {
           e.preventDefault(); // or the letter lands in the picker's search box
           openPicker(property);

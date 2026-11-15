@@ -51,7 +51,7 @@ export const status = {
   manage: "statuses",
   picker: {
     title: () => t("prop.set.status"),
-    hotkey: "s",
+    hotkey: { key: "s", shortcut: "shortcuts.status" },
     useItems: (tasks) => ({
       items: useStatuses(tasks[0]?.project_id).map((s) => ({
         id: s.id,
@@ -65,5 +65,17 @@ export const status = {
   },
   Panel: StatusRow,
   Create: StatusPill,
+  palette: {
+    icon: <CircleDot />,
+    useChoices: (task) =>
+      useStatuses(task.project_id).map((s) => ({
+        id: s.id,
+        label: s.name,
+        words: tMaybe(`category.${s.category}`),
+        icon: <StatusIcon category={s.category} />,
+        checked: s.id === task.status_id,
+        apply: () => setStatus([task], s.id),
+      })),
+  },
   bulk: { place: "bar", icon: <CircleDot className="size-3.5" aria-hidden /> },
 } satisfies TaskProperty<"status">;

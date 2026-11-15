@@ -6,7 +6,6 @@
 import type { ReactNode } from "react";
 import {
   Bookmark,
-  CircleDot,
   Copy,
   FilePlus2,
   FileText,
@@ -20,13 +19,11 @@ import {
   Moon,
   Plus,
   Shapes,
-  SignalHigh,
   SlidersHorizontal,
   Sun,
   SunMoon,
   Tag,
   Tags,
-  UserRound,
   Wrench,
 } from "lucide-react";
 import { matchPath, useLocation } from "react-router";
@@ -44,12 +41,13 @@ import { ui } from "@/lib/ui-state";
 import { settingsGroups } from "@/settings/pages";
 import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";
 import { openNewTask } from "@/tasks/draft";
+import { PALETTE, type PropertyName } from "@/tasks/properties";
 import { taskPath } from "@/lib/task-link";
 
-export type ChoicePage = "status" | "assignee" | "priority" | "labels";
 /** Pages where the box takes a name for something new. */
 export type MakePage = "new-label" | "new-status";
-export type PalettePage = ChoicePage | MakePage;
+/** A page of a task property's values, by its name; or a page that makes something new. */
+export type PalettePage = PropertyName | MakePage;
 
 export interface Cmd {
   id: string;
@@ -112,30 +110,13 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   const docsOf = matchPath("/:ws/p/:key/docs/*", useLocation().pathname) ? project : undefined;
   const docsAt = docsOf ? projectDocs(slug, docsOf) : workspaceDocs(slug);
 
-  const taskChanges: Cmd[] = [
-    {
-      id: "task:status",
-      label: t("prop.set.status"),
-      icon: <CircleDot />,
-      hint: "S",
-      run: () => openPage("status"),
-    },
-    {
-      id: "task:assignee",
-      label: t("prop.set.assignee"),
-      icon: <UserRound />,
-      hint: "A",
-      run: () => openPage("assignee"),
-    },
-    {
-      id: "task:priority",
-      label: t("prop.set.priority"),
-      icon: <SignalHigh />,
-      hint: "P",
-      run: () => openPage("priority"),
-    },
-    { id: "task:labels", label: t("prop.set.labels"), icon: <Tag />, hint: "L", run: () => openPage("labels") },
-  ];
+  const taskChanges: Cmd[] = PALETTE.map(({ name, picker, palette }) => ({
+    id: `task:${name}`,
+    label: picker.title(),
+    icon: palette.icon,
+    hint: picker.hotkey?.key.toUpperCase(),
+    run: () => openPage(name),
+  }));
 
   const forTask: Cmd[] = task
     ? [

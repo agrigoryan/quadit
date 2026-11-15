@@ -1,15 +1,24 @@
 // Who has the task: a person or an agent, or nobody.
 
-import { UserRound } from "lucide-react";
+import { CircleSlash, UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
+import type { Task } from "@/lib/types";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
 import { setAssignee } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow, PropRow } from "@/tasks/properties/panel-row";
-import { type CreateProps, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import {
+  type Choice,
+  type CreateProps,
+  NONE,
+  type PanelProps,
+  shared,
+  type TaskProperty,
+} from "@/tasks/properties/property";
 import { memberItems, noneItem } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
+import { ListeningDot } from "@/ui/listening-dot";
 import { Picker } from "@/ui/picker";
 import { Tooltip } from "@/ui/tooltip";
 
@@ -67,12 +76,43 @@ function AssigneePill({ value, onChange }: CreateProps) {
   );
 }
 
+/** Unassigned, then me, then the rest by handle; a suspended member only while it has the task. */
+function useChoices(task: Task): Choice[] {
+  const members = useMembers();
+  const me = useMe();
+  const listening = useListening();
+  return [
+    {
+      id: "nobody",
+      label: t("task.unassigned"),
+      icon: <CircleSlash className="text-ink-3" />,
+      checked: !task.assignee_id,
+      apply: () => setAssignee([task], null),
+    },
+    ...[...members]
+      .filter((m) => !m.suspended_at || m.user_id === task.assignee_id)
+      .sort((a, b) => Number(b.user_id === me.user_id) - Number(a.user_id === me.user_id))
+      .map((m) => ({
+        id: m.user_id,
+        label: m.name,
+        detail: `@${m.handle}`,
+        mark:
+          listening(m) === undefined ? undefined : (
+            <ListeningDot on={listening(m) === true} className="ml-1.5 align-middle" />
+          ),
+        icon: <Avatar member={m} size="xs" />,
+        checked: m.user_id === task.assignee_id,
+        apply: () => setAssignee([task], m.user_id),
+      })),
+  ];
+}
+
 export const assignee = {
   name: "assignee",
   title: () => t("prop.assignee"),
   picker: {
     title: () => t("prop.set.assignee"),
-    hotkey: "a",
+    hotkey: { key: "a", shortcut: "shortcuts.assignee" },
     useItems: (tasks) => {
       const members = useMembers();
       const me = useMe();
@@ -87,5 +127,6 @@ export const assignee = {
   },
   Panel: AssigneeRow,
   Create: AssigneePill,
+  palette: { icon: <UserRound />, useChoices },
   bulk: { place: "bar", icon: <UserRound className="size-3.5" aria-hidden /> },
 } satisfies TaskProperty<"assignee">;

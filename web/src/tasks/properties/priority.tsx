@@ -1,5 +1,6 @@
 // How urgent a task is: 1 (urgent) to 4 (low), or 0 for none.
 
+import { SignalHigh } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { setPriority } from "@/tasks/actions";
 import { Pill, pill } from "@/tasks/properties/create-pill";
@@ -49,7 +50,7 @@ export const priority = {
   title: () => t("prop.priority"),
   picker: {
     title: () => t("prop.set.priority"),
-    hotkey: "p",
+    hotkey: { key: "p", shortcut: "shortcuts.priority" },
     useItems: (tasks) => ({
       items: PRIORITIES.map((p) => ({
         id: String(p),
@@ -63,5 +64,17 @@ export const priority = {
   },
   Panel: PriorityRow,
   Create: PriorityPill,
+  palette: {
+    icon: <SignalHigh />,
+    // Urgent first and "no priority" last, unlike the picker's list.
+    useChoices: (task) =>
+      [1, 2, 3, 4, 0].map((p) => ({
+        id: String(p),
+        label: t(`priority.${p}` as "priority.0"),
+        icon: <PriorityIcon priority={p} title="" />,
+        checked: p === task.priority,
+        apply: () => setPriority([task], p),
+      })),
+  },
   bulk: { place: "bar", icon: <PriorityIcon priority={2} title="" /> },
 } satisfies TaskProperty<"priority">;

@@ -7,6 +7,7 @@
 // a due date is typed, not picked from a list, so it has no picker.
 
 import type { ComponentType, ReactNode } from "react";
+import type { Key } from "@/lib/i18n";
 import type { Project, Task } from "@/lib/types";
 import type { PickerItem } from "@/ui/picker";
 
@@ -32,8 +33,32 @@ export interface TaskProperty<Name extends string = string> {
   Panel?: ComponentType<PanelProps>;
   /** Its pill in the create dialog. */
   Create?: ComponentType<CreateProps>;
+  /** Changing it on the open task from the command palette: a command that opens a page of its values. */
+  palette?: PalettePart;
   /** Changing it on every task of a selection, from the bulk bar. */
   bulk?: BulkPart;
+}
+
+export interface PalettePart {
+  icon: ReactNode;
+  /** The values the open task can take, the one it has checked. A hook. */
+  useChoices: (task: Task) => Choice[];
+  /** What the page says when there is no value at all to offer. */
+  empty?: () => string;
+}
+
+/** One value on the palette's page of a property. */
+export interface Choice {
+  id: string;
+  label: string;
+  /** More words the search should match. */
+  words?: string;
+  detail?: string;
+  /** Drawn after the detail: whether anything is listening for an agent. */
+  mark?: ReactNode;
+  icon: ReactNode;
+  checked: boolean;
+  apply: () => void;
 }
 
 export interface BulkPart {
@@ -87,8 +112,8 @@ export interface PanelProps {
 export interface PickerPart {
   /** The picker's title and the words in its search box: "Change status…". */
   title: () => string;
-  /** The key that opens the picker on a list's current row and on the open task. */
-  hotkey?: string;
+  /** The key that opens the picker on a list's current row and on the open task, and what the shortcuts sheet calls it. */
+  hotkey?: { key: string; shortcut: Key };
   /** The rows offered for these tasks, and what they all have now. A hook: it reads only what this kind needs. */
   useItems: (tasks: Task[]) => { items: PickerItem[]; value: string | string[] | undefined };
   /** Sets the picked value on every one of the tasks. */

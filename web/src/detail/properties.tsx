@@ -35,7 +35,7 @@ export function Properties({ task, side }: Props) {
   useHotkeys(
     Object.fromEntries(
       KEYED.map(({ name, picker }) => [
-        picker.hotkey,
+        picker.hotkey?.key,
         (e: KeyboardEvent) => {
           if (readOnly) return;
           e.preventDefault();

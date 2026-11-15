@@ -6,8 +6,8 @@ import { matchPath, useLocation, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { useSlug, useTaskByKeyEvenIfGone } from "@/lib/selectors";
 import { ui, useUi } from "@/lib/ui-state";
-import { choiceTitle, ChoicesPage } from "@/palette/palette-choices";
-import type { ChoicePage, MakePage, PalettePage } from "@/palette/palette-commands";
+import { ChoicesPage } from "@/palette/palette-choices";
+import type { MakePage, PalettePage } from "@/palette/palette-commands";
 import { makeTitle, MakePageRows } from "@/palette/palette-make";
 import { RootPage } from "@/palette/palette-root";
 import { useFocusReturn } from "@/palette/focus-return";
@@ -15,6 +15,7 @@ import { useServerSearch } from "@/palette/palette-search";
 import { focusPage } from "@/shell/page-focus";
 import { pageUnder, projectInView } from "@/lib/project-in-view";
 import { useTaskNav } from "@/lib/task-link";
+import { PALETTE } from "@/tasks/properties";
 import { Spinner } from "@/ui/spinner";
 
 /**
@@ -46,8 +47,7 @@ function Palette() {
 
   // A page that needs the open task or a project falls back to the first page without one.
   const making: MakePage | null = (page === "new-label" || page === "new-status") && project ? page : null;
-  const choosing: ChoicePage | null =
-    page !== "root" && page !== "new-label" && page !== "new-status" && openTask ? page : null;
+  const choosing = (openTask && PALETTE.find((p) => p.name === page)) || null;
   const onRoot = !making && !choosing;
   const search = useServerSearch(onRoot ? query : "");
 
@@ -113,7 +113,7 @@ function Palette() {
                 value={query}
                 onValueChange={setQuery}
                 placeholder={
-                  making ? makeTitle[making]() : choosing ? choiceTitle[choosing]() : t("palette.placeholder")
+                  making ? makeTitle[making]() : choosing ? choosing.picker.title() : t("palette.placeholder")
                 }
                 className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-3 max-sm:text-[16px]"
               />
@@ -125,7 +125,7 @@ function Palette() {
               {making && project ? (
                 <MakePageRows page={making} project={project} query={query} run={run} />
               ) : choosing && openTask ? (
-                <ChoicesPage page={choosing} task={openTask} query={query} run={run} />
+                <ChoicesPage key={choosing.name} property={choosing} task={openTask} query={query} run={run} />
               ) : (
                 <RootPage
                   query={query}
