@@ -28,6 +28,7 @@ import { StatusIcon } from "@/ui/icons";
 import { FormField } from "@/ui/form";
 import { Menu, MenuContent, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 import { Select } from "@/ui/picker";
+import { useStatusTaskCount } from "@/tasks/data";
 
 const patch = (status: Status, fields: Partial<Status>) =>
   send({ type: "status.update", args: { id: status.id, ...fields } }, (tx) => tx.patch("statuses", status.id, fields));
@@ -154,14 +155,20 @@ export function StatusMenu({ status, project, onRename }: Props) {
 }
 
 /**
- * Asks before deleting. The server refuses while tasks have the status; its
- * reason is shown as it came, with a place to say where those tasks go.
+ * Asks before deleting. The server wants to know where the status's tasks go
+ * (all of them: archived and in the trash too), and which status becomes the
+ * default when it was the default; the dialog asks that up front. Should the
+ * server still refuse, its reason is shown as it came, with the same place
+ * to say where the tasks go.
  */
 function DeleteStatus({ status, others, onClose }: { status: Status; others: Status[]; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   /** The server's reason, as it came; it stays up while the next try is out, and that try's answer replaces it. */
   const [refusal, setRefusal] = useState("");
-  const [needsMove, setNeedsMove] = useState(false);
+  const [refusedForMove, setRefusedForMove] = useState(false);
+  const count = useStatusTaskCount(status.id).data;
+  const total = count ? count.kept + count.trashed : 0;
+  const needsMove = refusedForMove || !!status.is_default || total > 0;
   const [moveTo, setMoveTo] = useState(
     () => (others.find((s) => s.category === status.category) ?? others[0])?.id ?? "",
   );
@@ -177,7 +184,7 @@ function DeleteStatus({ status, others, onClose }: { status: Status; others: Sta
       onClose();
     } catch (err) {
       setRefusal(errorMessage(err));
-      if (err instanceof ApiError && err.field === "move_to") setNeedsMove(true);
+      if (err instanceof ApiError && err.field === "move_to") setRefusedForMove(true);
       setBusy(false);
     }
   }
@@ -204,6 +211,13 @@ function DeleteStatus({ status, others, onClose }: { status: Status; others: Sta
         {refusal && (
           <p role="alert" className="rounded-md bg-danger-soft px-2.5 py-1.5 text-sm text-danger">
             {refusal}
+          </p>
+        )}
+        {count && (
+          <p className="text-sm text-ink-2">
+            {total === 0 ? t("col.delete.noTasks") : t("col.delete.tasks", { n: total })}
+            {count.trashed > 0 && ` ${t("col.delete.trashed", { n: count.trashed })}`}
+            {status.is_default && ` ${t("col.delete.default")}`}
           </p>
         )}
         {needsMove && (

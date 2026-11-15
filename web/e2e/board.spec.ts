@@ -46,3 +46,30 @@ test("a card moves to the next column and back from the keyboard", async ({ page
   await expect.poll(async () => (await quadit.task(key)).status).toBe("Todo");
   for (const k of [above, below]) expect((await quadit.task(k)).status).toBe("Todo");
 });
+
+// The server moves every task of a deleted status, those in the trash too; the
+// dialog asks where before the first try, though the column shows no card.
+test("a status whose only task is in the trash is deleted once its tasks have a place", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await quadit.cli(
+    "do",
+    "status.create",
+    JSON.stringify({ project: project.key, name: "Polish", category: "started" }),
+  );
+  const key = await project.newTask("Sand the edges", "status=Polish");
+  await quadit.cli("delete", key);
+  await page.goto(`/e2e/p/${project.key}/board`);
+  await page.getByRole("button", { name: "Status options: Polish" }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete the status “Polish”?" });
+  await expect(dialog.getByText("That counts one task in the trash, which moves too.")).toBeVisible();
+  await expect(dialog.getByRole("group", { name: "Move its tasks to" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Move tasks and delete" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("region", { name: "Polish", exact: true })).toBeHidden();
+  await quadit.cli("restore", key);
+  await expect.poll(async () => (await quadit.task(key)).status).toBe("In Progress");
+});

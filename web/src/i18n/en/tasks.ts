@@ -163,6 +163,11 @@ export const tasks = {
   "col.delete.title": "Delete the status “{name}”?",
   "col.delete.body":
     "Its column leaves the board. A status that tasks still have cannot go until they are given another.",
+  "col.delete.noTasks": "No task has this status.",
+  "col.delete.tasks": "One task has this status: pick where it goes. | {n} tasks have this status: pick where they go.",
+  "col.delete.trashed":
+    "That counts one task in the trash, which moves too. | That counts {n} tasks in the trash, which move too.",
+  "col.delete.default": "It is the project's default status: the one you pick becomes the default.",
   "col.delete.moveTo": "Move its tasks to",
   "col.delete.move": "Move tasks and delete",
   "col.add": "Add status",
