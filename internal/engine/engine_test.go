@@ -546,7 +546,7 @@ func TestCatalog(t *testing.T) {
 	}
 	for _, ci := range cat {
 		if len(ci.Args) == 0 {
-			t.Errorf("%s has no described arguments: register it with its own argument struct, register[A] in engine.go, whose fields have json tags", ci.Type)
+			t.Errorf("%s has no described arguments: register it with its own argument struct, register[A] in register.go, whose fields have json tags", ci.Type)
 		}
 	}
 }
