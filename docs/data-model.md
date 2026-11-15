@@ -103,7 +103,7 @@ The feed is the task history, the record of who did what, what agents read from 
 The rest of the code talks to `store.DB` (`internal/store/store.go`): get, list, insert, update and delete rows of registered types, plus the few queries that need more (task filters, the feed, search). `sqlstore` implements it once for SQL:
 
 - Row types are structs with `db` tags; a small mapper builds the statements. `,null` stores a zero value as NULL; `,json` stores a field as JSON.
-- Migrations are written once with type macros (`{{ID}}`, `{{TS}}`, `{{JSON}}`, `{{BOOL}}`). SQLite gets TEXT and INTEGER; Postgres gets UUID, BIGINT, JSONB and BOOLEAN. A file named `NNNN_name.sqlite.sql` or `.postgres.sql` runs only there (search).
+- Migrations are written once with type macros (`{{ID}}`, `{{TS}}`, `{{JSON}}`, `{{BOOL}}`). SQLite gets TEXT and INTEGER; Postgres gets UUID, BIGINT, JSONB and BOOLEAN. A file named `NNNN_name.sqlite.sql` or `.postgres.sql` runs only there (search). goose runs them: [store.md](store.md) says how.
 - Queries are written with `?` and rebound for Postgres.
 - Every test that touches data runs on both through `internal/testdb`.
 

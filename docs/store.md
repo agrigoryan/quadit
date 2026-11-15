@@ -1,37 +1,183 @@
-# The data layer: goose, sqlc, and what to change
+# The data layer: migrations on goose, and the open question of queries
 
-A proposal, written before any code. It answers two questions: how would the code that
-uses the store change, and how much repeated code would each choice bring. Nothing here
-is built yet. What was tried was tried outside the repository, on the real schema, with
-goose v3.30.1 and sqlc v1.31.1; where a number is an estimate it says so.
+Two parts. **Migrations** run on goose: that is built, and the first half says how it
+works. **Queries** are undecided: the second half is the comparison written before any
+code, kept as it was for that decision. What was tried for it was tried outside the
+repository, on the real schema, with sqlc v1.31.1; where a number is an estimate it says
+so.
 
 ## In short
 
-- **goose for migrations: yes.** It replaces the hand-written runner, adds a lock so two
-  servers starting together cannot both migrate, and knows MySQL already. An install at
-  schema version 7 is taken over without running anything.
+- **Migrations run on goose** (v3.29.0, as a library). The schema files are the ones
+  there were, written once for every database; an install made before goose is taken over
+  without running anything; on Postgres a lock makes servers that start together take
+  turns.
+- **Queries: undecided.** The comparison below found that sqlc for every query is a bad
+  trade here, and proposed sqlc for about 30 statements with the mapper kept (design B).
+  That proposal is on hold while a library in place of the mapper is tried.
+
+## Migrations
+
+### The files
+
+`internal/store/sqlstore/migrations/` holds one set of files for every database:
+
+```
+0001_core.sql              every database; column types are macros: {{ID}}, {{TS}}, {{JSON}}, {{BOOL}}, …
+0006_search.sqlite.sql     SQLite only
+0006_search.postgres.sql   Postgres only
+```
+
+A released file is never edited (`TestMigrationsAreFrozen` holds their checksums, which
+did not change when goose came in). A change to the schema is a new file with the next
+number, recorded by running that test once with `QUADIT_UPDATE_MIGRATIONS=1`.
+
+### What goose is given
+
+goose reads plain SQL, one file per version. `migration_files.go` makes those files in
+memory each time a database is opened; nothing is written to disk. For one version it
+
+1. takes the shared file, then the file for this database, if there is one;
+2. replaces each `{{TYPE}}` macro with the database's column type (`{{ID}}` is `TEXT` on
+   SQLite and `UUID` on Postgres; the table is in `dialect.go`);
+3. drops blank lines and lines that are only a comment;
+4. puts `-- +goose Up` on top, which goose asks of every file.
+
+So on SQLite goose sees `0006_search.sql` holding `-- +goose Up` and the statements of
+`0006_search.sqlite.sql`. goose cuts a file into statements where a line ends in a
+semicolon. Step 3 makes those statements the same, byte for byte, as the ones the runner
+before goose executed: `TestMigrationsRunAsBefore` keeps that runner's code and compares
+(131 statements on SQLite, 132 on Postgres, in 7 versions). An install made before goose
+and one made after it have the same schema.
+
+What a migration file may hold is what it could before: plain statements, each ending in
+a semicolon at the end of a line. A statement with semicolons inside (a function, a
+trigger) needs goose's `StatementBegin` comments, which step 3 would drop: change step 3
+when the first one is needed.
+
+### Running them
+
+`migrate.go` hands goose (`goose.NewProvider`) those files, the database, and a record of
+applied versions. goose runs each pending version in its own transaction and records it
+in the same transaction, so a failed upgrade leaves the last good version in place.
+There is no way down: going back is the copy made before an upgrade.
+
+On Postgres goose holds a session lock (an advisory lock on the database) while it
+works. A server that finds it taken looks again every second, for up to five minutes;
+then it applies whatever is still pending, usually nothing. SQLite has one server.
+
+`MigrateTo(n)` stops at a version (the upgrade tests use it to stand in for an older
+binary). `Pending` and `SchemaVersion` read the record and write nothing.
+
+### The record of applied versions
+
+Two tables, written in the same transaction (`ledger.go`):
+
+| Table | Whose | For |
+| --- | --- | --- |
+| `goose_db_version` | goose's own, in its own SQL | deciding what still has to run |
+| `schema_migrations` | the one this code kept before goose | binaries from before goose |
+
+Keeping the second in step means an older binary still reads the version a database is
+at: it refuses a schema newer than it knows ("database is at version 8, this binary knows
+7"), and it opens the copy that `quadit upgrade --undo` puts back. Had the table been
+left alone, an older binary would have run against a schema it does not know.
+
+### Opening a database
+
+In this order (`sqlite.go` and `postgres.go`, then `MigrateTo`):
+
+1. Read the version: from goose's table when it is there, else from
+   `schema_migrations`, else 0. Nothing is written.
+2. A database newer than the binary is refused, unchanged.
+3. If the binary has newer versions and the database is not new, a copy of it as it was
+   is made (`quadit.sqlite.before-vN`, or the database `<name>_before_vN`). If the copy
+   cannot be made, opening stops here and nothing has been changed.
+4. An install from before goose (`schema_migrations`, no table of goose's) is taken over
+   (`adopt.go`): goose's table is made and versions 1 to the one it is at are written to
+   it as applied, all or nothing, under the same lock goose takes. Nothing is run.
+5. goose applies what is newer.
+
+| The database | Copy | Taken over | Run |
+| --- | --- | --- | --- |
+| New | no | no | every version |
+| Before goose, at the newest version | no | yes | nothing |
+| Before goose, at 5 of 7 | yes, without goose's table | versions 1–5 | 6 and 7 |
+| Kept by goose, up to date | no | no | nothing |
+| Kept by goose, behind | yes | no | what is newer |
+
+An install taken over at its own version can still be opened by the older binary as it
+is: goose's table is one that binary does not look at. `quadit upgrade --undo` is
+unchanged: it puts the copy from step 3 in place and keeps the upgraded database beside
+it; when the schema did not change there is no copy, and it says so.
+
+### goose itself
+
+| | |
+| --- | --- |
+| Version | v3.29.0 (2026-10-11), pinned in `go.mod` |
+| Licence | MIT; 11.7k stars; 43 commits since May |
+| Added to `go.mod` | goose, `mfridman/interpolate` (MIT), `sethvargo/go-retry` (Apache-2.0), `go.uber.org/multierr` (MIT). Its drivers for other databases are not imported and stay out |
+| In the binary | 467 kB more (97.2 MB to 97.7 MB) |
+
+Not v3.30.1, the newest: it asks for `modernc.org/libc` v1.80.2, while the SQLite driver
+in use (`modernc.org/sqlite` v1.62.0) says to build it with exactly the libc its own
+`go.mod` names, v1.80.1; it also moves eight other modules (gRPC and the Azure SDK among
+them). v3.29.0 moves nothing. Two faults fixed in v3.30.1 are stepped around: a lock
+object used more than once can stop waiting too early, so `postgresMigrationLock` makes a
+new one for every use; and v3.29.0 does not build with `mfridman/interpolate` v0.2.0, so
+that module stays at v0.0.2 until goose moves (a `go get -u` would move it). Move to a
+newer goose together with the SQLite driver, when that asks for the same libc.
+
+A third database: goose has its SQL for the record already (MySQL among them); it needs
+its column types and `hasTable` query in `dialect.go`, and files of its own where its
+DDL differs.
+
+### How it was proven
+
+- Statements: `TestMigrationsRunAsBefore`, both databases, as above.
+- Taking over, the part-way case with its copy and the way back, a new install and a
+  newer database refused: `adopt_test.go` beside `upgrade_test.go` in
+  `internal/store/sqlite`. Taking over, the part-way case, servers starting together,
+  and "nothing changes when the copy cannot be made": the same file in
+  `internal/store/postgres`.
+- With real binaries, on SQLite files and on Postgres databases: an install made by the
+  binary from before goose (set up, served, tasks added through the command-line tool)
+  was opened by the new one. A dump of the database before and after differed only by
+  goose's table (and, on SQLite, the `sqlite_sequence` table SQLite keeps for it); the tasks, comments and schema version read the same; the older binary
+  then opened it again. An install stopped at version 5 by the older code got 6 and 7,
+  its copy was the database as it was to the row, `quadit upgrade --undo` put it back to
+  the row, and its schema after the upgrade was the same as an install the older binary
+  made. Two new servers started at the same moment on an empty Postgres database both
+  came up, with each version applied once.
+
+## Queries: the comparison (undecided)
+
+Written before any code, to answer two questions: how would the code that uses the store
+change, and how much repeated code would each choice bring.
+
 - **sqlc for every query: no.** 81% of the calls are "rows of one table where these
   columns equal these values". One 626-line mapper serves them all today with no code per
   query. sqlc needs a named query for each shape (about 420), generates each one twice,
   cannot fill the existing `internal/core` structs, and cannot express the 10% of calls
   whose conditions are decided at run time.
-- **sqlc for the statements that are real SQL: yes, about 30 of them** (counters, grouped
+- **sqlc for the statements that are real SQL: about 30 of them** (counters, grouped
   counts, changes to many rows by a range, the workspace lock, the feed notice). They all
   return numbers, so one adapter serves both databases and nothing is written twice.
 - The task filter stays one hand-written builder. One static query with optional
   arguments was tried: SQLite then reads the whole table instead of using an index.
 
-The choice is the owner's. The designs are compared below with the same nine call sites.
+The designs are compared below with the same nine call sites.
 
-## The two tools
+## sqlc
 
-| | goose (`pressly/goose/v3`) | sqlc (`sqlc-dev/sqlc`) |
-| --- | --- | --- |
-| Licence | MIT | MIT |
-| Latest release | v3.30.1, 2026-11-12 | v1.31.1, 2026-04-22 (the main branch is active: 98 commits since May) |
-| Adoption | 11.7k stars, 43 commits since May | 18.5k stars |
-| In the binary | Yes: about 1.0 MB, measured on a small program (the binary is 97 MB) | Nothing: it runs at build time, its output uses only `database/sql` |
-| Added to `go.mod` | goose, `mfridman/interpolate` (MIT), `sethvargo/go-retry` (Apache-2.0), `go.uber.org/multierr` (MIT). Its other requirements (ClickHouse, MySQL, YDB drivers) are not imported by the library and stay out | Nothing, if two defaults are avoided: Postgres JSONB maps to `sqlc-dev/pqtype` and a Postgres array argument to `lib/pq` unless overridden |
+| | sqlc (`sqlc-dev/sqlc`) |
+| --- | --- |
+| Licence | MIT |
+| Latest release | v1.31.1, 2026-04-22 (the main branch is active: 98 commits since May) |
+| Adoption | 18.5k stars |
+| In the binary | Nothing: it runs at build time, its output uses only `database/sql` |
+| Added to `go.mod` | Nothing, if two defaults are avoided: Postgres JSONB maps to `sqlc-dev/pqtype` and a Postgres array argument to `lib/pq` unless overridden |
 
 What the sqlc trial found, on this schema:
 
@@ -297,9 +443,9 @@ Also looked at, not tried:
   checked earlier; it swaps 626 known lines for a large dependency. Worth a look only if
   MySQL becomes real.
 
-## Recommendation
+## What was proposed for queries (on hold)
 
-1. goose, as below.
+1. goose: done, as above.
 2. Design B. `Incr` and `Tally` leave the generic API (they were added to it because real
    SQL had nowhere to live); each becomes a named method backed by a query in a `.sql`
    file. The mapper keeps serving rows of one table; the filter builder stays.
@@ -310,13 +456,13 @@ Also looked at, not tried:
 
 Close calls: B over C (B's whole gain is about 30 named, checked statements and a home
 for the next real query; if the build step is not worth that, C is B without step 2 and
-nothing else changes), and the layout of migrations (below).
+nothing else changes).
 
 Layout under B:
 
 ```
 internal/store/store.go              the interface, as now, with named methods in place of Incr and Tally
-internal/store/migrations/           the schema files (see below)
+internal/store/sqlstore/migrations/  the schema files (as now)
 internal/store/sqlstore/             common code: mapper, filter builder, the one adapter, transactions
 internal/store/sqlstore/queries/     shared.sql, sqlite.sql, postgres.sql
 internal/store/sqlite/               open, copy before upgrade, FTS5 search (by hand), gen/ (sqlc)
@@ -329,59 +475,7 @@ generate` runs sqlc v1.31.1 (pinned, checked), and `make check-generated` (part 
 test-all`) regenerates into a temporary directory and compares, skipping when sqlc is not
 installed.
 
-## Migrations on goose
+Still to prove if design B is built:
 
-**Running.** `goose.NewProvider(dialect, db, files)` from an embedded file system, with
-goose's Postgres session lock. `MigrateTo(n)` becomes `provider.UpTo`, the schema version
-shown by the server becomes `provider.GetDBVersion`, "is an upgrade pending" becomes
-`provider.HasPending`. No Down sections: going back is the copy made before an upgrade.
-Tried: goose applied today's seven versions to SQLite from files with `-- +goose Up` on
-top, and `UpTo(5)` then `Up()` applied 6 and 7.
-
-**Layout.** Two ways, and the owner's "no duplicate code" decides between them:
-
-| | One set of files with type macros, as now | A directory per database |
-| --- | --- | --- |
-| Files | the 8 there are, unchanged | 14: each of the 6 shared files twice, differing only in type names (about 1,050 more lines) |
-| A new migration | written once | written twice |
-| What goose reads | a 40-line wrapper around the embedded files that puts `-- +goose Up` on top and expands `{{ID}}`, `{{TS}}` for the database | the files as they are |
-| Frozen checksums | unchanged | recorded again, once |
-| sqlc's schema (design B) | `make generate` writes the expanded schema to a file per database, checked like other generated code | reads the directories |
-| goose's own command-line tool | cannot read the files | can |
-
-Recommended: one set. The binary is the only thing that runs migrations, and the
-expansion is then by construction what today's code executes.
-
-**An existing install.** It has `schema_migrations` at 7 and no goose table. On opening:
-
-1. Read the version: from goose's table if it is there, else from `schema_migrations`.
-2. If the binary has newer versions and the database is not empty, make the copy first,
-   exactly as now (`quadit.sqlite.before-vN`, `<name>_before_vN`). If the copy cannot be
-   made, stop: nothing has been changed.
-3. If goose's table is missing, create it and record versions 1 to the current one as
-   applied, in one transaction, with goose's own store (`database.NewStore`:
-   `CreateVersionTable`, `Insert`). Nothing is run. An install at 5 records 1–5.
-4. `provider.Up`: an install at 7 runs nothing; one at 5 runs 6 and 7.
-
-**The old `schema_migrations` table** stays, and stays in step: each version goose applies
-is also recorded there in the same transaction (a 25-line wrapper around goose's store).
-An older binary pointed at a newer database then still refuses to start ("database is at
-version 8, this binary knows 7"), where leaving the table untouched would let it run
-against a schema it does not know. The other way, a store of our own that makes goose use
-`schema_migrations` itself, needs no step 3 but is the part of goose that would otherwise
-make a new database free.
-
-**Undo** is unchanged: `quadit upgrade --undo` puts the copy in place and keeps the
-upgraded database beside it. The copy holds both tables as they were, so the older binary
-opens it as before.
-
-**Frozen migrations**: `TestMigrationsAreFrozen` keeps checking the files goose reads.
-
-## To prove when it is built
-
-- The statements goose runs for versions 1–7 are, one for one, those today's code runs,
-  on each database (both splitters dumped and compared).
-- An install made by today's binary, opened by the new one: no migration runs, data
-  intact, undo as documented. On SQLite files and on a Postgres database.
 - Every sqlc query: the same statement as before, or its plan compared at 10,000 tasks.
 - The Postgres list form (`string_to_array`) against today's `IN ($1, $2, …)`.
