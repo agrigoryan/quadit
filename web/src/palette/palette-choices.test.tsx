@@ -6,6 +6,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { WithQuery } from "@/test/query";
 import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, loadBootstrap } from "@/lib/store";
@@ -84,6 +85,7 @@ function openPalette() {
         <CommandPalette />
       </TooltipProvider>
     </MemoryRouter>,
+    { wrapper: WithQuery },
   );
 }
 

@@ -5,6 +5,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { WithQuery } from "@/test/query";
 import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, getState, loadBootstrap } from "@/lib/store";
@@ -99,6 +100,7 @@ function open(kind: PropertyName, tasks: Task[] = [theTask()]) {
         <TaskPropertyPicker property={{ ...property, picker }} tasks={tasks} open onOpenChange={() => {}} />
       </TooltipProvider>
     </MemoryRouter>,
+    { wrapper: WithQuery },
   );
 }
 

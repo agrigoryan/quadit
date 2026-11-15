@@ -6,6 +6,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { WithQuery } from "@/test/query";
 import { Properties } from "@/detail/properties";
 import { api } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
@@ -84,6 +85,7 @@ function renderPanel() {
         <Properties task={getState().collections.tasks.t1 as Task} />
       </TooltipProvider>
     </MemoryRouter>,
+    { wrapper: WithQuery },
   );
 }
 

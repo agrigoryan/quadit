@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useMemo, useState } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { WithQuery } from "@/test/query";
 import { emptyCollections } from "@/lib/collections";
 import { loadBootstrap, useStore } from "@/lib/store";
 import { PeekContext } from "@/lib/task-link";
@@ -95,6 +96,7 @@ function renderList(groups = GROUPS, nested = true) {
         <Page groups={groups} nested={nested} />
       </TooltipProvider>
     </MemoryRouter>,
+    { wrapper: WithQuery },
   );
 }
 
