@@ -4,6 +4,7 @@
 
 import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
+import { isDay } from "@/lib/days";
 import { t } from "@/lib/i18n";
 import { useMembers } from "@/lib/selectors";
 import { docTitle, useRows } from "@/docs/data";
@@ -98,7 +99,7 @@ function parseInput(prop: DBProperty, text: string): unknown {
     const n = Number(s.replace(",", "."));
     return Number.isFinite(n) ? n : undefined;
   }
-  if (prop.type === "date") return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined;
+  if (prop.type === "date") return isDay(s) ? s : undefined;
   return prop.type === "text" ? text : s;
 }
 
