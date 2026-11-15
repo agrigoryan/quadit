@@ -314,8 +314,8 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 		if to == "" {
 			return false, nil
 		}
-		var st core.Status
-		if there, err := rowFound(db.Get(ctx, &st, store.Eq("id", to))); err != nil || !there || st.Category != m.ToCategory {
+		var status core.Status
+		if there, err := rowFound(db.Get(ctx, &status, store.Eq("id", to))); err != nil || !there || status.Category != m.ToCategory {
 			return false, err
 		}
 	}

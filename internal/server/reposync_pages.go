@@ -13,6 +13,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// The source's pages, and the hashes that say what both sides agreed on at the last sync.
+
 func shortHash(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return hex.EncodeToString(sum[:8])

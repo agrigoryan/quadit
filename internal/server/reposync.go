@@ -120,7 +120,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	defer func() {
 		set := map[string]any{"last_sync_at": time.Now().UnixMilli(), "last_error": ""}
 		if err != nil {
-			set["last_error"] = oneLine(err.Error(), 400)
+			set["last_error"] = oneLine(err.Error(), lastErrorSize)
 		} else if res.Commit != "" {
 			set["last_commit"] = res.Commit
 		}

@@ -11,6 +11,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// Settling each file against its page, and each page against its file.
+
 // reconcile settles every file against its page, then every page that has
 // no file, in one write. Pages are made, rewritten and trashed here; what
 // has to change in the repository is noted for the steps that follow.

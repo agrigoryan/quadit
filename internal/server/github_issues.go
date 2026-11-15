@@ -49,24 +49,24 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 		}
 		project = p.Key
 	}
-	if g.st.IssueTasks == nil {
-		g.st.IssueTasks = map[string]string{}
+	if g.state.IssueTasks == nil {
+		g.state.IssueTasks = map[string]string{}
 	}
 	q := "/repos/" + g.cfg.Repo + "/issues?state=all&sort=updated&direction=desc&per_page=50"
 	if g.cfg.IssuesLabel != "*" {
 		q += "&labels=" + url.QueryEscape(g.cfg.IssuesLabel)
 	}
-	if g.st.IssuesSince != "" {
-		q += "&since=" + url.QueryEscape(g.st.IssuesSince)
+	if g.state.IssuesSince != "" {
+		q += "&since=" + url.QueryEscape(g.state.IssuesSince)
 	}
 	var issues []ghIssue
 	if err := g.gh.call(ctx, "GET", q, nil, &issues); err != nil {
 		return 0, err
 	}
-	newest, handled := g.st.IssuesSince, 0
+	newest, handled := g.state.IssuesSince, 0
 	// Oldest first, so tasks are numbered in the order the issues changed.
 	for _, is := range slices.Backward(issues) {
-		if is.PullRequest != nil || is.UpdatedAt <= g.st.IssuesSince {
+		if is.PullRequest != nil || is.UpdatedAt <= g.state.IssuesSince {
 			continue
 		}
 		if is.UpdatedAt > newest {
@@ -80,7 +80,7 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 		}
 		handled++
 	}
-	g.st.IssuesSince = newest
+	g.state.IssuesSince = newest
 	return handled, nil
 }
 
@@ -89,7 +89,7 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 func (g *githubSync) taskOfIssue(ctx context.Context, sys *engine.Sys, project string, is ghIssue, text string) (core.Task, error) {
 	num := strconv.Itoa(is.Number)
 	var t core.Task
-	if known := g.st.IssueTasks[num]; known != "" {
+	if known := g.state.IssueTasks[num]; known != "" {
 		there, err := rowFound(sys.Tx().Get(ctx, &t, store.Eq("id", known)))
 		if err != nil || there {
 			return t, err
@@ -111,7 +111,7 @@ func (g *githubSync) taskOfIssue(ctx context.Context, sys *engine.Sys, project s
 			return t, err
 		}
 	}
-	g.st.IssueTasks[num] = t.ID
+	g.state.IssueTasks[num] = t.ID
 	return t, nil
 }
 

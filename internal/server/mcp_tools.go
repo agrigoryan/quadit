@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// The MCP tools: their list, what each takes, and the API path most of them read.
+
 // mcpTool is one tool: what it is called, what it takes, and how it maps
 // onto the API.
 type mcpTool struct {
@@ -110,6 +112,8 @@ func mcpToolList() map[string]any {
 	return map[string]any{"tools": tools}
 }
 
+// toolSchema is a tool's input schema: each argument with its type and
+// what it is for, and which are required.
 func toolSchema(t mcpTool) map[string]any {
 	props := map[string]any{}
 	required := []string{}

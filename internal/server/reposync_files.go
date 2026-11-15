@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+// The source's folder in the working copy: finding it, reading its files, writing pages back.
+
 // findFolder settles where in the working copy the source's pages are kept.
 func (r *syncRun) findFolder() error {
 	r.root = filepath.Join(r.dir, filepath.FromSlash(r.src.Subdir))
@@ -17,7 +19,7 @@ func (r *syncRun) findFolder() error {
 	if !staysInside(r.dir, r.root) {
 		return errors.New("the source's folder leads out of its repository, or goes through a link in it; set it to a real folder inside, such as docs")
 	}
-	if st, serr := os.Stat(r.root); r.src.Subdir != "" && serr == nil && !st.IsDir() {
+	if info, serr := os.Stat(r.root); r.src.Subdir != "" && serr == nil && !info.IsDir() {
 		return errors.New("the source's folder " + r.src.Subdir + " is a file in the repository; set it to a folder")
 	} else if r.src.Subdir != "" && serr != nil {
 		// Said, and not the end of it: pages written here may be what
@@ -81,8 +83,8 @@ func (r *syncRun) pathTaken(p string) bool {
 		return true
 	}
 	// Or a link, or a folder, by that very name.
-	st, lerr := os.Lstat(filepath.Join(r.root, filepath.FromSlash(p)))
-	return lerr == nil && (st.Mode()&os.ModeSymlink != 0 || st.IsDir())
+	info, lerr := os.Lstat(filepath.Join(r.root, filepath.FromSlash(p)))
+	return lerr == nil && (info.Mode()&os.ModeSymlink != 0 || info.IsDir())
 }
 
 // writeOut puts into the working copy what reconcile found is to be written

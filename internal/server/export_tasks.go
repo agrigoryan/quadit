@@ -8,6 +8,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
+// tasks/ of an export: one readable Markdown file per task.
+
 // tasks writes tasks/: one readable file each.
 func (e *exporter) tasks() error {
 	e.indexTasks()
@@ -84,8 +86,8 @@ func (e *exporter) taskMarkdown(t core.Task) string {
 // taskFields writes the head of a task's page: its fields, one a line.
 func (e *exporter) taskFields(b *strings.Builder, t core.Task) {
 	names := e.names
-	st := names.statuses[t.StatusID]
-	fmt.Fprintf(b, "---\nkey: %s\ntitle: %q\nstatus: %q\n", t.Key, t.Title, st.Name)
+	status := names.statuses[t.StatusID]
+	fmt.Fprintf(b, "---\nkey: %s\ntitle: %q\nstatus: %q\n", t.Key, t.Title, status.Name)
 	if t.AssigneeID != "" {
 		fmt.Fprintf(b, "assignee: %q\n", names.handle(t.AssigneeID))
 	}

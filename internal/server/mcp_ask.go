@@ -24,6 +24,8 @@ type askOption struct {
 	Files       any    `json:"files"`
 }
 
+// toolAsk asks a person a question: a choice when it has options, a yes or
+// no when it has none, with any files on the question or its options.
 func toolAsk(s *Server, token string, a map[string]any) (string, bool) {
 	open := map[string]any{"task": argText(a, "task"), "question": argText(a, "question")}
 	for _, k := range []string{"details", "ask"} {

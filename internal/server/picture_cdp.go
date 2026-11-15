@@ -177,20 +177,20 @@ func takePicture(ctx context.Context, p pictureRequest) (png []byte, whole int, 
 		return nil, 0, err
 	}
 	defer b.stop()
-	c := b.cdp
-	s, err := openPage(ctx, c, p)
+	devtools := b.cdp
+	s, err := openPage(ctx, devtools, p)
 	if err != nil {
 		return nil, 0, err
 	}
-	if err := waitForSettledPage(ctx, c, s); err != nil {
+	if err := waitForSettledPage(ctx, devtools, s); err != nil {
 		return nil, 0, err
 	}
 	if p.full {
-		if whole, err = fitWholePage(ctx, c, s, p); err != nil {
+		if whole, err = fitWholePage(ctx, devtools, s, p); err != nil {
 			return nil, 0, err
 		}
 	}
-	res, err := c.call(ctx, s, "Page.captureScreenshot", map[string]any{"format": "png"})
+	res, err := devtools.call(ctx, s, "Page.captureScreenshot", map[string]any{"format": "png"})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -204,7 +204,7 @@ func takePicture(ctx context.Context, p pictureRequest) (png []byte, whole int, 
 	if err != nil || len(png) == 0 {
 		return nil, 0, errors.New("the browser made no picture")
 	}
-	_, _ = c.call(ctx, "", "Browser.close", map[string]any{}) //nolint:errcheck // the browser is stopped below in any case
+	_, _ = devtools.call(ctx, "", "Browser.close", map[string]any{}) //nolint:errcheck // the browser is stopped below in any case
 	return png, whole, nil
 }
 
@@ -280,8 +280,8 @@ func (b *browser) stop() {
 // openPage opens a tab with the device and color scheme asked for,
 // goes to the target and waits for it to load. It returns the tab's
 // session.
-func openPage(ctx context.Context, c *cdp, p pictureRequest) (string, error) {
-	res, err := c.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"})
+func openPage(ctx context.Context, devtools *cdp, p pictureRequest) (string, error) {
+	res, err := devtools.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"})
 	if err != nil {
 		return "", err
 	}
@@ -291,7 +291,7 @@ func openPage(ctx context.Context, c *cdp, p pictureRequest) (string, error) {
 	if err := json.Unmarshal(res, &made); err != nil {
 		return "", fmt.Errorf("the browser's answer to opening a tab: %w", err)
 	}
-	res, err = c.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": made.TargetID, "flatten": true})
+	res, err = devtools.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": made.TargetID, "flatten": true})
 	if err != nil {
 		return "", err
 	}
@@ -303,23 +303,23 @@ func openPage(ctx context.Context, c *cdp, p pictureRequest) (string, error) {
 	}
 	s := at.SessionID
 	phone := p.width < phoneWidth
-	if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
+	if _, err := devtools.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
 		"width": p.width, "height": p.height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
 		return "", err
 	}
 	if phone {
-		_, _ = c.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true}) //nolint:errcheck // without touch the page is still a phone's
+		_, _ = devtools.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true}) //nolint:errcheck // without touch the page is still a phone's
 	}
 	scheme := "light"
 	if p.dark {
 		scheme = "dark"
 	}
-	_, _ = c.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{ //nolint:errcheck // without it the page shows in its default scheme
+	_, _ = devtools.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{ //nolint:errcheck // without it the page shows in its default scheme
 		"features": []map[string]string{{"name": "prefers-color-scheme", "value": scheme}}})
-	if _, err := c.call(ctx, s, "Page.enable", map[string]any{}); err != nil {
+	if _, err := devtools.call(ctx, s, "Page.enable", map[string]any{}); err != nil {
 		return "", err
 	}
-	res, err = c.call(ctx, s, "Page.navigate", map[string]any{"url": p.target})
+	res, err = devtools.call(ctx, s, "Page.navigate", map[string]any{"url": p.target})
 	if err != nil {
 		return "", err
 	}
@@ -332,17 +332,17 @@ func openPage(ctx context.Context, c *cdp, p pictureRequest) (string, error) {
 	if nav.ErrorText != "" {
 		return "", fmt.Errorf("the page did not open: %s", nav.ErrorText)
 	}
-	c.event(ctx, pageLoadWait, func(m cdpMsg) bool { return m.Method == "Page.loadEventFired" })
+	devtools.event(ctx, pageLoadWait, func(m cdpMsg) bool { return m.Method == "Page.loadEventFired" })
 	return s, nil
 }
 
 // waitForSettledPage waits for the page to have its data, then for two
 // looks in a row that agree, so a list that is still filling in is not
 // caught half-way. A page that does not settle in time is pictured as it is.
-func waitForSettledPage(ctx context.Context, c *cdp, s string) error {
+func waitForSettledPage(ctx context.Context, devtools *cdp, s string) error {
 	settled := 0
 	for deadline := time.Now().Add(pageSettleWait); time.Now().Before(deadline) && settled < 2; {
-		if c.evalTrue(ctx, s, pageSettled) {
+		if devtools.evalTrue(ctx, s, pageSettled) {
 			settled++
 		} else {
 			settled = 0
@@ -359,8 +359,8 @@ func waitForSettledPage(ctx context.Context, c *cdp, s string) error {
 // fitWholePage makes the window as tall as the page's longest scrolling
 // part needs, within reason, and no taller, and returns how tall the page
 // is. A page whose height cannot be read is pictured at the size asked.
-func fitWholePage(ctx context.Context, c *cdp, s string, p pictureRequest) (int, error) {
-	res, err := c.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": pageHeight, "returnByValue": true})
+func fitWholePage(ctx context.Context, devtools *cdp, s string, p pictureRequest) (int, error) {
+	res, err := devtools.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": pageHeight, "returnByValue": true})
 	var out struct {
 		Result struct {
 			Value float64 `json:"value"`
@@ -371,7 +371,7 @@ func fitWholePage(ctx context.Context, c *cdp, s string, p pictureRequest) (int,
 	}
 	whole := int(out.Result.Value) + 1
 	height := min(max(whole, pictureMinHeight), pictureMaxHeight)
-	if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
+	if _, err := devtools.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
 		"width": p.width, "height": height, "deviceScaleFactor": 1, "mobile": p.width < phoneWidth}); err != nil {
 		return 0, err
 	}

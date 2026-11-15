@@ -180,11 +180,11 @@ func (r *backupRun) write(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	st, err := os.Stat(r.path)
+	info, err := os.Stat(r.path)
 	if err != nil {
 		return err
 	}
-	r.b.Size, r.b.SHA256 = st.Size(), hex.EncodeToString(h.Sum(nil))
+	r.b.Size, r.b.SHA256 = info.Size(), hex.EncodeToString(h.Sum(nil))
 	return nil
 }
 
@@ -269,7 +269,7 @@ func (r *backupRun) finish(ctx context.Context, err error) (core.Backup, error) 
 	b.FinishedAt = time.Now().UnixMilli()
 	set := map[string]any{"finished_at": b.FinishedAt, "size": b.Size, "sha256": b.SHA256, "verified_at": b.VerifiedAt, "location": b.Location}
 	if err != nil {
-		b.Error = oneLine(err.Error(), 400)
+		b.Error = oneLine(err.Error(), lastErrorSize)
 		set["error"] = b.Error
 		os.Remove(r.path)
 		r.s.log.Error("backup failed", "err", err)

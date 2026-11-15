@@ -8,6 +8,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// data/ of an export: every row of the workspace as JSON, one file per kind.
+
 // exportRows are the rows read for data/ that the later parts are written
 // from as well.
 type exportRows struct {

@@ -48,12 +48,12 @@ func (g *githubSync) syncPulls(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	newest := g.st.Since
+	newest := g.state.Since
 	handled := 0
 	for _, pr := range pulls {
 		num := fmt.Sprint(pr.Number)
-		changed := pr.UpdatedAt > g.st.Since
-		if !changed && !g.st.PendingChecks[num] {
+		changed := pr.UpdatedAt > g.state.Since
+		if !changed && !g.state.PendingChecks[num] {
 			continue
 		}
 		if pr.UpdatedAt > newest {
@@ -65,7 +65,7 @@ func (g *githubSync) syncPulls(ctx context.Context) (int, error) {
 		}
 		state := pr.state()
 		checks := g.checksOf(ctx, pr, state)
-		g.st.Heads[num] = pr.Head.SHA
+		g.state.Heads[num] = pr.Head.SHA
 		for key := range keys {
 			if err := g.linkPull(ctx, pr, key, state, checks); err != nil {
 				return handled, err
@@ -73,7 +73,7 @@ func (g *githubSync) syncPulls(ctx context.Context) (int, error) {
 		}
 		handled++
 	}
-	g.st.Since = newest
+	g.state.Since = newest
 	return handled, nil
 }
 
@@ -123,7 +123,7 @@ func (pr ghPull) state() string {
 func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) string {
 	num := fmt.Sprint(pr.Number)
 	if state != "open" && state != "draft" {
-		delete(g.st.PendingChecks, num)
+		delete(g.state.PendingChecks, num)
 		return ""
 	}
 	checks := ""
@@ -146,7 +146,7 @@ func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) stri
 			}
 		}
 	}
-	g.st.PendingChecks[num] = checks == "pending"
+	g.state.PendingChecks[num] = checks == "pending"
 	return checks
 }
 
@@ -197,7 +197,7 @@ func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks
 // pass that looks at the pull request.
 func (g *githubSync) commentBack(ctx context.Context, pr ghPull, key string, t core.Task) error {
 	mark := fmt.Sprint(pr.Number) + " " + key
-	if !g.cfg.CommentBack || g.st.Commented[mark] || g.token == "" {
+	if !g.cfg.CommentBack || g.state.Commented[mark] || g.token == "" {
 		return nil
 	}
 	var ws core.Workspace
@@ -206,7 +206,7 @@ func (g *githubSync) commentBack(ctx context.Context, pr ghPull, key string, t c
 	}
 	body := fmt.Sprintf("Linked to **%s** %s — %s/%s/task/%s", key, t.Title, g.s.cfg.BaseURL, ws.Slug, key)
 	if err := g.gh.call(ctx, "POST", fmt.Sprintf("/repos/%s/issues/%d/comments", g.cfg.Repo, pr.Number), map[string]string{"body": body}, nil); err == nil {
-		g.st.Commented[mark] = true
+		g.state.Commented[mark] = true
 	}
 	return nil
 }

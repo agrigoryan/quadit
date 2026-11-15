@@ -114,11 +114,11 @@ func (s *Server) runGitHub(ctx context.Context) {
 // githubStateOf reads what an integration remembers. State that does not
 // read is taken as nothing remembered: the next pass starts afresh.
 func githubStateOf(raw json.RawMessage) githubState {
-	var st githubState
-	if len(raw) > 0 && json.Unmarshal(raw, &st) != nil {
+	var state githubState
+	if len(raw) > 0 && json.Unmarshal(raw, &state) != nil {
 		return githubState{}
 	}
-	return st
+	return state
 }
 
 // integrationOf reads the integration a request names.
@@ -161,15 +161,15 @@ func (s *Server) handleShowIntegrationWebhook(x *c) error {
 	if err != nil {
 		return err
 	}
-	st := githubStateOf(in.State)
-	if st.HookSecret == "" {
-		st.HookSecret = auth.Random(24)
-		raw, _ := json.Marshal(st) // plain fields: always encodes
+	state := githubStateOf(in.State)
+	if state.HookSecret == "" {
+		state.HookSecret = auth.Random(24)
+		raw, _ := json.Marshal(state) // plain fields: always encodes
 		if _, err := x.db.Update(x.ctx(), "integrations", map[string]any{"state": json.RawMessage(raw)}, store.Eq("id", in.ID)); err != nil {
 			return err
 		}
 	}
-	return x.ok(map[string]any{"url": s.cfg.BaseURL + "/hooks/github/" + in.ID, "secret": st.HookSecret, "content_type": "application/json",
+	return x.ok(map[string]any{"url": s.cfg.BaseURL + "/hooks/github/" + in.ID, "secret": state.HookSecret, "content_type": "application/json",
 		"events": []string{"pull_request", "check_suite", "check_run", "status"}})
 }
 
@@ -191,10 +191,10 @@ func (s *Server) handleReceiveGitHubEvent(w http.ResponseWriter, r *http.Request
 		http.Error(w, "the body could not be read: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	st := githubStateOf(in.State)
-	mac := hmac.New(sha256.New, []byte(st.HookSecret))
+	state := githubStateOf(in.State)
+	mac := hmac.New(sha256.New, []byte(state.HookSecret))
 	mac.Write(body)
-	if st.HookSecret == "" || !hmac.Equal([]byte(r.Header.Get("X-Hub-Signature-256")), []byte("sha256="+hex.EncodeToString(mac.Sum(nil)))) {
+	if state.HookSecret == "" || !hmac.Equal([]byte(r.Header.Get("X-Hub-Signature-256")), []byte("sha256="+hex.EncodeToString(mac.Sum(nil)))) {
 		http.Error(w, "bad signature", http.StatusUnauthorized)
 		return
 	}
@@ -219,12 +219,12 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 	if err := db.Get(ctx, &in, store.Eq("id", in.ID)); err != nil { // the freshest state
 		return 0, err
 	}
-	st := githubStateOf(in.State)
-	if st.Heads == nil {
-		st.Heads, st.Commented, st.PendingChecks = map[string]string{}, map[string]bool{}, map[string]bool{}
+	state := githubStateOf(in.State)
+	if state.Heads == nil {
+		state.Heads, state.Commented, state.PendingChecks = map[string]string{}, map[string]bool{}, map[string]bool{}
 	}
-	if st.PendingChecks == nil {
-		st.PendingChecks = map[string]bool{}
+	if state.PendingChecks == nil {
+		state.PendingChecks = map[string]bool{}
 	}
 	n := 0
 	var cfg githubConfig
@@ -235,13 +235,13 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 	if err != nil {
 		err = fmt.Errorf("the integration's settings do not read: %w", err)
 	} else {
-		n, err = s.githubPass(ctx, db, in, cfg, &st)
+		n, err = s.githubPass(ctx, db, in, cfg, &state)
 	}
 	set := map[string]any{"last_sync_at": time.Now().UnixMilli(), "last_error": ""}
 	if err != nil {
-		set["last_error"] = oneLine(err.Error(), 400)
+		set["last_error"] = oneLine(err.Error(), lastErrorSize)
 	}
-	raw, _ := json.Marshal(st) // plain fields: always encodes
+	raw, _ := json.Marshal(state) // plain fields: always encodes
 	set["state"] = json.RawMessage(raw)
 	// Not remembered, what was done is done again on the next pass (a
 	// second comment on a pull request), so the write is retried, and a
@@ -260,12 +260,12 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 // integration is set to do, what it remembers between passes, and the
 // client it asks GitHub with.
 type githubSync struct {
-	s   *Server
-	db  store.DB
-	in  core.Integration
-	cfg githubConfig
-	st  *githubState
-	gh  *githubClient
+	s     *Server
+	db    store.DB
+	in    core.Integration
+	cfg   githubConfig
+	state *githubState
+	gh    *githubClient
 	// token is the integration's own; without one nothing is written on GitHub.
 	token string
 }
@@ -276,7 +276,7 @@ var ghRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
 // githubPass looks at the repository once: its pull requests
 // (github_pulls.go), then its issues (github_issues.go). It returns how
 // many of them it handled.
-func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integration, cfg githubConfig, st *githubState) (int, error) {
+func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integration, cfg githubConfig, state *githubState) (int, error) {
 	if !ghRepoRE.MatchString(cfg.Repo) {
 		return 0, fmt.Errorf("the repository must be given as owner/name, got %q", cfg.Repo)
 	}
@@ -285,7 +285,7 @@ func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integratio
 		return 0, err
 	}
 	api := strings.TrimRight(firstNonEmpty(cfg.APIURL, "https://api.github.com"), "/")
-	g := &githubSync{s: s, db: db, in: in, cfg: cfg, st: st, gh: s.githubAPI(api, token), token: token}
+	g := &githubSync{s: s, db: db, in: in, cfg: cfg, state: state, gh: s.githubAPI(api, token), token: token}
 	handled, err := g.syncPulls(ctx)
 	if err != nil {
 		return handled, err

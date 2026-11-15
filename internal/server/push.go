@@ -232,7 +232,7 @@ func sendPush(ctx context.Context, key *ecdsa.PrivateKey, subject string, sub co
 	req.Header.Set("TTL", "86400")
 	req.Header.Set("Urgency", "high")
 	req.Header.Set("Authorization", "vapid t="+token+", k="+b64.EncodeToString(ek.PublicKey().Bytes()))
-	hc := http.Client{Timeout: 15 * time.Second}
+	hc := http.Client{Timeout: deliveryTimeout} // as long as a webhook receiver has
 	resp, err := hc.Do(req)
 	if err != nil {
 		return 0, err

@@ -10,6 +10,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/md"
 )
 
+// docs/ of an export: the page tree as folders of Markdown.
+
 // docs writes docs/: the page tree as folders of Markdown; private pages of
 // others stay out.
 func (e *exporter) docs() error {

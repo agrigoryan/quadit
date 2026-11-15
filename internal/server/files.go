@@ -65,6 +65,7 @@ type counter struct {
 	n int64
 }
 
+// Read reads from the reader underneath and counts what came.
 func (c *counter) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	c.n += int64(n)

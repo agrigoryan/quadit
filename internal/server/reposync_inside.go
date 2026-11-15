@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// What keeps a sync's reading and writing inside its working copy.
+
 // staysInside reports whether path is under dir with no symbolic link on
 // the way there, is not a link itself, and has no plain file where one of
 // its folders would be. A repository can hold links to
@@ -25,14 +27,14 @@ func staysInside(dir, path string) bool {
 			continue
 		}
 		at = filepath.Join(at, part)
-		st, err := os.Lstat(at)
+		info, err := os.Lstat(at)
 		if err != nil {
 			return true // nothing there yet, so nothing below it either
 		}
-		if st.Mode()&os.ModeSymlink != 0 {
+		if info.Mode()&os.ModeSymlink != 0 {
 			return false
 		}
-		if i < len(parts)-1 && !st.IsDir() {
+		if i < len(parts)-1 && !info.IsDir() {
 			return false // a file stands where a folder would have to be
 		}
 	}

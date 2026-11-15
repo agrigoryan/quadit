@@ -10,6 +10,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/blob"
 )
 
+// files/ of an export: the uploaded files as they were uploaded.
+
 // notIncludedName is the entry of files/ that names the uploaded files the
 // export could not include, so whoever opens it knows it is incomplete.
 const notIncludedName = "files/NOT-INCLUDED.txt"

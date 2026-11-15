@@ -26,6 +26,10 @@ const (
 	jobErrorSize = 500 // how much of a job's error is kept
 )
 
+// lastErrorSize is how much of the error a backup, a sync or an
+// integration's pass ended in is kept on its record.
+const lastErrorSize = 400
+
 // Recording what became of background work.
 const (
 	outcomeTries = 3                      // how many times the write is tried
@@ -84,21 +88,21 @@ func (s *Server) runJob(ctx context.Context, worker string, now int64, j core.Jo
 		return
 	}
 	run, ok := jobKinds[j.Kind]
-	var jerr error
+	var runErr error
 	if !ok {
-		jerr = fmt.Errorf("unknown job kind %q", j.Kind)
+		runErr = fmt.Errorf("unknown job kind %q", j.Kind)
 	} else {
-		jerr = run(s, ctx, j)
+		runErr = run(s, ctx, j)
 	}
 	set := map[string]any{"claimed_until": 0}
 	switch {
-	case jerr == nil:
+	case runErr == nil:
 		set["done_at"], set["error"] = time.Now().UnixMilli(), ""
 	case j.Attempts+1 >= jobMaxTries || !ok:
-		set["done_at"], set["error"] = time.Now().UnixMilli(), oneLine(jerr.Error(), jobErrorSize)
-		s.log.Error("job gave up", "kind", j.Kind, "err", jerr)
+		set["done_at"], set["error"] = time.Now().UnixMilli(), oneLine(runErr.Error(), jobErrorSize)
+		s.log.Error("job gave up", "kind", j.Kind, "err", runErr)
 	default:
-		set["run_at"], set["error"] = time.Now().Add(backoff(j.Attempts+1)).UnixMilli(), oneLine(jerr.Error(), jobErrorSize)
+		set["run_at"], set["error"] = time.Now().Add(backoff(j.Attempts+1)).UnixMilli(), oneLine(runErr.Error(), jobErrorSize)
 	}
 	// A job that ran is recorded even when the server is stopping; one not
 	// recorded runs again when its claim runs out.
