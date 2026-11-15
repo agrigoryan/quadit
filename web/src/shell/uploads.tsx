@@ -43,9 +43,7 @@ export function UploadsIndicator() {
             ) : (
               <Upload className="size-3.5 text-accent-text" aria-hidden />
             )}
-            <span role="status" className="tabular-nums">
-              {label}
-            </span>
+            <output className="tabular-nums">{label}</output>
           </button>
         </PopoverTrigger>
         <PopoverContent side="top" align="start" aria-label={t("upload.title")} className="w-80 p-3">

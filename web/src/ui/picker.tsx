@@ -129,8 +129,7 @@ export function PickerList({
         )}
         {manage && (
           <>
-            {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- a separator that cannot take focus is not a control */}
-            <div role="separator" className="-mx-1 my-1 h-px bg-line" />
+            <Command.Separator alwaysRender className="-mx-1 my-1 h-px bg-line" />
             <Command.Item value="picker:manage" onSelect={manage.onSelect} className={cx(rowClass, "text-ink-2")}>
               <span className="flex size-4 shrink-0 items-center justify-center">
                 <Settings2 className="size-3.5" aria-hidden />

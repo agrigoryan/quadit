@@ -138,7 +138,7 @@ export function AvatarInput({ member, value, onChange, hint, disabled }: Props) 
                 </Button>
               </PopoverTrigger>
               <PopoverContent aria-label={t("avatar.emojiPick")} className="w-64 p-2.5">
-                <div role="group" aria-label={t("avatar.emojiPick")} className="grid grid-cols-8 gap-0.5">
+                <div className="grid grid-cols-8 gap-0.5">
                   {EMOJI.map((e) => (
                     <button
                       key={e}

@@ -85,7 +85,7 @@ export function FilterBar({ entries, filters, onChange }: Props) {
   const button = { className: "max-w-48 shrink-0 max-sm:h-9" };
 
   return (
-    <div role="search" aria-label={t("declog.filters")} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+    <search aria-label={t("declog.filters")} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <div className="relative min-w-40 flex-1 basis-56 sm:max-w-80">
         <Search
           className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-ink-3"
@@ -140,6 +140,6 @@ export function FilterBar({ entries, filters, onChange }: Props) {
           </Button>
         )}
       </div>
-    </div>
+    </search>
   );
 }

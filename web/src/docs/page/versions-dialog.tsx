@@ -142,17 +142,12 @@ export default function VersionsDialog({ doc, canRestore, canKeep, onClose }: Pr
           ) : versions.length === 0 ? (
             <p className="px-1 py-4 text-sm text-ink-3">{t("docs.versions.none")}</p>
           ) : (
-            <ul
-              className="max-h-40 overflow-y-auto sm:max-h-[60vh]"
-              role="listbox"
-              aria-label={t("docs.menu.versions")}
-            >
+            <ul className="max-h-40 overflow-y-auto sm:max-h-[60vh]" aria-label={t("docs.menu.versions")}>
               {versions.map((v) => (
                 <li key={v.id}>
                   <button
                     type="button"
-                    role="option"
-                    aria-selected={picked === v.id}
+                    aria-pressed={picked === v.id}
                     onClick={() => setPicked(v.id)}
                     className={cx(
                       "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover",

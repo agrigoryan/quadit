@@ -177,10 +177,7 @@ function QueueSteps({ queue }: { queue: QueuePlace }) {
 export function TrashBanner({ task }: { task: Task }) {
   const can = useCan();
   return (
-    <div
-      role="status"
-      className="flex shrink-0 items-center gap-2 border-b border-line bg-danger-soft px-4 py-2 text-sm text-danger md:px-6"
-    >
+    <output className="flex shrink-0 items-center gap-2 border-b border-line bg-danger-soft px-4 py-2 text-sm text-danger md:px-6">
       <Trash2 className="size-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">{t("detail.inTrash")}</span>
       {can.edit(task.project_id) && (
@@ -188,6 +185,6 @@ export function TrashBanner({ task }: { task: Task }) {
           {t("detail.restore")}
         </Button>
       )}
-    </div>
+    </output>
   );
 }

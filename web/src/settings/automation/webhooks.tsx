@@ -42,12 +42,11 @@ function TestLine({ test }: { test: Test }) {
   else if (ok) text = t("auto.hook.test.ok", { status: test.result.status, ms: test.result.ms });
   else text = t("auto.hook.test.bad", { status: test.result.status, ms: test.result.ms, error: test.result.error });
   return (
-    <p
-      role="status"
-      className={cx("rounded-md px-2 py-1 text-xs", ok ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger")}
+    <output
+      className={cx("block rounded-md px-2 py-1 text-xs", ok ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger")}
     >
       {text}
-    </p>
+    </output>
   );
 }
 

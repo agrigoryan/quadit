@@ -117,10 +117,10 @@ export function FormView({ db, view, onAdd, readOnly }: ViewProps) {
         />
         {sent ? (
           <div className="mt-4 flex flex-col items-start gap-3">
-            <p role="status" className="flex items-center gap-2 rounded-md bg-ok-soft px-3 py-2 text-sm text-ok">
+            <output className="flex items-center gap-2 rounded-md bg-ok-soft px-3 py-2 text-sm text-ok">
               <Check className="size-4" aria-hidden />
               {t("db.form.sent")}
-            </p>
+            </output>
             <Button onClick={() => setSent(false)}>{t("db.form.another")}</Button>
           </div>
         ) : (

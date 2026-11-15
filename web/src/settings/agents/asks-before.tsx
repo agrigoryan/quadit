@@ -97,19 +97,14 @@ export function AsksBefore({ value, onChange, disabled }: Props) {
     <div className="flex flex-col gap-3">
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
         {GROUPS.map((group) => (
-          <div
-            key={group.key}
-            role="group"
-            aria-label={t(`agent.asks.group.${group.key}`)}
-            className="flex flex-col gap-1.5"
-          >
-            <p className="text-xs font-medium text-ink-3">{t(`agent.asks.group.${group.key}`)}</p>
+          <fieldset key={group.key} className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-xs font-medium text-ink-3">{t(`agent.asks.group.${group.key}`)}</legend>
             {group.asks.map((ask) => (
               <Checkbox key={ask.key} checked={has(ask)} onChange={(on) => toggle(ask, on)} disabled={disabled}>
                 {tMaybe(`agent.asks.item.${ask.key}`, ask.types.join(", "))}
               </Checkbox>
             ))}
-          </div>
+          </fieldset>
         ))}
       </div>
       <div className="flex flex-col gap-1.5">

@@ -1,7 +1,7 @@
 // Picking a colour: one of the swatches, or any other.
 
 import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
+import { t, tMaybe } from "@/lib/i18n";
 import { SWATCHES } from "@/lib/swatches";
 
 interface ColorProps {
@@ -21,7 +21,7 @@ export function ColorPicker({ value, onChange, label }: ColorProps) {
           type="button"
           role="radio"
           aria-checked={value.toLowerCase() === color}
-          aria-label={color}
+          aria-label={tMaybe(`swatch.${color}`, color)}
           onClick={() => onChange(color)}
           className={cx(
             "size-5 rounded-full ring-offset-2 ring-offset-surface transition-shadow",

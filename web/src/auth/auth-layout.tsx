@@ -49,11 +49,7 @@ export function FormError({ children }: { children: ReactNode }) {
 /** Good news above a form: "Password changed". */
 export function FormNotice({ children }: { children: ReactNode }) {
   if (!children) return null;
-  return (
-    <p role="status" className="rounded-md bg-ok-soft px-2.5 py-2 text-sm text-ok">
-      {children}
-    </p>
-  );
+  return <output className="block rounded-md bg-ok-soft px-2.5 py-2 text-sm text-ok">{children}</output>;
 }
 
 /** A link in the words around a form. */

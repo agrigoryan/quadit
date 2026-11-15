@@ -143,17 +143,14 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
       </div>
 
       {gone && (
-        <p
-          role="status"
-          className="flex min-h-8 shrink-0 items-center gap-2 border-b border-line bg-sunken px-3 text-xs text-ink-2 md:px-4"
-        >
+        <output className="flex min-h-8 shrink-0 items-center gap-2 border-b border-line bg-sunken px-3 text-xs text-ink-2 md:px-4">
           {t("view.gone")}
           {view && can.editMadeBy(view.owner_id) && (
             <Button size="sm" onClick={fixView}>
               {t("view.fix")}
             </Button>
           )}
-        </p>
+        </output>
       )}
 
       <div className="relative min-h-0 flex-1">

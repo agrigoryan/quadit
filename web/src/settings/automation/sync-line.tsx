@@ -9,14 +9,13 @@ export function SyncLine({ state }: { state: SyncState | undefined }) {
   if (!state) return null;
   if (state.busy) return <p className="text-xs text-ink-3">{t("auto.syncing")}</p>;
   return (
-    <p
-      role="status"
+    <output
       className={cx(
-        "rounded-md px-2 py-1 text-xs break-words",
+        "block rounded-md px-2 py-1 text-xs break-words",
         state.ok ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger",
       )}
     >
       {state.text}
-    </p>
+    </output>
   );
 }

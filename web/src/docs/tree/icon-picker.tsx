@@ -24,14 +24,13 @@ export function IconPicker({ docId, current, children, open, onOpenChange }: Pro
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent aria-label={t("docs.icon.pick")} className="w-64 p-2">
-        <div className="grid grid-cols-8 gap-0.5" role="listbox" aria-label={t("docs.icon.pick")}>
+        <div className="grid grid-cols-8 gap-0.5">
           {EMOJI.map((emoji) => (
             <PopoverClose asChild key={emoji}>
               <button
                 type="button"
-                role="option"
-                aria-selected={emoji === current}
-                className="flex size-7 items-center justify-center rounded-sm text-base hover:bg-hover aria-selected:bg-press"
+                aria-pressed={emoji === current}
+                className="flex size-7 items-center justify-center rounded-sm text-base hover:bg-hover aria-pressed:bg-press"
                 onClick={() => set(emoji)}
               >
                 {emoji}

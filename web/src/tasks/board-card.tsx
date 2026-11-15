@@ -59,6 +59,8 @@ export const BoardCard = memo(function BoardCard({ id, task }: { id: string; tas
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     disabled: draft || fixed,
+    // A card is a link that can also be lifted: dnd-kit would call it a button.
+    attributes: { role: "link" },
   });
   const link = useTaskLink(task);
   const style = { transform: CSS.Translate.toString(transform), transition };
@@ -79,7 +81,6 @@ export const BoardCard = memo(function BoardCard({ id, task }: { id: string; tas
       className={cx(shell, "touch-manipulation outline-offset-2 hover:border-line-strong", isDragging && "opacity-35")}
       {...attributes}
       {...listeners}
-      role="link"
     >
       <CardBody task={task} />
     </Link>
