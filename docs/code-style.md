@@ -64,7 +64,7 @@ Signs, when reading or reviewing, that a design needs another look:
 7. Inside a function, comment the why and the non-obvious, in plain words. Comments do not restate the code, and they do not tell the history of a change.
 
 ### Wiring and state
-8. No `init()` for registration. A feature is named in an explicit list (routes, background loops, job kinds, change types, import sources).
+8. No `init()` for registration: a feature is named in an explicit list in one visible place (routes in `allRoutes`, background loops and job kinds in `run.go`, commands, tables, import sources). The one exception is change types: each `internal/engine/ch_*.go` registers its own changes from `init()`, beside their code, and `TestCatalog` checks the catalogue whole; lint allows `init()` there and nowhere else.
 9. No package-level mutable state except lookup tables. A hook is a field set by the constructor.
 10. Every goroutine has an owner that can wait for it. `ctx` is the first parameter and is not stored in a struct, except in a struct that is one run of work and says so. `context.Background()` appears only in `main`, in tests, and in detached work that says why it is detached.
 
