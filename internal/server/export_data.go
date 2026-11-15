@@ -10,9 +10,11 @@ import (
 
 // data/ of an export: every row of the workspace as JSON, one file per kind.
 
-// exportRows are the rows read for data/ that the later parts are written
+// exportRows are every row the export holds: the tables of data/ in the
+// order data/ holds them, and by name the ones the other parts are written
 // from as well.
 type exportRows struct {
+	tables    []exportTable
 	decisions []core.Decision
 	options   []core.Option
 	comments  []core.Comment
@@ -24,18 +26,18 @@ type exportRows struct {
 }
 
 // exportTable is one kind of row in data/: the name of its file, a pointer
-// to the list the rows are read into, and how they are read.
+// to the list of its rows, and how they are read (tasks and events are read
+// page by page, and have none).
 type exportTable struct {
 	name string
 	rows any
 	q    store.Q
 }
 
-// tables lists the workspace's tables in the order data/ holds them. Tasks
-// and events are not here: they are read page by page.
-func (e *exporter) tables() []exportTable {
-	r, live := &e.rows, store.Where(store.Live)
-	return []exportTable{
+// load reads every row of the workspace the export holds.
+func (e *exporter) load() (*exportRows, error) {
+	r, live := &exportRows{}, store.Where(store.Live)
+	r.tables = []exportTable{
 		{"members", new([]core.Member), store.Q{}},
 		{"projects", new([]core.Project), live},
 		{"statuses", new([]core.Status), live},
@@ -56,30 +58,32 @@ func (e *exporter) tables() []exportTable {
 		{"preferences", new([]core.Preference), live},
 		{"views", new([]core.View), live},
 	}
+	for _, t := range r.tables {
+		if err := e.x.db.List(e.x.ctx(), t.rows, t.q); err != nil {
+			return nil, err
+		}
+	}
+	// Tasks and events are read page by page, and go last.
+	var err error
+	if r.tasks, err = e.everyTaskByKey(); err != nil {
+		return nil, err
+	}
+	evs, err := e.everyEvent()
+	if err != nil {
+		return nil, err
+	}
+	r.tables = append(r.tables, exportTable{name: "tasks", rows: &r.tasks}, exportTable{name: "events", rows: &evs})
+	return r, nil
 }
 
 // data writes data/: every workspace table as JSON.
-func (e *exporter) data() error {
-	for _, t := range e.tables() {
-		if err := e.x.db.List(e.x.ctx(), t.rows, t.q); err != nil {
-			return err
-		}
+func (e *exporter) data(r *exportRows) error {
+	for _, t := range r.tables {
 		if err := e.dump(t.name, reflect.ValueOf(t.rows).Elem().Interface()); err != nil {
 			return err
 		}
 	}
-	var err error
-	if e.rows.tasks, err = e.everyTaskByKey(); err != nil {
-		return err
-	}
-	if err := e.dump("tasks", e.rows.tasks); err != nil {
-		return err
-	}
-	evs, err := e.everyEvent()
-	if err != nil {
-		return err
-	}
-	return e.dump("events", evs)
+	return nil
 }
 
 // dump writes one file of data/.

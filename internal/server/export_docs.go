@@ -14,17 +14,17 @@ import (
 
 // docs writes docs/: the page tree as folders of Markdown; private pages of
 // others stay out.
-func (e *exporter) docs() error {
+func (e *exporter) docs(rows *exportRows) error {
 	blocksOf := map[string][]core.Block{}
-	for _, bl := range e.rows.blocks {
+	for _, bl := range rows.blocks {
 		blocksOf[bl.DocID] = append(blocksOf[bl.DocID], bl)
 	}
 	byID := map[string]core.Doc{}
-	for _, d := range e.rows.docs {
+	for _, d := range rows.docs {
 		byID[d.ID] = d
 	}
 	used := map[string]bool{}
-	for _, d := range e.rows.docs {
+	for _, d := range rows.docs {
 		if !engine.CanSeeDoc(d, e.x.member.UserID) {
 			continue
 		}

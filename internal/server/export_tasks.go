@@ -11,9 +11,9 @@ import (
 // tasks/ of an export: one readable Markdown file per task.
 
 // tasks writes tasks/: one readable file each.
-func (e *exporter) tasks() error {
-	e.indexTasks()
-	for _, t := range e.rows.tasks {
+func (e *exporter) tasks(rows *exportRows) error {
+	e.indexTasks(rows)
+	for _, t := range rows.tasks {
 		name := fmt.Sprintf("tasks/%s/%s %s.md", e.names.projects[t.ProjectID].Key, t.Key, fileSafe(t.Title))
 		if err := e.addTextFile(name, e.taskMarkdown(t)); err != nil {
 			return err
@@ -25,31 +25,31 @@ func (e *exporter) tasks() error {
 // indexTasks sorts out what the task files point at: each task's decisions
 // and comments, each decision's options, the files on each task and option,
 // and every task's key.
-func (e *exporter) indexTasks() {
+func (e *exporter) indexTasks(rows *exportRows) {
 	e.optionsOf = map[string][]core.Option{}
-	for _, o := range e.rows.options {
+	for _, o := range rows.options {
 		e.optionsOf[o.DecisionID] = append(e.optionsOf[o.DecisionID], o)
 	}
 	e.decisionsOn = map[string][]core.Decision{}
-	for _, d := range e.rows.decisions {
+	for _, d := range rows.decisions {
 		e.decisionsOn[d.TaskID] = append(e.decisionsOn[d.TaskID], d)
 	}
 	e.commentsOn = map[string][]core.Comment{}
-	for _, cm := range e.rows.comments {
+	for _, cm := range rows.comments {
 		e.commentsOn[cm.TaskID] = append(e.commentsOn[cm.TaskID], cm)
 	}
 	fileOf := map[string]core.File{}
-	for _, f := range e.rows.files {
+	for _, f := range rows.files {
 		fileOf[f.ID] = f
 	}
 	e.filesOn = map[string][]string{}
-	for _, a := range e.rows.atts {
+	for _, a := range rows.atts {
 		if f, ok := fileOf[a.FileID]; ok {
 			e.filesOn[a.SubjectID] = append(e.filesOn[a.SubjectID], "files/"+f.ID+"/"+fileSafe(f.Name))
 		}
 	}
 	e.keyOf = map[string]string{}
-	for _, t := range e.rows.tasks {
+	for _, t := range rows.tasks {
 		e.keyOf[t.ID] = t.Key
 	}
 }

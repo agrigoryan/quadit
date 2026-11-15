@@ -19,9 +19,9 @@ const notIncludedName = "files/NOT-INCLUDED.txt"
 
 // files writes files/: as uploaded. A file whose stored bytes cannot be
 // opened is left out, named in notIncludedName, and the rest still go in.
-func (e *exporter) files() error {
+func (e *exporter) files(rows *exportRows) error {
 	var missing []string
-	for _, f := range e.rows.files {
+	for _, f := range rows.files {
 		if f.State != core.FileReady {
 			continue
 		}

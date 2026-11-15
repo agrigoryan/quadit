@@ -74,32 +74,35 @@ func (s *Server) handleExportWorkspace(x *c) error {
 	return err
 }
 
-// write writes the README and then each part of the archive.
+// write writes the README, reads the workspace, and writes each part of
+// the archive from what it read.
 func (e *exporter) write() error {
 	if err := e.addTextFile("README.txt", exportReadme); err != nil {
 		return err
 	}
-	parts := []func() error{
+	rows, err := e.load() // export_data.go
+	if err != nil {
+		return err
+	}
+	parts := []func(*exportRows) error{
 		e.data,  // export_data.go
 		e.tasks, // export_tasks.go
 		e.docs,  // export_docs.go
 		e.files, // export_files.go
 	}
 	for _, part := range parts {
-		if err := part(); err != nil {
+		if err := part(rows); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// exporter is one export being written: the request, the archive, and the
-// rows read so far, which the parts after data/ are written from.
+// exporter is one export being written: the request and the archive.
 type exporter struct {
 	x     *c
 	names *nameLookup
 	zw    *zip.Writer
-	rows  exportRows // export_data.go
 
 	// What tasks/ is written from, by indexTasks.
 	optionsOf   map[string][]core.Option   // a decision's options
