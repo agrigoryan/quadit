@@ -179,6 +179,7 @@ export const docs = {
   "docs.comment.reply": "Reply…",
   "docs.comment.replySend": "Reply",
   "docs.comment.resolve": "Resolve",
+  "docs.comment.locate": "Show in the page",
   "docs.comment.reopen": "Reopen",
   "docs.comment.delete": "Delete comment",
   "docs.comment.threadsOnBlock": "{n} open comment thread on this block | {n} open comment threads on this block",

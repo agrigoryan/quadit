@@ -95,6 +95,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen, readOnly
     >
       {focused && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />}
       <span className="flex h-5 w-2 shrink-0 items-center justify-center">
+        {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a picture drawn with CSS or SVG, not an image file */}
         {unread && <span className="size-2 rounded-full bg-move" role="img" aria-label={t("inbox.unread")} />}
       </span>
       <span className="flex h-5 shrink-0 items-center">
@@ -116,12 +117,20 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen, readOnly
             to={to}
             onClick={() => unread && !readOnly && markRead([item.id])}
             aria-label={label}
+            // J and K move a marker, not the page's focus: the row's link says it is the one they are on.
+            aria-current={focused || undefined}
             className={whatStyle}
           >
             {what}
           </Link>
         ) : (
-          <button type="button" onClick={() => onOpen(item)} aria-label={label} className={whatStyle}>
+          <button
+            type="button"
+            onClick={() => onOpen(item)}
+            aria-label={label}
+            aria-current={focused || undefined}
+            className={whatStyle}
+          >
             {what}
           </button>
         )}

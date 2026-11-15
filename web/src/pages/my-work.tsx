@@ -159,6 +159,8 @@ function QuestionRow({ decision, task, focused }: { decision: Decision; task: Ta
       </span>
       <Link
         {...link}
+        // J and K move a marker, not the page's focus: the row's link says it is the one they are on.
+        aria-current={focused || undefined}
         className="min-w-0 shrink truncate py-2 font-medium outline-none after:absolute after:inset-0 after:content-['']"
       >
         {decision.question}

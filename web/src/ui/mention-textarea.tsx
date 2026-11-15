@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type Ref, type TextareaHTMLAttributes, useRef, useState } from "react";
+import { type KeyboardEvent, type Ref, type TextareaHTMLAttributes, useId, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { useMembers } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
@@ -44,6 +44,7 @@ export function MentionTextarea({
   const members = useMembers();
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [active, setActive] = useState(0);
+  const listId = useId();
 
   const options: Member[] = mention
     ? members
@@ -108,6 +109,8 @@ export function MentionTextarea({
         className={className}
         aria-autocomplete="list"
         aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
         onChange={(e) => {
           onChange(e.target.value);
           track(e.target);
@@ -124,12 +127,13 @@ export function MentionTextarea({
         }}
         {...rest}
       />
-      {open && <MentionOptions options={options} active={active} onActive={setActive} onPick={pick} />}
+      {open && <MentionOptions id={listId} options={options} active={active} onActive={setActive} onPick={pick} />}
     </div>
   );
 }
 
 interface OptionsProps {
+  id: string;
   options: Member[];
   active: number;
   onActive: (index: number) => void;
@@ -137,10 +141,12 @@ interface OptionsProps {
 }
 
 /** The people and agents an "@" offers. Beside each agent: whether anything is listening for its work right now. */
-function MentionOptions({ options, active, onActive, onPick }: OptionsProps) {
+function MentionOptions({ id, options, active, onActive, onPick }: OptionsProps) {
   const listening = useListening();
   return (
     <ul
+      id={id}
+      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role, jsx-a11y/no-noninteractive-element-to-interactive-role -- a list the text box drives with its arrows (aria-activedescendant); a <select> cannot be
       role="listbox"
       className="absolute top-full left-0 z-[65] mt-1 w-60 rounded-lg bg-surface p-1 shadow-pop animate-pop"
       onMouseDown={(e) => e.preventDefault()}
@@ -148,8 +154,11 @@ function MentionOptions({ options, active, onActive, onPick }: OptionsProps) {
       {options.map((m, i) => {
         const on = listening(m);
         return (
+          // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- the text box's keys pick from the list
           <li
             key={m.user_id}
+            id={`${id}-${i}`}
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role, jsx-a11y/no-noninteractive-element-to-interactive-role -- see the list
             role="option"
             aria-selected={i === active}
             onMouseEnter={() => onActive(i)}

@@ -1,4 +1,4 @@
-import { Check, RotateCcw, Trash2 } from "lucide-react";
+import { Check, LocateFixed, RotateCcw, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
@@ -32,7 +32,9 @@ export function Thread({ thread, docId, projectId, quote, active, onLocate }: Pr
   const done = !!root.resolved_at;
   const readOnly = !useCan().edit(projectId);
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a click on the thread is the mouse's way to its block; the keyboard has the thread's own button
     <article
+      aria-current={active || undefined}
       className={cx(
         "rounded-lg border bg-surface p-2 transition-colors",
         active ? "border-move" : "border-line",
@@ -44,6 +46,11 @@ export function Thread({ thread, docId, projectId, quote, active, onLocate }: Pr
     >
       <div className="flex items-start gap-1">
         <div className="min-w-0 flex-1">{quote}</div>
+        {onLocate && (
+          <IconButton size="sm" label={t("docs.comment.locate")} onClick={onLocate}>
+            <LocateFixed className="size-3.5" />
+          </IconButton>
+        )}
         {!readOnly && (
           <IconButton
             size="sm"
