@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "@/lib/types";
 import type { TaskGroup } from "@/tasks/filters";
-import { layOut, type Row, ROW, rowPlace, rowsBetween, stepFrom, treeStep } from "@/tasks/list-layout";
+import { layOut, type Row, ROW, rowOfSameTask, rowPlace, rowsBetween, stepFrom, treeStep } from "@/tasks/list-layout";
 
 const task = (n: number) => ({ id: `t${n}`, key: `SVA-${n}` }) as Task;
 const group = (id: string, numbers: number[], kind: TaskGroup["kind"] = "status"): TaskGroup => ({
@@ -44,6 +44,24 @@ describe("layOut", () => {
   it("lists a task under every group it is in", () => {
     const { rows } = layOut([group("art", [1]), group("bug", [1])], new Set());
     expect(rows.map((row) => row.key)).toEqual(["art:t1", "bug:t1"]);
+  });
+});
+
+describe("rowOfSameTask", () => {
+  const keyOfTask = (rows: Row[], id: string) => rows.find((row) => row.task.id === id)?.key ?? "";
+
+  it("finds a task's row in the group it moved to, by the key its row had before", () => {
+    const before = layOut([group("Todo", [1, 2]), group("Doing", [3])], new Set());
+    const key = keyOfTask(before.rows, "t2");
+    const after = layOut([group("Todo", [1]), group("Doing", [2, 3])], new Set());
+    expect(after.indexOf.has(key)).toBe(false);
+    expect(rowOfSameTask(after.rows, key)?.key).toBe(keyOfTask(after.rows, "t2"));
+  });
+
+  it("finds nothing for a task that is no longer listed", () => {
+    const before = layOut([group("Todo", [1, 2])], new Set());
+    const after = layOut([group("Todo", [1])], new Set());
+    expect(rowOfSameTask(after.rows, keyOfTask(before.rows, "t2"))).toBeUndefined();
   });
 });
 

@@ -53,10 +53,8 @@ test("P, A and S change the focused row", async ({ page, project, quadit }) => {
     });
 });
 
-// Product bug: the list keeps the keyboard focus by row key, `${group}:${task}`
-// (tasks/list-layout.ts rowKey). S moves the row to another status group, its
-// key changes, the focus is lost, and the next A or P does nothing.
-test.fixme("the focus stays on a row that S moved to another group", async ({ page, project, quadit }) => {
+// S moves the row to another status group; the focus goes with the task, so the next key still lands on it.
+test("the focus stays on a row that S moved to another group", async ({ page, project, quadit }) => {
   const key = await project.newTask("Fix the signup page");
   await page.goto(`/e2e/p/${project.key}/tasks`);
   await expect(page.getByRole("link", { name: `Open ${key}` })).toBeVisible();

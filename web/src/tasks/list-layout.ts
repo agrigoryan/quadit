@@ -78,6 +78,15 @@ export interface ListLayout {
 export const rowKey = (group: TaskGroup, task: Task) => `${group.id}:${task.id}`;
 
 /**
+ * The row that now shows the task a row key was for, when that row itself is
+ * gone: the task moved to another group (its status was changed), so its key
+ * changed with it. Its own row there, not one that shows it for context.
+ */
+export function rowOfSameTask(rows: Row[], key: string): Row | undefined {
+  return rows.find((row) => !row.branch?.context && key.endsWith(`:${row.task.id}`));
+}
+
+/**
  * Lays the groups out one under the other; a folded group is its heading
  * alone. `folded` holds the groups folded, by id, and the parents folded, by
  * row key. Given `nesting`, each group's rows are its tree (see the top of

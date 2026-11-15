@@ -15,7 +15,18 @@ import type { SortBy, Task } from "@/lib/types";
 import type { NewTaskDraft } from "@/tasks/draft";
 import { comparer, NONE, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";
-import { layOut, OVERSCAN, ROW, type Row, rowPlace, rowsBetween, stepFrom, TAIL, treeStep } from "@/tasks/list-layout";
+import {
+  layOut,
+  OVERSCAN,
+  ROW,
+  type Row,
+  rowOfSameTask,
+  rowPlace,
+  rowsBetween,
+  stepFrom,
+  TAIL,
+  treeStep,
+} from "@/tasks/list-layout";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
@@ -82,6 +93,9 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
   );
   const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 
+  // The focused row's task moved to another group (S changed its status): the focus goes with it.
+  const movedTo = focusKey !== null && !indexOf.has(focusKey) ? rowOfSameTask(rows, focusKey) : undefined;
+  if (movedTo) setFocusKey(movedTo.key);
   const focusAt = focusKey === null ? -1 : (indexOf.get(focusKey) ?? -1);
   const focusedRow = rows[focusAt];
   const focused = focusedRow?.task;
