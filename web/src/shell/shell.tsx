@@ -2,6 +2,7 @@ import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from 
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { useMedia } from "@/decisions/data";
 import { ShortcutsSheet } from "@/palette/shortcuts";
+import { ahead } from "@/lib/ahead";
 import { useHotkeys } from "@/lib/hotkeys";
 import { useStore } from "@/lib/store";
 import { ui, useUi } from "@/lib/ui-state";
@@ -17,7 +18,7 @@ import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
 import { UploadsIndicator } from "@/shell/uploads";
-import { canGoBack, type Peek, PeekContext, taskPath } from "@/tasks/task-link";
+import { canGoBack, isTaskPath, type Peek, PeekContext, taskPath } from "@/tasks/task-link";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
 
 // The larger parts of the app are fetched when first opened.
@@ -29,19 +30,20 @@ const CyclesPage = lazy(() => import("@/pages/cycles").then((m) => ({ default: m
 
 // So are the parts drawn over the page, and a task's own page. These are
 // also fetched ahead, once the first page is up, so that opening a task,
-// the palette or the new-task dialog does not wait on the network.
-const loadTaskPanel = () => import("@/detail/task-panel");
-const loadTaskPage = () => import("@/detail/task-page");
-const loadPalette = () => import("@/palette/palette");
-const loadCreateTask = () => import("@/tasks/create-task");
-const TaskPanel = lazy(() => loadTaskPanel().then((m) => ({ default: m.TaskPanel })));
-const TaskPage = lazy(() => loadTaskPage().then((m) => ({ default: m.TaskPage })));
-const CommandPalette = lazy(() => loadPalette().then((m) => ({ default: m.CommandPalette })));
-const CreateTaskDialog = lazy(() => loadCreateTask().then((m) => ({ default: m.CreateTaskDialog })));
+// the palette or the new-task dialog does not wait on the network; and once
+// their code is here they are drawn without a round through Suspense
+// (lib/ahead.tsx).
+const taskPanel = ahead(() => import("@/detail/task-panel").then((m) => m.TaskPanel));
+const taskPage = ahead(() => import("@/detail/task-page").then((m) => m.TaskPage));
+const palette = ahead(() => import("@/palette/palette").then((m) => m.CommandPalette));
+const createTask = ahead(() => import("@/tasks/create-task").then((m) => m.CreateTaskDialog));
 
 function fetchAhead() {
-  for (const load of [loadTaskPanel, loadTaskPage, loadPalette, loadCreateTask]) load().catch(() => {});
+  for (const part of [taskPanel, taskPage, palette, createTask]) part.fetch().catch(() => {});
 }
+
+// The address is a task's (a link opened in a new tab): its page is asked for now, along with the workspace.
+if (typeof window !== "undefined" && isTaskPath(window.location.pathname)) taskPage.fetch().catch(() => {});
 
 function Later({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
@@ -135,16 +137,16 @@ export function Shell() {
               <Route key={path} path={path} element={<Later><InsightRoutes /></Later>} />
             ))}
             <Route path="trash" element={<TrashPage />} />
-            <Route path="task/:key" element={<Later><TaskPage onBack={leavePage} /></Later>} />
+            <Route path="task/:key" element={<Later><taskPage.Part onBack={leavePage} /></Later>} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </PageBoundary>
           <UploadsIndicator />
         </main>
       </div>
-      <Part on={inPanel}>{inPanel && <TaskPanel taskKey={taskKey} onClose={closePanel} onExpand={phone ? undefined : expandPanel} />}</Part>
-      <Part on={paletteOpen}>{paletteOpen && <CommandPalette />}</Part>
-      <Part on={!!newTask}>{newTask && <CreateTaskDialog draft={newTask} />}</Part>
+      <Part on={inPanel}>{inPanel && <taskPanel.Part taskKey={taskKey} onClose={closePanel} onExpand={phone ? undefined : expandPanel} />}</Part>
+      <Part on={paletteOpen}>{paletteOpen && <palette.Part />}</Part>
+      <Part on={!!newTask}>{newTask && <createTask.Part draft={newTask} />}</Part>
       <ShortcutsSheet />
       <GoHint />
     </div>
