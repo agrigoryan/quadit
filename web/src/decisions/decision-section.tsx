@@ -4,8 +4,9 @@
 
 import { type DragEvent, useState } from "react";
 import { MessageCircleQuestion } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import { useTask } from "@/lib/selectors";
+import { useRowEvenIfGone } from "@/lib/selectors";
 import { Section } from "@/detail/section";
 import { Button } from "@/ui/button";
 import { useTaskDecisions } from "@/decisions/data";
@@ -29,10 +30,12 @@ const keepDrags = {
 };
 
 export function DecisionSection({ taskId }: { taskId: string }) {
-  const task = useTask(taskId);
+  // The section is drawn on a trashed task's page too, without the button.
+  const task = useRowEvenIfGone("tasks", taskId);
+  const can = useCan();
   const decisions = useTaskDecisions(taskId);
   const [asking, setAsking] = useState(false);
-  const canAsk = !!task && !task.deleted_at;
+  const canAsk = !!task && can.editTask(task);
   const open = decisions.filter((d) => d.state === "open").length;
 
   const dialog = asking && (

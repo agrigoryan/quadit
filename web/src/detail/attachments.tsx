@@ -1,8 +1,8 @@
 // The files attached to the task itself (not to a comment or a question).
 
 import { Paperclip } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import { useMe } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import type { Attached } from "@/detail/data";
 import { FileGrid } from "@/detail/file-grid";
@@ -19,8 +19,8 @@ interface Props {
 }
 
 export function Attachments({ task, files, pending, onAttach }: Props) {
-  const me = useMe();
-  const readOnly = !!task.deleted_at;
+  const can = useCan();
+  const readOnly = !can.editTask(task);
   return (
     <Section
       title={t("detail.files")}
@@ -38,7 +38,7 @@ export function Attachments({ task, files, pending, onAttach }: Props) {
         pending={pending}
         className="mt-1"
         // The server lets only whoever attached a file, or an admin, remove it.
-        canRemove={(a) => !readOnly && (a.created_by === me.user_id || me.role !== "member")}
+        canRemove={(a) => !readOnly && can.editMadeBy(a.created_by, task.project_id)}
         onRemove={(a) => removeAttachment(a.id)}
       />
     </Section>

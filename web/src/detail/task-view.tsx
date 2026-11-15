@@ -4,7 +4,7 @@
 
 import { useHotkeys } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useTaskByKey } from "@/lib/selectors";
+import { useTaskByKeyEvenIfGone } from "@/lib/selectors";
 import { useTaskDetail } from "@/lib/task-detail";
 import { usePageTitle } from "@/lib/ui-state";
 import { useFindTask } from "@/detail/data";
@@ -59,7 +59,8 @@ function PageTitle({ title }: { title: string }) {
 }
 
 export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
-  const task = useTaskByKey(taskKey);
+  // The task's own page shows it in the trash or the archive too.
+  const task = useTaskByKeyEvenIfGone(taskKey);
   const find = useFindTask(taskKey, !!task);
   const lost = useLostProject(taskKey.split("-")[0]);
   const status = useTaskDetail(task?.id);

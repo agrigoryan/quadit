@@ -5,11 +5,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
-import { getState, useStore } from "@/lib/store";
+import { getRows, useLookupEvenIfGone, useRow } from "@/lib/selectors";
+import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Relation, Task } from "@/lib/types";
 import { type Side, sideOf, useEnsureTasks } from "@/detail/data";
@@ -42,9 +44,9 @@ function storedRow(taskId: string, type: AddType, otherId: string) {
 }
 
 function addRelation(task: Task, type: AddType, otherId: string) {
-  const { collections: c, me } = getState();
+  const { me } = getState();
   const row = storedRow(task.id, type, otherId);
-  const exists = Object.values(c.relations).some(
+  const exists = getRows("relations").some(
     (r) => r.task_id === row.task_id && r.related_task_id === row.related_task_id && r.type === row.type,
   );
   if (exists) {
@@ -62,7 +64,7 @@ function removeRelation(id: string) {
 }
 
 function RelationRow({ relation, other, readOnly }: { relation: Relation; other: Task; readOnly: boolean }) {
-  const status = useStore((s) => s.collections.statuses[other.status_id]);
+  const status = useRow("statuses", other.status_id);
   const link = useTaskLink(other);
   return (
     <li className="group relative -mx-1.5 flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10">
@@ -129,9 +131,11 @@ interface Props {
 }
 
 export function Relations({ task, relations, startAdding, onEmptyClose }: Props) {
-  const tasks = useStore((s) => s.collections.tasks);
+  // An archived task still stands in a relation; one in the trash does not.
+  const tasks = useLookupEvenIfGone("tasks");
   const [adding, setAdding] = useState(!!startAdding);
-  const readOnly = !!task.deleted_at;
+  const can = useCan();
+  const readOnly = !can.editTask(task);
   // The task at the other end may not be in the local copy yet; the relation is shown once it is.
   useEnsureTasks(useMemo(() => relations.map((r) => sideOf(r, task.id).otherId), [relations, task.id]));
 

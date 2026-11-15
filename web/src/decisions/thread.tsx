@@ -74,10 +74,12 @@ interface BodyProps extends Subject {
   placeholder: string;
   autoFocus?: boolean;
   className?: string;
+  /** Shows the comments without the box to add one. */
+  readOnly?: boolean;
 }
 
 /** The comments and the box to add one. Cmd/Ctrl-Enter sends. */
-export function ThreadBody({ placeholder, autoFocus, className, ...subject }: BodyProps) {
+export function ThreadBody({ placeholder, autoFocus, className, readOnly, ...subject }: BodyProps) {
   const comments = useSubjectThread(subject);
   const [draft, setDraft] = useState("");
 
@@ -97,29 +99,31 @@ export function ThreadBody({ placeholder, autoFocus, className, ...subject }: Bo
           ))}
         </ul>
       )}
-      <div className="flex items-end gap-1">
-        <div className="min-w-0 flex-1">
-          <MentionTextarea
-            value={draft}
-            onChange={setDraft}
-            onSubmit={submit}
-            rows={1}
-            autoFocus={autoFocus}
-            placeholder={placeholder}
-            aria-label={placeholder}
-            className="min-h-8 max-sm:min-h-10 max-sm:py-2 max-sm:text-base"
-          />
+      {!readOnly && (
+        <div className="flex items-end gap-1">
+          <div className="min-w-0 flex-1">
+            <MentionTextarea
+              value={draft}
+              onChange={setDraft}
+              onSubmit={submit}
+              rows={1}
+              autoFocus={autoFocus}
+              placeholder={placeholder}
+              aria-label={placeholder}
+              className="min-h-8 max-sm:min-h-10 max-sm:py-2 max-sm:text-base"
+            />
+          </div>
+          <IconButton
+            label={t("decision.commentSend")}
+            hint={`${MOD} ↵`}
+            disabled={!draft.trim()}
+            onClick={submit}
+            className="mb-0.5 max-sm:size-10"
+          >
+            <SendHorizontal className="size-4" />
+          </IconButton>
         </div>
-        <IconButton
-          label={t("decision.commentSend")}
-          hint={`${MOD} ↵`}
-          disabled={!draft.trim()}
-          onClick={submit}
-          className="mb-0.5 max-sm:size-10"
-        >
-          <SendHorizontal className="size-4" />
-        </IconButton>
-      </div>
+      )}
     </div>
   );
 }

@@ -4,11 +4,11 @@
 import { useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useSubtaskProgress } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
-import type { Task } from "@/lib/types";
+import { useRow, useSubtaskProgress } from "@/lib/selectors";
+import { isClosedCategory, type Task } from "@/lib/types";
 import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";
 import { createTask, setParent } from "@/tasks/actions";
@@ -19,9 +19,11 @@ import { IconButton } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
 
 function SubtaskRow({ task }: { task: Task }) {
-  const status = useStore((s) => s.collections.statuses[task.status_id]);
+  const status = useRow("statuses", task.status_id);
   const link = useTaskLink(task);
-  const closed = status?.category === "done" || status?.category === "canceled";
+  const can = useCan();
+  const readOnly = !can.editTask(task);
+  const closed = !!status && isClosedCategory(status.category);
   return (
     <li className="group relative -mx-1.5 flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10">
       {status && (
@@ -29,6 +31,7 @@ function SubtaskRow({ task }: { task: Task }) {
           <button
             type="button"
             aria-label={`${t("prop.status")}: ${status.name}`}
+            disabled={readOnly}
             className="relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-sunken data-[state=open]:bg-sunken"
           >
             <StatusIcon category={status.category} />
@@ -45,14 +48,16 @@ function SubtaskRow({ task }: { task: Task }) {
       >
         {task.title}
       </Link>
-      <IconButton
-        label={t("detail.subtasks.detach", { key: task.key })}
-        size="sm"
-        className={cx("relative z-[1]", rowAction)}
-        onClick={() => setParent([task], null)}
-      >
-        <X className="size-3.5" />
-      </IconButton>
+      {!readOnly && (
+        <IconButton
+          label={t("detail.subtasks.detach", { key: task.key })}
+          size="sm"
+          className={cx("relative z-[1]", rowAction)}
+          onClick={() => setParent([task], null)}
+        >
+          <X className="size-3.5" />
+        </IconButton>
+      )}
       <span className="relative z-[1] flex shrink-0">
         <AssigneeAvatar userId={task.assignee_id} />
       </span>
@@ -110,6 +115,7 @@ interface Props {
 export function Subtasks({ task, subtasks, focusAdd }: Props) {
   // The same count as the pill on the task's row: canceled sub-tasks are in neither number.
   const { done, total } = useSubtaskProgress(task.id) ?? { done: 0, total: 0 };
+  const can = useCan();
 
   return (
     <Section
@@ -142,7 +148,7 @@ export function Subtasks({ task, subtasks, focusAdd }: Props) {
           ))}
         </ul>
       )}
-      {!task.deleted_at && <QuickAdd parent={task} autoFocus={focusAdd} />}
+      {can.editTask(task) && <QuickAdd parent={task} autoFocus={focusAdd} />}
     </Section>
   );
 }

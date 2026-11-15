@@ -2,13 +2,13 @@
 // other side of a relation. Search matches the key and the title.
 
 import { type ReactNode, useMemo } from "react";
-import { useCollection } from "@/lib/selectors";
+import { useLookup, useRows } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { StatusIcon } from "@/ui/icons";
 import { Picker, type PickerItem } from "@/ui/picker";
 
 interface Props {
-  /** Which tasks to offer. Tasks in the trash are never offered. */
+  /** Which tasks to offer. Tasks in the trash or the archive are never offered. */
   filter: (task: Task) => boolean;
   value?: string | null;
   onPick: (taskId: string) => void;
@@ -21,11 +21,11 @@ interface Props {
 }
 
 export function TaskPicker({ filter, value, onPick, label, extra, open, onOpenChange, children }: Props) {
-  const tasks = useCollection("tasks");
-  const statuses = useCollection("statuses");
+  const tasks = useRows("tasks");
+  const statuses = useLookup("statuses");
   const items = useMemo<PickerItem[]>(() => {
-    const rows = Object.values(tasks)
-      .filter((tk) => !tk.deleted_at && filter(tk))
+    const rows = tasks
+      .filter(filter)
       .sort((a, b) => b.updated_at - a.updated_at)
       .map((tk) => {
         const category = statuses[tk.status_id]?.category;

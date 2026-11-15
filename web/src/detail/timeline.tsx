@@ -2,9 +2,10 @@
 // as cards, and the comment box at the end.
 
 import { memo, useMemo } from "react";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useMember } from "@/lib/selectors";
+import { useLookup, useMember } from "@/lib/selectors";
 import { useTaskEvents } from "@/lib/task-detail";
 import type { Task } from "@/lib/types";
 import { CommentCard, When } from "@/detail/comment-card";
@@ -12,6 +13,7 @@ import { Composer } from "@/detail/composer";
 import { nameOf, useAttachmentsBySubject } from "@/detail/data";
 import { Section } from "@/detail/section";
 import { buildTimeline, commentHistory, type LineItem } from "@/detail/timeline-model";
+import { useStoredRows } from "@/detail/timeline-known";
 import { joinPhrases } from "@/detail/timeline-phrases";
 import { Avatar } from "@/ui/avatar";
 import { Loading } from "@/ui/spinner";
@@ -48,9 +50,11 @@ const lineText = (item: LineItem) => joinPhrases(item.phrases);
 
 export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
   const events = useTaskEvents(task.id);
-  const comments = useCollection("comments");
+  const comments = useLookup("comments");
+  const stored = useStoredRows();
   const files = useAttachmentsBySubject("comment");
-  const items = useMemo(() => buildTimeline(task.id, events, comments), [task.id, events, comments]);
+  const items = useMemo(() => buildTimeline(task.id, events, comments, stored), [task.id, events, comments, stored]);
+  const can = useCan();
   const history = useMemo(() => commentHistory(events), [events]);
 
   return (
@@ -83,7 +87,7 @@ export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
           )}
         </ol>
       )}
-      {!task.deleted_at && (
+      {can.editTask(task) && (
         <div className="mt-3">
           <Composer task={task} />
         </div>

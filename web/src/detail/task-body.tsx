@@ -6,6 +6,7 @@
 import { useRef, useState } from "react";
 import { GitFork, Link2, ListTree, Paperclip } from "lucide-react";
 import { DecisionSection } from "@/decisions/decision-section";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
@@ -43,6 +44,7 @@ export function TaskBody({ task, status, layout }: Props) {
   const files = useTaskAttachments(task.id);
   const pending = useUploads((s) => s.pending[task.id]) ?? NO_UPLOADS;
   const chooser = useRef<HTMLInputElement>(null);
+  const can = useCan();
   // Sections with nothing in them stay out of the way until asked for.
   const [opened, setOpened] = useState<Partial<Record<Extra, boolean>>>({});
   const open = (name: Extra) => setOpened((o) => ({ ...o, [name]: true }));
@@ -50,7 +52,7 @@ export function TaskBody({ task, status, layout }: Props) {
 
   const loading = status === "loading";
   const failed = status !== "loading" && status !== "ready";
-  const readOnly = !!task.deleted_at;
+  const readOnly = !can.editTask(task);
   const page = layout === "page";
   const show = {
     subtasks: subtasks.length > 0 || !!opened.subtasks,

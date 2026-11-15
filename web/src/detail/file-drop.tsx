@@ -3,6 +3,7 @@
 // inside it.
 
 import { type DragEvent, type ReactNode, useRef, useState } from "react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
 import { attachToTask, carriesFiles } from "@/detail/uploads";
@@ -21,7 +22,8 @@ interface FileDrop {
 
 export function useFileDrop(task: Task | undefined): FileDrop {
   const [dragging, setDragging] = useState(false);
-  const canDrop = !!task && !task.deleted_at;
+  const can = useCan();
+  const canDrop = !!task && can.editTask(task);
   // dragenter and dragleave fire for every child crossed; count them to know when the drag has really left.
   const depth = useRef(0);
 

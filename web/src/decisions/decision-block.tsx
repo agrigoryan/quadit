@@ -200,6 +200,7 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
             key={thread.id}
             decision={decision}
             optionId={thread.id}
+            readOnly={!viewer.canComment}
             autoFocus
             placeholder={t("decision.commentOn", { label: thread.label })}
           />
@@ -235,7 +236,13 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
         </>
       )}
       {talk && (
-        <ThreadBody decision={decision} autoFocus placeholder={t("decision.commentOnQuestion")} className="mt-1.5" />
+        <ThreadBody
+          decision={decision}
+          readOnly={!viewer.canComment}
+          autoFocus
+          placeholder={t("decision.commentOnQuestion")}
+          className="mt-1.5"
+        />
       )}
       <DecisionMentions taskId={decision.task_id} decisionId={decision.id} />
 

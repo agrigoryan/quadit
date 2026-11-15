@@ -8,7 +8,7 @@ import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
-import { useMe, useMembers, useTask } from "@/lib/selectors";
+import { useMe, useMembers, useRow } from "@/lib/selectors";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { FormField } from "@/ui/form";
@@ -72,7 +72,7 @@ function examine(taskId: string, draft: Composed): { problems: Problems; decisio
 /** Mount it only while it is open, so each question starts empty. */
 export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose: () => void }) {
   const me = useMe();
-  const task = useTask(taskId);
+  const task = useRow("tasks", taskId);
   const [draft, setDraft] = useState<Composed>(() => ({
     question: "",
     details: "",

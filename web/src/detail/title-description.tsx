@@ -4,6 +4,7 @@ import { type MouseEvent, useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
 import { caretToEnd } from "@/detail/caret-to-end";
@@ -19,6 +20,7 @@ import { MentionTextarea } from "@/ui/mention-textarea";
  */
 export function EditableTitle({ task, large }: { task: Task; large?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const can = useCan();
 
   // Leaving the box saves; Enter leaves it.
   function save() {
@@ -33,7 +35,7 @@ export function EditableTitle({ task, large }: { task: Task; large?: boolean }) 
       autoGrow
       rows={1}
       aria-label={t("detail.title")}
-      readOnly={!!task.deleted_at}
+      readOnly={!can.editTask(task)}
       value={draft ?? task.title}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => draft !== null && save()}
@@ -74,7 +76,8 @@ function DescriptionSkeleton() {
 export function Description({ task, loading }: { task: Task; loading: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const text = task.description ?? "";
-  const readOnly = !!task.deleted_at;
+  const can = useCan();
+  const readOnly = !can.editTask(task);
 
   // Leaving the task for the trash ends the edit.
   useEffect(() => {

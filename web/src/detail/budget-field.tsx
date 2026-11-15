@@ -3,6 +3,7 @@
 // it; nothing set means no limit.
 
 import { type FormEvent, useState } from "react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
 import { PropButton } from "@/detail/property-fields";
@@ -32,13 +33,14 @@ function whole(text: string, scale = 1): number | null {
 export function BudgetField({ task }: { task: Task }) {
   const budget = task.budget;
   const [open, setOpen] = useState(false);
+  const can = useCan();
   const text = summary(budget);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <PropButton
           empty={!text}
-          disabled={!!task.deleted_at}
+          disabled={!can.editTask(task)}
           aria-label={`${t("prop.budget")}: ${text || t("prop.budget.none")}`}
         >
           <span className="truncate tnum">{text || t("prop.budget.none")}</span>

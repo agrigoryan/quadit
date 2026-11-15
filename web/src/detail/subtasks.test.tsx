@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
 import { emptyCollections } from "@/lib/collections";
 import { useStore } from "@/lib/store";
-import type { Status, Task } from "@/lib/types";
+import type { Member, Status, Task } from "@/lib/types";
 import { Subtasks } from "@/detail/subtasks";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -57,5 +57,30 @@ describe("Subtasks", () => {
     expect(screen.getByText("1 of 2 done")).toBeTruthy();
     // The canceled one is still listed.
     expect(screen.getByText("Task 4")).toBeTruthy();
+  });
+
+  it("offers a read-only member no way to change the sub-tasks", () => {
+    const member = { user_id: "u", role: "member", name: "Ann", kind: "person", handle: "ann" } as Member;
+    const draw = () =>
+      render(
+        <MemoryRouter>
+          <TooltipProvider>
+            <Subtasks task={parent} subtasks={children} />
+          </TooltipProvider>
+        </MemoryRouter>,
+      );
+
+    useStore.setState({ me: member });
+    const writer = draw();
+    expect(screen.getByRole("textbox", { name: "Add a sub-task" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^Remove SVA-/ })).toHaveLength(3);
+    writer.unmount();
+
+    useStore.setState({ me: { ...member, scope: { read_only: true } } });
+    draw();
+    expect(screen.queryByRole("textbox", { name: "Add a sub-task" })).toBeNull();
+    expect(screen.queryAllByRole("button", { name: /^Remove SVA-/ })).toHaveLength(0);
+    for (const button of screen.getAllByRole("button", { name: /^Status/ }))
+      expect(button).toHaveProperty("disabled", true);
   });
 });

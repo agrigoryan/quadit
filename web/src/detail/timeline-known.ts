@@ -2,8 +2,31 @@
 // task's events carried when each thing was made, with the store's copy as
 // a fallback for anything older than the events that were loaded.
 
-import { type Dict, getState } from "@/lib/store";
+import { useMemo } from "react";
+import { useLookupEvenIfGone } from "@/lib/selectors";
+import type { Dict } from "@/lib/store";
 import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/lib/types";
+
+/** The store's rows the timeline names things from, gone ones included: a deleted comment, a removed file. */
+export interface StoredRows {
+  comments: Dict<Comment>;
+  attachments: Dict<Attachment>;
+  links: Dict<TaskLink>;
+  relations: Dict<Relation>;
+  decisions: Dict<Decision>;
+}
+
+export function useStoredRows(): StoredRows {
+  const comments = useLookupEvenIfGone("comments");
+  const attachments = useLookupEvenIfGone("attachments");
+  const links = useLookupEvenIfGone("links");
+  const relations = useLookupEvenIfGone("relations");
+  const decisions = useLookupEvenIfGone("decisions");
+  return useMemo(
+    () => ({ comments, attachments, links, relations, decisions }),
+    [comments, attachments, links, relations, decisions],
+  );
+}
 
 export interface Known {
   comments: Dict<Comment>;
@@ -18,8 +41,7 @@ export interface Known {
   asked: Dict<{ at: number; by: string }>;
 }
 
-export function knownRows(events: FeedEvent[]): Known {
-  const { collections: c } = getState();
+export function knownRows(events: FeedEvent[], c: StoredRows): Known {
   const known: Known = {
     comments: { ...c.comments },
     attachments: { ...c.attachments },

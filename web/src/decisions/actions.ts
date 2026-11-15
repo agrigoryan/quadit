@@ -6,6 +6,7 @@ import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { after } from "@/lib/rank";
 import type { FileRole } from "@/decisions/data";
+import { getRows } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import type { Decision, FileRow, Outcome } from "@/lib/types";
 
@@ -170,7 +171,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
       rank: fileRanks[i] as string,
     }));
   });
-  const siblings = Object.values(getState().collections.decisions).filter((d) => d.task_id === draft.taskId);
+  const siblings = getRows("decisions").filter((d) => d.task_id === draft.taskId);
   const lastRank = siblings.reduce((max, d) => (d.rank > max ? d.rank : max), "");
 
   const args: Changes["decision.open"] = {
@@ -241,7 +242,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
 export function attachToOption(decision: Decision, optionId: string, file: FileRow, role?: FileRole) {
   const id = newId();
   let last = "";
-  for (const a of Object.values(getState().collections.attachments)) {
+  for (const a of getRows("attachments")) {
     if (a.subject_id === optionId && a.rank > last) last = a.rank;
   }
   const args: Changes["attachment.add"] = { id, file: file.id, option: optionId };

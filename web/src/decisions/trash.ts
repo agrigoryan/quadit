@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, errorMessage, workspacePath } from "@/lib/api";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
 import { onEvents, useStore } from "@/lib/store";
 
 interface TrashedDecision {
@@ -45,8 +45,9 @@ export interface DecisionTrash {
 /** Deleted questions, newest deletion first. */
 export function useTrashedDecisions(): DecisionTrash {
   const slug = useSlug();
-  const decisions = useCollection("decisions");
-  const tasks = useCollection("tasks");
+  // The trash: the deleted questions themselves, and the tasks they were on, which may be gone too.
+  const decisions = useLookupEvenIfGone("decisions");
+  const tasks = useLookupEvenIfGone("tasks");
   // Asked again when the stream comes back: deletions made meanwhile were missed.
   const live = useStore((s) => s.stream === "live");
   const [fetched, setFetched] = useState<Fetched | null>(null);

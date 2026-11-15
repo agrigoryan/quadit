@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import { create } from "zustand";
 import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
+import { useRow, useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { getState, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { Section } from "@/detail/section";
@@ -80,8 +80,9 @@ const rowStyle =
 const linkStyle = "min-w-0 flex-1 truncate py-1.5 outline-none after:absolute after:inset-0 after:content-['']";
 
 function TaskMention({ mention }: { mention: Mention }) {
-  const task = useStore((s) => s.collections.tasks[mention.id]);
-  const status = useStore((s) => (task ? s.collections.statuses[task.status_id] : undefined));
+  // What mentions this task stays listed, trashed or archived, as the server lists it.
+  const task = useRowEvenIfGone("tasks", mention.id);
+  const status = useRow("statuses", task?.status_id);
   const key = task?.key ?? mention.key ?? "";
   const link = useTaskLink({ key });
   return (
@@ -99,7 +100,7 @@ function TaskMention({ mention }: { mention: Mention }) {
 
 function DocMention({ mention }: { mention: Mention }) {
   const slug = useSlug();
-  const doc = useStore((s) => s.collections.docs[mention.id]);
+  const doc = useRowEvenIfGone("docs", mention.id);
   return (
     <li className={rowStyle}>
       <span className="flex size-6 shrink-0 items-center justify-center">

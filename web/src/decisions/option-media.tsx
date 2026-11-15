@@ -7,7 +7,7 @@ import { useCallback, useState } from "react";
 import { FileText, Maximize2 } from "lucide-react";
 import { isVideo } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import { useStore } from "@/lib/store";
+import { useMember } from "@/lib/selectors";
 import type { FileRow } from "@/lib/types";
 import { RoleLabel, SidePair, SwipePair } from "@/decisions/before-after";
 import { isSmallArt, nameOf, type OptionFile } from "@/decisions/data";
@@ -35,10 +35,10 @@ function useWidth(): [(el: HTMLElement | null) => (() => void) | undefined, numb
 
 /** "Attached by @artist": who put the file shown on the option. */
 function AttachedBy({ file }: { file: OptionFile }) {
-  const names = useStore((s) => {
-    const ids = [...new Set([file.before?.attachedBy, file.attachedBy].filter((id): id is string => !!id))];
-    return ids.map((id) => nameOf(s.collections.members[id], t("common.someone"))).join(", ");
-  });
+  const before = useMember(file.before?.attachedBy);
+  const by = useMember(file.attachedBy);
+  const ids = [...new Set([file.before?.attachedBy, file.attachedBy].filter((id): id is string => !!id))];
+  const names = ids.map((id) => nameOf(id === file.attachedBy ? by : before, t("common.someone"))).join(", ");
   return <p className="truncate px-3 pt-1.5 text-2xs text-ink-3">{t("decision.file.by", { name: names })}</p>;
 }
 
@@ -156,6 +156,6 @@ export function OptionDocs({ files }: { files: OptionFile[] }) {
 }
 
 function DocBy({ file }: { file: OptionFile }) {
-  const name = useStore((s) => nameOf(s.collections.members[file.attachedBy], t("common.someone")));
+  const name = nameOf(useMember(file.attachedBy), t("common.someone"));
   return <span className="ml-1.5 shrink-0 text-2xs text-ink-3">{t("decision.file.by", { name })}</span>;
 }

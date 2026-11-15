@@ -16,12 +16,12 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "react-router";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
-import { useMe, useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useMe, useRow, useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import type { Task } from "@/lib/types";
 import type { TaskLayout } from "@/detail/task-body";
@@ -51,8 +51,10 @@ function setWatching(task: Task, userId: string, watching: boolean) {
 export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }: Props) {
   const me = useMe();
   const slug = useSlug();
-  const project = useStore((s) => (task ? s.collections.projects[task.project_id] : undefined));
-  const watching = useStore((s) => (task ? !!s.collections.watchers[`${me.user_id}:${task.id}`] : false));
+  // An archived project is still where the task lives.
+  const project = useRowEvenIfGone("projects", task?.project_id);
+  const watching = !!useRow("watchers", task ? `${me.user_id}:${task.id}` : undefined);
+  const can = useCan();
   const page = layout === "page";
 
   async function copyLink() {
@@ -91,18 +93,21 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }:
       </div>
       {task && (
         <>
-          <IconButton
-            label={watching ? t("detail.unwatch") : t("detail.watch")}
-            aria-pressed={watching}
-            className="max-md:size-10"
-            onClick={() => setWatching(task, me.user_id, !watching)}
-          >
-            {watching ? <Eye className="size-4 text-accent-text" /> : <EyeOff className="size-4" />}
-          </IconButton>
+          {/* Watching is a change too: a read-only member may not make it. */}
+          {can.write && (
+            <IconButton
+              label={watching ? t("detail.unwatch") : t("detail.watch")}
+              aria-pressed={watching}
+              className="max-md:size-10"
+              onClick={() => setWatching(task, me.user_id, !watching)}
+            >
+              {watching ? <Eye className="size-4 text-accent-text" /> : <EyeOff className="size-4" />}
+            </IconButton>
+          )}
           <IconButton label={t("detail.copyLink")} className="max-md:size-10" onClick={copyLink}>
             <Link2 className="size-4" />
           </IconButton>
-          {!task.deleted_at && (
+          {can.editTask(task) && (
             <Menu>
               <MenuTrigger asChild>
                 <IconButton label={t("common.more")} className="max-md:size-10">
@@ -170,6 +175,7 @@ function QueueSteps({ queue }: { queue: QueuePlace }) {
 
 /** Shown under the header while the task is in the trash. */
 export function TrashBanner({ task }: { task: Task }) {
+  const can = useCan();
   return (
     <div
       role="status"
@@ -177,9 +183,11 @@ export function TrashBanner({ task }: { task: Task }) {
     >
       <Trash2 className="size-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">{t("detail.inTrash")}</span>
-      <Button size="sm" onClick={() => restoreTasks([task])}>
-        {t("detail.restore")}
-      </Button>
+      {can.edit(task.project_id) && (
+        <Button size="sm" onClick={() => restoreTasks([task])}>
+          {t("detail.restore")}
+        </Button>
+      )}
     </div>
   );
 }

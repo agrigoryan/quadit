@@ -3,6 +3,7 @@
 
 import { memo, useState } from "react";
 import { MoreHorizontal, Pencil, Reply, Trash2 } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMe, useMember } from "@/lib/selectors";
@@ -122,17 +123,21 @@ interface EntryProps {
   files: Attached[];
   /** What the comment said before each edit, oldest first. */
   earlier: Earlier[];
+  /** The task's project: who may delete a comment depends on it. */
+  projectId: string;
   readOnly: boolean;
   onReply?: () => void;
 }
 
 /** One comment or reply: who, when, what they wrote, and what they attached. */
-function Entry({ comment, files, earlier, readOnly, onReply }: EntryProps) {
+function Entry({ comment, files, earlier, projectId, readOnly, onReply }: EntryProps) {
   const me = useMe();
+  const can = useCan();
   const author = useMember(comment.author_id);
   const [editing, setEditing] = useState(false);
   const mine = comment.author_id === me.user_id;
-  const canDelete = mine || me.role !== "member";
+  // The server lets only the author edit a comment, and the author or an admin delete it.
+  const canDelete = can.editMadeBy(comment.author_id, projectId);
   const evidence = evidenceFields.filter(([field]) => comment.evidence?.[field]);
 
   return (
@@ -217,13 +222,15 @@ const NO_EDITS: Earlier[] = [];
 
 export const CommentCard = memo(function CommentCard({ task, comment, replies, files, history }: Props) {
   const [replying, setReplying] = useState(false);
-  const readOnly = !!task.deleted_at;
+  const can = useCan();
+  const readOnly = !can.editTask(task);
   return (
     <article className="rounded-lg border border-line">
       <Entry
         comment={comment}
         files={files[comment.id] ?? NO_FILES}
         earlier={history?.[comment.id] ?? NO_EDITS}
+        projectId={task.project_id}
         readOnly={readOnly}
         onReply={() => setReplying(true)}
       />
@@ -233,6 +240,7 @@ export const CommentCard = memo(function CommentCard({ task, comment, replies, f
             comment={reply}
             files={files[reply.id] ?? NO_FILES}
             earlier={history?.[reply.id] ?? NO_EDITS}
+            projectId={task.project_id}
             readOnly={readOnly}
           />
         </div>

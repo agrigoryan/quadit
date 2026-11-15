@@ -9,6 +9,7 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
+import { getRows } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Task } from "@/lib/types";
@@ -62,9 +63,9 @@ async function attachOne(task: Task, file: File) {
     },
   });
   if (row) {
-    const { collections: c, me } = getState();
+    const { me } = getState();
     let last = "";
-    for (const a of Object.values(c.attachments)) {
+    for (const a of getRows("attachments")) {
       if (a.subject_type === "task" && a.subject_id === task.id && a.rank > last) last = a.rank;
     }
     const id = newId();

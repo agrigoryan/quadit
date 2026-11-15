@@ -6,7 +6,7 @@
 import { t } from "@/lib/i18n";
 import type { Dict } from "@/lib/store";
 import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/lib/types";
-import { type Known, knownRows } from "@/detail/timeline-known";
+import { type Known, knownRows, type StoredRows } from "@/detail/timeline-known";
 import {
   askedPhrase,
   type Changes,
@@ -188,10 +188,10 @@ function mergeChanges(into: Changes, more: Changes): Changes {
   return out;
 }
 
-/** The task's own comments as threads: each top-level comment with its replies, oldest first. */
+/** The task's own comments as threads: each top-level comment with its replies, oldest first. `comments` holds live ones only. */
 function threads(taskId: string, comments: Dict<Comment>): { comment: Comment; replies: Comment[] }[] {
   const mine = Object.values(comments)
-    .filter((c) => c.task_id === taskId && c.subject_type === "task" && !c.deleted_at)
+    .filter((c) => c.task_id === taskId && c.subject_type === "task")
     .sort((a, b) => a.created_at - b.created_at || (a.id < b.id ? -1 : 1));
   const live = new Set(mine.map((c) => c.id));
   const replies: Dict<Comment[]> = {};
@@ -236,9 +236,15 @@ function fold(atoms: Atom[]): Atom[] {
   return out;
 }
 
-export function buildTimeline(taskId: string, events: FeedEvent[], comments: Dict<Comment>): TimelineItem[] {
+/** `comments`: the live comments, drawn as cards; `stored`: every row, to name what is gone. */
+export function buildTimeline(
+  taskId: string,
+  events: FeedEvent[],
+  comments: Dict<Comment>,
+  stored: StoredRows,
+): TimelineItem[] {
   const withDecision = new Set(events.filter((ev) => ev.type.startsWith("decision.")).map((ev) => ev.change_id));
-  const known = knownRows(events);
+  const known = knownRows(events, stored);
   const commentSeq: Dict<number> = {};
   const atoms: Atom[] = [];
   for (const ev of events) {

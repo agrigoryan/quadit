@@ -3,20 +3,20 @@
 // what the signed-in person may do.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCan } from "@/lib/access";
 import { isImage } from "@/lib/files";
-import { useCollection, useMe } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useMe, useMember, useRowEvenIfGone, useRows } from "@/lib/selectors";
 import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } from "@/lib/types";
 
 const byRank = (a: { rank: string }, b: { rank: string }) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0);
 
 /** A task's decisions: the open ones first, each group in the order asked. */
 export function useTaskDecisions(taskId: string): Decision[] {
-  const decisions = useCollection("decisions");
+  const decisions = useRows("decisions");
   return useMemo(
     () =>
-      Object.values(decisions)
-        .filter((d) => d.task_id === taskId && !d.deleted_at)
+      decisions
+        .filter((d) => d.task_id === taskId)
         .sort((a, b) => Number(a.state !== "open") - Number(b.state !== "open") || byRank(a, b)),
     [decisions, taskId],
   );
@@ -41,13 +41,13 @@ export interface OptionFile extends FileRow {
 export type OptionFiles = Record<string, OptionFile[]>;
 
 export function useOptionFiles(decision: Decision): OptionFiles {
-  const attachments = useCollection("attachments");
+  const attachments = useRows("attachments");
   const options = decision.options;
   return useMemo(() => {
     const out: OptionFiles = {};
     const ids = new Set((options ?? []).map((o) => o.id));
-    const rows = Object.values(attachments)
-      .filter((a) => a.subject_type === "decision_option" && ids.has(a.subject_id) && !a.deleted_at && a.file)
+    const rows = attachments
+      .filter((a) => a.subject_type === "decision_option" && ids.has(a.subject_id) && a.file)
       .sort(byRank);
     for (const a of rows) {
       const role = a.role === "before" || a.role === "after" ? a.role : undefined;
@@ -65,12 +65,12 @@ export function useOptionFiles(decision: Decision): OptionFiles {
 
 /** The files on the question itself, in order. */
 export function useQuestionFiles(decision: Decision): OptionFile[] {
-  const attachments = useCollection("attachments");
+  const attachments = useRows("attachments");
   const id = decision.id;
   return useMemo(
     () =>
-      Object.values(attachments)
-        .filter((a) => a.subject_type === "decision" && a.subject_id === id && !a.deleted_at && a.file)
+      attachments
+        .filter((a) => a.subject_type === "decision" && a.subject_id === id && a.file)
         .sort(byRank)
         .map((a) => ({
           ...(a.file as FileRow),
@@ -118,11 +118,11 @@ export function mediaAspect(files: FileRow[]): number {
 
 /** The comments on one option, or on a decision as a whole, oldest first. */
 export function useThread(subjectType: SubjectType, subjectId: string): Comment[] {
-  const comments = useCollection("comments");
+  const comments = useRows("comments");
   return useMemo(
     () =>
-      Object.values(comments)
-        .filter((c) => c.subject_type === subjectType && c.subject_id === subjectId && !c.deleted_at)
+      comments
+        .filter((c) => c.subject_type === subjectType && c.subject_id === subjectId)
         .sort((a, b) => a.created_at - b.created_at),
     [comments, subjectType, subjectId],
   );
@@ -139,10 +139,16 @@ export interface Viewer {
   canDelete: boolean;
   /** I asked, an answer is in, and I may say it does not settle the question. */
   canReopen: boolean;
+  /** I may comment on it: the task is not in the trash and I may change it. */
+  canComment: boolean;
 }
 
 export function useViewer(decision: Decision): Viewer {
   const me = useMe();
+  const can = useCan();
+  const task = useRowEvenIfGone("tasks", decision.task_id);
+  // Every answer, edit and comment is a change to the task: none on a task in the trash, none by a read-only member.
+  const write = !!task && can.editTask(task);
   const open = decision.state === "open";
   const isAsker = decision.created_by === me.user_id;
   // An agent answers only what was asked of it; a person may answer anything they did not ask.
@@ -150,10 +156,11 @@ export function useViewer(decision: Decision): Viewer {
   return {
     isAsker,
     mine: open && decision.asked_id === me.user_id,
-    canAnswer: open && !isAsker && !barred,
-    canEdit: open && isAsker,
-    canDelete: open && (isAsker || me.role !== "member"),
-    canReopen: !open && isAsker,
+    canAnswer: write && open && !isAsker && !barred,
+    canEdit: write && open && isAsker,
+    canDelete: write && open && can.editMadeBy(decision.created_by, task?.project_id),
+    canReopen: write && !open && isAsker,
+    canComment: write,
   };
 }
 
@@ -164,7 +171,7 @@ export function nameOf(member: Member | undefined, fallback: string): string {
 }
 
 export function useMemberName(userId: string | undefined, fallback: string): string {
-  return useStore((s) => nameOf(userId ? s.collections.members[userId] : undefined, fallback));
+  return nameOf(useMember(userId), fallback);
 }
 
 /** Follows a media query, for the few places where layout cannot be done in CSS. */

@@ -4,6 +4,7 @@
 import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
@@ -134,7 +135,8 @@ interface Props {
 
 export function Links({ task, links, startAdding, onEmptyClose }: Props) {
   const [adding, setAdding] = useState(!!startAdding);
-  const readOnly = !!task.deleted_at;
+  const can = useCan();
+  const readOnly = !can.editTask(task);
 
   function closeForm() {
     setAdding(false);

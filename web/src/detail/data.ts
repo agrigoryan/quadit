@@ -5,7 +5,7 @@
 import { useEffect, useMemo } from "react";
 import { api, ApiError, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { sortByRank, useCollection } from "@/lib/selectors";
+import { getRowEvenIfGone, sortByRank, useLookupEvenIfGone, useRows } from "@/lib/selectors";
 import { type Dict, getState, mergeRows, useStore } from "@/lib/store";
 import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/lib/types";
 import { useLoad } from "@/lib/use-load";
@@ -45,40 +45,34 @@ export function useFindTask(taskKey: string, have: boolean): FindTask {
 }
 
 export function useSubtasks(taskId: string): Task[] {
-  const tasks = useCollection("tasks");
-  return useMemo(
-    () => sortByRank(Object.values(tasks).filter((tk) => tk.parent_id === taskId && !tk.deleted_at)),
-    [tasks, taskId],
-  );
+  const tasks = useRows("tasks");
+  return useMemo(() => sortByRank(tasks.filter((tk) => tk.parent_id === taskId)), [tasks, taskId]);
 }
 
 export function useTaskRelations(taskId: string): Relation[] {
-  const relations = useCollection("relations");
+  const relations = useRows("relations");
   return useMemo(
-    () => Object.values(relations).filter((r) => r.task_id === taskId || r.related_task_id === taskId),
+    () => relations.filter((r) => r.task_id === taskId || r.related_task_id === taskId),
     [relations, taskId],
   );
 }
 
 export function useTaskLinks(taskId: string): TaskLink[] {
-  const links = useCollection("links");
+  const links = useRows("links");
   return useMemo(
-    () =>
-      Object.values(links)
-        .filter((l) => l.task_id === taskId && !l.deleted_at)
-        .sort((a, b) => (a.id < b.id ? -1 : 1)),
+    () => links.filter((l) => l.task_id === taskId).sort((a, b) => (a.id < b.id ? -1 : 1)),
     [links, taskId],
   );
 }
 
-const hasFile = (a: Attachment): a is Attached => !a.deleted_at && !!a.file;
+const hasFile = (a: Attachment): a is Attached => !!a.file;
 
 /** Live attachments of one kind of subject, grouped by the subject they are on, in order. */
 export function useAttachmentsBySubject(subjectType: SubjectType): Dict<Attached[]> {
-  const attachments = useCollection("attachments");
+  const attachments = useRows("attachments");
   return useMemo(() => {
     const out: Dict<Attached[]> = {};
-    for (const a of sortByRank(Object.values(attachments))) {
+    for (const a of sortByRank(attachments)) {
       if (a.subject_type === subjectType && hasFile(a)) (out[a.subject_id] ??= []).push(a);
     }
     return out;
@@ -97,7 +91,8 @@ export function nameOf(member: Member | undefined): string {
   return member.kind === "agent" ? `@${member.handle}` : member.name;
 }
 
-export const who = (userId: string | undefined) => nameOf(userId ? getState().collections.members[userId] : undefined);
+/** A member removed from the workspace is still named. */
+export const who = (userId: string | undefined) => nameOf(getRowEvenIfGone("members", userId));
 
 /** A relation as seen from one task. */
 export type Side = "blocks" | "blockedBy" | "relates" | "duplicates" | "duplicatedBy";
@@ -130,7 +125,8 @@ const asked = new Set<string>();
  * the rest; one may be in the trash), so a row that names one can be drawn.
  */
 export function useEnsureTasks(ids: string[]) {
-  const missing = useStore((s) => ids.filter((id) => !s.collections.tasks[id]).join(","));
+  const tasks = useLookupEvenIfGone("tasks");
+  const missing = ids.filter((id) => !tasks[id]).join(",");
   useEffect(() => {
     for (const id of missing ? missing.split(",") : []) {
       if (asked.has(id)) continue;

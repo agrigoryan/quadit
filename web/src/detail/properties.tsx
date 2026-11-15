@@ -5,11 +5,11 @@
 
 import { useRef, useState } from "react";
 import { Globe, Layers, RefreshCw, Target } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { useHotkeys } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useMe, useMember } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useLookupEvenIfGone, useMe, useMember, useRowEvenIfGone } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { nameOf } from "@/detail/data";
 import { BudgetField } from "@/detail/budget-field";
@@ -32,17 +32,19 @@ interface Props {
 
 export function Properties({ task, side }: Props) {
   const me = useMe();
-  const project = useStore((s) => s.collections.projects[task.project_id]);
-  const status = useStore((s) => s.collections.statuses[task.status_id]);
-  const labels = useStore((s) => s.collections.labels);
-  const epic = useStore((s) => (task.epic_id ? s.collections.epics[task.epic_id] : undefined));
-  const milestone = useStore((s) => (task.milestone_id ? s.collections.milestones[task.milestone_id] : undefined));
-  const cycle = useStore((s) => (task.cycle_id ? s.collections.cycles[task.cycle_id] : undefined));
+  const can = useCan();
+  // What the task is filed under is named even when it is gone: an archived project, a deleted label.
+  const project = useRowEvenIfGone("projects", task.project_id);
+  const status = useRowEvenIfGone("statuses", task.status_id);
+  const labels = useLookupEvenIfGone("labels");
+  const epic = useRowEvenIfGone("epics", task.epic_id);
+  const milestone = useRowEvenIfGone("milestones", task.milestone_id);
+  const cycle = useRowEvenIfGone("cycles", task.cycle_id);
   const assignee = useMember(task.assignee_id);
   const askedBy = useMember(task.asked_by);
   const waitingOn = useMember(task.waiting_on_id);
   const holder = useMember(task.lease_holder_id);
-  const readOnly = !!task.deleted_at;
+  const readOnly = !can.editTask(task);
   const held = holder && (task.lease_until ?? 0) > Date.now();
   const waitsOnMe = waitingOn?.user_id === me.user_id;
   const outside = waitsOutside(task);
@@ -243,7 +245,8 @@ export function Properties({ task, side }: Props) {
           <ParentField task={task} />
         </PropRow>
 
-        {me.role !== "member" && (
+        {/* Admins set a task's budget; the server takes it from any member who may edit the task. */}
+        {can.administer && (
           <PropRow label={t("prop.budget")}>
             <BudgetField task={task} />
           </PropRow>

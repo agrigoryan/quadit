@@ -5,9 +5,10 @@
 import { type ButtonHTMLAttributes, type ReactNode, type Ref, useCallback, useMemo, useState } from "react";
 import { ArrowUpRight, CircleSlash, X } from "lucide-react";
 import { Link } from "react-router";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useTask } from "@/lib/selectors";
+import { useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { setDue, setEstimate, setParent, setWaitingOn, setWaitingOutside, waitsOutside } from "@/tasks/actions";
 import { useTaskLink } from "@/lib/task-link";
@@ -52,6 +53,7 @@ const inlineField =
 export function WaitingNote({ task, below }: { task: Task; below?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const saved = task.waiting_on_note ?? "";
+  const can = useCan();
 
   function save() {
     if (draft === null) return;
@@ -70,7 +72,7 @@ export function WaitingNote({ task, below }: { task: Task; below?: boolean }) {
       rows={1}
       aria-label={t("detail.waitingNote")}
       placeholder={waitsOutside(task) ? t("prop.outside.placeholder") : t("detail.waitingNotePlaceholder")}
-      readOnly={!!task.deleted_at}
+      readOnly={!can.editTask(task)}
       value={draft ?? saved}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={save}
@@ -94,6 +96,7 @@ export function WaitingNote({ task, below }: { task: Task; below?: boolean }) {
 
 export function EstimateField({ task }: { task: Task }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const can = useCan();
 
   function save() {
     if (draft === null) return;
@@ -111,7 +114,7 @@ export function EstimateField({ task }: { task: Task }) {
       step={1}
       aria-label={t("prop.estimate")}
       placeholder={t("detail.estimatePlaceholder")}
-      readOnly={!!task.deleted_at}
+      readOnly={!can.editTask(task)}
       value={draft ?? (task.estimate ? String(task.estimate) : "")}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={save}
@@ -129,17 +132,19 @@ export function EstimateField({ task }: { task: Task }) {
 
 /** The browser's own date field, dressed to sit in the grid, with a way to clear it. */
 export function DueField({ task }: { task: Task }) {
+  const can = useCan();
+  const readOnly = !can.editTask(task);
   return (
     <>
       <input
         type="date"
         aria-label={t("prop.due")}
-        readOnly={!!task.deleted_at}
+        readOnly={readOnly}
         value={task.due_on ?? ""}
         onChange={(e) => setDue([task], e.target.value || null)}
         className={cx(inlineField, "tnum", !task.due_on && "text-ink-3 focus:text-ink")}
       />
-      {task.due_on && !task.deleted_at && (
+      {task.due_on && !readOnly && (
         <Tooltip label={t("prop.clearDue")}>
           <button
             type="button"
@@ -175,8 +180,11 @@ function OpenTaskLink({ task }: { task: Task }) {
 
 /** The task this one is a part of: any task of the same project that is not below it. */
 export function ParentField({ task }: { task: Task }) {
-  const parent = useTask(task.parent_id);
-  const tasks = useCollection("tasks");
+  // The parent is named even when it is in the trash or the archive.
+  const parent = useRowEvenIfGone("tasks", task.parent_id);
+  // Gone tasks count too: one restored later must not end up under its own sub-task.
+  const tasks = useLookupEvenIfGone("tasks");
+  const can = useCan();
 
   // A task cannot sit under itself or under anything that sits under it.
   const below = useMemo(() => {
@@ -217,7 +225,7 @@ export function ParentField({ task }: { task: Task }) {
       >
         <PropButton
           empty={!parent}
-          disabled={!!task.deleted_at}
+          disabled={!can.editTask(task)}
           aria-label={`${t("prop.parent")}: ${parent ? parent.key : t("task.noParent")}`}
           // Room is left for the arrow that opens the parent, so a long title does not push it onto a line of its own.
           className={parent ? "max-w-[calc(100%-1.75rem)]" : undefined}
