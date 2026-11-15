@@ -39,11 +39,33 @@ export const useUi = create<UiState>(() => ({
   title: "",
 }));
 
-/** Names the page: shown in the top bar and the browser tab. */
+/**
+ * The names of the pages on screen that name themselves, in the order they
+ * did; the last one is shown. Written only by usePageTitle.
+ */
+const titles: { title: string }[] = [];
+
+function showTitle() {
+  const title = titles.at(-1)?.title ?? "";
+  useUi.setState({ title });
+  document.title = title ? `${title} – Quadit` : "Quadit";
+}
+
+/**
+ * Names the page: shown in the top bar and the browser tab. When the page
+ * goes away its name goes with it, and the page that named itself before
+ * (one it was shown inside: Settings around a page that is not there) names
+ * the tab again.
+ */
 export function usePageTitle(title: string) {
   useEffect(() => {
-    useUi.setState({ title });
-    document.title = title ? `${title} – Quadit` : "Quadit";
+    const mine = { title };
+    titles.push(mine);
+    showTitle();
+    return () => {
+      titles.splice(titles.indexOf(mine), 1);
+      showTitle();
+    };
   }, [title]);
 }
 
