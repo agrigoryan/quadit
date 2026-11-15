@@ -432,7 +432,9 @@ func TestSyncAwkwardRepositories(t *testing.T) {
 
 	// A second page called "empty" gets a file of its own.
 	s.change(s.owner, "", "doc.create", M{"title": "empty", "parent": root, "markdown": "Not so empty.\n"})
-	sync(200)
+	if out := sync(200); !strings.Contains(out, "was written as empty-2.md") {
+		t.Fatalf("a page given another file name is not said: %s", out)
+	}
 	if got := git(bare, "show", "main:docs/empty.md"); got != "" {
 		t.Fatalf("the empty file was written over: %q", got)
 	}
@@ -523,6 +525,33 @@ func TestSyncAwkwardRepositories(t *testing.T) {
 	sync(200)
 	if got := git(bare, "show", "main:docs/plain.md"); got != "plain text\n" {
 		t.Fatalf("a file put back in the repository: %q", got)
+	}
+	// The page that went to the trash when the file was deleted, brought
+	// back now: it says what plain.md says, so no second file is made of
+	// it, and the answer says why. Once it says something else, it is written.
+	var trashed struct{ Docs []struct{ ID, Title string } }
+	s.call(s.owner, "", "GET", w+"/docs?trash=1", nil, 200, &trashed)
+	old := ""
+	for _, d := range trashed.Docs {
+		if d.Title == "plain" {
+			old = d.ID
+		}
+	}
+	if old != "" {
+		s.change(s.owner, "", "doc.restore", M{"id": old})
+		if out := sync(200); !strings.Contains(out, "already says the same") || strings.Contains(git(bare, "ls-tree", "-r", "--name-only", "main"), "plain-2.md") {
+			t.Fatalf("a restored page saying what its file says: %s\n%s", out, git(bare, "ls-tree", "-r", "--name-only", "main"))
+		}
+		// Said again on a sync that has nothing at all to write.
+		if out := sync(200); !strings.Contains(out, "already says the same") || !strings.Contains(out, `"files_written":0`) {
+			t.Fatalf("a sync with nothing to write lost the note: %s", out)
+		}
+		s.change(s.owner, "", "doc.write", M{"doc": old, "markdown": "plain, but different now\n"})
+		if out := sync(200); !strings.Contains(out, "was written as plain-2.md") {
+			t.Fatalf("a restored page that now differs: %s", out)
+		}
+	} else {
+		t.Fatal("the page trashed with its file is not in the trash")
 	}
 	var live struct{ Docs []struct{ Title string } }
 	s.call(s.owner, "", "GET", w+"/docs", nil, 200, &live)

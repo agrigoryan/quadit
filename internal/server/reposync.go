@@ -257,6 +257,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	toWrite := map[string]string{} // path -> text to put in the repository
 	var toRemove []string
 	written := map[string]string{} // doc id -> page hash, set after a push
+	var renamed []string           // pages given another file name than their title's, and why
 	editors := map[string]int64{}  // who last changed the pages being written, and when
 
 	err = s.eng.System(ctx, src.WorkspaceID, src.CreatedBy, func(sys *engine.Sys) error {
@@ -391,12 +392,26 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 				st, lerr := os.Lstat(filepath.Join(root, filepath.FromSlash(p)))
 				return lerr == nil && (st.Mode()&os.ModeSymlink != 0 || st.IsDir())
 			}
+			natural := path
 			for n := 2; taken(path); n++ {
 				path = fmt.Sprintf("%s%s-%d.md", dirOf, slugFrom(page.Title), n)
 			}
 			body, err := pageMD(page.ID)
 			if err != nil {
 				return err
+			}
+			if path != natural {
+				// Said in the answer: someone who made or restored a page
+				// should learn that the name was taken, and when the two
+				// say the same thing, that one of them is one too many.
+				if text, ok := files[natural]; ok && strings.TrimSpace(text) == strings.TrimSpace(body) {
+					// A second page saying exactly what that file says (a page
+					// brought back from the trash after its file returned):
+					// no second file is made of it while it says nothing new.
+					renamed = append(renamed, fmt.Sprintf("%q was not written: %s already says the same, and has its own page; one of the two pages can go", orText(page.Title, "untitled"), natural))
+					continue
+				}
+				renamed = append(renamed, fmt.Sprintf("%q was written as %s (%s is taken)", orText(page.Title, "untitled"), path, natural))
 			}
 			if _, err := tx.Update(ctx, "docs", map[string]any{"source_path": path}, store.Eq("id", page.ID)); err != nil {
 				return err
@@ -414,6 +429,10 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	}
 	res.Commit, _ = git(ctx, dir, "rev-parse", "--short", "HEAD")
 	if (len(toWrite) == 0 && len(toRemove) == 0) || src.WriteMode == "none" {
+		// Still said, on a sync with nothing to write: why a page has no file.
+		if len(renamed) > 0 {
+			res.Note = strings.TrimSpace(res.Note + " " + oneLine(strings.Join(renamed, "; "), 400))
+		}
 		return res, nil
 	}
 	blocked := map[string]bool{} // paths a link in the repository stands on, or in the way of
@@ -451,6 +470,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		}
 		sort.Strings(names)
 		res.Note = fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 200))
+	}
+	if len(renamed) > 0 {
+		res.Note = strings.TrimSpace(res.Note + " " + oneLine(strings.Join(renamed, "; "), 400))
 	}
 	if _, err := git(ctx, dir, "add", "--all", "."); err != nil {
 		return res, err
