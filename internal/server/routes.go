@@ -209,8 +209,28 @@ var collections = map[string]collection{
 		if err != nil {
 			return nil, err
 		}
-		x.s.withResponsible(x.ctx(), rows.([]core.Member))
-		return rows, nil
+		ms := rows.([]core.Member)
+		x.s.withResponsible(x.ctx(), ms)
+		if x.member.Role.AtLeast(core.RoleAdmin) {
+			// Admins see people's addresses: they invite and import by them.
+			var ids []string
+			for _, m := range ms {
+				if m.Kind == core.KindPerson {
+					ids = append(ids, m.UserID)
+				}
+			}
+			var users []core.User
+			if len(ids) > 0 && x.s.st.List(x.ctx(), &users, store.Where(store.In("id", ids))) == nil {
+				by := map[string]string{}
+				for _, u := range users {
+					by[u.ID] = u.Email
+				}
+				for i := range ms {
+					ms[i].Email = by[ms[i].UserID]
+				}
+			}
+		}
+		return ms, nil
 	}},
 	"projects":    {load: listOf[core.Project]("rank")},
 	"statuses":    {load: listOf[core.Status]("rank")},

@@ -110,6 +110,7 @@ type syncResult struct {
 	FilesWritten int    `json:"files_written"`
 	Commit       string `json:"commit"`
 	Pushed       string `json:"pushed,omitempty"`
+	Note         string `json:"note,omitempty"`
 }
 
 // hashes are what was the same on both sides at the last sync, stored as
@@ -157,8 +158,20 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	}
 	branch := src.Branch
 	if branch == "" {
-		if branch, err = git(ctx, dir, "rev-parse", "--abbrev-ref", "HEAD"); err != nil {
-			return res, err
+		// The branch the repository itself calls its main one. A repository
+		// with no commits yet has none: there is nothing to sync until it does.
+		heads, lerr := git(ctx, dir, "ls-remote", "--symref", "origin", "HEAD")
+		if lerr != nil {
+			return res, lerr
+		}
+		for _, line := range strings.Split(heads, "\n") {
+			if rest, ok := strings.CutPrefix(line, "ref: refs/heads/"); ok {
+				branch = strings.Fields(rest)[0]
+			}
+		}
+		if branch == "" {
+			res.Note = "the repository has no commits yet; pages will sync once it has"
+			return res, nil
 		}
 	}
 	if _, err := git(ctx, dir, "fetch", "--quiet", "origin", branch); err != nil {

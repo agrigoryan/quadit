@@ -161,8 +161,24 @@ func (c *cx) link(fromType, fromID, scopeType, scopeID, text string) ([]core.Mem
 		}
 	}
 	for _, m := range wikiRefRE.FindAllStringSubmatch(text, -1) {
+		want := strings.TrimSpace(m[1])
 		var ds []core.Doc
-		if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("title", strings.TrimSpace(m[1])), store.Live}, Limit: 2}); err == nil && len(ds) == 1 {
+		if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("title", want), store.Live}, Limit: 2}); err != nil {
+			continue
+		}
+		if len(ds) == 0 {
+			// Written in another case than the page's title.
+			var all []core.Doc
+			if err := c.tx.List(c.ctx, &all, store.Q{Where: []store.Cond{store.Live, store.Ne("kind", core.DocRow)}, Limit: 5000}); err != nil {
+				continue
+			}
+			for _, d := range all {
+				if strings.EqualFold(d.Title, want) {
+					ds = append(ds, d)
+				}
+			}
+		}
+		if len(ds) == 1 {
 			add("doc", ds[0].ID)
 		}
 	}

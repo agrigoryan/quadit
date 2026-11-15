@@ -358,6 +358,9 @@ CREATE TABLE changes (
     first_seq     {{BIGINT}} NOT NULL,
     last_seq      {{BIGINT}} NOT NULL,
     created_at    {{TS}} NOT NULL,
+    -- what the change made or touched, so that sending it again says so too
+    ref           TEXT NOT NULL DEFAULT '',
+    key           TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (workspace_id, id)
 );
 

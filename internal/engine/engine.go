@@ -463,6 +463,7 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 			return nil, conflictErr("change id %s was already used for a different change; use a new id", ch.ID)
 		}
 		res.Duplicate, res.FirstSeq, res.Seq = true, prev.FirstSeq, prev.LastSeq
+		res.Ref, res.Key = prev.Ref, prev.Key
 		return res, nil
 	}
 	if !errors.Is(err, store.ErrNotFound) {
@@ -504,7 +505,7 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 		return nil, err
 	}
 	res.Events, res.Ref, res.Key = c.events, c.ref, c.key
-	applied := core.AppliedChange{WorkspaceID: c.ws, ID: ch.ID, ActorID: m.UserID, Type: ch.Type, ArgsHash: hash, CreatedAt: now}
+	applied := core.AppliedChange{WorkspaceID: c.ws, ID: ch.ID, ActorID: m.UserID, Type: ch.Type, ArgsHash: hash, CreatedAt: now, Ref: c.ref, Key: c.key}
 	if len(c.events) > 0 {
 		applied.FirstSeq = c.events[0].Seq
 		applied.LastSeq = c.events[len(c.events)-1].Seq

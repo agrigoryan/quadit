@@ -140,6 +140,9 @@ type Member struct {
 	// ResponsibleID is the person who answers for an agent. It is kept on
 	// the user and filled in when members are read.
 	ResponsibleID string `json:"responsible_id,omitempty"`
+	// Email is the person's address, filled in only for admins who list
+	// members (an import matches people by it). It is not a column here.
+	Email string `json:"email,omitempty"`
 }
 
 type APIToken struct {
@@ -398,6 +401,10 @@ type AppliedChange struct {
 	FirstSeq    int64  `db:"first_seq"`
 	LastSeq     int64  `db:"last_seq"`
 	CreatedAt   int64  `db:"created_at"`
+	// Ref and Key are what the change made or touched: a retry of the same
+	// change is told them again.
+	Ref string `db:"ref"`
+	Key string `db:"key"`
 }
 
 type Cursor struct {

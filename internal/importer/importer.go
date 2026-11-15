@@ -35,6 +35,9 @@ type Task struct {
 	ParentExt   string
 	URL         string // where it lived
 	Comments    []Comment
+	// WasKey is what the task was called where it lived (ENG-12), kept in its
+	// text so that old links and habits still find it.
+	WasKey string
 	// Blocks and Relates name other tasks of the same import by their Ext.
 	Blocks  []string
 	Relates []string
@@ -148,9 +151,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 
 	// What is there already.
 	type row struct {
-		ID, Key, Name, Handle, Category string
-		ProjectID                       string `json:"project_id"`
-		UserID                          string `json:"user_id"`
+		ID, Key, Name, Handle, Category, Email string
+		ProjectID                              string `json:"project_id"`
+		UserID                                 string `json:"user_id"`
 	}
 	list := func(name string) ([]row, error) {
 		raw, err := sink.Get("/list/"+name, nil)
@@ -228,7 +231,7 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		w := strings.ToLower(strings.TrimSpace(who))
 		local := strings.SplitN(w, "@", 2)[0]
 		for _, m := range members {
-			if w != "" && (strings.ToLower(m.Name) == w || m.Handle == w || m.Handle == local || strings.ToLower(m.Name) == strings.ReplaceAll(local, ".", " ")) {
+			if w != "" && (strings.ToLower(m.Email) == w || strings.ToLower(m.Name) == w || m.Handle == w || m.Handle == local || strings.ToLower(m.Name) == strings.ReplaceAll(local, ".", " ")) {
 				return m.UserID
 			}
 		}
@@ -306,6 +309,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 				unmatched[t.Assignee] = true
 				notes = append(notes, "Assigned there to "+t.Assignee+".")
 			}
+		}
+		if t.WasKey != "" {
+			notes = append(notes, "Was "+t.WasKey+" there.")
 		}
 		if t.URL != "" {
 			notes = append(notes, "Imported from "+t.URL)

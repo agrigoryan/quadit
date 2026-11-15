@@ -550,7 +550,9 @@ func init() {
 	// A view is saved only with a filter that task queries can read.
 	engine.CheckViewQuery = func(raw json.RawMessage) error {
 		var q TaskQuery
-		if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&q); err != nil {
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.DisallowUnknownFields() // "labels" for "label" would otherwise match everything
+		if err := dec.Decode(&q); err != nil {
 			return fmt.Errorf("this filter cannot be read (%s). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}", strings.TrimPrefix(err.Error(), "json: "))
 		}
 		return nil

@@ -272,7 +272,11 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 			if err := tx.Get(ctx, &t, store.Eq("id", id)); err != nil {
 				return err
 			}
-			return sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, map[string]any{"row": t, "key": t.Key, "from_backup": true})
+			if err := sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, map[string]any{"row": t, "key": t.Key, "from_backup": true}); err != nil {
+				return err
+			}
+			_, err := sys.c.link("task", t.ID, "task", t.ID, t.Title+"\n"+t.Description)
+			return err
 		}
 		if _, err := tx.Update(ctx, "docs", map[string]any{"updated_seq": next, "content_seq": next + 1}, store.Eq("id", id)); err != nil {
 			return err
@@ -299,7 +303,15 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 				live = append(live, b)
 			}
 		}
-		return sys.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true,
-			"changes": map[string]core.FieldChange{"content_seq": {To: next + 1}}})
+		if err := sys.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true,
+			"changes": map[string]core.FieldChange{"content_seq": {To: next + 1}}}); err != nil {
+			return err
+		}
+		// What the page mentions is worked out again from its text as it stands.
+		rows, err := LoadBlocks(cxLister{sys.c}, d.ID)
+		if err != nil {
+			return err
+		}
+		return sys.c.afterDocText(d, newEditor(sys.c, d, rows))
 	})
 }

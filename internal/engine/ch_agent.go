@@ -243,7 +243,11 @@ func (c *cx) budgetWarnings(s core.AgentSession) error {
 			return err
 		}
 		if near(cost, b.CostMicros) || near(minutes, b.Minutes) {
-			if err := once(self.ResponsibleID, "member", s.AgentID, c.actor.Name+" has used 80% of its weekly budget", weekStart(c.at)); err != nil {
+			title := c.actor.Name + " has used 80% of its weekly budget"
+			if b.CostMicros > 0 && cost >= b.CostMicros || b.Minutes > 0 && minutes >= b.Minutes {
+				title = c.actor.Name + " has used up its weekly budget"
+			}
+			if err := once(self.ResponsibleID, "member", s.AgentID, title, weekStart(c.at)); err != nil {
 				return err
 			}
 		}

@@ -542,6 +542,7 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 		Estimate                                          int
 		ParentTaskID                                      string `json:"parent_task_id"`
 		MilestoneID                                       string `json:"milestone_id"`
+		Number                                            int
 	}
 	var all []orbitTask
 	for cursor := ""; ; {
@@ -559,15 +560,19 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 		}
 		cursor = pg.Next
 	}
-	// Oldest first, so tasks get their numbers in the order they were made.
-	for i, j := 0, len(all)-1; i < j; i, j = i+1, j-1 {
-		all[i], all[j] = all[j], all[i]
-	}
+	// In the order of their numbers there, so that SVA-12 stays SVA-12 here
+	// whenever the project is new on this side.
+	sort.SliceStable(all, func(i, j int) bool {
+		if all[i].ProjectID != all[j].ProjectID {
+			return all[i].ProjectID < all[j].ProjectID
+		}
+		return all[i].Number < all[j].Number
+	})
 	for _, ot := range all {
 		st := statusOf[ot.StatusID]
 		t := Task{Ext: ot.ID, Project: KeyFrom(keyOf[ot.ProjectID]), Title: ot.Title, Description: ot.Description, Status: st[0], Category: st[1],
 			Priority: priorityNames[ot.Priority], DueOn: ot.DueAt, Estimate: ot.Estimate, ParentExt: ot.ParentTaskID, URL: ot.URL,
-			Epic: milestoneOf[ot.MilestoneID]}
+			Epic: milestoneOf[ot.MilestoneID], WasKey: ot.Identifier}
 		// What it blocks and what it relates to. Each pair is listed on both
 		// tasks there; it is taken from the side that says "outgoing".
 		var rels page[struct {

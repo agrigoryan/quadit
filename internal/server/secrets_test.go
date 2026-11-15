@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -758,4 +759,50 @@ func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
 			t.Fatalf("the restore is not on the record: %s", out)
 		}
 	})
+}
+
+// TestEveryRouteIsDescribed checks that the API description leaves no route
+// out: every address the server answers under /api/v1 is in openapi.json.
+func TestEveryRouteIsDescribed(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	var spec struct {
+		Paths map[string]map[string]any
+	}
+	s.call(nil, "", "GET", "/api/v1/openapi.json", nil, 200, &spec)
+	described := map[string]bool{}
+	for path, methods := range spec.Paths {
+		for method := range methods {
+			described[strings.ToUpper(method)+" "+regexp.MustCompile(`\{[^}]+\}`).ReplaceAllString(path, "{}")] = true
+		}
+	}
+	files, _ := filepath.Glob("*.go")
+	plain := regexp.MustCompile(`HandleFunc\("([A-Z]+) (/api/v1[^"]*)"`)
+	inWorkspace := regexp.MustCompile(`HandleFunc\("([A-Z]+) "\+w\+"([^"]*)"`)
+	n := 0
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var routes [][2]string
+		for _, m := range plain.FindAllStringSubmatch(string(src), -1) {
+			routes = append(routes, [2]string{m[1], m[2]})
+		}
+		for _, m := range inWorkspace.FindAllStringSubmatch(string(src), -1) {
+			routes = append(routes, [2]string{m[1], "/api/v1/w/{ws}" + m[2]})
+		}
+		for _, r := range routes {
+			n++
+			path := strings.TrimSuffix(regexp.MustCompile(`\{[^}]+\}`).ReplaceAllString(r[1], "{}"), "/{}") // a trailing catch-all is the path above it
+			if !described[r[0]+" "+path] && !described[r[0]+" "+regexp.MustCompile(`\{[^}]+\}`).ReplaceAllString(r[1], "{}")] {
+				t.Errorf("%s %s (%s) is not in the API description", r[0], r[1], file)
+			}
+		}
+	}
+	if n < 80 {
+		t.Fatalf("found only %d routes in the source; the check is not reading them", n)
+	}
 }
