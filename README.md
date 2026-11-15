@@ -73,6 +73,18 @@ make test-all    # SQLite and Postgres, with the race detector (needs Postgres: 
 make server      # the binary without the web app, for API work
 make lint        # the Go linter, then the web app's lint and format check
 cd web && pnpm check   # the web app: types, lint, format, tests
+make e2e         # the end-to-end suite: Chromium against the binary (builds it first)
 ```
 
 Every test that touches data runs on both databases. Dependencies are permissively licensed only.
+
+### End-to-end tests
+
+`web/e2e` is a [Playwright](https://playwright.dev) suite that drives the real binary in Chromium: one short spec per area of the app (sign-in, tasks, keyboard, board, task page, decisions, docs, palette, live updates, offline, settings, phone width). It is not part of `pnpm check`, because it needs the binary.
+
+- First time: `cd web && pnpm exec playwright install chromium`.
+- `make e2e` builds and runs everything. After `make build`, `cd web && pnpm e2e` runs it again; `pnpm e2e tasks` runs the specs whose file name matches, `pnpm e2e --ui` opens Playwright's runner, `pnpm e2e --headed` shows the browser.
+- Each run starts `bin/quadit serve` on a free port with a new empty data directory in the system's temp folder, makes the owner through the first-run page, an agent (`@coder`) and a token for each, and deletes it all at the end (`web/e2e/global-setup.ts`). It never touches another server. The server's log is left in `web/test-results/quadit-server.log`.
+- In CI a failed test is retried once with a trace; the HTML report and traces are kept as the run's `playwright-report` artifact (`pnpm exec playwright show-trace <trace.zip>` opens one).
+
+To add a test, put it in the spec of its area (or a new `web/e2e/<area>.spec.ts`) and import `test` and `expect` from `./quadit`, not from `@playwright/test`. A test is signed in as the owner. It asks for `project` to get a new project of its own, and makes what it needs with `project.newTask(title, "status=Done", …)`; it asks for `quadit` to run the CLI as the owner (`quadit.cli`) or as the agent (`quadit.agent`) and to check what reached the server (`quadit.task(key)`). Seed and check through the CLI or the API, never the database. Find things the way a person does: `getByRole` with the accessible name, `getByLabel`, `getByText`; no CSS classes. Wait with web-first assertions (`expect(locator).toBeVisible()`, `expect.poll`), never a fixed sleep. Give anything that is not inside the test's project (a token, a workspace name) a name of its own, so the test can run again on the same server. A control that cannot be found by role and name is an accessibility defect: fix the control, not the test. A test that shows a product bug is written as `test.fixme` with a comment saying what is wrong.
