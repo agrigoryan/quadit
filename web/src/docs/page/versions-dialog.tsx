@@ -3,14 +3,17 @@
 // while a page is edited; "keep a version now" makes a named one.
 
 import { BookmarkPlus, History } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { api, errorMessage, workspacePath } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { lazy, Suspense, useState } from "react";
+import { api, workspacePath } from "@/lib/api";
+import { queryClient } from "@/lib/query";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { keepVersion, revertTo } from "@/docs/actions";
+import { docsKeys } from "@/docs/store";
 import type { BlockTree, Doc, DocVersion } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
@@ -34,35 +37,30 @@ export default function VersionsDialog({ doc, canRestore, canKeep, onClose }: Pr
   const slug = useSlug();
   // Who kept each version, one since removed from the workspace included.
   const members = useLookupEvenIfGone("members");
-  const [versions, setVersions] = useState<DocVersion[] | null>(null);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [shown, setShown] = useState<{ id: string; blocks: BlockTree[] } | null>(null);
+  const list = useQuery({
+    queryKey: docsKeys.versions(slug, doc.id),
+    queryFn: ({ signal }) =>
+      api
+        .get<{ versions: DocVersion[] }>(workspacePath(slug, `/docs/${doc.id}/versions`), signal)
+        .then((out) => out.versions ?? []),
+    meta: { failureToast: "docs.versions.loadFailed" },
+  });
+  const versions = list.data ?? null;
+  const [chosen, setPicked] = useState<string | null>(null);
+  // The newest until one is picked.
+  const picked = chosen ?? versions?.[0]?.id ?? null;
+  const version = useQuery({
+    queryKey: docsKeys.version(slug, doc.id, picked ?? ""),
+    queryFn: ({ signal }) =>
+      api
+        .get<{ blocks: BlockTree[] | null }>(workspacePath(slug, `/docs/${doc.id}/versions/${picked}`), signal)
+        .then((out) => out.blocks ?? []),
+    enabled: !!picked,
+    staleTime: Infinity,
+  });
+  const shown = picked && version.data ? { id: picked, blocks: version.data } : null;
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(
-    () =>
-      api.get<{ versions: DocVersion[] }>(workspacePath(slug, `/docs/${doc.id}/versions`)).then(
-        (out) => {
-          setVersions(out.versions ?? []);
-          setPicked((cur) => cur ?? out.versions?.[0]?.id ?? null);
-        },
-        (err: unknown) => toast.error(errorMessage(err)),
-      ),
-    [slug, doc.id],
-  );
-
-  useEffect(() => void load(), [load]);
-
-  useEffect(() => {
-    if (!picked) return;
-    const ctl = new AbortController();
-    api
-      .get<{ blocks: BlockTree[] | null }>(workspacePath(slug, `/docs/${doc.id}/versions/${picked}`), ctl.signal)
-      .then((out) => setShown({ id: picked, blocks: out.blocks ?? [] }))
-      .catch(() => {});
-    return () => ctl.abort();
-  }, [slug, doc.id, picked]);
 
   async function keep() {
     setBusy(true);
@@ -70,7 +68,7 @@ export default function VersionsDialog({ doc, canRestore, canKeep, onClose }: Pr
       await keepVersion(doc.id, label.trim());
       setLabel("");
       setPicked(null);
-      await load();
+      await queryClient.invalidateQueries({ queryKey: docsKeys.versions(slug, doc.id), exact: true });
     } catch {
       // mutate() has shown why.
     }

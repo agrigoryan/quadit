@@ -88,6 +88,10 @@ useStore.subscribe((s) => {
 export const docsKeys = {
   page: (slug: string, id: string) => [...inWorkspace(slug), "page", id] as const,
   trash: (slug: string) => [...inWorkspace(slug), "docs-trash"] as const,
+  /** A page's kept versions. */
+  versions: (slug: string, id: string) => [...inWorkspace(slug), "versions", id] as const,
+  /** One kept version's blocks, which never change. */
+  version: (slug: string, id: string, versionId: string) => [...inWorkspace(slug), "versions", id, versionId] as const,
   /** A gallery card's picture, as of one version of the row's content. */
   cover: (slug: string, rowId: string, contentSeq: number) =>
     [...inWorkspace(slug), "cover", rowId, contentSeq] as const,
