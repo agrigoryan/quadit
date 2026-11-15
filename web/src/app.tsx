@@ -1,4 +1,5 @@
 import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import { NoWorkspacePage } from "@/auth/create-workspace";
 import { InvitePage } from "@/auth/invite";
@@ -8,6 +9,7 @@ import { ResetConfirmPage, ResetRequestPage } from "@/auth/reset";
 import { loadSession, useSession } from "@/auth/session";
 import { SetupPage } from "@/auth/setup";
 import { NetworkError, whenReachable } from "@/lib/api";
+import { queryClient } from "@/lib/query";
 import { Offline } from "@/shell/offline";
 import { WorkspaceRoute } from "@/shell/workspace";
 import { Loading } from "@/ui/spinner";
@@ -15,6 +17,10 @@ import { Toaster } from "@/ui/toast";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const AdminRoutes = lazy(() => import("@/admin/routes"));
+// The cache's inspector, in development only: a production build leaves it out.
+const QueryDevtools = import.meta.env.DEV
+  ? lazy(() => import("@tanstack/react-query-devtools").then((m) => ({ default: m.ReactQueryDevtools })))
+  : () => null;
 const AccountSecurityPage = lazy(() =>
   import("@/settings/me/account-security").then((m) => ({ default: m.AccountSecurityPage })),
 );
@@ -77,54 +83,59 @@ export function App() {
   }
 
   return (
-    <BrowserRouter>
-      <TooltipProvider delayDuration={350} skipDelayDuration={150}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/setup" element={<SetupPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/reset" element={<ResetRequestPage />} />
-          <Route path="/reset/:token" element={<ResetConfirmPage />} />
-          <Route path="/invite/:token" element={<InvitePage />} />
-          <Route
-            path="/admin/*"
-            element={
-              <RequireSession>
-                <Suspense fallback={<Loading />}>
-                  <AdminRoutes />
-                </Suspense>
-              </RequireSession>
-            }
-          />
-          <Route
-            path="/account/security"
-            element={
-              <RequireSession>
-                <Suspense fallback={<Loading />}>
-                  <AccountSecurityPage />
-                </Suspense>
-              </RequireSession>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <RequireSession>
-                <Home />
-              </RequireSession>
-            }
-          />
-          <Route
-            path="/:ws/*"
-            element={
-              <RequireSession>
-                <WorkspaceRoute />
-              </RequireSession>
-            }
-          />
-        </Routes>
-        <Toaster />
-      </TooltipProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <TooltipProvider delayDuration={350} skipDelayDuration={150}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/setup" element={<SetupPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/reset" element={<ResetRequestPage />} />
+            <Route path="/reset/:token" element={<ResetConfirmPage />} />
+            <Route path="/invite/:token" element={<InvitePage />} />
+            <Route
+              path="/admin/*"
+              element={
+                <RequireSession>
+                  <Suspense fallback={<Loading />}>
+                    <AdminRoutes />
+                  </Suspense>
+                </RequireSession>
+              }
+            />
+            <Route
+              path="/account/security"
+              element={
+                <RequireSession>
+                  <Suspense fallback={<Loading />}>
+                    <AccountSecurityPage />
+                  </Suspense>
+                </RequireSession>
+              }
+            />
+            <Route
+              path="/"
+              element={
+                <RequireSession>
+                  <Home />
+                </RequireSession>
+              }
+            />
+            <Route
+              path="/:ws/*"
+              element={
+                <RequireSession>
+                  <WorkspaceRoute />
+                </RequireSession>
+              }
+            />
+          </Routes>
+          <Toaster />
+        </TooltipProvider>
+      </BrowserRouter>
+      <Suspense fallback={null}>
+        <QueryDevtools />
+      </Suspense>
+    </QueryClientProvider>
   );
 }

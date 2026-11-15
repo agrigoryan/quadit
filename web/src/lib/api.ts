@@ -207,6 +207,12 @@ export function onReachableAgain(listener: () => void): () => void {
 const RETRY_FIRST_MS = 1000;
 const RETRY_LONGEST_MS = 15_000;
 
+/** How long whenReachable waits at most before try number `attempt` (from 0): its timer, without the reasons to end early. */
+export function retryWait(attempt: number): number {
+  const longest = Math.min(RETRY_FIRST_MS * 2 ** attempt, RETRY_LONGEST_MS);
+  return longest / 2 + Math.random() * (longest / 2);
+}
+
 /**
  * Waits until it is worth trying again something the server could not be
  * reached for. `attempt` counts the tries in a row that failed before this
@@ -220,8 +226,7 @@ const RETRY_LONGEST_MS = 15_000;
 export function whenReachable(attempt: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(signal.reason);
-    const longest = Math.min(RETRY_FIRST_MS * 2 ** attempt, RETRY_LONGEST_MS);
-    const timer = setTimeout(end, longest / 2 + Math.random() * (longest / 2));
+    const timer = setTimeout(end, retryWait(attempt));
     const browser = typeof window === "undefined" ? undefined : window;
     function end() {
       clearTimeout(timer);
