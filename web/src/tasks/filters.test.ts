@@ -1,0 +1,207 @@
+// Filtering and grouping tasks, and filters to and from a saved view's query (tasks/filters.ts).
+
+import { describe, expect, it } from "vitest";
+import type { Dict } from "@/lib/store";
+import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/lib/types";
+import { emptyFilters, type Filters, fromQuery, groupTasks, matcher, sortFromQuery, toQuery } from "@/tasks/filters";
+
+const byId = <T extends { id: string }>(rows: T[]): Dict<T> => Object.fromEntries(rows.map((r) => [r.id, r]));
+
+const statuses = byId([
+  { id: "s-todo", project_id: "p1", name: "To do", category: "unstarted", rank: "a" },
+  { id: "s-doing", project_id: "p1", name: "Doing", category: "started", rank: "b" },
+  { id: "s-done", project_id: "p1", name: "Done", category: "done", rank: "c" },
+  { id: "s-old", project_id: "p1", name: "Old", category: "started", rank: "d", deleted_at: 1 },
+  { id: "s-other", project_id: "p2", name: "Doing", category: "started", rank: "a" },
+] as Status[]);
+const members: Dict<Member> = {
+  u1: { user_id: "u1", name: "Ann", handle: "ann", kind: "person" } as Member,
+  u2: { user_id: "u2", name: "Bot", handle: "coder", kind: "agent" } as Member,
+  u3: { user_id: "u3", name: "Cy", handle: "cy", kind: "person", removed_at: 5 } as Member,
+};
+const labels = byId([
+  { id: "l-bug", name: "bug" },
+  { id: "l-art", name: "art", project_id: "p1" },
+  { id: "l-gone", name: "gone", deleted_at: 1 },
+] as Label[]);
+const epics = byId([
+  { id: "e1", name: "Launch", project_id: "p1", rank: "a" },
+  { id: "e2", name: "Old", project_id: "p1", rank: "b", deleted_at: 1 },
+] as Epic[]);
+const projects = byId([
+  { id: "p1", key: "SVA" },
+  { id: "p2", key: "OPS" },
+] as Project[]);
+const cycles = byId([
+  { id: "cy1", project_id: "p1", number: 4, starts_on: "2000-01-01", ends_on: "2000-01-14" },
+] as Cycle[]);
+
+let n = 0;
+const task = (over: Partial<Task>): Task =>
+  ({ id: `t${++n}`, key: `SVA-${n}`, title: "a task", status_id: "s-todo", priority: 0, rank: "m", ...over }) as Task;
+
+const filters = (over: Partial<Filters>): Filters => ({ ...emptyFilters, ...over });
+
+describe("matcher", () => {
+  const ids = (f: Partial<Filters>, tasks: Task[], open: Dict<unknown> = {}) =>
+    tasks.filter(matcher(filters(f), { statuses }, open)).map((t) => t.id);
+
+  it("passes every task with no filter set", () => {
+    const tasks = [task({ id: "a" }), task({ id: "b", assignee_id: "u1" })];
+    expect(ids({}, tasks)).toEqual(["a", "b"]);
+  });
+
+  it("matches the assignee, with 'none' for unassigned", () => {
+    const tasks = [
+      task({ id: "mine", assignee_id: "u1" }),
+      task({ id: "theirs", assignee_id: "u2" }),
+      task({ id: "free" }),
+    ];
+    expect(ids({ assignee: ["u1", "none"] }, tasks)).toEqual(["mine", "free"]);
+  });
+
+  it("matches a status category through the task's status", () => {
+    const tasks = [
+      task({ id: "todo" }),
+      task({ id: "doing", status_id: "s-doing" }),
+      task({ id: "done", status_id: "s-done" }),
+    ];
+    expect(ids({ category: ["started", "done"] }, tasks)).toEqual(["doing", "done"]);
+  });
+
+  it("matches a task with any one of the labels picked", () => {
+    const tasks = [
+      task({ id: "both", label_ids: ["l-bug", "l-art"] }),
+      task({ id: "art", label_ids: ["l-art"] }),
+      task({ id: "bare" }),
+    ];
+    expect(ids({ label: ["l-bug"] }, tasks)).toEqual(["both"]);
+    expect(ids({ label: ["l-bug", "l-art"] }, tasks)).toEqual(["both", "art"]);
+  });
+
+  it("tells waiting on a person, on an outside event, and on nothing apart", () => {
+    const tasks = [
+      task({ id: "person", waiting_on_id: "u2" }),
+      task({ id: "outside", waiting_outside: true }),
+      task({ id: "nothing" }),
+    ];
+    expect(ids({ waitingOn: "u2" }, tasks)).toEqual(["person"]);
+    expect(ids({ waitingOn: "outside" }, tasks)).toEqual(["outside"]);
+    expect(ids({ waitingOn: "none" }, tasks)).toEqual(["nothing"]);
+  });
+
+  it("finds text in the title or the key, whatever its case, and needs every filter to pass", () => {
+    const tasks = [
+      task({ id: "title", title: "Fix the Login page", priority: 1 }),
+      task({ id: "key", key: "SVA-77", priority: 1 }),
+      task({ id: "low", title: "login again", priority: 4 }),
+    ];
+    expect(ids({ text: "  LOGIN " }, tasks)).toEqual(["title", "low"]);
+    expect(ids({ text: "sva-77" }, tasks)).toEqual(["key"]);
+    expect(ids({ text: "login", priority: [1] }, tasks)).toEqual(["title"]);
+    expect(ids({ openDecision: true }, tasks, { key: true })).toEqual(["key"]);
+  });
+});
+
+describe("groupTasks", () => {
+  const c = { statuses, members, epics, labels };
+  const shape = (groups: ReturnType<typeof groupTasks>) => groups.map((g) => [g.id, g.tasks.map((t) => t.id)]);
+
+  it("groups by the project's own statuses in their order, keeping the empty ones of that project", () => {
+    const tasks = [task({ id: "a", status_id: "s-done" }), task({ id: "b", status_id: "s-todo" })];
+    expect(shape(groupTasks(tasks, "status", c, "p1"))).toEqual([
+      ["s-todo", ["b"]],
+      ["s-done", ["a"]],
+    ]);
+    expect(shape(groupTasks(tasks, "status", c, "p1", true))).toEqual([
+      ["s-todo", ["b"]],
+      ["s-doing", []],
+      ["s-done", ["a"]],
+    ]);
+  });
+
+  it("groups by category across projects", () => {
+    const tasks = [task({ id: "a", status_id: "s-other" }), task({ id: "b", status_id: "s-doing" }), task({ id: "c" })];
+    expect(shape(groupTasks(tasks, "status", c, undefined))).toEqual([
+      ["unstarted", ["c"]],
+      ["started", ["a", "b"]],
+    ]);
+  });
+
+  it("puts a task in each of its labels' groups, and one with none in 'No label'", () => {
+    const tasks = [task({ id: "a", label_ids: ["l-bug", "l-art"] }), task({ id: "b", label_ids: ["l-gone"] })];
+    expect(shape(groupTasks(tasks, "label", c, "p1"))).toEqual([
+      ["l-art", ["a"]],
+      ["l-bug", ["a"]],
+      ["none", ["b"]],
+    ]);
+  });
+
+  it("orders assignees people first, and keeps a removed member's group only while it holds a task", () => {
+    const tasks = [task({ id: "a", assignee_id: "u2" }), task({ id: "b" }), task({ id: "c", assignee_id: "u9" })];
+    expect(shape(groupTasks(tasks, "assignee", c, "p1", true))).toEqual([
+      ["u1", []],
+      ["u2", ["a"]],
+      ["none", ["b", "c"]],
+    ]);
+    expect(groupTasks([task({ assignee_id: "u3" })], "assignee", c, "p1").map((g) => g.id)).toEqual(["u3"]);
+  });
+
+  it("orders priorities urgent first and 'no priority' last", () => {
+    const tasks = [
+      task({ id: "none", priority: 0 }),
+      task({ id: "low", priority: 4 }),
+      task({ id: "urgent", priority: 1 }),
+    ];
+    expect(shape(groupTasks(tasks, "priority", c, "p1"))).toEqual([
+      ["1", ["urgent"]],
+      ["4", ["low"]],
+      ["0", ["none"]],
+    ]);
+  });
+});
+
+describe("toQuery and fromQuery", () => {
+  const source = { projects, members, statuses, labels, epics, cycles };
+
+  it("give back the same filters and sort", () => {
+    const f: Filters = {
+      assignee: ["u1", "none"],
+      status: ["s-doing"],
+      category: ["done"],
+      label: ["l-bug"],
+      priority: [1, 2],
+      epic: ["e1", "none"],
+      cycle: ["cy1"],
+      waitingOn: "outside",
+      openDecision: true,
+      text: "login",
+    };
+    const q = toQuery(f, "SVA", "due");
+    // The server's names for the project and the sort.
+    expect(q).toMatchObject({ project: ["SVA"], sort: "due" });
+    expect(toQuery(emptyFilters, undefined, "updated")).toEqual({ sort: "-updated" });
+    expect(fromQuery(q, source, "u1")).toEqual(f);
+    expect(sortFromQuery(q)).toBe("due");
+    expect(fromQuery(toQuery(emptyFilters, undefined, "manual"), source, "u1")).toEqual(emptyFilters);
+  });
+
+  it("read names where ids belong, and drop what names nothing or something gone", () => {
+    const q = {
+      project: ["sva"],
+      assignee: ["me", "@Coder", "cy", "nobody"],
+      status: ["doing", "Done", "waiting", "nonsense"],
+      label: ["BUG", "gone"],
+      epic: ["launch", "old"],
+      cycle: ["4"],
+    };
+    expect(fromQuery(q, source, "u1")).toMatchObject({
+      assignee: ["u1", "u2"],
+      status: ["s-doing", "s-done"],
+      category: ["waiting"],
+      label: ["l-bug"],
+      epic: ["e1"],
+      cycle: ["cy1"],
+    });
+  });
+});
