@@ -27,6 +27,7 @@ function syncText(r: SyncResult): string {
   ];
   let text = t("auto.src.result", { commit: (r.commit || "").slice(0, 8) || "–", parts: parts.join(", ") });
   if (r.pushed) text += ` ${t("auto.src.result.pushed", { branch: r.pushed })}`;
+  if (r.note) text += ` ${r.note.charAt(0).toUpperCase()}${r.note.slice(1)}.`;
   return text;
 }
 

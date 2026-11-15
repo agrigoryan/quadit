@@ -282,8 +282,12 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
     const rows = Object.values(c.cycles)
       .filter((cy) => !cy.deleted_at && inScope(cy.project_id))
       .sort((a, b) => a.starts_on.localeCompare(b.starts_on));
-    if (ref === "current") return rows.filter((cy) => cy.starts_on <= today && today <= cy.ends_on).map((cy) => cy.id);
-    if (ref === "next") return rows.filter((cy) => cy.starts_on > today).slice(0, 1).map((cy) => cy.id);
+    // On a day with no cycle running (or none to come) the word itself stays
+    // as the filter: no task is in "current", so none is shown, as the
+    // server answers too. Dropping it would show every task.
+    const orWord = (ids: string[]) => (ids.length ? ids : [ref]);
+    if (ref === "current") return orWord(rows.filter((cy) => cy.starts_on <= today && today <= cy.ends_on).map((cy) => cy.id));
+    if (ref === "next") return orWord(rows.filter((cy) => cy.starts_on > today).slice(0, 1).map((cy) => cy.id));
     return rows.filter((cy) => cy.id === ref || String(cy.number) === ref).map((cy) => cy.id);
   };
 

@@ -191,9 +191,16 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		return res, err
 	}
 	root := filepath.Join(dir, filepath.FromSlash(src.Subdir))
-	if _, serr := os.Stat(root); serr != nil && src.Subdir != "" {
-		res.Note = "the repository has no folder " + src.Subdir + " on " + branch + "; nothing was read"
-		return res, nil
+	// Whatever is stored, nothing outside the checkout is ever read.
+	if rel, rerr := filepath.Rel(dir, root); rerr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return res, errors.New("the source's folder leads out of its repository; set it to a path inside, such as docs")
+	}
+	if st, serr := os.Stat(root); src.Subdir != "" && serr == nil && !st.IsDir() {
+		return res, errors.New("the source's folder " + src.Subdir + " is a file in the repository; set it to a folder")
+	} else if src.Subdir != "" && serr != nil {
+		// Said, and not the end of it: pages written here may be what
+		// makes the folder.
+		res.Note = "the repository has no folder " + src.Subdir + " on " + branch + " yet"
 	}
 	files := map[string]string{} // path under the folder -> text
 	err = filepath.WalkDir(root, func(p string, e os.DirEntry, werr error) error {

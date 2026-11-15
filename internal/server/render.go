@@ -573,13 +573,16 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 			what += " — " + oneLine(n.Snippet, 160)
 		}
 	default:
+		if ev.EntityType == "member" && ev.Type != "member.created" {
+			what += " " + nm.handle(ev.EntityID) // whose membership it is
+		}
 		if len(d.Changes) > 0 {
 			what += " " + x.changeText(d.Changes, nm)
 		} else if d.Key == "" && len(d.Row) > 0 {
 			// Something new that the cases above do not know: its name.
 			var row map[string]any
 			json.Unmarshal(d.Row, &row)
-			for _, k := range []string{"key", "title", "name", "slug", "handle"} {
+			for _, k := range []string{"key", "name", "title", "slug", "handle", "repo", "body"} {
 				if v, _ := row[k].(string); v != "" {
 					what += " " + strconv.Quote(oneLine(v, 80))
 					break

@@ -450,6 +450,9 @@ func sourceCreate(c *cx) error {
 	if strings.TrimSpace(a.Repo.V) == "" {
 		return invalid("repo", "give the repository: a path on the server, or a URL git can clone")
 	}
+	if err := checkSubdir(a.Subdir.V); err != nil {
+		return err
+	}
 	src := core.DocSource{ID: sid, WorkspaceID: c.ws, Repo: strings.TrimSpace(a.Repo.V), Branch: a.Branch.V, Subdir: strings.Trim(a.Subdir.V, "/"),
 		Authority: orStr(a.Authority.V, "repo"), WriteMode: orStr(a.WriteMode.V, "commit"), CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if !contains(authorities, src.Authority) {
@@ -499,6 +502,12 @@ func sourceUpdate(c *cx) error {
 		return err
 	}
 	p.str("branch", a.Branch, &src.Branch)
+	if a.Subdir.Set {
+		if err := checkSubdir(a.Subdir.V); err != nil {
+			return err
+		}
+		a.Subdir.V = strings.Trim(a.Subdir.V, "/")
+	}
 	p.str("subdir", a.Subdir, &src.Subdir)
 	if a.Authority.Set {
 		if !contains(authorities, a.Authority.V) {
@@ -653,4 +662,15 @@ func (c *cx) addOptions(p *core.DBProperty, vals []string) error {
 	}
 	return c.emitTo(docAudience(d), seq, "property.updated", "property", p.ID, "doc", d.ID, d.ProjectID,
 		map[string]any{"id": p.ID, "changes": map[string]core.FieldChange{"config": {From: old, To: json.RawMessage(raw)}}})
+}
+
+// checkSubdir keeps a source's folder inside its repository: no way up and
+// out of it, and nothing of git's own.
+func checkSubdir(dir string) error {
+	for _, part := range strings.FieldsFunc(dir, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if part == ".." || part == ".git" {
+			return invalid("subdir", "the folder is a path inside the repository, such as docs or docs/handbook; %q leads out of it", dir)
+		}
+	}
+	return nil
 }

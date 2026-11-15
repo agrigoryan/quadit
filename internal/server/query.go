@@ -442,6 +442,11 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 				found = true
 			}
 		}
+		if !found && (ref == "current" || ref == "next") {
+			// No cycle is running (or none comes next): nothing is in it.
+			f.CycleIDs = append(f.CycleIDs, "no-such-cycle")
+			continue
+		}
 		if !found {
 			return f, errBad("no cycle %q: use current, next, a cycle number or none", ref)
 		}

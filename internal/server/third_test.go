@@ -259,6 +259,24 @@ func TestThirdAuditFindings(t *testing.T) {
 		s.call(s.owner, "", "GET", w+"/tasks?view=good", nil, 200, nil)
 		s.call(nil, wide, "GET", "/api/v1/w/-/render?task=SVA-1&width=5", nil, 400, nil)
 
+		// A seventh check. "Nobody, or one of these" means either.
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "In the fight", "epic": "Boss fight", "assignee": "@wide"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Loose end"})
+		for _, q := range []string{"epic=none,Boss+fight", "assignee=none,@wide"} {
+			out := s.call(s.owner, "", "GET", w+"/tasks?project=SVA&format=text&limit=200&"+q, nil, 200, nil)
+			if !strings.Contains(out, "In the fight") || !strings.Contains(out, "Loose end") {
+				t.Fatalf("%s lost one side of the list: %s", q, out)
+			}
+		}
+		// "The current cycle" on a day with none running is nothing, not an error.
+		if out := s.call(s.owner, "", "GET", w+"/tasks?project=OPS&cycle=current&format=text", nil, 200, nil); !strings.Contains(out, "no tasks match") {
+			t.Fatalf("cycle=current with no cycle running: %s", out)
+		}
+		// A source's folder cannot lead out of its repository.
+		for _, dir := range []string{"../../outside", "docs/../../x", ".git/hooks"} {
+			s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "source.create", "args": M{"title": "Out", "repo": "/tmp/nowhere.git", "subdir": dir}}, 400, nil)
+		}
+
 		// A failed press of "Test" is in the log, not among the lost.
 		hook := s.change(s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x"})["ref"].(string)
 		s.call(s.owner, "", "POST", w+"/webhooks/"+hook+"/test", nil, 200, nil)

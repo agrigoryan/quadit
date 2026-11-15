@@ -39,6 +39,26 @@ func (c *clause) in(col string, vals []string, ids bool) {
 	c.add(col+" IN ("+m+")", a...)
 }
 
+// inOrNone is in, joined with "or has none" when none is asked as well: a
+// list filter of "nobody, or one of these" means either.
+func (c *clause) inOrNone(col string, vals []string, none bool) {
+	var keep []string
+	for _, v := range vals {
+		if looksUUID(v) {
+			keep = append(keep, v)
+		}
+	}
+	switch {
+	case none && len(keep) == 0:
+		c.add(col + " IS NULL")
+	case none:
+		m, a := marks(keep)
+		c.add("("+col+" IS NULL OR "+col+" IN ("+m+"))", a...)
+	case len(vals) > 0:
+		c.in(col, vals, true)
+	}
+}
+
 func (c *clause) sql() string {
 	if len(c.parts) == 0 {
 		return "1 = 1"
@@ -78,11 +98,7 @@ func (c conn) taskWhere(f store.TaskFilter) *clause {
 	if len(f.ProjectIDs) > 0 {
 		w.in(`t.project_id`, f.ProjectIDs, true)
 	}
-	if f.Unassigned {
-		w.add(`t.assignee_id IS NULL`)
-	} else if len(f.AssigneeIDs) > 0 {
-		w.in(`t.assignee_id`, f.AssigneeIDs, true)
-	}
+	w.inOrNone(`t.assignee_id`, f.AssigneeIDs, f.Unassigned)
 	if f.CreatedBy != "" {
 		w.add(`t.created_by = ?`, idOrNone(f.CreatedBy))
 	}
@@ -123,19 +139,11 @@ func (c conn) taskWhere(f store.TaskFilter) *clause {
 	if f.TopLevel {
 		w.add(`t.parent_id IS NULL`)
 	}
-	if f.NoEpic {
-		w.add(`t.epic_id IS NULL`)
-	} else if len(f.EpicIDs) > 0 {
-		w.in(`t.epic_id`, f.EpicIDs, true)
-	}
+	w.inOrNone(`t.epic_id`, f.EpicIDs, f.NoEpic)
 	if f.MilestoneID != "" {
 		w.add(`t.milestone_id = ?`, idOrNone(f.MilestoneID))
 	}
-	if f.NoCycle {
-		w.add(`t.cycle_id IS NULL`)
-	} else if len(f.CycleIDs) > 0 {
-		w.in(`t.cycle_id`, f.CycleIDs, true)
-	}
+	w.inOrNone(`t.cycle_id`, f.CycleIDs, f.NoCycle)
 	if len(f.Priorities) > 0 {
 		m := placeholders(len(f.Priorities))
 		a := make([]any, len(f.Priorities))

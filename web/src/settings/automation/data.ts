@@ -134,6 +134,8 @@ export interface SyncResult {
   files_written: number;
   commit: string;
   pushed?: string;
+  /** Something the server wants said about this sync (no commits yet, no such folder). */
+  note?: string;
 }
 
 /** One of the lists the server keeps for admins: webhooks, rules, integrations, deliveries. */

@@ -653,6 +653,8 @@ func plainNetError(err error) string {
 		return "could not connect: nothing is listening at that address"
 	case strings.Contains(said, "no such host"):
 		return "could not connect: the host name was not found"
+	case strings.Contains(said, "HTTP response to HTTPS client"):
+		return "could not connect: the address answers plain HTTP, not HTTPS; write it with http://"
 	case strings.Contains(said, "certificate"):
 		return "could not connect: the address's certificate was not accepted (" + oneLine(said[strings.LastIndex(said, ": ")+2:], 120) + ")"
 	}
