@@ -190,6 +190,11 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	if _, err := git(ctx, dir, "reset", "--quiet", "--hard", "origin/"+branch); err != nil {
 		return res, err
 	}
+	// Nothing but what the branch holds: files an interrupted sync left
+	// behind would otherwise be read as if the repository had them.
+	if _, err := git(ctx, dir, "clean", "--quiet", "-fd"); err != nil {
+		return res, err
+	}
 	root := filepath.Join(dir, filepath.FromSlash(src.Subdir))
 	// Whatever is stored, and whatever links the repository holds, nothing
 	// outside the checkout is ever read or written.
@@ -366,7 +371,11 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			// A name no file has, and that no link in the repository stands
 			// on (a link is not a page, and is not written through).
 			taken := func(p string) bool {
-				if files[p] != "" || toWrite[p] != "" {
+				// By being there, not by having text: an empty file is a file.
+				if _, ok := files[p]; ok {
+					return true
+				}
+				if _, ok := toWrite[p]; ok {
 					return true
 				}
 				st, lerr := os.Lstat(filepath.Join(root, filepath.FromSlash(p)))
@@ -407,11 +416,16 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			delete(toWrite, path)
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
-			return res, err
+		werr := os.MkdirAll(filepath.Dir(full), 0o750)
+		if werr == nil {
+			werr = os.WriteFile(full, []byte(text), 0o640)
 		}
-		if err := os.WriteFile(full, []byte(text), 0o640); err != nil {
-			return res, err
+		if werr != nil {
+			// Leave the checkout as the branch has it, and say what failed
+			// without the server's own paths.
+			git(ctx, dir, "reset", "--quiet", "--hard", "origin/"+branch)
+			git(ctx, dir, "clean", "--quiet", "-fd")
+			return res, fmt.Errorf("could not write %s in the repository: %s", path, strings.ReplaceAll(werr.Error(), dir+string(filepath.Separator), ""))
 		}
 	}
 	for _, path := range toRemove {
@@ -425,7 +439,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			names = append(names, path)
 		}
 		sort.Strings(names)
-		res.Note = fmt.Sprintf("%d page(s) were not written to the repository, because a link there stands where the file would go: %s", len(names), oneLine(strings.Join(names, ", "), 200))
+		res.Note = fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 200))
 	}
 	if _, err := git(ctx, dir, "add", "--all", "."); err != nil {
 		return res, err
@@ -530,7 +544,8 @@ func (s *Server) commitAuthor(ctx context.Context, db store.DB, editors map[stri
 }
 
 // staysInside reports whether path is under dir with no symbolic link on
-// the way there, and is not a link itself. A repository can hold links to
+// the way there, is not a link itself, and has no plain file where one of
+// its folders would be. A repository can hold links to
 // anywhere: out of the checkout, or to another folder inside it. Sync
 // neither reads nor writes through any of them, so a page is only ever
 // stored in the file its own path names. A part of the path that does not
@@ -541,7 +556,8 @@ func staysInside(dir, path string) bool {
 		return false
 	}
 	at := dir
-	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+	parts := strings.Split(rel, string(filepath.Separator))
+	for i, part := range parts {
 		if part == "" || part == "." {
 			continue
 		}
@@ -552,6 +568,9 @@ func staysInside(dir, path string) bool {
 		}
 		if st.Mode()&os.ModeSymlink != 0 {
 			return false
+		}
+		if i < len(parts)-1 && !st.IsDir() {
+			return false // a file stands where a folder would have to be
 		}
 	}
 	return true

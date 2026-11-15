@@ -383,3 +383,87 @@ func TestSyncDoesNotFollowLinks(t *testing.T) {
 		t.Fatalf("the file outside was changed: %q", raw)
 	}
 }
+
+// TestSyncAwkwardRepositories: an empty file still owns its name, and a
+// plain file standing where a page's folder would be holds back only that
+// page: the sync goes on, says so, and loses nobody's edit.
+func TestSyncAwkwardRepositories(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	s := newSite(t, testdb.SQLite(t))
+	work := t.TempDir()
+	bare := filepath.Join(t.TempDir(), "origin.git")
+	git := func(dir string, args ...string) string {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return string(out)
+	}
+	git(work, "init", "-q", "-b", "main")
+	os.MkdirAll(filepath.Join(work, "docs", "inl"), 0o755)
+	os.WriteFile(filepath.Join(work, "docs", "empty.md"), nil, 0o644)
+	os.WriteFile(filepath.Join(work, "docs", "inl", "b.md"), []byte("b\n"), 0o644)
+	git(work, "add", "-A")
+	git(work, "commit", "-q", "-m", "docs")
+	git(work, "init", "-q", "--bare", "-b", "main", bare)
+	git(work, "remote", "add", "origin", bare)
+	git(work, "push", "-q", "origin", "main")
+
+	src := s.change(s.owner, "", "source.create", M{"title": "Handbook", "repo": bare, "subdir": "docs"})["ref"].(string)
+	sync := func(want int) string { return s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, want, nil) }
+	sync(200)
+	page := func(title string) string {
+		var docs struct{ Docs []struct{ ID, Title string } }
+		s.call(s.owner, "", "GET", w+"/docs", nil, 200, &docs)
+		for _, d := range docs.Docs {
+			if d.Title == title {
+				return d.ID
+			}
+		}
+		t.Fatalf("no page %q", title)
+		return ""
+	}
+	root, folder := page("Handbook"), page("inl")
+
+	// A second page called "empty" gets a file of its own.
+	s.change(s.owner, "", "doc.create", M{"title": "empty", "parent": root, "markdown": "Not so empty.\n"})
+	sync(200)
+	if got := git(bare, "show", "main:docs/empty.md"); got != "" {
+		t.Fatalf("the empty file was written over: %q", got)
+	}
+	if got := git(bare, "show", "main:docs/empty-2.md"); !strings.Contains(got, "Not so empty") {
+		t.Fatalf("the second page's own file: %q", got)
+	}
+
+	// The folder becomes a plain file there. A page under it cannot be
+	// written; everything else still is, and a later edit is kept.
+	git(work, "pull", "-q", "origin", "main")
+	git(work, "rm", "-rq", "docs/inl")
+	os.WriteFile(filepath.Join(work, "docs", "inl"), []byte("now a file\n"), 0o644)
+	git(work, "add", "-A")
+	git(work, "commit", "-q", "-m", "a file where a folder was")
+	git(work, "push", "-q", "origin", "main")
+	sync(200)
+	s.change(s.owner, "", "doc.create", M{"title": "under", "parent": folder, "markdown": "Cannot land.\n"})
+	za := s.change(s.owner, "", "doc.create", M{"title": "za", "parent": root, "markdown": "za v1\n"})["ref"].(string)
+	if out := sync(200); !strings.Contains(out, "stands in the way") || strings.Contains(out, s.dir) {
+		t.Fatalf("a file where a folder would be: %s", out)
+	}
+	if got := git(bare, "show", "main:docs/za.md"); !strings.Contains(got, "za v1") {
+		t.Fatalf("the page beside it was not written: %q", got)
+	}
+	s.change(s.owner, "", "doc.write", M{"doc": za, "markdown": "za v2 edited\n"})
+	sync(200)
+	sync(200)
+	if got := git(bare, "show", "main:docs/za.md"); !strings.Contains(got, "za v2 edited") {
+		t.Fatalf("an edit after the trouble was lost: %q", got)
+	}
+	if got := git(bare, "show", "main:docs/inl"); got != "now a file\n" {
+		t.Fatalf("the file in the way was changed: %q", got)
+	}
+}

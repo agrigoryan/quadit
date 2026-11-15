@@ -29,8 +29,9 @@ func TestStaysInside(t *testing.T) {
 		"docs":                    true,
 		"docs/real":               true,
 		"docs/real/deep.md":       true,
-		"docs/real/new.md":        true, // not there yet
-		"docs/new/folder/page.md": true, // nor its folders
+		"docs/real/new.md":        true,  // not there yet
+		"docs/new/folder/page.md": true,  // nor its folders
+		"docs/real/deep.md/x.md":  false, // a file stands where a folder would be
 		"docs/inl":                false,
 		"docs/inl/deep.md":        false, // would overwrite real/deep.md
 		"docs/inl/new.md":         false, // would land in real/
