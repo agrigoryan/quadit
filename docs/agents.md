@@ -25,7 +25,9 @@ API paths are under `/api/v1/w/-/`; the `-` means "the workspace of this token".
 ## Reading
 
 - Every read returns JSON, or one line per item with `format=text` (what the CLI prints). Long text is cut at a stated size; `full=1` returns all of it.
-- Names work wherever ids do: `SVA-12`, `@handle`, a status or label by name, `me`.
+- Names work wherever ids do: `SVA-12`, `@handle`, a status, label, epic, milestone or saved view by name, a priority as `high`, `me`. A decision is named by its task: `SVA-12` when the task has one open question, `SVA-12#2` for its second.
+- Every list takes `fields=key,title` (only those fields, and the id) and `since=1042` (only what changed after that feed position), so you never pay for what you already know.
+- A long list says how to read on: `cursor=…` from the last answer. Tasks added while you page are left for the next read, so nothing repeats or is skipped.
 - `quadit tasks assignee=me status=todo label=art open=1 sort=priority`; `count=1` returns only the number; `view=SLUG` runs a saved view.
 - `quadit show SVA-12 since=1042` returns only what happened in the task after feed position 1042.
 - A refusal says what was wrong, lists what would have been accepted and suggests the nearest match:
@@ -68,7 +70,9 @@ quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 - `--dry-run` checks a change without making it.
 - `base_seq` refuses the update if the task changed since you read it, and says which fields changed.
 - A batch (`POST /changes {"changes": […]}`) applies all of its changes or none.
-- `quadit changes` lists every change type with its arguments.
+- `quadit changes` lists every change type with its arguments, and the surface version (within one major version nothing an agent relies on is removed or renamed).
+- `--id=UUID` gives a change its id yourself: after a crash, sending it again with the same id does nothing twice. `--for=@member` makes a change for someone: it then runs with their access.
+- A task can wait on something that is not a member: `quadit update SVA-12 waiting_on=outside waiting_on_note="the certificate from Apple"`. `quadit tasks waiting_on=outside` and `waiting_on=none` find those, and the ones nobody has.
 
 ## Decisions
 
@@ -82,7 +86,16 @@ When they answer, the task waits on you again and the answer is in your inbox an
 
 If the answer does not settle the question, say so in one line with `decision.unclear` instead of guessing; the question goes back to them.
 
-For a plain yes or no, `quadit approval SVA-12 "Merge this?"`. If your scope says a change needs approval (say `task.delete`), ask with `action=task.delete` and send the change with `approval=DECISION_ID` once it is approved.
+For a plain yes or no, `quadit approval SVA-12 "Merge this?"`.
+
+Some changes need approval first. A new agent asks before anything that cannot be taken back or that reaches outside (deleting a project, adding or removing people, webhooks, integrations, repository sources, secrets); the person responsible for it can change that list. A refused change says so (`needs_approval`). Ask with the exact change:
+
+```bash
+quadit approval SVA-12 "Delete the duplicate SVA-14?" action=task.delete args='{"id":"SVA-14"}'
+quadit do task.delete '{"id":"SVA-14"}' approval=DECISION_ID      # once approved
+```
+
+An approval covers that one change with those arguments, once.
 
 ## Results
 
@@ -98,6 +111,10 @@ The task goes back to whoever answered your last question.
 
 - `quadit take SVA-12` makes you the one working on it for 30 minutes; take it again to renew. Two agents cannot take the same task, and a task held by an agent that stopped frees itself.
 - A shared resource (a build machine, a test device) has a queue: change `resource.acquire {"resource": "minipc"}` answers `holding` or `waiting`, and you are told when it is yours. Release it with `resource.release`.
+
+## Helpers
+
+An agent can make a helper for one task: `quadit do agent.create '{"name":"Inker","handle":"inker","task":"SVA-12"}'`, then a token for it with `POST tokens {"user":"@inker"}`. The helper is a member limited to that task's project and to its maker's own limits, the same person answers for it, and it is suspended when the task is done or dropped.
 
 ## Memory
 
@@ -122,7 +139,7 @@ quadit rows DATABASE_ID filter=State:is:todo sort=-Frames
 
 ## Session records and budgets
 
-Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links`, `cost_micros` and at the end `state: "done"`. Cost counts against your weekly budget; `quadit me` says what is left, and new work is refused once it is used up.
+Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links`, `cost_micros` and at the end `state: "done"`. Cost and time count against your weekly budget, and against the task's own budget when it has one; `quadit me` says what is left. The person concerned is told at 80%. Once a budget is used up new work is refused (a new run, taking the task), while saying so on the task and handing it back still work. A budget can also limit hand-offs between agents; past it, hand the task to a person.
 
 ## Secrets
 
@@ -152,7 +169,7 @@ A task a person gives to an agent records who (`asked_by`). Agents work on that 
 
 ## MCP
 
-The same surface, for any MCP client: `https://your.server/mcp`, with a token in the `Authorization` header or by signing in through OAuth. About twenty tools; results are the compact text form.
+The same surface, for any MCP client: `https://your.server/mcp`, with a token in the `Authorization` header or by signing in through OAuth. When signing in, the person picks whom the client works as: choose an agent, so its work carries the agent's name. About twenty-five tools; results are the compact text form. `change` takes one change or a list applied together, an `id` for safe retries and `for`; `upload` takes large files in parts; `render` answers with a picture.
 
 ## Seeing what people see
 
