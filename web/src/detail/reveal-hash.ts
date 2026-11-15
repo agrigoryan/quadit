@@ -11,7 +11,7 @@ const PATTERN = /^#decision-([0-9a-f-]{8,})$/i;
 /** Lights the question up briefly. It is found by its id inside the task panel. */
 function highlight(decisionId: string, tries = 40) {
   const el = document.getElementById(`decision-${decisionId}`);
-  if (!el?.closest("[data-task-panel]")) {
+  if (!el?.closest("[data-task-panel], [data-task-page]")) {
     if (tries > 0) setTimeout(() => highlight(decisionId, tries - 1), 100);
     return;
   }

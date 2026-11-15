@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { CheckCheck, Inbox } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useCollection, useMe } from "@/lib/selectors";
@@ -7,8 +7,8 @@ import type { Notification } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { archive, markAllRead, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { InboxRow } from "@/pages/inbox-row";
-import { useListKeys } from "@/pages/list-keys";
-import { useOpenTask } from "@/pages/open-task";
+import { type OpenAs, useListKeys } from "@/pages/list-keys";
+import { useTaskNav } from "@/tasks/task-link";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 
@@ -19,7 +19,8 @@ export function InboxPage() {
   usePageTitle(t("nav.inbox"));
   const me = useMe();
   const notifications = useCollection("notifications");
-  const openTask = useOpenTask();
+  const tasks = useTaskNav();
+  const scroller = useRef<HTMLDivElement>(null);
 
   const items = useMemo(
     () =>
@@ -31,18 +32,19 @@ export function InboxPage() {
   const unread = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
 
   const open = useCallback(
-    (item: Notification) => {
+    (item: Notification, as: OpenAs = "peek") => {
       if (!item.read_at) markRead([item.id]);
       const key = (item.task_id && getState().c.tasks[item.task_id]?.key) || splitTitle(item.title).key;
-      if (key) openTask(key);
+      if (key) tasks[as](key);
     },
-    [openTask],
+    [tasks],
   );
 
   const focusId = useListKeys({
     rows: items,
     idOf: (item) => item.id,
     onOpen: open,
+    scroller,
     keys: { e: (item) => archive([item.id]), u: toggleRead },
   });
 
@@ -51,7 +53,7 @@ export function InboxPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto pb-10">
+    <div ref={scroller} className="h-full overflow-y-auto pb-10">
       <header className="sticky top-0 z-[2] flex h-10 items-center gap-2 border-b border-line bg-surface pr-2 pl-4">
         <p className="flex-1 text-xs text-ink-2 tnum" aria-live="polite">
           {unread > 0 ? t("nav.unread", { n: unread }) : t("inbox.allRead")}

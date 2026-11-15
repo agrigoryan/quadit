@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
-import { type Location, matchPath, useLocation, useNavigate } from "react-router";
+import { matchPath, useLocation, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { useSlug, useTaskByKey } from "@/lib/selectors";
 import { ui, useUi } from "@/lib/ui-state";
@@ -11,7 +11,8 @@ import type { ChoicePage, MakePage, PalettePage } from "@/palette/palette-comman
 import { makeTitle, MakePageRows } from "@/palette/palette-make";
 import { RootPage } from "@/palette/palette-root";
 import { useServerSearch } from "@/palette/palette-search";
-import { projectInView } from "@/shell/project-in-view";
+import { pageUnder, projectInView } from "@/shell/project-in-view";
+import { taskPath, useTaskNav } from "@/tasks/task-link";
 import { Spinner } from "@/ui/spinner";
 
 /**
@@ -28,6 +29,7 @@ function Palette() {
   const slug = useSlug();
   const location = useLocation();
   const navigate = useNavigate();
+  const tasks = useTaskNav();
   const [page, setPage] = useState<"root" | PalettePage>("root");
   const [query, setQuery] = useState("");
   const box = useRef<HTMLInputElement>(null);
@@ -35,7 +37,6 @@ function Palette() {
   const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
   const task = useTaskByKey(taskKey);
   const openTask = task && !task.deleted_at ? task : undefined;
-  const background = (location.state as { background?: Location } | null)?.background;
   // Where a new task, label or status goes, and whose pages the letters after G open.
   const project = projectInView(location);
 
@@ -115,14 +116,13 @@ function Palette() {
                   query={query}
                   slug={slug}
                   task={openTask}
+                  expand={openTask && pageUnder(location) ? () => navigate(taskPath(slug, openTask.key), { replace: true }) : undefined}
                   project={project}
                   hits={search.hits}
                   searching={search.busy}
                   run={run}
                   go={(path) => run(() => navigate(path))}
-                  openTask={(key) =>
-                    run(() => navigate(`/${slug}/task/${key}`, { state: { background: taskKey ? background : location } }))
-                  }
+                  openTask={(key) => run(() => tasks.peek(key))}
                   openPage={toPage}
                 />
               )}

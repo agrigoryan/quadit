@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
 import { useHotkeys } from "@/lib/hotkeys";
-import { isDraft, useStore } from "@/lib/store";
+import { usePlace } from "@/lib/place";
+import { isDraft } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import type { NewTaskDraft } from "@/tasks/draft";
 import { NONE, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";
 import { type TaskProperty, TaskPropertyPicker } from "@/tasks/property-picker";
+import { usePeek, useTaskNav } from "@/tasks/task-link";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { useViewport } from "@/tasks/use-viewport";
 
@@ -60,22 +61,31 @@ interface Row {
 
 const rowKey = (group: TaskGroup, task: Task) => `${group.id}:${task.id}`;
 
+/** Space on a focused button presses it; anywhere else it is the list's. */
+const onButton = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("button, [role=button], summary") !== null;
+
 /**
  * Tasks as dense rows under collapsible group headings, driven from the
- * keyboard: J/K move, Enter opens, X selects, S/A/P/L change the focused
- * row or the whole selection. Only the rows on screen are drawn, so the
- * list stays quick at any length.
+ * keyboard: J/K move, Space shows the focused task in the panel, Enter
+ * opens its page, X selects, S/A/P/L change the focused row or the whole
+ * selection. While the panel is open J/K move it to the next task, and
+ * Space or Escape closes it with the focus still on the row. Only the rows
+ * on screen are drawn, so the list stays quick at any length. Left for a
+ * task's page and come back to, it is where it was (lib/place.ts).
  */
 export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
-  const slug = useStore((s) => s.slug);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const open = useTaskNav();
+  const peek = usePeek();
+  const peeking = peek.key !== undefined;
+  const scroller = useRef<HTMLDivElement>(null);
+  const place = useRef({ focus: null as string | null, folded: [] as string[] });
+  const saved = usePlace(scroller, () => place.current);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(saved?.folded));
+  const [focusKey, setFocusKey] = useState<string | null>(saved?.focus ?? null);
+  place.current = { focus: focusKey, folded: [...collapsed] };
   const [picker, setPicker] = useState<TaskProperty | null>(null);
   const anchor = useRef<Element | null>(null);
   const lastPicked = useRef<string | null>(null);
-  const scroller = useRef<HTMLDivElement>(null);
   const view = useViewport(scroller);
 
   const { sections, rows, indexOf, total } = useMemo(() => {
@@ -131,14 +141,41 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
     else if (top + ROW > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW - el.clientHeight;
   }
 
-  function move(step: number) {
+  function move(step: number, from = focusAt): Row | undefined {
     if (rows.length === 0) return;
-    const at = Math.max(0, Math.min(rows.length - 1, focusAt < 0 ? (step > 0 ? 0 : rows.length - 1) : focusAt + step));
+    const at = Math.max(0, Math.min(rows.length - 1, from < 0 ? (step > 0 ? 0 : rows.length - 1) : from + step));
     const next = rows[at];
     if (!next) return;
     setFocusKey(next.key);
     reveal(at);
+    return next;
   }
+
+  /** Where the task in the panel is listed, when the focus is not on it. */
+  const peekedAt = focused?.key === peek.key ? focusAt : rows.findIndex((row) => row.task.key === peek.key);
+  /** The tasks this list asked the panel for, so their arrival is not taken for a move made elsewhere. */
+  const asked = useRef(new Set<string>());
+
+  function showInPanel(task: Task) {
+    // A row not yet numbered by the server has nothing to show.
+    if (isDraft(task.id)) return;
+    asked.current.add(task.key);
+    open.peek(task.key);
+  }
+
+  /** Moves the panel a row along. The focus leads and the panel follows, so keys pressed quickly are all counted. */
+  function movePeek(step: number) {
+    const next = move(step, focusAt < 0 ? peekedAt : focusAt);
+    if (next) showInPanel(next.task);
+  }
+
+  // The panel went to another task by other means (a sub-task opened inside it): the focus goes with it.
+  useEffect(() => {
+    if (peek.key === undefined) return asked.current.clear();
+    if (asked.current.delete(peek.key) || peekedAt < 0 || peekedAt === focusAt) return;
+    setFocusKey(rows[peekedAt]?.key ?? null);
+    reveal(peekedAt);
+  }, [peek.key]);
 
   const select = useCallback(
     (task: Task, range: boolean, at?: string) => {
@@ -190,7 +227,12 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
       move(-1);
     },
     // A draft has no address yet.
-    Enter: () => focused && !isDraft(focused.id) && navigate(`/${slug}/task/${focused.key}`, { state: { background: location } }),
+    Enter: () => focused && !isDraft(focused.id) && open.page(focused.key),
+    " ": (e) => {
+      if (!focused || onButton(e)) return;
+      e.preventDefault(); // or the list scrolls a screen down
+      showInPanel(focused);
+    },
     x: () => focused && select(focused, false, focusKey ?? undefined),
     Escape: () => selected.size > 0 && onSelectedChange(new Set()),
     ...Object.fromEntries(
@@ -204,11 +246,31 @@ export function TaskList({ groups, selected, onSelectedChange, onAdd }: Props) {
     ),
   });
 
+  // The same keys while the panel is open: they move it, and Space puts it away.
+  const step = (by: number) => (e: KeyboardEvent) => {
+    e.preventDefault();
+    movePeek(by);
+  };
+  useHotkeys(
+    {
+      j: step(1),
+      k: step(-1),
+      ArrowDown: step(1),
+      ArrowUp: step(-1),
+      " ": (e) => {
+        if (onButton(e)) return;
+        e.preventDefault();
+        peek.close();
+      },
+    },
+    { layer: "panel", enabled: peeking },
+  );
+
   const from = view.top - OVERSCAN;
   const to = view.top + view.height + OVERSCAN;
 
   return (
-    <div ref={scroller} className="h-full overflow-y-auto" style={keyStyle} onMouseLeave={() => !picker && setFocusKey(null)}>
+    <div ref={scroller} className="h-full overflow-y-auto" style={keyStyle} onMouseLeave={() => !picker && !peeking && setFocusKey(null)}>
       <div className="relative" style={{ height: total + TAIL }}>
         {sections.map((section) => {
           if (section.top + section.height < from || section.top > to) return null;

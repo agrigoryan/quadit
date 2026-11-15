@@ -1,27 +1,40 @@
 // Keyboard focus for a page that is one flat run of rows: J and K move it,
-// Enter opens the row it is on. The focus follows a row by its id, so rows
-// arriving or leaving while the page is open do not move it.
+// Space shows the row's task in the panel, Enter opens the task's page.
+// While the panel is open J and K move it along the rows, and Space puts it
+// away. The focus follows a row by its id, so rows arriving or leaving
+// while the page is open do not move it; left and come back to, the page is
+// where it was (lib/place.ts).
 
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { type Hotkeys, useHotkeys } from "@/lib/hotkeys";
+import { usePlace } from "@/lib/place";
+import { usePeek } from "@/tasks/task-link";
 
-/** True while a task panel covers the page: its rows then leave the keys alone. */
-const panelOpen = () => /\/task\/[^/]+\/?$/.test(window.location.pathname);
-
-/** A focused link or button answers Enter itself. */
+/** A focused link or button answers Enter and Space itself. */
 const onControl = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("a, button") !== null;
+const onButton = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("button") !== null;
+
+/** How a row is opened: in the panel over the list, or as the task's own page. */
+export type OpenAs = "peek" | "page";
 
 interface Options<Row> {
   rows: Row[];
   idOf: (row: Row) => string;
-  onOpen: (row: Row) => void;
+  onOpen: (row: Row, as: OpenAs) => void;
+  /** The element that scrolls the rows. */
+  scroller: RefObject<HTMLElement | null>;
   /** More keys that act on the focused row ("e" archives it). */
   keys?: Record<string, (row: Row) => void>;
 }
 
 /** Returns the id of the focused row, or null before the keyboard is used. */
-export function useListKeys<Row>({ rows, idOf, onOpen, keys = {} }: Options<Row>): string | null {
-  const [focusId, setFocusId] = useState<string | null>(null);
+export function useListKeys<Row>({ rows, idOf, onOpen, scroller, keys = {} }: Options<Row>): string | null {
+  const peek = usePeek();
+  const peeking = peek.key !== undefined;
+  const place = useRef<{ focus: string | null }>({ focus: null });
+  const saved = usePlace(scroller, () => place.current);
+  const [focusId, setFocusId] = useState<string | null>(saved?.focus ?? null);
+  place.current = { focus: focusId };
   const lastIndex = useRef(-1);
 
   let index = focusId === null ? -1 : rows.findIndex((row) => idOf(row) === focusId);
@@ -31,30 +44,57 @@ export function useListKeys<Row>({ rows, idOf, onOpen, keys = {} }: Options<Row>
   const current = rows[index];
   const currentId = current ? idOf(current) : null;
 
-  const move = (by: number) => {
+  const move = (by: number): Row | undefined => {
     const next = rows[Math.min(Math.max(index + by, 0), rows.length - 1)];
     if (!next) return;
     setFocusId(idOf(next));
     // One marker at a time: a row left focused by the mouse or Tab gives way.
     const active = document.activeElement;
     if (active instanceof HTMLElement && active.closest("main")) active.blur();
+    return next;
   };
 
   const hotkeys: Hotkeys = {
-    j: () => !panelOpen() && move(1),
-    k: () => !panelOpen() && move(index < 0 ? 1 : -1),
+    j: () => move(1),
+    k: () => move(index < 0 ? 1 : -1),
     Enter: (e) => {
-      if (!current || panelOpen() || onControl(e)) return;
+      if (!current || onControl(e)) return;
       e.preventDefault();
-      onOpen(current);
+      onOpen(current, "page");
+    },
+    " ": (e) => {
+      if (!current || onButton(e)) return;
+      e.preventDefault();
+      onOpen(current, "peek");
     },
   };
   for (const [key, run] of Object.entries(keys)) {
     hotkeys[key] = () => {
-      if (current && !panelOpen()) run(current);
+      if (current) run(current);
     };
   }
   useHotkeys(hotkeys);
+
+  // The same keys while the panel is open: they move it to the next row, and Space puts it away.
+  const step = (by: number) => (e: KeyboardEvent) => {
+    e.preventDefault();
+    const next = move(by);
+    if (next && next !== current) onOpen(next, "peek");
+  };
+  useHotkeys(
+    {
+      j: step(1),
+      k: step(-1),
+      ArrowDown: step(1),
+      ArrowUp: step(-1),
+      " ": (e) => {
+        if (onButton(e)) return;
+        e.preventDefault();
+        peek.close();
+      },
+    },
+    { layer: "panel", enabled: peeking },
+  );
 
   useEffect(() => {
     if (currentId) document.querySelector("main [data-focused]")?.scrollIntoView({ block: "nearest" });

@@ -2,6 +2,7 @@
 
 import { type MouseEvent, useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
+import { cx } from "@/lib/cx";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
@@ -16,7 +17,7 @@ import { MentionTextarea } from "@/ui/mention-textarea";
  * The title is always a text box that looks like a heading: click and type.
  * Enter saves, Escape puts the old title back, and it can never be left empty.
  */
-export function EditableTitle({ task }: { task: Task }) {
+export function EditableTitle({ task, large }: { task: Task; large?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
 
   // Leaving the box saves; Enter leaves it.
@@ -47,7 +48,11 @@ export function EditableTitle({ task }: { task: Task }) {
           requestAnimationFrame(() => el.blur());
         }
       }}
-      className="-mx-1.5 block w-[calc(100%+0.75rem)] rounded-md px-1.5 py-0.5 text-lg font-semibold tracking-tight hover:bg-hover/60 focus:bg-transparent focus:ring-2 focus:ring-accent/25"
+      className={cx(
+        "-mx-1.5 block w-[calc(100%+0.75rem)] rounded-md px-1.5 py-0.5 text-lg font-semibold tracking-tight hover:bg-hover/60 focus:bg-transparent focus:ring-2 focus:ring-accent/25",
+        // On the task's own page the title is the page's heading.
+        large && "lg:text-2xl",
+      )}
     />
   );
 }

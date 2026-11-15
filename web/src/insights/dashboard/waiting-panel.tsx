@@ -10,7 +10,7 @@ import { useCollection, useLiveTasks, useMe, useMember } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { type Decision, isOpenCategory, type Task } from "@/lib/types";
 import { MoveCount, Panel, PanelEmpty } from "@/insights/ui/panel";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
 import { Ago } from "@/ui/ago";

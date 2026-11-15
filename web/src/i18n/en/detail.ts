@@ -1,10 +1,11 @@
-// The task panel: properties, description, sub-tasks, files, timeline, comments.
+// A task, in the panel and on its own page: properties, description, sub-tasks, files, timeline, comments.
 
 export const detail = {
   "detail.title": "Title",
   "detail.watch": "Watch this task",
   "detail.unwatch": "Stop watching",
   "detail.copyLink": "Copy link",
+  "detail.openPage": "Open as a page",
   "detail.moveToTrash": "Move to trash",
   "detail.inTrash": "This task is in the trash.",
   "detail.restore": "Restore",

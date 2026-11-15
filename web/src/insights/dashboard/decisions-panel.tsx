@@ -9,7 +9,7 @@ import { parseWhen } from "@/insights/lib/format";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { DecisionView, Preference } from "@/insights/lib/types";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { Avatar } from "@/ui/avatar";
 import { Ago } from "@/ui/ago";
 

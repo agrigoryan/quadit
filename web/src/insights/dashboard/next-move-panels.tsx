@@ -12,7 +12,7 @@ import { isOpenCategory, type Task } from "@/lib/types";
 import { count } from "@/insights/lib/format";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { ProjectGlyph } from "@/shell/sidebar";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { Ago } from "@/ui/ago";
 
 /** The next move is no member's but an outside event's; the note says which. */

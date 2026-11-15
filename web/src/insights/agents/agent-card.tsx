@@ -15,7 +15,7 @@ import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/
 import type { AgentWork } from "@/insights/agents/agent-data";
 import { SessionRow, sessionLength } from "@/insights/agents/session-row";
 import { isFinishedHelper } from "@/settings/agents/helpers";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { DecisionMark, StatusIcon } from "@/ui/icons";

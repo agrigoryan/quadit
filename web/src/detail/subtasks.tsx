@@ -13,7 +13,7 @@ import { Section } from "@/detail/section";
 import { createTask, setParent } from "@/tasks/actions";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { AssigneeAvatar } from "@/tasks/task-chips";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { IconButton } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
 

@@ -13,7 +13,7 @@ import { ago, exact, timeOfDay } from "@/lib/time";
 import { nameOf } from "@/detail/data";
 import type { Claim, Resource } from "@/insights/lib/types";
 import { Panel } from "@/insights/ui/panel";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";

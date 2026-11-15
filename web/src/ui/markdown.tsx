@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import remarkGfm from "remark-gfm";
 import { cx } from "@/lib/cx";
 import { useStore } from "@/lib/store";
+import { useTaskLink } from "@/tasks/task-link";
 
 // Markdown as the server stores it, with two additions shown as links:
 // @handle of a real member, and a task key such as SVA-12.
@@ -50,8 +51,16 @@ const remarkRefs = () => (tree: Node) => walk(tree);
 
 const allowRefs = (url: string) => (url.startsWith("mention:") || url.startsWith("task:") ? url : defaultUrlTransform(url));
 
+/** A task's key in a text opens the task the way every link to a task does. */
+function TaskRef({ taskKey, children }: { taskKey: string; children?: React.ReactNode }) {
+  return (
+    <Link {...useTaskLink({ key: taskKey })} className="task-ref">
+      {children}
+    </Link>
+  );
+}
+
 function RefLink({ href, children }: { href?: string; children?: React.ReactNode }) {
-  const slug = useStore((s) => s.slug);
   const handle = href?.startsWith("mention:") ? href.slice(8) : undefined;
   const member = useStore((s) => (handle ? Object.values(s.c.members).find((m) => m.handle === handle) : undefined));
   const meId = useStore((s) => s.me?.user_id);
@@ -63,13 +72,7 @@ function RefLink({ href, children }: { href?: string; children?: React.ReactNode
       </span>
     );
   }
-  if (href?.startsWith("task:")) {
-    return (
-      <Link to={`/${slug}/task/${href.slice(5)}`} className="task-ref">
-        {children}
-      </Link>
-    );
-  }
+  if (href?.startsWith("task:")) return <TaskRef taskKey={href.slice(5)}>{children}</TaskRef>;
   return (
     <a href={href} target="_blank" rel="noreferrer noopener">
       {children}

@@ -9,7 +9,7 @@ import { useIsDraft, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { waitsOutside } from "@/tasks/actions";
 import { AssigneeAvatar, DueChip, WaitsOnChip } from "@/tasks/task-chips";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon } from "@/ui/icons";
 

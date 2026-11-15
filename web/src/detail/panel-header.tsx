@@ -1,8 +1,10 @@
-// The top of the task panel: where the task lives, and what can be done to
-// it as a whole (watch, copy its link, move it to the trash, close).
+// The top of a task, in the panel and on its own page: where the task
+// lives, and what can be done to it as a whole (watch, copy its link, move
+// it to the trash, open it as a page, close or go back).
 
-import { ArrowLeft, ChevronRight, Eye, EyeOff, Link2, MoreHorizontal, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, Eye, EyeOff, Link2, Maximize2, MoreHorizontal, Trash2, X } from "lucide-react";
 import { Link } from "react-router";
+import { cx } from "@/lib/cx";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
@@ -10,14 +12,18 @@ import { useMe, useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Task } from "@/lib/types";
+import type { TaskLayout } from "@/detail/task-body";
 import { restoreTasks, trashTasks } from "@/tasks/actions";
+import { taskPath } from "@/tasks/task-link";
 import { Button, IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 
 interface Props {
   taskKey: string;
   task: Task | undefined;
+  layout: TaskLayout;
   onClose: () => void;
+  onExpand?: () => void;
 }
 
 function setWatching(task: Task, userId: string, watching: boolean) {
@@ -27,23 +33,30 @@ function setWatching(task: Task, userId: string, watching: boolean) {
   });
 }
 
-export function PanelHeader({ taskKey, task, onClose }: Props) {
+export function PanelHeader({ taskKey, task, layout, onClose, onExpand }: Props) {
   const me = useMe();
   const slug = useSlug();
   const project = useStore((s) => (task ? s.c.projects[task.project_id] : undefined));
   const watching = useStore((s) => (task ? !!s.c.watchers[`${me.user_id}:${task.id}`] : false));
+  const page = layout === "page";
 
   async function copyLink() {
-    const ok = await copyText(`${location.origin}/${slug}/task/${taskKey}`);
+    const ok = await copyText(location.origin + taskPath(slug, taskKey));
     if (ok) toast.info(t("common.copied"));
     else toast.error(t("common.copyFailed"));
   }
 
   return (
-    <header className="flex h-11 shrink-0 items-center gap-1 border-b border-line pr-2 pl-4 max-md:h-12 max-md:pl-1">
+    <header className={cx("flex h-11 shrink-0 items-center gap-1 border-b border-line pr-2 max-md:h-12 max-md:pl-1", page ? "md:pl-2" : "md:pl-4")}>
+      {/* On a phone the task covers the screen: the way out is an arrow. The page has it at every width. */}
       <IconButton label={t("common.back")} size="lg" className="md:hidden" onClick={onClose}>
         <ArrowLeft className="size-5" />
       </IconButton>
+      {page && (
+        <IconButton label={t("common.back")} hint="Esc" className="mr-1 max-md:hidden" onClick={onClose}>
+          <ArrowLeft className="size-4" />
+        </IconButton>
+      )}
       <div className="flex min-w-0 flex-1 items-center gap-1 text-sm text-ink-2">
         {project && (
           <>
@@ -91,9 +104,16 @@ export function PanelHeader({ taskKey, task, onClose }: Props) {
           )}
         </>
       )}
-      <IconButton label={t("common.close")} hint="Esc" className="max-md:hidden" onClick={onClose}>
-        <X className="size-4" />
-      </IconButton>
+      {onExpand && (
+        <IconButton label={t("detail.openPage")} hint="Enter" className="max-md:hidden" onClick={onExpand}>
+          <Maximize2 className="size-3.5" />
+        </IconButton>
+      )}
+      {!page && (
+        <IconButton label={t("common.close")} hint="Esc" className="max-md:hidden" onClick={onClose}>
+          <X className="size-4" />
+        </IconButton>
+      )}
     </header>
   );
 }

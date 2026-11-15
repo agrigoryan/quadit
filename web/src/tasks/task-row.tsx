@@ -1,26 +1,16 @@
 import { type CSSProperties, memo } from "react";
 import { Check } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useDecisionFlag, useSubtaskProgress } from "@/lib/selectors";
 import { useIsDraft, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
+import { useTaskLink } from "@/tasks/task-link";
 import { AssigneeAvatar, DueChip, EpicChip, WaitsOnChip } from "@/tasks/task-chips";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon, StatusIcon } from "@/ui/icons";
-
-/** Where a task opens: its panel, over whatever page is showing now. */
-export function useTaskLink(task: Pick<Task, "key">) {
-  const slug = useStore((s) => s.slug);
-  const location = useLocation();
-  // From inside a panel the page stays the one under it. A panel opened from a bare
-  // link has no page under it; the shell then puts the task's own list there.
-  const under = (location.state as { background?: unknown } | null)?.background;
-  const background = under ?? (/\/task\/[^/]+\/?$/.test(location.pathname) ? undefined : location);
-  return { to: `/${slug}/task/${task.key}`, state: background ? { background } : undefined };
-}
 
 /**
  * The key column is 4.25rem wide, which holds "SVA-9999". Where a list has

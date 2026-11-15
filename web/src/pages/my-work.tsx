@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Link } from "react-router";
 import { FirstProjectNudge } from "@/auth/first-run";
 import { cx } from "@/lib/cx";
@@ -8,8 +8,8 @@ import { exact } from "@/lib/time";
 import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { useListKeys } from "@/pages/list-keys";
-import { useOpenTask } from "@/pages/open-task";
-import { keyCell, keyColumn, TaskRow, useTaskLink } from "@/tasks/task-row";
+import { useTaskLink, useTaskNav } from "@/tasks/task-link";
+import { keyCell, keyColumn, TaskRow } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
 import { Ago } from "@/ui/ago";
@@ -41,7 +41,8 @@ export function MyWorkPage() {
   const allTasks = useCollection("tasks");
   const statuses = useCollection("statuses");
   const decisions = useCollection("decisions");
-  const openTask = useOpenTask();
+  const open = useTaskNav();
+  const scroller = useRef<HTMLDivElement>(null);
 
   const { waiting, questions, assigned } = useMemo(() => {
     const open = tasks.filter((task) => isOpenCategory(statuses[task.status_id]?.category));
@@ -72,12 +73,12 @@ export function MyWorkPage() {
     ],
     [waiting, questions, assigned],
   );
-  const focusId = useListKeys({ rows, idOf: (row) => row.id, onOpen: (row) => openTask(row.task.key) });
+  const focusId = useListKeys({ rows, idOf: (row) => row.id, onOpen: (row, as) => open[as](row.task.key), scroller });
   const yours = waiting.length + questions.length;
   const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 
   return (
-    <div className="h-full overflow-y-auto pb-10" style={keyStyle}>
+    <div ref={scroller} className="h-full overflow-y-auto pb-10" style={keyStyle}>
       <FirstProjectNudge />
       <section aria-labelledby="mywork-waiting">
         <header className="flex min-h-12 flex-wrap items-center gap-x-2.5 border-b border-line px-4 pt-3 pb-2">

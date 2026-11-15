@@ -1,9 +1,11 @@
 // Everything a task is filed under, as one dense block of label and value
-// rows: two columns of rows on a wide panel, one on a phone. The S, A, P
-// and L keys open the status, assignee, priority and label pickers.
+// rows: two columns of rows on a wide panel, one on a phone and at the side
+// of the task's own page. The S, A, P and L keys open the status, assignee,
+// priority and label pickers.
 
 import { useRef, useState } from "react";
 import { Globe, Layers, RefreshCw, Target } from "lucide-react";
+import { cx } from "@/lib/cx";
 import { useHotkeys } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMe, useMember } from "@/lib/selectors";
@@ -22,7 +24,13 @@ import { Tooltip } from "@/ui/tooltip";
 type Keyed = "status" | "assignee" | "priority" | "labels";
 const KEYS: Record<string, Keyed> = { s: "status", a: "assignee", p: "priority", l: "labels" };
 
-export function Properties({ task }: { task: Task }) {
+interface Props {
+  task: Task;
+  /** At the side of the task's page: one column of rows where the page is wide enough to have a side. */
+  side?: boolean;
+}
+
+export function Properties({ task, side }: Props) {
   const me = useMe();
   const project = useStore((s) => s.c.projects[task.project_id]);
   const status = useStore((s) => s.c.statuses[task.status_id]);
@@ -73,8 +81,8 @@ export function Properties({ task }: { task: Task }) {
   const taskLabels = (task.label_ids ?? []).map((id) => labels[id]).filter((l) => l !== undefined);
 
   return (
-    <section aria-label={t("detail.properties")} className="border-t border-line px-4 py-2.5 md:px-6">
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2">
+    <section aria-label={t("detail.properties")} className={cx("border-t border-line px-4 py-2.5 md:px-6", side && "lg:sticky lg:top-0 lg:border-t-0 lg:px-5 lg:pt-6")}>
+      <dl className={cx("grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2", side && "lg:grid-cols-1 lg:gap-y-1 lg:[&>*]:col-span-1")}>
         <PropRow label={t("prop.status")}>
           <TaskPropertyPicker {...picker("status")}>
             <PropButton {...trigger("status")} aria-label={`${t("prop.status")}: ${status?.name ?? ""}`}>

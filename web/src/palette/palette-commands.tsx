@@ -20,6 +20,7 @@ import {
   KeyRound,
   Link2,
   ListPlus,
+  Maximize2,
   LogOut,
   Monitor,
   Moon,
@@ -52,6 +53,7 @@ import type { Project, Task } from "@/lib/types";
 import { ui } from "@/lib/ui-state";
 import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";
 import { openNewTask } from "@/tasks/draft";
+import { taskPath } from "@/tasks/task-link";
 
 export type ChoicePage = "status" | "assignee" | "priority" | "labels";
 /** Pages where the box takes a name for something new. */
@@ -73,8 +75,10 @@ export interface Cmd {
 
 export interface CommandContext {
   slug: string;
-  /** The task whose panel is open, if one is. */
+  /** The task that is open, in the panel or on its page, if one is. */
   task: Task | undefined;
+  /** Turns the panel into the task's page; not given when the task is not in the panel. */
+  expand?: () => void;
   /** The project in view: where a new task, label or status goes. */
   project: Project | undefined;
   /** Runs a command and closes the palette. */
@@ -123,7 +127,7 @@ export interface Commands {
   general: Cmd[];
 }
 
-export function useCommands({ slug, task, project, run, go, openPage }: CommandContext): Commands {
+export function useCommands({ slug, task, expand, project, run, go, openPage }: CommandContext): Commands {
   const projects = useProjects();
   const views = useViews();
   const me = useMe();
@@ -134,6 +138,7 @@ export function useCommands({ slug, task, project, run, go, openPage }: CommandC
 
   const forTask: Cmd[] = task
     ? [
+        ...(expand ? [{ id: "task:page", label: t("palette.openPage"), words: "full expand view", icon: <Maximize2 />, hint: "Enter", run: () => run(expand) }] : []),
         { id: "task:status", label: t("prop.set.status"), icon: <CircleDot />, hint: "S", run: () => openPage("status") },
         { id: "task:assignee", label: t("prop.set.assignee"), icon: <UserRound />, hint: "A", run: () => openPage("assignee") },
         { id: "task:priority", label: t("prop.set.priority"), icon: <SignalHigh />, hint: "P", run: () => openPage("priority") },
@@ -144,7 +149,7 @@ export function useCommands({ slug, task, project, run, go, openPage }: CommandC
           label: t("palette.copyLink"),
           words: "url",
           icon: <Link2 />,
-          run: () => run(() => void copy(`${window.location.origin}/${slug}/task/${task.key}`)),
+          run: () => run(() => void copy(window.location.origin + taskPath(slug, task.key))),
         },
       ]
     : [];

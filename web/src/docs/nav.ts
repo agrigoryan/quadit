@@ -4,6 +4,7 @@
 
 import type { Location, NavigateFunction } from "react-router";
 import { getState } from "@/lib/store";
+import { isTaskPath, taskPath } from "@/tasks/task-link";
 
 let navigate: NavigateFunction | null = null;
 let location: Location | null = null;
@@ -20,19 +21,22 @@ export function openDoc(id: string) {
   else window.location.assign(docPath(id));
 }
 
+/** A panel already open over the page gives its place to the next task (see tasks/task-link.ts). */
+const panelOpen = () => isTaskPath(window.location.pathname);
+
 /** Opens a task's panel over the page that is showing. */
 export function openTask(key: string) {
-  const path = `/${getState().slug}/task/${key}`;
-  if (navigate) void navigate(path, { state: { background: location } });
+  const path = taskPath(getState().slug, key);
+  if (navigate) void navigate(path, { state: { background: location }, replace: panelOpen() });
   else window.location.assign(path);
 }
 
 /** Opens a task's panel at one of its decisions. */
 export function openDecision(key: string, decisionId: string) {
   const anchor = `decision-${decisionId}`;
-  const path = `/${getState().slug}/task/${key}#${anchor}`;
+  const path = `${taskPath(getState().slug, key)}#${anchor}`;
   if (!navigate) return window.location.assign(path);
-  void navigate(path, { state: { background: location } });
+  void navigate(path, { state: { background: location }, replace: panelOpen() });
   // The panel draws the task a moment after the address changes: bring the decision into view once it is there.
   let tries = 0;
   const seek = () => {

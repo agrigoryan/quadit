@@ -1,5 +1,6 @@
-import { lazy, type ReactNode, Suspense, useEffect } from "react";
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from "react";
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
+import { useMedia } from "@/decisions/data";
 import { ShortcutsSheet } from "@/palette/shortcuts";
 import { useHotkeys } from "@/lib/hotkeys";
 import { useStore } from "@/lib/store";
@@ -11,11 +12,12 @@ import { insightPaths } from "@/insights/paths";
 import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
 import { GoHint, useGoKeys } from "@/shell/go-keys";
 import { NotFoundPage } from "@/shell/placeholders";
-import { projectInView } from "@/shell/project-in-view";
+import { pageUnder, projectInView } from "@/shell/project-in-view";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
 import { UploadsIndicator } from "@/shell/uploads";
+import { canGoBack, type Peek, PeekContext, taskPath } from "@/tasks/task-link";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
 
 // The larger parts of the app are fetched when first opened.
@@ -32,6 +34,7 @@ const loadTaskPanel = () => import("@/detail/task-panel");
 const loadPalette = () => import("@/palette/palette");
 const loadCreateTask = () => import("@/tasks/create-task");
 const TaskPanel = lazy(() => loadTaskPanel().then((m) => ({ default: m.TaskPanel })));
+const TaskPage = lazy(() => import("@/detail/task-page").then((m) => ({ default: m.TaskPage })));
 const CommandPalette = lazy(() => loadPalette().then((m) => ({ default: m.CommandPalette })));
 const CreateTaskDialog = lazy(() => loadCreateTask().then((m) => ({ default: m.CreateTaskDialog })));
 
@@ -55,9 +58,12 @@ function Part({ on, children }: { on: string | boolean; children: ReactNode }) {
 /**
  * The frame of a workspace: sidebar, top bar, the page, and the task panel.
  *
- * A task opens at /:ws/task/:key as a panel over the page it was opened
- * from. That page travels in the link's state as `background`; a task
- * opened from a bare link gets its project's list behind it.
+ * A task's address is /:ws/task/:key (tasks/task-link.ts). Opened from a
+ * list it is a panel over that list, which travels in the link's state as
+ * `background`. Opened bare (a pasted address, a link from a notification,
+ * Enter in a list) it is the task's own page. A phone has room for one
+ * thing at a time: there the task always covers the screen, with its
+ * project's list behind it when it was opened bare.
  */
 export function Shell() {
   const slug = useStore((s) => s.slug);
@@ -71,15 +77,23 @@ export function Shell() {
     return () => clearTimeout(timer);
   }, []);
 
-  const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
-  const background = (location.state as { background?: Location } | null)?.background;
+  const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key?.toUpperCase();
+  const background = pageUnder(location);
+  const phone = useMedia("(max-width: 767px)");
+  const inPanel = !!taskKey && (!!background || phone);
   const projectKey = taskKey?.split("-")[0];
-  const fallback = `/${slug}/${projectKey ? `p/${projectKey.toUpperCase()}/tasks` : "my-work"}`;
-  const page: Location | string = taskKey ? (background ?? fallback) : location;
+  const fallback = `/${slug}/${projectKey ? `p/${projectKey}/tasks` : "my-work"}`;
+  const page: Location | string = inPanel ? (background ?? fallback) : location;
   const pagePath = typeof page === "string" ? page : page.pathname;
 
   const openNewTask = () => ui.newTask({ projectId: projectInView(location)?.id });
-  const closePanel = () => navigate(typeof page === "string" ? page : page.pathname + page.search);
+  // The panel is one step above its page in the history: closing it is going back that step.
+  const closePanel = useCallback(() => void (background && canGoBack() ? navigate(-1) : navigate(fallback)), [background, fallback, navigate]);
+  // The page's place is taken by the panel's, so one step back from the page is the list again.
+  const expandPanel = () => taskKey && void navigate(taskPath(slug, taskKey), { replace: !!background });
+  // From a task's page: back to where the person was, or to the task's list when they arrived by its address.
+  const leavePage = () => void (canGoBack() ? navigate(-1) : navigate(fallback));
+  const peek = useMemo<Peek>(() => ({ key: inPanel ? taskKey : undefined, close: closePanel }), [inPanel, taskKey, closePanel]);
 
   useHotkeys(
     {
@@ -98,6 +112,7 @@ export function Shell() {
   useGoKeys();
 
   return (
+    <PeekContext value={peek}>
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -119,17 +134,19 @@ export function Shell() {
               <Route key={path} path={path} element={<Later><InsightRoutes /></Later>} />
             ))}
             <Route path="trash" element={<TrashPage />} />
+            <Route path="task/:key" element={<Later><TaskPage onBack={leavePage} /></Later>} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </PageBoundary>
           <UploadsIndicator />
         </main>
       </div>
-      <Part on={taskKey ?? ""}>{taskKey && <TaskPanel key={taskKey.toUpperCase()} taskKey={taskKey.toUpperCase()} onClose={closePanel} />}</Part>
+      <Part on={inPanel}>{inPanel && <TaskPanel taskKey={taskKey} onClose={closePanel} onExpand={phone ? undefined : expandPanel} />}</Part>
       <Part on={paletteOpen}>{paletteOpen && <CommandPalette />}</Part>
       <Part on={!!newTask}>{newTask && <CreateTaskDialog draft={newTask} />}</Part>
       <ShortcutsSheet />
       <GoHint />
     </div>
+    </PeekContext>
   );
 }

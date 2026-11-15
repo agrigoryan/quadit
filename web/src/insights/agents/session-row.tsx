@@ -12,7 +12,7 @@ import { ago, exact } from "@/lib/time";
 import type { AgentSession } from "@/lib/types";
 import { moneyMicros, short, span } from "@/insights/lib/format";
 import { sessionLink, stepText } from "@/insights/agents/session-data";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { Avatar } from "@/ui/avatar";
 
 const marks = {

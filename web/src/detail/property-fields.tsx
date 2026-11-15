@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { useCollection, useTask } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { setDue, setEstimate, setParent, setWaitingOn, setWaitingOutside, waitsOutside } from "@/tasks/actions";
-import { useTaskLink } from "@/tasks/task-row";
+import { useTaskLink } from "@/tasks/task-link";
 import { TaskPicker } from "@/detail/task-picker";
 import { Tooltip } from "@/ui/tooltip";
 

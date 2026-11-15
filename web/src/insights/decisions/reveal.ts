@@ -7,7 +7,7 @@ let run = 0;
 
 function find(decisionId: string): HTMLElement | null {
   const el = document.getElementById(`decision-${decisionId}`);
-  return el?.closest("[data-task-panel]") ? el : null;
+  return el?.closest("[data-task-panel], [data-task-page]") ? el : null;
 }
 
 /** Scrolls the task panel to this decision, once the panel shows it. */
