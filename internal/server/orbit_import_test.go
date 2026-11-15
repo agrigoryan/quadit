@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -263,4 +264,80 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 			t.Fatalf("a wrong session: %s", out)
 		}
 	})
+}
+
+// TestImportIsHistoryNotNews: what an import brings is in the feed, but in
+// nobody's inbox, from the server's import and from the command line's.
+// Its comment writers who are members here follow their tasks, and the next
+// ordinary comment tells them and the rest as usual. Only an admin may send
+// a change quiet.
+func TestImportIsHistoryNotNews(t *testing.T) {
+	for _, from := range []string{"server", "command line"} {
+		t.Run(from, func(t *testing.T) {
+			st := testdb.SQLite(t)
+			s := newSite(t, st)
+			var fetched int
+			orbit := orbitAsItAnswers(t, &fetched)
+			s.change(s.owner, "", "agent.create", M{"name": "Claude Helper", "handle": "helper"})
+			var helper struct{ Token string }
+			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@helper"}, 201, &helper)
+			// Bea, a second person, follows the whole project.
+			var inv struct{ Link string }
+			s.call(s.owner, "", "POST", w+"/invites", M{"role": "member"}, 201, &inv)
+			bea := browser()
+			s.call(bea, "", "POST", "/api/v1/auth/invite/"+inv.Link[strings.LastIndex(inv.Link, "/")+1:],
+				M{"name": "Bea", "email": "bea@example.com", "password": "another-long-password"}, 200, nil)
+			s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Aliens"})
+			s.change(bea, "", "watch.set", M{"type": "project", "subject": "SVA"})
+
+			opts := M{"workspace": "ws1", "token": "orbit-token", "session": "orbit-session"}
+			if from == "server" {
+				s.call(s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": opts}, 200, nil)
+			} else {
+				var own struct{ Token string }
+				s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &own)
+				if out, code := s.quadit(own.Token, "import", "orbit", orbit.URL, "workspace=ws1", "token=orbit-token", "session=orbit-session"); code != 0 {
+					t.Fatalf("quadit import: %d %s", code, out)
+				}
+			}
+			inbox := func(hc *http.Client, token string) string {
+				return s.call(hc, token, "GET", w+"/inbox?format=text&all=1", nil, 200, nil)
+			}
+			if a, b := inbox(nil, helper.Token), inbox(bea, ""); strings.Contains(a, "SVA-") || strings.Contains(b, "SVA-") {
+				t.Fatalf("the import reached inboxes:\nhelper: %s\nbea: %s", a, b)
+			}
+			if n, _ := st.Count(context.Background(), "notifications"); n != 0 {
+				t.Fatalf("%d inbox items after the import", n)
+			}
+			if n, _ := st.Count(context.Background(), "jobs", store.Eq("kind", "notify")); n != 0 {
+				t.Fatalf("%d wake-ups after the import", n)
+			}
+			// The feed has it all, marked as brought in; the assignment and
+			// the comment writer's watch are set.
+			feed := s.call(s.owner, "", "GET", w+"/events?task=SVA-1&limit=500", nil, 200, nil)
+			if !strings.Contains(feed, `"task.created"`) || !strings.Contains(feed, `"comment.created"`) || !strings.Contains(feed, `"quiet":true`) {
+				t.Fatalf("the feed: %s", feed)
+			}
+			var two, one struct {
+				Task     struct{ Assignee string }
+				Watchers []string
+			}
+			s.call(s.owner, "", "GET", w+"/tasks/SVA-2", nil, 200, &two)
+			s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &one)
+			if two.Task.Assignee != "@helper" || !strings.Contains(strings.Join(one.Watchers, ","), "@helper") {
+				t.Fatalf("assignee %q, watchers of SVA-1 %v", two.Task.Assignee, one.Watchers)
+			}
+
+			// News after the import is news again.
+			s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "the walk-in stays"})
+			if a, b := inbox(nil, helper.Token), inbox(bea, ""); !strings.Contains(a, "SVA-1") || !strings.Contains(b, "SVA-1") {
+				t.Fatalf("a comment after the import told nobody:\nhelper: %s\nbea: %s", a, b)
+			}
+
+			// A member or an agent may not send a change quiet.
+			quiet := M{"changes": []M{{"id": id.New(), "type": "comment.create", "args": M{"task": "SVA-1", "body": "psst"}, "quiet": true}}}
+			s.call(bea, "", "POST", w+"/changes", quiet, 403, nil)
+			s.call(nil, helper.Token, "POST", w+"/changes", quiet, 403, nil)
+		})
+	}
 }

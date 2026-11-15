@@ -3,6 +3,8 @@ package importer
 import (
 	"encoding/json"
 	"net/url"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // API is the workspace's API as an import uses it. The command-line tool
@@ -27,10 +29,20 @@ type apiSink struct {
 	api  API
 	logf func(format string, a ...any)
 	dup  bool
+	// quiet is whether changes go out marked quiet: once asked, and true
+	// when the importer is an admin, who alone may send them so.
+	quiet *bool
 }
 
+// Change sends one change of the import. What an import makes is history,
+// not news: an admin's import sends it quiet, so nobody gets an inbox item
+// for it.
 func (s *apiSink) Change(changeID, typ string, args any) error {
-	raw, _ := json.Marshal(map[string]any{"id": changeID, "type": typ, "args": args})
+	change := map[string]any{"id": changeID, "type": typ, "args": args}
+	if s.mayBeQuiet() {
+		change["quiet"] = true
+	}
+	raw, _ := json.Marshal(map[string]any{"changes": []any{change}})
 	out, err := s.api.Call("POST", "/changes", nil, raw)
 	var res struct {
 		Results []struct {
@@ -39,6 +51,22 @@ func (s *apiSink) Change(changeID, typ string, args any) error {
 	}
 	s.dup = err == nil && json.Unmarshal(out, &res) == nil && len(res.Results) > 0 && res.Results[0].Duplicate
 	return err
+}
+
+// mayBeQuiet says whether the one importing may send changes quiet. A
+// member's import tells people as any of their work does, and says so.
+func (s *apiSink) mayBeQuiet() bool {
+	if s.quiet != nil {
+		return *s.quiet
+	}
+	var me struct{ Role core.Role }
+	raw, err := s.api.Call("GET", "/me", nil, nil)
+	quiet := err == nil && json.Unmarshal(raw, &me) == nil && me.Role.AtLeast(core.RoleAdmin)
+	if !quiet {
+		s.logf("note: only an admin's import is kept out of people's inboxes; this one will notify as usual")
+	}
+	s.quiet = &quiet
+	return quiet
 }
 
 // WasDuplicate reports whether the last change had been made before.

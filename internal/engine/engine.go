@@ -52,6 +52,10 @@ type Change struct {
 	// shared agent with wide access cannot be used to get around someone's
 	// own narrower access.
 	For string `json:"for,omitempty"`
+	// Quiet marks history being brought in (an import): the change tells
+	// nobody, no inbox item and no wake-up, though its events are in the
+	// feed as usual, each marked "quiet". Only an admin may send it.
+	Quiet bool `json:"quiet,omitempty"`
 }
 
 // Result says what a change produced.
@@ -240,6 +244,8 @@ type cx struct {
 	// origin, when set, is stamped on every event the write emits, so the
 	// rule that caused a change is known and rules do not set each other off.
 	origin string
+	// quiet is set for a change that tells nobody (Change.Quiet).
+	quiet bool
 	// asker is the member named with "for": the one this change is made for.
 	asker string
 	// askerOK remembers the tasks whose asker was already checked.
@@ -378,6 +384,9 @@ func (c *cx) emitTo(audience string, seq int64, typ, entityType, entityID, scope
 	}
 	if m, ok := data.(map[string]any); ok && c.origin != "" {
 		m["rule"] = c.origin
+	}
+	if m, ok := data.(map[string]any); ok && c.quiet {
+		m["quiet"] = true // the feed shows it was brought in, not done now
 	}
 	raw, err := json.Marshal(data)
 	if err != nil {
@@ -550,6 +559,9 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 	if !m.Role.AtLeast(h.min) {
 		return nil, forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, m.Role)
 	}
+	if ch.Quiet && !m.Role.AtLeast(core.RoleAdmin) {
+		return nil, forbidden("quiet is for an admin bringing in history; a change by a %s tells those it concerns", m.Role)
+	}
 	askerID := ""
 	if ch.For != "" {
 		asker, err := (&Resolver{ctx: ctx, db: tx, actor: m, at: now}).memberRef("for", ch.For)
@@ -573,7 +585,7 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 		return nil, forbidden("this credential is read-only")
 	}
 	c := &cx{Resolver: &Resolver{ctx: ctx, db: tx, actor: m, at: now}, e: e, tx: tx, ws: tx.WorkspaceID(), scope: scope,
-		change: ch, notified: map[string]bool{}, asker: askerID, askerOK: map[string]bool{}}
+		change: ch, notified: map[string]bool{}, asker: askerID, askerOK: map[string]bool{}, quiet: ch.Quiet}
 	if contains(scope.NeedsApproval, ch.Type) {
 		if err := c.checkApproval(); err != nil {
 			return nil, err

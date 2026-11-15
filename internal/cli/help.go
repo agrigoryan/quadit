@@ -75,6 +75,7 @@ var helpTopics = map[string]string{
                                a picture of how it looks to a person; full=1 takes the whole page
 `,
 	"import": `bring work in (safe to run twice: nothing is added a second time)
+  An admin's import is history, not news: it reaches nobody's inbox.
   import linear FILE.csv project=KEY       import trello BOARD.json project=KEY
   import asana FILE.csv project=KEY        import github OWNER/REPO project=KEY [token=…]
   import notion EXPORT.zip                 import obsidian FOLDER     import markdown FOLDER

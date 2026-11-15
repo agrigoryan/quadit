@@ -13,9 +13,9 @@ import (
 // notify puts an item in a member's inbox and tells only them, in the feed.
 // The actor is never notified of their own change, and a member gets at most
 // one item per change and subject: callers notify the most specific reason
-// first.
+// first. A quiet change (history being imported) notifies nobody.
 func (c *cx) notify(userID, typ string, n core.Notification) error {
-	if userID == "" || (userID == c.actor.UserID && !c.selfNotify) {
+	if userID == "" || (userID == c.actor.UserID && !c.selfNotify) || c.quiet {
 		return nil
 	}
 	key := userID + "|" + n.TaskID + n.DocID

@@ -29,7 +29,8 @@ const taskFilters = "project: key; assignee: me, @handle or none; status: name o
 // changes. Every other write is a change, described from the engine's catalog.
 var apiOps = []apiOperation{
 	{"POST", "/changes", "Apply one change, or a batch that succeeds or fails together. Body: {id, type, args} or {changes: […], dry_run}. " +
-		"The id is made by the caller; sending the same id again applies nothing twice.", "events: true to get the events back; dry_run: true to check without writing", "write"},
+		"The id is made by the caller; sending the same id again applies nothing twice. " +
+		"In a batch, an admin may mark a change quiet: true (history being imported): it notifies nobody, and its events say quiet.", "events: true to get the events back; dry_run: true to check without writing", "write"},
 	{"GET", "/me", "Who am I: role, projects, what needs approval, budget left, unread count, feed position, cursors.", "", "orient"},
 	{"GET", "/my-work", "What waits on me, questions asked of me, tasks assigned to me, my unread inbox.", "", "orient"},
 	{"GET", "/projects/{key}/layout", "A project's statuses, labels, members, epics, cycles and templates, by name.", "", "orient"},

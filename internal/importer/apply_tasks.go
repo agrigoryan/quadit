@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/id"
 )
 
 func (a *applier) makeTasks() error {
@@ -147,8 +149,10 @@ func (a *applier) describe(t Task, notes []string, sameKey bool) string {
 }
 
 // makeComments brings a task's comments. They are written by the one
-// running the import, so each says who wrote it there, and when.
+// running the import, so each says who wrote it there, and when; a writer
+// who is a member here follows the task, as if they had written it here.
 func (a *applier) makeComments(t Task) error {
+	watching := map[string]bool{}
 	for i, cm := range t.Comments {
 		if strings.TrimSpace(cm.Body) == "" && len(cm.Files) == 0 {
 			continue
@@ -171,6 +175,23 @@ func (a *applier) makeComments(t Task) error {
 		if err := a.attach(cm.Files, "comment", a.uid("comment", was), was); err != nil {
 			return err
 		}
+		if m := a.member(cm.Author); m != "" && !watching[m] {
+			watching[m] = true
+			if err := a.follow(t, m); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// follow makes a member a watcher of an imported task. It is not counted
+// in what the import made.
+func (a *applier) follow(t Task, userID string) error {
+	task := a.uid("task", t.Ext)
+	err := a.sink.Change(id.From("import-change", a.plan.Source, "watch.set", task, userID), "watch.set", map[string]any{"subject": task, "user": userID})
+	if err != nil {
+		return fmt.Errorf("watcher of %q: %w", t.Title, err)
 	}
 	return nil
 }
