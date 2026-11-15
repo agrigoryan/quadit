@@ -14,11 +14,14 @@ func (s *Server) LimitFactor() float64 {
 	return s.limits.factor
 }
 
+// GitHubTimeout is how long one request to GitHub may take, for tests to shorten.
+var GitHubTimeout = &githubTimeout
+
 // GitHubIdentity reads who a GitHub token belongs to, the way sign-in with
 // GitHub does, for a test against the real service.
 func GitHubIdentity(ctx context.Context, token, api string) (subject, name string, hasVerifiedEmail bool, err error) {
 	hc := oauth2.NewClient(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}))
-	who, err := githubIdentity(ctx, hc, api)
+	who, err := githubIdentity(ctx, hc, api, "test")
 	return who.Subject, who.Name, who.Email != "" && who.Verified, err
 }
 

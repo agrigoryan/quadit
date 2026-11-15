@@ -66,6 +66,9 @@ type oauthSetting struct {
 	AuthURL  string `json:"auth_url"`
 	TokenURL string `json:"token_url"`
 	APIURL   string `json:"api_url"`
+	// version is this server's, for a provider asked with a client that
+	// says who is asking; it is not stored.
+	version string
 }
 
 // outsider is who the provider says signed in.
@@ -85,6 +88,7 @@ func (s *Server) signInWith(ctx context.Context, provider string) (signInProvide
 		return nil, cfg, false
 	}
 	s.setting(ctx, "auth."+provider, &cfg)
+	cfg.version = s.cfg.Version
 	if !cfg.Enabled || cfg.ClientID == "" {
 		return p, cfg, false
 	}

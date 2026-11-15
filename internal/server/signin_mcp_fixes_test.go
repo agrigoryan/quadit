@@ -13,6 +13,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 
+	"github.com/agrigoryan/quadit/internal/server"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -130,5 +131,51 @@ func TestOIDCConnectedAccountNeedsNoVerifiedAddress(t *testing.T) {
 		resp.Body.Close()
 		var me struct{ Email string }
 		s.call(b, "", "GET", "/api/v1/auth/me", nil, 200, &me)
+	})
+}
+
+// TestGitHubSignInGivesUp: a GitHub that takes the token but never says
+// who it belongs to ends the sign-in, as any other failure to confirm who
+// signed in does, within the time GitHub is given.
+func TestGitHubSignInGivesUp(t *testing.T) {
+	was := *server.GitHubTimeout
+	*server.GitHubTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { *server.GitHubTimeout = was })
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		mux := http.NewServeMux()
+		mux.HandleFunc("/login/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
+			q := r.URL.Query()
+			http.Redirect(w, r, q.Get("redirect_uri")+"?code=the-code&state="+url.QueryEscape(q.Get("state")), http.StatusFound)
+		})
+		mux.HandleFunc("/login/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"access_token":"gho_fake123","token_type":"bearer","scope":"read:user,user:email"}`))
+		})
+		mux.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
+			// Silent until the asker gives up, or long past the time it has.
+			select {
+			case <-r.Context().Done():
+			case <-time.After(5 * time.Second):
+				json.NewEncoder(w).Encode(M{"id": 1, "login": "slow"})
+			}
+		})
+		gh := httptest.NewServer(mux)
+		t.Cleanup(gh.Close)
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
+			"auth_url": gh.URL + "/login/oauth/authorize", "token_url": gh.URL + "/login/oauth/access_token", "api_url": gh.URL}, 200, nil)
+		start := time.Now()
+		resp, err := browser().Get(s.url + "/api/v1/auth/oauth/github/start")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		want := "/login?error=" + url.QueryEscape("The provider could not confirm who you are.")
+		if got := resp.Request.URL.RequestURI(); got != want {
+			t.Fatalf("sign-in ended at %s after %s, want %s", got, time.Since(start), want)
+		}
+		if took := time.Since(start); took > 3*time.Second {
+			t.Fatalf("the sign-in waited %s for GitHub", took)
+		}
 	})
 }

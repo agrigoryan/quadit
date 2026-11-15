@@ -28,14 +28,14 @@ func (githubSignIn) Endpoint(_ context.Context, cfg oauthSetting) (oauth2.Endpoi
 }
 
 func (githubSignIn) Identity(ctx context.Context, cfg oauthSetting, oc *oauth2.Config, tok *oauth2.Token, _ string) (outsider, error) {
-	return githubIdentity(ctx, oc.Client(ctx, tok), cfg.APIURL)
+	return githubIdentity(ctx, oc.Client(ctx, tok), cfg.APIURL, cfg.version)
 }
 
 // githubIdentity asks GitHub whose token hc carries: the account, and the
-// address GitHub has verified for it.
-func githubIdentity(ctx context.Context, hc *http.Client, api string) (outsider, error) {
+// address GitHub has verified for it. version is this server's.
+func githubIdentity(ctx context.Context, hc *http.Client, api, version string) (outsider, error) {
 	var who outsider
-	gh := githubSignInAPI(hc, api)
+	gh := newGitHubClient(hc, api, version)
 	var u struct {
 		ID    int64  `json:"id"`
 		Login string `json:"login"`
