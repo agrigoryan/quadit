@@ -418,7 +418,7 @@ function listen(s: Session) {
     () => {
       s.parked = true;
       s.downSince ||= Date.now();
-      dropStream(s);
+      // If this tab led, onFollow lets go of the stream.
       s.tabs?.park();
     },
     { signal },
@@ -486,6 +486,10 @@ function reconnectNow(s: Session) {
 async function followStream(s: Session, held: AbortSignal) {
   for (let tries = 0; ;) {
     const status = await new Promise<number | null>((closed, dropped) => {
+      const drop = () => {
+        stream.close();
+        dropped(held.reason);
+      };
       const stream = openEventStream(workspacePath(s.slug, `/events/stream?after=${getState().seq}`), {
         onOpen() {
           tries = 0;
@@ -519,10 +523,6 @@ async function followStream(s: Session, held: AbortSignal) {
           closed(status);
         },
       });
-      const drop = () => {
-        stream.close();
-        dropped(held.reason);
-      };
       held.addEventListener("abort", drop);
     });
 

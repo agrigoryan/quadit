@@ -613,6 +613,38 @@ describe("the connection", () => {
       expect(a.state().ready).toBe(false);
     });
 
+    it("a reason to start over that comes while a copy is on its way starts the asking over, and nothing is kept after all", async () => {
+      server.get(OPEN_PART, before);
+      const leader = lead();
+      const b = await openTab();
+      await b.start();
+
+      // Too far behind to replay: a whole copy is asked for, which would keep what is on screen.
+      server.get(MISSED, { events: [], seq: 10, more: true });
+      const whole = server.hold(WHOLE);
+      leader.passOn(40, retitle(41, "t1", "late"));
+      await settle();
+      expect(whole.calls).toHaveLength(1);
+
+      // Then the server says to start over: the copy on its way may be from before that.
+      const fresh = server.hold(OPEN_PART);
+      leader.say({ t: "reset" });
+      await settle();
+      expect(whole.calls[0]?.aborted).toBe(true);
+      expect(fresh.calls).toHaveLength(1);
+
+      // And a second reason that by itself would keep the old copy: still nothing is kept.
+      leader.say({ t: "state", state: "live", seq: 99 });
+      await settle();
+      leader.passOn(98, retitle(99, "t1", "later still"));
+      await settle();
+      expect(whole.calls).toHaveLength(1);
+      fresh.calls.at(-1)?.answer(after);
+      await settle();
+      expect(b.state().seq).toBe(30);
+      expect(b.state().lostProjects).toEqual(["OPS"]);
+    });
+
     // Once a defect: opening the stream cancelled the wait to ask again, and
     // the tab went live on the copy it was told to throw away, with rows on
     // screen the person may no longer see.
@@ -627,13 +659,15 @@ describe("the connection", () => {
       await settle();
       leader.letGo();
       await settle();
+      // It leads now, but follows no stream from the copy it is about to throw away.
+      expect(b.streams).toHaveLength(0);
 
       server.down = false;
       server.get(OPEN_PART, after);
       await later(15_000);
       expect(b.state().seq).toBe(30);
       expect(b.state().lostProjects).toEqual(["OPS"]);
-      expect(b.stream.closed).toBe(false);
+      expect(b.streams).toHaveLength(1);
       expect(b.stream.url).toBe(`${W}/events/stream?after=30`);
     });
   });
@@ -748,6 +782,18 @@ describe("the connection", () => {
       await settle();
       expect(a.streams).toHaveLength(1);
       expect(a.stream.url).toBe(`${W}/events/stream?after=10`);
+    });
+
+    it("put away and shown again before its copy arrived, it joins the tabs when the copy does", async () => {
+      const first = server.hold(OPEN_PART);
+      const a = await openTab();
+      await a.start();
+      putAway();
+      shownAgain();
+      await settle();
+      first.calls[0]?.answer(copy());
+      await settle();
+      expect(a.streams).toHaveLength(1);
     });
 
     it("where tabs cannot share, lets go of its own stream and opens it again when shown", async () => {

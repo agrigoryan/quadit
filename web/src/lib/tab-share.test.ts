@@ -164,6 +164,8 @@ describe("park", () => {
     await settle();
     b.park();
     c.park();
+    // Nor does it keep a place in line: the page may be frozen when its turn comes.
+    expect((await tabs.locks.query()).pending).toEqual([]);
     await later(10 * 60_000);
     expect(leader.taken).toBe(false);
     leader.letGo();
@@ -178,6 +180,14 @@ describe("park", () => {
     b.unpark();
     await settle();
     expect(b.leads).toBe(true);
+  });
+
+  it("a tab parked just as the lead falls to it does not take it", async () => {
+    const a = tab();
+    a.park();
+    await settle();
+    expect(a).toMatchObject({ leads: false, led: 0 });
+    expect(tabs.locks.isHeld(NAME)).toBe(false);
   });
 });
 

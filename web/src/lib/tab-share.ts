@@ -118,7 +118,6 @@ export function join<M>(name: string, handlers: TabHandlers<M>): TabShare<M> {
   }
 
   channel.onmessage = (e) => {
-    if (left) return;
     const wire = e.data as Wire<M>;
     if (wire.is === "say") handlers.onMessage(wire.msg);
     else if (wire.is === "ping" && leads) send({ is: "pong" });
