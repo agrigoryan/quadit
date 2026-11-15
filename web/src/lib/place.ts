@@ -4,7 +4,7 @@
 // it was, and arriving at it afresh starts at the top. It is kept in the
 // tab's own storage, so a reload finds it too.
 
-import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useEffectEvent, useLayoutEffect, useState } from "react";
 import { useLocation } from "react-router";
 
 export interface Place {
@@ -72,12 +72,13 @@ export function usePlace(
   const step = useLocation().key;
   const name = part ? `${step}#${part}` : step;
   const [saved] = useState(() => places.get(name));
-  const latest = useRef(now);
-  latest.current = now;
+  // Where the list is as of the last render, asked as it leaves.
+  const latest = useEffectEvent(now);
 
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!saved || !el) return;
+    // oxlint-disable-next-line react/immutability -- the list's element, scrolled back to where it was: what an effect is for
     el.scrollTop = saved.top;
     if (saved.left) el.scrollLeft = saved.left;
   }, [saved, scroller]);
@@ -86,7 +87,7 @@ export function usePlace(
   useLayoutEffect(() => {
     const save = () => {
       const el = scroller.current;
-      if (el) keep(name, { top: el.scrollTop, left: el.scrollLeft || undefined, ...latest.current() });
+      if (el) keep(name, { top: el.scrollTop, left: el.scrollLeft || undefined, ...latest() });
     };
     return save;
   }, [name, scroller]);
@@ -95,7 +96,7 @@ export function usePlace(
   useEffect(() => {
     const save = () => {
       const el = scroller.current;
-      if (el) keep(name, { top: el.scrollTop, left: el.scrollLeft || undefined, ...latest.current() });
+      if (el) keep(name, { top: el.scrollTop, left: el.scrollLeft || undefined, ...latest() });
     };
     window.addEventListener("pagehide", save);
     return () => window.removeEventListener("pagehide", save);

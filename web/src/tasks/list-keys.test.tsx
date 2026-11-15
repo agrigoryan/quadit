@@ -11,19 +11,31 @@ import { type OpenAs, useListKeys } from "@/tasks/list-keys";
 
 const ROWS = ["a", "b", "c"];
 
-function List({ onOpen, onArchive }: { onOpen: (row: string, as: OpenAs) => void; onArchive: (row: string) => void }) {
+interface ListProps {
+  onOpen: (row: string, as: OpenAs) => void;
+  onArchive: (row: string) => void;
+  /** Archiving takes the row off the list, as the inbox does. */
+  removes?: boolean;
+}
+
+function List({ onOpen, onArchive, removes }: ListProps) {
   const scroller = useRef<HTMLDivElement>(null);
+  const [rows, setRows] = useState(ROWS);
   const [peeked, setPeeked] = useState<string | undefined>(undefined);
   const peek = useMemo(() => ({ key: peeked, close: () => setPeeked(undefined) }), [peeked]);
   return (
     <PeekContext.Provider value={peek}>
       <Rows
+        rows={rows}
         scroller={scroller}
         onOpen={(row, as) => {
           onOpen(row, as);
           if (as === "peek") setPeeked(row);
         }}
-        onArchive={onArchive}
+        onArchive={(row) => {
+          onArchive(row);
+          if (removes) setRows((all) => all.filter((r) => r !== row));
+        }}
       />
       {peeked && <div data-task-panel />}
     </PeekContext.Provider>
@@ -31,16 +43,18 @@ function List({ onOpen, onArchive }: { onOpen: (row: string, as: OpenAs) => void
 }
 
 function Rows({
+  rows,
   scroller,
   onOpen,
   onArchive,
 }: {
+  rows: string[];
   scroller: RefObject<HTMLDivElement | null>;
   onOpen: (row: string, as: OpenAs) => void;
   onArchive: (row: string) => void;
 }) {
   const focusId = useListKeys({
-    rows: ROWS,
+    rows,
     idOf: (row) => row,
     onOpen,
     taskKeyOf: (row) => row.toUpperCase(),
@@ -49,7 +63,7 @@ function Rows({
   });
   return (
     <main ref={scroller} tabIndex={-1}>
-      {ROWS.map((row) => (
+      {rows.map((row) => (
         <div key={row} data-focused={focusId === row || undefined}>
           <a href={`#${row}`}>{row}</a>
           <button type="button">{`mark ${row}`}</button>
@@ -60,13 +74,13 @@ function Rows({
 }
 
 let step = 0;
-function renderList() {
+function renderList({ removes = false } = {}) {
   const onOpen = vi.fn<(row: string, as: OpenAs) => void>();
   const onArchive = vi.fn<(row: string) => void>();
   step += 1;
   render(
     <MemoryRouter initialEntries={[{ pathname: "/inbox", key: `list${step}` }]}>
-      <List onOpen={onOpen} onArchive={onArchive} />
+      <List onOpen={onOpen} onArchive={onArchive} removes={removes} />
     </MemoryRouter>,
   );
   return { onOpen, onArchive };
@@ -95,6 +109,19 @@ describe("useListKeys", () => {
     expect(onOpen).toHaveBeenLastCalledWith("c", "page");
     press(" ");
     expect(onOpen).toHaveBeenLastCalledWith("c", "peek");
+  });
+
+  it("stays in place when the current row leaves the list, on the row that takes its place", () => {
+    renderList({ removes: true });
+    press("j");
+    press("j");
+    expect(current()).toBe("b");
+    press("e");
+    expect(current()).toBe("c");
+    press("e");
+    expect(current()).toBe("a");
+    press("j");
+    expect(current()).toBe("a");
   });
 
   it("steps the open panel with J and K and closes it on Space, the row staying current", () => {

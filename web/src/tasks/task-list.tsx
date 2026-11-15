@@ -80,7 +80,10 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
   const saved = usePlace(scroller, () => place.current);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(saved?.folded));
   const [focusKey, setFocusKey] = useState<string | null>(saved?.focus ?? null);
-  place.current = { focus: focusKey, folded: [...collapsed] };
+  // Where the list is, for usePlace to keep as the list leaves.
+  useLayoutEffect(() => {
+    place.current = { focus: focusKey, folded: [...collapsed] };
+  });
   const [picker, setPicker] = useState<TaskProperty | null>(null);
   const anchor = useRef<Element | null>(null);
   const lastPicked = useRef<string | null>(null);
@@ -143,6 +146,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     const at = key ? rows.findIndex((row) => row.task.key === key) : -1;
     if (at >= 0) focusRow(at);
   });
+  // oxlint-disable-next-line react/set-state-in-effect -- the task left in the module's memory is taken once, as the list comes back; an initializer may run twice, and a take cannot
   useLayoutEffect(() => focusSeen(listStep), [listStep]);
 
   /** Where the task in the panel is listed, when the focus is not on it. */

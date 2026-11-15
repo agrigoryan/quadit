@@ -31,8 +31,12 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
   const place = useRef<{ focus: string | null }>({ focus: null });
   const saved = usePlace(scroller, () => place.current);
   const [focusId, setFocusId] = useState<string | null>(saved?.focus ?? null);
-  place.current = { focus: focusId };
-  const lastIndex = useRef(-1);
+  // Where the list is, for usePlace to keep as the list leaves.
+  useLayoutEffect(() => {
+    place.current = { focus: focusId };
+  });
+  /** Where the focus was at the last render, for when its row leaves. */
+  const [lastIndex, setLastIndex] = useState(-1);
 
   // Come back to from a task's page that stepped on to another task, the focus is on the task it ended at.
   const listStep = useTaskOrder(() => rows.map(taskKeyOf));
@@ -41,13 +45,13 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
     const row = key ? rows.find((r) => taskKeyOf(r) === key) : undefined;
     if (row) setFocusId(idOf(row));
   });
+  // oxlint-disable-next-line react/set-state-in-effect -- the task left in the module's memory is taken once, as the list comes back; an initializer may run twice, and a take cannot
   useLayoutEffect(() => focusSeen(listStep), [listStep]);
 
   let index = focusId === null ? -1 : rows.findIndex((row) => idOf(row) === focusId);
   // The focused row left the list (archived, answered): stay where it was.
-  if (focusId !== null && index < 0 && rows.length > 0)
-    index = Math.min(Math.max(lastIndex.current, 0), rows.length - 1);
-  lastIndex.current = index;
+  if (focusId !== null && index < 0 && rows.length > 0) index = Math.min(Math.max(lastIndex, 0), rows.length - 1);
+  if (index !== lastIndex) setLastIndex(index);
   const current = rows[index];
   const currentId = current ? idOf(current) : null;
 
