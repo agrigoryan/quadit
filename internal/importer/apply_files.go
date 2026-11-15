@@ -5,7 +5,6 @@ package importer
 import (
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -19,22 +18,6 @@ type fileSet struct {
 
 type fileLink struct{ text, ext string }
 
-func (a *applier) indexFiles() error {
-	a.files = fileSet{byExt: map[string]File{}, sent: map[string]string{}}
-	for _, f := range a.plan.Files {
-		a.files.byExt[f.Ext] = f
-		for _, l := range f.Links {
-			if l != "" {
-				a.files.links = append(a.files.links, fileLink{l, f.Ext})
-			}
-		}
-	}
-	// Longest first: an address with the server's name before the same one
-	// without it.
-	sort.SliceStable(a.files.links, func(i, j int) bool { return len(a.files.links[i].text) > len(a.files.links[j].text) })
-	return nil
-}
-
 // send uploads one of the plan's files unless it was sent before, in this
 // run or an earlier one, and gives its address here: without the server's
 // name, so that it still holds when the install moves to another one.
@@ -42,14 +25,8 @@ func (a *applier) send(ext string) string {
 	if u, ok := a.files.sent[ext]; ok {
 		return u
 	}
-	f, isNew := a.files.byExt[ext], true
-	var u string
-	var err error
-	if up, ok := a.sink.(FileUploader); ok {
-		u, isNew, err = up.UploadAs(a.uid("file", ext), f.Path)
-	} else {
-		u, err = a.sink.Upload(f.Path)
-	}
+	f := a.files.byExt[ext]
+	u, isNew, err := a.sink.Upload(a.uid("file", ext), f.Path)
 	switch {
 	case err != nil:
 		a.sink.Logf("note: the file %s did not come over: %v", filepath.Base(f.Path), err)
@@ -85,7 +62,7 @@ func (a *applier) attach(exts []string, on, subject, was string) error {
 		if !ok || a.send(ext) == "" {
 			continue
 		}
-		if err := a.change("attachment.add", map[string]any{"id": a.uid("attachment", was+"/"+ext), "file": a.uid("file", ext), on: subject}); err != nil {
+		if _, err := a.change("attachment.add", map[string]any{"id": a.uid("attachment", was+"/"+ext), "file": a.uid("file", ext), on: subject}); err != nil {
 			return fmt.Errorf("file %s: %w", filepath.Base(f.Path), err)
 		}
 	}

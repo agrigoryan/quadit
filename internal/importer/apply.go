@@ -1,10 +1,11 @@
-// Apply, the run of it that the apply_*.go files add steps to, and the
-// refusals a run gets past.
+// Apply, the workspace as an import run knows it, and the refusals a run
+// gets past.
 
 package importer
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/id"
@@ -13,24 +14,33 @@ import (
 // Apply makes everything in a plan. project is the key that tasks with no
 // project of their own go into.
 func Apply(sink Sink, plan Plan, project string) (Summary, error) {
-	a := &applier{sink: sink, plan: plan, project: strings.ToUpper(project), fresh: true}
 	for _, n := range plan.Notes {
 		sink.Logf("note: %s", n)
 	}
-	steps := []func() error{
-		a.makeProjects, // apply_workflow.go
-		a.loadLayout,
-		a.makeWorkflow,
-		a.indexFiles, // apply_files.go
-		a.makeTasks,  // apply_tasks.go
-		a.relateTasks,
-		a.makeDocs, // apply_docs.go
-		a.makeTables,
+	a, err := newApplier(sink, plan, project)
+	if err != nil {
+		return Summary{}, err
 	}
-	for _, step := range steps {
-		if err := step(); err != nil {
-			return a.sum, err
-		}
+	if err := a.makeProjects(); err != nil { // apply_workflow.go
+		return a.sum, err
+	}
+	if err := a.loadLayout(); err != nil {
+		return a.sum, err
+	}
+	if err := a.makeWorkflow(); err != nil {
+		return a.sum, err
+	}
+	if err := a.makeTasks(); err != nil { // apply_tasks.go
+		return a.sum, err
+	}
+	if err := a.relateTasks(); err != nil {
+		return a.sum, err
+	}
+	if err := a.makeDocs(); err != nil { // apply_docs.go
+		return a.sum, err
+	}
+	if err := a.makeTables(); err != nil {
+		return a.sum, err
 	}
 	return a.sum, nil
 }
@@ -42,9 +52,6 @@ type applier struct {
 	plan    Plan
 	project string // the key for tasks that name no project
 	sum     Summary
-	// fresh says whether the last change made something, or found it there
-	// already from an earlier run of the same import.
-	fresh bool
 
 	// The workspace as it is, kept up as the import adds to it.
 	projectID   map[string]string // key -> id
@@ -56,13 +63,49 @@ type applier struct {
 
 	files fileSet // apply_files.go
 
-	tasks     map[string]Task // by Ext
+	tasks     map[string]Task // the plan's, by Ext
 	taskDone  map[string]bool
 	unmatched map[string]bool // assignees with no member here
 
-	docs    map[string]Doc // by Ext
+	docs    map[string]Doc // the plan's, by Ext
 	docDone map[string]bool
 	titleID map[string]string // a page's title in lower case -> its id here
+}
+
+// newApplier starts a run of Apply: the plan's tasks, pages and files
+// indexed, and the workspace's projects read.
+func newApplier(sink Sink, plan Plan, project string) (*applier, error) {
+	a := &applier{sink: sink, plan: plan, project: strings.ToUpper(project),
+		projectID: map[string]string{}, madeProject: map[string]bool{},
+		files: fileSet{byExt: map[string]File{}, sent: map[string]string{}},
+		tasks: map[string]Task{}, taskDone: map[string]bool{}, unmatched: map[string]bool{},
+		docs: map[string]Doc{}, docDone: map[string]bool{}, titleID: map[string]string{}}
+	projects, err := a.list("projects")
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range projects {
+		a.projectID[p.Key] = p.ID
+	}
+	for _, t := range plan.Tasks {
+		a.tasks[t.Ext] = t
+	}
+	for _, d := range plan.Docs {
+		a.docs[d.Ext] = d
+		a.titleID[strings.ToLower(d.Title)] = a.uid("doc", d.Ext)
+	}
+	for _, f := range plan.Files {
+		a.files.byExt[f.Ext] = f
+		for _, l := range f.Links {
+			if l != "" {
+				a.files.links = append(a.files.links, fileLink{l, f.Ext})
+			}
+		}
+	}
+	// Longest first: an address with the server's name before the same one
+	// without it.
+	sort.SliceStable(a.files.links, func(i, j int) bool { return len(a.files.links[i].text) > len(a.files.links[j].text) })
+	return a, nil
 }
 
 // row is a row of any of the lists the import reads: only the fields it
@@ -80,24 +123,25 @@ func (a *applier) uid(kind, ext string) string {
 	return id.From("import", a.plan.Source, kind, ext)
 }
 
-// change sends one change, under an id made from what it says, and notes
-// whether it made something.
-func (a *applier) change(typ string, args map[string]any) error {
+// change sends one change, under an id made from what it says. made is
+// false when an earlier run of the same import had made it, which is
+// counted in the summary.
+func (a *applier) change(typ string, args map[string]any) (made bool, err error) {
 	raw, _ := json.Marshal(args)
-	err := a.sink.Change(id.From("import-change", a.plan.Source, typ, string(raw)), typ, args)
-	a.fresh = true
-	if d, ok := a.sink.(duplicateTeller); ok && d.WasDuplicate() {
-		a.fresh = false
-		a.sum.Already++
-	}
+	made, err = a.sink.Change(id.From("import-change", a.plan.Source, typ, string(raw)), typ, args)
 	// The same thing from an earlier run, but changed at the source since
 	// (an edited description, say): what is here stays as it is.
 	if refusedFor(err, refusalAlreadyInUse) {
-		a.fresh = false
 		a.sum.Already++
-		return nil
+		return false, nil
 	}
-	return err
+	if err != nil {
+		return false, err
+	}
+	if !made {
+		a.sum.Already++
+	}
+	return made, nil
 }
 
 // The refusals an import gets past, each matched by what its message

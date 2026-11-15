@@ -23,24 +23,26 @@ type siteSink struct {
 	t *testing.T
 }
 
-func (k siteSink) Change(changeID, typ string, args any) error {
+// Change counts every change as made: it does not read the answer.
+func (k siteSink) Change(changeID, typ string, args any) (bool, error) {
 	k.t.Helper()
 	k.s.call(k.s.owner, "", "POST", w+"/changes", M{"id": changeID, "type": typ, "args": args}, 200, nil)
-	return nil
+	return true, nil
 }
 
 func (k siteSink) Get(path string, q url.Values) ([]byte, error) {
 	return []byte(k.s.call(k.s.owner, "", "GET", w+path, nil, 200, nil)), nil
 }
 
-func (k siteSink) Upload(path string) (string, error) {
+// Upload stores every file anew, under an id the server makes.
+func (k siteSink) Upload(_, path string) (string, bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	var f struct{ URL string }
 	k.s.call(k.s.owner, "", "POST", w+"/files?name="+url.QueryEscape(filepath.Base(path)), raw, 201, &f)
-	return f.URL, nil
+	return f.URL, true, nil
 }
 
 func (k siteSink) Logf(string, ...any) {}

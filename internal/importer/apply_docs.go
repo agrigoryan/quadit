@@ -20,11 +20,6 @@ var (
 )
 
 func (a *applier) makeDocs() error {
-	a.docs, a.docDone, a.titleID = map[string]Doc{}, map[string]bool{}, map[string]string{}
-	for _, d := range a.plan.Docs {
-		a.docs[d.Ext] = d
-		a.titleID[strings.ToLower(d.Title)] = a.uid("doc", d.Ext)
-	}
 	for _, d := range a.plan.Docs {
 		if err := a.makeDoc(d, 0); err != nil {
 			return err
@@ -47,10 +42,11 @@ func (a *applier) makeDoc(d Doc, depth int) error {
 		args["parent"] = a.uid("doc", p.Ext)
 	}
 	args["markdown"] = a.localImages(d, a.wikiLinks(a.here(d.Markdown)))
-	if err := a.change("doc.create", args); err != nil {
+	made, err := a.change("doc.create", args)
+	if err != nil {
 		return fmt.Errorf("page %q: %w", d.Title, err)
 	}
-	if a.fresh {
+	if made {
 		a.sum.Docs++
 	}
 	return nil
@@ -87,7 +83,7 @@ func (a *applier) localImages(d Doc, text string) string {
 		}
 		for _, p := range []string{filepath.Join(d.Dir, ref), filepath.Join(d.Dir, filepath.Base(ref))} {
 			if st, err := os.Stat(p); err == nil && !st.IsDir() {
-				if u, err := a.sink.Upload(p); err == nil {
+				if u, _, err := a.sink.Upload("", p); err == nil {
 					a.sum.Files++
 					return "![" + sub[1] + "](" + u + ")"
 				}
@@ -114,10 +110,11 @@ func (a *applier) makeTable(tb Table) error {
 	if _, ok := a.docs[tb.ParentExt]; ok {
 		args["parent"] = a.uid("doc", tb.ParentExt)
 	}
-	if err := a.change("doc.create", args); err != nil {
+	made, err := a.change("doc.create", args)
+	if err != nil {
 		return fmt.Errorf("database %q: %w", tb.Title, err)
 	}
-	if a.fresh {
+	if made {
 		a.sum.Docs++
 	}
 	cols := tb.Columns
@@ -126,7 +123,7 @@ func (a *applier) makeTable(tb Table) error {
 	}
 	prop := func(col string) string { return a.uid("prop", tb.Ext+"/"+col) }
 	for i, c := range cols {
-		if err := a.change("property.create", map[string]any{"id": prop(c), "database": dbID, "name": orStr(c, fmt.Sprintf("Column %d", i+2)), "type": "text"}); err != nil {
+		if _, err := a.change("property.create", map[string]any{"id": prop(c), "database": dbID, "name": orStr(c, fmt.Sprintf("Column %d", i+2)), "type": "text"}); err != nil {
 			return fmt.Errorf("column %q: %w", c, err)
 		}
 	}
@@ -141,10 +138,11 @@ func (a *applier) makeTable(tb Table) error {
 		if len(r) > 0 {
 			title = r[0]
 		}
-		if err := a.change("doc.create", map[string]any{"id": a.uid("row", fmt.Sprintf("%s/%d", tb.Ext, i)), "parent": dbID, "title": title, "props": props}); err != nil {
+		made, err := a.change("doc.create", map[string]any{"id": a.uid("row", fmt.Sprintf("%s/%d", tb.Ext, i)), "parent": dbID, "title": title, "props": props})
+		if err != nil {
 			return fmt.Errorf("row %d of %q: %w", i+1, tb.Title, err)
 		}
-		if a.fresh {
+		if made {
 			a.sum.Rows++
 		}
 	}

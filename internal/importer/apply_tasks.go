@@ -16,10 +16,6 @@ import (
 // makeTasks makes every task of the plan, each after the one it is under,
 // and notes the assignees who have no member here.
 func (a *applier) makeTasks() error {
-	a.tasks, a.taskDone, a.unmatched = map[string]Task{}, map[string]bool{}, map[string]bool{}
-	for _, t := range a.plan.Tasks {
-		a.tasks[t.Ext] = t
-	}
 	for _, t := range a.plan.Tasks {
 		if err := a.makeTask(t, 0); err != nil {
 			return err
@@ -68,10 +64,11 @@ func (a *applier) makeTask(t Task, depth int) error {
 	if t.Estimate > 0 {
 		args["estimate"] = t.Estimate
 	}
-	if err := a.createTask(t, key, args, notes); err != nil {
+	made, err := a.createTask(t, key, args, notes)
+	if err != nil {
 		return fmt.Errorf("task %q: %w", t.Title, err)
 	}
-	if a.fresh {
+	if made {
 		a.sum.Tasks++
 	}
 	if err := a.attach(t.Files, "task", a.uid("task", t.Ext), t.Ext); err != nil {
@@ -108,7 +105,7 @@ func (a *applier) place(t Task, key string, args map[string]any) error {
 	}
 	if t.Epic != "" {
 		if !a.has(a.epics, key, t.Epic) {
-			if err := a.change("epic.create", map[string]any{"id": a.uid("epic", key+"/"+strings.ToLower(t.Epic)), "project": a.projectID[key], "name": t.Epic}); err != nil {
+			if _, err := a.change("epic.create", map[string]any{"id": a.uid("epic", key+"/"+strings.ToLower(t.Epic)), "project": a.projectID[key], "name": t.Epic}); err != nil {
 				return fmt.Errorf("epic %q: %w", t.Epic, err)
 			}
 			a.epics = append(a.epics, row{Name: t.Epic, ProjectID: a.projectID[key]})
@@ -120,20 +117,20 @@ func (a *applier) place(t Task, key string, args map[string]any) error {
 
 // createTask sends the task. It asks for the number the task had at the
 // source; if someone here has that number already, it gets the next one.
-func (a *applier) createTask(t Task, key string, args map[string]any, notes []string) error {
+func (a *applier) createTask(t Task, key string, args map[string]any, notes []string) (made bool, err error) {
 	keyHere := ""
 	if t.Number > 0 {
 		keyHere = fmt.Sprintf("%s-%d", key, t.Number)
 		args["number"] = t.Number
 	}
 	args["description"] = a.describe(t, notes, keyHere)
-	err := a.change("task.create", args)
+	made, err = a.change("task.create", args)
 	if t.Number > 0 && refusedFor(err, refusalNumberTaken) {
 		delete(args, "number")
 		args["description"] = a.describe(t, notes, "")
-		err = a.change("task.create", args)
+		made, err = a.change("task.create", args)
 	}
-	return err
+	return made, err
 }
 
 // describe is the task's description here: its text, with files pointing
@@ -175,10 +172,11 @@ func (a *applier) makeComments(t Task) error {
 			}
 			body = head + ":\n\n" + body
 		}
-		if err := a.change("comment.create", map[string]any{"id": a.uid("comment", was), "task": a.uid("task", t.Ext), "body": body}); err != nil {
+		made, err := a.change("comment.create", map[string]any{"id": a.uid("comment", was), "task": a.uid("task", t.Ext), "body": body})
+		if err != nil {
 			return fmt.Errorf("comment on %q: %w", t.Title, err)
 		}
-		if a.fresh {
+		if made {
 			a.sum.Comments++
 		}
 		if err := a.attach(cm.Files, "comment", a.uid("comment", was), was); err != nil {
@@ -198,7 +196,7 @@ func (a *applier) makeComments(t Task) error {
 // in what the import made.
 func (a *applier) follow(t Task, userID string) error {
 	task := a.uid("task", t.Ext)
-	err := a.sink.Change(id.From("import-change", a.plan.Source, "watch.set", task, userID), "watch.set", map[string]any{"subject": task, "user": userID})
+	_, err := a.sink.Change(id.From("import-change", a.plan.Source, "watch.set", task, userID), "watch.set", map[string]any{"subject": task, "user": userID})
 	if err != nil {
 		return fmt.Errorf("watcher of %q: %w", t.Title, err)
 	}
@@ -243,7 +241,7 @@ func (a *applier) relateTasks() error {
 				if _, ok := a.tasks[o]; !ok {
 					continue
 				}
-				if err := a.change("relation.add", map[string]any{"id": a.uid("relation", t.Ext+"/"+typ+"/"+o), "task": a.uid("task", t.Ext), "other": a.uid("task", o), "type": typ}); err != nil {
+				if _, err := a.change("relation.add", map[string]any{"id": a.uid("relation", t.Ext+"/"+typ+"/"+o), "task": a.uid("task", t.Ext), "other": a.uid("task", o), "type": typ}); err != nil {
 					return fmt.Errorf("relation of %q: %w", t.Title, err)
 				}
 			}

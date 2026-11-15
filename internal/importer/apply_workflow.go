@@ -13,14 +13,6 @@ import (
 // makeProjects makes the projects the plan names, and the ones its tasks
 // go in, unless they are there.
 func (a *applier) makeProjects() error {
-	projects, err := a.list("projects")
-	if err != nil {
-		return err
-	}
-	a.projectID, a.madeProject = map[string]string{}, map[string]bool{}
-	for _, p := range projects {
-		a.projectID[p.Key] = p.ID
-	}
 	want := append([]Project(nil), a.plan.Projects...)
 	named := map[string]bool{}
 	for _, p := range want {
@@ -42,11 +34,12 @@ func (a *applier) makeProjects() error {
 			continue
 		}
 		pid := a.uid("project", key)
-		if err := a.change("project.create", map[string]any{"id": pid, "key": key, "name": orStr(p.Name, key)}); err != nil {
+		made, err := a.change("project.create", map[string]any{"id": pid, "key": key, "name": orStr(p.Name, key)})
+		if err != nil {
 			return fmt.Errorf("project %s: %w", key, err)
 		}
 		a.projectID[key] = pid
-		a.madeProject[key] = a.fresh
+		a.madeProject[key] = made
 		a.sink.Logf("made project %s", key)
 	}
 	return nil
@@ -105,7 +98,7 @@ func (a *applier) makeStatus(key, name, category, color string) error {
 	if color != "" {
 		args["color"] = color
 	}
-	if err := a.change("status.create", args); err != nil {
+	if _, err := a.change("status.create", args); err != nil {
 		return fmt.Errorf("status %q: %w", name, err)
 	}
 	a.statuses = append(a.statuses, row{Name: name, ProjectID: a.projectID[key]})
@@ -121,7 +114,7 @@ func (a *applier) makeLabel(key, name, color string) error {
 	if color != "" {
 		args["color"] = color
 	}
-	if err := a.change("label.create", args); err != nil {
+	if _, err := a.change("label.create", args); err != nil {
 		return fmt.Errorf("label %q: %w", name, err)
 	}
 	a.labels = append(a.labels, row{Name: name, ProjectID: a.projectID[key]})
@@ -162,7 +155,7 @@ func (a *applier) settleWorkflow(key string) error {
 	at := ""
 	for _, n := range names {
 		at = rank.Between(at, "")
-		if err := a.change("status.update", map[string]any{"id": here[n].ID, "rank": at}); err != nil {
+		if _, err := a.change("status.update", map[string]any{"id": here[n].ID, "rank": at}); err != nil {
 			return fmt.Errorf("status %q: %w", here[n].Name, err)
 		}
 	}
@@ -183,11 +176,11 @@ func (a *applier) dropStarterStatuses(here map[string]row, names []string, takeO
 			continue
 		}
 		if s.IsDefault {
-			if err := a.change("status.update", map[string]any{"id": here[takeOver].ID, "is_default": true}); err != nil {
+			if _, err := a.change("status.update", map[string]any{"id": here[takeOver].ID, "is_default": true}); err != nil {
 				return fmt.Errorf("status %q: %w", here[takeOver].Name, err)
 			}
 		}
-		if err := a.change("status.delete", map[string]any{"id": s.ID}); err != nil {
+		if _, err := a.change("status.delete", map[string]any{"id": s.ID}); err != nil {
 			return fmt.Errorf("status %q: %w", s.Name, err)
 		}
 		delete(here, n)
