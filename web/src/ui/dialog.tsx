@@ -45,10 +45,12 @@ export function Dialog({
         <RDialog.Content
           {...(description ? {} : { "aria-describedby": undefined })}
           onOpenAutoFocus={(e) => {
-            // Start in the first field, not on the Close button (whose tooltip would pop up).
+            // Start in the first field, not on the Close button (whose tooltip would pop up). A file
+            // input is left out: it is hidden behind its button (a picture to upload).
             const root = e.currentTarget as HTMLElement;
             e.preventDefault();
-            (root.querySelector<HTMLElement>("[autofocus], input:not([type=hidden]), textarea") ?? root).focus();
+            const first = "[autofocus], input:not([type=hidden]):not([type=file]), textarea";
+            (root.querySelector<HTMLElement>(first) ?? root).focus();
           }}
           className={cx(
             "fixed z-50 flex flex-col bg-surface text-ink shadow-pop outline-none",
