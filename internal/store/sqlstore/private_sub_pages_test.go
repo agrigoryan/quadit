@@ -12,13 +12,14 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "modernc.org/sqlite"
+
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/store/sqlstore"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "modernc.org/sqlite"
 )
 
 // TestUpgradeMakesThePagesUnderAPrivatePagePrivate: a database from before
