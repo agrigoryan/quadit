@@ -17,7 +17,7 @@ import { defaultsFor, ensureDatabase, useDatabase, type ViewProps } from "@/docs
 import { ViewTabs } from "@/docs/db/view-tabs";
 import { ViewToolbar } from "@/docs/db/view-toolbar";
 import { useDocsStore } from "@/docs/store";
-import type { Doc, ViewType } from "@/lib/types-docs";
+import type { DBView, Doc, ViewType } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { Loading } from "@/ui/spinner";
 
@@ -30,6 +30,15 @@ const VIEWS: Record<ViewType, (props: ViewProps) => React.ReactNode> = {
   form: FormView,
 };
 
+/** The table a database is shown in until it has a view of its own. */
+const unsavedTable = (databaseId: string): DBView => ({
+  id: "",
+  database_id: databaseId,
+  name: t("db.view.table"),
+  type: "table",
+  rank: "",
+});
+
 /**
  * A database below its title: its views as tabs, the open view with its
  * filters and sorts applied, and a row opened beside it. Which view and
@@ -38,8 +47,13 @@ const VIEWS: Record<ViewType, (props: ViewProps) => React.ReactNode> = {
  */
 export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
   const db = useDatabase(doc.id);
-  const views = useViews(doc.id);
+  const saved = useViews(doc.id);
   const loaded = useDocsStore((s) => !!s.meta[doc.id]);
+  // One who may not change the database is not given a first view (below): they read it in a plain table nobody saved.
+  const views = useMemo(
+    () => (saved.length === 0 && loaded && readOnly ? [unsavedTable(doc.id)] : saved),
+    [saved, loaded, readOnly, doc.id],
+  );
   const [params, setParams] = useSearchParams();
   const view = views.find((v) => v.id === params.get("v")) ?? views[0];
   const peek = params.get("peek");
@@ -51,10 +65,10 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
   // A database with no view yet gets a table, once (by one who may change it).
   const made = useRef(false);
   useEffect(() => {
-    if (!loaded || views.length > 0 || made.current || readOnly) return;
+    if (!loaded || saved.length > 0 || made.current || readOnly) return;
     made.current = true;
     createView(doc.id, "table", t("db.view.table"));
-  }, [loaded, views.length, doc.id, readOnly]);
+  }, [loaded, saved.length, doc.id, readOnly]);
 
   const setParam = useCallback(
     (name: string, value: string | null) =>
