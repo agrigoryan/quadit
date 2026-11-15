@@ -1,5 +1,6 @@
 // The epic a task is part of, if any.
 
+import { useMemo } from "react";
 import { Layers } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { getRowEvenIfGone, useEpics, useRowEvenIfGone } from "@/lib/selectors";
@@ -16,6 +17,7 @@ import {
 } from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
 import { Picker } from "@/ui/picker";
+import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
 
 function EpicRow(panel: PanelProps) {
   const e = useRowEvenIfGone("epics", panel.task.epic_id);
@@ -80,4 +82,26 @@ export const epic = {
       },
     },
   ],
+  filter: {
+    word: "epic",
+    title: () => t("filter.epic"),
+    useOptions: (project) => {
+      const epics = useEpics(project?.id);
+      return useMemo(
+        () => [
+          noneItem(t("task.noEpic")),
+          ...epics.map((e) => ({
+            id: e.id,
+            label: e.name,
+            icon: <Layers className="size-3.5 text-ink-2" aria-hidden />,
+          })),
+        ],
+        [epics],
+      );
+    },
+    matches: (task, picked) => picked.includes(task.epic_id ?? NONE),
+    read: (q, ctx) => (q.epic ?? []).flatMap((ref) => (ref === NONE ? [NONE] : rowsNamed(ctx.c.epics, ref, ctx))),
+    address: (id, c, projectId) => (id === NONE ? NONE : nameWord(c.epics, id, projectId)),
+    canBeGone: true,
+  },
 } satisfies TaskProperty<"epic">;

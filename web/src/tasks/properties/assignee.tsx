@@ -1,5 +1,6 @@
 // Who has the task: a person or an agent, or nobody.
 
+import { useMemo } from "react";
 import { CircleSlash, UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
@@ -23,6 +24,7 @@ import { Avatar } from "@/ui/avatar";
 import { ListeningDot } from "@/ui/listening-dot";
 import { Picker } from "@/ui/picker";
 import { Tooltip } from "@/ui/tooltip";
+import { memberOf, memberWord } from "@/tasks/properties/query-words";
 
 /** Who has the task, and, for an agent, the person it works for. */
 function AssigneeRow(panel: PanelProps) {
@@ -140,4 +142,20 @@ export const assignee = {
       },
     },
   ],
+  filter: {
+    word: "assignee",
+    title: () => t("filter.assignee"),
+    useOptions: () => {
+      const members = useMembers();
+      const me = useMe();
+      return useMemo(
+        () => [noneItem(t("task.unassigned")), ...memberItems(members, me.user_id)],
+        [members, me.user_id],
+      );
+    },
+    matches: (task, picked) => picked.includes(task.assignee_id ?? NONE),
+    read: (q, ctx) => (q.assignee ?? []).map((ref) => memberOf(ref, ctx)).filter((id) => id !== undefined),
+    address: (id, c) => memberWord(id, c),
+    canBeGone: true,
+  },
 } satisfies TaskProperty<"assignee">;

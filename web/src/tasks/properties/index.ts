@@ -6,6 +6,7 @@
 import type { ComponentType } from "react";
 import { assignee } from "@/tasks/properties/assignee";
 import { budget } from "@/tasks/properties/budget";
+import { category } from "@/tasks/properties/category";
 import { cycle } from "@/tasks/properties/cycle";
 import { due } from "@/tasks/properties/due";
 import { epic } from "@/tasks/properties/epic";
@@ -15,12 +16,20 @@ import { milestone } from "@/tasks/properties/milestone";
 import { parent } from "@/tasks/properties/parent";
 import { priority } from "@/tasks/properties/priority";
 import { project } from "@/tasks/properties/project";
-import type { BulkPart, CreateProps, PalettePart, PickerProperty, TaskProperty } from "@/tasks/properties/property";
+import type {
+  BulkPart,
+  CreateProps,
+  FilterPart,
+  PalettePart,
+  PickerProperty,
+  TaskProperty,
+} from "@/tasks/properties/property";
 import { status } from "@/tasks/properties/status";
 import { waiting } from "@/tasks/properties/waiting";
 
 const TABLE = [
   status,
+  category,
   assignee,
   waiting,
   priority,
@@ -86,6 +95,18 @@ export const TIMELINE: TaskProperty<PropertyName>[] = [
   parent,
   project,
 ];
+
+const FILTER_TABLE = [assignee, status, category, label, priority, epic, cycle, waiting] as const;
+
+/** The name of each property a task list can be filtered by. */
+export type FilterName = (typeof FILTER_TABLE)[number]["name"];
+
+/**
+ * The filters, in the filter menu's order, which is also the order of the
+ * words in a page's address and a saved view's query: the assignee first,
+ * the wait last, unlike the panel.
+ */
+export const FILTERS: readonly (TaskProperty<FilterName> & { filter: FilterPart })[] = FILTER_TABLE;
 
 /** The ones the command palette changes on the open task, in the table's order. */
 export const PALETTE = PROPERTIES.filter(

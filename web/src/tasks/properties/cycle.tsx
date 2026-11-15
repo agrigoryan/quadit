@@ -1,13 +1,21 @@
 // The cycle (a project's run of days) a task is planned for, if any.
 
+import { useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { getRowEvenIfGone, useCycles, useRowEvenIfGone } from "@/lib/selectors";
-import { formatDay } from "@/lib/time";
+import { formatDay, serverDay } from "@/lib/time";
 import type { Cycle } from "@/lib/types";
 import { setCycle } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import { asText, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import {
+  asText,
+  NONE,
+  type PanelProps,
+  type QueryContext,
+  shared,
+  type TaskProperty,
+} from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
 
 /** "Cycle 4", where it has no name of its own. */
@@ -25,6 +33,32 @@ function CycleRow(panel: PanelProps) {
       <span className="truncate">{name}</span>
     </PickerRow>
   );
+}
+
+/**
+ * The cycles a query's word names: by number or id, "current" for the one
+ * running today and "next" for the one after. On a day with none running
+ * (or none to come) the word itself stays as the filter: no task is in
+ * "current", so none is shown, as the server answers too. Dropping it would
+ * show every task.
+ */
+function cyclesNamed(ref: string, { c, inScope }: QueryContext): string[] {
+  if (ref === NONE) return [NONE];
+  const rows = Object.values(c.cycles)
+    .filter((cy) => inScope(cy.project_id))
+    .sort((a, b) => a.starts_on.localeCompare(b.starts_on));
+  const orWord = (ids: string[]) => (ids.length ? ids : [ref]);
+  const day = serverDay(); // a cycle's days are the server's, not this browser's
+  if (ref === "current")
+    return orWord(rows.filter((cy) => cy.starts_on <= day && day <= cy.ends_on).map((cy) => cy.id));
+  if (ref === "next")
+    return orWord(
+      rows
+        .filter((cy) => cy.starts_on > day)
+        .slice(0, 1)
+        .map((cy) => cy.id),
+    );
+  return rows.filter((cy) => cy.id === ref || String(cy.number) === ref).map((cy) => cy.id);
 }
 
 export const cycle = {
@@ -63,4 +97,26 @@ export const cycle = {
       },
     },
   ],
+  filter: {
+    word: "cycle",
+    title: () => t("filter.cycle"),
+    offered: (project) => !!project?.settings?.cycles,
+    useOptions: (project) => {
+      const cycles = useCycles(project?.id);
+      return useMemo(
+        () => [
+          noneItem(t("task.noCycle")),
+          ...cycles.map((c) => ({
+            id: c.id,
+            label: cycleName(c),
+            icon: <RefreshCw className="size-3.5 text-ink-2" aria-hidden />,
+          })),
+        ],
+        [cycles],
+      );
+    },
+    matches: (task, picked) => picked.includes(task.cycle_id ?? NONE),
+    read: (q, ctx) => (q.cycle ?? []).flatMap((ref) => cyclesNamed(ref, ctx)),
+    canBeGone: true,
+  },
 } satisfies TaskProperty<"cycle">;

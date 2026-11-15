@@ -89,9 +89,9 @@ describe("matcher", () => {
       task({ id: "outside", waiting_outside: true }),
       task({ id: "nothing" }),
     ];
-    expect(ids({ waitingOn: "u2" }, tasks)).toEqual(["person"]);
-    expect(ids({ waitingOn: "outside" }, tasks)).toEqual(["outside"]);
-    expect(ids({ waitingOn: "none" }, tasks)).toEqual(["nothing"]);
+    expect(ids({ waiting: ["u2"] }, tasks)).toEqual(["person"]);
+    expect(ids({ waiting: ["outside"] }, tasks)).toEqual(["outside"]);
+    expect(ids({ waiting: ["none"] }, tasks)).toEqual(["nothing"]);
   });
 
   it("finds text in the title or the key, whatever its case, and needs every filter to pass", () => {
@@ -102,7 +102,7 @@ describe("matcher", () => {
     ];
     expect(ids({ text: "  LOGIN " }, tasks)).toEqual(["title", "low"]);
     expect(ids({ text: "sva-77" }, tasks)).toEqual(["key"]);
-    expect(ids({ text: "login", priority: [1] }, tasks)).toEqual(["title"]);
+    expect(ids({ text: "login", priority: ["1"] }, tasks)).toEqual(["title"]);
     expect(ids({ openDecision: true }, tasks, { key: true })).toEqual(["key"]);
   });
 });
@@ -233,10 +233,10 @@ describe("toQuery and fromQuery", () => {
       status: ["s-doing"],
       category: ["done"],
       label: ["l-bug"],
-      priority: [1, 2],
+      priority: ["1", "2"],
       epic: ["e1", "none"],
       cycle: ["cy1"],
-      waitingOn: "outside",
+      waiting: ["outside"],
       openDecision: true,
       text: "login",
     };

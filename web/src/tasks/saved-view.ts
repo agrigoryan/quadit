@@ -6,15 +6,9 @@
 import { useMemo, useState } from "react";
 import { today } from "@/lib/time";
 import type { TaskQuery, View } from "@/lib/types";
-import {
-  fromQuery,
-  goneFromQuery,
-  normalizeQuery,
-  type QuerySource,
-  sameFilters,
-  sortFromQuery,
-} from "@/tasks/filters";
+import { fromQuery, goneFromQuery, normalizeQuery, sameFilters, sortFromQuery } from "@/tasks/filters";
 import { defaultViewState, readDisplay, type ViewState } from "@/tasks/view-state";
+import type { QuerySource } from "@/tasks/properties/property";
 
 export interface SavedView {
   /** The view's query, normalised; null when it cannot be read. */

@@ -1,5 +1,6 @@
 // A task's labels: any number of its project's (or the workspace's) labels.
 
+import { useMemo } from "react";
 import { Tag } from "lucide-react";
 import { joinPhrases, t } from "@/lib/i18n";
 import { getRowEvenIfGone, useLabels, useLookupEvenIfGone } from "@/lib/selectors";
@@ -10,6 +11,7 @@ import { PickerRow } from "@/tasks/properties/panel-row";
 import { asIds, type CreateProps, type PanelProps, type TaskProperty } from "@/tasks/properties/property";
 import { LabelChip } from "@/ui/badge";
 import { Picker } from "@/ui/picker";
+import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
 
 function LabelRow(panel: PanelProps) {
   // A deleted label the task still has is named.
@@ -119,4 +121,25 @@ export const label = {
       },
     },
   ],
+  filter: {
+    word: "label",
+    title: () => t("filter.label"),
+    useOptions: (project) => {
+      const labels = useLabels(project?.id);
+      return useMemo(
+        () =>
+          labels.map((l) => ({
+            id: l.id,
+            label: l.name,
+            icon: <span className="size-2.5 rounded-full" style={{ background: l.color || "var(--ink-3)" }} />,
+          })),
+        [labels],
+      );
+    },
+    // Any one of them.
+    matches: (task, picked) => picked.some((id) => task.label_ids?.includes(id)),
+    read: (q, ctx) => (q.label ?? []).flatMap((ref) => rowsNamed(ctx.c.labels, ref, ctx)),
+    address: (id, c, projectId) => nameWord(c.labels, id, projectId),
+    canBeGone: true,
+  },
 } satisfies TaskProperty<"label">;

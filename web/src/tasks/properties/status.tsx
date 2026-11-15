@@ -1,5 +1,6 @@
 // A task's status: where it is in its project's workflow.
 
+import { useMemo } from "react";
 import { CircleDot } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { getRowEvenIfGone, useRowEvenIfGone, useStatuses } from "@/lib/selectors";
@@ -10,6 +11,7 @@ import { setStatus } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
 import { asText, type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { StatusIcon } from "@/ui/icons";
+import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
 
 function StatusRow(panel: PanelProps) {
   // Named even when it is gone, as everything a task is filed under.
@@ -89,4 +91,21 @@ export const status = {
       },
     },
   ],
+  filter: {
+    word: "status",
+    title: () => t("filter.status"),
+    // A project's own: statuses differ from one project to the next.
+    offered: (project) => !!project,
+    useOptions: (project) => {
+      const statuses = useStatuses(project?.id);
+      return useMemo(
+        () => statuses.map((s) => ({ id: s.id, label: s.name, icon: <StatusIcon category={s.category} /> })),
+        [statuses],
+      );
+    },
+    matches: (task, picked) => picked.includes(task.status_id),
+    read: (q, ctx) => (q.status ?? []).flatMap((ref) => rowsNamed(ctx.c.statuses, ref, ctx)),
+    address: (id, c, projectId) => nameWord(c.statuses, id, projectId),
+    canBeGone: true,
+  },
 } satisfies TaskProperty<"status">;

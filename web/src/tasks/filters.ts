@@ -5,52 +5,34 @@
 import { t, tMaybe } from "@/lib/i18n";
 import type { Collections, Dict } from "@/lib/store";
 import { CATEGORIES, type Category, type GroupBy, type SortBy, type Task, type TaskQuery } from "@/lib/types";
-import { serverDay } from "@/lib/time";
-import { NONE, OUTSIDE } from "@/tasks/properties/property";
+import { type FilterName, FILTERS } from "@/tasks/properties";
+import { NONE, type QueryContext, type QuerySource } from "@/tasks/properties/property";
 
 /** How a page groups its tasks: the server's groupings, and by label. */
 export type Grouping = GroupBy | "label";
 
-export interface Filters {
-  /** User ids, or "none" for unassigned. */
-  assignee: string[];
-  status: string[];
-  category: Category[];
-  label: string[];
-  priority: number[];
-  /** Epic ids, or "none". */
-  epic: string[];
-  /** Cycle ids, or "none". */
-  cycle: string[];
-  /** One user id, "outside" (an outside event), "none" (nobody and nothing), or "". */
-  waitingOn: string;
-  openDecision: boolean;
-  text: string;
+/**
+ * What a task list is filtered by: for each property it can be filtered by
+ * (tasks/properties FILTERS), the values picked, any one of which a task
+ * must have ("none" where it can have none); and an open question, and
+ * words in the title or key.
+ */
+export type Filters = Record<FilterName, string[]> & { openDecision: boolean; text: string };
+
+/** Each filter's values, in the filters' order (which sameFilters relies on). */
+function byFilter(values: (p: (typeof FILTERS)[number]) => string[]): Record<FilterName, string[]> {
+  const out = {} as Record<FilterName, string[]>;
+  for (const p of FILTERS) out[p.name] = values(p);
+  return out;
 }
 
-export const emptyFilters: Filters = {
-  assignee: [],
-  status: [],
-  category: [],
-  label: [],
-  priority: [],
-  epic: [],
-  cycle: [],
-  waitingOn: "",
-  openDecision: false,
-  text: "",
-};
-
-export type ListFilterKey = "assignee" | "status" | "category" | "label" | "priority" | "epic" | "cycle";
-export const LIST_KEYS: ListFilterKey[] = ["assignee", "status", "category", "label", "priority", "epic", "cycle"];
+export const emptyFilters: Filters = { ...byFilter(() => []), openDecision: false, text: "" };
 
 export function countFilters(f: Filters): number {
-  return LIST_KEYS.filter((k) => f[k].length > 0).length + (f.waitingOn ? 1 : 0) + (f.openDecision ? 1 : 0);
+  return FILTERS.filter((p) => f[p.name].length > 0).length + (f.openDecision ? 1 : 0);
 }
 
 export const sameFilters = (a: Filters, b: Filters) => JSON.stringify(a) === JSON.stringify(b);
-
-const anyOf = (picked: string[], value: string | undefined) => picked.length === 0 || picked.includes(value ?? NONE);
 
 /** Builds the test a task must pass. `openDecisionTasks` holds the ids of tasks with an open question. */
 export function matcher(
@@ -59,25 +41,9 @@ export function matcher(
   openDecisionTasks: Dict<unknown>,
 ): (task: Task) => boolean {
   const text = f.text.trim().toLowerCase();
+  const set = FILTERS.filter((p) => f[p.name].length > 0);
   return (task) => {
-    if (!anyOf(f.assignee, task.assignee_id)) return false;
-    if (f.status.length && !f.status.includes(task.status_id)) return false;
-    if (f.category.length && !f.category.includes(c.statuses[task.status_id]?.category as Category)) return false;
-    if (f.label.length && !f.label.some((id) => task.label_ids?.includes(id))) return false;
-    if (f.priority.length && !f.priority.includes(task.priority)) return false;
-    if (!anyOf(f.epic, task.epic_id)) return false;
-    if (!anyOf(f.cycle, task.cycle_id)) return false;
-    if (f.waitingOn) {
-      const outside = task.waiting_outside === true;
-      if (
-        f.waitingOn === OUTSIDE
-          ? !outside
-          : f.waitingOn === NONE
-            ? outside || !!task.waiting_on_id
-            : task.waiting_on_id !== f.waitingOn
-      )
-        return false;
-    }
+    if (!set.every((p) => p.filter.matches(task, f[p.name], c))) return false;
     if (f.openDecision && !openDecisionTasks[task.id]) return false;
     if (text && !task.title.toLowerCase().includes(text) && !task.key.toLowerCase().includes(text)) return false;
     return true;
@@ -210,13 +176,6 @@ export function groupTasks(
   return shown();
 }
 
-/**
- * The tables a stored query's names are looked up in: the live rows
- * (useLookup), so a name of something gone matches nothing; projects every
- * row (useLookupEvenIfGone), so a view of an archived project stays about it.
- */
-export type QuerySource = Pick<Collections, "projects" | "members" | "statuses" | "labels" | "epics" | "cycles">;
-
 const SORT_TO_QUERY: Record<SortBy, string> = {
   manual: "rank",
   priority: "priority",
@@ -227,16 +186,13 @@ const SORT_TO_QUERY: Record<SortBy, string> = {
 
 /** The filters as the server's TaskQuery, for a saved view. Everything is sent as ids. */
 export function toQuery(f: Filters, projectKey: string | undefined, sort: SortBy): TaskQuery {
-  const q: TaskQuery = {};
+  const q: Record<string, unknown> = {};
   if (projectKey) q.project = [projectKey];
-  if (f.assignee.length) q.assignee = f.assignee;
-  if (f.status.length) q.status = f.status;
-  if (f.category.length) q.category = f.category;
-  if (f.label.length) q.label = f.label;
-  if (f.priority.length) q.priority = f.priority;
-  if (f.epic.length) q.epic = f.epic;
-  if (f.cycle.length) q.cycle = f.cycle;
-  if (f.waitingOn) q.waiting_on = f.waitingOn;
+  for (const { name, filter } of FILTERS) {
+    const values = f[name];
+    if (values.length === 0) continue;
+    q[filter.word] = filter.holds === "one" ? values[0] : filter.holds === "numbers" ? values.map(Number) : values;
+  }
   if (f.openDecision) q.has_open_decision = true;
   if (f.text.trim()) q.q = f.text.trim();
   q.sort = SORT_TO_QUERY[sort];
@@ -248,8 +204,6 @@ export function sortFromQuery(q: TaskQuery | undefined): SortBy | undefined {
   return found;
 }
 
-const QUERY_LISTS = ["project", "assignee", "status", "category", "label", "epic", "cycle"] as const;
-
 /**
  * A stored query made safe to read: a view may have been written by hand or
  * by an agent, with one value where a list belongs ("label": "art"). Each
@@ -260,7 +214,7 @@ export function normalizeQuery(raw: unknown): TaskQuery | null {
   if (raw === undefined || raw === null) return {};
   if (typeof raw !== "object" || Array.isArray(raw)) return null;
   const from = raw as Record<string, unknown>;
-  const q: TaskQuery = {};
+  const q: Record<string, unknown> = {};
   const scalar = (v: unknown): v is string | number => (typeof v === "string" && v !== "") || typeof v === "number";
   const list = (v: unknown): string[] | null => {
     if (v === undefined || v === null || v === "") return [];
@@ -268,16 +222,20 @@ export function normalizeQuery(raw: unknown): TaskQuery | null {
     if (Array.isArray(v) && v.every(scalar)) return v.map(String);
     return null;
   };
-  for (const field of QUERY_LISTS) {
-    const values = list(from[field]);
+  const projects = list(from.project);
+  if (!projects) return null;
+  if (projects.length) q.project = projects;
+  for (const { filter } of FILTERS) {
+    const v = from[filter.word];
+    if (filter.holds === "one") {
+      if (scalar(v)) q[filter.word] = String(v);
+      continue;
+    }
+    const values = list(v);
     if (!values) return null;
-    if (values.length) q[field] = values;
+    const kept = filter.holds === "numbers" ? values.map(Number).filter((n) => Number.isInteger(n) && n >= 0) : values;
+    if (kept.length) q[filter.word] = kept;
   }
-  const priority = list(from.priority);
-  if (!priority) return null;
-  const numbers = priority.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 4);
-  if (numbers.length) q.priority = numbers;
-  if (scalar(from.waiting_on)) q.waiting_on = String(from.waiting_on);
   if (from.has_open_decision === true || from.has_open_decision === "true") q.has_open_decision = true;
   if (scalar(from.q)) q.q = String(from.q);
   if (typeof from.sort === "string") q.sort = from.sort;
@@ -294,63 +252,16 @@ export function normalizeQuery(raw: unknown): TaskQuery | null {
  */
 export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string, _today?: string): Filters {
   if (!q) return emptyFilters;
-  const low = (s: string) => s.toLowerCase();
   const projectIds = (q.project ?? [])
-    .map((ref) => Object.values(c.projects).find((p) => p.id === ref || low(p.key) === low(ref))?.id)
+    .map((ref) => Object.values(c.projects).find((p) => p.id === ref || p.key.toLowerCase() === ref.toLowerCase())?.id)
     .filter(Boolean) as string[];
-  const inScope = (projectId: string | undefined) =>
-    projectIds.length === 0 || !projectId || projectIds.includes(projectId);
-
-  const member = (ref: string): string | undefined => {
-    if (ref === NONE) return NONE;
-    if (ref === OUTSIDE) return OUTSIDE;
-    if (ref === "me") return meId;
-    const handle = low(ref.replace(/^@/, ""));
-    return Object.values(c.members).find((m) => m.user_id === ref || low(m.handle) === handle)?.user_id;
+  const ctx: QueryContext = {
+    c,
+    meId,
+    inScope: (projectId) => projectIds.length === 0 || !projectId || projectIds.includes(projectId),
   };
-  const byName = <T extends { id: string; name: string; project_id?: string }>(table: Dict<T>, ref: string): string[] =>
-    Object.values(table)
-      .filter((row) => (row.id === ref || low(row.name) === low(ref)) && inScope(row.project_id))
-      .map((row) => row.id);
-  const cycle = (ref: string): string[] => {
-    if (ref === NONE) return [NONE];
-    const rows = Object.values(c.cycles)
-      .filter((cy) => inScope(cy.project_id))
-      .sort((a, b) => a.starts_on.localeCompare(b.starts_on));
-    // On a day with no cycle running (or none to come) the word itself stays
-    // as the filter: no task is in "current", so none is shown, as the
-    // server answers too. Dropping it would show every task.
-    const orWord = (ids: string[]) => (ids.length ? ids : [ref]);
-    const day = serverDay(); // a cycle's days are the server's, not this browser's
-    if (ref === "current")
-      return orWord(rows.filter((cy) => cy.starts_on <= day && day <= cy.ends_on).map((cy) => cy.id));
-    if (ref === "next")
-      return orWord(
-        rows
-          .filter((cy) => cy.starts_on > day)
-          .slice(0, 1)
-          .map((cy) => cy.id),
-      );
-    return rows.filter((cy) => cy.id === ref || String(cy.number) === ref).map((cy) => cy.id);
-  };
-
-  const category = [...(q.category ?? [])] as Category[];
-  const status: string[] = [];
-  for (const ref of q.status ?? []) {
-    const ids = byName(c.statuses, ref);
-    if (ids.length) status.push(...ids);
-    else if ((CATEGORIES as string[]).includes(low(ref))) category.push(low(ref) as Category);
-  }
-
   return {
-    assignee: (q.assignee ?? []).map(member).filter(Boolean) as string[],
-    status,
-    category: category.filter((cat) => CATEGORIES.includes(cat)),
-    label: (q.label ?? []).flatMap((ref) => byName(c.labels, ref)),
-    priority: q.priority ?? [],
-    epic: (q.epic ?? []).flatMap((ref) => (ref === NONE ? [NONE] : byName(c.epics, ref))),
-    cycle: (q.cycle ?? []).flatMap(cycle),
-    waitingOn: (q.waiting_on && member(q.waiting_on)) || "",
+    ...byFilter(({ filter }) => filter.read(q, ctx)),
     openDecision: !!q.has_open_decision,
     text: q.q ?? "",
   };
@@ -365,29 +276,28 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
  * none is), or null when nothing is gone.
  */
 export function goneFromQuery(q: TaskQuery, c: QuerySource, meId: string, today: string): Partial<TaskQuery> | null {
-  const read = (one: TaskQuery) => fromQuery({ project: q.project, ...one }, c, meId, today);
-  const found = {
-    assignee: (ref: string) => read({ assignee: [ref] }).assignee.length > 0,
-    status: (ref: string) => {
-      const f = read({ status: [ref] });
-      return f.status.length > 0 || f.category.length > 0;
-    },
-    label: (ref: string) => read({ label: [ref] }).label.length > 0,
-    epic: (ref: string) => read({ epic: [ref] }).epic.length > 0,
-    // "current" and "next" name no cycle on some days; nothing is gone then.
-    cycle: (ref: string) => ref === "current" || ref === "next" || read({ cycle: [ref] }).cycle.length > 0,
+  /** Whether a word still names something: read alone, it gives some filter a value. */
+  const found = (one: Record<string, unknown>) => {
+    const f = fromQuery({ project: q.project, ...one }, c, meId, today);
+    return FILTERS.some((p) => f[p.name].length > 0);
   };
-  const patch: Partial<TaskQuery> = {};
+  const patch: Record<string, unknown> = {};
   let gone = false;
-  for (const field of Object.keys(found) as (keyof typeof found)[]) {
-    const values = q[field] ?? [];
-    const left = values.filter(found[field]);
+  for (const { filter } of FILTERS) {
+    if (!filter.canBeGone) continue;
+    const word = filter.word;
+    const stored = (q as Record<string, unknown>)[word];
+    if (stored === undefined) continue;
+    if (filter.holds === "one") {
+      if (found({ [word]: stored })) continue;
+      patch[word] = undefined;
+      gone = true;
+      continue;
+    }
+    const values = stored as string[];
+    const left = values.filter((ref) => found({ [word]: [ref] }));
     if (left.length === values.length) continue;
-    patch[field] = left.length > 0 ? left : undefined;
-    gone = true;
-  }
-  if (q.waiting_on && !read({ waiting_on: q.waiting_on }).waitingOn) {
-    patch.waiting_on = undefined;
+    patch[word] = left.length > 0 ? left : undefined;
     gone = true;
   }
   return gone ? patch : null;

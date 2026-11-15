@@ -8,7 +8,8 @@
 
 import type { ComponentType, ReactNode } from "react";
 import type { Key } from "@/lib/i18n";
-import type { FeedEvent, FieldChange, Project, Task } from "@/lib/types";
+import type { Collections } from "@/lib/store";
+import type { FeedEvent, FieldChange, Project, Task, TaskQuery } from "@/lib/types";
 import type { PickerItem } from "@/ui/picker";
 
 /** "Nothing set", where an id would be: in a picker, a filter, a group. */
@@ -39,6 +40,51 @@ export interface TaskProperty<Name extends string = string> {
   bulk?: BulkPart;
   /** How the timeline says it changed: the task's fields it is stored in, each with its phrase. */
   timeline?: Phrase[];
+  /** Filtering a task list by it, and its word in a task query. */
+  filter?: FilterPart;
+}
+
+/**
+ * The tables a stored query's names are looked up in: the live rows
+ * (useLookup), so a name of something gone matches nothing; projects every
+ * row (useLookupEvenIfGone), so a view of an archived project stays about it.
+ */
+export type QuerySource = Pick<Collections, "projects" | "members" | "statuses" | "labels" | "epics" | "cycles">;
+
+/** What reading a stored query's words needs. */
+export interface QueryContext {
+  c: QuerySource;
+  meId: string;
+  /** Whether a row of this project is one the query is about: any, when it names no project. */
+  inScope: (projectId: string | undefined) => boolean;
+}
+
+/** The words of a task query that filter by a property. */
+export type FilterWord = "assignee" | "status" | "category" | "label" | "priority" | "epic" | "cycle" | "waiting_on";
+
+export interface FilterPart {
+  /** Its word in a task query: a saved view's query, the page's address (?label=bug). */
+  word: FilterWord;
+  /** Its name in the filter menu and on its chip. */
+  title: () => string;
+  /** How a query holds its values: a list of ids or names (left out), one word (waiting on), or numbers (priority). */
+  holds?: "one" | "numbers";
+  /** Offered only where it means something: a project's statuses, a project's cycles. */
+  offered?: (project: Project | undefined) => boolean;
+  /** The values it can be set to, for the project in view or the whole workspace. A hook. */
+  useOptions: (project: Project | undefined) => PickerItem[];
+  /** Whether a task passes, for the values picked (never none). */
+  matches: (task: Task, picked: string[], c: Pick<Collections, "statuses">) => boolean;
+  /**
+   * The values a stored query stands for. A view may have been written by
+   * hand or by an agent, with names where ids belong ("@coder", "art"); a
+   * word that names nothing, or something gone, is left out.
+   */
+  read: (q: TaskQuery, ctx: QueryContext) => string[];
+  /** A value as the page's address writes it, where that is not the value itself: a name, a handle. */
+  address?: (id: string, c: QuerySource, projectId: string | undefined) => string;
+  /** Its values name rows that can be deleted or people who can leave, so a saved view can name one that is gone. */
+  canBeGone?: boolean;
 }
 
 /** The fields one change to a task changed, by name. */

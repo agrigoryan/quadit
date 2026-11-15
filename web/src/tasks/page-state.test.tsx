@@ -5,7 +5,8 @@ import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
-import { emptyFilters, type QuerySource } from "@/tasks/filters";
+import { emptyFilters } from "@/tasks/filters";
+import type { QuerySource } from "@/tasks/properties/property";
 import { usePageState } from "@/tasks/page-state";
 
 const tables: QuerySource = { projects: {}, members: {}, statuses: {}, labels: {}, epics: {}, cycles: {} };

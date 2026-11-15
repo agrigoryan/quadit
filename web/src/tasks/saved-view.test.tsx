@@ -4,7 +4,7 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Label, View } from "@/lib/types";
-import type { QuerySource } from "@/tasks/filters";
+import type { QuerySource } from "@/tasks/properties/property";
 import { useSavedView } from "@/tasks/saved-view";
 
 const label = (id: string, name: string) => ({ id, name, project_id: "p", color: "" }) as Label;

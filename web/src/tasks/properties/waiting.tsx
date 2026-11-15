@@ -2,7 +2,7 @@
 // an outside event (a build, a reply, a date), with a note saying what is
 // wanted. Picking an outside event asks for that note first.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Globe } from "lucide-react";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
@@ -27,6 +27,7 @@ import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input, Textarea } from "@/ui/input";
 import { PickerList } from "@/ui/picker";
+import { memberOf, memberWord } from "@/tasks/properties/query-words";
 
 function useItems(tasks: Task[]) {
   const members = useMembers();
@@ -231,4 +232,39 @@ export const waiting = {
       },
     },
   ],
+  filter: {
+    word: "waiting_on",
+    title: () => t("filter.waitingOn"),
+    holds: "one",
+    // People first and "nothing" last, unlike the picker's list.
+    useOptions: () => {
+      const members = useMembers();
+      const me = useMe();
+      return useMemo(
+        () => [
+          ...memberItems(members, me.user_id),
+          {
+            id: OUTSIDE,
+            label: t("prop.outside"),
+            icon: <Globe className="size-3.5 text-ink-2" aria-hidden />,
+            keywords: t("prop.outside.words"),
+          },
+          noneItem(t("prop.nobody")),
+        ],
+        [members, me.user_id],
+      );
+    },
+    matches: (task, [on]) => {
+      const outside = task.waiting_outside === true;
+      if (on === OUTSIDE) return outside;
+      if (on === NONE) return !outside && !task.waiting_on_id;
+      return task.waiting_on_id === on;
+    },
+    read: (q, ctx) => {
+      const id = q.waiting_on && memberOf(q.waiting_on, ctx);
+      return id ? [id] : [];
+    },
+    address: (id, c) => memberWord(id, c),
+    canBeGone: true,
+  },
 } satisfies TaskProperty<"waiting">;

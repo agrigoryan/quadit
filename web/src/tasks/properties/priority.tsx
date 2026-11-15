@@ -86,4 +86,17 @@ export const priority = {
       },
     },
   ],
+  filter: {
+    word: "priority",
+    title: () => t("filter.priority"),
+    holds: "numbers",
+    useOptions: () =>
+      PRIORITIES.map((p) => ({
+        id: String(p),
+        label: tMaybe(`priority.${p}`),
+        icon: <PriorityIcon priority={p} title="" />,
+      })),
+    matches: (task, picked) => picked.includes(String(task.priority)),
+    read: (q) => (q.priority ?? []).filter((p) => PRIORITIES.includes(p)).map(String),
+  },
 } satisfies TaskProperty<"priority">;

@@ -2,11 +2,11 @@ import { useState } from "react";
 import { ListFilter, Search, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import type { Project } from "@/lib/types";
-import { FILTER_LABEL, type FilterKind, useFilterOptions } from "@/tasks/filter-options";
-import { countFilters, emptyFilters, type Filters, LIST_KEYS, type ListFilterKey } from "@/tasks/filters";
-import { createLabel, createLabelText, type ManageLink, useManageLinks } from "@/tasks/manage";
+import { countFilters, emptyFilters, type Filters } from "@/tasks/filters";
+import { useManageLinks } from "@/tasks/manage";
+import { FILTERS } from "@/tasks/properties";
 import { Button } from "@/ui/button";
-import { Picker, type PickerItem, PickerList } from "@/ui/picker";
+import { Picker, type PickerAction, PickerList } from "@/ui/picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 interface Props {
@@ -16,78 +16,69 @@ interface Props {
   project: Project | undefined;
 }
 
-/** The values picked for one filter, as picker ids. */
-function picked(f: Filters, kind: FilterKind): string[] {
-  if (kind === "openDecision") return [];
-  if (kind === "waitingOn") return f.waitingOn ? [f.waitingOn] : [];
-  return f[kind].map(String);
+/** One property a list can be filtered by (tasks/properties). */
+type Filter = (typeof FILTERS)[number];
+
+/** The "has an open question" filter, which is no property of the task: its id in the menu. */
+const OPEN_DECISION = "openDecision";
+
+/** Toggles one value of one filter. A filter of one value at a time takes the new one, or none when it was that. */
+function toggle(f: Filters, { name, filter }: Filter, id: string): Filters {
+  const now = f[name];
+  const next =
+    filter.holds === "one"
+      ? now[0] === id
+        ? []
+        : [id]
+      : now.includes(id)
+        ? now.filter((v) => v !== id)
+        : [...now, id];
+  return { ...f, [name]: next };
 }
 
-/** Toggles one value of one filter. */
-function toggle(f: Filters, kind: Exclude<FilterKind, "openDecision">, id: string): Filters {
-  if (kind === "waitingOn") return { ...f, waitingOn: f.waitingOn === id ? "" : id };
-  if (kind === "priority") {
-    const n = Number(id);
-    return { ...f, priority: f.priority.includes(n) ? f.priority.filter((p) => p !== n) : [...f.priority, n] };
-  }
-  const list = f[kind] as string[];
-  return { ...f, [kind]: list.includes(id) ? list.filter((v) => v !== id) : [...list, id] };
+/** What a filter's list offers besides its values: making one (a label), the way to where they are kept. */
+function useExtras(p: Filter, filters: Filters, onChange: (f: Filters) => void, project: Project | undefined) {
+  const links = useManageLinks(project?.id);
+  const { make, manage } = p;
+  return {
+    // A label made here is filtered by at once, ready to be put on tasks.
+    onCreate: make && ((name: string) => onChange(toggle(filters, p, make.run(project?.id, name)))),
+    createLabel: make?.label,
+    manage: manage && links[manage],
+  };
 }
 
-function clear(f: Filters, kind: FilterKind): Filters {
-  if (kind === "openDecision") return { ...f, openDecision: false };
-  if (kind === "waitingOn") return { ...f, waitingOn: "" };
-  return { ...f, [kind]: [] };
-}
-
-/** What a filter's list offers besides its values: making a label, the way to where labels and statuses are kept. */
-interface Extra {
-  onCreate?: (name: string) => void;
-  createLabel?: (name: string) => string;
-  manage?: ManageLink;
+interface ChipProps {
+  property: Filter;
+  filters: Filters;
+  onChange: (f: Filters) => void;
+  project: Project | undefined;
 }
 
 /** An active filter: what it is set to, a click to change it, a cross to drop it. */
-function FilterChip({
-  kind,
-  items,
-  filters,
-  onChange,
-  extra,
-}: {
-  kind: FilterKind;
-  items: PickerItem[];
-  filters: Filters;
-  onChange: (f: Filters) => void;
-  extra?: Extra;
-}) {
-  const values = picked(filters, kind);
+function FilterChip({ property, filters, onChange, project }: ChipProps) {
+  const { name, filter } = property;
+  const items = filter.useOptions(project);
+  const extras = useExtras(property, filters, onChange, project);
+  const values = filters[name];
   const first = items.find((i) => i.id === values[0]);
-  const name = t(FILTER_LABEL[kind]);
-  if (kind === "openDecision") {
-    return (
-      <span className="flex h-6 shrink-0 items-stretch rounded-sm border border-line bg-surface text-xs">
-        <span className="flex items-center pr-1 pl-2 font-medium text-ink">{name}</span>
-        <RemoveFilter name={name} onClick={() => onChange(clear(filters, kind))} />
-      </span>
-    );
-  }
+  const title = filter.title();
   return (
     <span className="flex h-6 shrink-0 items-stretch rounded-sm border border-line bg-surface text-xs">
       <Picker
         items={items}
         value={values}
-        multiple={kind !== "waitingOn"}
-        label={name}
-        placeholder={name}
-        onPick={(id) => onChange(toggle(filters, kind, id))}
-        {...extra}
+        multiple={filter.holds !== "one"}
+        label={title}
+        placeholder={title}
+        onPick={(id) => onChange(toggle(filters, property, id))}
+        {...extras}
       >
         <button
           type="button"
           className="flex h-full min-w-0 items-center gap-1.5 rounded-l-sm pr-1 pl-2 hover:bg-hover"
         >
-          <span className="text-ink-3">{name}</span>
+          <span className="text-ink-3">{title}</span>
           <span className="flex min-w-0 items-center gap-1 font-medium text-ink">
             {values.length === 1 && first?.icon}
             <span className="max-w-32 truncate">
@@ -96,7 +87,7 @@ function FilterChip({
           </span>
         </button>
       </Picker>
-      <RemoveFilter name={name} onClick={() => onChange(clear(filters, kind))} />
+      <RemoveFilter name={title} onClick={() => onChange({ ...filters, [name]: [] })} />
     </span>
   );
 }
@@ -114,39 +105,44 @@ function RemoveFilter({ name, onClick }: { name: string; onClick: () => void }) 
   );
 }
 
+/** One filter's values, in the "add a filter" popover once the filter is picked. */
+function StageList({ property, filters, onChange, project, close }: ChipProps & { close: () => void }) {
+  const { filter } = property;
+  const extras = useExtras(property, filters, onChange, project);
+  const title = filter.title();
+  const link = extras.manage;
+  // The list's own popover closes before going to where the values are kept.
+  const manage: PickerAction | undefined = link && {
+    label: link.label,
+    onSelect: () => {
+      close();
+      link.onSelect();
+    },
+  };
+  return (
+    <PickerList
+      label={title}
+      placeholder={title}
+      items={filter.useOptions(project)}
+      value={filters[property.name]}
+      onPick={(id) => {
+        onChange(toggle(filters, property, id));
+        if (filter.holds === "one") close();
+      }}
+      {...extras}
+      manage={manage}
+    />
+  );
+}
+
 /** Text search, the active filters as chips, and a button to add another. */
 export function FilterBar({ filters, onChange, project }: Props) {
-  const options = useFilterOptions(project);
   const [open, setOpen] = useState(false);
-  const [stage, setStage] = useState<Exclude<FilterKind, "openDecision"> | null>(null);
+  const [stage, setStage] = useState<Filter | null>(null);
 
-  const kinds: FilterKind[] = [
-    "assignee",
-    ...(project ? (["status"] as const) : []),
-    "category",
-    "label",
-    "priority",
-    "epic",
-    ...(project?.settings?.cycles ? (["cycle"] as const) : []),
-    "waitingOn",
-    "openDecision",
-  ];
-  const active: FilterKind[] = [
-    ...LIST_KEYS.filter((k: ListFilterKey) => filters[k].length > 0),
-    ...(filters.waitingOn ? (["waitingOn"] as const) : []),
-    ...(filters.openDecision ? (["openDecision"] as const) : []),
-  ];
+  const offered = FILTERS.filter((p) => p.filter.offered?.(project) ?? true);
+  const active = FILTERS.filter((p) => filters[p.name].length > 0);
   const count = countFilters(filters);
-  const manage = useManageLinks(project?.id);
-  const extras: Partial<Record<FilterKind, Extra>> = {
-    // A label made here is filtered by at once, ready to be put on tasks.
-    label: {
-      onCreate: (name) => onChange(toggle(filters, "label", createLabel(project?.id, name))),
-      createLabel: createLabelText,
-      manage: manage.labels,
-    },
-    status: { manage: manage.statuses },
-  };
 
   return (
     <div className="flex shrink-0 items-center gap-1.5">
@@ -163,16 +159,15 @@ export function FilterBar({ filters, onChange, project }: Props) {
         />
       </label>
 
-      {active.map((kind) => (
-        <FilterChip
-          key={kind}
-          kind={kind}
-          items={kind === "openDecision" ? [] : options[kind]}
-          filters={filters}
-          onChange={onChange}
-          extra={extras[kind]}
-        />
+      {active.map((p) => (
+        <FilterChip key={p.name} property={p} filters={filters} onChange={onChange} project={project} />
       ))}
+      {filters.openDecision && (
+        <span className="flex h-6 shrink-0 items-stretch rounded-sm border border-line bg-surface text-xs">
+          <span className="flex items-center pr-1 pl-2 font-medium text-ink">{t("filter.openDecision")}</span>
+          <RemoveFilter name={t("filter.openDecision")} onClick={() => onChange({ ...filters, openDecision: false })} />
+        </span>
+      )}
 
       <Popover
         open={open}
@@ -187,45 +182,31 @@ export function FilterBar({ filters, onChange, project }: Props) {
             {t("filter.add")}
           </Button>
         </PopoverTrigger>
-        <PopoverContent aria-label={t(stage === null ? "filter.add" : FILTER_LABEL[stage])} className="p-0">
+        <PopoverContent aria-label={stage === null ? t("filter.add") : stage.filter.title()} className="p-0">
           {stage === null ? (
             <PickerList
               label={t("filter.add")}
               placeholder={t("filter.add")}
-              items={kinds.map((k) => ({ id: k, label: t(FILTER_LABEL[k]) }))}
-              value={active}
+              items={[
+                ...offered.map((p) => ({ id: p.name, label: p.filter.title() })),
+                { id: OPEN_DECISION, label: t("filter.openDecision") },
+              ]}
+              value={[...active.map((p) => p.name), ...(filters.openDecision ? [OPEN_DECISION] : [])]}
               onPick={(id) => {
-                const kind = id as FilterKind;
-                if (kind === "openDecision") {
+                if (id === OPEN_DECISION) {
                   onChange({ ...filters, openDecision: !filters.openDecision });
                   setOpen(false);
-                } else setStage(kind);
+                } else setStage(offered.find((p) => p.name === id) ?? null);
               }}
             />
           ) : (
-            <PickerList
-              key={stage}
-              label={t(FILTER_LABEL[stage])}
-              placeholder={t(FILTER_LABEL[stage])}
-              items={options[stage]}
-              value={picked(filters, stage)}
-              onPick={(id) => {
-                onChange(toggle(filters, stage, id));
-                if (stage === "waitingOn") setOpen(false);
-              }}
-              {...extras[stage]}
-              manage={(() => {
-                const link = extras[stage]?.manage;
-                return (
-                  link && {
-                    label: link.label,
-                    onSelect: () => {
-                      setOpen(false);
-                      link.onSelect();
-                    },
-                  }
-                );
-              })()}
+            <StageList
+              key={stage.name}
+              property={stage}
+              filters={filters}
+              onChange={onChange}
+              project={project}
+              close={() => setOpen(false)}
             />
           )}
         </PopoverContent>
