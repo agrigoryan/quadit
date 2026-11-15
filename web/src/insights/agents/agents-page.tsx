@@ -19,7 +19,6 @@ import { AgentCard, type HelperOf } from "@/insights/agents/agent-card";
 import { NO_WORK, useAgentWork, useClaims, useResources } from "@/insights/agents/agent-data";
 import { Resources } from "@/insights/agents/resources";
 import { useSessions } from "@/insights/agents/session-data";
-import type { AgentMember } from "@/settings/agents/data";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
 import { Checkbox } from "@/settings/ui/form";
 import { EmptyState } from "@/ui/empty";
@@ -82,7 +81,7 @@ export function AgentsPage() {
         top.helpers.push({
           member: agent,
           state: states[agent.user_id],
-          task: tasks[(agent as AgentMember).delegated_task ?? ""],
+          task: tasks[agent.delegated_task ?? ""],
         });
     }
     return out;

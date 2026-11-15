@@ -31,7 +31,7 @@ type Table = "props" | "views";
 
 /** Adds or replaces a property or view. */
 export function putRow<K extends Table>(table: K, row: DocsState[K][string]) {
-  useDocsStore.setState((s) => ({ [table]: { ...s[table], [row.id]: row } }) as Partial<DocsState>);
+  useDocsStore.setState((s) => ({ [table]: { ...s[table], [row.id]: row } }));
 }
 
 /** Sets fields on a property or view; returns the row as it was, to put back if the server refuses. */
@@ -45,7 +45,7 @@ export function dropRow(table: Table, id: string) {
   useDocsStore.setState((s) => {
     const next = { ...s[table] };
     delete next[id];
-    return { [table]: next } as Partial<DocsState>;
+    return { [table]: next };
   });
 }
 

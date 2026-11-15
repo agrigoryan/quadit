@@ -342,7 +342,7 @@ export function TaskPropertyPicker({ kind, tasks, open, onOpenChange, children, 
   return (
     <Popover open={isOpen} onOpenChange={setOpen}>
       {children && <PopoverTrigger asChild>{children}</PopoverTrigger>}
-      {anchor && <PopoverAnchor virtualRef={anchor as RefObject<Element>} />}
+      {anchor && <PopoverAnchor virtualRef={anchor} />}
       {isOpen && (
         <PopoverContent align={align} side={side} className="p-0">
           {kind === "assignee" || kind === "waiting" ? (

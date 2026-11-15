@@ -41,7 +41,7 @@ export const COLLECTION_OF: Record<string, CollectionName> = {
 export const emptyCollections = (): Collections => {
   const c = {} as Record<CollectionName, Dict<never>>;
   for (const name of new Set(Object.values(COLLECTION_OF))) c[name] = {};
-  return c as Collections;
+  return c;
 };
 
 /** Members are keyed by user id; a watcher has no id of its own. */

@@ -35,7 +35,7 @@
     // Prettier puts parentheses around a comma sequence; they do not make it fine.
     "no-sequences": ["error", { "allowInParentheses": false }],
     "no-unused-vars": "warn",
-    "typescript/no-unnecessary-type-assertion": "warn",
+    "typescript/no-unnecessary-type-assertion": "error",
     "typescript/no-floating-promises": "warn",
     "typescript/no-base-to-string": "warn",
     "typescript/no-misused-promises": ["warn", { "checksVoidReturn": { "attributes": false } }],

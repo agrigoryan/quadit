@@ -152,7 +152,7 @@ export function FilterEditor({ view, props }: { view: DBView; props: DBProperty[
               value={f.prop}
               onPick={(id) => {
                 const nextOps = opsFor(props.find((p) => p.id === id));
-                patch(i, { prop: id, op: nextOps.includes(f.op) ? f.op : (nextOps[0] as FilterOp), value: undefined });
+                patch(i, { prop: id, op: nextOps.includes(f.op) ? f.op : nextOps[0], value: undefined });
               }}
               buttonProps={{ className: "w-32 [&>span]:flex-1" }}
             />

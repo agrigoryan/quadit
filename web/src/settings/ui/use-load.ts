@@ -54,5 +54,5 @@ export function useLoad<T>(fetcher: () => Promise<T>, deps: unknown[]): Loaded<T
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { data, error, loading, reload, set: setData as Loaded<T>["set"] };
+  return { data, error, loading, reload, set: setData };
 }

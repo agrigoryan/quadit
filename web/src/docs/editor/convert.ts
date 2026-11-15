@@ -180,7 +180,7 @@ function inlineOut(content: unknown): unknown {
     } else if (type === "link") {
       out.push({ type: "link", href: raw.href, content: inlineOut(raw.content) });
     } else if (TO_SERVER[type] && isObj(raw.props)) {
-      const server = TO_SERVER[type] as string;
+      const server = TO_SERVER[type];
       const prop = CHIP_PROP[server] as string;
       out.push({ type: server, props: { [prop]: raw.props[prop] } });
     }

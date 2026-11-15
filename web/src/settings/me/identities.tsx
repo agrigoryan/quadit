@@ -17,11 +17,6 @@ interface Identity {
   created_at: number;
 }
 
-interface Provider {
-  id: string;
-  name: string;
-}
-
 const builtIn: Record<string, string> = { google: "Google", github: "GitHub" };
 
 /** Sends the browser to the provider; it comes back to this page with the account connected. */
@@ -37,7 +32,7 @@ export function IdentitiesSection({ onChanged }: { onChanged: () => void }) {
       authConfig(),
       api.get<{ identities: Identity[] }>("/api/v1/auth/identities"),
     ]);
-    return { providers: config.providers as Provider[], identities: ids.identities };
+    return { providers: config.providers, identities: ids.identities };
   }, []);
   const [removing, setRemoving] = useState<{ identity: Identity; name: string } | null>(null);
 

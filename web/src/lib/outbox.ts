@@ -185,7 +185,7 @@ export const outbox = {
     return inOrder(async () => {
       if (!hasLocks) return takeOver(slug, user);
       try {
-        return (await navigator.locks.request("quadit-outbox", () => takeOver(slug, user))) as OutboxItem[];
+        return await navigator.locks.request("quadit-outbox", () => takeOver(slug, user));
       } catch {
         return takeOver(slug, user);
       }

@@ -18,7 +18,7 @@ export interface ScopeDraft {
 }
 
 export const scopeDraftOf = (m: Member | undefined): ScopeDraft => {
-  const scope = (m as ScopedMember | undefined)?.scope;
+  const scope = m?.scope;
   return { projects: scope?.projects ?? [], readOnly: scope?.read_only ?? false };
 };
 

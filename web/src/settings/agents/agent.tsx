@@ -30,7 +30,7 @@ import { EmptyState } from "@/ui/empty";
 export function AgentPage() {
   const { handle = "" } = useParams();
   const base = useSettingsBase();
-  const agent = useMembers().find((m) => m.kind === "agent" && m.handle === handle) as AgentMember | undefined;
+  const agent = useMembers().find((m) => m.kind === "agent" && m.handle === handle);
   if (!agent) {
     return (
       <EmptyState

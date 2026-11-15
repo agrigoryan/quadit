@@ -57,7 +57,7 @@ export class DocSync {
     seq: number,
     private onState: (state: SaveState) => void = () => {},
   ) {
-    this.schema = editor.schema.blockSchema as unknown as BlockSchemaLike;
+    this.schema = editor.schema.blockSchema;
     this.seq = seq;
     for (const row of rows) this.remember(row);
     this.stops.push(editor.onChange(() => !this.applying && this.schedule()));
@@ -75,7 +75,7 @@ export class DocSync {
   }
 
   private doc(): EdBlock[] {
-    return this.editor.document as unknown as EdBlock[];
+    return this.editor.document;
   }
 
   private sigOf(block: EdBlock): string {

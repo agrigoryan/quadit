@@ -93,7 +93,6 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 | --- | ---: |
 | `jsx-a11y/prefer-tag-over-role` | 67 |
 | `no-restricted-imports` (layers; the files are listed in `.oxlintrc.json`) | 33 |
-| `typescript/no-unnecessary-type-assertion` | 26 |
 | `react/refs` | 22 |
 | `react-hooks/exhaustive-deps` | 21 |
 | `typescript/no-floating-promises` | 17 |

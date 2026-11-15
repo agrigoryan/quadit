@@ -222,7 +222,7 @@ function workspaceChanges(events: FeedEvent[]): Partial<Workspace> | null {
     out ??= {};
     for (const [field, change] of Object.entries(ev.data.changes)) out[field] = change.to;
   }
-  return out as Partial<Workspace> | null;
+  return out;
 }
 
 export interface BootstrapData extends Partial<Record<CollectionName, AnyRow[]>> {

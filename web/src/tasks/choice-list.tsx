@@ -131,7 +131,7 @@ export function ChoicePicker({
   return (
     <Popover open={isOpen} onOpenChange={setOpen}>
       {children && <PopoverTrigger asChild>{children}</PopoverTrigger>}
-      {anchor && <PopoverAnchor virtualRef={anchor as RefObject<Element>} />}
+      {anchor && <PopoverAnchor virtualRef={anchor} />}
       <PopoverContent align={align} side={side} className="p-0">
         <ChoiceList
           {...list}

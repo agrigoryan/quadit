@@ -201,6 +201,7 @@ export function groupTasks(
   add({ id: NONE, title: by === "assignee" ? t("task.unassigned") : t("task.noEpic"), value: NONE });
   for (const task of tasks) {
     const key = (by === "assignee" ? task.assignee_id : task.epic_id) ?? NONE;
+    // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- tsc needs it: get() may be undefined, and the NONE group was added above
     (groups.get(key) ?? (groups.get(NONE) as TaskGroup)).tasks.push(task);
   }
   return shown();

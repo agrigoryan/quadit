@@ -106,7 +106,7 @@ export function useDraft<T>(name: string, fallback: T, opts: DraftOptions<T> = {
 
   const set = useCallback((next: Partial<T> | T) => {
     setSaved(false);
-    setDraft((cur) => (isObject(cur) && isObject(next) ? ({ ...cur, ...next } as T) : (next as T)));
+    setDraft((cur) => (isObject(cur) && isObject(next) ? { ...cur, ...next } : (next as T)));
   }, []);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(setting.value);

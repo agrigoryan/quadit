@@ -65,7 +65,7 @@ export function callFunction(name: string, a: Value[], env: Env, now: Date): Val
     case "empty":
       return isEmpty(arg(0));
     case "round": {
-      const scale = a.length > 1 ? 10 ** num(a[1] as Value) : 1;
+      const scale = a.length > 1 ? 10 ** num(a[1]) : 1;
       return roundHalfAway(num(arg(0)) * scale) / scale;
     }
     case "floor":
@@ -79,7 +79,7 @@ export function callFunction(name: string, a: Value[], env: Env, now: Date): Val
     case "sum": {
       const vals = flatten(a);
       if (vals.length === 0) return null;
-      let out = num(vals[0] as Value);
+      let out = num(vals[0]);
       for (const v of vals.slice(1)) {
         const n = num(v);
         out = name === "min" ? Math.min(out, n) : name === "max" ? Math.max(out, n) : out + n;
@@ -155,7 +155,7 @@ function addDate(d: FDate, years: number, months: number, days: number): FDate {
 
 function unit(a: Value[], i: number): string {
   if (i >= a.length) return "days";
-  const u = formulaText(a[i] as Value).toLowerCase();
+  const u = formulaText(a[i]).toLowerCase();
   return u.endsWith("s") ? u : `${u}s`;
 }
 

@@ -7,7 +7,7 @@ import { useCollection } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 import type { AgentMember } from "@/settings/agents/data";
 
-export const isHelper = (m: Member): boolean => !!(m as AgentMember).delegated_task;
+export const isHelper = (m: Member): boolean => !!m.delegated_task;
 
 /** A helper whose task has closed: the server suspended it and ended its tokens. */
 export const isFinishedHelper = (m: Member): boolean => isHelper(m) && !!m.suspended_at;
@@ -58,7 +58,7 @@ export function placeHelpers<M extends Member>(
 export function useHelperLabel(): (m: Member) => string {
   const tasks = useCollection("tasks");
   return (m) => {
-    const id = (m as AgentMember).delegated_task;
+    const id = m.delegated_task;
     if (!id) return "";
     const key = tasks[id]?.key;
     return key ? t("agents.helperFor", { task: key }) : t("agents.helperForTask");
