@@ -1,7 +1,7 @@
 // What is open on screen: things several parts of the app need to open or
 // close (the palette, the create-task dialog, the sidebar on a phone).
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { keep, readKept } from "@/lib/kept";
 
@@ -40,33 +40,43 @@ export const useUi = create<UiState>(() => ({
 }));
 
 /**
- * The names of the pages on screen that name themselves, in the order they
- * did; the last one is shown. Written only by usePageTitle.
+ * The names of the pages on screen that name themselves, by the order the
+ * pages were drawn in; the last one is shown. Written only by usePageTitle.
  */
-const titles: { title: string }[] = [];
+const titles: { title: string; order: number }[] = [];
+
+/** Counts the pages drawn, in the order React draws them. Written only by usePageTitle. */
+let drawn = 0;
 
 function showTitle() {
-  const title = titles.at(-1)?.title ?? "";
-  useUi.setState({ title });
+  const title = titles.reduce<{ title: string; order: number } | undefined>(
+    (last, entry) => (!last || entry.order > last.order ? entry : last),
+    undefined,
+  )?.title;
+  useUi.setState({ title: title ?? "" });
   document.title = title ? `${title} – Quadit` : "Quadit";
 }
 
 /**
- * Names the page: shown in the top bar and the browser tab. When the page
- * goes away its name goes with it, and the page that named itself before
- * (one it was shown inside: Settings around a page that is not there) names
- * the tab again.
+ * Names the page: shown in the top bar and the browser tab. The page drawn
+ * last wins: a page inside another (a page that is not there, inside
+ * Settings) over the one around it, also when both come at once, and the
+ * later of two side by side. When the page goes away its name goes with it,
+ * and the page that named itself before names the tab again.
  */
 export function usePageTitle(title: string) {
+  // React draws a page before the pages inside it, but runs their effects
+  // the other way round, so the order is taken while drawing.
+  const [order] = useState(() => ++drawn);
   useEffect(() => {
-    const mine = { title };
+    const mine = { title, order };
     titles.push(mine);
     showTitle();
     return () => {
       titles.splice(titles.indexOf(mine), 1);
       showTitle();
     };
-  }, [title]);
+  }, [title, order]);
 }
 
 export const ui = {

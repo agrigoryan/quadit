@@ -25,6 +25,27 @@ describe("usePageTitle", () => {
     expect(document.title).toBe("Settings – Quadit");
   });
 
+  it("names the tab after the page inside when both come at once (an address in Settings that is not there, loaded directly)", () => {
+    const { unmount } = render(
+      <Titled title="Settings">
+        <Titled title="There is nothing at this address" />
+      </Titled>,
+    );
+    expect(document.title).toBe("There is nothing at this address – Quadit");
+    unmount();
+  });
+
+  it("names the tab after the later of two pages side by side (a task's panel over its list)", () => {
+    const { unmount } = render(
+      <>
+        <Titled title="Release" />
+        <Titled title="SVA-12" />
+      </>,
+    );
+    expect(document.title).toBe("SVA-12 – Quadit");
+    unmount();
+  });
+
   it("names the tab after a page that changes its name", () => {
     const { rerender, unmount } = render(<Titled title="Release" />);
     rerender(<Titled title="Release v2" />);
