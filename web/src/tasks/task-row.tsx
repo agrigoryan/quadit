@@ -7,7 +7,7 @@ import { useCan } from "@/data/access";
 import { useDecisionFlag, useLookup, useMember, useRow } from "@/data/selectors";
 import { useIsDraft } from "@/data/store";
 import { isClosedCategory, type Task } from "@/types/core";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import type { Branch } from "@/tasks/list-layout";
 import { assignee as assigneeProperty } from "@/tasks/properties/assignee";
 import { priority } from "@/tasks/properties/priority";

@@ -17,7 +17,7 @@ import { Bar } from "@/insights/timeline/bar";
 import { type EpicLine, setEpicDates, type TaskLine } from "@/insights/timeline/data";
 import { type Scale, widthOf, xOf } from "@/insights/timeline/scale";
 import { setDue } from "@/tasks/actions";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Badge } from "@/ui/badge";
 import { StatusIcon } from "@/ui/icons";
 import { Tooltip } from "@/ui/tooltip";

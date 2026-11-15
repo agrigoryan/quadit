@@ -7,7 +7,7 @@ import { getLookupEvenIfGone, projectByKey } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { docPath } from "@/docs/area";
 import { inProject } from "@/docs/data";
-import { isTaskPath, taskPath } from "@/lib/task-link";
+import { isTaskPath, taskPath } from "@/nav/task-link";
 
 let navigate: NavigateFunction | null = null;
 let location: Location | null = null;
@@ -38,7 +38,7 @@ export function openDoc(id: string) {
   else window.location.assign(path);
 }
 
-/** A panel already open over the page gives its place to the next task (see lib/task-link.ts). */
+/** A panel already open over the page gives its place to the next task (see nav/task-link.ts). */
 const panelOpen = () => isTaskPath(window.location.pathname);
 
 /** Opens a task's panel over the page that is showing. */

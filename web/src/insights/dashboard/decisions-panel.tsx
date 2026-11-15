@@ -9,7 +9,7 @@ import { useMembersByHandle } from "@/insights/lib/members";
 import type { DecisionView } from "@/insights/lib/types";
 import type { Preference } from "@/types/plan";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { Ago } from "@/ui/ago";
 

@@ -18,7 +18,7 @@ import { type Side, sideOf, useEnsureTasks } from "@/detail/data";
 import { rowAction } from "@/detail/row-action";
 import { Section } from "@/detail/section";
 import { TaskPicker } from "@/detail/task-picker";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Button, IconButton } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
 import { Select } from "@/ui/picker";

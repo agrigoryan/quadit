@@ -8,12 +8,12 @@
 
 import { type MouseEvent, type RefObject, useEffect, useEffectEvent, useRef } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
-import { usePlace } from "@/lib/place";
+import { usePlace } from "@/nav/place";
 import { isDraft } from "@/data/store";
 import type { Task } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
-import { usePeek, useTaskNav } from "@/lib/task-link";
-import { takeSeen, useTaskOrder } from "@/lib/task-queue";
+import { usePeek, useTaskNav } from "@/nav/task-link";
+import { takeSeen, useTaskOrder } from "@/nav/task-queue";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 
 /** The id of the task whose card has the focus. */
@@ -44,7 +44,7 @@ function focusCard(id: string, keepScroll: boolean, tries = 20) {
  * Give the returned handlers to the element that holds the columns, whose
  * ref is `scroller`. Left for a task's page and come back to, the board is
  * scrolled where it was with the focus on the card that was opened
- * (lib/place.ts; each column keeps its own scroll in tasks/board-column.tsx).
+ * (nav/place.ts; each column keeps its own scroll in tasks/board-column.tsx).
  */
 export function useBoardKeys(groups: TaskGroup[], scroller: RefObject<HTMLElement | null>) {
   const open = useTaskNav();

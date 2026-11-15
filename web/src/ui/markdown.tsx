@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 import { cx } from "@/lib/cx";
 import { getProjectByKey, useRows } from "@/data/selectors";
 import { useStore } from "@/data/store";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 
 // Markdown as the server stores it, with two additions shown as links:
 // @handle of a real member, and a task key such as SVA-12.

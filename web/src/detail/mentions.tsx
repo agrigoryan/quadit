@@ -13,7 +13,7 @@ import { type MentionRef, useTaskMentions } from "@/data/task-detail";
 import type { Task } from "@/types/core";
 import { Section } from "@/detail/section";
 import { PageIcon } from "@/docs/page-icon";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { StatusIcon } from "@/ui/icons";
 import { docPath } from "@/docs/area";
 

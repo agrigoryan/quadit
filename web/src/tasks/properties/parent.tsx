@@ -7,7 +7,7 @@ import { Link } from "react-router";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import { getRowEvenIfGone, useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/data/selectors";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import type { Task } from "@/types/core";
 import { TaskPicker } from "@/detail/task-picker";
 import { setParent } from "@/tasks/actions";

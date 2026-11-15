@@ -13,7 +13,7 @@ import type { AgentSession } from "@/types/core";
 import { moneyMicros, short } from "@/insights/lib/amounts";
 import { span } from "@/insights/lib/durations";
 import { sessionLink, stepText } from "@/insights/agents/session-data";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 
 const marks = {

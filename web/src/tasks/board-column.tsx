@@ -6,7 +6,7 @@ import { useLocation } from "react-router";
 import { Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { usePlace } from "@/lib/place";
+import { usePlace } from "@/nav/place";
 import { rankBetween } from "@/lib/rank";
 import { useCan } from "@/data/access";
 import { useRow } from "@/data/selectors";
@@ -73,7 +73,7 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
   // A Done or Canceled column is not empty while the finished work is still on its way; its header says so.
   const waitingForRest = !useRestLoaded() && group.kind === "status" && !isOpenCategory(group.category);
 
-  // Come back to, the column is scrolled where it was (lib/place.ts), with the cards there drawn from the start.
+  // Come back to, the column is scrolled where it was (nav/place.ts), with the cards there drawn from the start.
   const part = `column:${group.id}`;
   const saved = usePlace(scroller, NO_FOCUS, part);
   const heightsAt = `${useLocation().key}#${part}`;

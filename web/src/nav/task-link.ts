@@ -9,13 +9,19 @@
 // task it shows: moving it to another task replaces that step, and closing
 // it goes back one. So Back closes the panel, and never walks through every
 // task that was looked at.
+//
+// The nav folder: what the app keeps in, and reads from, the browser's
+// history through the router, for more than one feature. This file opens
+// tasks; task-queue.ts is the list a task's page steps through with J and
+// K; place.ts is where a list was left (its scroll, its keyboard row);
+// project-in-view.ts is the project the screen is about.
 
 import { createContext, useContext, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useStore } from "@/data/store";
 import type { Task } from "@/types/core";
-import { pageUnder } from "@/lib/project-in-view";
-import { leaveForPage } from "@/lib/task-queue";
+import { pageUnder } from "@/nav/project-in-view";
+import { leaveForPage } from "@/nav/task-queue";
 
 export const taskPath = (slug: string, key: string) => `/${slug}/task/${key}`;
 
@@ -74,7 +80,7 @@ export function useTaskNav() {
         void navigate(at(key, anchor), { state: { background: under ?? location }, replace });
       },
       page(key: string, anchor?: string) {
-        // The page takes the order of the list it leaves with it, for its next and previous (lib/task-queue.ts).
+        // The page takes the order of the list it leaves with it, for its next and previous (nav/task-queue.ts).
         const from = leaveForPage();
         void navigate(at(key, anchor), { replace, state: from ? { from } : undefined });
       },

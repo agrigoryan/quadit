@@ -3,12 +3,12 @@
 // While the panel is open J and K move it along the rows, and Space puts it
 // away. The focus follows a row by its id, so rows arriving or leaving
 // while the page is open do not move it; left and come back to, the page is
-// where it was (lib/place.ts).
+// where it was (nav/place.ts).
 
 import { type RefObject, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { type Hotkeys, useHotkeys } from "@/lib/hotkeys";
-import { usePlace } from "@/lib/place";
-import { takeSeen, useTaskOrder } from "@/lib/task-queue";
+import { usePlace } from "@/nav/place";
+import { takeSeen, useTaskOrder } from "@/nav/task-queue";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 
 /** How a row is opened: in the panel over the list, or as the task's own page. */

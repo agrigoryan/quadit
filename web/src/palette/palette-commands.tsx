@@ -42,7 +42,7 @@ import { settingsGroups } from "@/settings/pages";
 import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";
 import { openNewTask } from "@/tasks/draft";
 import { PALETTE, type PropertyName } from "@/tasks/properties";
-import { taskPath } from "@/lib/task-link";
+import { taskPath } from "@/nav/task-link";
 
 /** Pages where the box takes a name for something new. */
 export type MakePage = "new-label" | "new-status";

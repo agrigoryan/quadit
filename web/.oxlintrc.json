@@ -107,7 +107,7 @@
             "patterns": [
               { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
               {
-                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/data/**", "!@/test/**"],
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/test/**"],
                 "message": "lib knows neither the server's data, the router nor the interface: it imports only types and i18n."
               }
             ]
@@ -133,6 +133,23 @@
       }
     },
     {
+      "files": ["src/nav/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/data/**", "!@/nav/**", "!@/test/**"],
+                "message": "nav (the router-aware helpers) sits below ui and every feature."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["src/ui/**"],
       "rules": {
         "no-restricted-imports": [
@@ -141,7 +158,16 @@
             "patterns": [
               { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
               {
-                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/data/**", "!@/ui/**", "!@/test/**"],
+                "group": [
+                  "@/**",
+                  "!@/types/**",
+                  "!@/i18n/**",
+                  "!@/lib/**",
+                  "!@/data/**",
+                  "!@/nav/**",
+                  "!@/ui/**",
+                  "!@/test/**"
+                ],
                 "message": "ui sits below every feature folder."
               }
             ]

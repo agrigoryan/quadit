@@ -10,7 +10,7 @@ import { useLiveTasks, useLookup, useMe, useMember, useOpenDecisions } from "@/d
 import { exact } from "@/lib/time";
 import { type Decision, isOpenCategory, type Task } from "@/types/core";
 import { MoveCount, Panel, PanelEmpty } from "@/insights/ui/panel";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
 import { Ago } from "@/ui/ago";

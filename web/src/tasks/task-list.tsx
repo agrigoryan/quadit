@@ -6,12 +6,12 @@
 
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
-import { usePlace } from "@/lib/place";
+import { usePlace } from "@/nav/place";
 import { useCan } from "@/data/access";
 import { useLookup } from "@/data/selectors";
 import { isDraft } from "@/data/store";
-import { usePeek, useTaskNav } from "@/lib/task-link";
-import { takeSeen, useTaskOrder } from "@/lib/task-queue";
+import { usePeek, useTaskNav } from "@/nav/task-link";
+import { takeSeen, useTaskOrder } from "@/nav/task-queue";
 import type { SortBy, Task } from "@/types/core";
 import type { NewTaskDraft } from "@/tasks/draft";
 import { comparer, type TaskGroup } from "@/tasks/filters";
@@ -58,7 +58,7 @@ const groupingOf = (group: TaskGroup) => GROUPINGS.find((p) => p.name === group.
  * any row, but is never selected. While the panel is open J/K move it to the next task, and
  * Space or Escape closes it with the focus still on the row. Only the rows
  * on screen are drawn, so the list stays quick at any length. Left for a
- * task's page and come back to, it is where it was (lib/place.ts).
+ * task's page and come back to, it is where it was (nav/place.ts).
  */
 export function TaskList({ groups, nested, sort, selected, onSelectedChange, onAdd }: Props) {
   const open = useTaskNav();
@@ -127,7 +127,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     return next;
   }
 
-  // A task's page opened from here steps along these rows (lib/task-queue.ts). Come back to
+  // A task's page opened from here steps along these rows (nav/task-queue.ts). Come back to
   // from a page that stepped on, the focus is on the task it ended at.
   const listStep = useTaskOrder(() => rows.map((row) => row.task.key));
   const focusSeen = useEffectEvent((step: string) => {

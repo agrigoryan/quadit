@@ -14,7 +14,7 @@ import { ago, exact, timeOfDay } from "@/lib/time";
 import { nameOf } from "@/detail/data";
 import type { Claim, Resource } from "@/types/agents";
 import { Panel } from "@/insights/ui/panel";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";

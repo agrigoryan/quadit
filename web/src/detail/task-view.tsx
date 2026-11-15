@@ -13,7 +13,7 @@ import { PanelHeader, TrashBanner } from "@/detail/panel-header";
 import { useRevealFromHash } from "@/detail/reveal-hash";
 import { TaskBody, type TaskLayout } from "@/detail/task-body";
 import { LostProject, useLostProject } from "@/ui/not-found";
-import { isTaskPath } from "@/lib/task-link";
+import { isTaskPath } from "@/nav/task-link";
 import { EmptyState } from "@/ui/empty";
 import { LoadFailed } from "@/ui/load-gate";
 import { Loading } from "@/ui/spinner";

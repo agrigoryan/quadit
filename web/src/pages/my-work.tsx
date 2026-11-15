@@ -8,7 +8,7 @@ import { exact } from "@/lib/time";
 import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { useListKeys } from "@/tasks/list-keys";
-import { useTaskLink, useTaskNav } from "@/lib/task-link";
+import { useTaskLink, useTaskNav } from "@/nav/task-link";
 import { keyCell, keyColumn, TaskRow } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";

@@ -10,7 +10,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { WithQuery } from "@/test/query";
 import { emptyCollections } from "@/data/collections";
 import { loadBootstrap, useStore } from "@/data/store";
-import { PeekContext } from "@/lib/task-link";
+import { PeekContext } from "@/nav/task-link";
 import type { Member, Task, User, Workspace } from "@/types/core";
 import type { TaskGroup } from "@/tasks/filters";
 import { TaskList } from "@/tasks/task-list";
@@ -85,7 +85,7 @@ function Page({ groups, nested }: { groups: TaskGroup[]; nested: boolean }) {
   );
 }
 
-/** Each test is a new step of the history, so none finds the place another left (lib/place.ts). */
+/** Each test is a new step of the history, so none finds the place another left (nav/place.ts). */
 let step = 0;
 
 function renderList(groups = GROUPS, nested = true) {

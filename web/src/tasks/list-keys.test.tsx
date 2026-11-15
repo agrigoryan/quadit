@@ -6,7 +6,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { type RefObject, useMemo, useRef, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { PeekContext } from "@/lib/task-link";
+import { PeekContext } from "@/nav/task-link";
 import { type OpenAs, useListKeys } from "@/tasks/list-keys";
 
 const ROWS = ["a", "b", "c"];

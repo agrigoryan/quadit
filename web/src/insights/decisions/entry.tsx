@@ -15,7 +15,7 @@ import { useMemberName } from "@/decisions/data";
 import { rich, Who } from "@/decisions/who";
 import type { Attached } from "@/detail/data";
 import { ProjectGlyph } from "@/ui/project-glyph";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { DecisionMark } from "@/ui/icons";

@@ -15,7 +15,7 @@ import { createTask, setParent } from "@/tasks/actions";
 import { status as statusProperty } from "@/tasks/properties/status";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { AssigneeAvatar } from "@/tasks/task-chips";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { IconButton } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
 

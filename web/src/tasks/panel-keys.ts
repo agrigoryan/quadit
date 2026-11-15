@@ -6,7 +6,7 @@
 // (detail/task-view.tsx).
 
 import { type Hotkeys, isTyping, useHotkeys } from "@/lib/hotkeys";
-import { usePeek } from "@/lib/task-link";
+import { usePeek } from "@/nav/task-link";
 
 /** What answers Space itself: it presses a button and opens a summary. A link does not take Space. */
 const ANSWERS_SPACE = "button, summary, [role=button], [role=menuitem]";

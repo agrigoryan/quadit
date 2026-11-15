@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
 import { useCan } from "@/data/access";
 import { getRow } from "@/data/selectors";
-import { useTaskNav } from "@/lib/task-link";
+import { useTaskNav } from "@/nav/task-link";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
 import { createTask } from "@/tasks/actions";

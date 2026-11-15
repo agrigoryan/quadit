@@ -22,7 +22,7 @@ import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/types/core";
 import { anchorOf, archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
-import { useTaskLink } from "@/lib/task-link";
+import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { DecisionMark } from "@/ui/icons";

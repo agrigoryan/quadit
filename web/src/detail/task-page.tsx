@@ -7,8 +7,8 @@
 import { useLocation, useNavigate, useParams } from "react-router";
 import { useSlug } from "@/data/selectors";
 import { type QueuePlace, TaskView } from "@/detail/task-view";
-import { taskPath } from "@/lib/task-link";
-import { cameFrom, markSeen, placeInQueue } from "@/lib/task-queue";
+import { taskPath } from "@/nav/task-link";
+import { cameFrom, markSeen, placeInQueue } from "@/nav/task-queue";
 
 interface Props {
   /** Back to where the person came from, or to the task's list when they came from nowhere. */

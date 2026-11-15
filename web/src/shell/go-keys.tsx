@@ -8,7 +8,7 @@ import { useKeySequences, usePendingKey } from "@/lib/key-sequence";
 import { useStore } from "@/data/store";
 import { useDelayedFlag } from "@/lib/use-delayed-flag";
 import { DESTINATIONS, destinationPath, listedName, type Where } from "@/shell/destinations";
-import { projectInView } from "@/lib/project-in-view";
+import { projectInView } from "@/nav/project-in-view";
 import { Kbd } from "@/ui/kbd";
 
 const PREFIX = "g";
