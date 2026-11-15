@@ -30,7 +30,10 @@ so.
 
 A released file is never edited (`TestMigrationsAreFrozen` holds their checksums, which
 did not change when goose came in). A change to the schema is a new file with the next
-number, recorded by running that test once with `QUADIT_UPDATE_MIGRATIONS=1`.
+number, recorded by running that test once with `QUADIT_UPDATE_MIGRATIONS=1`. So is a
+repair of rows already stored, which runs once, on the upgrade, after the copy is made:
+`0008_private_sub_pages` gives the pages under a private page its owner and sharing, which
+they lacked when the page was made private after them.
 
 ### What goose is given
 
@@ -47,7 +50,7 @@ So on SQLite goose sees `0006_search.sql` holding `-- +goose Up` and the stateme
 `0006_search.sqlite.sql`. goose cuts a file into statements where a line ends in a
 semicolon. Step 3 makes those statements the same, byte for byte, as the ones the runner
 before goose executed: `TestMigrationsRunAsBefore` keeps that runner's code and compares
-(131 statements on SQLite, 132 on Postgres, in 7 versions). An install made before goose
+(133 statements on SQLite, 134 on Postgres, in 8 versions). An install made before goose
 and one made after it have the same schema.
 
 What a migration file may hold is what it could before: plain statements, each ending in
