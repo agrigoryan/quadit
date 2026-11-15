@@ -5,6 +5,7 @@ import { Pencil } from "lucide-react";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import type { Epic } from "@/lib/types";
+import { sendOnModEnter } from "@/lib/mod-enter";
 import { updateEpic } from "@/insights/plan/actions";
 import { Button, IconButton } from "@/ui/button";
 import { Textarea } from "@/ui/input";
@@ -34,7 +35,7 @@ export function EpicDescription({ epic }: { epic: Epic }) {
             if (e.key === "Escape") {
               e.stopPropagation();
               setDraft(null);
-            } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+            } else sendOnModEnter(e, save);
           }}
         />
         <div className="mt-2 flex items-center gap-2">

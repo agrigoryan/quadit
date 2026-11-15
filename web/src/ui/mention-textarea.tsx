@@ -3,6 +3,7 @@ import { cx } from "@/lib/cx";
 import { useMembers } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 import { useListening } from "@/lib/listening";
+import { sendOnModEnter } from "@/lib/mod-enter";
 import { Avatar } from "@/ui/avatar";
 import { Textarea } from "@/ui/input";
 import { ListeningDot } from "@/ui/listening-dot";
@@ -89,11 +90,7 @@ export function MentionTextarea({
         return;
       }
     }
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onSubmit) {
-      e.preventDefault();
-      onSubmit();
-      return;
-    }
+    if (onSubmit && sendOnModEnter(e, onSubmit)) return;
     onKeyDown?.(e);
   }
 

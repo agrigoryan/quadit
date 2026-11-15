@@ -8,6 +8,7 @@ import { formulaText } from "@/docs/db/formula-values";
 import { PropIcon } from "@/docs/db/prop-meta";
 import { useDatabase } from "@/docs/db/use-table";
 import type { DBProperty } from "@/lib/types-docs";
+import { sendOnModEnter } from "@/lib/mod-enter";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 
@@ -105,7 +106,7 @@ export function FormulaEditor({ prop, onClose }: { prop: DBProperty; onClose: ()
           autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => (e.metaKey || e.ctrlKey) && e.key === "Enter" && save()}
+          onKeyDown={(e) => sendOnModEnter(e, save)}
           spellCheck={false}
           rows={4}
           aria-label={t("db.formula.label")}
