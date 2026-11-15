@@ -119,6 +119,7 @@ The web app follows common React and TypeScript practice first: the official Rea
 ### Shape
 10. A component does one thing and does it completely. Take a hook or a child out when it is a thing of its own: a clear name, a small interface, understandable without reading the component it came from. A hook with one user that hands back a dozen values is the component's own state moved to another file: keep it in the component. State that always changes together (the fields of one form) can be one object.
 11. The same goes for plain functions: together or apart by meaning, never by length.
+    A task property (status, assignee, due date…) is described once, in its own file under `tasks/properties/`, and listed in `tasks/properties/index.ts`; the pickers, the property panel, the bulk bar, the create dialog, the palette, the filters, the groupings and the timeline read that table and never name a kind themselves.
 12. A form in a dialog that follows the usual pattern (clear errors, mark busy, send, show a refusal, close) uses `ui/form-dialog`; a check made in the browser throws `refuse(field, message)` so it shows the way a server refusal does. Other forms that follow the pattern use `useSubmit` and `useFieldErrors`. A form whose submit does something different writes it out plainly; do not bend it to fit the hook, and do not give the hook an option for one caller.
 
 ### Types
