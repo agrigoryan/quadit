@@ -11,12 +11,16 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
+// The export of a workspace: a zip of Markdown, JSON and the uploaded
+// files, written by the parts in export_*.go.
+
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("GET /api/v1/w/{ws}/export", s.workspaceMember(s.handleExportWorkspace))
 	})
 }
 
+// exportReadme is the README.txt at the top of an export.
 const exportReadme = `This is an export of one workspace, in open formats.
 
 tasks/   one Markdown file per task: its fields, description, decisions and comments
@@ -29,6 +33,8 @@ files/   the uploaded files, as they were uploaded; any that could not be
 Nothing here needs this product to be read.
 `
 
+// fileSafe makes a name usable as a file name on any system: no path
+// separators or other reserved characters, at most 80 bytes, never empty.
 func fileSafe(s string) string {
 	s = strings.Map(func(r rune) rune {
 		if strings.ContainsRune(`/\:*?"<>|`, r) || r < 32 {
@@ -59,7 +65,17 @@ func (s *Server) handleExportWorkspace(x *c) error {
 	x.w.Header().Set("Content-Type", "application/zip")
 	x.w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.zip"`, x.ws.Slug, time.Now().UTC().Format("2006-01-02")))
 	e := &exporter{x: x, names: names, zw: zip.NewWriter(x.w)}
-	defer e.zw.Close()
+	err = e.write()
+	// The archive is closed even after a failed part, as far as it got.
+	if cerr := e.zw.Close(); cerr != nil && err == nil {
+		// The answer is under way: it can only end short, and be logged.
+		s.log.Error("export: finishing the archive", "workspace", x.ws.Slug, "err", cerr)
+	}
+	return err
+}
+
+// write writes the README and then each part of the archive.
+func (e *exporter) write() error {
 	if err := e.addTextFile("README.txt", exportReadme); err != nil {
 		return err
 	}

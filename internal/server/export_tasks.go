@@ -123,9 +123,10 @@ func (e *exporter) decisionMarkdown(b *strings.Builder, n int, d core.Decision) 
 	}
 	for i, o := range e.optionsOf[d.ID] {
 		mark := ""
-		if o.ID == d.PickedOptionID {
+		switch o.ID {
+		case d.PickedOptionID:
 			mark = " **(picked)**"
-		} else if o.ID == d.RecommendedOptionID {
+		case d.RecommendedOptionID:
 			mark = " (recommended)"
 		}
 		fmt.Fprintf(b, "%d. %s%s", i+1, o.Label, mark)
