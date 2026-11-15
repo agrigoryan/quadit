@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"net/http/httptest"
 	"slices"
 	"strings"
 	"sync"
@@ -205,9 +203,7 @@ func readsSiteWithLog(t *testing.T, st store.Store) (*site, *readsLog) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hs := httptest.NewUnstartedServer(nil)
-	_, port, _ := net.SplitHostPort(hs.Listener.Addr().String())
-	base := "http://localhost:" + port
+	hs, base := localhostServer(t)
 	srv := server.New(server.Config{DataDir: dir, BaseURL: base, Version: "test", Log: slog.New(slog.NewTextHandler(logs, nil))}, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()

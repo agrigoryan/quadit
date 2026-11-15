@@ -10,7 +10,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -80,9 +79,7 @@ func secondServer(t *testing.T, st store.Store) *site {
 		t.Fatal(err)
 	}
 	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
-	hs := httptest.NewUnstartedServer(nil)
-	_, port, _ := net.SplitHostPort(hs.Listener.Addr().String())
-	base := "http://localhost:" + port
+	hs, base := localhostServer(t)
 	srv := server.New(server.Config{DataDir: dir, BaseURL: base, Version: "test"}, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()

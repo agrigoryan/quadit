@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -41,9 +40,7 @@ func newSite(t *testing.T, st store.Store) *site {
 		t.Fatal(err)
 	}
 	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
-	hs := httptest.NewUnstartedServer(nil)
-	_, port, _ := net.SplitHostPort(hs.Listener.Addr().String())
-	base := "http://localhost:" + port // a name, not an address: passkeys need one
+	hs, base := localhostServer(t)
 	srv := server.New(server.Config{DataDir: dir, BaseURL: base, Version: "test"}, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()
