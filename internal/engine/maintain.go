@@ -351,7 +351,8 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 			if err := tx.Get(ctx, &t, store.Eq("id", id)); err != nil {
 				return err
 			}
-			if err := sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, core.EventData{Row: t, Key: &t.Key, FromBackup: true}); err != nil {
+			if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "task.restored", entity: "task", entityID: t.ID, place: inTask(t),
+				data: core.EventData{Row: t, Key: &t.Key, FromBackup: true}}); err != nil {
 				return err
 			}
 			_, err := sys.c.link("task", t.ID, "task", t.ID, t.Title+"\n"+t.Description)
@@ -367,7 +368,8 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 		if err := tx.Get(ctx, &doc, store.Eq("id", id)); err != nil {
 			return err
 		}
-		if err := sys.Emit("doc.restored", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, core.EventData{Row: doc, FromBackup: true}); err != nil {
+		if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "doc.restored", entity: "doc", entityID: doc.ID, place: inDoc(doc),
+			data: core.EventData{Row: doc, FromBackup: true}}); err != nil {
 			return err
 		}
 		var all []core.Block
@@ -382,8 +384,9 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 				live = append(live, b)
 			}
 		}
-		if err := sys.Emit("doc.edited", "doc", doc.ID, "doc", doc.ID, doc.ProjectID, core.EventData{ID: doc.ID, Blocks: &live, Deleted: gone, FromBackup: true,
-			Changes: map[string]core.FieldChange{"content_seq": {To: next + 1}}}); err != nil {
+		if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "doc.edited", entity: "doc", entityID: doc.ID, place: inDoc(doc),
+			data: core.EventData{ID: doc.ID, Blocks: &live, Deleted: gone, FromBackup: true,
+				Changes: map[string]core.FieldChange{"content_seq": {To: next + 1}}}}); err != nil {
 			return err
 		}
 		// What the page mentions is worked out again from its text as it stands.

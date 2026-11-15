@@ -76,9 +76,22 @@ func (s *Sys) From(ruleID string) { s.c.origin = ruleID }
 // Tx gives a system write direct access to the transaction.
 func (s *Sys) Tx() store.Tx { return s.c.tx }
 
-// Emit records an event from a system write.
-func (s *Sys) Emit(typ, entityType, entityID, scopeType, scopeID, projectID string, data core.EventData) error {
-	return s.c.emit(event{seq: s.c.tx.NextSeq(), typ: typ, entity: entityType, entityID: entityID, place: place{scopeType: scopeType, scopeID: scopeID, projectID: projectID}, data: data})
+// SysEvent is an event a system write records in the feed.
+type SysEvent struct {
+	Type     string // what happened: "member.updated"
+	Entity   string // the kind of thing it happened to: "member"
+	EntityID string
+	// Where it shows, as for any event: the scope (a task, a page, the
+	// workspace) and the project, if any, that decide who may see it.
+	ScopeType, ScopeID, ProjectID string
+	Data                          core.EventData
+}
+
+// Emit records an event from a system write, at the next position in the
+// feed.
+func (s *Sys) Emit(ev SysEvent) error {
+	return s.c.emit(event{seq: s.c.tx.NextSeq(), typ: ev.Type, entity: ev.Entity, entityID: ev.EntityID,
+		place: place{scopeType: ev.ScopeType, scopeID: ev.ScopeID, projectID: ev.ProjectID}, data: ev.Data})
 }
 
 // Ref returns the id of the thing the last Do made.
