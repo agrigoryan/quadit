@@ -193,7 +193,10 @@ func (s *Syncer) Sync(ctx context.Context, src core.DocSource) (res Result, err 
 	// others who changed pages in it are named in its message. It goes to
 	// the branch, or to quadit/docs when the source only proposes.
 	message := fmt.Sprintf("docs: update %d page(s) from Quadit", len(written)+len(p.removals))
-	author, others := s.commitAuthor(ctx, db, p.editors)
+	author, others, err := s.commitAuthor(ctx, db, p.editors)
+	if err != nil {
+		return Result{}, err
+	}
 	if len(others) > 0 {
 		message += "\n\nAlso edited by: " + strings.Join(others, ", ")
 	}
@@ -220,8 +223,10 @@ func (s *Syncer) Sync(ctx context.Context, src core.DocSource) (res Result, err 
 }
 
 // commitAuthor names the member who changed the pages last as a git author
-// ("Name <email>"), and the names of any others, sorted.
-func (s *Syncer) commitAuthor(ctx context.Context, db store.DB, editors map[string]int64) (author string, others []string) {
+// ("Name <email>"), and the names of any others, sorted. An editor whose
+// account is gone is left out; one that cannot be read is an error, so the
+// commit waits for a run that can name them.
+func (s *Syncer) commitAuthor(ctx context.Context, db store.DB, editors map[string]int64) (author string, others []string, err error) {
 	latest, at := "", int64(-1)
 	for id, when := range editors {
 		if when > at {
@@ -230,8 +235,10 @@ func (s *Syncer) commitAuthor(ctx context.Context, db store.DB, editors map[stri
 	}
 	for id := range editors {
 		var u core.User
-		if err := s.Store.Get(ctx, &u, store.Eq("id", id)); err != nil {
+		if err := s.Store.Get(ctx, &u, store.Eq("id", id)); errors.Is(err, store.ErrNotFound) {
 			continue
+		} else if err != nil {
+			return "", nil, fmt.Errorf("reading who edited the pages: %w", err)
 		}
 		if id != latest {
 			others = append(others, u.Name)
@@ -240,14 +247,16 @@ func (s *Syncer) commitAuthor(ctx context.Context, db store.DB, editors map[stri
 		email := u.Email
 		if email == "" {
 			var m core.Member
-			if db.Get(ctx, &m, store.Eq("user_id", id)) == nil {
+			if err := db.Get(ctx, &m, store.Eq("user_id", id)); err == nil {
 				email = m.Handle + "@quadit.invalid" // an agent has no mailbox
+			} else if !errors.Is(err, store.ErrNotFound) {
+				return "", nil, fmt.Errorf("reading who edited the pages: %w", err)
 			}
 		}
 		author = fmt.Sprintf("%s <%s>", strings.NewReplacer("<", "", ">", "").Replace(u.Name), email)
 	}
 	slices.Sort(others)
-	return author, others
+	return author, others, nil
 }
 
 // sentences joins what a sync says, leaving out what it does not.

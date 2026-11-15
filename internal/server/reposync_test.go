@@ -411,3 +411,35 @@ func TestRepositorySyncDecides(t *testing.T) {
 		})
 	}
 }
+
+func TestARepositorySyncFailsWhenItCannotReadWhoEditedThePages(t *testing.T) {
+	st := newFaultyStore(testdb.SQLite(t))
+	s := newSite(t, st)
+	r := newSyncedRepo(t, s, map[string]string{"docs/design.md": "# Design\n\nThe boss has three phases.\n"})
+	r.src = s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": r.origin, "subdir": "docs"})["ref"].(string)
+	r.sync()
+	s.change(s.owner, "", "doc.write", M{"doc": s.pageID("Design"), "markdown": "# Design\n\nThe boss has four phases.\n"})
+	before := gitIn(t, r.origin, "rev-parse", "main")
+
+	// The commit's author is read by id alone; signing in reads the same row
+	// as a live one, and is let through.
+	owner := s.ownerID()
+	fired := st.faults.arm(fault{op: "get", table: "users", times: 1,
+		match: func(_ map[string]any, where []store.Cond) bool {
+			return len(where) == 1 && whereHas(where, "id", owner)
+		}})
+	if _, raw := r.syncAnswering(409); !strings.Contains(raw, errOutage.Error()) {
+		t.Fatalf("the sync answered %s; want it to fail on the outage", raw)
+	}
+	if fired() != 1 {
+		t.Fatalf("fault fired %d times", fired())
+	}
+	if after := gitIn(t, r.origin, "rev-parse", "main"); after != before {
+		t.Fatal("a commit went out though its author could not be read")
+	}
+	// The next run, with the database back, makes the commit in the editor's name.
+	r.sync()
+	if who := gitIn(t, r.origin, "log", "-1", "--format=%an <%ae>", "main"); who != "Aram <owner@example.com>" {
+		t.Fatalf("the commit's author is %q", who)
+	}
+}
