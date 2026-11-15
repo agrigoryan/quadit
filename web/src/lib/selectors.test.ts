@@ -9,6 +9,7 @@ import {
   getRow,
   getRowEvenIfGone,
   getRows,
+  getTaskByKey,
   getTaskByKeyEvenIfGone,
   isLive,
   projectByKey,
@@ -28,6 +29,7 @@ import {
   useRows,
   useSubtaskProgress,
   useStatuses,
+  useTaskByKey,
   useTaskByKeyEvenIfGone,
   useTemplates,
   useTrashed,
@@ -183,8 +185,16 @@ describe("what is gone is reached by name", () => {
     expect(getTaskByKeyEvenIfGone("SVA-9")).toBeUndefined();
   });
 
-  it("projectByKey finds an archived project, case aside", () => {
+  it("projectByKey finds an archived project, case aside, and not one in the trash", () => {
     expect(projectByKey(getState().collections.projects, "old")?.id).toBe("p2");
+    expect(projectByKey(getState().collections.projects, "BIN")).toBeUndefined();
+  });
+
+  it("useTaskByKey finds a live task only", () => {
+    expect(hook(() => useTaskByKey("sva-1"))?.id).toBe("t1");
+    expect(hook(() => useTaskByKey("SVA-2"))).toBeUndefined();
+    expect(hook(() => useTaskByKey("SVA-3"))).toBeUndefined();
+    expect(getTaskByKey("SVA-3")).toBeUndefined();
   });
 });
 

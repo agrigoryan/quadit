@@ -190,7 +190,7 @@ export function getProjectByKey(key: string | undefined): Project | undefined {
 export function projectByKey(projects: Dict<Project>, key: string | undefined): Project | undefined {
   if (!key) return undefined;
   const low = key.toLowerCase();
-  return Object.values(projects).find((p) => p.key.toLowerCase() === low);
+  return Object.values(projects).find((p) => !p.deleted_at && p.key.toLowerCase() === low);
 }
 
 export function statusesOf(statuses: Dict<Status>, projectId: string): Status[] {
@@ -260,17 +260,6 @@ export function useViews(): View[] {
   return useStore((s) => viewList(s.collections.views));
 }
 
-// Transitional: the feature folders move off these one by one; they go when none is left.
-export function useCollection<K extends keyof Collections>(name: K): Collections[K] {
-  return useStore((s) => s.collections[name]);
-}
-export function useTask(id: string | undefined): Task | undefined {
-  return useRowEvenIfGone("tasks", id);
-}
-export function findTaskByKey(tasks: Dict<Task>, key: string): Task | undefined {
-  return taskByKey(tasks, key);
-}
-
 const taskKeys = perTable((tasks: Dict<Task>) => {
   const out = new Map<string, Task>();
   for (const task of Object.values(tasks)) if (!out.has(task.key)) out.set(task.key, task);
@@ -282,8 +271,12 @@ function taskByKey(tasks: Dict<Task>, key: string | undefined): Task | undefined
   return key ? taskKeys(tasks).get(key.toUpperCase()) : undefined;
 }
 
+/** A live task by key; one in the trash or the archive is not found. */
 export function useTaskByKey(key: string | undefined): Task | undefined {
-  return useStore((s) => taskByKey(s.collections.tasks, key));
+  return useStore((s) => {
+    const task = taskByKey(s.collections.tasks, key);
+    return task && isLive(task) ? task : undefined;
+  });
 }
 
 /** useTaskByKey outside a component. */
