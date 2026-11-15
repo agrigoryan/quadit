@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,14 +16,14 @@ import (
 // handleShowProjectLayout describes one project: its statuses, labels, members, epics,
 // cycles and templates, by name.
 func (s *Server) handleShowProjectLayout(x *c) error {
-	project, err := x.resolver().Project(x.r.PathValue("key"))
+	project, err := x.resolver(x.ctx()).Project(x.r.PathValue("key"))
 	if err != nil {
 		return err
 	}
 	if !x.canProject(project.ID) {
 		return errNotFound("project " + project.Key)
 	}
-	out, err := x.layout(project)
+	out, err := x.layout(x.ctx(), project)
 	if err != nil {
 		return err
 	}
@@ -47,13 +48,13 @@ type layoutItem struct {
 
 // layout gathers what a project has: its statuses in their own order, the
 // other lists by name. A list the project has nothing in is left out.
-func (x *c) layout(project core.Project) (map[string][]layoutItem, error) {
-	names, err := x.names()
+func (who *viewer) layout(ctx context.Context, project core.Project) (map[string][]layoutItem, error) {
+	names, err := who.names(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var templates []core.Template
-	if err := x.db.List(x.ctx(), &templates, store.Where(store.Live)); err != nil {
+	if err := who.db.List(ctx, &templates, store.Where(store.Live)); err != nil {
 		return nil, err
 	}
 	out := map[string][]layoutItem{

@@ -205,7 +205,7 @@ func (b *bootstrapRows) keepToCaller() {
 	x := b.x
 	inScope := x.canProject
 	x.s.withResponsible(x.ctx(), b.members)
-	x.hideActions(b.members)
+	x.hideActions(x.ctx(), b.members)
 	epicOK := map[string]bool{}
 	for _, e := range b.epics {
 		epicOK[e.ID] = inScope(e.ProjectID)

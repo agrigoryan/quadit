@@ -244,12 +244,12 @@ func firstNonEmpty(a, b string) string {
 // sendDelivery sends the request. The body carries the event as stored plus one
 // line saying what happened, so a receiver can act without calling back.
 func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Webhook, deliveryID string, ev core.Event) (status int, errText string, took time.Duration) {
-	// The line is written by the same code that answers requests, which
-	// reads through a request: this one is made up, and carries ctx.
-	x := &c{s: s, r: (&http.Request{}).WithContext(ctx), ws: ws, db: s.st.In(ws.ID)}
+	// The line says what happened as the feed's text form does, to nobody in
+	// particular: a webhook is the workspace's, not one member's.
+	who := s.viewerFor(ws, core.Member{})
 	line := ""
-	if names, err := x.names(); err == nil { //nolint:contextcheck // x carries ctx in its made-up request
-		line = x.eventLine(ev, names) //nolint:contextcheck // as above
+	if names, err := who.names(ctx); err == nil {
+		line = who.eventLine(ctx, ev, names)
 	}
 	payload := map[string]any{"delivery": deliveryID, "workspace": ws.Slug, "seq": ev.Seq, "type": ev.Type, "text": line, "event": ev,
 		"url": s.cfg.BaseURL}

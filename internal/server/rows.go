@@ -62,7 +62,7 @@ type propConfig struct {
 // needed. A database the caller may not see, or that is gone, reads as
 // empty; one that cannot be read fails the whole answer.
 func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return nil, err
 	}

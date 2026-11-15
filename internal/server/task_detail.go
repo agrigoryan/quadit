@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -14,21 +15,20 @@ import (
 // buildTaskDetail builds everything about one task in its named form.
 // maxChars is where a long description is cut, and half of it where a long
 // comment is; 0 cuts nothing.
-func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
-	ctx := x.ctx()
+func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars int) (taskDetail, error) {
 	var d taskDetail
-	names, err := x.names()
+	names, err := who.names(ctx)
 	if err != nil {
 		return d, err
 	}
 
 	// The task itself, and where the feed stands.
 	var ws core.Workspace
-	if err := x.s.st.Get(ctx, &ws, store.Eq("id", x.ws.ID)); err != nil {
+	if err := who.st.Get(ctx, &ws, store.Eq("id", who.ws.ID)); err != nil {
 		return d, err
 	}
 	d.Seq = ws.Seq
-	tv, err := x.detailedTaskViews([]core.Task{t})
+	tv, err := who.detailedTaskViews(ctx, []core.Task{t})
 	if err != nil {
 		return d, err
 	}
@@ -36,7 +36,7 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 	if t.Budget != nil {
 		// What agents have spent of the task's own budget so far.
 		var runs []core.AgentSession
-		if err := x.db.List(ctx, &runs, store.Where(store.Eq("task_id", t.ID))); err != nil {
+		if err := who.db.List(ctx, &runs, store.Where(store.Eq("task_id", t.ID))); err != nil {
 			return d, err
 		}
 		spent := core.Budget{}
@@ -54,26 +54,26 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 	d.Task.Description, d.Task.Truncated = truncate(d.Task.Description, maxChars)
 
 	// Its sub-tasks, in their order.
-	subs, err := x.db.Tasks(ctx, store.TaskFilter{ParentID: t.ID, Sort: "rank", Limit: 500})
+	subs, err := who.db.Tasks(ctx, store.TaskFilter{ParentID: t.ID, Sort: "rank", Limit: 500})
 	if err != nil {
 		return d, err
 	}
-	if d.Subtasks, err = x.taskViews(subs); err != nil {
+	if d.Subtasks, err = who.taskViews(ctx, subs); err != nil {
 		return d, err
 	}
 
 	// Its decisions, with their files.
 	var decisions []core.Decision
-	if err := x.db.List(ctx, &decisions, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "rank"}); err != nil {
+	if err := who.db.List(ctx, &decisions, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "rank"}); err != nil {
 		return d, err
 	}
-	if d.Decisions, err = x.decisionViewsWithFiles(decisions); err != nil {
+	if d.Decisions, err = who.decisionViewsWithFiles(ctx, decisions); err != nil {
 		return d, err
 	}
 
 	// Every file in the task, by what it is attached to; the task's own go
 	// on the task, the comments' on their comments.
-	files, _, err := x.attachments(store.Eq("task_id", t.ID))
+	files, _, err := who.attachments(ctx, store.Eq("task_id", t.ID))
 	if err != nil {
 		return d, err
 	}
@@ -89,7 +89,7 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 		}
 	}
 	var comments []core.Comment
-	if err := x.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_seq"}); err != nil {
+	if err := who.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_seq"}); err != nil {
 		return d, err
 	}
 	for _, cm := range comments {
@@ -104,10 +104,10 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 
 	// The tasks it is related to, from either end.
 	var outgoing, incoming []core.Relation
-	if err := x.db.List(ctx, &outgoing, store.Where(store.Eq("task_id", t.ID))); err != nil {
+	if err := who.db.List(ctx, &outgoing, store.Where(store.Eq("task_id", t.ID))); err != nil {
 		return d, err
 	}
-	if err := x.db.List(ctx, &incoming, store.Where(store.Eq("related_task_id", t.ID))); err != nil {
+	if err := who.db.List(ctx, &incoming, store.Where(store.Eq("related_task_id", t.ID))); err != nil {
 		return d, err
 	}
 	var otherIDs []string
@@ -118,7 +118,7 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 		otherIDs = append(otherIDs, r.TaskID)
 	}
 	if len(otherIDs) > 0 {
-		others, err := x.db.Tasks(ctx, store.TaskFilter{IDs: otherIDs, Archived: true, Limit: 1000})
+		others, err := who.db.Tasks(ctx, store.TaskFilter{IDs: otherIDs, Archived: true, Limit: 1000})
 		if err != nil {
 			return d, err
 		}
@@ -142,7 +142,7 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 
 	// Its links: branches, pull requests, addresses.
 	var links []core.TaskLink
-	if err := x.db.List(ctx, &links, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
+	if err := who.db.List(ctx, &links, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
 		return d, err
 	}
 	for _, l := range links {
@@ -151,7 +151,7 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 
 	// Who watches it, by handle.
 	var watchers []core.Watcher
-	if err := x.db.List(ctx, &watchers, store.Where(store.Eq("subject_id", t.ID))); err != nil {
+	if err := who.db.List(ctx, &watchers, store.Where(store.Eq("subject_id", t.ID))); err != nil {
 		return d, err
 	}
 	for _, w := range watchers {
@@ -162,12 +162,12 @@ func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 }
 
 // taskByRef loads a task the caller may read.
-func (x *c) taskByRef(ref string) (core.Task, error) {
-	t, err := x.resolver().Task(ref)
+func (who *viewer) taskByRef(ctx context.Context, ref string) (core.Task, error) {
+	t, err := who.resolver(ctx).Task(ref)
 	if err != nil {
 		return t, err
 	}
-	if !x.canProject(t.ProjectID) {
+	if !who.canProject(t.ProjectID) {
 		return t, errNotFound("task " + ref)
 	}
 	return t, nil
@@ -188,7 +188,7 @@ const defaultMaxChars = 6000
 // handleShowTask returns one task with everything in it. since=N returns only what
 // happened in it after feed position N. raw=1 returns rows, for the web app.
 func (s *Server) handleShowTask(x *c) error {
-	t, err := x.taskByRef(x.r.PathValue("ref"))
+	t, err := x.taskByRef(x.ctx(), x.r.PathValue("ref"))
 	if err != nil {
 		return err
 	}
@@ -202,9 +202,13 @@ func (s *Server) handleShowTask(x *c) error {
 		return x.events(eventPage{events: evs, seq: t.ActivitySeq})
 	}
 	if truthyParam(v, "raw") {
-		return s.rawTask(x, t)
+		rows, err := x.taskRows(x.ctx(), t)
+		if err != nil {
+			return err
+		}
+		return x.ok(rows)
 	}
-	detail, err := x.buildTaskDetail(t, x.maxChars())
+	detail, err := x.buildTaskDetail(x.ctx(), t, x.maxChars())
 	if err != nil {
 		return err
 	}
@@ -214,54 +218,54 @@ func (s *Server) handleShowTask(x *c) error {
 	return x.ok(detail)
 }
 
-// rawTask returns a task's rows as stored.
-func (s *Server) rawTask(x *c, t core.Task) error {
-	ctx := x.ctx()
+// taskRows is a task with the rows that hang on it, as stored: what the web
+// app reads. Where the task is mentioned is kept to what the viewer may see.
+func (who *viewer) taskRows(ctx context.Context, t core.Task) (map[string]any, error) {
 	var comments []core.Comment
 	var links []core.TaskLink
 	var watchers []core.Watcher
 	var sessions []core.AgentSession
-	if err := x.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_seq"}); err != nil {
-		return err
+	if err := who.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_seq"}); err != nil {
+		return nil, err
 	}
-	if err := x.db.List(ctx, &links, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
-		return err
+	if err := who.db.List(ctx, &links, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
+		return nil, err
 	}
-	if err := x.db.List(ctx, &watchers, store.Where(store.Eq("subject_id", t.ID))); err != nil {
-		return err
+	if err := who.db.List(ctx, &watchers, store.Where(store.Eq("subject_id", t.ID))); err != nil {
+		return nil, err
 	}
-	if err := x.db.List(ctx, &sessions, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID)}, Order: "-started_at", Limit: 50}); err != nil {
-		return err
+	if err := who.db.List(ctx, &sessions, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID)}, Order: "-started_at", Limit: 50}); err != nil {
+		return nil, err
 	}
-	_, atts, err := x.attachments(store.Eq("task_id", t.ID))
+	_, atts, err := who.attachments(ctx, store.Eq("task_id", t.ID))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Where this task, and each of its decisions, is mentioned: in pages,
 	// in other tasks, in comments. Each says what it is called.
 	targets := []string{t.ID}
 	var decisions []core.Decision
-	if err := x.db.List(ctx, &decisions, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
-		return err
+	if err := who.db.List(ctx, &decisions, store.Where(store.Eq("task_id", t.ID), store.Live)); err != nil {
+		return nil, err
 	}
 	for _, decision := range decisions {
 		targets = append(targets, decision.ID)
 	}
 	var refs []core.Ref
-	if err := x.db.List(ctx, &refs, store.Where(store.In("to_id", targets))); err != nil {
-		return err
+	if err := who.db.List(ctx, &refs, store.Where(store.In("to_id", targets))); err != nil {
+		return nil, err
 	}
-	mentioned, err := x.namedRefs(refs)
+	mentioned, err := who.namedRefs(ctx, refs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var outgoing, incoming []core.Relation
-	if err := x.db.List(ctx, &outgoing, store.Where(store.Eq("task_id", t.ID))); err != nil {
-		return err
+	if err := who.db.List(ctx, &outgoing, store.Where(store.Eq("task_id", t.ID))); err != nil {
+		return nil, err
 	}
-	if err := x.db.List(ctx, &incoming, store.Where(store.Eq("related_task_id", t.ID))); err != nil {
-		return err
+	if err := who.db.List(ctx, &incoming, store.Where(store.Eq("related_task_id", t.ID))); err != nil {
+		return nil, err
 	}
-	return x.ok(map[string]any{"task": t, "comments": comments, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions,
-		"mentioned_in": mentioned, "relations": append(outgoing, incoming...)})
+	return map[string]any{"task": t, "comments": comments, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions,
+		"mentioned_in": mentioned, "relations": append(outgoing, incoming...)}, nil
 }

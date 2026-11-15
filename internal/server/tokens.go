@@ -35,7 +35,7 @@ func (s *Server) handleCreateToken(x *c) error {
 	if x.actor.ReadOnly {
 		return errForbidden("this credential is read-only")
 	}
-	resolver := x.resolver()
+	resolver := x.resolver(x.ctx())
 	if b.User == "" {
 		b.User = "me"
 	}

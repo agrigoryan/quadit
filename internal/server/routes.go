@@ -230,13 +230,13 @@ func listConditions[T any](x *c, conds []store.Cond) ([]store.Cond, error) {
 func (x *c) narrowingID(param, val string) (string, error) {
 	switch param {
 	case "project":
-		p, err := x.resolver().Project(val)
+		p, err := x.resolver(x.ctx()).Project(val)
 		if err != nil {
 			return "", err
 		}
 		return p.ID, nil
 	case "task":
-		tk, err := x.resolver().Task(val)
+		tk, err := x.resolver(x.ctx()).Task(val)
 		if err != nil {
 			return "", err
 		}
@@ -314,17 +314,17 @@ var taskKeyIn = regexp.MustCompile(`\b([A-Z][A-Z0-9]{1,9})-\d+\b`)
 
 // hideActions blanks, for a caller limited to some projects, what a member
 // last did when it names a task of another project.
-func (x *c) hideActions(members []core.Member) {
-	if x.projects == nil {
+func (who *viewer) hideActions(ctx context.Context, members []core.Member) {
+	if who.projects == nil {
 		return
 	}
 	// When the projects cannot be read, mine stays empty and every action
 	// that names a task is hidden: this fails closed.
 	mine := map[string]bool{}
 	var projects []core.Project
-	if err := x.db.List(x.ctx(), &projects, store.Q{}); err == nil {
+	if err := who.db.List(ctx, &projects, store.Q{}); err == nil {
 		for _, p := range projects {
-			mine[p.Key] = x.canProject(p.ID)
+			mine[p.Key] = who.canProject(p.ID)
 		}
 	}
 	for i := range members {
@@ -389,7 +389,7 @@ func loadMembers(x *c) (any, error) {
 	}
 	ms := rows.([]core.Member)
 	x.s.withResponsible(x.ctx(), ms)
-	x.hideActions(ms)
+	x.hideActions(x.ctx(), ms)
 	if !x.member.Role.AtLeast(core.RoleAdmin) {
 		return ms, nil
 	}
@@ -421,7 +421,7 @@ func loadAttachments(x *c) (any, error) {
 		conds = []store.Cond{store.NotNull("deleted_at")}
 	}
 	if ref := x.r.URL.Query().Get("task"); ref != "" {
-		t, err := x.taskByRef(ref)
+		t, err := x.taskByRef(x.ctx(), ref)
 		if err != nil {
 			return nil, err
 		}
@@ -431,7 +431,7 @@ func loadAttachments(x *c) (any, error) {
 	if err := x.db.List(x.ctx(), &atts, store.Q{Where: conds, Order: "-created_at", Limit: 1000}); err != nil {
 		return nil, err
 	}
-	byID, err := x.attachedFiles(atts)
+	byID, err := x.attachedFiles(x.ctx(), atts)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +452,7 @@ func loadAttachments(x *c) (any, error) {
 }
 
 // attachedFiles loads the files of attachments, with their addresses, by id.
-func (x *c) attachedFiles(atts []core.Attachment) (map[string]core.File, error) {
+func (who *viewer) attachedFiles(ctx context.Context, atts []core.Attachment) (map[string]core.File, error) {
 	ids := make([]string, 0, len(atts))
 	for _, a := range atts {
 		ids = append(ids, a.FileID)
@@ -462,11 +462,11 @@ func (x *c) attachedFiles(atts []core.Attachment) (map[string]core.File, error) 
 		return byID, nil
 	}
 	var files []core.File
-	if err := x.db.List(x.ctx(), &files, store.Where(store.In("id", ids))); err != nil {
+	if err := who.db.List(ctx, &files, store.Where(store.In("id", ids))); err != nil {
 		return nil, err
 	}
 	for _, f := range files {
-		f.URL, f.PreviewURL = x.fileURL(f)
+		f.URL, f.PreviewURL = who.fileURL(f)
 		byID[f.ID] = f
 	}
 	return byID, nil

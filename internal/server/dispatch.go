@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -185,14 +184,8 @@ func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watche
 	if !ok {
 		return nil
 	}
-	// Run the view's query as the watcher, narrowed to this one task. The
-	// query is read by the same code that answers requests, which reads
-	// through a request: this one is made up, and carries ctx.
-	x := &c{s: s, r: (&http.Request{URL: &url.URL{}}).WithContext(ctx), ws: ws, db: db, member: m}
-	if m.Scope != nil {
-		x.projects = m.Scope.Projects
-	}
-	f, _, err := x.taskFilter(q) //nolint:contextcheck // x carries ctx in its made-up request
+	// Run the view's query as the watcher, narrowed to this one task.
+	f, _, err := s.viewerFor(ws, m).taskFilter(ctx, q)
 	if _, refused := errors.AsType[*engine.Error](err); refused {
 		return nil // the view names something that is gone, or out of the watcher's reach: nothing to watch
 	}

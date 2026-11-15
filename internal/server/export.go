@@ -57,7 +57,7 @@ func (s *Server) handleExportWorkspace(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return err
 	}

@@ -229,7 +229,7 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 // when it was on a task of the projects the agents are seen in.
 func (w *agentWork) lastAction(m core.Member) string {
 	shown := []core.Member{m}
-	w.x.hideActions(shown)
+	w.x.hideActions(w.x.ctx(), shown)
 	if w.keys != nil && !actsIn(shown[0].LastAction, w.keys) {
 		return ""
 	}
@@ -239,7 +239,7 @@ func (w *agentWork) lastAction(m core.Member) string {
 // handleListAgents is the live view of agents: who is doing what, who is waiting,
 // who is not reachable.
 func (s *Server) handleListAgents(x *c) error {
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -15,20 +16,13 @@ import (
 // handleShowTaskContext is the context pack: one call with everything an agent needs to
 // work on a task.
 func (s *Server) handleShowTaskContext(x *c) error {
-	t, err := x.taskByRef(x.r.PathValue("ref"))
+	t, err := x.taskByRef(x.ctx(), x.r.PathValue("ref"))
 	if err != nil {
 		return err
 	}
-	detail, err := x.buildTaskDetail(t, x.maxChars())
+	pack, err := x.contextPack(x.ctx(), t, x.maxChars())
 	if err != nil {
 		return err
-	}
-	pack := &contextPack{x: x, t: t, out: map[string]any{"task": detail}}
-	pack.text.WriteString(detail.text())
-	for _, part := range []func() error{pack.parents, pack.epic, pack.preferences, pack.recentDecisions, pack.docs} {
-		if err := part(); err != nil {
-			return err
-		}
 	}
 	if x.wantText() {
 		return x.text(pack.text.String())
@@ -36,10 +30,30 @@ func (s *Server) handleShowTaskContext(x *c) error {
 	return x.ok(pack.out)
 }
 
+// contextPack builds a task's context pack: the task in full, then what
+// surrounds it. maxChars is where the task's own long text is cut (see
+// buildTaskDetail).
+func (who *viewer) contextPack(ctx context.Context, t core.Task, maxChars int) (*contextPack, error) {
+	detail, err := who.buildTaskDetail(ctx, t, maxChars)
+	if err != nil {
+		return nil, err
+	}
+	pack := &contextPack{who: who, ctx: ctx, t: t, out: map[string]any{"task": detail}}
+	pack.text.WriteString(detail.text())
+	for _, part := range []func() error{pack.parents, pack.epic, pack.preferences, pack.recentDecisions, pack.docs} {
+		if err := part(); err != nil {
+			return nil, err
+		}
+	}
+	return pack, nil
+}
+
 // contextPack is one task's context pack in the making, in both its forms:
-// each part adds to the answer and to the text.
+// each part adds to the answer and to the text. It is one run of work, made
+// and finished inside viewer.contextPack, which is why it holds a ctx.
 type contextPack struct {
-	x    *c
+	who  *viewer
+	ctx  context.Context
 	t    core.Task
 	out  map[string]any
 	text strings.Builder
@@ -59,18 +73,18 @@ const (
 // parents adds the chain of parents, which says what this task is part of.
 // A parent that is gone ends the chain.
 func (pack *contextPack) parents() error {
-	x := pack.x
+	who, ctx := pack.who, pack.ctx
 	var parents []taskView
 	for cur, depth := pack.t.ParentID, 0; cur != "" && depth < packParentDepth; depth++ {
 		var up core.Task
-		there, err := store.Find(x.ctx(), x.db, &up, store.Eq("id", cur))
+		there, err := store.Find(ctx, who.db, &up, store.Eq("id", cur))
 		if err != nil {
 			return err
 		}
 		if !there {
 			break
 		}
-		views, err := x.detailedTaskViews([]core.Task{up})
+		views, err := who.detailedTaskViews(ctx, []core.Task{up})
 		if err != nil {
 			return err
 		}
@@ -91,7 +105,7 @@ func (pack *contextPack) parents() error {
 
 // epic adds the epic the task is in.
 func (pack *contextPack) epic() error {
-	names, err := pack.x.names()
+	names, err := pack.who.names(pack.ctx)
 	if err != nil {
 		return err
 	}
@@ -112,7 +126,7 @@ func (pack *contextPack) epic() error {
 func (pack *contextPack) preferences() error {
 	t := pack.t
 	var prefs []core.Preference
-	if err := pack.x.db.List(pack.x.ctx(), &prefs, store.Where(store.Live, store.Null("retired_at"))); err != nil {
+	if err := pack.who.db.List(pack.ctx, &prefs, store.Where(store.Live, store.Null("retired_at"))); err != nil {
 		return err
 	}
 	var rules []string
@@ -135,9 +149,9 @@ func (pack *contextPack) preferences() error {
 // recentDecisions adds earlier answers in the same project, which guide
 // later work.
 func (pack *contextPack) recentDecisions() error {
-	x, ctx, t := pack.x, pack.x.ctx(), pack.t
+	who, ctx, t := pack.who, pack.ctx, pack.t
 	var picked []core.Decision
-	if err := x.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: packDecisionsToCheck}); err != nil {
+	if err := who.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: packDecisionsToCheck}); err != nil {
 		return err
 	}
 	var recent []core.Decision
@@ -146,7 +160,7 @@ func (pack *contextPack) recentDecisions() error {
 			continue
 		}
 		var asker core.Task // the task the decision was asked on
-		there, err := store.Find(ctx, x.db, &asker, store.Eq("id", decision.TaskID))
+		there, err := store.Find(ctx, who.db, &asker, store.Eq("id", decision.TaskID))
 		if err != nil {
 			return err
 		}
@@ -157,7 +171,7 @@ func (pack *contextPack) recentDecisions() error {
 			recent = append(recent, decision)
 		}
 	}
-	views, err := x.decisionViews(recent)
+	views, err := who.decisionViews(ctx, recent)
 	if err != nil {
 		return err
 	}
@@ -181,13 +195,13 @@ func (pack *contextPack) recentDecisions() error {
 
 // docs adds the docs this task mentions, or that mention it.
 func (pack *contextPack) docs() error {
-	x, ctx, t := pack.x, pack.x.ctx(), pack.t
+	who, ctx, t := pack.who, pack.ctx, pack.t
 	var refs []core.Ref
-	if err := x.db.List(ctx, &refs, store.Where(store.Eq("from_scope_id", t.ID), store.Eq("to_type", "doc"))); err != nil {
+	if err := who.db.List(ctx, &refs, store.Where(store.Eq("from_scope_id", t.ID), store.Eq("to_type", "doc"))); err != nil {
 		return err
 	}
 	var back []core.Ref
-	if err := x.db.List(ctx, &back, store.Where(store.Eq("to_id", t.ID), store.Eq("from_scope_type", "doc"))); err != nil {
+	if err := who.db.List(ctx, &back, store.Where(store.Eq("to_id", t.ID), store.Eq("from_scope_type", "doc"))); err != nil {
 		return err
 	}
 	docIDs := map[string]bool{}
@@ -200,15 +214,15 @@ func (pack *contextPack) docs() error {
 	var docs []map[string]any
 	for docID := range docIDs {
 		var doc core.Doc
-		there, err := store.Find(ctx, x.db, &doc, store.Eq("id", docID), store.Live)
+		there, err := store.Find(ctx, who.db, &doc, store.Eq("id", docID), store.Live)
 		if err != nil {
 			return err
 		}
 		if !there {
 			continue
 		}
-		if engine.CanSeeDoc(doc, x.member.UserID) {
-			docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": x.s.cfg.BaseURL + "/" + x.ws.Slug + "/docs/" + doc.ID})
+		if engine.CanSeeDoc(doc, who.member.UserID) {
+			docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": who.baseURL + "/" + who.ws.Slug + "/docs/" + doc.ID})
 		}
 	}
 	if len(docs) > 0 {
@@ -232,35 +246,34 @@ type namedRef struct {
 
 // namedRefs gives each mention the name of where it was made, leaving out
 // those the caller may not see and those made in something since deleted.
-func (x *c) namedRefs(refs []core.Ref) ([]namedRef, error) {
+func (who *viewer) namedRefs(ctx context.Context, refs []core.Ref) ([]namedRef, error) {
 	out := []namedRef{}
-	ctx := x.ctx()
 	for _, ref := range refs {
 		named := namedRef{Ref: ref}
 		switch ref.FromScopeType {
 		case "doc":
 			var doc core.Doc
-			there, err := store.Find(ctx, x.db, &doc, store.Eq("id", ref.FromScopeID), store.Live)
+			there, err := store.Find(ctx, who.db, &doc, store.Eq("id", ref.FromScopeID), store.Live)
 			if err != nil {
 				return nil, err
 			}
 			if !there {
 				continue
 			}
-			if !engine.CanSeeDoc(doc, x.member.UserID) || !x.canProject(doc.ProjectID) {
+			if !engine.CanSeeDoc(doc, who.member.UserID) || !who.canProject(doc.ProjectID) {
 				continue
 			}
 			named.Title = doc.Title
 		case "task":
 			var t core.Task
-			there, err := store.Find(ctx, x.db, &t, store.Eq("id", ref.FromScopeID), store.Live)
+			there, err := store.Find(ctx, who.db, &t, store.Eq("id", ref.FromScopeID), store.Live)
 			if err != nil {
 				return nil, err
 			}
 			if !there {
 				continue
 			}
-			if !x.canProject(t.ProjectID) {
+			if !who.canProject(t.ProjectID) {
 				continue
 			}
 			named.Title, named.Key = t.Title, t.Key

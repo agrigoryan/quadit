@@ -6,6 +6,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -31,13 +32,13 @@ type nameLookup struct {
 	milestones map[string]string
 }
 
-// names returns the request's nameLookup: the workspace's small tables
-// (members, statuses, labels, projects, epics, cycles, milestones), every
-// row of them, deleted ones too, read on the first call and kept for the
-// rest of the request.
-func (x *c) names() (*nameLookup, error) {
-	if x.nameCache != nil {
-		return x.nameCache, nil
+// names returns the workspace's names: its small tables (members, statuses,
+// labels, projects, epics, cycles, milestones), every row of them, deleted
+// ones too, read on the first call and kept for as long as the viewer is: a
+// request, or one piece of the server's own work.
+func (who *viewer) names(ctx context.Context) (*nameLookup, error) {
+	if who.nameCache != nil {
+		return who.nameCache, nil
 	}
 	lookup := &nameLookup{members: map[string]core.Member{}, statuses: map[string]core.Status{}, labels: map[string]core.Label{},
 		projects: map[string]core.Project{}, epics: map[string]core.Epic{}, cycles: map[string]core.Cycle{}, milestones: map[string]string{}}
@@ -48,14 +49,13 @@ func (x *c) names() (*nameLookup, error) {
 	var epics []core.Epic
 	var cycles []core.Cycle
 	var milestones []core.Milestone
-	ctx := x.ctx()
 	for _, list := range []struct {
 		into  any
 		order string
 	}{
 		{&members, ""}, {&statuses, "rank"}, {&labels, ""}, {&projects, "rank"}, {&epics, ""}, {&cycles, ""}, {&milestones, ""},
 	} {
-		if err := x.db.List(ctx, list.into, store.Q{Order: list.order}); err != nil {
+		if err := who.db.List(ctx, list.into, store.Q{Order: list.order}); err != nil {
 			return nil, err
 		}
 	}
@@ -80,7 +80,7 @@ func (x *c) names() (*nameLookup, error) {
 	for _, milestone := range milestones {
 		lookup.milestones[milestone.ID] = milestone.Name
 	}
-	x.nameCache = lookup
+	who.nameCache = lookup
 	return lookup, nil
 }
 
@@ -180,16 +180,16 @@ func splitList(s string) []string {
 
 // resolver finds tasks, projects, members and cycles by what the caller
 // calls them, as the caller.
-func (x *c) resolver() *engine.Resolver {
-	return engine.NewResolver(x.ctx(), x.db, x.member, time.Now().UnixMilli())
+func (who *viewer) resolver(ctx context.Context) *engine.Resolver {
+	return engine.NewResolver(ctx, who.db, who.member, time.Now().UnixMilli())
 }
 
 // taskFilter turns a task query into the store's filter as the caller,
 // kept to the projects the caller may read. stale is what a saved view
 // names that is gone, in words for the caller, when the list was read
 // without that part.
-func (x *c) taskFilter(q core.TaskQuery) (f store.TaskFilter, stale string, err error) {
-	return x.resolver().TaskFilter(q, x.projects)
+func (who *viewer) taskFilter(ctx context.Context, q core.TaskQuery) (f store.TaskFilter, stale string, err error) {
+	return who.resolver(ctx).TaskFilter(q, who.projects)
 }
 
 // idLength is the length of an id (a UUID): a reference that long is taken

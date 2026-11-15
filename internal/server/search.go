@@ -89,7 +89,7 @@ func (s *Server) handleListDecisions(x *c) error {
 	if decisions, err = x.decisionsInProjects(decisions, splitList(v.Get("project"))); err != nil {
 		return err
 	}
-	views, err := x.decisionViewsWithFiles(decisions)
+	views, err := x.decisionViewsWithFiles(x.ctx(), decisions)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (x *c) decisionConds() ([]store.Cond, error) {
 		conds = append(conds, store.Like("question", "%"+strings.NewReplacer("%", "", "_", " ").Replace(words)+"%"))
 	}
 	if ref := v.Get("asked"); ref != "" {
-		asked, err := x.resolver().Member("asked", ref)
+		asked, err := x.resolver(x.ctx()).Member("asked", ref)
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +150,7 @@ func (x *c) decisionConds() ([]store.Cond, error) {
 func (x *c) decisionsInProjects(decisions []core.Decision, refs []string) ([]core.Decision, error) {
 	var projectIDs []string
 	for _, ref := range refs {
-		project, err := x.resolver().Project(ref)
+		project, err := x.resolver(x.ctx()).Project(ref)
 		if err != nil {
 			return nil, err
 		}

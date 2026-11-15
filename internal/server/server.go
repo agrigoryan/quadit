@@ -224,8 +224,9 @@ var statusOf = map[string]int{
 // c is one request with who is asking: the request context every handler
 // takes, named x. The route wrapper makes it with s, w and r (and
 // firstStepEnough); identify fills in who is asking; enterWorkspace fills
-// in the workspace and what the caller may do there. Contexts made for work
-// outside a request (dispatch.go, query.go) set only what that work reads.
+// in the viewer (the workspace, the membership and what the caller may
+// read there) and the actor. What reads the workspace's data is a method
+// of the viewer, not of c: c is the HTTP side of a request.
 type c struct {
 	narrowed bool // fields= and since= were applied by the handler (narrowedAlready)
 	s        *Server
@@ -234,17 +235,13 @@ type c struct {
 	user     core.User      // the account asking (identify)
 	sess     *core.Session  // the session, when signed in by cookie (identify)
 	token    *core.APIToken // the token, when signed in by one (identify)
-	ws       core.Workspace // the workspace in the path (enterWorkspace)
-	member   core.Member    // the caller's membership in ws (enterWorkspace)
+	// viewer is the caller as a member of the workspace in the path, with
+	// what it may read (enterWorkspace). Its fields and methods are used as
+	// the request's own: x.ws, x.member, x.db, x.canProject.
+	viewer
 	// actor is who the engine applies changes as, read-only or limited to
 	// projects by the token's scopes (enterWorkspace).
 	actor engine.Actor
-	// projects, when not nil, are the only projects this caller may read:
-	// the membership's scope, narrowed by the token's (enterWorkspace). nil
-	// lets in every project; engine.NoProjects() lets in none.
-	projects  []string
-	db        store.DB    // bound to ws (enterWorkspace)
-	nameCache *nameLookup // the workspace's names, loaded once per request (query.go)
 	// firstStepEnough lets a session that still owes its second step through.
 	// Set by firstStepPassed.
 	firstStepEnough bool
@@ -424,14 +421,6 @@ func (x *c) hasFullAccess() bool {
 		return x.sess.Stage == core.SessionFull
 	}
 	return x.token != nil && x.token.Kind == core.TokenAPI && x.token.Scopes == ""
-}
-
-// admin refuses a caller whose role in the workspace is below admin.
-func (x *c) admin() error {
-	if !x.member.Role.AtLeast(core.RoleAdmin) {
-		return errForbidden("this needs the admin role; you are a %s", x.member.Role)
-	}
-	return nil
 }
 
 // fail writes an error in the one shape every error has.
@@ -687,8 +676,8 @@ func (s *Server) loadAccount(ctx context.Context, x *c, userID, disabledMsg stri
 }
 
 // enterWorkspace binds the request to a workspace the caller belongs to. "-" means
-// the workspace of the token used. It fills in x.ws, x.db, x.member,
-// x.actor and x.projects, and records the member's presence.
+// the workspace of the token used. It fills in the viewer (x.ws, x.db,
+// x.member, x.projects) and x.actor, and records the member's presence.
 func (s *Server) enterWorkspace(x *c, ref string) error {
 	ctx := x.ctx()
 	if err := s.loadMembership(ctx, x, ref); err != nil {
@@ -701,9 +690,6 @@ func (s *Server) enterWorkspace(x *c, ref string) error {
 		}
 	}
 	x.actor = engine.Actor{UserID: x.user.ID}
-	if x.member.Scope != nil {
-		x.projects = x.member.Scope.Projects
-	}
 	if x.token != nil {
 		x.applyTokenScopes()
 	}
@@ -712,8 +698,8 @@ func (s *Server) enterWorkspace(x *c, ref string) error {
 }
 
 // loadMembership finds the workspace ref names and the caller's membership
-// in it, filling in x.ws, x.db and x.member. A workspace the caller is not
-// a member of is not found, as if it did not exist.
+// in it, and makes the request's viewer of them. A workspace the caller is
+// not a member of is not found, as if it did not exist.
 func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 	cond := store.Eq("slug", ref)
 	if ref == "-" {
@@ -722,26 +708,28 @@ func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 		}
 		cond = store.Eq("id", x.token.WorkspaceID)
 	}
-	there, err := store.Find(ctx, s.st, &x.ws, cond, store.Live)
+	var ws core.Workspace
+	there, err := store.Find(ctx, s.st, &ws, cond, store.Live)
 	if err != nil {
 		return err
 	}
 	if !there {
 		return errNotFound("workspace " + ref)
 	}
-	if x.token != nil && x.token.WorkspaceID != x.ws.ID {
+	if x.token != nil && x.token.WorkspaceID != ws.ID {
 		return errForbidden("this token belongs to another workspace")
 	}
-	x.db = s.st.In(x.ws.ID)
-	if there, err = store.Find(ctx, x.db, &x.member, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
+	var member core.Member
+	if there, err = store.Find(ctx, s.st.In(ws.ID), &member, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
 		return err
 	}
 	if !there {
 		return errNotFound("workspace " + ref) // not a member: it does not exist for them
 	}
-	if x.member.SuspendedAt != 0 {
+	if member.SuspendedAt != 0 {
 		return errForbidden("your membership in this workspace is suspended")
 	}
+	x.viewer = *s.viewerFor(ws, member)
 	return nil
 }
 
@@ -780,11 +768,6 @@ func (x *c) applyTokenScopes() {
 // has reports whether list holds v.
 func has(list []string, v string) bool {
 	return slices.Contains(list, v)
-}
-
-// canProject reports whether the caller may read a project.
-func (x *c) canProject(projectID string) bool {
-	return x.projects == nil || projectID == "" || slices.Contains(x.projects, projectID)
 }
 
 // touchPresence records that a member was just here, at most every 20

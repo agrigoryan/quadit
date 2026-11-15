@@ -76,7 +76,7 @@ func (s *Server) handleListPages(x *c) error {
 	}
 	docs = keep(docs, func(d core.Doc) bool { return d.Kind != core.DocRow })
 	if ref := x.r.URL.Query().Get("project"); ref != "" {
-		project, err := x.resolver().Project(ref)
+		project, err := x.resolver(x.ctx()).Project(ref)
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func (s *Server) handleListPages(x *c) error {
 	if !x.wantText() {
 		return x.ok(map[string]any{"docs": docs})
 	}
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func (x *c) pageAnswer(page core.Doc, blocks []core.Block) (map[string]any, erro
 		return nil, err
 	}
 	out["mentioned_in"], out["mentions"] = back, fwd
-	_, atts, err := x.attachments(store.Eq("subject_id", page.ID))
+	_, atts, err := x.attachments(x.ctx(), store.Eq("subject_id", page.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +398,7 @@ func (s *Server) regenerate(x *c, page *core.Doc) error {
 // the open questions, each kept to the page's project when it has one.
 func (s *Server) generated(x *c, page core.Doc) (string, error) {
 	ctx := x.ctx()
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return "", err
 	}
@@ -440,7 +440,7 @@ func (s *Server) generated(x *c, page core.Doc) (string, error) {
 		if err := x.db.List(ctx, &decisions, store.Q{Where: conds, Order: "-updated_seq", Limit: 2000}); err != nil {
 			return "", err
 		}
-		views, err := x.decisionViews(decisions)
+		views, err := x.decisionViews(x.ctx(), decisions)
 		if err != nil {
 			return "", err
 		}
@@ -518,7 +518,7 @@ func (x *c) memoryAgent() (core.Member, error) {
 	if ref == "" {
 		ref = "me"
 	}
-	agent, err := x.resolver().Member("agent", ref)
+	agent, err := x.resolver(x.ctx()).Member("agent", ref)
 	if err != nil {
 		return agent, err
 	}

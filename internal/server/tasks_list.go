@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -23,7 +24,7 @@ func (s *Server) handleListTasks(x *c) error {
 	if err != nil {
 		return err
 	}
-	f, stale, err := x.taskFilter(query)
+	f, stale, err := x.taskFilter(x.ctx(), query)
 	if err != nil {
 		return err
 	}
@@ -44,7 +45,7 @@ func (s *Server) handleListTasks(x *c) error {
 		}
 		f.After, f.MadeUpTo, f.Offset = cur.K, cur.S, 0
 	}
-	page, err := x.readTaskPage(f)
+	page, err := x.readTaskPage(x.ctx(), f)
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func (s *Server) handleListTasks(x *c) error {
 	if slices.Contains(fields, "description") || slices.Contains(fields, "id") || slices.Contains(fields, "project") {
 		viewsOf = x.detailedTaskViews
 	}
-	views, err := viewsOf(page.tasks)
+	views, err := viewsOf(x.ctx(), page.tasks)
 	if err != nil {
 		return err
 	}
@@ -157,18 +158,18 @@ type taskPage struct {
 
 // readTaskPage reads the page a filter asks for: up to f.Limit tasks, and
 // whether more follow.
-func (x *c) readTaskPage(f store.TaskFilter) (taskPage, error) {
+func (who *viewer) readTaskPage(ctx context.Context, f store.TaskFilter) (taskPage, error) {
 	var page taskPage
 	limit := f.Limit
 	f.Limit++ // one extra row says whether there are more
-	tasks, err := x.db.Tasks(x.ctx(), f)
+	tasks, err := who.db.Tasks(ctx, f)
 	if err != nil {
 		return page, err
 	}
 	page.tasks = tasks
 	if page.more = len(page.tasks) > limit; page.more {
 		page.tasks = page.tasks[:limit]
-		next, err := x.cursorAfter(f, page.tasks[limit-1])
+		next, err := who.cursorAfter(ctx, f, page.tasks[limit-1])
 		if err != nil {
 			return page, err
 		}
@@ -176,7 +177,7 @@ func (x *c) readTaskPage(f store.TaskFilter) (taskPage, error) {
 		return page, nil
 	}
 	if len(f.After) > 0 && f.MadeUpTo > 0 {
-		moved, err := x.changedDuringWalk(f, page.tasks)
+		moved, err := who.changedDuringWalk(ctx, f, page.tasks)
 		if err != nil {
 			return page, err
 		}
@@ -187,10 +188,10 @@ func (x *c) readTaskPage(f store.TaskFilter) (taskPage, error) {
 
 // changedDuringWalk finds the tasks of a list that changed since a walk
 // through it by cursor began, leaving out those of its last page.
-func (x *c) changedDuringWalk(f store.TaskFilter, lastPage []core.Task) ([]core.Task, error) {
+func (who *viewer) changedDuringWalk(ctx context.Context, f store.TaskFilter, lastPage []core.Task) ([]core.Task, error) {
 	again := f
 	again.After, again.Offset, again.Limit, again.UpdatedAfter = nil, 0, maxTaskPage, max(f.UpdatedAfter, f.MadeUpTo)
-	moved, err := x.db.Tasks(x.ctx(), again)
+	moved, err := who.db.Tasks(ctx, again)
 	if err != nil {
 		return nil, err
 	}
@@ -203,11 +204,11 @@ func (x *c) changedDuringWalk(f store.TaskFilter, lastPage []core.Task) ([]core.
 
 // cursorAfter makes the cursor that continues a list after one of its rows.
 // The first page's cursor notes where the feed stands.
-func (x *c) cursorAfter(f store.TaskFilter, last core.Task) (taskCursor, error) {
+func (who *viewer) cursorAfter(ctx context.Context, f store.TaskFilter, last core.Task) (taskCursor, error) {
 	cur := taskCursor{S: f.MadeUpTo, Sort: f.Sort}
 	if cur.S == 0 {
 		var ws core.Workspace
-		if err := x.s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err != nil {
+		if err := who.st.Get(ctx, &ws, store.Eq("id", who.ws.ID)); err != nil {
 			return cur, err
 		}
 		cur.S = ws.Seq

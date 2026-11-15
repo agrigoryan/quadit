@@ -74,13 +74,13 @@ type dashboard struct {
 // newDashboard works out which projects the dashboard covers and reads
 // their tasks.
 func (x *c) newDashboard() (*dashboard, error) {
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return nil, err
 	}
 	projects := x.projects
 	if ref := x.r.URL.Query().Get("project"); ref != "" {
-		project, err := x.resolver().Project(ref)
+		project, err := x.resolver(x.ctx()).Project(ref)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +126,7 @@ func (d *dashboard) waitingOnMe() error {
 	}
 	sort.Slice(waiting, func(i, j int) bool { return waiting[i].UpdatedAt < waiting[j].UpdatedAt })
 	var err error
-	if d.waiting, err = x.taskViews(waiting); err != nil {
+	if d.waiting, err = x.taskViews(x.ctx(), waiting); err != nil {
 		return err
 	}
 	var asked []core.Decision
@@ -136,7 +136,7 @@ func (d *dashboard) waitingOnMe() error {
 	// Only questions on the tasks the dashboard covers: one narrowed to a
 	// project leaves out what is asked on another's.
 	asked = keep(asked, func(question core.Decision) bool { return d.covered[question.TaskID] })
-	d.asked, err = x.decisionViews(asked)
+	d.asked, err = x.decisionViews(x.ctx(), asked)
 	return err
 }
 
@@ -153,7 +153,7 @@ func (d *dashboard) recentDecisions() error {
 		picked = picked[:dashboardDecisions]
 	}
 	var err error
-	if d.decided, err = x.decisionViews(picked); err != nil {
+	if d.decided, err = x.decisionViews(x.ctx(), picked); err != nil {
 		return err
 	}
 	var prefs []core.Preference

@@ -126,7 +126,7 @@ func picturePath(x *c) (string, error) {
 	path := "/" + x.ws.Slug
 	switch {
 	case q.Get("task") != "":
-		t, err := x.taskByRef(q.Get("task"))
+		t, err := x.taskByRef(x.ctx(), q.Get("task"))
 		if err != nil {
 			return "", err
 		}

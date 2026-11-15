@@ -19,7 +19,7 @@ func (s *Server) handleShowCycleChart(x *c) error {
 	if !x.canProject(cycle.ProjectID) {
 		return errNotFound("cycle")
 	}
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return err
 	}

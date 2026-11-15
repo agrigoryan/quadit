@@ -40,13 +40,13 @@ func (x *c) events(page eventPage) error {
 		}
 		return x.ok(map[string]any{"events": evs, "seq": page.seq, "more": page.more})
 	}
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return err
 	}
 	eventLines := make([]string, len(page.events))
 	for i, ev := range page.events {
-		eventLines[i] = x.eventLine(ev, names)
+		eventLines[i] = x.eventLine(x.ctx(), ev, names)
 	}
 	if !x.wantText() {
 		return x.ok(map[string]any{"events": eventLines, "seq": page.seq, "more": page.more})
@@ -100,7 +100,7 @@ func (s *Server) handleReadFeed(x *c) error {
 		f.OnlyAudience = x.member.UserID
 	}
 	if ref := v.Get("task"); ref != "" {
-		t, err := x.taskByRef(ref)
+		t, err := x.taskByRef(x.ctx(), ref)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (s *Server) handleReadFeed(x *c) error {
 	}
 	if query.Watching || len(v) > 0 && hasTaskFilter(query) {
 		query.Archived = true
-		tf, _, err := x.taskFilter(query)
+		tf, _, err := x.taskFilter(x.ctx(), query)
 		if err != nil {
 			return err
 		}

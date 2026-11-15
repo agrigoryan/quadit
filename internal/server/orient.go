@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -16,7 +17,7 @@ import (
 // budget left, and where the caller's cursors stand.
 func (s *Server) handleShowWhoAmI(x *c) error {
 	ctx := x.ctx()
-	names, err := x.names()
+	names, err := x.names(x.ctx())
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 	if x.member.Kind == core.KindAgent {
 		out["responsible"] = names.handle(x.user.ResponsibleID)
 		if limits := x.member.Budget; limits != nil {
-			budget, err := s.weekBudget(x, limits)
+			budget, err := x.weekBudget(ctx, limits)
 			if err != nil {
 				return err
 			}
@@ -52,12 +53,12 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 		return err
 	}
 	out["unread"] = unread
-	cursors, err := x.cursorSeqs()
+	cursors, err := x.cursorSeqs(x.ctx())
 	if err != nil {
 		return err
 	}
 	out["cursors"] = cursors
-	rules, err := x.workspaceRules()
+	rules, err := x.workspaceRules(x.ctx())
 	if err != nil {
 		return err
 	}
@@ -71,10 +72,10 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 }
 
 // projectKeys lists, in order, the keys of the projects the caller may read.
-func (x *c) projectKeys(names *nameLookup) []string {
+func (who *viewer) projectKeys(names *nameLookup) []string {
 	var keys []string
 	for _, project := range names.projects {
-		if project.DeletedAt == 0 && project.ArchivedAt == 0 && x.canProject(project.ID) {
+		if project.DeletedAt == 0 && project.ArchivedAt == 0 && who.canProject(project.ID) {
 			keys = append(keys, project.Key)
 		}
 	}
@@ -84,8 +85,8 @@ func (x *c) projectKeys(names *nameLookup) []string {
 
 // weekBudget says what an agent has used of its budget this week, what is
 // left, and when the week starts over.
-func (s *Server) weekBudget(x *c, limits *core.Budget) (map[string]any, error) {
-	cost, minutes, err := s.eng.Usage(x.ctx(), x.db, x.member.UserID, weekStart(time.Now()))
+func (who *viewer) weekBudget(ctx context.Context, limits *core.Budget) (map[string]any, error) {
+	cost, minutes, err := who.agentUsage(ctx, who.db, who.member.UserID, weekStart(time.Now()))
 	if err != nil {
 		return nil, err
 	}
@@ -101,9 +102,9 @@ func (s *Server) weekBudget(x *c, limits *core.Budget) (map[string]any, error) {
 }
 
 // cursorSeqs is where each of the caller's cursors stands, by name.
-func (x *c) cursorSeqs() (map[string]int64, error) {
+func (who *viewer) cursorSeqs(ctx context.Context) (map[string]int64, error) {
 	var cursors []core.Cursor
-	if err := x.db.List(x.ctx(), &cursors, store.Where(store.Eq("user_id", x.member.UserID))); err != nil {
+	if err := who.db.List(ctx, &cursors, store.Where(store.Eq("user_id", who.member.UserID))); err != nil {
 		return nil, err
 	}
 	seqs := map[string]int64{}
@@ -114,9 +115,9 @@ func (x *c) cursorSeqs() (map[string]int64, error) {
 }
 
 // workspaceRules lists the standing preferences that hold in every project.
-func (x *c) workspaceRules() ([]string, error) {
+func (who *viewer) workspaceRules(ctx context.Context) ([]string, error) {
 	var prefs []core.Preference
-	if err := x.db.List(x.ctx(), &prefs, store.Where(store.Live, store.Null("retired_at"), store.Null("project_id"))); err != nil {
+	if err := who.db.List(ctx, &prefs, store.Where(store.Live, store.Null("retired_at"), store.Null("project_id"))); err != nil {
 		return nil, err
 	}
 	var rules []string
@@ -206,17 +207,17 @@ type inboxQuery struct {
 }
 
 // inboxItems reads the caller's inbox, leaving out what was archived.
-func (x *c) inboxItems(query inboxQuery) ([]inboxItem, error) {
-	names, err := x.names()
+func (who *viewer) inboxItems(ctx context.Context, query inboxQuery) ([]inboxItem, error) {
+	names, err := who.names(ctx)
 	if err != nil {
 		return nil, err
 	}
-	conds := []store.Cond{store.Eq("user_id", x.member.UserID), store.Null("archived_at")}
+	conds := []store.Cond{store.Eq("user_id", who.member.UserID), store.Null("archived_at")}
 	if query.unreadOnly {
 		conds = append(conds, store.Null("read_at"))
 	}
 	var notes []core.Notification
-	if err := x.db.List(x.ctx(), &notes, store.Q{Where: conds, Order: "-seq", Limit: query.limit}); err != nil {
+	if err := who.db.List(ctx, &notes, store.Q{Where: conds, Order: "-seq", Limit: query.limit}); err != nil {
 		return nil, err
 	}
 	out := make([]inboxItem, len(notes))
@@ -240,7 +241,7 @@ const (
 // handleListInbox lists what concerns the caller: mentions, assignments, picks,
 // replies. Unread only unless all=1.
 func (s *Server) handleListInbox(x *c) error {
-	items, err := x.inboxItems(inboxQuery{unreadOnly: !truthyParam(x.r.URL.Query(), "all"), limit: min(x.intParam("limit", defaultInboxPage), maxInboxPage)})
+	items, err := x.inboxItems(x.ctx(), inboxQuery{unreadOnly: !truthyParam(x.r.URL.Query(), "all"), limit: min(x.intParam("limit", defaultInboxPage), maxInboxPage)})
 	if err != nil {
 		return err
 	}
@@ -269,11 +270,11 @@ func (s *Server) handleShowMyWork(x *c) error {
 	if err != nil {
 		return err
 	}
-	assignedViews, err := x.taskViews(assigned)
+	assignedViews, err := x.taskViews(x.ctx(), assigned)
 	if err != nil {
 		return err
 	}
-	waitingViews, err := x.taskViews(waiting)
+	waitingViews, err := x.taskViews(x.ctx(), waiting)
 	if err != nil {
 		return err
 	}
@@ -281,11 +282,11 @@ func (s *Server) handleShowMyWork(x *c) error {
 	if err := x.db.List(ctx, &asked, store.Q{Where: []store.Cond{store.Eq("asked_id", me), store.Eq("state", core.StateOpen), store.Live}, Order: "created_seq"}); err != nil {
 		return err
 	}
-	askedViews, err := x.decisionViews(asked)
+	askedViews, err := x.decisionViews(x.ctx(), asked)
 	if err != nil {
 		return err
 	}
-	inbox, err := x.inboxItems(inboxQuery{unreadOnly: true, limit: defaultInboxPage})
+	inbox, err := x.inboxItems(x.ctx(), inboxQuery{unreadOnly: true, limit: defaultInboxPage})
 	if err != nil {
 		return err
 	}

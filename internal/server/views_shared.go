@@ -41,10 +41,10 @@ func lines[T any](items []T, line func(T) string, empty string) string {
 }
 
 // fileURL is where a file is served, and its reduced copy when it has one.
-func (x *c) fileURL(f core.File) (fileAddress, preview string) {
-	fileAddress = x.s.cfg.BaseURL + "/f/" + f.ID + "/" + url.PathEscape(f.Name)
+func (who *viewer) fileURL(f core.File) (fileAddress, preview string) {
+	fileAddress = who.baseURL + "/f/" + f.ID + "/" + url.PathEscape(f.Name)
 	if f.PreviewKey != "" {
-		preview = x.s.cfg.BaseURL + "/f/" + f.ID + "/preview"
+		preview = who.baseURL + "/f/" + f.ID + "/preview"
 	}
 	return fileAddress, preview
 }
@@ -52,9 +52,9 @@ func (x *c) fileURL(f core.File) (fileAddress, preview string) {
 // attachments loads the attachments the conditions select (those of a task,
 // of a page) with their files: as views by what each is attached to, and as
 // rows, each with its file.
-func (x *c) attachments(conds ...store.Cond) (map[string][]attachmentView, []core.Attachment, error) {
+func (who *viewer) attachments(ctx context.Context, conds ...store.Cond) (map[string][]attachmentView, []core.Attachment, error) {
 	var atts []core.Attachment
-	if err := x.db.List(x.ctx(), &atts, store.Q{Where: append(conds, store.Live), Order: "rank"}); err != nil {
+	if err := who.db.List(ctx, &atts, store.Q{Where: append(conds, store.Live), Order: "rank"}); err != nil {
 		return nil, nil, err
 	}
 	ids := make([]string, len(atts))
@@ -63,13 +63,13 @@ func (x *c) attachments(conds ...store.Cond) (map[string][]attachmentView, []cor
 	}
 	var files []core.File
 	if len(ids) > 0 {
-		if err := x.db.List(x.ctx(), &files, store.Where(store.In("id", ids))); err != nil {
+		if err := who.db.List(ctx, &files, store.Where(store.In("id", ids))); err != nil {
 			return nil, nil, err
 		}
 	}
 	byID := map[string]core.File{}
 	for _, f := range files {
-		f.URL, f.PreviewURL = x.fileURL(f)
+		f.URL, f.PreviewURL = who.fileURL(f)
 		byID[f.ID] = f
 	}
 	out := map[string][]attachmentView{}
@@ -83,23 +83,23 @@ func (x *c) attachments(conds ...store.Cond) (map[string][]attachmentView, []cor
 }
 
 // decisionViews names decisions, numbering them within their task.
-func (x *c) decisionViews(decisions []core.Decision) ([]decisionView, error) {
-	return x.decisionViewsOf(decisions, false)
+func (who *viewer) decisionViews(ctx context.Context, decisions []core.Decision) ([]decisionView, error) {
+	return who.decisionViewsOf(ctx, decisions, false)
 }
 
 // decisionViewsWithFiles is decisionViews with the files on each question
 // and on each option, and with how many comments each option has.
-func (x *c) decisionViewsWithFiles(decisions []core.Decision) ([]decisionView, error) {
-	return x.decisionViewsOf(decisions, true)
+func (who *viewer) decisionViewsWithFiles(ctx context.Context, decisions []core.Decision) ([]decisionView, error) {
+	return who.decisionViewsOf(ctx, decisions, true)
 }
 
 // decisionViewsOf names decisions, numbering each within its task and each
 // option within its decision; withFiles adds the files and comment counts.
-func (x *c) decisionViewsOf(decisions []core.Decision, withFiles bool) ([]decisionView, error) {
+func (who *viewer) decisionViewsOf(ctx context.Context, decisions []core.Decision, withFiles bool) ([]decisionView, error) {
 	if len(decisions) == 0 {
 		return nil, nil
 	}
-	names, err := x.names()
+	names, err := who.names(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (x *c) decisionViewsOf(decisions []core.Decision, withFiles bool) ([]decisi
 		taskIDs = append(taskIDs, taskID)
 	}
 	var options []core.Option
-	if err := x.db.List(x.ctx(), &options, store.Q{Where: []store.Cond{store.In("decision_id", ids), store.Live}, Order: "rank"}); err != nil {
+	if err := who.db.List(ctx, &options, store.Q{Where: []store.Cond{store.In("decision_id", ids), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
 
@@ -127,10 +127,10 @@ func (x *c) decisionViewsOf(decisions []core.Decision, withFiles bool) ([]decisi
 		for _, option := range options {
 			subjects = append(subjects, option.ID)
 		}
-		if files, _, err = x.attachments(store.In("subject_id", subjects)); err != nil {
+		if files, _, err = who.attachments(ctx, store.In("subject_id", subjects)); err != nil {
 			return nil, err
 		}
-		counts, err := x.db.Tally(x.ctx(), "comments", []string{"subject_id"}, store.In("task_id", taskIDs), store.Eq("subject_type", "decision_option"), store.Live)
+		counts, err := who.db.Tally(ctx, "comments", []string{"subject_id"}, store.In("task_id", taskIDs), store.Eq("subject_type", "decision_option"), store.Live)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func (x *c) decisionViewsOf(decisions []core.Decision, withFiles bool) ([]decisi
 	}
 
 	keys := map[string]string{} // task key by task id
-	tasks, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: taskIDs, Archived: true, Limit: maxTasksByID})
+	tasks, err := who.db.Tasks(ctx, store.TaskFilter{IDs: taskIDs, Archived: true, Limit: maxTasksByID})
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -90,8 +91,8 @@ func oneLine(s string, limit int) string {
 }
 
 // taskViews turns tasks into their listed form.
-func (x *c) taskViews(tasks []core.Task) ([]taskView, error) {
-	names, err := x.names()
+func (who *viewer) taskViews(ctx context.Context, tasks []core.Task) ([]taskView, error) {
+	names, err := who.names(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +105,7 @@ func (x *c) taskViews(tasks []core.Task) ([]taskView, error) {
 	}
 	parentKey := map[string]string{}
 	if len(parentIDs) > 0 {
-		parents, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: parentIDs, Archived: true, Limit: maxTasksByID})
+		parents, err := who.db.Tasks(ctx, store.TaskFilter{IDs: parentIDs, Archived: true, Limit: maxTasksByID})
 		if err != nil {
 			return nil, err
 		}
@@ -134,12 +135,12 @@ func (x *c) taskViews(tasks []core.Task) ([]taskView, error) {
 // detailedTaskViews turns tasks into their listed form with the fields a
 // list leaves out: the id, the project, the description, and who made the
 // task and when.
-func (x *c) detailedTaskViews(tasks []core.Task) ([]taskView, error) {
-	views, err := x.taskViews(tasks)
+func (who *viewer) detailedTaskViews(ctx context.Context, tasks []core.Task) ([]taskView, error) {
+	views, err := who.taskViews(ctx, tasks)
 	if err != nil {
 		return nil, err
 	}
-	names, err := x.names()
+	names, err := who.names(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -512,7 +513,7 @@ func (d taskDetail) text() string {
 // actor, then what happened in words. Tasks, comments, decisions, claims and
 // inbox items each have their own wording; any other event says its type
 // and its changed fields (changeText), or the name of what it made.
-func (x *c) eventLine(ev core.Event, names *nameLookup) string {
+func (who *viewer) eventLine(ctx context.Context, ev core.Event, names *nameLookup) string {
 	data, _ := ev.Payload() // like readStored: data that does not read makes a shorter line
 	key := ""
 	if data.Key != nil {
@@ -532,7 +533,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 			what += " " + names.handle(t.AssigneeID)
 		}
 	case "task.updated":
-		what += " " + x.changeText(data.Changes, names)
+		what += " " + names.changeText(data.Changes)
 	case "comment.created":
 		var cm core.Comment
 		data.ReadRow(&cm)
@@ -592,7 +593,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 			// server handing the resource to the next in line.
 			what = "claim " + firstNonEmpty(data.Why, "changed")
 			var resource core.Resource
-			if data.ResourceID != "" && x.foundForLine(&resource, store.Eq("id", data.ResourceID)) {
+			if data.ResourceID != "" && who.foundForLine(ctx, &resource, store.Eq("id", data.ResourceID)) {
 				what += ": " + resource.Name
 			}
 			if data.UserID != "" {
@@ -608,7 +609,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		}
 		if claim.TaskID != "" {
 			var t core.Task
-			if x.foundForLine(&t, store.Eq("id", claim.TaskID)) {
+			if who.foundForLine(ctx, &t, store.Eq("id", claim.TaskID)) {
 				what += " for " + t.Key
 			}
 		}
@@ -627,7 +628,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 			what += " " + names.handle(ev.EntityID) // whose membership it is
 		}
 		if len(data.Changes) > 0 {
-			what += " " + x.changeText(data.Changes, names)
+			what += " " + names.changeText(data.Changes)
 		} else if row := map[string]any{}; key == "" && data.ReadRow(&row) {
 			// Something new that the cases above do not know: its name.
 			for _, k := range []string{"key", "name", "title", "slug", "handle", "repo", "body"} {
@@ -652,10 +653,10 @@ func readStored(raw []byte, dst any) {
 // foundForLine reads one row that a line of text names, if it can, and
 // says whether it was found. The line is written without it otherwise; a
 // read that failed is logged, since a line cannot report it.
-func (x *c) foundForLine(dst any, where ...store.Cond) bool {
-	there, err := store.Find(x.ctx(), x.db, dst, where...)
+func (who *viewer) foundForLine(ctx context.Context, dst any, where ...store.Cond) bool {
+	there, err := store.Find(ctx, who.db, dst, where...)
 	if err != nil {
-		x.s.log.Warn("a feed line left out a name it could not read", "err", err)
+		who.log.Warn("a feed line left out a name it could not read", "err", err)
 	}
 	return there
 }
@@ -669,20 +670,20 @@ var quietFields = map[string]bool{"started_at": true, "completed_at": true, "can
 // alphabetical order: "status: Todo -> Done; assignee: none -> @ann". Ids
 // become names, quiet fields are left out, and the moves into and out of
 // the trash, the archive, removal and suspension are said as one word.
-func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) string {
+func (n *nameLookup) changeText(changes map[string]core.FieldChange) string {
 	var parts []string
 	// name says one value of a field: what the id names, or the value itself.
 	name := func(field string, v any) string {
 		s, _ := v.(string)
 		switch field {
 		case "status_id":
-			return names.statuses[s].Name
+			return n.statuses[s].Name
 		case "assignee_id", "waiting_on_id", "lease_holder_id", "lead_id":
-			return names.handle(s)
+			return n.handle(s)
 		case "epic_id":
-			return names.epics[s].Name
+			return n.epics[s].Name
 		case "cycle_id":
-			if cycle, ok := names.cycles[s]; ok {
+			if cycle, ok := n.cycles[s]; ok {
 				return fmt.Sprintf("%d", cycle.Number)
 			}
 			return ""
@@ -694,7 +695,7 @@ func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) s
 					ids = append(ids, id)
 				}
 			}
-			return strings.Join(names.labelNames(ids), ",")
+			return strings.Join(n.labelNames(ids), ",")
 		case "priority":
 			if f, ok := v.(float64); ok && int(f) < len(priorityNames) {
 				return priorityNames[int(f)]
@@ -727,7 +728,7 @@ func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) s
 						var keys []string
 						for _, id := range ids {
 							pid, _ := id.(string)
-							keys = append(keys, firstNonEmpty(names.projects[pid].Key, pid))
+							keys = append(keys, firstNonEmpty(n.projects[pid].Key, pid))
 						}
 						parts = append(parts, "projects "+strings.Join(keys, ","))
 						continue
