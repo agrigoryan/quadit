@@ -104,7 +104,11 @@ export function ProjectTemplates({ project }: { project: Project }) {
         title={t("templates.delete.title", { name: deleting?.name ?? "" })}
         body={t("templates.delete.body")}
         confirm={t("s.delete")}
-        onConfirm={() => mutate({ type: "template.delete", args: { id: deleting?.id } }, undefined, { quiet: true })}
+        onConfirm={() =>
+          deleting
+            ? mutate({ type: "template.delete", args: { id: deleting.id } }, undefined, { quiet: true })
+            : undefined
+        }
       />
     </div>
   );

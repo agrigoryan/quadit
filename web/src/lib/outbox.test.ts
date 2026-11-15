@@ -12,7 +12,7 @@ function item(key: string, over: Partial<OutboxItem> = {}): OutboxItem {
     slug: "acme",
     user: "u1",
     tab: "gone-tab",
-    changes: [{ id: `ch-${key}`, type: "task.update", args: {} }],
+    changes: [{ id: `ch-${key}`, type: "task.update", args: { id: "t1" } }],
     what: key,
     at: Date.now(),
     ...over,
@@ -62,7 +62,7 @@ describe("outbox.adopt", () => {
 
     const taken = await outbox.adopt("acme", "u1");
     expect(taken.map((i) => i.key)).toEqual(["k1", "k3"]);
-    expect(taken[0]?.changes).toEqual([{ id: "ch-k1", type: "task.update", args: {} }]);
+    expect(taken[0]?.changes).toEqual([{ id: "ch-k1", type: "task.update", args: { id: "t1" } }]);
 
     // Taken once: they now belong to this tab, and nothing else changed hands.
     expect(await outbox.adopt("acme", "u1")).toEqual([]);
@@ -93,8 +93,8 @@ describe("outbox.count", () => {
   it("counts what is kept for one workspace and person, whichever tab holds it, a batch once", async () => {
     const closeTab = await openTab("open-tab");
     const batch: OutboxChange[] = [
-      { id: "c1", type: "task.update", args: {} },
-      { id: "c2", type: "task.update", args: {} },
+      { id: "c1", type: "task.update", args: { id: "t1" } },
+      { id: "c2", type: "task.update", args: { id: "t1" } },
     ];
     await leave([
       item("k1"),

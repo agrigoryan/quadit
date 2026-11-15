@@ -205,11 +205,13 @@ export function ProjectStatuses({ project, admin }: { project: Project; admin: b
         body={needsMove ? t("statuses.delete.body") : t("statuses.delete.empty")}
         confirm={t("s.delete")}
         onConfirm={() =>
-          mutate(
-            { type: "status.delete", args: { id: deleting?.id, ...(needsMove ? { move_to: moveTo } : {}) } },
-            undefined,
-            { quiet: true },
-          )
+          deleting
+            ? mutate(
+                { type: "status.delete", args: { id: deleting.id, ...(needsMove ? { move_to: moveTo } : {}) } },
+                undefined,
+                { quiet: true },
+              )
+            : undefined
         }
       >
         {needsMove && (

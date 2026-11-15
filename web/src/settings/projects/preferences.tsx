@@ -94,7 +94,11 @@ export function ProjectPreferences({ project, admin }: { project: Project; admin
         title={t("prefs.delete.title")}
         body={t("prefs.delete.body")}
         confirm={t("s.delete")}
-        onConfirm={() => mutate({ type: "preference.delete", args: { id: deleting?.id } }, undefined, { quiet: true })}
+        onConfirm={() =>
+          deleting
+            ? mutate({ type: "preference.delete", args: { id: deleting.id } }, undefined, { quiet: true })
+            : undefined
+        }
       />
     </div>
   );

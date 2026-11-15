@@ -116,9 +116,11 @@ export function MembersPage() {
         body={t("members.suspend.body")}
         confirm={t("members.suspend")}
         onConfirm={() =>
-          mutate({ type: "member.update", args: { id: ask?.member.user_id, suspended: true } }, undefined, {
-            quiet: true,
-          })
+          ask
+            ? mutate({ type: "member.update", args: { id: ask.member.user_id, suspended: true } }, undefined, {
+                quiet: true,
+              })
+            : undefined
         }
       />
       <ConfirmDialog
@@ -128,7 +130,9 @@ export function MembersPage() {
         body={t("members.remove.body")}
         confirm={t("s.remove")}
         onConfirm={() =>
-          mutate({ type: "member.remove", args: { id: ask?.member.user_id } }, undefined, { quiet: true })
+          ask
+            ? mutate({ type: "member.remove", args: { id: ask.member.user_id } }, undefined, { quiet: true })
+            : undefined
         }
       />
     </Page>

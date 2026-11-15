@@ -17,7 +17,11 @@ import { OUTSIDE } from "@/tasks/filters";
 type Fields = Record<string, unknown>;
 
 /** Sends task.update for each task with the same arguments, patching the store with `local`. */
-function updateAll(tasks: Task[], args: (task: Task) => Changes["task.update"] | null, local: (task: Task) => Fields) {
+function updateAll(
+  tasks: Task[],
+  args: (task: Task) => Omit<Changes["task.update"], "id"> | null,
+  local: (task: Task) => Fields,
+) {
   const changes: ChangeSpec[] = [];
   const patches: [string, Fields][] = [];
   for (const task of tasks) {

@@ -98,7 +98,9 @@ export function ProjectLabels({ project }: { project: Project }) {
         title={t("labels.delete.title", { name: deleting?.name ?? "" })}
         body={t("labels.delete.body")}
         confirm={t("s.delete")}
-        onConfirm={() => mutate({ type: "label.delete", args: { id: deleting?.id } }, undefined, { quiet: true })}
+        onConfirm={() =>
+          deleting ? mutate({ type: "label.delete", args: { id: deleting.id } }, undefined, { quiet: true }) : undefined
+        }
       />
     </div>
   );
