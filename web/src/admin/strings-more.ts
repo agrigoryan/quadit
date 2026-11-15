@@ -40,7 +40,7 @@ export const adminMoreStrings = {
   "admin.limits.lead": "How hard one token may hit the API. Agents that go over are told to slow down and try again.",
   "admin.limits.rate": "Requests per token",
   "admin.limits.perMinute": "per minute",
-  "admin.limits.rateHint": "Empty uses the default, 1200 a minute.",
+  "admin.limits.rateHint": "Empty uses the default, 1,200 a minute.",
   "admin.limits.tooLow": "At least 10, or nothing works",
 
   "admin.backups.title": "Backups",

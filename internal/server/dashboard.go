@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -435,8 +436,8 @@ func (s *Server) hDashboard(x *c) error {
 	// Health: what is failing behind the scenes.
 	health := map[string]any{}
 	health["webhooks_failing"], _ = x.db.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0))
-	health["deliveries_dead"], _ = x.db.Count(ctx, "webhook_deliveries", store.Eq("state", "dead"))
-	health["deliveries_pending"], _ = x.db.Count(ctx, "webhook_deliveries", store.Eq("state", "pending"), store.Gt("attempts", 0))
+	health["deliveries_dead"] = liveDeliveries(ctx, x.db, store.Eq("state", "dead"))
+	health["deliveries_pending"] = liveDeliveries(ctx, x.db, store.Eq("state", "pending"), store.Gt("attempts", 0))
 	var backups []core.Backup
 	if err := s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err == nil && len(backups) > 0 {
 		health["last_backup"] = when(backups[0].FinishedAt)
@@ -564,4 +565,20 @@ func (x *c) everyTask(f store.TaskFilter) ([]core.Task, error) {
 		// Past the last one read, in the order they were made.
 		f.After = []any{page[len(page)-1].ID}
 	}
+}
+
+// liveDeliveries counts deliveries of webhooks that still exist: what a
+// deleted webhook left behind can no longer be sent again, so it is not
+// something to act on.
+func liveDeliveries(ctx context.Context, db store.DB, conds ...store.Cond) int {
+	var hooks []core.Webhook
+	if err := db.List(ctx, &hooks, store.Where(store.Live)); err != nil || len(hooks) == 0 {
+		return 0
+	}
+	ids := make([]string, len(hooks))
+	for i, h := range hooks {
+		ids[i] = h.ID
+	}
+	n, _ := db.Count(ctx, "webhook_deliveries", append(conds, store.In("webhook_id", ids))...)
+	return n
 }

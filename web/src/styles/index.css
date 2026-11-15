@@ -179,11 +179,18 @@
 
 /* iPhone Safari zooms the whole page in when a field with text under 16px
    takes focus, and does not zoom back. Fields are 16px wherever fingers are
-   used. Outside the layers on purpose: it has to win over size utilities. */
+   used. Outside the layers and marked important on purpose: it has to win
+   over size utilities, the forced ones too. Fields that are larger already
+   (a page's title, a task's title) keep their size. */
 @media (pointer: coarse) {
-  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
-  textarea,
-  select {
-    font-size: 16px;
+  :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), textarea, select):not(
+      [class*="text-lg"],
+      [class*="text-xl"],
+      [class*="text-2xl"],
+      [class*="text-3xl"],
+      [class*="text-[1."],
+      [class*="text-[2"]
+    ) {
+    font-size: 16px !important;
   }
 }

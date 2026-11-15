@@ -61,15 +61,19 @@ export function TrashPage() {
 
   useEffect(() => {
     const ctl = new AbortController();
-    api
-      .get<{ tasks: Task[] }>(ws(slug, "/tasks?trash=1&raw=1&limit=1000"), ctl.signal)
-      .then((out) => {
+    // Everything in the trash, a thousand at a time: the page shows what
+    // has arrived and goes on reading.
+    const read = async () => {
+      for (let offset = 0; offset < 50_000; offset += 1000) {
+        const out = await api.get<{ tasks: Task[]; more?: boolean }>(ws(slug, `/tasks?trash=1&raw=1&limit=1000&offset=${offset}`), ctl.signal);
         mergeRows("tasks", out.tasks ?? []);
         setState("ready");
-      })
-      .catch((err: unknown) => {
-        if (!ctl.signal.aborted) setState({ error: errorMessage(err) });
-      });
+        if (!out.more) return;
+      }
+    };
+    read().catch((err: unknown) => {
+      if (!ctl.signal.aborted) setState({ error: errorMessage(err) });
+    });
     return () => ctl.abort();
   }, [slug]);
 

@@ -295,8 +295,8 @@ func (s *Server) hHealth(x *c) error {
 	out["jobs_waiting"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"))
 	out["jobs_failing"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"), store.Gt("attempts", 2))
 	out["webhooks_failing"], _ = s.st.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0))
-	out["deliveries_dead"], _ = s.st.Count(ctx, "webhook_deliveries", store.Eq("state", "dead"))
-	out["deliveries_pending"], _ = s.st.Count(ctx, "webhook_deliveries", store.Eq("state", "pending"))
+	out["deliveries_dead"] = liveDeliveries(ctx, s.st, store.Eq("state", "dead"))
+	out["deliveries_pending"] = liveDeliveries(ctx, s.st, store.Eq("state", "pending"))
 	var backups []core.Backup
 	if err := s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err == nil && len(backups) > 0 {
 		out["last_backup"] = backups[0]

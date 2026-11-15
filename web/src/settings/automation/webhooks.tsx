@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, ScrollText, Send, Trash2 } from "lucide-react";
 import { api, errorMessage, ws } from "@/lib/api";
 import { cx } from "@/lib/cx";
@@ -137,6 +137,23 @@ export function WebhooksPage() {
   const [removing, setRemoving] = useState<Webhook | null>(null);
   const [rotating, setRotating] = useState<Webhook | null>(null);
   const [tests, setTests] = useState<Record<string, Test>>({});
+
+  // A webhook made or removed somewhere else is heard through the feed.
+  // What it last sent is not an event, so the list is read again now and
+  // then while the page is in view and nothing is open over it.
+  const known = useCollection("webhooks");
+  const reload = hooks.reload;
+  const busy = !!(form || log || removing || rotating);
+  useEffect(() => {
+    void reload();
+  }, [known, reload]);
+  useEffect(() => {
+    if (busy) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void reload();
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [busy, reload]);
 
   async function test(hook: Webhook) {
     setTests((s) => ({ ...s, [hook.id]: { busy: true } }));
