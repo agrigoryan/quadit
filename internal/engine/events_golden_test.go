@@ -31,7 +31,8 @@ import (
 // alike.
 func TestEventPayloads(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
-		got := eventScenario(t, st)
+		evs, _ := eventScenario(t, st, false)
+		got := numbered(evs)
 		const file = "testdata/events.golden"
 		if os.Getenv("QUADIT_UPDATE_EVENTS") != "" && t.Name() == "TestEventPayloads/sqlite" {
 			if err := os.WriteFile(file, []byte(strings.Join(got, "\n")+"\n"), 0o644); err != nil {
@@ -82,10 +83,32 @@ func jsonbForm(t *testing.T, line string) string {
 	return typ + " " + string(out)
 }
 
+// TestQuietEveryEvent checks that history brought in quietly says so in
+// every event it writes, whatever the change: the scenario again, with every
+// change quiet. A quiet event notifies nobody and sets off no rule; one that
+// lost the mark would. The engine sets the mark on the one type every event's
+// data is, so no event can be written without it.
+func TestQuietEveryEvent(t *testing.T) {
+	evs, quiet := eventScenario(t, testdb.SQLite(t), true)
+	n := 0
+	for _, ev := range evs {
+		if !quiet[ev.ChangeID] {
+			continue // written by the engine itself: a rule, an upkeep job
+		}
+		n++
+		if d, err := ev.Payload(); err != nil || !d.Quiet {
+			t.Errorf("%s of a quiet change is not marked quiet: %s", ev.Type, ev.Data)
+		}
+	}
+	if n < 100 {
+		t.Fatalf("only %d events came from quiet changes", n)
+	}
+}
+
 // eventScenario runs every change type the engine has (and the background
-// jobs that write events) in one workspace, and returns each event as
-// "type data", ids numbered.
-func eventScenario(t *testing.T, st store.Store) []string {
+// jobs that write events) in one workspace, and returns the events written
+// and the ids of the changes it applied, each quiet if asked.
+func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, applied map[string]bool) {
 	ctx := context.Background()
 	e := New(st)
 	clock := time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC)
@@ -98,10 +121,11 @@ func eventScenario(t *testing.T, st store.Store) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ran := map[string]bool{}
+	ran, applied := map[string]bool{}, map[string]bool{}
 	try := func(ch Change, actor string) (*Result, error) {
 		ch.ID = id.New()
-		ran[ch.Type] = true
+		ch.Quiet = ch.Quiet || quiet
+		ran[ch.Type], applied[ch.ID] = true, true
 		return e.Apply(ctx, ws.ID, Actor{UserID: actor}, ch)
 	}
 	as := func(actor, typ string, args any) *Result {
@@ -331,10 +355,16 @@ func eventScenario(t *testing.T, st store.Store) []string {
 		}
 	}
 
-	evs, err := st.In(ws.ID).Events(ctx, store.EventFilter{Limit: 100000})
+	evs, err = st.In(ws.ID).Events(ctx, store.EventFilter{Limit: 100000})
 	if err != nil {
 		t.Fatal(err)
 	}
+	return evs, applied
+}
+
+// numbered gives each event as "type data", its ids numbered by first
+// appearance.
+func numbered(evs []core.Event) []string {
 	ids := map[string]string{}
 	number := func(s string) string {
 		return uuidish.ReplaceAllStringFunc(s, func(u string) string {
