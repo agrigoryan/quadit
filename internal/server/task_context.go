@@ -3,6 +3,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -192,7 +193,7 @@ func (pack *contextPack) recentDecisions() error {
 	return nil
 }
 
-// docs adds the docs this task mentions, or that mention it.
+// docs adds the docs this task mentions, or that mention it, by title.
 func (pack *contextPack) docs() error {
 	who, ctx, t := pack.who, pack.ctx, pack.t
 	var refs []core.Ref
@@ -210,19 +211,21 @@ func (pack *contextPack) docs() error {
 	for _, r := range back {
 		docIDs[r.FromScopeID] = true
 	}
-	var docs []map[string]any
+	var linked []core.Doc
 	for docID := range docIDs {
 		var doc core.Doc
 		there, err := store.Find(ctx, who.db, &doc, store.Eq("id", docID), store.Live)
 		if err != nil {
 			return err
 		}
-		if !there {
-			continue
+		if there && who.canSeeDoc(doc) {
+			linked = append(linked, doc)
 		}
-		if who.canSeeDoc(doc) {
-			docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": who.baseURL + "/" + who.ws.Slug + "/docs/" + doc.ID})
-		}
+	}
+	slices.SortFunc(linked, func(a, b core.Doc) int { return cmp.Or(cmp.Compare(a.Title, b.Title), cmp.Compare(a.ID, b.ID)) })
+	var docs []map[string]any
+	for _, doc := range linked {
+		docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": who.baseURL + "/" + who.ws.Slug + "/docs/" + doc.ID})
 	}
 	if len(docs) > 0 {
 		pack.out["docs"] = docs
