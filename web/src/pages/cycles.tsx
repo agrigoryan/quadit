@@ -6,7 +6,7 @@ import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
 import { useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
-import { daysUntil, formatDay, serverDay, today } from "@/lib/time";
+import { daysUntil, formatDay, serverDay } from "@/lib/time";
 import type { Cycle, Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { addDays } from "@/insights/lib/format";
@@ -74,7 +74,7 @@ function Cycles({ project }: { project: Project }) {
                     to={`/${slug}/p/${project.key}/cycles/${cycle.id}`}
                     badge={
                       group.id === "current" ? (
-                        <Badge tone="accent">{t("cycle.daysLeft", { n: daysUntil(cycle.ends_on) + 1 })}</Badge>
+                        <Badge tone="accent">{t("cycle.daysLeft", { n: daysUntil(cycle.ends_on, serverDay()) + 1 })}</Badge>
                       ) : undefined
                     }
                     meta={<CycleMeta cycle={cycle} tally={tallies[cycle.id]} />}
@@ -116,7 +116,7 @@ function NewCycle({ project, cycles }: { project: Project; cycles: Cycle[] }) {
   const length = project.settings?.cycle_days || 14;
   // The next free stretch: the day after the last cycle ends, or today.
   const lastEnd = cycles.reduce((max, c) => (c.ends_on > max ? c.ends_on : max), "");
-  const suggestedStart = lastEnd && lastEnd >= today() ? addDays(lastEnd, 1) : today();
+  const suggestedStart = lastEnd && lastEnd >= serverDay() ? addDays(lastEnd, 1) : serverDay();
   const [edited, setEdited] = useState<{ start: string; end: string } | null>(null);
   const start = edited?.start ?? suggestedStart;
   const end = edited?.end ?? addDays(suggestedStart, length - 1);

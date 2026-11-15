@@ -363,7 +363,16 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 				dirOf = parent.SourcePath
 			}
 			path := dirOf + slugFrom(orText(page.Title, "untitled")) + ".md"
-			for n := 2; files[path] != "" || toWrite[path] != ""; n++ {
+			// A name no file has, and that no link in the repository stands
+			// on (a link is not a page, and is not written through).
+			taken := func(p string) bool {
+				if files[p] != "" || toWrite[p] != "" {
+					return true
+				}
+				st, lerr := os.Lstat(filepath.Join(root, filepath.FromSlash(p)))
+				return lerr == nil && st.Mode()&os.ModeSymlink != 0
+			}
+			for n := 2; taken(path); n++ {
 				path = fmt.Sprintf("%s%s-%d.md", dirOf, slugFrom(page.Title), n)
 			}
 			body, err := pageMD(page.ID)
@@ -388,10 +397,15 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	if (len(toWrite) == 0 && len(toRemove) == 0) || src.WriteMode == "none" {
 		return res, nil
 	}
+	blocked := map[string]bool{} // paths a link in the repository stands on, or in the way of
 	for path, text := range toWrite {
 		full := filepath.Join(root, filepath.FromSlash(path))
 		if !staysInside(dir, full) {
-			continue // through a link out of the repository: not written
+			// Through a link: not written, not counted, and not taken as
+			// synced, so the page stays as it is and the sync says why.
+			blocked[path] = true
+			delete(toWrite, path)
+			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
 			return res, err
@@ -404,6 +418,14 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		if full := filepath.Join(root, filepath.FromSlash(path)); staysInside(dir, full) {
 			os.Remove(full)
 		}
+	}
+	if len(blocked) > 0 {
+		var names []string
+		for path := range blocked {
+			names = append(names, path)
+		}
+		sort.Strings(names)
+		res.Note = fmt.Sprintf("%d page(s) were not written to the repository, because a link there stands where the file would go: %s", len(names), oneLine(strings.Join(names, ", "), 200))
 	}
 	if _, err := git(ctx, dir, "add", "--all", "."); err != nil {
 		return res, err
@@ -442,7 +464,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	// What was pushed is now the common ground for those pages.
 	for docID, pageHash := range written {
 		var d core.Doc
-		if db.Get(ctx, &d, store.Eq("id", docID)) != nil {
+		if db.Get(ctx, &d, store.Eq("id", docID)) != nil || blocked[d.SourcePath] {
 			continue
 		}
 		fileHash := pageHash

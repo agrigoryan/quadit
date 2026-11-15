@@ -332,14 +332,44 @@ func TestSyncDoesNotFollowLinks(t *testing.T) {
 	os.Symlink(outside, filepath.Join(work, "link"))
 	run("add", "-A")
 	run("commit", "-q", "-m", "docs")
+	// What is synced is a bare repository, which can be pushed to.
+	bare := filepath.Join(t.TempDir(), "origin.git")
+	run("init", "-q", "--bare", "-b", "main", bare)
+	run("remote", "add", "origin", bare)
+	run("push", "-q", "origin", "main")
 
-	src := s.change(s.owner, "", "source.create", M{"title": "Handbook", "repo": work, "subdir": "docs"})["ref"].(string)
+	src := s.change(s.owner, "", "source.create", M{"title": "Handbook", "repo": bare, "subdir": "docs"})["ref"].(string)
 	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil)
 	pages := func() string {
 		return strings.ToLower(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil))
 	}
 	if out := pages(); strings.Contains(out, "leak") || !strings.Contains(out, "real") {
 		t.Fatalf("after a sync the pages are (the linked file must not be one, the real one must):\n%s", out)
+	}
+	// A page made here whose name a link already has gets a file of its
+	// own beside it, is written once, and is still there after the next sync.
+	var docs struct{ Docs []struct{ ID, Title string } }
+	s.call(s.owner, "", "GET", w+"/docs", nil, 200, &docs)
+	root := ""
+	for _, d := range docs.Docs {
+		if d.Title == "Handbook" {
+			root = d.ID
+		}
+	}
+	s.change(s.owner, "", "doc.create", M{"title": "leak", "parent": root, "markdown": "Written in the app.\n"})
+	var first struct {
+		FilesWritten int `json:"files_written"`
+	}
+	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, &first)
+	var second struct {
+		PagesTrashed int `json:"pages_trashed"`
+	}
+	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, &second)
+	if first.FilesWritten != 1 || second.PagesTrashed != 0 || !strings.Contains(pages(), "leak") {
+		t.Fatalf("a page named like a link: wrote %d files, then trashed %d pages; pages:\n%s", first.FilesWritten, second.PagesTrashed, pages())
+	}
+	if raw, _ := os.ReadFile(filepath.Join(outside, "secret.md")); string(raw) != "the server's own secret" {
+		t.Fatalf("the file outside was changed: %q", raw)
 	}
 	// A folder reached through a link is refused when syncing.
 	s.change(s.owner, "", "source.update", M{"id": src, "subdir": "link/sub"})

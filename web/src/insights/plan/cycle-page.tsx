@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { statusesOf, useCollection, useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
-import { daysUntil, formatDay, serverDay, today } from "@/lib/time";
+import { daysUntil, formatDay, serverDay } from "@/lib/time";
 import { type Cycle, isOpenCategory, type Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
@@ -63,7 +63,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
         .filter((g) => g.tasks.length > 0),
     [statuses, project.id, tasks],
   );
-  const left = daysUntil(cycle.ends_on);
+  const left = daysUntil(cycle.ends_on, serverDay()); // a cycle's days are the server's
 
   return (
     <div className="flex h-full flex-col">
@@ -204,7 +204,7 @@ function BurnPanel({ cycle, hasPoints }: { cycle: Cycle; hasPoints: boolean }) {
             rows={burnRows(data.days, shown)}
           />
         ) : (
-          <BurnUp days={data.days} unit={shown} today={today()} />
+          <BurnUp days={data.days} unit={shown} today={serverDay()} />
         )}
       </div>
     </Panel>

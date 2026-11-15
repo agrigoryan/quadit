@@ -52,8 +52,8 @@ export function formatDay(day: string): string {
 }
 
 /** Whole days from today to a day; negative when it has passed. */
-export function daysUntil(day: string): number {
-  return Math.round((parseDay(day).getTime() - parseDay(today()).getTime()) / DAY);
+export function daysUntil(day: string, from: string = today()): number {
+  return Math.round((parseDay(day).getTime() - parseDay(from).getTime()) / DAY);
 }
 
 /** How a due date reads next to a task: "Today", "Tomorrow", "3d late", "Dec 1". */
