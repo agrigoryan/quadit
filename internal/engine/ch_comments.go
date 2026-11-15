@@ -133,7 +133,7 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 		data["attachments"] = atts
 	}
 	c.ref, c.key = cm.ID, t.Key
-	if err := c.emit(seq, "comment.created", "comment", cm.ID, "task", t.ID, t.ProjectID, data); err != nil {
+	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inTask(t), data: data}); err != nil {
 		return err
 	}
 	if err := c.commentReaches(cm, t); err != nil {
@@ -146,10 +146,10 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.handOn(cm, t, a, note); err != nil {
 		return err
 	}
-	if err := c.notifyWatchers(t, note, "comment", cm.ID, cm.Body); err != nil {
+	if err := c.notifyWatchers(t, note, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
 		return err
 	}
-	return c.index("comment", cm.ID, "task", t.ID, t.ProjectID, "", t.Key+" "+t.Title, cm.Body)
+	return c.index(store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: cm.Body})
 }
 
 // commentSubject works out what a comment on a task is about: an option, a
@@ -205,7 +205,7 @@ func (c *cx) commentReaches(cm core.Comment, t core.Task) error {
 		if err := c.watch(m.UserID, "task", t.ID); err != nil {
 			return err
 		}
-		if err := c.notifyTask(m.UserID, core.NoteMentioned, t, "comment", cm.ID, cm.Body); err != nil {
+		if err := c.notifyTask(m.UserID, core.NoteMentioned, t, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
 			return err
 		}
 	}
@@ -216,7 +216,7 @@ func (c *cx) commentReaches(cm core.Comment, t core.Task) error {
 			return err
 		}
 		if ok {
-			if err := c.notifyTask(parent.AuthorID, core.NoteReplied, t, "comment", cm.ID, cm.Body); err != nil {
+			if err := c.notifyTask(parent.AuthorID, core.NoteReplied, t, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
 				return err
 			}
 		}
@@ -262,7 +262,7 @@ func (c *cx) handOn(cm core.Comment, t core.Task, a commentCreateArgs, note stri
 		}
 	}
 	if handTo != "" {
-		if err := c.notifyTask(handTo, note, t, "comment", cm.ID, cm.Body); err != nil {
+		if err := c.notifyTask(handTo, note, t, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
 			return err
 		}
 		if err := c.setWaitingOn(t, handTo, handNote); err != nil {
@@ -298,7 +298,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 		return alreadyInUse(err, "id", cm.ID)
 	}
 	c.ref = cm.ID
-	if err := c.emitTo(d.OwnerID, seq, "comment.created", "comment", cm.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": cm}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(d), audience: d.OwnerID, data: map[string]any{"row": cm}}); err != nil {
 		return err
 	}
 	if err := c.watch(c.actor.UserID, "doc", d.ID); err != nil {
@@ -335,19 +335,20 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 			return err
 		}
 	}
-	return c.index("comment", cm.ID, "doc", d.ID, d.ProjectID, d.OwnerID, d.Title, cm.Body)
+	return c.index(store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "doc", ScopeID: d.ID, ProjectID: d.ProjectID, AudienceID: d.OwnerID, Title: d.Title, Body: cm.Body})
 }
 
-// commentScope returns where a comment's events belong.
-func (c *cx) commentScope(cm core.Comment) (scopeType, scopeID, projectID, key string, err error) {
+// commentPlace returns where a comment's events belong, and the key of its
+// task when it is on one.
+func (c *cx) commentPlace(cm core.Comment) (where place, key string, err error) {
 	if cm.TaskID != "" {
 		var t core.Task
 		if err = c.tx.Get(c.ctx, &t, store.Eq("id", cm.TaskID)); err != nil {
-			return
+			return place{}, "", err
 		}
-		return "task", t.ID, t.ProjectID, t.Key, nil
+		return inTask(t), t.Key, nil
 	}
-	return "doc", cm.DocID, "", "", nil
+	return place{scopeType: "doc", scopeID: cm.DocID}, "", nil
 }
 
 type commentUpdateArgs struct {
@@ -382,15 +383,15 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 			p.put("resolved_at", cm.ResolvedAt, int64(0))
 		}
 	}
-	st, sid, pid, key, err := c.commentScope(cm)
+	where, key, err := c.commentPlace(cm)
 	if err != nil {
 		return err
 	}
-	if err := c.save(p, "comments", "comment", cm.ID, st, sid, pid, map[string]any{"key": key}); err != nil {
+	if err := c.save(p, target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: map[string]any{"key": key}}); err != nil {
 		return err
 	}
 	if _, ok := p.set["body"]; ok {
-		if _, err := c.link("comment", cm.ID, st, sid, cm.Body); err != nil {
+		if _, err := c.link("comment", cm.ID, where.scopeType, where.scopeID, cm.Body); err != nil {
 			return err
 		}
 	}
@@ -405,12 +406,12 @@ func commentDelete(c *cx, a idArgs) error {
 	if cm.AuthorID != c.actor.UserID && !c.actor.Role.AtLeast(core.RoleAdmin) {
 		return forbidden("only its author, or an admin, can delete a comment")
 	}
-	st, sid, pid, key, err := c.commentScope(cm)
+	where, key, err := c.commentPlace(cm)
 	if err != nil {
 		return err
 	}
 	if err := c.tx.Unindex(c.ctx, cm.ID); err != nil {
 		return err
 	}
-	return c.trash("comments", "comment", cm.ID, st, sid, pid, map[string]any{"key": key})
+	return c.trash(target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: map[string]any{"key": key}})
 }

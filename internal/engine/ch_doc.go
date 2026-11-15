@@ -189,7 +189,7 @@ func (c *cx) insertDoc(d core.Doc, a docCreateArgs) error {
 	if len(rows) > 0 {
 		data["blocks"] = rows
 	}
-	if err := c.emitTo(docAudience(d), seq, "doc.created", "doc", d.ID, "doc", d.ID, d.ProjectID, data); err != nil {
+	if err := c.emit(event{seq: seq, typ: "doc.created", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: data}); err != nil {
 		return err
 	}
 	if err := c.watch(c.actor.UserID, "doc", d.ID); err != nil {
@@ -218,7 +218,7 @@ func (c *cx) afterDocText(d core.Doc, ed *editor) error {
 	if len(text) > 200_000 {
 		text = text[:200_000]
 	}
-	return c.index("doc", d.ID, "doc", d.ID, d.ProjectID, d.OwnerID, d.Title, text)
+	return c.index(store.SearchDoc{Kind: "doc", EntityID: d.ID, ScopeType: "doc", ScopeID: d.ID, ProjectID: d.ProjectID, AudienceID: d.OwnerID, Title: d.Title, Body: text})
 }
 
 type docUpdateArgs struct {
@@ -456,15 +456,14 @@ func (u *pageEdit) save() error {
 		}
 		data["row"] = now
 	}
-	if err := c.emitTo(audience, seq, "doc.updated", "doc", d.ID, "doc", d.ID, d.ProjectID, data); err != nil {
+	if err := c.emit(event{seq: seq, typ: "doc.updated", entity: "doc", entityID: d.ID, place: inDoc(d), audience: audience, data: data}); err != nil {
 		return err
 	}
 	if docAudience(d) != "" {
 		// Someone the page is no longer shared with stops getting its events:
 		// tell each of them, alone, to let go of their copy.
 		for _, uid := range u.unshared {
-			if err := c.emitTo(uid, c.tx.NextSeq(), "doc.unshared", "doc", d.ID, "user", uid, d.ProjectID,
-				map[string]any{"id": d.ID, "gone": true}); err != nil {
+			if err := c.emit(event{seq: c.tx.NextSeq(), typ: "doc.unshared", entity: "doc", entityID: d.ID, place: place{scopeType: "user", scopeID: uid, projectID: d.ProjectID}, audience: uid, data: map[string]any{"id": d.ID, "gone": true}}); err != nil {
 				return err
 			}
 		}
@@ -536,8 +535,7 @@ func docDelete(c *cx, a idArgs) error {
 		return err
 	}
 	c.ref = d.ID
-	return c.emitTo(docAudience(d), seq, "doc.deleted", "doc", d.ID, "doc", d.ID, d.ProjectID,
-		map[string]any{"ids": ids, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}})
+	return c.emit(event{seq: seq, typ: "doc.deleted", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"ids": ids, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}}})
 }
 
 func docRestore(c *cx, a idArgs) error {
@@ -582,8 +580,7 @@ func docRestore(c *cx, a idArgs) error {
 	if _, err := c.tx.Update(c.ctx, "docs", set, store.In("id", ids)); err != nil {
 		return err
 	}
-	if err := c.emitTo(docAudience(d), seq, "doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID,
-		map[string]any{"ids": ids, "changes": map[string]core.FieldChange{"deleted_at": {To: nil}}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "doc.restored", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"ids": ids, "changes": map[string]core.FieldChange{"deleted_at": {To: nil}}}}); err != nil {
 		return err
 	}
 	for _, x := range all {

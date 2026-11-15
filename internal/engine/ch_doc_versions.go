@@ -114,8 +114,8 @@ func docRevert(c *cx, a docRevertArgs) error {
 		return err
 	}
 	c.ref = d.ID
-	if err := c.emitTo(docAudience(d), seq, "doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": upserted,
-		"deleted": gone, "reverted_to": v.ID, "changes": map[string]core.FieldChange{"content_seq": {To: seq}, "updated_at": {To: c.at}}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "doc.edited", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": d.ID, "blocks": upserted,
+		"deleted": gone, "reverted_to": v.ID, "changes": map[string]core.FieldChange{"content_seq": {To: seq}, "updated_at": {To: c.at}}}}); err != nil {
 		return err
 	}
 	return c.afterDocText(d, ed)

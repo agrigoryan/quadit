@@ -90,7 +90,7 @@ func propertyCreate(c *cx, a propertyArgs) error {
 		return alreadyInUse(err, "id", pid)
 	}
 	c.ref = p.ID
-	return c.emitTo(docAudience(d), seq, "property.created", "property", p.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": p})
+	return c.emit(event{seq: seq, typ: "property.created", entity: "property", entityID: p.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"row": p}})
 }
 
 func (c *cx) propertyDoc(ref string) (core.DBProperty, core.Doc, error) {
@@ -144,7 +144,7 @@ func propertyUpdate(c *cx, a propertyArgs) error {
 	if _, err := c.tx.Update(c.ctx, "db_properties", p.set, store.Eq("id", pr.ID)); err != nil {
 		return err
 	}
-	if err := c.emitTo(docAudience(d), seq, "property.updated", "property", pr.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": pr.ID, "changes": p.changes}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "property.updated", entity: "property", entityID: pr.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": pr.ID, "changes": p.changes}}); err != nil {
 		return err
 	}
 	if a.RenameOption != nil {
@@ -210,8 +210,7 @@ func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error
 		if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"props": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", row.ID)); err != nil {
 			return err
 		}
-		if err := c.emitTo(docAudience(row), seq, "doc.updated", "doc", row.ID, "doc", row.ID, row.ProjectID,
-			map[string]any{"id": row.ID, "changes": map[string]core.FieldChange{"props": {To: json.RawMessage(raw)}}}); err != nil {
+		if err := c.emit(event{seq: seq, typ: "doc.updated", entity: "doc", entityID: row.ID, place: inDoc(row), audience: docAudience(row), data: map[string]any{"id": row.ID, "changes": map[string]core.FieldChange{"props": {To: json.RawMessage(raw)}}}}); err != nil {
 			return err
 		}
 	}
@@ -275,8 +274,7 @@ func (c *cx) renameInFilters(pr core.DBProperty, d core.Doc, from, to string) er
 		if _, err := c.tx.Update(c.ctx, "db_views", map[string]any{"config": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", v.ID)); err != nil {
 			return err
 		}
-		if err := c.emitTo(docAudience(d), seq, "dbview.updated", "dbview", v.ID, "doc", d.ID, d.ProjectID,
-			map[string]any{"id": v.ID, "changes": map[string]core.FieldChange{"config": {From: v.Config, To: json.RawMessage(raw)}}}); err != nil {
+		if err := c.emit(event{seq: seq, typ: "dbview.updated", entity: "dbview", entityID: v.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": v.ID, "changes": map[string]core.FieldChange{"config": {From: v.Config, To: json.RawMessage(raw)}}}}); err != nil {
 			return err
 		}
 	}
@@ -293,8 +291,7 @@ func propertyDelete(c *cx, a idArgs) error {
 		return err
 	}
 	c.ref = pr.ID
-	return c.emitTo(docAudience(d), seq, "property.deleted", "property", pr.ID, "doc", d.ID, d.ProjectID,
-		map[string]any{"id": pr.ID, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}})
+	return c.emit(event{seq: seq, typ: "property.deleted", entity: "property", entityID: pr.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": pr.ID, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}}})
 }
 
 type dbviewArgs struct {
@@ -337,7 +334,7 @@ func dbviewCreate(c *cx, a dbviewArgs) error {
 		return alreadyInUse(err, "id", vid)
 	}
 	c.ref = v.ID
-	return c.emitTo(docAudience(d), seq, "dbview.created", "dbview", v.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": v})
+	return c.emit(event{seq: seq, typ: "dbview.created", entity: "dbview", entityID: v.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"row": v}})
 }
 
 func (c *cx) dbviewDoc(ref string) (core.DBView, core.Doc, error) {
@@ -380,7 +377,7 @@ func dbviewUpdate(c *cx, a dbviewArgs) error {
 	if _, err := c.tx.Update(c.ctx, "db_views", p.set, store.Eq("id", v.ID)); err != nil {
 		return err
 	}
-	return c.emitTo(docAudience(d), seq, "dbview.updated", "dbview", v.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": v.ID, "changes": p.changes})
+	return c.emit(event{seq: seq, typ: "dbview.updated", entity: "dbview", entityID: v.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": v.ID, "changes": p.changes}})
 }
 
 func dbviewDelete(c *cx, a idArgs) error {
@@ -393,8 +390,7 @@ func dbviewDelete(c *cx, a idArgs) error {
 		return err
 	}
 	c.ref = v.ID
-	return c.emitTo(docAudience(d), seq, "dbview.deleted", "dbview", v.ID, "doc", d.ID, d.ProjectID,
-		map[string]any{"id": v.ID, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}})
+	return c.emit(event{seq: seq, typ: "dbview.deleted", entity: "dbview", entityID: v.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": v.ID, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}}})
 }
 
 // rowProps turns a row's values as a caller sends them (by property name or
@@ -527,6 +523,5 @@ func (c *cx) addOptions(p *core.DBProperty, vals []string) error {
 	if _, err := c.tx.Update(c.ctx, "db_properties", map[string]any{"config": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", p.ID)); err != nil {
 		return err
 	}
-	return c.emitTo(docAudience(d), seq, "property.updated", "property", p.ID, "doc", d.ID, d.ProjectID,
-		map[string]any{"id": p.ID, "changes": map[string]core.FieldChange{"config": {From: old, To: json.RawMessage(raw)}}})
+	return c.emit(event{seq: seq, typ: "property.updated", entity: "property", entityID: p.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": p.ID, "changes": map[string]core.FieldChange{"config": {From: old, To: json.RawMessage(raw)}}}})
 }

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"maps"
 	"reflect"
 	"strings"
 
@@ -97,54 +98,60 @@ func (p *patch) date(col string, o Opt[string], cur *string) error {
 	return nil
 }
 
+// target names the row a save or a trash writes, and where its event
+// belongs. extra is added to the event's data.
+type target struct {
+	table  string
+	entity string // the kind of thing the row is, in events: "project"
+	id     string
+	place  place
+	extra  map[string]any
+}
+
 // save writes the patch to one row and emits "<entity>.updated" with the
-// changes. extra is added to the event's data.
-func (c *cx) save(p *patch, table, entity, rowID, scopeType, scopeID, projectID string, extra map[string]any) error {
-	c.ref = rowID
+// changes.
+func (c *cx) save(p *patch, row target) error {
+	c.ref = row.id
 	if p.empty() {
 		return nil // already as asked: nothing to write, no event
 	}
 	seq := c.tx.NextSeq()
 	p.set["updated_seq"] = seq
-	n, err := c.tx.Update(c.ctx, table, p.set, store.Eq("id", rowID))
+	n, err := c.tx.Update(c.ctx, row.table, p.set, store.Eq("id", row.id))
 	if err != nil {
-		return alreadyInUse(err, entity, rowID)
+		return alreadyInUse(err, row.entity, row.id)
 	}
 	if n != 1 {
-		return notFound(entity, rowID)
+		return notFound(row.entity, row.id)
 	}
-	data := map[string]any{"id": rowID, "changes": p.changes}
-	for k, v := range extra {
-		data[k] = v
-	}
-	return c.emit(seq, entity+".updated", entity, rowID, scopeType, scopeID, projectID, data)
+	data := map[string]any{"id": row.id, "changes": p.changes}
+	maps.Copy(data, row.extra)
+	return c.emit(event{seq: seq, typ: row.entity + ".updated", entity: row.entity, entityID: row.id, place: row.place, data: data})
 }
 
 // trash moves a row to the trash and emits "<entity>.deleted".
-func (c *cx) trash(table, entity, rowID, scopeType, scopeID, projectID string, extra map[string]any) error {
-	c.ref = rowID
+func (c *cx) trash(row target) error {
+	c.ref = row.id
 	seq := c.tx.NextSeq()
 	set := map[string]any{"deleted_at": c.at}
-	if tb, ok := store.TableNamed(table); ok {
+	if tb, ok := store.TableNamed(row.table); ok {
 		if _, has := tb.Type.FieldByName("UpdatedSeq"); has {
 			set["updated_seq"] = seq
 		}
 	}
-	n, err := c.tx.Update(c.ctx, table, set, store.Eq("id", rowID), store.Live)
+	n, err := c.tx.Update(c.ctx, row.table, set, store.Eq("id", row.id), store.Live)
 	if err != nil {
 		return err
 	}
 	if n != 1 {
-		return notFound(entity, rowID)
+		return notFound(row.entity, row.id)
 	}
-	data := map[string]any{"id": rowID, "changes": map[string]core.FieldChange{"deleted_at": {From: nil, To: c.at}}}
-	for k, v := range extra {
-		data[k] = v
-	}
-	return c.emit(seq, entity+".deleted", entity, rowID, scopeType, scopeID, projectID, data)
+	data := map[string]any{"id": row.id, "changes": map[string]core.FieldChange{"deleted_at": {From: nil, To: c.at}}}
+	maps.Copy(data, row.extra)
+	return c.emit(event{seq: seq, typ: row.entity + ".deleted", entity: row.entity, entityID: row.id, place: row.place, data: data})
 }
 
 // emitDeleted emits "<entity>.deleted" for a row that was removed outright.
-func (c *cx) emitDeleted(entity, rowID, scopeType, scopeID, projectID string) error {
-	return c.emit(c.tx.NextSeq(), entity+".deleted", entity, rowID, scopeType, scopeID, projectID, map[string]any{"id": rowID, "gone": true})
+func (c *cx) emitDeleted(entity, rowID string, where place) error {
+	return c.emit(event{seq: c.tx.NextSeq(), typ: entity + ".deleted", entity: entity, entityID: rowID, place: where, data: map[string]any{"id": rowID, "gone": true}})
 }

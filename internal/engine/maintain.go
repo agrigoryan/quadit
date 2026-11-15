@@ -234,7 +234,7 @@ func (run *purge) tasks() error {
 			rowsOf{"refs", store.Eq("from_scope_id", t.ID)}, rowsOf{"refs", store.Eq("to_id", t.ID)}, rowsOf{"tasks", store.Eq("id", t.ID)}); err != nil {
 			return err
 		}
-		if err := run.c.emitDeleted("task", t.ID, "task", t.ID, t.ProjectID); err != nil {
+		if err := run.c.emitDeleted("task", t.ID, inTask(t)); err != nil {
 			return err
 		}
 		run.purged++
@@ -258,7 +258,7 @@ func (run *purge) docs() error {
 			rowsOf{"watchers", store.Eq("subject_id", d.ID)}, rowsOf{"refs", store.Eq("from_scope_id", d.ID)}, rowsOf{"refs", store.Eq("to_id", d.ID)}, rowsOf{"docs", store.Eq("id", d.ID)}); err != nil {
 			return err
 		}
-		if err := run.c.emitTo(d.OwnerID, tx.NextSeq(), "doc.deleted", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "gone": true}); err != nil {
+		if err := run.c.emit(event{seq: tx.NextSeq(), typ: "doc.deleted", entity: "doc", entityID: d.ID, place: inDoc(d), audience: d.OwnerID, data: map[string]any{"id": d.ID, "gone": true}}); err != nil {
 			return err
 		}
 		run.purged++

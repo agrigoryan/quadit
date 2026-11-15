@@ -87,7 +87,7 @@ func ruleCreate(c *cx, a ruleArgs) error {
 	if err := c.tx.Insert(c.ctx, r); err != nil {
 		return alreadyInUse(err, "id", rid)
 	}
-	return c.created(seq, "rule", r.ID, "workspace", c.ws, "", r)
+	return c.created(seq, "rule", r.ID, inWorkspace(c.ws), r)
 }
 
 func ruleUpdate(c *cx, a ruleArgs) error {
@@ -116,7 +116,7 @@ func ruleUpdate(c *cx, a ruleArgs) error {
 		p.set["match_on"], p.set["action"] = m, act
 		p.changes["match"], p.changes["action"] = core.FieldChange{To: m}, core.FieldChange{To: act}
 	}
-	return c.save(p, "rules", "rule", r.ID, "workspace", c.ws, "", nil)
+	return c.save(p, target{table: "rules", entity: "rule", id: r.ID, place: inWorkspace(c.ws)})
 }
 
 func ruleDelete(c *cx, a idArgs) error {
@@ -124,5 +124,5 @@ func ruleDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	return c.trash("rules", "rule", r.ID, "workspace", c.ws, "", nil)
+	return c.trash(target{table: "rules", entity: "rule", id: r.ID, place: inWorkspace(c.ws)})
 }

@@ -33,22 +33,28 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 	if err := c.tx.Insert(c.ctx, n); err != nil {
 		return err
 	}
-	scopeType, scopeID := "workspace", c.ws
+	where := inWorkspace(c.ws)
 	if n.TaskID != "" {
-		scopeType, scopeID = "task", n.TaskID
+		where = place{scopeType: "task", scopeID: n.TaskID}
 	} else if n.DocID != "" {
-		scopeType, scopeID = "doc", n.DocID
+		where = place{scopeType: "doc", scopeID: n.DocID}
 	}
-	return c.emitTo(userID, seq, "notification.created", "notification", n.ID, scopeType, scopeID, "", map[string]any{"row": n})
+	return c.emit(event{seq: seq, typ: "notification.created", entity: "notification", entityID: n.ID, place: where, audience: userID, data: map[string]any{"row": n}})
+}
+
+// about is what in a task a notification is about: a comment, a decision,
+// or the task itself, with the text to show from it.
+type about struct {
+	entity, id, text string
 }
 
 // notifyTask notifies about something in a task.
-func (c *cx) notifyTask(userID, typ string, t core.Task, entityType, entityID, text string) error {
-	return c.notify(userID, typ, core.Notification{TaskID: t.ID, EntityType: entityType, EntityID: entityID, Title: t.Key + " " + t.Title, Snippet: text})
+func (c *cx) notifyTask(userID, typ string, t core.Task, what about) error {
+	return c.notify(userID, typ, core.Notification{TaskID: t.ID, EntityType: what.entity, EntityID: what.id, Title: t.Key + " " + t.Title, Snippet: what.text})
 }
 
-// notifyWatchers notifies everyone watching a task, except those in skip.
-func (c *cx) notifyWatchers(t core.Task, typ, entityType, entityID, text string) error {
+// notifyWatchers notifies everyone watching a task.
+func (c *cx) notifyWatchers(t core.Task, typ string, what about) error {
 	// Watching a task's epic or its project is watching the task.
 	subjects := []string{t.ID, t.ProjectID}
 	if t.EpicID != "" {
@@ -59,7 +65,7 @@ func (c *cx) notifyWatchers(t core.Task, typ, entityType, entityID, text string)
 		return err
 	}
 	for _, w := range ws {
-		if err := c.notifyTask(w.UserID, typ, t, entityType, entityID, text); err != nil {
+		if err := c.notifyTask(w.UserID, typ, t, what); err != nil {
 			return err
 		}
 	}
@@ -276,7 +282,6 @@ func (l *linker) save(old []core.Ref) error {
 }
 
 // index puts text in the full-text index.
-func (c *cx) index(kind, entityID, scopeType, scopeID, projectID, audience, title, body string) error {
-	return c.tx.Index(c.ctx, store.SearchDoc{Kind: kind, EntityID: entityID, ScopeType: scopeType, ScopeID: scopeID,
-		ProjectID: projectID, AudienceID: audience, Title: title, Body: body})
+func (c *cx) index(entry store.SearchDoc) error {
+	return c.tx.Index(c.ctx, entry)
 }

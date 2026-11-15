@@ -63,69 +63,32 @@ func (e *Engine) Apply(ctx context.Context, workspaceID string, actor Actor, ch 
 
 var errDryRun = errors.New("dry run")
 
+// maxBatch is the most changes one batch holds.
+const maxBatch = 500
+
 // Batch runs several changes in one transaction: all apply or none do. With
 // dryRun the changes are checked and their events returned, and nothing is
 // kept.
 func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, changes []Change, dryRun bool) ([]*Result, error) {
-	if len(changes) == 0 {
-		return nil, invalid("changes", "send at least one change")
+	if err := checkBatch(changes); err != nil {
+		return nil, err
 	}
-	if len(changes) > 500 {
-		return nil, invalid("changes", "a batch holds at most 500 changes; this one has %d", len(changes))
-	}
-	for i, ch := range changes {
-		if !id.Valid(ch.ID) {
-			return nil, withIndex(i, invalid("id", "a change needs an id made by the caller (a lower-case UUID); resending the same id is then safe"))
-		}
-		if _, ok := handlers[ch.Type]; !ok {
-			return nil, withIndex(i, oneOf("type", "change type", ch.Type, ChangeTypes()))
-		}
-	}
+	run := &batch{ctx: ctx, e: e, dryRun: dryRun}
 	results := make([]*Result, len(changes))
 	var lastSeq int64
 	err := e.st.Write(ctx, workspaceID, func(raw store.Tx) error {
-		var tx store.Tx = newMemoTx(raw)
-		var m core.Member
-		err := tx.Get(ctx, &m, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
-		if errors.Is(err, store.ErrNotFound) {
-			return forbidden("you are not a member of this workspace")
-		}
-		if err != nil {
+		if err := run.start(newMemoTx(raw), actor); err != nil {
 			return err
 		}
-		if m.SuspendedAt != 0 {
-			return forbidden("your membership is suspended")
-		}
-		scope := core.Scope{}
-		if m.Scope != nil {
-			scope = *m.Scope
-		}
-		if actor.ReadOnly {
-			scope.ReadOnly = true
-		}
-		if len(actor.Projects) > 0 {
-			scope.Projects = intersectProjects(scope.Projects, actor.Projects)
-		}
-		now := e.now().UnixMilli()
 		for i, ch := range changes {
-			res, err := e.applyOne(ctx, tx, m, scope, now, ch, dryRun)
+			res, err := run.apply(ch)
 			if err != nil {
-				var ee *Error
-				if errors.As(err, &ee) {
-					return withIndex(i, ee)
-				}
-				if errors.Is(err, store.ErrNotFound) {
-					return withIndex(i, &Error{Code: CodeNotFound, Message: err.Error()})
-				}
-				return fmt.Errorf("change %d (%s): %w", i, ch.Type, err)
+				return refusedAt(i, ch, err)
 			}
 			results[i] = res
 		}
-		lastSeq = tx.Seq()
-		if dryRun {
-			return errDryRun
-		}
-		return nil
+		lastSeq = run.tx.Seq()
+		return run.end()
 	})
 	if err != nil && !errors.Is(err, errDryRun) {
 		return nil, err
@@ -136,53 +99,109 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 	return results, nil
 }
 
-func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope core.Scope, now int64, ch Change, dryRun bool) (*Result, error) {
+// checkBatch refuses a batch that is empty, too long, or has a change with
+// no id or of an unknown type, before anything is read.
+func checkBatch(changes []Change) error {
+	if len(changes) == 0 {
+		return invalid("changes", "send at least one change")
+	}
+	if len(changes) > maxBatch {
+		return invalid("changes", "a batch holds at most 500 changes; this one has %d", len(changes))
+	}
+	for i, ch := range changes {
+		if !id.Valid(ch.ID) {
+			return withIndex(i, invalid("id", "a change needs an id made by the caller (a lower-case UUID); resending the same id is then safe"))
+		}
+		if _, ok := handlers[ch.Type]; !ok {
+			return withIndex(i, oneOf("type", "change type", ch.Type, ChangeTypes()))
+		}
+	}
+	return nil
+}
+
+// refusedAt says which change of a batch failed: a refusal carries its
+// position, anything else names it.
+func refusedAt(i int, ch Change, err error) error {
+	if ee, ok := errors.AsType[*Error](err); ok {
+		return withIndex(i, ee)
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		return withIndex(i, &Error{Code: CodeNotFound, Message: err.Error()})
+	}
+	return fmt.Errorf("change %d (%s): %w", i, ch.Type, err)
+}
+
+// batch is one run of Batch: one actor's changes in one transaction. It
+// holds its ctx because it is one run of work.
+type batch struct {
+	ctx    context.Context
+	e      *Engine
+	tx     store.Tx
+	member core.Member // the actor
+	scope  core.Scope  // what the actor's membership and credential allow
+	now    int64
+	dryRun bool // check the changes and keep nothing
+}
+
+// start checks that the actor may write to the workspace at all, and works
+// out how far their credential reaches.
+func (b *batch) start(tx store.Tx, actor Actor) error {
+	b.tx = tx
+	err := tx.Get(b.ctx, &b.member, store.Eq("user_id", actor.UserID), store.Null("removed_at"))
+	if errors.Is(err, store.ErrNotFound) {
+		return forbidden("you are not a member of this workspace")
+	}
+	if err != nil {
+		return err
+	}
+	if b.member.SuspendedAt != 0 {
+		return forbidden("your membership is suspended")
+	}
+	if b.member.Scope != nil {
+		b.scope = *b.member.Scope
+	}
+	if actor.ReadOnly {
+		b.scope.ReadOnly = true
+	}
+	if len(actor.Projects) > 0 {
+		b.scope.Projects = intersectProjects(b.scope.Projects, actor.Projects)
+	}
+	b.now = b.e.now().UnixMilli()
+	return nil
+}
+
+// end keeps the batch's writes, or, for a dry run, undoes them.
+func (b *batch) end() error {
+	if b.dryRun {
+		return errDryRun
+	}
+	return nil
+}
+
+// apply runs one change of the batch, or answers it from the first time
+// its id was used.
+func (b *batch) apply(ch Change) (*Result, error) {
 	h := handlers[ch.Type]
 	hash := argsHash(ch)
-	res := &Result{ChangeID: ch.ID, Type: ch.Type}
-
-	var prev core.AppliedChange
-	err := tx.Get(ctx, &prev, store.Eq("id", ch.ID))
-	if err == nil {
-		if prev.Type != ch.Type || prev.ArgsHash != hash || prev.ActorID != m.UserID {
-			return nil, conflictErr("change id %s was already used for a different change; use a new id", ch.ID)
-		}
-		res.Duplicate, res.FirstSeq, res.Seq = true, prev.FirstSeq, prev.LastSeq
-		res.Ref, res.Key = prev.Ref, prev.Key
-		return res, nil
+	res, err := b.resent(ch, hash)
+	if res != nil || err != nil {
+		return res, err
 	}
-	if !errors.Is(err, store.ErrNotFound) {
+	if !b.member.Role.AtLeast(h.min) {
+		return nil, forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, b.member.Role)
+	}
+	if ch.Quiet && !b.member.Role.AtLeast(core.RoleAdmin) {
+		return nil, forbidden("quiet is for an admin bringing in history; a change by a %s tells those it concerns", b.member.Role)
+	}
+	scope := b.scope
+	askerID, err := b.checkFor(ch, h, &scope)
+	if err != nil {
 		return nil, err
-	}
-	if !m.Role.AtLeast(h.min) {
-		return nil, forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, m.Role)
-	}
-	if ch.Quiet && !m.Role.AtLeast(core.RoleAdmin) {
-		return nil, forbidden("quiet is for an admin bringing in history; a change by a %s tells those it concerns", m.Role)
-	}
-	askerID := ""
-	if ch.For != "" {
-		asker, err := (&Resolver{ctx: ctx, db: tx, actor: m, at: now}).memberRef("for", ch.For)
-		if err != nil {
-			return nil, err
-		}
-		askerID = asker.UserID
-		if asker.SuspendedAt != 0 || !asker.Role.AtLeast(h.min) {
-			return nil, forbidden("%s needs the %s role; @%s, who asked for it, is a %s", ch.Type, h.min, asker.Handle, asker.Role)
-		}
-		if asker.Scope != nil {
-			if asker.Scope.ReadOnly {
-				return nil, forbidden("@%s, who asked for this, may only read", asker.Handle)
-			}
-			if len(asker.Scope.Projects) > 0 {
-				scope.Projects = intersectProjects(scope.Projects, asker.Scope.Projects)
-			}
-		}
 	}
 	if scope.ReadOnly {
 		return nil, forbidden("this credential is read-only")
 	}
-	c := &cx{Resolver: &Resolver{ctx: ctx, db: tx, actor: m, at: now}, e: e, tx: tx, ws: tx.WorkspaceID(), scope: scope,
+	c := &cx{Resolver: b.resolver(), e: b.e, tx: b.tx, ws: b.tx.WorkspaceID(), scope: scope,
 		change: ch, notified: map[string]bool{}, asker: askerID, askerOK: map[string]bool{}, quiet: ch.Quiet}
 	if contains(scope.NeedsApproval, ch.Type) {
 		if err := c.checkApproval(); err != nil {
@@ -192,18 +211,68 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 	if err := h.fn(c); err != nil {
 		return nil, err
 	}
-	res.Events, res.Ref, res.Key = c.events, c.ref, c.key
-	applied := core.AppliedChange{WorkspaceID: c.ws, ID: ch.ID, ActorID: m.UserID, Type: ch.Type, ArgsHash: hash, CreatedAt: now, Ref: c.ref, Key: c.key}
+	return b.remember(c, ch, hash)
+}
+
+func (b *batch) resolver() *Resolver {
+	return &Resolver{ctx: b.ctx, db: b.tx, actor: b.member, at: b.now}
+}
+
+// resent answers a change whose id was already applied with what it did
+// then, and refuses one whose id was used for another change. It returns
+// nil for a new id.
+func (b *batch) resent(ch Change, hash string) (*Result, error) {
+	var prev core.AppliedChange
+	ok, err := found(b.tx.Get(b.ctx, &prev, store.Eq("id", ch.ID)))
+	if !ok {
+		return nil, err
+	}
+	if prev.Type != ch.Type || prev.ArgsHash != hash || prev.ActorID != b.member.UserID {
+		return nil, conflictErr("change id %s was already used for a different change; use a new id", ch.ID)
+	}
+	return &Result{ChangeID: ch.ID, Type: ch.Type, Duplicate: true, FirstSeq: prev.FirstSeq, Seq: prev.LastSeq, Ref: prev.Ref, Key: prev.Key}, nil
+}
+
+// checkFor holds a change made "for" a member to what that member may do,
+// narrowing scope to their projects. It returns the member's id.
+func (b *batch) checkFor(ch Change, h handler, scope *core.Scope) (string, error) {
+	if ch.For == "" {
+		return "", nil
+	}
+	asker, err := b.resolver().memberRef("for", ch.For)
+	if err != nil {
+		return "", err
+	}
+	if asker.SuspendedAt != 0 || !asker.Role.AtLeast(h.min) {
+		return "", forbidden("%s needs the %s role; @%s, who asked for it, is a %s", ch.Type, h.min, asker.Handle, asker.Role)
+	}
+	if asker.Scope == nil {
+		return asker.UserID, nil
+	}
+	if asker.Scope.ReadOnly {
+		return "", forbidden("@%s, who asked for this, may only read", asker.Handle)
+	}
+	if len(asker.Scope.Projects) > 0 {
+		scope.Projects = intersectProjects(scope.Projects, asker.Scope.Projects)
+	}
+	return asker.UserID, nil
+}
+
+// remember records that the change was applied, at the positions of its
+// events, so that sending it again is answered and not applied twice.
+func (b *batch) remember(c *cx, ch Change, hash string) (*Result, error) {
+	res := &Result{ChangeID: ch.ID, Type: ch.Type, Events: c.events, Ref: c.ref, Key: c.key}
+	applied := core.AppliedChange{WorkspaceID: c.ws, ID: ch.ID, ActorID: b.member.UserID, Type: ch.Type, ArgsHash: hash, CreatedAt: b.now, Ref: c.ref, Key: c.key}
 	if len(c.events) > 0 {
 		applied.FirstSeq = c.events[0].Seq
 		applied.LastSeq = c.events[len(c.events)-1].Seq
 	} else {
 		// Nothing changed (an update to the values already there). The
 		// change is still remembered, at the position it was checked.
-		applied.FirstSeq, applied.LastSeq = tx.Seq(), tx.Seq()
+		applied.FirstSeq, applied.LastSeq = b.tx.Seq(), b.tx.Seq()
 	}
 	res.FirstSeq, res.Seq = applied.FirstSeq, applied.LastSeq
-	return res, tx.Insert(ctx, applied)
+	return res, b.tx.Insert(b.ctx, applied)
 }
 
 // checkApproval makes sure the change comes with an approved decision that
@@ -246,8 +315,7 @@ func (c *cx) checkApproval() error {
 		if err := c.tx.Get(c.ctx, &t, store.Eq("id", d.TaskID)); err != nil {
 			return err
 		}
-		return c.emit(seq, "decision.updated", "decision", d.ID, "task", t.ID, t.ProjectID,
-			map[string]any{"id": d.ID, "changes": map[string]core.FieldChange{"action_used_at": {To: c.at}}})
+		return c.emit(event{seq: seq, typ: "decision.updated", entity: "decision", entityID: d.ID, place: inTask(t), data: map[string]any{"id": d.ID, "changes": map[string]core.FieldChange{"action_used_at": {To: c.at}}}})
 	}
 	return need
 }

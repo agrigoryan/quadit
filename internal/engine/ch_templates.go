@@ -47,20 +47,19 @@ func templateCreate(c *cx, a templateCreateArgs) error {
 	if a.Preset != nil {
 		tp.Preset, _ = json.Marshal(a.Preset)
 	}
-	scopeType, scopeID := "workspace", c.ws
 	if a.Project != "" {
 		p, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		tp.ProjectID, scopeType, scopeID = p.ID, "project", p.ID
+		tp.ProjectID = p.ID
 	}
 	seq := c.tx.NextSeq()
 	tp.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, tp); err != nil {
 		return alreadyInUse(err, "id", tid)
 	}
-	return c.created(seq, "template", tp.ID, scopeType, scopeID, tp.ProjectID, tp)
+	return c.created(seq, "template", tp.ID, c.inProjectOrWorkspace(tp.ProjectID), tp)
 }
 
 type templateUpdateArgs struct {
@@ -69,13 +68,6 @@ type templateUpdateArgs struct {
 	Title       Opt[string] `json:"title"`
 	Description Opt[string] `json:"description"`
 	Preset      Opt[Preset] `json:"preset"`
-}
-
-func tplScope(c *cx, t core.Template) (string, string) {
-	if t.ProjectID != "" {
-		return "project", t.ProjectID
-	}
-	return "workspace", c.ws
 }
 
 func templateUpdate(c *cx, a templateUpdateArgs) error {
@@ -99,8 +91,7 @@ func templateUpdate(c *cx, a templateUpdateArgs) error {
 			p.changes["preset"] = core.FieldChange{From: tp.Preset, To: json.RawMessage(raw)}
 		}
 	}
-	st, sid := tplScope(c, tp)
-	return c.save(p, "templates", "template", tp.ID, st, sid, tp.ProjectID, nil)
+	return c.save(p, target{table: "templates", entity: "template", id: tp.ID, place: c.inProjectOrWorkspace(tp.ProjectID)})
 }
 
 func templateDelete(c *cx, a idArgs) error {
@@ -108,8 +99,7 @@ func templateDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	st, sid := tplScope(c, tp)
-	return c.trash("templates", "template", tp.ID, st, sid, tp.ProjectID, nil)
+	return c.trash(target{table: "templates", entity: "template", id: tp.ID, place: c.inProjectOrWorkspace(tp.ProjectID)})
 }
 
 // template finds a template usable in project p by id or name.

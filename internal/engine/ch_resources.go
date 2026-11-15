@@ -35,7 +35,7 @@ func resourceCreate(c *cx, a resourceCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, r); err != nil {
 		return alreadyInUse(err, "resource name", r.Name)
 	}
-	return c.created(seq, "resource", r.ID, "workspace", c.ws, "", r)
+	return c.created(seq, "resource", r.ID, inWorkspace(c.ws), r)
 }
 
 func (c *cx) resource(ref string) (core.Resource, error) {
@@ -66,7 +66,7 @@ func resourceDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	return c.trash("resources", "resource", r.ID, "workspace", c.ws, "", nil)
+	return c.trash(target{table: "resources", entity: "resource", id: r.ID, place: inWorkspace(c.ws)})
 }
 
 type resourceAcquireArgs struct {
@@ -113,7 +113,7 @@ func (c *cx) setClaim(cl core.ResourceClaim, set map[string]any, why string) err
 	}
 	was := c.system
 	c.system = true
-	err = c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, projectID, map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource_id": cl.ResourceID, "user_id": cl.UserID, "task_id": cl.TaskID})
+	err = c.emit(event{seq: c.tx.NextSeq(), typ: "claim.updated", entity: "claim", entityID: cl.ID, place: place{scopeType: "workspace", scopeID: c.ws, projectID: projectID}, data: map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource_id": cl.ResourceID, "user_id": cl.UserID, "task_id": cl.TaskID}})
 	c.system = was
 	return err
 }
@@ -204,7 +204,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 	if err != nil {
 		return err
 	}
-	if err := c.emit(c.tx.NextSeq(), "claim.created", "claim", cl.ID, "workspace", c.ws, projectID, map[string]any{"row": cl, "resource": r.Name}); err != nil {
+	if err := c.emit(event{seq: c.tx.NextSeq(), typ: "claim.created", entity: "claim", entityID: cl.ID, place: place{scopeType: "workspace", scopeID: c.ws, projectID: projectID}, data: map[string]any{"row": cl, "resource": r.Name}}); err != nil {
 		return err
 	}
 	if cl.State == "waiting" {

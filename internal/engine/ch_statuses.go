@@ -67,7 +67,7 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, st); err != nil {
 		return alreadyInUse(err, "status name", st.Name)
 	}
-	return c.created(seq, "status", st.ID, "project", p.ID, p.ID, st)
+	return c.created(seq, "status", st.ID, inProject(p.ID), st)
 }
 
 type statusUpdateArgs struct {
@@ -108,14 +108,14 @@ func statusUpdate(c *cx, a statusUpdateArgs) error {
 			if o.IsDefault {
 				op := newPatch()
 				op.put("is_default", true, false)
-				if err := c.save(op, "statuses", "status", o.ID, "project", st.ProjectID, st.ProjectID, nil); err != nil {
+				if err := c.save(op, target{table: "statuses", entity: "status", id: o.ID, place: inProject(st.ProjectID)}); err != nil {
 					return err
 				}
 			}
 		}
 		p.put("is_default", false, true)
 	}
-	return alreadyInUse(c.save(p, "statuses", "status", st.ID, "project", st.ProjectID, st.ProjectID, nil), "status name", st.Name)
+	return alreadyInUse(c.save(p, target{table: "statuses", entity: "status", id: st.ID, place: inProject(st.ProjectID)}), "status name", st.Name)
 }
 
 type statusDeleteArgs struct {
@@ -162,10 +162,10 @@ func statusDelete(c *cx, a statusDeleteArgs) error {
 		if st.IsDefault {
 			op := newPatch()
 			op.put("is_default", false, true)
-			if err := c.save(op, "statuses", "status", to.ID, "project", pr.ID, pr.ID, nil); err != nil {
+			if err := c.save(op, target{table: "statuses", entity: "status", id: to.ID, place: inProject(pr.ID)}); err != nil {
 				return err
 			}
 		}
 	}
-	return c.trash("statuses", "status", st.ID, "project", pr.ID, pr.ID, nil)
+	return c.trash(target{table: "statuses", entity: "status", id: st.ID, place: inProject(pr.ID)})
 }

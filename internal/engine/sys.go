@@ -76,7 +76,7 @@ func (s *Sys) Tx() store.Tx { return s.c.tx }
 
 // Emit records an event from a system write.
 func (s *Sys) Emit(typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error {
-	return s.c.emit(s.c.tx.NextSeq(), typ, entityType, entityID, scopeType, scopeID, projectID, data)
+	return s.c.emit(event{seq: s.c.tx.NextSeq(), typ: typ, entity: entityType, entityID: entityID, place: place{scopeType: scopeType, scopeID: scopeID, projectID: projectID}, data: data})
 }
 
 // Ref returns the id of the thing the last Do made.

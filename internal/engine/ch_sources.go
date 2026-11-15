@@ -79,7 +79,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 	if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"source_id": src.ID}, store.Eq("id", src.RootDocID)); err != nil {
 		return err
 	}
-	return c.created(seq, "source", src.ID, "doc", src.RootDocID, "", src)
+	return c.created(seq, "source", src.ID, place{scopeType: "doc", scopeID: src.RootDocID}, src)
 }
 
 func sourceUpdate(c *cx, a sourceArgs) error {
@@ -114,7 +114,7 @@ func sourceUpdate(c *cx, a sourceArgs) error {
 		}
 		p.setText("write_mode", a.WriteMode, &src.WriteMode)
 	}
-	return c.save(p, "doc_sources", "source", src.ID, "doc", src.RootDocID, "", nil)
+	return c.save(p, target{table: "doc_sources", entity: "source", id: src.ID, place: place{scopeType: "doc", scopeID: src.RootDocID}})
 }
 
 // sourceDelete stops mirroring a repository. The pages stay as ordinary pages.
@@ -126,7 +126,7 @@ func sourceDelete(c *cx, a idArgs) error {
 	if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"source_id": "", "source_path": "", "source_hash": ""}, store.Eq("source_id", src.ID)); err != nil {
 		return err
 	}
-	return c.trash("doc_sources", "source", src.ID, "doc", src.RootDocID, "", nil)
+	return c.trash(target{table: "doc_sources", entity: "source", id: src.ID, place: place{scopeType: "doc", scopeID: src.RootDocID}})
 }
 
 // checkSubdir keeps a source's folder inside its repository: no way up and

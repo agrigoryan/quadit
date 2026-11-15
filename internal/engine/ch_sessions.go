@@ -30,13 +30,13 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 	seq := c.tx.NextSeq()
 	s := core.AgentSession{ID: sid, WorkspaceID: c.ws, AgentID: c.actor.UserID, Title: a.Title, Instructions: a.Instructions,
 		State: "running", StartedAt: c.at, UpdatedSeq: seq}
-	scopeType, scopeID, projectID, key := "workspace", c.ws, "", ""
+	where, key := inWorkspace(c.ws), ""
 	if a.Task != "" {
 		t, err := c.task("task", a.Task)
 		if err != nil {
 			return err
 		}
-		s.TaskID, scopeType, scopeID, projectID, key = t.ID, "task", t.ID, t.ProjectID, t.Key
+		s.TaskID, where, key = t.ID, inTask(t), t.Key
 		if s.Title == "" {
 			s.Title = t.Title
 		}
@@ -49,7 +49,7 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 		return alreadyInUse(err, "id", sid)
 	}
 	c.ref = s.ID
-	return c.emit(seq, "session.created", "session", s.ID, scopeType, scopeID, projectID, map[string]any{"row": s, "key": key})
+	return c.emit(event{seq: seq, typ: "session.created", entity: "session", entityID: s.ID, place: where, data: map[string]any{"row": s, "key": key}})
 }
 
 type sessionUpdateArgs struct {
@@ -130,7 +130,7 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	total("cost_micros", a.CostMicros, &s.CostMicros)
 	total("tokens_in", a.TokensIn, &s.TokensIn)
 	total("tokens_out", a.TokensOut, &s.TokensOut)
-	scopeType, scopeID, projectID := "workspace", c.ws, ""
+	where := inWorkspace(c.ws)
 	if s.TaskID != "" {
 		var t core.Task
 		ok, err := found(c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)))
@@ -138,10 +138,10 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 			return err
 		}
 		if ok {
-			scopeType, scopeID, projectID = "task", t.ID, t.ProjectID
+			where = inTask(t)
 		}
 	}
-	if err := c.save(p, "agent_sessions", "session", s.ID, scopeType, scopeID, projectID, nil); err != nil {
+	if err := c.save(p, target{table: "agent_sessions", entity: "session", id: s.ID, place: where}); err != nil {
 		return err
 	}
 	_ = before

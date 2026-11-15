@@ -352,7 +352,7 @@ func (u *taskEdit) notifyConcerned() error {
 		return err
 	}
 	if u.moved != nil && !core.OpenCategory(u.moved.Category) {
-		return c.notifyWatchers(t, core.NoteStatus, "task", t.ID, "moved to "+u.moved.Name)
+		return c.notifyWatchers(t, core.NoteStatus, about{entity: "task", id: t.ID, text: "moved to " + u.moved.Name})
 	}
 	return nil
 }

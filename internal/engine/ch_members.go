@@ -111,7 +111,7 @@ func (c *cx) addMember(m core.Member) error {
 		}
 		return err
 	}
-	return c.created(seq, "member", m.UserID, "workspace", c.ws, "", m)
+	return c.created(seq, "member", m.UserID, inWorkspace(c.ws), m)
 }
 
 var handleStrip = regexp.MustCompile(`[^a-z0-9_-]+`)
@@ -196,7 +196,7 @@ func (c *cx) saveMember(m core.Member, p *patch) error {
 		}
 		return err
 	}
-	return c.emit(seq, "member.updated", "member", m.UserID, "workspace", c.ws, "", map[string]any{"id": m.UserID, "changes": p.changes})
+	return c.emit(event{seq: seq, typ: "member.updated", entity: "member", entityID: m.UserID, place: inWorkspace(c.ws), data: map[string]any{"id": m.UserID, "changes": p.changes}})
 }
 
 func memberUpdate(c *cx, a memberUpdateArgs) error {

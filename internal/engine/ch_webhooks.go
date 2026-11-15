@@ -66,7 +66,7 @@ func webhookCreate(c *cx, a webhookCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, w); err != nil {
 		return alreadyInUse(err, "id", wid)
 	}
-	return c.created(seq, "webhook", w.ID, "workspace", c.ws, "", w)
+	return c.created(seq, "webhook", w.ID, inWorkspace(c.ws), w)
 }
 
 type webhookUpdateArgs struct {
@@ -128,7 +128,7 @@ func webhookUpdate(c *cx, a webhookUpdateArgs) error {
 			p.set["failures"] = 0 // turning it back on gives it a clean slate
 		}
 	}
-	return c.save(p, "webhooks", "webhook", w.ID, "workspace", c.ws, "", nil)
+	return c.save(p, target{table: "webhooks", entity: "webhook", id: w.ID, place: inWorkspace(c.ws)})
 }
 
 func webhookDelete(c *cx, a idArgs) error {
@@ -136,5 +136,5 @@ func webhookDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	return c.trash("webhooks", "webhook", w.ID, "workspace", c.ws, "", nil)
+	return c.trash(target{table: "webhooks", entity: "webhook", id: w.ID, place: inWorkspace(c.ws)})
 }

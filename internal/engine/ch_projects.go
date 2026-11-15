@@ -67,7 +67,7 @@ func projectCreate(c *cx, a projectCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, p); err != nil {
 		return alreadyInUse(err, "project key", a.Key)
 	}
-	if err := c.created(seq, "project", p.ID, "project", p.ID, p.ID, p); err != nil {
+	if err := c.created(seq, "project", p.ID, inProject(p.ID), p); err != nil {
 		return err
 	}
 	for i, d := range defaultStatuses {
@@ -77,7 +77,7 @@ func projectCreate(c *cx, a projectCreateArgs) error {
 		if err := c.tx.Insert(c.ctx, st); err != nil {
 			return err
 		}
-		if err := c.emit(seq, "status.created", "status", st.ID, "project", p.ID, p.ID, map[string]any{"row": st}); err != nil {
+		if err := c.emit(event{seq: seq, typ: "status.created", entity: "status", entityID: st.ID, place: inProject(p.ID), data: map[string]any{"row": st}}); err != nil {
 			return err
 		}
 	}
@@ -157,7 +157,7 @@ func projectUpdate(c *cx, a projectUpdateArgs) error {
 	if !p.empty() {
 		p.set["updated_at"] = c.at
 	}
-	if err := c.save(p, "projects", "project", pr.ID, "project", pr.ID, pr.ID, nil); err != nil {
+	if err := c.save(p, target{table: "projects", entity: "project", id: pr.ID, place: inProject(pr.ID)}); err != nil {
 		return alreadyInUse(err, "project key", pr.Key)
 	}
 	if pr.Key != oldKey {
@@ -198,5 +198,5 @@ func projectDelete(c *cx, a memberRefArgs) error {
 	if err != nil {
 		return err
 	}
-	return c.trash("projects", "project", pr.ID, "project", pr.ID, pr.ID, map[string]any{"key": pr.Key})
+	return c.trash(target{table: "projects", entity: "project", id: pr.ID, place: inProject(pr.ID), extra: map[string]any{"key": pr.Key}})
 }

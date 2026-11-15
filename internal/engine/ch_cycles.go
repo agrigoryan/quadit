@@ -71,7 +71,7 @@ func cycleCreate(c *cx, a cycleCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, cy); err != nil {
 		return alreadyInUse(err, "id", cid)
 	}
-	return c.created(seq, "cycle", cy.ID, "project", p.ID, p.ID, cy)
+	return c.created(seq, "cycle", cy.ID, inProject(p.ID), cy)
 }
 
 type cycleUpdateArgs struct {
@@ -100,7 +100,7 @@ func cycleUpdate(c *cx, a cycleUpdateArgs) error {
 	if err := c.cycleOverlap(cy.ProjectID, cy.ID, cy.StartsOn, cy.EndsOn); err != nil {
 		return err
 	}
-	return c.save(p, "cycles", "cycle", cy.ID, "project", cy.ProjectID, cy.ProjectID, nil)
+	return c.save(p, target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(cy.ProjectID)})
 }
 
 func cycleDelete(c *cx, a idArgs) error {
@@ -119,7 +119,7 @@ func cycleDelete(c *cx, a idArgs) error {
 			return err
 		}
 	}
-	return c.trash("cycles", "cycle", cy.ID, "project", cy.ProjectID, cy.ProjectID, nil)
+	return c.trash(target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(cy.ProjectID)})
 }
 
 // startCycles makes a project's first cycles as soon as cycles are on, so
@@ -222,7 +222,7 @@ func (c *cx) rollProject(p core.Project, today string) error {
 		}
 		cp := newPatch()
 		cp.put("closed_at", int64(0), c.at)
-		if err := c.save(cp, "cycles", "cycle", cy.ID, "project", p.ID, p.ID, map[string]any{"rolled": len(open)}); err != nil {
+		if err := c.save(cp, target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(p.ID), extra: map[string]any{"rolled": len(open)}}); err != nil {
 			return err
 		}
 	}

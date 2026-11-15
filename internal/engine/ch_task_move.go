@@ -94,5 +94,5 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	if err := c.saveTask(t, p, map[string]any{"moved_from": oldKey, "from_project_id": oldProject}); err != nil {
 		return err
 	}
-	return c.index("task", t.ID, "task", t.ID, t.ProjectID, "", t.Key+" "+t.Title, t.Description)
+	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})
 }

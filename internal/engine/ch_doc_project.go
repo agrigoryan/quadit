@@ -65,7 +65,7 @@ func (c *cx) moveSubPages(root core.Doc, toProject string) error {
 		if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"project_id": toProject, "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {
 			return err
 		}
-		if err := c.emitTo(docAudience(d), seq, "doc.updated", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "changes": change}); err != nil {
+		if err := c.emit(event{seq: seq, typ: "doc.updated", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: map[string]any{"id": d.ID, "changes": change}}); err != nil {
 			return err
 		}
 		if err := c.tellNewProject(d); err != nil {
@@ -95,5 +95,5 @@ func (c *cx) tellNewProject(was core.Doc) error {
 	if err := c.tx.Get(c.ctx, &now, store.Eq("id", was.ID)); err != nil {
 		return err
 	}
-	return c.emitTo(docAudience(now), c.tx.NextSeq(), "doc.updated", "doc", now.ID, "doc", now.ID, now.ProjectID, map[string]any{"row": now})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: "doc.updated", entity: "doc", entityID: now.ID, place: inDoc(now), audience: docAudience(now), data: map[string]any{"row": now}})
 }

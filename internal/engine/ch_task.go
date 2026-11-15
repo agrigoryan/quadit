@@ -270,7 +270,7 @@ func (d *taskDraft) insert() error {
 			return err
 		}
 	}
-	if err := c.created(seq, "task", t.ID, "task", t.ID, d.p.ID, *t); err != nil {
+	if err := c.created(seq, "task", t.ID, place{scopeType: "task", scopeID: t.ID, projectID: d.p.ID}, *t); err != nil {
 		return err
 	}
 	c.key = t.Key
@@ -319,5 +319,5 @@ func taskRestore(c *cx, a idArgs) error {
 	if err := c.saveTask(t, p, map[string]any{"restored": true}); err != nil {
 		return err
 	}
-	return c.index("task", t.ID, "task", t.ID, t.ProjectID, "", t.Key+" "+t.Title, t.Description)
+	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})
 }

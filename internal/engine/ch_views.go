@@ -67,13 +67,12 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 			return err
 		}
 	}
-	scopeType, scopeID := "workspace", c.ws
 	if a.Project != "" {
 		p, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		v.ProjectID, scopeType, scopeID = p.ID, "project", p.ID
+		v.ProjectID = p.ID
 	}
 	base := slugify(v.Name)
 	v.Slug = base
@@ -102,7 +101,7 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 	if !v.Shared {
 		audience = v.OwnerID
 	}
-	return c.emitTo(audience, seq, "view.created", "view", v.ID, scopeType, scopeID, v.ProjectID, map[string]any{"row": v})
+	return c.emit(event{seq: seq, typ: "view.created", entity: "view", entityID: v.ID, place: c.inProjectOrWorkspace(v.ProjectID), audience: audience, data: map[string]any{"row": v}})
 }
 
 type viewUpdateArgs struct {
@@ -117,29 +116,26 @@ type viewUpdateArgs struct {
 	Rank        Opt[string]          `json:"rank"`
 }
 
-func (c *cx) view(ref string) (core.View, string, string, error) {
+func (c *cx) loadView(ref string) (core.View, error) {
 	var v core.View
 	cond := store.Eq("slug", ref)
 	if isID(ref) {
 		cond = store.Eq("id", ref)
 	}
 	if err := c.tx.Get(c.ctx, &v, cond, store.Live); err != nil {
-		return v, "", "", missing(err, "view", ref)
+		return v, missing(err, "view", ref)
 	}
 	if !v.Shared && v.OwnerID != c.actor.UserID {
-		return v, "", "", notFound("view", ref)
+		return v, notFound("view", ref)
 	}
 	if v.OwnerID != c.actor.UserID && !c.actor.Role.AtLeast(core.RoleAdmin) {
-		return v, "", "", forbidden("only its owner, or an admin, can change a view")
+		return v, forbidden("only its owner, or an admin, can change a view")
 	}
-	if v.ProjectID != "" {
-		return v, "project", v.ProjectID, nil
-	}
-	return v, "workspace", c.ws, nil
+	return v, nil
 }
 
 func viewUpdate(c *cx, a viewUpdateArgs) error {
-	v, st, sid, err := c.view(a.ID)
+	v, err := c.loadView(a.ID)
 	if err != nil {
 		return err
 	}
@@ -186,15 +182,15 @@ func viewUpdate(c *cx, a viewUpdateArgs) error {
 	if err := p.rank(a.Rank, &v.Rank); err != nil {
 		return err
 	}
-	return c.save(p, "views", "view", v.ID, st, sid, v.ProjectID, nil)
+	return c.save(p, target{table: "views", entity: "view", id: v.ID, place: c.inProjectOrWorkspace(v.ProjectID)})
 }
 
 func viewDelete(c *cx, a idArgs) error {
-	v, st, sid, err := c.view(a.ID)
+	v, err := c.loadView(a.ID)
 	if err != nil {
 		return err
 	}
-	return c.trash("views", "view", v.ID, st, sid, v.ProjectID, nil)
+	return c.trash(target{table: "views", entity: "view", id: v.ID, place: c.inProjectOrWorkspace(v.ProjectID)})
 }
 
 // checkViewValues refuses a filter that names a status or a label the

@@ -41,7 +41,7 @@ func workspaceUpdate(c *cx, a workspaceUpdateArgs) error {
 	if _, err := c.tx.Update(c.ctx, "workspaces", p.set, store.Eq("id", c.ws)); err != nil {
 		return err
 	}
-	return c.emit(seq, "workspace.updated", "workspace", c.ws, "workspace", c.ws, "", map[string]any{"id": c.ws, "changes": p.changes})
+	return c.emit(event{seq: seq, typ: "workspace.updated", entity: "workspace", entityID: c.ws, place: inWorkspace(c.ws), data: map[string]any{"id": c.ws, "changes": p.changes}})
 }
 
 type workspaceDeleteArgs struct {
@@ -68,5 +68,5 @@ func workspaceDelete(c *cx, a workspaceDeleteArgs) error {
 		return err
 	}
 	c.ref = w.ID
-	return c.emit(seq, "workspace.deleted", "workspace", w.ID, "workspace", w.ID, "", map[string]any{"id": w.ID, "gone": true, "slug": w.Slug})
+	return c.emit(event{seq: seq, typ: "workspace.deleted", entity: "workspace", entityID: w.ID, place: inWorkspace(w.ID), data: map[string]any{"id": w.ID, "gone": true, "slug": w.Slug}})
 }

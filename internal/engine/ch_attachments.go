@@ -117,9 +117,9 @@ func attachmentAdd(c *cx, a attachArgs) error {
 		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
-		return c.emit(seq, "attachment.created", "attachment", at.ID, "task", t.ID, t.ProjectID, map[string]any{"row": at, "key": t.Key})
+		return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: inTask(t), data: map[string]any{"row": at, "key": t.Key}})
 	}
-	return c.emit(seq, "attachment.created", "attachment", at.ID, "doc", docID, "", map[string]any{"row": at})
+	return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: place{scopeType: "doc", scopeID: docID}, data: map[string]any{"row": at}})
 }
 
 func attachmentRemove(c *cx, a idArgs) error {
@@ -143,9 +143,9 @@ func attachmentRemove(c *cx, a idArgs) error {
 		if err := c.tx.Get(c.ctx, &t, store.Eq("id", at.TaskID)); err != nil {
 			return err
 		}
-		return c.trash("attachments", "attachment", at.ID, "task", t.ID, t.ProjectID, nil)
+		return c.trash(target{table: "attachments", entity: "attachment", id: at.ID, place: inTask(t)})
 	}
-	return c.trash("attachments", "attachment", at.ID, "doc", at.SubjectID, "", nil)
+	return c.trash(target{table: "attachments", entity: "attachment", id: at.ID, place: place{scopeType: "doc", scopeID: at.SubjectID}})
 }
 
 // attachmentRestore puts a removed file back where it was, within the 30
@@ -190,16 +190,16 @@ func attachmentRestore(c *cx, a idArgs) error {
 		return err
 	}
 	at.DeletedAt, at.File = 0, &f
-	scopeType, scopeID, projectID := "doc", at.SubjectID, ""
+	where := place{scopeType: "doc", scopeID: at.SubjectID}
 	if at.TaskID != "" {
 		var t core.Task
 		if err := c.tx.Get(c.ctx, &t, store.Eq("id", at.TaskID)); err != nil {
 			return err
 		}
-		scopeType, scopeID, projectID = "task", t.ID, t.ProjectID
+		where = inTask(t)
 		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
 	}
-	return c.emit(seq, "attachment.restored", "attachment", at.ID, scopeType, scopeID, projectID, map[string]any{"row": at})
+	return c.emit(event{seq: seq, typ: "attachment.restored", entity: "attachment", entityID: at.ID, place: where, data: map[string]any{"row": at}})
 }

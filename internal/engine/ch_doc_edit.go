@@ -46,7 +46,7 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block, extra map[s
 	for k, v := range extra {
 		data[k] = v
 	}
-	if err := c.emitTo(docAudience(d), seq, "doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, data); err != nil {
+	if err := c.emit(event{seq: seq, typ: "doc.edited", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: data}); err != nil {
 		return err
 	}
 	return c.afterDocText(d, ed)

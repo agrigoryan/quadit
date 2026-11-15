@@ -54,7 +54,7 @@ func integrationCreate(c *cx, a integrationArgs) error {
 	if err := c.tx.Insert(c.ctx, in); err != nil {
 		return alreadyInUse(err, "id", iid)
 	}
-	return c.created(seq, "integration", in.ID, "workspace", c.ws, "", in)
+	return c.created(seq, "integration", in.ID, inWorkspace(c.ws), in)
 }
 
 func integrationUpdate(c *cx, a integrationArgs) error {
@@ -90,7 +90,7 @@ func integrationUpdate(c *cx, a integrationArgs) error {
 		p.changes["has_secret"] = core.FieldChange{To: sealed != ""}
 	}
 	p.setFlag("active", a.Active, &in.Active)
-	return c.save(p, "integrations", "integration", in.ID, "workspace", c.ws, "", nil)
+	return c.save(p, target{table: "integrations", entity: "integration", id: in.ID, place: inWorkspace(c.ws)})
 }
 
 func integrationDelete(c *cx, a idArgs) error {
@@ -98,5 +98,5 @@ func integrationDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	return c.trash("integrations", "integration", in.ID, "workspace", c.ws, "", nil)
+	return c.trash(target{table: "integrations", entity: "integration", id: in.ID, place: inWorkspace(c.ws)})
 }

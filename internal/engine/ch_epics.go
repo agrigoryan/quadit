@@ -74,10 +74,10 @@ func epicCreate(c *cx, a epicCreateArgs) error {
 	if err := c.watch(c.actor.UserID, "epic", e.ID); err != nil {
 		return err
 	}
-	if err := c.index("epic", e.ID, "epic", e.ID, p.ID, "", e.Name, e.Description); err != nil {
+	if err := c.index(store.SearchDoc{Kind: "epic", EntityID: e.ID, ScopeType: "epic", ScopeID: e.ID, ProjectID: p.ID, Title: e.Name, Body: e.Description}); err != nil {
 		return err
 	}
-	return c.created(seq, "epic", e.ID, "project", p.ID, p.ID, e)
+	return c.created(seq, "epic", e.ID, inProject(p.ID), e)
 }
 
 type epicUpdateArgs struct {
@@ -138,10 +138,10 @@ func epicUpdate(c *cx, a epicUpdateArgs) error {
 	if !p.empty() {
 		p.set["updated_at"] = c.at
 	}
-	if err := c.save(p, "epics", "epic", e.ID, "project", e.ProjectID, e.ProjectID, nil); err != nil {
+	if err := c.save(p, target{table: "epics", entity: "epic", id: e.ID, place: inProject(e.ProjectID)}); err != nil {
 		return err
 	}
-	return c.index("epic", e.ID, "epic", e.ID, e.ProjectID, "", e.Name, e.Description)
+	return c.index(store.SearchDoc{Kind: "epic", EntityID: e.ID, ScopeType: "epic", ScopeID: e.ID, ProjectID: e.ProjectID, Title: e.Name, Body: e.Description})
 }
 
 func epicDelete(c *cx, a idArgs) error {
@@ -165,5 +165,5 @@ func epicDelete(c *cx, a idArgs) error {
 	if err := c.tx.Unindex(c.ctx, e.ID); err != nil {
 		return err
 	}
-	return c.trash("epics", "epic", e.ID, "project", e.ProjectID, e.ProjectID, nil)
+	return c.trash(target{table: "epics", entity: "epic", id: e.ID, place: inProject(e.ProjectID)})
 }

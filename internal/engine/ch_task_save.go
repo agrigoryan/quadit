@@ -12,7 +12,7 @@ func (c *cx) afterTaskText(t core.Task, textChanged bool, newAssignee, newWaitin
 		return err
 	}
 	if newWaitingOn != "" {
-		if err := c.notifyTask(newWaitingOn, core.NoteWaitingOn, t, "task", t.ID, t.WaitingOnNote); err != nil {
+		if err := c.notifyTask(newWaitingOn, core.NoteWaitingOn, t, about{entity: "task", id: t.ID, text: t.WaitingOnNote}); err != nil {
 			return err
 		}
 	}
@@ -20,7 +20,7 @@ func (c *cx) afterTaskText(t core.Task, textChanged bool, newAssignee, newWaitin
 		if err := c.watch(newAssignee, "task", t.ID); err != nil {
 			return err
 		}
-		if err := c.notifyTask(newAssignee, core.NoteAssigned, t, "task", t.ID, ""); err != nil {
+		if err := c.notifyTask(newAssignee, core.NoteAssigned, t, about{entity: "task", id: t.ID, text: ""}); err != nil {
 			return err
 		}
 	}
@@ -35,11 +35,11 @@ func (c *cx) afterTaskText(t core.Task, textChanged bool, newAssignee, newWaitin
 		if err := c.watch(m.UserID, "task", t.ID); err != nil {
 			return err
 		}
-		if err := c.notifyTask(m.UserID, core.NoteMentioned, t, "task", t.ID, t.Description); err != nil {
+		if err := c.notifyTask(m.UserID, core.NoteMentioned, t, about{entity: "task", id: t.ID, text: t.Description}); err != nil {
 			return err
 		}
 	}
-	return c.index("task", t.ID, "task", t.ID, t.ProjectID, "", t.Key+" "+t.Title, t.Description)
+	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})
 }
 
 // stampStatus keeps the lifecycle times in step with the status category.
@@ -143,7 +143,7 @@ func (c *cx) saveTask(t core.Task, p *patch, extra map[string]any) error {
 	for k, v := range extra {
 		data[k] = v
 	}
-	if err := c.emit(seq, "task.updated", "task", t.ID, "task", t.ID, t.ProjectID, data); err != nil {
+	if err := c.emit(event{seq: seq, typ: "task.updated", entity: "task", entityID: t.ID, place: inTask(t), data: data}); err != nil {
 		return err
 	}
 	// The task is done or dropped: the sub-agents made for it are finished too.

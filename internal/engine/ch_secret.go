@@ -86,7 +86,7 @@ func secretSet(c *cx, a secretArgs) error {
 		if err := c.tx.Insert(c.ctx, s); err != nil {
 			return alreadyInUse(err, "id", sid)
 		}
-		return c.created(seq, "secret", s.ID, "workspace", c.ws, "", s)
+		return c.created(seq, "secret", s.ID, inWorkspace(c.ws), s)
 	}
 	p := newPatch()
 	p.setText("description", a.Description, &cur.Description)
@@ -110,7 +110,7 @@ func secretSet(c *cx, a secretArgs) error {
 		p.set["updated_at"] = c.at
 		p.changes["updated_at"] = core.FieldChange{From: cur.UpdatedAt, To: c.at}
 	}
-	return c.save(p, "secrets", "secret", cur.ID, "workspace", c.ws, "", nil)
+	return c.save(p, target{table: "secrets", entity: "secret", id: cur.ID, place: inWorkspace(c.ws)})
 }
 
 func secretDelete(c *cx, a idArgs) error {
@@ -127,5 +127,5 @@ func secretDelete(c *cx, a idArgs) error {
 	if _, err := c.tx.Update(c.ctx, "secrets", map[string]any{"value": ""}, store.Eq("id", s.ID)); err != nil {
 		return err
 	}
-	return c.trash("secrets", "secret", s.ID, "workspace", c.ws, "", map[string]any{"name": s.Name})
+	return c.trash(target{table: "secrets", entity: "secret", id: s.ID, place: inWorkspace(c.ws), extra: map[string]any{"name": s.Name}})
 }

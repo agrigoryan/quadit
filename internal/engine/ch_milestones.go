@@ -49,7 +49,7 @@ func milestoneCreate(c *cx, a milestoneCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, m); err != nil {
 		return alreadyInUse(err, "id", mid)
 	}
-	return c.created(seq, "milestone", m.ID, "project", e.ProjectID, e.ProjectID, m)
+	return c.created(seq, "milestone", m.ID, inProject(e.ProjectID), m)
 }
 
 type milestoneUpdateArgs struct {
@@ -85,7 +85,7 @@ func milestoneUpdate(c *cx, a milestoneUpdateArgs) error {
 	if err := p.rank(a.Rank, &m.Rank); err != nil {
 		return err
 	}
-	return c.save(p, "milestones", "milestone", m.ID, "project", e.ProjectID, e.ProjectID, nil)
+	return c.save(p, target{table: "milestones", entity: "milestone", id: m.ID, place: inProject(e.ProjectID)})
 }
 
 func milestoneDelete(c *cx, a idArgs) error {
@@ -104,5 +104,5 @@ func milestoneDelete(c *cx, a idArgs) error {
 			return err
 		}
 	}
-	return c.trash("milestones", "milestone", m.ID, "project", e.ProjectID, e.ProjectID, nil)
+	return c.trash(target{table: "milestones", entity: "milestone", id: m.ID, place: inProject(e.ProjectID)})
 }

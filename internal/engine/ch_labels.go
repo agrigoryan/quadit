@@ -31,13 +31,13 @@ func labelCreate(c *cx, a labelCreateArgs) error {
 	if strings.TrimSpace(a.Name) == "" {
 		return invalid("name", "a label needs a name")
 	}
-	scopeType, scopeID, projectID := "workspace", c.ws, ""
+	projectID := ""
 	if a.Project != "" {
 		p, err := c.project(a.Project)
 		if err != nil {
 			return err
 		}
-		scopeType, scopeID, projectID = "project", p.ID, p.ID
+		projectID = p.ID
 	}
 	seq := c.tx.NextSeq()
 	l := core.Label{ID: lid, WorkspaceID: c.ws, ProjectID: projectID, Name: strings.TrimSpace(a.Name), Color: a.Color,
@@ -45,7 +45,7 @@ func labelCreate(c *cx, a labelCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, l); err != nil {
 		return alreadyInUse(err, "id", lid)
 	}
-	return c.created(seq, "label", l.ID, scopeType, scopeID, projectID, l)
+	return c.created(seq, "label", l.ID, c.inProjectOrWorkspace(projectID), l)
 }
 
 type labelUpdateArgs struct {
@@ -53,13 +53,6 @@ type labelUpdateArgs struct {
 	Name        Opt[string] `json:"name"`
 	Color       Opt[string] `json:"color"`
 	Description Opt[string] `json:"description"`
-}
-
-func labelScope(c *cx, l core.Label) (string, string) {
-	if l.ProjectID != "" {
-		return "project", l.ProjectID
-	}
-	return "workspace", c.ws
 }
 
 func labelUpdate(c *cx, a labelUpdateArgs) error {
@@ -73,8 +66,7 @@ func labelUpdate(c *cx, a labelUpdateArgs) error {
 	}
 	p.setText("color", a.Color, &l.Color)
 	p.setText("description", a.Description, &l.Description)
-	st, sid := labelScope(c, l)
-	return c.save(p, "labels", "label", l.ID, st, sid, l.ProjectID, nil)
+	return c.save(p, target{table: "labels", entity: "label", id: l.ID, place: c.inProjectOrWorkspace(l.ProjectID)})
 }
 
 func labelDelete(c *cx, a memberRefArgs) error {
@@ -96,6 +88,5 @@ func labelDelete(c *cx, a memberRefArgs) error {
 			return err
 		}
 	}
-	st, sid := labelScope(c, l)
-	return c.trash("labels", "label", l.ID, st, sid, l.ProjectID, nil)
+	return c.trash(target{table: "labels", entity: "label", id: l.ID, place: c.inProjectOrWorkspace(l.ProjectID)})
 }

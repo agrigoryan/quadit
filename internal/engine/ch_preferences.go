@@ -40,12 +40,11 @@ func preferenceCreate(c *cx, a preferenceCreateArgs) error {
 			a.Project = t.ProjectID
 		}
 	}
-	scopeType, scopeID := "workspace", c.ws
 	if a.Project != "" {
 		if pr, err = c.project(a.Project); err != nil {
 			return err
 		}
-		pf.ProjectID, scopeType, scopeID = pr.ID, "project", pr.ID
+		pf.ProjectID = pr.ID
 		if pf.LabelIDs, err = c.labelIDs(pr, "labels", a.Labels); err != nil {
 			return err
 		}
@@ -57,20 +56,13 @@ func preferenceCreate(c *cx, a preferenceCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, pf); err != nil {
 		return alreadyInUse(err, "id", pid)
 	}
-	return c.created(seq, "preference", pf.ID, scopeType, scopeID, pf.ProjectID, pf)
+	return c.created(seq, "preference", pf.ID, c.inProjectOrWorkspace(pf.ProjectID), pf)
 }
 
 type preferenceUpdateArgs struct {
 	ID      string      `json:"id"`
 	Body    Opt[string] `json:"body"`
 	Retired Opt[bool]   `json:"retired"`
-}
-
-func prefScope(c *cx, pf core.Preference) (string, string) {
-	if pf.ProjectID != "" {
-		return "project", pf.ProjectID
-	}
-	return "workspace", c.ws
 }
 
 func preferenceUpdate(c *cx, a preferenceUpdateArgs) error {
@@ -89,8 +81,7 @@ func preferenceUpdate(c *cx, a preferenceUpdateArgs) error {
 			p.put("retired_at", pf.RetiredAt, int64(0))
 		}
 	}
-	st, sid := prefScope(c, pf)
-	return c.save(p, "preferences", "preference", pf.ID, st, sid, pf.ProjectID, nil)
+	return c.save(p, target{table: "preferences", entity: "preference", id: pf.ID, place: c.inProjectOrWorkspace(pf.ProjectID)})
 }
 
 func preferenceDelete(c *cx, a idArgs) error {
@@ -98,6 +89,5 @@ func preferenceDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	st, sid := prefScope(c, pf)
-	return c.trash("preferences", "preference", pf.ID, st, sid, pf.ProjectID, nil)
+	return c.trash(target{table: "preferences", entity: "preference", id: pf.ID, place: c.inProjectOrWorkspace(pf.ProjectID)})
 }

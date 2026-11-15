@@ -28,62 +28,47 @@ func watchSet(c *cx, a watchSetArgs) error {
 		}
 		userID = m.UserID
 	}
-	var subjectID, scopeType, projectID string
-	scopeType = a.Type
-	switch a.Type {
-	case "task":
-		t, err := c.task("subject", a.Subject)
-		if err != nil {
-			return err
-		}
-		subjectID, projectID = t.ID, t.ProjectID
-	case "epic":
-		e, err := loadLive[core.Epic](c, "epic", "subject", a.Subject)
-		if err != nil {
-			return err
-		}
-		subjectID, projectID, scopeType = e.ID, e.ProjectID, "project"
-	case "project":
-		p, err := c.project(a.Subject)
-		if err != nil {
-			return err
-		}
-		subjectID, projectID = p.ID, p.ID
-	case "view":
-		v, err := loadLive[core.View](c, "view", "subject", a.Subject)
-		if err != nil {
-			return err
-		}
-		subjectID, scopeType = v.ID, "workspace"
-	case "doc":
-		d, err := loadLive[core.Doc](c, "doc", "subject", a.Subject)
-		if err != nil {
-			return err
-		}
-		subjectID = d.ID
-	default:
-		return oneOf("type", "subject type", a.Type, []string{"task", "epic", "project", "view", "doc"})
+	subjectID, where, err := c.watchSubject(a.Type, a.Subject)
+	if err != nil {
+		return err
 	}
-	scopeID := subjectID
-	if scopeType == "project" {
-		scopeID = projectID
-	} else if scopeType == "workspace" {
-		scopeID = c.ws
-	}
-	w := core.Watcher{WorkspaceID: c.ws, UserID: userID, SubjectType: a.Type, SubjectID: subjectID, CreatedAt: c.at}
 	if a.Watching != nil && !*a.Watching {
 		n, err := c.tx.Delete(c.ctx, "watchers", store.Eq("subject_id", subjectID), store.Eq("user_id", userID))
 		if err != nil || n == 0 {
 			return err
 		}
-		return c.emitTo(userID, c.tx.NextSeq(), "watcher.deleted", "watcher", subjectID, scopeType, scopeID, projectID,
-			map[string]any{"id": subjectID, "gone": true, "user_id": userID})
+		return c.emit(event{seq: c.tx.NextSeq(), typ: "watcher.deleted", entity: "watcher", entityID: subjectID, place: where, audience: userID,
+			data: map[string]any{"id": subjectID, "gone": true, "user_id": userID}})
 	}
 	if n, err := c.tx.Count(c.ctx, "watchers", store.Eq("subject_id", subjectID), store.Eq("user_id", userID)); err != nil || n > 0 {
 		return err
 	}
+	w := core.Watcher{WorkspaceID: c.ws, UserID: userID, SubjectType: a.Type, SubjectID: subjectID, CreatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, w); err != nil {
 		return err
 	}
-	return c.emitTo(userID, c.tx.NextSeq(), "watcher.created", "watcher", subjectID, scopeType, scopeID, projectID, map[string]any{"row": w})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: "watcher.created", entity: "watcher", entityID: subjectID, place: where, audience: userID, data: map[string]any{"row": w}})
+}
+
+// watchSubject finds what is to be watched, and where the watcher's events
+// belong: an epic's in its project, a view's in the workspace.
+func (c *cx) watchSubject(subjectType, ref string) (string, place, error) {
+	switch subjectType {
+	case "task":
+		t, err := c.task("subject", ref)
+		return t.ID, inTask(t), err
+	case "epic":
+		e, err := loadLive[core.Epic](c, "epic", "subject", ref)
+		return e.ID, inProject(e.ProjectID), err
+	case "project":
+		p, err := c.project(ref)
+		return p.ID, inProject(p.ID), err
+	case "view":
+		v, err := loadLive[core.View](c, "view", "subject", ref)
+		return v.ID, inWorkspace(c.ws), err
+	case "doc":
+		d, err := loadLive[core.Doc](c, "doc", "subject", ref)
+		return d.ID, place{scopeType: "doc", scopeID: d.ID}, err
+	}
+	return "", place{}, oneOf("type", "subject type", subjectType, []string{"task", "epic", "project", "view", "doc"})
 }

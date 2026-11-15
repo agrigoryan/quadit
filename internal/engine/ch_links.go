@@ -67,7 +67,7 @@ func linkSet(c *cx, a linkSetArgs) error {
 		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
-		return c.emit(seq, "link.created", "link", l.ID, "task", t.ID, t.ProjectID, map[string]any{"row": l, "key": t.Key})
+		return c.emit(event{seq: seq, typ: "link.created", entity: "link", entityID: l.ID, place: inTask(t), data: map[string]any{"row": l, "key": t.Key}})
 	}
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func linkSet(c *cx, a linkSetArgs) error {
 		return nil
 	}
 	p.set["updated_at"] = c.at
-	if err := c.save(p, "task_links", "link", l.ID, "task", t.ID, t.ProjectID, map[string]any{"key": t.Key, "kind": l.Kind, "ref": l.Ref}); err != nil {
+	if err := c.save(p, target{table: "task_links", entity: "link", id: l.ID, place: inTask(t), extra: map[string]any{"key": t.Key, "kind": l.Kind, "ref": l.Ref}}); err != nil {
 		return err
 	}
 	return c.touchTask(t.ID, c.tx.Seq())
@@ -101,5 +101,5 @@ func linkRemove(c *cx, a idArgs) error {
 	if err := c.tx.Get(c.ctx, &t, store.Eq("id", l.TaskID)); err != nil {
 		return err
 	}
-	return c.trash("task_links", "link", l.ID, "task", t.ID, t.ProjectID, nil)
+	return c.trash(target{table: "task_links", entity: "link", id: l.ID, place: inTask(t)})
 }
