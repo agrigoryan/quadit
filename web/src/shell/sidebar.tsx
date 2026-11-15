@@ -1,4 +1,4 @@
-import { Bookmark, Bot, ChartGantt, FileText, Inbox, Layers, LayoutDashboard, ListTodo, MessageCircleQuestion, PanelLeft, RefreshCw, Settings, SquareKanban, Trash2, UserRound } from "lucide-react";
+import { Bookmark, PanelLeft } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { SidebarDocs } from "@/docs/tree/sidebar-docs";
 import { cx } from "@/lib/cx";
@@ -6,14 +6,22 @@ import { t } from "@/lib/i18n";
 import { useProjects, useSlug, useUnreadCount, useViews } from "@/lib/selectors";
 import type { Project } from "@/lib/types";
 import { ui, useUi } from "@/lib/ui-state";
+import { type DestinationGroup, destinationPath, goKeys, placesIn } from "@/shell/destinations";
 import { NavItem, NavSection } from "@/shell/nav-item";
 import { WorkspaceSwitcher } from "@/shell/workspace-switcher";
 import { IconButton } from "@/ui/button";
 
+// What the sidebar lists is the table in shell/destinations.tsx; this file only lays it out.
+
+/** A project's pages: the places every project has, for this one. Folded, the project is one mark that opens its first page. */
 function ProjectNav({ project, slug, collapsed }: { project: Project; slug: string; collapsed: boolean }) {
-  const base = `/${slug}/p/${project.key}`;
+  const pages = placesIn("project").flatMap((place) => {
+    const to = destinationPath(place, { slug, project, installAdmin: false });
+    return to ? [{ place, to }] : [];
+  });
   if (collapsed) {
-    return <NavItem to={`${base}/tasks`} label={project.name} collapsed icon={<ProjectGlyph project={project} />} />;
+    const first = pages[0];
+    return first ? <NavItem to={first.to} label={project.name} collapsed icon={<ProjectGlyph project={project} />} /> : null;
   }
   return (
     <div className="mb-1.5">
@@ -22,13 +30,36 @@ function ProjectNav({ project, slug, collapsed }: { project: Project; slug: stri
         <span className="min-w-0 flex-1 truncate">{project.name}</span>
       </div>
       <div className="flex flex-col gap-px">
-        <NavItem nested to={`${base}/tasks`} label={t("nav.tasks")} icon={<ListTodo />} />
-        <NavItem nested to={`${base}/board`} label={t("nav.board")} icon={<SquareKanban />} />
-        <NavItem nested to={`${base}/timeline`} label={t("nav.timeline")} icon={<ChartGantt />} />
-        <NavItem nested to={`${base}/epics`} label={t("nav.epics")} icon={<Layers />} />
-        {project.settings?.cycles && <NavItem nested to={`${base}/cycles`} label={t("nav.cycles")} icon={<RefreshCw />} />}
+        {pages.map(({ place, to }) => (
+          <NavItem key={place.id} nested to={to} label={t(place.label)} icon={place.icon} />
+        ))}
       </div>
     </div>
+  );
+}
+
+/** The places of one part of the sidebar. Folded to icons, each says its keys in its tooltip. */
+function Places({ group, slug, collapsed }: { group: DestinationGroup; slug: string; collapsed: boolean }) {
+  const unread = useUnreadCount();
+  return (
+    <>
+      {placesIn(group).map((place) => {
+        const to = destinationPath(place, { slug, project: undefined, installAdmin: false });
+        if (!to) return null;
+        return (
+          <NavItem
+            key={place.id}
+            to={to}
+            label={t(place.label)}
+            icon={place.icon}
+            hint={goKeys(place)}
+            count={place.count === "unread" ? unread : undefined}
+            loud={!!place.count}
+            collapsed={collapsed}
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -49,8 +80,6 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
   const slug = useSlug();
   const projects = useProjects();
   const views = useViews();
-  const unread = useUnreadCount();
-  const at = (path: string) => `/${slug}/${path}`;
 
   return (
     <nav aria-label={t("nav.main")} className="flex h-full flex-col">
@@ -67,8 +96,7 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
 
       <div className={"min-h-0 flex-1 overflow-y-auto px-2 pb-3"}>
         <div className={cx("flex flex-col gap-px", collapsed && "items-center")}>
-          <NavItem to={at("inbox")} label={t("nav.inbox")} icon={<Inbox />} count={unread} loud collapsed={collapsed} />
-          <NavItem to={at("my-work")} label={t("nav.myWork")} icon={<UserRound />} collapsed={collapsed} />
+          <Places group="top" slug={slug} collapsed={collapsed} />
         </div>
 
         <NavSection title={t("nav.projects")} collapsed={collapsed}>
@@ -80,7 +108,7 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
         {views.length > 0 && (
           <NavSection title={t("nav.views")} collapsed={collapsed}>
             {views.map((v) => (
-              <NavItem key={v.id} to={at(`view/${v.slug}`)} label={v.name} icon={<Bookmark />} collapsed={collapsed} />
+              <NavItem key={v.id} to={`/${slug}/view/${v.slug}`} label={v.name} icon={<Bookmark />} collapsed={collapsed} />
             ))}
           </NavSection>
         )}
@@ -88,16 +116,12 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
         <SidebarDocs collapsed={collapsed} />
 
         <NavSection title={t("common.more")} collapsed={collapsed}>
-          <NavItem to={at("docs")} label={t("nav.docs")} icon={<FileText />} collapsed={collapsed} />
-          <NavItem to={at("dashboard")} label={t("nav.dashboard")} icon={<LayoutDashboard />} collapsed={collapsed} />
-          <NavItem to={at("agents")} label={t("nav.agents")} icon={<Bot />} collapsed={collapsed} />
-          <NavItem to={at("decisions")} label={t("nav.decisions")} icon={<MessageCircleQuestion />} collapsed={collapsed} />
+          <Places group="more" slug={slug} collapsed={collapsed} />
         </NavSection>
       </div>
 
       <div className={cx("flex shrink-0 flex-col gap-px border-t border-line p-2", collapsed && "items-center")}>
-        <NavItem to={at("trash")} label={t("nav.trash")} icon={<Trash2 />} collapsed={collapsed} />
-        <NavItem to={at("settings")} label={t("nav.settings")} icon={<Settings />} collapsed={collapsed} />
+        <Places group="foot" slug={slug} collapsed={collapsed} />
       </div>
     </nav>
   );

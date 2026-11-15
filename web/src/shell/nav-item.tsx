@@ -14,12 +14,14 @@ interface Props {
   loud?: boolean;
   /** Icons only: the label moves into a tooltip. */
   collapsed?: boolean;
+  /** The keys that go here, shown in that tooltip. */
+  hint?: string;
   /** Indented under a project. */
   nested?: boolean;
   end?: boolean;
 }
 
-export function NavItem({ to, icon, label, count, loud, collapsed, nested, end }: Props) {
+export function NavItem({ to, icon, label, count, loud, collapsed, hint, nested, end }: Props) {
   const link = (
     <NavLink
       to={to}
@@ -51,7 +53,7 @@ export function NavItem({ to, icon, label, count, loud, collapsed, nested, end }
   );
   if (!collapsed) return link;
   return (
-    <Tooltip label={label} side="right">
+    <Tooltip label={label} hint={hint} side="right">
       {link}
     </Tooltip>
   );
