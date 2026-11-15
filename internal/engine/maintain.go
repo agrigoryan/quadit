@@ -26,9 +26,8 @@ func (e *Engine) Reindex(ctx context.Context, workspaceID string) error {
 	return nil
 }
 
-// reindex is one run of Reindex. It holds its ctx because it is one run of
-// work; the tasks and pages it indexed are kept by id for the comments and
-// decisions on them.
+// reindex is one run of Reindex: the tasks and pages it has indexed, kept by
+// id for the comments and decisions on them.
 type reindex struct {
 	ctx   context.Context
 	db    store.DB
@@ -182,8 +181,8 @@ func (e *Engine) PurgeTrash(ctx context.Context, keep time.Duration) (purged int
 	return run.purged, run.blobKeys, nil
 }
 
-// purge is one run of PurgeTrash. It holds its ctx because it is one run of
-// work; c is the system write to the workspace being purged.
+// purge is one run of PurgeTrash: the system write to the workspace being
+// purged (c), and what it has removed so far.
 type purge struct {
 	ctx      context.Context
 	c        *cx
