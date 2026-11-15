@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Bookmark, PanelLeft } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { SidebarDocs } from "@/docs/tree/sidebar-docs";
@@ -16,6 +17,7 @@ import { ProjectGlyph } from "@/ui/project-glyph";
 
 /** A project's pages: the places every project has, for this one. Folded, the project is one mark that opens its first page. */
 function ProjectNav({ project, slug, collapsed }: { project: Project; slug: string; collapsed: boolean }) {
+  const nameId = useId();
   const pages = placesIn("project").flatMap((place) => {
     const to = destinationPath(place, { slug, project, installAdmin: false });
     return to ? [{ place, to }] : [];
@@ -30,13 +32,18 @@ function ProjectNav({ project, slug, collapsed }: { project: Project; slug: stri
     <div className="mb-1.5">
       <div className="flex h-7 items-center gap-2 px-2 text-sm font-medium text-ink">
         <ProjectGlyph project={project} />
-        <span className="min-w-0 flex-1 truncate">{project.name}</span>
+        <span id={nameId} className="min-w-0 flex-1 truncate">
+          {project.name}
+        </span>
       </div>
-      <div className="flex flex-col gap-px">
+      {/* Every project has a "Tasks" and a "Board": the list's name says whose they are. */}
+      <ul aria-labelledby={nameId} className="flex flex-col gap-px">
         {pages.map(({ place, to }) => (
-          <NavItem key={place.id} nested to={to} label={t(place.label)} icon={place.icon} />
+          <li key={place.id}>
+            <NavItem nested to={to} label={t(place.label)} icon={place.icon} />
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

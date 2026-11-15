@@ -20,20 +20,18 @@ test("on a phone the task list, a task page and the sidebar drawer work", async 
   await expect(page.getByRole("tab", { name: "Board" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save as view" })).toBeVisible();
 
-  // The sidebar is a drawer here. Every project in it has its own "Tasks" and
-  // "Board" with nothing around them to tell them apart (shell/sidebar.tsx),
-  // so the address picks this project's.
+  // The sidebar is a drawer here. Every project in it has its own "Tasks" and "Board", in a list named after the project.
   const sidebar = page.getByRole("navigation", { name: "Main" });
-  const place = (name: string, path: string) =>
-    sidebar.getByRole("link", { name, exact: true }).and(page.locator(`[href="/e2e/p/${project.key}/${path}"]`));
+  const place = (name: string) =>
+    sidebar.getByRole("list", { name: project.name, exact: true }).getByRole("link", { name, exact: true });
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", { name: "Open navigation" }).tap();
   await expect(sidebar).toBeVisible();
-  await place("Board", "board").tap();
+  await place("Board").tap();
   await expect(page).toHaveURL(new RegExp(`/e2e/p/${project.key}/board$`));
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", { name: "Open navigation" }).tap();
-  await place("Tasks", "tasks").tap();
+  await place("Tasks").tap();
   await expect(page).toHaveURL(new RegExp(`/e2e/p/${project.key}/tasks$`));
 
   // The task opens over the list, as a sheet.
