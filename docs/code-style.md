@@ -87,20 +87,19 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 
 ### Lint warnings still to fix
 
-These rules are warnings in `web/.oxlintrc.json` because the code breaks them today; `pnpm lint` passes with them. Fix one rule's findings, make the rule an `"error"`, and take its line off this list. Counts as of the commit that brought the linter in.
+These rules are warnings in `web/.oxlintrc.json` because the code breaks them today; `pnpm lint` passes with them. Fix one rule's findings, make the rule an `"error"`, and take its line off this list. Counts as of the commit that made the layering rule an error.
 
 | Rule | Findings |
 | --- | ---: |
 | `jsx-a11y/prefer-tag-over-role` | 67 |
-| `no-restricted-imports` (layers; the files are listed in `.oxlintrc.json`) | 33 |
-| `react/refs` | 22 |
+| `react/refs` | 21 |
 | `react-hooks/exhaustive-deps` | 21 |
-| `react/set-state-in-effect` | 16 |
+| `react/set-state-in-effect` | 15 |
 | `jsx-a11y/click-events-have-key-events` | 11 |
 | `jsx-a11y/no-static-element-interactions` | 9 |
 | `jsx-a11y/no-noninteractive-element-interactions` | 8 |
 | `jsx-a11y/no-noninteractive-tabindex` | 6 |
-| `react/immutability` | 4 |
+| `react/immutability` | 3 |
 | `jsx-a11y/no-noninteractive-element-to-interactive-role` | 3 |
 | `jsx-a11y/interactive-supports-focus` | 3 |
 | `react/purity` | 3 |
