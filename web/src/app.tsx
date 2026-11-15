@@ -7,7 +7,7 @@ import { RegisterPage } from "@/auth/register";
 import { ResetConfirmPage, ResetRequestPage } from "@/auth/reset";
 import { loadSession, useSession } from "@/auth/session";
 import { SetupPage } from "@/auth/setup";
-import { NetworkError } from "@/lib/api";
+import { NetworkError, whenReachable } from "@/lib/api";
 import { Offline } from "@/shell/offline";
 import { WorkspaceRoute } from "@/shell/workspace";
 import { Loading } from "@/ui/spinner";
@@ -42,35 +42,36 @@ export function App() {
   const status = useSession((s) => s.status);
   /** The server could not be asked who is signed in. That is not "signed out": keep asking. */
   const [unreachable, setUnreachable] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  /** Raised by "Try again": the asking starts over, at once. */
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
-    let current = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const again = () => current && setAttempt((n) => n + 1);
-    loadSession().then(
-      () => current && setUnreachable(false),
-      (err: unknown) => {
-        if (!current) return;
-        if (!(err instanceof NetworkError)) return useSession.setState({ status: "out" });
-        setUnreachable(true);
-        timer = setTimeout(again, Math.min(1500 * 2 ** Math.min(attempt, 3), 12_000));
-        window.addEventListener("online", again, { once: true });
-      },
-    );
-    return () => {
-      current = false;
-      clearTimeout(timer);
-      window.removeEventListener("online", again);
-    };
-  }, [attempt]);
+    const leaving = new AbortController();
+    async function askUntilAnswered() {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await loadSession();
+          if (!leaving.signal.aborted) setUnreachable(false);
+          return;
+        } catch (err) {
+          if (leaving.signal.aborted) return;
+          if (!(err instanceof NetworkError)) return useSession.setState({ status: "out" });
+          setUnreachable(true);
+          await whenReachable(attempt, leaving.signal);
+        }
+      }
+    }
+    // Rejects only when the wait is given up below, which is how the asking stops.
+    askUntilAnswered().catch(() => {});
+    return () => leaving.abort();
+  }, [round]);
 
   if (unreachable && status === "unknown") {
     // The address names the workspace being opened (/games/…): say what waits to be sent there.
     const slug = window.location.pathname.split("/")[1];
     return (
       <div className="h-dvh">
-        <Offline slug={slug} onRetry={() => setAttempt((n) => n + 1)} />
+        <Offline slug={slug} onRetry={() => setRound((n) => n + 1)} />
       </div>
     );
   }
