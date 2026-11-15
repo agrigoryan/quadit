@@ -4,8 +4,8 @@
 // and lets it be changed. What is saved is scope.needs_approval: the change
 // types, with an empty list meaning it asks for nothing.
 
-import { useEffect, useState } from "react";
-import { api } from "@/data/api";
+import { useQuery } from "@tanstack/react-query";
+import { changeCatalogQuery } from "@/data/change-catalog";
 import { t, tMaybe } from "@/lib/i18n";
 import { Checkbox } from "@/ui/form";
 import { MultiPick } from "@/settings/ui/multi-pick";
@@ -42,39 +42,6 @@ const LISTED = new Set(GROUPS.flatMap((g) => g.asks.flatMap((a) => a.types)));
 /** What a new agent asks before, unless its maker says otherwise (the server's AsksFirst). */
 export const ASKS_FIRST: string[] = [...LISTED];
 
-export interface ChangeCatalog {
-  /** The version of what agents can call: the server's "agent surface". */
-  surface: string;
-  types: string[];
-}
-
-let catalog: Promise<ChangeCatalog> | null = null;
-
-/** Every change type the server knows, and the version of that list. Fetched once. */
-export function loadChangeCatalog(): Promise<ChangeCatalog> {
-  catalog ??= api
-    .get<{ surface?: string; changes: { type: string }[] }>("/api/v1/changes")
-    .then((r) => ({ surface: r.surface ?? "", types: r.changes.map((c) => c.type).sort() }));
-  catalog.catch(() => {
-    catalog = null;
-  });
-  return catalog;
-}
-
-function useChangeTypes(): string[] {
-  const [types, setTypes] = useState<string[]>([]);
-  useEffect(() => {
-    let current = true;
-    loadChangeCatalog()
-      .then((c) => current && setTypes(c.types))
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, []);
-  return types;
-}
-
 interface Props {
   value: string[];
   onChange: (value: string[]) => void;
@@ -82,7 +49,7 @@ interface Props {
 }
 
 export function AsksBefore({ value, onChange, disabled }: Props) {
-  const types = useChangeTypes();
+  const types = useQuery(changeCatalogQuery).data?.types ?? [];
   const has = (ask: Ask) => ask.types.every((type) => value.includes(type));
   const toggle = (ask: Ask, on: boolean) => {
     const rest = value.filter((type) => !ask.types.includes(type));

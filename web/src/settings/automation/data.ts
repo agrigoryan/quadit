@@ -3,6 +3,7 @@
 // under. None of these lists is in the store: each page reads its own and it
 // is asked again after a change.
 
+import { queryOptions } from "@tanstack/react-query";
 import { api, workspacePath } from "@/data/api";
 import type { Changes } from "@/types/changes.gen";
 import { type ChangeSpec, type ChangeType, mutate } from "@/data/mutate";
@@ -122,7 +123,7 @@ export function randomSecret(): string {
 
 // The event types offered first, by family. The server takes any
 // "entity.verb" and "entity.*"; these are the ones a receiver most often
-// wants. The whole list comes from the server (see useEventTypes).
+// wants. The whole list comes from the server (eventTypesQuery).
 export const EVENT_GROUPS: { id: string; types: string[] }[] = [
   { id: "task", types: ["task.created", "task.updated", "task.restored"] },
   { id: "decision", types: ["decision.opened", "decision.picked", "decision.unclear"] },
@@ -135,19 +136,19 @@ export const EVENT_GROUPS: { id: string; types: string[] }[] = [
 /** What is offered when the server's list cannot be had. */
 export const FALLBACK_EVENTS = EVENT_GROUPS.flatMap((g) => g.types);
 
-let eventTypes: Promise<string[]> | null = null;
-
-/** Every event type the server's feed carries. Asked for once; the fallback list if that fails. */
-export function loadEventTypes(): Promise<string[]> {
-  eventTypes ??= api
-    .get<{ types?: string[] }>("/api/v1/events/types")
-    .then((r) => (r.types?.length ? r.types : FALLBACK_EVENTS))
-    .catch(() => {
-      eventTypes = null; // ask again next time
-      return FALLBACK_EVENTS;
-    });
-  return eventTypes;
-}
+/**
+ * Every event type the server's feed carries: the same for the whole
+ * install, and new only with the server, so read once. The fallback list
+ * stands in while it is on its way or when it fails.
+ */
+export const eventTypesQuery = queryOptions({
+  queryKey: ["install", "event-types"],
+  queryFn: ({ signal }) =>
+    api
+      .get<{ types?: string[] }>("/api/v1/events/types", signal)
+      .then((r) => (r.types?.length ? r.types : FALLBACK_EVENTS)),
+  staleTime: Infinity,
+});
 
 /** Whether a list of patterns lets an event type through, the way the server decides it. */
 export function typeMatches(patterns: string[] | undefined, type: string): boolean {

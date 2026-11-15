@@ -8,7 +8,7 @@ import { formatNumber, t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import { Button } from "@/ui/button";
 import type { Backup } from "@/admin/backups";
-import { loadChangeCatalog } from "@/settings/agents/asks-before";
+import { changeCatalogQuery } from "@/data/change-catalog";
 import { LoadGate } from "@/ui/load-gate";
 import { Page, Rows, Section } from "@/ui/page-layout";
 import { useNow } from "@/data/live";
@@ -166,10 +166,7 @@ export function HealthPage() {
     queryFn: ({ signal }) => api.get<Health>("/api/v1/admin/health", signal),
   });
   // What agents can call has a version of its own, apart from the server's.
-  const surface = useQuery({
-    queryKey: adminKeys.changeSurface,
-    queryFn: () => loadChangeCatalog().then((c) => c.surface),
-  });
+  const surface = useQuery({ ...changeCatalogQuery, select: (c) => c.surface });
   const count = (n: number) => (n === 0 ? t("admin.health.zero") : formatNumber(n));
   return (
     <Page

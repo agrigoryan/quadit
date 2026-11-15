@@ -11,8 +11,8 @@
 // shared by the tabs), mutate.ts with outbox.ts (the person's own edits, kept
 // on the device until sent), and selectors.ts and access.ts (how the app
 // reads it, and what the member may do). Beside it: api.ts, the one place
-// that talks HTTP; query.ts, live.ts, task-detail.ts and listening.ts, the
-// reads the copy does not hold; and files.ts, uploads. Nothing here knows
+// that talks HTTP; query.ts, live.ts, task-detail.ts, listening.ts and
+// change-catalog.ts, the reads the copy does not hold; and files.ts, uploads. Nothing here knows
 // the router or the interface.
 
 import { create } from "zustand";

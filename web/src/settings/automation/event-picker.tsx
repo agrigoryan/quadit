@@ -2,14 +2,15 @@
 // first, then every other type the server's feed carries, and a line for
 // patterns ("epic.*").
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Fragment, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { Badge } from "@/ui/badge";
 import { Input } from "@/ui/input";
 import { Checkbox } from "@/ui/form";
-import { EVENT_GROUPS, FALLBACK_EVENTS, loadEventTypes } from "@/settings/automation/data";
+import { EVENT_GROUPS, eventTypesQuery, FALLBACK_EVENTS } from "@/settings/automation/data";
 
 /** "a task changes" for "task.updated"; the bare type when it has no name here. */
 export const eventName = (type: string) => tMaybe(`auto.event.${type}`, type);
@@ -19,19 +20,6 @@ const parseOther = (text: string) =>
     .split(/[\s,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-
-/** The server's event types; the short built-in list until (or unless) the server answers. */
-function useEventTypes(): string[] {
-  const [types, setTypes] = useState(FALLBACK_EVENTS);
-  useEffect(() => {
-    let current = true;
-    void loadEventTypes().then((list) => current && setTypes(list));
-    return () => {
-      current = false;
-    };
-  }, []);
-  return types;
-}
 
 interface Group {
   id: string;
@@ -63,7 +51,8 @@ interface Props {
 }
 
 export function EventPicker({ value, onChange }: Props) {
-  const all = useEventTypes();
+  // The short built-in list until (or unless) the server answers.
+  const all = useQuery(eventTypesQuery).data ?? FALLBACK_EVENTS;
   const { common, rest } = useMemo(() => groupTypes(all), [all]);
   const listed = (type: string) => all.includes(type);
   // The line shows the types and patterns that have no box; once the person

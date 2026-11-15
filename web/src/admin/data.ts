@@ -8,6 +8,4 @@ export const adminKeys = {
   workspaces: ["admin", "workspaces"],
   backups: ["admin", "backups"],
   health: ["admin", "health"],
-  /** The version of what agents can call, which has a version of its own. */
-  changeSurface: ["admin", "change-surface"],
 } as const;
