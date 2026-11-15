@@ -3,6 +3,7 @@ package sqlstore
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -86,6 +87,66 @@ func TestFindTellsAMissingRowFromAFailure(t *testing.T) {
 			there, err := store.Find(ctx, s.In(ws), &core.TaskKey{}, store.Eq("key", "X-1"))
 			if err == nil || errors.Is(err, store.ErrNotFound) || there {
 				t.Fatalf("Find on a table that cannot be read: %v %v, want the failure", there, err)
+			}
+		})
+	})
+}
+
+// TestIncrStartsACounterThatIsNotThere: Incr on a counter with no row makes
+// the row, once, however many callers start it at the same time.
+func TestIncrStartsACounterThatIsNotThere(t *testing.T) {
+	eachDB(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		at := []store.Cond{store.Eq("name", "test:a"), store.Eq("bucket", 7)}
+
+		n, err := s.Incr(ctx, "rate_counters", "hits", 3, at...)
+		if err != nil || n != 3 {
+			t.Fatalf("the first Incr: %d %v, want 3", n, err)
+		}
+		if n, err = s.Incr(ctx, "rate_counters", "hits", 2, at...); err != nil || n != 5 {
+			t.Fatalf("the second Incr: %d %v, want 5", n, err)
+		}
+
+		t.Run("by many at once", func(t *testing.T) {
+			const callers = 20
+			got := make(chan int64, callers)
+			var wg sync.WaitGroup
+			for range callers {
+				wg.Go(func() {
+					n, err := s.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", "test:b"), store.Eq("bucket", 7))
+					if err != nil {
+						t.Error(err)
+					}
+					got <- n
+				})
+			}
+			wg.Wait()
+			close(got)
+			seen := map[int64]bool{}
+			for n := range got {
+				seen[n] = true
+			}
+			if len(seen) != callers || !seen[1] || !seen[callers] {
+				t.Fatalf("the callers were told %v, want each of 1 to %d once", seen, callers)
+			}
+		})
+
+		t.Run("not in another workspace", func(t *testing.T) {
+			ws := fillTasks(t, s, 1)
+			var project core.Project
+			if err := s.In(ws).Get(ctx, &project); err != nil {
+				t.Fatal(err)
+			}
+			elsewhere := id.New()
+			if err := s.Insert(ctx, core.Workspace{ID: elsewhere, Slug: "elsewhere", Name: "E", CreatedAt: 1, UpdatedAt: 1}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.In(elsewhere).Incr(ctx, "projects", "task_counter", 1, store.Eq("id", project.ID)); err == nil {
+				t.Fatal("a project of another workspace was counted on")
+			}
+			var after core.Project
+			if err := s.Get(ctx, &after, store.Eq("id", project.ID)); err != nil || after.TaskCounter != project.TaskCounter {
+				t.Fatalf("the project's counter went from %d to %d (%v)", project.TaskCounter, after.TaskCounter, err)
 			}
 		})
 	})

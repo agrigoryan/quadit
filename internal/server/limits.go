@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -44,13 +43,6 @@ func (l *limiter) shareCounts(ctx context.Context, st store.Store) {
 	for key, n := range mine {
 		name := "api:" + key
 		total, err := st.Incr(ctx, "rate_counters", "hits", int64(n), store.Eq("name", name), store.Eq("bucket", window))
-		if errors.Is(err, store.ErrNotFound) {
-			if err = st.Insert(ctx, core.RateCounter{Name: name, Bucket: window, Hits: n}); err == nil {
-				total = int64(n)
-			} else if errors.Is(err, store.ErrConflict) {
-				total, err = st.Incr(ctx, "rate_counters", "hits", int64(n), store.Eq("name", name), store.Eq("bucket", window))
-			}
-		}
 		if err != nil {
 			total = int64(n) // the database is unwell: count what is known here
 		}

@@ -60,26 +60,18 @@ const accountRequestsPerHour = 10
 // refused: a limit that cannot be checked lets nobody through.
 func (s *Server) throttle(ctx context.Context, name string, limit int, window time.Duration) error {
 	bucket := time.Now().Unix() / int64(window.Seconds())
-	var counter core.RateCounter
-	err := s.st.Get(ctx, &counter, store.Eq("name", name), store.Eq("bucket", bucket))
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-		if err := s.st.Upsert(ctx, core.RateCounter{Name: name, Bucket: bucket, Hits: 1}, "name", "bucket"); err != nil {
-			return s.uncounted(name, err)
-		}
+	hits, err := s.st.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", name), store.Eq("bucket", bucket))
+	if err != nil {
+		return s.uncounted(name, err)
+	}
+	if hits == 1 { // the window's first attempt
 		if _, err := s.st.Delete(ctx, "rate_counters", store.Lt("bucket", bucket-2)); err != nil {
 			s.log.Warn("old rate-limit windows not cleared; the next first attempt tries again", "err", err)
 		}
-		return nil
-	case err != nil:
-		return s.uncounted(name, err)
 	}
-	if counter.Hits >= limit {
+	if hits > int64(limit) {
 		wait := int(int64(window.Seconds()) - time.Now().Unix()%int64(window.Seconds()))
 		return &httpError{Status: 429, Code: "rate_limited", RetryAfter: wait, Message: "too many attempts; try again in a few minutes"}
-	}
-	if _, err := s.st.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", name), store.Eq("bucket", bucket)); err != nil {
-		return s.uncounted(name, err)
 	}
 	return nil
 }

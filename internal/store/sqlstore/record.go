@@ -664,7 +664,11 @@ func (c conn) Delete(ctx context.Context, table string, where ...store.Cond) (in
 	return res.RowsAffected()
 }
 
-// Incr adds n to a counter column on one row and returns the new value.
+// Incr adds n to a counter column on one row and returns the new value. A
+// row that is not there is made from the conditions, with the counter at n
+// (see store.DB): the update is tried first, as the row is usually there,
+// and the insert settles a race with another caller making the same row
+// through ON CONFLICT, which both databases spell alike.
 func (c conn) Incr(ctx context.Context, table, col string, n int64, where ...store.Cond) (int64, error) {
 	m, err := metaNamed(table)
 	if err != nil {
@@ -680,10 +684,46 @@ func (c conn) Incr(ctx context.Context, table, col string, n int64, where ...sto
 	}
 	var out int64
 	err = c.row(ctx, "UPDATE "+m.name+" SET "+counter+" = "+counter+" + ? WHERE "+whereSQL+" RETURNING "+counter, append([]any{n}, args...)...).Scan(&out)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, store.ErrNotFound
+	if !errors.Is(err, sql.ErrNoRows) {
+		return out, err
 	}
-	return out, err
+
+	// No row: make one. Its key is the conditions' columns, each of which
+	// must say column = value.
+	cols, keys := []string{counter}, []string{}
+	vals := []any{n}
+	for _, cond := range where {
+		f, ok := m.byCol[cond.Col]
+		if !ok || cond.Op != "=" {
+			return 0, m.notFound()
+		}
+		v, err := toDB(f, reflect.ValueOf(cond.Val))
+		if err != nil {
+			return 0, err
+		}
+		if s, isStr := v.(string); v == nil || isStr && f.isID && !looksUUID(s) {
+			return 0, m.notFound() // no row can have it
+		}
+		cols, keys, vals = append(cols, ident(f.col)), append(keys, ident(f.col)), append(vals, v)
+	}
+	// A row of another workspace with the same key is left alone: the
+	// update applies only to a row of this one.
+	guard := ""
+	if c.workspaceID != "" && !m.table.Global {
+		cols, vals = append(cols, ident("workspace_id")), append(vals, c.workspaceID)
+		guard = " WHERE " + m.name + "." + ident("workspace_id") + " = ?"
+		vals = append(vals, c.workspaceID)
+	}
+	if len(keys) == 0 {
+		return 0, m.notFound()
+	}
+	err = c.row(ctx, "INSERT INTO "+m.name+" ("+strings.Join(cols, ", ")+") VALUES ("+placeholders(len(cols))+
+		") ON CONFLICT ("+strings.Join(keys, ", ")+") DO UPDATE SET "+counter+" = "+m.name+"."+counter+" + excluded."+counter+guard+
+		" RETURNING "+counter, vals...).Scan(&out)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, m.notFound()
+	}
+	return out, conflict(err)
 }
 
 // Tally counts the matching rows of a table grouped by the given columns,

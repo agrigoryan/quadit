@@ -161,6 +161,13 @@ type DB interface {
 	// were. It is not the trash: that is deleted_at, set with Update.
 	Delete(ctx context.Context, table string, where ...Cond) (int64, error)
 	// Incr adds n to a counter column on one row and returns the new value.
+	// When no row matches, it makes the row, with the counter at n, from
+	// the conditions: each must be column = value and together they must
+	// be a unique key of the table ("name" and "bucket" of a rate
+	// counter). Callers racing to make the same row each count once. A
+	// row that needs more columns than the conditions give is the
+	// database's refusal, and conditions that cannot make a row at all
+	// (another operator, a NULL) are NotFoundError.
 	Incr(ctx context.Context, table, col string, n int64, where ...Cond) (int64, error)
 
 	Tasks(ctx context.Context, f TaskFilter) ([]core.Task, error)

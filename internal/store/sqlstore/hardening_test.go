@@ -57,7 +57,8 @@ func eachDB(t *testing.T, fn func(t *testing.T, s *Store)) {
 
 func sqliteStore(t *testing.T) *Store {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "quadit.sqlite"))
+	// Writers wait for each other, as they do in package sqlite.
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "quadit.sqlite")+"?_pragma=busy_timeout(10000)")
 	if err != nil {
 		t.Fatal(err)
 	}

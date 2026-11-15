@@ -99,13 +99,13 @@ func TestSignInIsRefusedWhenAttemptsCannotBeCounted(t *testing.T) {
 		login := M{"email": "owner@example.com", "password": ownerPassword}
 		t.Run("the count cannot be read", func(t *testing.T) {
 			s := s.in(t)
-			fs.faults.set("get rate_counters")
+			fs.faults.set("incr rate_counters") // the count is read as the attempt is added
 			defer fs.faults.clear()
 			s.call(browser(), "", "POST", "/api/v1/auth/login", login, 429, nil)
 		})
 		t.Run("a first attempt cannot be stored", func(t *testing.T) {
 			s := s.in(t)
-			fs.faults.set("upsert rate_counters")
+			fs.faults.set("incr rate_counters")
 			defer fs.faults.clear()
 			s.call(browser(), "", "POST", "/api/v1/auth/register", M{"name": "Cy", "email": "cy@example.com", "password": "another-long-password"}, 403, nil)
 			s.call(browser(), "", "POST", "/oauth/register", M{"client_name": "C", "redirect_uris": []string{"http://localhost:9/cb"}}, 429, nil)
