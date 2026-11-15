@@ -41,14 +41,26 @@ func init() {
 
 const sessionLife = 30 * 24 * time.Hour
 
+// Sign-in attempts are counted in windows of signInWindow: at most
+// signInsPerIP from one address, and signInsPerEmail for one account.
+const (
+	signInWindow    = 15 * time.Minute
+	signInsPerIP    = 30
+	signInsPerEmail = 10
+)
+
+// accountRequestsPerHour is how many registrations, or requests for a reset
+// link, one address may make in an hour.
+const accountRequestsPerHour = 10
+
 // throttle counts an attempt under a name and refuses when there were more
 // than limit in the window. The count is in the database, so every server
 // sharing it sees the same number. An attempt that cannot be counted is
 // refused: a limit that cannot be checked lets nobody through.
 func (s *Server) throttle(ctx context.Context, name string, limit int, window time.Duration) error {
 	bucket := time.Now().Unix() / int64(window.Seconds())
-	var rc core.RateCounter
-	err := s.st.Get(ctx, &rc, store.Eq("name", name), store.Eq("bucket", bucket))
+	var counter core.RateCounter
+	err := s.st.Get(ctx, &counter, store.Eq("name", name), store.Eq("bucket", bucket))
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		if err := s.st.Upsert(ctx, core.RateCounter{Name: name, Bucket: bucket, Hits: 1}, "name", "bucket"); err != nil {
@@ -61,7 +73,7 @@ func (s *Server) throttle(ctx context.Context, name string, limit int, window ti
 	case err != nil:
 		return s.uncounted(name, err)
 	}
-	if rc.Hits >= limit {
+	if counter.Hits >= limit {
 		wait := int(int64(window.Seconds()) - time.Now().Unix()%int64(window.Seconds()))
 		return &httpError{Status: 429, Code: "rate_limited", RetryAfter: wait, Message: "too many attempts; try again in a few minutes"}
 	}
@@ -87,27 +99,29 @@ const uncountedRetry = 60
 func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, life time.Duration) (string, error) {
 	token := auth.Random(32)
 	now := time.Now()
-	ot := core.OneTimeToken{ID: id.New(), Kind: kind, TokenHash: auth.Hash(token), UserID: userID, CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(life).UnixMilli()}
+	row := core.OneTimeToken{ID: id.New(), Kind: kind, TokenHash: auth.Hash(token), UserID: userID, CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(life).UnixMilli()}
 	if data != nil {
-		ot.Data, _ = json.Marshal(data)
+		row.Data, _ = json.Marshal(data)
 	}
-	return token, s.st.Insert(ctx, ot)
+	return token, s.st.Insert(ctx, row)
 }
 
 // useOneTime spends a one-time secret. It works once and only while fresh.
+//
+//nolint:revive,unparam // keep is in the signature picture.go calls too; dropping it belongs to the unit that owns that file
 func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) (core.OneTimeToken, error) {
-	var ot core.OneTimeToken
-	err := s.st.Get(ctx, &ot, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
-	if err != nil || ot.ExpiresAt < time.Now().UnixMilli() {
-		return ot, &engine.Error{Code: engine.CodeNotFound, Message: "this link is no longer valid; ask for a new one"}
+	var spent core.OneTimeToken
+	err := s.st.Get(ctx, &spent, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
+	if err != nil || spent.ExpiresAt < time.Now().UnixMilli() {
+		return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link is no longer valid; ask for a new one"}
 	}
 	if !keep {
-		n, err := s.st.Update(ctx, "one_time_tokens", map[string]any{"used_at": time.Now().UnixMilli()}, store.Eq("id", ot.ID), store.Null("used_at"))
+		n, err := s.st.Update(ctx, "one_time_tokens", map[string]any{"used_at": time.Now().UnixMilli()}, store.Eq("id", spent.ID), store.Null("used_at"))
 		if err != nil || n != 1 {
-			return ot, &engine.Error{Code: engine.CodeNotFound, Message: "this link was already used"}
+			return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link was already used"}
 		}
 	}
-	return ot, nil
+	return spent, nil
 }
 
 // startSession signs a person in on this browser.
@@ -238,10 +252,10 @@ func (s *Server) handleSignIn(x *c) error {
 		return errForbidden("signing in with a password is turned off on this install")
 	}
 	email := strings.ToLower(strings.TrimSpace(b.Email))
-	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), 30, 15*time.Minute); err != nil {
+	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), signInsPerIP, signInWindow); err != nil {
 		return err
 	}
-	if err := s.throttle(ctx, "login:email:"+email, 10, 15*time.Minute); err != nil {
+	if err := s.throttle(ctx, "login:email:"+email, signInsPerEmail, signInWindow); err != nil {
 		return err
 	}
 	var u core.User
@@ -353,51 +367,12 @@ func (s *Server) handleUpdateProfile(x *c) error {
 		return errForbidden("a profile is changed by its person: signed in, or with a personal token that is not narrowed")
 	}
 	ctx := x.ctx()
-	set := map[string]any{}
-	memberSet := map[string]any{}
-	if b.Name != nil {
-		name := strings.TrimSpace(*b.Name)
-		if name == "" {
-			return errBad("a name cannot be empty")
-		}
-		set["name"], memberSet["name"] = name, name
+	set, memberSet, err := profileChanges(b)
+	if err != nil {
+		return err
 	}
-	if b.Avatar != nil {
-		set["avatar"], memberSet["avatar"] = *b.Avatar, *b.Avatar
-	}
-	if b.Timezone != nil {
-		if _, err := time.LoadLocation(*b.Timezone); err != nil {
-			return errBad("%q is not a time zone: use a name like Europe/Berlin", *b.Timezone)
-		}
-		set["timezone"] = *b.Timezone
-	}
-	if b.Theme != nil {
-		if !has([]string{"", "light", "dark", "system"}, *b.Theme) {
-			return errBad("theme is light, dark or system")
-		}
-		set["theme"] = *b.Theme
-	}
-	if b.Locale != nil {
-		set["locale"] = *b.Locale
-	}
-	if b.Notify != nil {
-		set["notify"] = *b.Notify
-	}
-	if b.Email != nil && !strings.EqualFold(strings.TrimSpace(*b.Email), x.user.Email) {
-		email := strings.ToLower(strings.TrimSpace(*b.Email))
-		if !strings.Contains(email, "@") || strings.ContainsAny(email, " \t\n<>") {
-			return &engine.Error{Code: engine.CodeInvalid, Field: "email", Message: "that is not an email address"}
-		}
-		if x.user.PasswordHash != "" && !auth.CheckPassword(x.user.PasswordHash, b.Password) {
-			return &engine.Error{Code: engine.CodeForbidden, Field: "password", Message: "confirm with your current password"}
-		}
-		if n, err := s.st.Count(ctx, "users", store.Eq("email", email), store.Live); err != nil {
-			return err
-		} else if n > 0 {
-			return &engine.Error{Code: engine.CodeConflict, Field: "email", Message: "another account uses this address"}
-		}
-		set["email"] = email
-		s.audit(x.r, "", x.user, "email.changed", "user", x.user.ID, map[string]string{"from": x.user.Email, "to": email})
+	if err := s.changeEmail(x, b, set); err != nil {
+		return err
 	}
 	if len(set) == 0 {
 		return s.handleShowAccount(x)
@@ -407,32 +382,98 @@ func (s *Server) handleUpdateProfile(x *c) error {
 		return err
 	}
 	if len(memberSet) > 0 {
-		// The name and avatar are copied onto each membership; tell each
-		// workspace so open browsers show the change.
-		ms, err := s.memberships(ctx, x.user.ID)
-		if err != nil {
+		if err := s.copyToMemberships(ctx, x.user.ID, memberSet); err != nil {
 			return err
-		}
-		for _, m := range ms {
-			err := s.eng.System(ctx, m.ID, x.user.ID, func(sys *engine.Sys) error {
-				if _, err := sys.Tx().Update(ctx, "members", memberSet, store.Eq("user_id", x.user.ID)); err != nil {
-					return err
-				}
-				changes := map[string]core.FieldChange{}
-				for k, v := range memberSet {
-					changes[k] = core.FieldChange{To: v}
-				}
-				return sys.Emit("member.updated", "member", x.user.ID, "workspace", m.ID, "", map[string]any{"id": x.user.ID, "changes": changes})
-			})
-			if err != nil {
-				return err
-			}
 		}
 	}
 	if err := s.st.Get(ctx, &x.user, store.Eq("id", x.user.ID)); err != nil {
 		return err
 	}
 	return s.handleShowAccount(x)
+}
+
+// profileChanges checks a profile change and gives the columns it sets on
+// the person, and those of them also copied onto each membership. The
+// email address is changeEmail's.
+func profileChanges(b profileBody) (set, memberSet map[string]any, err error) {
+	set, memberSet = map[string]any{}, map[string]any{}
+	if b.Name != nil {
+		name := strings.TrimSpace(*b.Name)
+		if name == "" {
+			return nil, nil, errBad("a name cannot be empty")
+		}
+		set["name"], memberSet["name"] = name, name
+	}
+	if b.Avatar != nil {
+		set["avatar"], memberSet["avatar"] = *b.Avatar, *b.Avatar
+	}
+	if b.Timezone != nil {
+		if _, err := time.LoadLocation(*b.Timezone); err != nil {
+			return nil, nil, errBad("%q is not a time zone: use a name like Europe/Berlin", *b.Timezone)
+		}
+		set["timezone"] = *b.Timezone
+	}
+	if b.Theme != nil {
+		if !has([]string{"", "light", "dark", "system"}, *b.Theme) {
+			return nil, nil, errBad("theme is light, dark or system")
+		}
+		set["theme"] = *b.Theme
+	}
+	if b.Locale != nil {
+		set["locale"] = *b.Locale
+	}
+	if b.Notify != nil {
+		set["notify"] = *b.Notify
+	}
+	return set, memberSet, nil
+}
+
+// changeEmail checks a new sign-in address, confirmed with the current
+// password, and adds it to set. The change is written to the audit log.
+func (s *Server) changeEmail(x *c, b profileBody, set map[string]any) error {
+	if b.Email == nil || strings.EqualFold(strings.TrimSpace(*b.Email), x.user.Email) {
+		return nil
+	}
+	email := strings.ToLower(strings.TrimSpace(*b.Email))
+	if !strings.Contains(email, "@") || strings.ContainsAny(email, " \t\n<>") {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "email", Message: "that is not an email address"}
+	}
+	if x.user.PasswordHash != "" && !auth.CheckPassword(x.user.PasswordHash, b.Password) {
+		return &engine.Error{Code: engine.CodeForbidden, Field: "password", Message: "confirm with your current password"}
+	}
+	if n, err := s.st.Count(x.ctx(), "users", store.Eq("email", email), store.Live); err != nil {
+		return err
+	} else if n > 0 {
+		return &engine.Error{Code: engine.CodeConflict, Field: "email", Message: "another account uses this address"}
+	}
+	set["email"] = email
+	s.audit(x.r, "", x.user, "email.changed", "user", x.user.ID, map[string]string{"from": x.user.Email, "to": email})
+	return nil
+}
+
+// copyToMemberships copies a person's name and avatar onto each of their
+// memberships, telling each workspace so open browsers show the change.
+func (s *Server) copyToMemberships(ctx context.Context, userID string, memberSet map[string]any) error {
+	ms, err := s.memberships(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, m := range ms {
+		err := s.eng.System(ctx, m.ID, userID, func(sys *engine.Sys) error {
+			if _, err := sys.Tx().Update(ctx, "members", memberSet, store.Eq("user_id", userID)); err != nil {
+				return err
+			}
+			changes := map[string]core.FieldChange{}
+			for k, v := range memberSet {
+				changes[k] = core.FieldChange{To: v}
+			}
+			return sys.Emit("member.updated", "member", userID, "workspace", m.ID, "", map[string]any{"id": userID, "changes": changes})
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type passwordBody struct {

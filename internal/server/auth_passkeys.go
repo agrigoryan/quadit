@@ -33,6 +33,10 @@ func init() {
 	})
 }
 
+// passkeyStateLife is how long the browser has to finish adding a passkey,
+// or signing in with one, once started.
+const passkeyStateLife = 10 * time.Minute
+
 // webAuthnUser is a person as the WebAuthn library wants to see one.
 type webAuthnUser struct {
 	u     core.User
@@ -116,15 +120,15 @@ func (s *Server) handleStartPasskeyRegistration(x *c) error {
 		return err
 	}
 	var exclude []protocol.CredentialDescriptor
-	for _, c := range user.creds {
-		exclude = append(exclude, c.Descriptor())
+	for _, cred := range user.creds {
+		exclude = append(exclude, cred.Descriptor())
 	}
 	opts, session, err := wa.BeginRegistration(user, webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired),
 		webauthn.WithExclusions(exclude))
 	if err != nil {
 		return err
 	}
-	state, err := s.oneTime(x.ctx(), "passkey_register", x.user.ID, session, 10*time.Minute)
+	state, err := s.oneTime(x.ctx(), "passkey_register", x.user.ID, session, passkeyStateLife)
 	if err != nil {
 		return err
 	}
@@ -135,12 +139,12 @@ func (s *Server) handleStartPasskeyRegistration(x *c) error {
 // the browser's credential; the state comes in the query.
 func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	ctx := x.ctx()
-	ot, err := s.useOneTime(ctx, "passkey_register", x.r.URL.Query().Get("state"), false)
-	if err != nil || ot.UserID != x.user.ID {
+	spent, err := s.useOneTime(ctx, "passkey_register", x.r.URL.Query().Get("state"), false)
+	if err != nil || spent.UserID != x.user.ID {
 		return errBad("this passkey setup has expired; start again")
 	}
 	var session webauthn.SessionData
-	if err := json.Unmarshal(ot.Data, &session); err != nil {
+	if err := json.Unmarshal(spent.Data, &session); err != nil {
 		return err
 	}
 	wa, err := s.webauthn(x.r)
@@ -158,7 +162,7 @@ func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	raw, _ := json.Marshal(cred)
 	name := strings.TrimSpace(x.r.URL.Query().Get("name"))
 	if name == "" {
-		name = "Passkey " + time.Now().UTC().Format("2006-01-02")
+		name = "Passkey " + time.Now().UTC().Format(time.DateOnly)
 	}
 	pk := core.Passkey{ID: id.New(), UserID: x.user.ID, Name: name, CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID), Credential: raw,
 		CreatedAt: time.Now().UnixMilli()}
@@ -250,7 +254,7 @@ func (s *Server) handleStartPasskeySignIn(x *c) error {
 	if err != nil {
 		return err
 	}
-	state, err := s.oneTime(x.ctx(), "passkey_login", "", session, 10*time.Minute)
+	state, err := s.oneTime(x.ctx(), "passkey_login", "", session, passkeyStateLife)
 	if err != nil {
 		return err
 	}
@@ -261,15 +265,15 @@ func (s *Server) handleStartPasskeySignIn(x *c) error {
 // signs its person in.
 func (s *Server) handleFinishPasskeySignIn(x *c) error {
 	ctx := x.ctx()
-	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), 30, 15*time.Minute); err != nil {
+	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), signInsPerIP, signInWindow); err != nil {
 		return err
 	}
-	ot, err := s.useOneTime(ctx, "passkey_login", x.r.URL.Query().Get("state"), false)
+	spent, err := s.useOneTime(ctx, "passkey_login", x.r.URL.Query().Get("state"), false)
 	if err != nil {
 		return errBad("this sign-in has expired; try again")
 	}
 	var session webauthn.SessionData
-	if err := json.Unmarshal(ot.Data, &session); err != nil {
+	if err := json.Unmarshal(spent.Data, &session); err != nil {
 		return err
 	}
 	wa, err := s.webauthn(x.r)

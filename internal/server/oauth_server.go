@@ -73,14 +73,14 @@ func (s *Server) handleRegisterOAuthClient(x *c) error {
 	if err := s.throttle(x.ctx(), "oauth-register:"+clientIP(x.r), 30, time.Hour); err != nil {
 		return err
 	}
-	cl := core.OAuthClient{ID: "qc_" + auth.Random(16), Name: strings.TrimSpace(b.Name), RedirectURIs: b.RedirectURIs, CreatedAt: time.Now().UnixMilli()}
-	if cl.Name == "" {
-		cl.Name = "An MCP client"
+	client := core.OAuthClient{ID: "qc_" + auth.Random(16), Name: strings.TrimSpace(b.Name), RedirectURIs: b.RedirectURIs, CreatedAt: time.Now().UnixMilli()}
+	if client.Name == "" {
+		client.Name = "An MCP client"
 	}
-	if err := s.st.Insert(x.ctx(), cl); err != nil {
+	if err := s.st.Insert(x.ctx(), client); err != nil {
 		return err
 	}
-	return x.json(201, map[string]any{"client_id": cl.ID, "client_name": cl.Name, "redirect_uris": cl.RedirectURIs,
+	return x.json(201, map[string]any{"client_id": client.ID, "client_name": client.Name, "redirect_uris": client.RedirectURIs,
 		"token_endpoint_auth_method": "none", "grant_types": []string{"authorization_code", "refresh_token"}, "response_types": []string{"code"}})
 }
 
@@ -168,11 +168,11 @@ You can take this back at any time in Settings, under tokens.</p>
 func (s *Server) handleShowConsentPage(x *c) error {
 	q := x.r.URL.Query()
 	ctx := x.ctx()
-	var cl core.OAuthClient
-	if err := s.st.Get(ctx, &cl, store.Eq("id", q.Get("client_id"))); err != nil {
+	var client core.OAuthClient
+	if err := s.st.Get(ctx, &client, store.Eq("id", q.Get("client_id"))); err != nil {
 		return errBad("unknown client; the client must register first")
 	}
-	if !has(cl.RedirectURIs, q.Get("redirect_uri")) {
+	if !has(client.RedirectURIs, q.Get("redirect_uri")) {
 		return errBad("that redirect URI is not one the client registered")
 	}
 	if q.Get("response_type") != "code" || q.Get("code_challenge") == "" || (q.Get("code_challenge_method") != "S256" && q.Get("code_challenge_method") != "") {
@@ -195,14 +195,14 @@ func (s *Server) handleShowConsentPage(x *c) error {
 			hasAgent = hasAgent || a.Agent
 		}
 	}
-	req := authRequest{ClientID: cl.ID, RedirectURI: q.Get("redirect_uri"), State: q.Get("state"), Challenge: q.Get("code_challenge"), Scope: q.Get("scope"), UserID: x.user.ID}
-	token, err := s.oneTime(ctx, "oauth_consent", x.user.ID, req, 15*time.Minute)
+	req := authRequest{ClientID: client.ID, RedirectURI: q.Get("redirect_uri"), State: q.Get("state"), Challenge: q.Get("code_challenge"), Scope: q.Get("scope"), UserID: x.user.ID}
+	token, err := s.oneTime(ctx, "oauth_consent", x.user.ID, req, approvalLife)
 	if err != nil {
 		return err
 	}
 	x.w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	x.w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' "+originOf(req.RedirectURI))
-	return consentPage.Execute(x.w, map[string]any{"Client": cl.Name, "User": x.user.Name, "Groups": groups, "HasAgent": hasAgent, "Request": token})
+	return consentPage.Execute(x.w, map[string]any{"Client": client.Name, "User": x.user.Name, "Groups": groups, "HasAgent": hasAgent, "Request": token})
 }
 
 func originOf(raw string) string {
@@ -223,12 +223,12 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 	if err := s.identify(x); err != nil || x.sess == nil {
 		return errUnauthorized("sign in first")
 	}
-	ot, err := s.useOneTime(ctx, "oauth_consent", x.r.PostForm.Get("request"), false)
-	if err != nil || ot.UserID != x.user.ID {
+	spent, err := s.useOneTime(ctx, "oauth_consent", x.r.PostForm.Get("request"), false)
+	if err != nil || spent.UserID != x.user.ID {
 		return errBad("this request has expired; start again from the client")
 	}
 	var req authRequest
-	if err := json.Unmarshal(ot.Data, &req); err != nil {
+	if err := json.Unmarshal(spent.Data, &req); err != nil {
 		return err
 	}
 	back, err := url.Parse(req.RedirectURI)
@@ -276,8 +276,9 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 // How long an MCP client's tokens last, and how long a person has to
 // answer a consent page, or to sign in at an outside provider.
 const (
-	accessLife  = 8 * time.Hour
-	refreshLife = 90 * 24 * time.Hour
+	accessLife   = 8 * time.Hour
+	refreshLife  = 90 * 24 * time.Hour
+	approvalLife = 15 * time.Minute
 )
 
 // handleIssueOAuthToken trades a code, or a refresh token, for an access token.
@@ -293,7 +294,7 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 		fail("invalid_request", "send a form")
 		return
 	}
-	f := r.PostForm
+	form := r.PostForm
 	issue := func(userID, workspaceID, clientID, scope string) {
 		access, prefix := auth.NewAPIToken()
 		refresh := "qr_" + auth.Random(32)
@@ -302,43 +303,43 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 		if scope == "read" {
 			scopes = "read"
 		}
-		var cl core.OAuthClient
-		if err := s.st.Get(ctx, &cl, store.Eq("id", clientID)); err != nil {
+		var client core.OAuthClient
+		if err := s.st.Get(ctx, &client, store.Eq("id", clientID)); err != nil {
 			s.log.Warn("oauth token: the client's name is not known; the token gets a plain one", "err", err)
 		}
-		t := core.APIToken{ID: id.New(), WorkspaceID: workspaceID, UserID: userID, Name: firstNonEmpty(cl.Name, "MCP client"), TokenHash: auth.Hash(access), Prefix: prefix,
+		issued := core.APIToken{ID: id.New(), WorkspaceID: workspaceID, UserID: userID, Name: firstNonEmpty(client.Name, "MCP client"), TokenHash: auth.Hash(access), Prefix: prefix,
 			Scopes: scopes, Kind: "oauth", ClientID: clientID, RefreshHash: auth.Hash(refresh), CreatedBy: userID, CreatedAt: now.UnixMilli(),
 			ExpiresAt: now.Add(accessLife).UnixMilli()}
-		if err := s.st.Insert(ctx, t); err != nil {
+		if err := s.st.Insert(ctx, issued); err != nil {
 			fail("server_error", "the token could not be stored")
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]any{"access_token": access, "token_type": "Bearer", "expires_in": int(accessLife.Seconds()),
 			"refresh_token": refresh, "scope": firstNonEmpty(scope, "read write")})
 	}
-	switch f.Get("grant_type") {
+	switch form.Get("grant_type") {
 	case "authorization_code":
-		ot, err := s.useOneTime(ctx, "oauth_code", f.Get("code"), false)
+		spent, err := s.useOneTime(ctx, "oauth_code", form.Get("code"), false)
 		if err != nil {
 			fail("invalid_grant", "the code is not valid or was already used")
 			return
 		}
 		var req authRequest
-		if err := json.Unmarshal(ot.Data, &req); err != nil {
+		if err := json.Unmarshal(spent.Data, &req); err != nil {
 			s.log.Error("oauth token: the stored request does not read", "err", err)
 			fail("server_error", "the code could not be read")
 			return
 		}
-		sum := sha256.Sum256([]byte(f.Get("code_verifier")))
-		if req.ClientID != f.Get("client_id") || req.RedirectURI != f.Get("redirect_uri") || base64.RawURLEncoding.EncodeToString(sum[:]) != req.Challenge {
+		sum := sha256.Sum256([]byte(form.Get("code_verifier")))
+		if req.ClientID != form.Get("client_id") || req.RedirectURI != form.Get("redirect_uri") || base64.RawURLEncoding.EncodeToString(sum[:]) != req.Challenge {
 			fail("invalid_grant", "the client, redirect URI or code verifier does not match the request")
 			return
 		}
 		issue(firstNonEmpty(req.ActAs, req.UserID), req.WorkspaceID, req.ClientID, req.Scope)
 	case "refresh_token":
 		var old core.APIToken
-		if err := s.st.Get(ctx, &old, store.Eq("refresh_hash", auth.Hash(f.Get("refresh_token"))), store.Null("revoked_at")); err != nil ||
-			old.CreatedAt < time.Now().Add(-refreshLife).UnixMilli() || (f.Get("client_id") != "" && f.Get("client_id") != old.ClientID) {
+		if err := s.st.Get(ctx, &old, store.Eq("refresh_hash", auth.Hash(form.Get("refresh_token"))), store.Null("revoked_at")); err != nil ||
+			old.CreatedAt < time.Now().Add(-refreshLife).UnixMilli() || (form.Get("client_id") != "" && form.Get("client_id") != old.ClientID) {
 			fail("invalid_grant", "the refresh token is not valid; sign in again")
 			return
 		}

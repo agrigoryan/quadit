@@ -148,16 +148,16 @@ func (s *Server) oauth2Config(ctx context.Context, p signInProvider, cfg oauthSe
 
 // oauthIdentity trades the code the provider sent the browser back with
 // for who signed in.
-func (s *Server) oauthIdentity(ctx context.Context, p signInProvider, cfg oauthSetting, st oauthState, code string) (outsider, error) {
+func (s *Server) oauthIdentity(ctx context.Context, p signInProvider, cfg oauthSetting, state oauthState, code string) (outsider, error) {
 	var who outsider
 	oc, err := s.oauth2Config(ctx, p, cfg)
 	if err != nil {
 		return who, err
 	}
 	ctx = providerCalls(ctx)
-	tok, err := oc.Exchange(ctx, code, oauth2.VerifierOption(st.Verifier))
+	tok, err := oc.Exchange(ctx, code, oauth2.VerifierOption(state.Verifier))
 	if err != nil {
 		return who, fmt.Errorf("the provider refused the sign-in: %w", err)
 	}
-	return p.Identity(ctx, cfg, oc, tok, st.Nonce)
+	return p.Identity(ctx, cfg, oc, tok, state.Nonce)
 }

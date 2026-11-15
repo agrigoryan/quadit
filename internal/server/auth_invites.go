@@ -87,7 +87,7 @@ func (s *Server) handleRegisterAccount(x *c) error {
 	} else if !allowed {
 		return errForbidden("accounts here are limited to certain email domains")
 	}
-	if err := s.throttle(ctx, "register:ip:"+clientIP(x.r), 10, time.Hour); err != nil {
+	if err := s.throttle(ctx, "register:ip:"+clientIP(x.r), accountRequestsPerHour, time.Hour); err != nil {
 		return err
 	}
 	if b.Password == "" {
@@ -233,6 +233,28 @@ func (s *Server) handleShowInvite(x *c) error {
 	return x.ok(out)
 }
 
+// newInvitedPerson makes the account of someone accepting an invitation
+// without one, from the name and password sent along, and signs them in.
+func (s *Server) newInvitedPerson(x *c, inv core.Invite, b registerBody) (core.User, error) {
+	email := b.Email
+	if inv.Email != "" {
+		email = inv.Email
+	}
+	if allowed, err := s.emailAllowed(x.ctx(), email); err != nil {
+		return core.User{}, err
+	} else if !allowed {
+		return core.User{}, errForbidden("accounts here are limited to certain email domains")
+	}
+	if b.Password == "" {
+		return core.User{}, &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: "choose a password, or sign in first if you have an account"}
+	}
+	u, err := s.newPerson(x.ctx(), b.Name, email, b.Password)
+	if err != nil {
+		return u, err
+	}
+	return u, s.startSession(x, u, "full")
+}
+
 // handleAcceptInvite joins the workspace: as the person signed in, or as a new
 // account made from the name and password sent along.
 func (s *Server) handleAcceptInvite(x *c) error {
@@ -250,25 +272,8 @@ func (s *Server) handleAcceptInvite(x *c) error {
 	var u core.User
 	if s.identify(x) == nil && x.user.Kind == core.KindPerson {
 		u = x.user
-	} else {
-		email := b.Email
-		if inv.Email != "" {
-			email = inv.Email
-		}
-		if allowed, err := s.emailAllowed(ctx, email); err != nil {
-			return err
-		} else if !allowed {
-			return errForbidden("accounts here are limited to certain email domains")
-		}
-		if b.Password == "" {
-			return &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: "choose a password, or sign in first if you have an account"}
-		}
-		if u, err = s.newPerson(ctx, b.Name, email, b.Password); err != nil {
-			return err
-		}
-		if err := s.startSession(x, u, "full"); err != nil {
-			return err
-		}
+	} else if u, err = s.newInvitedPerson(x, inv, b); err != nil {
+		return err
 	}
 	if inv.Email != "" && !strings.EqualFold(inv.Email, u.Email) {
 		return errForbidden("this invitation is for %s; you are signed in as %s", inv.Email, u.Email)

@@ -58,19 +58,19 @@ func (s *Server) handleStartProviderSignIn(x *c) error {
 		http.Redirect(x.w, x.r, "/login?error="+url.QueryEscape(couldNotConfirm), http.StatusFound)
 		return nil
 	}
-	st := oauthState{Provider: provider, Verifier: oauth2.GenerateVerifier(), Nonce: id.New(), Next: x.r.URL.Query().Get("next"), Invite: x.r.URL.Query().Get("invite")}
-	if !strings.HasPrefix(st.Next, "/") || strings.HasPrefix(st.Next, "//") {
-		st.Next = "/"
+	state := oauthState{Provider: provider, Verifier: oauth2.GenerateVerifier(), Nonce: id.New(), Next: x.r.URL.Query().Get("next"), Invite: x.r.URL.Query().Get("invite")}
+	if !strings.HasPrefix(state.Next, "/") || strings.HasPrefix(state.Next, "//") {
+		state.Next = "/"
 	}
 	// Someone already signed in is adding this provider to their account.
 	if s.identify(x) == nil && x.sess != nil && x.r.URL.Query().Has("link") {
-		st.LinkUser = x.user.ID
+		state.LinkUser = x.user.ID
 	}
-	state, err := s.oneTime(ctx, "oauth", "", st, 15*time.Minute)
+	stateToken, err := s.oneTime(ctx, "oauth", "", state, approvalLife)
 	if err != nil {
 		return err
 	}
-	http.Redirect(x.w, x.r, oc.AuthCodeURL(state, oauth2.S256ChallengeOption(st.Verifier), oidc.Nonce(st.Nonce)), http.StatusFound)
+	http.Redirect(x.w, x.r, oc.AuthCodeURL(stateToken, oauth2.S256ChallengeOption(state.Verifier), oidc.Nonce(state.Nonce)), http.StatusFound)
 	return nil
 }
 
@@ -85,27 +85,27 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 	}
 	q := x.r.URL.Query()
 	if e := q.Get("error"); e != "" {
-		return back("The sign-in was cancelled.") //nolint:misspell // the words the person is shown; changing them is not this unit's to do
+		return back("The sign-in was cancelled.") //nolint:misspell // the words the person is shown, kept as they are
 	}
-	ot, err := s.useOneTime(ctx, "oauth", q.Get("state"), false)
+	spent, err := s.useOneTime(ctx, "oauth", q.Get("state"), false)
 	if err != nil {
 		return back("This sign-in has expired. Try again.")
 	}
-	var st oauthState
-	if err := json.Unmarshal(ot.Data, &st); err != nil {
+	var state oauthState
+	if err := json.Unmarshal(spent.Data, &state); err != nil {
 		s.log.Error("oauth sign-in: the stored state does not read", "provider", provider, "err", err)
 		return back("This sign-in has expired. Try again.")
 	}
 	p, cfg, ok := s.signInWith(ctx, provider)
-	if !ok || st.Provider != provider {
+	if !ok || state.Provider != provider {
 		return back("This sign-in provider is not available.")
 	}
-	who, err := s.oauthIdentity(ctx, p, cfg, st, q.Get("code"))
+	who, err := s.oauthIdentity(ctx, p, cfg, state, q.Get("code"))
 	if err != nil {
 		s.log.Error("oauth sign-in", "provider", provider, "err", err)
 		return back(couldNotConfirm)
 	}
-	u, refusal, err := s.oauthAccount(x, providerSignIn{provider: provider, providerName: cfg.Name, state: st, who: who})
+	u, refusal, err := s.oauthAccount(x, providerSignIn{provider: provider, providerName: cfg.Name, state: state, who: who})
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 	if u.DisabledAt != 0 || u.Kind != core.KindPerson {
 		return back("This account is disabled.")
 	}
-	if st.LinkUser == "" {
+	if state.LinkUser == "" {
 		stage := "full"
 		if u.TOTPAt != 0 {
 			stage = "mfa"
@@ -124,14 +124,14 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 			return err
 		}
 		if stage == "mfa" {
-			http.Redirect(x.w, x.r, "/login?second_step=1&next="+url.QueryEscape(st.Next), http.StatusFound)
+			http.Redirect(x.w, x.r, "/login?second_step=1&next="+url.QueryEscape(state.Next), http.StatusFound)
 			return nil
 		}
 		s.audit(x.r, "", u, "signin", "user", u.ID, map[string]string{"method": provider})
 	}
-	next := st.Next
-	if st.Invite != "" {
-		next = "/invite/" + st.Invite
+	next := state.Next
+	if state.Invite != "" {
+		next = "/invite/" + state.Invite
 	}
 	http.Redirect(x.w, x.r, next, http.StatusFound)
 	return nil

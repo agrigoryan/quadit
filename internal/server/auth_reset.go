@@ -25,7 +25,7 @@ func (s *Server) handleRequestPasswordReset(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
-	if err := s.throttle(ctx, "reset:ip:"+clientIP(x.r), 10, time.Hour); err != nil {
+	if err := s.throttle(ctx, "reset:ip:"+clientIP(x.r), accountRequestsPerHour, time.Hour); err != nil {
 		return err
 	}
 	if !s.mailReady(ctx) {
@@ -67,7 +67,7 @@ func (s *Server) handleConfirmPasswordReset(x *c) error {
 	if err := auth.CheckPasswordRules(b.Password); err != nil {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: err.Error()}
 	}
-	ot, err := s.useOneTime(ctx, "reset", b.Token, false)
+	spent, err := s.useOneTime(ctx, "reset", b.Token, false)
 	if err != nil {
 		return err
 	}
@@ -75,10 +75,10 @@ func (s *Server) handleConfirmPasswordReset(x *c) error {
 	if err != nil {
 		return err
 	}
-	if err := s.setPassword(ctx, ot.UserID, hash); err != nil {
+	if err := s.setPassword(ctx, spent.UserID, hash); err != nil {
 		return err
 	}
 	s.accessChanged()
-	s.audit(x.r, "", core.User{ID: ot.UserID}, "password.reset", "user", ot.UserID, nil)
+	s.audit(x.r, "", core.User{ID: spent.UserID}, "password.reset", "user", spent.UserID, nil)
 	return x.ok(map[string]any{"ok": true})
 }

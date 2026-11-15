@@ -51,7 +51,7 @@ func (s *Server) handleFinishSecondStep(x *c) error {
 		return x.ok(map[string]any{"user": x.user})
 	}
 	ctx := x.ctx()
-	if err := s.throttle(ctx, "mfa:"+x.user.ID, 8, 15*time.Minute); err != nil {
+	if err := s.throttle(ctx, "mfa:"+x.user.ID, 8, signInWindow); err != nil {
 		return err
 	}
 	if !s.checkSecond(ctx, x.user, b.Code) {

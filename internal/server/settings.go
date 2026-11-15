@@ -111,15 +111,15 @@ func (s *Server) readSetting(ctx context.Context, name string) (json.RawMessage,
 		}
 		return raw, true, nil
 	}
-	var st core.Setting
-	err := s.st.Get(ctx, &st, store.Eq("name", name))
+	var row core.Setting
+	err := s.st.Get(ctx, &row, store.Eq("name", name))
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, false, nil
 	case err != nil:
 		return nil, false, fmt.Errorf("reading the setting %s: %w", name, err)
 	}
-	return s.unsealFields(name, st.Value), false, nil
+	return s.unsealFields(name, row.Value), false, nil
 }
 
 // cacheSetting keeps a setting as read or saved.
@@ -309,8 +309,8 @@ func (s *Server) sealSecrets(ctx context.Context, name string, secrets []string,
 // storedSetting reads a setting's stored object as it is in the database,
 // secrets sealed; nil when it is not set.
 func (s *Server) storedSetting(ctx context.Context, name string) (map[string]any, error) {
-	var st core.Setting
-	err := s.st.Get(ctx, &st, store.Eq("name", name))
+	var row core.Setting
+	err := s.st.Get(ctx, &row, store.Eq("name", name))
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return nil, nil
@@ -318,7 +318,7 @@ func (s *Server) storedSetting(ctx context.Context, name string) (map[string]any
 		return nil, fmt.Errorf("reading the setting %s before saving it: %w", name, err)
 	}
 	var old map[string]any
-	if err := json.Unmarshal(st.Value, &old); err != nil {
+	if err := json.Unmarshal(row.Value, &old); err != nil {
 		return nil, fmt.Errorf("the stored setting %s: %w", name, err)
 	}
 	return old, nil

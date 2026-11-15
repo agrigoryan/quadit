@@ -8,6 +8,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -33,54 +34,97 @@ func (s *Server) handleCreateToken(x *c) error {
 	if x.actor.ReadOnly {
 		return errForbidden("this credential is read-only")
 	}
-	rs := x.resolver()
+	resolver := x.resolver()
 	if b.User == "" {
 		b.User = "me"
 	}
-	m, err := rs.Member("user", b.User)
+	m, err := resolver.Member("user", b.User)
 	if err != nil {
 		return err
 	}
-	if m.UserID != x.member.UserID {
-		// An admin makes tokens for agents; anyone makes them for a
-		// sub-agent they made themselves.
-		if m.DelegatedBy != x.member.UserID {
-			if err := x.admin(); err != nil {
-				return err
-			}
-		}
-		if m.Kind != core.KindAgent {
-			return errForbidden("a person's tokens are made by that person")
-		}
-		// An agent hands out no more than it has itself: not a higher role,
-		// not projects beyond its own.
-		if x.member.Kind == core.KindAgent {
-			if m.Role != x.member.Role && m.Role.AtLeast(x.member.Role) {
-				return errForbidden("an agent cannot make a token for an agent with a higher role than its own")
-			}
-			if mine := x.member.Scope; mine != nil {
-				theirs := m.Scope
-				if theirs == nil {
-					theirs = &core.Scope{}
-				}
-				if mine.ReadOnly && !theirs.ReadOnly {
-					return errForbidden("an agent that may only read cannot make a token for one that may write")
-				}
-				if len(mine.Projects) > 0 {
-					if len(theirs.Projects) == 0 {
-						return errForbidden("@%s works in every project and you do not; you cannot make a token for it", m.Handle)
-					}
-					for _, p := range theirs.Projects {
-						if !has(mine.Projects, p) {
-							return errForbidden("@%s works in projects you do not; you cannot make a token for it", m.Handle)
-						}
-					}
-				}
-			}
-		}
-	} else if x.member.Kind == core.KindAgent && x.token != nil {
-		return errForbidden("an agent cannot issue itself more tokens; ask an admin")
+	if err := mayMakeTokenFor(x, m); err != nil {
+		return err
 	}
+	scopes, err := tokenScopes(x, resolver, b)
+	if err != nil {
+		return err
+	}
+	token, prefix := auth.NewAPIToken()
+	now := time.Now()
+	info := core.APIToken{ID: id.New(), WorkspaceID: x.ws.ID, UserID: m.UserID, Name: strings.TrimSpace(b.Name), TokenHash: auth.Hash(token), Prefix: prefix,
+		Scopes: strings.Join(scopes, " "), Kind: "token", CreatedBy: x.member.UserID, CreatedAt: now.UnixMilli()}
+	if info.Name == "" {
+		info.Name = "token " + now.UTC().Format(time.DateOnly)
+	}
+	if b.ExpiresDays > 0 {
+		info.ExpiresAt = now.AddDate(0, 0, b.ExpiresDays).UnixMilli()
+	}
+	if err := x.db.Insert(x.ctx(), info); err != nil {
+		return err
+	}
+	s.audit(x.r, x.ws.ID, x.user, "token.created", "token", info.ID, map[string]string{"for": m.Handle, "scopes": info.Scopes})
+	return x.json(201, map[string]any{"token": token, "info": info, "note": "this is the only time the token is shown"})
+}
+
+// mayMakeTokenFor refuses a token the caller may not make for member m.
+func mayMakeTokenFor(x *c, m core.Member) error {
+	if m.UserID == x.member.UserID {
+		if x.member.Kind == core.KindAgent && x.token != nil {
+			return errForbidden("an agent cannot issue itself more tokens; ask an admin")
+		}
+		return nil
+	}
+	// An admin makes tokens for agents; anyone makes them for a
+	// sub-agent they made themselves.
+	if m.DelegatedBy != x.member.UserID {
+		if err := x.admin(); err != nil {
+			return err
+		}
+	}
+	if m.Kind != core.KindAgent {
+		return errForbidden("a person's tokens are made by that person")
+	}
+	if x.member.Kind == core.KindAgent {
+		return agentMayHandOut(x.member, m)
+	}
+	return nil
+}
+
+// agentMayHandOut refuses a token an agent would make for another agent
+// that could do more than the agent itself: an agent hands out no more than
+// it has, not a higher role, not projects beyond its own.
+func agentMayHandOut(agent, m core.Member) error {
+	if m.Role != agent.Role && m.Role.AtLeast(agent.Role) {
+		return errForbidden("an agent cannot make a token for an agent with a higher role than its own")
+	}
+	mine := agent.Scope
+	if mine == nil {
+		return nil
+	}
+	theirs := m.Scope
+	if theirs == nil {
+		theirs = &core.Scope{}
+	}
+	if mine.ReadOnly && !theirs.ReadOnly {
+		return errForbidden("an agent that may only read cannot make a token for one that may write")
+	}
+	if len(mine.Projects) == 0 {
+		return nil
+	}
+	if len(theirs.Projects) == 0 {
+		return errForbidden("@%s works in every project and you do not; you cannot make a token for it", m.Handle)
+	}
+	for _, p := range theirs.Projects {
+		if !has(mine.Projects, p) {
+			return errForbidden("@%s works in projects you do not; you cannot make a token for it", m.Handle)
+		}
+	}
+	return nil
+}
+
+// tokenScopes lists what a new token may do: read only, limited to
+// projects, given secrets. A token made with a token keeps its limits.
+func tokenScopes(x *c, resolver *engine.Resolver, b tokenBody) ([]string, error) {
 	var scopes []string
 	if b.ReadOnly || x.actor.ReadOnly {
 		scopes = append(scopes, "read")
@@ -93,38 +137,24 @@ func (s *Server) handleCreateToken(x *c) error {
 	}
 	if b.Secrets {
 		if err := x.admin(); err != nil {
-			return err
+			return nil, err
 		}
 		if x.token != nil {
-			return errForbidden("a token for secrets is made by a signed-in admin, not with another token")
+			return nil, errForbidden("a token for secrets is made by a signed-in admin, not with another token")
 		}
 		scopes = append(scopes, "secrets")
 	}
 	for _, ref := range b.Projects {
-		p, err := rs.Project(ref)
+		p, err := resolver.Project(ref)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if x.token != nil && len(x.actor.Projects) > 0 && !has(x.actor.Projects, p.ID) {
-			return errForbidden("this token does not reach project %s, so it cannot make one that does", p.Key)
+			return nil, errForbidden("this token does not reach project %s, so it cannot make one that does", p.Key)
 		}
 		scopes = append(scopes, "project:"+p.ID)
 	}
-	token, prefix := auth.NewAPIToken()
-	now := time.Now()
-	t := core.APIToken{ID: id.New(), WorkspaceID: x.ws.ID, UserID: m.UserID, Name: strings.TrimSpace(b.Name), TokenHash: auth.Hash(token), Prefix: prefix,
-		Scopes: strings.Join(scopes, " "), Kind: "token", CreatedBy: x.member.UserID, CreatedAt: now.UnixMilli()}
-	if t.Name == "" {
-		t.Name = "token " + now.UTC().Format("2006-01-02")
-	}
-	if b.ExpiresDays > 0 {
-		t.ExpiresAt = now.AddDate(0, 0, b.ExpiresDays).UnixMilli()
-	}
-	if err := x.db.Insert(x.ctx(), t); err != nil {
-		return err
-	}
-	s.audit(x.r, x.ws.ID, x.user, "token.created", "token", t.ID, map[string]string{"for": m.Handle, "scopes": t.Scopes})
-	return x.json(201, map[string]any{"token": token, "info": t, "note": "this is the only time the token is shown"})
+	return scopes, nil
 }
 
 func (s *Server) handleListTokens(x *c) error {
@@ -141,19 +171,19 @@ func (s *Server) handleListTokens(x *c) error {
 
 // handleRevokeToken ends a token at once.
 func (s *Server) handleRevokeToken(x *c) error {
-	var t core.APIToken
-	if err := x.db.Get(x.ctx(), &t, store.Eq("id", x.r.PathValue("id")), store.Null("revoked_at")); err != nil {
+	var token core.APIToken
+	if err := x.db.Get(x.ctx(), &token, store.Eq("id", x.r.PathValue("id")), store.Null("revoked_at")); err != nil {
 		return errNotFound("token")
 	}
-	if t.UserID != x.member.UserID {
+	if token.UserID != x.member.UserID {
 		if err := x.admin(); err != nil {
 			return err
 		}
 	}
-	if _, err := x.db.Update(x.ctx(), "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", t.ID)); err != nil {
+	if _, err := x.db.Update(x.ctx(), "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", token.ID)); err != nil {
 		return err
 	}
 	s.accessChanged()
-	s.audit(x.r, x.ws.ID, x.user, "token.revoked", "token", t.ID, nil)
+	s.audit(x.r, x.ws.ID, x.user, "token.revoked", "token", token.ID, nil)
 	return x.ok(map[string]any{"ok": true})
 }

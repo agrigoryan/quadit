@@ -19,10 +19,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -148,76 +148,22 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	if err != nil {
 		return err
 	}
-	fill := func(v string) string {
-		v = strings.ReplaceAll(v, "{{secret}}", value)
-		v = strings.ReplaceAll(v, "{{secret:base64}}", base64.StdEncoding.EncodeToString([]byte(value)))
-		// "user:{{secret}}" in base64, for Basic sign-in.
-		for {
-			i := strings.Index(v, "{{basic:")
-			if i < 0 {
-				break
-			}
-			j := strings.Index(v[i:], "}}")
-			if j < 0 {
-				break
-			}
-			user := v[i+len("{{basic:") : i+j]
-			v = v[:i] + base64.StdEncoding.EncodeToString([]byte(user+":"+value)) + v[i+j+2:]
-		}
-		return v
-	}
-	u, err := url.Parse(fill(b.URL))
-	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
-		return &engine.Error{Code: engine.CodeInvalid, Field: "url", Message: "url must be a full http(s) address"}
-	}
-	if len(sec.Hosts) == 0 {
-		return errForbidden("the secret %s is not bound to any host, so it cannot be sent anywhere; an admin sets its hosts", sec.Name)
-	}
-	if !hostAllowed(sec, u) {
-		return &engine.Error{Code: engine.CodeForbidden, Field: "url", Allowed: sec.Hosts,
-			Message: fmt.Sprintf("the secret %s may only be sent to: %s", sec.Name, strings.Join(sec.Hosts, ", "))}
-	}
-	method := strings.ToUpper(b.Method)
-	if method == "" {
-		method = "GET"
-	}
-	body := []byte(fill(b.Body))
-	if b.BodyBase64 != "" {
-		if body, err = base64.StdEncoding.DecodeString(b.BodyBase64); err != nil {
-			return &engine.Error{Code: engine.CodeInvalid, Field: "body_base64", Message: "body_base64 does not decode"}
-		}
-	}
-	req, err := http.NewRequestWithContext(x.ctx(), method, u.String(), bytes.NewReader(body))
+	req, target, err := newSecretRequest(x, sec, value, b)
 	if err != nil {
-		return &engine.Error{Code: engine.CodeInvalid, Field: "method", Message: err.Error()}
-	}
-	for k, v := range b.Headers {
-		req.Header.Set(k, fill(v))
-	}
-	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", "quadit")
+		return err
 	}
 	started := time.Now()
 	resp, err := secretRequestClient.Do(req)
 	s.markSecretUsed(x, sec, started)
-	s.audit(x.r, x.ws.ID, x.user, "secret.used", "secret", sec.ID, map[string]string{"name": sec.Name, "method": method, "host": u.Host, "path": u.Path})
-	// mask blanks the value out of anything that goes back to the caller.
-	mask := func(v string) string {
-		v = strings.ReplaceAll(v, value, secretMask)
-		return strings.ReplaceAll(v, base64.StdEncoding.EncodeToString([]byte(value)), secretMask)
-	}
+	s.audit(x.r, x.ws.ID, x.user, "secret.used", "secret", sec.ID, map[string]string{"name": sec.Name, "method": req.Method, "host": target.Host, "path": target.Path})
+	mask := secretMasker(value)
 	if err != nil {
 		return x.ok(map[string]any{"ok": false, "error": mask(err.Error()), "ms": time.Since(started).Milliseconds()})
 	}
 	defer resp.Body.Close()
-	const limit = 1 << 20
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	raw, cut, err := readSecretAnswer(resp.Body)
 	if err != nil {
 		return x.ok(map[string]any{"ok": false, "error": mask(err.Error()), "ms": time.Since(started).Milliseconds()})
-	}
-	cut := len(raw) > limit
-	if cut {
-		raw = raw[:limit]
 	}
 	headers := map[string]string{}
 	for k, vs := range resp.Header {
@@ -234,30 +180,117 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 		out["body_base64"] = base64.StdEncoding.EncodeToString(raw)
 	}
 	if x.wantText() {
-		var t strings.Builder
-		fmt.Fprintf(&t, "%d %s\n", resp.StatusCode, http.StatusText(resp.StatusCode))
-		keys := make([]string, 0, len(headers))
-		for k := range headers {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			if k == "Content-Type" || k == "Location" || strings.HasPrefix(k, "X-Ratelimit") {
-				fmt.Fprintf(&t, "%s: %s\n", k, headers[k])
-			}
-		}
-		t.WriteString("\n")
-		if body, ok := out["body"].(string); ok {
-			t.WriteString(body)
-		} else {
-			fmt.Fprintf(&t, "(%d bytes, not text)", len(raw))
-		}
-		if cut {
-			t.WriteString("\n(cut at 1 MB)")
-		}
-		return x.text(t.String() + "\n")
+		return x.text(secretAnswerText(resp.StatusCode, headers, out, len(raw)))
 	}
 	return x.ok(out)
+}
+
+// newSecretRequest builds the request the vault sends: the secret filled in
+// where it is asked for, and the address checked against the hosts the
+// secret is bound to. target is the address as the caller wrote it, for the
+// audit log.
+func newSecretRequest(x *c, sec core.Secret, value string, b secretRequest) (req *http.Request, target *url.URL, err error) {
+	u, err := url.Parse(fillSecret(b.URL, value))
+	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
+		return nil, nil, &engine.Error{Code: engine.CodeInvalid, Field: "url", Message: "url must be a full http(s) address"}
+	}
+	if len(sec.Hosts) == 0 {
+		return nil, nil, errForbidden("the secret %s is not bound to any host, so it cannot be sent anywhere; an admin sets its hosts", sec.Name)
+	}
+	if !hostAllowed(sec, u) {
+		return nil, nil, &engine.Error{Code: engine.CodeForbidden, Field: "url", Allowed: sec.Hosts,
+			Message: fmt.Sprintf("the secret %s may only be sent to: %s", sec.Name, strings.Join(sec.Hosts, ", "))}
+	}
+	method := strings.ToUpper(b.Method)
+	if method == "" {
+		method = "GET"
+	}
+	body := []byte(fillSecret(b.Body, value))
+	if b.BodyBase64 != "" {
+		if body, err = base64.StdEncoding.DecodeString(b.BodyBase64); err != nil {
+			return nil, nil, &engine.Error{Code: engine.CodeInvalid, Field: "body_base64", Message: "body_base64 does not decode"}
+		}
+	}
+	req, err = http.NewRequestWithContext(x.ctx(), method, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, nil, &engine.Error{Code: engine.CodeInvalid, Field: "method", Message: err.Error()}
+	}
+	for k, v := range b.Headers {
+		req.Header.Set(k, fillSecret(v, value))
+	}
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", "quadit")
+	}
+	return req, u, nil
+}
+
+// fillSecret puts the secret's value where a template asks for it:
+// {{secret}}, {{secret:base64}}, and {{basic:user}} for "user:value" in
+// base64, for Basic sign-in.
+func fillSecret(template, value string) string {
+	v := strings.ReplaceAll(template, "{{secret}}", value)
+	v = strings.ReplaceAll(v, "{{secret:base64}}", base64.StdEncoding.EncodeToString([]byte(value)))
+	for {
+		i := strings.Index(v, "{{basic:")
+		if i < 0 {
+			break
+		}
+		j := strings.Index(v[i:], "}}")
+		if j < 0 {
+			break
+		}
+		user := v[i+len("{{basic:") : i+j]
+		v = v[:i] + base64.StdEncoding.EncodeToString([]byte(user+":"+value)) + v[i+j+2:]
+	}
+	return v
+}
+
+// secretMasker blanks a secret's value out of anything that goes back to
+// the caller, plain or in base64.
+func secretMasker(value string) func(string) string {
+	return func(v string) string {
+		v = strings.ReplaceAll(v, value, secretMask)
+		return strings.ReplaceAll(v, base64.StdEncoding.EncodeToString([]byte(value)), secretMask)
+	}
+}
+
+// secretAnswerLimit is how much of an answer the vault passes back.
+const secretAnswerLimit = 1 << 20
+
+// readSecretAnswer reads an answer's body up to secretAnswerLimit; cut
+// says there was more.
+func readSecretAnswer(body io.Reader) (raw []byte, cut bool, err error) {
+	raw, err = io.ReadAll(io.LimitReader(body, secretAnswerLimit+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if len(raw) > secretAnswerLimit {
+		return raw[:secretAnswerLimit], true, nil
+	}
+	return raw, false, nil
+}
+
+// secretAnswerText is an answer in the compact text form: the status, the
+// headers worth seeing, and the body. out is the answer as JSON; size is
+// how many bytes of body were read.
+func secretAnswerText(status int, headers map[string]string, out map[string]any, size int) string {
+	var text strings.Builder
+	fmt.Fprintf(&text, "%d %s\n", status, http.StatusText(status))
+	for _, k := range slices.Sorted(maps.Keys(headers)) {
+		if k == "Content-Type" || k == "Location" || strings.HasPrefix(k, "X-Ratelimit") {
+			fmt.Fprintf(&text, "%s: %s\n", k, headers[k])
+		}
+	}
+	text.WriteString("\n")
+	if body, ok := out["body"].(string); ok {
+		text.WriteString(body)
+	} else {
+		fmt.Fprintf(&text, "(%d bytes, not text)", size)
+	}
+	if cut, _ := out["truncated"].(bool); cut {
+		text.WriteString("\n(cut at 1 MB)")
+	}
+	return text.String() + "\n"
 }
 
 // markSecretUsed notes when a secret was last used. The audit log has
