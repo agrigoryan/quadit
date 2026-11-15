@@ -120,10 +120,7 @@ func deliver(cl *smtp.Client, c Config, tlsCfg *tls.Config, m Message) error {
 	if err := cl.Rcpt(address(m.To)); err != nil {
 		return fmt.Errorf("mail: recipient refused: %w", err)
 	}
-	body, err := build(c.From, m)
-	if err != nil {
-		return fmt.Errorf("mail: %w", err)
-	}
+	body := build(c.From, m)
 	w, err := cl.Data()
 	if err != nil {
 		return fmt.Errorf("mail: %w", err)
@@ -150,41 +147,30 @@ func clean(s string) string { return strings.NewReplacer("\r", "", "\n", " ").Re
 
 // build writes the message out: its headers, and the text alone or the
 // text and the HTML as alternatives, each quoted-printable.
-func build(from string, m Message) ([]byte, error) {
+func build(from string, m Message) []byte {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\nMIME-Version: 1.0\r\n", clean(from), clean(m.To),
 		mime.QEncoding.Encode("utf-8", clean(m.Subject)), time.Now().Format(time.RFC1123Z))
 	if m.HTML == "" {
-		if err := writePart(&b, "text/plain", m.Text); err != nil {
-			return nil, err
-		}
-		return b.Bytes(), nil
+		writePart(&b, "text/plain", m.Text)
+		return b.Bytes()
 	}
 	const boundary = "quadit-alt-7f3a9c"
 	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n", boundary)
 	fmt.Fprintf(&b, "--%s\r\n", boundary)
-	if err := writePart(&b, "text/plain", m.Text); err != nil {
-		return nil, err
-	}
+	writePart(&b, "text/plain", m.Text)
 	fmt.Fprintf(&b, "--%s\r\n", boundary)
-	if err := writePart(&b, "text/html", m.HTML); err != nil {
-		return nil, err
-	}
+	writePart(&b, "text/html", m.HTML)
 	fmt.Fprintf(&b, "--%s--\r\n", boundary)
-	return b.Bytes(), nil
+	return b.Bytes()
 }
 
 // writePart writes one part of the message: its type and its body,
 // quoted-printable with CRLF line ends.
-func writePart(b *bytes.Buffer, ctype, body string) error {
+func writePart(b *bytes.Buffer, ctype, body string) {
 	fmt.Fprintf(b, "Content-Type: %s; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n", ctype)
 	qp := quotedprintable.NewWriter(b)
-	if _, err := qp.Write([]byte(strings.ReplaceAll(body, "\n", "\r\n"))); err != nil {
-		return err
-	}
-	if err := qp.Close(); err != nil {
-		return err
-	}
+	_, _ = qp.Write([]byte(strings.ReplaceAll(body, "\n", "\r\n"))) // fails only when b does, and a bytes.Buffer cannot
+	_ = qp.Close()                                                  // flushes into b, which cannot fail
 	b.WriteString("\r\n")
-	return nil
 }
