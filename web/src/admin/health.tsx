@@ -12,6 +12,7 @@ import { loadChangeCatalog } from "@/settings/agents/asks-before";
 import { LoadGate } from "@/ui/load-gate";
 import { Page, Rows, Section } from "@/ui/page-layout";
 import { useLoad } from "@/lib/use-load";
+import { useNow } from "@/lib/live";
 import { Ago } from "@/ui/ago";
 
 interface Health {
@@ -83,6 +84,7 @@ const more = (to: string, text: string) => (
 );
 
 function BackupLine({ backup }: { backup: Backup | undefined }) {
+  const now = useNow();
   const label = t("admin.health.lastBackup");
   const link = more("/admin/backups", t("admin.nav.backups"));
   if (!backup) {
@@ -134,7 +136,7 @@ function BackupLine({ backup }: { backup: Backup | undefined }) {
         note={link}
       />
     );
-  const old = Date.now() - backup.started_at > 3 * 24 * 3600_000;
+  const old = now - backup.started_at > 3 * 24 * 3600_000;
   return (
     <Line
       tone={old ? "warn" : "ok"}

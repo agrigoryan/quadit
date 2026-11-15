@@ -2,6 +2,7 @@ import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { useNow } from "@/lib/live";
 import { dayAndMonth } from "@/lib/time";
 import { useProjects, useSlug } from "@/lib/selectors";
 import type { AgentMember, Token } from "@/settings/agents/data";
@@ -37,7 +38,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState("");
   const [revoke, setRevoke] = useState<Token | null>(null);
-  const now = Date.now();
+  const now = useNow();
 
   return (
     <Section

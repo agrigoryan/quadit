@@ -8,6 +8,7 @@ import { Globe, Layers, RefreshCw, Target } from "lucide-react";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { useHotkeys } from "@/lib/hotkeys";
+import { useNow } from "@/lib/live";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useMe, useMember, useRowEvenIfGone } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
@@ -45,7 +46,8 @@ export function Properties({ task, side }: Props) {
   const waitingOn = useMember(task.waiting_on_id);
   const holder = useMember(task.lease_holder_id);
   const readOnly = !can.editTask(task);
-  const held = holder && (task.lease_until ?? 0) > Date.now();
+  const now = useNow();
+  const held = holder && (task.lease_until ?? 0) > now;
   const waitsOnMe = waitingOn?.user_id === me.user_id;
   const outside = waitsOutside(task);
 
