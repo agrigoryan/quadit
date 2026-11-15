@@ -54,10 +54,7 @@ export function useSessions(
   }, [slug, query, live]);
 
   const stored = useRows("sessions");
-  const sessions = useMemo(
-    () => stored.filter(keep).sort((a, b) => b.started_at - a.started_at),
-    [stored, keep],
-  );
+  const sessions = useMemo(() => stored.filter(keep).sort((a, b) => b.started_at - a.started_at), [stored, keep]);
   return { sessions, loading: query !== null && loaded !== query, error };
 }
 
