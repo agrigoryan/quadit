@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -14,22 +15,44 @@ import (
 // errOutage is what a faulty store answers in place of a row.
 var errOutage = errors.New("the database is not answering (a test fault)")
 
-// faults are the operations a faulty store fails, each named as operation
-// plus table: "get settings", "update sessions", "count passkeys".
-type faults struct {
-	mu   sync.Mutex
-	fail map[string]bool
+// fault fails the calls of one operation on one table: op is "get",
+// "list", "count", "insert", "upsert", "update", "delete" or "incr", table is
+// the table's name.
+type fault struct {
+	op, table string
+	// match narrows the calls that fail; nil fails them all.
+	match func(set map[string]any, where []store.Cond) bool
+	// times is how many calls fail before the fault is spent; 0 fails every
+	// call until the faults are cleared.
+	times int
+
+	hits int
 }
 
-// set makes these operations fail until clear.
+// faults are the faults a faulty store checks every call against.
+type faults struct {
+	mu   sync.Mutex
+	list []*fault
+}
+
+// set makes these operations, each named as operation plus table ("get
+// settings", "update sessions"), fail until clear.
 func (f *faults) set(ops ...string) {
+	for _, op := range ops {
+		name, table, _ := strings.Cut(op, " ")
+		f.arm(fault{op: name, table: table})
+	}
+}
+
+// arm adds a fault and returns a function that says how often it fired.
+func (f *faults) arm(ft fault) func() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.fail == nil {
-		f.fail = map[string]bool{}
-	}
-	for _, op := range ops {
-		f.fail[op] = true
+	f.list = append(f.list, &ft)
+	return func() int {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return ft.hits
 	}
 }
 
@@ -37,18 +60,39 @@ func (f *faults) set(ops ...string) {
 func (f *faults) clear() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.fail = nil
+	f.list = nil
 }
 
-// check is the error an operation on a table gives: errOutage when it was
-// set to fail.
-func (f *faults) check(op, table string) error {
+// check is the error a call gives: errOutage when a fault that is not spent
+// matches it.
+func (f *faults) check(op, table string, set map[string]any, where []store.Cond) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.fail[op+" "+table] {
-		return errOutage
+	for _, ft := range f.list {
+		if ft.op != op || ft.table != table || (ft.times > 0 && ft.hits >= ft.times) {
+			continue
+		}
+		if ft.match == nil || ft.match(set, where) {
+			ft.hits++
+			return errOutage
+		}
 	}
 	return nil
+}
+
+// idIs matches the calls about the row with this id.
+func idIs(rowID string) func(map[string]any, []store.Cond) bool {
+	return func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "id", rowID) }
+}
+
+// whereHas reports whether the conditions say col = val.
+func whereHas(where []store.Cond, col string, val any) bool {
+	for _, c := range where {
+		if c.Col == col && c.Op == "=" && c.Val == val {
+			return true
+		}
+	}
+	return false
 }
 
 // tableOf names the table of a row, a pointer to one, or a list of them.
@@ -70,59 +114,80 @@ type faultyDB struct {
 }
 
 func (d *faultyDB) Get(ctx context.Context, dst any, where ...store.Cond) error {
-	if err := d.faults.check("get", tableOf(dst)); err != nil {
+	if err := d.faults.check("get", tableOf(dst), nil, where); err != nil {
 		return err
 	}
 	return d.DB.Get(ctx, dst, where...)
 }
 
 func (d *faultyDB) List(ctx context.Context, dst any, q store.Q) error {
-	if err := d.faults.check("list", tableOf(dst)); err != nil {
+	if err := d.faults.check("list", tableOf(dst), nil, q.Where); err != nil {
 		return err
 	}
 	return d.DB.List(ctx, dst, q)
 }
 
 func (d *faultyDB) Count(ctx context.Context, table string, where ...store.Cond) (int, error) {
-	if err := d.faults.check("count", table); err != nil {
+	if err := d.faults.check("count", table, nil, where); err != nil {
 		return 0, err
 	}
 	return d.DB.Count(ctx, table, where...)
 }
 
+func (d *faultyDB) Insert(ctx context.Context, row any) error {
+	if err := d.faults.check("insert", tableOf(row), nil, nil); err != nil {
+		return err
+	}
+	return d.DB.Insert(ctx, row)
+}
+
 func (d *faultyDB) Upsert(ctx context.Context, row any, key ...string) error {
-	if err := d.faults.check("upsert", tableOf(row)); err != nil {
+	if err := d.faults.check("upsert", tableOf(row), nil, nil); err != nil {
 		return err
 	}
 	return d.DB.Upsert(ctx, row, key...)
 }
 
 func (d *faultyDB) Update(ctx context.Context, table string, set map[string]any, where ...store.Cond) (int64, error) {
-	if err := d.faults.check("update", table); err != nil {
+	if err := d.faults.check("update", table, set, where); err != nil {
 		return 0, err
 	}
 	return d.DB.Update(ctx, table, set, where...)
 }
 
+func (d *faultyDB) Delete(ctx context.Context, table string, where ...store.Cond) (int64, error) {
+	if err := d.faults.check("delete", table, nil, where); err != nil {
+		return 0, err
+	}
+	return d.DB.Delete(ctx, table, where...)
+}
+
 func (d *faultyDB) Incr(ctx context.Context, table, col string, n int64, where ...store.Cond) (int64, error) {
-	if err := d.faults.check("incr", table); err != nil {
+	if err := d.faults.check("incr", table, nil, where); err != nil {
 		return 0, err
 	}
 	return d.DB.Incr(ctx, table, col, n, where...)
 }
 
 func (d *faultyDB) Tasks(ctx context.Context, f store.TaskFilter) ([]core.Task, error) {
-	if err := d.faults.check("list", "tasks"); err != nil {
+	if err := d.faults.check("list", "tasks", nil, nil); err != nil {
 		return nil, err
 	}
 	return d.DB.Tasks(ctx, f)
 }
 
 func (d *faultyDB) CountTasks(ctx context.Context, f store.TaskFilter) (int, error) {
-	if err := d.faults.check("count", "tasks"); err != nil {
+	if err := d.faults.check("count", "tasks", nil, nil); err != nil {
 		return 0, err
 	}
 	return d.DB.CountTasks(ctx, f)
+}
+
+func (d *faultyDB) Events(ctx context.Context, f store.EventFilter) ([]core.Event, error) {
+	if err := d.faults.check("list", "events", nil, nil); err != nil {
+		return nil, err
+	}
+	return d.DB.Events(ctx, f)
 }
 
 // faultyStore is a store.Store whose operations, in every workspace, fail
@@ -150,12 +215,20 @@ func (s *faultyStore) Count(ctx context.Context, table string, where ...store.Co
 	return s.db().Count(ctx, table, where...)
 }
 
+func (s *faultyStore) Insert(ctx context.Context, row any) error {
+	return s.db().Insert(ctx, row)
+}
+
 func (s *faultyStore) Upsert(ctx context.Context, row any, key ...string) error {
 	return s.db().Upsert(ctx, row, key...)
 }
 
 func (s *faultyStore) Update(ctx context.Context, table string, set map[string]any, where ...store.Cond) (int64, error) {
 	return s.db().Update(ctx, table, set, where...)
+}
+
+func (s *faultyStore) Delete(ctx context.Context, table string, where ...store.Cond) (int64, error) {
+	return s.db().Delete(ctx, table, where...)
 }
 
 func (s *faultyStore) Incr(ctx context.Context, table, col string, n int64, where ...store.Cond) (int64, error) {
@@ -168,6 +241,10 @@ func (s *faultyStore) Tasks(ctx context.Context, f store.TaskFilter) ([]core.Tas
 
 func (s *faultyStore) CountTasks(ctx context.Context, f store.TaskFilter) (int, error) {
 	return s.db().CountTasks(ctx, f)
+}
+
+func (s *faultyStore) Events(ctx context.Context, f store.EventFilter) ([]core.Event, error) {
+	return s.db().Events(ctx, f)
 }
 
 func (s *faultyStore) In(workspaceID string) store.DB {
