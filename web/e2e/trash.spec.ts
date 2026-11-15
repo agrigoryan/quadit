@@ -32,11 +32,7 @@ test("a trashed task leaves the list, the board, My work and the palette", async
   await expectGoneEverywhere(page, project, (key) => trash(quadit, key));
 });
 
-test("an archived task leaves the list, the board, My work and the palette", async ({
-  page,
-  project,
-  quadit,
-}) => {
+test("an archived task leaves the list, the board, My work and the palette", async ({ page, project, quadit }) => {
   await expectGoneEverywhere(page, project, (key) => archive(quadit, key));
 });
 
