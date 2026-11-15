@@ -1,5 +1,7 @@
 package server
 
+// Install settings: reading them, cached, and saving them from the admin area.
+
 import (
 	"bytes"
 	"context"
@@ -21,8 +23,10 @@ import (
 
 // Install settings live in the settings table as JSON, set from the admin
 // area. Each can also come from the environment, which then wins:
-// "auth.google" is read from QUADIT_SETTING_AUTH_GOOGLE as JSON. The fields
-// listed here are secrets: stored encrypted and never sent back.
+// "auth.google" is read from QUADIT_SETTING_AUTH_GOOGLE as JSON.
+
+// settingSecrets names every setting, with the fields of it that are
+// secrets: stored encrypted and never sent back.
 var settingSecrets = map[string][]string{
 	"install.name":                 nil,
 	"auth.password":                nil,
@@ -138,6 +142,8 @@ func (s *Server) rawSetting(ctx context.Context, name string) (json.RawMessage, 
 	return raw, fromEnv
 }
 
+// unsealFields decrypts the secret fields of a setting's stored JSON. A
+// field that does not decrypt is left as it is.
 func (s *Server) unsealFields(name string, raw json.RawMessage) json.RawMessage {
 	secrets := settingSecrets[name]
 	if len(secrets) == 0 || len(raw) == 0 {

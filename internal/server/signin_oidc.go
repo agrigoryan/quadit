@@ -1,5 +1,7 @@
 package server
 
+// Sign-in with an OpenID Connect provider: Google, or one given by its issuer.
+
 import (
 	"context"
 	"errors"

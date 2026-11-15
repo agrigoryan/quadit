@@ -1,5 +1,7 @@
 package server
 
+// Sign-in with a password, sessions, and the signed-in person's own account.
+
 import (
 	"context"
 	"encoding/json"
@@ -127,6 +129,7 @@ func (s *Server) startSession(x *c, u core.User, stage string) error {
 	return nil
 }
 
+// clearCookie takes the session cookie off this browser.
 func (s *Server) clearCookie(x *c) {
 	http.SetCookie(x.w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", HttpOnly: true, MaxAge: -1})
 }
@@ -437,6 +440,8 @@ type passwordBody struct {
 	New     string `json:"new"`
 }
 
+// handleChangePassword changes the signed-in person's password, confirmed
+// with the current one, and signs out their other browsers.
 func (s *Server) handleChangePassword(x *c) error {
 	var b passwordBody
 	if err := x.body(&b); err != nil {

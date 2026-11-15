@@ -1,5 +1,7 @@
 package server
 
+// What every outside sign-in provider shares: the interface, the list, the setting, the OAuth 2 exchange.
+
 import (
 	"context"
 	"fmt"

@@ -1,5 +1,7 @@
 package server
 
+// Two-step verification: authenticator codes and recovery codes.
+
 import (
 	"context"
 	"fmt"
@@ -129,6 +131,8 @@ func (s *Server) handleEnableTwoStep(x *c) error {
 	return x.ok(map[string]any{"recovery_codes": codes})
 }
 
+// handleDisableTwoStep turns two-step verification off, confirmed with a
+// current code or the password.
 func (s *Server) handleDisableTwoStep(x *c) error {
 	var b codeBody
 	if err := x.body(&b); err != nil {

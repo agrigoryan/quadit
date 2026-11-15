@@ -1,5 +1,7 @@
 package server
 
+// Sign-in with an outside provider: its routes, the account it signs in to, connected accounts.
+
 import (
 	"context"
 	"encoding/json"

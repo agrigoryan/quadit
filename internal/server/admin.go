@@ -1,5 +1,7 @@
 package server
 
+// The install admin's API: settings, people, workspaces, the audit log and the health panel.
+
 import (
 	"context"
 	"encoding/csv"
@@ -244,6 +246,8 @@ func revokeAccess(ctx context.Context, db store.DB, userID string) error {
 	return err
 }
 
+// handleListWorkspaces lists every workspace on the install, with how many
+// members and tasks each has.
 func (s *Server) handleListWorkspaces(x *c) error {
 	ctx := x.ctx()
 	var wss []core.Workspace

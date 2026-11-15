@@ -1,5 +1,7 @@
 package server
 
+// This server as the OAuth 2.1 authorization server of MCP clients.
+
 import (
 	"context"
 	"crypto/sha256"
@@ -95,7 +97,7 @@ type authRequest struct {
 	ActAs string `json:"act_as"`
 }
 
-// actor is one name a client can be let in under.
+// oauthActor is one name a client can be let in under.
 type oauthActor struct {
 	Value string // workspace id, a colon, the member's user id
 	Label string
@@ -271,6 +273,8 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 	return nil
 }
 
+// How long an MCP client's tokens last, and how long a person has to
+// answer a consent page, or to sign in at an outside provider.
 const (
 	accessLife  = 8 * time.Hour
 	refreshLife = 90 * 24 * time.Hour

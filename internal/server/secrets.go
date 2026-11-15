@@ -1,5 +1,18 @@
 package server
 
+// The vault. A secret is set by an admin and never comes back out of the
+// API. An agent uses one in two ways:
+//
+//   - It asks the server to make an HTTP request for it, writing {{secret}}
+//     where the value belongs. The request goes only to the hosts the secret
+//     is bound to, redirects are not followed, and the value is blanked out
+//     of the answer. The agent uses the key and never holds it.
+//   - A secret marked env is handed to the companion ("quadit run"), which
+//     must hold a token made for that, to put in the environment of the
+//     command it starts. This is for tools on the agent's own machine.
+//
+// Every use is written to the audit log.
+
 import (
 	"bytes"
 	"encoding/base64"
@@ -18,18 +31,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// The vault. A secret is set by an admin and never comes back out of the
-// API. An agent uses one in two ways:
-//
-//   - It asks the server to make an HTTP request for it, writing {{secret}}
-//     where the value belongs. The request goes only to the hosts the secret
-//     is bound to, redirects are not followed, and the value is blanked out
-//     of the answer. The agent uses the key and never holds it.
-//   - A secret marked env is handed to the companion ("quadit run"), which
-//     must hold a token made for that, to put in the environment of the
-//     command it starts. This is for tools on the agent's own machine.
-//
-// Every use is written to the audit log.
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("GET /api/v1/w/{ws}/secrets", s.workspaceMember(s.handleListSecrets))

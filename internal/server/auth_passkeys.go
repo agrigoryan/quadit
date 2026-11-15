@@ -1,5 +1,7 @@
 package server
 
+// Passkeys: adding them to an account and signing in with them.
+
 import (
 	"context"
 	"encoding/base64"
@@ -255,6 +257,8 @@ func (s *Server) handleStartPasskeySignIn(x *c) error {
 	return x.ok(map[string]any{"options": opts, "state": state})
 }
 
+// handleFinishPasskeySignIn checks the passkey the browser signed with and
+// signs its person in.
 func (s *Server) handleFinishPasskeySignIn(x *c) error {
 	ctx := x.ctx()
 	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), 30, 15*time.Minute); err != nil {

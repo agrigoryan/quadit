@@ -1,5 +1,7 @@
 package server
 
+// Resetting a forgotten password with a mailed link.
+
 import (
 	"context"
 	"strings"
@@ -54,6 +56,8 @@ type resetConfirmBody struct {
 	Password string `json:"password"`
 }
 
+// handleConfirmPasswordReset sets a new password with a mailed reset link,
+// and signs the person out everywhere.
 func (s *Server) handleConfirmPasswordReset(x *c) error {
 	var b resetConfirmBody
 	if err := x.body(&b); err != nil {

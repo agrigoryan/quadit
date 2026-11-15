@@ -1,5 +1,7 @@
 package server
 
+// API tokens: making, listing and revoking them.
+
 import (
 	"strings"
 	"time"

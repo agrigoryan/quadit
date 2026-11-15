@@ -1,5 +1,7 @@
 package server
 
+// Registration and invitations: how a person gets an account and joins a workspace.
+
 import (
 	"context"
 	"errors"

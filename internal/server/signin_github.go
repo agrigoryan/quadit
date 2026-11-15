@@ -1,5 +1,7 @@
 package server
 
+// Sign-in with GitHub.
+
 import (
 	"context"
 	"fmt"
