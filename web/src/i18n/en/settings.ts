@@ -4,6 +4,7 @@
 import { authStrings } from "@/auth/strings";
 import { agentStrings } from "@/settings/strings/agents";
 import { automationStrings } from "@/settings/strings/automation";
+import { importStrings } from "@/settings/strings/import";
 import { meStrings } from "@/settings/strings/me";
 import { projectStrings } from "@/settings/strings/projects";
 import { secretStrings } from "@/settings/strings/secrets";
@@ -17,6 +18,7 @@ export const settings = {
   ...agentStrings,
   ...automationStrings,
   ...secretStrings,
+  ...importStrings,
   ...meStrings,
   ...authStrings,
 };

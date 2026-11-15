@@ -23,6 +23,9 @@ function initials(name: string): string {
   return (first + second).toUpperCase();
 }
 
+/** An avatar is a picture's address, or a short text shown in its place: an emoji, or a letter or two. */
+export const isPictureAvatar = (avatar: string | undefined): boolean => !!avatar && /^(\/|https?:|data:|blob:)/.test(avatar);
+
 interface Props {
   member: Pick<Member, "user_id" | "name" | "kind" | "avatar"> | undefined;
   size?: Size;
@@ -38,21 +41,25 @@ export function Avatar({ member, size = "sm", className }: Props) {
     return <span className={cx("inline-block shrink-0 rounded-full border border-dashed border-line-strong", boxes[size], className)} />;
   }
   const agent = member.kind === "agent";
+  const picture = isPictureAvatar(member.avatar);
+  // An emoji is drawn larger than letters and on a quiet ground: it has colour of its own.
+  const letters = !member.avatar || /^[\p{L}\p{N}]{1,2}$/u.test(member.avatar);
   return (
     <span className={cx("relative inline-flex shrink-0", className)} title={member.name}>
-      {member.avatar ? (
+      {picture ? (
         <img src={member.avatar} alt="" className={cx("object-cover", boxes[size], agent ? "rounded-[28%]" : "rounded-full")} />
       ) : (
         <span
           aria-hidden
           className={cx(
-            "inline-flex items-center justify-center font-semibold text-white select-none",
+            "inline-flex items-center justify-center overflow-hidden font-semibold text-white select-none",
             boxes[size],
             agent ? "rounded-[28%]" : "rounded-full",
+            !letters && "bg-sunken text-[1.6em] leading-none",
           )}
-          style={{ background: tintOf(member.user_id) }}
+          style={letters ? { background: tintOf(member.user_id) } : undefined}
         >
-          {initials(member.name)}
+          {member.avatar ? (letters ? member.avatar.toUpperCase() : member.avatar) : initials(member.name)}
         </span>
       )}
       {agent && (

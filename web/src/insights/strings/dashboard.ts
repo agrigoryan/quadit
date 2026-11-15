@@ -24,6 +24,14 @@ export const dashboardStrings = {
   "dash.waiting.question": "A question asked of you",
   "dash.waiting.task": "A task handed to you",
 
+  "dash.outside": "Waiting on the outside",
+  "dash.outside.hint": "Nobody here can move these: each waits for something outside.",
+  "dash.outside.empty": "No task waits on an outside event.",
+  "dash.nobody": "Nobody has the next move",
+  "dash.nobody.count": "{n} open task names nobody | {n} open tasks name nobody",
+  "dash.nobody.hint": "No assignee, waiting on no one and on nothing outside: they sit until someone picks them up.",
+  "dash.nobody.empty": "Every open task names someone, or says what it waits for.",
+
   "dash.epics.count": "{done}/{total} done",
   "dash.epics.points": ", {done}/{total} points",
   "dash.epics.atRisk": "At risk: {why}",

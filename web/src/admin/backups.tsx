@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CircleAlert, CircleCheck, Download, LoaderCircle } from "lucide-react";
+import { ArchiveRestore, CircleAlert, CircleCheck, Download, LoaderCircle } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { fileSize } from "@/lib/files";
 import { t } from "@/lib/i18n";
@@ -7,6 +7,7 @@ import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
+import { RestoreItemDialog } from "@/admin/restore-item";
 import { NumberField, SettingForm } from "@/admin/setting-form";
 import { useDraft } from "@/admin/settings";
 import { download, LoadGate } from "@/settings/ui/bits";
@@ -85,7 +86,7 @@ function ScheduleForm() {
   );
 }
 
-function BackupRow({ backup }: { backup: Backup }) {
+function BackupRow({ backup, onRestore }: { backup: Backup; onRestore: () => void }) {
   const running = !backup.finished_at && !backup.error;
   const file = backup.location?.split("/").pop() ?? backup.id;
   return (
@@ -117,9 +118,17 @@ function BackupRow({ backup }: { backup: Backup }) {
       }
       actions={
         !backup.error && !running ? (
-          <IconButton label={t("s.download")} onClick={() => download(`/api/v1/admin/backups/${backup.id}/download`)}>
-            <Download className="size-4" />
-          </IconButton>
+          <>
+            <Button variant="ghost" size="sm" onClick={onRestore} className="max-sm:hidden">
+              {t("admin.restoreItem.open")}
+            </Button>
+            <IconButton label={t("admin.restoreItem.open")} onClick={onRestore} className="sm:hidden">
+              <ArchiveRestore className="size-4" />
+            </IconButton>
+            <IconButton label={t("s.download")} onClick={() => download(`/api/v1/admin/backups/${backup.id}/download`)}>
+              <Download className="size-4" />
+            </IconButton>
+          </>
         ) : (
           <span className="size-7" />
         )
@@ -132,6 +141,7 @@ export function BackupsPage() {
   const list = useLoad(() => api.get<BackupList>("/api/v1/admin/backups"), []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [restoring, setRestoring] = useState<Backup | null>(null);
 
   async function backUpNow() {
     setBusy(true);
@@ -171,7 +181,7 @@ export function BackupsPage() {
               ) : (
                 <Rows>
                   {data.backups.map((b) => (
-                    <BackupRow key={b.id} backup={b} />
+                    <BackupRow key={b.id} backup={b} onRestore={() => setRestoring(b)} />
                   ))}
                 </Rows>
               )
@@ -180,6 +190,7 @@ export function BackupsPage() {
           <p className="text-xs text-ink-3">{t("admin.backups.restoreHint")}</p>
         </div>
       </Section>
+      {restoring && <RestoreItemDialog backup={restoring} onClose={() => setRestoring(null)} />}
     </Page>
   );
 }

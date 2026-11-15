@@ -108,6 +108,12 @@ function IntegrationItem({ it, sync, onSync, onToggle, onEdit, onHook, onDelete 
         {cfg.on_open && <Fact label={t("auto.gh.onOpenShort")}>{tMaybe(`category.${cfg.on_open}`)}</Fact>}
         {cfg.on_merge && <Fact label={t("auto.gh.onMergeShort")}>{tMaybe(`category.${cfg.on_merge}`)}</Fact>}
         {cfg.comment_back && <span className="text-ink-2">{t("auto.gh.commentsBack")}</span>}
+        {cfg.issues_label && (
+          <Fact label={t("auto.gh.issuesShort")}>
+            {cfg.issues_label === "*" ? t("auto.gh.issuesEvery") : cfg.issues_label}
+            {cfg.issues_project ? ` → ${cfg.issues_project}` : ""}
+          </Fact>
+        )}
         <Fact label={t("auto.lastSync")}>
           <When ms={it.last_sync_at} />
         </Fact>

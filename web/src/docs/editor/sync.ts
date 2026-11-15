@@ -187,7 +187,11 @@ export class DocSync {
     for (const ev of events) {
       if (ev.type !== "doc.edited" || ev.entity_id !== this.docId || this.own.has(ev.change_id)) continue;
       this.seq = Math.max(this.seq, ev.seq);
-      this.remote((ev.data.blocks as BlockRow[] | undefined) ?? [], (ev.data.deleted as string[] | undefined) ?? []);
+      let rows = (ev.data.blocks as BlockRow[] | undefined) ?? [];
+      // A page brought back from a backup arrives whole, its blocks stamped as they were when the
+      // backup was taken: older than what is on screen, yet they are what the page now is.
+      if (ev.data.from_backup) rows = rows.map((row) => ({ ...row, updated_seq: Math.max(row.updated_seq ?? 0, ev.seq) }));
+      this.remote(rows, (ev.data.deleted as string[] | undefined) ?? []);
     }
   };
 

@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { AGENT_FIELDS, type AgentDraft, AgentLimitFields, AgentProfileFields, draftOf, limitsOf } from "@/settings/agents/agent-form";
 import { ListeningMark, StateBadge } from "@/settings/agents/agents";
 import { type AgentMember, useAgentStates } from "@/settings/agents/data";
+import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helpers";
 import { AgentTokens } from "@/settings/agents/tokens";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact, When } from "@/settings/ui/bits";
@@ -50,6 +51,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
   const errors = useFieldErrors(AGENT_FIELDS);
   const set = (patch: Partial<AgentDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const state = states.data?.[agent.user_id];
+  const helper = useHelperLabel()(agent);
 
   // Someone else changed who is responsible while this page was open: follow, unless the person already chose here.
   const [seenResponsible, setSeenResponsible] = useState(knownResponsible);
@@ -68,6 +70,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
       id: agent.user_id,
       name: draft.name.trim(),
       description: draft.description.trim(),
+      avatar: draft.avatar,
       scope: limits.scope,
       budget: limits.budget,
     };
@@ -98,7 +101,8 @@ function AgentBody({ agent }: { agent: AgentMember }) {
           <span>@{agent.handle}</span>
           <StateBadge state={state} />
           {state && <ListeningMark on={state.listening} withText />}
-          {agent.suspended_at && <Badge tone="wait">{t("agents.suspended")}</Badge>}
+          {isFinishedHelper(agent) ? <Badge>{t("agents.finished")}</Badge> : agent.suspended_at ? <Badge tone="wait">{t("agents.suspended")}</Badge> : null}
+          {helper && <span className="text-ink-2">{helper}</span>}
         </span>
       }
       actions={<Avatar member={agent} size="lg" />}
@@ -120,7 +124,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
       <form onSubmit={save} className="flex flex-col gap-8">
         <Section title={t("agent.profile")}>
           <Card>
-            <AgentProfileFields draft={draft} set={set} errors={errors} disabled={!admin} />
+            <AgentProfileFields draft={draft} set={set} errors={errors} disabled={!admin} seed={agent.user_id} />
           </Card>
         </Section>
         <Section title={t("agent.limits")} lead={t("agent.limitsLead")}>

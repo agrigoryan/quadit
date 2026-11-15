@@ -3,14 +3,16 @@
 // and L keys open the status, assignee, priority and label pickers.
 
 import { useRef, useState } from "react";
-import { Layers, RefreshCw, Target } from "lucide-react";
+import { Globe, Layers, RefreshCw, Target } from "lucide-react";
 import { useHotkeys } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMe, useMember } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { nameOf } from "@/detail/data";
+import { BudgetField } from "@/detail/budget-field";
 import { DueField, EstimateField, ParentField, PropButton, PropRow, WaitingNote } from "@/detail/property-fields";
+import { waitsOutside } from "@/tasks/actions";
 import { TaskPropertyPicker, type TaskProperty } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { LabelChip } from "@/ui/badge";
@@ -35,6 +37,7 @@ export function Properties({ task }: { task: Task }) {
   const readOnly = !!task.deleted_at;
   const held = holder && (task.lease_until ?? 0) > Date.now();
   const waitsOnMe = waitingOn?.user_id === me.user_id;
+  const outside = waitsOutside(task);
 
   // Which picker a key opened, and the buttons they open next to.
   const [opened, setOpened] = useState<Keyed | null>(null);
@@ -103,8 +106,17 @@ export function Properties({ task }: { task: Task }) {
 
         <PropRow label={t("prop.waitingOn")} wide>
           <TaskPropertyPicker kind="waiting" tasks={[task]}>
-            <PropButton empty={!waitingOn} disabled={readOnly} aria-label={`${t("prop.waitingOn")}: ${waitingOn ? nameOf(waitingOn) : t("prop.nobody")}`}>
-              {waitingOn ? (
+            <PropButton
+              empty={!waitingOn && !outside}
+              disabled={readOnly}
+              aria-label={`${t("prop.waitingOn")}: ${outside ? t("prop.outside") : waitingOn ? nameOf(waitingOn) : t("prop.nobody")}`}
+            >
+              {outside ? (
+                <>
+                  <Globe className="size-3.5 shrink-0 text-wait" aria-hidden />
+                  <span className="truncate">{t("prop.outside.label")}</span>
+                </>
+              ) : waitingOn ? (
                 waitsOnMe ? (
                   <span className="flex h-5 items-center gap-1.5 rounded-sm bg-move px-1.5 font-semibold text-move-ink">
                     <Avatar member={waitingOn} size="xs" />
@@ -121,7 +133,7 @@ export function Properties({ task }: { task: Task }) {
               )}
             </PropButton>
           </TaskPropertyPicker>
-          {waitingOn && <WaitingNote task={task} />}
+          {(waitingOn || outside) && <WaitingNote task={task} />}
         </PropRow>
 
         <PropRow label={t("prop.priority")}>
@@ -192,6 +204,12 @@ export function Properties({ task }: { task: Task }) {
         <PropRow label={t("prop.parent")}>
           <ParentField task={task} />
         </PropRow>
+
+        {me.role !== "member" && (
+          <PropRow label={t("prop.budget")}>
+            <BudgetField task={task} />
+          </PropRow>
+        )}
       </dl>
 
       {held && (

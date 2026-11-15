@@ -4,6 +4,7 @@ import { loadSession } from "@/auth/session";
 import { ws } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
+import { useMe } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Workspace } from "@/lib/types";
@@ -11,10 +12,11 @@ import { useSettingsBase } from "@/settings/base";
 import { download } from "@/settings/ui/bits";
 import { FormAlert, FormField, FormFoot, useFieldErrors } from "@/settings/ui/form";
 import { Card, Page, Section } from "@/settings/ui/layout";
+import { DeleteWorkspaceDialog } from "@/settings/workspace/delete-workspace";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
-/** The workspace's name and icon, and a way to take everything out of it. */
+/** The workspace's name and icon, a way to take everything out of it, and (for an owner) the way to delete it. */
 export function GeneralPage() {
   const base = useSettingsBase();
   const workspace = useStore((s) => s.workspace) as Workspace;
@@ -22,6 +24,8 @@ export function GeneralPage() {
   const [name, setName] = useState(workspace.name);
   const [icon, setIcon] = useState(workspace.icon ?? "");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const owner = useMe().role === "owner";
   const errors = useFieldErrors(["name", "icon"]);
   const dirty = name.trim() !== workspace.name || icon.trim() !== (workspace.icon ?? "");
 
@@ -80,6 +84,21 @@ export function GeneralPage() {
           {t("general.export.button")}
         </Button>
       </Section>
+
+      {owner && (
+        <Section title={t("general.danger")}>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/40 bg-surface p-4">
+            <div className="min-w-0 max-w-md">
+              <p className="text-sm font-medium">{t("general.delete.heading")}</p>
+              <p className="text-sm text-ink-2">{t("general.delete.lead")}</p>
+            </div>
+            <Button variant="danger-quiet" onClick={() => setDeleting(true)}>
+              {t("general.delete.button")}
+            </Button>
+          </div>
+        </Section>
+      )}
+      {deleting && <DeleteWorkspaceDialog workspace={workspace} onClose={() => setDeleting(false)} />}
     </Page>
   );
 }

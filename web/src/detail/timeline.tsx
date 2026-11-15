@@ -2,6 +2,7 @@
 // as cards, and the comment box at the end.
 
 import { memo, useMemo } from "react";
+import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useMember } from "@/lib/selectors";
 import { useTaskEvents } from "@/lib/task-detail";
@@ -10,22 +11,31 @@ import { CommentCard, When } from "@/detail/comment-card";
 import { Composer } from "@/detail/composer";
 import { nameOf, useAttachmentsBySubject } from "@/detail/data";
 import { Section } from "@/detail/section";
-import { buildTimeline, type LineItem } from "@/detail/timeline-model";
+import { buildTimeline, commentHistory, type LineItem } from "@/detail/timeline-model";
 import { joinPhrases } from "@/detail/timeline-phrases";
 import { Avatar } from "@/ui/avatar";
 import { Loading } from "@/ui/spinner";
 
+interface LineProps {
+  actorId: string;
+  at: number;
+  text: string;
+  note?: string;
+  /** Something taken away: said, but faintly. */
+  quiet?: boolean;
+}
+
 /** "Aram moved this from Todo to In progress", with when. */
-const Line = memo(function Line({ actorId, at, text, note }: { actorId: string; at: number; text: string; note?: string }) {
+const Line = memo(function Line({ actorId, at, text, note, quiet }: LineProps) {
   const actor = useMember(actorId);
   return (
-    <li className="flex items-start gap-2 px-3 text-xs leading-5 text-ink-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+    <li className={cx("flex items-start gap-2 px-3 text-xs leading-5", quiet ? "text-ink-3" : "text-ink-2")}>
+      <span className={cx("flex h-5 w-5 shrink-0 items-center justify-center", quiet && "opacity-60")}>
         <Avatar member={actor} size="xs" />
       </span>
       <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         <p>
-          <span className="font-medium text-ink">{nameOf(actor)}</span> {text} <When at={at} />
+          <span className={cx("font-medium", quiet ? "text-ink-2" : "text-ink")}>{nameOf(actor)}</span> {text} <When at={at} />
         </p>
         {note && <p className="mt-0.5 border-l-2 border-line pl-2 text-ink-2">{note}</p>}
       </div>
@@ -40,6 +50,7 @@ export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
   const comments = useCollection("comments");
   const files = useAttachmentsBySubject("comment");
   const items = useMemo(() => buildTimeline(task.id, events, comments), [task.id, events, comments]);
+  const history = useMemo(() => commentHistory(events), [events]);
 
   return (
     <Section title={t("timeline.title")} className="pb-6">
@@ -49,10 +60,10 @@ export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
         <ol className="mt-1 flex flex-col gap-2.5">
           {items.map((item) =>
             item.kind === "line" ? (
-              <Line key={item.id} actorId={item.actorId} at={item.at} text={lineText(item)} note={item.note} />
+              <Line key={item.id} actorId={item.actorId} at={item.at} text={lineText(item)} note={item.note} quiet={item.quiet} />
             ) : (
               <li key={item.id}>
-                <CommentCard task={task} comment={item.comment} replies={item.replies} files={files} />
+                <CommentCard task={task} comment={item.comment} replies={item.replies} files={files} history={history} />
               </li>
             ),
           )}

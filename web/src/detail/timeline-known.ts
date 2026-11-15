@@ -1,0 +1,50 @@
+// What the timeline needs to name a thing after it is gone: the rows the
+// task's events carried when each thing was made, with the store's copy as
+// a fallback for anything older than the events that were loaded.
+
+import { type Dict, getState } from "@/lib/store";
+import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/lib/types";
+
+export interface Known {
+  comments: Dict<Comment>;
+  attachments: Dict<Attachment>;
+  links: Dict<TaskLink>;
+  relations: Dict<Relation>;
+  /** Option labels, by option id. */
+  options: Dict<string>;
+  /** Questions, by decision id. */
+  questions: Dict<string>;
+}
+
+export function knownRows(events: FeedEvent[]): Known {
+  const { c } = getState();
+  const known: Known = {
+    comments: { ...c.comments },
+    attachments: { ...c.attachments },
+    links: { ...c.links },
+    relations: { ...c.relations },
+    options: {},
+    questions: {},
+  };
+  const decision = (d: Decision) => {
+    known.questions[d.id] = d.question;
+    for (const o of d.options ?? []) known.options[o.id] = o.label;
+  };
+  for (const d of Object.values(c.decisions)) decision(d);
+
+  for (const ev of events) {
+    for (const a of ev.data.attachments ?? []) known.attachments[a.id] = a;
+    const row = ev.data.row;
+    if (!row) {
+      const comment = ev.type === "comment.deleted" ? known.comments[ev.entity_id] : undefined;
+      if (comment) known.comments[ev.entity_id] = { ...comment, deleted_at: ev.at };
+      continue;
+    }
+    if (ev.entity_type === "comment") known.comments[ev.entity_id] = row as unknown as Comment;
+    else if (ev.entity_type === "attachment") known.attachments[ev.entity_id] = row as unknown as Attachment;
+    else if (ev.entity_type === "link") known.links[ev.entity_id] = row as unknown as TaskLink;
+    else if (ev.entity_type === "relation") known.relations[ev.entity_id] = row as unknown as Relation;
+    else if (ev.entity_type === "decision") decision(row as unknown as Decision);
+  }
+  return known;
+}

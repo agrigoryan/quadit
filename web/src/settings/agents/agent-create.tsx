@@ -16,6 +16,7 @@ export function CreateAgentDialog({ onClose, onCreated }: { onClose: () => void;
   // Whoever makes an agent answers for it unless they name someone else.
   const [draft, setDraft] = useState<AgentDraft>(() => draftOf(undefined, me.user_id));
   const [busy, setBusy] = useState(false);
+  const [id] = useState(newId);
   const errors = useFieldErrors(AGENT_FIELDS);
   const set = (patch: Partial<AgentDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -23,11 +24,11 @@ export function CreateAgentDialog({ onClose, onCreated }: { onClose: () => void;
     e.preventDefault();
     errors.clear();
     if (!draft.name.trim()) return errors.set("name", t("s.required"));
-    const limits = limitsOf(draft);
+    const limits = limitsOf(draft, true);
     if ("bad" in limits) return errors.set(limits.bad, t("agent.budgetBad"));
-    const id = newId();
     const args: Record<string, unknown> = { id, name: draft.name.trim(), description: draft.description.trim(), role: draft.role };
     if (draft.handle.trim()) args.handle = draft.handle.trim();
+    if (draft.avatar) args.avatar = draft.avatar;
     if (draft.responsible) args.responsible = draft.responsible;
     if (limits.scope) args.scope = limits.scope;
     if (limits.budget) args.budget = limits.budget;
@@ -57,7 +58,7 @@ export function CreateAgentDialog({ onClose, onCreated }: { onClose: () => void;
       }
     >
       <form id="agent-create" onSubmit={submit} className="flex flex-col gap-5">
-        <AgentProfileFields draft={draft} set={set} errors={errors} creating />
+        <AgentProfileFields draft={draft} set={set} errors={errors} creating seed={id} />
         <div className="border-t border-line pt-4">
           <h3 className="text-sm font-semibold">{t("agent.limits")}</h3>
           <p className="mb-3 text-sm text-ink-2">{t("agent.limitsLead")}</p>

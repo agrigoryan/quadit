@@ -5,12 +5,15 @@
 import { useId, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ImagePlus, ThumbsUp, Trash2, X } from "lucide-react";
 import { cx } from "@/lib/cx";
+import { isImage } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/lib/types";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { MediaThumb } from "@/ui/media";
+import { Menu, MenuContent, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "@/ui/menu";
 import { Spinner } from "@/ui/spinner";
+import type { FileRole } from "@/decisions/data";
 
 export interface DraftFile {
   key: string;
@@ -19,6 +22,8 @@ export interface DraftFile {
   file?: FileRow;
   /** Why the upload failed. */
   failed?: string;
+  /** Its part in a before/after pair. */
+  role?: FileRole;
 }
 
 export interface DraftOption {
@@ -43,13 +48,43 @@ interface Props {
   onReason: (reason: string) => void;
   onAddFiles: (files: File[]) => void;
   onRemoveFile: (key: string) => void;
+  onFileRole: (key: string, role: FileRole | undefined) => void;
 }
 
-function Thumb({ entry, onRemove }: { entry: DraftFile; onRemove: () => void }) {
+const NO_ROLE = "none";
+
+/** "Before", "After" or neither, for one picture. */
+function RolePicker({ entry, onRole }: { entry: DraftFile; onRole: (role: FileRole | undefined) => void }) {
   return (
-    <li className="relative size-14 shrink-0">
+    <Menu>
+      <MenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("decision.new.roleOf", { name: entry.name })}
+          className={cx(
+            "mt-1 flex h-5 w-full items-center justify-center rounded-sm text-2xs hover:bg-hover data-[state=open]:bg-hover max-sm:h-7",
+            entry.role ? "bg-accent-soft font-medium text-accent-text" : "text-ink-3",
+          )}
+        >
+          {entry.role ? t(`decision.new.role.${entry.role}`) : t("decision.new.role")}
+        </button>
+      </MenuTrigger>
+      <MenuContent>
+        <MenuRadioGroup value={entry.role ?? NO_ROLE} onValueChange={(value) => onRole(value === NO_ROLE ? undefined : (value as FileRole))}>
+          <MenuRadioItem value={NO_ROLE}>{t("decision.new.role.none")}</MenuRadioItem>
+          <MenuRadioItem value="before">{t("decision.new.role.before")}</MenuRadioItem>
+          <MenuRadioItem value="after">{t("decision.new.role.after")}</MenuRadioItem>
+        </MenuRadioGroup>
+      </MenuContent>
+    </Menu>
+  );
+}
+
+function Thumb({ entry, onRemove, onRole }: { entry: DraftFile; onRemove: () => void; onRole: (role: FileRole | undefined) => void }) {
+  return (
+    <li className="relative w-14 shrink-0">
       {entry.file ? (
-        <MediaThumb file={entry.file} className="size-14 rounded-md border border-line" />
+        <MediaThumb file={entry.file} className="block size-14 rounded-md border border-line" />
       ) : (
         <span
           title={entry.failed ?? entry.name}
@@ -69,6 +104,7 @@ function Thumb({ entry, onRemove }: { entry: DraftFile; onRemove: () => void }) 
       >
         <X className="size-3" strokeWidth={2.5} aria-hidden />
       </button>
+      {entry.file && isImage(entry.file) && <RolePicker entry={entry} onRole={onRole} />}
     </li>
   );
 }
@@ -136,9 +172,14 @@ export function OptionEditor(props: Props) {
 
         <div className="flex flex-wrap items-center gap-2">
           {option.files.length > 0 && (
-            <ul className="flex flex-wrap gap-2.5 py-1">
+            <ul className="flex flex-wrap items-start gap-2.5 py-1">
               {option.files.map((entry) => (
-                <Thumb key={entry.key} entry={entry} onRemove={() => props.onRemoveFile(entry.key)} />
+                <Thumb
+                  key={entry.key}
+                  entry={entry}
+                  onRemove={() => props.onRemoveFile(entry.key)}
+                  onRole={(role) => props.onFileRole(entry.key, role)}
+                />
               ))}
             </ul>
           )}
@@ -168,6 +209,9 @@ export function OptionEditor(props: Props) {
             {recommended ? t("decision.recommended") : t("decision.new.recommend")}
           </Button>
         </div>
+        {option.files.some((f) => f.role) && !(option.files.some((f) => f.role === "before") && option.files.some((f) => f.role === "after")) && (
+          <p className="text-xs text-ink-3">{t("decision.new.pairHint")}</p>
+        )}
         {recommended && (
           <Input
             value={reason}

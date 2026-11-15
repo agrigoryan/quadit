@@ -13,6 +13,7 @@ import { DecisionsPanel } from "@/insights/dashboard/decisions-panel";
 import { EpicsPanel } from "@/insights/dashboard/epics-panel";
 import { StatusPanel, WaitsPanel, WeeklyPanel } from "@/insights/dashboard/flow-panels";
 import { HealthPanel } from "@/insights/dashboard/health-panel";
+import { NobodyPanel, OutsidePanel } from "@/insights/dashboard/next-move-panels";
 import { WaitingPanel } from "@/insights/dashboard/waiting-panel";
 import { useLive } from "@/insights/lib/live";
 import type { Dashboard } from "@/insights/lib/types";
@@ -60,6 +61,8 @@ export function DashboardPage() {
           ) : data ? (
             <>
               <AgentsPanel agents={data.agents} className="lg:col-span-5" />
+              <OutsidePanel projectId={project?.id} className="lg:col-span-7" />
+              <NobodyPanel projectId={project?.id} className="lg:col-span-5" />
               <EpicsPanel epics={data.epics} showProject={!project} className="lg:col-span-7" />
               <WaitsPanel rows={data.flow.waiting} className="lg:col-span-5" />
               <StatusPanel rows={data.flow.by_status} className="lg:col-span-5" />

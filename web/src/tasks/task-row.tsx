@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useDecisionFlag, useSubtaskProgress } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useIsDraft, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { AssigneeAvatar, DueChip, EpicChip, WaitsOnChip } from "@/tasks/task-chips";
@@ -15,8 +15,11 @@ import { DecisionMark, PriorityIcon, StatusIcon } from "@/ui/icons";
 export function useTaskLink(task: Pick<Task, "key">) {
   const slug = useStore((s) => s.slug);
   const location = useLocation();
-  const background = (location.state as { background?: unknown } | null)?.background ?? location;
-  return { to: `/${slug}/task/${task.key}`, state: { background } };
+  // From inside a panel the page stays the one under it. A panel opened from a bare
+  // link has no page under it; the shell then puts the task's own list there.
+  const under = (location.state as { background?: unknown } | null)?.background;
+  const background = under ?? (/\/task\/[^/]+\/?$/.test(location.pathname) ? undefined : location);
+  return { to: `/${slug}/task/${task.key}`, state: background ? { background } : undefined };
 }
 
 interface Props {
@@ -25,8 +28,10 @@ interface Props {
   focused?: boolean;
   selected?: boolean;
   /** Shows a checkbox; leave out where rows cannot be selected. */
-  onSelect?: (task: Task, range: boolean) => void;
-  onHover?: (task: Task) => void;
+  onSelect?: (task: Task, range: boolean, at?: string) => void;
+  onHover?: (task: Task, at?: string) => void;
+  /** Which row this is, where a task can be listed more than once; handed back to onSelect and onHover. */
+  at?: string;
   /** Hide the columns that the grouping already says. */
   hide?: { epic?: boolean; assignee?: boolean };
 }
@@ -37,20 +42,22 @@ const iconButton = "relative z-[1] flex size-6 shrink-0 items-center justify-cen
  * One task as a dense line: key, title, and what matters about it right now.
  * The status, priority and assignee can be changed in place.
  */
-export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect, onHover, hide }: Props) {
+export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect, onHover, at, hide }: Props) {
   const status = useStore((s) => s.c.statuses[task.status_id]);
   const epic = useStore((s) => (task.epic_id ? s.c.epics[task.epic_id] : undefined));
   const labels = useStore((s) => s.c.labels);
   const decision = useDecisionFlag(task.id);
   const progress = useSubtaskProgress(task.id);
   const link = useTaskLink(task);
+  // Just made here and not yet numbered by the server: there is no address to open it at.
+  const draft = useIsDraft(task.id);
   const closed = status?.category === "done" || status?.category === "canceled";
 
   return (
     <div
       data-task={task.id}
       data-focused={focused || undefined}
-      onMouseMove={onHover ? () => onHover(task) : undefined}
+      onMouseMove={onHover && !focused ? () => onHover(task, at) : undefined}
       className={cx(
         "group relative flex h-9 items-center gap-1.5 border-b border-line/70 pr-3 pl-1.5 text-sm [contain-intrinsic-size:auto_36px] [content-visibility:auto]",
         selected ? "bg-accent-soft" : focused ? "bg-hover" : "bg-surface",
@@ -63,7 +70,7 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
           role="checkbox"
           aria-checked={!!selected}
           aria-label={t("list.select", { key: task.key })}
-          onClick={(e) => onSelect(task, e.shiftKey)}
+          onClick={(e) => onSelect(task, e.shiftKey, at)}
           className={cx(
             "relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-sm",
             selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-data-[focused]:opacity-100",
@@ -96,13 +103,17 @@ export const TaskRow = memo(function TaskRow({ task, focused, selected, onSelect
         </TaskPropertyPicker>
       )}
 
-      <Link
-        {...link}
-        aria-label={t("task.open", { key: task.key })}
-        className={cx("min-w-0 flex-1 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']", closed && "text-ink-2")}
-      >
-        {task.title}
-      </Link>
+      {draft ? (
+        <span className="min-w-0 flex-1 truncate py-2 text-ink-2">{task.title}</span>
+      ) : (
+        <Link
+          {...link}
+          aria-label={t("task.open", { key: task.key })}
+          className={cx("min-w-0 flex-1 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']", closed && "text-ink-2")}
+        >
+          {task.title}
+        </Link>
+      )}
 
       {/* Everything right of the title sits above the row-wide link. */}
       <div className="relative z-[1] flex shrink-0 items-center gap-2">

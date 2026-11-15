@@ -7,6 +7,11 @@ import type { Collections, Dict } from "@/lib/store";
 import { CATEGORIES, type Category, type GroupBy, type SortBy, type Task, type TaskQuery } from "@/lib/types";
 
 export const NONE = "none";
+/** In the "waiting on" filter: tasks that wait on an outside event. */
+export const OUTSIDE = "outside";
+
+/** How a page groups its tasks: the server's groupings, and by label. */
+export type Grouping = GroupBy | "label";
 
 export interface Filters {
   /** User ids, or "none" for unassigned. */
@@ -19,7 +24,7 @@ export interface Filters {
   epic: string[];
   /** Cycle ids, or "none". */
   cycle: string[];
-  /** One user id, or "". */
+  /** One user id, "outside" (an outside event), "none" (nobody and nothing), or "". */
   waitingOn: string;
   openDecision: boolean;
   text: string;
@@ -50,7 +55,7 @@ export const sameFilters = (a: Filters, b: Filters) => JSON.stringify(a) === JSO
 const anyOf = (picked: string[], value: string | undefined) => picked.length === 0 || picked.includes(value ?? NONE);
 
 /** Builds the test a task must pass. `openDecisionTasks` holds the ids of tasks with an open question. */
-export function matcher(f: Filters, c: Collections, openDecisionTasks: Dict<unknown>): (task: Task) => boolean {
+export function matcher(f: Filters, c: Pick<Collections, "statuses">, openDecisionTasks: Dict<unknown>): (task: Task) => boolean {
   const text = f.text.trim().toLowerCase();
   return (task) => {
     if (!anyOf(f.assignee, task.assignee_id)) return false;
@@ -60,7 +65,10 @@ export function matcher(f: Filters, c: Collections, openDecisionTasks: Dict<unkn
     if (f.priority.length && !f.priority.includes(task.priority)) return false;
     if (!anyOf(f.epic, task.epic_id)) return false;
     if (!anyOf(f.cycle, task.cycle_id)) return false;
-    if (f.waitingOn && task.waiting_on_id !== f.waitingOn) return false;
+    if (f.waitingOn) {
+      const outside = task.waiting_outside === true;
+      if (f.waitingOn === OUTSIDE ? !outside : f.waitingOn === NONE ? outside || !!task.waiting_on_id : task.waiting_on_id !== f.waitingOn) return false;
+    }
     if (f.openDecision && !openDecisionTasks[task.id]) return false;
     if (text && !task.title.toLowerCase().includes(text) && !task.key.toLowerCase().includes(text)) return false;
     return true;
@@ -89,25 +97,33 @@ export interface TaskGroup {
   /** Unique within the list. For status groups this is the status id (or the category, across projects). */
   id: string;
   title: string;
-  kind: GroupBy;
-  /** The value the group stands for: a status id or category, a user id, an epic id, a priority. */
+  kind: Grouping;
+  /** The value the group stands for: a status id or category, a user id, an epic id, a label id, a priority. */
   value: string;
   category?: Category;
   tasks: Task[];
 }
 
+/** The tables grouping reads; a page passes only these, so it regroups only when one of them changes. */
+export type GroupSource = Pick<Collections, "statuses" | "members" | "epics" | "labels">;
+
 /**
  * Splits tasks into groups, in a fixed order with empty groups left out
  * (status groups of the project in view are always shown, so a column or
- * section does not vanish when its last task moves).
+ * section does not vanish when its last task moves). The board asks to keep
+ * the empty ones, so there is always a column to drop a card in. Grouped by
+ * label, a task with several labels is in each of their groups.
  */
-export function groupTasks(tasks: Task[], by: GroupBy, c: Collections, projectId: string | undefined): TaskGroup[] {
+export function groupTasks(tasks: Task[], by: Grouping, c: GroupSource, projectId: string | undefined, keepEmpty = false): TaskGroup[] {
   if (by === "none") return [{ id: "all", title: "", kind: "none", value: "", tasks }];
   const groups = new Map<string, TaskGroup>();
+  /** Groups that are shown only when they hold a task: someone removed, a deleted epic. */
+  const quiet = new Set<string>();
   const add = (g: Omit<TaskGroup, "tasks" | "kind">) => {
     if (!groups.has(g.id)) groups.set(g.id, { ...g, kind: by, tasks: [] });
     return groups.get(g.id) as TaskGroup;
   };
+  const shown = () => [...groups.values()].filter((g) => g.tasks.length > 0 || (keepEmpty && !quiet.has(g.id)));
 
   if (by === "status") {
     if (projectId) {
@@ -116,34 +132,62 @@ export function groupTasks(tasks: Task[], by: GroupBy, c: Collections, projectId
         .sort((a, b) => (a.rank < b.rank ? -1 : 1));
       for (const s of own) add({ id: s.id, title: s.name, value: s.id, category: s.category });
       for (const task of tasks) groups.get(task.status_id)?.tasks.push(task);
-      return [...groups.values()];
+      return shown();
     }
     // Several projects: their statuses differ, the six categories do not.
     for (const cat of CATEGORIES) add({ id: cat, title: tMaybe(`category.${cat}`), value: cat, category: cat });
     for (const task of tasks) groups.get(c.statuses[task.status_id]?.category ?? "backlog")?.tasks.push(task);
-    return [...groups.values()].filter((g) => g.tasks.length > 0);
+    return shown();
   }
 
   if (by === "priority") {
     for (const p of [1, 2, 3, 4, 0]) add({ id: String(p), title: tMaybe(`priority.${p}`), value: String(p) });
     for (const task of tasks) groups.get(String(task.priority))?.tasks.push(task);
-    return [...groups.values()].filter((g) => g.tasks.length > 0);
+    return shown();
   }
 
-  const named: { id: string; name: string }[] =
-    by === "assignee"
-      ? Object.values(c.members).map((m) => ({ id: m.user_id, name: m.name }))
-      : Object.values(c.epics)
-          .sort((a, b) => (a.rank < b.rank ? -1 : 1))
-          .map((e) => ({ id: e.id, name: e.name }));
-  for (const n of named) add({ id: n.id, title: n.name, value: n.id });
+  if (by === "label") {
+    const labels = Object.values(c.labels)
+      .filter((l) => !l.deleted_at && (!l.project_id || !projectId || l.project_id === projectId))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    for (const l of labels) add({ id: l.id, title: l.name, value: l.id });
+    const none = add({ id: NONE, title: t("task.noLabel"), value: NONE });
+    for (const task of tasks) {
+      let placed = false;
+      for (const id of task.label_ids ?? []) {
+        const group = groups.get(id);
+        if (!group) continue;
+        group.tasks.push(task);
+        placed = true;
+      }
+      if (!placed) none.tasks.push(task);
+    }
+    return shown();
+  }
+
+  if (by === "assignee") {
+    const members = Object.values(c.members).sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "person" ? -1 : 1));
+    for (const m of members) {
+      add({ id: m.user_id, title: m.name, value: m.user_id });
+      if (m.removed_at || m.suspended_at) quiet.add(m.user_id);
+    }
+  } else {
+    const epics = Object.values(c.epics).sort((a, b) => (a.rank < b.rank ? -1 : 1));
+    for (const e of epics) {
+      add({ id: e.id, title: e.name, value: e.id });
+      if (e.deleted_at || (projectId && e.project_id !== projectId)) quiet.add(e.id);
+    }
+  }
   add({ id: NONE, title: by === "assignee" ? t("task.unassigned") : t("task.noEpic"), value: NONE });
   for (const task of tasks) {
     const key = (by === "assignee" ? task.assignee_id : task.epic_id) ?? NONE;
     (groups.get(key) ?? (groups.get(NONE) as TaskGroup)).tasks.push(task);
   }
-  return [...groups.values()].filter((g) => g.tasks.length > 0);
+  return shown();
 }
+
+/** The tables a stored query's names are looked up in. */
+export type QuerySource = Pick<Collections, "projects" | "members" | "statuses" | "labels" | "epics" | "cycles">;
 
 const SORT_TO_QUERY: Record<SortBy, string> = { manual: "rank", priority: "priority", updated: "-updated", created: "-created", due: "due" };
 
@@ -170,12 +214,49 @@ export function sortFromQuery(q: TaskQuery | undefined): SortBy | undefined {
   return found;
 }
 
+const QUERY_LISTS = ["project", "assignee", "status", "category", "label", "epic", "cycle"] as const;
+
 /**
- * Reads a saved view's query. A view may have been made by an agent with
- * names instead of ids ("@coder", "me", "In Progress", "art", "current"),
- * so every reference is looked up both ways; one that matches nothing is dropped.
+ * A stored query made safe to read: a view may have been written by hand or
+ * by an agent, with one value where a list belongs ("label": "art"). Each
+ * list field is given as a list of strings whatever was stored. Returns null
+ * when the query is not something a view can show at all.
  */
-export function fromQuery(q: TaskQuery | undefined, c: Collections, meId: string, today: string): Filters {
+export function normalizeQuery(raw: unknown): TaskQuery | null {
+  if (raw === undefined || raw === null) return {};
+  if (typeof raw !== "object" || Array.isArray(raw)) return null;
+  const from = raw as Record<string, unknown>;
+  const q: TaskQuery = {};
+  const scalar = (v: unknown): v is string | number => (typeof v === "string" && v !== "") || typeof v === "number";
+  const list = (v: unknown): string[] | null => {
+    if (v === undefined || v === null || v === "") return [];
+    if (scalar(v)) return [String(v)];
+    if (Array.isArray(v) && v.every(scalar)) return v.map(String);
+    return null;
+  };
+  for (const field of QUERY_LISTS) {
+    const values = list(from[field]);
+    if (!values) return null;
+    if (values.length) q[field] = values;
+  }
+  const priority = list(from.priority);
+  if (!priority) return null;
+  const numbers = priority.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 4);
+  if (numbers.length) q.priority = numbers;
+  if (scalar(from.waiting_on)) q.waiting_on = String(from.waiting_on);
+  if (from.has_open_decision === true || from.has_open_decision === "true") q.has_open_decision = true;
+  if (scalar(from.q)) q.q = String(from.q);
+  if (typeof from.sort === "string") q.sort = from.sort;
+  return q;
+}
+
+/**
+ * Reads a saved view's query (one that normalizeQuery has been over). A view
+ * may have been made by an agent with names instead of ids ("@coder", "me",
+ * "In Progress", "art", "current"), so every reference is looked up both
+ * ways; one that matches nothing is dropped.
+ */
+export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string, today: string): Filters {
   if (!q) return emptyFilters;
   const low = (s: string) => s.toLowerCase();
   const projectIds = (q.project ?? [])
@@ -185,6 +266,7 @@ export function fromQuery(q: TaskQuery | undefined, c: Collections, meId: string
 
   const member = (ref: string): string | undefined => {
     if (ref === NONE) return NONE;
+    if (ref === OUTSIDE) return OUTSIDE;
     if (ref === "me") return meId;
     const handle = low(ref.replace(/^@/, ""));
     return Object.values(c.members).find((m) => m.user_id === ref || low(m.handle) === handle)?.user_id;

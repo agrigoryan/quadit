@@ -3,11 +3,11 @@
 // knows what is listening and what was spent); everything else is read from
 // the store, so the page moves as the feed does.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useMe, useMembers, useSlug } from "@/lib/selectors";
+import { useCollection, useMe, useMembers, useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { AgentSession } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
@@ -15,10 +15,13 @@ import { useLive, useNow } from "@/insights/lib/live";
 import type { AgentState } from "@/insights/lib/types";
 import { isStranded } from "@/insights/ui/agent-bits";
 import { PageBar } from "@/insights/ui/panel";
-import { AgentCard } from "@/insights/agents/agent-card";
+import { AgentCard, type HelperOf } from "@/insights/agents/agent-card";
 import { NO_WORK, useAgentWork, useClaims, useResources } from "@/insights/agents/agent-data";
 import { Resources } from "@/insights/agents/resources";
 import { useSessions } from "@/insights/agents/session-data";
+import type { AgentMember } from "@/settings/agents/data";
+import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
+import { Checkbox } from "@/settings/ui/form";
 import { EmptyState } from "@/ui/empty";
 
 const NO_SESSIONS: AgentSession[] = [];
@@ -64,8 +67,23 @@ export function AgentsPage() {
   }, [sessions]);
 
   const resourceNames = useMemo(() => Object.fromEntries(resources.map((r) => [r.id, r.name])), [resources]);
-  const working = agents.filter((a) => states[a.user_id]?.state === "working").length;
-  const stranded = agents.filter((a) => {
+  // A helper (an agent made for one task) is shown inside its maker's card; one whose task has closed is hidden until asked for.
+  const [showFinished, setShowFinished] = useState(false);
+  const tasks = useCollection("tasks");
+  const helperLabel = useHelperLabel();
+  const finished = agents.filter(isFinishedHelper).length;
+  const active = agents.filter((a) => !isFinishedHelper(a));
+  const cards = useMemo(() => {
+    const out: { member: (typeof agents)[number]; helpers: HelperOf[] }[] = [];
+    for (const { agent, depth } of placeHelpers(agents, showFinished).rows) {
+      const top = out[out.length - 1];
+      if (depth === 0 || !top) out.push({ member: agent, helpers: [] });
+      else top.helpers.push({ member: agent, state: states[agent.user_id], task: tasks[(agent as AgentMember).delegated_task ?? ""] });
+    }
+    return out;
+  }, [agents, showFinished, states, tasks]);
+  const working = active.filter((a) => states[a.user_id]?.state === "working").length;
+  const stranded = active.filter((a) => {
     const s = states[a.user_id];
     return s && isStranded(s);
   }).length;
@@ -74,14 +92,21 @@ export function AgentsPage() {
     <div className="flex h-full flex-col">
       <PageBar>
         <p className="flex-1 text-xs text-ink-2 tnum">
-          {t("agents.count", { n: agents.length })}
-          {live.data && agents.length > 0 && <span className="text-ink-3">, {t("agents.workingCount", { n: working })}</span>}
+          {t("agents.count", { n: active.length })}
+          {live.data && active.length > 0 && <span className="text-ink-3">, {t("agents.workingCount", { n: working })}</span>}
           {stranded > 0 && <span className="ml-2 font-medium text-danger">{t("agents.strandedCount", { n: stranded })}</span>}
         </p>
         {live.error && (
           <p role="alert" className="text-xs text-danger">
             {t("ins.loadFailed", { why: live.error })}
           </p>
+        )}
+        {finished > 0 && (
+          <span className="pr-2">
+            <Checkbox checked={showFinished} onChange={setShowFinished}>
+              {t("agents.helper.showFinished", { n: finished })}
+            </Checkbox>
+          </span>
         )}
       </PageBar>
       <div className="min-h-0 flex-1 overflow-y-auto bg-canvas pb-10">
@@ -102,11 +127,13 @@ export function AgentsPage() {
           </div>
         ) : (
           <div className="grid items-stretch md:grid-cols-2 2xl:grid-cols-3">
-            {agents.map((member) => (
+            {cards.map(({ member, helpers }) => (
               <AgentCard
                 key={member.user_id}
                 member={member}
                 state={states[member.user_id]}
+                helpers={helpers}
+                helperNote={helperLabel(member)}
                 work={work[member.user_id] ?? NO_WORK}
                 sessions={byAgent[member.user_id] ?? NO_SESSIONS}
                 resourceNames={resourceNames}

@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { CircleSlash, Layers, RefreshCw } from "lucide-react";
+import { CircleSlash, Globe, Layers, RefreshCw } from "lucide-react";
 import { t, tMaybe, type Key } from "@/lib/i18n";
 import { useCycles, useEpics, useLabels, useMe, useMembers, useStatuses } from "@/lib/selectors";
 import { CATEGORIES, type Project } from "@/lib/types";
-import { type ListFilterKey, NONE } from "@/tasks/filters";
+import { type ListFilterKey, NONE, OUTSIDE } from "@/tasks/filters";
 import { memberItems, PRIORITIES } from "@/tasks/property-picker";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";
 import type { PickerItem } from "@/ui/picker";
@@ -37,7 +37,11 @@ export function useFilterOptions(project: Project | undefined): Record<Exclude<F
     const people = memberItems(members, me.user_id);
     return {
       assignee: [none(t("task.unassigned")), ...people],
-      waitingOn: people,
+      waitingOn: [
+        ...people,
+        { id: OUTSIDE, label: t("prop.outside"), icon: <Globe className="size-3.5 text-ink-2" aria-hidden />, keywords: t("prop.outside.words") },
+        none(t("prop.nobody")),
+      ],
       status: statuses.map((s) => ({ id: s.id, label: s.name, icon: <StatusIcon category={s.category} /> })),
       category: CATEGORIES.map((cat) => ({ id: cat, label: tMaybe(`category.${cat}`), icon: <StatusIcon category={cat} /> })),
       label: labels.map((l) => ({

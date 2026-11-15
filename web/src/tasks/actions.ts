@@ -5,8 +5,9 @@
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
+import { rankBetween } from "@/lib/rank";
 import { statusesOf } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { draftKey, getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { isOpenCategory, type Status, type Task } from "@/lib/types";
 
@@ -50,7 +51,7 @@ export function setStatus(tasks: Task[], statusId: string) {
     (task) => {
       const s = target(task) as Status;
       // A closed task waits on nobody; the server clears it too.
-      return isOpenCategory(s.category) ? { status_id: s.id } : { status_id: s.id, waiting_on_id: null, waiting_on_note: null };
+      return isOpenCategory(s.category) ? { status_id: s.id } : { status_id: s.id, waiting_on_id: null, waiting_outside: null, waiting_on_note: null };
     },
   );
 }
@@ -63,12 +64,34 @@ export function setAssignee(tasks: Task[], userId: string | null) {
   );
 }
 
+export type TaskBudget = NonNullable<Task["budget"]>;
+
+/** The picker id that stands for "an outside event" where a member's id would be. */
+export const OUTSIDE = "outside";
+
+/** True when the task's next move is nobody's here: it waits on something outside (a build, a reply, a date). */
+export const waitsOutside = (task: Task) => task.waiting_outside === true;
+
 export function setWaitingOn(tasks: Task[], userId: string | null, note?: string) {
   updateAll(
     tasks,
     () => ({ waiting_on: userId, waiting_on_note: userId ? (note ?? "") : "" }),
-    () => ({ waiting_on_id: userId, waiting_on_note: userId ? note || null : null }),
+    () => ({ waiting_on_id: userId, waiting_outside: null, waiting_on_note: userId ? note || null : null }),
   );
+}
+
+/** The task waits on an outside event; the note says which. */
+export function setWaitingOutside(tasks: Task[], note: string) {
+  updateAll(
+    tasks,
+    () => ({ waiting_on: OUTSIDE, waiting_on_note: note }),
+    () => ({ waiting_on_id: null, waiting_outside: true, waiting_on_note: note || null }),
+  );
+}
+
+/** Gives one task a budget of its own (money, minutes of agent time, hand-offs between agents); null takes it away. */
+export function setBudget(task: Task, budget: TaskBudget | null) {
+  send({ type: "task.update", args: { id: task.id, budget } }, (tx) => tx.patch("tasks", task.id, { budget }));
 }
 
 export function setPriority(tasks: Task[], priority: number) {
@@ -115,11 +138,58 @@ export const setEstimate = setter("estimate", "estimate");
 export const setTitle = setter("title", "title");
 export const setDescription = setter("description", "description");
 
-/** Moves a card on the board: a new place in the order, and maybe a new column. */
-export function moveTask(task: Task, statusId: string, rank: string) {
-  const args: Fields = { id: task.id, rank };
-  if (statusId !== task.status_id) args.status = statusId;
-  send({ type: "task.update", args }, (tx) => tx.patch("tasks", task.id, { status_id: statusId, rank }));
+/** What dropping a card in another column changes, besides its place in the order. */
+export interface CardMove {
+  statusId?: string;
+  /** null takes the task from whoever has it. */
+  assigneeId?: string | null;
+  addLabel?: string;
+  removeLabel?: string;
+}
+
+/**
+ * Moves a card on the board: a new place in the order, and whatever its new
+ * column stands for (a status, an assignee, a label in place of another).
+ * All of it goes out as one task.update.
+ */
+export function moveCard(task: Task, rank: string | undefined, move: CardMove = {}) {
+  const args: Fields = { id: task.id };
+  const local: Fields = {};
+  if (rank && rank !== task.rank) args.rank = local.rank = rank;
+  if (move.statusId && move.statusId !== task.status_id) {
+    args.status = move.statusId;
+    local.status_id = move.statusId;
+  }
+  if (move.assigneeId !== undefined && (task.assignee_id ?? null) !== move.assigneeId) {
+    args.assignee = move.assigneeId;
+    local.assignee_id = move.assigneeId;
+  }
+  const had = task.label_ids ?? [];
+  const add = move.addLabel && !had.includes(move.addLabel) ? move.addLabel : undefined;
+  const remove = move.removeLabel && had.includes(move.removeLabel) ? move.removeLabel : undefined;
+  if (add) args.add_labels = [add];
+  if (remove) args.remove_labels = [remove];
+  if (add || remove) {
+    const next = [...had.filter((id) => id !== remove), ...(add ? [add] : [])];
+    local.label_ids = next.length ? next : null;
+  }
+  if (Object.keys(args).length === 1) return;
+  send({ type: "task.update", args }, (tx) => tx.patch("tasks", task.id, local));
+}
+
+/**
+ * Moves tasks to another project, as one batch. Each gets a new key there
+ * and the status of the same name (or kind); what belongs to the old
+ * project (its labels, epic, cycle) is left behind. The server's answer
+ * redraws them; nothing is guessed ahead of it.
+ */
+export function moveToProject(tasks: Task[], projectId: string) {
+  const project = getState().c.projects[projectId];
+  const moving = tasks.filter((task) => task.project_id !== projectId);
+  if (!project || moving.length === 0) return;
+  mutate(moving.map((task) => ({ type: "task.move", args: { id: task.id, project: projectId } })))
+    .then(() => toast.info(t("bulk.moved", { n: moving.length, project: project.name })))
+    .catch(() => {});
 }
 
 export function restoreTasks(tasks: Task[]) {
@@ -160,24 +230,26 @@ export interface NewTask {
   rank?: string;
 }
 
-/**
- * Creates a task. It appears at once under the key it will most likely get;
- * the server's row replaces it a moment later. Resolves with the real key.
- */
-export async function createTask(input: NewTask): Promise<string> {
-  const { c, me } = getState();
-  const project = c.projects[input.projectId];
-  if (!project || !me) throw new Error("no project");
-  const id = newId();
-  const statuses = statusesOf(c.statuses, project.id);
-  const status = (input.statusId && c.statuses[input.statusId]) || statuses.find((s) => s.is_default) || statuses[0];
+/** Where new tasks of a project go: the next number, and the rank of the last task there. */
+function endOf(projectId: string): { number: number; lastRank: string } {
   let number = 1;
   let lastRank = "";
-  for (const task of Object.values(c.tasks)) {
-    if (task.project_id !== project.id) continue;
+  for (const task of Object.values(getState().c.tasks)) {
+    if (task.project_id !== projectId) continue;
     number = Math.max(number, task.number + 1);
     if (task.rank > lastRank) lastRank = task.rank;
   }
+  return { number, lastRank };
+}
+
+/** The change that creates a task, and the row shown until the server's own arrives. */
+function creation(input: NewTask, number: number, rank: string): { change: ChangeSpec; row: Fields } | null {
+  const { c, me } = getState();
+  const project = c.projects[input.projectId];
+  if (!project || !me) return null;
+  const id = newId();
+  const statuses = statusesOf(c.statuses, project.id);
+  const status = (input.statusId && c.statuses[input.statusId]) || statuses.find((s) => s.is_default) || statuses[0];
   const args: Fields = { id, project: project.id, title: input.title.trim() };
   if (input.description?.trim()) args.description = input.description;
   if (input.statusId) args.status = input.statusId;
@@ -190,31 +262,75 @@ export async function createTask(input: NewTask): Promise<string> {
   if (input.dueOn) args.due_on = input.dueOn;
   if (input.templateId) args.template = input.templateId;
   if (input.rank) args.rank = input.rank;
-
   const now = Date.now();
-  const results = await mutate({ type: "task.create", args }, (tx) => {
-    if (!status) return;
-    tx.insert("tasks", {
-      id,
-      project_id: project.id,
-      number,
-      key: `${project.key}-${number}`,
-      title: args.title,
-      description: input.description || undefined,
-      status_id: status.id,
-      priority: input.priority ?? 0,
-      assignee_id: input.assigneeId,
-      label_ids: input.labelIds?.length ? input.labelIds : undefined,
-      epic_id: input.epicId,
-      parent_id: input.parentId,
-      cycle_id: input.cycleId,
-      due_on: input.dueOn,
-      rank: input.rank ?? `${lastRank}z`,
-      created_by: me.user_id,
-      created_at: now,
-      updated_at: now,
-      updated_seq: 0,
-    });
+  const row: Fields = {
+    id,
+    project_id: project.id,
+    number,
+    // Its real key comes with the server's answer; until then it reads "SVA-…".
+    key: draftKey(project.key),
+    title: args.title,
+    description: input.description || undefined,
+    status_id: status?.id,
+    priority: input.priority ?? 0,
+    assignee_id: input.assigneeId,
+    label_ids: input.labelIds?.length ? input.labelIds : undefined,
+    epic_id: input.epicId,
+    parent_id: input.parentId,
+    cycle_id: input.cycleId,
+    due_on: input.dueOn,
+    rank: input.rank ?? rank,
+    created_by: me.user_id,
+    created_at: now,
+    updated_at: now,
+    updated_seq: 0,
+  };
+  return { change: { type: "task.create", args }, row };
+}
+
+/**
+ * Creates a task. It appears at once under the key it will most likely get;
+ * the server's row replaces it a moment later. Resolves with the real key.
+ */
+export async function createTask(input: NewTask): Promise<string> {
+  const { number, lastRank } = endOf(input.projectId);
+  const made = creation(input, number, `${lastRank}z`);
+  if (!made) throw new Error("no project");
+  const results = await mutate(made.change, (tx) => {
+    if (made.row.status_id) tx.insert("tasks", made.row);
   });
-  return results[0]?.key ?? `${project.key}-${number}`;
+  return results[0]?.key ?? String(made.row.key);
+}
+
+/** The most changes the server takes in one request. */
+const BATCH = 500;
+
+/**
+ * Creates several tasks that share everything but their titles. Each batch
+ * of up to 500 is all-or-nothing; they are sent in order. Resolves with how
+ * many were made; rejects with the server's reason if a batch is refused
+ * (tasks of earlier batches stay).
+ */
+export async function createTasks(shared: Omit<NewTask, "title">, titles: string[]): Promise<number> {
+  const end = endOf(shared.projectId);
+  let rank = end.lastRank;
+  const made = titles.map((title, i) => {
+    rank = rankBetween(rank || undefined, undefined);
+    return creation({ ...shared, title }, end.number + i, rank);
+  });
+  if (made.some((m) => !m)) throw new Error("no project");
+  const all = made as { change: ChangeSpec; row: Fields }[];
+  let done = 0;
+  for (let from = 0; from < all.length; from += BATCH) {
+    const batch = all.slice(from, from + BATCH);
+    await mutate(
+      batch.map((m) => m.change),
+      (tx) => {
+        for (const m of batch) if (m.row.status_id) tx.insert("tasks", m.row);
+      },
+      { quiet: true },
+    );
+    done += batch.length;
+  }
+  return done;
 }

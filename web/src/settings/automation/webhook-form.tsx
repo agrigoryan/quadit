@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { useMembers, useProjects } from "@/lib/selectors";
+import { memberChoiceLabel, useListening } from "@/settings/agents/data";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
@@ -22,6 +23,7 @@ interface Props {
 export function WebhookForm({ hook, onClose, onSaved }: Props) {
   const projects = useProjects();
   const members = useMembers();
+  const listening = useListening();
   const [name, setName] = useState(hook?.name ?? "");
   const [url, setUrl] = useState(hook?.url ?? "");
   const [events, setEvents] = useState<string[]>(hook?.event_types ?? []);
@@ -134,7 +136,7 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
               id="wh-for"
               value={memberId}
               onChange={(v) => (setMemberId(v), errors.set("for", ""))}
-              options={[{ value: "", label: t("auto.pickMember") }, ...inboxes.map((m) => ({ value: m.user_id, label: `${m.name} (@${m.handle})` }))]}
+              options={[{ value: "", label: t("auto.pickMember") }, ...inboxes.map((m) => ({ value: m.user_id, label: memberChoiceLabel(m, listening(m)) }))]}
             />
           </FormField>
         )}

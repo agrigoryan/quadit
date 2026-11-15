@@ -62,7 +62,11 @@ export function FileGrid({ files, pending = [], canRemove, onRemove, small, clas
         {pending.map((p) => (
           <li key={p.id} className={cx("flex flex-col items-center justify-center gap-1.5 p-2 text-center", tile)}>
             <Spinner label={t("detail.files.uploading", { name: p.name })} />
-            <span className="line-clamp-2 text-2xs break-all text-ink-3">{p.name}</span>
+            {/* How far along it is, or why it has stopped. */}
+            <span className="text-2xs font-medium text-ink-2 tnum" aria-live="polite">
+              {p.waiting ? t("upload.waitingOne") : t("detail.files.percent", { n: p.percent ?? 0 })}
+            </span>
+            <span className="line-clamp-1 text-2xs break-all text-ink-3">{p.name}</span>
           </li>
         ))}
       </ul>

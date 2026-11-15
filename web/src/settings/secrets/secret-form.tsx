@@ -8,6 +8,7 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";
+import { useListening } from "@/settings/agents/data";
 import { addHosts, setSecret, useSecrets, validName } from "@/settings/secrets/data";
 import { HostInput } from "@/settings/secrets/host-input";
 import { FormAlert, FormField, SwitchRow, useFieldErrors } from "@/settings/ui/form";
@@ -22,6 +23,7 @@ interface Props {
 /** Makes a secret or changes one. Its value goes in and is never shown again. */
 export function SecretForm({ secret, onClose }: Props) {
   const members = useMembers();
+  const listening = useListening();
   const existing = useSecrets();
   const [name, setName] = useState(secret?.name ?? "");
   const [value, setValue] = useState("");
@@ -39,8 +41,14 @@ export function SecretForm({ secret, onClose }: Props) {
     () =>
       members
         .filter((m) => m.kind === "agent" || agents.includes(m.user_id))
-        .map((m) => ({ id: m.user_id, label: m.name, icon: <Avatar member={m} size="xs" />, hint: `@${m.handle}`, keywords: m.handle })),
-    [members, agents],
+        .map((m) => ({
+          id: m.user_id,
+          label: m.name,
+          icon: <Avatar member={m} size="xs" />,
+          hint: listening(m) === undefined ? `@${m.handle}` : `@${m.handle} · ${listening(m) ? t("agents.choice.listening") : t("agents.choice.notListening")}`,
+          keywords: m.handle,
+        })),
+    [members, agents, listening],
   );
 
   async function submit(e: FormEvent) {

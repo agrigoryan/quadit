@@ -5,33 +5,43 @@ import { t } from "@/lib/i18n";
 import { mutate, send } from "@/lib/mutate";
 import { useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
-import type { GroupBy, Project, SortBy, View } from "@/lib/types";
-import { toQuery } from "@/tasks/filters";
-import { resetViewState, type ViewState } from "@/tasks/view-state";
+import type { Project, SortBy, View } from "@/lib/types";
+import { type Grouping, toQuery } from "@/tasks/filters";
+import { BOARD_GROUPS, type BoardGrouping, LIST_GROUPS, resetViewState, type StoredDisplay, type ViewState } from "@/tasks/view-state";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Field, Input } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Select } from "@/ui/picker";
 
-const GROUPS: GroupBy[] = ["status", "assignee", "epic", "priority", "none"];
 const SORTS: SortBy[] = ["manual", "priority", "updated", "created", "due"];
 
-/** How the tasks are grouped and ordered. */
+/** How the tasks are grouped and ordered. A board is always in manual order: its cards are dragged into place. */
 export function DisplayControls({ state, onChange }: { state: ViewState; onChange: (patch: Partial<ViewState>) => void }) {
+  if (state.layout === "board") {
+    return (
+      <Select
+        label={t("group.columns")}
+        prefix={t("group.columns")}
+        value={state.boardGroup}
+        items={BOARD_GROUPS.map((g) => ({ id: g, label: t(`group.${g}`) }))}
+        onPick={(id) => onChange({ boardGroup: id as BoardGrouping })}
+        align="end"
+        buttonProps={{ variant: "ghost", size: "sm" }}
+      />
+    );
+  }
   return (
     <>
-      {state.layout === "list" && (
-        <Select
-          label={t("group.label")}
-          prefix={t("group.label")}
-          value={state.group}
-          items={GROUPS.map((g) => ({ id: g, label: t(`group.${g}`) }))}
-          onPick={(id) => onChange({ group: id as GroupBy })}
-          align="end"
-          buttonProps={{ variant: "ghost", size: "sm" }}
-        />
-      )}
+      <Select
+        label={t("group.by")}
+        prefix={t("group.by")}
+        value={state.group}
+        items={LIST_GROUPS.map((g) => ({ id: g, label: t(`group.${g}`) }))}
+        onPick={(id) => onChange({ group: id as Grouping })}
+        align="end"
+        buttonProps={{ variant: "ghost", size: "sm" }}
+      />
       <Select
         label={t("sort.label")}
         prefix={t("sort.label")}
@@ -50,7 +60,7 @@ function viewArgs(state: ViewState, project: Project | undefined) {
   return {
     query: toQuery(state.filters, project?.key, state.sort),
     layout: state.layout,
-    display: { group: state.group, sort: state.sort },
+    display: { group: state.group, board_group: state.boardGroup, sort: state.sort } satisfies StoredDisplay,
   };
 }
 

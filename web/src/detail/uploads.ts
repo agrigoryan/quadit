@@ -4,7 +4,7 @@
 
 import { create } from "zustand";
 import { errorMessage } from "@/lib/api";
-import { uploadFile } from "@/lib/files";
+import { uploadFile, type UploadOptions } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
@@ -16,6 +16,10 @@ import type { Task } from "@/lib/types";
 export interface PendingUpload {
   id: string;
   name: string;
+  /** How much of the file the server has, 0 to 100. */
+  percent?: number;
+  /** The connection is away; the upload carries on by itself when it is back. */
+  waiting?: boolean;
 }
 
 /** Files still uploading, by the task they will be attached to. */
@@ -26,9 +30,9 @@ function setPending(taskId: string, change: (list: PendingUpload[]) => PendingUp
 }
 
 /** Uploads one file, saying so if it fails. Resolves with nothing when it did. */
-export async function uploadOrToast(file: File) {
+export async function uploadOrToast(file: File, opts?: UploadOptions) {
   try {
-    return await uploadFile(file);
+    return await uploadFile(file, opts);
   } catch (err) {
     toast.error(t("detail.files.failed", { name: file.name, reason: errorMessage(err) }));
     return undefined;
@@ -38,7 +42,19 @@ export async function uploadOrToast(file: File) {
 async function attachOne(task: Task, file: File) {
   const pending: PendingUpload = { id: newId(), name: file.name };
   setPending(task.id, (list) => [...list, pending]);
-  const row = await uploadOrToast(file);
+  // Each new try starts by saying "sending"; the tile keeps saying it waits until bytes really move again.
+  let waiting = false;
+  let reached = 0;
+  const row = await uploadOrToast(file, {
+    onProgress: (p) => {
+      if (p.state === "waiting") waiting = true;
+      else if (p.sent > reached) waiting = false;
+      reached = Math.max(reached, p.sent);
+      const percent = p.total > 0 ? Math.min(100, Math.floor((p.sent / p.total) * 100)) : 0;
+      const now = waiting;
+      setPending(task.id, (list) => list.map((it) => (it.id === pending.id && (it.percent !== percent || it.waiting !== now) ? { ...it, percent, waiting: now } : it)));
+    },
+  });
   if (row) {
     const { c, me } = getState();
     let last = "";

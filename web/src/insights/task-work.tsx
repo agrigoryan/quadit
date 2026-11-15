@@ -20,6 +20,7 @@ import { t, tMaybe } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
 import { useCollection } from "@/lib/selectors";
 import type { AgentSession, Task, TaskLink } from "@/lib/types";
+import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
 import { moneyMicros } from "@/insights/lib/format";
@@ -101,6 +102,7 @@ function CodeLink({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
           </IconButton>
         )}
       </span>
+      <BranchCommits link={link} />
     </li>
   );
 }

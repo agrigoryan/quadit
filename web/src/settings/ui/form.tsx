@@ -165,14 +165,14 @@ interface CheckProps {
 export function Checkbox({ checked, onChange, children, disabled }: CheckProps) {
   const id = useId();
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-start gap-2">
       <RCheckbox.Root
         id={id}
         checked={checked}
         disabled={disabled}
         onCheckedChange={(v) => onChange(v === true)}
         className={cx(
-          "flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors disabled:opacity-50",
+          "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-xs border transition-colors disabled:opacity-50",
           checked ? "border-accent bg-accent text-accent-ink" : "border-line-strong bg-surface",
         )}
       >

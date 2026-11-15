@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, ws } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { sortByRank, useCollection } from "@/lib/selectors";
-import { type Dict, getState, mergeRows } from "@/lib/store";
+import { type Dict, getState, mergeRows, useStore } from "@/lib/store";
 import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/lib/types";
 
 /** An attachment whose file is known (every one the panel draws). */
@@ -102,4 +102,24 @@ export function linkName(link: Pick<TaskLink, "kind" | "title" | "ref" | "repo" 
   if (link.kind === "commit" && link.ref) return link.ref.slice(0, 8);
   if (link.ref) return link.ref;
   return (link.url ?? "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+}
+
+const asked = new Set<string>();
+
+/**
+ * Fetches tasks the store does not hold yet (closed ones arrive later than
+ * the rest; one may be in the trash), so a row that names one can be drawn.
+ */
+export function useEnsureTasks(ids: string[]) {
+  const missing = useStore((s) => ids.filter((id) => !s.c.tasks[id]).join(","));
+  useEffect(() => {
+    for (const id of missing ? missing.split(",") : []) {
+      if (asked.has(id)) continue;
+      asked.add(id);
+      api
+        .get<{ task: Task }>(ws(getState().slug, `/tasks/${id}?raw=1`))
+        .then((raw) => mergeRows("tasks", [raw.task]))
+        .catch(() => {});
+    }
+  }, [missing]);
 }

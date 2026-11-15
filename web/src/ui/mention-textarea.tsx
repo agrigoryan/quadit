@@ -2,8 +2,10 @@ import { type KeyboardEvent, type Ref, type TextareaHTMLAttributes, useRef, useS
 import { cx } from "@/lib/cx";
 import { useMembers } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
+import { useListening } from "@/settings/agents/data";
 import { Avatar } from "@/ui/avatar";
 import { Textarea } from "@/ui/input";
+import { ListeningDot } from "@/ui/listening-dot";
 
 interface Props extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
   value: string;
@@ -113,28 +115,45 @@ export function MentionTextarea({ value, onChange, onSubmit, onFiles, className,
         }}
         {...rest}
       />
-      {open && (
-        <ul
-          role="listbox"
-          className="absolute top-full left-0 z-[65] mt-1 w-60 rounded-lg bg-surface p-1 shadow-pop animate-pop"
-          onMouseDown={(e) => e.preventDefault()}
-        >
-          {options.map((m, i) => (
-            <li
-              key={m.user_id}
-              role="option"
-              aria-selected={i === active}
-              onMouseEnter={() => setActive(i)}
-              onClick={() => pick(m)}
-              className={cx("flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm", i === active && "bg-hover")}
-            >
-              <Avatar member={m} size="sm" />
-              <span className="min-w-0 flex-1 truncate">{m.name}</span>
-              <span className="text-xs text-ink-3">@{m.handle}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {open && <MentionOptions options={options} active={active} onActive={setActive} onPick={pick} />}
     </div>
+  );
+}
+
+interface OptionsProps {
+  options: Member[];
+  active: number;
+  onActive: (index: number) => void;
+  onPick: (member: Member) => void;
+}
+
+/** The people and agents an "@" offers. Beside each agent: whether anything is listening for its work right now. */
+function MentionOptions({ options, active, onActive, onPick }: OptionsProps) {
+  const listening = useListening();
+  return (
+    <ul
+      role="listbox"
+      className="absolute top-full left-0 z-[65] mt-1 w-60 rounded-lg bg-surface p-1 shadow-pop animate-pop"
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {options.map((m, i) => {
+        const on = listening(m);
+        return (
+          <li
+            key={m.user_id}
+            role="option"
+            aria-selected={i === active}
+            onMouseEnter={() => onActive(i)}
+            onClick={() => onPick(m)}
+            className={cx("flex h-7 cursor-default items-center gap-2 rounded-sm px-2 text-sm", i === active && "bg-hover")}
+          >
+            <Avatar member={m} size="sm" />
+            <span className="min-w-0 flex-1 truncate">{m.name}</span>
+            <span className="text-xs text-ink-3">@{m.handle}</span>
+            {on !== undefined && <ListeningDot on={on} />}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

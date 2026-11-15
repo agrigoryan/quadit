@@ -14,6 +14,7 @@ import { NotFoundPage } from "@/shell/placeholders";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
+import { UploadsIndicator } from "@/shell/uploads";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
 
 // The larger parts of the app are fetched when first opened.
@@ -131,6 +132,7 @@ export function Shell() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           </PageBoundary>
+          <UploadsIndicator />
         </main>
       </div>
       <Part on={taskKey ?? ""}>{taskKey && <TaskPanel key={taskKey.toUpperCase()} taskKey={taskKey.toUpperCase()} onClose={closePanel} />}</Part>

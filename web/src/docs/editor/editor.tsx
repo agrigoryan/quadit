@@ -21,11 +21,22 @@ import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } f
 import { uploadFile } from "@/lib/files";
 import { type BlockSchemaLike, type EdBlock, plainText, rowsToEditor } from "@/docs/editor/convert";
 import { Markers } from "@/docs/editor/markers";
-import { ActionsContext, BlockMenu, CommentButton, type EditorActions, extraSlashItems, mentionItems } from "@/docs/editor/menus";
+import {
+  ActionsContext,
+  BlockMenu,
+  CommentButton,
+  decisionItems,
+  type EditorActions,
+  extraSlashItems,
+  hashOpensDecisions,
+  mentionItems,
+  pageTitleItems,
+  QuietMenu,
+} from "@/docs/editor/menus";
 import { type ChipKind, ChipPicker } from "@/docs/editor/pickers";
 import { schema } from "@/docs/editor/schema";
 import { DocSync, type SaveState } from "@/docs/editor/sync";
-import { chipTypedTaskKey } from "@/docs/editor/task-keys";
+import { chipTyped } from "@/docs/editor/task-keys";
 import { useThemeName } from "@/docs/editor/use-theme";
 import type { BlockRow, PresenceEntry } from "@/docs/types";
 
@@ -89,7 +100,7 @@ export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState
     const sync = new DocSync(editor, docId, rows, seq, (state) => callbacks.current.onSaveState?.(state));
     const dom = editor.domElement;
     const onBlur = () => sync.flush();
-    const onInput = () => setTimeout(() => chipTypedTaskKey(editor), 0);
+    const onInput = () => setTimeout(() => chipTyped(editor), 0);
     dom?.addEventListener("focusout", onBlur);
     dom?.addEventListener("input", onInput);
     return () => {
@@ -149,6 +160,7 @@ export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState
     () => ({
       comment: (blockId) => callbacks.current.onComment?.(blockId),
       pickTask: () => setPicking("task"),
+      pickDecision: () => setPicking("decision"),
       pickPage: () => setPicking("page"),
     }),
     [],
@@ -159,7 +171,12 @@ export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState
     // After the dialog has given the focus back.
     setTimeout(() => {
       editor.focus();
-      const chip = kind === "task" ? { type: "taskChip", props: { key: ref } } : { type: "pageLink", props: { doc: ref } };
+      const chip =
+        kind === "task"
+          ? { type: "taskChip", props: { key: ref } }
+          : kind === "decision"
+            ? { type: "decisionChip", props: { key: ref } }
+            : { type: "pageLink", props: { doc: ref } };
       editor.insertInlineContent([chip, " "] as never);
     }, 30);
   }
@@ -178,6 +195,13 @@ export default function Editor({ docId, rows, seq, readOnly, handle, onSaveState
             }
           />
           <SuggestionMenuController triggerCharacter="@" getItems={async (query) => filterSuggestionItems(mentionItems(editor), query)} />
+          <SuggestionMenuController
+            triggerCharacter="#"
+            shouldOpen={() => hashOpensDecisions(editor)}
+            getItems={async (query) => decisionItems(editor, query)}
+            suggestionMenuComponent={QuietMenu}
+          />
+          <SuggestionMenuController triggerCharacter="[[" getItems={async (query) => pageTitleItems(editor, query, docId)} suggestionMenuComponent={QuietMenu} />
           <FormattingToolbarController
             formattingToolbar={() => <FormattingToolbar>{[...getFormattingToolbarItems(), ...(onComment ? [<CommentButton key="qdComment" />] : [])]}</FormattingToolbar>}
           />

@@ -31,9 +31,10 @@ export type BlockSchemaLike = Record<string, { propSchema: Record<string, { defa
 
 // Inline things that are not text have other names in the editor ("doc" is
 // taken there by the document itself).
-const TO_EDITOR: Record<string, string> = { mention: "mention", task: "taskChip", doc: "pageLink" };
-const TO_SERVER: Record<string, string> = { mention: "mention", taskChip: "task", pageLink: "doc" };
-const CHIP_PROP: Record<string, string> = { mention: "handle", task: "key", doc: "doc" };
+// A decision carries the text the server reads it by, "SVA-7#2", as its key.
+const TO_EDITOR: Record<string, string> = { mention: "mention", task: "taskChip", decision: "decisionChip", doc: "pageLink" };
+const TO_SERVER: Record<string, string> = { mention: "mention", taskChip: "task", decisionChip: "decision", pageLink: "doc" };
+const CHIP_PROP: Record<string, string> = { mention: "handle", task: "key", decision: "key", doc: "doc" };
 
 /** Props a block always carries on the server, even at their default (as Markdown conversion writes them). */
 const ALWAYS: Record<string, string[]> = { heading: ["level"], checkListItem: ["checked"] };

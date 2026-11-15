@@ -193,7 +193,7 @@
   font-size: 0.75rem;
 }
 
-/* ---- inline chips: a person, a task, a page ---- */
+/* ---- inline chips: a person, a task, a decision, a page ---- */
 
 .qd-chip {
   display: inline-flex;
@@ -222,14 +222,37 @@
   color: var(--move-text);
 }
 .qd-task,
+.qd-decision,
 .qd-page {
   cursor: pointer;
   background: var(--sunken);
   color: var(--ink);
 }
 .qd-task:hover,
+.qd-decision:hover,
 .qd-page:hover {
   background: var(--press);
+}
+.qd-decision-sep {
+  color: var(--ink-3);
+}
+/* How the decision stands: quiet once it is made, marked while it waits. */
+.qd-decision-state {
+  flex: none;
+  border-radius: 4px;
+  padding: 0 0.35em;
+  max-width: 14em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.82em;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.qd-decision-state.is-open {
+  background: var(--move-soft);
+  color: var(--move-text);
 }
 .qd-task-key {
   font-variant-numeric: tabular-nums;

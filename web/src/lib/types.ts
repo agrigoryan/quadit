@@ -38,7 +38,13 @@ export interface Member {
   title?: string;
   /** For an agent: the person who answers for it. */
   responsible_id?: string;
-  budget?: { cost_micros?: number; minutes?: number };
+  /** Limits per week: money, minutes of agent time, and hand-offs of work to another agent. */
+  budget?: { cost_micros?: number; minutes?: number; handoffs?: number };
+  /** `projects`: the member sees only these (ids). `read_only`: it may look but change nothing. */
+  scope?: { projects?: string[]; read_only?: boolean };
+  /** A helper agent made for one task: the user id of its maker, and the task. It is suspended when the task closes. */
+  delegated_by?: string;
+  delegated_task?: string;
   last_action?: string;
   last_seen_at?: number;
   listening_until?: number;
@@ -90,6 +96,8 @@ export interface Task {
   priority: number;
   assignee_id?: string;
   waiting_on_id?: string;
+  /** The next move is nobody's here: the task waits on an outside event, which the note names. */
+  waiting_outside?: boolean;
   waiting_on_note?: string;
   parent_id?: string;
   epic_id?: string;
@@ -101,6 +109,8 @@ export interface Task {
   lease_until?: number;
   /** The person who gave the task to an agent; the agent works with no more access than they have. */
   asked_by?: string;
+  /** What work on this task may take in total: money, minutes of agent time, hand-offs between agents. */
+  budget?: { cost_micros?: number; minutes?: number; handoffs?: number };
   rank: string;
   due_on?: string;
   created_by: string;

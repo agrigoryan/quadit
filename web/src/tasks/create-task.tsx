@@ -7,10 +7,12 @@ import { useProjects, useSlug } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Project, Template } from "@/lib/types";
-import { type TaskDraft, ui } from "@/lib/ui-state";
+import { ui } from "@/lib/ui-state";
 import { ProjectGlyph } from "@/shell/sidebar";
 import { createTask } from "@/tasks/actions";
 import { CreateFields, type TaskFields } from "@/tasks/create-fields";
+import type { NewTaskDraft } from "@/tasks/draft";
+import { MultiCreateDialog } from "@/tasks/multi-create";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Kbd } from "@/ui/kbd";
@@ -44,8 +46,14 @@ function presetOf(template: Template | undefined, project: Project): Partial<Tas
   return out;
 }
 
-/** The "new task" dialog (C). Cmd/Ctrl-Enter creates; "Create more" keeps it open for the next one. */
-export function CreateTaskDialog({ draft }: { draft: TaskDraft }) {
+/** The "new task" dialog (C), for one task or, on request, for several at once. */
+export function CreateTaskDialog({ draft }: { draft: NewTaskDraft }) {
+  const [many, setMany] = useState(!!draft.many);
+  return many ? <MultiCreateDialog draft={draft} onSingle={() => setMany(false)} /> : <SingleDialog draft={draft} onMany={() => setMany(true)} />;
+}
+
+/** One task. Cmd/Ctrl-Enter creates; "Create more" keeps it open for the next one. */
+function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => void }) {
   const slug = useSlug();
   const projects = useProjects();
   const navigate = useNavigate();
@@ -61,7 +69,7 @@ export function CreateTaskDialog({ draft }: { draft: TaskDraft }) {
     statusId: draft.statusId ?? "",
     assigneeId: draft.assigneeId ?? "",
     priority: 0,
-    labelIds: [],
+    labelIds: draft.labelIds ?? [],
     epicId: draft.epicId ?? "",
     parentId: draft.parentId ?? "",
     dueOn: "",
@@ -163,8 +171,12 @@ export function CreateTaskDialog({ draft }: { draft: TaskDraft }) {
             onPick={changeProject}
             buttonProps={{ size: "sm" }}
           />
-          <span className="text-xs text-ink-3">{t("create.title")}</span>
-          <div className="ml-auto flex rounded-md bg-sunken p-0.5 text-xs">
+          <span className="text-xs text-ink-3 max-sm:hidden">{t("create.title")}</span>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={onMany} aria-label={t("multi.open")}>
+            <span className="max-sm:hidden">{t("multi.open")}</span>
+            <span className="sm:hidden">{t("multi.openShort")}</span>
+          </Button>
+          <div className="flex rounded-md bg-sunken p-0.5 text-xs">
             {[false, true].map((p) => (
               <button
                 key={String(p)}
@@ -211,7 +223,7 @@ export function CreateTaskDialog({ draft }: { draft: TaskDraft }) {
             {error}
           </p>
         )}
-        {project && <CreateFields project={project} value={fields} onChange={change} />}
+        {project && <CreateFields project={project} value={fields} onChange={change} onLeave={ui.closeNewTask} />}
       </form>
     </Dialog>
   );

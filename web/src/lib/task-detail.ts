@@ -5,7 +5,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { api, ApiError, ws } from "@/lib/api";
-import { getState, markOpened, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
+import { getState, markOpened, mergeRows, onEvents, onReplaced, removeRow, useStore } from "@/lib/store";
 import type { AgentSession, Attachment, Comment, FeedEvent, Task, TaskLink, Watcher } from "@/lib/types";
 
 interface RawTask {
@@ -26,6 +26,10 @@ interface DetailState {
 
 export const useTaskDetailStore = create<DetailState>(() => ({ events: {}, status: {} }));
 
+// A history belongs to the copy it was fetched for: at sign-out, in another
+// workspace, or once the person's access changed, none of it may remain.
+onReplaced(() => useTaskDetailStore.setState({ events: {}, status: {} }));
+
 function setStatus(taskId: string, status: string) {
   useTaskDetailStore.setState((s) => ({ status: { ...s.status, [taskId]: status } }));
 }
@@ -39,6 +43,8 @@ export async function loadTask(taskId: string): Promise<void> {
       api.get<RawTask>(ws(slug, `/tasks/${taskId}?raw=1`)),
       api.get<{ events: FeedEvent[] }>(ws(slug, `/events?task=${taskId}&limit=500`)),
     ]);
+    // The copy was replaced while this was on its way: the answer is for the old one.
+    if (getState().slug !== slug) return;
     // Rows that were deleted while nobody was looking are not in the answer.
     const { comments, attachments, links } = getState().c;
     const fresh = new Set([...raw.comments, ...raw.attachments, ...raw.links].map((r) => r.id));
@@ -100,9 +106,11 @@ export function useTaskDetail(taskId: string | undefined): string {
   useEffect(() => {
     if (taskId && live) void loadTask(taskId);
   }, [taskId, live]);
+  // Not fetched yet, or thrown away with the copy it was fetched for (the person's access changed).
+  const missing = useTaskDetailStore((s) => !!taskId && !s.status[taskId]);
   useEffect(() => {
-    if (taskId && !useTaskDetailStore.getState().status[taskId]) void loadTask(taskId);
-  }, [taskId]);
+    if (taskId && missing) void loadTask(taskId);
+  }, [taskId, missing]);
   return useTaskDetailStore((s) => (taskId ? (s.status[taskId] ?? "loading") : "loading"));
 }
 

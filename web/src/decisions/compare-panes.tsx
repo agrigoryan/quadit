@@ -6,10 +6,12 @@ import { ImageOff } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { isVideo } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import type { DecisionOption, FileRow } from "@/lib/types";
+import type { DecisionOption } from "@/lib/types";
 import { Button } from "@/ui/button";
 import { Kbd } from "@/ui/kbd";
+import { afterClip, PairLabels, RoleLabel, SwipeHandle } from "@/decisions/before-after";
 import { type Compare, paneNote } from "@/decisions/compare-state";
+import { isSmallArt, type OptionFile } from "@/decisions/data";
 import { FileStepper, PickedBadge, RecommendedBadge } from "@/decisions/parts";
 
 interface Size {
@@ -33,7 +35,9 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
   const { ref: wheel, ...handlers } = c.zoom.bind;
   const [box, setBox] = useState<Size | null>(null);
   const [loaded, setLoaded] = useState<{ id: string; size: Size } | null>(null);
-  const { setFit, setVideo } = c;
+  /** Where the divider of a before/after pair stands across the pane, 0 to 100. */
+  const [swipe, setSwipe] = useState(50);
+  const { setFit, setVideo, setSmallArt } = c;
 
   const attach = useCallback(
     (el: HTMLDivElement | null) => {
@@ -56,8 +60,15 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
   useEffect(() => {
     if (gauge && fit > 0) setFit(fit);
   }, [gauge, fit, setFit]);
+  const sharp = c.sharp(natural?.w, natural?.h);
+  const small = !!natural && isSmall(natural);
+  useEffect(() => {
+    if (gauge && natural) setSmallArt(small);
+  }, [gauge, natural, small, setSmallArt]);
 
   if (!file) return <NoMedia />;
+  const rendering = sharp ? ("pixelated" as const) : undefined;
+  const picture = "size-full object-contain";
   return (
     <div
       ref={attach}
@@ -80,24 +91,46 @@ export function PaneMedia({ c, option, gauge, swipeThrough }: MediaProps) {
             preload="auto"
             aria-label={file.name}
             onLoadedMetadata={(e) => setLoaded({ id: file.id, size: { w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight } })}
-            className="size-full object-contain"
-            style={{ imageRendering: c.pixelated ? "pixelated" : undefined }}
+            className={picture}
+            style={{ imageRendering: rendering }}
           />
         ) : (
-          <img
-            key={file.id}
-            src={file.url}
-            alt={file.name}
-            draggable={false}
-            onLoad={(e) => setLoaded({ id: file.id, size: { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight } })}
-            className="size-full object-contain"
-            style={{ imageRendering: c.pixelated ? "pixelated" : undefined }}
-          />
+          <>
+            {file.before && (
+              <img
+                key={file.before.id}
+                src={file.before.url}
+                alt={t("decision.pair.beforeAlt", { name: file.before.name })}
+                draggable={false}
+                className={cx(picture, "absolute inset-0")}
+                style={{ imageRendering: rendering }}
+              />
+            )}
+            <img
+              key={file.id}
+              src={file.url}
+              alt={file.before ? t("decision.pair.afterAlt", { name: file.name }) : file.name}
+              draggable={false}
+              onLoad={(e) => setLoaded({ id: file.id, size: { w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight } })}
+              className={cx(picture, file.before && "absolute inset-0")}
+              style={{ imageRendering: rendering, ...(file.before ? afterClip(swipe, view) : undefined) }}
+            />
+          </>
         )}
       </div>
+      {file.before ? (
+        <>
+          <PairLabels />
+          <SwipeHandle pos={swipe} onChange={setSwipe} />
+        </>
+      ) : (
+        file.role && <RoleLabel role={file.role} />
+      )}
     </div>
   );
 }
+
+const isSmall = (size: Size) => isSmallArt(size.w, size.h);
 
 function NoMedia() {
   return (
@@ -110,7 +143,7 @@ function NoMedia() {
 
 function Pane({ c, option, index, gauge }: { c: Compare; option: DecisionOption; index: number; gauge: boolean }) {
   const focused = c.focus === index;
-  const files: FileRow[] = c.filesOf(option);
+  const files: OptionFile[] = c.filesOf(option);
   return (
     <section
       aria-label={option.label}

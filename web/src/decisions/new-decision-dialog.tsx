@@ -11,7 +11,6 @@ import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { useMe, useMembers, useTask } from "@/lib/selectors";
-import type { FileRow } from "@/lib/types";
 import { memberItems } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
@@ -19,7 +18,7 @@ import { Dialog } from "@/ui/dialog";
 import { Field, Input } from "@/ui/input";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { Picker } from "@/ui/picker";
-import { openDecision } from "@/decisions/actions";
+import { type NewOptionFile, openDecision } from "@/decisions/actions";
 import { useReturnFocus } from "@/decisions/data";
 import { type DraftFile, type DraftOption, OptionEditor } from "@/decisions/option-editor";
 
@@ -107,7 +106,7 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
         kind,
         question,
         details,
-        options: kept.map((o) => ({ ...o, files: o.files.flatMap((f): FileRow[] => (f.file ? [f.file] : [])) })),
+        options: kept.map((o) => ({ ...o, files: o.files.flatMap((f): NewOptionFile[] => (f.file ? [{ file: f.file, role: f.role }] : [])) })),
         recommended: kept.some((o) => o.id === recommended) ? (recommended ?? undefined) : undefined,
         recommendation: reason,
         ask: ask ?? undefined,
@@ -250,6 +249,7 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
                   onReason={setReason}
                   onAddFiles={(files) => addFiles(option.id, files)}
                   onRemoveFile={(key) => patchOption(option.id, (o) => ({ ...o, files: o.files.filter((f) => f.key !== key) }))}
+                  onFileRole={(key, role) => patchFile(option.id, key, { role })}
                 />
               ))}
             </ol>

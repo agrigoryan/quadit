@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, Bot, Building2, FolderGit2, FolderKanban, KeyRound, Lock, Plug, ScrollText, ShieldCheck, SquareAsterisk, UserRound, Users, Webhook, Workflow } from "lucide-react";
+import { Bell, Bot, Building2, FolderGit2, FolderKanban, Import, KeyRound, Lock, Plug, ScrollText, ShieldCheck, SquareAsterisk, UserRound, Users, Webhook, Workflow } from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
@@ -12,6 +12,7 @@ import { RulesPage } from "@/settings/automation/rules";
 import { SourcesPage } from "@/settings/automation/sources";
 import { WebhooksPage } from "@/settings/automation/webhooks";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
+import { ImportPage } from "@/settings/import/import-page";
 import { NotificationsPage } from "@/settings/me/notifications";
 import { ProfilePage } from "@/settings/me/profile";
 import { SecurityPage } from "@/settings/me/security";
@@ -33,7 +34,7 @@ function useGroups(admin: boolean): NavGroup[] {
       items: [
         ...(admin ? [item("general", "settings.nav.general", <Building2 />)] : []),
         item("members", "settings.nav.members", <Users />),
-        ...(admin ? [item("audit", "settings.nav.audit", <ScrollText />)] : []),
+        ...(admin ? [item("import", "settings.nav.import", <Import />), item("audit", "settings.nav.audit", <ScrollText />)] : []),
       ],
     },
     { title: t("settings.group.work"), items: [item("projects", "settings.nav.projects", <FolderKanban />)] },
@@ -106,6 +107,7 @@ export default function SettingsRoutes() {
         <Route index element={<Root first={admin ? "general" : "me/profile"} />} />
         <Route path="general" element={forAdmins(<GeneralPage />)} />
         <Route path="members" element={<MembersPage />} />
+        <Route path="import" element={forAdmins(<ImportPage />)} />
         <Route path="audit" element={forAdmins(<WorkspaceAuditPage />)} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:key/*" element={<ProjectPage />} />

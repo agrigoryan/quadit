@@ -2,6 +2,7 @@
 // files and comments of each option, and what the signed-in person may do.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isImage } from "@/lib/files";
 import { useCollection, useMe } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } from "@/lib/types";
@@ -22,8 +23,21 @@ export function useTaskDecisions(taskId: string): Decision[] {
 
 export const optionsOf = (decision: Decision): DecisionOption[] => decision.options ?? [];
 
+/** What a file shows of a change: how it was, or how it is now. */
+export type FileRole = "before" | "after";
+
+/** A file on an option, with what its attachment says: who put it there, and its part in a before/after pair. */
+export interface OptionFile extends FileRow {
+  attachmentId: string;
+  role?: FileRole;
+  attachedBy: string;
+  attachedAt: number;
+  /** On the "after" picture of a pair: the "before" it is shown against. */
+  before?: OptionFile;
+}
+
 /** Each option's files, in order, by option id. */
-export type OptionFiles = Record<string, FileRow[]>;
+export type OptionFiles = Record<string, OptionFile[]>;
 
 export function useOptionFiles(decision: Decision): OptionFiles {
   const attachments = useCollection("attachments");
@@ -34,10 +48,39 @@ export function useOptionFiles(decision: Decision): OptionFiles {
     const rows = Object.values(attachments)
       .filter((a) => a.subject_type === "decision_option" && ids.has(a.subject_id) && !a.deleted_at && a.file)
       .sort(byRank);
-    for (const a of rows) (out[a.subject_id] ??= []).push(a.file as FileRow);
+    for (const a of rows) {
+      const role = a.role === "before" || a.role === "after" ? a.role : undefined;
+      (out[a.subject_id] ??= []).push({ ...(a.file as FileRow), attachmentId: a.id, role, attachedBy: a.created_by, attachedAt: a.created_at });
+    }
     return out;
   }, [attachments, options]);
 }
+
+/**
+ * Joins an option's "before" and "after" pictures into pairs, first with
+ * first: each pair becomes one entry (the "after", carrying its "before")
+ * where the earlier of the two stood. Anything unmatched stays as it is.
+ */
+export function pairUp(files: OptionFile[]): OptionFile[] {
+  const befores = files.filter((f) => f.role === "before" && isImage(f));
+  const afters = files.filter((f) => f.role === "after" && isImage(f));
+  const pairs = Math.min(befores.length, afters.length);
+  if (pairs === 0) return files;
+  const out: OptionFile[] = [];
+  const placed = new Set<number>();
+  for (const f of files) {
+    const at = f.role === "before" ? befores.indexOf(f) : f.role === "after" ? afters.indexOf(f) : -1;
+    if (at < 0 || at >= pairs) out.push(f);
+    else if (!placed.has(at)) {
+      placed.add(at);
+      out.push({ ...(afters[at] as OptionFile), before: befores[at] });
+    }
+  }
+  return out;
+}
+
+/** Pictures this small are sprite art: scale them up with hard pixel edges. */
+export const isSmallArt = (width: number | undefined, height: number | undefined) => !!width && !!height && Math.max(width, height) <= 256;
 
 /** The shape every card of one decision gives its media (width over height), from the first file there is. */
 export function mediaAspect(files: FileRow[]): number {

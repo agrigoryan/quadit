@@ -27,9 +27,13 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
   const [onOpen, setOnOpen] = useState<string>(cfg.on_open ?? "");
   const [onMerge, setOnMerge] = useState<string>(cfg.on_merge ?? "");
   const [commentBack, setCommentBack] = useState(cfg.comment_back ?? false);
+  const [issuesLabel, setIssuesLabel] = useState(cfg.issues_label ?? "");
+  const [issuesProject, setIssuesProject] = useState(cfg.issues_project ?? "");
   const [active, setActive] = useState(it?.active ?? true);
   const [busy, setBusy] = useState(false);
-  const errors = useFieldErrors(["name", "project", "repo", "secret", "config", "kind"]);
+  const errors = useFieldErrors(["name", "project", "repo", "secret", "config", "kind", "issues_project"]);
+  // Tasks made from issues need a project: the one chosen for them, or the one the integration is limited to.
+  const issueProjectKey = issuesProject || projects.find((p) => p.id === projectId)?.key || "";
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -47,6 +51,11 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
     if (onOpen) config.on_open = onOpen as GitHubConfig["on_open"];
     if (onMerge) config.on_merge = onMerge as GitHubConfig["on_merge"];
     if (commentBack) config.comment_back = true;
+    if (issuesLabel.trim()) {
+      if (!issueProjectKey) return errors.set("issues_project", t("auto.gh.issuesProjectNeeded"));
+      config.issues_label = issuesLabel.trim();
+      if (issuesProject) config.issues_project = issuesProject;
+    }
     const args: Record<string, unknown> = { id: it?.id ?? newId(), kind: "github", name: name.trim() || cleanRepo, project: projectId, config, active };
     // The token never comes back; an empty field keeps the one that is stored.
     if (token.trim()) args.secret = token.trim();
@@ -130,6 +139,29 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
           </FormField>
         </div>
         <SwitchRow title={t("auto.gh.commentBack")} hint={t("auto.gh.commentBackHint")} checked={commentBack} onChange={setCommentBack} />
+        <div className="border-t border-line pt-3.5">
+          <p className="text-sm font-medium text-ink">{t("auto.gh.issues")}</p>
+          <p className="mb-2.5 text-xs text-ink-3">{t("auto.gh.issuesLead")}</p>
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <FormField label={t("auto.gh.issuesLabel")} htmlFor="gh-issues-label" hint={t("auto.gh.issuesLabelHint")}>
+              <Input id="gh-issues-label" spellCheck={false} autoCapitalize="off" placeholder="quadit" value={issuesLabel} onChange={(e) => setIssuesLabel(e.target.value)} />
+            </FormField>
+            <FormField label={t("auto.gh.issuesProject")} htmlFor="gh-issues-project" error={errors.fields.issues_project} hint={t("auto.gh.issuesProjectHint")}>
+              <NativeSelect
+                id="gh-issues-project"
+                value={issuesProject}
+                onChange={(v) => (setIssuesProject(v), errors.set("issues_project", ""))}
+                disabled={!issuesLabel.trim()}
+                options={[
+                  { value: "", label: t("auto.gh.issuesProjectSame") },
+                  ...projects.map((p) => ({ value: p.key, label: `${p.key} · ${p.name}` })),
+                  // A key saved earlier whose project is gone from the list: still show what is stored.
+                  ...(issuesProject && !projects.some((p) => p.key === issuesProject) ? [{ value: issuesProject, label: issuesProject }] : []),
+                ]}
+              />
+            </FormField>
+          </div>
+        </div>
         <FormField label={t("auto.gh.apiUrl")} htmlFor="gh-api" error={errors.fields.config} hint={t("auto.gh.apiUrlHint")}>
           <Input id="gh-api" type="url" placeholder="https://api.github.com" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} />
         </FormField>

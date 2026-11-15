@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { registerServiceWorker } from "@/auth/pwa";
 import { getPasskey } from "@/auth/webauthn";
 import { api, ApiError, onUnauthorized } from "@/lib/api";
+import { clearOutbox } from "@/lib/mutate";
 import { clearStore } from "@/lib/store";
 import { stopSync } from "@/lib/sync";
 import { adoptAccountTheme, applyTheme, type ThemeChoice } from "@/lib/theme";
@@ -142,6 +143,8 @@ export async function signOut() {
   try {
     await api.post("/api/v1/auth/logout");
   } finally {
+    // Changes not yet sent are dropped with the session: the next person here must not send them.
+    void clearOutbox();
     signedOut();
     useSession.setState({ half: false });
   }

@@ -138,12 +138,33 @@ export function DecisionResult({ decision, viewer, onUnclear }: ResultProps) {
   );
 }
 
-/** What an approval lets the asker do, in plain words. */
+/** The exact change an approval is for, as the server will run it: its name and arguments. */
+function changeText(action: string, args: unknown): string {
+  if (!args || typeof args !== "object" || Object.keys(args).length === 0) return action;
+  return `${action} ${JSON.stringify(args)}`;
+}
+
+/** What an approval lets the asker do, in plain words, then the exact change, and whether it has been used. */
 export function ApprovalAction({ decision }: { decision: Decision }) {
   const asker = useMemberName(decision.created_by, t("common.someone"));
   if (!decision.action) return null;
+  // The exact arguments approved, and when the approval was spent on them.
+  const { action_args: args, action_used_at: usedAt } = decision as Decision & { action_args?: unknown; action_used_at?: number };
   const action = tMaybe(`decision.action.${decision.action}`, t("decision.action.other", { type: decision.action }));
-  return <p className="mt-2 text-sm text-ink-2">{t("decision.actionLine", { name: asker, action })}</p>;
+  return (
+    <div className="mt-2">
+      <p className="text-sm text-ink-2">{t("decision.actionLine", { name: asker, action })}</p>
+      <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-xs text-ink-2">
+        <span className="shrink-0 text-ink-3">{t("decision.change")}</span>
+        <code className="min-w-0 rounded-sm bg-sunken px-1 py-0.5 font-mono text-2xs [overflow-wrap:anywhere]">{changeText(decision.action, args)}</code>
+        {!!usedAt && (
+          <Badge tone="ok" title={exact(usedAt)}>
+            {t("decision.changeUsed")}
+          </Badge>
+        )}
+      </p>
+    </div>
+  );
 }
 
 /** Approve or decline, with room for a note. */

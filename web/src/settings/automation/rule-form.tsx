@@ -3,6 +3,7 @@ import { t, tMaybe } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { useMembers, useProjects } from "@/lib/selectors";
 import { CATEGORIES } from "@/lib/types";
+import { memberChoiceLabel, useListening } from "@/settings/agents/data";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
@@ -24,6 +25,7 @@ const FIELDS = ["name", "project", "project_id", "actor_kind", "outcome", "to_ca
 export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
   const projects = useProjects();
   const members = useMembers();
+  const listening = useListening();
   const m = rule?.match ?? {};
   const [name, setName] = useState(rule?.name ?? "");
   const [active, setActive] = useState(rule?.active ?? true);
@@ -74,7 +76,7 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
   }
 
   const any = { value: "", label: t("auto.any") };
-  const memberChoices = [{ value: "", label: t("auto.pickMember") }, ...members.map((mb) => ({ value: mb.user_id, label: `${mb.name} (@${mb.handle})` }))];
+  const memberChoices = [{ value: "", label: t("auto.pickMember") }, ...members.map((mb) => ({ value: mb.user_id, label: memberChoiceLabel(mb, listening(mb)) }))];
 
   return (
     <Dialog

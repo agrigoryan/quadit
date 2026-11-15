@@ -1,29 +1,41 @@
-// Picking the task or the page a chip stands for, after the slash menu's
-// "Task" or "Page link".
+// Picking the task, the decision or the page a chip stands for, after the
+// slash menu's "Task", "Decision" or "Page link".
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
 import { useLiveTasks } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { docTitle, useLinkablePages } from "@/docs/data";
+import { decisionStateText } from "@/docs/editor/chips";
+import { mentionable } from "@/docs/editor/decision-refs";
 import { PageIcon } from "@/docs/page-icon";
 import { Dialog } from "@/ui/dialog";
-import { StatusIcon } from "@/ui/icons";
+import { DecisionMark, StatusIcon } from "@/ui/icons";
 import { PickerList } from "@/ui/picker";
 
-export type ChipKind = "task" | "page";
+export type ChipKind = "task" | "decision" | "page";
 
 interface Props {
   kind: ChipKind | null;
   onClose: () => void;
-  /** A task key, or a page id. */
+  /** A task key, a decision as "SVA-7#2", or a page id. */
   onPick: (kind: ChipKind, ref: string) => void;
 }
 
+const TITLE = { task: "docs.slash.task", decision: "docs.slash.decision", page: "docs.slash.page" } as const;
+
 export function ChipPicker({ kind, onClose, onPick }: Props) {
   return (
-    <Dialog open={kind !== null} onOpenChange={(open) => !open && onClose()} title={t(kind === "page" ? "docs.slash.page" : "docs.slash.task")} hideTitle size="sm" className="[&_[cmdk-root]]:w-full">
-      <div className="-mx-4 -my-3">{kind === "task" ? <TaskList onPick={(key) => onPick("task", key)} /> : kind === "page" ? <PageList onPick={(id) => onPick("page", id)} /> : null}</div>
+    <Dialog open={kind !== null} onOpenChange={(open) => !open && onClose()} title={t(TITLE[kind ?? "task"])} hideTitle size="sm" className="[&_[cmdk-root]]:w-full">
+      <div className="-mx-4 -my-3">
+        {kind === "task" ? (
+          <TaskList onPick={(key) => onPick("task", key)} />
+        ) : kind === "decision" ? (
+          <DecisionList onPick={(ref) => onPick("decision", ref)} />
+        ) : kind === "page" ? (
+          <PageList onPick={(id) => onPick("page", id)} />
+        ) : null}
+      </div>
     </Dialog>
   );
 }
@@ -46,6 +58,25 @@ function TaskList({ onPick }: { onPick: (key: string) => void }) {
     [tasks, statuses],
   );
   return <PickerList items={items} onPick={onPick} label={t("docs.slash.task")} placeholder={t("docs.pick.task")} />;
+}
+
+function DecisionList({ onPick }: { onPick: (ref: string) => void }) {
+  const c = useStore((s) => s.c);
+  const me = useStore((s) => s.me?.user_id);
+  const items = useMemo(
+    () =>
+      mentionable(c)
+        .slice(0, 400)
+        .map((f) => ({
+          id: f.ref,
+          label: f.decision.question,
+          keywords: `${f.ref} ${f.task.key} ${f.task.title}`,
+          hint: `${f.task.key} · ${decisionStateText(f.decision)}`,
+          icon: <DecisionMark mine={f.decision.state === "open" && f.decision.asked_id === me} />,
+        })),
+    [c, me],
+  );
+  return <PickerList items={items} onPick={onPick} label={t("docs.slash.decision")} placeholder={t("docs.pick.decision")} />;
 }
 
 function PageList({ onPick }: { onPick: (id: string) => void }) {

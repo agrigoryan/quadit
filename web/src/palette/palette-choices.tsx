@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
-import { CircleSlash } from "lucide-react";
+import { CircleSlash, Plus } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { useLabels, useMe, useMembers, useStatuses } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { Group, Item, Note } from "@/palette/palette-parts";
-import type { ChoicePage } from "@/palette/palette-root";
+import type { ChoicePage } from "@/palette/palette-commands";
 import { matches } from "@/palette/palette-search";
 import { setAssignee, setPriority, setStatus, toggleLabel } from "@/tasks/actions";
+import { createLabel, createLabelText } from "@/tasks/manage";
+import { useListening } from "@/settings/agents/data";
 import { Avatar } from "@/ui/avatar";
+import { ListeningDot } from "@/ui/listening-dot";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";
 
 interface Choice {
@@ -16,6 +19,8 @@ interface Choice {
   /** More words the search should match. */
   words?: string;
   detail?: string;
+  /** Drawn after the detail: whether anything is listening for an agent. */
+  mark?: ReactNode;
   icon: ReactNode;
   checked: boolean;
   apply: () => void;
@@ -36,6 +41,7 @@ function useChoices(page: ChoicePage, task: Task): Choice[] {
   const members = useMembers();
   const labels = useLabels(task.project_id);
   const me = useMe();
+  const listening = useListening();
 
   switch (page) {
     case "status":
@@ -63,6 +69,7 @@ function useChoices(page: ChoicePage, task: Task): Choice[] {
             id: m.user_id,
             label: m.name,
             detail: `@${m.handle}`,
+            mark: listening(m) === undefined ? undefined : <ListeningDot on={listening(m) === true} className="ml-1.5 align-middle" />,
             icon: <Avatar member={m} size="xs" />,
             checked: m.user_id === task.assignee_id,
             apply: () => setAssignee([task], m.user_id),
@@ -101,16 +108,40 @@ export function ChoicesPage({ page, task, query, run }: Props) {
   const q = query.trim();
   const shown = q ? choices.filter((c) => matches(q, `${c.label} ${c.detail ?? ""} ${c.words ?? ""}`)) : choices;
 
-  if (choices.length === 0 && page === "labels") return <Note>{t("palette.noLabels")}</Note>;
-  if (shown.length === 0) return <Note>{t("common.noMatches")}</Note>;
+  // A label that does not exist yet can be made here and put on the task in one go.
+  const canCreate = page === "labels" && q !== "" && !choices.some((c) => c.label.toLowerCase() === q.toLowerCase());
+
+  if (choices.length === 0 && page === "labels" && !canCreate) return <Note>{t("palette.noLabels")}</Note>;
+  if (shown.length === 0 && !canCreate) return <Note>{t("common.noMatches")}</Note>;
 
   return (
     <Group>
       {shown.map((c) => (
-        <Item key={c.id} value={`${page}:${c.id}`} icon={c.icon} detail={c.detail} checked={c.checked} onSelect={() => run(c.apply)}>
+        <Item
+          key={c.id}
+          value={`${page}:${c.id}`}
+          icon={c.icon}
+          detail={
+            c.mark ? (
+              <>
+                {c.detail}
+                {c.mark}
+              </>
+            ) : (
+              c.detail
+            )
+          }
+          checked={c.checked}
+          onSelect={() => run(c.apply)}
+        >
           {c.label}
         </Item>
       ))}
+      {canCreate && (
+        <Item value="labels:create" icon={<Plus />} onSelect={() => run(() => toggleLabel([task], createLabel(task.project_id, q)))}>
+          {createLabelText(q)}
+        </Item>
+      )}
     </Group>
   );
 }

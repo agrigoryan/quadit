@@ -4,6 +4,7 @@
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { after } from "@/lib/rank";
+import type { FileRole } from "@/decisions/data";
 import { getState } from "@/lib/store";
 import type { Decision, FileRow, Outcome } from "@/lib/types";
 
@@ -114,11 +115,17 @@ export function addComment(decision: Decision, optionId: string | undefined, bod
   );
 }
 
+/** A file for an option, with its part in a before/after pair when it has one. */
+export interface NewOptionFile {
+  file: FileRow;
+  role?: FileRole;
+}
+
 export interface NewOption {
   id: string;
   label: string;
   description: string;
-  files: FileRow[];
+  files: NewOptionFile[];
 }
 
 export interface NewDecision {
@@ -150,7 +157,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
   const optionRanks = ranks(options.length);
   const attachments = options.flatMap((o) => {
     const fileRanks = ranks(o.files.length);
-    return o.files.map((file, i) => ({ id: newId(), option: o.id, file, rank: fileRanks[i] as string }));
+    return o.files.map(({ file, role }, i) => ({ id: newId(), option: o.id, file, role, rank: fileRanks[i] as string }));
   });
   const siblings = Object.values(getState().c.decisions).filter((d) => d.task_id === draft.taskId);
   const lastRank = siblings.reduce((max, d) => (d.rank > max ? d.rank : max), "");
@@ -165,7 +172,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
       id: o.id,
       label: o.label.trim(),
       description: o.description.trim(),
-      attachments: attachments.filter((a) => a.option === o.id).map((a) => ({ id: a.id, file: a.file.id })),
+      attachments: attachments.filter((a) => a.option === o.id).map((a) => ({ id: a.id, file: a.file.id, ...(a.role ? { role: a.role } : {}) })),
     })),
   };
   if (recommended) {
@@ -205,6 +212,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
           subject_type: "decision_option",
           subject_id: a.option,
           task_id: draft.taskId,
+          role: a.role,
           rank: a.rank,
           created_by: meId(),
           created_at: now,
@@ -213,5 +221,30 @@ export async function openDecision(draft: NewDecision): Promise<void> {
       }
     },
     { quiet: true },
+  );
+}
+
+/** Adds one uploaded file to an option of an open question, as "before", "after" or neither. */
+export function attachToOption(decision: Decision, optionId: string, file: FileRow, role?: FileRole) {
+  const id = newId();
+  let last = "";
+  for (const a of Object.values(getState().c.attachments)) {
+    if (a.subject_id === optionId && a.rank > last) last = a.rank;
+  }
+  const args: Record<string, unknown> = { id, file: file.id, option: optionId };
+  if (role) args.role = role;
+  send({ type: "attachment.add", args }, (tx) =>
+    tx.insert("attachments", {
+      id,
+      file_id: file.id,
+      subject_type: "decision_option",
+      subject_id: optionId,
+      task_id: decision.task_id,
+      role,
+      rank: after(last),
+      created_by: meId(),
+      created_at: Date.now(),
+      file,
+    }),
   );
 }

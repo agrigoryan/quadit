@@ -2,7 +2,7 @@
 // relates to or repeats. The server keeps one row per pair, so each row is
 // read from this task's side.
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
@@ -12,7 +12,7 @@ import { send } from "@/lib/mutate";
 import { getState, useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Relation, Task } from "@/lib/types";
-import { type Side, sideOf } from "@/detail/data";
+import { type Side, sideOf, useEnsureTasks } from "@/detail/data";
 import { rowAction } from "@/detail/bits";
 import { Section } from "@/detail/section";
 import { TaskPicker } from "@/detail/task-picker";
@@ -127,6 +127,8 @@ export function Relations({ task, relations, startAdding, onEmptyClose }: Props)
   const tasks = useStore((s) => s.c.tasks);
   const [adding, setAdding] = useState(!!startAdding);
   const readOnly = !!task.deleted_at;
+  // The task at the other end may not be in the local copy yet; the relation is shown once it is.
+  useEnsureTasks(useMemo(() => relations.map((r) => sideOf(r, task.id).otherId), [relations, task.id]));
 
   const groups = SIDES.map((side) => ({
     side,

@@ -5,8 +5,8 @@
 import { t } from "@/lib/i18n";
 import { getState } from "@/lib/store";
 import { formatDay } from "@/lib/time";
-import type { Decision, FeedEvent, FieldChange, Relation, TaskLink } from "@/lib/types";
-import { linkName, sideOf, who } from "@/detail/data";
+import type { Attachment, Comment, Decision, FeedEvent, FieldChange, Relation, TaskLink } from "@/lib/types";
+import { linkName, type Side, sideOf, who } from "@/detail/data";
 
 export type Changes = Record<string, FieldChange>;
 
@@ -39,20 +39,30 @@ const writers: [string, Writer][] = [
   [
     "waiting_on_id",
     (c, { changes }) => {
-      if (!c.to) return t("timeline.waitingCleared");
+      // Handed from someone to an outside event: the outside wait says it.
+      if (!c.to) return changes.waiting_outside?.to ? null : t("timeline.waitingCleared");
       const note = str(changes.waiting_on_note?.to);
       const name = who(str(c.to));
       return note ? t("timeline.waitingNote", { name, note }) : t("timeline.waiting", { name });
     },
   ],
   [
+    "waiting_outside",
+    (c, { changes }) => {
+      if (!c.to) return changes.waiting_on_id ? null : t("timeline.waitingCleared");
+      const note = str(changes.waiting_on_note?.to);
+      return note ? t("timeline.waitingOutsideNote", { note }) : t("timeline.waitingOutside");
+    },
+  ],
+  [
     "waiting_on_note",
     (c, { changes }) => {
-      // Said together with who it is for, when that changed too.
-      if (changes.waiting_on_id) return null;
+      // Said together with who or what it is for, when that changed too.
+      if (changes.waiting_on_id || changes.waiting_outside) return null;
       return c.to ? t("timeline.noteSet", { note: str(c.to) }) : t("timeline.noteCleared");
     },
   ],
+  ["budget", (c) => (c.to ? t("timeline.budgetSet") : t("timeline.budgetCleared"))],
   [
     "priority",
     (c) => {
@@ -171,4 +181,49 @@ export function relationRemovedPhrase(r: Relation | undefined, taskId: string): 
 export function linkPhrase(link: TaskLink): string {
   const kind = (["branch", "commit", "pr"] as const).find((k) => k === link.kind) ?? "url";
   return t(`timeline.linked.${kind}`, { name: linkName(link) });
+}
+
+export function linkRemovedPhrase(link: TaskLink | undefined): string {
+  return link ? t("timeline.linkRemoved", { name: linkName(link) }) : t("timeline.linkRemovedAny");
+}
+
+/**
+ * A relation as told to the task at its far end (the `task.related` event).
+ * That task is always the one the relation points at: the blocked one, the
+ * original of a duplicate.
+ */
+export function relatedPhrase(data: FeedEvent["data"]): string | null {
+  const key = str(data.other_key);
+  if (!key) return null;
+  if (data.removed === true) return t("timeline.relationRemoved", { key });
+  const side: Side = data.type === "blocks" ? "blockedBy" : data.type === "duplicates" ? "duplicatedBy" : "relates";
+  return t(`timeline.relation.${side}`, { key });
+}
+
+/** Where a file was put: on the task itself, on a question, or on one of its options. */
+export interface FilePlace {
+  on: "task" | "option" | "decision";
+  id: string;
+  /** The option's label or the question; empty when it is not known. */
+  name: string;
+}
+
+export function filesPhrase(place: FilePlace, names: string[]): string {
+  const list = joinPhrases(names);
+  if (place.on === "option" && place.name) return t("timeline.attachedOption", { names: list, option: place.name });
+  if (place.on === "decision" && place.name) return t("timeline.attachedQuestion", { names: list, question: place.name });
+  if (place.on !== "task") return t("timeline.attachedAnyOption", { names: list });
+  return t("timeline.attached", { names: list });
+}
+
+export function fileRemovedPhrase(a: Attachment | undefined, place: FilePlace | null): string {
+  const name = a?.file?.name;
+  if (!name) return t("timeline.fileRemovedAny");
+  if (place?.on === "option" && place.name) return t("timeline.fileRemovedOption", { name, option: place.name });
+  return t("timeline.fileRemoved", { name });
+}
+
+export function commentDeletedPhrase(comment: Comment | undefined, actorId: string): string {
+  if (!comment || comment.author_id === actorId) return t("timeline.commentDeleted");
+  return t("timeline.commentDeletedBy", { name: who(comment.author_id) });
 }

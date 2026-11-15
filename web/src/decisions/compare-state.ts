@@ -1,17 +1,17 @@
 // The state of an open compare view: which option has the focus, which file
-// of each option is showing, the shared zoom, the videos on stage, and the
-// pick waiting for its confirmation.
+// of each option is showing, the shared zoom, whether pictures keep hard
+// pixel edges, the videos on stage, and the pick waiting for its confirmation.
 
 import { useCallback, useRef, useState } from "react";
 import { isVideo } from "@/lib/files";
-import type { Decision, DecisionOption, FileRow } from "@/lib/types";
-import type { OptionFiles, Viewer } from "@/decisions/data";
+import type { Decision, DecisionOption } from "@/lib/types";
+import { isSmallArt, type OptionFile, type OptionFiles, type Viewer } from "@/decisions/data";
 import { useSharedZoom, type Zoom } from "@/decisions/use-zoom";
 
 export interface CompareProps {
   decision: Decision;
   options: DecisionOption[];
-  /** Pictures and videos of each option, by option id. */
+  /** Pictures and videos of each option, by option id; a before/after pair is one entry. */
   media: OptionFiles;
   viewer: Viewer;
   /** Where to open: the position of an option and of one of its files. */
@@ -27,16 +27,22 @@ export interface Compare extends CompareProps {
   focused: DecisionOption | undefined;
   /** Moves the focus, staying inside the options. Drops a pick that waits for confirmation. */
   focusOn: (index: number) => void;
-  filesOf: (option: DecisionOption) => FileRow[];
+  filesOf: (option: DecisionOption) => OptionFile[];
   fileIndexOf: (option: DecisionOption) => number;
-  fileOf: (option: DecisionOption) => FileRow | undefined;
+  fileOf: (option: DecisionOption) => OptionFile | undefined;
   stepFile: (option: DecisionOption, delta: number) => void;
   zoom: Zoom;
   /** Screen pixels per picture pixel of the focused file when it fits its pane. */
   fit: number;
   setFit: (fit: number) => void;
+  /** What the "Pixel-perfect" switch shows: the person's choice, else whether the focused picture is sprite art. */
   pixelated: boolean;
+  /** The person's own choice; it then holds for every picture. */
   setPixelated: (on: boolean) => void;
+  /** Whether a picture of this size is drawn with hard edges: small art is, until the person says otherwise. */
+  sharp: (width: number | undefined, height: number | undefined) => boolean;
+  /** The pane the zoom is measured on says whether its picture is small art (its size may be known only once loaded). */
+  setSmallArt: (small: boolean) => void;
   /** The option a number key chose, until Enter confirms or Escape cancels. */
   pending: DecisionOption | undefined;
   setPending: (optionId: string | null) => void;
@@ -55,7 +61,13 @@ export function useCompare(props: CompareProps): Compare {
     return first ? { [first.id]: props.start.file } : {};
   });
   const [fit, setFit] = useState(1);
-  const [pixelated, setPixelated] = useState(false);
+  // Sprite art opens sharp: smoothing a 32-pixel picture up to the screen shows nothing of it.
+  const [smallArt, setSmallArt] = useState(() => {
+    const first = options[props.start.option];
+    const file = first ? media[first.id]?.[props.start.file] : undefined;
+    return isSmallArt(file?.width, file?.height);
+  });
+  const [pixelChoice, setPixelChoice] = useState<boolean | null>(null);
   const [pendingId, setPending] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const zoom = useSharedZoom(1 / fit);
@@ -89,8 +101,10 @@ export function useCompare(props: CompareProps): Compare {
     zoom,
     fit,
     setFit,
-    pixelated,
-    setPixelated,
+    pixelated: pixelChoice ?? smallArt,
+    setPixelated: setPixelChoice,
+    sharp: (width, height) => pixelChoice ?? isSmallArt(width, height),
+    setSmallArt,
     pending: viewer.canAnswer ? options.find((o) => o.id === pendingId) : undefined,
     setPending,
     playing,

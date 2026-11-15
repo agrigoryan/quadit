@@ -1,37 +1,70 @@
-import type { ReactNode, RefObject } from "react";
-import { CircleSlash, Layers, RefreshCw, Target } from "lucide-react";
+import { type ReactNode, type RefObject, useState } from "react";
+import { CircleSlash, Globe, Layers, RefreshCw, Target } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
-import { useCycles, useEpics, useLabels, useMe, useMembers, useStatuses } from "@/lib/selectors";
+import { useCycles, useEpics, useLabels, useMe, useMembers, useProjects, useStatuses } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { Member, Task } from "@/lib/types";
 import { formatDay } from "@/lib/time";
-import { setAssignee, setCycle, setEpic, setMilestone, setPriority, setStatus, setWaitingOn, toggleLabel } from "@/tasks/actions";
+import { useListening } from "@/settings/agents/data";
+import { ProjectGlyph } from "@/shell/sidebar";
+import {
+  moveToProject,
+  OUTSIDE,
+  setAssignee,
+  setCycle,
+  setEpic,
+  setMilestone,
+  setPriority,
+  setStatus,
+  setWaitingOn,
+  setWaitingOutside,
+  toggleLabel,
+  waitsOutside,
+} from "@/tasks/actions";
+import { ChoiceList } from "@/tasks/choice-list";
+import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { Avatar } from "@/ui/avatar";
+import { Button } from "@/ui/button";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";
-import { Picker, type PickerItem } from "@/ui/picker";
+import { Input } from "@/ui/input";
+import { ListeningDot } from "@/ui/listening-dot";
+import type { PickerItem } from "@/ui/picker";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
-export type TaskProperty = "status" | "assignee" | "waiting" | "priority" | "labels" | "epic" | "milestone" | "cycle";
+export type TaskProperty = "status" | "assignee" | "waiting" | "priority" | "labels" | "epic" | "milestone" | "cycle" | "project";
 
 const NONE = "none";
 const noneIcon = <CircleSlash className="size-3.5 text-ink-3" aria-hidden />;
 
 export const PRIORITIES = [0, 1, 2, 3, 4];
 
-/** People and agents as picker rows, "me" first. */
-export function memberItems(members: Member[], meId: string | undefined): PickerItem[] {
+/** Says whether something is listening for an agent; nothing for a person. From useListening (settings/agents/data). */
+export type Listening = (member: Member | undefined) => boolean | undefined;
+
+/** People and agents as picker rows, "me" first. With `listening`, each agent shows whether anything waits for its work. */
+export function memberItems(members: Member[], meId: string | undefined, listening?: Listening): PickerItem[] {
   return [...members]
     .sort((a, b) => Number(b.user_id === meId) - Number(a.user_id === meId))
-    .map((m) => ({
-      id: m.user_id,
-      label: m.name,
-      icon: <Avatar member={m} size="xs" />,
-      hint: m.kind === "agent" ? t("common.agent") : undefined,
-      keywords: `@${m.handle}`,
-    }));
+    .map((m) => {
+      const on = listening?.(m);
+      return {
+        id: m.user_id,
+        label: m.name,
+        icon: <Avatar member={m} size="xs" />,
+        hint:
+          m.kind === "agent" ? (
+            <span className="flex items-center gap-1.5">
+              {t("common.agent")}
+              {on !== undefined && <ListeningDot on={on} />}
+            </span>
+          ) : undefined,
+        keywords: `@${m.handle}`,
+      };
+    });
 }
 
 /** The rows a picker offers for one property, and what is picked now. */
-function useItems(kind: TaskProperty, tasks: Task[]): { items: PickerItem[]; value: string | string[] | undefined } {
+function useItems(kind: TaskProperty, tasks: Task[], listening?: Listening): { items: PickerItem[]; value: string | string[] | undefined } {
   const first = tasks[0];
   const projectId = first?.project_id;
   const statuses = useStatuses(kind === "status" ? projectId : undefined);
@@ -41,6 +74,7 @@ function useItems(kind: TaskProperty, tasks: Task[]): { items: PickerItem[]; val
   const epics = useEpics(projectId);
   const cycles = useCycles(projectId);
   const milestones = useStore((s) => s.c.milestones);
+  const projects = useProjects();
   const same = <T,>(get: (task: Task) => T) => (tasks.every((task) => get(task) === get(first as Task)) ? get(first as Task) : undefined);
 
   switch (kind) {
@@ -50,10 +84,18 @@ function useItems(kind: TaskProperty, tasks: Task[]): { items: PickerItem[]; val
         value: same((task) => task.status_id),
       };
     case "assignee":
+      return {
+        items: [{ id: NONE, label: t("task.unassigned"), icon: noneIcon }, ...memberItems(members, me.user_id, listening)],
+        value: same((task) => task.assignee_id ?? NONE),
+      };
     case "waiting":
       return {
-        items: [{ id: NONE, label: kind === "assignee" ? t("task.unassigned") : t("prop.nobody"), icon: noneIcon }, ...memberItems(members, me.user_id)],
-        value: same((task) => (kind === "assignee" ? task.assignee_id : task.waiting_on_id) ?? NONE),
+        items: [
+          { id: NONE, label: t("prop.nobody"), icon: noneIcon },
+          { id: OUTSIDE, label: t("prop.outside.pick"), icon: <Globe className="size-3.5 text-ink-2" aria-hidden />, keywords: t("prop.outside.words") },
+          ...memberItems(members, me.user_id, listening),
+        ],
+        value: same((task) => (waitsOutside(task) ? OUTSIDE : (task.waiting_on_id ?? NONE))),
       };
     case "priority":
       return {
@@ -105,6 +147,11 @@ function useItems(kind: TaskProperty, tasks: Task[]): { items: PickerItem[]; val
         ],
         value: same((task) => task.cycle_id ?? NONE),
       };
+    case "project":
+      return {
+        items: projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, hint: p.key, keywords: p.key })),
+        value: same((task) => task.project_id),
+      };
   }
 }
 
@@ -127,6 +174,8 @@ function apply(kind: TaskProperty, tasks: Task[], id: string) {
       return setMilestone(tasks, value);
     case "cycle":
       return setCycle(tasks, value);
+    case "project":
+      return moveToProject(tasks, id);
   }
 }
 
@@ -139,6 +188,7 @@ const titles: Record<TaskProperty, () => string> = {
   epic: () => t("prop.set.epic"),
   milestone: () => t("prop.set.milestone"),
   cycle: () => t("prop.set.cycle"),
+  project: () => t("prop.set.project"),
 };
 
 interface Props {
@@ -155,18 +205,102 @@ interface Props {
   side?: "top" | "right" | "bottom" | "left";
 }
 
-/** Changes one property of one or many tasks. Used by rows, the bulk bar, the task panel and the palette. */
-export function TaskPropertyPicker({ kind, tasks, ...rest }: Props) {
-  const { items, value } = useItems(kind, tasks);
+interface ChoicesProps {
+  kind: TaskProperty;
+  tasks: Task[];
+  close: () => void;
+  listening?: Listening;
+}
+
+/** Choosing a person or an agent: asks the server which agents have something listening, while the list is open. */
+function MemberChoices(props: ChoicesProps) {
+  return <Choices {...props} listening={useListening()} />;
+}
+
+/** The list inside the popover. It reads the store only while the picker is open. */
+function Choices({ kind, tasks, close, listening }: ChoicesProps) {
+  const { items, value } = useItems(kind, tasks, listening);
+  const projectId = tasks[0]?.project_id;
+  const manage = useManageLinks(projectId);
+  /** Waiting on an outside event needs a word about which: the list gives way to a note box. */
+  const [outside, setOutside] = useState(false);
+  if (outside) return <OutsideNote tasks={tasks} onDone={close} />;
   return (
-    <Picker
-      {...rest}
+    <ChoiceList
       items={items}
       value={value}
-      multiple={kind === "labels"}
       label={titles[kind]()}
       placeholder={titles[kind]()}
-      onPick={(id) => apply(kind, tasks, id)}
+      onPick={(id) => {
+        if (kind === "waiting" && id === OUTSIDE) return setOutside(true);
+        apply(kind, tasks, id);
+        if (kind !== "labels") close();
+      }}
+      onCreate={kind === "labels" ? (name) => toggleLabel(tasks, createLabel(projectId, name)) : undefined}
+      createLabel={createLabelText}
+      manage={
+        kind === "labels" || kind === "status"
+          ? (() => {
+              const link = kind === "labels" ? manage.labels : manage.statuses;
+              return link && { label: link.label, onSelect: () => (close(), link.onSelect()) };
+            })()
+          : undefined
+      }
     />
+  );
+}
+
+/** What the task waits on outside the workspace, in a few words: "the store's review", "the client's reply". */
+function OutsideNote({ tasks, onDone }: { tasks: Task[]; onDone: () => void }) {
+  const first = tasks[0];
+  const [note, setNote] = useState(() => (first && waitsOutside(first) ? (first.waiting_on_note ?? "") : ""));
+  return (
+    <form
+      className="flex w-60 flex-col gap-2 p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setWaitingOutside(tasks, note.trim());
+        onDone();
+      }}
+    >
+      <label htmlFor="outside-note" className="text-xs font-medium text-ink-2">
+        {t("prop.outside.note")}
+      </label>
+      <Input id="outside-note" autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("prop.outside.placeholder")} />
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onDone}>
+          {t("common.cancel")}
+        </Button>
+        <Button type="submit" variant="primary">
+          {t("prop.outside.set")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Changes one property of one or many tasks. Used by rows, the bulk bar, the
+ * task panel and the palette. A list draws three of these on every row, so
+ * nothing but the trigger exists until one is opened.
+ */
+export function TaskPropertyPicker({ kind, tasks, open, onOpenChange, children, anchor, align, side }: Props) {
+  const [own, setOwn] = useState(false);
+  const isOpen = open ?? own;
+  const setOpen = onOpenChange ?? setOwn;
+  return (
+    <Popover open={isOpen} onOpenChange={setOpen}>
+      {children && <PopoverTrigger asChild>{children}</PopoverTrigger>}
+      {anchor && <PopoverAnchor virtualRef={anchor as RefObject<Element>} />}
+      {isOpen && (
+        <PopoverContent align={align} side={side} className="p-0">
+          {kind === "assignee" || kind === "waiting" ? (
+            <MemberChoices kind={kind} tasks={tasks} close={() => setOpen(false)} />
+          ) : (
+            <Choices kind={kind} tasks={tasks} close={() => setOpen(false)} />
+          )}
+        </PopoverContent>
+      )}
+    </Popover>
   );
 }

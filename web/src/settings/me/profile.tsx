@@ -1,7 +1,6 @@
-import { type FormEvent, useMemo, useRef, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { saveTheme } from "@/auth/session";
 import { errorMessage } from "@/lib/api";
-import { isImage, uploadFile } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import { useMe } from "@/lib/selectors";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
@@ -9,10 +8,10 @@ import { toast } from "@/lib/toast";
 import { useSettingsBase } from "@/settings/base";
 import { type Account, saveAccount, useAccount } from "@/settings/me/account";
 import { Segmented } from "@/settings/me/segmented";
+import { AvatarInput } from "@/settings/ui/avatar-input";
 import { LoadGate } from "@/settings/ui/bits";
 import { FormAlert, FormField, FormFoot, NativeSelect, useFieldErrors } from "@/settings/ui/form";
 import { Card, Page, Section } from "@/settings/ui/layout";
-import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
@@ -40,77 +39,13 @@ function useZones(current: string) {
 
 function AvatarField({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
   const me = useMe();
-  const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const avatar = account.user.avatar;
-
-  async function save(next: string) {
-    setBusy(true);
-    setError("");
-    try {
-      onSaved(await saveAccount({ avatar: next }));
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function pick(file: File | undefined) {
-    if (!file) return;
-    if (!isImage({ content_type: file.type })) {
-      setError(t("me.profile.avatarNotImage"));
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const row = await uploadFile(file);
-      await save(row.url);
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  }
-
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-4">
-        <span className="flex size-14 shrink-0 items-center justify-center">
-          <Avatar member={{ user_id: me.user_id, name: account.user.name, kind: "person", avatar }} size="lg" className="scale-[1.75]" />
-        </span>
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button disabled={busy} onClick={() => input.current?.click()}>
-              {busy ? t("me.profile.uploading") : avatar ? t("me.profile.avatarChange") : t("me.profile.avatarUpload")}
-            </Button>
-            {avatar && (
-              <Button variant="ghost" disabled={busy} onClick={() => void save("")}>
-                {t("me.profile.avatarRemove")}
-              </Button>
-            )}
-          </div>
-          <p className="text-xs text-ink-3">{t("me.profile.avatarHint")}</p>
-        </div>
-        <input
-          ref={input}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          aria-label={t("me.profile.avatarUpload")}
-          onChange={(e) => {
-            void pick(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-      </div>
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
-    </div>
+    <AvatarInput
+      member={{ user_id: me.user_id, name: account.user.name, kind: "person" }}
+      value={account.user.avatar ?? ""}
+      onChange={async (next) => onSaved(await saveAccount({ avatar: next }))}
+      hint={t("me.profile.avatarHint")}
+    />
   );
 }
 

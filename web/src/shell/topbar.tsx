@@ -3,6 +3,7 @@ import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
 import { ConnectionIndicator } from "@/shell/connection";
+import { RestLoadingHint } from "@/shell/rest-note";
 import { UserMenu } from "@/shell/user-menu";
 import { Button, IconButton } from "@/ui/button";
 import { Kbd } from "@/ui/kbd";
@@ -22,6 +23,7 @@ export function TopBar({ onNewTask }: Props) {
       </IconButton>
       <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</h1>
 
+      <RestLoadingHint />
       <ConnectionIndicator />
 
       <button

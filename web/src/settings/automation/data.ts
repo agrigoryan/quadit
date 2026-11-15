@@ -84,6 +84,10 @@ export interface GitHubConfig {
   on_open?: Category | "";
   on_merge?: Category | "";
   comment_back?: boolean;
+  /** Issues with this label become tasks and stay in step with the issue; "*" means every issue. */
+  issues_label?: string;
+  /** The key of the project those tasks are made in; empty means the integration's own project. */
+  issues_project?: string;
 }
 
 export interface Integration {

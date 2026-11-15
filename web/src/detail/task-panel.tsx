@@ -3,8 +3,9 @@
 // and owns what they share: the file chooser, dropping files anywhere, and
 // which empty sections have been opened to add a first item.
 
-import { type DragEvent, useRef, useState } from "react";
+import { type DragEvent, type RefObject, useEffect, useRef, useState } from "react";
 import { GitFork, Link2, ListTree, Paperclip } from "lucide-react";
+import { useMedia } from "@/decisions/data";
 import { DecisionSection } from "@/decisions/decision-section";
 import { useHotkeys } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
@@ -14,9 +15,11 @@ import type { Task } from "@/lib/types";
 import { Attachments } from "@/detail/attachments";
 import { useFindTask, useSubtasks, useTaskAttachments, useTaskLinks, useTaskRelations } from "@/detail/data";
 import { Links } from "@/detail/links";
+import { MentionedIn } from "@/detail/mentions";
 import { PanelHeader, TrashBanner } from "@/detail/panel-header";
 import { Properties } from "@/detail/properties";
 import { Relations } from "@/detail/relations";
+import { useRevealFromHash } from "@/detail/reveal-hash";
 import { Subtasks } from "@/detail/subtasks";
 import { Timeline } from "@/detail/timeline";
 import { Description, EditableTitle } from "@/detail/title-description";
@@ -34,10 +37,45 @@ interface Props {
 type Extra = "subtasks" | "relations" | "links";
 const NO_UPLOADS: PendingUpload[] = [];
 
+/**
+ * Below the width where the panel leaves a strip of the page showing, it
+ * covers the whole screen. What is behind it is then put out of reach of
+ * the keyboard and of screen readers, as it is out of sight. Dialogs and
+ * menus are drawn outside the frame and stay usable.
+ */
+function useCoverPage(panel: RefObject<HTMLElement | null>) {
+  const covers = useMedia("(max-width: 767px)");
+  useEffect(() => {
+    const el = panel.current;
+    const frame = el?.parentElement;
+    if (!covers || !el || !frame) return;
+    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const put: { el: HTMLElement; inert: boolean; hidden: string | null }[] = [];
+    for (const other of frame.children) {
+      if (other === el || !(other instanceof HTMLElement) || other.contains(el)) continue;
+      put.push({ el: other, inert: other.inert, hidden: other.getAttribute("aria-hidden") });
+      other.inert = true;
+      other.setAttribute("aria-hidden", "true");
+    }
+    return () => {
+      for (const p of put) {
+        p.el.inert = p.inert;
+        if (p.hidden === null) p.el.removeAttribute("aria-hidden");
+        else p.el.setAttribute("aria-hidden", p.hidden);
+      }
+      // Back to the row the task was opened from, if nothing else took the focus.
+      if (before?.isConnected && (document.activeElement === document.body || el.contains(document.activeElement))) before.focus();
+    };
+  }, [covers, panel]);
+}
+
 export function TaskPanel({ taskKey, onClose }: Props) {
+  const panel = useRef<HTMLElement>(null);
+  useCoverPage(panel);
   const task = useTaskByKey(taskKey);
   const looking = useFindTask(taskKey, !!task);
   const status = useTaskDetail(task?.id);
+  useRevealFromHash(!!task);
   const [dragging, setDragging] = useState(false);
   const canDrop = !!task && !task.deleted_at;
   useHotkeys({ Escape: onClose }, { layer: "panel" });
@@ -56,6 +94,7 @@ export function TaskPanel({ taskKey, onClose }: Props) {
 
   return (
     <aside
+      ref={panel}
       data-task-panel
       aria-label={taskKey}
       onDragEnter={(e) => drag(e, 1)}
@@ -167,6 +206,7 @@ function PanelBody({ task, status }: { task: Task; status: string }) {
       {show.links && <Links task={task} links={links} startAdding={!!opened.links} onEmptyClose={() => close("links")} />}
       <TaskWork task={task} />
       {show.files && <Attachments task={task} files={files} pending={pending} onAttach={attach} />}
+      <MentionedIn task={task} />
 
       <Timeline task={task} loading={loading} />
     </div>

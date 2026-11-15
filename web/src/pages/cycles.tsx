@@ -5,6 +5,7 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
 import { useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
+import { useRestLoaded } from "@/lib/store";
 import { daysUntil, formatDay, today } from "@/lib/time";
 import type { Cycle, Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
@@ -95,9 +96,11 @@ function Cycles({ project }: { project: Project }) {
 
 /** The cycle's dates and, when its tasks are estimated, its points. */
 function CycleMeta({ cycle, tally }: { cycle: Cycle; tally: Tally | undefined }) {
+  // Points done are not known until the finished tasks have arrived; the row says it is loading.
+  const restLoaded = useRestLoaded();
   return (
     <>
-      {!!tally?.points && (
+      {restLoaded && !!tally?.points && (
         <span className="shrink-0 text-xs text-ink-3 tnum max-md:hidden">
           {t("ins.points", { done: tally.pointsDone, total: tally.points })}
         </span>

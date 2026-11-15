@@ -9,6 +9,7 @@ import type { Task } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { restoreDecision } from "@/decisions/actions";
 import { useTrashedDecisions } from "@/decisions/trash";
+import { TrashedFileRow, useTrashedFiles } from "@/pages/trash-files";
 import { restoreTasks } from "@/tasks/actions";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
@@ -40,8 +41,8 @@ function Deleted({ at }: { at: number | undefined }) {
 }
 
 /**
- * The trash: deleted tasks and deleted questions, newest deletion first,
- * each with a way back. The workspace's starting copy leaves them out, so
+ * The trash: deleted tasks, deleted questions and removed files, newest
+ * deletion first, each with a way back. The workspace's starting copy leaves them out, so
  * they are fetched here (the questions in decisions/trash.ts); what is
  * deleted while the app is open shows up here by itself.
  */
@@ -52,6 +53,7 @@ export function TrashPage() {
   const tasks = useCollection("tasks");
   const projects = useCollection("projects");
   const questions = useTrashedDecisions();
+  const files = useTrashedFiles();
   const [state, setState] = useState<"loading" | "ready" | { error: string }>("loading");
   /** Questions on their way back: hidden until the server has said yes or no. */
   const [restoring, setRestoring] = useState<Record<string, true>>({});
@@ -90,11 +92,13 @@ export function TrashPage() {
     [tasks],
   );
   const deletedDecisions = questions.rows.filter((d) => !restoring[d.id]);
-  const total = deletedTasks.length + deletedDecisions.length;
+  // A file whose task is in the trash comes back with the task; it is not listed twice.
+  const removedFiles = files.rows.filter((f) => !(f.task_id && tasks[f.task_id]?.deleted_at));
+  const total = deletedTasks.length + deletedDecisions.length + removedFiles.length;
 
   if (total === 0) {
-    if (state === "loading" || questions.loading) return <Loading />;
-    const error = state !== "ready" ? state.error : questions.error;
+    if (state === "loading" || questions.loading || files.loading) return <Loading />;
+    const error = state !== "ready" ? state.error : questions.error || files.error;
     if (error) return <EmptyState icon={<Trash2 />} title={t("trash.loadFailed")} hint={error} />;
     return <EmptyState icon={<Trash2 />} title={t("trash.empty")} hint={t("trash.emptyHint")} />;
   }
@@ -149,6 +153,13 @@ export function TrashPage() {
               </li>
             );
           })}
+        </Group>
+      )}
+      {removedFiles.length > 0 && (
+        <Group title={t("trash.files")} count={removedFiles.length}>
+          {removedFiles.map((file) => (
+            <TrashedFileRow key={file.id} row={file} rowClass={rowClass} when={<Deleted at={file.deleted_at} />} onRestore={() => files.restore(file.id)} />
+          ))}
         </Group>
       )}
     </div>

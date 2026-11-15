@@ -94,31 +94,56 @@ export class Draft {
   }
 }
 
-/** Applies one feed event to the draft. Applying an event twice is harmless. */
-export function applyEvent(d: Draft, ev: FeedEvent) {
+/** Collections whose rows carry `updated_seq`, the position of their last change, and come in the starting copy's second part. */
+const TRACKED: ReadonlySet<CollectionName> = new Set<CollectionName>(["tasks", "decisions"]);
+
+/**
+ * Applies one feed event to the draft. Applying an event twice is harmless.
+ * With `only`, the event touches just the rows it names (used to replay
+ * events over rows that arrived after them).
+ */
+export function applyEvent(d: Draft, ev: FeedEvent, only?: (collection: CollectionName, key: string) => boolean) {
   const name = COLLECTION_OF[ev.entity_type];
   const data = ev.data ?? {};
   if (!name) return;
+  const wanted = (collection: CollectionName, key: string) => !only || only(collection, key);
 
-  for (const att of data.attachments ?? []) d.put("attachments", att as unknown as AnyRow);
+  for (const att of data.attachments ?? []) {
+    const row = att as unknown as AnyRow;
+    if (wanted("attachments", keyOf("attachments", row))) d.put("attachments", row);
+  }
 
   if (data.row) {
     const row = data.row;
     // A task opened earlier keeps nothing stale: the event row is complete.
-    d.put(name, row);
+    if (wanted(name, keyOf(name, row))) d.put(name, row);
     return;
   }
 
   const id = name === "watchers" ? `${String(data.user_id ?? ev.audience_id)}:${ev.entity_id}` : ev.entity_id;
   if (data.gone === true) {
-    d.drop(name, id);
+    if (wanted(name, id)) d.drop(name, id);
     return;
   }
   if (data.changes) {
     const fields: AnyRow = {};
     for (const [field, change] of Object.entries(data.changes)) fields[field] = change.to;
     if (name === "tasks") fields.updated_at = ev.at;
-    for (const target of data.ids ?? [id]) d.patch(name, target, fields);
+    // The server stamps the row with the event's position; keep the copy's stamp in step,
+    // so an older copy of the row arriving later is recognised as older.
+    if (TRACKED.has(name)) fields.updated_seq = ev.seq;
+    for (const target of data.ids ?? [id]) {
+      if (wanted(name, target)) d.patch(name, target, fields);
+    }
   }
 }
 
+/** The rows an event names: the keys it would write in its own collection. */
+export function targetsOf(ev: FeedEvent): { collection: CollectionName; keys: string[]; gone: boolean } | null {
+  const name = COLLECTION_OF[ev.entity_type];
+  if (!name) return null;
+  const data = ev.data ?? {};
+  if (data.row) return { collection: name, keys: [keyOf(name, data.row)], gone: false };
+  const id = name === "watchers" ? `${String(data.user_id ?? ev.audience_id)}:${ev.entity_id}` : ev.entity_id;
+  return { collection: name, keys: data.ids ?? [id], gone: data.gone === true };
+}

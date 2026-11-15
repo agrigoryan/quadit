@@ -17,6 +17,11 @@ export const agentsStrings = {
   "agents.claim.holding": "Holds {name} until {time}",
   "agents.claim.waiting": "In line for {name}",
 
+  "agents.helpers": "Helpers",
+  "agents.helper.oneTask": "for one task",
+  "agents.helper.finished": "Finished",
+  "agents.helper.showFinished": "Show finished helpers ({n})",
+
   "agents.waits": "Waiting on it",
   "agents.waits.none": "Nothing waits on it.",
   "agents.waits.question": "A question asked of it",

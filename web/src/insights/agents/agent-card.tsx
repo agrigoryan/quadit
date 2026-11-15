@@ -3,7 +3,7 @@
 // runs.
 
 import { useState } from "react";
-import { Ear } from "lucide-react";
+import { CornerDownRight, Ear } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { ago, exact, timeOfDay } from "@/lib/time";
@@ -14,8 +14,10 @@ import type { AgentState, Claim } from "@/insights/lib/types";
 import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-bits";
 import type { AgentWork } from "@/insights/agents/agent-data";
 import { SessionRow, sessionLength } from "@/insights/agents/session-row";
+import { isFinishedHelper } from "@/settings/agents/helpers";
 import { useTaskLink } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
+import { Badge } from "@/ui/badge";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 
 const SHOWN = 4;
@@ -157,10 +159,37 @@ function Reach({ state, now }: { state: AgentState; now: number }) {
   );
 }
 
+/** A helper this agent made for one task, shown inside its maker's card. */
+export interface HelperOf {
+  member: Member;
+  state: AgentState | undefined;
+  /** The task it was made for, when the store has it. */
+  task: Task | undefined;
+}
+
+function HelperRow({ helper }: { helper: HelperOf }) {
+  const { member, state, task } = helper;
+  const done = isFinishedHelper(member);
+  return (
+    <li className="flex min-h-7 min-w-0 items-center gap-1.5 max-md:min-h-8">
+      <CornerDownRight className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+      <Avatar member={member} size="sm" className={done ? "opacity-60" : undefined} />
+      <span className={done ? "shrink-0 text-ink-2" : "shrink-0 font-medium"}>{member.name}</span>
+      <span className="flex min-w-0 flex-1 text-ink-2">{task ? <TaskRef task={task} /> : <span className="truncate text-ink-3">{t("agents.helper.oneTask")}</span>}</span>
+      {done ? <Badge>{t("agents.helper.finished")}</Badge> : state ? <AgentStateChip state={state.state} /> : null}
+      {!done && state && isStranded(state) && <NotListening urgent />}
+    </li>
+  );
+}
+
 interface Props {
   member: Member;
   /** From the server; missing until the first answer arrives. */
   state: AgentState | undefined;
+  /** The helpers it made, each for one task. */
+  helpers?: HelperOf[];
+  /** For a helper with a card of its own (a person made it): "Helper for SVA-12". */
+  helperNote?: string;
   work: AgentWork;
   sessions: AgentSession[];
   /** Names of the shared resources its claims are on. */
@@ -173,7 +202,7 @@ function claimLine(claim: Claim, name: string): string {
   return t("agents.claim.waiting", { name });
 }
 
-export function AgentCard({ member, state, work, sessions, resourceNames, now }: Props) {
+export function AgentCard({ member, state, helpers, helperNote, work, sessions, resourceNames, now }: Props) {
   const [allSessions, setAllSessions] = useState(false);
   const running = sessions.find((s) => s.state === "running");
   const waits = work.asked.length + work.waiting.length;
@@ -187,9 +216,9 @@ export function AgentCard({ member, state, work, sessions, resourceNames, now }:
             <span className="truncate">{member.name}</span>
             <span className="shrink-0 text-xs font-normal text-ink-3">@{member.handle}</span>
           </h3>
-          {member.title && <p className="truncate text-xs text-ink-2">{member.title}</p>}
+          {(helperNote || member.title) && <p className="truncate text-xs text-ink-2">{[helperNote, member.title].filter(Boolean).join(" · ")}</p>}
         </div>
-        {state && <AgentStateChip state={state.state} />}
+        {isFinishedHelper(member) ? <Badge>{t("agents.helper.finished")}</Badge> : state && <AgentStateChip state={state.state} />}
       </header>
 
       <Doing state={state} work={work} running={running} now={now} />
@@ -199,6 +228,20 @@ export function AgentCard({ member, state, work, sessions, resourceNames, now }:
             <li key={c.id}>{claimLine(c, resourceNames[c.resource_id] ?? "")}</li>
           ))}
         </ul>
+      )}
+
+      {helpers && helpers.length > 0 && (
+        <section>
+          <h4 className={label}>
+            {t("agents.helpers")}
+            <span className="ml-1.5 font-normal text-ink-3 tnum">{helpers.length}</span>
+          </h4>
+          <ul className="flex flex-col text-sm">
+            {helpers.map((h) => (
+              <HelperRow key={h.member.user_id} helper={h} />
+            ))}
+          </ul>
+        </section>
       )}
 
       <section>

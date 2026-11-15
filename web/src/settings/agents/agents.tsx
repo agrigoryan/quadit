@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, Plus, Radio } from "lucide-react";
+import { ChevronRight, CornerDownRight, Plus, Radio } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
@@ -7,8 +7,10 @@ import { useMembers } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { CreateAgentDialog } from "@/settings/agents/agent-create";
 import { type AgentMember, type AgentState, useAgentStates } from "@/settings/agents/data";
+import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact, When } from "@/settings/ui/bits";
+import { Checkbox } from "@/settings/ui/form";
 import { EmptyRow, Page, Rows } from "@/settings/ui/layout";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
@@ -47,6 +49,10 @@ export function AgentsPage() {
   const members = useStore((s) => s.c.members);
   const states = useAgentStates();
   const [creating, setCreating] = useState(false);
+  const [showFinished, setShowFinished] = useState(false);
+  const helperLabel = useHelperLabel();
+  const placed = placeHelpers(agents, showFinished);
+  const finished = agents.filter(isFinishedHelper).length;
 
   return (
     <Page
@@ -69,44 +75,60 @@ export function AgentsPage() {
           <p className="mt-1">{t("agents.noneHint")}</p>
         </EmptyRow>
       ) : (
-        <Rows>
-          {agents.map((a) => {
-            const state = states.data?.[a.user_id];
-            const person = members[a.responsible_id ?? ""];
-            return (
-              <button
-                key={a.user_id}
-                type="button"
-                onClick={() => navigate(`${base}/agents/${a.handle}`)}
-                aria-label={t("agents.open", { name: a.name })}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-hover/60"
-              >
-                <Avatar member={a} size="lg" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-medium">{a.name}</span>
-                    {a.role === "admin" && <Badge>{t("role.admin")}</Badge>}
-                    {a.suspended_at && <Badge tone="wait">{t("agents.suspended")}</Badge>}
-                    <StateBadge state={state} />
+        <>
+          <Rows>
+            {placed.rows.map(({ agent: a, depth }) => {
+              const state = states.data?.[a.user_id];
+              const person = members[a.responsible_id ?? ""];
+              const helper = helperLabel(a);
+              const done = isFinishedHelper(a);
+              const maker = helper && depth === 0 ? members[a.delegated_by ?? ""] : undefined;
+              return (
+                <button
+                  key={a.user_id}
+                  type="button"
+                  onClick={() => navigate(`${base}/agents/${a.handle}`)}
+                  aria-label={t("agents.open", { name: a.name })}
+                  className={cx("flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-hover/60", depth === 1 && "pl-8", depth === 2 && "pl-14")}
+                >
+                  {depth > 0 && <CornerDownRight className="-mr-1 size-3.5 shrink-0 text-ink-3" aria-hidden />}
+                  <Avatar member={a} size="lg" className={done ? "opacity-60" : undefined} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className={cx("truncate text-sm font-medium", done && "text-ink-2")}>{a.name}</span>
+                      {a.role === "admin" && <Badge>{t("role.admin")}</Badge>}
+                      {done ? <Badge>{t("agents.finished")}</Badge> : a.suspended_at ? <Badge tone="wait">{t("agents.suspended")}</Badge> : null}
+                      {!done && <StateBadge state={state} />}
+                    </span>
+                    <span className="block truncate text-xs text-ink-3">
+                      {helper && <span className="text-ink-2">{helper} · </span>}
+                      {maker && <span>{t("agents.helperOf", { name: maker.name })} · </span>}
+                      @{a.handle}
+                      {a.title ? ` · ${a.title}` : ""}
+                    </span>
                   </span>
-                  <span className="block truncate text-xs text-ink-3">
-                    @{a.handle}
-                    {a.title ? ` · ${a.title}` : ""}
+                  <span className="flex shrink-0 flex-col items-end gap-0.5 text-xs text-ink-2 max-md:hidden">
+                    {person && <Fact label={t("agents.responsible")}>{person.name}</Fact>}
+                    <span className="flex items-center gap-1">
+                      {a.last_action && <span className="max-w-44 truncate text-ink-3">{a.last_action}</span>}
+                      <When ms={a.last_seen_at} />
+                    </span>
                   </span>
-                </span>
-                <span className="flex shrink-0 flex-col items-end gap-0.5 text-xs text-ink-2 max-md:hidden">
-                  {person && <Fact label={t("agents.responsible")}>{person.name}</Fact>}
-                  <span className="flex items-center gap-1">
-                    {a.last_action && <span className="max-w-44 truncate text-ink-3">{a.last_action}</span>}
-                    <When ms={a.last_seen_at} />
-                  </span>
-                </span>
-                {state && <ListeningMark on={state.listening} />}
-                <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
-              </button>
-            );
-          })}
-        </Rows>
+                  {state && !done && <ListeningMark on={state.listening} />}
+                  <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
+                </button>
+              );
+            })}
+          </Rows>
+          {finished > 0 && (
+            <div className="-mt-5 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Checkbox checked={showFinished} onChange={setShowFinished}>
+                {t("agents.showFinished")}
+              </Checkbox>
+              {!showFinished && <span className="text-xs text-ink-3">{t("agents.finishedCount", { n: finished })}</span>}
+            </div>
+          )}
+        </>
       )}
       {creating && (
         <CreateAgentDialog

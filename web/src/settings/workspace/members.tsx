@@ -12,6 +12,7 @@ import { Page, Row, Rows, Section } from "@/settings/ui/layout";
 import { InvitesSection } from "@/settings/workspace/invites";
 import { EditMemberDialog } from "@/settings/workspace/member-dialog";
 import { roleChoices } from "@/settings/workspace/roles";
+import { ScopeTags } from "@/settings/workspace/scope-fields";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { IconButton } from "@/ui/button";
@@ -45,6 +46,7 @@ export function MembersPage() {
                   <span className="truncate">{m.name}</span>
                   {m.user_id === me.user_id && <Badge>{t("members.you")}</Badge>}
                   {m.suspended_at && <Badge tone="wait">{t("members.suspended")}</Badge>}
+                  <ScopeTags member={m} />
                 </span>
               }
               sub={`@${m.handle}${m.title ? ` · ${m.title}` : ""}`}

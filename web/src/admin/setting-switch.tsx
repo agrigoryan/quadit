@@ -2,7 +2,7 @@
 
 import { type ReactNode, useState } from "react";
 import { Lock } from "lucide-react";
-import { errorMessage } from "@/lib/api";
+import { ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useSetting } from "@/admin/settings";
 import { ConfirmDialog } from "@/settings/ui/dialogs";
@@ -54,7 +54,7 @@ export function SettingSwitch({ name, fallback, title, hint, confirm }: Props) {
         </p>
       )}
       {error && (
-        <p role="alert" className="mt-1 text-xs text-danger">
+        <p role="alert" className="mt-1 text-xs text-danger first-letter:uppercase">
           {error}
         </p>
       )}
@@ -65,7 +65,13 @@ export function SettingSwitch({ name, fallback, title, hint, confirm }: Props) {
           title={confirm.title}
           body={confirm.body}
           confirm={confirm.action}
-          onConfirm={() => save(confirm.when)}
+          onConfirm={() =>
+            save(confirm.when).catch((err: unknown) => {
+              // Refused as things stand (it would leave no way to sign in): the reason shows by the switch, which stays as it was.
+              if (err instanceof ApiError && err.status === 409) return;
+              throw err;
+            })
+          }
         />
       )}
     </div>

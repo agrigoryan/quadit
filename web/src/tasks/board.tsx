@@ -14,21 +14,29 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { rankBetween } from "@/lib/rank";
-import { statusesOf } from "@/lib/selectors";
+import { statusesOf, useMe } from "@/lib/selectors";
 import { getState } from "@/lib/store";
-import type { Task } from "@/lib/types";
-import { moveTask } from "@/tasks/actions";
+import type { Project, Task } from "@/lib/types";
+import { type CardMove, moveCard } from "@/tasks/actions";
+import { AddStatusColumn } from "@/tasks/add-status";
 import { CardOverlay } from "@/tasks/board-card";
-import { BoardColumn } from "@/tasks/board-column";
-import type { TaskGroup } from "@/tasks/filters";
+import { BoardColumn, type Card } from "@/tasks/board-column";
+import { NONE, type TaskGroup } from "@/tasks/filters";
 
 interface Props {
-  /** One group per column: the project's statuses in rank order (or the six categories across projects). */
+  /**
+   * One group per column: the project's statuses in rank order (the six
+   * categories across projects), or its assignees, or its labels.
+   */
   groups: TaskGroup[];
-  projectId: string | undefined;
+  /** The one project the board is about, when it is about one. */
+  project: Project | undefined;
 }
 
 type Order = Record<string, string[]>;
+
+/** Grouped by label a task can be in two columns, so a card is a task in a column. */
+const cardId = (group: TaskGroup, task: Task) => `${group.id}|${task.id}`;
 
 /** The status a task takes when dropped in a column. A category column maps to the task's own project. */
 function statusOf(group: TaskGroup, task: Task): string | undefined {
@@ -37,20 +45,42 @@ function statusOf(group: TaskGroup, task: Task): string | undefined {
   return statusesOf(statuses, task.project_id).find((s) => s.category === group.value)?.id;
 }
 
+/** What landing in `to` changes for a card that started in `from`. Nothing (null) when the column cannot take it. */
+function changeFor(task: Task, from: TaskGroup, to: TaskGroup): CardMove | null {
+  if (to.kind === "status") {
+    const statusId = statusOf(to, task);
+    return statusId ? { statusId } : null;
+  }
+  if (to.kind === "assignee") return { assigneeId: to.value === NONE ? null : to.value };
+  if (to.kind === "label") {
+    if (from.id === to.id) return {};
+    // The label of the column it left is swapped for the label of the column it lands in.
+    return { removeLabel: from.value === NONE ? undefined : from.value, addLabel: to.value === NONE ? undefined : to.value };
+  }
+  return {};
+}
+
 /**
- * Tasks as cards in columns by status. Dragging a card within a column
- * gives it a new rank between its neighbours; dragging it to another column
- * also changes its status. Both go out as one task.update.
+ * Tasks as cards in columns. Dragging a card within a column gives it a new
+ * rank between its neighbours; dragging it to another column also gives it
+ * what that column stands for. Both go out as one task.update. Each column
+ * draws only the cards in view.
  */
-export function Board({ groups, projectId }: Props) {
+export function Board({ groups, project }: Props) {
+  const me = useMe();
   const [activeId, setActiveId] = useState<string | null>(null);
   // While a card is being dragged the columns follow the pointer, not the store.
   const [order, setOrder] = useState<Order | null>(null);
 
-  const byId = useMemo(() => {
-    const map = new Map<string, Task>();
-    for (const g of groups) for (const task of g.tasks) map.set(task.id, task);
-    return map;
+  const { cards, byGroup } = useMemo(() => {
+    const cards = new Map<string, Card & { group: TaskGroup }>();
+    const byGroup = new Map<string, Card[]>();
+    for (const group of groups) {
+      const list = group.tasks.map((task) => ({ id: cardId(group, task), task }));
+      byGroup.set(group.id, list);
+      for (const card of list) cards.set(card.id, { ...card, group });
+    }
+    return { cards, byGroup };
   }, [groups]);
 
   const sensors = useSensors(
@@ -67,7 +97,7 @@ export function Board({ groups, projectId }: Props) {
 
   function start(e: DragStartEvent) {
     setActiveId(String(e.active.id));
-    setOrder(Object.fromEntries(groups.map((g) => [g.id, g.tasks.map((task) => task.id)])));
+    setOrder(Object.fromEntries(groups.map((g) => [g.id, (byGroup.get(g.id) ?? []).map((card) => card.id)])));
   }
 
   function over(e: DragOverEvent) {
@@ -91,27 +121,30 @@ export function Board({ groups, projectId }: Props) {
     const id = String(e.active.id);
     const overId = String(e.over.id);
     const col = columnOf(current, id);
-    const task = byId.get(id);
+    const card = cards.get(id);
     const group = groups.find((g) => g.id === col);
-    if (!col || !task || !group) return;
+    if (!col || !card || !group) return;
+    const { task } = card;
 
     let ids = current[col] ?? [];
     const from = ids.indexOf(id);
     const to = ids.indexOf(overId);
     if (to >= 0 && to !== from) ids = arrayMove(ids, from, to);
-    const at = ids.indexOf(id);
-    const above = byId.get(ids[at - 1] ?? "");
-    const below = byId.get(ids[at + 1] ?? "");
-    const statusId = statusOf(group, task);
-    if (!statusId) return;
+    // Its neighbours in the new place; the same task shown twice in a column is no neighbour of itself.
+    const others = ids.filter((v) => v === id || cards.get(v)?.task.id !== task.id);
+    const at = others.indexOf(id);
+    const above = cards.get(others[at - 1] ?? "")?.task;
+    const below = cards.get(others[at + 1] ?? "")?.task;
 
-    const moved = statusId !== task.status_id;
-    const unchanged = !moved && (!above || above.rank < task.rank) && (!below || task.rank < below.rank);
-    if (unchanged) return;
-    moveTask(task, statusId, rankBetween(above?.rank, below?.rank));
+    const change = changeFor(task, card.group, group);
+    if (!change) return;
+    const inPlace = (!above || above.rank < task.rank) && (!below || task.rank < below.rank);
+    moveCard(task, inPlace ? undefined : rankBetween(above?.rank, below?.rank), change);
   }
 
-  const active = activeId ? byId.get(activeId) : undefined;
+  const active = activeId ? cards.get(activeId)?.task : undefined;
+  // Statuses are edited where they are used: on a project's board, by those who may.
+  const editable = !!project && me.role !== "member" && groups[0]?.kind === "status";
 
   return (
     <DndContext
@@ -127,13 +160,18 @@ export function Board({ groups, projectId }: Props) {
     >
       <div className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3">
         {groups.map((group) => {
-          const tasks = order ? ((order[group.id] ?? []).map((id) => byId.get(id)).filter(Boolean) as Task[]) : group.tasks;
+          const list = order ? ((order[group.id] ?? []).map((id) => cards.get(id)).filter(Boolean) as Card[]) : (byGroup.get(group.id) ?? []);
           return (
             <div key={group.id} className="h-full max-sm:snap-center">
-              <BoardColumn group={group} tasks={tasks} projectId={projectId} />
+              <BoardColumn group={group} cards={list} project={project} activeId={activeId} editable={editable} />
             </div>
           );
         })}
+        {editable && project && (
+          <div className="h-full max-sm:snap-center">
+            <AddStatusColumn project={project} />
+          </div>
+        )}
       </div>
       <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>{active && <CardOverlay task={active} />}</DragOverlay>
     </DndContext>

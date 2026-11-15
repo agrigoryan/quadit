@@ -13,12 +13,14 @@ import { caretToEnd } from "@/detail/bits";
 import { createComment, deleteComment, updateComment } from "@/detail/comment-actions";
 import type { Attached } from "@/detail/data";
 import { FileGrid } from "@/detail/file-grid";
+import type { Earlier } from "@/detail/timeline-model";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Tooltip } from "@/ui/tooltip";
 import { Ago } from "@/ui/ago";
 
@@ -83,15 +85,49 @@ const evidenceFields = [
   ["not_verified", "comment.evidence.notVerified"],
 ] as const;
 
+/**
+ * "edited" on a comment that was changed. When the task's history has what it
+ * said before, the word opens that: nothing a person wrote is lost from view.
+ */
+function Edited({ earlier }: { earlier: Earlier[] }) {
+  if (earlier.length === 0) return <span className="shrink-0 text-xs text-ink-3">{t("comment.edited")}</span>;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("comment.editedShow")}
+          className="shrink-0 rounded-sm text-xs text-ink-3 underline decoration-dotted underline-offset-2 hover:text-ink data-[state=open]:text-ink max-md:py-1.5"
+        >
+          {t("comment.edited")}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent aria-label={t("comment.earlier")} className="w-80 max-w-[calc(100vw-1rem)] p-3">
+        <h4 className="text-xs font-medium text-ink-2">{t("comment.earlier")}</h4>
+        <ol className="mt-1.5 flex flex-col gap-2.5">
+          {earlier.map((version, i) => (
+            <li key={`${version.until}-${i}`} className="border-l-2 border-line pl-2.5">
+              <Markdown text={version.body} tight className="text-ink-2" />
+              <p className="mt-0.5 text-xs text-ink-3">{t("comment.earlierUntil", { when: exact(version.until) })}</p>
+            </li>
+          ))}
+        </ol>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface EntryProps {
   comment: Comment;
   files: Attached[];
+  /** What the comment said before each edit, oldest first. */
+  earlier: Earlier[];
   readOnly: boolean;
   onReply?: () => void;
 }
 
 /** One comment or reply: who, when, what they wrote, and what they attached. */
-function Entry({ comment, files, readOnly, onReply }: EntryProps) {
+function Entry({ comment, files, earlier, readOnly, onReply }: EntryProps) {
   const me = useMe();
   const author = useMember(comment.author_id);
   const [editing, setEditing] = useState(false);
@@ -106,7 +142,8 @@ function Entry({ comment, files, readOnly, onReply }: EntryProps) {
         <span className="min-w-0 truncate text-sm font-medium">{author?.name ?? t("common.someone")}</span>
         {comment.kind === "result" && <Badge tone="ok">{t("comment.result")}</Badge>}
         <When at={comment.created_at} />
-        {!!comment.edited_at && <span className="shrink-0 text-xs text-ink-3">{t("comment.edited")}</span>}
+        {/* An edit by someone else arrives as an event that changes only the text: the history then says it was edited. */}
+        {(!!comment.edited_at || earlier.length > 0) && <Edited earlier={earlier} />}
         <span className="flex-1" />
         {!readOnly && onReply && (
           <IconButton label={t("comment.reply")} size="sm" className="max-md:size-9" onClick={onReply}>
@@ -171,19 +208,28 @@ interface Props {
   replies: Comment[];
   /** Files by the comment they are on. */
   files: Dict<Attached[]>;
+  /** Earlier wordings by comment, from the task's history. */
+  history?: Dict<Earlier[]>;
 }
 
 const NO_FILES: Attached[] = [];
+const NO_EDITS: Earlier[] = [];
 
-export const CommentCard = memo(function CommentCard({ task, comment, replies, files }: Props) {
+export const CommentCard = memo(function CommentCard({ task, comment, replies, files, history }: Props) {
   const [replying, setReplying] = useState(false);
   const readOnly = !!task.deleted_at;
   return (
     <article className="rounded-lg border border-line">
-      <Entry comment={comment} files={files[comment.id] ?? NO_FILES} readOnly={readOnly} onReply={() => setReplying(true)} />
+      <Entry
+        comment={comment}
+        files={files[comment.id] ?? NO_FILES}
+        earlier={history?.[comment.id] ?? NO_EDITS}
+        readOnly={readOnly}
+        onReply={() => setReplying(true)}
+      />
       {replies.map((reply) => (
         <div key={reply.id} className="ml-7 border-t border-line">
-          <Entry comment={reply} files={files[reply.id] ?? NO_FILES} readOnly={readOnly} />
+          <Entry comment={reply} files={files[reply.id] ?? NO_FILES} earlier={history?.[reply.id] ?? NO_EDITS} readOnly={readOnly} />
         </div>
       ))}
       {replying && (

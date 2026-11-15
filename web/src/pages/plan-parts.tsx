@@ -8,10 +8,11 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useLiveTasks } from "@/lib/selectors";
-import type { Dict } from "@/lib/store";
+import { type Dict, useRestLoaded } from "@/lib/store";
 import { CATEGORIES, type Task } from "@/lib/types";
 import { emptyTally, type Tally } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";
+import { RestLoadingNote } from "@/shell/rest-note";
 import { TaskRow } from "@/tasks/task-row";
 
 /** A project's live tasks by the epic or cycle they are in, in status order. */
@@ -51,6 +52,7 @@ interface Props {
 
 /** An epic or a cycle as one dense line; the arrow shows its tasks underneath. */
 export function PlanRow({ name, to, badge, meta, menu, tally = emptyTally(), tasks, open, onToggle, emptyText, hide }: Props) {
+  const restLoaded = useRestLoaded();
   return (
     <li>
       <div className="flex h-9 items-center gap-2 border-b border-line/70 pr-2 pl-2 text-sm hover:bg-hover">
@@ -69,7 +71,8 @@ export function PlanRow({ name, to, badge, meta, menu, tally = emptyTally(), tas
         {badge}
         <span className="flex-1" />
         {meta}
-        <ProgressCount done={tally.done} started={tally.started} total={tally.total} />
+        {/* Finished tasks arrive after the rest; a count without them would be wrong. */}
+        {restLoaded ? <ProgressCount done={tally.done} started={tally.started} total={tally.total} /> : <RestLoadingNote className="shrink-0" />}
         {menu}
       </div>
       {open && (

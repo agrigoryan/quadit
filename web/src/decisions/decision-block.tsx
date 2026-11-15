@@ -8,23 +8,24 @@ import { cx } from "@/lib/cx";
 import { isMedia } from "@/lib/files";
 import { t } from "@/lib/i18n";
 import type { Decision, DecisionOption } from "@/lib/types";
+import { DecisionMentions } from "@/detail/mentions";
 import { Button, IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";
 import { deleteDecision, markUnclear, pick } from "@/decisions/actions";
 import { CompareView } from "@/decisions/compare-view";
 import { EditDecisionDialog } from "@/decisions/edit-decision-dialog";
-import { mediaAspect, type OptionFiles, optionsOf, useMemberName, useOptionFiles, useViewer } from "@/decisions/data";
+import { mediaAspect, type OptionFiles, optionsOf, pairUp, useMemberName, useOptionFiles, useViewer } from "@/decisions/data";
 import { ApprovalAction, ApprovalControls, DecisionHeader, DecisionResult, UnclearNote } from "@/decisions/decision-meta";
 import { NoteDialog, type NotePrompt } from "@/decisions/note-dialog";
 import { OptionCard } from "@/decisions/option-card";
 import { ThreadBody, ThreadToggle } from "@/decisions/thread";
 
-/** Splits each option's files into what can be looked at and everything else. */
+/** Splits each option's files into what can be looked at (before and after pictures joined into pairs) and everything else. */
 function splitFiles(files: OptionFiles): { media: OptionFiles; docs: OptionFiles } {
   const media: OptionFiles = {};
   const docs: OptionFiles = {};
   for (const [id, list] of Object.entries(files)) {
-    media[id] = list.filter(isMedia);
+    media[id] = pairUp(list.filter(isMedia));
     docs[id] = list.filter((f) => !isMedia(f));
   }
   return { media, docs };
@@ -189,6 +190,7 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
         </>
       )}
       {talk && <ThreadBody decision={decision} autoFocus placeholder={t("decision.commentOnQuestion")} className="mt-1.5" />}
+      <DecisionMentions taskId={decision.task_id} decisionId={decision.id} />
 
       {prompt && <NoteDialog prompt={prompt} onClose={() => setPrompt(null)} />}
       {editing && <EditDecisionDialog decision={decision} onClose={() => setEditing(false)} />}

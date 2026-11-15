@@ -7,7 +7,9 @@ import { t } from "@/lib/i18n";
 import { useProjects, useSlug, useTaskByKey } from "@/lib/selectors";
 import { ui, useUi } from "@/lib/ui-state";
 import { choiceTitle, ChoicesPage } from "@/palette/palette-choices";
-import { type ChoicePage, RootPage } from "@/palette/palette-root";
+import type { ChoicePage, MakePage, PalettePage } from "@/palette/palette-commands";
+import { makeTitle, MakePageRows } from "@/palette/palette-make";
+import { RootPage } from "@/palette/palette-root";
 import { useServerSearch } from "@/palette/palette-search";
 import { Spinner } from "@/ui/spinner";
 
@@ -26,7 +28,7 @@ function Palette() {
   const location = useLocation();
   const navigate = useNavigate();
   const projects = useProjects();
-  const [page, setPage] = useState<"root" | ChoicePage>("root");
+  const [page, setPage] = useState<"root" | PalettePage>("root");
   const [query, setQuery] = useState("");
 
   const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
@@ -39,7 +41,10 @@ function Palette() {
   const project =
     projects.find((p) => p.id === openTask?.project_id) ?? projects.find((p) => p.key === projectKey?.toUpperCase()) ?? projects[0];
 
-  const onRoot = page === "root" || !openTask;
+  // A page that needs the open task or a project falls back to the first page without one.
+  const making: MakePage | null = (page === "new-label" || page === "new-status") && project ? page : null;
+  const choosing: ChoicePage | null = page !== "root" && page !== "new-label" && page !== "new-status" && openTask ? page : null;
+  const onRoot = !making && !choosing;
   const search = useServerSearch(onRoot ? query : "");
 
   const close = () => ui.setPalette(false);
@@ -47,7 +52,7 @@ function Palette() {
     close();
     action();
   };
-  const toPage = (next: "root" | ChoicePage) => {
+  const toPage = (next: "root" | PalettePage) => {
     setPage(next);
     setQuery("");
   };
@@ -84,13 +89,15 @@ function Palette() {
               {onRoot ? (
                 <Search className="size-4 shrink-0 text-ink-3" aria-hidden />
               ) : (
-                <span className="flex h-5 shrink-0 items-center rounded-sm bg-sunken px-1.5 text-xs font-medium text-ink-2 tnum">{openTask.key}</span>
+                <span className="flex h-5 shrink-0 items-center rounded-sm bg-sunken px-1.5 text-xs font-medium text-ink-2 tnum">
+                  {choosing ? openTask?.key : project?.key}
+                </span>
               )}
               <Command.Input
                 autoFocus
                 value={query}
                 onValueChange={setQuery}
-                placeholder={onRoot ? t("palette.placeholder") : choiceTitle[page as ChoicePage]()}
+                placeholder={making ? makeTitle[making]() : choosing ? choiceTitle[choosing]() : t("palette.placeholder")}
                 className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-3 max-sm:text-[16px]"
               />
               <span className="flex size-4 shrink-0 items-center justify-center">
@@ -98,7 +105,11 @@ function Palette() {
               </span>
             </div>
             <Command.List className="max-h-[min(26rem,60dvh)] scroll-py-1.5 overflow-y-auto overscroll-contain p-1.5">
-              {onRoot ? (
+              {making && project ? (
+                <MakePageRows page={making} project={project} query={query} run={run} />
+              ) : choosing && openTask ? (
+                <ChoicesPage page={choosing} task={openTask} query={query} run={run} />
+              ) : (
                 <RootPage
                   query={query}
                   slug={slug}
@@ -113,8 +124,6 @@ function Palette() {
                   }
                   openPage={toPage}
                 />
-              ) : (
-                <ChoicesPage page={page as ChoicePage} task={openTask} query={query} run={run} />
               )}
             </Command.List>
           </Command>

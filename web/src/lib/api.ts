@@ -70,19 +70,82 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
   // A gateway in front of a stopped server answers 502-504: same as offline.
   if (res.status >= 502 && res.status <= 504) throw new NetworkError();
 
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (err) {
+    // The connection went away while the answer was arriving.
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw new NetworkError(err);
+  }
+  return answer<T>(res.status, text, opts.quiet401);
+}
+
+/** Turns a status and a body into the result, or throws the error they mean. */
+function answer<T>(status: number, text: string, quiet401?: boolean): T {
   let data: unknown;
   try {
     data = text ? JSON.parse(text) : undefined;
   } catch {
     data = undefined;
   }
-  if (!res.ok) {
-    const err = (data as { error?: Partial<ApiError> } | undefined)?.error ?? {};
-    if (res.status === 401 && !opts.quiet401) unauthorized();
-    throw new ApiError(res.status, err);
+  if (status < 200 || status >= 300) {
+    const err = (data as { error?: Partial<ApiError> } | undefined)?.error;
+    // The server always says why it refused. A 5xx without a reason came from
+    // something in front of it (a proxy whose server is away): same as offline.
+    if (status >= 500 && !err) throw new NetworkError();
+    if (status === 401 && !quiet401) unauthorized();
+    throw new ApiError(status, err ?? {});
   }
   return data as T;
+}
+
+export interface SendOptions {
+  contentType?: string;
+  signal?: AbortSignal;
+  /** Called as the bytes leave, with how many of this request's have gone. */
+  onProgress?: (sent: number) => void;
+}
+
+/**
+ * Sends raw bytes (a file, or one part of one) and reports how far it has
+ * got, which fetch cannot do. Errors are the same as for every other call.
+ */
+function sendBytes<T>(method: string, path: string, bytes: Blob, opts: SendOptions = {}): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, path);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.setRequestHeader("Content-Type", opts.contentType || bytes.type || "application/octet-stream");
+    const abort = () => xhr.abort();
+    const done = () => opts.signal?.removeEventListener("abort", abort);
+    if (opts.onProgress) {
+      const report = opts.onProgress;
+      xhr.upload.onprogress = (e) => report(e.loaded);
+    }
+    xhr.onload = () => {
+      done();
+      if (xhr.status >= 502 && xhr.status <= 504) return reject(new NetworkError());
+      try {
+        resolve(answer<T>(xhr.status, xhr.responseText));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    xhr.onerror = () => {
+      done();
+      reject(new NetworkError());
+    };
+    xhr.ontimeout = xhr.onerror;
+    xhr.onabort = () => {
+      done();
+      reject(new DOMException("aborted", "AbortError"));
+    };
+    if (opts.signal?.aborted) return reject(new DOMException("aborted", "AbortError"));
+    opts.signal?.addEventListener("abort", abort);
+    xhr.send(bytes);
+  });
 }
 
 export const api = {
@@ -93,6 +156,8 @@ export const api = {
   del: <T>(path: string, body?: unknown) => request<T>("DELETE", path, { body }),
   upload: <T>(path: string, file: Blob, contentType?: string) =>
     request<T>("POST", path, { raw: file, contentType }),
+  /** Sends bytes with POST or PATCH, reporting progress (lib/files.ts sends a file in parts with it). */
+  send: sendBytes,
 };
 
 /** The API path for a workspace: ws("games", "/bootstrap"). */

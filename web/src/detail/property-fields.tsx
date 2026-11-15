@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCollection, useTask } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
-import { setDue, setEstimate, setParent, setWaitingOn } from "@/tasks/actions";
+import { setDue, setEstimate, setParent, setWaitingOn, setWaitingOutside, waitsOutside } from "@/tasks/actions";
 import { useTaskLink } from "@/tasks/task-row";
 import { TaskPicker } from "@/detail/task-picker";
 import { Tooltip } from "@/ui/tooltip";
@@ -51,14 +51,17 @@ export function WaitingNote({ task }: { task: Task }) {
   function save() {
     if (draft === null) return;
     const next = draft.trim();
-    if (next !== saved) setWaitingOn([task], task.waiting_on_id ?? null, next);
+    if (next !== saved) {
+      if (waitsOutside(task)) setWaitingOutside([task], next);
+      else setWaitingOn([task], task.waiting_on_id ?? null, next);
+    }
     setDraft(null);
   }
 
   return (
     <input
       aria-label={t("detail.waitingNote")}
-      placeholder={t("detail.waitingNotePlaceholder")}
+      placeholder={waitsOutside(task) ? t("prop.outside.placeholder") : t("detail.waitingNotePlaceholder")}
       readOnly={!!task.deleted_at}
       value={draft ?? saved}
       onChange={(e) => setDraft(e.target.value)}

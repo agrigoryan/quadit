@@ -8,6 +8,7 @@ import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import { Button } from "@/ui/button";
 import type { Backup } from "@/admin/backups";
+import { loadChangeCatalog } from "@/settings/agents/asks-before";
 import { LoadGate } from "@/settings/ui/bits";
 import { Page, Rows, Section } from "@/settings/ui/layout";
 import { useLoad } from "@/settings/ui/use-load";
@@ -90,6 +91,8 @@ function BackupLine({ backup }: { backup: Backup | undefined }) {
 
 export function HealthPage() {
   const health = useLoad(() => api.get<Health>("/api/v1/admin/health"), []);
+  // What agents can call has a version of its own, apart from the server's.
+  const surface = useLoad(() => loadChangeCatalog().then((c) => c.surface), []);
   const count = (n: number) => (n === 0 ? t("admin.health.zero") : String(n));
   return (
     <Page
@@ -158,6 +161,9 @@ export function HealthPage() {
             <Section title={t("admin.health.install")}>
               <Rows>
                 <Line tone="plain" label={t("admin.health.version")} value={<span className="font-mono text-xs">{h.version}</span>} />
+                {surface.data && (
+                  <Line tone="plain" label={t("admin.health.surface")} value={<span className="font-mono text-xs">{surface.data}</span>} note={t("admin.health.surfaceNote")} />
+                )}
                 <Line tone="plain" label={t("admin.health.database")} value={t(`admin.health.database.${h.database === "postgres" ? "postgres" : "sqlite"}`)} />
                 <Line tone="plain" label={t("admin.health.files")} value={t(`admin.storage.kind.${(["s3", "gcs", "azure"] as const).find((k) => k === h.files) ?? "disk"}`)} />
               </Rows>

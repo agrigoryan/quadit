@@ -26,3 +26,19 @@ export function openTask(key: string) {
   if (navigate) void navigate(path, { state: { background: location } });
   else window.location.assign(path);
 }
+
+/** Opens a task's panel at one of its decisions. */
+export function openDecision(key: string, decisionId: string) {
+  const anchor = `decision-${decisionId}`;
+  const path = `/${getState().slug}/task/${key}#${anchor}`;
+  if (!navigate) return window.location.assign(path);
+  void navigate(path, { state: { background: location } });
+  // The panel draws the task a moment after the address changes: bring the decision into view once it is there.
+  let tries = 0;
+  const seek = () => {
+    const el = document.getElementById(anchor);
+    if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+    else if (++tries < 40) setTimeout(seek, 75);
+  };
+  setTimeout(seek, 0);
+}

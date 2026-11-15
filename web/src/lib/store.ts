@@ -1,10 +1,11 @@
 // The browser's copy of one workspace: every row, in collections keyed by
-// id. It is filled once from /bootstrap and then kept current by the event
-// feed (lib/sync.ts) and by the person's own edits (lib/mutate.ts). Pages
-// read from here and never ask the server for a list.
+// id. It is filled from /bootstrap (the open work first, the finished work a
+// moment later) and then kept current by the event feed (lib/sync.ts) and by
+// the person's own edits (lib/mutate.ts). Pages read from here and never ask
+// the server for a list.
 
 import { create } from "zustand";
-import { type AnyRow, applyEvent, Draft, emptyCollections, keyOf, normalize } from "@/lib/apply";
+import { type AnyRow, applyEvent, Draft, emptyCollections, keyOf, normalize, targetsOf } from "@/lib/apply";
 import type {
   AgentSession,
   Attachment,
@@ -83,6 +84,17 @@ export interface StoreState {
   unsent: number;
   /** True after a send failed for lack of a connection, until one succeeds. */
   offline: boolean;
+  /**
+   * False while the finished work (done, canceled and archived tasks, and
+   * what hangs on them) is still on its way. Until it is true, a list of
+   * done work is not complete: say "Loading finished work…" instead of "none".
+   */
+  restLoaded: boolean;
+  /**
+   * Rows made here that the server has not confirmed yet, by id (the value
+   * is the collection). A task in here is a draft: it has no number yet.
+   */
+  drafts: Dict<CollectionName>;
 }
 
 export const useStore = create<StoreState>(() => ({
@@ -97,9 +109,23 @@ export const useStore = create<StoreState>(() => ({
   stream: "connecting",
   unsent: 0,
   offline: false,
+  restLoaded: false,
+  drafts: {},
 }));
 
 export const getState = useStore.getState;
+
+/** True while a row made here waits for the server: a new task before it has its number. */
+export const isDraft = (id: string | undefined): boolean => !!id && id in getState().drafts;
+
+/** isDraft for components: re-renders when the row is confirmed. */
+export const useIsDraft = (id: string | undefined): boolean => useStore((s) => !!id && id in s.drafts);
+
+/** How a draft task's key reads until the server numbers it: "SVA-…". */
+export const draftKey = (projectKey: string) => `${projectKey}-…`;
+
+/** False until the finished work has arrived (see StoreState.restLoaded). */
+export const useRestLoaded = (): boolean => useStore((s) => s.restLoaded);
 
 type EventListener = (events: FeedEvent[]) => void;
 const listeners = new Set<EventListener>();
@@ -110,22 +136,36 @@ export function onEvents(listener: EventListener): () => void {
   return () => listeners.delete(listener);
 }
 
+/** Events applied while the finished work was still on its way; replayed over it when it lands. */
+let held: FeedEvent[] = [];
+/** Past this many held events the second part is not worth patching: the whole copy is fetched again. */
+const HELD_MAX = 20_000;
+
 /**
  * Applies feed events. Events from the live stream arrive in order and move
  * `seq`; events returned by a write are applied early and do not, because
  * the stream will deliver them again in their place.
  */
 export function applyEvents(events: FeedEvent[], fromStream: boolean) {
-  const { seq, c } = getState();
+  const { seq, c, drafts, restLoaded } = getState();
   const fresh = events.filter((ev) => ev.seq > seq);
   if (fresh.length === 0) return;
   const d = new Draft(c);
   let last = seq;
+  let confirmed: Dict<CollectionName> | null = null;
   for (const ev of fresh) {
+    last = Math.max(last, ev.seq);
     if (ev.entity_type === "workspace" && ev.data?.changes) continue;
     applyEvent(d, ev);
-    last = Math.max(last, ev.seq);
+    // The server's own row for something made here: it is no longer a draft.
+    const id = ev.data?.row ? String(ev.data.row.id) : "";
+    if (id && id in drafts) {
+      confirmed ??= { ...drafts };
+      delete confirmed[id];
+    }
   }
+  // Past the limit nothing more is held: mergeRest then asks for the whole copy again.
+  if (!restLoaded && held.length <= HELD_MAX) held.push(...fresh);
   const workspacePatch = workspaceChanges(fresh);
   const next = d.done();
   useStore.setState((s) => ({
@@ -134,8 +174,28 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
     me: (s.me && next.members[s.me.user_id]) || s.me,
     seq: fromStream ? last : s.seq,
     workspace: s.workspace && workspacePatch ? { ...s.workspace, ...workspacePatch } : s.workspace,
+    drafts: confirmed ?? s.drafts,
   }));
   for (const listener of listeners) listener(fresh);
+}
+
+type OwnListener = (events: FeedEvent[], slug: string) => void;
+const ownListeners = new Set<OwnListener>();
+
+/** Hear the events this tab's own accepted changes came back with (lib/sync.ts passes them to the other tabs). */
+export function onOwnEvents(listener: OwnListener): () => void {
+  ownListeners.add(listener);
+  return () => ownListeners.delete(listener);
+}
+
+/**
+ * Applies the events a write of this tab was answered with, ahead of the
+ * stream, and hands them on so the person's other tabs show them at once.
+ */
+export function applyOwnEvents(slug: string, events: FeedEvent[]) {
+  if (events.length === 0) return;
+  if (getState().slug === slug) applyEvents(events, false);
+  for (const listener of ownListeners) listener(events, slug);
 }
 
 function workspaceChanges(events: FeedEvent[]): Partial<Workspace> | null {
@@ -153,12 +213,45 @@ export interface BootstrapData extends Partial<Record<CollectionName, AnyRow[]>>
   me: Member;
   user: User;
   workspace: Workspace;
+  /** "open" when the answer holds only the open work; `rest` then counts the tasks left out. */
+  part?: string;
+  rest?: number;
+}
+
+/** The second part of the starting copy: the finished tasks and what hangs on them. */
+export interface RestData {
+  seq: number;
+  tasks?: AnyRow[];
+  decisions?: AnyRow[];
+  attachments?: AnyRow[];
+  relations?: AnyRow[];
+}
+
+type ReplacedListener = () => void;
+const replacedListeners = new Set<ReplacedListener>();
+
+/**
+ * Hear when the copy is thrown away: at sign-out, on leaving a workspace,
+ * and when the person's access changed. Whatever was fetched outside the
+ * store for the old copy (a task's history) must go with it.
+ */
+export function onReplaced(listener: ReplacedListener): () => void {
+  replacedListeners.add(listener);
+  return () => replacedListeners.delete(listener);
+}
+
+export interface LoadOptions {
+  /**
+   * Start from nothing: keep no row of the copy before. Used when the
+   * person's access changed, so that what they may no longer see is gone.
+   */
+  fresh?: boolean;
 }
 
 /** Replaces the whole copy with a fresh one from the server. */
-export function loadBootstrap(slug: string, data: BootstrapData) {
+export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptions = {}) {
   const prev = getState();
-  const keep = prev.slug === slug ? prev : null;
+  const keep = prev.slug === slug && !opts.fresh ? prev : null;
   const c = emptyCollections();
   for (const name of Object.keys(c) as CollectionName[]) {
     const table = c[name] as Dict<AnyRow>;
@@ -182,7 +275,14 @@ export function loadBootstrap(slug: string, data: BootstrapData) {
     for (const decision of Object.values(keep.c.decisions)) {
       if (decision.deleted_at && !c.decisions[decision.id]) c.decisions[decision.id] = decision;
     }
+    // Rows made here and not yet confirmed are in no answer from the server; they stay on screen.
+    for (const [id, name] of Object.entries(keep.drafts)) {
+      const table = c[name] as Dict<AnyRow>;
+      const row = (keep.c[name] as Dict<AnyRow>)[id];
+      if (row && !table[id]) table[id] = row;
+    }
   }
+  held = [];
   useStore.setState({
     slug,
     ready: true,
@@ -192,7 +292,83 @@ export function loadBootstrap(slug: string, data: BootstrapData) {
     workspace: data.workspace,
     c,
     opened: keep?.opened ?? {},
+    restLoaded: !(data.part === "open" && (data.rest ?? 0) > 0),
+    drafts: keep?.drafts ?? {},
   });
+  if (!keep) for (const listener of replacedListeners) listener();
+}
+
+const REST_PARTS = ["tasks", "decisions", "attachments", "relations"] as const;
+
+/**
+ * Adds the second part of the starting copy. A row the store already has is
+ * left alone unless the arriving one is newer (by `updated_seq`): the feed
+ * may have changed it since. Events that came in after this part was read on
+ * the server are applied again over the rows it brings.
+ *
+ * Returns the ids of tasks that events named meanwhile and that are in
+ * neither part (closed when the first was read, open again by the second);
+ * the caller fetches those one by one. Returns null when too much happened
+ * to patch: the caller then fetches the whole copy again.
+ */
+export function mergeRest(slug: string, data: RestData): string[] | null {
+  const s = getState();
+  if (s.slug !== slug || s.restLoaded) return [];
+  if (held.length > HELD_MAX) {
+    held = [];
+    return null;
+  }
+  const d = new Draft(s.c);
+  const added = new Set<string>();
+  for (const name of REST_PARTS) {
+    for (const row of data[name] ?? []) {
+      const key = keyOf(name, row);
+      const cur = d.peek(name)[key];
+      if (cur) {
+        const mine = cur.updated_seq;
+        const theirs = row.updated_seq;
+        if (!(typeof mine === "number" && typeof theirs === "number" && mine < theirs)) continue;
+        // A task opened earlier keeps the description the lists do not carry.
+        d.put(name, cur.description && !row.description ? { ...row, description: cur.description } : row);
+      } else {
+        d.put(name, row);
+      }
+      added.add(`${name}:${key}`);
+    }
+  }
+  const late = held;
+  held = [];
+  for (const ev of late) {
+    if (ev.seq > data.seq) applyEvent(d, ev, (name, key) => added.has(`${name}:${key}`));
+  }
+  const next = d.done();
+  const missing = new Set<string>();
+  for (const ev of late) {
+    const target = targetsOf(ev);
+    if (target?.collection !== "tasks" || target.gone) continue;
+    for (const id of target.keys) if (!next.tasks[id]) missing.add(id);
+  }
+  useStore.setState({ c: next, restLoaded: true });
+  return [...missing];
+}
+
+/** Marks rows made here as waiting for the server (lib/mutate.ts does this for every row an edit inserts). */
+export function markDrafts(collection: CollectionName, ids: string[]) {
+  if (ids.length === 0) return;
+  useStore.setState((s) => {
+    const drafts = { ...s.drafts };
+    for (const id of ids) drafts[id] = collection;
+    return { drafts };
+  });
+}
+
+/** The server answered (either way) for these rows: they are drafts no longer. */
+export function clearDrafts(ids: string[]) {
+  const { drafts } = getState();
+  if (!ids.some((id) => id in drafts)) return;
+  const next = { ...drafts };
+  for (const id of ids) delete next[id];
+  useStore.setState({ drafts: next });
 }
 
 /** Adds or replaces rows fetched outside the feed (an opened task, the trash). */
@@ -219,8 +395,23 @@ export function markOpened(taskId: string) {
   useStore.setState((s) => (s.opened[taskId] ? s : { opened: { ...s.opened, [taskId]: true } }));
 }
 
+/** Empties the copy: at sign-out, and when the person may no longer see this workspace. */
 export function clearStore() {
-  useStore.setState({ slug: "", ready: false, seq: 0, me: null, user: null, workspace: null, c: emptyCollections(), opened: {} });
+  held = [];
+  useStore.setState({
+    slug: "",
+    ready: false,
+    seq: 0,
+    me: null,
+    user: null,
+    workspace: null,
+    c: emptyCollections(),
+    opened: {},
+    stream: "connecting",
+    restLoaded: false,
+    drafts: {},
+  });
+  for (const listener of replacedListeners) listener();
 }
 
 export { keyOf };

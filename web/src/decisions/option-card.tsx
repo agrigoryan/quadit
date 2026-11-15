@@ -4,20 +4,21 @@
 
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import type { Decision, DecisionOption, FileRow } from "@/lib/types";
+import type { Decision, DecisionOption } from "@/lib/types";
 import { Button } from "@/ui/button";
-import type { Viewer } from "@/decisions/data";
-import { OptionDocs, OptionMedia } from "@/decisions/option-media";
+import type { OptionFile, Viewer } from "@/decisions/data";
+import { AttachToOption } from "@/decisions/option-attach";
+import { NoMediaCaption, OptionDocs, OptionMedia } from "@/decisions/option-media";
 import { PickedBadge, RecommendedBadge } from "@/decisions/parts";
 import { ThreadToggle } from "@/decisions/thread";
 
 interface Props {
   decision: Decision;
   option: DecisionOption;
-  /** Pictures and videos, shown at the top. */
-  media: FileRow[];
+  /** Pictures and videos, shown at the top; a before/after pair is one entry. */
+  media: OptionFile[];
   /** Any other files, shown as links. */
-  docs: FileRow[];
+  docs: OptionFile[];
   /** Whether any option of this decision has media: cards then keep the same shape. */
   aspect: number | null;
   viewer: Viewer;
@@ -57,7 +58,12 @@ export function OptionCard({
       {media.length > 0 ? (
         <OptionMedia files={media} label={option.label} aspect={aspect ?? 4 / 3} onOpen={onCompare} />
       ) : (
-        aspect !== null && <div aria-hidden className="rounded-t-[9px] bg-sunken" style={{ aspectRatio: aspect }} />
+        aspect !== null && (
+          <>
+            <div aria-hidden className="rounded-t-[9px] bg-sunken" style={{ aspectRatio: aspect }} />
+            <NoMediaCaption />
+          </>
+        )
       )}
 
       <div className="flex flex-1 flex-col p-3">
@@ -84,8 +90,9 @@ export function OptionCard({
         )}
       </div>
 
-      <div className="border-t border-line px-1.5 py-1">
+      <div className="flex items-center justify-between gap-1 border-t border-line px-1.5 py-1">
         <ThreadToggle decision={decision} optionId={option.id} open={threadOpen} onToggle={onToggleThread} />
+        {viewer.canEdit && <AttachToOption decision={decision} option={option} />}
       </div>
     </article>
   );
