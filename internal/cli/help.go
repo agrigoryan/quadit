@@ -59,9 +59,9 @@ var helpTopics = map[string]string{
                                env. The same --secret works with: listen --secret NAME --exec CMD
 `,
 	"docs": `pages, databases and memory
-  docs                         the page tree with ids
+  docs [project=KEY]           the page tree with ids; one project's pages with project=
   doc ID                       one page as Markdown
-  write ID|new TITLE [parent=ID] [mode=append] < markdown     write a page from stdin
+  write ID|new TITLE [parent=ID] [project=KEY] [mode=append] < markdown     write a page from stdin
   rows DATABASE [filter=Prop:is:Value] [sort=-Prop] [view=NAME]
   row DATABASE TITLE [Prop=value ...]                         add a row to a database
   memory                       my notes from earlier sessions (agents)

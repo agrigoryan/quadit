@@ -65,6 +65,16 @@ func (s *Server) handleListPages(x *c) error {
 		return err
 	}
 	docs = keep(docs, func(d core.Doc) bool { return d.Kind != core.DocRow })
+	if ref := x.r.URL.Query().Get("project"); ref != "" {
+		p, err := x.resolver().Project(ref)
+		if err != nil {
+			return err
+		}
+		if !x.canProject(p.ID) {
+			return errNotFound("project " + ref)
+		}
+		docs = pagesOfProject(docs, p.ID)
+	}
 	if since := int64(x.intParam("since", -1)); since >= 0 && x.wantText() {
 		// Only the pages changed after that position, as a flat list.
 		changed := keep(docs, func(d core.Doc) bool { return d.UpdatedSeq > since })
@@ -73,9 +83,52 @@ func (s *Server) handleListPages(x *c) error {
 	if !x.wantText() {
 		return x.ok(map[string]any{"docs": docs})
 	}
+	names, err := x.names()
+	if err != nil {
+		return err
+	}
+	return x.text(pageOutline(docs, names.projects))
+}
+
+// pagesOfProject keeps the pages tied to a project and the pages under
+// them: what the project's Docs view shows.
+func pagesOfProject(docs []core.Doc, projectID string) []core.Doc {
+	byID := map[string]core.Doc{}
+	for _, d := range docs {
+		byID[d.ID] = d
+	}
+	within := func(d core.Doc) bool {
+		for depth := 0; depth < 60; depth++ {
+			if d.ProjectID == projectID {
+				return true
+			}
+			parent, ok := byID[d.ParentID]
+			if !ok {
+				return false
+			}
+			d = parent
+		}
+		return false
+	}
+	return keep(docs, within)
+}
+
+// pageOutline writes pages as an indented tree with their ids. A page whose
+// parent is not among them stands at the top. A page says its project
+// where that is not its parent's: a sub-page is in its parent's project
+// unless it says otherwise.
+func pageOutline(docs []core.Doc, projects map[string]core.Project) string {
+	byID := map[string]core.Doc{}
+	for _, d := range docs {
+		byID[d.ID] = d
+	}
 	kids := map[string][]core.Doc{}
 	for _, d := range docs {
-		kids[d.ParentID] = append(kids[d.ParentID], d)
+		parent := d.ParentID
+		if _, ok := byID[parent]; !ok {
+			parent = ""
+		}
+		kids[parent] = append(kids[parent], d)
 	}
 	var b strings.Builder
 	var walk func(parent, indent string)
@@ -92,6 +145,9 @@ func (s *Server) handleListPages(x *c) error {
 			case d.OwnerID != "":
 				note = " [private]"
 			}
+			if d.ProjectID != byID[parent].ProjectID {
+				note += " [" + firstNonEmpty(projects[d.ProjectID].Key, "no project") + "]"
+			}
 			fmt.Fprintf(&b, "%s%s%s  (%s)\n", indent, firstNonEmpty(d.Title, "Untitled"), note, d.ID)
 			walk(d.ID, indent+"  ")
 		}
@@ -100,7 +156,7 @@ func (s *Server) handleListPages(x *c) error {
 	if b.Len() == 0 {
 		b.WriteString("no pages\n")
 	}
-	return x.text(b.String())
+	return b.String()
 }
 
 // handleShowPage returns one page: as rows for the editor, or as Markdown.
