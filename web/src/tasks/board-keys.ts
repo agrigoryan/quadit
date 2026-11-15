@@ -1,28 +1,68 @@
 // The board's keys for looking at tasks. A board has no row the keyboard
-// is "on", so the card under the pointer is the one the keys mean: Space
-// shows it in the panel, Enter opens its page. While the panel is open, J
-// and K (or the arrows) move it down and up the column, and the left and
-// right arrows to the column beside it. A card that has the focus (reached
-// with Tab) keeps Space for lifting it, as before.
+// is "on", so the card the keys mean is the one that has the focus (clicked,
+// or reached with Tab), else the one under the pointer: Space shows it in
+// the panel and puts the panel away again, Enter opens its page. While the
+// panel is open, J and K (or the arrows) move it down and up the column,
+// and the left and right arrows to the column beside it. Space being the
+// quick look, a card is lifted for moving with Shift+Space (tasks/board.tsx).
 
-import { type MouseEvent, useRef } from "react";
+import { type MouseEvent, type RefObject, useEffect, useRef } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
+import { usePlace } from "@/lib/place";
 import { isDraft } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import type { TaskGroup } from "@/tasks/filters";
 import { usePeek, useTaskNav } from "@/tasks/task-link";
+import { takeSeen, useTaskOrder } from "@/tasks/task-queue";
 
-/** A focused link or button answers the key itself. */
-const onControl = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("a, button, [role=button]") !== null;
+/** Space on a focused button presses it. A card is a link: Space is free there. */
+const onButton = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("button, summary, input, select, textarea") !== null;
+/** Enter on any other link or button than a card is that control's. */
+const onOtherControl = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("a:not([data-task]), button, [role=button]:not([data-task])") !== null;
+/** The id of the task whose card has the focus. */
+const focusedCard = (e: KeyboardEvent) => (e.target instanceof HTMLElement ? e.target.closest<HTMLElement>("[data-task]")?.dataset.task : undefined);
 
-/** Give the returned handlers to the element that holds the columns. */
-export function useBoardKeys(groups: TaskGroup[]) {
+/** The card of a task, where it is drawn. */
+const cardOf = (id: string) => document.querySelector<HTMLElement>(`main a[data-task="${CSS.escape(id)}"]`);
+const focusedId = () => (document.activeElement instanceof HTMLElement ? (document.activeElement.closest<HTMLElement>("[data-task]")?.dataset.task ?? null) : null);
+
+/**
+ * Puts the focus on a task's card once it is drawn: a column draws its
+ * cards a moment after it is on the page. It gives up if the person has
+ * meanwhile put the focus somewhere themselves.
+ */
+function focusCard(id: string, keepScroll: boolean, tries = 20) {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active !== document.body && active.tagName !== "MAIN") return;
+  const card = cardOf(id);
+  if (card) card.focus({ preventScroll: keepScroll });
+  else if (tries > 0) setTimeout(() => focusCard(id, keepScroll, tries - 1), 50);
+}
+
+/**
+ * Give the returned handlers to the element that holds the columns, whose
+ * ref is `scroller`. Left for a task's page and come back to, the board is
+ * scrolled where it was with the focus on the card that was opened
+ * (lib/place.ts; each column keeps its own scroll in tasks/board-column.tsx).
+ */
+export function useBoardKeys(groups: TaskGroup[], scroller: RefObject<HTMLElement | null>) {
   const open = useTaskNav();
   const peek = usePeek();
   const hoveredId = useRef<string | null>(null);
 
-  const hovered = (): Task | undefined => {
-    const id = hoveredId.current;
+  const saved = usePlace(scroller, () => ({ focus: focusedId() }));
+  // A task's page opened from here steps down each column in turn; come back to from one that stepped on, the focus is on the task it ended at.
+  const boardStep = useTaskOrder(() => groups.flatMap((g) => g.tasks.map((tk) => tk.key)));
+  useEffect(() => {
+    const key = takeSeen(boardStep);
+    const seen = key ? groups.flatMap((g) => g.tasks).find((tk) => tk.key === key)?.id : undefined;
+    const id = seen ?? saved?.focus;
+    if (id) focusCard(id, !seen);
+  }, [boardStep]);
+
+  /** The task a key means: the card with the focus, else the one under the pointer. */
+  const meant = (e: KeyboardEvent): Task | undefined => {
+    const id = focusedCard(e) ?? hoveredId.current;
     if (!id || isDraft(id)) return undefined;
     for (const group of groups) {
       const task = group.tasks.find((tk) => tk.id === id);
@@ -33,15 +73,17 @@ export function useBoardKeys(groups: TaskGroup[]) {
 
   useHotkeys({
     " ": (e) => {
-      const task = hovered();
-      if (!task || onControl(e)) return;
+      const task = meant(e);
+      if (!task || onButton(e)) return;
       e.preventDefault();
       open.peek(task.key);
     },
     Enter: (e) => {
-      const task = hovered();
-      if (!task || onControl(e)) return;
+      const task = meant(e);
+      if (!task || onOtherControl(e)) return;
       e.preventDefault();
+      // The card opened is the one to come back to.
+      cardOf(task.id)?.focus({ preventScroll: true });
       open.page(task.key);
     },
   });
@@ -68,9 +110,12 @@ export function useBoardKeys(groups: TaskGroup[]) {
       ArrowRight: step(0, 1),
       ArrowLeft: step(0, -1),
       " ": (e) => {
-        if (onControl(e)) return;
+        if (onButton(e)) return;
         e.preventDefault();
-        peek.close();
+        // On another card than the one in the panel, Space shows that one; on the same, or on none, it puts the panel away.
+        const task = meant(e);
+        if (task && task.key !== peek.key) open.peek(task.key);
+        else peek.close();
       },
     },
     { layer: "panel", enabled: peek.key !== undefined },

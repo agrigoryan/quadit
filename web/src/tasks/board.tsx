@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   closestCorners,
   DndContext,
@@ -13,6 +13,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
 import { statusesOf, useMe } from "@/lib/selectors";
 import { getState } from "@/lib/store";
@@ -35,6 +36,18 @@ interface Props {
 }
 
 type Order = Record<string, string[]>;
+
+/**
+ * Lifting a card from the keyboard. Space alone is the quick look
+ * (tasks/board-keys.ts), so a card is lifted with Shift+Space; the arrows
+ * then move it, Space drops it and Escape puts it back.
+ */
+class LiftSensor extends KeyboardSensor {
+  static activators: typeof KeyboardSensor.activators = KeyboardSensor.activators.map((activator) => ({
+    ...activator,
+    handler: (event, options, context) => event.nativeEvent.shiftKey && activator.handler(event, options, context),
+  }));
+}
 
 /** Grouped by label a task can be in two columns, so a card is a task in a column. */
 const cardId = (group: TaskGroup, task: Task) => `${group.id}|${task.id}`;
@@ -73,7 +86,8 @@ export function Board({ groups, project }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   // While a card is being dragged the columns follow the pointer, not the store.
   const [order, setOrder] = useState<Order | null>(null);
-  const pointer = useBoardKeys(groups);
+  const scroller = useRef<HTMLDivElement>(null);
+  const pointer = useBoardKeys(groups, scroller);
 
   const { cards, byGroup } = useMemo(() => {
     const cards = new Map<string, Card & { group: TaskGroup }>();
@@ -89,8 +103,7 @@ export function Board({ groups, project }: Props) {
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    // Space lifts and drops a card; Enter is left alone so it still opens the task.
-    useSensor(KeyboardSensor, {
+    useSensor(LiftSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
       keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
     }),
@@ -156,12 +169,13 @@ export function Board({ groups, project }: Props) {
       onDragStart={start}
       onDragOver={over}
       onDragEnd={end}
+      accessibility={{ screenReaderInstructions: { draggable: t("board.dragKeys") } }}
       onDragCancel={() => {
         setActiveId(null);
         setOrder(null);
       }}
     >
-      <div {...pointer} className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3">
+      <div ref={scroller} {...pointer} className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3">
         {groups.map((group) => {
           const list = order ? ((order[group.id] ?? []).map((id) => cards.get(id)).filter(Boolean) as Card[]) : (byGroup.get(group.id) ?? []);
           return (

@@ -1,10 +1,12 @@
-import { type FormEvent, memo, useCallback, useMemo, useRef, useState } from "react";
+import { type FormEvent, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, type Range, useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import { useLocation } from "react-router";
 import { Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { usePlace } from "@/lib/place";
 import { rankBetween } from "@/lib/rank";
 import { useRestLoaded, useStore } from "@/lib/store";
 import { isOpenCategory, type Project, type Task } from "@/lib/types";
@@ -42,6 +44,17 @@ function fieldsFor(group: TaskGroup): Partial<NewTask> {
 }
 
 const GAP = 6;
+const NO_FOCUS = () => ({ focus: null });
+
+/**
+ * The heights of a column's cards as they were measured, by step of the
+ * history and column. A column drawn anew only guesses the heights of the
+ * cards above the ones in view, so scrolled back to the same number it
+ * would show slightly different cards; with the heights it had, it shows
+ * the same ones.
+ */
+const measured = new Map<string, VirtualItem[]>();
+const MEASURED_KEPT = 40;
 
 /** One column of cards, with a quick-add box at the top. Only the cards in view are drawn. */
 export const BoardColumn = memo(function BoardColumn({ group, cards, project, activeId, editable }: Props) {
@@ -54,9 +67,15 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
   // A Done or Canceled column is not empty while the finished work is still on its way; its header says so.
   const waitingForRest = !useRestLoaded() && group.kind === "status" && !isOpenCategory(group.category);
 
+  // Come back to, the column is scrolled where it was (lib/place.ts), with the cards there drawn from the start.
+  const part = `column:${group.id}`;
+  const saved = usePlace(scroller, NO_FOCUS, part);
+  const heightsAt = `${useLocation().key}#${part}`;
   const activeIndex = activeId ? cards.findIndex((card) => card.id === activeId) : -1;
   const virtual = useVirtualizer({
     count: cards.length,
+    initialOffset: saved?.top ?? 0,
+    initialMeasurementsCache: measured.get(heightsAt),
     getScrollElement: () => scroller.current,
     estimateSize: () => 76,
     gap: GAP,
@@ -71,6 +90,14 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
       [activeIndex],
     ),
   });
+  useLayoutEffect(
+    () => () => {
+      measured.delete(heightsAt);
+      measured.set(heightsAt, virtual.measurementsCache);
+      if (measured.size > MEASURED_KEPT) measured.delete(measured.keys().next().value as string);
+    },
+    [heightsAt, virtual],
+  );
   const items = virtual.getVirtualItems();
   const shownIds = useMemo(() => items.map((item) => cards[item.index]?.id).filter((id): id is string => !!id), [items, cards]);
 

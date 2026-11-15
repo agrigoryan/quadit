@@ -177,6 +177,7 @@ export const tasks = {
   "board.add": "Add a task to {name}",
   "board.addPlaceholder": "Task title, then Enter",
   "board.empty": "Nothing here",
+  "board.dragKeys": "To move a card, press Shift and Space. Use the arrow keys to move it, Space to drop it, or Escape to put it back.",
 
   "create.title": "New task",
   "create.titlePlaceholder": "Task title",
