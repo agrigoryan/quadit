@@ -38,7 +38,7 @@ export function SetupPage() {
     e.preventDefault();
     await run(async () => {
       const slug = await setUp(form);
-      navigate(`/${slug}`, { replace: true });
+      void navigate(`/${slug}`, { replace: true });
     });
   }
 

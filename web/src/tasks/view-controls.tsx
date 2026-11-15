@@ -143,7 +143,7 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
       });
       toast.info(t("view.saved"));
       const saved = results[0]?.key;
-      if (saved) navigate(`/${slug}/view/${saved}`);
+      if (saved) void navigate(`/${slug}/view/${saved}`);
     } catch {
       // The refusal is already shown.
     }
@@ -163,7 +163,7 @@ export function ViewControls({ state, scope, project, view, changed }: Props) {
       tx.patch("views", view.id, { deleted_at: Date.now() }),
     );
     toast.info(t("view.deleted"));
-    navigate(project ? `/${slug}/p/${project.key}/tasks` : `/${slug}/my-work`);
+    void navigate(project ? `/${slug}/p/${project.key}/tasks` : `/${slug}/my-work`);
   }
 
   return (

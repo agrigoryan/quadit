@@ -128,7 +128,7 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
   function writeAddress(filters: Filters) {
     const search = searchFromFilters(filters, tables, project?.id, location.search);
     if (search !== location.search)
-      navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
+      void navigate({ pathname: location.pathname, search }, { replace: true, state: location.state });
   }
 
   /** A filter changed here: the page takes it at once, and the address follows. */
@@ -194,7 +194,7 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
 
   function setLayout(next: "list" | "board") {
     if (routeLayout && project)
-      navigate(`/${slug}/p/${project.key}/${next === "board" ? "board" : "tasks"}${location.search}`);
+      void navigate(`/${slug}/p/${project.key}/${next === "board" ? "board" : "tasks"}${location.search}`);
     else setState({ layout: next });
   }
 

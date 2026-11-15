@@ -135,7 +135,7 @@ function Palette() {
                   hits={search.hits}
                   searching={search.busy}
                   run={run}
-                  go={(path) => run(() => navigate(path))}
+                  go={(path) => run(() => void navigate(path))}
                   openTask={(key) => run(() => tasks.peek(key))}
                   openPage={toPage}
                 />

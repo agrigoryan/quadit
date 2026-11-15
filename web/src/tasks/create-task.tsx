@@ -134,7 +134,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
       });
       toast.info(t("create.created", { key }), {
         label: t("create.open"),
-        run: () => navigate(`/${slug}/task/${key}`, { state: { background: location } }),
+        run: () => void navigate(`/${slug}/task/${key}`, { state: { background: location } }),
       });
     } catch (err) {
       // A refusal is shown as a toast by mutate; anything else is said here.

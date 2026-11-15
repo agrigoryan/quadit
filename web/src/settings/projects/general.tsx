@@ -63,7 +63,7 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
         { quiet: true },
       );
       toast.info(t("s.saved"));
-      if (draft.key !== project.key) navigate(`${base}/projects/${draft.key}/general`, { replace: true });
+      if (draft.key !== project.key) void navigate(`${base}/projects/${draft.key}/general`, { replace: true });
     });
   }
 
@@ -183,7 +183,7 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
           if (typed.trim().toUpperCase() !== project.key)
             throw new Error(t("project.delete.type", { key: project.key }));
           await mutate({ type: "project.delete", args: { id: project.id } }, undefined, { quiet: true });
-          navigate(`${base}/projects`);
+          void navigate(`${base}/projects`);
         }}
       >
         <FormField label={t("project.delete.type", { key: project.key })} htmlFor="delete-key">

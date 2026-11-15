@@ -32,7 +32,7 @@ export function LoginPage() {
 
   // A fresh install has nobody to sign in as yet.
   useEffect(() => {
-    if (config?.setup_needed) navigate("/setup", { replace: true });
+    if (config?.setup_needed) void navigate("/setup", { replace: true });
   }, [config, navigate]);
 
   if (status === "in") return <Navigate to={next} replace />;

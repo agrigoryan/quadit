@@ -36,7 +36,7 @@ export function DeleteWorkspaceDialog({ workspace, onClose }: { workspace: Works
     // The workspaces the person still has come with the session; "/" then opens one, or offers to make one.
     await loadSession().catch(() => {});
     toast.info(t("general.delete.done", { name: workspace.name }));
-    navigate("/", { replace: true });
+    void navigate("/", { replace: true });
   }
 
   return (

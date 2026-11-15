@@ -149,7 +149,7 @@ function CreateProjectDialog({ used, onClose }: { used: number; onClose: () => v
         { quiet: true },
       );
       toast.info(t("project.created", { name: draft.name.trim() }));
-      navigate(`${base}/projects/${draft.key}/statuses`);
+      void navigate(`${base}/projects/${draft.key}/statuses`);
     });
   }
 

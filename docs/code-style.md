@@ -70,7 +70,7 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 ### Types
 13. No `any`, no `!`, no `@ts-ignore`. `as unknown as` only at a third-party boundary, with the reason on the line.
 14. Wire types are declared once in `lib/types*.ts`, named after the Go type they mirror. A response shape used twice has a name.
-15. Promises are awaited, returned, or marked `void`. Event handlers contain no comma operator.
+15. Promises are awaited, returned, or marked `void` with the reason it is safe to drop on the line above. `navigate()` is the exception that needs no reason: its type says promise, but under `BrowserRouter` it returns nothing. Event handlers contain no comma operator.
 
 ### Words, dates, controls
 16. Every word shown goes through `t()`. Strings live in `i18n/en/`.
@@ -95,7 +95,6 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 | `no-restricted-imports` (layers; the files are listed in `.oxlintrc.json`) | 33 |
 | `react/refs` | 22 |
 | `react-hooks/exhaustive-deps` | 21 |
-| `typescript/no-floating-promises` | 17 |
 | `react/set-state-in-effect` | 16 |
 | `jsx-a11y/click-events-have-key-events` | 11 |
 | `typescript/no-base-to-string` | 11 |
@@ -106,7 +105,6 @@ These rules are warnings in `web/.oxlintrc.json` because the code breaks them to
 | `jsx-a11y/no-noninteractive-element-to-interactive-role` | 3 |
 | `jsx-a11y/interactive-supports-focus` | 3 |
 | `react/purity` | 3 |
-| `typescript/no-misused-promises` | 3 |
 | `react/preserve-manual-memoization` | 2 |
 | `react/no-did-update-set-state` | 2 |
 | `jsx-a11y/control-has-associated-label` | 2 |

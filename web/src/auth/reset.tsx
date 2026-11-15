@@ -117,7 +117,7 @@ export function ResetConfirmPage() {
     setFieldError("");
     try {
       await api.post("/api/v1/auth/reset/confirm", { token, password });
-      navigate("/login", { replace: true, state: { notice: t("auth.reset.done") } });
+      void navigate("/login", { replace: true, state: { notice: t("auth.reset.done") } });
     } catch (err) {
       if (err instanceof ApiError && err.field === "password") setFieldError(err.message);
       else {

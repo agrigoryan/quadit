@@ -77,7 +77,8 @@ export function WorkspaceRoute() {
     if (!lost) return;
     let current = true;
     const name = useSession.getState().workspaces.find((w) => w.slug === ws)?.name ?? ws;
-    loadSession()
+    // Not awaited: an effect cannot wait. A failed reload is caught and the session as it stands is read.
+    void loadSession()
       .catch(() => {})
       .then(() => {
         if (!current) return;
@@ -88,7 +89,7 @@ export function WorkspaceRoute() {
           return;
         }
         toast.info(t("sync.removed", { name }));
-        navigate("/", { replace: true });
+        void navigate("/", { replace: true });
       });
     return () => {
       current = false;

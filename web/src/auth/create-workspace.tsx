@@ -46,7 +46,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
     try {
       const made = await createWorkspace(name, address);
       change(false);
-      navigate(`/${made}`);
+      void navigate(`/${made}`);
     } catch (err) {
       // An older server refuses a taken address without naming the field; it is the address that needs changing.
       if (err instanceof ApiError && err.code === "conflict" && !err.field) errors.set("slug", err.message);

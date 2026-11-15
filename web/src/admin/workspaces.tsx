@@ -55,7 +55,7 @@ export function WorkspacesPage() {
     void list.reload();
     toast.info(t("admin.workspaces.joined", { name: w.name }), {
       label: t("admin.workspaces.open"),
-      run: () => navigate(`/${w.slug}`),
+      run: () => void navigate(`/${w.slug}`),
     });
   }
 

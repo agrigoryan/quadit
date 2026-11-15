@@ -148,7 +148,7 @@ export function AgentsPage() {
           onClose={() => setCreating(false)}
           onCreated={(handle) => {
             setCreating(false);
-            navigate(`${base}/agents/${handle}`);
+            void navigate(`${base}/agents/${handle}`);
           }}
         />
       )}

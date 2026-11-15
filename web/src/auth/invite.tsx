@@ -51,7 +51,7 @@ export function InvitePage() {
 
   async function joined(out: Accepted) {
     await loadSession();
-    navigate(`/${out.workspace.slug}`, { replace: true });
+    void navigate(`/${out.workspace.slug}`, { replace: true });
   }
 
   if (gone) {

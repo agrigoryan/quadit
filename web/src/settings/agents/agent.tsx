@@ -192,7 +192,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
         confirm={t("s.remove")}
         onConfirm={async () => {
           await mutate({ type: "member.remove", args: { id: agent.user_id } }, undefined, { quiet: true });
-          navigate(`${base}/agents`);
+          void navigate(`${base}/agents`);
         }}
       />
     </Page>
