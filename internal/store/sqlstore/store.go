@@ -56,7 +56,8 @@ func New(db *sql.DB, d Dialect) *Store {
 // Dialect returns the name of the database kind, "sqlite" or "postgres".
 func (s *Store) Dialect() string { return s.d.Name }
 
-// Close releases the database.
+// Close closes the database: queries already under way finish, and any
+// later one fails.
 func (s *Store) Close() error { return s.db.Close() }
 
 // Ping checks that the database answers.

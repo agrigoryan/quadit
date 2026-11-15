@@ -43,7 +43,7 @@ func NewDisk(dir string) (*Disk, error) {
 	return &Disk{Root: dir}, nil
 }
 
-// Kind is "disk".
+// Kind names the store for the admin area: "disk".
 func (d *Disk) Kind() string { return "disk" }
 
 // path is where key is kept; a key that climbs out of the root is refused.

@@ -165,7 +165,6 @@ func newestCopy(ctx context.Context, admin *pgx.Conn, name string) (string, int,
 	return newest, version, rows.Err()
 }
 
-// rename renames a database.
 func rename(ctx context.Context, admin *pgx.Conn, from, to string) error {
 	_, err := admin.Exec(ctx, "ALTER DATABASE "+quote(from)+" RENAME TO "+quote(to))
 	return err

@@ -124,7 +124,7 @@ type fileMoves struct {
 // fileMove is one rename made.
 type fileMove struct{ from, to string }
 
-// move renames from to to.
+// move renames from to to, and remembers it to be undone.
 func (m *fileMoves) move(from, to string) error {
 	if err := os.Rename(from, to); err != nil {
 		return err
