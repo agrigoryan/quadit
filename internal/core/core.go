@@ -6,22 +6,47 @@
 //
 // The db tag names the column a field is stored in. ",null" stores the zero
 // value as NULL; ",json" stores the field as JSON.
+//
+// "Page" is the word in prose, in the web app and in handler names; "Doc"
+// is the word in types, tables and change names. They are the same thing.
+//
+// A state or a kind that code compares against has a named constant here,
+// beside the type whose column holds it.
+//
+// How the package is laid out:
+//
+//	core.go     roles, users, members, tokens, projects, statuses, labels,
+//	            tasks, relations, comments, decisions, events and cursors
+//	tasks.go    what organizes tasks: epics, milestones, cycles, views, links
+//	            to code, mentions, templates, preferences, old keys
+//	inbox.go    watchers and notifications
+//	files.go    files and attachments
+//	pages.go    pages (Doc), blocks, versions, databases, repository sources,
+//	            presence
+//	agents.go   webhooks, rules, jobs, agent sessions, resources,
+//	            integrations, secrets
+//	signin.go   sessions, identities, passkeys, invites, one-time tokens,
+//	            settings, the audit log, push, OAuth clients, backups
 package core
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"slices"
+)
 
 // Role is what a member may do in a workspace. A role is a ceiling: an
 // agent's scope can only narrow it.
 type Role string
 
+// The roles, from the most to the least.
 const (
 	RoleOwner  Role = "owner"  // people only
 	RoleAdmin  Role = "admin"  // manages members, agents, projects, settings
 	RoleMember Role = "member" // works on tasks, decisions and comments
 )
 
-// AtLeast reports whether r grants everything min does.
-func (r Role) AtLeast(min Role) bool { return roleLevel[r] >= roleLevel[min] && roleLevel[r] > 0 }
+// AtLeast reports whether r grants everything floor does.
+func (r Role) AtLeast(floor Role) bool { return roleLevel[r] >= roleLevel[floor] && roleLevel[r] > 0 }
 
 var roleLevel = map[Role]int{RoleMember: 1, RoleAdmin: 2, RoleOwner: 3}
 
@@ -31,7 +56,7 @@ const (
 	KindAgent  = "agent"
 )
 
-// Status categories are fixed; names, colours and order belong to the team.
+// Status categories are fixed; names, colors and order belong to the team.
 const (
 	CatBacklog   = "backlog"
 	CatUnstarted = "unstarted"
@@ -45,25 +70,19 @@ const (
 var Categories = []string{CatBacklog, CatUnstarted, CatStarted, CatWaiting, CatDone, CatCanceled}
 
 // ValidCategory reports whether c is one of the fixed status categories.
-func ValidCategory(c string) bool {
-	for _, k := range Categories {
-		if k == c {
-			return true
-		}
-	}
-	return false
-}
+func ValidCategory(c string) bool { return slices.Contains(Categories, c) }
 
 // OpenCategory reports whether a task in this category is still open.
 func OpenCategory(c string) bool { return c != CatDone && c != CatCanceled }
 
+// Workspace is one team's space: its members, projects, tasks and pages.
 type Workspace struct {
 	ID            string          `json:"id" db:"id"`
 	Slug          string          `json:"slug" db:"slug"`
 	Name          string          `json:"name" db:"name"`
 	Icon          string          `json:"icon,omitempty" db:"icon"`
-	Seq           int64           `json:"seq" db:"seq"`
-	DispatchedSeq int64           `json:"-" db:"dispatched_seq"`
+	Seq           int64           `json:"seq" db:"seq"`          // the last event's number
+	DispatchedSeq int64           `json:"-" db:"dispatched_seq"` // the last event handed to webhooks and rules
 	Settings      json.RawMessage `json:"settings,omitempty" db:"settings,json"`
 	CreatedAt     int64           `json:"created_at" db:"created_at"`
 	UpdatedAt     int64           `json:"-" db:"updated_at"`
@@ -73,7 +92,7 @@ type Workspace struct {
 // User is a person or an agent.
 type User struct {
 	ID            string          `json:"id" db:"id"`
-	Kind          string          `json:"kind" db:"kind"`
+	Kind          string          `json:"kind" db:"kind"` // KindPerson or KindAgent
 	Name          string          `json:"name" db:"name"`
 	Email         string          `json:"email,omitempty" db:"email,null"`
 	Avatar        string          `json:"avatar,omitempty" db:"avatar"`
@@ -84,7 +103,7 @@ type User struct {
 	PasswordHash  string          `json:"-" db:"password_hash,null"`
 	TOTPSecret    string          `json:"-" db:"totp_secret,null"`
 	TOTPAt        int64           `json:"totp_at,omitempty" db:"totp_at,null"`
-	IsAdmin       bool            `json:"is_admin,omitempty" db:"is_admin"`
+	IsAdmin       bool            `json:"is_admin,omitempty" db:"is_admin"` // runs the install
 	Notify        json.RawMessage `json:"notify,omitempty" db:"notify,json"`
 	WorkspaceID   string          `json:"workspace_id,omitempty" db:"workspace_id,null"`     // agents: the workspace that owns it
 	ResponsibleID string          `json:"responsible_id,omitempty" db:"responsible_id,null"` // agents: the person who answers for it
@@ -128,7 +147,7 @@ type Member struct {
 	Budget         *Budget `json:"budget,omitempty" db:"budget,json"`
 	LastSeenAt     int64   `json:"last_seen_at,omitempty" db:"last_seen_at,null"`
 	LastAction     string  `json:"last_action,omitempty" db:"last_action"`
-	ListeningUntil int64   `json:"listening_until,omitempty" db:"listening_until,null"`
+	ListeningUntil int64   `json:"listening_until,omitempty" db:"listening_until,null"` // an agent's companion is waiting for its inbox until then
 	CreatedAt      int64   `json:"created_at" db:"created_at"`
 	UpdatedSeq     int64   `json:"updated_seq" db:"updated_seq"`
 	SuspendedAt    int64   `json:"suspended_at,omitempty" db:"suspended_at,null"`
@@ -145,15 +164,22 @@ type Member struct {
 	Email string `json:"email,omitempty"`
 }
 
+// API token kinds.
+const (
+	TokenAPI   = "token" // made by a member or an admin
+	TokenOAuth = "oauth" // issued to an app through the server's own OAuth
+)
+
+// APIToken is a credential for the API, held by a member of one workspace.
 type APIToken struct {
 	ID          string `json:"id" db:"id"`
 	WorkspaceID string `json:"workspace_id" db:"workspace_id"`
 	UserID      string `json:"user_id" db:"user_id"`
 	Name        string `json:"name" db:"name"`
 	TokenHash   string `json:"-" db:"token_hash"`
-	Prefix      string `json:"prefix" db:"prefix"`
-	Scopes      string `json:"scopes,omitempty" db:"scopes"`
-	Kind        string `json:"kind" db:"kind"`
+	Prefix      string `json:"prefix" db:"prefix"`           // the start of the token, to tell it apart
+	Scopes      string `json:"scopes,omitempty" db:"scopes"` // space-separated; empty: all the member may do
+	Kind        string `json:"kind" db:"kind"`               // TokenAPI or TokenOAuth
 	ClientID    string `json:"client_id,omitempty" db:"client_id"`
 	RefreshHash string `json:"-" db:"refresh_hash,null"`
 	CreatedBy   string `json:"created_by" db:"created_by"`
@@ -171,6 +197,7 @@ type ProjectSettings struct {
 	Estimates  bool `json:"estimates,omitempty"`
 }
 
+// Project holds tasks under one key (SVA), with its own workflow.
 type Project struct {
 	ID           string           `json:"id" db:"id"`
 	WorkspaceID  string           `json:"workspace_id" db:"workspace_id"`
@@ -182,8 +209,8 @@ type Project struct {
 	LeadID       string           `json:"lead_id,omitempty" db:"lead_id,null"`
 	Rank         string           `json:"rank,omitempty" db:"rank"`
 	Settings     *ProjectSettings `json:"settings,omitempty" db:"settings,json"`
-	TaskCounter  int              `json:"-" db:"task_counter"`
-	CycleCounter int              `json:"-" db:"cycle_counter"`
+	TaskCounter  int              `json:"-" db:"task_counter"`  // the last task number given
+	CycleCounter int              `json:"-" db:"cycle_counter"` // the last cycle number given
 	CreatedBy    string           `json:"created_by" db:"created_by"`
 	CreatedAt    int64            `json:"created_at" db:"created_at"`
 	UpdatedAt    int64            `json:"-" db:"updated_at"`
@@ -193,6 +220,8 @@ type Project struct {
 	DeletedAt    int64            `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
 
+// Status is one step of a project's workflow, in one of the fixed
+// categories.
 type Status struct {
 	ID          string `json:"id" db:"id"`
 	WorkspaceID string `json:"-" db:"workspace_id"`
@@ -207,6 +236,7 @@ type Status struct {
 	DeletedAt   int64  `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
 
+// Label is a tag on tasks, of one project or of the whole workspace.
 type Label struct {
 	ID          string `json:"id" db:"id"`
 	WorkspaceID string `json:"-" db:"workspace_id"`
@@ -219,6 +249,7 @@ type Label struct {
 	DeletedAt   int64  `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
 
+// Task is one piece of work in a project.
 type Task struct {
 	ID            string `json:"id" db:"id"`
 	WorkspaceID   string `json:"-" db:"workspace_id"`
@@ -228,7 +259,7 @@ type Task struct {
 	Title         string `json:"title" db:"title"`
 	Description   string `json:"description,omitempty" db:"description"`
 	StatusID      string `json:"status_id" db:"status_id"`
-	Priority      int    `json:"priority" db:"priority"`
+	Priority      int    `json:"priority" db:"priority"` // 0 none, 1 urgent … 4 low
 	AssigneeID    string `json:"assignee_id,omitempty" db:"assignee_id,null"`
 	WaitingOnID   string `json:"waiting_on_id,omitempty" db:"waiting_on_id,null"`
 	WaitingOnNote string `json:"waiting_on_note,omitempty" db:"waiting_on_note"`
@@ -244,8 +275,8 @@ type Task struct {
 	CycleID       string   `json:"cycle_id,omitempty" db:"cycle_id,null"`
 	Estimate      int      `json:"estimate,omitempty" db:"estimate,null"`
 	LabelIDs      []string `json:"label_ids,omitempty" db:"label_ids,json"`
-	LeaseHolderID string   `json:"lease_holder_id,omitempty" db:"lease_holder_id,null"`
-	LeaseUntil    int64    `json:"lease_until,omitempty" db:"lease_until,null"`
+	LeaseHolderID string   `json:"lease_holder_id,omitempty" db:"lease_holder_id,null"` // who has taken it
+	LeaseUntil    int64    `json:"lease_until,omitempty" db:"lease_until,null"`         // until when they hold it
 	Budget        *Budget  `json:"budget,omitempty" db:"budget,json"`
 	Rank          string   `json:"rank" db:"rank"`
 	DueOn         string   `json:"due_on,omitempty" db:"due_on,null"`
@@ -257,7 +288,7 @@ type Task struct {
 	CanceledAt    int64    `json:"canceled_at,omitempty" db:"canceled_at,null"`
 	CreatedSeq    int64    `json:"created_seq" db:"created_seq"`
 	UpdatedSeq    int64    `json:"updated_seq" db:"updated_seq"`
-	ActivitySeq   int64    `json:"activity_seq" db:"activity_seq"`
+	ActivitySeq   int64    `json:"activity_seq" db:"activity_seq"` // the last event on it or on what is in it
 	ArchivedAt    int64    `json:"archived_at,omitempty" db:"archived_at,null"`
 	DeletedAt     int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`
 	DeletedBy     string   `json:"-" db:"deleted_by,null"`
@@ -270,6 +301,7 @@ const (
 	RelDuplicates = "duplicates"
 )
 
+// Relation ties two tasks: one blocks, relates to or duplicates the other.
 type Relation struct {
 	ID            string `json:"id" db:"id"`
 	WorkspaceID   string `json:"-" db:"workspace_id"`
@@ -287,6 +319,13 @@ type Evidence struct {
 	NotVerified string `json:"not_verified,omitempty"`
 }
 
+// Comment kinds.
+const (
+	CommentPlain  = "comment"
+	CommentResult = "result" // the report of what was done, with its evidence
+)
+
+// Comment is a comment on a task, a decision or a page.
 type Comment struct {
 	ID          string    `json:"id" db:"id"`
 	WorkspaceID string    `json:"-" db:"workspace_id"`
@@ -294,7 +333,7 @@ type Comment struct {
 	DocID       string    `json:"doc_id,omitempty" db:"doc_id,null"`
 	SubjectType string    `json:"subject_type" db:"subject_type"`
 	SubjectID   string    `json:"subject_id" db:"subject_id"`
-	Kind        string    `json:"kind" db:"kind"`
+	Kind        string    `json:"kind" db:"kind"` // CommentPlain or CommentResult
 	Evidence    *Evidence `json:"evidence,omitempty" db:"evidence,json"`
 	ResolvedAt  int64     `json:"resolved_at,omitempty" db:"resolved_at,null"`
 	ParentID    string    `json:"parent_id,omitempty" db:"parent_id,null"`
@@ -356,6 +395,7 @@ type Decision struct {
 	Options             []Option        `json:"options,omitempty"`
 }
 
+// Option is one answer a decision offers.
 type Option struct {
 	ID          string `json:"id" db:"id"`
 	WorkspaceID string `json:"-" db:"workspace_id"`
@@ -407,6 +447,8 @@ type AppliedChange struct {
 	Key string `db:"key"`
 }
 
+// Cursor is how far a member has handled the events, under a name of
+// their choosing.
 type Cursor struct {
 	WorkspaceID string `db:"workspace_id"`
 	UserID      string `db:"user_id"`
