@@ -176,7 +176,11 @@ async function loadRest(s: Session, copy: number, attempt: number) {
       (raw) => {
         if (s === cur && s.copy === copy && !getState().collections.tasks[id]) mergeRows("tasks", [raw.task]);
       },
-      () => {},
+      (err: unknown) => {
+        // The task stays out of the copy until the next full load; leave a trace for whoever looks into it.
+        // oxlint-disable-next-line no-console -- no place on screen asks for this task, so there is nowhere else to say it
+        console.warn(`quadit: could not fetch task ${id} missing from the copy`, err);
+      },
     );
   }
 }
