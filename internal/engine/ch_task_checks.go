@@ -3,9 +3,7 @@
 package engine
 
 import (
-	"encoding/json"
 	"sort"
-	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -21,13 +19,9 @@ func (c *cx) staleError(t core.Task, base int64) error {
 	}
 	fields := map[string]bool{}
 	for _, ev := range evs {
-		var d struct {
-			Changes map[string]json.RawMessage `json:"changes"`
-		}
-		if json.Unmarshal(ev.Data, &d) == nil {
-			for f := range d.Changes {
-				fields[f] = true
-			}
+		d, _ := ev.Payload() // data that does not read names no field
+		for f := range d.Changes {
+			fields[f] = true
 		}
 	}
 	var changed []string
@@ -93,7 +87,8 @@ func (c *cx) checkHandoff(t core.Task) error {
 
 // isHandoff reports whether a task event changed who the task is assigned to.
 func isHandoff(ev core.Event) bool {
-	return strings.Contains(string(ev.Data), `"assignee_id"`)
+	d, _ := ev.Payload() // data that does not read hands the task to nobody
+	return d.Sets("assignee_id")
 }
 
 // byAgent reports whether an event was written by an agent that is still a

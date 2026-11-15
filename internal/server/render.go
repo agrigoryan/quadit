@@ -513,22 +513,20 @@ func (d taskDetail) text() string {
 // inbox items each have their own wording; any other event says its type
 // and its changed fields (changeText), or the name of what it made.
 func (x *c) eventLine(ev core.Event, names *nameLookup) string {
-	var data struct {
-		Key     string                      `json:"key"`
-		Row     json.RawMessage             `json:"row"`
-		Changes map[string]core.FieldChange `json:"changes"`
-		Deleted bool                        `json:"deleted"`
+	data, _ := ev.Payload() // like readStored: data that does not read makes a shorter line
+	key := ""
+	if data.Key != nil {
+		key = *data.Key
 	}
-	readStored(ev.Data, &data)
 	head := fmt.Sprintf("#%d %s %s", ev.Seq, time.UnixMilli(ev.At).UTC().Format("01-02 15:04"), names.handle(ev.ActorID))
 	what := ev.Type
-	if data.Key != "" {
-		what += " " + data.Key
+	if key != "" {
+		what += " " + key
 	}
 	switch ev.Type {
 	case "task.created":
 		var t core.Task
-		readStored(data.Row, &t)
+		data.ReadRow(&t)
 		what = fmt.Sprintf("task.created %s %q [%s]", t.Key, t.Title, names.statuses[t.StatusID].Name)
 		if t.AssigneeID != "" {
 			what += " " + names.handle(t.AssigneeID)
@@ -537,7 +535,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		what += " " + x.changeText(data.Changes, names)
 	case "comment.created":
 		var cm core.Comment
-		readStored(data.Row, &cm)
+		data.ReadRow(&cm)
 		kind := "comment"
 		if cm.Kind == "result" {
 			kind = "RESULT"
@@ -549,11 +547,11 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		case "decision":
 			on = " on a decision"
 		}
-		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, data.Key, on, oneLine(cm.Body, 240), cm.ID)
+		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, key, on, oneLine(cm.Body, 240), cm.ID)
 	case "decision.opened", "decision.picked", "decision.unclear":
 		var decision core.Decision
-		readStored(data.Row, &decision)
-		what = fmt.Sprintf("%s %s %q", ev.Type, data.Key, oneLine(decision.Question, 120))
+		data.ReadRow(&decision)
+		what = fmt.Sprintf("%s %s %q", ev.Type, key, oneLine(decision.Question, 120))
 		switch ev.Type {
 		case "decision.opened":
 			var opts []string
@@ -586,45 +584,40 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		}
 		what += "  (id=" + decision.ID + ")"
 	case "claim.created", "claim.updated":
-		var claim struct {
-			Row        core.ResourceClaim `json:"row"`
-			Resource   string             `json:"resource"`
-			Why        string             `json:"why"`
-			ResourceID string             `json:"resource_id"`
-			UserID     string             `json:"user_id"`
-			TaskID     string             `json:"task_id"`
-		}
-		readStored(ev.Data, &claim)
+		var claim core.ResourceClaim
+		data.ReadRow(&claim)
 		switch {
 		case ev.Type == "claim.updated":
 			// Whose hold on what: the one acting may be an admin, or the
 			// server handing the resource to the next in line.
-			what = "claim " + firstNonEmpty(claim.Why, "changed")
+			what = "claim " + firstNonEmpty(data.Why, "changed")
 			var resource core.Resource
-			if claim.ResourceID != "" && x.foundForLine(&resource, store.Eq("id", claim.ResourceID)) {
+			if data.ResourceID != "" && x.foundForLine(&resource, store.Eq("id", data.ResourceID)) {
 				what += ": " + resource.Name
 			}
-			if claim.UserID != "" {
-				what += " (" + names.handle(claim.UserID) + ")"
+			if data.UserID != "" {
+				what += " (" + names.handle(data.UserID) + ")"
 			}
-			claim.Row.TaskID = claim.TaskID
-		case claim.Row.State == "holding":
-			what = "claim: took " + claim.Resource
+			if data.TaskID != nil {
+				claim.TaskID = *data.TaskID
+			}
+		case claim.State == "holding":
+			what = "claim: took " + data.Resource
 		default:
-			what = "claim: waits for " + claim.Resource
+			what = "claim: waits for " + data.Resource
 		}
-		if claim.Row.TaskID != "" {
+		if claim.TaskID != "" {
 			var t core.Task
-			if x.foundForLine(&t, store.Eq("id", claim.Row.TaskID)) {
+			if x.foundForLine(&t, store.Eq("id", claim.TaskID)) {
 				what += " for " + t.Key
 			}
 		}
-		if claim.Row.Note != "" {
-			what += ": " + oneLine(claim.Row.Note, 120)
+		if claim.Note != "" {
+			what += ": " + oneLine(claim.Note, 120)
 		}
 	case "notification.created":
 		var note core.Notification
-		readStored(data.Row, &note)
+		data.ReadRow(&note)
 		what = fmt.Sprintf("inbox %s: %s", note.Type, oneLine(note.Title, 100))
 		if note.Snippet != "" {
 			what += " — " + oneLine(note.Snippet, 160)
@@ -635,10 +628,8 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		}
 		if len(data.Changes) > 0 {
 			what += " " + x.changeText(data.Changes, names)
-		} else if data.Key == "" && len(data.Row) > 0 {
+		} else if row := map[string]any{}; key == "" && data.ReadRow(&row) {
 			// Something new that the cases above do not know: its name.
-			var row map[string]any
-			readStored(data.Row, &row)
 			for _, k := range []string{"key", "name", "title", "slug", "handle", "repo", "body"} {
 				if v, _ := row[k].(string); v != "" {
 					what += " " + strconv.Quote(oneLine(v, 80))

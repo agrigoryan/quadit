@@ -5,7 +5,6 @@ package server
 
 import (
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -137,7 +136,8 @@ func (d *dashboard) flowWaiting() ([]flowWait, error) {
 		return nil, err
 	}
 	for _, ev := range evs {
-		if _, seen := since[ev.ScopeID]; seen || !strings.Contains(string(ev.Data), "waiting_on_id") {
+		d, _ := ev.Payload() // data that does not read hands the task to nobody
+		if _, seen := since[ev.ScopeID]; seen || !d.Sets("waiting_on_id") {
 			continue
 		}
 		since[ev.ScopeID] = ev.At

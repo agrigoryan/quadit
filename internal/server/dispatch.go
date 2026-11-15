@@ -127,12 +127,7 @@ type listeners struct {
 // import) is not: it goes only to the feed, the search, local copies and
 // webhooks. This is the one place that tells the two apart.
 func isNews(ev core.Event) bool {
-	var d struct {
-		Quiet bool `json:"quiet"`
-	}
-	if err := json.Unmarshal(ev.Data, &d); err != nil {
-		return true // data that does not read says nothing of being quiet
-	}
+	d, _ := ev.Payload() // data that does not read says nothing of being quiet
 	return !d.Quiet
 }
 
@@ -151,21 +146,18 @@ func (s *Server) reactToNews(ctx context.Context, l listeners, ev core.Event) {
 			}
 		}
 	}
-	if len(l.rules) > 0 && ev.AudienceID == "" && !strings.Contains(string(ev.Data), `"rule":`) {
+	d, _ := ev.Payload() // data that does not read names no rule and no inbox item
+	if len(l.rules) > 0 && ev.AudienceID == "" && d.Rule == "" {
 		for _, r := range l.rules {
 			if err := s.runRule(ctx, l, r, ev); err != nil {
 				s.log.Error("rule", "rule", r.Name, "seq", ev.Seq, "err", err)
 			}
 		}
 	}
-	if ev.Type == "notification.created" {
-		var d struct {
-			Row core.Notification `json:"row"`
-		}
-		if json.Unmarshal(ev.Data, &d) == nil && d.Row.ID != "" {
-			// Give the person a moment to see it in an open window first.
-			s.enqueue(ctx, "notify", ws.ID, "notify:"+d.Row.ID, map[string]string{"id": d.Row.ID}, time.Now().Add(notifyDelay))
-		}
+	var n core.Notification
+	if ev.Type == "notification.created" && d.ReadRow(&n) && n.ID != "" {
+		// Give the person a moment to see it in an open window first.
+		s.enqueue(ctx, "notify", ws.ID, "notify:"+n.ID, map[string]string{"id": n.ID}, time.Now().Add(notifyDelay))
 	}
 }
 
@@ -282,12 +274,6 @@ func (s *Server) runRule(ctx context.Context, l listeners, r core.Rule, ev core.
 	return s.ruleAct(ctx, l.ws, r, taskID, ev)
 }
 
-// ruleEventData is the part of an event's data that a rule's match reads.
-type ruleEventData struct {
-	Row     json.RawMessage             `json:"row"`
-	Changes map[string]core.FieldChange `json:"changes"`
-}
-
 // ruleMatches reports whether an event is one a rule's match describes. A
 // match with nothing set takes every event. A row a condition names that is
 // gone does not match; a read that fails is an error.
@@ -298,15 +284,14 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 	if !typeMatches(m.EventTypes, ev.Type) || (m.ProjectID != "" && m.ProjectID != ev.ProjectID) || (m.ActorID != "" && m.ActorID != ev.ActorID) {
 		return false, nil
 	}
-	var d ruleEventData
-	_ = json.Unmarshal(ev.Data, &d) //nolint:errcheck // data that does not read matches no condition on it
+	d, _ := ev.Payload() // data that does not read matches no condition on it
 	if m.ActorKind != "" {
 		var actor core.Member
 		if there, err := rowFound(db.Get(ctx, &actor, store.Eq("user_id", ev.ActorID))); err != nil || !there || actor.Kind != m.ActorKind {
 			return false, err
 		}
 	}
-	if m.Outcome != "" && decisionOutcome(d.Row) != m.Outcome {
+	if m.Outcome != "" && decisionOutcome(d) != m.Outcome {
 		return false, nil
 	}
 	if m.ToCategory != "" {
@@ -333,9 +318,9 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 
 // decisionOutcome is the outcome of the decision in an event's row, or ""
 // when the row is not one that reads.
-func decisionOutcome(row json.RawMessage) string {
+func decisionOutcome(d core.EventData) string {
 	var dc core.Decision
-	if err := json.Unmarshal(row, &dc); err != nil {
+	if !d.ReadRow(&dc) {
 		return ""
 	}
 	return dc.Outcome
