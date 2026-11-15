@@ -74,7 +74,7 @@ export function ProjectLabels({ project }: { project: Project }) {
       for (const id of task.label_ids ?? []) counts[id] = (counts[id] ?? 0) + 1;
     }
     return { own: live.filter((l) => l.project_id === project.id), shared: live.filter((l) => !l.project_id), counts };
-  }, [all, tasks, project.id]);
+  }, [all, tasks, project]);
 
   return (
     <div className="flex flex-col gap-6">

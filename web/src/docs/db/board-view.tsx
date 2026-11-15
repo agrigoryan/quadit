@@ -169,7 +169,7 @@ export function BoardView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps
   );
 
   const byId = useMemo(() => new Map(rows.map((r) => [r.id, r])), [rows]);
-  const options = group ? optionsOf(group) : [];
+  const options = useMemo(() => (group ? optionsOf(group) : []), [group]);
   const grouped = useMemo(() => {
     const out: Order = { [NONE]: [] };
     for (const o of options) out[colId(o.name)] = [];

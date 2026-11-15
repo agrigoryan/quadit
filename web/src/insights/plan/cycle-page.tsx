@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
 import { statusesOf, useCycles, useLookup, useProjectByKey, useRow, useSlug } from "@/lib/selectors";
 import { daysUntil, formatDay, serverDay } from "@/lib/time";
-import { type Cycle, isOpenCategory, type Project } from "@/lib/types";
+import { type Cycle, isOpenCategory, type Project, type Task } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { BurnUp, burnRows } from "@/insights/charts/burn-up";
@@ -45,6 +45,8 @@ export function CyclePage() {
   return <CycleView project={project} cycle={cycle} />;
 }
 
+const NO_TASKS: Task[] = [];
+
 function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
   const name = cycleName(cycle);
   usePageTitle(name);
@@ -52,7 +54,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
   const statuses = useLookup("statuses");
   const readOnly = !useCan().edit(project.id);
   const cycles = useCycles(project.id);
-  const tasks = useTasksBy(project.id, "cycle_id")[cycle.id] ?? [];
+  const tasks = useTasksBy(project.id, "cycle_id")[cycle.id] ?? NO_TASKS;
   const tally = useTallies("cycle_id")[cycle.id] ?? emptyTally();
   const phase = cyclePhase(cycle);
   const next = cycles.find((c) => c.starts_on > cycle.ends_on);

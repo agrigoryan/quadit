@@ -67,7 +67,7 @@ export function MyWorkPage() {
           b.updated_at - a.updated_at,
       );
     return { waiting, questions, assigned };
-  }, [tasks, liveTasks, statuses, openDecisions, me.user_id]);
+  }, [tasks, liveTasks, statuses, openDecisions, me]);
 
   const rows = useMemo<Row[]>(
     () => [
