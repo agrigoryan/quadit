@@ -11,7 +11,7 @@ import { Tooltip } from "@/ui/tooltip";
 import { useListening } from "@/settings/agents/data";
 import { addHosts, setSecret, useSecrets, validName } from "@/settings/secrets/data";
 import { HostInput } from "@/settings/secrets/host-input";
-import { FormAlert, FormField, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { MultiPick } from "@/settings/ui/multi-pick";
 
 interface Props {
@@ -33,8 +33,8 @@ export function SecretForm({ secret, onClose }: Props) {
   const [hostDraft, setHostDraft] = useState("");
   const [agents, setAgents] = useState<string[]>(secret?.agents ?? []);
   const [env, setEnv] = useState(secret?.env ?? false);
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "value", "hosts", "agents"]);
+  const { busy, run } = useSubmit(errors);
 
   // The workspace's agents, and anyone else the secret already names.
   const choices = useMemo(
@@ -65,15 +65,10 @@ export function SecretForm({ secret, onClose }: Props) {
     if ("bad" in all) return errors.set("hosts", t("secrets.hostInvalid", { host: all.bad }));
     setHosts(all.hosts);
     setHostDraft("");
-    setBusy(true);
-    try {
+    await run(async () => {
       await setSecret({ name: secret?.name ?? trimmed, value: value || undefined, description: description.trim(), hosts: all.hosts, agents, env });
       onClose();
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

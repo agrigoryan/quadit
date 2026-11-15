@@ -6,7 +6,7 @@ import { useMe } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { AGENT_FIELDS, type AgentDraft, AgentLimitFields, AgentProfileFields, draftOf, limitsOf } from "@/settings/agents/agent-form";
-import { FormAlert, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 
@@ -15,9 +15,9 @@ export function CreateAgentDialog({ onClose, onCreated }: { onClose: () => void;
   const me = useMe();
   // Whoever makes an agent answers for it unless they name someone else.
   const [draft, setDraft] = useState<AgentDraft>(() => draftOf(undefined, me.user_id));
-  const [busy, setBusy] = useState(false);
   const [id] = useState(newId);
   const errors = useFieldErrors(AGENT_FIELDS);
+  const { busy, run } = useSubmit(errors, { once: true });
   const set = (patch: Partial<AgentDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
   async function submit(e: FormEvent) {
@@ -32,15 +32,11 @@ export function CreateAgentDialog({ onClose, onCreated }: { onClose: () => void;
     if (draft.responsible) args.responsible = draft.responsible;
     if (limits.scope) args.scope = limits.scope;
     if (limits.budget) args.budget = limits.budget;
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate({ type: "agent.create", args }, undefined, { quiet: true });
       toast.info(t("agent.created", { name: draft.name.trim() }));
       onCreated(getState().c.members[id]?.handle ?? draft.handle.trim());
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (

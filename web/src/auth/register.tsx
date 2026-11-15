@@ -5,7 +5,7 @@ import { safeNext, useAuthConfig } from "@/auth/config";
 import { ProviderButtons } from "@/auth/providers";
 import { register, useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { FormField, useFieldErrors } from "@/settings/ui/form";
+import { FormField, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Loading } from "@/ui/spinner";
@@ -16,8 +16,8 @@ export function RegisterPage() {
   const config = useAuthConfig();
   const [params] = useSearchParams();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "email", "password"]);
+  const { busy, run } = useSubmit(errors, { once: true });
   const next = safeNext(params.get("next"));
 
   if (status === "in") return <Navigate to={next} replace />;
@@ -41,14 +41,9 @@ export function RegisterPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    errors.clear();
-    try {
+    await run(async () => {
       await register(form);
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (

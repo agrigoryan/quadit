@@ -13,7 +13,7 @@ import { CATEGORIES, type Category, type Project, type Status } from "@/lib/type
 import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";
 import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormField, NativeSelect, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Rows } from "@/settings/ui/layout";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
@@ -181,22 +181,17 @@ export function ProjectStatuses({ project, admin }: { project: Project; admin: b
 function AddStatus({ project, last }: { project: Project; last: string | undefined }) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<Category>("started");
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "category"]);
+  const { busy, run } = useSubmit(errors);
 
   async function add(e: FormEvent) {
     e.preventDefault();
     errors.clear();
     if (!name.trim()) return errors.set("name", t("s.required"));
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate({ type: "status.create", args: { id: newId(), project: project.id, name: name.trim(), category, rank: rankBetween(last, undefined) } }, undefined, { quiet: true });
       setName("");
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

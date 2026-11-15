@@ -4,7 +4,7 @@ import { newId } from "@/lib/ids";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { FormAlert, FormField, NativeSelect, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { type Authority, change, type Source, type WriteMode } from "@/settings/automation/data";
 
 interface Props {
@@ -24,8 +24,8 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
   const [authority, setAuthority] = useState<Authority>(source?.authority ?? "repo");
   const [writeMode, setWriteMode] = useState<WriteMode>(source?.write_mode ?? "commit");
   const [title, setTitle] = useState("");
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["repo", "branch", "subdir", "authority", "write_mode", "title", "root"]);
+  const { busy, run } = useSubmit(errors);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -40,15 +40,10 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
       write_mode: writeMode,
     };
     if (!source && title.trim()) args.title = title.trim();
-    setBusy(true);
-    try {
+    await run(async () => {
       await change(source ? "source.update" : "source.create", args);
       onSaved();
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

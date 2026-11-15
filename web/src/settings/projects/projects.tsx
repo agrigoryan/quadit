@@ -10,7 +10,7 @@ import type { Project } from "@/lib/types";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";
 import { SWATCHES } from "@/settings/ui/bits";
-import { FormAlert, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Page, Rows, Section } from "@/settings/ui/layout";
 import { ProjectGlyph } from "@/shell/sidebar";
 import { Badge } from "@/ui/badge";
@@ -104,8 +104,8 @@ function CreateProjectDialog({ used, onClose }: { used: number; onClose: () => v
   const base = useSettingsBase();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<ProjectDraft>({ key: "", name: "", icon: "", color: SWATCHES[(used + 1) % SWATCHES.length] ?? "", description: "" });
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(PROJECT_FIELDS);
+  const { busy, run } = useSubmit(errors, { once: true });
   const set = (patch: Partial<ProjectDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
   async function submit(e: FormEvent) {
@@ -113,8 +113,7 @@ function CreateProjectDialog({ used, onClose }: { used: number; onClose: () => v
     errors.clear();
     if (!draft.name.trim()) return errors.set("name", t("s.required"));
     if (!KEY_RE.test(draft.key)) return errors.set("key", t("project.keyBad"));
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate(
         { type: "project.create", args: { id: newId(), key: draft.key, name: draft.name.trim(), icon: draft.icon.trim(), color: draft.color, description: draft.description.trim() } },
         undefined,
@@ -122,10 +121,7 @@ function CreateProjectDialog({ used, onClose }: { used: number; onClose: () => v
       );
       toast.info(t("project.created", { name: draft.name.trim() }));
       navigate(`${base}/projects/${draft.key}/statuses`);
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { AuthLayout, FormError } from "@/auth/auth-layout";
 import { authConfig, setUp } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { FormField, useFieldErrors } from "@/settings/ui/form";
+import { FormField, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
@@ -13,7 +13,7 @@ export function SetupPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
   // The server names the workspace's address "slug"; it comes from the workspace's name here.
   const errors = useFieldErrors(["name", "owner_name", "email", "owner_email", "password", "slug", "workspace_slug", "workspace_name"]);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useSubmit(errors, { once: true });
 
   // Set-up works once; after that this page is the sign-in page.
   useEffect(() => {
@@ -27,15 +27,10 @@ export function SetupPage() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    errors.clear();
-    try {
+    await run(async () => {
       const slug = await setUp(form);
       navigate(`/${slug}`, { replace: true });
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (

@@ -7,7 +7,7 @@ import { toast } from "@/lib/toast";
 import type { Account } from "@/settings/me/account";
 import { QrCode } from "@/settings/me/qr";
 import { CopyField, RevealDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormField, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Card, Section } from "@/settings/ui/layout";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -103,14 +103,12 @@ function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; o
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const errors = useFieldErrors(["code", "password"]);
-  const [busy, setBusy] = useState(false);
+  const { busy, run } = useSubmit(errors);
   const off = mode === "off";
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    errors.clear();
-    try {
+    await run(async () => {
       if (off) {
         await api.post(`${TOTP}/disable`, { code: code.trim(), password });
         onDone();
@@ -118,11 +116,7 @@ function ConfirmCodeDialog({ mode, onClose, onDone }: { mode: "off" | "renew"; o
         const out = await api.post<{ recovery_codes: string[] }>("/api/v1/auth/recovery-codes", { code: code.trim() });
         onDone(out.recovery_codes);
       }
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

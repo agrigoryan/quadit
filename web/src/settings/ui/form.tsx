@@ -1,6 +1,6 @@
 // Form parts for settings pages: a field that can show what is wrong with
-// it, a switch, a plain select, and the hook that puts the server's refusal
-// next to the field it names.
+// it, a switch, a plain select, the hook that puts the server's refusal
+// next to the field it names, and the hook that runs a form's request.
 
 import { type ReactNode, type SelectHTMLAttributes, useCallback, useId, useState } from "react";
 import { Checkbox as RCheckbox, Switch as RSwitch } from "radix-ui";
@@ -105,6 +105,47 @@ export function useFieldErrors(known: string[] = []): FieldErrors {
     setForm("");
   }, []);
   return { fields, form, fail, set, clear };
+}
+
+interface Submit {
+  /** The request is on its way: the form's button is off. */
+  busy: boolean;
+  /** Clears the old refusal, runs `action` with `busy` on, and sorts what it throws into the form's errors. */
+  run: (action: () => Promise<unknown>) => Promise<void>;
+}
+
+/**
+ * The busy flag of a form and the run of its request:
+ *
+ *   const { busy, run } = useSubmit(errors);
+ *   await run(async () => {
+ *     await mutate(...);
+ *     toast.info(t("s.saved"));
+ *   });
+ *
+ * A form that checks its fields in the browser first clears the errors itself
+ * before checking, so an old refusal goes even when the check stops it short
+ * of `run`.
+ *
+ * `once` is for a form that is over when its request goes through (its dialog
+ * closes, the page moves on): `busy` then stays on, so the button cannot be
+ * pressed again on the way out. A refusal turns it off either way.
+ */
+export function useSubmit(errors: Pick<FieldErrors, "clear" | "fail">, { once = false }: { once?: boolean } = {}): Submit {
+  const [busy, setBusy] = useState(false);
+  async function run(action: () => Promise<unknown>) {
+    errors.clear();
+    setBusy(true);
+    try {
+      await action();
+    } catch (err) {
+      errors.fail(err);
+      setBusy(false);
+      return;
+    }
+    if (!once) setBusy(false);
+  }
+  return { busy, run };
 }
 
 interface SwitchProps {

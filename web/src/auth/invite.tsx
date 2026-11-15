@@ -7,7 +7,7 @@ import { loadSession, signOut, useSession } from "@/auth/session";
 import { api, errorMessage } from "@/lib/api";
 import { t, tMaybe } from "@/lib/i18n";
 import type { Role } from "@/lib/types";
-import { FormField, useFieldErrors } from "@/settings/ui/form";
+import { FormField, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Loading } from "@/ui/spinner";
@@ -166,20 +166,15 @@ function JoinAsMe({ path, name, email, onJoined }: JoinProps & { name: string; e
 /** Not signed in and no account yet: a name and a password make one, already in the workspace. */
 function NewAccount({ path, email, onJoined }: JoinProps & { email?: string }) {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "email", "password"]);
+  const { busy, run } = useSubmit(errors, { once: true });
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    errors.clear();
-    try {
+    await run(async () => {
       await onJoined(await api.post<Accepted>(path, { name: form.name, email: email || form.email, password: form.password }));
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (

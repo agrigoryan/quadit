@@ -10,7 +10,7 @@ import { type Account, saveAccount, useAccount } from "@/settings/me/account";
 import { Segmented } from "@/settings/me/segmented";
 import { AvatarInput } from "@/settings/ui/avatar-input";
 import { LoadGate } from "@/settings/ui/bits";
-import { FormAlert, FormField, FormFoot, NativeSelect, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, FormFoot, NativeSelect, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Card, Page, Section } from "@/settings/ui/layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -52,8 +52,8 @@ function AvatarField({ account, onSaved }: { account: Account; onSaved: (a: Acco
 function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
   const [name, setName] = useState(account.user.name);
   const [zone, setZone] = useState(account.user.timezone || browserZone());
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "timezone"]);
+  const { busy, run } = useSubmit(errors);
   const zones = useZones(zone);
   const dirty = name.trim() !== account.user.name || zone !== (account.user.timezone ?? "");
 
@@ -64,15 +64,10 @@ function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Acco
       errors.set("name", t("me.profile.nameRequired"));
       return;
     }
-    setBusy(true);
-    try {
+    await run(async () => {
       onSaved(await saveAccount({ name: name.trim(), timezone: zone }));
       toast.info(t("s.saved"));
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -104,8 +99,8 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["email", "password"]);
+  const { busy, run } = useSubmit(errors);
 
   function close() {
     setOpen(false);
@@ -121,16 +116,11 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
     if (!next) return errors.set("email", t("me.email.required"));
     if (next.toLowerCase() === current.toLowerCase()) return errors.set("email", t("me.email.same"));
     if (account.has_password && !password) return errors.set("password", t("me.email.passwordRequired"));
-    setBusy(true);
-    try {
+    await run(async () => {
       onSaved(await saveAccount(account.has_password ? { email: next, password } : { email: next }));
       toast.info(t("me.email.changed"));
       close();
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

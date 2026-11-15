@@ -8,7 +8,7 @@ import type { Project } from "@/lib/types";
 import { useSettingsBase } from "@/settings/base";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";
 import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormField, FormFoot, NativeSelect, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, FormFoot, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Card, Section } from "@/settings/ui/layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -31,10 +31,10 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
     color: project.color ?? "",
     description: project.description ?? "",
   });
-  const [busy, setBusy] = useState(false);
   const [ask, setAsk] = useState<"archive" | "delete" | null>(null);
   const [typed, setTyped] = useState("");
   const errors = useFieldErrors(PROJECT_FIELDS);
+  const { busy, run } = useSubmit(errors);
   const set = (patch: Partial<ProjectDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const settings: Settings = project.settings ?? {};
 
@@ -43,8 +43,7 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
     errors.clear();
     if (!draft.name.trim()) return errors.set("name", t("s.required"));
     if (!KEY_RE.test(draft.key)) return errors.set("key", t("project.keyBad"));
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate(
         { type: "project.update", args: { id: project.id, key: draft.key, name: draft.name.trim(), icon: draft.icon.trim(), color: draft.color, description: draft.description.trim() } },
         undefined,
@@ -52,11 +51,7 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
       );
       toast.info(t("s.saved"));
       if (draft.key !== project.key) navigate(`${base}/projects/${draft.key}/general`, { replace: true });
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   /** Switches save as they are flipped. */

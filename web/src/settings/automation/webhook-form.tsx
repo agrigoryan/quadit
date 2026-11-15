@@ -6,7 +6,7 @@ import { memberChoiceLabel, useListening } from "@/settings/agents/data";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { change, randomSecret, type Webhook } from "@/settings/automation/data";
 import { EventPicker } from "@/settings/automation/event-picker";
 
@@ -31,8 +31,8 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
   const [projectId, setProjectId] = useState(hook?.project_id ?? "");
   const [memberId, setMemberId] = useState(hook?.user_id ?? "");
   const [active, setActive] = useState(hook?.active ?? true);
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "url", "project", "for", "event_types"]);
+  const { busy, run } = useSubmit(errors);
 
   // Agents first: waking an agent is what "for" is for.
   const inboxes = [...members].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "agent" ? -1 : 1));
@@ -43,8 +43,7 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
     if (!/^https?:\/\/\S+$/i.test(url.trim())) return errors.set("url", t("auto.hook.urlInvalid"));
     if (scope === "project" && !projectId) return errors.set("project", t("auto.hook.projectMissing"));
     if (scope === "member" && !memberId) return errors.set("for", t("auto.hook.memberMissing"));
-    setBusy(true);
-    try {
+    await run(async () => {
       if (hook) {
         await change("webhook.update", {
           id: hook.id,
@@ -68,11 +67,7 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
         await change("webhook.create", args);
         onSaved({ name: name.trim() || new URL(url.trim()).host, value: secret });
       }
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const scopeChoices = [

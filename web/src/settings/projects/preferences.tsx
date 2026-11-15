@@ -8,7 +8,7 @@ import type { Project } from "@/lib/types";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { Dot, When } from "@/settings/ui/bits";
 import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormField, FormFoot, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, FormFoot, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Card, EmptyRow, Rows, Section } from "@/settings/ui/layout";
 import { Badge, LabelChip } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
@@ -109,23 +109,18 @@ function AddPreference({ project }: { project: Project }) {
   const labels = useLabels(project.id);
   const [body, setBody] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["body", "labels"]);
+  const { busy, run } = useSubmit(errors);
 
   async function add(e: FormEvent) {
     e.preventDefault();
     errors.clear();
     if (!body.trim()) return errors.set("body", t("s.required"));
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate({ type: "preference.create", args: { id: newId(), body: body.trim(), project: project.id, labels: picked } }, undefined, { quiet: true });
       setBody("");
       setPicked([]);
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

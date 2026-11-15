@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import type { Member } from "@/lib/types";
-import { FormAlert, FormField, Note, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, Note, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { MemberScopeFields, sameScope, scopeArg, scopeDraftOf } from "@/settings/workspace/scope-fields";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
@@ -13,23 +13,18 @@ export function EditMemberDialog({ member, onClose }: { member: Member; onClose:
   const [handle, setHandle] = useState(member.handle);
   const [title, setTitle] = useState(member.title ?? "");
   const [scope, setScope] = useState(() => scopeDraftOf(member));
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["handle", "title", "scope", "projects"]);
+  const { busy, run } = useSubmit(errors, { once: true });
   const owner = member.role === "owner";
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    errors.clear();
-    setBusy(true);
-    try {
+    await run(async () => {
       const args: Record<string, unknown> = { id: member.user_id, handle: handle.trim(), title: title.trim() };
       if (!owner && !sameScope(scope, scopeDraftOf(member))) args.scope = scopeArg(scope);
       await mutate({ type: "member.update", args }, undefined, { quiet: true });
       onClose();
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (

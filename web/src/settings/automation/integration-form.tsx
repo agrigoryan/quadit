@@ -6,7 +6,7 @@ import { CATEGORIES } from "@/lib/types";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { change, type GitHubConfig, type Integration } from "@/settings/automation/data";
 
 interface Props {
@@ -30,8 +30,8 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
   const [issuesLabel, setIssuesLabel] = useState(cfg.issues_label ?? "");
   const [issuesProject, setIssuesProject] = useState(cfg.issues_project ?? "");
   const [active, setActive] = useState(it?.active ?? true);
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "project", "repo", "secret", "config", "kind", "issues_project"]);
+  const { busy, run } = useSubmit(errors);
   // Tasks made from issues need a project: the one chosen for them, or the one the integration is limited to.
   const issueProjectKey = issuesProject || projects.find((p) => p.id === projectId)?.key || "";
 
@@ -60,15 +60,10 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
     // The token never comes back; an empty field keeps the one that is stored.
     if (token.trim()) args.secret = token.trim();
 
-    setBusy(true);
-    try {
+    await run(async () => {
       await change(it ? "integration.update" : "integration.create", args);
       onSaved();
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const categories = [{ value: "", label: t("auto.gh.leaveAlone") }, ...CATEGORIES.map((c) => ({ value: c, label: tMaybe(`category.${c}`) }))];

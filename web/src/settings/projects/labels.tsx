@@ -9,7 +9,7 @@ import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";
 import { SWATCHES } from "@/settings/ui/bits";
 import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { FormAlert, NativeSelect, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, NativeSelect, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { EmptyRow, Rows, Section } from "@/settings/ui/layout";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -78,24 +78,19 @@ export function ProjectLabels({ project }: { project: Project }) {
 function AddLabel({ project, used }: { project: Project; used: number }) {
   const [name, setName] = useState("");
   const [scope, setScope] = useState<"project" | "workspace">("project");
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name"]);
+  const { busy, run } = useSubmit(errors);
 
   async function add(e: FormEvent) {
     e.preventDefault();
     errors.clear();
     if (!name.trim()) return errors.set("name", t("s.required"));
-    setBusy(true);
-    try {
+    await run(async () => {
       const args: Record<string, unknown> = { id: newId(), name: name.trim(), color: SWATCHES[(used + 2) % SWATCHES.length] };
       if (scope === "project") args.project = project.id;
       await mutate({ type: "label.create", args }, undefined, { quiet: true });
       setName("");
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (

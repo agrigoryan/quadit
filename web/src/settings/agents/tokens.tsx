@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { api, ws } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -7,28 +7,16 @@ import type { AgentMember, Token } from "@/settings/agents/data";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { Fact, When } from "@/settings/ui/bits";
 import { ConfirmDialog, RevealDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, SwitchRow } from "@/settings/ui/form";
 import { EmptyRow, Row, Rows, Section } from "@/settings/ui/layout";
+import { CreateTokenDialog, ScopeBadges, type TokenFieldsProps } from "@/settings/ui/tokens";
 import { useLoad } from "@/settings/ui/use-load";
 import { ProjectGlyph } from "@/shell/sidebar";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 
 const EXPIRY = [0, 7, 30, 90, 365];
-
-/** What a token is narrowed to, as badges. */
-function ScopeBadges({ scopes }: { scopes: string | undefined }) {
-  const parts = (scopes ?? "").split(" ").filter(Boolean);
-  const projects = parts.filter((p) => p.startsWith("project:")).length;
-  return (
-    <>
-      {parts.includes("read") && <Badge>{t("tokens.scope.read")}</Badge>}
-      {projects > 0 && <Badge>{t("tokens.scope.projects", { n: projects })}</Badge>}
-    </>
-  );
-}
 
 /** The tokens issued to one agent: make one (shown once), see when each was used, revoke. */
 export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: boolean }) {
@@ -69,7 +57,11 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
               sub={<span className="font-mono">{tk.prefix}…</span>}
               meta={
                 <>
-                  <ScopeBadges scopes={tk.scopes} />
+                  <ScopeBadges
+                    scopes={tk.scopes}
+                    readOnly={t("tokens.scope.read")}
+                    projects={(ids) => <Badge>{t("tokens.scope.projects", { n: ids.length })}</Badge>}
+                  />
                   {tk.expires_at ? (
                     tk.expires_at < now ? (
                       <Badge tone="danger">{t("tokens.expired")}</Badge>
@@ -99,10 +91,15 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
       {creating && (
         <CreateTokenDialog
           user={`@${agent.handle}`}
+          title={t("tokens.new")}
+          create={t("tokens.create")}
+          compact
+          days={0}
+          fields={AgentTokenFields}
           onClose={() => setCreating(false)}
-          onCreated={(token) => {
+          onCreated={(created) => {
             setCreating(false);
-            setSecret(token);
+            setSecret(created.token);
             void tokens.reload();
           }}
         />
@@ -141,80 +138,32 @@ export function TokenReveal({ token, onClose }: { token: string; onClose: () => 
   );
 }
 
-interface CreateProps {
-  /** "@handle" of an agent, or "me". */
-  user: string;
-  onClose: () => void;
-  onCreated: (token: string) => void;
-}
-
-export function CreateTokenDialog({ user, onClose, onCreated }: CreateProps) {
-  const slug = useSlug();
+/** The fields of a token for an agent: its name, read-only or not, its projects, when it expires. */
+function AgentTokenFields({ name, setName, readOnly, setReadOnly, projects: picked, setProjects: setPicked, days, setDays, errors }: TokenFieldsProps) {
   const projects = useProjects();
-  const [name, setName] = useState("");
-  const [readOnly, setReadOnly] = useState(false);
-  const [picked, setPicked] = useState<string[]>([]);
-  const [days, setDays] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const errors = useFieldErrors(["name", "projects"]);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    errors.clear();
-    setBusy(true);
-    try {
-      const out = await api.post<{ token: string }>(ws(slug, "/tokens"), {
-        user,
-        name: name.trim(),
-        read_only: readOnly,
-        projects: picked,
-        expires_days: days,
-      });
-      onCreated(out.token);
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
-  }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
-      title={t("tokens.new")}
-      size="sm"
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button variant="primary" type="submit" form="token-create" disabled={busy}>
-            {t("tokens.create")}
-          </Button>
-        </>
-      }
-    >
-      <form id="token-create" onSubmit={submit} className="flex flex-col gap-3.5">
-        <FormField label={t("tokens.name")} htmlFor="token-name" hint={t("tokens.nameHint")} error={errors.fields.name}>
-          <Input id="token-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("tokens.namePlaceholder")} maxLength={80} />
-        </FormField>
-        <SwitchRow title={t("tokens.readOnly")} hint={t("tokens.readOnlyHint")} checked={readOnly} onChange={setReadOnly} />
-        <FormField label={t("tokens.projects")} hint={t("tokens.projectsHint")} error={errors.fields.projects}>
-          <MultiPick
-            items={projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, keywords: p.key }))}
-            value={picked}
-            onChange={setPicked}
-            addLabel={t("agent.projectsPick")}
-            empty={t("s.everyProject")}
-          />
-        </FormField>
-        <FormField label={t("tokens.expires")}>
-          <NativeSelect
-            value={String(days)}
-            onChange={(v) => setDays(Number(v))}
-            options={EXPIRY.map((n) => ({ value: String(n), label: n === 0 ? t("tokens.expires.never") : t("tokens.expires.days", { n }) }))}
-          />
-        </FormField>
-        <FormAlert>{errors.form}</FormAlert>
-      </form>
-    </Dialog>
+    <>
+      <FormField label={t("tokens.name")} htmlFor="token-name" hint={t("tokens.nameHint")} error={errors.fields.name}>
+        <Input id="token-name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("tokens.namePlaceholder")} maxLength={80} />
+      </FormField>
+      <SwitchRow title={t("tokens.readOnly")} hint={t("tokens.readOnlyHint")} checked={readOnly} onChange={setReadOnly} />
+      <FormField label={t("tokens.projects")} hint={t("tokens.projectsHint")} error={errors.fields.projects}>
+        <MultiPick
+          items={projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, keywords: p.key }))}
+          value={picked}
+          onChange={setPicked}
+          addLabel={t("agent.projectsPick")}
+          empty={t("s.everyProject")}
+        />
+      </FormField>
+      <FormField label={t("tokens.expires")}>
+        <NativeSelect
+          value={String(days)}
+          onChange={(v) => setDays(Number(v))}
+          options={EXPIRY.map((n) => ({ value: String(n), label: n === 0 ? t("tokens.expires.never") : t("tokens.expires.days", { n }) }))}
+        />
+      </FormField>
+    </>
   );
 }

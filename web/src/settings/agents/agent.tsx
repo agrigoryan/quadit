@@ -12,7 +12,7 @@ import { AgentTokens } from "@/settings/agents/tokens";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact, When } from "@/settings/ui/bits";
 import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormFoot, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormFoot, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Card, Page, Section } from "@/settings/ui/layout";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
@@ -46,9 +46,9 @@ function AgentBody({ agent }: { agent: AgentMember }) {
   const states = useAgentStates();
   const knownResponsible = agent.responsible_id ?? "";
   const [draft, setDraft] = useState<AgentDraft>(() => draftOf(agent, knownResponsible));
-  const [busy, setBusy] = useState(false);
   const [ask, setAsk] = useState<"suspend" | "remove" | null>(null);
   const errors = useFieldErrors(AGENT_FIELDS);
+  const { busy, run } = useSubmit(errors);
   const set = (patch: Partial<AgentDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const state = states.data?.[agent.user_id];
   const helper = useHelperLabel()(agent);
@@ -77,15 +77,10 @@ function AgentBody({ agent }: { agent: AgentMember }) {
     if (draft.responsible && draft.responsible !== knownResponsible) args.responsible = draft.responsible;
     const changes: ChangeSpec[] = [{ type: "agent.update", args }];
     if (draft.role !== agent.role) changes.push({ type: "member.update", args: { id: agent.user_id, role: draft.role } });
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate(changes, undefined, { quiet: true });
       toast.info(t("s.saved"));
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const resume = () =>

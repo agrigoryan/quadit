@@ -10,7 +10,7 @@ import { toast } from "@/lib/toast";
 import type { Workspace } from "@/lib/types";
 import { useSettingsBase } from "@/settings/base";
 import { download } from "@/settings/ui/bits";
-import { FormAlert, FormField, FormFoot, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, FormFoot, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { Card, Page, Section } from "@/settings/ui/layout";
 import { DeleteWorkspaceDialog } from "@/settings/workspace/delete-workspace";
 import { Button } from "@/ui/button";
@@ -23,27 +23,22 @@ export function GeneralPage() {
   const slug = useStore((s) => s.slug);
   const [name, setName] = useState(workspace.name);
   const [icon, setIcon] = useState(workspace.icon ?? "");
-  const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const owner = useMe().role === "owner";
   const errors = useFieldErrors(["name", "icon"]);
+  const { busy, run } = useSubmit(errors);
   const dirty = name.trim() !== workspace.name || icon.trim() !== (workspace.icon ?? "");
 
   async function save(e: FormEvent) {
     e.preventDefault();
     errors.clear();
     if (!name.trim()) return errors.set("name", t("s.required"));
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate({ type: "workspace.update", args: { name: name.trim(), icon: icon.trim() } }, undefined, { quiet: true });
       // The list of workspaces in the switcher comes with the session.
       await loadSession();
       toast.info(t("s.saved"));
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   function exportAll() {

@@ -7,7 +7,7 @@ import { memberChoiceLabel, useListening } from "@/settings/agents/data";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { ACTION_KINDS, type ActionKind, change, OUTCOMES, type Rule, type RuleAction, type RuleMatch, typeMatches, type Webhook } from "@/settings/automation/data";
 import { EventPicker } from "@/settings/automation/event-picker";
 
@@ -38,8 +38,8 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
   const [userId, setUserId] = useState(rule?.action?.user_id ?? "");
   const [webhookId, setWebhookId] = useState(rule?.action?.webhook_id ?? "");
   const [message, setMessage] = useState(rule?.action?.message ?? "");
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(FIELDS);
+  const { busy, run } = useSubmit(errors);
 
   // These two narrow one kind of event each; offer them only when that event can match.
   const canOutcome = typeMatches(events, "decision.picked");
@@ -64,15 +64,10 @@ export function RuleForm({ rule, hooks, onClose, onSaved }: Props) {
     const action: RuleAction = kind === "webhook" ? { kind, webhook_id: webhookId } : { kind, user_id: userId };
     if (message.trim() && (kind === "notify" || kind === "wait_on")) action.message = message.trim();
 
-    setBusy(true);
-    try {
+    await run(async () => {
       await change(rule ? "rule.update" : "rule.create", { id: rule?.id ?? newId(), name: name.trim(), active, match, action });
       onSaved();
-    } catch (err) {
-      errors.fail(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const any = { value: "", label: t("auto.any") };

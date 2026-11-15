@@ -7,7 +7,7 @@ import { useLabels, useStatuses } from "@/lib/selectors";
 import type { Project, Template } from "@/lib/types";
 import type { DecisionSkeleton, Preset } from "@/settings/projects/templates";
 import { Dot } from "@/settings/ui/bits";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
@@ -41,8 +41,8 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
   const [options, setOptions] = useState<Option[]>(
     preset.decision?.options?.length ? preset.decision.options.map((o) => ({ label: o.label, description: o.description ?? "" })) : blankOptions(),
   );
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["name", "title", "description", "question", "options"]);
+  const { busy, run } = useSubmit(errors, { once: true });
 
   // A preset names its status and labels, so the same template works when they are renamed back or shared.
   const statusChoices = [{ value: "", label: t("templates.statusDefault") }, ...statuses.map((s) => ({ value: s.name, label: s.name }))];
@@ -77,18 +77,14 @@ export function TemplateDialog({ project, template, onClose }: { project: Projec
       next.decision = decision;
     }
     const fields = { name: name.trim(), title, description, preset: next };
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate(
         template ? { type: "template.update", args: { id: template.id, ...fields } } : { type: "template.create", args: { id: newId(), project: project.id, ...fields } },
         undefined,
         { quiet: true },
       );
       onClose();
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (

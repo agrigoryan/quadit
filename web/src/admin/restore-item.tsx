@@ -10,7 +10,7 @@ import { toast } from "@/lib/toast";
 import type { Backup } from "@/admin/backups";
 import { fetchWorkspaces } from "@/admin/workspaces";
 import { Segmented } from "@/settings/me/segmented";
-import { FormAlert, FormField, NativeSelect, Note, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, Note, useFieldErrors, useSubmit } from "@/settings/ui/form";
 import { useLoad } from "@/settings/ui/use-load";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
@@ -31,8 +31,8 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
   const [slug, setSlug] = useState("");
   const [kind, setKind] = useState<Kind>("task");
   const [ref, setRef] = useState("");
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["ref"]);
+  const { busy, run } = useSubmit(errors, { once: true });
   const workspace = slug || workspaces.data?.[0]?.slug || "";
 
   async function submit(e: FormEvent) {
@@ -42,15 +42,11 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
     const doc = pageIdOf(ref);
     if (kind === "task" && !key) return errors.set("ref", t("admin.restoreItem.taskBad"));
     if (kind === "doc" && !doc) return errors.set("ref", t("admin.restoreItem.pageBad"));
-    setBusy(true);
-    try {
+    await run(async () => {
       await api.post(`/api/v1/admin/backups/${backup.id}/restore-item`, kind === "task" ? { workspace, task: key } : { workspace, doc });
       toast.info(kind === "task" ? t("admin.restoreItem.doneTask", { key }) : t("admin.restoreItem.donePage"));
       onClose();
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (
