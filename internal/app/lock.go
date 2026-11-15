@@ -1,3 +1,5 @@
+// The lock that keeps a data directory to one server.
+
 package app
 
 import (
@@ -23,5 +25,5 @@ func lockData(dir string) (release func(), err error) {
 		f.Close()
 		return nil, fmt.Errorf("a server is running on %s; stop it first", dir)
 	}
-	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+	return func() { f.Close() }, nil // closing the file lets the lock go
 }

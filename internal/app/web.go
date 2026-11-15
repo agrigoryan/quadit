@@ -1,5 +1,7 @@
 //go:build web
 
+// The built-in web app, served from the files embedded at build time.
+
 package app
 
 import (
@@ -12,6 +14,9 @@ import (
 	"github.com/agrigoryan/quadit/web"
 )
 
+// init sets WebHandler to serve the embedded app: its built files as they
+// are, and its index page for every other path, which the app's own
+// router then shows.
 func init() {
 	mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	WebHandler = func() http.Handler {

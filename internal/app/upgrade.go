@@ -1,3 +1,6 @@
+// The upgrade command: bringing the database up to this binary's version,
+// and undoing that.
+
 package app
 
 import (
@@ -60,9 +63,13 @@ func Upgrade(args []string, version string) int {
 		return 1
 	}
 	defer st.Close()
-	v, _ := st.(interface {
+	v, err := st.(interface {
 		SchemaVersion(context.Context) (int, error)
 	}).SchemaVersion(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "the database was upgraded, but its schema version could not be read:", err)
+		return 1
+	}
 	fmt.Printf("the database is at schema version %d, which is what quadit %s uses.\nTo go back: stop the server, run \"quadit upgrade --undo\", and start the older binary.\n", v, version)
 	return 0
 }
