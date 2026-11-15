@@ -155,14 +155,6 @@ describe("loadBootstrap", () => {
     expect(getState().lostProjects).toEqual([]);
   });
 
-  it("starts holding events anew: a second part is not patched with what was held for the copy before", () => {
-    loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
-    applyEvents([retitle(11, "t9", "held for the copy before")], true);
-    loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
-    mergeRest("acme", { seq: 10, tasks: [{ id: "t9", title: "as the server has it", updated_seq: 3 }] });
-    expect(getState().collections.tasks.t9?.title).toBe("as the server has it");
-  });
-
   it("says the finished work is still on its way when only the open part came", () => {
     loadBootstrap("acme", boot({ part: "open", rest: 3 }));
     expect(getState().restLoaded).toBe(false);
@@ -185,15 +177,19 @@ describe("mergeRest", () => {
         ],
       }),
     );
-    mergeRest("acme", {
-      seq: 10,
-      tasks: [
-        { id: "t1", title: "stale", updated_seq: 8 },
-        { id: "t2", title: "newer", updated_seq: 9 },
-        { id: "t3", title: "stamped", updated_seq: 9 },
-        { id: "t4", title: "finished" },
-      ],
-    });
+    mergeRest(
+      "acme",
+      {
+        seq: 10,
+        tasks: [
+          { id: "t1", title: "stale", updated_seq: 8 },
+          { id: "t2", title: "newer", updated_seq: 9 },
+          { id: "t3", title: "stamped", updated_seq: 9 },
+          { id: "t4", title: "finished" },
+        ],
+      },
+      [],
+    );
     const { tasks } = getState().collections;
     expect(tasks.t1?.title).toBe("changed by the feed");
     expect(tasks.t2).toMatchObject({ title: "newer", description: "fetched" });
@@ -202,17 +198,22 @@ describe("mergeRest", () => {
     expect(getState().restLoaded).toBe(true);
   });
 
-  it("replays held events over the rows it brings, only those past its own position", () => {
+  it("applies again, over the rows it brings, the events past its own position", () => {
     loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
-    applyEvents([retitle(11, "t9", "b"), retitle(13, "t8", "after")], true);
+    const meanwhile = [retitle(11, "t9", "b"), retitle(13, "t8", "after")];
+    applyEvents(meanwhile, true);
     // The second part was read at 12: it already holds t9's later title.
-    const missing = mergeRest("acme", {
-      seq: 12,
-      tasks: [
-        { id: "t9", title: "c", updated_seq: 12 },
-        { id: "t8", title: "before", updated_seq: 3 },
-      ],
-    });
+    const missing = mergeRest(
+      "acme",
+      {
+        seq: 12,
+        tasks: [
+          { id: "t9", title: "c", updated_seq: 12 },
+          { id: "t8", title: "before", updated_seq: 3 },
+        ],
+      },
+      meanwhile,
+    );
     expect(getState().collections.tasks.t9?.title).toBe("c");
     expect(getState().collections.tasks.t8?.title).toBe("after");
     expect(missing).toEqual([]);
@@ -220,13 +221,14 @@ describe("mergeRest", () => {
 
   it("returns the tasks events named that are in neither part", () => {
     loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
-    applyEvents([retitle(11, "t7", "reopened")], true);
-    expect(mergeRest("acme", { seq: 10, tasks: [] })).toEqual(["t7"]);
+    const meanwhile = [retitle(11, "t7", "reopened")];
+    applyEvents(meanwhile, true);
+    expect(mergeRest("acme", { seq: 10, tasks: [] }, meanwhile)).toEqual(["t7"]);
   });
 
   it("does nothing for another workspace", () => {
     loadBootstrap("acme", boot({ part: "open", rest: 1, tasks: [] }));
-    expect(mergeRest("other", { seq: 10, tasks: [{ id: "t1" }] })).toEqual([]);
+    expect(mergeRest("other", { seq: 10, tasks: [{ id: "t1" }] }, [])).toEqual([]);
     expect(getState().collections.tasks).toEqual({});
     expect(getState().restLoaded).toBe(false);
   });

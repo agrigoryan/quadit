@@ -1,7 +1,7 @@
 // The browser's copy of one workspace: every row, in collections keyed by
-// id. It is filled from /bootstrap (the open work first, the finished work a
-// moment later) and then kept current by the event feed (lib/sync.ts) and by
-// the person's own edits (lib/mutate.ts). Pages read from here and never ask
+// id. lib/sync.ts fills it from /bootstrap (the open work first, the finished
+// work a moment later) and then keeps it current from the event feed;
+// lib/mutate.ts puts the person's own edits in. Pages read from here and never ask
 // the server for a list.
 
 import { create } from "zustand";
@@ -101,19 +101,21 @@ type EventListener = (events: FeedEvent[]) => void;
 const listeners = new Set<EventListener>();
 
 /**
- * Hear every event the store applies (a task's timeline follows along this
- * way). An event of this tab's own write can be heard twice: early, with the
- * write's answer, and again when the live stream delivers it in its place.
+ * Hear the events the store applies (a task's timeline follows along this
+ * way). The listener is called after each batch is in the store, with the
+ * events of it that were past the store's position.
+ *
+ * An event can be heard twice: one that a change made in this browser came
+ * back with is applied early (in the tab that made it and, passed on, in
+ * the person's other tabs) and again when the live stream delivers it in
+ * its place. A listener must come to the same result either way.
+ *
+ * Returns the function that stops the listening.
  */
 export function onEvents(listener: EventListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
-
-/** Events applied while the finished work was still on its way; replayed over it when it lands. */
-let held: FeedEvent[] = [];
-/** Past this many held events the second part is not worth patching: the whole copy is fetched again. */
-const HELD_MAX = 20_000;
 
 /**
  * Applies feed events. Events from the live stream arrive in order and move
@@ -121,7 +123,7 @@ const HELD_MAX = 20_000;
  * the stream will deliver them again in their place.
  */
 export function applyEvents(events: FeedEvent[], fromStream: boolean) {
-  const { seq, collections: c, drafts, restLoaded } = getState();
+  const { seq, collections: c, drafts } = getState();
   const fresh = events.filter((ev) => ev.seq > seq);
   if (fresh.length === 0) return;
   const d = new CopyOnWrite(c);
@@ -138,8 +140,6 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
       delete confirmed[id];
     }
   }
-  // Past the limit nothing more is held: mergeRest then asks for the whole copy again.
-  if (!restLoaded && held.length <= HELD_MAX) held.push(...fresh);
   const workspacePatch = workspaceChanges(fresh);
   const next = d.done();
   useStore.setState((s) => ({
@@ -264,7 +264,6 @@ export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptio
       if (!p.deleted_at && !keys.has(p.key) && !lostProjects.includes(p.key)) lostProjects.push(p.key);
     }
   }
-  held = [];
   useStore.setState({
     slug,
     ready: true,
@@ -286,21 +285,17 @@ const REST_PARTS = ["tasks", "decisions", "attachments", "relations"] as const;
 /**
  * Adds the second part of the starting copy. A row the store already has is
  * left alone unless the arriving one is newer (by `updated_seq`): the feed
- * may have changed it since. Events that came in after this part was read on
- * the server are applied again over the rows it brings.
+ * may have changed it since. `meanwhile` is every event applied since the
+ * first part was loaded: those that came after this part was read on the
+ * server are applied again, over the rows it brings.
  *
- * Returns the ids of tasks that events named meanwhile and that are in
- * neither part (closed when the first was read, open again by the second);
- * the caller fetches those one by one. Returns null when too much happened
- * to patch: the caller then fetches the whole copy again.
+ * Returns the ids of tasks that those events named and that are in neither
+ * part (closed when the first was read, open again by the second); the
+ * caller fetches those one by one.
  */
-export function mergeRest(slug: string, data: RestData): string[] | null {
+export function mergeRest(slug: string, data: RestData, meanwhile: FeedEvent[]): string[] {
   const s = getState();
   if (s.slug !== slug || s.restLoaded) return [];
-  if (held.length > HELD_MAX) {
-    held = [];
-    return null;
-  }
   const d = new CopyOnWrite(s.collections);
   const added = new Set<string>();
   for (const name of REST_PARTS) {
@@ -319,14 +314,12 @@ export function mergeRest(slug: string, data: RestData): string[] | null {
       added.add(`${name}:${key}`);
     }
   }
-  const late = held;
-  held = [];
-  for (const ev of late) {
+  for (const ev of meanwhile) {
     if (ev.seq > data.seq) applyEvent(d, ev, (name, key) => added.has(`${name}:${key}`));
   }
   const next = d.done();
   const missing = new Set<string>();
-  for (const ev of late) {
+  for (const ev of meanwhile) {
     const target = targetsOf(ev);
     if (target?.collection !== "tasks" || target.gone) continue;
     for (const id of target.keys) if (!next.tasks[id]) missing.add(id);
@@ -393,7 +386,6 @@ export function markOpened(taskId: string) {
 
 /** Empties the copy: at sign-out, and when the person may no longer see this workspace. */
 export function clearStore() {
-  held = [];
   useStore.setState({
     slug: "",
     ready: false,

@@ -23,7 +23,7 @@ const WHO_AM_I = "/api/v1/auth/me";
 const CHANGES = `${W}/changes?events=1`;
 const MISSED = /\/events\?after=\d+&limit=2000$/;
 /** The name the tabs of the workspace share, for their channel and for the leader's lock. */
-const SHARED = "quadit-stream-acme";
+const SHARED = "quadit-tabs-acme";
 
 const me = { user_id: "u1", role: "member" } as Member;
 const copy = (over: Partial<BootstrapData> = {}): BootstrapData => ({
@@ -150,7 +150,12 @@ type Said = { t: string } & Record<string, unknown>;
 function lead() {
   const channel = tabs.channel(SHARED);
   const heard: Said[] = [];
-  channel.onmessage = (e) => heard.push(e.data as Said);
+  // What the app's tabs say to each other travels inside lib/tab-share.ts's own envelope.
+  channel.onmessage = (e) => {
+    const wire = e.data as { is: string; msg: Said };
+    if (wire.is === "say") heard.push(wire.msg);
+  };
+  const say = (msg: Said) => channel.postMessage({ is: "say", msg });
   const lock = { letGo: () => {}, lost: false };
   tabs.locks
     .request(SHARED, () => new Promise<void>((resolve) => (lock.letGo = resolve)))
@@ -158,9 +163,9 @@ function lead() {
   return {
     heard,
     asks: () => heard.filter((msg) => msg.t === "hello").length,
-    say: (msg: Said) => channel.postMessage(msg),
+    say,
     /** Passes events on as read from the stream; `from` is where the leader stood before them. */
-    passOn: (from: number, ...events: FeedEvent[]) => channel.postMessage({ t: "ev", from, events }),
+    passOn: (from: number, ...events: FeedEvent[]) => say({ t: "ev", from, events }),
     /** Gives the lock up, as a closing tab does. */
     letGo: () => lock.letGo(),
     /** True once the lock was taken from it. */
@@ -170,6 +175,8 @@ function lead() {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // Every wait before a new try is as long as it can be: lib/api.ts shortens them at random.
+  vi.spyOn(Math, "random").mockReturnValue(1);
   tabs = fakeTabs();
   server = fakeServer();
   page = {
@@ -402,6 +409,7 @@ describe("the connection", () => {
     const a = await openLeader();
     a.stream.events(retitle(11, "t1", "b"));
     a.stream.end();
+    await settle();
     expect(a.state().stream).toBe("down");
 
     await later(999);
@@ -428,6 +436,7 @@ describe("the connection", () => {
   it("asks whether the person may still be here before reopening a stream the server refused", async () => {
     const a = await openLeader();
     a.stream.end(403);
+    await settle();
     expect(a.state().stream).toBe("down");
     await later(999);
     expect(server.count(WHO_AM_I)).toBe(0);
@@ -600,33 +609,29 @@ describe("the connection", () => {
       expect(a.state().ready).toBe(false);
     });
 
-    // The defect: one timer slot serves every pending retry, and opening the
-    // stream clears it. A follower waiting to ask again for its fresh copy,
-    // to which the lead then falls, forgets to ask and goes live on the copy
-    // it was told to throw away: rows the person may no longer see stay on screen.
-    it.fails(
-      "a follower still waiting for its fresh copy when the lead falls to it starts over all the same",
-      async () => {
-        server.get(OPEN_PART, before);
-        const leader = lead();
-        const b = await openTab();
-        await b.start();
+    // Once a defect: opening the stream cancelled the wait to ask again, and
+    // the tab went live on the copy it was told to throw away, with rows on
+    // screen the person may no longer see.
+    it("a follower still waiting for its fresh copy when the lead falls to it starts over all the same", async () => {
+      server.get(OPEN_PART, before);
+      const leader = lead();
+      const b = await openTab();
+      await b.start();
 
-        server.down = true;
-        leader.say({ t: "reset" });
-        await settle();
-        leader.letGo();
-        await settle();
+      server.down = true;
+      leader.say({ t: "reset" });
+      await settle();
+      leader.letGo();
+      await settle();
 
-        server.down = false;
-        server.get(OPEN_PART, after);
-        await later(15_000);
-        expect(b.state().seq).toBe(30);
-        expect(b.state().lostProjects).toEqual(["OPS"]);
-        expect(b.stream.closed).toBe(false);
-        expect(b.stream.url).toBe(`${W}/events/stream?after=30`);
-      },
-    );
+      server.down = false;
+      server.get(OPEN_PART, after);
+      await later(15_000);
+      expect(b.state().seq).toBe(30);
+      expect(b.state().lostProjects).toEqual(["OPS"]);
+      expect(b.stream.closed).toBe(false);
+      expect(b.stream.url).toBe(`${W}/events/stream?after=30`);
+    });
   });
 
   describe("when the server says to leave (gone)", () => {
