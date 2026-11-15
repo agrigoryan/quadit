@@ -29,7 +29,7 @@ import { DecisionEntry } from "@/insights/decisions/entry";
 import { FilterBar } from "@/insights/decisions/filters";
 import { PreferenceDialog } from "@/insights/decisions/preference-dialog";
 import { PreferenceList } from "@/insights/decisions/preferences";
-import { count } from "@/insights/lib/amounts";
+import { count } from "@/lib/amounts";
 import { PageBar } from "@/insights/ui/panel";
 
 const PAGE = 50;

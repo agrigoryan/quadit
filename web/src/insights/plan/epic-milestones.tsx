@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { getTaskByKey, sortByRank, useLookup, useRows } from "@/data/selectors";
 import type { Epic, Milestone, Task } from "@/types/core";
-import { count } from "@/insights/lib/amounts";
+import { count } from "@/lib/amounts";
 import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from "@/insights/plan/actions";
 import { tallyOf } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";

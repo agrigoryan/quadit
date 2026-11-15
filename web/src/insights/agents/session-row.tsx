@@ -8,10 +8,9 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember, useRowEvenIfGone } from "@/data/selectors";
-import { ago, exact } from "@/lib/time";
+import { ago, exact, lengthOf } from "@/lib/time";
 import type { AgentSession } from "@/types/core";
-import { moneyMicros, short } from "@/insights/lib/amounts";
-import { span } from "@/insights/lib/durations";
+import { moneyMicros, short } from "@/lib/amounts";
 import { sessionLink, stepText } from "@/insights/agents/session-data";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
@@ -29,7 +28,7 @@ const stateOf = (s: AgentSession): StateName => (s.state in marks ? (s.state as 
 /** How long a run took, or has taken so far. */
 export function sessionLength(s: AgentSession, now: number): string {
   const ms = Math.max(0, (s.ended_at ?? now) - s.started_at);
-  return ms < 60_000 ? t("agents.session.underMinute") : span(ms);
+  return ms < 60_000 ? t("agents.session.underMinute") : lengthOf(ms);
 }
 
 function StateMark({ session }: { session: AgentSession }) {

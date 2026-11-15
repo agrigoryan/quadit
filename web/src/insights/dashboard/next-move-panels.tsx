@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { useLiveTasks, useLookup, useProjects, useSlug } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import { isOpenCategory, type Task } from "@/types/core";
-import { count } from "@/insights/lib/amounts";
+import { count } from "@/lib/amounts";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { useTaskLink } from "@/nav/task-link";

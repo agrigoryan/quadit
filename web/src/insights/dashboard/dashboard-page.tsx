@@ -16,7 +16,7 @@ import { HealthPanel } from "@/insights/dashboard/health-panel";
 import { NobodyPanel, OutsidePanel } from "@/insights/dashboard/next-move-panels";
 import { WaitingPanel } from "@/insights/dashboard/waiting-panel";
 import { useLive } from "@/data/live";
-import type { Dashboard } from "@/insights/lib/types";
+import type { Dashboard } from "@/types/dashboard";
 import { PageBar } from "@/insights/ui/panel";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Select } from "@/ui/picker";

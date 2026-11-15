@@ -14,9 +14,9 @@ import { type Cycle, isOpenCategory, type Project, type Task } from "@/types/cor
 import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { BurnUp, burnRows } from "@/insights/charts/burn-up";
-import { count } from "@/insights/lib/amounts";
+import { count } from "@/lib/amounts";
 import { useLive } from "@/data/live";
-import type { CycleChart } from "@/insights/lib/types";
+import type { CycleChart } from "@/types/dashboard";
 import { moveToCycle, updateCycle } from "@/insights/plan/actions";
 import { emptyTally, useTallies } from "@/insights/plan/stats";
 import { PageBar, Panel } from "@/insights/ui/panel";

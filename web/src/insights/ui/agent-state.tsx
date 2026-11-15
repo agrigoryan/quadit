@@ -7,9 +7,9 @@ import "@/insights/viz.css";
 import { CircleDashed, EarOff, Hourglass, Inbox, Loader } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { money } from "@/insights/lib/amounts";
-import { minutes } from "@/insights/lib/durations";
-import type { AgentState, AgentStateName } from "@/insights/lib/types";
+import { money } from "@/lib/amounts";
+import { lengthOfMinutes } from "@/lib/time";
+import type { AgentState, AgentStateName } from "@/types/dashboard";
 
 const looks: Record<AgentStateName, { icon: typeof Loader; tone: string }> = {
   working: { icon: Loader, tone: "bg-accent-soft text-accent-text" },
@@ -72,12 +72,12 @@ interface BudgetProps {
 export function BudgetBar({ agent, className }: BudgetProps) {
   const cost = Number(agent.cost_week ?? 0) || 0;
   const budget = Number(agent.budget ?? 0) || 0;
-  const time = agent.minutes_week ? minutes(agent.minutes_week) : "";
+  const time = agent.minutes_week ? lengthOfMinutes(agent.minutes_week) : "";
   if (budget <= 0) {
     return (
       <p className={cx("text-xs text-ink-3 tnum", className)}>
         {cost > 0 || time
-          ? t("ins.agent.spentNoBudget", { cost: money(cost), time: time || t("ins.time.m", { m: 0 }) })
+          ? t("ins.agent.spentNoBudget", { cost: money(cost), time: time || lengthOfMinutes(0) })
           : t("ins.agent.nothingSpent")}
       </p>
     );

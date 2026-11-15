@@ -13,7 +13,7 @@ import type { Dict } from "@/data/store";
 import type { AgentSession } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { useLive, useNow } from "@/data/live";
-import type { AgentState } from "@/insights/lib/types";
+import type { AgentState } from "@/types/dashboard";
 import { isStranded } from "@/insights/ui/agent-state";
 import { PageBar } from "@/insights/ui/panel";
 import { AgentCard, type HelperOf } from "@/insights/agents/agent-card";

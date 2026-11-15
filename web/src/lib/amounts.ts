@@ -1,4 +1,4 @@
-// How the insight pages write amounts: money and counts.
+// Amounts as a person reads them: money and counts.
 
 import { formatNumber } from "@/lib/i18n";
 

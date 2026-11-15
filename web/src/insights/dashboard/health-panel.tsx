@@ -8,7 +8,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMinute } from "@/hooks/tick";
 import { ago, exact, parseWhen } from "@/lib/time";
-import type { Health } from "@/insights/lib/types";
+import type { Health } from "@/types/dashboard";
 import { Panel } from "@/insights/ui/panel";
 
 function Line({

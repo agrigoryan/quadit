@@ -24,7 +24,7 @@ import type { AgentSession, Task, TaskLink } from "@/types/core";
 import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
-import { moneyMicros } from "@/insights/lib/amounts";
+import { moneyMicros } from "@/lib/amounts";
 import { useNow } from "@/data/live";
 import { SessionRow } from "@/insights/agents/session-row";
 import { Badge } from "@/ui/badge";

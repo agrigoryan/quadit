@@ -7,8 +7,8 @@ import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { formatDay } from "@/lib/time";
 import { ChartTip, Legend, numberWidth, ticks, useWidth } from "@/insights/charts/base";
-import { count } from "@/insights/lib/amounts";
-import type { ChartDay } from "@/insights/lib/types";
+import { count } from "@/lib/amounts";
+import type { ChartDay } from "@/types/dashboard";
 
 const H = 200;
 const TOP = 18;

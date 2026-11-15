@@ -1,13 +1,10 @@
-// Words the insight pages share: navigation, time, progress and agent states.
+// Words the insight pages share: navigation, progress and agent states.
 
 export const coreStrings = {
   "nav.agents": "Agents",
   "nav.decisions": "Decisions",
   "nav.timeline": "Timeline",
 
-  "ins.time.m": "{m}m",
-  "ins.time.hm": "{h}h {m}m",
-  "ins.time.dh": "{d}d {h}h",
   "ins.loadFailed": "Could not load this: {why}",
   "ins.allProjects": "All projects",
   "ins.project": "Project",

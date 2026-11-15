@@ -7,10 +7,10 @@ import { useLookupEvenIfGone } from "@/data/selectors";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { statusRows, StatusStack } from "@/insights/charts/status-stack";
 import { WeeklyBars, weeklyRows } from "@/insights/charts/weekly-bars";
-import { count } from "@/insights/lib/amounts";
-import { hours } from "@/insights/lib/durations";
-import { useMembersByHandle } from "@/insights/lib/members";
-import type { StatusCount, WaitRow, WeekCount } from "@/insights/lib/types";
+import { count } from "@/lib/amounts";
+import { lengthOfHours } from "@/lib/time";
+import { useMembersByHandle } from "@/insights/members-by-handle";
+import type { StatusCount, WaitRow, WeekCount } from "@/types/dashboard";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { Avatar } from "@/ui/avatar";
 
@@ -114,7 +114,7 @@ export function WaitsPanel({ rows, className }: { rows: WaitRow[]; className?: s
                   </th>
                   <td className="border-b border-line/70 px-2 py-1.5 text-right tnum">{count(row.tasks)}</td>
                   <td className="border-b border-line/70 px-2 py-1.5 text-right text-ink-2 tnum max-sm:hidden">
-                    {hours(row.avg_hours)}
+                    {lengthOfHours(row.avg_hours)}
                   </td>
                   <td className="border-b border-line/70 py-1.5 pr-4 pl-2 text-right tnum">
                     <span className="inline-flex items-center justify-end gap-2">
@@ -127,7 +127,7 @@ export function WaitsPanel({ rows, className }: { rows: WaitRow[]; className?: s
                           style={{ width: `${(row.oldest_hours / longest) * 100}%`, background: "var(--viz-waiting)" }}
                         />
                       </span>
-                      {hours(row.oldest_hours)}
+                      {lengthOfHours(row.oldest_hours)}
                     </span>
                   </td>
                 </tr>

@@ -130,6 +130,21 @@ export function dueLabel(day: string): { text: string; tone: "late" | "soon" | "
   return { text: formatDay(day), tone: n <= 3 ? "soon" : "later" };
 }
 
+/** A length of time in minutes: "45m", "3h 05m", "2d 4h". */
+export function lengthOfMinutes(total: number): string {
+  const m = Math.max(0, Math.round(total));
+  if (m < 60) return t("time.length.m", { m });
+  const h = Math.floor(m / 60);
+  if (h < 24) return t("time.length.hm", { h, m: String(m % 60).padStart(2, "0") });
+  return t("time.length.dh", { d: Math.floor(h / 24), h: h % 24 });
+}
+
+/** A length of time in hours, as the server counts waits (3.4): "3h 24m", "2d 4h". */
+export const lengthOfHours = (h: number) => lengthOfMinutes(h * 60);
+
+/** A length of time in milliseconds. */
+export const lengthOf = (ms: number) => lengthOfMinutes(ms / MIN);
+
 /** Video time as m:ss. */
 export function clockTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));

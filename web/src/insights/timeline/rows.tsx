@@ -11,7 +11,7 @@ import { useCan } from "@/data/access";
 import { useSlug } from "@/data/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
 import { type Category, type Epic, isClosedCategory } from "@/types/core";
-import { count } from "@/insights/lib/amounts";
+import { count } from "@/lib/amounts";
 import { dayFromNumber } from "@/lib/days";
 import { Bar } from "@/insights/timeline/bar";
 import { type EpicLine, setEpicDates, type TaskLine } from "@/insights/timeline/data";

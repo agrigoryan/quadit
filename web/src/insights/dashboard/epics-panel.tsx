@@ -7,7 +7,7 @@ import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { useSlug } from "@/data/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
-import type { EpicProgress } from "@/insights/lib/types";
+import type { EpicProgress } from "@/types/dashboard";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { Progress } from "@/insights/ui/progress";
 

@@ -6,7 +6,7 @@ import { type FormEvent, useState } from "react";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/types/core";
-import { moneyMicros } from "@/insights/lib/amounts";
+import { moneyMicros } from "@/lib/amounts";
 import { setBudget, type TaskBudget } from "@/tasks/actions";
 import { PropButton, PropRow } from "@/tasks/properties/panel-row";
 import type { PanelProps, TaskProperty } from "@/tasks/properties/property";

@@ -13,7 +13,7 @@ import { useProjectByKey, useSlug } from "@/data/selectors";
 import { today } from "@/lib/time";
 import type { Project } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
-import { count } from "@/insights/lib/amounts";
+import { count } from "@/lib/amounts";
 import { dayNumber } from "@/lib/days";
 import { useTimeline } from "@/insights/timeline/data";
 import { Backdrop, ScaleHeader } from "@/insights/timeline/header";

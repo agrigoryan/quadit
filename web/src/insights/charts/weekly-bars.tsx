@@ -7,8 +7,8 @@ import { t } from "@/lib/i18n";
 import { formatDay } from "@/lib/time";
 import { ChartTip, Legend, numberWidth, ticks, useWidth } from "@/insights/charts/base";
 import { addDays } from "@/lib/days";
-import { count } from "@/insights/lib/amounts";
-import type { WeekCount } from "@/insights/lib/types";
+import { count } from "@/lib/amounts";
+import type { WeekCount } from "@/types/dashboard";
 
 const H = 132;
 const TOP = 14;

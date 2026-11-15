@@ -6,8 +6,8 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { type Category, isCanceledCategory } from "@/types/core";
 import { Legend, useWidth } from "@/insights/charts/base";
-import { count } from "@/insights/lib/amounts";
-import type { StatusCount } from "@/insights/lib/types";
+import { count } from "@/lib/amounts";
+import type { StatusCount } from "@/types/dashboard";
 import { Tooltip } from "@/ui/tooltip";
 
 /** The order parts are drawn in, and the colour of each kind of status. */

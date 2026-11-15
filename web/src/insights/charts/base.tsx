@@ -7,7 +7,7 @@ import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } fro
 import { ChartNoAxesColumn, Table2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { count } from "@/insights/lib/amounts";
+import { count } from "@/lib/amounts";
 import { IconButton } from "@/ui/button";
 
 /** The width of an element in CSS pixels, followed as it changes. */
