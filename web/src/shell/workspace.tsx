@@ -1,5 +1,8 @@
+// The route of a workspace: loads it, follows it live, and shows the shell
+// once it is here, or why it is not.
+
 import { Lock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { loadSession, signOut, useSession } from "@/auth/session";
 import { ApiError, errorMessage, NetworkError } from "@/lib/api";
@@ -25,33 +28,34 @@ const retryIn = (attempt: number) => Math.min(1500 * 2 ** Math.min(attempt, 3), 
 
 /** Loads the workspace named in the address, follows it live, and shows the shell once it is here. */
 export function WorkspaceRoute() {
-  const { ws = "" } = useParams();
-  const ready = useStore((s) => s.ready && s.slug === ws);
-  const lost = useAccess((s) => (s.lost?.slug === ws ? s.lost : null));
-  const [failure, setFailure] = useState<Failure | null>(null);
+  const { ws: workspaceSlug = "" } = useParams();
+  const ready = useStore((s) => s.ready && s.slug === workspaceSlug);
+  const lost = useAccess((s) => (s.lost?.slug === workspaceSlug ? s.lost : null));
+  const [failed, setFailed] = useState<{ slug: string; failure: Failure } | null>(null);
+  // What went wrong with another workspace says nothing about this one.
+  const failure = failed?.slug === workspaceSlug ? failed.failure : null;
   const [attempt, setAttempt] = useState(0);
   const userId = useSession((s) => s.user?.id);
   const navigate = useNavigate();
-
-  // Another workspace: what went wrong with the last one says nothing about this one.
-  useEffect(() => setFailure(null), [ws]);
+  // An install that requires a second step opens no workspace without one: go and set it up.
+  const toSecondStep = useEffectEvent(() => void navigate("/account/security", { replace: true }));
+  const toWorkspaces = useEffectEvent(() => void navigate("/", { replace: true }));
 
   useEffect(() => {
     let current = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const again = () => current && setAttempt((n) => n + 1);
-    startSync(ws).then(
-      () => current && setFailure(null),
+    const fail = (failure: Failure) => setFailed({ slug: workspaceSlug, failure });
+    startSync(workspaceSlug).then(
+      () => current && setFailed(null),
       (err: unknown) => {
         if (!current) return;
-        // An install that requires a second step opens no workspace without one: go and set it up.
-        if (err instanceof ApiError && err.code === "second_step_required")
-          return navigate("/account/security", { replace: true });
+        if (err instanceof ApiError && err.code === "second_step_required") return toSecondStep();
         // A 401 has already sent the person to sign in.
         if (err instanceof ApiError && err.status === 401) return;
         if (err instanceof NetworkError) {
           // Not refused, just not reached: keep asking, and at once when the connection is back.
-          setFailure({ kind: "offline" });
+          fail({ kind: "offline" });
           // A copy from an earlier visit may be on screen meanwhile: say that it is not being kept current.
           useStore.setState({ stream: "down" });
           timer = setTimeout(again, retryIn(attempt));
@@ -59,7 +63,7 @@ export function WorkspaceRoute() {
           return;
         }
         const refused = err instanceof ApiError && (err.status === 403 || err.status === 404);
-        setFailure({ kind: refused ? "refused" : "error", message: errorMessage(err) });
+        fail({ kind: refused ? "refused" : "error", message: errorMessage(err) });
       },
     );
     return () => {
@@ -68,7 +72,7 @@ export function WorkspaceRoute() {
       window.removeEventListener("online", again);
       stopSync();
     };
-  }, [ws, attempt]);
+  }, [workspaceSlug, attempt]);
 
   // The server ended this person's time here while the workspace was open
   // (lib/sync.ts emptied the copy). Removed: on to the workspaces they still
@@ -76,7 +80,7 @@ export function WorkspaceRoute() {
   useEffect(() => {
     if (!lost) return;
     let current = true;
-    const name = useSession.getState().workspaces.find((w) => w.slug === ws)?.name ?? ws;
+    const name = useSession.getState().workspaces.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug;
     // Not awaited: an effect cannot wait. A failed reload is caught and the session as it stands is read.
     void loadSession()
       .catch(() => {})
@@ -84,23 +88,23 @@ export function WorkspaceRoute() {
         if (!current) return;
         const session = useSession.getState();
         if (session.status !== "in") return; // signed out: the router shows the sign-in page
-        if (session.workspaces.some((w) => w.slug === ws)) {
-          setFailure({ kind: "refused", message: lost.message });
+        if (session.workspaces.some((w) => w.slug === workspaceSlug)) {
+          setFailed({ slug: workspaceSlug, failure: { kind: "refused", message: lost.message } });
           return;
         }
         toast.info(t("sync.removed", { name }));
-        void navigate("/", { replace: true });
+        toWorkspaces();
       });
     return () => {
       current = false;
     };
-  }, [lost]);
+  }, [lost, workspaceSlug]);
 
   if (ready) return <Shell />;
   if (failure?.kind === "offline")
-    return <Offline slug={ws} userId={userId} onRetry={() => setAttempt((n) => n + 1)} />;
+    return <Offline slug={workspaceSlug} userId={userId} onRetry={() => setAttempt((n) => n + 1)} />;
   if (failure?.kind === "refused")
-    return <NoAccess slug={ws} message={failure.message} onRetry={() => setAttempt((n) => n + 1)} />;
+    return <NoAccess slug={workspaceSlug} message={failure.message} onRetry={() => setAttempt((n) => n + 1)} />;
   if (failure) {
     return (
       <EmptyState
