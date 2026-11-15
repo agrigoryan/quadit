@@ -183,6 +183,7 @@ export const docs = {
 
   // ---- databases ----
 
+  "db.loadFailed": "Could not load a database, so some values are missing: {why}",
   "db.title": "Title",
   "db.untitled": "Untitled",
   "db.new": "New",
