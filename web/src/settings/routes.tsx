@@ -1,22 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Bell,
-  Bot,
-  Building2,
-  FolderGit2,
-  FolderKanban,
-  Import,
-  KeyRound,
-  Lock,
-  Plug,
-  ScrollText,
-  ShieldCheck,
-  SquareAsterisk,
-  UserRound,
-  Users,
-  Webhook,
-  Workflow,
-} from "lucide-react";
+import { Lock } from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
@@ -37,52 +20,11 @@ import { MyTokensPage } from "@/settings/me/tokens";
 import { ProjectPage } from "@/settings/projects/project";
 import { ProjectsPage } from "@/settings/projects/projects";
 import { SecretsPage } from "@/settings/secrets/secrets";
-import { type NavGroup, NavLayout } from "@/ui/settings-layout";
+import { settingsGroups } from "@/settings/pages";
+import { NavLayout } from "@/ui/settings-layout";
 import { GeneralPage } from "@/settings/workspace/general";
 import { MembersPage } from "@/settings/workspace/members";
 import { EmptyState } from "@/ui/empty";
-
-/** The pages of workspace settings. A member sees the ones that are not only for admins. */
-function useGroups(admin: boolean): NavGroup[] {
-  const item = (to: string, key: Parameters<typeof t>[0], icon: React.ReactNode) => ({ to, label: t(key), icon });
-  return [
-    {
-      title: t("settings.group.workspace"),
-      items: [
-        ...(admin ? [item("general", "settings.nav.general", <Building2 />)] : []),
-        item("members", "settings.nav.members", <Users />),
-        ...(admin
-          ? [item("import", "settings.nav.import", <Import />), item("audit", "settings.nav.audit", <ScrollText />)]
-          : []),
-      ],
-    },
-    { title: t("settings.group.work"), items: [item("projects", "settings.nav.projects", <FolderKanban />)] },
-    {
-      title: t("settings.group.automation"),
-      items: [
-        item("agents", "settings.nav.agents", <Bot />),
-        ...(admin
-          ? [
-              item("webhooks", "settings.nav.webhooks", <Webhook />),
-              item("rules", "settings.nav.rules", <Workflow />),
-              item("integrations", "settings.nav.integrations", <Plug />),
-              item("secrets", "settings.nav.secrets", <SquareAsterisk />),
-              item("sources", "settings.nav.sources", <FolderGit2 />),
-            ]
-          : []),
-      ],
-    },
-    {
-      title: t("settings.group.me"),
-      items: [
-        item("me/profile", "settings.nav.profile", <UserRound />),
-        item("me/security", "settings.nav.security", <ShieldCheck />),
-        item("me/notifications", "settings.nav.notifications", <Bell />),
-        item("me/tokens", "settings.nav.tokens", <KeyRound />),
-      ],
-    },
-  ];
-}
 
 const wide = typeof matchMedia === "function" ? matchMedia("(min-width: 768px)") : null;
 
@@ -121,7 +63,10 @@ export default function SettingsRoutes() {
   usePageTitle(t("settings.title"));
   const base = useSettingsBase();
   const admin = useIsAdmin();
-  const groups = useGroups(admin);
+  const groups = settingsGroups(admin).map((group) => ({
+    title: t(group.title),
+    items: group.pages.map((page) => ({ to: page.path, label: t(page.label), icon: page.icon })),
+  }));
   const forAdmins = (page: React.ReactNode) => (admin ? page : <AdminsOnly base={base} />);
   return (
     <NavLayout base={base} label={t("settings.title")} groups={groups}>
