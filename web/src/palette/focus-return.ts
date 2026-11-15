@@ -5,7 +5,7 @@
 // <body>: Tab then starts from the top of the document. So what had the
 // focus is noted here, before either opens, and given it back after.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { focusPage } from "@/shell/page-focus";
 
 /**
@@ -14,18 +14,19 @@ import { focusPage } from "@/shell/page-focus";
  * palette is there only while it is open).
  */
 export function useFocusReturn(open: boolean) {
-  const before = useRef<Element | null>(null);
-  const wasOpen = useRef(false);
+  const [before, setBefore] = useState<Element | null>(() => (open ? document.activeElement : null));
+  const [wasOpen, setWasOpen] = useState(open);
   // Noted while rendering the opening, before anything inside takes the focus.
-  if (open && !wasOpen.current) before.current = document.activeElement;
-  wasOpen.current = open;
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setBefore(document.activeElement);
+  }
 
   useEffect(() => {
     if (!open) return;
-    const had = before.current;
     // After the dialog has given the focus back as it can.
-    return () => void window.setTimeout(() => giveBack(had));
-  }, [open]);
+    return () => void window.setTimeout(() => giveBack(before));
+  }, [open, before]);
 }
 
 /** Puts the focus on had, or on the page, when nothing has it now. */

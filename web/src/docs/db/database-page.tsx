@@ -77,18 +77,15 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
     [db, view],
   );
 
-  const viewRef = useRef(view);
-  viewRef.current = view;
-  const propsRef = useRef(db?.table.props ?? []);
-  propsRef.current = db?.table.props ?? [];
+  const props = db?.table.props;
   const addRow = useCallback(
     (values?: Record<string, unknown>, title?: string) =>
       createDoc({
         parentId: doc.id,
         title: title ?? "",
-        props: { ...defaultsFor(viewRef.current, propsRef.current), ...values },
+        props: { ...defaultsFor(view, props ?? []), ...values },
       }),
-    [doc.id],
+    [doc.id, view, props],
   );
 
   if (!db || !loaded || !view) return <Loading />;
