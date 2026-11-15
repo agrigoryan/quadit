@@ -229,7 +229,7 @@ func missingScenario(t *testing.T, st store.Store) *probes {
 	do("cycle.update", M{"id": cycle, "name": "Much later"})
 	tpl := do("template.create", M{"project": "SVA", "name": "Bug", "title": "Bug: "}).Ref
 	do("template.update", M{"id": tpl, "description": "what broke"})
-	view := do("view.create", M{"name": "Mine", "project": "SVA", "query": M{"assignee": "me"}, "shared": true}).Ref
+	view := do("view.create", M{"name": "Mine", "project": "SVA", "query": M{"assignee": []string{"me"}}, "shared": true}).Ref
 	do("view.update", M{"id": view, "description": "my tasks"})
 	pref := do("preference.create", M{"body": "Prefer small commits", "project": "SVA"}).Ref
 	do("preference.update", M{"id": pref, "body": "Prefer small, clear commits"})
