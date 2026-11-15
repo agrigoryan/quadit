@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -28,6 +29,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/store/postgres"
 	"github.com/agrigoryan/quadit/internal/store/sqlite"
+	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -119,6 +121,9 @@ func Serve(args []string, version string) int {
 	tlsCert := fs.String("tls-cert", env("QUADIT_TLS_CERT", ""), "serve HTTPS with this certificate file (QUADIT_TLS_CERT), with --tls-key")
 	tlsKey := fs.String("tls-key", env("QUADIT_TLS_KEY", ""), "the certificate's private key file (QUADIT_TLS_KEY)")
 	tlsDomain := fs.String("tls-domain", env("QUADIT_TLS_DOMAIN", ""), "serve HTTPS for this name with a free certificate from Let's Encrypt, got and renewed by itself; needs ports 443 and 80 reachable (QUADIT_TLS_DOMAIN)")
+	acmeDir := fs.String("acme-directory", env("QUADIT_ACME_DIRECTORY", ""), "with --tls-domain: another certificate authority that speaks ACME (a company's own, or a test one); default Let's Encrypt (QUADIT_ACME_DIRECTORY)")
+	acmeCA := fs.String("acme-ca", env("QUADIT_ACME_CA", ""), "a PEM file to trust when talking to that authority, when its own certificate is not publicly trusted (QUADIT_ACME_CA)")
+	acmeHTTP := fs.String("acme-http-listen", env("QUADIT_ACME_HTTP_LISTEN", ":80"), "with --tls-domain: where the plain-HTTP side listens, which answers the authority's checks and sends everyone else to HTTPS (QUADIT_ACME_HTTP_LISTEN)")
 	localListen := fs.String("local-listen", env("QUADIT_LOCAL_LISTEN", "127.0.0.1:4781"), "with HTTPS on: a plain address on this machine only, for the server's own use (QUADIT_LOCAL_LISTEN)")
 	fs.Parse(args)
 	https := *tlsDomain != "" || *tlsCert != ""
@@ -195,10 +200,27 @@ func Serve(args []string, version string) int {
 		// everyone else to HTTPS.
 		m := &autocert.Manager{Prompt: autocert.AcceptTOS, HostPolicy: autocert.HostWhitelist(strings.Split(*tlsDomain, ",")...),
 			Cache: autocert.DirCache(filepath.Join(o.Data, "certs"))}
+		if *acmeDir != "" {
+			client := &acme.Client{DirectoryURL: *acmeDir}
+			if *acmeCA != "" {
+				pem, err := os.ReadFile(*acmeCA)
+				if err != nil {
+					log.Error("cannot start", "err", fmt.Errorf("--acme-ca: %w", err))
+					return 1
+				}
+				pool := x509.NewCertPool()
+				if !pool.AppendCertsFromPEM(pem) {
+					log.Error("cannot start", "err", fmt.Errorf("--acme-ca: %s holds no certificate", *acmeCA))
+					return 1
+				}
+				client.HTTPClient = &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}}
+			}
+			m.Client = client
+		}
 		hs.TLSConfig = m.TLSConfig()
 		go func() { errc <- hs.ListenAndServeTLS("", "") }()
 		go func() {
-			errc <- (&http.Server{Addr: ":80", Handler: m.HTTPHandler(nil), ReadHeaderTimeout: 10 * time.Second}).ListenAndServe()
+			errc <- (&http.Server{Addr: *acmeHTTP, Handler: m.HTTPHandler(nil), ReadHeaderTimeout: 10 * time.Second}).ListenAndServe()
 		}()
 	case https:
 		hs.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}

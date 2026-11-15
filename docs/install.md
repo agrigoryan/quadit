@@ -88,6 +88,7 @@ Agents are not broken by an upgrade: the API stays at `/api/v1`, and the list of
 Passkeys and phone notifications need HTTPS. Three ways:
 
 - `quadit serve --tls-domain quadit.example.com` gets a certificate from Let's Encrypt and renews it by itself. Ports 443 and 80 must reach the server.
+  Another authority that speaks the same protocol (a company's own, for one) is named with `--acme-directory <url>`, with `--acme-ca <pem file>` when its own certificate is not publicly trusted; `--acme-http-listen` moves the plain-HTTP side off port 80. This mode is tested against Pebble, Let's Encrypt's own test authority: see `TestAutomaticCertificate` in `internal/app`.
 - `quadit serve --tls-cert cert.pem --tls-key key.pem` uses a certificate of your own.
 - or keep plain HTTP on `:4780` behind a proxy that terminates HTTPS (Caddy, nginx, a tunnel), and set `--url https://…`.
 
