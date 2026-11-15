@@ -16,7 +16,7 @@ func (s *Server) handleShowTaskContext(x *c) error {
 	if err != nil {
 		return err
 	}
-	d, err := x.detail(t, x.maxChars())
+	d, err := x.buildTaskDetail(t, x.maxChars())
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (p *contextPack) parents() error {
 			break
 		}
 		pv, _ := x.taskViews([]core.Task{up}, true)
-		pv[0].Description, pv[0].Truncated = cut(pv[0].Description, 1500)
+		pv[0].Description, pv[0].Truncated = truncate(pv[0].Description, 1500)
 		parents = append(parents, pv[0])
 		cur = up.ParentID
 	}
@@ -68,9 +68,9 @@ func (p *contextPack) parents() error {
 
 // epic adds the epic the task is in.
 func (p *contextPack) epic() error {
-	nm, _ := p.x.names()
-	if e, ok := nm.epics[p.t.EpicID]; ok {
-		desc, _ := cut(e.Description, 2000)
+	names, _ := p.x.names()
+	if e, ok := names.epics[p.t.EpicID]; ok {
+		desc, _ := truncate(e.Description, 2000)
 		p.out["epic"] = map[string]any{"name": e.Name, "state": e.State, "target_on": e.TargetOn, "description": desc}
 		fmt.Fprintf(&p.text, "=== epic: %s (%s", e.Name, e.State)
 		if e.TargetOn != "" {

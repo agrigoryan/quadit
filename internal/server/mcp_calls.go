@@ -15,10 +15,10 @@ import (
 // path: each takes the tool's arguments and answers with text and whether
 // the call succeeded.
 
-// internal calls the API from inside the server, as the bearer of token.
+// callAPI calls the API from inside the server, as the bearer of token.
 // It returns the answer's text and whether the call succeeded; a refusal
 // comes back as its message, with the allowed values when there are any.
-func (s *Server) internal(token, method, path string, q url.Values, body []byte) (string, bool) {
+func (s *Server) callAPI(token, method, path string, q url.Values, body []byte) (string, bool) {
 	who := bearerOf(token)
 	if strings.HasPrefix(path, "/api/") {
 		who.base = "" // a path outside the workspace is given whole
@@ -30,13 +30,13 @@ func (s *Server) internal(token, method, path string, q url.Values, body []byte)
 	return answerText(s.selfCall(who, method, path, q, body, contentType))
 }
 
-// internalRaw is internal for a body that is a file's bytes.
-func (s *Server) internalRaw(token, method, path string, q url.Values, body []byte) (string, bool) {
+// callAPIWithBytes is callAPI for a body that is a file's bytes.
+func (s *Server) callAPIWithBytes(token, method, path string, q url.Values, body []byte) (string, bool) {
 	return answerText(s.selfCall(bearerOf(token), method, path, q, body, "application/octet-stream"))
 }
 
 // answerText is what a tool makes of an in-process call's answer.
-func answerText(ans *buffer, err error) (string, bool) {
+func answerText(ans *recordedAnswer, err error) (string, bool) {
 	if err != nil {
 		return err.Error(), false
 	}
@@ -47,17 +47,17 @@ func answerText(ans *buffer, err error) (string, bool) {
 }
 
 func toolAck(s *Server, token string, a map[string]any) (string, bool) {
-	name := str(a, "cursor")
+	name := argText(a, "cursor")
 	if name == "" {
 		name = "main"
 	}
 	body, _ := json.Marshal(map[string]any{"seq": a["seq"]})
-	return s.internal(token, "PUT", "/cursors/"+url.PathEscape(name), nil, body)
+	return s.callAPI(token, "PUT", "/cursors/"+url.PathEscape(name), nil, body)
 }
 
 func toolRemember(s *Server, token string, a map[string]any) (string, bool) {
-	body, _ := json.Marshal(map[string]any{"title": a["title"], "markdown": a["markdown"], "mode": str(a, "mode")})
-	return s.internal(token, "POST", "/memory", nil, body)
+	body, _ := json.Marshal(map[string]any{"title": a["title"], "markdown": a["markdown"], "mode": argText(a, "mode")})
+	return s.callAPI(token, "POST", "/memory", nil, body)
 }
 
 // toolChange makes one change, or several together when changes lists them.
@@ -65,18 +65,18 @@ func toolChange(s *Server, token string, a map[string]any) (string, bool) {
 	if list, ok := a["changes"].([]any); ok && len(list) > 0 {
 		return toolChangeBatch(s, token, a, list)
 	}
-	if str(a, "type") == "" {
+	if argText(a, "type") == "" {
 		return "give type and args, or changes", false
 	}
-	cid := str(a, "id")
+	cid := argText(a, "id")
 	if cid == "" {
 		cid = id.New()
 	}
 	req := map[string]any{"id": cid, "type": a["type"], "args": a["args"]}
-	if v := str(a, "for"); v != "" {
+	if v := argText(a, "for"); v != "" {
 		req["for"] = v
 	}
-	if v := str(a, "approval"); v != "" {
+	if v := argText(a, "approval"); v != "" {
 		req["approval"] = v
 	}
 	if b, _ := a["dry_run"].(bool); b {
@@ -89,7 +89,7 @@ func toolChange(s *Server, token string, a map[string]any) (string, bool) {
 		}
 	}
 	body, _ := json.Marshal(req)
-	out, ok := s.internal(token, "POST", "/changes", nil, body)
+	out, ok := s.callAPI(token, "POST", "/changes", nil, body)
 	if !ok {
 		return out, false
 	}
@@ -130,7 +130,7 @@ func toolChangeBatch(s *Server, token string, a map[string]any, list []any) (str
 		req["dry_run"] = true
 	}
 	body, _ := json.Marshal(req)
-	out, ok := s.internal(token, "POST", "/changes", nil, body)
+	out, ok := s.callAPI(token, "POST", "/changes", nil, body)
 	if !ok {
 		return out, false
 	}
@@ -150,11 +150,11 @@ func toolChangeBatch(s *Server, token string, a map[string]any, list []any) (str
 func toolRender(s *Server, token string, a map[string]any) (string, bool) {
 	q := url.Values{}
 	for _, k := range []string{"task", "doc", "width", "theme"} {
-		if v := str(a, k); v != "" {
+		if v := argText(a, k); v != "" {
 			q.Set(k, v)
 		}
 	}
-	out, ok := s.internal(token, "GET", "/render", q, nil)
+	out, ok := s.callAPI(token, "GET", "/render", q, nil)
 	if !ok {
 		return out, false
 	}
@@ -162,7 +162,7 @@ func toolRender(s *Server, token string, a map[string]any) (string, bool) {
 }
 
 func toolSecretRequest(s *Server, token string, a map[string]any) (string, bool) {
-	req := map[string]any{"method": str(a, "method"), "url": str(a, "url"), "body": str(a, "body")}
+	req := map[string]any{"method": argText(a, "method"), "url": argText(a, "url"), "body": argText(a, "body")}
 	switch h := a["headers"].(type) {
 	case map[string]any:
 		req["headers"] = h
@@ -176,26 +176,26 @@ func toolSecretRequest(s *Server, token string, a map[string]any) (string, bool)
 		}
 	}
 	raw, _ := json.Marshal(req)
-	return s.internal(token, "POST", "/secrets/"+url.PathEscape(str(a, "name"))+"/request", url.Values{"format": {"text"}}, raw)
+	return s.callAPI(token, "POST", "/secrets/"+url.PathEscape(argText(a, "name"))+"/request", url.Values{"format": {"text"}}, raw)
 }
 
 // toolUpload stores a file sent whole, or one part of a file sent in several calls.
 func toolUpload(s *Server, token string, a map[string]any) (string, bool) {
-	if str(a, "size") != "" || str(a, "id") != "" {
+	if argText(a, "size") != "" || argText(a, "id") != "" {
 		return s.uploadPart(token, a)
 	}
-	if str(a, "name") == "" {
+	if argText(a, "name") == "" {
 		return "give the file a name", false
 	}
-	data := []byte(str(a, "text"))
-	if b := str(a, "base64"); b != "" {
+	data := []byte(argText(a, "text"))
+	if b := argText(a, "base64"); b != "" {
 		raw, err := base64.StdEncoding.DecodeString(b)
 		if err != nil {
 			return "base64 does not decode: " + err.Error(), false
 		}
 		data = raw
 	}
-	out, ok := s.internalRaw(token, "POST", "/files", url.Values{"name": {str(a, "name")}}, data)
+	out, ok := s.callAPIWithBytes(token, "POST", "/files", url.Values{"name": {argText(a, "name")}}, data)
 	if !ok {
 		return out, false
 	}
@@ -206,16 +206,16 @@ func toolUpload(s *Server, token string, a map[string]any) (string, bool) {
 
 // uploadPart takes one part of a file that comes in several calls.
 func (s *Server) uploadPart(token string, a map[string]any) (string, bool) {
-	raw, err := base64.StdEncoding.DecodeString(str(a, "base64"))
+	raw, err := base64.StdEncoding.DecodeString(argText(a, "base64"))
 	if err != nil {
 		return "base64 does not decode: " + err.Error(), false
 	}
 	var out string
 	var ok bool
-	if fid := str(a, "id"); fid != "" {
-		out, ok = s.internalRaw(token, "PATCH", "/files/"+url.PathEscape(fid), url.Values{"offset": {str(a, "offset")}}, raw)
+	if fid := argText(a, "id"); fid != "" {
+		out, ok = s.callAPIWithBytes(token, "PATCH", "/files/"+url.PathEscape(fid), url.Values{"offset": {argText(a, "offset")}}, raw)
 	} else {
-		out, ok = s.internalRaw(token, "POST", "/files", url.Values{"name": {str(a, "name")}, "size": {str(a, "size")}}, raw)
+		out, ok = s.callAPIWithBytes(token, "POST", "/files", url.Values{"name": {argText(a, "name")}, "size": {argText(a, "size")}}, raw)
 	}
 	if !ok {
 		return out, false

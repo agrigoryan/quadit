@@ -41,7 +41,7 @@ func (e *exporter) files() error {
 	if len(missing) == 0 {
 		return nil
 	}
-	return e.put(notIncludedName, "These uploaded files are not in this export:\n\n"+strings.Join(missing, "\n")+"\n")
+	return e.addTextFile(notIncludedName, "These uploaded files are not in this export:\n\n"+strings.Join(missing, "\n")+"\n")
 }
 
 // notIncludedWhy says, without naming anything on the server, why a file's

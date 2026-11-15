@@ -51,15 +51,15 @@ type taskView struct {
 	Archived    bool         `json:"archived,omitempty"`
 }
 
-func when(ms int64) string {
+func formatTime(ms int64) string {
 	if ms == 0 {
 		return ""
 	}
 	return time.UnixMilli(ms).UTC().Format("2006-01-02 15:04")
 }
 
-// cut shortens text to max bytes on a rune boundary.
-func cut(s string, max int) (string, bool) {
+// truncate shortens text to max bytes on a rune boundary.
+func truncate(s string, max int) (string, bool) {
 	if max <= 0 || len(s) <= max {
 		return s, false
 	}
@@ -71,7 +71,7 @@ func cut(s string, max int) (string, bool) {
 
 func oneLine(s string, max int) string {
 	s = strings.Join(strings.Fields(s), " ")
-	if out, was := cut(s, max); was {
+	if out, was := truncate(s, max); was {
 		return out + "…"
 	}
 	return s
@@ -80,7 +80,7 @@ func oneLine(s string, max int) string {
 // taskViews turns tasks into their listed form. detail adds the fields a
 // list leaves out.
 func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
@@ -104,28 +104,28 @@ func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
 	now := time.Now().UnixMilli()
 	out := make([]taskView, len(tasks))
 	for i, t := range tasks {
-		st := nm.statuses[t.StatusID]
-		v := taskView{Key: t.Key, Title: t.Title, Status: st.Name, Category: st.Category, Assignee: nm.handle(t.AssigneeID),
-			WaitingOn: waitsOn(nm, t), WaitingOnNote: t.WaitingOnNote, Labels: nm.labelNames(t.LabelIDs),
-			Epic: nm.epics[t.EpicID].Name, Milestone: nm.milestones[t.MilestoneID], Budget: t.Budget, Cycle: nm.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
+		st := names.statuses[t.StatusID]
+		v := taskView{Key: t.Key, Title: t.Title, Status: st.Name, Category: st.Category, Assignee: names.handle(t.AssigneeID),
+			WaitingOn: waitsOn(names, t), WaitingOnNote: t.WaitingOnNote, Labels: names.labelNames(t.LabelIDs),
+			Epic: names.epics[t.EpicID].Name, Milestone: names.milestones[t.MilestoneID], Budget: t.Budget, Cycle: names.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
 			Estimate: t.Estimate, Seq: t.ActivitySeq, UpdatedSeq: t.UpdatedSeq, Trashed: t.DeletedAt != 0, Archived: t.ArchivedAt != 0}
 		if t.Priority > 0 && t.Priority < len(priorityNames) {
 			v.Priority = priorityNames[t.Priority]
 		}
 		if t.LeaseHolderID != "" && t.LeaseUntil > now {
-			v.HeldBy = nm.handle(t.LeaseHolderID)
+			v.HeldBy = names.handle(t.LeaseHolderID)
 		}
 		if detail {
-			v.ID, v.Project, v.Description = t.ID, nm.projects[t.ProjectID].Key, t.Description
-			v.CreatedBy, v.CreatedAt = nm.handle(t.CreatedBy), when(t.CreatedAt)
+			v.ID, v.Project, v.Description = t.ID, names.projects[t.ProjectID].Key, t.Description
+			v.CreatedBy, v.CreatedAt = names.handle(t.CreatedBy), formatTime(t.CreatedAt)
 		}
 		out[i] = v
 	}
 	return out, nil
 }
 
-// pick keeps only the named fields of each item, for callers that asked.
-func pick(items any, fields []string) any {
+// pickFields keeps only the named fields of each item, for callers that asked.
+func pickFields(items any, fields []string) any {
 	if len(fields) == 0 {
 		return items
 	}
@@ -456,7 +456,7 @@ func (d taskDetail) text() string {
 }
 
 // eventLine says what one event did, on one line.
-func (x *c) eventLine(ev core.Event, nm *names) string {
+func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 	var d struct {
 		Key     string                      `json:"key"`
 		Row     json.RawMessage             `json:"row"`
@@ -464,7 +464,7 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 		Deleted bool                        `json:"deleted"`
 	}
 	json.Unmarshal(ev.Data, &d)
-	head := fmt.Sprintf("#%d %s %s", ev.Seq, time.UnixMilli(ev.At).UTC().Format("01-02 15:04"), nm.handle(ev.ActorID))
+	head := fmt.Sprintf("#%d %s %s", ev.Seq, time.UnixMilli(ev.At).UTC().Format("01-02 15:04"), names.handle(ev.ActorID))
 	what := ev.Type
 	if d.Key != "" {
 		what += " " + d.Key
@@ -473,12 +473,12 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 	case "task.created":
 		var t core.Task
 		json.Unmarshal(d.Row, &t)
-		what = fmt.Sprintf("task.created %s %q [%s]", t.Key, t.Title, nm.statuses[t.StatusID].Name)
+		what = fmt.Sprintf("task.created %s %q [%s]", t.Key, t.Title, names.statuses[t.StatusID].Name)
 		if t.AssigneeID != "" {
-			what += " " + nm.handle(t.AssigneeID)
+			what += " " + names.handle(t.AssigneeID)
 		}
 	case "task.updated":
-		what += " " + x.changeText(d.Changes, nm)
+		what += " " + x.changeText(d.Changes, names)
 	case "comment.created":
 		var cm core.Comment
 		json.Unmarshal(d.Row, &cm)
@@ -511,7 +511,7 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 				what += " [" + strings.Join(opts, "  ") + "]"
 			}
 			if dc.AskedID != "" {
-				what += " asked " + nm.handle(dc.AskedID)
+				what += " asked " + names.handle(dc.AskedID)
 			}
 		case "decision.picked":
 			ans := dc.Outcome
@@ -542,13 +542,13 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 		case ev.Type == "claim.updated":
 			// Whose hold on what: the one acting may be an admin, or the
 			// server handing the resource to the next in line.
-			what = "claim " + orText(cd.Why, "changed")
+			what = "claim " + firstNonEmpty(cd.Why, "changed")
 			var res core.Resource
 			if cd.ResourceID != "" && x.db.Get(x.ctx(), &res, store.Eq("id", cd.ResourceID)) == nil {
 				what += ": " + res.Name
 			}
 			if cd.UserID != "" {
-				what += " (" + nm.handle(cd.UserID) + ")"
+				what += " (" + names.handle(cd.UserID) + ")"
 			}
 			cd.Row.TaskID = cd.TaskID
 		case cd.Row.State == "holding":
@@ -574,10 +574,10 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 		}
 	default:
 		if ev.EntityType == "member" && ev.Type != "member.created" {
-			what += " " + nm.handle(ev.EntityID) // whose membership it is
+			what += " " + names.handle(ev.EntityID) // whose membership it is
 		}
 		if len(d.Changes) > 0 {
-			what += " " + x.changeText(d.Changes, nm)
+			what += " " + x.changeText(d.Changes, names)
 		} else if d.Key == "" && len(d.Row) > 0 {
 			// Something new that the cases above do not know: its name.
 			var row map[string]any
@@ -598,19 +598,19 @@ var quietFields = map[string]bool{"started_at": true, "completed_at": true, "can
 	"number": true, "deleted_at": true, "archived_at": true, "updated_at": true, "content_seq": true, "updated_by": true,
 	"removed_at": true, "suspended_at": true}
 
-func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
+func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) string {
 	var parts []string
 	name := func(field string, v any) string {
 		s, _ := v.(string)
 		switch field {
 		case "status_id":
-			return nm.statuses[s].Name
+			return names.statuses[s].Name
 		case "assignee_id", "waiting_on_id", "lease_holder_id", "lead_id":
-			return nm.handle(s)
+			return names.handle(s)
 		case "epic_id":
-			return nm.epics[s].Name
+			return names.epics[s].Name
 		case "cycle_id":
-			if c, ok := nm.cycles[s]; ok {
+			if c, ok := names.cycles[s]; ok {
 				return fmt.Sprintf("%d", c.Number)
 			}
 			return ""
@@ -622,7 +622,7 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 					ids = append(ids, id)
 				}
 			}
-			return strings.Join(nm.labelNames(ids), ",")
+			return strings.Join(names.labelNames(ids), ",")
 		case "priority":
 			if f, ok := v.(float64); ok && int(f) < len(priorityNames) {
 				return priorityNames[int(f)]
@@ -647,7 +647,7 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 				switch k {
 				case "cost_micros":
 					if n, ok := val.(float64); ok {
-						parts = append(parts, "cost "+money(int64(n)))
+						parts = append(parts, "cost "+formatMoney(int64(n)))
 						continue
 					}
 				case "projects":
@@ -655,7 +655,7 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 						var keys []string
 						for _, id := range ids {
 							pid, _ := id.(string)
-							keys = append(keys, orText(nm.projects[pid].Key, pid))
+							keys = append(keys, firstNonEmpty(names.projects[pid].Key, pid))
 						}
 						parts = append(parts, "projects "+strings.Join(keys, ","))
 						continue
@@ -720,9 +720,9 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 
 // waitsOn names who has the next move on a task: a member's handle, or
 // "outside" when it waits for an event its note describes.
-func waitsOn(nm *names, t core.Task) string {
+func waitsOn(names *nameLookup, t core.Task) string {
 	if t.WaitingOutside {
 		return "outside"
 	}
-	return nm.handle(t.WaitingOnID)
+	return names.handle(t.WaitingOnID)
 }

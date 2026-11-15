@@ -223,7 +223,7 @@ func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integratio
 	if err != nil {
 		return 0, err
 	}
-	api := strings.TrimRight(orText(cfg.APIURL, "https://api.github.com"), "/")
+	api := strings.TrimRight(firstNonEmpty(cfg.APIURL, "https://api.github.com"), "/")
 	g := &githubSync{s: s, db: db, in: in, cfg: cfg, st: st, gh: s.githubAPI(api, token), token: token}
 	handled, err := g.syncPulls(ctx)
 	if err != nil {

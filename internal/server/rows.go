@@ -14,16 +14,16 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// table is a database loaded for reading: its columns and its rows.
-type table struct {
+// loadedDatabase is a database loaded for reading: its columns and its rows.
+type loadedDatabase struct {
 	doc    core.Doc
 	props  []core.DBProperty
 	rows   []core.Doc
 	values map[string]map[string]any // row id -> property id -> stored value
 }
 
-func (x *c) loadTable(d core.Doc) (*table, error) {
-	t := &table{doc: d, values: map[string]map[string]any{}}
+func (x *c) loadTable(d core.Doc) (*loadedDatabase, error) {
+	t := &loadedDatabase{doc: d, values: map[string]map[string]any{}}
 	if err := x.db.List(x.ctx(), &t.props, store.Q{Where: []store.Cond{store.Eq("database_id", d.ID), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
@@ -51,8 +51,8 @@ type propConfig struct {
 
 // computed works out every cell of a database: stored values as they are,
 // and formulas, rollups and the built-in columns from them.
-func (x *c) computed(t *table) (map[string]map[string]any, error) {
-	nm, err := x.names()
+func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
+	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +60,8 @@ func (x *c) computed(t *table) (map[string]map[string]any, error) {
 	for _, p := range t.props {
 		byName[strings.ToLower(p.Name)] = p
 	}
-	related := map[string]*table{} // other databases, loaded when a relation needs them
-	other := func(dbID string) *table {
+	related := map[string]*loadedDatabase{} // other databases, loaded when a relation needs them
+	other := func(dbID string) *loadedDatabase {
 		if dbID == t.doc.ID {
 			return t
 		}
@@ -69,7 +69,7 @@ func (x *c) computed(t *table) (map[string]map[string]any, error) {
 			return rt
 		}
 		var d core.Doc
-		var rt *table
+		var rt *loadedDatabase
 		if x.db.Get(x.ctx(), &d, store.Eq("id", dbID), store.Live) == nil && engine.CanSeeDoc(d, x.member.UserID) {
 			rt, _ = x.loadTable(d)
 		}
@@ -104,10 +104,10 @@ func (x *c) computed(t *table) (map[string]map[string]any, error) {
 		case "updated_at":
 			return time.UnixMilli(row.UpdatedAt).UTC().Format("2006-01-02 15:04")
 		case "created_by":
-			return nm.handle(row.CreatedBy)
+			return names.handle(row.CreatedBy)
 		case "member":
 			if s, ok := stored.(string); ok {
-				return nm.handle(s)
+				return names.handle(s)
 			}
 			return nil
 		case "formula":

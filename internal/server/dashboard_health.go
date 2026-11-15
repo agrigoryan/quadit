@@ -16,7 +16,7 @@ func (d *dashboard) health() error {
 	health["deliveries_pending"] = liveDeliveries(ctx, x.db, store.Eq("state", "pending"), store.Gt("attempts", 0))
 	var backups []core.Backup
 	if err := x.s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err == nil && len(backups) > 0 {
-		health["last_backup"] = when(backups[0].FinishedAt)
+		health["last_backup"] = formatTime(backups[0].FinishedAt)
 		health["last_backup_ok"] = backups[0].Error == "" && backups[0].FinishedAt != 0
 	}
 	var sources []core.DocSource

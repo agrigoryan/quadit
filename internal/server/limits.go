@@ -30,9 +30,9 @@ func newLimiter() *limiter {
 	return &limiter{hits: map[string]int{}, shared: map[string]int{}, factor: 1}
 }
 
-// share adds what was counted here to the database's counters and takes
+// shareCounts adds what was counted here to the database's counters and takes
 // the totals back.
-func (l *limiter) share(ctx context.Context, st store.Store) {
+func (l *limiter) shareCounts(ctx context.Context, st store.Store) {
 	l.mu.Lock()
 	window, mine := l.window, l.hits
 	l.hits = map[string]int{}

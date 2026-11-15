@@ -9,8 +9,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// detail builds everything about one task in its named form.
-func (x *c) detail(t core.Task, maxChars int) (taskDetail, error) {
+// buildTaskDetail builds everything about one task in its named form.
+func (x *c) buildTaskDetail(t core.Task, maxChars int) (taskDetail, error) {
 	b := &detailBuilder{x: x, t: t, maxChars: maxChars}
 	for _, part := range []func() error{b.task, b.subtasks, b.decisions, b.attachments, b.comments, b.relations, b.links, b.watchers} {
 		if err := part(); err != nil {
@@ -28,7 +28,7 @@ type detailBuilder struct {
 	// comment is; 0 cuts nothing.
 	maxChars int
 	d        taskDetail
-	nm       *names
+	names    *nameLookup
 	files    map[string][]attachmentView // by what each file is attached to
 }
 
@@ -37,7 +37,7 @@ type detailBuilder struct {
 func (b *detailBuilder) task() error {
 	x, ctx, t := b.x, b.x.ctx(), b.t
 	var err error
-	if b.nm, err = x.names(); err != nil {
+	if b.names, err = x.names(); err != nil {
 		return err
 	}
 	var ws core.Workspace
@@ -68,7 +68,7 @@ func (b *detailBuilder) task() error {
 		}
 		b.d.Task.Spent = &spent
 	}
-	b.d.Task.Description, b.d.Task.Truncated = cut(b.d.Task.Description, b.maxChars)
+	b.d.Task.Description, b.d.Task.Truncated = truncate(b.d.Task.Description, b.maxChars)
 	return nil
 }
 
@@ -115,12 +115,12 @@ func (b *detailBuilder) comments() error {
 		return err
 	}
 	for _, cm := range cms {
-		v := commentView{ID: cm.ID, Seq: cm.CreatedSeq, By: b.nm.handle(cm.AuthorID), At: when(cm.CreatedAt), On: where[cm.SubjectID],
+		v := commentView{ID: cm.ID, Seq: cm.CreatedSeq, By: b.names.handle(cm.AuthorID), At: formatTime(cm.CreatedAt), On: where[cm.SubjectID],
 			ReplyTo: cm.ParentID, Evidence: cm.Evidence, Attachments: b.files[cm.ID], Edited: cm.EditedAt != 0}
 		if cm.Kind != "comment" {
 			v.Kind = cm.Kind
 		}
-		v.Body, v.Truncated = cut(cm.Body, b.maxChars/2)
+		v.Body, v.Truncated = truncate(cm.Body, b.maxChars/2)
 		b.d.Comments = append(b.d.Comments, v)
 	}
 	return nil
@@ -156,7 +156,7 @@ func (b *detailBuilder) relations() error {
 	}
 	add := func(r core.Relation, otherID, typ string) {
 		if o, ok := byID[otherID]; ok {
-			b.d.Relations = append(b.d.Relations, relationView{ID: r.ID, Type: typ, Task: o.Key, Title: o.Title, State: b.nm.statuses[o.StatusID].Name})
+			b.d.Relations = append(b.d.Relations, relationView{ID: r.ID, Type: typ, Task: o.Key, Title: o.Title, State: b.names.statuses[o.StatusID].Name})
 		}
 	}
 	for _, r := range out {
@@ -186,7 +186,7 @@ func (b *detailBuilder) watchers() error {
 		return err
 	}
 	for _, w := range ws {
-		b.d.Watchers = append(b.d.Watchers, b.nm.handle(w.UserID))
+		b.d.Watchers = append(b.d.Watchers, b.names.handle(w.UserID))
 	}
 	sort.Strings(b.d.Watchers)
 	return nil
@@ -230,7 +230,7 @@ func (s *Server) handleShowTask(x *c) error {
 	if truthyParam(v, "raw") {
 		return s.rawTask(x, t)
 	}
-	d, err := x.detail(t, x.maxChars())
+	d, err := x.buildTaskDetail(t, x.maxChars())
 	if err != nil {
 		return err
 	}

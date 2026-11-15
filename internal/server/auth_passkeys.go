@@ -31,16 +31,16 @@ func init() {
 	})
 }
 
-// waUser is a person as the WebAuthn library wants to see one.
-type waUser struct {
+// webAuthnUser is a person as the WebAuthn library wants to see one.
+type webAuthnUser struct {
 	u     core.User
 	creds []webauthn.Credential
 }
 
-func (w waUser) WebAuthnID() []byte                         { return []byte(w.u.ID) }
-func (w waUser) WebAuthnName() string                       { return w.u.Email }
-func (w waUser) WebAuthnDisplayName() string                { return w.u.Name }
-func (w waUser) WebAuthnCredentials() []webauthn.Credential { return w.creds }
+func (w webAuthnUser) WebAuthnID() []byte                         { return []byte(w.u.ID) }
+func (w webAuthnUser) WebAuthnName() string                       { return w.u.Email }
+func (w webAuthnUser) WebAuthnDisplayName() string                { return w.u.Name }
+func (w webAuthnUser) WebAuthnCredentials() []webauthn.Credential { return w.creds }
 
 // webauthn builds the relying party for this request. The party is the
 // host people reach the server on; a local dev server on another port of
@@ -63,12 +63,12 @@ func (s *Server) webauthn(r *http.Request) (*webauthn.WebAuthn, error) {
 	return webauthn.New(&webauthn.Config{RPID: base.Hostname(), RPDisplayName: s.settingStr(r.Context(), "install.name", "Quadit"), RPOrigins: origins})
 }
 
-func (s *Server) passkeyUser(ctx context.Context, u core.User) (waUser, error) {
+func (s *Server) passkeyUser(ctx context.Context, u core.User) (webAuthnUser, error) {
 	var rows []core.Passkey
 	if err := s.st.List(ctx, &rows, store.Where(store.Eq("user_id", u.ID))); err != nil {
-		return waUser{}, err
+		return webAuthnUser{}, err
 	}
-	w := waUser{u: u}
+	w := webAuthnUser{u: u}
 	for _, row := range rows {
 		var cred webauthn.Credential
 		if json.Unmarshal(row.Credential, &cred) == nil {
@@ -180,9 +180,9 @@ func (s *Server) handleRenamePasskey(x *c) error {
 	return x.ok(map[string]any{"ok": true})
 }
 
-// waysIn counts how a person can still sign in, so the last one is not
+// signInWayCount counts how a person can still sign in, so the last one is not
 // taken away.
-func (s *Server) waysIn(ctx context.Context, u core.User) int {
+func (s *Server) signInWayCount(ctx context.Context, u core.User) int {
 	n := 0
 	if u.PasswordHash != "" {
 		n++
@@ -197,7 +197,7 @@ func (s *Server) handleDeletePasskey(x *c) error {
 	if x.sess == nil {
 		return errForbidden("a passkey is removed by its person, signed in")
 	}
-	if s.waysIn(ctx, x.user) <= 1 {
+	if s.signInWayCount(ctx, x.user) <= 1 {
 		return &engine.Error{Code: engine.CodeConflict, Message: "this is your only way to sign in; set a password or add another passkey first"}
 	}
 	n, err := s.st.Delete(ctx, "passkeys", store.Eq("id", x.r.PathValue("id")), store.Eq("user_id", x.user.ID))

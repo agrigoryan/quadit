@@ -21,13 +21,13 @@ var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "t
 // events writes a list of events in the form asked for.
 func (x *c) events(evs []core.Event, seq int64, more bool) error {
 	if x.wantText() || truthyParam(x.r.URL.Query(), "compact") {
-		nm, err := x.names()
+		names, err := x.names()
 		if err != nil {
 			return err
 		}
 		ls := make([]string, len(evs))
 		for i, ev := range evs {
-			ls[i] = x.eventLine(ev, nm)
+			ls[i] = x.eventLine(ev, names)
 		}
 		if x.wantText() {
 			out := strings.Join(ls, "\n")
@@ -116,12 +116,12 @@ func (s *Server) handleReadFeed(x *c) error {
 	if wait > 0 {
 		s.listening(x, wait+5)
 	}
-	opened, _ := s.access(x)
+	opened, _ := s.recheckAccess(x)
 	for round := 0; ; round++ {
 		if round > 0 {
 			// The request has been held: before answering, check that the
 			// caller may still see what it was opened to see.
-			if now, ok := s.access(x); !ok {
+			if now, ok := s.recheckAccess(x); !ok {
 				return errUnauthorized("your access ended while this request was waiting")
 			} else if now != opened {
 				return &httpError{Status: 409, Code: "access_changed", Message: "what you may see changed while this request was waiting; ask again"}
@@ -151,7 +151,7 @@ func (s *Server) handleReadFeed(x *c) error {
 		// and sleep until the feed moves.
 		f.After = max(f.After, ws.Seq)
 		wctx, cancel := context.WithDeadline(ctx, deadline)
-		hctx, release := s.held(wctx)
+		hctx, release := s.keptOpenContext(wctx)
 		s.hub.Wait(hctx, x.ws.ID, ws.Seq)
 		release()
 		cancel()
@@ -239,7 +239,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 		x.w.WriteHeader(http.StatusNoContent)
 		return nil
 	}
-	ctx, release := s.held(x.ctx())
+	ctx, release := s.keptOpenContext(x.ctx())
 	defer release()
 	after := int64(x.intParam("after", 0))
 	if last := x.r.Header.Get("Last-Event-ID"); last != "" {
@@ -257,7 +257,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: x.projects, AllowNoProject: true, Limit: 500}
 	beat := time.NewTicker(25 * time.Second)
 	defer beat.Stop()
-	opened, _ := s.access(x)
+	opened, _ := s.recheckAccess(x)
 	for {
 		// Counted before the check: a change of access that lands right
 		// after it is then seen by the read and the wait below, not missed.
@@ -265,7 +265,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 		// Before anything more goes out: may they still have it? Someone
 		// removed, suspended or signed out is told to go; someone whose role
 		// or projects changed is told to start over with what they may see now.
-		switch now, ok := s.access(x); {
+		switch now, ok := s.recheckAccess(x); {
 		case !ok:
 			fmt.Fprintf(x.w, "event: gone\ndata: {}\n\n")
 			flusher.Flush()
@@ -287,7 +287,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 			// What was read may have been written after the check above,
 			// and after the caller lost the right to it: check once more
 			// before any of it is sent.
-			if now, ok := s.access(x); !ok || now != opened {
+			if now, ok := s.recheckAccess(x); !ok || now != opened {
 				continue // the top of the loop says how it ends
 			}
 		}
@@ -329,11 +329,11 @@ func (s *Server) handleStreamFeed(x *c) error {
 	}
 }
 
-// access says whether the caller of a held connection may still be here,
+// recheckAccess says whether the caller of a held connection may still be here,
 // and a fingerprint of what they may see. A connection that stays open for
 // minutes must not outlive the access it was opened with: it is asked again
 // before anything more is sent on it.
-func (s *Server) access(x *c) (fingerprint string, ok bool) {
+func (s *Server) recheckAccess(x *c) (fingerprint string, ok bool) {
 	ctx := context.WithoutCancel(x.ctx())
 	now := time.Now().UnixMilli()
 	if x.token != nil {

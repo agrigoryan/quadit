@@ -58,7 +58,7 @@ func (s *Server) handleListTasks(x *c) error {
 	if len(fields) == 0 {
 		fields = listFields
 	}
-	out := map[string]any{"tasks": pick(views, fields)}
+	out := map[string]any{"tasks": pickFields(views, fields)}
 	if page.more {
 		if len(f.After) == 0 {
 			out["next_offset"] = f.Offset + f.Limit

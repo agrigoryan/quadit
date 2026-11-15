@@ -194,7 +194,7 @@ func (s *Server) handleUnlinkIdentity(x *c) error {
 	if x.sess == nil {
 		return errForbidden("a connected account is removed by its person, signed in")
 	}
-	if s.waysIn(ctx, x.user) <= 1 {
+	if s.signInWayCount(ctx, x.user) <= 1 {
 		return &engine.Error{Code: engine.CodeConflict, Message: "this is your only way to sign in; set a password or add a passkey first"}
 	}
 	n, err := s.st.Delete(ctx, "identities", store.Eq("id", x.r.PathValue("id")), store.Eq("user_id", x.user.ID))

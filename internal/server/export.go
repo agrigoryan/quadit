@@ -51,16 +51,16 @@ func (s *Server) handleExportWorkspace(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return err
 	}
 	s.audit(x.r, x.ws.ID, x.user, "workspace.exported", "workspace", x.ws.ID, nil)
 	x.w.Header().Set("Content-Type", "application/zip")
 	x.w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.zip"`, x.ws.Slug, time.Now().UTC().Format("2006-01-02")))
-	e := &exporter{x: x, nm: nm, zw: zip.NewWriter(x.w)}
+	e := &exporter{x: x, names: names, zw: zip.NewWriter(x.w)}
 	defer e.zw.Close()
-	if err := e.put("README.txt", exportReadme); err != nil {
+	if err := e.addTextFile("README.txt", exportReadme); err != nil {
 		return err
 	}
 	parts := []func() error{
@@ -80,10 +80,10 @@ func (s *Server) handleExportWorkspace(x *c) error {
 // exporter is one export being written: the request, the archive, and the
 // rows read so far, which the parts after data/ are written from.
 type exporter struct {
-	x    *c
-	nm   *names
-	zw   *zip.Writer
-	rows exportRows // export_data.go
+	x     *c
+	names *nameLookup
+	zw    *zip.Writer
+	rows  exportRows // export_data.go
 
 	// What tasks/ is written from, by indexTasks.
 	optionsOf   map[string][]core.Option   // a decision's options
@@ -93,8 +93,8 @@ type exporter struct {
 	keyOf       map[string]string          // a task's key, by its id
 }
 
-// put writes one file of text into the archive.
-func (e *exporter) put(name, body string) error {
+// addTextFile writes one file of text into the archive.
+func (e *exporter) addTextFile(name, body string) error {
 	w, err := e.zw.Create(name)
 	if err != nil {
 		return err

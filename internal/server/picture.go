@@ -95,7 +95,7 @@ func (s *Server) handleTakePicture(x *c) error {
 	if err != nil {
 		return err
 	}
-	base := orText(s.cfg.LocalURL, s.cfg.BaseURL)
+	base := firstNonEmpty(s.cfg.LocalURL, s.cfg.BaseURL)
 	target := base + "/api/v1/auth/render-session?token=" + url.QueryEscape(token) + "&next=" + url.QueryEscape(path)
 	dir, err := os.MkdirTemp("", "quadit-render-*")
 	if err != nil {

@@ -18,8 +18,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// names turns ids into what people call things, for compact output.
-type names struct {
+// nameLookup turns ids into what people call things, for compact output.
+type nameLookup struct {
 	members  map[string]core.Member
 	statuses map[string]core.Status
 	labels   map[string]core.Label
@@ -31,11 +31,11 @@ type names struct {
 }
 
 // names loads the workspace's small tables once per request.
-func (x *c) names() (*names, error) {
-	if x.nm != nil {
-		return x.nm, nil
+func (x *c) names() (*nameLookup, error) {
+	if x.nameCache != nil {
+		return x.nameCache, nil
 	}
-	n := &names{members: map[string]core.Member{}, statuses: map[string]core.Status{}, labels: map[string]core.Label{},
+	n := &nameLookup{members: map[string]core.Member{}, statuses: map[string]core.Status{}, labels: map[string]core.Label{},
 		projects: map[string]core.Project{}, epics: map[string]core.Epic{}, cycles: map[string]core.Cycle{}}
 	var ms []core.Member
 	var ss []core.Status
@@ -85,12 +85,12 @@ func (x *c) names() (*names, error) {
 	for _, cy := range cs {
 		n.cycles[cy.ID] = cy
 	}
-	x.nm = n
+	x.nameCache = n
 	return n, nil
 }
 
 // handle returns "@handle" for a user id, or "" for none.
-func (n *names) handle(userID string) string {
+func (n *nameLookup) handle(userID string) string {
 	if userID == "" {
 		return ""
 	}
@@ -100,7 +100,7 @@ func (n *names) handle(userID string) string {
 	return "@unknown"
 }
 
-func (n *names) labelNames(ids []string) []string {
+func (n *nameLookup) labelNames(ids []string) []string {
 	var out []string
 	for _, l := range ids {
 		if lb, ok := n.labels[l]; ok {
@@ -255,10 +255,10 @@ func (x *c) resolver() *engine.Resolver {
 // filter turns a TaskQuery into the store's filter, resolving every name
 // and keeping the caller inside the projects it may read.
 func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
-	f := store.TaskFilter{Keys: upper(q.Keys), Priorities: q.Priorities(), DueBefore: q.DueBefore, DueAfter: q.DueAfter,
+	f := store.TaskFilter{Keys: upperAll(q.Keys), Priorities: q.Priorities(), DueBefore: q.DueBefore, DueAfter: q.DueAfter,
 		ActivityAfter: q.ChangedSince, UpdatedAfter: q.UpdatedSince, OpenDecision: q.OpenDecision, TopLevel: q.TopLevel,
 		Text: q.Q, InTrash: q.Trash, Archived: q.Archived, Sort: q.Sort, Limit: q.Limit, Offset: q.Offset, Categories: q.Category}
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return f, err
 	}
@@ -276,7 +276,7 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 		f.ProjectIDs = append(f.ProjectIDs, p.ID)
 	}
 	if len(projects) == 0 {
-		for _, p := range nm.projects {
+		for _, p := range names.projects {
 			if p.DeletedAt == 0 && x.canProject(p.ID) {
 				projects = append(projects, p)
 			}
@@ -351,7 +351,7 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 		low := strings.ToLower(ref)
 		var found bool
 		var allowed []string
-		for _, s := range nm.statuses {
+		for _, s := range names.statuses {
 			if s.DeletedAt != 0 || !inScope(s.ProjectID) {
 				continue
 			}
@@ -368,7 +368,7 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 			found = true
 		}
 		if !found && q.view != "" {
-			x.stale(q.view, "a status")
+			x.noteStaleView(q.view, "a status")
 			continue
 		}
 		if !found {
@@ -380,7 +380,7 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 	for _, ref := range q.Label {
 		low := strings.ToLower(ref)
 		var ids, allowed []string
-		for _, l := range nm.labels {
+		for _, l := range names.labels {
 			if l.DeletedAt != 0 || (l.ProjectID != "" && !inScope(l.ProjectID)) {
 				continue
 			}
@@ -394,7 +394,7 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 			f.LabelIDs = append(f.LabelIDs, ids[0])
 		case 0:
 			if q.view != "" {
-				x.stale(q.view, "a label")
+				x.noteStaleView(q.view, "a label")
 				continue
 			}
 			sort.Strings(allowed)
@@ -411,7 +411,7 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 		low := strings.ToLower(ref)
 		var found bool
 		var allowed []string
-		for _, e := range nm.epics {
+		for _, e := range names.epics {
 			if e.DeletedAt != 0 || !inScope(e.ProjectID) {
 				continue
 			}
@@ -422,7 +422,7 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 			allowed = append(allowed, e.Name)
 		}
 		if !found && q.view != "" {
-			x.stale(q.view, "an epic")
+			x.noteStaleView(q.view, "an epic")
 			continue
 		}
 		if !found {
@@ -490,7 +490,7 @@ var sortNames = []string{"created", "-created", "rank", "priority", "due", "-act
 // Priorities returns the priority filter.
 func (q TaskQuery) Priorities() []int { return q.Priority }
 
-func upper(list []string) []string {
+func upperAll(list []string) []string {
 	out := make([]string, len(list))
 	for i, s := range list {
 		out[i] = strings.ToUpper(s)
@@ -612,9 +612,9 @@ func init() {
 	}
 }
 
-// stale notes that a saved view names something deleted since it was saved.
+// noteStaleView notes that a saved view names something deleted since it was saved.
 // The list is read without that part, as the web app shows it, and says so.
-func (x *c) stale(view, what string) {
+func (x *c) noteStaleView(view, what string) {
 	if x.staleView == "" {
 		x.staleView = fmt.Sprintf("the view %s filters by %s that no longer exists; that part was left out. Save the view again (view.update) to drop it", view, what)
 	}

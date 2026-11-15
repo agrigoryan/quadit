@@ -12,7 +12,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-func sha(text string) string {
+func shortHash(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return hex.EncodeToString(sum[:8])
 }
@@ -41,8 +41,8 @@ func (r *syncRun) loadPages() error {
 	return nil
 }
 
-// pageMD renders a page as Markdown.
-func (r *syncRun) pageMD(docID string) (string, error) {
+// pageMarkdown renders a page as Markdown.
+func (r *syncRun) pageMarkdown(docID string) (string, error) {
 	var blocks []core.Block
 	if err := r.db.List(r.ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", docID), store.Live}, Order: "rank"}); err != nil {
 		return "", err
@@ -50,8 +50,8 @@ func (r *syncRun) pageMD(docID string) (string, error) {
 	return md.Render(engine.BlockTree(blocks)), nil
 }
 
-// mdOf renders a page inside a write, seeing what the write just did.
-func mdOf(ctx context.Context, tx store.Tx, docID string) (string, error) {
+// pageMarkdownInTx renders a page inside a write, seeing what the write just did.
+func pageMarkdownInTx(ctx context.Context, tx store.Tx, docID string) (string, error) {
 	var blocks []core.Block
 	if err := tx.List(ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", docID), store.Live}, Order: "rank"}); err != nil {
 		return "", err
@@ -62,7 +62,7 @@ func mdOf(ctx context.Context, tx store.Tx, docID string) (string, error) {
 // queue notes that a page's text is to be written to a file.
 func (r *syncRun) queue(path, docID, body string) {
 	r.toWrite[path] = body
-	r.written[docID] = sha(body)
+	r.written[docID] = shortHash(body)
 }
 
 // editedBy notes who changed a page that is being written, for the commit.
@@ -83,7 +83,7 @@ func (r *syncRun) recordHashes() error {
 		}
 		fileHash := pageHash
 		if text, ok := r.toWrite[d.SourcePath]; ok {
-			fileHash = sha(text)
+			fileHash = shortHash(text)
 		}
 		if r.src.WriteMode == "propose" {
 			// The branch still has the old file until the proposal is merged.

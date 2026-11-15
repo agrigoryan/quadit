@@ -23,7 +23,7 @@ func (r *syncRun) findFolder() error {
 		// Said, and not the end of it: pages written here may be what
 		// makes the folder.
 		r.noFolder = "the repository has no folder " + r.src.Subdir + " on " + r.branch + " yet"
-		r.say(r.noFolder)
+		r.addNote(r.noFolder)
 	}
 	return nil
 }
@@ -55,9 +55,9 @@ func (r *syncRun) readFiles() error {
 	})
 }
 
-// taken reports whether a path under the folder cannot be given to a new
+// pathTaken reports whether a path under the folder cannot be given to a new
 // file: a file has it, or a link or a folder stands on it.
-func (r *syncRun) taken(p string) bool {
+func (r *syncRun) pathTaken(p string) bool {
 	// By being there, not by having text: an empty file is a file.
 	if _, ok := r.files[p]; ok {
 		return true
@@ -115,7 +115,7 @@ func (r *syncRun) writeOut() error {
 			names = append(names, path)
 		}
 		sort.Strings(names)
-		r.say(fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 800)))
+		r.addNote(fmt.Sprintf("%d page(s) were not written to the repository, because a link or a file there stands in the way: %s", len(names), oneLine(strings.Join(names, ", "), 800)))
 	}
 	r.sayRenamed()
 	return nil

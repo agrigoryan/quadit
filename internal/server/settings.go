@@ -55,12 +55,12 @@ func envName(setting string) string {
 // environment or the database. It is cached for a few seconds, so reading a
 // setting on every request costs nothing.
 func (s *Server) rawSetting(ctx context.Context, name string) (json.RawMessage, bool) {
-	s.setMu.Lock()
-	if cs, ok := s.setTTL[name]; ok && time.Now().Before(cs.until) {
-		s.setMu.Unlock()
+	s.settingsMu.Lock()
+	if cs, ok := s.settingsCache[name]; ok && time.Now().Before(cs.until) {
+		s.settingsMu.Unlock()
 		return cs.raw, cs.fromEnv
 	}
-	s.setMu.Unlock()
+	s.settingsMu.Unlock()
 	var raw json.RawMessage
 	fromEnv := false
 	if v := os.Getenv(envName(name)); v != "" {
@@ -74,12 +74,12 @@ func (s *Server) rawSetting(ctx context.Context, name string) (json.RawMessage, 
 			raw = s.unsealFields(name, st.Value)
 		}
 	}
-	s.setMu.Lock()
-	if s.setTTL == nil {
-		s.setTTL = map[string]cachedSetting{}
+	s.settingsMu.Lock()
+	if s.settingsCache == nil {
+		s.settingsCache = map[string]cachedSetting{}
 	}
-	s.setTTL[name] = cachedSetting{raw: raw, fromEnv: fromEnv, until: time.Now().Add(3 * time.Second)}
-	s.setMu.Unlock()
+	s.settingsCache[name] = cachedSetting{raw: raw, fromEnv: fromEnv, until: time.Now().Add(3 * time.Second)}
+	s.settingsMu.Unlock()
 	return raw, fromEnv
 }
 
@@ -195,9 +195,9 @@ func (s *Server) saveSetting(ctx context.Context, name string, value json.RawMes
 		}
 	}
 	err := s.st.Upsert(ctx, core.Setting{Name: name, Value: value, UpdatedAt: time.Now().UnixMilli(), UpdatedBy: by}, "name")
-	s.setMu.Lock()
-	delete(s.setTTL, name)
-	s.setMu.Unlock()
+	s.settingsMu.Lock()
+	delete(s.settingsCache, name)
+	s.settingsMu.Unlock()
 	if name == "limits.api_per_minute" {
 		s.applyLimits(ctx)
 	}
@@ -316,7 +316,7 @@ func checkSettingShape(name string, value json.RawMessage) error {
 
 // forgetSetting drops a setting from the short-lived cache.
 func (s *Server) forgetSetting(name string) {
-	s.setMu.Lock()
-	delete(s.setTTL, name)
-	s.setMu.Unlock()
+	s.settingsMu.Lock()
+	delete(s.settingsCache, name)
+	s.settingsMu.Unlock()
 }

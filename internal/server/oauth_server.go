@@ -295,7 +295,7 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 		}
 		var cl core.OAuthClient
 		s.st.Get(ctx, &cl, store.Eq("id", clientID))
-		t := core.APIToken{ID: id.New(), WorkspaceID: workspaceID, UserID: userID, Name: orText(cl.Name, "MCP client"), TokenHash: auth.Hash(access), Prefix: prefix,
+		t := core.APIToken{ID: id.New(), WorkspaceID: workspaceID, UserID: userID, Name: firstNonEmpty(cl.Name, "MCP client"), TokenHash: auth.Hash(access), Prefix: prefix,
 			Scopes: scopes, Kind: "oauth", ClientID: clientID, RefreshHash: auth.Hash(refresh), CreatedBy: userID, CreatedAt: now.UnixMilli(),
 			ExpiresAt: now.Add(accessLife).UnixMilli()}
 		if err := s.st.Insert(ctx, t); err != nil {
@@ -303,7 +303,7 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]any{"access_token": access, "token_type": "Bearer", "expires_in": int(accessLife.Seconds()),
-			"refresh_token": refresh, "scope": orText(scope, "read write")})
+			"refresh_token": refresh, "scope": firstNonEmpty(scope, "read write")})
 	}
 	switch f.Get("grant_type") {
 	case "authorization_code":
@@ -319,7 +319,7 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 			fail("invalid_grant", "the client, redirect URI or code verifier does not match the request")
 			return
 		}
-		issue(orText(req.ActAs, req.UserID), req.WorkspaceID, req.ClientID, req.Scope)
+		issue(firstNonEmpty(req.ActAs, req.UserID), req.WorkspaceID, req.ClientID, req.Scope)
 	case "refresh_token":
 		var old core.APIToken
 		if err := s.st.Get(ctx, &old, store.Eq("refresh_hash", auth.Hash(f.Get("refresh_token"))), store.Null("revoked_at")); err != nil ||

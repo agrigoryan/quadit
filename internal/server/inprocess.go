@@ -52,7 +52,7 @@ func callerOf(x *c) selfCaller {
 
 // selfCall sends one request to the server's own API as who and returns
 // the answer whole. An empty contentType sends none.
-func (s *Server) selfCall(who selfCaller, method, path string, q url.Values, body []byte, contentType string) (*buffer, error) {
+func (s *Server) selfCall(who selfCaller, method, path string, q url.Values, body []byte, contentType string) (*recordedAnswer, error) {
 	u := who.base + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
@@ -66,25 +66,25 @@ func (s *Server) selfCall(who selfCaller, method, path string, q url.Values, bod
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	ans := &buffer{h: http.Header{}, status: 200}
+	ans := &recordedAnswer{h: http.Header{}, status: 200}
 	s.mux.ServeHTTP(ans, req)
 	return ans, nil
 }
 
-// buffer collects a handler's answer for a caller inside the process.
-type buffer struct {
+// recordedAnswer collects a handler's answer for a caller inside the process.
+type recordedAnswer struct {
 	h      http.Header
 	status int
 	body   bytes.Buffer
 }
 
-func (b *buffer) Header() http.Header         { return b.h }
-func (b *buffer) WriteHeader(code int)        { b.status = code }
-func (b *buffer) Write(p []byte) (int, error) { return b.body.Write(p) }
+func (b *recordedAnswer) Header() http.Header         { return b.h }
+func (b *recordedAnswer) WriteHeader(code int)        { b.status = code }
+func (b *recordedAnswer) Write(p []byte) (int, error) { return b.body.Write(p) }
 
 // refusal is the error a failed answer carries; nil when the call
 // succeeded, or failed with something else for a body.
-func (b *buffer) refusal() *engine.Error {
+func (b *recordedAnswer) refusal() *engine.Error {
 	if b.status < 300 {
 		return nil
 	}

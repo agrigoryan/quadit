@@ -312,7 +312,7 @@ func (s *Server) handleUpdateProfile(x *c) error {
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	if !x.whole() || x.user.Kind != core.KindPerson {
+	if !x.hasFullAccess() || x.user.Kind != core.KindPerson {
 		return errForbidden("a profile is changed by its person: signed in, or with a personal token that is not narrowed")
 	}
 	ctx := x.ctx()
@@ -472,7 +472,7 @@ func (s *Server) handleCreateWorkspace(x *c) error {
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	if x.user.Kind != core.KindPerson || !x.whole() {
+	if x.user.Kind != core.KindPerson || !x.hasFullAccess() {
 		return errForbidden("a workspace is created by a person: signed in, or with a personal token that is not narrowed")
 	}
 	if !x.user.IsAdmin && !s.settingBool(x.ctx(), "workspaces.anyone_can_create", true) {

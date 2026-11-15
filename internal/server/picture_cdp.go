@@ -104,8 +104,8 @@ func (c *cdp) event(ctx context.Context, wait time.Duration, ok func(cdpMsg) boo
 	}
 }
 
-// truthy evaluates a JavaScript expression in the page.
-func (c *cdp) truthy(ctx context.Context, session, js string) bool {
+// evalTrue evaluates a JavaScript expression in the page.
+func (c *cdp) evalTrue(ctx context.Context, session, js string) bool {
 	res, err := c.call(ctx, session, "Runtime.evaluate", map[string]any{"expression": js, "returnByValue": true})
 	if err != nil {
 		return false
@@ -254,7 +254,7 @@ func takePictureOf(ctx context.Context, chrome string, extra []string, profile, 
 	// agree, so a list that is still filling in is not caught half-way.
 	settled := 0
 	for deadline := time.Now().Add(12 * time.Second); time.Now().Before(deadline) && settled < 2; {
-		if c.truthy(ctx, s, pageSettled) {
+		if c.evalTrue(ctx, s, pageSettled) {
 			settled++
 		} else {
 			settled = 0

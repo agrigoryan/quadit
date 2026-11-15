@@ -32,13 +32,13 @@ type agentState struct {
 }
 
 // agentStates says what every agent is doing right now.
-func (x *c) agentStates(tasks []core.Task, nm *names) ([]agentState, error) {
-	w, err := x.agentWork(tasks, nm)
+func (x *c) agentStates(tasks []core.Task, names *nameLookup) ([]agentState, error) {
+	w, err := x.agentWork(tasks, names)
 	if err != nil {
 		return nil, err
 	}
 	var out []agentState
-	for _, m := range nm.members {
+	for _, m := range names.members {
 		if m.Kind != core.KindAgent || m.RemovedAt != 0 || m.SuspendedAt != 0 {
 			continue // a suspended agent is not idle: it is not there
 		}
@@ -57,7 +57,7 @@ func (x *c) agentStates(tasks []core.Task, nm *names) ([]agentState, error) {
 // webhook, and the open questions.
 type agentWork struct {
 	x        *c
-	nm       *names
+	names    *nameLookup
 	now      time.Time
 	tasks    []core.Task
 	keyOf    map[string]core.Task // the same tasks, by id
@@ -67,9 +67,9 @@ type agentWork struct {
 }
 
 // agentWork reads it, for the open tasks given.
-func (x *c) agentWork(tasks []core.Task, nm *names) (*agentWork, error) {
+func (x *c) agentWork(tasks []core.Task, names *nameLookup) (*agentWork, error) {
 	ctx := x.ctx()
-	w := &agentWork{x: x, nm: nm, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
+	w := &agentWork{x: x, names: names, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
 	if err := x.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", "running"), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
 		Order: "-started_at"}); err != nil {
 		return nil, err
@@ -98,14 +98,14 @@ func (x *c) agentWork(tasks []core.Task, nm *names) (*agentWork, error) {
 
 // stateOf says what one agent is doing.
 func (w *agentWork) stateOf(m core.Member) (agentState, error) {
-	x, nm, now := w.x, w.nm, w.now
+	x, names, now := w.x, w.names, w.now
 	shown := []core.Member{m}
 	x.hideActions(shown)
-	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: when(m.LastSeenAt), LastDid: shown[0].LastAction,
+	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: shown[0].LastAction,
 		Listening: m.ListeningUntil > now.UnixMilli() || w.pushed[m.UserID]}
 	var waitsOnOthers, mine int
 	for _, t := range w.tasks {
-		if !core.OpenCategory(nm.statuses[t.StatusID].Category) {
+		if !core.OpenCategory(names.statuses[t.StatusID].Category) {
 			continue
 		}
 		if t.WaitingOnID == m.UserID {
@@ -117,7 +117,7 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 		mine++
 		if t.WaitingOnID != "" && t.WaitingOnID != m.UserID {
 			waitsOnOthers++
-			a.WaitsOn = nm.handle(t.WaitingOnID)
+			a.WaitsOn = names.handle(t.WaitingOnID)
 		}
 		if t.LeaseHolderID == m.UserID && t.LeaseUntil > now.UnixMilli() && a.Task == "" {
 			a.State, a.Task, a.Doing = "working", t.Key, t.Title
@@ -131,7 +131,7 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 	}
 	for _, se := range w.sessions {
 		if se.AgentID == m.UserID {
-			a.State, a.Doing, a.Since = "working", orText(se.Title, a.Doing), when(se.StartedAt)
+			a.State, a.Doing, a.Since = "working", firstNonEmpty(se.Title, a.Doing), formatTime(se.StartedAt)
 			if t, ok := w.keyOf[se.TaskID]; ok {
 				a.Task = t.Key
 			}
@@ -153,11 +153,11 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 		return a, err
 	}
 	if cost > 0 {
-		a.CostWeek = money(cost)
+		a.CostWeek = formatMoney(cost)
 	}
 	a.MinWeek = minutes
 	if b := m.Budget; b != nil && b.CostMicros > 0 {
-		a.Budget = money(b.CostMicros)
+		a.Budget = formatMoney(b.CostMicros)
 	}
 	return a, nil
 }
@@ -165,7 +165,7 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 // handleListAgents is the live view of agents: who is doing what, who is waiting,
 // who is not reachable.
 func (s *Server) handleListAgents(x *c) error {
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (s *Server) handleListAgents(x *c) error {
 	if err != nil {
 		return err
 	}
-	agents, err := x.agentStates(tasks, nm)
+	agents, err := x.agentStates(tasks, names)
 	if err != nil {
 		return err
 	}
@@ -200,11 +200,11 @@ func (s *Server) handleListAgents(x *c) error {
 func (d *dashboard) agentStates() error {
 	var open []core.Task
 	for _, t := range d.tasks {
-		if core.OpenCategory(d.nm.statuses[t.StatusID].Category) {
+		if core.OpenCategory(d.names.statuses[t.StatusID].Category) {
 			open = append(open, t)
 		}
 	}
 	var err error
-	d.agents, err = d.x.agentStates(open, d.nm)
+	d.agents, err = d.x.agentStates(open, d.names)
 	return err
 }

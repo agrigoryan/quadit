@@ -108,7 +108,7 @@ func (s *Server) shareRateCounts(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			s.limits.share(ctx, s.st)
+			s.limits.shareCounts(ctx, s.st)
 		}
 	}
 }

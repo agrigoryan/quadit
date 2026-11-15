@@ -52,11 +52,11 @@ type Server struct {
 	mux     *http.ServeMux
 	web     http.Handler // the web app, when built in
 
-	seenMu sync.Mutex
-	seen   map[string]int64 // user id -> last time presence was written
-	setMu  sync.Mutex
-	setTTL map[string]cachedSetting
-	limits *limiter
+	seenMu        sync.Mutex
+	seen          map[string]int64 // user id -> last time presence was written
+	settingsMu    sync.Mutex
+	settingsCache map[string]cachedSetting
+	limits        *limiter
 	// quit is closed when the server is told to stop: held connections
 	// (live streams, waits for the next event) end then, at once.
 	quit     chan struct{}
@@ -69,9 +69,9 @@ type Server struct {
 // shutdown does not wait out their timeouts. Requests in progress finish.
 func (s *Server) Stop() { s.quitOnce.Do(func() { close(s.quit) }) }
 
-// held returns a context for a connection that is kept open: it ends with
+// keptOpenContext returns a context for a connection that is kept open: it ends with
 // the request, and when the server stops.
-func (s *Server) held(parent context.Context) (context.Context, context.CancelFunc) {
+func (s *Server) keptOpenContext(parent context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 	go func() {
 		select {
@@ -183,11 +183,11 @@ type c struct {
 	member    core.Member
 	actor     engine.Actor
 	// projects, when not nil, are the only projects this caller may read.
-	projects []string
-	db       store.DB // bound to the workspace
-	nm       *names
-	// halfOK lets a session that still owes its second step through.
-	halfOK bool
+	projects  []string
+	db        store.DB // bound to the workspace
+	nameCache *nameLookup
+	// firstStepEnough lets a session that still owes its second step through.
+	firstStepEnough bool
 }
 
 func (x *c) ctx() context.Context { return x.r.Context() }
@@ -315,9 +315,9 @@ func (x *c) intParam(name string, def int) int {
 // itself, so they are not applied a second time.
 func (x *c) narrowedAlready() { x.narrowed = true }
 
-// whole reports whether the caller acts with everything the account may
+// hasFullAccess reports whether the caller acts with everything the account may
 // do: a signed-in session, or a token with no narrowing on it.
-func (x *c) whole() bool {
+func (x *c) hasFullAccess() bool {
 	if x.sess != nil {
 		return x.sess.Stage == "full"
 	}
@@ -403,7 +403,7 @@ func (s *Server) signedIn(h handler) http.HandlerFunc {
 // sign-in step and may still owe the second.
 func (s *Server) firstStepPassed(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		x := &c{s: s, w: w, r: r, halfOK: true}
+		x := &c{s: s, w: w, r: r, firstStepEnough: true}
 		if err := s.identify(x); err != nil {
 			s.fail(w, r, err)
 			return
@@ -423,7 +423,7 @@ func (s *Server) workspaceMember(h handler) http.HandlerFunc {
 		x := &c{s: s, w: w, r: r}
 		err := s.identify(x)
 		if err == nil {
-			err = s.enter(x, r.PathValue("ws"))
+			err = s.enterWorkspace(x, r.PathValue("ws"))
 		}
 		if err == nil {
 			err = checkParams(r.URL.Query())
@@ -488,7 +488,7 @@ func (s *Server) identify(x *c) error {
 		if x.r.Method != http.MethodGet && x.r.Method != http.MethodHead {
 			return errForbidden("this session is read-only")
 		}
-	case sess.Stage != "full" && !x.halfOK:
+	case sess.Stage != "full" && !x.firstStepEnough:
 		return &httpError{Status: 401, Code: "second_step", Message: "finish signing in with your second step"}
 	}
 	// A cookie rides along on requests other sites make; refuse those.
@@ -510,9 +510,9 @@ func (s *Server) identify(x *c) error {
 	return s.limits.check("u:"+x.user.ID, 3000)
 }
 
-// enter binds the request to a workspace the caller belongs to. "-" means
+// enterWorkspace binds the request to a workspace the caller belongs to. "-" means
 // the workspace of the token used.
-func (s *Server) enter(x *c, ref string) error {
+func (s *Server) enterWorkspace(x *c, ref string) error {
 	ctx := x.ctx()
 	cond := store.Eq("slug", ref)
 	if ref == "-" {

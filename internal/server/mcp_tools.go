@@ -22,8 +22,8 @@ const pictureMark = "\x00png:"
 // The tools, in the order a client is shown them. Most read one API path
 // (get); the ones that do more are in mcp_calls.go.
 var mcpTools = []mcpTool{
-	{Name: "whoami", Desc: "Who am I: role, projects, what needs approval, budget left, unread count, feed position. Call first in a session.", Run: get("/me")},
-	{Name: "my_work", Desc: "What waits on me, questions asked of me, tasks assigned to me, and my unread inbox. One line each.", Run: get("/my-work")},
+	{Name: "whoami", Desc: "Who am I: role, projects, what needs approval, budget left, unread count, feed position. Call first in a session.", Run: readPathTool("/me")},
+	{Name: "my_work", Desc: "What waits on me, questions asked of me, tasks assigned to me, and my unread inbox. One line each.", Run: readPathTool("/my-work")},
 	{Name: "tasks", Desc: "Find tasks. All filters combine. Returns one line per task; count=true returns only the number.",
 		Props: map[string]string{"project": "project key", "assignee": "me, @handle or none", "status": "status name or category (backlog, unstarted, started, waiting, done, canceled)",
 			"open": "true for not done and not canceled", "waiting_on": "me or @handle", "label": "label name", "epic": "epic name, or none", "cycle": "current, next, a number, or none",
@@ -32,35 +32,35 @@ var mcpTools = []mcpTool{
 			"creator": "me or @handle", "held_by": "who has taken it: me or @handle", "due_before": "YYYY-MM-DD", "due_after": "YYYY-MM-DD",
 			"fields": "comma-separated fields to return instead of the line, e.g. key,title,status",
 			"view":   "a saved view's slug", "sort": "created, -created, rank, priority, due, -activity, -updated, key", "limit": "default 50", "cursor": "the cursor the last page ended with, to read on", "offset": "", "count": "true"},
-		Run: get("/tasks")},
+		Run: readPathTool("/tasks")},
 	{Name: "task", Desc: "One task with its description, decisions (with numbered options), comments, sub-tasks, links and files. since=<seq> returns only what changed after that feed position.",
-		Props: map[string]string{"!key": "task key, e.g. SVA-12", "since": "feed position", "full": "true to not cut long text"}, Run: get("/tasks/{key}", "key")},
+		Props: map[string]string{"!key": "task key, e.g. SVA-12", "since": "feed position", "full": "true to not cut long text"}, Run: readPathTool("/tasks/{key}", "key")},
 	{Name: "context", Desc: "Everything needed to work on a task in one call: the task, its parents, epic, standing preferences, recent decisions in the project, linked docs.",
-		Props: map[string]string{"!key": "task key"}, Run: get("/tasks/{key}/context", "key")},
-	{Name: "search", Desc: "Full-text search across tasks, decisions, comments and docs.", Props: map[string]string{"!q": "text", "kind": "task, comment, decision, doc"}, Run: get("/search")},
-	{Name: "inbox", Desc: "My inbox: mentions, assignments, answers to my questions, replies. Unread only unless all=true.", Props: map[string]string{"all": "true"}, Run: get("/inbox")},
+		Props: map[string]string{"!key": "task key"}, Run: readPathTool("/tasks/{key}/context", "key")},
+	{Name: "search", Desc: "Full-text search across tasks, decisions, comments and docs.", Props: map[string]string{"!q": "text", "kind": "task, comment, decision, doc"}, Run: readPathTool("/search")},
+	{Name: "inbox", Desc: "My inbox: mentions, assignments, answers to my questions, replies. Unread only unless all=true.", Props: map[string]string{"all": "true"}, Run: readPathTool("/inbox")},
 	{Name: "events", Desc: "The change feed after a position, one line per event. wait=N holds the call up to N seconds until something arrives (use it instead of polling). " +
 		"cursor=NAME reads from the position the server keeps for me; call ack to move it. mine=true keeps to tasks I am assigned to, mentioned in or watching; others=true hides my own changes. " +
 		"The task filters of the tasks tool work here too.",
 		Props: map[string]string{"after": "feed position", "cursor": "name of a server-kept cursor, e.g. main", "wait": "seconds, up to 55", "mine": "true", "others": "true",
 			"task": "task key", "types": "comma-separated event types", "inbox": "true for only my inbox items", "limit": ""},
-		Run: get("/events")},
+		Run: readPathTool("/events")},
 	{Name: "ack", Desc: "Mark the feed handled up to a position, for a server-kept cursor.", Props: map[string]string{"!seq": "feed position", "cursor": "cursor name, default main"},
 		Run: toolAck},
 	{Name: "decisions", Desc: "The decision log: questions with their options, the answer, the reason and the date.",
-		Props: map[string]string{"state": "answered (default), open, picked, sent_back, all", "project": "project key", "q": "text in the question", "asked": "me or @handle"}, Run: get("/decisions")},
+		Props: map[string]string{"state": "answered (default), open, picked, sent_back, all", "project": "project key", "q": "text in the question", "asked": "me or @handle"}, Run: readPathTool("/decisions")},
 	{Name: "layout", Desc: "A project's statuses, labels, members, agents, epics, cycles and templates, by name.", Props: map[string]string{"!project": "project key"},
-		Run: get("/projects/{project}/layout", "project")},
-	{Name: "docs", Desc: "The page tree with ids.", Run: get("/docs")},
-	{Name: "doc", Desc: "One page as Markdown.", Props: map[string]string{"!id": "page id", "full": "true to not cut long text"}, Run: get("/docs/{id}", "id")},
+		Run: readPathTool("/projects/{project}/layout", "project")},
+	{Name: "docs", Desc: "The page tree with ids.", Run: readPathTool("/docs")},
+	{Name: "doc", Desc: "One page as Markdown.", Props: map[string]string{"!id": "page id", "full": "true to not cut long text"}, Run: readPathTool("/docs/{id}", "id")},
 	{Name: "rows", Desc: "A database's rows as a table, with formulas worked out.",
 		Props: map[string]string{"!id": "database id", "filter": "Prop:op:value, comma-separated; ops: is, is_not, contains, gt, lt, empty, not_empty, checked, unchecked", "sort": "Prop or -Prop", "view": "a view's name"},
-		Run:   get("/docs/{id}/rows", "id")},
-	{Name: "memory", Desc: "My notes from earlier sessions (agents only). Read at the start of a session.", Run: get("/memory")},
+		Run:   readPathTool("/docs/{id}/rows", "id")},
+	{Name: "memory", Desc: "My notes from earlier sessions (agents only). Read at the start of a session.", Run: readPathTool("/memory")},
 	{Name: "remember", Desc: "Save a note to my memory: the page with this title, made if new. mode=append adds to it.",
 		Props: map[string]string{"!title": "page title", "!markdown": "the note", "mode": "replace (default) or append"},
 		Run:   toolRemember},
-	{Name: "changes", Desc: "Every change type with its arguments. Read once to learn what change can do.", Run: get("/api/v1/changes")},
+	{Name: "changes", Desc: "Every change type with its arguments. Read once to learn what change can do.", Run: readPathTool("/api/v1/changes")},
 	{Name: "change", Desc: "Make one change. Common types: task.create {project, title, description, assignee, labels, parent}; task.update {id, status, assignee, waiting_on, priority, add_labels}; " +
 		"task.take {id}; comment.create {task, body, waiting_on} (add evidence {checked, measured, not_verified} to post a result); " +
 		"decision.open {task, question, options:[{label, description}], recommended, recommendation, ask}; decision.pick {id, option, note}; " +
@@ -70,13 +70,13 @@ var mcpTools = []mcpTool{
 			"id": "a UUID you make for this change; sending the same id again does nothing, so a retry is safe", "for": "@handle of the member this is done for; it then runs with their access",
 			"changes": "instead of type and args: a list of {type, args} applied together, all or nothing"},
 		Run: toolChange},
-	{Name: "dashboard", Desc: "Where everything stands: what waits on me, epics with progress, flow, agents, recent decisions, health.", Props: map[string]string{"project": "project key"}, Run: get("/dashboard")},
-	{Name: "agents", Desc: "What every agent is doing now, what it holds, and whether anything is listening for it.", Run: get("/agents")},
+	{Name: "dashboard", Desc: "Where everything stands: what waits on me, epics with progress, flow, agents, recent decisions, health.", Props: map[string]string{"project": "project key"}, Run: readPathTool("/dashboard")},
+	{Name: "agents", Desc: "What every agent is doing now, what it holds, and whether anything is listening for it.", Run: readPathTool("/agents")},
 	{Name: "render", Desc: "A picture of a task or a page as a person sees it, to check how work looks. Give task or doc.",
 		Props: map[string]string{"task": "task key", "doc": "page id", "width": "390 for a phone, 1280 (default) for a desktop", "theme": "light or dark"},
 		Run:   toolRender},
-	{Name: "file", Desc: "A file's details: name, type, size, checksum, address, and whether its upload is complete.", Props: map[string]string{"!id": "file id"}, Run: get("/files/{id}", "id")},
-	{Name: "secrets", Desc: "The secrets (keys, passwords) I may use, by name, with the hosts each may be sent to. Values are never shown.", Run: get("/secrets")},
+	{Name: "file", Desc: "A file's details: name, type, size, checksum, address, and whether its upload is complete.", Props: map[string]string{"!id": "file id"}, Run: readPathTool("/files/{id}", "id")},
+	{Name: "secrets", Desc: "The secrets (keys, passwords) I may use, by name, with the hosts each may be sent to. Values are never shown.", Run: readPathTool("/secrets")},
 	{Name: "secret_request", Desc: "Make an HTTP request with a secret I cannot read: write {{secret}} where the value belongs (a header, the URL or the body); {{basic:USER}} gives base64 of USER:secret. " +
 		"It goes only to the secret's hosts, and the value is blanked out of the answer.",
 		Props: map[string]string{"!name": "the secret's name", "!url": "full https address", "method": "GET (default), POST, PUT, PATCH, DELETE",
@@ -133,9 +133,9 @@ func toolSchema(t mcpTool) map[string]any {
 	return map[string]any{"type": "object", "properties": props, "required": required}
 }
 
-// get makes a tool that reads one API path in text form. Arguments named
+// readPathTool makes a tool that reads one API path in text form. Arguments named
 // in path are filled into it; the rest become URL parameters.
-func get(path string, pathArgs ...string) func(s *Server, token string, a map[string]any) (string, bool) {
+func readPathTool(path string, pathArgs ...string) func(s *Server, token string, a map[string]any) (string, bool) {
 	return func(s *Server, token string, a map[string]any) (string, bool) {
 		p := path
 		q := url.Values{"format": {"text"}}
@@ -143,23 +143,23 @@ func get(path string, pathArgs ...string) func(s *Server, token string, a map[st
 			used := false
 			for _, pa := range pathArgs {
 				if pa == k {
-					p = strings.Replace(p, "{"+k+"}", url.PathEscape(str(a, k)), 1)
+					p = strings.Replace(p, "{"+k+"}", url.PathEscape(argText(a, k)), 1)
 					used = true
 				}
 			}
-			if !used && a[k] != nil && str(a, k) != "" {
-				q.Set(k, str(a, k))
+			if !used && a[k] != nil && argText(a, k) != "" {
+				q.Set(k, argText(a, k))
 			}
 		}
 		if strings.Contains(p, "{") {
 			return "missing argument: " + p[strings.Index(p, "{")+1:strings.Index(p, "}")], false
 		}
-		return s.internal(token, "GET", p, q, nil)
+		return s.callAPI(token, "GET", p, q, nil)
 	}
 }
 
-// str reads an argument as text, whatever JSON type the client sent it as.
-func str(a map[string]any, k string) string {
+// argText reads an argument as text, whatever JSON type the client sent it as.
+func argText(a map[string]any, k string) string {
 	switch v := a[k].(type) {
 	case string:
 		return v

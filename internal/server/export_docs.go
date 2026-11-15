@@ -37,7 +37,7 @@ func (e *exporter) docs() error {
 			}
 			continue
 		}
-		if err := e.put(path+".md", md.Render(engine.BlockTree(blocksOf[d.ID]))); err != nil {
+		if err := e.addTextFile(path+".md", md.Render(engine.BlockTree(blocksOf[d.ID]))); err != nil {
 			return err
 		}
 	}
@@ -47,7 +47,7 @@ func (e *exporter) docs() error {
 // docPath is where a page goes under docs/: its title under those of the
 // pages above it.
 func docPath(byID map[string]core.Doc, d core.Doc, depth int) string {
-	name := fileSafe(orText(d.Title, "Untitled"))
+	name := fileSafe(firstNonEmpty(d.Title, "Untitled"))
 	if p, ok := byID[d.ParentID]; ok && depth < 30 {
 		return docPath(byID, p, depth+1) + "/" + name
 	}

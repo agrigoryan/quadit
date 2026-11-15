@@ -102,7 +102,7 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 			return "", false
 		}
 	}
-	if _, ok := s.internal(token, "GET", "/me", url.Values{"format": {"text"}}, nil); !ok {
+	if _, ok := s.callAPI(token, "GET", "/me", url.Values{"format": {"text"}}, nil); !ok {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token", resource_metadata="`+s.cfg.BaseURL+`/.well-known/oauth-protected-resource"`)
 		http.Error(w, "this token is not valid", http.StatusUnauthorized)
 		return "", false

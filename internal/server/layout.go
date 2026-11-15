@@ -46,13 +46,13 @@ type layoutItem struct {
 // layout gathers what a project has: its statuses in their own order, the
 // other lists by name.
 func (x *c) layout(p core.Project) (map[string][]layoutItem, error) {
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
 	out := map[string][]layoutItem{}
 	var sts []core.Status
-	for _, st := range nm.statuses {
+	for _, st := range names.statuses {
 		if st.ProjectID == p.ID && st.DeletedAt == 0 {
 			sts = append(sts, st)
 		}
@@ -61,23 +61,23 @@ func (x *c) layout(p core.Project) (map[string][]layoutItem, error) {
 	for _, st := range sts {
 		out["statuses"] = append(out["statuses"], layoutItem{Name: st.Name, Category: st.Category, Default: st.IsDefault})
 	}
-	for _, l := range nm.labels {
+	for _, l := range names.labels {
 		if (l.ProjectID == "" || l.ProjectID == p.ID) && l.DeletedAt == 0 {
 			out["labels"] = append(out["labels"], layoutItem{Name: l.Name})
 		}
 	}
-	for _, m := range nm.members {
+	for _, m := range names.members {
 		if m.RemovedAt == 0 {
 			out["members"] = append(out["members"], layoutItem{Name: "@" + m.Handle, Role: string(m.Role), Kind: m.Kind, Title: m.Name})
 		}
 	}
-	for _, e := range nm.epics {
+	for _, e := range names.epics {
 		if e.ProjectID == p.ID && e.DeletedAt == 0 {
 			out["epics"] = append(out["epics"], layoutItem{Name: e.Name, State: e.State, Dates: e.TargetOn})
 		}
 	}
 	today := time.Now().UTC().Format("2006-01-02")
-	for _, cy := range nm.cycles {
+	for _, cy := range names.cycles {
 		if cy.ProjectID == p.ID && cy.DeletedAt == 0 && cy.EndsOn >= today {
 			out["cycles"] = append(out["cycles"], layoutItem{Name: fmt.Sprint(cy.Number), Dates: cy.StartsOn + " to " + cy.EndsOn})
 		}

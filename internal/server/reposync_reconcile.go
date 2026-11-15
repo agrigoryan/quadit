@@ -48,7 +48,7 @@ func (r *syncRun) fromFile(sys *engine.Sys, path string) error {
 		r.fileOfTrashedPage(path, text, page)
 		return nil
 	}
-	return r.settle(sys, path, text, page)
+	return r.reconcilePage(sys, path, text, page)
 }
 
 // dirPage finds or makes the page for a directory.
@@ -84,11 +84,11 @@ func (r *syncRun) newFile(sys *engine.Sys, path, text string) error {
 		return err
 	}
 	pid := sys.Ref()
-	body, err := mdOf(r.ctx, sys.Tx(), pid)
+	body, err := pageMarkdownInTx(r.ctx, sys.Tx(), pid)
 	if err != nil {
 		return err
 	}
-	if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_id": r.src.ID, "source_path": path, "source_hash": sha(text) + ":" + sha(body)}, store.Eq("id", pid)); err != nil {
+	if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_id": r.src.ID, "source_path": path, "source_hash": shortHash(text) + ":" + shortHash(body)}, store.Eq("id", pid)); err != nil {
 		return err
 	}
 	r.res.PagesCreated++
@@ -101,35 +101,35 @@ func (r *syncRun) fileOfTrashedPage(path, text string, page core.Doc) {
 	lastFile, _ := splitHashes(page.SourceHash)
 	// The page went to the trash here: the file goes too, unless
 	// the file changed since and the repository has the say.
-	if sha(text) == lastFile || r.src.Authority == "pages" {
+	if shortHash(text) == lastFile || r.src.Authority == "pages" {
 		r.toRemove = append(r.toRemove, path)
 		return
 	}
 	// Kept, and said: the file now has no page to follow it.
-	r.renamed = append(r.renamed, fmt.Sprintf("%s changed in the repository after its page %q was deleted here; the file was kept, and restoring the page takes up its text", path, orText(page.Title, "untitled")))
+	r.renamed = append(r.renamed, fmt.Sprintf("%s changed in the repository after its page %q was deleted here; the file was kept, and restoring the page takes up its text", path, firstNonEmpty(page.Title, "untitled")))
 }
 
-// settle brings a file and its page in line when either changed since the
+// reconcilePage brings a file and its page in line when either changed since the
 // last sync: the file's text goes into the page, or the page's is noted to
 // be written to the file.
-func (r *syncRun) settle(sys *engine.Sys, path, text string, page core.Doc) error {
-	fileHash := sha(text)
+func (r *syncRun) reconcilePage(sys *engine.Sys, path, text string, page core.Doc) error {
+	fileHash := shortHash(text)
 	lastFile, lastPage := splitHashes(page.SourceHash)
-	body, err := r.pageMD(page.ID)
+	body, err := r.pageMarkdown(page.ID)
 	if err != nil {
 		return err
 	}
-	pageChanged := sha(body) != lastPage
+	pageChanged := shortHash(body) != lastPage
 	fileChanged := fileHash != lastFile
 	switch {
 	case fileChanged && (!pageChanged || r.src.Authority == "repo"):
 		if err := sys.Do("doc.write", map[string]any{"doc": page.ID, "markdown": text}); err != nil {
 			return err
 		}
-		if body, err = mdOf(r.ctx, sys.Tx(), page.ID); err != nil {
+		if body, err = pageMarkdownInTx(r.ctx, sys.Tx(), page.ID); err != nil {
 			return err
 		}
-		if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_hash": fileHash + ":" + sha(body)}, store.Eq("id", page.ID)); err != nil {
+		if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_hash": fileHash + ":" + shortHash(body)}, store.Eq("id", page.ID)); err != nil {
 			return err
 		}
 		r.res.PagesUpdated++
@@ -182,7 +182,7 @@ func (r *syncRun) newPage(sys *engine.Sys, page core.Doc) error {
 	if parent, ok := r.byID[page.ParentID]; ok && strings.HasSuffix(parent.SourcePath, "/") {
 		dirOf = parent.SourcePath
 	}
-	path := dirOf + slugFrom(orText(page.Title, "untitled")) + ".md"
+	path := dirOf + slugFrom(firstNonEmpty(page.Title, "untitled")) + ".md"
 	// The file by its name is about to be removed, because the page
 	// that had it went to the trash: this page takes the file over
 	// instead, so the repository never sees it go and come back.
@@ -192,10 +192,10 @@ func (r *syncRun) newPage(sys *engine.Sys, page core.Doc) error {
 	// A name no file has, and that no link in the repository stands
 	// on (a link is not a page, and is not written through).
 	natural := path
-	for n := 2; r.taken(path); n++ {
+	for n := 2; r.pathTaken(path); n++ {
 		path = fmt.Sprintf("%s%s-%d.md", dirOf, slugFrom(page.Title), n)
 	}
-	body, err := r.pageMD(page.ID)
+	body, err := r.pageMarkdown(page.ID)
 	if err != nil {
 		return err
 	}
@@ -207,10 +207,10 @@ func (r *syncRun) newPage(sys *engine.Sys, page core.Doc) error {
 			// A second page saying exactly what that file says (a page
 			// brought back from the trash after its file returned):
 			// no second file is made of it while it says nothing new.
-			r.renamed = append(r.renamed, fmt.Sprintf("%q was not written: %s already says the same, and has its own page; one of the two pages can go", orText(page.Title, "untitled"), natural))
+			r.renamed = append(r.renamed, fmt.Sprintf("%q was not written: %s already says the same, and has its own page; one of the two pages can go", firstNonEmpty(page.Title, "untitled"), natural))
 			return nil
 		}
-		r.renamed = append(r.renamed, fmt.Sprintf("%q was written as %s (%s is taken)", orText(page.Title, "untitled"), path, natural))
+		r.renamed = append(r.renamed, fmt.Sprintf("%q was written as %s (%s is taken)", firstNonEmpty(page.Title, "untitled"), path, natural))
 	}
 	if _, err := sys.Tx().Update(r.ctx, "docs", map[string]any{"source_path": path}, store.Eq("id", page.ID)); err != nil {
 		return err
@@ -224,7 +224,7 @@ func (r *syncRun) newPage(sys *engine.Sys, page core.Doc) error {
 // toRemove[at] is not removed after all, and is written only if the page
 // says something else than it does.
 func (r *syncRun) takeOver(sys *engine.Sys, page core.Doc, path string, at int) error {
-	body, err := r.pageMD(page.ID)
+	body, err := r.pageMarkdown(page.ID)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (r *syncRun) takeOver(sys *engine.Sys, page core.Doc, path string, at int) 
 	}
 	set := map[string]any{"source_id": r.src.ID, "source_path": path}
 	if strings.TrimSpace(r.files[path]) == strings.TrimSpace(body) {
-		set["source_hash"] = sha(r.files[path]) + ":" + sha(body) // already the same: nothing to write
+		set["source_hash"] = shortHash(r.files[path]) + ":" + shortHash(body) // already the same: nothing to write
 	} else {
 		r.queue(path, page.ID, body)
 	}

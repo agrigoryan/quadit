@@ -79,7 +79,7 @@ func (x *c) decisionViews(ds []core.Decision, withFiles bool) ([]decisionView, e
 	if len(ds) == 0 {
 		return nil, nil
 	}
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +124,8 @@ func (x *c) decisionViews(ds []core.Decision, withFiles bool) ([]decisionView, e
 	for i, d := range ds {
 		ordinal[d.TaskID]++
 		v := decisionView{N: ordinal[d.TaskID], ID: d.ID, Task: keys[d.TaskID], TaskID: d.TaskID, DeletedAt: d.DeletedAt, Kind: d.Kind, Question: d.Question, Details: d.Details, Action: d.Action,
-			State: d.State, By: nm.handle(d.CreatedBy), Asked: nm.handle(d.AskedID), Recommendation: d.Recommendation, Outcome: d.Outcome,
-			Note: d.OutcomeNote, DecidedBy: nm.handle(d.DecidedBy), DecidedAt: when(d.DecidedAt), UnclearNote: d.UnclearNote, AskedAt: when(d.CreatedAt)}
+			State: d.State, By: names.handle(d.CreatedBy), Asked: names.handle(d.AskedID), Recommendation: d.Recommendation, Outcome: d.Outcome,
+			Note: d.OutcomeNote, DecidedBy: names.handle(d.DecidedBy), DecidedAt: formatTime(d.DecidedAt), UnclearNote: d.UnclearNote, AskedAt: formatTime(d.CreatedAt)}
 		n := 0
 		for _, o := range opts {
 			if o.DecisionID != d.ID {

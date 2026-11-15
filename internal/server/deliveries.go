@@ -119,7 +119,7 @@ func (s *Server) deliver(ctx context.Context, d core.WebhookDelivery) bool {
 		db.Update(ctx, "webhook_deliveries", map[string]any{"state": "dead", "error": "the event is gone", "done_at": time.Now().UnixMilli()}, store.Eq("id", d.ID))
 		return true
 	}
-	status, errText, took := s.post(ctx, h, d.ID, evs[0])
+	status, errText, took := s.sendDelivery(ctx, h, d.ID, evs[0])
 	now := time.Now().UnixMilli()
 	set := map[string]any{"status_code": status, "error": errText, "duration_ms": int(took.Milliseconds())}
 	hookSet := map[string]any{"last_at": now}
@@ -129,32 +129,32 @@ func (s *Server) deliver(ctx context.Context, d core.WebhookDelivery) bool {
 		hookSet["failures"], hookSet["last_status"] = 0, fmt.Sprint(status)
 	case d.Attempts >= maxAttempts:
 		set["state"], set["done_at"] = "dead", now
-		hookSet["failures"], hookSet["last_status"] = h.Failures+1, orText(errText, fmt.Sprint(status))
+		hookSet["failures"], hookSet["last_status"] = h.Failures+1, firstNonEmpty(errText, fmt.Sprint(status))
 	default:
 		set["next_at"] = now + backoff(d.Attempts).Milliseconds()
-		hookSet["failures"], hookSet["last_status"] = h.Failures+1, orText(errText, fmt.Sprint(status))
+		hookSet["failures"], hookSet["last_status"] = h.Failures+1, firstNonEmpty(errText, fmt.Sprint(status))
 	}
 	db.Update(ctx, "webhook_deliveries", set, store.Eq("id", d.ID))
 	db.Update(ctx, "webhooks", hookSet, store.Eq("id", h.ID))
 	return set["state"] == "ok" || set["state"] == "dead"
 }
 
-func orText(a, b string) string {
+func firstNonEmpty(a, b string) string {
 	if a != "" {
 		return a
 	}
 	return b
 }
 
-// post sends the request. The body carries the event as stored plus one
+// sendDelivery sends the request. The body carries the event as stored plus one
 // line saying what happened, so a receiver can act without calling back.
-func (s *Server) post(ctx context.Context, h core.Webhook, deliveryID string, ev core.Event) (status int, errText string, took time.Duration) {
+func (s *Server) sendDelivery(ctx context.Context, h core.Webhook, deliveryID string, ev core.Event) (status int, errText string, took time.Duration) {
 	var ws core.Workspace
 	s.st.Get(ctx, &ws, store.Eq("id", h.WorkspaceID))
 	x := &c{s: s, r: (&http.Request{}).WithContext(ctx), ws: ws, db: s.st.In(ws.ID)}
 	line := ""
-	if nm, err := x.names(); err == nil {
-		line = x.eventLine(ev, nm)
+	if names, err := x.names(); err == nil {
+		line = x.eventLine(ev, names)
 	}
 	body, _ := json.Marshal(map[string]any{"delivery": deliveryID, "workspace": ws.Slug, "seq": ev.Seq, "type": ev.Type, "text": line, "event": ev,
 		"url": s.cfg.BaseURL})
@@ -243,7 +243,7 @@ func (s *Server) handleSendTestWebhook(x *c) error {
 	ev := core.Event{WorkspaceID: x.ws.ID, At: time.Now().UnixMilli(), ActorID: x.member.UserID, Type: "webhook.test", EntityType: "webhook",
 		EntityID: h.ID, ScopeType: "workspace", ScopeID: x.ws.ID, Data: sample}
 	did := id.New()
-	status, errText, took := s.post(x.ctx(), h, did, ev)
+	status, errText, took := s.sendDelivery(x.ctx(), h, did, ev)
 	// A test shows in the delivery log like any other delivery. It has no
 	// place in the feed, so it gets a number of its own below zero.
 	now := time.Now().UnixMilli()
@@ -259,7 +259,7 @@ func (s *Server) handleSendTestWebhook(x *c) error {
 	// does not count for or against it as a run of failures.
 	last := fmt.Sprint(status)
 	if d.State != "ok" {
-		last = orText(errText, last)
+		last = firstNonEmpty(errText, last)
 	}
 	if _, err := x.db.Update(x.ctx(), "webhooks", map[string]any{"last_at": now, "last_status": last}, store.Eq("id", h.ID)); err != nil {
 		s.log.Error("webhook test: last result", "err", err)

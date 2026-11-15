@@ -12,8 +12,8 @@ import (
 func (e *exporter) tasks() error {
 	e.indexTasks()
 	for _, t := range e.rows.tasks {
-		name := fmt.Sprintf("tasks/%s/%s %s.md", e.nm.projects[t.ProjectID].Key, t.Key, fileSafe(t.Title))
-		if err := e.put(name, e.taskMarkdown(t)); err != nil {
+		name := fmt.Sprintf("tasks/%s/%s %s.md", e.names.projects[t.ProjectID].Key, t.Key, fileSafe(t.Title))
+		if err := e.addTextFile(name, e.taskMarkdown(t)); err != nil {
 			return err
 		}
 	}
@@ -55,7 +55,7 @@ func (e *exporter) indexTasks() {
 // taskMarkdown is one task as a page: its fields, description, files,
 // decisions and comments.
 func (e *exporter) taskMarkdown(t core.Task) string {
-	nm := e.nm
+	names := e.names
 	var b strings.Builder
 	e.taskFields(&b, t)
 	fmt.Fprintf(&b, "---\n\n# %s\n\n%s\n", t.Title, t.Description)
@@ -69,7 +69,7 @@ func (e *exporter) taskMarkdown(t core.Task) string {
 		if i == 0 {
 			b.WriteString("\n\n## Comments\n")
 		}
-		fmt.Fprintf(&b, "\n**%s**, %s", nm.handle(cm.AuthorID), when(cm.CreatedAt))
+		fmt.Fprintf(&b, "\n**%s**, %s", names.handle(cm.AuthorID), formatTime(cm.CreatedAt))
 		if cm.Kind == "result" {
 			b.WriteString(" (result)")
 		}
@@ -83,22 +83,22 @@ func (e *exporter) taskMarkdown(t core.Task) string {
 
 // taskFields writes the head of a task's page: its fields, one a line.
 func (e *exporter) taskFields(b *strings.Builder, t core.Task) {
-	nm := e.nm
-	st := nm.statuses[t.StatusID]
+	names := e.names
+	st := names.statuses[t.StatusID]
 	fmt.Fprintf(b, "---\nkey: %s\ntitle: %q\nstatus: %q\n", t.Key, t.Title, st.Name)
 	if t.AssigneeID != "" {
-		fmt.Fprintf(b, "assignee: %q\n", nm.handle(t.AssigneeID))
+		fmt.Fprintf(b, "assignee: %q\n", names.handle(t.AssigneeID))
 	}
 	if t.WaitingOnID != "" {
-		fmt.Fprintf(b, "waiting_on: %q\n", nm.handle(t.WaitingOnID))
+		fmt.Fprintf(b, "waiting_on: %q\n", names.handle(t.WaitingOnID))
 	}
 	if t.Priority > 0 {
 		fmt.Fprintf(b, "priority: %s\n", priorityNames[t.Priority])
 	}
-	if ls := nm.labelNames(t.LabelIDs); len(ls) > 0 {
+	if ls := names.labelNames(t.LabelIDs); len(ls) > 0 {
 		fmt.Fprintf(b, "labels: [%s]\n", strings.Join(ls, ", "))
 	}
-	if ep, ok := nm.epics[t.EpicID]; ok {
+	if ep, ok := names.epics[t.EpicID]; ok {
 		fmt.Fprintf(b, "epic: %q\n", ep.Name)
 	}
 	if t.ParentID != "" {
@@ -107,7 +107,7 @@ func (e *exporter) taskFields(b *strings.Builder, t core.Task) {
 	if t.DueOn != "" {
 		fmt.Fprintf(b, "due: %s\n", t.DueOn)
 	}
-	fmt.Fprintf(b, "created: %s\ncreated_by: %q\n", time.UnixMilli(t.CreatedAt).UTC().Format(time.RFC3339), nm.handle(t.CreatedBy))
+	fmt.Fprintf(b, "created: %s\ncreated_by: %q\n", time.UnixMilli(t.CreatedAt).UTC().Format(time.RFC3339), names.handle(t.CreatedBy))
 	if t.CompletedAt != 0 {
 		fmt.Fprintf(b, "completed: %s\n", time.UnixMilli(t.CompletedAt).UTC().Format(time.RFC3339))
 	}
@@ -116,7 +116,7 @@ func (e *exporter) taskFields(b *strings.Builder, t core.Task) {
 // decisionMarkdown writes one decision of a task, the n-th: the question,
 // its options, who asked and what was answered.
 func (e *exporter) decisionMarkdown(b *strings.Builder, n int, d core.Decision) {
-	nm := e.nm
+	names := e.names
 	fmt.Fprintf(b, "\n\n## Decision %d: %s\n\n", n, d.Question)
 	if d.Details != "" {
 		b.WriteString(d.Details + "\n\n")
@@ -137,12 +137,12 @@ func (e *exporter) decisionMarkdown(b *strings.Builder, n int, d core.Decision) 
 		}
 		b.WriteString("\n")
 	}
-	fmt.Fprintf(b, "\nAsked by %s", nm.handle(d.CreatedBy))
+	fmt.Fprintf(b, "\nAsked by %s", names.handle(d.CreatedBy))
 	if d.AskedID != "" {
-		b.WriteString(" of " + nm.handle(d.AskedID))
+		b.WriteString(" of " + names.handle(d.AskedID))
 	}
 	if d.Outcome != "" {
-		fmt.Fprintf(b, ". Answer: %s by %s on %s", strings.ReplaceAll(d.Outcome, "_", " "), nm.handle(d.DecidedBy), when(d.DecidedAt))
+		fmt.Fprintf(b, ". Answer: %s by %s on %s", strings.ReplaceAll(d.Outcome, "_", " "), names.handle(d.DecidedBy), formatTime(d.DecidedAt))
 		if d.OutcomeNote != "" {
 			b.WriteString(": " + d.OutcomeNote)
 		}

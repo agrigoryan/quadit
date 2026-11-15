@@ -34,7 +34,7 @@ func (s *Server) installAdmin(h handler) handler {
 	return func(x *c) error {
 		// A person who runs the install, signed in or with a token of their
 		// own that is not narrowed: what the admin pages do, a script can do.
-		if !x.user.IsAdmin || x.user.Kind != core.KindPerson || !x.whole() {
+		if !x.user.IsAdmin || x.user.Kind != core.KindPerson || !x.hasFullAccess() {
 			return errForbidden("this is for the people who run the install (signed in, or with a personal token that is not read-only or limited to projects)")
 		}
 		return h(x)

@@ -14,8 +14,8 @@ func init() {
 	})
 }
 
-// op is one operation of the API, described for the OpenAPI document.
-type op struct {
+// apiOperation is one operation of the API, described for the OpenAPI document.
+type apiOperation struct {
 	Method, Path, Summary string
 	Query                 string // "name: what it does; name2: …"
 	Tag                   string
@@ -27,7 +27,7 @@ const taskFilters = "project: key; assignee: me, @handle or none; status: name o
 
 // apiOps is the read surface and the few write endpoints that are not
 // changes. Every other write is a change, described from the engine's catalog.
-var apiOps = []op{
+var apiOps = []apiOperation{
 	{"POST", "/changes", "Apply one change, or a batch that succeeds or fails together. Body: {id, type, args} or {changes: […], dry_run}. " +
 		"The id is made by the caller; sending the same id again applies nothing twice.", "events: true to get the events back; dry_run: true to check without writing", "write"},
 	{"GET", "/me", "Who am I: role, projects, what needs approval, budget left, unread count, feed position, cursors.", "", "orient"},
@@ -87,7 +87,7 @@ var apiOps = []op{
 // installOps are the calls outside any workspace: accounts and sign-in, and
 // the install's own administration. An agent seldom needs them; a script
 // that sets an install up does.
-var installOps = []op{
+var installOps = []apiOperation{
 	{"GET", "/auth/config", "What this install offers for signing in, and whether it has been set up.", "", "account"},
 	{"POST", "/auth/setup", "First run: make the first person and workspace. Body: {name, email, password, workspace_name}.", "", "account"},
 	{"POST", "/auth/login", "Sign in with email and password. Body: {email, password}. Answers with a session cookie; with two-step on, the second step follows.", "", "account"},
@@ -145,7 +145,7 @@ var installOps = []op{
 
 // rootOps are the addresses outside /api/v1: files, the MCP endpoint and
 // its sign-in, incoming GitHub events, and what monitoring reads.
-var rootOps = []op{
+var rootOps = []apiOperation{
 	{"GET", "/f/{id}/{name}", "A file's bytes. The name is for the reader; the id decides. /f/{id}/preview is its small preview. Takes a session or a token, and byte ranges.", "", "files"},
 	{"POST", "/mcp", "The MCP endpoint (streamable HTTP). Takes a personal token or an OAuth token as a Bearer credential.", "", "mcp"},
 	{"GET", "/mcp", "The MCP endpoint's event stream, for clients that open one.", "", "mcp"},
@@ -166,7 +166,7 @@ var rootOps = []op{
 // routes above and the engine's catalog of changes.
 func (s *Server) handleDescribeAPI(w http.ResponseWriter, r *http.Request) {
 	paths := map[string]map[string]any{}
-	prefixed := make([]op, 0, len(installOps)+len(rootOps))
+	prefixed := make([]apiOperation, 0, len(installOps)+len(rootOps))
 	for _, o := range installOps {
 		o.Path = "/api/v1" + o.Path
 		prefixed = append(prefixed, o)

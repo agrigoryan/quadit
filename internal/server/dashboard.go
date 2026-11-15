@@ -48,7 +48,7 @@ func (s *Server) handleShowDashboard(x *c) error {
 // its parts as they are filled in.
 type dashboard struct {
 	x        *c
-	nm       *names
+	names    *nameLookup
 	now      time.Time
 	projects []string        // the projects it covers; none means all the caller may read
 	tasks    []core.Task     // every task of those projects, archived ones too
@@ -69,7 +69,7 @@ type dashboard struct {
 // newDashboard works out which projects the dashboard covers and reads
 // their tasks.
 func (x *c) newDashboard() (*dashboard, error) {
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (x *c) newDashboard() (*dashboard, error) {
 	for _, t := range tasks {
 		covered[t.ID] = true
 	}
-	return &dashboard{x: x, nm: nm, now: time.Now(), projects: projects, tasks: tasks, covered: covered}, nil
+	return &dashboard{x: x, names: names, now: time.Now(), projects: projects, tasks: tasks, covered: covered}, nil
 }
 
 // answer is the dashboard as it is sent.
@@ -115,7 +115,7 @@ func (d *dashboard) waitingOnMe() error {
 	x, me := d.x, d.x.member.UserID
 	var waiting []core.Task
 	for _, t := range d.tasks {
-		if t.WaitingOnID == me && core.OpenCategory(d.nm.statuses[t.StatusID].Category) {
+		if t.WaitingOnID == me && core.OpenCategory(d.names.statuses[t.StatusID].Category) {
 			waiting = append(waiting, t)
 		}
 	}

@@ -14,7 +14,7 @@ import (
 // budget left, and where the caller's cursors stand.
 func (s *Server) handleShowWhoAmI(x *c) error {
 	ctx := x.ctx()
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return err
 	}
@@ -27,7 +27,7 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 		"workspace": map[string]any{"slug": ws.Slug, "name": ws.Name}, "seq": ws.Seq, "server_time": time.Now().UTC().Format(time.RFC3339),
 		"version": s.cfg.Version,
 	}
-	keys := x.projectKeys(nm)
+	keys := x.projectKeys(names)
 	out["projects"] = keys
 	if x.actor.ReadOnly || (x.member.Scope != nil && x.member.Scope.ReadOnly) {
 		out["read_only"] = true
@@ -36,7 +36,7 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 		out["needs_approval"] = sc.NeedsApproval
 	}
 	if x.member.Kind == core.KindAgent {
-		out["responsible"] = nm.handle(x.user.ResponsibleID)
+		out["responsible"] = names.handle(x.user.ResponsibleID)
 		if b := x.member.Budget; b != nil {
 			bud, err := s.weekBudget(x, b)
 			if err != nil {
@@ -63,15 +63,15 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 		out["standing_preferences"] = rules
 	}
 	if x.wantText() {
-		return x.text(meText(out, ws, keys, cm, rules))
+		return x.text(whoAmIText(out, ws, keys, cm, rules))
 	}
 	return x.ok(out)
 }
 
 // projectKeys lists, in order, the keys of the projects the caller may read.
-func (x *c) projectKeys(nm *names) []string {
+func (x *c) projectKeys(names *nameLookup) []string {
 	var keys []string
-	for _, p := range nm.projects {
+	for _, p := range names.projects {
 		if p.DeletedAt == 0 && p.ArchivedAt == 0 && x.canProject(p.ID) {
 			keys = append(keys, p.Key)
 		}
@@ -89,7 +89,7 @@ func (s *Server) weekBudget(x *c, b *core.Budget) (map[string]any, error) {
 	}
 	bud := map[string]any{}
 	if b.CostMicros > 0 {
-		bud["cost_limit"], bud["cost_used"], bud["cost_left"] = money(b.CostMicros), money(cost), money(max(0, b.CostMicros-cost))
+		bud["cost_limit"], bud["cost_used"], bud["cost_left"] = formatMoney(b.CostMicros), formatMoney(cost), formatMoney(max(0, b.CostMicros-cost))
 	}
 	if b.Minutes > 0 {
 		bud["minutes_limit"], bud["minutes_used"], bud["minutes_left"] = b.Minutes, minutes, max(0, b.Minutes-minutes)
@@ -124,8 +124,8 @@ func (x *c) workspaceRules() ([]string, error) {
 	return rules, nil
 }
 
-// meText is handleShowWhoAmI's answer as lines of text.
-func meText(out map[string]any, ws core.Workspace, keys []string, cursors map[string]int64, rules []string) string {
+// whoAmIText is handleShowWhoAmI's answer as lines of text.
+func whoAmIText(out map[string]any, ws core.Workspace, keys []string, cursors map[string]int64, rules []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "you are %s (%s, %s) in %s\n", out["handle"], out["kind"], out["role"], ws.Slug)
 	fmt.Fprintf(&b, "projects: %s\n", strings.Join(keys, ", "))
@@ -169,7 +169,7 @@ func weekStart(t time.Time) int64 {
 	return time.Date(t.Year(), t.Month(), t.Day()-wd, 0, 0, 0, 0, time.UTC).UnixMilli()
 }
 
-func money(micros int64) string { return fmt.Sprintf("%.2f", float64(micros)/1e6) }
+func formatMoney(micros int64) string { return fmt.Sprintf("%.2f", float64(micros)/1e6) }
 
 type inboxItem struct {
 	ID      string `json:"id"`
@@ -192,7 +192,7 @@ func (i inboxItem) line() string {
 }
 
 func (x *c) inboxItems(unreadOnly bool, limit int) ([]inboxItem, error) {
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (x *c) inboxItems(unreadOnly bool, limit int) ([]inboxItem, error) {
 	}
 	out := make([]inboxItem, len(ns))
 	for i, n := range ns {
-		it := inboxItem{ID: n.ID, Seq: n.Seq, Type: n.Type, By: nm.handle(n.ActorID), Title: n.Title, Snippet: n.Snippet, At: when(n.CreatedAt), Read: n.ReadAt != 0}
+		it := inboxItem{ID: n.ID, Seq: n.Seq, Type: n.Type, By: names.handle(n.ActorID), Title: n.Title, Snippet: n.Snippet, At: formatTime(n.CreatedAt), Read: n.ReadAt != 0}
 		if n.TaskID != "" {
 			it.Task = strings.SplitN(n.Title, " ", 2)[0]
 		}

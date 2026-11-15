@@ -14,7 +14,7 @@ func (s *Server) handleShowCycleChart(x *c) error {
 	if err := x.db.Get(x.ctx(), &cy, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil || !x.canProject(cy.ProjectID) {
 		return errNotFound("cycle")
 	}
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (s *Server) handleShowCycleChart(x *c) error {
 			continue
 		}
 		for _, t := range tasks {
-			if t.CreatedAt >= eod || nm.statuses[t.StatusID].Category == core.CatCanceled && t.CanceledAt < eod {
+			if t.CreatedAt >= eod || names.statuses[t.StatusID].Category == core.CatCanceled && t.CanceledAt < eod {
 				continue
 			}
 			row.Scope++
@@ -55,11 +55,11 @@ func (s *Server) handleShowCycleChart(x *c) error {
 	}
 	total, done := 0, 0
 	for _, t := range tasks {
-		if nm.statuses[t.StatusID].Category == core.CatCanceled {
+		if names.statuses[t.StatusID].Category == core.CatCanceled {
 			continue
 		}
 		total++
-		if nm.statuses[t.StatusID].Category == core.CatDone {
+		if names.statuses[t.StatusID].Category == core.CatDone {
 			done++
 		}
 	}

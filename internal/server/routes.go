@@ -59,11 +59,11 @@ func (s *Server) routes() {
 	m.HandleFunc("PATCH "+w+"/files/{id}", s.workspaceMember(s.handleUploadFilePart))
 	m.HandleFunc("GET "+w+"/files/{id}", s.workspaceMember(s.handleShowFile))
 	m.HandleFunc("GET /f/{id}/{name...}", s.signedIn(s.handleServeFile))
-	s.moreRoutes(m)
+	s.addFeatureRoutes(m)
 }
 
-// moreRoutes registers the routes added by other files of this package.
-func (s *Server) moreRoutes(m *http.ServeMux) {
+// addFeatureRoutes registers the routes added by other files of this package.
+func (s *Server) addFeatureRoutes(m *http.ServeMux) {
 	for _, add := range extraRoutes {
 		add(s, m)
 	}

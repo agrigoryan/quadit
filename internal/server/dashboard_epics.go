@@ -27,17 +27,17 @@ type epicProgress struct {
 
 // epicProgress fills in the epics with their progress.
 func (d *dashboard) epicProgress() error {
-	nm := d.nm
+	names := d.names
 	byEpic := map[string]*epicProgress{}
-	for _, e := range nm.epics {
+	for _, e := range names.epics {
 		if e.DeletedAt != 0 || (len(d.projects) > 0 && !has(d.projects, e.ProjectID)) || e.State == core.EpicCanceled {
 			continue
 		}
-		byEpic[e.ID] = &epicProgress{ID: e.ID, Name: e.Name, Project: nm.projects[e.ProjectID].Key, State: e.State, Lead: nm.handle(e.LeadID), TargetOn: e.TargetOn}
+		byEpic[e.ID] = &epicProgress{ID: e.ID, Name: e.Name, Project: names.projects[e.ProjectID].Key, State: e.State, Lead: names.handle(e.LeadID), TargetOn: e.TargetOn}
 	}
 	lastMove := map[string]int64{}
 	for _, t := range d.tasks {
-		cat := nm.statuses[t.StatusID].Category
+		cat := names.statuses[t.StatusID].Category
 		ep, ok := byEpic[t.EpicID]
 		if !ok || cat == core.CatCanceled {
 			continue

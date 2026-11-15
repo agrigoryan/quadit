@@ -28,7 +28,7 @@ type flowStatus struct {
 }
 
 func (d *dashboard) flowByStatus() []flowStatus {
-	nm := d.nm
+	names := d.names
 	count := map[string]int{}
 	for _, t := range d.tasks {
 		if t.ArchivedAt == 0 {
@@ -36,7 +36,7 @@ func (d *dashboard) flowByStatus() []flowStatus {
 		}
 	}
 	var sts []core.Status
-	for _, st := range nm.statuses {
+	for _, st := range names.statuses {
 		if st.DeletedAt == 0 && (len(d.projects) == 0 || has(d.projects, st.ProjectID)) && d.x.canProject(st.ProjectID) {
 			sts = append(sts, st)
 		}
@@ -44,7 +44,7 @@ func (d *dashboard) flowByStatus() []flowStatus {
 	sort.Slice(sts, func(i, j int) bool { return statusBefore(sts[i], sts[j]) })
 	var out []flowStatus
 	for _, st := range sts {
-		out = append(out, flowStatus{Status: st.Name, Category: st.Category, Project: nm.projects[st.ProjectID].Key, Count: count[st.ID]})
+		out = append(out, flowStatus{Status: st.Name, Category: st.Category, Project: names.projects[st.ProjectID].Key, Count: count[st.ID]})
 	}
 	return out
 }
@@ -115,7 +115,7 @@ type flowWait struct {
 // flowWaiting says how long each open task has waited on its member: since
 // the last change that handed it to them.
 func (d *dashboard) flowWaiting() ([]flowWait, error) {
-	nm := d.nm
+	names := d.names
 	since := map[string]int64{}
 	evs, err := d.x.db.Events(d.x.ctx(), store.EventFilter{Types: []string{"task.updated", "task.created"}, ProjectIDs: d.projects, Desc: true, Limit: 2000})
 	if err != nil {
@@ -129,7 +129,7 @@ func (d *dashboard) flowWaiting() ([]flowWait, error) {
 	}
 	waits := map[string]*flowWait{}
 	for _, t := range d.tasks {
-		if t.WaitingOnID == "" || !core.OpenCategory(nm.statuses[t.StatusID].Category) {
+		if t.WaitingOnID == "" || !core.OpenCategory(names.statuses[t.StatusID].Category) {
 			continue
 		}
 		at := since[t.ID]
@@ -139,7 +139,7 @@ func (d *dashboard) flowWaiting() ([]flowWait, error) {
 		h := float64(d.now.UnixMilli()-at) / 3600_000
 		wt := waits[t.WaitingOnID]
 		if wt == nil {
-			wt = &flowWait{Member: nm.handle(t.WaitingOnID), Kind: nm.members[t.WaitingOnID].Kind}
+			wt = &flowWait{Member: names.handle(t.WaitingOnID), Kind: names.members[t.WaitingOnID].Kind}
 			waits[t.WaitingOnID] = wt
 		}
 		wt.Tasks++

@@ -92,7 +92,7 @@ func (s *Server) handleListPages(x *c) error {
 			case d.OwnerID != "":
 				note = " [private]"
 			}
-			fmt.Fprintf(&b, "%s%s%s  (%s)\n", indent, orText(d.Title, "Untitled"), note, d.ID)
+			fmt.Fprintf(&b, "%s%s%s  (%s)\n", indent, firstNonEmpty(d.Title, "Untitled"), note, d.ID)
 			walk(d.ID, indent+"  ")
 		}
 	}
@@ -122,14 +122,14 @@ func (s *Server) handleShowPage(x *c) error {
 	format := x.r.URL.Query().Get("format")
 	if format == "md" || x.wantText() {
 		body := md.Render(engine.BlockTree(blocks))
-		text, cutOff := cut(body, x.maxChars())
+		text, cutOff := truncate(body, x.maxChars())
 		if cutOff {
 			text += "\n… (cut; add full=1)\n"
 		}
 		if format == "md" {
 			return x.text(text)
 		}
-		return x.text(fmt.Sprintf("# %s\n(doc %s, seq %d)\n\n%s", orText(d.Title, "Untitled"), d.ID, d.ContentSeq, text))
+		return x.text(fmt.Sprintf("# %s\n(doc %s, seq %d)\n\n%s", firstNonEmpty(d.Title, "Untitled"), d.ID, d.ContentSeq, text))
 	}
 	out := map[string]any{"doc": d, "blocks": blocks}
 	var children []core.Doc
@@ -291,7 +291,7 @@ func (s *Server) regenerate(x *c, d *core.Doc) error {
 // generated writes the Markdown of a page built from data.
 func (s *Server) generated(x *c, d core.Doc) (string, error) {
 	ctx := x.ctx()
-	nm, err := x.names()
+	names, err := x.names()
 	if err != nil {
 		return "", err
 	}
@@ -314,7 +314,7 @@ func (s *Server) generated(x *c, d core.Doc) (string, error) {
 			}
 			fmt.Fprintf(&b, "- %s %s", t.Key, t.Title)
 			if t.AssigneeID != "" {
-				b.WriteString(" (" + nm.handle(t.AssigneeID) + ")")
+				b.WriteString(" (" + names.handle(t.AssigneeID) + ")")
 			}
 			b.WriteString("\n")
 		}
@@ -352,16 +352,16 @@ func (s *Server) generated(x *c, d core.Doc) (string, error) {
 				continue
 			}
 			n++
-			at := orText(v.DecidedAt, v.AskedAt)
+			at := firstNonEmpty(v.DecidedAt, v.AskedAt)
 			if m := at[:min(7, len(at))]; m != month && d.Generated == "decision_log" {
 				month = m
 				fmt.Fprintf(&b, "\n## %s\n\n", m)
 			}
 			fmt.Fprintf(&b, "- **%s** %s", v.Task, v.Question)
 			if v.State == core.StateOpen {
-				fmt.Fprintf(&b, " — asked of %s by %s on %s", orText(v.Asked, "anyone"), v.By, at)
+				fmt.Fprintf(&b, " — asked of %s by %s on %s", firstNonEmpty(v.Asked, "anyone"), v.By, at)
 			} else {
-				ans := orText(v.PickedLabel, v.Outcome)
+				ans := firstNonEmpty(v.PickedLabel, v.Outcome)
 				fmt.Fprintf(&b, " → **%s**", ans)
 				if v.Outcome != "" && v.Outcome != ans && v.Outcome != core.OutcomeAsIs {
 					b.WriteString(" (" + strings.ReplaceAll(v.Outcome, "_", " ") + ")")

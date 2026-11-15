@@ -63,9 +63,9 @@ func (c *counter) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// gather puts the parts of an upload together into one local file, in
+// joinUploadParts puts the parts of an upload together into one local file, in
 // order, and removes them from file storage.
-func (s *Server) gather(ctx context.Context, f core.File) error {
+func (s *Server) joinUploadParts(ctx context.Context, f core.File) error {
 	var keys []string
 	if err := s.fileStore().List(ctx, f.StorageKey+".parts/", func(key string, _ int64) error { keys = append(keys, key); return nil }); err != nil {
 		return err
@@ -261,7 +261,7 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	path := s.partPath(f.ID)
 	defer os.Remove(path)
-	if err := s.gather(ctx, *f); err != nil {
+	if err := s.joinUploadParts(ctx, *f); err != nil {
 		return fmt.Errorf("file storage: %w", err)
 	}
 	in, err := os.Open(path)
