@@ -4,33 +4,18 @@
 // task's detail. The task's own are listed in the panel, a question's under
 // that question.
 
-import { useEffect } from "react";
+import { useMemo } from "react";
 import { FileText } from "lucide-react";
 import { Link } from "react-router";
-import { create } from "zustand";
-import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useRow, useRowEvenIfGone, useSlug } from "@/lib/selectors";
-import { getState, useStore } from "@/lib/store";
+import { type MentionRef, useTaskMentions } from "@/lib/task-detail";
 import type { Task } from "@/lib/types";
 import { Section } from "@/detail/section";
 import { PageIcon } from "@/docs/page-icon";
 import { useTaskLink } from "@/lib/task-link";
 import { StatusIcon } from "@/ui/icons";
 import { docPath } from "@/docs/area";
-
-/** One reference as the server sends it: what is mentioned, and the task or page the mention is in. */
-interface Ref {
-  from_scope_type: string;
-  from_scope_id: string;
-  /** "task", or "decision" when it is one of the task's questions that is named. */
-  to_type: string;
-  to_id: string;
-  /** What the source is called: the page's or the task's title. */
-  title?: string;
-  /** The task's key, when the mention is in a task or one of its comments. */
-  key?: string;
-}
 
 export interface Mention {
   kind: "task" | "doc";
@@ -42,13 +27,8 @@ export interface Mention {
   decisionId?: string;
 }
 
-const NONE: Mention[] = [];
-
-/** What mentions each opened task, by task id. */
-const useMentions = create<Record<string, Mention[]>>(() => ({}));
-
 /** Each source once per thing it mentions, however often it names it; a task naming itself is not news. */
-function read(refs: Ref[], taskId: string): Mention[] {
+function read(refs: MentionRef[], taskId: string): Mention[] {
   const seen = new Set<string>();
   const list: Mention[] = [];
   for (const ref of refs) {
@@ -62,17 +42,10 @@ function read(refs: Ref[], taskId: string): Mention[] {
   return list;
 }
 
-/** Asks where a task is mentioned: when it opens, and whenever the live stream comes back. */
-function useLoadMentions(taskId: string) {
-  const live = useStore((s) => s.stream === "live");
-  useEffect(() => {
-    const ctl = new AbortController();
-    api
-      .get<{ mentioned_in?: Ref[] }>(workspacePath(getState().slug, `/tasks/${taskId}?raw=1`), ctl.signal)
-      .then((raw) => useMentions.setState({ [taskId]: read(raw.mentioned_in ?? [], taskId) }))
-      .catch(() => {});
-    return () => ctl.abort();
-  }, [taskId, live]);
+/** What mentions the task, as it came with the task's detail (lib/task-detail.ts). */
+function useMentions(taskId: string): Mention[] {
+  const refs = useTaskMentions(taskId);
+  return useMemo(() => read(refs, taskId), [refs, taskId]);
 }
 
 const rowStyle =
@@ -126,8 +99,7 @@ function Rows({ mentions }: { mentions: Mention[] }) {
 
 /** The panel's section: what mentions the task itself. Draws nothing when nothing does. */
 export function MentionedIn({ task }: { task: Task }) {
-  useLoadMentions(task.id);
-  const all = useMentions((s) => s[task.id]) ?? NONE;
+  const all = useMentions(task.id);
   const mentions = all.filter((m) => !m.decisionId);
   if (mentions.length === 0) return null;
   return (
@@ -139,7 +111,7 @@ export function MentionedIn({ task }: { task: Task }) {
 
 /** Under a question: the tasks and pages that mention that question. Draws nothing when none does. */
 export function DecisionMentions({ taskId, decisionId }: { taskId: string; decisionId: string }) {
-  const all = useMentions((s) => s[taskId]) ?? NONE;
+  const all = useMentions(taskId);
   const mentions = all.filter((m) => m.decisionId === decisionId);
   if (mentions.length === 0) return null;
   return (

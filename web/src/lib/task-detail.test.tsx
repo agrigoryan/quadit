@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 // An opened task (lib/task-detail.ts): its rows go to the store, its history
-// is kept beside it and grows with live events, a failure says why, and the
-// task is fetched again when the live stream comes back.
+// and what mentions it are kept beside it (the history grows with live
+// events), a failure says why, and the task is fetched again when the live
+// stream comes back.
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getRowEvenIfGone } from "@/lib/selectors";
 import { applyEvents, clearStore, loadBootstrap, useStore } from "@/lib/store";
-import { useTaskDetail, useTaskEvents } from "@/lib/task-detail";
+import { useTaskDetail, useTaskEvents, useTaskMentions } from "@/lib/task-detail";
 import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 import { WithQuery } from "@/test/query";
@@ -22,6 +23,7 @@ const raw = (comments: { id: string; body: string }[]) => ({
   watchers: [],
   attachments: [],
   sessions: [],
+  mentioned_in: [{ from_scope_type: "doc", from_scope_id: "d1", to_type: "task", to_id: "t1", title: "Plan" }],
 });
 
 const event = (seq: number) =>
@@ -46,7 +48,9 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 const open = () =>
-  renderHook(() => ({ status: useTaskDetail("t1"), events: useTaskEvents("t1") }), { wrapper: WithQuery });
+  renderHook(() => ({ status: useTaskDetail("t1"), events: useTaskEvents("t1"), mentions: useTaskMentions("t1") }), {
+    wrapper: WithQuery,
+  });
 
 describe("useTaskDetail", () => {
   it("puts the task's rows in the store and keeps its history, with live events added", async () => {
@@ -60,7 +64,8 @@ describe("useTaskDetail", () => {
     expect(result.current.events.map((e) => e.seq)).toEqual([1]);
     act(() => applyEvents([{ ...event(2), data: { row: { id: "c2", task_id: "t1", body: "more" } } }], true));
     await waitFor(() => expect(result.current.events.map((e) => e.seq)).toEqual([1, 2]));
-    // One fetch for both readers of the task.
+    expect(result.current.mentions.map((m) => m.title)).toEqual(["Plan"]);
+    // One fetch for every reader of the task.
     expect(server.count(TASK)).toBe(1);
   });
 

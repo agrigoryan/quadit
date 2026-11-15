@@ -1,7 +1,7 @@
 // What a task carries only once it is opened: its description, comments,
 // links, files and watchers (merged into the store, which owns them), and
-// its history (the raw events, which only the timeline reads: they are the
-// query's own data, and live events are added to it as they come).
+// its history and what mentions it (which only the panel reads: they are the
+// query's own data, and live events are added to the history as they come).
 
 import { useQuery } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api";
@@ -9,8 +9,22 @@ import { inWorkspace, queryClient, readError } from "@/lib/query";
 import { getState, markOpened, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
 import type { AgentSession, Attachment, Comment, FeedEvent, Task, TaskLink, Watcher } from "@/lib/types";
 
+/** One place that names the task or one of its questions, as the server sends it (detail/mentions.tsx reads these). */
+export interface MentionRef {
+  from_scope_type: string;
+  from_scope_id: string;
+  /** "task", or "decision" when it is one of the task's questions that is named. */
+  to_type: string;
+  to_id: string;
+  /** What the source is called: the page's or the task's title. */
+  title?: string;
+  /** The task's key, when the mention is in a task or one of its comments. */
+  key?: string;
+}
+
 interface RawTask {
   task: Task;
+  mentioned_in?: MentionRef[];
   comments: Comment[];
   links: TaskLink[];
   watchers: Watcher[];
@@ -19,21 +33,28 @@ interface RawTask {
 }
 
 export const taskKeys = {
-  /** A task opened whole: its rows go to the store, its history is the data. */
+  /** A task opened whole: its rows go to the store; its history and mentions are the data. */
   detail: (slug: string, taskId: string) => [...inWorkspace(slug), "task", taskId] as const,
   /** A task the store does not have, looked up by key or id to put it there. */
   row: (slug: string, keyOrId: string) => [...inWorkspace(slug), "task-row", keyOrId] as const,
 };
 
-/** Fetches everything in a task, merges it into the store and answers its history, oldest first. */
-async function fetchTask(slug: string, taskId: string, signal: AbortSignal): Promise<FeedEvent[]> {
+interface Opened {
+  /** Oldest first. */
+  events: FeedEvent[];
+  mentionedIn: MentionRef[];
+}
+
+/** Fetches everything in a task, merges it into the store and answers what the store does not hold. */
+async function fetchTask(slug: string, taskId: string, signal: AbortSignal): Promise<Opened> {
   const [raw, feed] = await Promise.all([
     api.get<RawTask>(workspacePath(slug, `/tasks/${taskId}?raw=1`), signal),
     api.get<{ events: FeedEvent[] }>(workspacePath(slug, `/events?task=${taskId}&limit=500`), signal),
   ]);
-  const had = queryClient.getQueryData<FeedEvent[]>(taskKeys.detail(slug, taskId)) ?? [];
+  const had = queryClient.getQueryData<Opened>(taskKeys.detail(slug, taskId))?.events ?? [];
+  const opened = { events: mergeEvents(had, feed.events), mentionedIn: raw.mentioned_in ?? [] };
   // The copy was replaced while this was on its way: the rows are for the old one.
-  if (getState().slug !== slug) return mergeEvents(had, feed.events);
+  if (getState().slug !== slug) return opened;
   // Rows that were deleted while nobody was looking are not in the answer.
   const { comments, attachments, links } = getState().collections;
   const fresh = new Set([...raw.comments, ...raw.attachments, ...raw.links].map((r) => r.id));
@@ -53,7 +74,7 @@ async function fetchTask(slug: string, taskId: string, signal: AbortSignal): Pro
   mergeRows("attachments", raw.attachments);
   mergeRows("sessions", raw.sessions);
   markOpened(taskId);
-  return mergeEvents(had, feed.events);
+  return opened;
 }
 
 function mergeEvents(have: FeedEvent[], more: FeedEvent[]): FeedEvent[] {
@@ -69,13 +90,17 @@ onEvents((events) => {
   const touched: Record<string, FeedEvent[]> = {};
   for (const ev of events) if (ev.scope_type === "task") (touched[ev.scope_id] ??= []).push(ev);
   for (const [id, more] of Object.entries(touched)) {
-    queryClient.setQueryData<FeedEvent[]>(taskKeys.detail(slug, id), (have) => have && mergeEvents(have, more));
+    queryClient.setQueryData<Opened>(
+      taskKeys.detail(slug, id),
+      (have) => have && { ...have, events: mergeEvents(have.events, more) },
+    );
   }
 });
 
 const NO_EVENTS: FeedEvent[] = [];
+const NO_MENTIONS: MentionRef[] = [];
 
-/** `fetch` false only reads what useTaskDetail fetched, so that a second reader of the task asks nothing. */
+/** `fetch` false only reads what useTaskDetail fetched, so that the other readers of the task ask nothing. */
 const useTaskQuery = (taskId: string | undefined, fetch: boolean) => {
   const slug = useStore((s) => s.slug);
   return useQuery({
@@ -99,5 +124,10 @@ export function useTaskDetail(taskId: string | undefined): string {
 
 /** A task's history, oldest first. Empty until useTaskDetail has loaded it. */
 export function useTaskEvents(taskId: string | undefined): FeedEvent[] {
-  return useTaskQuery(taskId, false).data ?? NO_EVENTS;
+  return useTaskQuery(taskId, false).data?.events ?? NO_EVENTS;
+}
+
+/** What names the task or its questions. Empty until useTaskDetail has loaded it. */
+export function useTaskMentions(taskId: string | undefined): MentionRef[] {
+  return useTaskQuery(taskId, false).data?.mentionedIn ?? NO_MENTIONS;
 }
