@@ -5539,13 +5539,6 @@ For Bea  (doc <doc For Bea>)
 === GET /api/v1/w/games/tasks/SVA-6/context
 200
 {
- "docs": [
-  {
-   "id": "<doc OPS runbook>",
-   "title": "OPS runbook",
-   "url": "http://quadit.test/games/docs/<doc OPS runbook>"
-  }
- ],
  "recent_decisions": [
   {
    "asked": "@aram",
@@ -5620,8 +5613,6 @@ labels: art   seq: 256
 - Explosions are ring-shaped.
 === recent decisions in this project
 SVA-1 "Which explosion?" -> Burst: reads better small
-=== linked docs
-OPS runbook  (doc <doc OPS runbook>)
 
 === GET /api/v1/w/games/tasks/OPS-5/context
 404

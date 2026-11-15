@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
-	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -221,7 +220,7 @@ func (pack *contextPack) docs() error {
 		if !there {
 			continue
 		}
-		if engine.CanSeeDoc(doc, who.member.UserID) {
+		if who.canSeeDoc(doc) {
 			docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": who.baseURL + "/" + who.ws.Slug + "/docs/" + doc.ID})
 		}
 	}
