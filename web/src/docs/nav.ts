@@ -3,9 +3,10 @@
 // router hooks do not work. The docs routes keep this pointed at the router.
 
 import { type Location, matchPath, type NavigateFunction } from "react-router";
+import { getLookupEvenIfGone, projectByKey } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { docPath } from "@/docs/area";
-import { getDocs, inProject } from "@/docs/data";
+import { inProject } from "@/docs/data";
 import { isTaskPath, taskPath } from "@/lib/task-link";
 
 let navigate: NavigateFunction | null = null;
@@ -18,14 +19,21 @@ export function setNavigator(nav: NavigateFunction | null, at: Location | null) 
 
 /** The project whose Docs are on screen, going by the address. */
 function projectOnScreen() {
-  const key = matchPath("/:ws/p/:key/docs/*", window.location.pathname)?.params.key?.toLowerCase();
-  return key ? Object.values(getState().collections.projects).find((p) => p.key.toLowerCase() === key) : undefined;
+  // An archived project's Docs still open, as the docs routes find it (useProjectByKey).
+  return projectByKey(
+    getLookupEvenIfGone("projects"),
+    matchPath("/:ws/p/:key/docs/*", window.location.pathname)?.params.key,
+  );
 }
 
 /** Opens a page: in the Docs of the project on screen when it is one of that project's pages, else in the workspace's. */
 export function openDoc(id: string) {
   const project = projectOnScreen();
-  const path = docPath(getState().slug, id, project && inProject(getDocs(), id, project.id) ? project : undefined);
+  const path = docPath(
+    getState().slug,
+    id,
+    project && inProject(getLookupEvenIfGone("docs"), id, project.id) ? project : undefined,
+  );
   if (navigate) void navigate(path);
   else window.location.assign(path);
 }

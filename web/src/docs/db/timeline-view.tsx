@@ -27,7 +27,7 @@ interface Span {
  * a bar sideways to move it in time. Rows with no start date are listed
  * without a bar.
  */
-export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
+export function TimelineView({ db, view, rows, onOpen, readOnly }: ViewProps) {
   const dates = db.table.props.filter((p) => p.type === "date");
   const startProp = dates.find((p) => p.id === view.config?.date_prop) ?? dates[0];
   const endProp =
@@ -74,7 +74,7 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
         icon={<ChartGantt />}
         title={t("db.timeline.needsDates")}
         hint={t("db.timeline.needsDatesHint")}
-        action={<Button onClick={make}>{t("db.timeline.addDates")}</Button>}
+        action={!readOnly && <Button onClick={make}>{t("db.timeline.addDates")}</Button>}
       />
     );
   }
@@ -179,14 +179,16 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
                     <button
                       type="button"
                       aria-label={span.row.title || t("db.untitled")}
-                      onPointerDown={(e) => grab(e, span)}
+                      onPointerDown={readOnly ? undefined : (e) => grab(e, span)}
+                      onClick={readOnly ? () => onOpen(span.row.id) : undefined}
                       onKeyDown={(e) => e.key === "Enter" && onOpen(span.row.id)}
                       style={{
                         left: (daysBetween(from, span.start) + shift) * DAY_W + 2,
                         width: (daysBetween(span.start, span.end) + 1) * DAY_W - 4,
                       }}
                       className={cx(
-                        "absolute top-1.5 flex h-6 cursor-grab touch-none items-center rounded-md border border-accent/30 bg-accent-soft px-1.5 text-xs font-medium text-accent-text hover:border-accent/60",
+                        "absolute top-1.5 flex h-6 touch-none items-center rounded-md border border-accent/30 bg-accent-soft px-1.5 text-xs font-medium text-accent-text hover:border-accent/60",
+                        !readOnly && "cursor-grab",
                         shift !== 0 && "cursor-grabbing shadow-pop",
                       )}
                     >

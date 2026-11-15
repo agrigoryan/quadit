@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { setRowProps } from "@/docs/actions";
 import { useProperties } from "@/docs/data";
@@ -14,7 +15,7 @@ import type { Doc } from "@/lib/types-docs";
  * A database row's values as a list: the property's name, then its value,
  * changed the same way as in the table. Sits above the row's page.
  */
-export function RowProperties({ row }: { row: Doc }) {
+export function RowProperties({ row, readOnly }: { row: Doc; readOnly: boolean }) {
   const databaseId = row.parent_id;
   const props = useProperties(databaseId);
   const db = useDatabase(databaseId);
@@ -31,16 +32,23 @@ export function RowProperties({ row }: { row: Doc }) {
     <div className="flex flex-col gap-px">
       {props.map((p) => (
         <div key={p.id} className="flex min-h-8 items-start gap-1">
-          <PropertyPopover prop={p} open={open === p.id} onOpenChange={(on) => setOpen(on ? p.id : null)}>
-            <button
-              type="button"
-              className="flex h-8 w-36 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-left text-sm text-ink-2 hover:bg-hover data-[state=open]:bg-hover max-sm:w-28"
-            >
+          {readOnly ? (
+            <span className="flex h-8 w-36 shrink-0 items-center gap-1.5 px-1.5 text-sm text-ink-2 max-sm:w-28">
               <PropIcon type={p.type} />
               <span className="truncate">{p.name}</span>
-            </button>
-          </PropertyPopover>
-          <div className="min-w-0 flex-1 rounded-md hover:bg-hover">
+            </span>
+          ) : (
+            <PropertyPopover prop={p} open={open === p.id} onOpenChange={(on) => setOpen(on ? p.id : null)}>
+              <button
+                type="button"
+                className="flex h-8 w-36 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-left text-sm text-ink-2 hover:bg-hover data-[state=open]:bg-hover max-sm:w-28"
+              >
+                <PropIcon type={p.type} />
+                <span className="truncate">{p.name}</span>
+              </button>
+            </PropertyPopover>
+          )}
+          <div className={cx("min-w-0 flex-1 rounded-md", !readOnly && "hover:bg-hover")}>
             <SelfCell
               prop={p}
               stored={row.props?.[p.id]}
@@ -49,19 +57,22 @@ export function RowProperties({ row }: { row: Doc }) {
               wrap
               placeholder={t("db.cell.empty")}
               className="min-h-8"
+              readOnly={readOnly}
             />
           </div>
         </div>
       ))}
-      <AddPropertyMenu databaseId={databaseId} onCreated={setOpen}>
-        <button
-          type="button"
-          className="flex h-8 w-fit items-center gap-1.5 rounded-md px-1.5 text-sm text-ink-3 hover:bg-hover hover:text-ink"
-        >
-          <Plus className="size-3.5" aria-hidden />
-          {t("db.prop.add")}
-        </button>
-      </AddPropertyMenu>
+      {!readOnly && (
+        <AddPropertyMenu databaseId={databaseId} onCreated={setOpen}>
+          <button
+            type="button"
+            className="flex h-8 w-fit items-center gap-1.5 rounded-md px-1.5 text-sm text-ink-3 hover:bg-hover hover:text-ink"
+          >
+            <Plus className="size-3.5" aria-hidden />
+            {t("db.prop.add")}
+          </button>
+        </AddPropertyMenu>
+      )}
     </div>
   );
 }

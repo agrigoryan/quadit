@@ -18,10 +18,11 @@ import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
-import { useCollection, useMe } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { getLookupEvenIfGone, getRow, useLookupEvenIfGone, useMe } from "@/lib/selectors";
 import { lastRank, moveDoc } from "@/docs/actions";
 import { useDocsArea } from "@/docs/area";
-import { docTitle, type DocTree, getDocs, isWithin, sectionOf } from "@/docs/data";
+import { docTitle, type DocTree, isWithin, sectionOf } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
 import { NewPageItems } from "@/docs/tree/new-page";
 import { setOpen } from "@/docs/tree/state";
@@ -33,13 +34,12 @@ import { Menu, MenuContent, MenuTrigger } from "@/ui/menu";
 /** Where a dragged page would land, if it may land there. */
 function targetOf(event: DragMoveEvent): DropTarget | null {
   const over = event.over;
-  const docs = getDocs();
-  const moving = docs[String(event.active.id)];
-  const onto = over ? docs[String(over.id)] : undefined;
+  const moving = getRow("docs", String(event.active.id));
+  const onto = over ? getRow("docs", String(over.id)) : undefined;
   const start = event.activatorEvent as PointerEvent;
   if (!over || !moving || !onto || moving.id === onto.id) return null;
-  // A page cannot go inside itself, and stays among pages of its own kind (team or private).
-  if (isWithin(docs, onto.id, moving.id) || sectionOf(moving) !== sectionOf(onto)) return null;
+  // A page cannot go inside itself (through trashed pages too), and stays among pages of its own kind (team or private).
+  if (isWithin(getLookupEvenIfGone("docs"), onto.id, moving.id) || sectionOf(moving) !== sectionOf(onto)) return null;
   const y = start.clientY + event.delta.y - over.rect.top;
   let zone: DropZone = y < over.rect.height * 0.28 ? "before" : y > over.rect.height * 0.72 ? "after" : "inside";
   if (zone === "inside" && onto.kind === "database") zone = "after";
@@ -47,18 +47,15 @@ function targetOf(event: DragMoveEvent): DropTarget | null {
 }
 
 function drop(tree: DocTree, movingId: string, target: DropTarget) {
-  const docs = getDocs();
-  const onto = docs[target.id];
+  const onto = getRow("docs", target.id);
   if (!onto) return;
   if (target.zone === "inside") {
     moveDoc(movingId, onto.id, lastRank(onto.id));
     setOpen(onto.id, true);
     return;
   }
-  const parent =
-    onto.parent_id && docs[onto.parent_id] && sectionOf(docs[onto.parent_id] as Doc) === sectionOf(onto)
-      ? onto.parent_id
-      : undefined;
+  const above = getRow("docs", onto.parent_id);
+  const parent = above && sectionOf(above) === sectionOf(onto) ? above.id : undefined;
   const list = (parent ? (tree.children[parent] ?? []) : tree.roots[sectionOf(onto)]).filter((d) => d.id !== movingId);
   const at = list.findIndex((d) => d.id === onto.id);
   const rank =
@@ -88,7 +85,9 @@ interface Props {
 export function DocsTree({ tree, className }: Props) {
   const projectId = useDocsArea().project?.id;
   const me = useMe();
-  const members = useCollection("members");
+  const can = useCan();
+  // An agent's notes stay under its name after it is removed.
+  const members = useLookupEvenIfGone("members");
   const [dragging, setDragging] = useState<Doc | null>(null);
   const [target, setTarget] = useState<DropTarget | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -123,7 +122,7 @@ export function DocsTree({ tree, className }: Props) {
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
-        onDragStart={(e) => setDragging(getDocs()[String(e.active.id)] ?? null)}
+        onDragStart={(e) => setDragging(getRow("docs", String(e.active.id)) ?? null)}
         onDragMove={(e) => setTarget(targetOf(e))}
         onDragEnd={end}
         onDragCancel={() => {
@@ -134,14 +133,14 @@ export function DocsTree({ tree, className }: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
           <TreeSection
             title={t("docs.section.team")}
-            add={<NewPageItems generated projectId={projectId} />}
+            add={can.edit(projectId) && <NewPageItems generated projectId={projectId} />}
             empty={t("docs.section.teamEmpty")}
           >
             {nodes(tree.roots.team, true)}
           </TreeSection>
           <TreeSection
             title={t("docs.section.private")}
-            add={<NewPageItems private projectId={projectId} />}
+            add={can.edit(projectId) && <NewPageItems private projectId={projectId} />}
             empty={t("docs.section.privateEmpty")}
           >
             {nodes(

@@ -26,6 +26,8 @@ interface Props {
   onActive: (rowId: string, col: string) => void;
   onEditing: (rowId: string, col: string, on: boolean) => void;
   onOpen: (rowId: string) => void;
+  /** Shown, not changed: no title or cell editing, no delete. */
+  readOnly: boolean;
 }
 
 /**
@@ -51,6 +53,7 @@ export const TableRow = memo(function TableRow({
   onActive,
   onEditing,
   onOpen,
+  readOnly,
 }: Props) {
   const slug = useSlug();
   const navigate = useNavigate();
@@ -82,7 +85,7 @@ export const TableRow = memo(function TableRow({
           />
         ) : (
           <div
-            className="flex min-h-8 w-full min-w-0 cursor-text items-center gap-1 pr-1 pl-2"
+            className={cx("flex min-h-8 w-full min-w-0 items-center gap-1 pr-1 pl-2", !readOnly && "cursor-text")}
             onClick={() => onEditing(row.id, TITLE, true)}
           >
             {row.icon && <span className="shrink-0">{row.icon}</span>}
@@ -116,10 +119,14 @@ export const TableRow = memo(function TableRow({
                 <MenuItem icon={<FileText />} onSelect={() => navigate(docPath(slug, row.id))}>
                   {t("db.row.page")}
                 </MenuItem>
-                <MenuSeparator />
-                <MenuItem danger icon={<Trash2 />} onSelect={() => trashDoc(row.id)}>
-                  {t("db.row.delete")}
-                </MenuItem>
+                {!readOnly && (
+                  <>
+                    <MenuSeparator />
+                    <MenuItem danger icon={<Trash2 />} onSelect={() => trashDoc(row.id)}>
+                      {t("db.row.delete")}
+                    </MenuItem>
+                  </>
+                )}
               </MenuContent>
             </Menu>
           </div>
@@ -145,6 +152,7 @@ export const TableRow = memo(function TableRow({
               onEditing={(next) => onEditing(row.id, p.id, next)}
               onChange={(value) => setRowProps(row.id, { [p.id]: value })}
               className="min-h-8"
+              readOnly={readOnly}
             />
           </div>
         );

@@ -2,20 +2,23 @@
 // a decision, another page. Each shows live from the workspace copy.
 
 import { FileText } from "lucide-react";
+import { useMemo } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useTaskByKey } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useLookupEvenIfGone, useMe, useRowEvenIfGone, useRows, useTaskByKeyEvenIfGone } from "@/lib/selectors";
 import type { Decision } from "@/lib/types";
-import { docTitle, useDoc } from "@/docs/data";
+import { docTitle } from "@/docs/data";
 import { answerOf, DECISION_REF, decisionsOf } from "@/docs/editor/decision-refs";
 import { openDecision, openDoc, openTask } from "@/docs/nav";
 import { PageIcon } from "@/docs/page-icon";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 
 export function MentionChip({ handle }: { handle: string }) {
-  const member = useStore((s) => Object.values(s.collections.members).find((m) => m.handle === handle));
-  const isMe = useStore((s) => !!member && s.me?.user_id === member.user_id);
+  // A removed member's mention still shows their name.
+  const members = useLookupEvenIfGone("members");
+  const member = useMemo(() => Object.values(members).find((m) => m.handle === handle), [members, handle]);
+  const meId = useMe()?.user_id;
+  const isMe = !!member && meId === member.user_id;
   return (
     <span className={cx("qd-chip qd-mention", isMe && "is-me")} data-handle={handle}>
       @{member?.name ?? handle}
@@ -24,8 +27,9 @@ export function MentionChip({ handle }: { handle: string }) {
 }
 
 export function TaskChip({ taskKey }: { taskKey: string }) {
-  const task = useTaskByKey(taskKey);
-  const category = useStore((s) => (task ? s.collections.statuses[task.status_id]?.category : undefined));
+  // A trashed task is found, to be shown as gone.
+  const task = useTaskByKeyEvenIfGone(taskKey);
+  const category = useRowEvenIfGone("statuses", task?.status_id)?.category;
   return (
     <span
       className={cx("qd-chip qd-task", (!task || !!task.deleted_at) && "is-missing")}
@@ -52,11 +56,18 @@ export function decisionStateText(decision: Decision): string {
 /** A decision, named as the server reads it ("SVA-7#2"): its task's key, the question, and how it stands. */
 export function DecisionChip({ decisionRef }: { decisionRef: string }) {
   const m = DECISION_REF.exec(decisionRef.toUpperCase());
-  const task = useTaskByKey(m?.[1]);
+  // A trashed task is found, so its decision shows as gone.
+  const task = useTaskByKeyEvenIfGone(m?.[1]);
   const live = !!task && !task.deleted_at;
+  const decisions = useRows("decisions");
+  const meId = useMe()?.user_id;
+  const number = m ? Number(m[2]) : 0;
   // Its number counts the task's questions in the order asked, as the server does.
-  const decision = useStore((s) => (live && m ? decisionsOf(s.collections, task.id)[Number(m[2]) - 1] : undefined));
-  const mine = useStore((s) => !!decision && decision.state === "open" && decision.asked_id === s.me?.user_id);
+  const decision = useMemo(
+    () => (live && number ? decisionsOf(decisions, task.id)[number - 1] : undefined),
+    [live, number, decisions, task],
+  );
+  const mine = !!decision && decision.state === "open" && decision.asked_id === meId;
   const open = decision?.state === "open";
   return (
     <span
@@ -83,7 +94,8 @@ export function DecisionChip({ decisionRef }: { decisionRef: string }) {
 }
 
 export function PageChip({ docId }: { docId: string }) {
-  const doc = useDoc(docId);
+  // A trashed page is found, to show its title as gone.
+  const doc = useRowEvenIfGone("docs", docId);
   const gone = !doc || !!doc.deleted_at;
   return (
     <span

@@ -4,7 +4,7 @@
 
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useStore } from "@/lib/store";
+import { useRowEvenIfGone } from "@/lib/selectors";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Tooltip } from "@/ui/tooltip";
 
@@ -21,7 +21,8 @@ interface Props {
 
 /** A project's mark with its name on hover. Nothing for a project the person cannot see. */
 export function ProjectMark({ projectId, className }: Props) {
-  const project = useStore((s) => (projectId ? s.collections.projects[projectId] : undefined));
+  // An archived project still names the pages tied to it.
+  const project = useRowEvenIfGone("projects", projectId);
   if (projectId && !project) return null;
   const label = project ? t("docs.project.in", { project: project.name }) : t("docs.project.notInParents");
   return (

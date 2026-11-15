@@ -3,19 +3,17 @@
 // the questions were asked ("SVA-7#2"). These find one from the other in the
 // workspace copy.
 
-import { findTaskByKey } from "@/lib/selectors";
-import type { Collections } from "@/lib/store";
+import { getRows, getTaskByKeyEvenIfGone } from "@/lib/selectors";
+import type { Dict } from "@/lib/store";
 import type { Decision, Task } from "@/lib/types";
 
 export const DECISION_REF = /^([A-Z][A-Z0-9]{1,9}-\d{1,6})#(\d{1,3})$/;
 
 const asked = (a: Decision, b: Decision) => a.created_at - b.created_at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-/** A task's decisions in the order asked: the first is number 1. Those in the trash do not count. */
-export function decisionsOf(c: Collections, taskId: string): Decision[] {
-  return Object.values(c.decisions)
-    .filter((d) => d.task_id === taskId && !d.deleted_at)
-    .sort(asked);
+/** A task's decisions in the order asked: the first is number 1. Give it the live decisions: those in the trash do not count. */
+export function decisionsOf(decisions: Decision[], taskId: string): Decision[] {
+  return decisions.filter((d) => d.task_id === taskId).sort(asked);
 }
 
 export interface Found {
@@ -26,27 +24,31 @@ export interface Found {
 }
 
 /** The decision a reference names, if the task and that number exist. */
-export function findDecision(c: Collections, ref: string): Found | undefined {
+export function findDecision(ref: string): Found | undefined {
   const m = DECISION_REF.exec(ref.trim().toUpperCase());
   if (!m) return undefined;
-  const task = findTaskByKey(c.tasks, m[1] as string);
+  // An archived task's decisions are still named; a trashed task's are not.
+  const task = getTaskByKeyEvenIfGone(m[1]);
   if (!task || task.deleted_at) return undefined;
-  const decision = decisionsOf(c, task.id)[Number(m[2]) - 1];
+  const decision = decisionsOf(getRows("decisions"), task.id)[Number(m[2]) - 1];
   return decision ? { task, decision, ref: `${task.key}#${m[2]}` } : undefined;
 }
 
-/** Every decision that can be mentioned, the open ones first, then the latest asked. */
-export function mentionable(c: Collections): Found[] {
+/**
+ * Every decision that can be mentioned, the open ones first, then the latest
+ * asked. Give it the live decisions, and every task by id: an archived
+ * task's decisions are mentionable, a trashed task's are not.
+ */
+export function mentionable(decisions: Decision[], tasks: Dict<Task>): Found[] {
   const byTask = new Map<string, Decision[]>();
-  for (const d of Object.values(c.decisions)) {
-    if (d.deleted_at) continue;
+  for (const d of decisions) {
     const list = byTask.get(d.task_id) ?? [];
     list.push(d);
     byTask.set(d.task_id, list);
   }
   const out: Found[] = [];
   for (const [taskId, list] of byTask) {
-    const task = c.tasks[taskId];
+    const task = tasks[taskId];
     if (!task || task.deleted_at) continue;
     list.sort(asked).forEach((decision, i) => out.push({ task, decision, ref: `${task.key}#${i + 1}` }));
   }

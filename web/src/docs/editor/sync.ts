@@ -16,6 +16,7 @@ import type { BlockNoteEditor } from "@blocknote/core";
 import { errorMessage } from "@/lib/api";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
+import { getRowEvenIfGone } from "@/lib/selectors";
 import { onEvents, useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { FeedEvent } from "@/lib/types";
@@ -200,7 +201,8 @@ export class DocSync {
   private onStore = () => {
     if (this.dead) return;
     setTimeout(() => {
-      const doc = useStore.getState().collections.docs[this.docId];
+      // A page put in the trash while open is still the page on screen.
+      const doc = getRowEvenIfGone("docs", this.docId);
       if (this.dead || this.pending > 0 || !doc || (doc.content_seq ?? 0) <= this.seq) return;
       this.seq = doc.content_seq ?? 0;
       void this.resync(false);

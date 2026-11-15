@@ -37,21 +37,23 @@ function GalleryCard({
 }
 
 /** Rows as cards, each with a picture: the cover of the row's page, or the first image in it. */
-export function GalleryView({ db, view, rows, onOpen, onAdd }: ViewProps) {
+export function GalleryView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps) {
   const props = shownProps(db.table.props, view).slice(0, 4);
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3 pt-1 pb-3 max-sm:grid-cols-2 max-sm:gap-2">
       {rows.map((row) => (
         <GalleryCard key={row.id} row={row} cells={db.cells[row.id]} props={props} onOpen={onOpen} />
       ))}
-      <button
-        type="button"
-        onClick={() => onOpen(onAdd())}
-        className="flex min-h-32 items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong text-sm text-ink-3 hover:bg-hover hover:text-ink"
-      >
-        <Plus className="size-4" aria-hidden />
-        {t("db.newRow")}
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={() => onOpen(onAdd())}
+          className="flex min-h-32 items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong text-sm text-ink-3 hover:bg-hover hover:text-ink"
+        >
+          <Plus className="size-4" aria-hidden />
+          {t("db.newRow")}
+        </button>
+      )}
     </div>
   );
 }

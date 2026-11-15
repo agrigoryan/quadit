@@ -1,10 +1,10 @@
 import { FilePlus2, FileText } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useProjectByKey, useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { useLookupEvenIfGone, useProjectByKey, useSlug } from "@/lib/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { DocsAreaProvider, projectDocs, useDocsArea, workspaceDocs } from "@/docs/area";
 import { inProject, treeIsEmpty, useDocTree } from "@/docs/data";
@@ -49,12 +49,16 @@ function Area() {
   const tree = useDocTree(project?.id);
   // A page that is not one of this project's (its project was just changed, or the address is old)
   // goes on where it is now: in its own project's Docs, or in the workspace's.
-  const elsewhere = useStore((s) => {
-    const doc = id ? s.collections.docs[id] : undefined;
-    if (!project || !doc || inProject(s.collections.docs, doc.id, project.id)) return undefined;
-    const own = doc.project_id ? s.collections.projects[doc.project_id] : undefined;
+  // A trashed page opens too (to be restored), and its own project may be archived.
+  const docs = useLookupEvenIfGone("docs");
+  const projects = useLookupEvenIfGone("projects");
+  const elsewhere = useMemo(() => {
+    const doc = id ? docs[id] : undefined;
+    if (!project || !doc || inProject(docs, doc.id, project.id)) return undefined;
+    const own = doc.project_id ? projects[doc.project_id] : undefined;
     return own ? projectDocs(slug, own) : workspaceDocs(slug);
-  });
+  }, [docs, projects, id, project, slug]);
+  const can = useCan();
 
   if (elsewhere) return <Navigate to={`${elsewhere}/${id}`} replace />;
   if (project && !id && treeIsEmpty(tree)) return <ProjectDocsHome project={project} empty />;
@@ -71,10 +75,17 @@ function Area() {
             {project && <ProjectGlyph project={project} />}
             <span className="truncate">{t("docs.title")}</span>
           </h1>
-          <Button variant="ghost" size="sm" onClick={() => createAndOpen({ projectId: project?.id })} className="gap-1">
-            <FilePlus2 className="size-3.5" />
-            {t("docs.new.page")}
-          </Button>
+          {can.edit(project?.id) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => createAndOpen({ projectId: project?.id })}
+              className="gap-1"
+            >
+              <FilePlus2 className="size-3.5" />
+              {t("docs.new.page")}
+            </Button>
+          )}
         </div>
         <DocsTree tree={tree} className="flex-1" />
       </aside>
@@ -87,15 +98,18 @@ function Area() {
 
 function DocsHome() {
   usePageTitle(t("docs.title"));
+  const can = useCan();
   return (
     <EmptyState
       icon={<FileText />}
       title={t("docs.home.title")}
       hint={t("docs.home.hint")}
       action={
-        <Button variant="primary" onClick={() => createAndOpen({})}>
-          {t("docs.new.page")}
-        </Button>
+        can.edit() && (
+          <Button variant="primary" onClick={() => createAndOpen({})}>
+            {t("docs.new.page")}
+          </Button>
+        )
       }
     />
   );

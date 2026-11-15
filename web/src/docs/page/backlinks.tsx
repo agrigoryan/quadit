@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
+import { useLookup, useLookupEvenIfGone } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
-import { docTitle, useDocs } from "@/docs/data";
+import { docTitle } from "@/docs/data";
 import { openDoc, openTask } from "@/docs/nav";
 import { PageIcon } from "@/docs/page-icon";
 import { useDocsStore } from "@/docs/store";
@@ -39,16 +39,17 @@ export function useBacklinks(docId: string): Backlink[] {
 
 export function BacklinksDialog({ docId, open, onClose }: { docId: string; open: boolean; onClose: () => void }) {
   const links = useBacklinks(docId);
-  const tasks = useCollection("tasks");
-  const statuses = useCollection("statuses");
+  const tasks = useLookup("tasks");
+  // A trashed or archived task is known, only not listed.
+  const known = useLookupEvenIfGone("tasks");
+  // The status a task is in, one deleted since included.
+  const statuses = useLookupEvenIfGone("statuses");
   const restLoaded = useRestLoaded();
-  const docs = useDocs();
+  const docs = useLookup("docs");
   const row = "flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-sm hover:bg-hover";
   // A task that is not in the copy: finished and still on its way, or in a project this person cannot see.
-  const unknown = links.filter((l) => l.kind === "task" && !tasks[l.id]).length;
-  const shown = links.filter((l) =>
-    l.kind === "task" ? !!tasks[l.id] && !tasks[l.id]?.deleted_at : !!docs[l.id] && !docs[l.id]?.deleted_at,
-  );
+  const unknown = links.filter((l) => l.kind === "task" && !known[l.id]).length;
+  const shown = links.filter((l) => (l.kind === "task" ? !!tasks[l.id] : !!docs[l.id]));
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()} title={t("docs.backlinks.title")} size="sm">
       {shown.length === 0 && unknown === 0 ? (

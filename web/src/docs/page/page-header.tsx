@@ -7,10 +7,10 @@ import { Fragment } from "react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/lib/selectors";
 import { useDocsArea } from "@/docs/area";
 import { useOpenThreads } from "@/docs/comments/panel";
-import { docTitle, pathTo, useDocs } from "@/docs/data";
+import { docTitle, pathTo } from "@/docs/data";
 import { tintOf } from "@/docs/presence-tint";
 import { PageMenu } from "@/docs/page/page-menu";
 import { ProjectField } from "@/docs/page/project-field";
@@ -34,8 +34,9 @@ function pathIn(above: Doc[], projectId: string | undefined): Doc[] {
 
 export function PageHeader({ doc }: { doc: Doc }) {
   const { base, project } = useDocsArea();
-  const docs = useDocs();
-  const members = useCollection("members");
+  // The path as the page hangs, a trashed page above it included.
+  const docs = useLookupEvenIfGone("docs");
+  const members = useLookupEvenIfGone("members");
   const path = pathIn(pathTo(docs, doc.id), project?.id);
   const others = useDocsStore((s) => s.presence[doc.id]) ?? NO_OTHERS;
   const saving = usePageUi((s) => s.saving[doc.id]);

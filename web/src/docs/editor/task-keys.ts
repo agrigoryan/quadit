@@ -4,8 +4,7 @@
 // brackets ("[[Art guide]]", when exactly one page has that title).
 
 import { SuggestionMenu } from "@blocknote/core/extensions";
-import { findTaskByKey } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getTaskByKeyEvenIfGone } from "@/lib/selectors";
 import { findDecision } from "@/docs/editor/decision-refs";
 import { pageByTitle } from "@/docs/editor/refs";
 import type { AnyEditor } from "@/docs/editor/sync";
@@ -32,8 +31,6 @@ export function chipTyped(editor: AnyEditor) {
     undefined,
     "￼",
   );
-  const { collections: c } = getState();
-
   const put = (from: number, to: number, type: string, props: Record<string, string>) => {
     const node = nodes[type];
     if (!node) return;
@@ -45,14 +42,14 @@ export function chipTyped(editor: AnyEditor) {
 
   const page = TYPED_PAGE.exec(before);
   if (page) {
-    const doc = pageByTitle(c, page[1] as string);
+    const doc = pageByTitle(page[1] as string);
     if (doc) put(sel.from - page[0].length, sel.from, "pageLink", { doc: doc.id });
     return;
   }
 
   const decision = TYPED_DECISION.exec(before);
   if (decision) {
-    const found = findDecision(c, decision[2] as string);
+    const found = findDecision(decision[2] as string);
     const end = sel.from - (decision[3] as string).length;
     if (found) put(end - (decision[2] as string).length, end, "decisionChip", { key: found.ref });
     return;
@@ -61,7 +58,8 @@ export function chipTyped(editor: AnyEditor) {
   const m = TYPED_TASK.exec(before);
   if (!m) return;
   const key = m[2] as string;
-  const task = findTaskByKey(c.tasks, key);
+  // An archived task still gets its chip; a trashed one's key stays text.
+  const task = getTaskByKeyEvenIfGone(key);
   if (!task || task.deleted_at) return;
   const end = sel.from - (m[3] as string).length;
   put(end - key.length, end, "taskChip", { key });

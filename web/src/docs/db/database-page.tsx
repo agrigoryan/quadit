@@ -36,7 +36,7 @@ const VIEWS: Record<ViewType, (props: ViewProps) => React.ReactNode> = {
  * which row are open is in the address (?v= and ?peek=), so a link lands
  * on the same thing.
  */
-export default function DatabaseView({ doc }: { doc: Doc }) {
+export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
   const db = useDatabase(doc.id);
   const views = useViews(doc.id);
   const loaded = useDocsStore((s) => !!s.meta[doc.id]);
@@ -48,13 +48,13 @@ export default function DatabaseView({ doc }: { doc: Doc }) {
     if (!loaded) ensureDatabase(doc.id);
   }, [loaded, doc.id]);
 
-  // A database with no view yet gets a table, once.
+  // A database with no view yet gets a table, once (by one who may change it).
   const made = useRef(false);
   useEffect(() => {
-    if (!loaded || views.length > 0 || made.current) return;
+    if (!loaded || views.length > 0 || made.current || readOnly) return;
     made.current = true;
     createView(doc.id, "table", t("db.view.table"));
-  }, [loaded, views.length, doc.id]);
+  }, [loaded, views.length, doc.id, readOnly]);
 
   const setParam = useCallback(
     (name: string, value: string | null) =>
@@ -97,9 +97,15 @@ export default function DatabaseView({ doc }: { doc: Doc }) {
   return (
     <section aria-label={doc.title} className="flex min-w-0 flex-col px-4 pt-2 pb-24 sm:px-8">
       <div className="flex items-center gap-1 border-b border-line">
-        <ViewTabs databaseId={doc.id} views={views} active={view} onPick={(id) => setParam("v", id)} />
-        <ViewToolbar view={view} props={db.table.props} />
-        {view.type !== "form" && (
+        <ViewTabs
+          databaseId={doc.id}
+          views={views}
+          active={view}
+          onPick={(id) => setParam("v", id)}
+          readOnly={readOnly}
+        />
+        <ViewToolbar view={view} props={db.table.props} readOnly={readOnly} />
+        {view.type !== "form" && !readOnly && (
           <Button variant="primary" size="sm" className="ml-1 shrink-0" onClick={() => openRow(addRow())}>
             <Plus className="size-3.5" aria-hidden />
             <span className="max-sm:hidden">{t("db.new")}</span>
@@ -108,9 +114,9 @@ export default function DatabaseView({ doc }: { doc: Doc }) {
         )}
       </div>
       <div className="min-w-0 pt-2">
-        <Body db={db} view={view} rows={rows} onOpen={openRow} onAdd={addRow} />
+        <Body db={db} view={view} rows={rows} onOpen={openRow} onAdd={addRow} readOnly={readOnly} />
       </div>
-      {peek && <RowPeek rowId={peek} onClose={closeRow} />}
+      {peek && <RowPeek rowId={peek} onClose={closeRow} readOnly={readOnly} />}
     </section>
   );
 }

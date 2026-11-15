@@ -3,8 +3,7 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useLiveTasks } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useLiveTasks, useLookupEvenIfGone, useMe, useRows } from "@/lib/selectors";
 import { docTitle, useLinkablePages } from "@/docs/data";
 import { decisionStateText } from "@/docs/editor/chips";
 import { mentionable } from "@/docs/editor/decision-refs";
@@ -49,7 +48,8 @@ export function ChipPicker({ kind, onClose, onPick }: Props) {
 
 function TaskList({ onPick }: { onPick: (key: string) => void }) {
   const tasks = useLiveTasks();
-  const statuses = useStore((s) => s.collections.statuses);
+  // The status each task is in, one deleted since included.
+  const statuses = useLookupEvenIfGone("statuses");
   const items = useMemo(
     () =>
       [...tasks]
@@ -68,11 +68,13 @@ function TaskList({ onPick }: { onPick: (key: string) => void }) {
 }
 
 function DecisionList({ onPick }: { onPick: (ref: string) => void }) {
-  const c = useStore((s) => s.collections);
-  const me = useStore((s) => s.me?.user_id);
+  const decisions = useRows("decisions");
+  // An archived task's decisions are mentionable; mentionable() leaves out a trashed task's.
+  const tasks = useLookupEvenIfGone("tasks");
+  const me = useMe()?.user_id;
   const items = useMemo(
     () =>
-      mentionable(c)
+      mentionable(decisions, tasks)
         .slice(0, 400)
         .map((f) => ({
           id: f.ref,
@@ -81,7 +83,7 @@ function DecisionList({ onPick }: { onPick: (ref: string) => void }) {
           hint: `${f.task.key} · ${decisionStateText(f.decision)}`,
           icon: <DecisionMark mine={f.decision.state === "open" && f.decision.asked_id === me} />,
         })),
-    [c, me],
+    [decisions, tasks, me],
   );
   return (
     <PickerList items={items} onPick={onPick} label={t("docs.slash.decision")} placeholder={t("docs.pick.decision")} />

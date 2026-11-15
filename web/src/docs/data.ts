@@ -3,8 +3,8 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useCollection, useMe } from "@/lib/selectors";
-import { type Dict, getState, useStore } from "@/lib/store";
+import { useLookup, useMe, useRows as useLiveRows } from "@/lib/selectors";
+import { type Dict, getState } from "@/lib/store";
 import { useDocsStore } from "@/docs/store";
 import type { DBProperty, DBView, Doc, DocComment } from "@/lib/types-docs";
 
@@ -12,17 +12,6 @@ export const byRank = (a: { rank: string; id: string }, b: { rank: string; id: s
   a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.id < b.id ? -1 : 1;
 
 export const docTitle = (doc: Pick<Doc, "title"> | undefined) => doc?.title?.trim() || t("docs.untitled");
-
-export function useDocs(): Dict<Doc> {
-  return useCollection("docs");
-}
-
-export function useDoc(id: string | undefined): Doc | undefined {
-  return useStore((s) => (id ? s.collections.docs[id] : undefined));
-}
-
-export const getDoc = (id: string): Doc | undefined => getState().collections.docs[id];
-export const getDocs = (): Dict<Doc> => getState().collections.docs;
 
 /**
  * True unless the person is limited to some projects and the page is tied
@@ -58,8 +47,7 @@ export interface DocTree {
 function buildTree(docs: Dict<Doc>, userId: string): DocTree {
   const roots: DocTree["roots"] = { team: [], private: [], memory: [], generated: [] };
   const children: Dict<Doc[]> = {};
-  const shown = (d: Doc | undefined): d is Doc =>
-    !!d && !d.deleted_at && !d.archived_at && d.kind !== "row" && canSee(d, userId);
+  const shown = (d: Doc | undefined): d is Doc => !!d && d.kind !== "row" && canSee(d, userId);
   for (const doc of Object.values(docs)) {
     if (!shown(doc)) continue;
     const parent = doc.parent_id ? docs[doc.parent_id] : undefined;
@@ -90,7 +78,7 @@ function projectTree(tree: DocTree, projectId: string): DocTree {
 
 /** The page tree: the whole workspace's, or one project's. */
 export function useDocTree(projectId?: string): DocTree {
-  const docs = useDocs();
+  const docs = useLookup("docs");
   const me = useMe();
   return useMemo(() => {
     const tree = buildTree(docs, me.user_id);
@@ -161,14 +149,9 @@ export function isWithin(docs: Dict<Doc>, id: string, ancestor: string): boolean
 
 /** A database's rows, in manual order. */
 export function useRows(databaseId: string | undefined): Doc[] {
-  const docs = useDocs();
+  const docs = useLiveRows("docs");
   return useMemo(
-    () =>
-      databaseId
-        ? Object.values(docs)
-            .filter((d) => d.parent_id === databaseId && d.kind === "row" && !d.deleted_at)
-            .sort(byRank)
-        : [],
+    () => (databaseId ? docs.filter((d) => d.parent_id === databaseId && d.kind === "row").sort(byRank) : []),
     [docs, databaseId],
   );
 }
@@ -201,24 +184,22 @@ export function useViews(databaseId: string | undefined): DBView[] {
 
 /** The comments of a page and its blocks, oldest first. */
 export function useDocComments(docId: string): DocComment[] {
-  const comments = useCollection("comments");
+  const comments = useLiveRows("comments");
   return useMemo(
     () =>
-      Object.values(comments)
-        .filter((c) => c.doc_id === docId && !c.deleted_at)
-        .sort((a, b) => a.created_at - b.created_at || (a.id < b.id ? -1 : 1)),
+      comments.filter((c) => c.doc_id === docId).sort((a, b) => a.created_at - b.created_at || (a.id < b.id ? -1 : 1)),
     [comments, docId],
   );
 }
 
 /** Pages a person may link to or move under: everything visible that is not a row. */
 export function useLinkablePages(): Doc[] {
-  const docs = useDocs();
+  const docs = useLiveRows("docs");
   const me = useMe();
   return useMemo(
     () =>
-      Object.values(docs)
-        .filter((d) => !d.deleted_at && !d.archived_at && d.kind !== "row" && canSee(d, me.user_id))
+      docs
+        .filter((d) => d.kind !== "row" && canSee(d, me.user_id))
         .sort((a, b) => docTitle(a).localeCompare(docTitle(b))),
     [docs, me.user_id],
   );

@@ -1,4 +1,5 @@
 import { Trash2, Undo2 } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 
 import { restoreDoc } from "@/docs/actions";
@@ -11,6 +12,7 @@ import { Ago } from "@/ui/ago";
 /** The trash for pages: what was deleted, each with a way back. In a project's Docs, that project's deleted pages. */
 export function TrashButton({ projectId }: { projectId?: string }) {
   const trashed = useTrashed(projectId);
+  const can = useCan();
   return (
     <Popover onOpenChange={(open) => open && void loadTrash()}>
       <PopoverTrigger asChild>
@@ -35,15 +37,17 @@ export function TrashButton({ projectId }: { projectId?: string }) {
                 <span className="shrink-0 text-xs text-ink-3">
                   <Ago ms={item.deleted_at} />
                 </span>
-                <button
-                  type="button"
-                  aria-label={t("docs.trash.restore")}
-                  title={t("docs.trash.restore")}
-                  onClick={() => restoreDoc(item.id)}
-                  className="flex size-6 shrink-0 items-center justify-center rounded-sm text-ink-2 hover:bg-press hover:text-ink"
-                >
-                  <Undo2 className="size-3.5" />
-                </button>
+                {can.edit(item.project_id) && (
+                  <button
+                    type="button"
+                    aria-label={t("docs.trash.restore")}
+                    title={t("docs.trash.restore")}
+                    onClick={() => restoreDoc(item.id)}
+                    className="flex size-6 shrink-0 items-center justify-center rounded-sm text-ink-2 hover:bg-press hover:text-ink"
+                  >
+                    <Undo2 className="size-3.5" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>

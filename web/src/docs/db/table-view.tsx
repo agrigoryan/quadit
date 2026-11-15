@@ -30,7 +30,7 @@ interface Active {
  * keyboard, arrows move, Enter opens the cell, typing starts writing,
  * Backspace clears, Space opens the row, Tab goes on to the next cell.
  */
-export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
+export function TableView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps) {
   const props = useMemo(() => shownProps(db.table.props, view), [db.table.props, view]);
   const [active, setActive] = useState<Active | null>(null);
   const [editing, setEditing] = useState<{ seed?: string } | null>(null);
@@ -81,10 +81,14 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
     if (document.activeElement !== grid.current) grid.current?.focus({ preventScroll: true });
   }, []);
 
-  const onEditing = useCallback((row: string, col: string, on: boolean) => {
-    if (on) setActive({ row, col });
-    setEditing(on ? {} : null);
-  }, []);
+  const onEditing = useCallback(
+    (row: string, col: string, on: boolean) => {
+      if (on && readOnly) return;
+      if (on) setActive({ row, col });
+      setEditing(on ? {} : null);
+    },
+    [readOnly],
+  );
 
   function move(dRow: number, dCol: number, wrap = false) {
     if (!active) return;
@@ -125,16 +129,18 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
     if (arrow) {
       e.preventDefault();
       move(arrow[0], arrow[1]);
+    } else if (e.key === " ") {
+      e.preventDefault();
+      onOpen(active.row);
+    } else if (e.key === "Escape") {
+      setActive(null);
+    } else if (readOnly) {
+      // Moving about and opening rows only.
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (prop?.type === "checkbox")
         setRowProps(active.row, { [prop.id]: rows.find((r) => r.id === active.row)?.props?.[prop.id] !== true });
       else if (!prop || !isComputed(prop)) setEditing({});
-    } else if (e.key === "Escape") {
-      setActive(null);
-    } else if (e.key === " ") {
-      e.preventDefault();
-      onOpen(active.row);
     } else if ((e.key === "Backspace" || e.key === "Delete") && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       move(1, 0);
@@ -192,6 +198,7 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
                   key={p.id}
                   prop={p}
                   view={view}
+                  readOnly={readOnly}
                   width={widths[p.id] ?? 160}
                   open={openProp === p.id}
                   onOpenChange={(open) => setOpenProp(open ? p.id : null)}
@@ -203,15 +210,17 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
               ))}
             </SortableContext>
           </DndContext>
-          <AddPropertyMenu databaseId={db.table.doc.id} onCreated={setOpenProp} align="end">
-            <button
-              type="button"
-              aria-label={t("db.prop.add")}
-              className="flex h-8 w-10 shrink-0 items-center justify-center text-ink-3 hover:bg-hover hover:text-ink"
-            >
-              <Plus className="size-4" aria-hidden />
-            </button>
-          </AddPropertyMenu>
+          {!readOnly && (
+            <AddPropertyMenu databaseId={db.table.doc.id} onCreated={setOpenProp} align="end">
+              <button
+                type="button"
+                aria-label={t("db.prop.add")}
+                className="flex h-8 w-10 shrink-0 items-center justify-center text-ink-3 hover:bg-hover hover:text-ink"
+              >
+                <Plus className="size-4" aria-hidden />
+              </button>
+            </AddPropertyMenu>
+          )}
           <div className="flex-1" />
         </div>
 
@@ -230,18 +239,21 @@ export function TableView({ db, view, rows, onOpen, onAdd }: ViewProps) {
               onActive={onActive}
               onEditing={onEditing}
               onOpen={onOpen}
+              readOnly={readOnly}
             />
           );
         })}
       </div>
-      <button
-        type="button"
-        onClick={addRow}
-        className="sticky left-0 flex h-8 w-full items-center gap-1.5 px-2 text-sm text-ink-3 hover:bg-hover hover:text-ink"
-      >
-        <Plus className="size-4" aria-hidden />
-        {t("db.newRow")}
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={addRow}
+          className="sticky left-0 flex h-8 w-full items-center gap-1.5 px-2 text-sm text-ink-3 hover:bg-hover hover:text-ink"
+        >
+          <Plus className="size-4" aria-hidden />
+          {t("db.newRow")}
+        </button>
+      )}
       <p className="sticky left-0 px-2 pt-1 text-xs text-ink-3 tnum">{t("db.rowCount", { n: rows.length })}</p>
     </div>
   );

@@ -4,10 +4,10 @@
 import { useEffect, useMemo } from "react";
 import { ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { useCollection, useMe } from "@/lib/selectors";
+import { useLookup, useLookupEvenIfGone, useMe } from "@/lib/selectors";
 import { type Dict, useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { byRank, canSee, useDocs } from "@/docs/data";
+import { byRank, canSee } from "@/docs/data";
 import { type Cells, computeCells, type TableData, type World } from "@/docs/db/compute";
 import { loadPage, useDocsStore } from "@/docs/store";
 import type { DBProperty, DBView, Doc } from "@/lib/types-docs";
@@ -41,16 +41,17 @@ useStore.subscribe((s, prev) => {
   if (s.stream === "live" && prev.stream !== "live") for (const id of [...failed]) ensureDatabase(id);
 });
 
+/** A database and its rows, out of the live pages. */
 function tableOf(docs: Dict<Doc>, props: Dict<DBProperty>, databaseId: string, userId: string): TableData | null {
   const doc = docs[databaseId];
-  if (!doc || doc.deleted_at || !canSee(doc, userId)) return null;
+  if (!doc || !canSee(doc, userId)) return null;
   return {
     doc,
     props: Object.values(props)
       .filter((p) => p.database_id === databaseId && !p.deleted_at)
       .sort(byRank),
     rows: Object.values(docs)
-      .filter((d) => d.parent_id === databaseId && d.kind === "row" && !d.deleted_at)
+      .filter((d) => d.parent_id === databaseId && d.kind === "row")
       .sort(byRank),
   };
 }
@@ -63,9 +64,10 @@ export interface Database {
 
 /** The database with every cell computed, or null while it is not in the workspace copy. */
 export function useDatabase(databaseId: string | undefined): Database | null {
-  const docs = useDocs();
+  const docs = useLookup("docs");
   const props = useDocsStore((s) => s.props);
-  const members = useCollection("members");
+  // A removed member's handle stays on the rows they made.
+  const members = useLookupEvenIfGone("members");
   const me = useMe();
 
   const out = useMemo(() => {
@@ -125,6 +127,8 @@ export interface ViewProps {
   onOpen: (rowId: string) => void;
   /** Adds a row with these values (on top of what the view's filters imply) and answers its id. */
   onAdd: (values?: Record<string, unknown>, title?: string) => string;
+  /** Shown, not changed: no new rows, no edits, no moves, and the view's own settings stay as they are. */
+  readOnly: boolean;
 }
 
 /**

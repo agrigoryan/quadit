@@ -6,9 +6,10 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
+import { getLookupEvenIfGone, getRow, getRowEvenIfGone, getRows } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import { getDoc, getDocs, sameProjectBelow } from "@/docs/data";
+import { sameProjectBelow } from "@/docs/data";
 import { loadPage } from "@/docs/store";
 import type { Doc, DocComment, DocKind } from "@/lib/types-docs";
 
@@ -35,8 +36,8 @@ export interface NewDoc {
 /** The rank that puts a new page last among the pages under a parent. */
 export function lastRank(parentId: string | undefined): string {
   let last = "";
-  for (const d of Object.values(getDocs())) {
-    if ((d.parent_id ?? "") === (parentId ?? "") && !d.deleted_at && d.rank > last) last = d.rank;
+  for (const d of getRows("docs")) {
+    if ((d.parent_id ?? "") === (parentId ?? "") && d.rank > last) last = d.rank;
   }
   return rankBetween(last || undefined, undefined);
 }
@@ -45,7 +46,7 @@ export function lastRank(parentId: string | undefined): string {
 export function createDoc(input: NewDoc = {}): string {
   const { me } = getState();
   const id = newId();
-  const parent = input.parentId ? getDoc(input.parentId) : undefined;
+  const parent = getRow("docs", input.parentId);
   const rank = input.rank ?? lastRank(input.parentId);
   const kind: DocKind = parent?.kind === "database" && input.kind !== "database" ? "row" : (input.kind ?? "page");
   const args: Changes["doc.create"] = { id, title: input.title ?? "", rank };
@@ -83,7 +84,7 @@ export function createDoc(input: NewDoc = {}): string {
 
 /** Sets simple fields of a page: title, icon, cover. */
 export function updateDoc(id: string, fields: Partial<Pick<Doc, "title" | "icon" | "cover">>) {
-  const doc = getDoc(id);
+  const doc = getRow("docs", id);
   if (!doc) return;
   const changed: Fields = {};
   for (const [key, value] of Object.entries(fields)) {
@@ -99,7 +100,7 @@ export function updateDoc(id: string, fields: Partial<Pick<Doc, "title" | "icon"
 
 /** Moves a page in the tree: under another page (or to the top), at a place among its new siblings. */
 export function moveDoc(id: string, parentId: string | null, rank: string) {
-  const doc = getDoc(id);
+  const doc = getRow("docs", id);
   if (!doc) return;
   const args: Changes["doc.update"] = { id, rank };
   if ((doc.parent_id ?? null) !== parentId) args.parent = parentId;
@@ -132,9 +133,10 @@ export function setSharing(id: string, sharing: { private?: boolean; sharedWith?
  * not among them.
  */
 export function setProject(id: string, projectId: string | null): Doc[] {
-  const doc = getDoc(id);
+  const doc = getRow("docs", id);
   if (!doc || (doc.project_id ?? null) === projectId) return [];
-  const along = sameProjectBelow(getDocs(), doc);
+  // The server takes the trashed pages under it along too, so one restored later comes back where its parent is.
+  const along = sameProjectBelow(getLookupEvenIfGone("docs"), doc);
   send({ type: "doc.update", args: { id, project: projectId } }, (tx) => {
     for (const each of [doc, ...along]) tx.patch("docs", each.id, { project_id: projectId });
   });
@@ -143,17 +145,17 @@ export function setProject(id: string, projectId: string | null): Doc[] {
 
 /** A page and every page under it. */
 function subtree(id: string): Doc[] {
-  const all = Object.values(getDocs());
+  const all = getRows("docs");
   const out: Doc[] = [];
   const walk = (parent: string) => {
     for (const d of all) {
-      if (d.parent_id === parent && !d.deleted_at) {
+      if (d.parent_id === parent) {
         out.push(d);
         walk(d.id);
       }
     }
   };
-  const root = getDoc(id);
+  const root = getRow("docs", id);
   if (root) out.push(root);
   walk(id);
   return out;
@@ -161,9 +163,9 @@ function subtree(id: string): Doc[] {
 
 /** Brings a page back from the trash, with the pages that went with it. */
 export function restoreDoc(id: string) {
-  const known = getDoc(id);
+  const known = getRowEvenIfGone("docs", id);
   const at = known?.deleted_at;
-  const ids = Object.values(getDocs())
+  const ids = Object.values(getLookupEvenIfGone("docs"))
     .filter((d) => d.id === id || (at && d.deleted_at === at))
     .map((d) => d.id);
   mutate({ type: "doc.restore", args: { id } }, (tx) => {
@@ -178,7 +180,7 @@ export function restoreDoc(id: string) {
 
 /** Moves a page and the pages under it to the trash, with a way back. */
 export function trashDoc(id: string) {
-  const doc = getDoc(id);
+  const doc = getRow("docs", id);
   if (!doc) return;
   const all = subtree(id);
   const at = Date.now();
@@ -193,7 +195,7 @@ export function trashDoc(id: string) {
 
 /** Sets values of a database row; null clears one. */
 export function setRowProps(rowId: string, values: Fields) {
-  const row = getDoc(rowId);
+  const row = getRow("docs", rowId);
   if (!row) return;
   const next: Fields = { ...(row.props ?? {}) };
   for (const [key, value] of Object.entries(values)) {

@@ -33,6 +33,8 @@ export interface CellProps {
   /** Shown faintly while the cell is empty. */
   placeholder?: string;
   className?: string;
+  /** Shown, not changed: for one who may not change the database. */
+  readOnly?: boolean;
 }
 
 const INPUT_TYPES = ["text", "number", "url", "date"];
@@ -172,6 +174,7 @@ export function Cell({
   wrap,
   placeholder,
   className,
+  readOnly,
 }: CellProps) {
   const anchor = useRef<HTMLDivElement>(null);
   const box = cx("flex min-h-7 w-full min-w-0 items-center px-2 text-sm", wrap && "py-1", className);
@@ -180,6 +183,7 @@ export function Cell({
   const hint = empty && placeholder ? <span className="truncate text-ink-3">{placeholder}</span> : null;
 
   if (isComputed(prop)) return <div className={cx(box, "text-ink-2")}>{value}</div>;
+  if (readOnly) return <div className={box}>{value}</div>;
 
   if (prop.type === "checkbox") {
     return (

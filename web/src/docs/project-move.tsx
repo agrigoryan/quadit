@@ -5,14 +5,16 @@ import { useMemo } from "react";
 import { t } from "@/lib/i18n";
 import type { Project } from "@/lib/types";
 import { setProject } from "@/docs/actions";
-import { countBelow, docTitle, useDocs, useLinkablePages } from "@/docs/data";
+import { useLookupEvenIfGone } from "@/lib/selectors";
+import { countBelow, docTitle, useLinkablePages } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
 import { Picker } from "@/ui/picker";
 import { Button } from "@/ui/button";
 
 /** A button that lists the pages in no project; each pick moves one into the project. Nothing when every page has one. */
 export function MovePagesHere({ project }: { project: Project }) {
-  const docs = useDocs();
+  // Counted as the project field counts them: through trashed pages too, the trash itself left out (countBelow).
+  const docs = useLookupEvenIfGone("docs");
   const pages = useLinkablePages();
   const items = useMemo(
     () =>

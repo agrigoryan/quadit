@@ -2,6 +2,7 @@
 // owner picks.
 
 import { Check, Link2, Lock, Users } from "lucide-react";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
@@ -20,6 +21,8 @@ export function SharePopover({ doc }: { doc: Doc }) {
   const members = useMembers();
   const isPrivate = !!doc.owner_id;
   const mine = !doc.owner_id || doc.owner_id === me.user_id;
+  const can = useCan();
+  const mayChange = mine && can.edit(doc.project_id);
   const shared = doc.shared_with ?? [];
   const owner = members.find((m) => m.user_id === doc.owner_id);
 
@@ -40,7 +43,7 @@ export function SharePopover({ doc }: { doc: Doc }) {
         <div role="radiogroup" aria-label={t("docs.share.title")}>
           <Choice
             checked={!isPrivate}
-            disabled={!mine}
+            disabled={!mayChange}
             icon={<Users />}
             title={t("docs.share.team")}
             hint={t("docs.share.teamHint")}
@@ -48,7 +51,7 @@ export function SharePopover({ doc }: { doc: Doc }) {
           />
           <Choice
             checked={isPrivate}
-            disabled={!mine}
+            disabled={!mayChange}
             icon={<Lock />}
             title={t("docs.share.private")}
             hint={t("docs.share.privateHint")}
@@ -69,7 +72,7 @@ export function SharePopover({ doc }: { doc: Doc }) {
                       type="button"
                       role="checkbox"
                       aria-checked={shared.includes(m.user_id)}
-                      disabled={!mine}
+                      disabled={!mayChange}
                       onClick={() => toggle(m.user_id)}
                       className="flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-sm hover:bg-hover disabled:hover:bg-transparent"
                     >

@@ -45,10 +45,15 @@ interface CardProps {
   cells: Record<string, Value> | undefined;
   props: DBProperty[];
   onOpen: (rowId: string) => void;
+  /** Cards open, they do not move, and columns take no new ones. */
+  readOnly: boolean;
 }
 
-function Card({ row, cells, props, onOpen }: CardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id });
+function Card({ row, cells, props, onOpen, readOnly }: CardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: row.id,
+    disabled: readOnly,
+  });
   return (
     <div
       ref={setNodeRef}
@@ -79,7 +84,7 @@ interface ColumnProps extends Omit<CardProps, "row" | "cells"> {
   onAdd: (title: string) => void;
 }
 
-function Column({ id, option, rows, allCells, props, onOpen, onAdd }: ColumnProps) {
+function Column({ id, option, rows, allCells, props, onOpen, onAdd, readOnly }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
@@ -100,15 +105,17 @@ function Column({ id, option, rows, allCells, props, onOpen, onAdd }: ColumnProp
       <header className="flex h-9 shrink-0 items-center gap-2 pr-1.5 pl-2.5">
         {option ? <OptionChip option={option} /> : <span className="text-sm font-medium text-ink-2">{name}</span>}
         <span className="flex-1 text-xs text-ink-3 tnum">{formatNumber(rows.length)}</span>
-        <button
-          type="button"
-          aria-label={t("db.board.add", { name })}
-          aria-expanded={adding}
-          onClick={() => setAdding((v) => !v)}
-          className="flex size-6 items-center justify-center rounded-md text-ink-2 hover:bg-hover hover:text-ink"
-        >
-          <Plus className="size-3.5" aria-hidden />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            aria-label={t("db.board.add", { name })}
+            aria-expanded={adding}
+            onClick={() => setAdding((v) => !v)}
+            className="flex size-6 items-center justify-center rounded-md text-ink-2 hover:bg-hover hover:text-ink"
+          >
+            <Plus className="size-3.5" aria-hidden />
+          </button>
+        )}
       </header>
       {adding && (
         <form onSubmit={add} className="px-2 pb-2">
@@ -133,7 +140,7 @@ function Column({ id, option, rows, allCells, props, onOpen, onAdd }: ColumnProp
           )}
         >
           {rows.map((row) => (
-            <Card key={row.id} row={row} cells={allCells[row.id]} props={props} onOpen={onOpen} />
+            <Card key={row.id} row={row} cells={allCells[row.id]} props={props} onOpen={onOpen} readOnly={readOnly} />
           ))}
         </div>
       </SortableContext>
@@ -146,7 +153,7 @@ function Column({ id, option, rows, allCells, props, onOpen, onAdd }: ColumnProp
  * card to another column changes the value; dragging it within a column
  * changes its place in the manual order.
  */
-export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
+export function BoardView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps) {
   const selects = db.table.props.filter((p) => p.type === "select");
   const group = selects.find((p) => p.id === view.config?.group_by) ?? selects[0];
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -188,7 +195,7 @@ export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
         icon={<SquareKanban />}
         title={t("db.board.needsSelect")}
         hint={t("db.board.needsSelectHint")}
-        action={<Button onClick={make}>{t("db.board.addStatus")}</Button>}
+        action={!readOnly && <Button onClick={make}>{t("db.board.addStatus")}</Button>}
       />
     );
   }
@@ -270,6 +277,7 @@ export function BoardView({ db, view, rows, onOpen, onAdd }: ViewProps) {
               props={cardProps}
               onOpen={onOpen}
               onAdd={(title) => onAdd(option ? { [group.id]: option.name } : undefined, title)}
+              readOnly={readOnly}
             />
           );
         })}

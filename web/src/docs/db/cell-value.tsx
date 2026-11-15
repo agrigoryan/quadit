@@ -3,10 +3,10 @@
 
 import { ArrowUpRight, Check } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { useMember } from "@/lib/selectors";
+import { useLookup, useMember } from "@/lib/selectors";
 import { isDay } from "@/lib/days";
 import { formatDay } from "@/lib/time";
-import { docTitle, useDocs } from "@/docs/data";
+import { docTitle } from "@/docs/data";
 import type { Value } from "@/docs/db/formula";
 import { formulaText } from "@/docs/db/formula-values";
 import { findOption, OptionChip } from "@/docs/db/options";
@@ -45,12 +45,12 @@ function MemberValue({ userId, fallback }: { userId: string; fallback: string })
 }
 
 function RelationValue({ ids, wrap }: { ids: string[]; wrap?: boolean }) {
-  const docs = useDocs();
+  const docs = useLookup("docs");
   return (
     <span className={cx("flex min-w-0 gap-1", wrap ? "flex-wrap" : "overflow-hidden")}>
       {ids.map((id) => {
         const row = docs[id];
-        if (!row || row.deleted_at) return null;
+        if (!row) return null;
         return (
           <span
             key={id}

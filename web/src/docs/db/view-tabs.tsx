@@ -13,6 +13,8 @@ interface Props {
   views: DBView[];
   active: DBView | undefined;
   onPick: (viewId: string) => void;
+  /** Tabs to switch between, without the menus that change views. */
+  readOnly: boolean;
 }
 
 const tabBase =
@@ -24,7 +26,7 @@ const tabOn = `${tabBase} border-accent text-ink`;
  * A database's views as tabs. Click the open tab for its menu: rename,
  * change how it shows, move it, delete it. The plus adds a view.
  */
-export function ViewTabs({ databaseId, views, active, onPick }: Props) {
+export function ViewTabs({ databaseId, views, active, onPick, readOnly }: Props) {
   const [renaming, setRenaming] = useState<string | null>(null);
 
   /** Swaps a view with its neighbour by giving it a rank on the other side. */
@@ -74,14 +76,14 @@ export function ViewTabs({ databaseId, views, active, onPick }: Props) {
               />
             );
           }
-          if (!on) {
+          if (!on || readOnly) {
             return (
               <button
                 key={view.id}
                 type="button"
                 role="tab"
-                aria-selected={false}
-                className={tab}
+                aria-selected={on}
+                className={on ? tabOn : tab}
                 onClick={() => onPick(view.id)}
               >
                 <Icon aria-hidden />
@@ -134,25 +136,27 @@ export function ViewTabs({ databaseId, views, active, onPick }: Props) {
           );
         })}
       </div>
-      <Menu>
-        <MenuTrigger
-          aria-label={t("db.view.add")}
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover"
-        >
-          <Plus className="size-4" aria-hidden />
-        </MenuTrigger>
-        <MenuContent>
-          <MenuLabel>{t("db.view.add")}</MenuLabel>
-          {VIEW_TYPES.map((type) => {
-            const TypeIcon = VIEW_ICONS[type];
-            return (
-              <MenuItem key={type} icon={<TypeIcon />} onSelect={() => add(type)}>
-                {viewTypeName(type)}
-              </MenuItem>
-            );
-          })}
-        </MenuContent>
-      </Menu>
+      {!readOnly && (
+        <Menu>
+          <MenuTrigger
+            aria-label={t("db.view.add")}
+            className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 hover:bg-hover hover:text-ink data-[state=open]:bg-hover"
+          >
+            <Plus className="size-4" aria-hidden />
+          </MenuTrigger>
+          <MenuContent>
+            <MenuLabel>{t("db.view.add")}</MenuLabel>
+            {VIEW_TYPES.map((type) => {
+              const TypeIcon = VIEW_ICONS[type];
+              return (
+                <MenuItem key={type} icon={<TypeIcon />} onSelect={() => add(type)}>
+                  {viewTypeName(type)}
+                </MenuItem>
+              );
+            })}
+          </MenuContent>
+        </Menu>
+      )}
     </div>
   );
 }

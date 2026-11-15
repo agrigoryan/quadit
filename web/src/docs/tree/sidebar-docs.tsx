@@ -3,6 +3,7 @@
 
 import { ChevronRight, Plus } from "lucide-react";
 import { NavLink, useNavigate } from "react-router";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMe, useSlug } from "@/lib/selectors";
@@ -72,23 +73,26 @@ export function SidebarDocs({ collapsed }: { collapsed: boolean }) {
   const me = useMe();
   const tree = useDocTree();
   const navigate = useNavigate();
+  const can = useCan();
   if (collapsed) return null;
   const roots = [...tree.roots.team, ...tree.roots.private.filter((d) => d.owner_id === me.user_id)];
   return (
     <NavSection title={t("nav.docs")}>
       <div className="relative">
-        <button
-          type="button"
-          aria-label={t("docs.new.blank")}
-          title={t("docs.new.blank")}
-          onClick={() => {
-            ui.setDrawer(false);
-            void navigate(docPath(slug, createDoc()));
-          }}
-          className="absolute -top-6 right-1 flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink"
-        >
-          <Plus className="size-3.5" />
-        </button>
+        {can.edit() && (
+          <button
+            type="button"
+            aria-label={t("docs.new.blank")}
+            title={t("docs.new.blank")}
+            onClick={() => {
+              ui.setDrawer(false);
+              void navigate(docPath(slug, createDoc()));
+            }}
+            className="absolute -top-6 right-1 flex size-5 items-center justify-center rounded-sm text-ink-3 hover:bg-press hover:text-ink"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        )}
         {roots.length === 0 && <p className="px-2 py-1 text-xs text-ink-3">{t("docs.section.teamEmpty")}</p>}
         {roots.slice(0, 12).map((doc) => (
           <Row key={doc.id} doc={doc} tree={tree} depth={0} slug={slug} parentProject={undefined} />

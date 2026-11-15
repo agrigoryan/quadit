@@ -3,9 +3,9 @@ import { ChevronsRight, Maximize2, Trash2 } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useSlug } from "@/lib/selectors";
+import { useRow, useSlug } from "@/lib/selectors";
 import { trashDoc } from "@/docs/actions";
-import { docTitle, useDoc } from "@/docs/data";
+import { docTitle } from "@/docs/data";
 import { IconButton } from "@/ui/button";
 import { Loading } from "@/ui/spinner";
 import { Tooltip } from "@/ui/tooltip";
@@ -19,10 +19,10 @@ const PageBody = lazy(() => import("@/docs/page/page-body").then((m) => ({ defau
  * panel at the right (the whole screen on a phone). The database stays in
  * reach behind it. Escape closes it, unless the caret is in the page's text.
  */
-export function RowPeek({ rowId, onClose }: { rowId: string; onClose: () => void }) {
-  const row = useDoc(rowId);
+export function RowPeek({ rowId, onClose, readOnly }: { rowId: string; onClose: () => void; readOnly: boolean }) {
+  const row = useRow("docs", rowId);
   const slug = useSlug();
-  const gone = !row || !!row.deleted_at;
+  const gone = !row;
   useEffect(() => {
     if (gone) onClose();
   }, [gone, onClose]);
@@ -59,15 +59,17 @@ export function RowPeek({ rowId, onClose }: { rowId: string; onClose: () => void
               </Link>
             </Tooltip>
             <span className="flex-1" />
-            <IconButton
-              label={t("db.row.delete")}
-              onClick={() => {
-                trashDoc(row.id);
-                onClose();
-              }}
-            >
-              <Trash2 className="size-4" />
-            </IconButton>
+            {!readOnly && (
+              <IconButton
+                label={t("db.row.delete")}
+                onClick={() => {
+                  trashDoc(row.id);
+                  onClose();
+                }}
+              >
+                <Trash2 className="size-4" />
+              </IconButton>
+            )}
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <Suspense fallback={<Loading />}>

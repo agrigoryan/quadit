@@ -7,7 +7,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api, errorMessage, workspacePath } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { keepVersion, revertTo } from "@/docs/actions";
@@ -25,12 +25,15 @@ interface Props {
   doc: Doc;
   /** False for pages that cannot be edited here: they can be looked at, not put back. */
   canRestore: boolean;
+  /** False for one who may not change the page: no new version either. */
+  canKeep: boolean;
   onClose: () => void;
 }
 
-export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
+export default function VersionsDialog({ doc, canRestore, canKeep, onClose }: Props) {
   const slug = useSlug();
-  const members = useCollection("members");
+  // Who kept each version, one since removed from the workspace included.
+  const members = useLookupEvenIfGone("members");
   const [versions, setVersions] = useState<DocVersion[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [shown, setShown] = useState<{ id: string; blocks: BlockTree[] } | null>(null);
@@ -108,30 +111,32 @@ export default function VersionsDialog({ doc, canRestore, onClose }: Props) {
     >
       <div className="flex min-h-[50vh] flex-col gap-3 sm:flex-row">
         <div className="flex w-full shrink-0 flex-col gap-2 sm:w-60">
-          <form
-            className="flex gap-1.5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void keep();
-            }}
-          >
-            <Input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={t("docs.versions.labelPlaceholder")}
-              aria-label={t("docs.versions.labelPlaceholder")}
-              className="h-7"
-            />
-            <Button
-              type="submit"
-              disabled={busy}
-              title={t("docs.versions.keepNow")}
-              aria-label={t("docs.versions.keepNow")}
-              className="px-2"
+          {canKeep && (
+            <form
+              className="flex gap-1.5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void keep();
+              }}
             >
-              <BookmarkPlus className="size-4" />
-            </Button>
-          </form>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={t("docs.versions.labelPlaceholder")}
+                aria-label={t("docs.versions.labelPlaceholder")}
+                className="h-7"
+              />
+              <Button
+                type="submit"
+                disabled={busy}
+                title={t("docs.versions.keepNow")}
+                aria-label={t("docs.versions.keepNow")}
+                className="px-2"
+              >
+                <BookmarkPlus className="size-4" />
+              </Button>
+            </form>
+          )}
           {versions === null ? (
             <Loading />
           ) : versions.length === 0 ? (

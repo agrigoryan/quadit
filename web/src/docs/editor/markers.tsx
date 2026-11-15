@@ -4,7 +4,7 @@
 import { MessageSquare } from "lucide-react";
 import { type RefObject, useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
-import { useStore } from "@/lib/store";
+import { useLookupEvenIfGone } from "@/lib/selectors";
 import { tintOf } from "@/docs/presence-tint";
 import type { AnyEditor } from "@/docs/editor/sync";
 import type { PresenceEntry } from "@/lib/types-docs";
@@ -23,7 +23,7 @@ interface Props {
 }
 
 export function Markers({ editor, wrap, others, threads, onOpenThread }: Props) {
-  const members = useStore((s) => s.collections.members);
+  const members = useLookupEvenIfGone("members");
   const [boxes, setBoxes] = useState<Record<string, Box>>({});
   const ids = [...new Set([...others.map((o) => o.block ?? ""), ...Object.keys(threads)])]
     .filter(Boolean)

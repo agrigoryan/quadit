@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router";
+import { useCan } from "@/lib/access";
 import { errorMessage, workspacePath } from "@/lib/api";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
@@ -51,7 +52,9 @@ export function PageMenu({ doc }: { doc: Doc }) {
   const backlinks = useBacklinks(doc.id);
   const [dialog, setDialog] = useState<"versions" | "import" | "backlinks" | null>(null);
   const isPage = doc.kind !== "database";
-  const canWrite = isPage && !doc.generated && !(source?.authority === "repo" && source.write_mode === "none");
+  const mayEdit = useCan().edit(doc.project_id);
+  const canWrite =
+    mayEdit && isPage && !doc.generated && !(source?.authority === "repo" && source.write_mode === "none");
   // After the menu has closed and given the focus back.
   const later = (what: typeof dialog) => () => setTimeout(() => setDialog(what), 0);
 
@@ -69,16 +72,18 @@ export function PageMenu({ doc }: { doc: Doc }) {
               <MenuItem icon={<History />} onSelect={later("versions")}>
                 {t("docs.menu.versions")}
               </MenuItem>
-              <MenuItem
-                icon={<BookmarkPlus />}
-                onSelect={() =>
-                  void keepVersion(doc.id, "")
-                    .then(() => toast.info(t("docs.versions.kept")))
-                    .catch(() => {})
-                }
-              >
-                {t("docs.versions.keepNow")}
-              </MenuItem>
+              {mayEdit && (
+                <MenuItem
+                  icon={<BookmarkPlus />}
+                  onSelect={() =>
+                    void keepVersion(doc.id, "")
+                      .then(() => toast.info(t("docs.versions.kept")))
+                      .catch(() => {})
+                  }
+                >
+                  {t("docs.versions.keepNow")}
+                </MenuItem>
+              )}
               <MenuSeparator />
               <MenuItem icon={<Download />} onSelect={() => void exportMarkdown(slug, doc)}>
                 {t("docs.menu.export")}
@@ -121,22 +126,26 @@ export function PageMenu({ doc }: { doc: Doc }) {
               </MenuItem>
             </>
           )}
-          <MenuSeparator />
-          <MenuItem
-            icon={<Trash2 />}
-            danger
-            onSelect={() => {
-              trashDoc(doc.id);
-              void navigate(doc.parent_id ? `${base}/${doc.parent_id}` : base);
-            }}
-          >
-            {t("docs.delete")}
-          </MenuItem>
+          {mayEdit && (
+            <>
+              <MenuSeparator />
+              <MenuItem
+                icon={<Trash2 />}
+                danger
+                onSelect={() => {
+                  trashDoc(doc.id);
+                  void navigate(doc.parent_id ? `${base}/${doc.parent_id}` : base);
+                }}
+              >
+                {t("docs.delete")}
+              </MenuItem>
+            </>
+          )}
         </MenuContent>
       </Menu>
       {dialog === "versions" && (
         <Suspense fallback={null}>
-          <VersionsDialog doc={doc} canRestore={canWrite} onClose={() => setDialog(null)} />
+          <VersionsDialog doc={doc} canRestore={canWrite} canKeep={mayEdit} onClose={() => setDialog(null)} />
         </Suspense>
       )}
       <ImportDialog doc={doc} open={dialog === "import"} onClose={() => setDialog(null)} />

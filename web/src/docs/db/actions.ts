@@ -6,7 +6,6 @@ import type { Changes } from "@/lib/changes.gen";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
-import { getDocs } from "@/docs/data";
 import { dropRow, patchRow, putRow, useDocsStore } from "@/docs/store";
 import type {
   DBProperty,
@@ -19,6 +18,7 @@ import type {
   ViewType,
 } from "@/lib/types-docs";
 import { OPTION_COLORS } from "@/lib/types-docs";
+import { getLookupEvenIfGone } from "@/lib/selectors";
 
 type Fields = Record<string, unknown>;
 
@@ -123,7 +123,8 @@ export function renameOption(prop: DBProperty, from: string, to: string) {
     config: { ...prop.config, options: options.map((o) => (o.name === from ? { ...o, name: to } : o)) },
   });
   const patches: [string, Fields][] = [];
-  for (const row of Object.values(getDocs())) {
+  // The server renames it in the trashed rows too.
+  for (const row of Object.values(getLookupEvenIfGone("docs"))) {
     if (row.parent_id !== prop.database_id || row.kind !== "row") continue;
     const cur = row.props?.[prop.id];
     let next: unknown;

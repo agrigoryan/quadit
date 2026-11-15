@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 import { api, workspacePath } from "@/lib/api";
+import { getRowEvenIfGone } from "@/lib/selectors";
 import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
 import type { FeedEvent } from "@/lib/types";
 import type { DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/lib/types-docs";
@@ -113,9 +114,9 @@ export async function loadPage(id: string, signal?: AbortSignal): Promise<PageDa
  * one who lost it, so the refusal does: take the page out of the copy.
  */
 export function forgetIfUnshared(id: string) {
-  const { collections: c, me } = getState();
-  const owner = (c.docs[id] as { owner_id?: string } | undefined)?.owner_id;
-  if (owner && owner !== me?.user_id) removeRow("docs", id);
+  // In the trash or not: the person may no longer see it either way.
+  const owner = getRowEvenIfGone("docs", id)?.owner_id;
+  if (owner && owner !== getState().me?.user_id) removeRow("docs", id);
 }
 
 if (import.meta.hot) import.meta.hot.accept(() => window.location.reload());

@@ -5,7 +5,8 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { EyeOff, Sigma, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { docTitle, useDocs, useProperties } from "@/docs/data";
+import { useRows as useLiveRows } from "@/lib/selectors";
+import { docTitle, useProperties } from "@/docs/data";
 import { deleteProperty, freeName, setViewConfig, updateProperty } from "@/docs/db/actions";
 import { FormulaEditor } from "@/docs/db/formula-editor";
 import { OptionsEditor } from "@/docs/db/options-editor";
@@ -40,12 +41,9 @@ function Labeled({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function RelationConfig({ prop, save }: { prop: DBProperty; save: (c: PropConfig) => void }) {
-  const docs = useDocs();
+  const docs = useLiveRows("docs");
   const items = useMemo(
-    () =>
-      Object.values(docs)
-        .filter((d) => d.kind === "database" && !d.deleted_at)
-        .map((d) => ({ id: d.id, label: docTitle(d) })),
+    () => docs.filter((d) => d.kind === "database").map((d) => ({ id: d.id, label: docTitle(d) })),
     [docs],
   );
   return (

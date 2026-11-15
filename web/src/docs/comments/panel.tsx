@@ -4,6 +4,7 @@
 
 import { MessageSquare, X } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useState } from "react";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { addComment } from "@/docs/actions";
@@ -52,13 +53,16 @@ export function useOpenThreads(docId: string): { perBlock: Record<string, number
 
 interface Props {
   docId: string;
+  /** The page's project: who may not change it may read its comments, not add to them. */
+  projectId: string | undefined;
   editor: RefObject<EditorHandle | null>;
   /** The page cannot take comments on blocks (no editor shown). */
   pageOnly?: boolean;
 }
 
-export function CommentsPanel({ docId, editor, pageOnly }: Props) {
+export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
   const comments = useDocComments(docId);
+  const readOnly = !useCan().edit(projectId);
   const draftBlock = usePageUi((s) => s.draftBlock);
   const focusBlock = usePageUi((s) => s.focusBlock);
   const showResolved = usePageUi((s) => s.showResolved);
@@ -109,7 +113,7 @@ export function CommentsPanel({ docId, editor, pageOnly }: Props) {
       </header>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-        {draftBlock && !showResolved && (
+        {draftBlock && !showResolved && !readOnly && (
           <div className="rounded-lg border border-accent bg-surface p-2">
             <Quote text={quote(draftBlock)} />
             <Composer
@@ -129,6 +133,7 @@ export function CommentsPanel({ docId, editor, pageOnly }: Props) {
             key={th.root.id}
             thread={th}
             docId={docId}
+            projectId={projectId}
             quote={
               <Quote
                 text={quote(th.blockId)}
@@ -149,7 +154,7 @@ export function CommentsPanel({ docId, editor, pageOnly }: Props) {
         )}
       </div>
 
-      {!showResolved && (
+      {!showResolved && !readOnly && (
         <footer className="shrink-0 border-t border-line p-2">
           <Composer
             placeholder={t("docs.comment.onPage")}

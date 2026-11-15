@@ -17,11 +17,16 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** Called while the edge is dragged, and with `done` when it is let go. */
   onResize: (width: number, done: boolean) => void;
+  /** Only the name: no settings, no moving, no resizing. */
+  readOnly: boolean;
 }
 
 /** A column's name. Click it for the property's settings, drag it to reorder, drag its edge to resize. */
-export function HeaderCell({ prop, view, width, open, onOpenChange, onResize }: Props) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: prop.id });
+export function HeaderCell({ prop, view, width, open, onOpenChange, onResize, readOnly }: Props) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: prop.id,
+    disabled: readOnly,
+  });
   const [resizing, setResizing] = useState(false);
 
   function startResize(e: ReactPointerEvent<HTMLSpanElement>) {
@@ -50,27 +55,36 @@ export function HeaderCell({ prop, view, width, open, onOpenChange, onResize }: 
       style={{ width, transform: CSS.Translate.toString(transform && { ...transform, y: 0 }), transition }}
       className={cx("relative shrink-0 border-r border-line", isDragging && "z-10 bg-hover opacity-80")}
     >
-      <PropertyPopover prop={prop} view={view} open={open} onOpenChange={onOpenChange}>
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="flex h-8 w-full items-center gap-1.5 px-2 text-left text-xs font-medium text-ink-2 hover:bg-hover data-[state=open]:bg-hover"
-        >
+      {readOnly ? (
+        <span className="flex h-8 w-full items-center gap-1.5 px-2 text-xs font-medium text-ink-2">
           <PropIcon type={prop.type} />
           <span className="truncate">{prop.name}</span>
-        </button>
-      </PropertyPopover>
-      <span
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={t("db.table.resize", { name: prop.name })}
-        onPointerDown={startResize}
-        className={cx(
-          "absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 hover:after:bg-accent",
-          resizing && "after:bg-accent",
-        )}
-      />
+        </span>
+      ) : (
+        <PropertyPopover prop={prop} view={view} open={open} onOpenChange={onOpenChange}>
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="flex h-8 w-full items-center gap-1.5 px-2 text-left text-xs font-medium text-ink-2 hover:bg-hover data-[state=open]:bg-hover"
+          >
+            <PropIcon type={prop.type} />
+            <span className="truncate">{prop.name}</span>
+          </button>
+        </PropertyPopover>
+      )}
+      {!readOnly && (
+        <span
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("db.table.resize", { name: prop.name })}
+          onPointerDown={startResize}
+          className={cx(
+            "absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 hover:after:bg-accent",
+            resizing && "after:bg-accent",
+          )}
+        />
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
 import { CircleHelp, FileSymlink, ListTodo, MessageSquarePlus } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect } from "react";
 import { t } from "@/lib/i18n";
+import { getLookupEvenIfGone, getRows } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { decisionStateText } from "@/docs/editor/chips";
 import { canSee, docTitle, pathTo } from "@/docs/data";
@@ -41,8 +42,8 @@ export const ActionsContext = createContext<EditorActions | null>(null);
 
 /** People first, then agents: whoever can be mentioned. */
 export function mentionItems(editor: AnyEditor): DefaultReactSuggestionItem[] {
-  const members = Object.values(getState().collections.members)
-    .filter((m) => !m.removed_at && !m.suspended_at)
+  const members = getRows("members")
+    .filter((m) => !m.suspended_at)
     .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "person" ? -1 : 1));
   return members.map((m) => ({
     title: m.name,
@@ -95,10 +96,9 @@ function distinct<T extends DefaultReactSuggestionItem>(items: T[], more: (item:
 export function decisionItems(editor: AnyEditor, query: string): DefaultReactSuggestionItem[] {
   // A space right after "#" is a heading or a plain hash, not a search.
   if (/^\s/.test(query)) return [];
-  const { collections: c } = getState();
   const key = keyBeforeHash(editor, query);
   const q = query.trim().toLowerCase();
-  let found = mentionable(c);
+  let found = mentionable(getRows("decisions"), getLookupEvenIfGone("tasks"));
   if (key)
     found = found
       .filter((f) => f.task.key === key)
@@ -134,18 +134,11 @@ export function decisionItems(editor: AnyEditor, query: string): DefaultReactSug
 export function pageTitleItems(editor: AnyEditor, query: string, self?: string): DefaultReactSuggestionItem[] {
   // Still typing inside the brackets: what follows a closing bracket is not part of a title.
   if (query.includes("]") || query.includes("\uFFFC")) return [];
-  const { collections: c, me } = getState();
+  const { me } = getState();
   const q = query.trim().toLowerCase();
-  const pages = Object.values(c.docs)
-    .filter(
-      (d) =>
-        d.id !== self &&
-        !d.deleted_at &&
-        !d.archived_at &&
-        d.kind !== "row" &&
-        (!me || canSee(d, me.user_id)) &&
-        !!d.title.trim(),
-    )
+  const docs = getLookupEvenIfGone("docs");
+  const pages = getRows("docs")
+    .filter((d) => d.id !== self && d.kind !== "row" && (!me || canSee(d, me.user_id)) && !!d.title.trim())
     .filter((d) => !q || d.title.toLowerCase().includes(q))
     // Titles that start with what was typed come first.
     .sort(
@@ -157,7 +150,7 @@ export function pageTitleItems(editor: AnyEditor, query: string, self?: string):
   const items = pages.map((doc) => ({
     title: docTitle(doc),
     subtext:
-      pathTo(c.docs, doc.id)
+      pathTo(docs, doc.id)
         .map((d) => docTitle(d))
         .join(" / ") || undefined,
     group: t("docs.mention.pages"),

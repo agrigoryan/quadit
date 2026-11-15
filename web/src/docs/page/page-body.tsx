@@ -4,6 +4,7 @@
 
 import { GitBranch, Sparkles } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { CommentsPanel, useOpenThreads } from "@/docs/comments/panel";
@@ -41,7 +42,10 @@ export function PageBody({ doc, compact }: Props) {
   const [block, setBlock] = useState<string | null>(null);
   const isDatabase = doc.kind === "database";
   const mirrorsReadOnly = !!source && source.authority === "repo" && source.write_mode === "none";
-  const readOnly = !!doc.generated || mirrorsReadOnly || !!doc.deleted_at;
+  // A page of no project is the workspace's: edit() with none.
+  const mayEdit = useCan().edit(doc.project_id);
+  const readOnly = !!doc.generated || mirrorsReadOnly || !!doc.deleted_at || !mayEdit;
+  const headReadOnly = !!doc.generated || !!doc.deleted_at || !mayEdit;
 
   usePresence(doc.id, block, page.status === "ready" && !isDatabase);
 
@@ -50,13 +54,13 @@ export function PageBody({ doc, compact }: Props) {
   return (
     <div className="relative flex min-h-0 flex-1">
       <div className="min-w-0 flex-1 overflow-y-auto" data-page={doc.id}>
-        {!compact && <PageCover doc={doc} readOnly={!!doc.generated || !!doc.deleted_at} />}
+        {!compact && <PageCover doc={doc} readOnly={headReadOnly} />}
         <div className={cx("mx-auto w-full", isDatabase ? "max-w-none" : "max-w-[52rem]")}>
           <div className={cx(compact ? "px-4" : isDatabase ? "px-4 sm:px-8" : "px-4 sm:px-12")}>
-            <PageTitle doc={doc} readOnly={!!doc.generated || !!doc.deleted_at} compact={compact} onEnter={focusText} />
+            <PageTitle doc={doc} readOnly={headReadOnly} compact={compact} onEnter={focusText} />
             {doc.kind === "row" && (
               <Suspense fallback={null}>
-                <RowProperties row={doc} />
+                <RowProperties row={doc} readOnly={headReadOnly} />
               </Suspense>
             )}
             {doc.generated && <Note icon={<Sparkles />}>{t("docs.readOnly.generated")}</Note>}
@@ -77,7 +81,7 @@ export function PageBody({ doc, compact }: Props) {
               }
             >
               {isDatabase ? (
-                <DatabaseView doc={doc} />
+                <DatabaseView doc={doc} readOnly={headReadOnly} />
               ) : (
                 <div className={cx("pt-2 pb-40", compact && "[&_.bn-editor]:!px-4")}>
                   <Editor
@@ -91,7 +95,7 @@ export function PageBody({ doc, compact }: Props) {
                     threads={compact ? undefined : threads.perBlock}
                     onFocusBlock={setBlock}
                     onSaveState={(state) => pageUi.setSaving(doc.id, state)}
-                    onComment={compact ? undefined : pageUi.startThread}
+                    onComment={compact || !mayEdit ? undefined : pageUi.startThread}
                     onOpenThread={pageUi.showThread}
                   />
                 </div>
@@ -100,7 +104,9 @@ export function PageBody({ doc, compact }: Props) {
           )}
         </div>
       </div>
-      {commentsOpen && <CommentsPanel docId={doc.id} editor={editor} pageOnly={isDatabase} />}
+      {commentsOpen && (
+        <CommentsPanel docId={doc.id} projectId={doc.project_id} editor={editor} pageOnly={isDatabase} />
+      )}
     </div>
   );
 }

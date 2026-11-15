@@ -6,11 +6,11 @@ import { CircleSlash } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useProjects } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { useLookupEvenIfGone, useProjects, useRowEvenIfGone } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { setProject } from "@/docs/actions";
-import { countBelow, sameProjectBelow, useDocs } from "@/docs/data";
+import { countBelow, sameProjectBelow } from "@/docs/data";
 import { NoProjectGlyph } from "@/docs/project-mark";
 import { useDocsStore } from "@/docs/store";
 import type { Doc } from "@/lib/types-docs";
@@ -27,7 +27,9 @@ const NONE = "none";
 const counted = (pages: Doc[]) => pages.filter((d) => d.kind !== "row" && !d.deleted_at).length;
 
 export function ProjectField({ doc }: { doc: Doc }) {
-  const project = useStore((s) => (doc.project_id ? s.collections.projects[doc.project_id] : undefined));
+  // An archived project is still the page's.
+  const project = useRowEvenIfGone("projects", doc.project_id);
+  const mayEdit = useCan().edit(doc.project_id);
   const [open, setOpen] = useState(false);
   const name = project?.name ?? t("docs.project.none");
   const label = project ? `${t("prop.project")}: ${name}` : name;
@@ -35,7 +37,7 @@ export function ProjectField({ doc }: { doc: Doc }) {
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip label={label}>
         <PopoverTrigger asChild>
-          <Button variant="ghost" aria-label={label} className="gap-1.5 px-2">
+          <Button variant="ghost" aria-label={label} disabled={!mayEdit} className="gap-1.5 px-2">
             {project ? <ProjectGlyph project={project} /> : <NoProjectGlyph />}
             <span className={cx("max-w-36 truncate max-xl:hidden", !project && "text-ink-3")}>{name}</span>
           </Button>
@@ -84,7 +86,8 @@ function ProjectChoices({ doc, close }: { doc: Doc; close: () => void }) {
 
 /** What changing the project does: who sees the page, which pages inside go along, and what a mirrored file makes of it. */
 function ProjectNotes({ doc }: { doc: Doc }) {
-  const docs = useDocs();
+  // The server takes trashed pages along too (and walks through them); only those not in the trash are counted.
+  const docs = useLookupEvenIfGone("docs");
   const source = useDocsStore((s) => s.meta[doc.id]?.source);
   const along = useMemo(() => counted(sameProjectBelow(docs, doc)), [docs, doc]);
   const stay = useMemo(() => countBelow(docs, doc.id), [docs, doc.id]) - along;

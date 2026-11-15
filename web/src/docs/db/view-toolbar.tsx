@@ -18,6 +18,11 @@ interface Props {
   props: DBProperty[];
 }
 
+interface ToolbarProps extends Props {
+  /** Nothing to show: every button here changes the view. */
+  readOnly: boolean;
+}
+
 function ToolButton({
   icon,
   label,
@@ -129,7 +134,8 @@ function LayoutPick({
 }
 
 /** The buttons beside the tabs: what the open view filters by, sorts by, shows, and is laid out by. */
-export function ViewToolbar({ view, props }: Props) {
+export function ViewToolbar({ view, props, readOnly }: ToolbarProps) {
+  if (readOnly) return null;
   const filters = view.config?.filters?.length ?? 0;
   const sorts = view.config?.sorts?.length ?? 0;
   return (

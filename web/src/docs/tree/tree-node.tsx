@@ -6,6 +6,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronRight, Link2, MoreHorizontal, PenLine, Plus, Smile, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { NavLink } from "react-router";
+import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
@@ -34,15 +35,17 @@ interface Props {
   doc: Doc;
   tree: DocTree;
   depth: number;
-  /** Pages of this part of the tree can be moved and changed. */
+  /** Pages of this part of the tree can be moved and changed (by one who may edit the page's project). */
   editable: boolean;
   drop: DropTarget | null;
   /** The project of the page it hangs under (at the top: of the Docs area). Its own is marked when it differs. */
   parentProject: string | undefined;
 }
 
-export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Props) {
+export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, parentProject }: Props) {
   const slug = useSlug();
+  const can = useCan();
+  const editable = inEditablePart && can.edit(doc.project_id);
   const { base } = useDocsArea();
   const open = useTreeState((s) => !!s.open[doc.id]);
   const renaming = useTreeState((s) => s.renaming === doc.id);
@@ -183,7 +186,7 @@ export function TreeNode({ doc, tree, depth, editable, drop, parentProject }: Pr
               doc={kid}
               tree={tree}
               depth={depth + 1}
-              editable={editable}
+              editable={inEditablePart}
               drop={drop}
               parentProject={doc.project_id}
             />

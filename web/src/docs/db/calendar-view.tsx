@@ -34,8 +34,8 @@ import { EmptyState } from "@/ui/empty";
 /** "Mon" … "Sun" in the person's language. 1 January 2024 was a Monday. */
 const WEEKDAYS = daysFrom("2024-01-01", 7).map((day) => weekdayName(day));
 
-function Chip({ row, onOpen }: { row: Doc; onOpen: (id: string) => void }) {
-  const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({ id: row.id });
+function Chip({ row, onOpen, readOnly }: { row: Doc; onOpen: (id: string) => void; readOnly: boolean }) {
+  const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({ id: row.id, disabled: readOnly });
   return (
     <button
       ref={setNodeRef}
@@ -65,6 +65,7 @@ function DayCell({
   rows,
   onOpen,
   onAdd,
+  readOnly,
 }: {
   day: string;
   dim: boolean;
@@ -72,12 +73,14 @@ function DayCell({
   rows: Doc[];
   onOpen: (id: string) => void;
   onAdd: () => void;
+  /** Rows open; a click on the day adds none, and nothing is dragged. */
+  readOnly: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: day });
+  const { setNodeRef, isOver } = useDroppable({ id: day, disabled: readOnly });
   return (
     <div
       ref={setNodeRef}
-      onClick={onAdd}
+      onClick={readOnly ? undefined : onAdd}
       className={cx(
         "group/day flex min-h-24 min-w-0 cursor-default flex-col gap-1 border-r border-b border-line p-1 max-sm:min-h-20 max-sm:p-0.5",
         dim && "bg-sunken/60",
@@ -85,7 +88,10 @@ function DayCell({
       )}
     >
       <div className="flex h-5 items-center justify-between">
-        <Plus className="size-3.5 text-ink-3 opacity-0 group-hover/day:opacity-100 max-sm:hidden" aria-hidden />
+        <Plus
+          className={cx("size-3.5 text-ink-3 opacity-0 max-sm:hidden", !readOnly && "group-hover/day:opacity-100")}
+          aria-hidden
+        />
         <span
           className={cx(
             "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs tnum",
@@ -96,14 +102,14 @@ function DayCell({
         </span>
       </div>
       {rows.map((row) => (
-        <Chip key={row.id} row={row} onOpen={onOpen} />
+        <Chip key={row.id} row={row} onOpen={onOpen} readOnly={readOnly} />
       ))}
     </div>
   );
 }
 
 /** Rows on a month grid by a date property. Click a day to add a row there; drag a row to another day. */
-export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
+export function CalendarView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps) {
   const dates = db.table.props.filter((p) => p.type === "date");
   const dateProp = dates.find((p) => p.id === view.config?.date_prop) ?? dates[0];
   const [month, setMonth] = useState(() => monthStart(today()));
@@ -130,7 +136,7 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
         icon={<CalendarDays />}
         title={t("db.calendar.needsDate")}
         hint={t("db.calendar.needsDateHint")}
-        action={<Button onClick={make}>{t("db.calendar.addDate")}</Button>}
+        action={!readOnly && <Button onClick={make}>{t("db.calendar.addDate")}</Button>}
       />
     );
   }
@@ -182,6 +188,7 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
               rows={byDay.get(day) ?? []}
               onOpen={onOpen}
               onAdd={() => onOpen(onAdd({ [dateProp.id]: day }))}
+              readOnly={readOnly}
             />
           ))}
         </div>

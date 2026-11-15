@@ -77,7 +77,7 @@ function Field({ prop, value, onChange }: { prop: DBProperty; value: unknown; on
 }
 
 /** A plain form of chosen properties. Sending it adds a row to the database. */
-export function FormView({ db, view, onAdd }: ViewProps) {
+export function FormView({ db, view, onAdd, readOnly }: ViewProps) {
   const fields = formProps(db.table.props, view);
   const [title, setTitle] = useState("");
   const [values, setValues] = useState<Record<string, unknown>>({});
@@ -105,6 +105,7 @@ export function FormView({ db, view, onAdd }: ViewProps) {
         <textarea
           key={view.id}
           defaultValue={view.config?.form_intro ?? ""}
+          readOnly={readOnly}
           onBlur={(e) =>
             e.target.value !== (view.config?.form_intro ?? "") &&
             setViewConfig(view, { form_intro: e.target.value || undefined })
@@ -139,7 +140,7 @@ export function FormView({ db, view, onAdd }: ViewProps) {
               />
             ))}
             <div>
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" disabled={readOnly}>
                 {t("db.form.submit")}
               </Button>
             </div>

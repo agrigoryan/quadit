@@ -5,9 +5,9 @@
 
 import { useEffect, useMemo } from "react";
 import { api, workspacePath } from "@/lib/api";
-import { useMe } from "@/lib/selectors";
+import { getRowEvenIfGone, useLookupEvenIfGone, useMe, useTrashed as useTrashedRows } from "@/lib/selectors";
 import { getState, mergeRows, useStore } from "@/lib/store";
-import { canSee, useDocs } from "@/docs/data";
+import { canSee } from "@/docs/data";
 import type { Doc } from "@/lib/types-docs";
 
 export interface Trashed {
@@ -15,6 +15,7 @@ export interface Trashed {
   title: string;
   icon?: string;
   kind: string;
+  project_id?: string;
   deleted_at: number;
 }
 
@@ -28,8 +29,7 @@ export function loadTrash(): Promise<void> {
     .get<{ docs: Doc[] }>(workspacePath(slug, "/docs?trash=1"))
     .then(({ docs }) => {
       if (getState().slug !== slug) return;
-      const have = getState().collections.docs;
-      mergeRows("docs", docs.filter((d) => !have[d.id]) as never[]);
+      mergeRows("docs", docs.filter((d) => !getRowEvenIfGone("docs", d.id)) as never[]);
     })
     .catch(() => {
       // The trash then shows what the feed reported during this visit.
@@ -42,7 +42,9 @@ export function loadTrash(): Promise<void> {
 
 /** Deleted pages, newest first; with a project, those tied to it. Only the top of what went together: the pages under it come back with it. */
 export function useTrashed(projectId?: string): Trashed[] {
-  const docs = useDocs();
+  const trashed = useTrashedRows("docs");
+  // To tell the top of what went together: a parent trashed in the same go.
+  const docs = useLookupEvenIfGone("docs");
   const me = useMe();
   const slug = useStore((s) => s.slug);
   // Asked again when the stream comes back: a copy fetched afresh after a long gap starts without the trash.
@@ -52,13 +54,20 @@ export function useTrashed(projectId?: string): Trashed[] {
   }, [slug, live]);
   return useMemo(() => {
     const out: Trashed[] = [];
-    for (const doc of Object.values(docs)) {
+    for (const doc of trashed) {
       if (!doc.deleted_at || doc.kind === "row" || !canSee(doc, me.user_id)) continue;
       if (projectId && doc.project_id !== projectId) continue;
       const parent = doc.parent_id ? docs[doc.parent_id] : undefined;
       if (parent?.deleted_at === doc.deleted_at) continue;
-      out.push({ id: doc.id, title: doc.title, icon: doc.icon, kind: doc.kind, deleted_at: doc.deleted_at });
+      out.push({
+        id: doc.id,
+        title: doc.title,
+        icon: doc.icon,
+        kind: doc.kind,
+        project_id: doc.project_id,
+        deleted_at: doc.deleted_at,
+      });
     }
-    return out.sort((a, b) => b.deleted_at - a.deleted_at);
-  }, [docs, me.user_id, projectId]);
+    return out;
+  }, [trashed, docs, me.user_id, projectId]);
 }

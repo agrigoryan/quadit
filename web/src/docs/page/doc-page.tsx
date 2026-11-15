@@ -1,9 +1,11 @@
 import { FileQuestion, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
+import { useRowEvenIfGone } from "@/lib/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { restoreDoc } from "@/docs/actions";
-import { docTitle, useDoc } from "@/docs/data";
+import { docTitle } from "@/docs/data";
 import { PageBody } from "@/docs/page/page-body";
 import { PageHeader } from "@/docs/page/page-header";
 import { pageUi } from "@/docs/page/state";
@@ -14,7 +16,9 @@ import { Loading } from "@/ui/spinner";
 
 /** One page of the docs: its header and everything under it. */
 export function DocPage({ id }: { id: string }) {
-  const doc = useDoc(id);
+  // A page in the trash opens as such, with the way to bring it back.
+  const doc = useRowEvenIfGone("docs", id);
+  const can = useCan();
   usePageTitle(doc ? docTitle(doc) : t("docs.title"));
 
   // Comments of another page are not this page's.
@@ -28,9 +32,11 @@ export function DocPage({ id }: { id: string }) {
         title={t("docs.trash.inTrash", { title: docTitle(doc) })}
         hint={t("docs.trash.inTrashHint")}
         action={
-          <Button variant="primary" onClick={() => restoreDoc(doc.id)}>
-            {t("docs.trash.restore")}
-          </Button>
+          can.edit(doc.project_id) && (
+            <Button variant="primary" onClick={() => restoreDoc(doc.id)}>
+              {t("docs.trash.restore")}
+            </Button>
+          )
         }
       />
     );
