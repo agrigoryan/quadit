@@ -2,22 +2,12 @@
 // on its page): the dialog that makes a token, and a token's scopes as badges.
 // Each page brings its own words and its own fields.
 
-import {
-  type ComponentType,
-  type Dispatch,
-  type FormEvent,
-  type ReactNode,
-  type SetStateAction,
-  useState,
-} from "react";
+import { type ComponentType, type Dispatch, type ReactNode, type SetStateAction, useState } from "react";
 import { api, workspacePath } from "@/lib/api";
-import { cx } from "@/lib/cx";
-import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
-import { type FieldErrors, FormAlert, useFieldErrors, useSubmit } from "@/ui/form";
+import { type FieldErrors, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
 import { Badge } from "@/ui/badge";
-import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 
 /** What the server answers when a token is made: the token itself, this once, and its row in the list. */
 export interface CreatedToken {
@@ -48,7 +38,7 @@ interface CreateProps {
   description?: string;
   /** The word on the button that makes it. */
   create: string;
-  /** The narrow dialog, with its rows closer together. */
+  /** The narrow dialog. */
   compact?: boolean;
   /** Days until it expires, as the dialog opens. */
   days: number;
@@ -76,54 +66,41 @@ export function CreateTokenDialog({
   const [projects, setProjects] = useState<string[]>([]);
   const [days, setDays] = useState(firstDays);
   const errors = useFieldErrors(["name", "projects"]);
-  const { busy, run } = useSubmit(errors, { once: true });
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    await run(async () => {
-      onCreated(
-        await api.post<CreatedToken>(workspacePath(slug, "/tokens"), {
-          user,
-          name: name.trim(),
-          read_only: readOnly,
-          projects,
-          expires_days: days,
-        }),
-      );
-    });
+  async function submit() {
+    onCreated(
+      await api.post<CreatedToken>(workspacePath(slug, "/tokens"), {
+        user,
+        name: name.trim(),
+        read_only: readOnly,
+        projects,
+        expires_days: days,
+      }),
+    );
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={title}
       description={description}
       size={compact ? "sm" : "md"}
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button type="submit" form="token-create" variant="primary" disabled={busy}>
-            {create}
-          </Button>
-        </>
-      }
+      submit={create}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="token-create" onSubmit={submit} className={cx("flex flex-col", compact ? "gap-3.5" : "gap-4")}>
-        <Fields
-          name={name}
-          setName={setName}
-          readOnly={readOnly}
-          setReadOnly={setReadOnly}
-          projects={projects}
-          setProjects={setProjects}
-          days={days}
-          setDays={setDays}
-          errors={errors}
-        />
-        <FormAlert>{errors.form}</FormAlert>
-      </form>
-    </Dialog>
+      <Fields
+        name={name}
+        setName={setName}
+        readOnly={readOnly}
+        setReadOnly={setReadOnly}
+        projects={projects}
+        setProjects={setProjects}
+        days={days}
+        setDays={setDays}
+        errors={errors}
+      />
+    </FormDialog>
   );
 }
 

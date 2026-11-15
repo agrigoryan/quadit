@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -7,10 +7,10 @@ import { useLabels, useStatuses } from "@/lib/selectors";
 import type { Project, Template } from "@/lib/types";
 import type { DecisionSkeleton, Preset } from "@/settings/projects/templates";
 import { Dot } from "@/ui/dot";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
+import { FormField, NativeSelect, refuse, SwitchRow, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { Button, IconButton } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { Input, Textarea } from "@/ui/input";
 
 interface Option {
@@ -52,7 +52,6 @@ export function TemplateDialog({
       : blankOptions(),
   );
   const errors = useFieldErrors(["name", "title", "description", "question", "options"]);
-  const { busy, run } = useSubmit(errors, { once: true });
 
   // A preset names its status and labels, so the same template works when they are renamed back or shared.
   const statusChoices = [
@@ -69,10 +68,8 @@ export function TemplateDialog({
   const setOption = (i: number, patch: Partial<Option>) =>
     setOptions((list) => list.map((o, at) => (at === i ? { ...o, ...patch } : o)));
 
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    errors.clear();
-    if (!name.trim()) return errors.set("name", t("s.required"));
+  async function save() {
+    if (!name.trim()) refuse("name", t("s.required"));
     const next: Preset = {};
     if (status) next.status = status;
     if (priority) next.priority = priority;
@@ -80,12 +77,12 @@ export function TemplateDialog({
     if (preset.assignee) next.assignee = preset.assignee;
     if (preset.estimate) next.estimate = preset.estimate;
     if (asks) {
-      if (!question.trim()) return errors.set("question", t("templates.questionNeed"));
+      if (!question.trim()) refuse("question", t("templates.questionNeed"));
       const decision: DecisionSkeleton = { kind, question: question.trim() };
       if (details.trim()) decision.details = details.trim();
       if (kind === "choice") {
         const named = options.filter((o) => o.label.trim());
-        if (named.length < 2) return errors.set("options", t("templates.optionsNeed"));
+        if (named.length < 2) refuse("options", t("templates.optionsNeed"));
         decision.options = named.map((o) => ({
           label: o.label.trim(),
           ...(o.description.trim() ? { description: o.description.trim() } : {}),
@@ -94,165 +91,153 @@ export function TemplateDialog({
       next.decision = decision;
     }
     const fields = { name: name.trim(), title, description, preset: next };
-    await run(async () => {
-      await mutate(
-        template
-          ? { type: "template.update", args: { id: template.id, ...fields } }
-          : { type: "template.create", args: { id: newId(), project: project.id, ...fields } },
-        undefined,
-        { quiet: true },
-      );
-      onClose();
-    });
+    await mutate(
+      template
+        ? { type: "template.update", args: { id: template.id, ...fields } }
+        : { type: "template.create", args: { id: newId(), project: project.id, ...fields } },
+      undefined,
+      { quiet: true },
+    );
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={template ? t("templates.edit") : t("templates.new")}
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button variant="primary" type="submit" form="template-form" disabled={busy}>
-            {template ? t("common.save") : t("s.create")}
-          </Button>
-        </>
-      }
+      submit={template ? t("common.save") : t("s.create")}
+      errors={errors}
+      onSubmit={save}
+      onClose={onClose}
     >
-      <form id="template-form" onSubmit={save} className="flex flex-col gap-3.5">
-        <FormField label={t("templates.name")} htmlFor="tpl-name" error={errors.fields.name}>
-          <Input
-            id="tpl-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("templates.namePlaceholder")}
-            maxLength={80}
+      <FormField label={t("templates.name")} htmlFor="tpl-name" error={errors.fields.name}>
+        <Input
+          id="tpl-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("templates.namePlaceholder")}
+          maxLength={80}
+        />
+      </FormField>
+      <FormField
+        label={t("templates.taskTitle")}
+        htmlFor="tpl-title"
+        hint={t("templates.taskTitleHint")}
+        error={errors.fields.title}
+      >
+        <Input id="tpl-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+      </FormField>
+      <FormField
+        label={t("templates.description")}
+        htmlFor="tpl-desc"
+        hint={t("templates.descriptionHint")}
+        error={errors.fields.description}
+      >
+        <Textarea
+          id="tpl-desc"
+          rows={4}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="font-mono text-xs"
+        />
+      </FormField>
+      <div className="grid grid-cols-2 gap-3.5">
+        <FormField label={t("templates.status")}>
+          <NativeSelect value={status} onChange={setStatus} options={statusChoices} />
+        </FormField>
+        <FormField label={t("templates.priority")}>
+          <NativeSelect
+            value={String(priority)}
+            onChange={(v) => setPriority(Number(v))}
+            options={[0, 1, 2, 3, 4].map((p) => ({
+              value: String(p),
+              label: t(`priority.${p as 0 | 1 | 2 | 3 | 4}`),
+            }))}
           />
         </FormField>
-        <FormField
-          label={t("templates.taskTitle")}
-          htmlFor="tpl-title"
-          hint={t("templates.taskTitleHint")}
-          error={errors.fields.title}
-        >
-          <Input id="tpl-title" value={title} onChange={(e) => setTitle(e.target.value)} />
-        </FormField>
-        <FormField
-          label={t("templates.description")}
-          htmlFor="tpl-desc"
-          hint={t("templates.descriptionHint")}
-          error={errors.fields.description}
-        >
-          <Textarea
-            id="tpl-desc"
-            rows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="font-mono text-xs"
-          />
-        </FormField>
-        <div className="grid grid-cols-2 gap-3.5">
-          <FormField label={t("templates.status")}>
-            <NativeSelect value={status} onChange={setStatus} options={statusChoices} />
-          </FormField>
-          <FormField label={t("templates.priority")}>
+      </div>
+      <FormField label={t("templates.labels")}>
+        <MultiPick
+          items={labelItems}
+          value={picked}
+          onChange={setPicked}
+          addLabel={t("templates.labelsAdd")}
+          empty={t("templates.labelsNone")}
+        />
+      </FormField>
+
+      <div className="border-t border-line pt-3">
+        <SwitchRow
+          title={t("templates.decision")}
+          hint={t("templates.decisionHint")}
+          checked={asks}
+          onChange={setAsks}
+        />
+      </div>
+      {asks && (
+        <div className="flex flex-col gap-3.5 rounded-lg border border-line bg-sunken/50 p-3">
+          <FormField label={t("templates.decisionKind")}>
             <NativeSelect
-              value={String(priority)}
-              onChange={(v) => setPriority(Number(v))}
-              options={[0, 1, 2, 3, 4].map((p) => ({
-                value: String(p),
-                label: t(`priority.${p as 0 | 1 | 2 | 3 | 4}`),
-              }))}
+              value={kind}
+              onChange={(v) => setKind(v as "choice" | "approval")}
+              options={[
+                { value: "choice", label: t("templates.decisionKind.choice") },
+                { value: "approval", label: t("templates.decisionKind.approval") },
+              ]}
             />
           </FormField>
-        </div>
-        <FormField label={t("templates.labels")}>
-          <MultiPick
-            items={labelItems}
-            value={picked}
-            onChange={setPicked}
-            addLabel={t("templates.labelsAdd")}
-            empty={t("templates.labelsNone")}
-          />
-        </FormField>
-
-        <div className="border-t border-line pt-3">
-          <SwitchRow
-            title={t("templates.decision")}
-            hint={t("templates.decisionHint")}
-            checked={asks}
-            onChange={setAsks}
-          />
-        </div>
-        {asks && (
-          <div className="flex flex-col gap-3.5 rounded-lg border border-line bg-sunken/50 p-3">
-            <FormField label={t("templates.decisionKind")}>
-              <NativeSelect
-                value={kind}
-                onChange={(v) => setKind(v as "choice" | "approval")}
-                options={[
-                  { value: "choice", label: t("templates.decisionKind.choice") },
-                  { value: "approval", label: t("templates.decisionKind.approval") },
-                ]}
-              />
-            </FormField>
-            <FormField label={t("templates.question")} htmlFor="tpl-question" error={errors.fields.question}>
-              <Input
-                id="tpl-question"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder={t("templates.questionPlaceholder")}
-              />
-            </FormField>
-            <FormField label={`${t("templates.details")} (${t("s.optional")})`} htmlFor="tpl-details">
-              <Textarea id="tpl-details" rows={2} value={details} onChange={(e) => setDetails(e.target.value)} />
-            </FormField>
-            {kind === "choice" && (
-              <FormField label={t("templates.options")} error={errors.fields.options}>
-                <div className="flex flex-col gap-2">
-                  {options.map((o, i) => (
-                    <div key={i} className="flex items-start gap-1.5">
-                      <div className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-[10rem_1fr]">
-                        <Input
-                          aria-label={t("templates.optionLabel", { n: i + 1 })}
-                          placeholder={t("templates.optionLabel", { n: i + 1 })}
-                          value={o.label}
-                          onChange={(e) => setOption(i, { label: e.target.value })}
-                        />
-                        <Input
-                          aria-label={t("templates.description")}
-                          placeholder={`${t("templates.description")} (${t("s.optional")})`}
-                          value={o.description}
-                          onChange={(e) => setOption(i, { description: e.target.value })}
-                        />
-                      </div>
-                      <IconButton
-                        label={t("templates.optionRemove", { n: i + 1 })}
-                        disabled={options.length <= 2}
-                        onClick={() => setOptions((list) => list.filter((_, at) => at !== i))}
-                        className="mt-0.5"
-                      >
-                        <X className="size-3.5" />
-                      </IconButton>
+          <FormField label={t("templates.question")} htmlFor="tpl-question" error={errors.fields.question}>
+            <Input
+              id="tpl-question"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder={t("templates.questionPlaceholder")}
+            />
+          </FormField>
+          <FormField label={`${t("templates.details")} (${t("s.optional")})`} htmlFor="tpl-details">
+            <Textarea id="tpl-details" rows={2} value={details} onChange={(e) => setDetails(e.target.value)} />
+          </FormField>
+          {kind === "choice" && (
+            <FormField label={t("templates.options")} error={errors.fields.options}>
+              <div className="flex flex-col gap-2">
+                {options.map((o, i) => (
+                  <div key={i} className="flex items-start gap-1.5">
+                    <div className="grid min-w-0 flex-1 gap-1.5 sm:grid-cols-[10rem_1fr]">
+                      <Input
+                        aria-label={t("templates.optionLabel", { n: i + 1 })}
+                        placeholder={t("templates.optionLabel", { n: i + 1 })}
+                        value={o.label}
+                        onChange={(e) => setOption(i, { label: e.target.value })}
+                      />
+                      <Input
+                        aria-label={t("templates.description")}
+                        placeholder={`${t("templates.description")} (${t("s.optional")})`}
+                        value={o.description}
+                        onChange={(e) => setOption(i, { description: e.target.value })}
+                      />
                     </div>
-                  ))}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="self-start"
-                    onClick={() => setOptions((list) => [...list, { label: "", description: "" }])}
-                  >
-                    <Plus className="size-3" aria-hidden />
-                    {t("templates.optionAdd")}
-                  </Button>
-                </div>
-              </FormField>
-            )}
-          </div>
-        )}
-        <FormAlert>{errors.form}</FormAlert>
-      </form>
-    </Dialog>
+                    <IconButton
+                      label={t("templates.optionRemove", { n: i + 1 })}
+                      disabled={options.length <= 2}
+                      onClick={() => setOptions((list) => list.filter((_, at) => at !== i))}
+                      className="mt-0.5"
+                    >
+                      <X className="size-3.5" />
+                    </IconButton>
+                  </div>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="self-start"
+                  onClick={() => setOptions((list) => [...list, { label: "", description: "" }])}
+                >
+                  <Plus className="size-3" aria-hidden />
+                  {t("templates.optionAdd")}
+                </Button>
+              </div>
+            </FormField>
+          )}
+        </div>
+      )}
+    </FormDialog>
   );
 }

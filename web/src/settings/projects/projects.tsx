@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Plus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { t } from "@/lib/i18n";
@@ -10,12 +10,12 @@ import type { Project } from "@/lib/types";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";
 import { SWATCHES } from "@/lib/swatches";
-import { FormAlert, useFieldErrors, useSubmit } from "@/ui/form";
+import { refuse, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
 import { Page, Rows, Section } from "@/ui/settings-layout";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { EmptyState } from "@/ui/empty";
 
 const byRank = (a: Project, b: Project) => ((a.rank ?? "") < (b.rank ?? "") ? -1 : 1);
@@ -124,53 +124,39 @@ function CreateProjectDialog({ used, onClose }: { used: number; onClose: () => v
     description: "",
   });
   const errors = useFieldErrors(PROJECT_FIELDS);
-  const { busy, run } = useSubmit(errors, { once: true });
   const set = (patch: Partial<ProjectDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    errors.clear();
-    if (!draft.name.trim()) return errors.set("name", t("s.required"));
-    if (!KEY_RE.test(draft.key)) return errors.set("key", t("project.keyBad"));
-    await run(async () => {
-      await mutate(
-        {
-          type: "project.create",
-          args: {
-            id: newId(),
-            key: draft.key,
-            name: draft.name.trim(),
-            icon: draft.icon.trim(),
-            color: draft.color,
-            description: draft.description.trim(),
-          },
+  async function submit() {
+    if (!draft.name.trim()) refuse("name", t("s.required"));
+    if (!KEY_RE.test(draft.key)) refuse("key", t("project.keyBad"));
+    await mutate(
+      {
+        type: "project.create",
+        args: {
+          id: newId(),
+          key: draft.key,
+          name: draft.name.trim(),
+          icon: draft.icon.trim(),
+          color: draft.color,
+          description: draft.description.trim(),
         },
-        undefined,
-        { quiet: true },
-      );
-      toast.info(t("project.created", { name: draft.name.trim() }));
-      void navigate(`${base}/projects/${draft.key}/statuses`);
-    });
+      },
+      undefined,
+      { quiet: true },
+    );
+    toast.info(t("project.created", { name: draft.name.trim() }));
+    void navigate(`${base}/projects/${draft.key}/statuses`);
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={t("projects.new")}
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button variant="primary" type="submit" form="project-create" disabled={busy}>
-            {t("project.create")}
-          </Button>
-        </>
-      }
+      submit={t("project.create")}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="project-create" onSubmit={submit} className="flex flex-col gap-3.5">
-        <ProjectFields draft={draft} set={set} errors={errors} />
-        <FormAlert>{errors.form}</FormAlert>
-      </form>
-    </Dialog>
+      <ProjectFields draft={draft} set={set} errors={errors} />
+    </FormDialog>
   );
 }
