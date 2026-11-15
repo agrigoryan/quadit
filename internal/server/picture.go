@@ -2,12 +2,12 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -62,10 +62,6 @@ const (
 // handleTakePicture returns a PNG of a task or a page as the caller would see it.
 // width=390 gives a phone, the default 1280 a desktop.
 func (s *Server) handleTakePicture(x *c) error {
-	chrome := findChrome()
-	if chrome == "" {
-		return &httpError{Status: 501, Code: "no_browser", Message: "the server has no Chrome or Chromium to take pictures with; install one, or set QUADIT_CHROME to its path"}
-	}
 	q := x.r.URL.Query()
 	width, height, err := pictureSize(x)
 	if err != nil {
@@ -82,15 +78,13 @@ func (s *Server) handleTakePicture(x *c) error {
 	}
 	base := firstNonEmpty(s.cfg.LocalURL, s.cfg.BaseURL)
 	target := base + "/api/v1/auth/render-session?token=" + url.QueryEscape(token) + "&next=" + url.QueryEscape(path)
-	dir, err := os.MkdirTemp("", "quadit-render-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(x.ctx(), pictureTimeout)
 	defer cancel()
-	png, whole, err := takePicture(ctx, pictureRequest{chrome: chrome, extra: chromeSwitches(), profile: filepath.Join(dir, "profile"), target: target,
+	png, whole, err := takePicture(ctx, pictureRequest{target: target,
 		width: width, height: height, dark: q.Get("theme") == "dark", full: truthyParam(q, "full") && x.intParam("height", 0) == 0})
+	if errors.Is(err, errNoBrowser) {
+		return &httpError{Status: 501, Code: "no_browser", Message: "the server has no Chrome or Chromium to take pictures with; install one, or set QUADIT_CHROME to its path"}
+	}
 	if err != nil {
 		s.log.Warn("render", "err", err)
 		return &httpError{Status: 502, Code: "render_failed", Message: "the browser could not take the picture: " + oneLine(err.Error(), 120)}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"time"
 )
@@ -157,22 +158,33 @@ const (
 
 // pictureRequest is what to take a picture of, and how.
 type pictureRequest struct {
-	chrome  string   // the browser to run
-	extra   []string // switches for it, besides the ones every picture needs
-	profile string   // a folder of its own for the browser's profile
-	target  string   // the address to open
-	width   int      // CSS pixels
-	height  int      // CSS pixels
-	dark    bool     // the page is told the reader prefers dark
-	full    bool     // the whole page, as tall as it is
+	target string // the address to open
+	width  int    // CSS pixels
+	height int    // CSS pixels
+	dark   bool   // the page is told the reader prefers dark
+	full   bool   // the whole page, as tall as it is
 }
+
+// errNoBrowser is takePicture finding no Chrome or Chromium on the server.
+var errNoBrowser = errors.New("no Chrome or Chromium to take pictures with")
 
 // takePicture opens the target in a headless browser at exactly width by
 // height CSS pixels and returns a PNG of it. When the whole page was asked
 // for it also says how tall the page is: a picture stops at 8000 pixels,
-// and the caller is told when the page goes on.
+// and the caller is told when the page goes on. It finds the browser
+// itself (errNoBrowser when there is none) and runs it with a profile of
+// its own, removed afterwards.
 func takePicture(ctx context.Context, p pictureRequest) (png []byte, whole int, err error) {
-	b, err := startBrowser(ctx, p)
+	chrome := findChrome()
+	if chrome == "" {
+		return nil, 0, errNoBrowser
+	}
+	dir, err := os.MkdirTemp("", "quadit-render-*")
+	if err != nil {
+		return nil, 0, err
+	}
+	defer os.RemoveAll(dir)
+	b, err := startBrowser(ctx, chrome, filepath.Join(dir, "profile"))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -217,9 +229,9 @@ type browser struct {
 	cdp *cdp
 }
 
-// startBrowser runs the browser with its debugging pipe and starts reading
-// what it says.
-func startBrowser(ctx context.Context, p pictureRequest) (*browser, error) {
+// startBrowser runs the browser at path chrome, with its profile in the
+// folder profile and its debugging pipe, and starts reading what it says.
+func startBrowser(ctx context.Context, chrome, profile string) (*browser, error) {
 	toBrowser, out, err := os.Pipe()
 	if err != nil {
 		return nil, err
@@ -231,8 +243,8 @@ func startBrowser(ctx context.Context, p pictureRequest) (*browser, error) {
 		return nil, err
 	}
 	args := append([]string{"--headless=new", "--remote-debugging-pipe", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
-		"--no-default-browser-check", "--user-data-dir=" + p.profile}, p.extra...)
-	cmd := exec.CommandContext(ctx, p.chrome, append(args, "about:blank")...)
+		"--no-default-browser-check", "--user-data-dir=" + profile}, chromeSwitches()...)
+	cmd := exec.CommandContext(ctx, chrome, append(args, "about:blank")...)
 	cmd.ExtraFiles = []*os.File{toBrowser, fromBrowser} // the browser reads commands on 3 and answers on 4
 	err = cmd.Start()
 	toBrowser.Close()
