@@ -1,8 +1,9 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { MessageCircleQuestion, Trash2, Undo2 } from "lucide-react";
 import { api, errorMessage, workspacePath } from "@/lib/api";
 import { formatNumber, t } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useLookupEvenIfGone, useSlug, useTrashedTasks } from "@/lib/selectors";
 import { mergeRows } from "@/lib/store";
 import { ago, exact } from "@/lib/time";
 import type { Task } from "@/lib/types";
@@ -55,8 +56,12 @@ export function TrashPage() {
   useMinute();
   usePageTitle(t("nav.trash"));
   const slug = useSlug();
-  const tasks = useCollection("tasks");
-  const projects = useCollection("projects");
+  const deletedTasks = useTrashedTasks();
+  // Every task by id, the trashed ones included: the task of a removed file or a deleted question may be in the trash.
+  const tasks = useLookupEvenIfGone("tasks");
+  // A trashed task's project may be archived: its name still shows.
+  const projects = useLookupEvenIfGone("projects");
+  const can = useCan();
   const questions = useTrashedDecisions();
   const files = useTrashedFiles();
   const [state, setState] = useState<"loading" | "ready" | { error: string }>("loading");
@@ -96,13 +101,6 @@ export function TrashPage() {
     restoreDecision(id).then(settle, settle);
   }
 
-  const deletedTasks = useMemo(
-    () =>
-      Object.values(tasks)
-        .filter((task) => task.deleted_at)
-        .sort((a, b) => (b.deleted_at ?? 0) - (a.deleted_at ?? 0)),
-    [tasks],
-  );
   const deletedDecisions = questions.rows.filter((d) => !restoring[d.id]);
   // A file whose task is in the trash comes back with the task; it is not listed twice.
   const removedFiles = files.rows.filter((f) => !(f.task_id && tasks[f.task_id]?.deleted_at));
@@ -136,15 +134,17 @@ export function TrashPage() {
                 {projects[task.project_id]?.name}
               </span>
               <Deleted at={task.deleted_at ?? 0} />
-              <Button
-                size="sm"
-                aria-label={t("trash.restoreTask", { key: task.key })}
-                onClick={() => restoreTasks([task])}
-                className="max-sm:h-9 max-sm:px-3"
-              >
-                <Undo2 className="size-3.5" aria-hidden />
-                {t("trash.restore")}
-              </Button>
+              {can.edit(task.project_id) && (
+                <Button
+                  size="sm"
+                  aria-label={t("trash.restoreTask", { key: task.key })}
+                  onClick={() => restoreTasks([task])}
+                  className="max-sm:h-9 max-sm:px-3"
+                >
+                  <Undo2 className="size-3.5" aria-hidden />
+                  {t("trash.restore")}
+                </Button>
+              )}
             </li>
           ))}
         </Group>
@@ -169,15 +169,17 @@ export function TrashPage() {
                   <span className="max-w-40 shrink-0 truncate text-xs text-ink-3 max-md:hidden">{task?.title}</span>
                 )}
                 <Deleted at={decision.deletedAt} />
-                <Button
-                  size="sm"
-                  aria-label={t("trash.restoreDecision", { question: decision.question })}
-                  onClick={() => restoreQuestion(decision.id)}
-                  className="max-sm:h-9 max-sm:px-3"
-                >
-                  <Undo2 className="size-3.5" aria-hidden />
-                  {t("trash.restore")}
-                </Button>
+                {can.edit(task?.project_id) && (
+                  <Button
+                    size="sm"
+                    aria-label={t("trash.restoreDecision", { question: decision.question })}
+                    onClick={() => restoreQuestion(decision.id)}
+                    className="max-sm:h-9 max-sm:px-3"
+                  >
+                    <Undo2 className="size-3.5" aria-hidden />
+                    {t("trash.restore")}
+                  </Button>
+                )}
               </li>
             );
           })}

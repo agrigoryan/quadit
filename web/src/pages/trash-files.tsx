@@ -9,7 +9,8 @@ import { api, errorMessage, workspacePath } from "@/lib/api";
 import { fileSize, isImage, isVideo } from "@/lib/files";
 import { t, tMaybe } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { onEvents } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Attachment, FileRow } from "@/lib/types";
@@ -85,8 +86,9 @@ export function TrashedFileRow({
   rowClass: string;
   when: React.ReactNode;
 }) {
-  const tasks = useCollection("tasks");
-  const task = row.task_id ? tasks[row.task_id] : undefined;
+  // The task it was on may be in the trash or archived: its key still shows.
+  const task = useRowEvenIfGone("tasks", row.task_id);
+  const can = useCan();
   // The server does not serve a file that is in the trash, so there is no picture to show: its kind, as an icon.
   const Icon = isImage(row.file) ? FileImage : isVideo(row.file) ? FileVideo : FileText;
   return (
@@ -101,15 +103,17 @@ export function TrashedFileRow({
         {tMaybe(`trash.fileOn.${row.subject_type}`, t("trash.fileOn.task"))}
       </span>
       {when}
-      <Button
-        size="sm"
-        aria-label={t("trash.restoreFile", { name: row.file.name })}
-        onClick={onRestore}
-        className="max-sm:h-9 max-sm:px-3"
-      >
-        <Undo2 className="size-3.5" aria-hidden />
-        {t("trash.restore")}
-      </Button>
+      {can.edit(task?.project_id) && (
+        <Button
+          size="sm"
+          aria-label={t("trash.restoreFile", { name: row.file.name })}
+          onClick={onRestore}
+          className="max-sm:h-9 max-sm:px-3"
+        >
+          <Undo2 className="size-3.5" aria-hidden />
+          {t("trash.restore")}
+        </Button>
+      )}
     </li>
   );
 }

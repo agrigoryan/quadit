@@ -32,9 +32,10 @@ import {
 import { matchPath, useLocation } from "react-router";
 import { saveTheme, signOut } from "@/auth/session";
 import { projectDocs, workspaceDocs } from "@/docs/area";
+import { useCan } from "@/lib/access";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import { useMe, useProjects, useViews } from "@/lib/selectors";
+import { useProjects, useViews } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
@@ -102,14 +103,39 @@ export interface Commands {
 export function useCommands({ slug, task, expand, project, run, go, openPage }: CommandContext): Commands {
   const projects = useProjects();
   const views = useViews();
-  const me = useMe();
+  const can = useCan();
   const installAdmin = useStore((s) => !!s.user?.is_admin);
   const theme = useThemeChoice();
-  const admin = me.role !== "member";
+  const admin = can.administer;
   const at = (path: string) => () => go(`/${slug}/${path}`);
   // On a project's Docs a new page is that project's; anywhere else it is tied to none.
   const docsOf = matchPath("/:ws/p/:key/docs/*", useLocation().pathname) ? project : undefined;
   const docsAt = docsOf ? projectDocs(slug, docsOf) : workspaceDocs(slug);
+
+  const taskChanges: Cmd[] = [
+    {
+      id: "task:status",
+      label: t("prop.set.status"),
+      icon: <CircleDot />,
+      hint: "S",
+      run: () => openPage("status"),
+    },
+    {
+      id: "task:assignee",
+      label: t("prop.set.assignee"),
+      icon: <UserRound />,
+      hint: "A",
+      run: () => openPage("assignee"),
+    },
+    {
+      id: "task:priority",
+      label: t("prop.set.priority"),
+      icon: <SignalHigh />,
+      hint: "P",
+      run: () => openPage("priority"),
+    },
+    { id: "task:labels", label: t("prop.set.labels"), icon: <Tag />, hint: "L", run: () => openPage("labels") },
+  ];
 
   const forTask: Cmd[] = task
     ? [
@@ -125,28 +151,8 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
               },
             ]
           : []),
-        {
-          id: "task:status",
-          label: t("prop.set.status"),
-          icon: <CircleDot />,
-          hint: "S",
-          run: () => openPage("status"),
-        },
-        {
-          id: "task:assignee",
-          label: t("prop.set.assignee"),
-          icon: <UserRound />,
-          hint: "A",
-          run: () => openPage("assignee"),
-        },
-        {
-          id: "task:priority",
-          label: t("prop.set.priority"),
-          icon: <SignalHigh />,
-          hint: "P",
-          run: () => openPage("priority"),
-        },
-        { id: "task:labels", label: t("prop.set.labels"), icon: <Tag />, hint: "L", run: () => openPage("labels") },
+        // What changes the task: not for a task in the trash, nor for someone who may not edit it.
+        ...(can.editTask(task) ? taskChanges : []),
         {
           id: "task:copy-key",
           label: t("palette.copyKey"),
@@ -164,7 +170,7 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
       ]
     : [];
 
-  const make: Cmd[] = [
+  const newTasks: Cmd[] = [
     {
       id: "new:task",
       label: project ? t("palette.newTaskIn", { project: project.name }) : t("palette.newTask"),
@@ -180,19 +186,25 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
       icon: <ListPlus />,
       run: () => openNewTask({ projectId: project?.id, many: true }),
     },
-    {
-      id: "new:page",
-      label: docsOf ? t("palette.newPageIn", { project: docsOf.name }) : t("palette.newPage"),
-      words: "new add create doc document page",
-      icon: <FilePlus2 />,
-      // The pages' code is fetched when a page is first made or opened.
-      run: () =>
-        run(
-          () =>
-            void import("@/docs/actions").then((docs) => go(`${docsAt}/${docs.createDoc({ projectId: docsOf?.id })}`)),
-        ),
-    },
-    ...(project
+  ];
+  const newPage: Cmd = {
+    id: "new:page",
+    label: docsOf ? t("palette.newPageIn", { project: docsOf.name }) : t("palette.newPage"),
+    words: "new add create doc document page",
+    icon: <FilePlus2 />,
+    // The pages' code is fetched when a page is first made or opened.
+    run: () =>
+      run(
+        () =>
+          void import("@/docs/actions").then((docs) => go(`${docsAt}/${docs.createDoc({ projectId: docsOf?.id })}`)),
+      ),
+  };
+
+  // Each is offered only to someone who may make it where it would go.
+  const make: Cmd[] = [
+    ...(can.edit(project?.id) ? newTasks : []),
+    ...(can.edit(docsOf?.id) ? [newPage] : []),
+    ...(project && can.edit(project.id)
       ? [
           {
             id: "new:label",

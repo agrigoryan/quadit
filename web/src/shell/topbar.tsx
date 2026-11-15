@@ -10,8 +10,8 @@ import { Kbd } from "@/ui/kbd";
 import { Tooltip } from "@/ui/tooltip";
 
 interface Props {
-  /** Opens the create-task dialog for the project in view. */
-  onNewTask: () => void;
+  /** Opens the create-task dialog for the project in view; none: no "New task" button (the member may not make one there). */
+  onNewTask?: () => void;
 }
 
 export function TopBar({ onNewTask }: Props) {
@@ -39,12 +39,19 @@ export function TopBar({ onNewTask }: Props) {
         <Search className="size-4" />
       </IconButton>
 
-      <Tooltip label={t("top.newTask")} hint="C">
-        <Button variant="primary" onClick={onNewTask} aria-label={t("top.newTask")} className="max-sm:w-7 max-sm:px-0">
-          <Plus className="size-4" aria-hidden />
-          <span className="max-sm:hidden">{t("top.newTask")}</span>
-        </Button>
-      </Tooltip>
+      {onNewTask && (
+        <Tooltip label={t("top.newTask")} hint="C">
+          <Button
+            variant="primary"
+            onClick={onNewTask}
+            aria-label={t("top.newTask")}
+            className="max-sm:w-7 max-sm:px-0"
+          >
+            <Plus className="size-4" aria-hidden />
+            <span className="max-sm:hidden">{t("top.newTask")}</span>
+          </Button>
+        </Tooltip>
+      )}
       <UserMenu />
     </header>
   );

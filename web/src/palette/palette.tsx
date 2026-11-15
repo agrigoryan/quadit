@@ -4,7 +4,7 @@ import { Search } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { matchPath, useLocation, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
-import { useSlug, useTaskByKey } from "@/lib/selectors";
+import { useSlug, useTaskByKeyEvenIfGone } from "@/lib/selectors";
 import { ui, useUi } from "@/lib/ui-state";
 import { choiceTitle, ChoicesPage } from "@/palette/palette-choices";
 import type { ChoicePage, MakePage, PalettePage } from "@/palette/palette-commands";
@@ -38,7 +38,8 @@ function Palette() {
   const box = useRef<HTMLInputElement>(null);
 
   const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
-  const task = useTaskByKey(taskKey);
+  // An archived task's page is still a task to act on (its commands ask whether it may be changed); one in the trash is not.
+  const task = useTaskByKeyEvenIfGone(taskKey);
   const openTask = task && !task.deleted_at ? task : undefined;
   // Where a new task, label or status goes, and whose pages the letters after G open.
   const project = projectInView(location);

@@ -18,8 +18,7 @@ import {
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMember } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useMember, useRowEvenIfGone } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/lib/types";
 import { anchorOf, archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
@@ -50,13 +49,15 @@ interface Props {
   item: Notification;
   focused: boolean;
   onOpen: (item: Notification) => void;
+  /** No marking read or archiving: the member may change nothing. */
+  readOnly?: boolean;
 }
 
 /**
  * One inbox item: who did what, on which task, and the words that came with
  * it. Unread items carry the highlighter dot and stronger text.
  */
-export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props) {
+export const InboxRow = memo(function InboxRow({ item, focused, onOpen, readOnly }: Props) {
   const actor = useMember(item.actor_id);
   const unread = !item.read_at;
   const { key, title } = splitTitle(item.title);
@@ -68,7 +69,8 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
   });
   const snippet = item.snippet ? plain(item.snippet) : "";
   // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
-  const taskKey = useStore((s) => (item.task_id ? s.collections.tasks[item.task_id]?.key : undefined)) ?? key;
+  // A task in the trash too: its page shows it as trashed.
+  const taskKey = useRowEvenIfGone("tasks", item.task_id)?.key ?? key;
   const link = useTaskLink({ key: taskKey ?? "" });
   const anchor = anchorOf(item);
   const to = anchor ? `${link.to}#${anchor}` : link.to;
@@ -112,7 +114,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
           <Link
             {...link}
             to={to}
-            onClick={() => unread && markRead([item.id])}
+            onClick={() => unread && !readOnly && markRead([item.id])}
             aria-label={label}
             className={whatStyle}
           >
@@ -133,32 +135,34 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
       >
         <Ago ms={item.created_at} />
       </time>
-      <div
-        className={cx(
-          "z-[1] flex items-center gap-0.5 bg-inherit",
-          "max-md:absolute max-md:right-1 max-md:bottom-0.5",
-          "md:absolute md:inset-y-0 md:right-2 md:pl-2 md:opacity-0 md:group-hover:opacity-100 md:group-data-[focused]:opacity-100 md:focus-within:opacity-100",
-        )}
-      >
-        <IconButton
-          label={unread ? t("inbox.markRead") : t("inbox.markUnread")}
-          hint="U"
-          size="sm"
-          className="max-md:hidden"
-          onClick={() => (unread ? markRead([item.id]) : markUnread([item.id]))}
+      {!readOnly && (
+        <div
+          className={cx(
+            "z-[1] flex items-center gap-0.5 bg-inherit",
+            "max-md:absolute max-md:right-1 max-md:bottom-0.5",
+            "md:absolute md:inset-y-0 md:right-2 md:pl-2 md:opacity-0 md:group-hover:opacity-100 md:group-data-[focused]:opacity-100 md:focus-within:opacity-100",
+          )}
         >
-          {unread ? <MailOpen className="size-3.5" /> : <Mail className="size-3.5" />}
-        </IconButton>
-        <IconButton
-          label={t("inbox.archive")}
-          hint="E"
-          size="sm"
-          className="max-md:size-10"
-          onClick={() => archive([item.id])}
-        >
-          <Archive className="size-3.5 max-md:size-4" />
-        </IconButton>
-      </div>
+          <IconButton
+            label={unread ? t("inbox.markRead") : t("inbox.markUnread")}
+            hint="U"
+            size="sm"
+            className="max-md:hidden"
+            onClick={() => (unread ? markRead([item.id]) : markUnread([item.id]))}
+          >
+            {unread ? <MailOpen className="size-3.5" /> : <Mail className="size-3.5" />}
+          </IconButton>
+          <IconButton
+            label={t("inbox.archive")}
+            hint="E"
+            size="sm"
+            className="max-md:size-10"
+            onClick={() => archive([item.id])}
+          >
+            <Archive className="size-3.5 max-md:size-4" />
+          </IconButton>
+        </div>
+      )}
     </div>
   );
 });

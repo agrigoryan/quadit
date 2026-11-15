@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { api, workspacePath } from "@/lib/api";
-import { useSlug } from "@/lib/selectors";
+import { isLive, useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { SearchHit, Task } from "@/lib/types";
 
@@ -35,18 +35,31 @@ function score(task: Task, q: string): number {
   return q.split(/\s+/).every((word) => key.includes(word) || title.includes(word)) ? 5 : -1;
 }
 
-/** Tasks in the store whose key or title holds the query, best first. */
-export function searchTasks(tasks: Dict<Task>, query: string, limit = 8): Task[] {
+/** Tasks whose key or title holds the query, best first; one in the trash or the archive is never found. */
+export function searchTasks(tasks: Task[], query: string, limit = 8): Task[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const found: { task: Task; score: number }[] = [];
-  for (const task of Object.values(tasks)) {
-    if (task.deleted_at) continue;
+  for (const task of tasks) {
+    if (!isLive(task)) continue;
     const s = score(task, q);
     if (s >= 0) found.push({ task, score: s });
   }
   found.sort((a, b) => a.score - b.score || b.task.updated_at - a.task.updated_at);
   return found.slice(0, limit).map((f) => f.task);
+}
+
+/**
+ * The server's hits less those in a task the store has as gone: the server
+ * finds words in archived tasks too, and its answer may predate a task's
+ * going. `tasks` holds every task by id, gone ones included. A hit in a task
+ * the store does not have yet (a finished one still on its way) stays.
+ */
+export function hitsOnLiveTasks(hits: SearchHit[], tasks: Dict<Task>): SearchHit[] {
+  return hits.filter((hit) => {
+    const known = hit.scope_type === "task" ? tasks[hit.scope_id] : undefined;
+    return !known || isLive(known);
+  });
 }
 
 /**

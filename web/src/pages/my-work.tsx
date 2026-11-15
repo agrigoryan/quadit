@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { FirstProjectNudge } from "@/auth/first-run";
 import { cx } from "@/lib/cx";
 import { formatNumber, t } from "@/lib/i18n";
-import { useCollection, useLiveTasks, useMe, useMember } from "@/lib/selectors";
+import { useLiveTasks, useLookup, useLookupEvenIfGone, useMe, useMember, useOpenDecisions } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
@@ -38,9 +38,10 @@ export function MyWorkPage() {
   usePageTitle(t("nav.myWork"));
   const me = useMe();
   const tasks = useLiveTasks();
-  const allTasks = useCollection("tasks");
-  const statuses = useCollection("statuses");
-  const decisions = useCollection("decisions");
+  const liveTasks = useLookup("tasks");
+  // Following each task's status id: a deleted status still has a category.
+  const statuses = useLookupEvenIfGone("statuses");
+  const openDecisions = useOpenDecisions();
   const open = useTaskNav();
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -50,10 +51,11 @@ export function MyWorkPage() {
       .filter((task) => task.waiting_on_id === me.user_id)
       .sort((a, b) => b.updated_at - a.updated_at);
     const questions: Question[] = [];
-    for (const decision of Object.values(decisions)) {
-      if (decision.state !== "open" || decision.deleted_at || decision.asked_id !== me.user_id) continue;
-      const task = allTasks[decision.task_id];
-      if (task && !task.deleted_at) questions.push({ decision, task });
+    for (const [taskId, open] of Object.entries(openDecisions)) {
+      // Only on a live task: one in the trash or the archive is not work waiting on me.
+      const task = liveTasks[taskId];
+      if (!task) continue;
+      for (const decision of open) if (decision.asked_id === me.user_id) questions.push({ decision, task });
     }
     questions.sort((a, b) => b.decision.created_at - a.decision.created_at);
     const assigned = open
@@ -65,7 +67,7 @@ export function MyWorkPage() {
           b.updated_at - a.updated_at,
       );
     return { waiting, questions, assigned };
-  }, [tasks, allTasks, statuses, decisions, me.user_id]);
+  }, [tasks, liveTasks, statuses, openDecisions, me.user_id]);
 
   const rows = useMemo<Row[]>(
     () => [

@@ -3,6 +3,7 @@ import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavi
 import { useMedia } from "@/decisions/data";
 import { ShortcutsSheet } from "@/palette/shortcuts";
 import { ahead } from "@/lib/ahead";
+import { useCan } from "@/lib/access";
 import { useHotkeys } from "@/lib/hotkeys";
 import { useStore } from "@/lib/store";
 import { ui, useUi } from "@/lib/ui-state";
@@ -91,7 +92,12 @@ export function Shell() {
   const page: Location | string = inPanel ? (background ?? fallback) : location;
   const pagePath = typeof page === "string" ? page : page.pathname;
 
-  const openNewTask = () => ui.newTask({ projectId: projectInView(location)?.id });
+  // A new task goes in the project in view: offered only to someone who may make one there.
+  const projectId = projectInView(location)?.id;
+  const mayCreate = useCan().edit(projectId);
+  const openNewTask = () => {
+    if (mayCreate) ui.newTask({ projectId });
+  };
   // The panel is one step above its page in the history: closing it is going back that step.
   const closePanel = useCallback(
     () => void (background && canGoBack() ? navigate(-1) : navigate(fallback)),
@@ -131,7 +137,7 @@ export function Shell() {
       <div className="flex h-dvh overflow-hidden">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar onNewTask={openNewTask} />
+          <TopBar onNewTask={mayCreate ? openNewTask : undefined} />
           {/* It takes the focus after each move (shell/page-focus.ts); what looks focused is then the page's own current row. */}
           <main data-page tabIndex={-1} className="relative min-h-0 flex-1 overflow-hidden bg-surface outline-none">
             <PageBoundary resetKey={pagePath}>

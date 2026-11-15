@@ -1,11 +1,11 @@
 import { FileText, ListTodo, MessageSquare } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
-import { useRestLoaded, useStore } from "@/lib/store";
+import { useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
+import { useRestLoaded } from "@/lib/store";
 import type { SearchHit } from "@/lib/types";
 import { type Cmd, type CommandContext, useCommands } from "@/palette/palette-commands";
 import { Group, Item, Note } from "@/palette/palette-rows";
-import { matches, searchTasks, snippetParts } from "@/palette/palette-search";
+import { hitsOnLiveTasks, matches, searchTasks, snippetParts } from "@/palette/palette-search";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { docPath } from "@/docs/area";
@@ -26,8 +26,11 @@ interface Props extends CommandContext {
 export function RootPage({ query, hits, searching, openTask, ...context }: Props) {
   const { slug, task, go } = context;
   const commands = useCommands(context);
-  const tasks = useCollection("tasks");
-  const statuses = useCollection("statuses");
+  const tasks = useLiveTasks();
+  // Every task by id, gone ones included: to tell a hit on a task now in the archive or the trash.
+  const everyTask = useLookupEvenIfGone("tasks");
+  // Following each found task's status id: a deleted status still has a category.
+  const statuses = useLookupEvenIfGone("statuses");
   const restLoaded = useRestLoaded();
   const q = query.trim();
 
@@ -42,7 +45,7 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
   const foundTasks = searchTasks(tasks, q);
   const listed = new Set(foundTasks.map((tk) => tk.key));
   // What the server found that is not already a row above; only things inside a task or a page can be opened.
-  const inText = hits
+  const inText = hitsOnLiveTasks(hits, everyTask)
     .filter((h) => (h.task && !(h.kind === "task" && listed.has(h.task))) || h.scope_type === "doc")
     .slice(0, 8);
 
@@ -102,9 +105,8 @@ export function RootPage({ query, hits, searching, openTask, ...context }: Props
 
 /** Something the server found inside a task or a page: where it is (the task's key, the page's project), and the words around the match. */
 function HitRow({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
-  const project = useStore((s) =>
-    hit.scope_type === "doc" && hit.project_id ? s.collections.projects[hit.project_id] : undefined,
-  );
+  // A page of an archived project still carries its project's mark.
+  const project = useRowEvenIfGone("projects", hit.scope_type === "doc" ? hit.project_id : undefined);
   const key = hit.task ?? "";
   const title = hit.title.startsWith(`${key} `) ? hit.title.slice(key.length + 1) : hit.title;
   const icon =
