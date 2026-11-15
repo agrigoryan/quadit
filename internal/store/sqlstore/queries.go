@@ -356,58 +356,17 @@ func searchTerms(text string) []string {
 }
 
 func (c conn) Index(ctx context.Context, d store.SearchDoc) error {
-	ws := c.ws
-	if ws == "" {
+	if c.ws == "" {
 		return fmt.Errorf("store: Index needs a workspace-bound DB")
 	}
-	if c.d.Name == "postgres" {
-		_, err := c.exec(ctx, `INSERT INTO search_index (workspace_id, kind, entity_id, scope_type, scope_id, project_id, audience_id, title, body)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT (entity_id) DO UPDATE SET kind = excluded.kind, scope_type = excluded.scope_type, scope_id = excluded.scope_id,
-			project_id = excluded.project_id, audience_id = excluded.audience_id, title = excluded.title, body = excluded.body`,
-			ws, d.Kind, d.EntityID, d.ScopeType, d.ScopeID, nz(d.ProjectID), nz(d.AudienceID), d.Title, d.Body)
-		return err
-	}
-	if err := c.Unindex(ctx, d.EntityID); err != nil {
-		return err
-	}
-	res, err := c.exec(ctx, `INSERT INTO search_index (title, body, workspace_id, kind, entity_id, scope_type, scope_id, project_id, audience_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, d.Title, d.Body, ws, d.Kind, d.EntityID, d.ScopeType, d.ScopeID, d.ProjectID, d.AudienceID)
-	if err != nil {
-		return err
-	}
-	rid, err := res.LastInsertId()
-	if err != nil {
-		return err
-	}
-	_, err = c.exec(ctx, `INSERT INTO search_map (entity_id, rid) VALUES (?, ?)`, d.EntityID, rid)
-	return err
-}
-
-func nz(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
+	return c.d.search.index(ctx, c, d)
 }
 
 func (c conn) Unindex(ctx context.Context, entityID string) error {
 	if !looksUUID(entityID) {
 		return nil
 	}
-	if c.d.Name == "postgres" {
-		_, err := c.exec(ctx, `DELETE FROM search_index WHERE entity_id = ?`, entityID)
-		return err
-	}
-	var rid int64
-	if err := c.row(ctx, `SELECT rid FROM search_map WHERE entity_id = ?`, entityID).Scan(&rid); err != nil {
-		return nil // not indexed
-	}
-	if _, err := c.exec(ctx, `DELETE FROM search_index WHERE rowid = ?`, rid); err != nil {
-		return err
-	}
-	_, err := c.exec(ctx, `DELETE FROM search_map WHERE entity_id = ?`, entityID)
-	return err
+	return c.d.search.unindex(ctx, c, entityID)
 }
 
 func (c conn) Search(ctx context.Context, sq store.SearchQuery) ([]store.SearchHit, error) {
@@ -420,41 +379,15 @@ func (c conn) Search(ctx context.Context, sq store.SearchQuery) ([]store.SearchH
 		limit = 20
 	}
 	w := &clause{}
-	var query string
-	if c.d.Name == "postgres" {
-		for i := range terms {
-			terms[i] += ":*"
-		}
-		tsq := strings.Join(terms, " & ")
-		w.add(`tsv @@ to_tsquery('simple', ?)`, tsq)
-		w.add(`workspace_id = ?`, c.ws)
-		query = `SELECT kind, entity_id, scope_type, scope_id, COALESCE(CAST(project_id AS TEXT), ''), title,
-			ts_headline('simple', body, to_tsquery('simple', ?), 'MaxWords=18, MinWords=6, StartSel=**, StopSel=**')
-			FROM search_index WHERE `
-		w.args = append([]any{tsq}, w.args...)
-	} else {
-		for i := range terms {
-			terms[i] = `"` + terms[i] + `"*`
-		}
-		w.add(`search_index MATCH ?`, strings.Join(terms, " "))
-		w.add(`workspace_id = ?`, c.ws)
-		query = `SELECT kind, entity_id, scope_type, scope_id, COALESCE(project_id, ''), title,
-			snippet(search_index, 1, '**', '**', '…', 18) FROM search_index WHERE `
-	}
+	query := c.d.search.match(w, terms, c.ws)
 	if len(sq.Kinds) > 0 {
 		w.in(`kind`, sq.Kinds, false)
 	}
 	if len(sq.ProjectIDs) > 0 {
 		w.in(`project_id`, sq.ProjectIDs, true)
 	}
-	if c.d.Name == "postgres" {
-		w.add(`(audience_id IS NULL OR audience_id = ?)`, idOrNone(sq.Viewer))
-		query += w.sql() + ` ORDER BY ts_rank(tsv, to_tsquery('simple', ?)) DESC`
-		w.args = append(w.args, w.args[0])
-	} else {
-		w.add(`(audience_id = '' OR audience_id = ?)`, sq.Viewer)
-		query += w.sql() + ` ORDER BY rank`
-	}
+	order := c.d.search.rank(w, sq.Viewer)
+	query += w.sql() + order
 	rows, err := c.query(ctx, query+fmt.Sprintf(" LIMIT %d", limit), w.args...)
 	if err != nil {
 		return nil, err

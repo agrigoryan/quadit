@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -74,11 +73,10 @@ func (s *Store) Listen(ctx context.Context, each func(workspaceID string, seq in
 // Poke tells every server sharing the database to wake its waiters with no
 // news in the feed. It does nothing on a database only one server uses.
 func (s *Store) Poke(ctx context.Context) error {
-	if s.d.Name != "postgres" {
+	if s.d.notify == nil {
 		return nil
 	}
-	_, err := s.db.ExecContext(ctx, `SELECT pg_notify('`+FeedChannel+`', 'poke')`)
-	return err
+	return s.d.notify.poke(ctx, s.db)
 }
 
 // SetListen gives the store its way to hear of other servers' writes.
@@ -173,10 +171,10 @@ func (s *Store) Write(ctx context.Context, workspaceID string, fn func(store.Tx)
 		if _, err = x.exec(ctx, `UPDATE workspaces SET seq = ?, updated_at = ? WHERE id = ?`, t.seq, time.Now().UnixMilli(), workspaceID); err != nil {
 			return err
 		}
-		if s.d.Name == "postgres" {
+		if s.d.notify != nil {
 			// Tell every server sharing this database that the feed moved.
 			// The database delivers it when, and only if, this write commits.
-			_, err = x.exec(ctx, `SELECT pg_notify('`+FeedChannel+`', ?)`, workspaceID+":"+strconv.FormatInt(t.seq, 10))
+			err = s.d.notify.feedMoved(ctx, x, workspaceID, t.seq)
 		}
 		return err
 	})

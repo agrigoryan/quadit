@@ -23,6 +23,13 @@ type Dialect struct {
 	// at a time. Writers then queue in this process instead of retrying
 	// against the database's lock.
 	SingleWriter bool
+
+	// search is the database's full-text index.
+	search searcher
+
+	// notify tells other servers sharing the database that a feed moved;
+	// nil when only one server uses the database.
+	notify notifier
 }
 
 // SQLite is the dialect for the default single-file install.
@@ -38,6 +45,7 @@ var SQLite = Dialect{
 		"BYTES":  "BLOB",
 	},
 	SingleWriter: true,
+	search:       ftsSearch{},
 }
 
 // Postgres is the dialect for larger installs.
@@ -53,6 +61,8 @@ var Postgres = Dialect{
 		"BYTES":  "BYTEA",
 	},
 	Numbered: true,
+	search:   tsvSearch{},
+	notify:   pgNotify{},
 }
 
 // Rebind turns the ? placeholders every query is written with into the
