@@ -43,13 +43,13 @@ func (s *Server) handleRequestPasswordReset(x *c) error {
 			return err
 		}
 		link := s.cfg.BaseURL + "/reset/" + token
-		go func() {
-			if err := s.sendMail(context.Background(), u.Email, "Reset your password",
+		s.detach(ctx, func(ctx context.Context) {
+			if err := s.sendMail(ctx, u.Email, "Reset your password",
 				"Someone asked to reset the password for this address.\n\nOpen this link within an hour to choose a new one:\n"+link+
 					"\n\nIf it was not you, ignore this message; nothing has changed."); err != nil {
 				s.log.Error("reset mail", "err", err)
 			}
-		}()
+		})
 		s.audit(x.r, "", u, "password.reset_requested", "user", u.ID, nil)
 	}
 	return x.ok(map[string]any{"ok": true})

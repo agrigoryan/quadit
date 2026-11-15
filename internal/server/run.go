@@ -33,6 +33,7 @@ func (s *Server) Run(ctx context.Context) {
 		}
 	}
 	s.applyLimits(ctx)
+	defer s.waitForDetached()
 	var loops sync.WaitGroup
 	defer loops.Wait()
 	for _, r := range runners {

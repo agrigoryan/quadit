@@ -162,11 +162,11 @@ func (s *Server) handleReceiveGitHubEvent(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusAccepted) // paused: taken, not acted on
 		return
 	}
-	go func() {
-		if _, err := s.syncGitHub(context.WithoutCancel(ctx), in); err != nil {
+	s.detach(ctx, func(ctx context.Context) {
+		if _, err := s.syncGitHub(ctx, in); err != nil {
 			s.log.Warn("github sync", "integration", in.ID, "err", err)
 		}
-	}()
+	})
 	w.WriteHeader(http.StatusAccepted)
 }
 

@@ -130,6 +130,8 @@ type Server struct {
 	mcp *mcp.Server
 	// github runs the passes of GitHub integrations (github.go).
 	github *github.Syncer
+	// detached is the work requests leave running after their answer (detached.go).
+	detached detached
 }
 
 // Stop ends the connections the server holds open for its callers, so a
