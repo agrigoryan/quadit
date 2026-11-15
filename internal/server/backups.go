@@ -113,13 +113,17 @@ func (s *Server) runSchedule(ctx context.Context) {
 	for {
 		now := time.Now().UTC()
 		day := now.Format("2006-01-02")
-		s.enqueue(ctx, "trash.purge", "", "trash.purge:"+day, nil, now)
+		if err := s.enqueue(ctx, "trash.purge", "", "trash.purge:"+day, nil, now); err != nil {
+			s.log.Error("the daily emptying of the trash; queued again on the next pass", "err", err)
+		}
 		var bs backupSetting
 		if s.setting(ctx, "backup", &bs) && bs.Enabled && now.Hour() >= bs.Hour {
 			var today []core.Backup
 			start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).UnixMilli()
 			if err := s.st.List(ctx, &today, store.Q{Where: []store.Cond{store.Gte("started_at", start)}, Limit: 1}); err == nil && len(today) == 0 {
-				s.enqueue(ctx, "backup", "", "backup:"+day, nil, now)
+				if err := s.enqueue(ctx, "backup", "", "backup:"+day, nil, now); err != nil {
+					s.log.Error("the daily backup; queued again on the next pass", "err", err)
+				}
 			}
 		}
 		select {

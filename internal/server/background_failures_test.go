@@ -157,6 +157,29 @@ func TestAJobOutlivesABriefOutage(t *testing.T) {
 	})
 }
 
+func TestAWakeUpOutlivesABriefOutage(t *testing.T) {
+	st := newFaultyStore(testdb.SQLite(t))
+	s := newSite(t, st)
+	jobs := func(kind string) int {
+		n, err := st.Store.Count(context.Background(), "jobs", store.Eq("kind", kind))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	// The daily jobs are queued when the server starts; wait for them, so
+	// the fault meets the wake-up.
+	eventually(t, "the daily jobs to be queued", func() bool { return jobs("trash.purge") > 0 })
+	_, bea := s.invitedPerson()
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	fired := st.faults.arm(fault{op: "insert", table: "jobs", times: 1})
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane", "assignee": bea})
+	eventually(t, "the wake-up for the inbox item to be queued on a later pass", func() bool { return jobs("notify") == 1 })
+	if fired() != 1 {
+		t.Fatalf("fault fired %d times", fired())
+	}
+}
+
 func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
 	logs := captureLogs(t)
 	st := newFaultyStore(testdb.SQLite(t))

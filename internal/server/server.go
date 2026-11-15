@@ -163,7 +163,9 @@ func (s *Server) useFiles(ctx context.Context, c blob.Config) error {
 		}
 		_ = cloud.Delete(ctx, probe) // best effort: a leftover probe is a two-byte file and harms nothing
 		next = blob.Layered{Primary: cloud, Old: s.disk}
-		s.enqueue(ctx, "files.move", "", "files.move", nil, time.Now().Add(5*time.Second))
+		if err := s.enqueue(ctx, "files.move", "", "files.move", nil, time.Now().Add(5*time.Second)); err != nil {
+			s.log.Error("copying local files to the cloud store; queued again when the server next starts", "err", err)
+		}
 	}
 	s.filesMu.Lock()
 	s.files = next

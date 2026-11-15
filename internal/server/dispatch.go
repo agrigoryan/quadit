@@ -104,7 +104,9 @@ func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error)
 			}
 		}
 		if isNews(ev) {
-			s.reactToNews(ctx, l, ev)
+			if err := s.reactToNews(ctx, l, ev); err != nil {
+				return 0, err
+			}
 		}
 	}
 	last := evs[len(evs)-1].Seq
@@ -133,8 +135,10 @@ func isNews(ev core.Event) bool {
 
 // reactToNews does what one event of news sets off: alerts for the saved
 // views it brings a task into, the rules it matches, and a wake-up (push or
-// mail) for an inbox item.
-func (s *Server) reactToNews(ctx context.Context, l listeners, ev core.Event) {
+// mail) for an inbox item. A view or a rule that fails is logged and
+// skipped; a wake-up that cannot be queued is the error, so the dispatcher
+// stays where it is and tries the event again.
+func (s *Server) reactToNews(ctx context.Context, l listeners, ev core.Event) error {
 	ws := l.ws
 	if len(l.viewWatchers) > 0 && ev.AudienceID == "" && ev.ScopeType == "task" && (ev.Type == "task.created" || ev.Type == "task.updated") {
 		for _, vw := range l.viewWatchers {
@@ -157,8 +161,9 @@ func (s *Server) reactToNews(ctx context.Context, l listeners, ev core.Event) {
 	var n core.Notification
 	if ev.Type == "notification.created" && d.ReadRow(&n) && n.ID != "" {
 		// Give the person a moment to see it in an open window first.
-		s.enqueue(ctx, "notify", ws.ID, "notify:"+n.ID, map[string]string{"id": n.ID}, time.Now().Add(notifyDelay))
+		return s.enqueue(ctx, "notify", ws.ID, "notify:"+n.ID, map[string]string{"id": n.ID}, time.Now().Add(notifyDelay))
 	}
+	return nil
 }
 
 // viewNews tells the watcher of a saved view when a change leaves a task in
