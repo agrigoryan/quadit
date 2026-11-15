@@ -25,7 +25,7 @@ func GitHubIdentity(ctx context.Context, token, api string) (subject, name strin
 // GoogleEndpoints asks Google where sign-in happens, as sign-in with Google
 // does when it starts.
 func (s *Server) GoogleEndpoints(ctx context.Context) (authURL, tokenURL string, err error) {
-	oc, _, err := s.oauth2Config(ctx, "google", oauthSetting{ClientID: "test", Issuer: "https://accounts.google.com"})
+	oc, err := s.oauth2Config(ctx, signInProviderFor("google"), oauthSetting{ClientID: "test", Issuer: "https://accounts.google.com"})
 	if err != nil {
 		return "", "", err
 	}

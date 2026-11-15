@@ -346,9 +346,9 @@ func (s *Server) keepsADoor(x *c, name string, value json.RawMessage) error {
 			return nil
 		}
 	}
-	for _, p := range []string{"google", "github", "oidc"} {
-		if on("auth."+p, false) {
-			if n, _ := s.st.Count(ctx, "identities", store.Eq("user_id", x.user.ID), store.Eq("provider", p)); n > 0 {
+	for _, p := range signInProviders {
+		if on("auth."+p.ID(), false) {
+			if n, _ := s.st.Count(ctx, "identities", store.Eq("user_id", x.user.ID), store.Eq("provider", p.ID())); n > 0 {
 				return nil
 			}
 		}

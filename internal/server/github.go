@@ -6,13 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +17,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
-	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -29,6 +25,14 @@ import (
 // title, its description or its branch name. The server asks GitHub for
 // news once a minute, so it works on a machine GitHub cannot reach; where
 // GitHub can reach it, a webhook makes the same thing immediate.
+//
+// How it is laid out:
+//
+//	github.go         what an integration is set to do and remembers, when
+//	                  it syncs (the timer, the button, the webhook), one pass
+//	github_pulls.go   pull requests and their checks, onto the tasks they name
+//	github_issues.go  labelled issues, made into tasks
+//	github_client.go  asking GitHub's REST API; sign-in with GitHub uses it too
 
 func init() {
 	runners = append(runners, (*Server).runGitHub)
@@ -162,26 +166,6 @@ func (s *Server) hGitHubHook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-type ghPull struct {
-	Number    int    `json:"number"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
-	State     string `json:"state"`
-	Draft     bool   `json:"draft"`
-	HTMLURL   string `json:"html_url"`
-	UpdatedAt string `json:"updated_at"`
-	MergedAt  string `json:"merged_at"`
-	Head      struct {
-		Ref string `json:"ref"`
-		SHA string `json:"sha"`
-	} `json:"head"`
-	User struct {
-		Login string `json:"login"`
-	} `json:"user"`
-}
-
-var ghKeyRE = regexp.MustCompile(`(?i)\b([A-Z][A-Z0-9]{1,9})-(\d+)\b`)
-
 // syncGitHub reads what changed on GitHub and updates the tasks' links.
 func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, error) {
 	mu, _ := ghLocks.LoadOrStore(in.ID, &sync.Mutex{})
@@ -212,8 +196,27 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 	return n, err
 }
 
+// githubSync is one pass over one integration's repository: what the
+// integration is set to do, what it remembers between passes, and the
+// client it asks GitHub with.
+type githubSync struct {
+	s   *Server
+	db  store.DB
+	in  core.Integration
+	cfg githubConfig
+	st  *githubState
+	gh  *githubClient
+	// token is the integration's own; without one nothing is written on GitHub.
+	token string
+}
+
+var ghRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
+
+// githubPass looks at the repository once: its pull requests
+// (github_pulls.go), then its issues (github_issues.go). It returns how
+// many of them it handled.
 func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integration, cfg githubConfig, st *githubState) (int, error) {
-	if !regexp.MustCompile(`^[\w.-]+/[\w.-]+$`).MatchString(cfg.Repo) {
+	if !ghRepoRE.MatchString(cfg.Repo) {
 		return 0, fmt.Errorf("the repository must be given as owner/name, got %q", cfg.Repo)
 	}
 	token, err := s.sealer.Open(in.Secret)
@@ -221,257 +224,11 @@ func (s *Server) githubPass(ctx context.Context, db store.DB, in core.Integratio
 		return 0, err
 	}
 	api := strings.TrimRight(orText(cfg.APIURL, "https://api.github.com"), "/")
-	call := func(method, path string, body any, dst any) error {
-		var rd io.Reader
-		if body != nil {
-			raw, _ := json.Marshal(body)
-			rd = strings.NewReader(string(raw))
-		}
-		rctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(rctx, method, api+path, rd)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Accept", "application/vnd.github+json")
-		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-		req.Header.Set("User-Agent", "Quadit/"+s.cfg.Version)
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-		if resp.StatusCode >= 300 {
-			return fmt.Errorf("GitHub answered %s to %s %s: %s", resp.Status, method, path, oneLine(string(raw), 160))
-		}
-		if dst != nil {
-			return json.Unmarshal(raw, dst)
-		}
-		return nil
+	g := &githubSync{s: s, db: db, in: in, cfg: cfg, st: st, gh: s.githubAPI(api, token), token: token}
+	handled, err := g.syncPulls(ctx)
+	if err != nil {
+		return handled, err
 	}
-	var pulls []ghPull
-	if err := call("GET", "/repos/"+cfg.Repo+"/pulls?state=all&sort=updated&direction=desc&per_page=50", nil, &pulls); err != nil {
-		return 0, err
-	}
-	// Which keys are real: the workspace's project keys.
-	var projects []core.Project
-	if err := db.List(ctx, &projects, store.Where(store.Live)); err != nil {
-		return 0, err
-	}
-	isKey := map[string]bool{}
-	for _, p := range projects {
-		if in.ProjectID == "" || in.ProjectID == p.ID {
-			isKey[p.Key] = true
-		}
-	}
-	newest := st.Since
-	handled := 0
-	for _, pr := range pulls {
-		num := fmt.Sprint(pr.Number)
-		changed := pr.UpdatedAt > st.Since
-		if !changed && !st.PendingChecks[num] {
-			continue
-		}
-		if pr.UpdatedAt > newest {
-			newest = pr.UpdatedAt
-		}
-		keys := map[string]bool{}
-		for _, m := range ghKeyRE.FindAllStringSubmatch(pr.Title+"\n"+pr.Head.Ref+"\n"+pr.Body, -1) {
-			if isKey[strings.ToUpper(m[1])] {
-				keys[strings.ToUpper(m[1])+"-"+m[2]] = true
-			}
-		}
-		if len(keys) == 0 {
-			continue
-		}
-		state := pr.State
-		switch {
-		case pr.MergedAt != "":
-			state = "merged"
-		case pr.Draft && pr.State == "open":
-			state = "draft"
-		}
-		checks := ""
-		if state == "open" || state == "draft" {
-			var runs struct {
-				CheckRuns []struct {
-					Status     string `json:"status"`
-					Conclusion string `json:"conclusion"`
-				} `json:"check_runs"`
-			}
-			if err := call("GET", "/repos/"+cfg.Repo+"/commits/"+pr.Head.SHA+"/check-runs?per_page=100", nil, &runs); err == nil && len(runs.CheckRuns) > 0 {
-				checks = "passing"
-				for _, r := range runs.CheckRuns {
-					switch {
-					case r.Status != "completed":
-						if checks != "failing" {
-							checks = "pending"
-						}
-					case r.Conclusion == "failure" || r.Conclusion == "timed_out" || r.Conclusion == "cancelled" || r.Conclusion == "action_required":
-						checks = "failing"
-					}
-				}
-			}
-			st.PendingChecks[num] = checks == "pending"
-		} else {
-			delete(st.PendingChecks, num)
-		}
-		st.Heads[num] = pr.Head.SHA
-		for key := range keys {
-			var t core.Task
-			if err := db.Get(ctx, &t, store.Eq("key", key), store.Live); err != nil {
-				continue
-			}
-			data, _ := json.Marshal(map[string]any{"branch": pr.Head.Ref, "author": pr.User.Login, "sha": pr.Head.SHA})
-			err := s.eng.System(ctx, in.WorkspaceID, in.CreatedBy, func(sys *engine.Sys) error {
-				if err := sys.Do("link.set", map[string]any{"task": t.ID, "kind": "pr", "repo": cfg.Repo, "ref": num, "url": pr.HTMLURL, "title": pr.Title,
-					"state": state, "checks": checks, "data": json.RawMessage(data)}); err != nil {
-					return err
-				}
-				// Move the task along with its pull request, when asked to.
-				to := ""
-				switch {
-				case state == "merged" && cfg.OnMerge != "":
-					to = cfg.OnMerge
-				case (state == "open" || state == "draft") && cfg.OnOpen != "":
-					var cur core.Status
-					if sys.Tx().Get(ctx, &cur, store.Eq("id", t.StatusID)) == nil && (cur.Category == core.CatBacklog || cur.Category == core.CatUnstarted) {
-						to = cfg.OnOpen
-					}
-				}
-				if to == "" {
-					return nil
-				}
-				return sys.Do("task.update", map[string]any{"id": t.ID, "status": to})
-			})
-			if err != nil {
-				return handled, fmt.Errorf("%s: %w", key, err)
-			}
-			if cfg.CommentBack && !st.Commented[num+" "+key] && token != "" {
-				var ws core.Workspace
-				s.st.Get(ctx, &ws, store.Eq("id", in.WorkspaceID))
-				body := fmt.Sprintf("Linked to **%s** %s — %s/%s/task/%s", key, t.Title, s.cfg.BaseURL, ws.Slug, key)
-				if err := call("POST", fmt.Sprintf("/repos/%s/issues/%d/comments", cfg.Repo, pr.Number), map[string]string{"body": body}, nil); err == nil {
-					st.Commented[num+" "+key] = true
-				}
-			}
-		}
-		handled++
-	}
-	st.Since = newest
-	n, err := s.githubIssues(ctx, db, in, cfg, st, call)
+	n, err := g.syncIssues(ctx)
 	return handled + n, err
-}
-
-type ghIssue struct {
-	Number      int    `json:"number"`
-	Title       string `json:"title"`
-	Body        string `json:"body"`
-	State       string `json:"state"`
-	HTMLURL     string `json:"html_url"`
-	UpdatedAt   string `json:"updated_at"`
-	PullRequest any    `json:"pull_request"` // set when the "issue" is a pull request
-}
-
-// githubIssues makes a task of each labelled issue and keeps it in step
-// with the issue: its title and text, and whether it is closed.
-func (s *Server) githubIssues(ctx context.Context, db store.DB, in core.Integration, cfg githubConfig, st *githubState,
-	call func(method, path string, body any, dst any) error) (int, error) {
-	if cfg.IssuesLabel == "" {
-		return 0, nil
-	}
-	project := cfg.IssuesProject
-	if project == "" {
-		var p core.Project
-		if in.ProjectID == "" || db.Get(ctx, &p, store.Eq("id", in.ProjectID), store.Live) != nil {
-			return 0, errors.New("issues are turned into tasks in a project: set issues_project to its key")
-		}
-		project = p.Key
-	}
-	if st.IssueTasks == nil {
-		st.IssueTasks = map[string]string{}
-	}
-	q := "/repos/" + cfg.Repo + "/issues?state=all&sort=updated&direction=desc&per_page=50"
-	if cfg.IssuesLabel != "*" {
-		q += "&labels=" + url.QueryEscape(cfg.IssuesLabel)
-	}
-	if st.IssuesSince != "" {
-		q += "&since=" + url.QueryEscape(st.IssuesSince)
-	}
-	var issues []ghIssue
-	if err := call("GET", q, nil, &issues); err != nil {
-		return 0, err
-	}
-	newest, handled := st.IssuesSince, 0
-	// Oldest first, so tasks are numbered in the order the issues changed.
-	for i := len(issues) - 1; i >= 0; i-- {
-		is := issues[i]
-		if is.PullRequest != nil || is.UpdatedAt <= st.IssuesSince {
-			continue
-		}
-		if is.UpdatedAt > newest {
-			newest = is.UpdatedAt
-		}
-		num := strconv.Itoa(is.Number)
-		text := strings.TrimSpace(is.Body)
-		if text != "" {
-			text += "\n\n"
-		}
-		text += fmt.Sprintf("From GitHub issue [%s#%d](%s).", cfg.Repo, is.Number, is.HTMLURL)
-		err := s.eng.System(ctx, in.WorkspaceID, in.CreatedBy, func(sys *engine.Sys) error {
-			var t core.Task
-			known := st.IssueTasks[num] != "" && sys.Tx().Get(ctx, &t, store.Eq("id", st.IssueTasks[num])) == nil
-			if !known {
-				tid := id.From("github-issue", in.ID, num) // the same issue is the same task, whatever happens between
-				if sys.Tx().Get(ctx, &t, store.Eq("id", tid)) != nil {
-					if err := sys.Do("task.create", map[string]any{"id": tid, "project": project, "title": is.Title, "description": text}); err != nil {
-						return err
-					}
-					if err := sys.Do("link.set", map[string]any{"task": tid, "kind": "issue", "repo": cfg.Repo, "ref": num, "url": is.HTMLURL, "title": is.Title, "state": is.State}); err != nil {
-						return err
-					}
-					if err := sys.Tx().Get(ctx, &t, store.Eq("id", tid)); err != nil {
-						return err
-					}
-				}
-				st.IssueTasks[num] = t.ID
-			}
-			if t.DeletedAt != 0 {
-				return nil // deleted here on purpose: the issue does not bring it back
-			}
-			set := map[string]any{"id": t.ID}
-			if t.Title != is.Title {
-				set["title"] = is.Title
-			}
-			if t.Description != text {
-				set["description"] = text
-			}
-			var cur core.Status
-			if err := sys.Tx().Get(ctx, &cur, store.Eq("id", t.StatusID)); err != nil {
-				return err
-			}
-			switch open := core.OpenCategory(cur.Category); {
-			case is.State == "closed" && open:
-				set["status"] = core.CatDone
-			case is.State == "open" && !open:
-				set["status"] = core.CatUnstarted
-			}
-			if len(set) > 1 {
-				if err := sys.Do("task.update", set); err != nil {
-					return err
-				}
-			}
-			return sys.Do("link.set", map[string]any{"task": t.ID, "kind": "issue", "repo": cfg.Repo, "ref": num, "url": is.HTMLURL, "title": is.Title, "state": is.State})
-		})
-		if err != nil {
-			return handled, fmt.Errorf("issue #%d: %w", is.Number, err)
-		}
-		handled++
-	}
-	st.IssuesSince = newest
-	return handled, nil
 }
