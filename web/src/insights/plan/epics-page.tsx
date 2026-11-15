@@ -1,3 +1,5 @@
+// A project's epics, as a list of rows.
+
 import { useState } from "react";
 import { Ellipsis, Layers, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
@@ -6,15 +8,15 @@ import { useEpics, useMember, useProjectByKey, useSlug } from "@/lib/selectors";
 import { formatDay } from "@/lib/time";
 import type { Epic, Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
-import { deleteEpic } from "@/insights/plan/actions";
+import { DeleteEpic } from "@/insights/plan/delete-epic";
 import { EpicDialog } from "@/insights/plan/epic-dialog";
 import { epicStateName, epicTones, riskLabel, riskOf, type Tally, useTallies } from "@/insights/plan/stats";
-import { PlanRow, useTasksBy } from "@/pages/plan-parts";
+import { PlanRow } from "@/insights/plan/plan-row";
+import { useTasksBy } from "@/insights/plan/tasks-by";
 import { NotFoundPage } from "@/ui/not-found";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { EmptyState } from "@/ui/empty";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Tooltip } from "@/ui/tooltip";
@@ -145,37 +147,5 @@ function EpicMeta({ epic }: { epic: Epic }) {
         {lead && <Avatar member={lead} size="sm" />}
       </span>
     </>
-  );
-}
-
-/** Asks before an epic is deleted: its tasks stay, without an epic. */
-export function DeleteEpic({ epic, onClose, onDeleted }: { epic: Epic; onClose: () => void; onDeleted?: () => void }) {
-  return (
-    <Dialog
-      open
-      size="sm"
-      onOpenChange={(open) => !open && onClose()}
-      title={t("epic.deleteTitle", { name: epic.name })}
-      description={t("epic.deleteHint")}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              deleteEpic(epic);
-              onClose();
-              onDeleted?.();
-            }}
-          >
-            {t("epic.delete")}
-          </Button>
-        </>
-      }
-    >
-      {null}
-    </Dialog>
   );
 }

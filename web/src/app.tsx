@@ -16,7 +16,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 const AdminRoutes = lazy(() => import("@/admin/routes"));
 const AccountSecurityPage = lazy(() =>
-  import("@/auth/account-security").then((m) => ({ default: m.AccountSecurityPage })),
+  import("@/settings/me/account-security").then((m) => ({ default: m.AccountSecurityPage })),
 );
 
 /** Shows its children only to someone signed in; everyone else goes to /login. */

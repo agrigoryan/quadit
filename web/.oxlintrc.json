@@ -99,27 +99,6 @@
         ]
       }
     },
-    { "files": ["src/**/*.test.{ts,tsx}", "src/test/**"], "rules": { "typescript/no-non-null-assertion": "off" } },
-
-    // Warnings: the files that break the layering today. One rule covers both
-    // relative imports and layers, so these files warn on both; take a file
-    // off its list once it imports only what its layer allows.
-    {
-      "files": ["src/insights/plan/cycle-page.tsx", "src/insights/plan/epic-page.tsx"],
-      "rules": {
-        "no-restricted-imports": [
-          "warn",
-          {
-            "patterns": [
-              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
-              {
-                "group": ["@/shell/**", "@/pages/**", "@/palette/**"],
-                "message": "Feature folders do not import from shell, pages or palette."
-              }
-            ]
-          }
-        ]
-      }
-    }
+    { "files": ["src/**/*.test.{ts,tsx}", "src/test/**"], "rules": { "typescript/no-non-null-assertion": "off" } }
   ]
 }

@@ -1,35 +1,18 @@
-// What the epics page and the cycles page share: a row that links to the
-// full page of an epic or cycle, shows how far along it is, and opens in
+// An epic or a cycle as a row of the epics or cycles page: it links to the
+// full page of the epic or cycle, shows how far along it is, and opens in
 // place to show its tasks.
 
-import { type ReactNode, useMemo } from "react";
+import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useLiveTasks } from "@/lib/selectors";
-import { type Dict, useRestLoaded } from "@/lib/store";
-import { CATEGORIES, type Task } from "@/lib/types";
+import { useRestLoaded } from "@/lib/store";
+import type { Task } from "@/lib/types";
 import { emptyTally, type Tally } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";
 import { RestLoadingNote } from "@/ui/rest-note";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
-
-/** A project's live tasks by the epic or cycle they are in, in status order. */
-export function useTasksBy(projectId: string, field: "epic_id" | "cycle_id"): Dict<Task[]> {
-  const tasks = useLiveTasks();
-  const statuses = useCollection("statuses");
-  return useMemo(() => {
-    const out: Dict<Task[]> = {};
-    for (const task of tasks) {
-      const group = task[field];
-      if (group && task.project_id === projectId) (out[group] ??= []).push(task);
-    }
-    const order = (task: Task) => CATEGORIES.indexOf(statuses[task.status_id]?.category ?? "backlog");
-    for (const list of Object.values(out)) list.sort((a, b) => order(a) - order(b) || (a.rank < b.rank ? -1 : 1));
-    return out;
-  }, [tasks, statuses, projectId, field]);
-}
 
 interface Props {
   name: string;

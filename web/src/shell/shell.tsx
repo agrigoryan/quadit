@@ -27,8 +27,8 @@ import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
 const DocsRoutes = lazy(() => import("@/docs/routes"));
 const SettingsRoutes = lazy(() => import("@/settings/routes"));
 const InsightRoutes = lazy(() => import("@/insights/routes"));
-const EpicsPage = lazy(() => import("@/pages/epics").then((m) => ({ default: m.EpicsPage })));
-const CyclesPage = lazy(() => import("@/pages/cycles").then((m) => ({ default: m.CyclesPage })));
+const EpicsPage = lazy(() => import("@/insights/plan/epics-page").then((m) => ({ default: m.EpicsPage })));
+const CyclesPage = lazy(() => import("@/insights/plan/cycles-page").then((m) => ({ default: m.CyclesPage })));
 
 // So are the parts drawn over the page, and a task's own page. These are
 // also fetched ahead, once the first page is up, so that opening a task,
