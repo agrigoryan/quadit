@@ -18,7 +18,6 @@ import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { REFUSAL_IN_TOAST, useSubmit } from "@/ui/form";
 import { Field, Input, Textarea } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 
@@ -174,22 +173,26 @@ function ResourceCard({
 function AddResource({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  // A name already in use is refused by the server; its message shows and the form stays.
-  const { busy, run } = useSubmit(REFUSAL_IN_TOAST);
+  const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || busy) return;
     const id = newId();
-    await run(async () => {
+    setBusy(true);
+    try {
       await mutate({ type: "resource.create", args: { id, name: trimmed, description: description.trim() } }, (tx) =>
         tx.insert("resources", { id, name: trimmed, description: description.trim() || undefined }),
       );
       setName("");
       setDescription("");
       onClose();
-    });
+    } catch {
+      // A name already in use is refused by the server; its message shows and the form stays.
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

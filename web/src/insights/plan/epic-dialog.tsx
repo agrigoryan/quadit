@@ -10,7 +10,6 @@ import { EPIC_STATES, epicStateName } from "@/insights/plan/stats";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { REFUSAL_IN_TOAST, useSubmit } from "@/ui/form";
 import { Field, Input, Textarea } from "@/ui/input";
 import { Select } from "@/ui/picker";
 
@@ -34,7 +33,7 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
     startOn: epic?.start_on ?? "",
     targetOn: epic?.target_on ?? "",
   });
-  const { busy, run } = useSubmit(REFUSAL_IN_TOAST, { once: true });
+  const [busy, setBusy] = useState(false);
   const set = (patch: Partial<EpicFields>) => setF((cur) => ({ ...cur, ...patch }));
   const backwards = !!f.startOn && !!f.targetOn && f.targetOn < f.startOn;
   const ok = f.name.trim() !== "" && !backwards;
@@ -54,12 +53,15 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
       onClose();
       return;
     }
-    // A refusal leaves the form open to be fixed.
-    await run(async () => {
+    setBusy(true);
+    try {
       const id = await createEpic(projectId, f);
       onClose();
       onCreated?.(id);
-    });
+    } catch {
+      // The server's reason is already shown; the form stays to be fixed.
+      setBusy(false);
+    }
   }
 
   return (

@@ -156,14 +156,6 @@ export function useSubmit(
   return { busy, run };
 }
 
-/**
- * The errors of a form whose request goes through `mutate`, which shows a
- * refusal as a toast itself: nothing for the form to show, nothing to clear.
- *
- *   const { busy, run } = useSubmit(REFUSAL_IN_TOAST, { once: true });
- */
-export const REFUSAL_IN_TOAST: Pick<FieldErrors, "clear" | "fail"> = { clear: () => {}, fail: () => {} };
-
 interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;

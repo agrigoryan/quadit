@@ -16,7 +16,6 @@ import { ProjectGlyph } from "@/ui/project-glyph";
 import { LabelChip } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { REFUSAL_IN_TOAST, useSubmit } from "@/ui/form";
 import { Field, Textarea } from "@/ui/input";
 import { Picker, Select } from "@/ui/picker";
 import { prefillRule } from "@/insights/decisions/data";
@@ -78,9 +77,9 @@ export function PreferenceDialog({ from, onClose }: Props) {
   const [body, setBody] = useState(() => (from ? prefillRule(from.decision) : ""));
   const [scope, setScope] = useState(from?.projectId ?? WORKSPACE);
   const [labelIds, setLabelIds] = useState<string[]>([]);
-  // Only the empty rule is caught here; a refusal from the server is a toast, and the dialog stays.
+  /** Only the empty rule is caught here; a refusal from the server is a toast, and the dialog stays. */
   const [error, setError] = useState("");
-  const { busy, run } = useSubmit(REFUSAL_IN_TOAST, { once: true });
+  const [busy, setBusy] = useState(false);
   const projectId = scope === WORKSPACE ? "" : scope;
   // Only the project's own labels: the server looks a rule's labels up in its project.
   const labels = useLabels(projectId || undefined).filter((l) => l.project_id === projectId);
@@ -94,7 +93,8 @@ export function PreferenceDialog({ from, onClose }: Props) {
       setError(t("prefs.bodyRequired"));
       return;
     }
-    await run(async () => {
+    setBusy(true);
+    try {
       await createPreference({
         body: rule,
         projectId,
@@ -103,7 +103,9 @@ export function PreferenceDialog({ from, onClose }: Props) {
       });
       toast.info(t("prefs.saved"));
       onClose();
-    });
+    } catch {
+      setBusy(false);
+    }
   }
 
   const scopes = [
