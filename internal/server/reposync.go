@@ -194,7 +194,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	// Whatever is stored, and whatever links the repository holds, nothing
 	// outside the checkout is ever read or written.
 	if !staysInside(dir, root) {
-		return res, errors.New("the source's folder leads out of its repository; set it to a path inside, such as docs")
+		return res, errors.New("the source's folder leads out of its repository, or goes through a link in it; set it to a real folder inside, such as docs")
 	}
 	if st, serr := os.Stat(root); src.Subdir != "" && serr == nil && !st.IsDir() {
 		return res, errors.New("the source's folder " + src.Subdir + " is a file in the repository; set it to a folder")
@@ -529,32 +529,30 @@ func (s *Server) commitAuthor(ctx context.Context, db store.DB, editors map[stri
 	return author, others
 }
 
-// staysInside reports whether path, once every symbolic link on the way is
-// followed, is still under dir, and is not itself a link. A repository can
-// hold links to anywhere on the server; sync neither reads nor writes
-// through them. A path that does not exist yet is judged by the nearest
-// folder above it that does.
+// staysInside reports whether path is under dir with no symbolic link on
+// the way there, and is not a link itself. A repository can hold links to
+// anywhere: out of the checkout, or to another folder inside it. Sync
+// neither reads nor writes through any of them, so a page is only ever
+// stored in the file its own path names. A part of the path that does not
+// exist yet is fine: it will be made as a real folder or file.
 func staysInside(dir, path string) bool {
-	realDir, err := filepath.EvalSymlinks(dir)
-	if err != nil {
+	rel, err := filepath.Rel(dir, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
 		return false
 	}
-	if st, err := os.Lstat(path); err == nil && st.Mode()&os.ModeSymlink != 0 {
-		return false
-	}
-	at, rest := path, ""
-	for {
-		real, err := filepath.EvalSymlinks(at)
-		if err == nil {
-			full := filepath.Join(real, rest)
-			rel, rerr := filepath.Rel(realDir, full)
-			return rerr == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	at := dir
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		if part == "" || part == "." {
+			continue
 		}
-		up := filepath.Dir(at)
-		if up == at {
+		at = filepath.Join(at, part)
+		st, err := os.Lstat(at)
+		if err != nil {
+			return true // nothing there yet, so nothing below it either
+		}
+		if st.Mode()&os.ModeSymlink != 0 {
 			return false
 		}
-		rest = filepath.Join(filepath.Base(at), rest)
-		at = up
 	}
+	return true
 }
