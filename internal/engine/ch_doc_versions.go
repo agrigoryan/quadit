@@ -31,7 +31,7 @@ func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string, force bool
 	}
 	snap, _ := json.Marshal(BlockTree(rows))
 	return c.tx.Insert(c.ctx, core.DocVersion{ID: id.New(), WorkspaceID: c.ws, DocID: d.ID, Seq: c.tx.Seq(), Label: label, Title: d.Title,
-		Snapshot: snap, CreatedBy: orStr(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at})
+		Snapshot: snap, CreatedBy: firstNonEmpty(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at})
 }
 
 type docSnapshotArgs struct {

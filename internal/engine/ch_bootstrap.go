@@ -27,7 +27,7 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 	var ws core.Workspace
 	var owner core.User
 	at := e.now().UnixMilli()
-	if !slugOK(a.WorkspaceSlug) {
+	if !validSlug(a.WorkspaceSlug) {
 		return ws, owner, invalid("workspace_slug", "a slug is 2 to 40 lower-case letters, digits or dashes")
 	}
 	err := e.st.Atomic(ctx, func(db store.DB) error {

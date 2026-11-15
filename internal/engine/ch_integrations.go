@@ -52,18 +52,18 @@ func integrationCreate(c *cx, a integrationArgs) error {
 	seq := c.tx.NextSeq()
 	in.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, in); err != nil {
-		return taken(err, "id", iid)
+		return alreadyInUse(err, "id", iid)
 	}
 	return c.created(seq, "integration", in.ID, "workspace", c.ws, "", in)
 }
 
 func integrationUpdate(c *cx, a integrationArgs) error {
-	in, err := get[core.Integration](c, "integration", "id", a.ID)
+	in, err := loadLive[core.Integration](c, "integration", "id", a.ID)
 	if err != nil {
 		return err
 	}
 	p := newPatch()
-	p.str("name", a.Name, &in.Name)
+	p.setText("name", a.Name, &in.Name)
 	if a.Project.Set {
 		pid := ""
 		if a.Project.V != "" {
@@ -89,12 +89,12 @@ func integrationUpdate(c *cx, a integrationArgs) error {
 		p.set["secret"] = sealed
 		p.changes["has_secret"] = core.FieldChange{To: sealed != ""}
 	}
-	p.flag("active", a.Active, &in.Active)
+	p.setFlag("active", a.Active, &in.Active)
 	return c.save(p, "integrations", "integration", in.ID, "workspace", c.ws, "", nil)
 }
 
 func integrationDelete(c *cx, a idArgs) error {
-	in, err := get[core.Integration](c, "integration", "id", a.ID)
+	in, err := loadLive[core.Integration](c, "integration", "id", a.ID)
 	if err != nil {
 		return err
 	}

@@ -55,7 +55,7 @@ func preferenceCreate(c *cx, a preferenceCreateArgs) error {
 	seq := c.tx.NextSeq()
 	pf.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, pf); err != nil {
-		return taken(err, "id", pid)
+		return alreadyInUse(err, "id", pid)
 	}
 	return c.created(seq, "preference", pf.ID, scopeType, scopeID, pf.ProjectID, pf)
 }
@@ -74,7 +74,7 @@ func prefScope(c *cx, pf core.Preference) (string, string) {
 }
 
 func preferenceUpdate(c *cx, a preferenceUpdateArgs) error {
-	pf, err := get[core.Preference](c, "preference", "id", a.ID)
+	pf, err := loadLive[core.Preference](c, "preference", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func preferenceUpdate(c *cx, a preferenceUpdateArgs) error {
 }
 
 func preferenceDelete(c *cx, a idArgs) error {
-	pf, err := get[core.Preference](c, "preference", "id", a.ID)
+	pf, err := loadLive[core.Preference](c, "preference", "id", a.ID)
 	if err != nil {
 		return err
 	}

@@ -46,7 +46,7 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 		}
 	}
 	if err := c.tx.Insert(c.ctx, s); err != nil {
-		return taken(err, "id", sid)
+		return alreadyInUse(err, "id", sid)
 	}
 	c.ref = s.ID
 	return c.emit(seq, "session.created", "session", s.ID, scopeType, scopeID, projectID, map[string]any{"row": s, "key": key})
@@ -80,7 +80,7 @@ func appendJSON(cur json.RawMessage, add []json.RawMessage) json.RawMessage {
 }
 
 func sessionUpdate(c *cx, a sessionUpdateArgs) error {
-	s, err := get[core.AgentSession](c, "session", "id", a.ID)
+	s, err := loadLive[core.AgentSession](c, "session", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -88,14 +88,14 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 		return forbidden("a session is updated by the agent that started it")
 	}
 	p := newPatch()
-	p.str("title", a.Title, &s.Title)
-	p.str("summary", a.Summary, &s.Summary)
+	p.setText("title", a.Title, &s.Title)
+	p.setText("summary", a.Summary, &s.Summary)
 	if a.State.Set {
 		states := []string{"running", "done", "failed", "stopped"}
 		if !contains(states, a.State.V) {
 			return oneOf("state", "session state", a.State.V, states)
 		}
-		p.str("state", a.State, &s.State)
+		p.setText("state", a.State, &s.State)
 		if s.State != "running" && s.EndedAt == 0 {
 			p.put("ended_at", int64(0), c.at)
 		}

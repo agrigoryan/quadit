@@ -155,8 +155,8 @@ func (c *cx) saveTask(t core.Task, p *patch, extra map[string]any) error {
 	return nil
 }
 
-// touch records that something happened inside a task.
-func (c *cx) touch(taskID string, seq int64) error {
+// touchTask records that something happened inside a task.
+func (c *cx) touchTask(taskID string, seq int64) error {
 	_, err := c.tx.Update(c.ctx, "tasks", map[string]any{"activity_seq": seq}, store.Eq("id", taskID))
 	return err
 }

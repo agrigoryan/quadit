@@ -33,7 +33,7 @@ func (c *cx) attach(a attachArgs, subjectType, subjectID string, t core.Task) (c
 	if err != nil {
 		return at, err
 	}
-	f, err := get[core.File](c, "file", "file", a.File)
+	f, err := loadLive[core.File](c, "file", "file", a.File)
 	if err != nil {
 		return at, err
 	}
@@ -50,7 +50,7 @@ func (c *cx) attach(a attachArgs, subjectType, subjectID string, t core.Task) (c
 	at = core.Attachment{ID: aid, WorkspaceID: c.ws, FileID: f.ID, SubjectType: subjectType, SubjectID: subjectID, TaskID: t.ID,
 		Role: a.Role, Caption: a.Caption, Rank: rk, CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, at); err != nil {
-		return at, taken(err, "id", aid)
+		return at, alreadyInUse(err, "id", aid)
 	}
 	// The event carries the file with where to fetch it, so a client can
 	// show it without asking.
@@ -68,29 +68,29 @@ func attachmentAdd(c *cx, a attachArgs) error {
 	var err error
 	switch {
 	case a.Option != "":
-		o, err := get[core.Option](c, "option", "option", a.Option)
+		o, err := loadLive[core.Option](c, "option", "option", a.Option)
 		if err != nil {
 			return err
 		}
-		d, err := get[core.Decision](c, "decision", "option", o.DecisionID)
+		d, err := loadLive[core.Decision](c, "decision", "option", o.DecisionID)
 		if err != nil {
 			return err
 		}
 		subjectType, subjectID, a.Task = "decision_option", o.ID, d.TaskID
 	case a.Decision != "":
-		d, err := get[core.Decision](c, "decision", "decision", a.Decision)
+		d, err := loadLive[core.Decision](c, "decision", "decision", a.Decision)
 		if err != nil {
 			return err
 		}
 		subjectType, subjectID, a.Task = "decision", d.ID, d.TaskID
 	case a.Comment != "":
-		cm, err := get[core.Comment](c, "comment", "comment", a.Comment)
+		cm, err := loadLive[core.Comment](c, "comment", "comment", a.Comment)
 		if err != nil {
 			return err
 		}
 		subjectType, subjectID, a.Task, docID = "comment", cm.ID, cm.TaskID, cm.DocID
 	case a.Doc != "":
-		d, err := get[core.Doc](c, "doc", "doc", a.Doc)
+		d, err := loadLive[core.Doc](c, "doc", "doc", a.Doc)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func attachmentAdd(c *cx, a attachArgs) error {
 	seq := c.tx.NextSeq()
 	c.ref = at.ID
 	if t.ID != "" {
-		if err := c.touch(t.ID, seq); err != nil {
+		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
 		return c.emit(seq, "attachment.created", "attachment", at.ID, "task", t.ID, t.ProjectID, map[string]any{"row": at, "key": t.Key})
@@ -123,7 +123,7 @@ func attachmentAdd(c *cx, a attachArgs) error {
 }
 
 func attachmentRemove(c *cx, a idArgs) error {
-	at, err := get[core.Attachment](c, "attachment", "id", a.ID)
+	at, err := loadLive[core.Attachment](c, "attachment", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func attachmentRestore(c *cx, a idArgs) error {
 			return err
 		}
 		scopeType, scopeID, projectID = "task", t.ID, t.ProjectID
-		if err := c.touch(t.ID, seq); err != nil {
+		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
 	}

@@ -286,8 +286,8 @@ func (c *Resolver) cycle(p core.Project, field, ref string) (core.Cycle, error) 
 		": use its number, \"current\" or \"next\""}
 }
 
-// get loads a live row by id, naming what is missing when it is.
-func get[T any](c *cx, what, field, ref string) (T, error) {
+// loadLive loads a live row by id, naming what is missing when it is.
+func loadLive[T any](c *cx, what, field, ref string) (T, error) {
 	var row T
 	if ref == "" {
 		return row, invalid(field, "%s is required", field)
@@ -430,7 +430,7 @@ func editDistance(a, b string) int {
 // doc loads a page the actor may see. A private page of someone else that
 // was not shared with the actor does not exist as far as they can tell.
 func (c *cx) doc(field, ref string) (core.Doc, error) {
-	d, err := get[core.Doc](c, "doc", field, ref)
+	d, err := loadLive[core.Doc](c, "doc", field, ref)
 	if err != nil {
 		return d, err
 	}

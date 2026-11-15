@@ -91,7 +91,7 @@ func newEditor(c *cx, d core.Doc, rows []core.Block) *editor {
 	return e
 }
 
-func (e *editor) mark(id, state string) {
+func (e *editor) setBlockState(id, state string) {
 	if _, seen := e.state[id]; !seen {
 		e.touched = append(e.touched, id)
 		e.state[id] = state
@@ -119,8 +119,8 @@ func (e *editor) siblings(parent string) []*core.Block {
 	return out
 }
 
-// place works out a rank from "after", "before", a given rank, or the end.
-func (e *editor) place(op BlockOp, self string) (string, error) {
+// rankFor works out a rank from "after", "before", a given rank, or the end.
+func (e *editor) rankFor(op BlockOp, self string) (string, error) {
 	if op.Rank != "" {
 		if !rank.Valid(op.Rank) {
 			return "", invalid("ops.rank", "%q is not a rank", op.Rank)
@@ -180,11 +180,11 @@ func (e *editor) insert(b md.Block, parent, rk string) error {
 		// The same insert sent twice, or a block coming back: bring it up to date.
 		old.Type, old.Props, old.Content, old.ParentID, old.Rank, old.DeletedAt = b.Type, props, b.Content, parent, rk, 0
 		old.Plain, old.UpdatedBy = md.Plain(b), e.c.actor.UserID
-		e.mark(bid, "dirty")
+		e.setBlockState(bid, "dirty")
 	} else {
 		e.rows[bid] = &core.Block{ID: bid, WorkspaceID: e.c.ws, DocID: e.doc.ID, ParentID: parent, Rank: rk, Type: b.Type, Props: props,
 			Content: b.Content, Plain: md.Plain(b), CreatedBy: e.c.actor.UserID, UpdatedBy: e.c.actor.UserID}
-		e.mark(bid, "new")
+		e.setBlockState(bid, "new")
 	}
 	for i, ch := range b.Children {
 		if err := e.insert(ch, bid, rank.ForNumber(i+1)); err != nil {
@@ -200,7 +200,7 @@ func (e *editor) remove(id string) {
 		return
 	}
 	r.DeletedAt = e.c.at
-	e.mark(id, "gone")
+	e.setBlockState(id, "gone")
 	for _, ch := range e.siblings(id) {
 		e.remove(ch.ID)
 	}
@@ -212,7 +212,7 @@ func (e *editor) apply(op BlockOp) error {
 		if op.Block == nil {
 			return invalid("ops.block", "an insert needs a block")
 		}
-		rk, err := e.place(op, op.Block.ID)
+		rk, err := e.rankFor(op, op.Block.ID)
 		if err != nil {
 			return err
 		}
@@ -235,7 +235,7 @@ func (e *editor) apply(op BlockOp) error {
 			r.Content = *op.Content
 		}
 		r.Plain, r.UpdatedBy = md.Plain(md.Block{Type: r.Type, Content: r.Content}), e.c.actor.UserID
-		e.mark(op.ID, "dirty")
+		e.setBlockState(op.ID, "dirty")
 	case "move":
 		r, ok := e.rows[op.ID]
 		if !ok || r.DeletedAt != 0 {
@@ -251,12 +251,12 @@ func (e *editor) apply(op BlockOp) error {
 			}
 			cur = p.ParentID
 		}
-		rk, err := e.place(op, op.ID)
+		rk, err := e.rankFor(op, op.ID)
 		if err != nil {
 			return err
 		}
 		r.ParentID, r.Rank, r.UpdatedBy = op.Parent, rk, e.c.actor.UserID
-		e.mark(op.ID, "dirty")
+		e.setBlockState(op.ID, "dirty")
 	case "delete":
 		e.remove(op.ID)
 	default:
@@ -278,7 +278,7 @@ func (e *editor) flush(seq int64) (upserted []core.Block, deleted []string, err 
 				continue // added and removed in the same edit
 			}
 			if err := e.c.tx.Insert(e.c.ctx, *r); err != nil {
-				return nil, nil, taken(err, "block id", bid)
+				return nil, nil, alreadyInUse(err, "block id", bid)
 			}
 			upserted = append(upserted, *r)
 		case "dirty":
@@ -298,7 +298,7 @@ func (e *editor) flush(seq int64) (upserted []core.Block, deleted []string, err 
 	return upserted, deleted, nil
 }
 
-func (e *editor) live() []core.Block {
+func (e *editor) liveBlocks() []core.Block {
 	var out []core.Block
 	for _, r := range e.rows {
 		if r.DeletedAt == 0 {
@@ -308,8 +308,8 @@ func (e *editor) live() []core.Block {
 	return out
 }
 
-// plain returns the page's text in reading order.
-func (e *editor) plain() string {
+// plainText returns the page's text in reading order.
+func (e *editor) plainText() string {
 	var b strings.Builder
 	var walk func([]md.Block)
 	walk = func(list []md.Block) {
@@ -320,6 +320,6 @@ func (e *editor) plain() string {
 			walk(bl.Children)
 		}
 	}
-	walk(BlockTree(e.live()))
+	walk(BlockTree(e.liveBlocks()))
 	return b.String()
 }

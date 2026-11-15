@@ -48,7 +48,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 		return err
 	}
 	src := core.DocSource{ID: sid, WorkspaceID: c.ws, Repo: strings.TrimSpace(a.Repo.V), Branch: a.Branch.V, Subdir: strings.Trim(a.Subdir.V, "/"),
-		Authority: orStr(a.Authority.V, "repo"), WriteMode: orStr(a.WriteMode.V, "commit"), CreatedBy: c.actor.UserID, CreatedAt: c.at}
+		Authority: firstNonEmpty(a.Authority.V, "repo"), WriteMode: firstNonEmpty(a.WriteMode.V, "commit"), CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if !contains(authorities, src.Authority) {
 		return oneOf("authority", "authority", src.Authority, authorities)
 	}
@@ -66,7 +66,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 		if title == "" {
 			title = strings.TrimSuffix(src.Repo[strings.LastIndexAny(src.Repo, "/:")+1:], ".git")
 		}
-		if err := c.sub("doc.create", docCreateArgs{Title: title, Icon: "git"}); err != nil {
+		if err := c.applyNested("doc.create", docCreateArgs{Title: title, Icon: "git"}); err != nil {
 			return err
 		}
 		src.RootDocID = c.subRef
@@ -74,7 +74,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 	seq := c.tx.NextSeq()
 	src.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, src); err != nil {
-		return taken(err, "id", sid)
+		return alreadyInUse(err, "id", sid)
 	}
 	if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"source_id": src.ID}, store.Eq("id", src.RootDocID)); err != nil {
 		return err
@@ -83,7 +83,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 }
 
 func sourceUpdate(c *cx, a sourceArgs) error {
-	src, err := get[core.DocSource](c, "source", "id", a.ID)
+	src, err := loadLive[core.DocSource](c, "source", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -94,32 +94,32 @@ func sourceUpdate(c *cx, a sourceArgs) error {
 	if err := p.name("repo", a.Repo, &src.Repo); err != nil {
 		return err
 	}
-	p.str("branch", a.Branch, &src.Branch)
+	p.setText("branch", a.Branch, &src.Branch)
 	if a.Subdir.Set {
 		if err := checkSubdir(a.Subdir.V); err != nil {
 			return err
 		}
 		a.Subdir.V = strings.Trim(a.Subdir.V, "/")
 	}
-	p.str("subdir", a.Subdir, &src.Subdir)
+	p.setText("subdir", a.Subdir, &src.Subdir)
 	if a.Authority.Set {
 		if !contains(authorities, a.Authority.V) {
 			return oneOf("authority", "authority", a.Authority.V, authorities)
 		}
-		p.str("authority", a.Authority, &src.Authority)
+		p.setText("authority", a.Authority, &src.Authority)
 	}
 	if a.WriteMode.Set {
 		if !contains(writeModes, a.WriteMode.V) {
 			return oneOf("write_mode", "write mode", a.WriteMode.V, writeModes)
 		}
-		p.str("write_mode", a.WriteMode, &src.WriteMode)
+		p.setText("write_mode", a.WriteMode, &src.WriteMode)
 	}
 	return c.save(p, "doc_sources", "source", src.ID, "doc", src.RootDocID, "", nil)
 }
 
 // sourceDelete stops mirroring a repository. The pages stay as ordinary pages.
 func sourceDelete(c *cx, a idArgs) error {
-	src, err := get[core.DocSource](c, "source", "id", a.ID)
+	src, err := loadLive[core.DocSource](c, "source", "id", a.ID)
 	if err != nil {
 		return err
 	}

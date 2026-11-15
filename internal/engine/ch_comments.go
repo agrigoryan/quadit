@@ -79,7 +79,7 @@ func commentKind(a commentCreateArgs) (string, error) {
 // replyTo makes a comment a reply. It joins its parent's thread, and where
 // the caller named nothing it is about what the parent is about.
 func (c *cx) replyTo(cm *core.Comment, a *commentCreateArgs) error {
-	parent, err := get[core.Comment](c, "comment", "parent", a.Parent)
+	parent, err := loadLive[core.Comment](c, "comment", "parent", a.Parent)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	seq := c.tx.NextSeq()
 	cm.CreatedSeq, cm.UpdatedSeq = seq, seq
 	if err := c.tx.Insert(c.ctx, cm); err != nil {
-		return taken(err, "id", cm.ID)
+		return alreadyInUse(err, "id", cm.ID)
 	}
 	var atts []core.Attachment
 	for _, aa := range a.Attachments {
@@ -125,7 +125,7 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	}
 	// A comment is activity on its task: this is what lets "what is new on
 	// my tasks" see it.
-	if err := c.touch(t.ID, seq); err != nil {
+	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
 	data := map[string]any{"row": cm, "key": t.Key}
@@ -157,14 +157,14 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 func (c *cx) commentSubject(cm *core.Comment, a commentCreateArgs) (core.Task, error) {
 	// A comment on an option or a decision knows its task.
 	if a.Option != "" {
-		o, err := get[core.Option](c, "option", "option", a.Option)
+		o, err := loadLive[core.Option](c, "option", "option", a.Option)
 		if err != nil {
 			return core.Task{}, err
 		}
 		cm.SubjectType, cm.SubjectID, a.Decision = "decision_option", o.ID, o.DecisionID
 	}
 	if a.Decision != "" {
-		d, err := get[core.Decision](c, "decision", "decision", a.Decision)
+		d, err := loadLive[core.Decision](c, "decision", "decision", a.Decision)
 		if err != nil {
 			return core.Task{}, err
 		}
@@ -271,7 +271,7 @@ func (c *cx) handOn(cm core.Comment, t core.Task, a commentCreateArgs, note stri
 // docComment adds a comment to a doc or one of its blocks.
 func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	if a.Block != "" {
-		b, err := get[core.Block](c, "block", "block", a.Block)
+		b, err := loadLive[core.Block](c, "block", "block", a.Block)
 		if err != nil {
 			return err
 		}
@@ -291,7 +291,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	seq := c.tx.NextSeq()
 	cm.CreatedSeq, cm.UpdatedSeq = seq, seq
 	if err := c.tx.Insert(c.ctx, cm); err != nil {
-		return taken(err, "id", cm.ID)
+		return alreadyInUse(err, "id", cm.ID)
 	}
 	c.ref = cm.ID
 	if err := c.emitTo(d.OwnerID, seq, "comment.created", "comment", cm.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": cm}); err != nil {
@@ -349,7 +349,7 @@ type commentUpdateArgs struct {
 }
 
 func commentUpdate(c *cx, a commentUpdateArgs) error {
-	cm, err := get[core.Comment](c, "comment", "id", a.ID)
+	cm, err := loadLive[core.Comment](c, "comment", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -361,7 +361,7 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 		if strings.TrimSpace(a.Body.V) == "" {
 			return invalid("body", "a comment needs text; delete it instead")
 		}
-		p.str("body", a.Body, &cm.Body)
+		p.setText("body", a.Body, &cm.Body)
 		if !p.empty() {
 			p.set["edited_at"] = c.at
 			p.changes["edited_at"] = core.FieldChange{From: zeroNil(cm.EditedAt), To: c.at}
@@ -390,7 +390,7 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 }
 
 func commentDelete(c *cx, a idArgs) error {
-	cm, err := get[core.Comment](c, "comment", "id", a.ID)
+	cm, err := loadLive[core.Comment](c, "comment", "id", a.ID)
 	if err != nil {
 		return err
 	}

@@ -27,7 +27,7 @@ func workspaceUpdate(c *cx, a workspaceUpdateArgs) error {
 	if err := p.name("name", a.Name, &w.Name); err != nil {
 		return err
 	}
-	p.str("icon", a.Icon, &w.Icon)
+	p.setText("icon", a.Icon, &w.Icon)
 	if a.Settings.Set {
 		if !json.Valid(a.Settings.V) {
 			return invalid("settings", "settings must be a JSON object")

@@ -27,7 +27,7 @@ func milestoneCreate(c *cx, a milestoneCreateArgs) error {
 	if err != nil {
 		return err
 	}
-	e, err := get[core.Epic](c, "epic", "epic", a.Epic)
+	e, err := loadLive[core.Epic](c, "epic", "epic", a.Epic)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func milestoneCreate(c *cx, a milestoneCreateArgs) error {
 	m := core.Milestone{ID: mid, WorkspaceID: c.ws, EpicID: e.ID, Name: strings.TrimSpace(a.Name), Description: a.Description,
 		TargetOn: a.TargetOn, Rank: rk, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, m); err != nil {
-		return taken(err, "id", mid)
+		return alreadyInUse(err, "id", mid)
 	}
 	return c.created(seq, "milestone", m.ID, "project", e.ProjectID, e.ProjectID, m)
 }
@@ -61,7 +61,7 @@ type milestoneUpdateArgs struct {
 }
 
 func (c *cx) milestoneEpic(ref string) (core.Milestone, core.Epic, error) {
-	m, err := get[core.Milestone](c, "milestone", "id", ref)
+	m, err := loadLive[core.Milestone](c, "milestone", "id", ref)
 	if err != nil {
 		return m, core.Epic{}, err
 	}
@@ -78,7 +78,7 @@ func milestoneUpdate(c *cx, a milestoneUpdateArgs) error {
 	if err := p.name("name", a.Name, &m.Name); err != nil {
 		return err
 	}
-	p.str("description", a.Description, &m.Description)
+	p.setText("description", a.Description, &m.Description)
 	if err := p.date("target_on", a.TargetOn, &m.TargetOn); err != nil {
 		return err
 	}

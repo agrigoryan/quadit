@@ -69,7 +69,7 @@ func epicCreate(c *cx, a epicCreateArgs) error {
 		e.CompletedAt = c.at
 	}
 	if err := c.tx.Insert(c.ctx, e); err != nil {
-		return taken(err, "id", eid)
+		return alreadyInUse(err, "id", eid)
 	}
 	if err := c.watch(c.actor.UserID, "epic", e.ID); err != nil {
 		return err
@@ -94,7 +94,7 @@ type epicUpdateArgs struct {
 }
 
 func epicUpdate(c *cx, a epicUpdateArgs) error {
-	e, err := get[core.Epic](c, "epic", "id", a.ID)
+	e, err := loadLive[core.Epic](c, "epic", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -102,13 +102,13 @@ func epicUpdate(c *cx, a epicUpdateArgs) error {
 	if err := p.name("name", a.Name, &e.Name); err != nil {
 		return err
 	}
-	p.str("description", a.Description, &e.Description)
+	p.setText("description", a.Description, &e.Description)
 	if a.State.Set {
 		if !contains(core.EpicStates, a.State.V) {
 			return oneOf("state", "epic state", a.State.V, core.EpicStates)
 		}
 		was := e.State
-		p.str("state", a.State, &e.State)
+		p.setText("state", a.State, &e.State)
 		if e.State == core.EpicDone && was != core.EpicDone {
 			p.put("completed_at", e.CompletedAt, c.at)
 		} else if e.State != core.EpicDone && e.CompletedAt != 0 {
@@ -124,8 +124,8 @@ func epicUpdate(c *cx, a epicUpdateArgs) error {
 		}
 		p.put("lead_id", e.LeadID, lead)
 	}
-	p.str("color", a.Color, &e.Color)
-	p.str("icon", a.Icon, &e.Icon)
+	p.setText("color", a.Color, &e.Color)
+	p.setText("icon", a.Icon, &e.Icon)
 	if err := p.date("start_on", a.StartOn, &e.StartOn); err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func epicUpdate(c *cx, a epicUpdateArgs) error {
 }
 
 func epicDelete(c *cx, a idArgs) error {
-	e, err := get[core.Epic](c, "epic", "id", a.ID)
+	e, err := loadLive[core.Epic](c, "epic", "id", a.ID)
 	if err != nil {
 		return err
 	}

@@ -39,8 +39,8 @@ func zeroNil(v any) any {
 	return v
 }
 
-// str applies an optional text argument. Null clears the field.
-func (p *patch) str(col string, o Opt[string], cur *string) {
+// setText applies an optional text argument. Null clears the field.
+func (p *patch) setText(col string, o Opt[string], cur *string) {
 	if !o.Set {
 		return
 	}
@@ -52,7 +52,7 @@ func (p *patch) str(col string, o Opt[string], cur *string) {
 	*cur = v
 }
 
-func (p *patch) num(col string, o Opt[int], cur *int) {
+func (p *patch) setNumber(col string, o Opt[int], cur *int) {
 	if !o.Set {
 		return
 	}
@@ -64,7 +64,7 @@ func (p *patch) num(col string, o Opt[int], cur *int) {
 	*cur = v
 }
 
-func (p *patch) flag(col string, o Opt[bool], cur *bool) {
+func (p *patch) setFlag(col string, o Opt[bool], cur *bool) {
 	if !o.Set {
 		return
 	}
@@ -93,7 +93,7 @@ func (p *patch) date(col string, o Opt[string], cur *string) error {
 			return err
 		}
 	}
-	p.str(col, o, cur)
+	p.setText(col, o, cur)
 	return nil
 }
 
@@ -108,7 +108,7 @@ func (c *cx) save(p *patch, table, entity, rowID, scopeType, scopeID, projectID 
 	p.set["updated_seq"] = seq
 	n, err := c.tx.Update(c.ctx, table, p.set, store.Eq("id", rowID))
 	if err != nil {
-		return taken(err, entity, rowID)
+		return alreadyInUse(err, entity, rowID)
 	}
 	if n != 1 {
 		return notFound(entity, rowID)
@@ -144,7 +144,7 @@ func (c *cx) trash(table, entity, rowID, scopeType, scopeID, projectID string, e
 	return c.emit(seq, entity+".deleted", entity, rowID, scopeType, scopeID, projectID, data)
 }
 
-// gone emits "<entity>.deleted" for a row that was removed outright.
-func (c *cx) gone(entity, rowID, scopeType, scopeID, projectID string) error {
+// emitDeleted emits "<entity>.deleted" for a row that was removed outright.
+func (c *cx) emitDeleted(entity, rowID, scopeType, scopeID, projectID string) error {
 	return c.emit(c.tx.NextSeq(), entity+".deleted", entity, rowID, scopeType, scopeID, projectID, map[string]any{"id": rowID, "gone": true})
 }

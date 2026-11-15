@@ -84,19 +84,19 @@ func secretSet(c *cx, a secretArgs) error {
 		seq := c.tx.NextSeq()
 		s.UpdatedSeq = seq
 		if err := c.tx.Insert(c.ctx, s); err != nil {
-			return taken(err, "id", sid)
+			return alreadyInUse(err, "id", sid)
 		}
 		return c.created(seq, "secret", s.ID, "workspace", c.ws, "", s)
 	}
 	p := newPatch()
-	p.str("description", a.Description, &cur.Description)
+	p.setText("description", a.Description, &cur.Description)
 	if a.Hosts.Set {
 		p.put("hosts", cur.Hosts, hosts)
 	}
 	if a.Agents.Set {
 		p.put("agents", cur.Agents, agents)
 	}
-	p.flag("env", a.Env, &cur.Env)
+	p.setFlag("env", a.Env, &cur.Env)
 	if a.Value.Set && a.Value.V != "" {
 		sealed, err := Seal(a.Value.V)
 		if err != nil {

@@ -157,7 +157,7 @@ func (e *Engine) PurgeTrash(ctx context.Context, keep time.Duration) (purged int
 						return err
 					}
 				}
-				if err := c.gone("task", t.ID, "task", t.ID, t.ProjectID); err != nil {
+				if err := c.emitDeleted("task", t.ID, "task", t.ID, t.ProjectID); err != nil {
 					return err
 				}
 				purged++

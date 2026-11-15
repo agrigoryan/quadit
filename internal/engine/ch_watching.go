@@ -38,7 +38,7 @@ func watchSet(c *cx, a watchSetArgs) error {
 		}
 		subjectID, projectID = t.ID, t.ProjectID
 	case "epic":
-		e, err := get[core.Epic](c, "epic", "subject", a.Subject)
+		e, err := loadLive[core.Epic](c, "epic", "subject", a.Subject)
 		if err != nil {
 			return err
 		}
@@ -50,13 +50,13 @@ func watchSet(c *cx, a watchSetArgs) error {
 		}
 		subjectID, projectID = p.ID, p.ID
 	case "view":
-		v, err := get[core.View](c, "view", "subject", a.Subject)
+		v, err := loadLive[core.View](c, "view", "subject", a.Subject)
 		if err != nil {
 			return err
 		}
 		subjectID, scopeType = v.ID, "workspace"
 	case "doc":
-		d, err := get[core.Doc](c, "doc", "subject", a.Subject)
+		d, err := loadLive[core.Doc](c, "doc", "subject", a.Subject)
 		if err != nil {
 			return err
 		}

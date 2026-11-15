@@ -58,7 +58,7 @@ func templateCreate(c *cx, a templateCreateArgs) error {
 	seq := c.tx.NextSeq()
 	tp.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, tp); err != nil {
-		return taken(err, "id", tid)
+		return alreadyInUse(err, "id", tid)
 	}
 	return c.created(seq, "template", tp.ID, scopeType, scopeID, tp.ProjectID, tp)
 }
@@ -79,7 +79,7 @@ func tplScope(c *cx, t core.Template) (string, string) {
 }
 
 func templateUpdate(c *cx, a templateUpdateArgs) error {
-	tp, err := get[core.Template](c, "template", "id", a.ID)
+	tp, err := loadLive[core.Template](c, "template", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -87,8 +87,8 @@ func templateUpdate(c *cx, a templateUpdateArgs) error {
 	if err := p.name("name", a.Name, &tp.Name); err != nil {
 		return err
 	}
-	p.str("title", a.Title, &tp.Title)
-	p.str("description", a.Description, &tp.Description)
+	p.setText("title", a.Title, &tp.Title)
+	p.setText("description", a.Description, &tp.Description)
 	if a.Preset.Set {
 		raw, _ := json.Marshal(a.Preset.V)
 		if a.Preset.Null {
@@ -104,7 +104,7 @@ func templateUpdate(c *cx, a templateUpdateArgs) error {
 }
 
 func templateDelete(c *cx, a idArgs) error {
-	tp, err := get[core.Template](c, "template", "id", a.ID)
+	tp, err := loadLive[core.Template](c, "template", "id", a.ID)
 	if err != nil {
 		return err
 	}

@@ -64,7 +64,7 @@ func linkSet(c *cx, a linkSetArgs) error {
 		if err := c.tx.Insert(c.ctx, l); err != nil {
 			return err
 		}
-		if err := c.touch(t.ID, seq); err != nil {
+		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
 		return c.emit(seq, "link.created", "link", l.ID, "task", t.ID, t.ProjectID, map[string]any{"row": l, "key": t.Key})
@@ -73,10 +73,10 @@ func linkSet(c *cx, a linkSetArgs) error {
 		return err
 	}
 	p := newPatch()
-	p.put("url", l.URL, orStr(a.URL, l.URL))
-	p.put("title", l.Title, orStr(a.Title, l.Title))
-	p.put("state", l.State, orStr(a.State, l.State))
-	p.put("checks", l.Checks, orStr(a.Checks, l.Checks))
+	p.put("url", l.URL, firstNonEmpty(a.URL, l.URL))
+	p.put("title", l.Title, firstNonEmpty(a.Title, l.Title))
+	p.put("state", l.State, firstNonEmpty(a.State, l.State))
+	p.put("checks", l.Checks, firstNonEmpty(a.Checks, l.Checks))
 	if len(a.Data) > 0 && string(a.Data) != string(l.Data) {
 		p.set["data"] = a.Data
 		p.changes["data"] = core.FieldChange{To: a.Data}
@@ -89,11 +89,11 @@ func linkSet(c *cx, a linkSetArgs) error {
 	if err := c.save(p, "task_links", "link", l.ID, "task", t.ID, t.ProjectID, map[string]any{"key": t.Key, "kind": l.Kind, "ref": l.Ref}); err != nil {
 		return err
 	}
-	return c.touch(t.ID, c.tx.Seq())
+	return c.touchTask(t.ID, c.tx.Seq())
 }
 
 func linkRemove(c *cx, a idArgs) error {
-	l, err := get[core.TaskLink](c, "link", "id", a.ID)
+	l, err := loadLive[core.TaskLink](c, "link", "id", a.ID)
 	if err != nil {
 		return err
 	}

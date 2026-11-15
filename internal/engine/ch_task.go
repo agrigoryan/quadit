@@ -263,7 +263,7 @@ func (d *taskDraft) insert() error {
 	seq := c.tx.NextSeq()
 	t.CreatedSeq, t.UpdatedSeq, t.ActivitySeq = seq, seq, seq
 	if err := c.tx.Insert(c.ctx, *t); err != nil {
-		return taken(err, "id", t.ID)
+		return alreadyInUse(err, "id", t.ID)
 	}
 	for _, l := range t.LabelIDs {
 		if err := c.tx.Insert(c.ctx, core.TaskLabel{TaskID: t.ID, LabelID: l, WorkspaceID: c.ws}); err != nil {
@@ -284,7 +284,7 @@ func (d *taskDraft) openDecision() error {
 	}
 	o := *d.opens
 	o.ID, o.Task = "", d.t.ID
-	return d.c.sub("decision.open", o)
+	return d.c.applyNested("decision.open", o)
 }
 
 func taskDelete(c *cx, a idArgs) error {

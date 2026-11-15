@@ -168,7 +168,7 @@ func (c *cx) insertDoc(d core.Doc, a docCreateArgs) error {
 	seq := c.tx.NextSeq()
 	d.CreatedSeq, d.UpdatedSeq, d.ContentSeq = seq, seq, seq
 	if err := c.tx.Insert(c.ctx, d); err != nil {
-		return taken(err, "id", d.ID)
+		return alreadyInUse(err, "id", d.ID)
 	}
 	blocks := a.Blocks
 	if len(blocks) == 0 && a.Markdown != "" {
@@ -200,7 +200,7 @@ func (c *cx) insertDoc(d core.Doc, a docCreateArgs) error {
 
 // afterDocText keeps search and mentions in step with a page's text.
 func (c *cx) afterDocText(d core.Doc, ed *editor) error {
-	text := ed.plain()
+	text := ed.plainText()
 	mentioned, err := c.link("doc", d.ID, "doc", d.ID, d.Title+"\n"+text)
 	if err != nil {
 		return err
@@ -259,7 +259,7 @@ func docUpdate(c *cx, a docUpdateArgs) error {
 	}
 	u := &pageEdit{c: c, a: a, d: d, p: newPatch(), wasAudience: docAudience(d)}
 	steps := []func() error{
-		u.look,
+		u.updateLook,
 		u.parent,
 		u.rank,
 		u.project,
@@ -291,10 +291,10 @@ type pageEdit struct {
 	unshared    []string // those who could see the page and no longer can
 }
 
-func (u *pageEdit) look() error {
-	u.p.str("title", u.a.Title, &u.d.Title)
-	u.p.str("icon", u.a.Icon, &u.d.Icon)
-	u.p.str("cover", u.a.Cover, &u.d.Cover)
+func (u *pageEdit) updateLook() error {
+	u.p.setText("title", u.a.Title, &u.d.Title)
+	u.p.setText("icon", u.a.Icon, &u.d.Icon)
+	u.p.setText("cover", u.a.Cover, &u.d.Cover)
 	return nil
 }
 

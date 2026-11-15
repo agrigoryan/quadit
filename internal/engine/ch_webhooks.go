@@ -61,7 +61,7 @@ func webhookCreate(c *cx, a webhookCreateArgs) error {
 	seq := c.tx.NextSeq()
 	w.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, w); err != nil {
-		return taken(err, "id", wid)
+		return alreadyInUse(err, "id", wid)
 	}
 	return c.created(seq, "webhook", w.ID, "workspace", c.ws, "", w)
 }
@@ -78,7 +78,7 @@ type webhookUpdateArgs struct {
 }
 
 func webhookUpdate(c *cx, a webhookUpdateArgs) error {
-	w, err := get[core.Webhook](c, "webhook", "id", a.ID)
+	w, err := loadLive[core.Webhook](c, "webhook", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func webhookUpdate(c *cx, a webhookUpdateArgs) error {
 		if err := checkURL("url", a.URL.V); err != nil {
 			return err
 		}
-		p.str("url", a.URL, &w.URL)
+		p.setText("url", a.URL, &w.URL)
 	}
 	if a.Secret.Set && a.Secret.V != w.Secret {
 		p.set["secret"] = a.Secret.V
@@ -129,7 +129,7 @@ func webhookUpdate(c *cx, a webhookUpdateArgs) error {
 }
 
 func webhookDelete(c *cx, a idArgs) error {
-	w, err := get[core.Webhook](c, "webhook", "id", a.ID)
+	w, err := loadLive[core.Webhook](c, "webhook", "id", a.ID)
 	if err != nil {
 		return err
 	}

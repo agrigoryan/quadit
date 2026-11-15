@@ -141,11 +141,11 @@ func missing(err error, what, ref string) error {
 	return err
 }
 
-// taken turns a broken uniqueness rule into a refusal naming what was
+// alreadyInUse turns a broken uniqueness rule into a refusal naming what was
 // asked for. The refusal still is the store's conflict underneath, so a
 // handler around a generic write (save names only the row) can name the
 // value instead.
-func taken(err error, what, value string) error {
+func alreadyInUse(err error, what, value string) error {
 	if errors.Is(err, store.ErrConflict) {
 		e := conflictErr("%s %q is already in use", what, value)
 		e.cause = err
@@ -444,10 +444,10 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 	}
 	for i, ch := range changes {
 		if !id.Valid(ch.ID) {
-			return nil, at(i, invalid("id", "a change needs an id made by the caller (a lower-case UUID); resending the same id is then safe"))
+			return nil, withIndex(i, invalid("id", "a change needs an id made by the caller (a lower-case UUID); resending the same id is then safe"))
 		}
 		if _, ok := handlers[ch.Type]; !ok {
-			return nil, at(i, oneOf("type", "change type", ch.Type, ChangeTypes()))
+			return nil, withIndex(i, oneOf("type", "change type", ch.Type, ChangeTypes()))
 		}
 	}
 	results := make([]*Result, len(changes))
@@ -473,7 +473,7 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 			scope.ReadOnly = true
 		}
 		if len(actor.Projects) > 0 {
-			scope.Projects = narrow(scope.Projects, actor.Projects)
+			scope.Projects = intersectProjects(scope.Projects, actor.Projects)
 		}
 		now := e.now().UnixMilli()
 		for i, ch := range changes {
@@ -481,10 +481,10 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 			if err != nil {
 				var ee *Error
 				if errors.As(err, &ee) {
-					return at(i, ee)
+					return withIndex(i, ee)
 				}
 				if errors.Is(err, store.ErrNotFound) {
-					return at(i, &Error{Code: CodeNotFound, Message: err.Error()})
+					return withIndex(i, &Error{Code: CodeNotFound, Message: err.Error()})
 				}
 				return fmt.Errorf("change %d (%s): %w", i, ch.Type, err)
 			}
@@ -505,9 +505,9 @@ func (e *Engine) Batch(ctx context.Context, workspaceID string, actor Actor, cha
 	return results, nil
 }
 
-// narrow returns the project ids allowed by both lists; an empty list
+// intersectProjects returns the project ids allowed by both lists; an empty list
 // allows everything.
-func narrow(a, b []string) []string {
+func intersectProjects(a, b []string) []string {
 	if len(a) == 0 {
 		return b
 	}
@@ -523,7 +523,7 @@ func narrow(a, b []string) []string {
 	return out
 }
 
-func at(i int, e *Error) *Error {
+func withIndex(i int, e *Error) *Error {
 	cp := *e
 	cp.Index = i
 	return &cp
@@ -565,7 +565,7 @@ func (e *Engine) applyOne(ctx context.Context, tx store.Tx, m core.Member, scope
 				return nil, forbidden("@%s, who asked for this, may only read", asker.Handle)
 			}
 			if len(asker.Scope.Projects) > 0 {
-				scope.Projects = narrow(scope.Projects, asker.Scope.Projects)
+				scope.Projects = intersectProjects(scope.Projects, asker.Scope.Projects)
 			}
 		}
 	}
@@ -759,7 +759,7 @@ func (o Opt[T]) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.V)
 }
 
-func slugOK(s string) bool {
+func validSlug(s string) bool {
 	if len(s) < 2 || len(s) > 40 {
 		return false
 	}
@@ -816,7 +816,7 @@ func (c *cx) checkAsker(taskID string) error {
 			if !contains(m.Scope.Projects, t.ProjectID) {
 				return forbidden("@%s, who asked for the work on %s, has no access to its project", m.Handle, t.Key)
 			}
-			c.scope.Projects = narrow(c.scope.Projects, m.Scope.Projects)
+			c.scope.Projects = intersectProjects(c.scope.Projects, m.Scope.Projects)
 		}
 	}
 	return nil

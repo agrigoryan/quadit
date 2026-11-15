@@ -69,7 +69,7 @@ func cycleCreate(c *cx, a cycleCreateArgs) error {
 	cy := core.Cycle{ID: cid, WorkspaceID: c.ws, ProjectID: p.ID, Number: int(n), Name: strings.TrimSpace(a.Name),
 		StartsOn: a.StartsOn, EndsOn: a.EndsOn, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, cy); err != nil {
-		return taken(err, "id", cid)
+		return alreadyInUse(err, "id", cid)
 	}
 	return c.created(seq, "cycle", cy.ID, "project", p.ID, p.ID, cy)
 }
@@ -82,12 +82,12 @@ type cycleUpdateArgs struct {
 }
 
 func cycleUpdate(c *cx, a cycleUpdateArgs) error {
-	cy, err := get[core.Cycle](c, "cycle", "id", a.ID)
+	cy, err := loadLive[core.Cycle](c, "cycle", "id", a.ID)
 	if err != nil {
 		return err
 	}
 	p := newPatch()
-	p.str("name", a.Name, &cy.Name)
+	p.setText("name", a.Name, &cy.Name)
 	if err := p.date("starts_on", a.StartsOn, &cy.StartsOn); err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func cycleUpdate(c *cx, a cycleUpdateArgs) error {
 }
 
 func cycleDelete(c *cx, a idArgs) error {
-	cy, err := get[core.Cycle](c, "cycle", "id", a.ID)
+	cy, err := loadLive[core.Cycle](c, "cycle", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func (c *cx) rollProject(p core.Project, today string) error {
 			start = addDays(today, -back)
 		}
 		end := addDays(start, days-1)
-		if err := c.sub("cycle.create", cycleCreateArgs{ID: id.New(), Project: p.ID, StartsOn: start, EndsOn: end}); err != nil {
+		if err := c.applyNested("cycle.create", cycleCreateArgs{ID: id.New(), Project: p.ID, StartsOn: start, EndsOn: end}); err != nil {
 			return err
 		}
 		all = append(all, core.Cycle{StartsOn: start, EndsOn: end})

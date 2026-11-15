@@ -39,9 +39,9 @@ func checkOutsideNote(note string) error {
 	return nil
 }
 
-// named is the reference an optional argument gives. Null, like "", names
+// refOf is the reference an optional argument gives. Null, like "", names
 // nothing.
-func named(o Opt[string]) string {
+func refOf(o Opt[string]) string {
 	if o.Null {
 		return ""
 	}
@@ -61,7 +61,7 @@ func (c *cx) taskEpic(p core.Project, ref string) (string, error) {
 // its epic: a task in another epic cannot be put in it, and a task in none
 // goes into the milestone's.
 func (c *cx) taskMilestone(ref, epicID string) (core.Milestone, error) {
-	ms, err := get[core.Milestone](c, "milestone", "milestone", ref)
+	ms, err := loadLive[core.Milestone](c, "milestone", "milestone", ref)
 	if err != nil {
 		return ms, err
 	}

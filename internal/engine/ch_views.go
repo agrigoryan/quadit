@@ -95,7 +95,7 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 	seq := c.tx.NextSeq()
 	v.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, v); err != nil {
-		return taken(err, "id", vid)
+		return alreadyInUse(err, "id", vid)
 	}
 	c.ref, c.key = v.ID, v.Slug
 	audience := ""
@@ -147,13 +147,13 @@ func viewUpdate(c *cx, a viewUpdateArgs) error {
 	if err := p.name("name", a.Name, &v.Name); err != nil {
 		return err
 	}
-	p.str("description", a.Description, &v.Description)
-	p.str("icon", a.Icon, &v.Icon)
+	p.setText("description", a.Description, &v.Description)
+	p.setText("icon", a.Icon, &v.Icon)
 	if a.Layout.Set {
 		if !contains(viewLayouts, a.Layout.V) {
 			return oneOf("layout", "layout", a.Layout.V, viewLayouts)
 		}
-		p.str("layout", a.Layout, &v.Layout)
+		p.setText("layout", a.Layout, &v.Layout)
 	}
 	raw := func(col string, o Opt[json.RawMessage], cur json.RawMessage) error {
 		if !o.Set {
@@ -182,7 +182,7 @@ func viewUpdate(c *cx, a viewUpdateArgs) error {
 	if err := raw("display", a.Display, v.Display); err != nil {
 		return err
 	}
-	p.flag("shared", a.Shared, &v.Shared)
+	p.setFlag("shared", a.Shared, &v.Shared)
 	if err := p.rank(a.Rank, &v.Rank); err != nil {
 		return err
 	}

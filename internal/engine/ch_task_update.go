@@ -44,7 +44,7 @@ func taskUpdate(c *cx, a taskUpdateArgs) error {
 		return err
 	}
 	if a.BaseSeq > 0 && t.UpdatedSeq > a.BaseSeq {
-		return c.stale(t, a.BaseSeq)
+		return c.refuseIfStale(t, a.BaseSeq)
 	}
 	u := &taskEdit{c: c, a: a, before: t, t: t, p: newPatch()}
 	if err := c.tx.Get(c.ctx, &u.pr, store.Eq("id", t.ProjectID)); err != nil {
@@ -76,7 +76,7 @@ func taskUpdate(c *cx, a taskUpdateArgs) error {
 	if u.p.empty() {
 		return nil
 	}
-	return u.tell()
+	return u.notifyConcerned()
 }
 
 // taskEdit is one task.update under way: the task as it was and as it is
@@ -96,7 +96,7 @@ func (u *taskEdit) text() error {
 	if err := u.p.name("title", u.a.Title, &u.t.Title); err != nil {
 		return err
 	}
-	u.p.str("description", u.a.Description, &u.t.Description)
+	u.p.setText("description", u.a.Description, &u.t.Description)
 	return nil
 }
 
@@ -121,13 +121,13 @@ func (u *taskEdit) numbers() error {
 		if a.Priority.Null || !priorityOK(a.Priority.V) {
 			return invalid("priority", priorityHelp)
 		}
-		p.num("priority", a.Priority, &t.Priority)
+		p.setNumber("priority", a.Priority, &t.Priority)
 	}
 	if a.Estimate.Set {
 		if err := checkEstimate(a.Estimate.V); err != nil {
 			return err
 		}
-		p.num("estimate", a.Estimate, &t.Estimate)
+		p.setNumber("estimate", a.Estimate, &t.Estimate)
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ func (u *taskEdit) member(col, field string, o Opt[string], cur *string) error {
 	if !o.Set {
 		return nil
 	}
-	v, err := u.c.optMember(field, named(o))
+	v, err := u.c.optMember(field, refOf(o))
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func (u *taskEdit) waitingOn() error {
 			t.WaitingOnNote = ""
 		}
 	}
-	p.str("waiting_on_note", a.WaitingOnNote, &t.WaitingOnNote)
+	p.setText("waiting_on_note", a.WaitingOnNote, &t.WaitingOnNote)
 	return nil
 }
 
@@ -206,7 +206,7 @@ func (u *taskEdit) parent() error {
 		return nil
 	}
 	pid := ""
-	if ref := named(u.a.Parent); ref != "" {
+	if ref := refOf(u.a.Parent); ref != "" {
 		parent, err := u.c.task("parent", ref)
 		if err != nil {
 			return err
@@ -225,7 +225,7 @@ func (u *taskEdit) epic() error {
 	if !a.Epic.Set {
 		return nil
 	}
-	eid, err := u.c.taskEpic(u.pr, named(a.Epic))
+	eid, err := u.c.taskEpic(u.pr, refOf(a.Epic))
 	if err != nil {
 		return err
 	}
@@ -244,7 +244,7 @@ func (u *taskEdit) milestone() error {
 		return nil
 	}
 	mid := ""
-	if ref := named(a.Milestone); ref != "" {
+	if ref := refOf(a.Milestone); ref != "" {
 		ms, err := u.c.taskMilestone(ref, t.EpicID)
 		if err != nil {
 			return err
@@ -260,7 +260,7 @@ func (u *taskEdit) cycle() error {
 	if !u.a.Cycle.Set {
 		return nil
 	}
-	cid, err := u.c.taskCycle(u.pr, named(u.a.Cycle))
+	cid, err := u.c.taskCycle(u.pr, refOf(u.a.Cycle))
 	if err != nil {
 		return err
 	}
@@ -331,9 +331,9 @@ func (u *taskEdit) labels() error {
 	return c.setLabels(u.p, &u.t, ids)
 }
 
-// tell lets the people the update concerns know of it: a new assignee, a
+// notifyConcerned lets the people the update concerns know of it: a new assignee, a
 // new next mover, those mentioned, and the watchers when the task closes.
-func (u *taskEdit) tell() error {
+func (u *taskEdit) notifyConcerned() error {
 	c, t, before := u.c, u.t, u.before
 	newAssignee, newWaiting := "", ""
 	if t.AssigneeID != before.AssigneeID {

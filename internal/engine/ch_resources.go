@@ -33,7 +33,7 @@ func resourceCreate(c *cx, a resourceCreateArgs) error {
 	seq := c.tx.NextSeq()
 	r := core.Resource{ID: rid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), Description: a.Description, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, r); err != nil {
-		return taken(err, "resource name", r.Name)
+		return alreadyInUse(err, "resource name", r.Name)
 	}
 	return c.created(seq, "resource", r.ID, "workspace", c.ws, "", r)
 }
@@ -193,7 +193,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 		cl.State, cl.AcquiredAt, cl.LeaseUntil = "holding", c.at, c.at+int64(a.Minutes)*60_000
 	}
 	if err := c.tx.Insert(c.ctx, cl); err != nil {
-		return taken(err, "id", cid)
+		return alreadyInUse(err, "id", cid)
 	}
 	c.ref, c.key = cl.ID, cl.State
 	if err := c.emit(c.tx.NextSeq(), "claim.created", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"row": cl, "resource": r.Name}); err != nil {

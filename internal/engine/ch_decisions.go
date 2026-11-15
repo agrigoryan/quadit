@@ -200,12 +200,12 @@ func (c *cx) insertDecision(d *core.Decision, t core.Task, a decisionOpenArgs) e
 	seq := c.tx.NextSeq()
 	d.CreatedSeq, d.UpdatedSeq = seq, seq
 	if err := c.tx.Insert(c.ctx, *d); err != nil {
-		return taken(err, "id", d.ID)
+		return alreadyInUse(err, "id", d.ID)
 	}
 	var atts []core.Attachment
 	for i, o := range d.Options {
 		if err := c.tx.Insert(c.ctx, o); err != nil {
-			return taken(err, "option id", o.ID)
+			return alreadyInUse(err, "option id", o.ID)
 		}
 		for _, aa := range a.Options[i].Attachments {
 			at, err := c.attach(aa, "decision_option", o.ID, t)
@@ -215,7 +215,7 @@ func (c *cx) insertDecision(d *core.Decision, t core.Task, a decisionOpenArgs) e
 			atts = append(atts, at)
 		}
 	}
-	if err := c.touch(t.ID, seq); err != nil {
+	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
 	data := map[string]any{"row": *d, "key": t.Key}
@@ -272,7 +272,7 @@ func (c *cx) decisionTask(ref string) (core.Decision, core.Task, error) {
 		}
 		ref = id
 	}
-	d, err := get[core.Decision](c, "decision", "id", ref)
+	d, err := loadLive[core.Decision](c, "decision", "id", ref)
 	if err != nil {
 		return d, core.Task{}, err
 	}
@@ -298,13 +298,13 @@ func decisionUpdate(c *cx, a decisionUpdateArgs) error {
 	if err := p.name("question", a.Question, &d.Question); err != nil {
 		return err
 	}
-	p.str("details", a.Details, &d.Details)
-	p.str("recommendation", a.Recommendation, &d.Recommendation)
+	p.setText("details", a.Details, &d.Details)
+	p.setText("recommendation", a.Recommendation, &d.Recommendation)
 	if a.Recommended.Set {
 		if !a.Recommended.Null && !hasOption(d, a.Recommended.V) {
 			return &Error{Code: CodeInvalid, Field: "recommended", Message: "recommended must be one of this decision's options", Allowed: optionIDs(d)}
 		}
-		p.str("recommended_option_id", a.Recommended, &d.RecommendedOptionID)
+		p.setText("recommended_option_id", a.Recommended, &d.RecommendedOptionID)
 	}
 	if !p.empty() {
 		p.set["updated_at"] = c.at
@@ -312,7 +312,7 @@ func decisionUpdate(c *cx, a decisionUpdateArgs) error {
 	if err := c.save(p, "decisions", "decision", d.ID, "task", t.ID, t.ProjectID, map[string]any{"key": t.Key}); err != nil {
 		return err
 	}
-	return c.touch(t.ID, c.tx.Seq())
+	return c.touchTask(t.ID, c.tx.Seq())
 }
 
 type decisionPickArgs struct {
@@ -350,7 +350,7 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 		return err
 	}
 	d.State, d.PickedOptionID, d.Outcome, d.OutcomeNote, d.DecidedBy, d.DecidedAt, d.UpdatedSeq, d.UnclearNote = state, optionID, outcome, a.Note, c.actor.UserID, c.at, seq, ""
-	if err := c.touch(t.ID, seq); err != nil {
+	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
 	c.ref, c.key = d.ID, t.Key
@@ -509,7 +509,7 @@ func decisionUnclear(c *cx, a decisionUnclearArgs) error {
 	}
 	prev := map[string]any{"picked_option_id": d.PickedOptionID, "outcome": d.Outcome, "outcome_note": d.OutcomeNote, "decided_by": d.DecidedBy}
 	d.State, d.UnclearNote, d.AskedID, d.PickedOptionID, d.Outcome, d.OutcomeNote, d.DecidedBy, d.DecidedAt, d.UpdatedSeq = core.StateOpen, a.Note, answerer, "", "", "", "", 0, seq
-	if err := c.touch(t.ID, seq); err != nil {
+	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
 	c.ref, c.key = d.ID, t.Key
@@ -536,7 +536,7 @@ func decisionDelete(c *cx, a idArgs) error {
 	if err := c.trash("decisions", "decision", d.ID, "task", t.ID, t.ProjectID, map[string]any{"key": t.Key}); err != nil {
 		return err
 	}
-	return c.touch(t.ID, c.tx.Seq())
+	return c.touchTask(t.ID, c.tx.Seq())
 }
 
 // decisionRestore takes a decision back out of the trash, as it was.
@@ -577,7 +577,7 @@ func decisionRestore(c *cx, a idArgs) error {
 	if err := c.index("decision", d.ID, "task", t.ID, t.ProjectID, "", d.Question, body); err != nil {
 		return err
 	}
-	if err := c.touch(t.ID, seq); err != nil {
+	if err := c.touchTask(t.ID, seq); err != nil {
 		return err
 	}
 	// The whole decision goes out again: a copy that dropped it has it back.

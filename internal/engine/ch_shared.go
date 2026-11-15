@@ -12,8 +12,8 @@ type idArgs struct {
 	ID string `json:"id"`
 }
 
-// sub runs another change type inside this one, as the same actor.
-func (c *cx) sub(changeType string, args any) error {
+// applyNested runs another change type inside this one, as the same actor.
+func (c *cx) applyNested(changeType string, args any) error {
 	raw, err := json.Marshal(args)
 	if err != nil {
 		return err
@@ -46,11 +46,11 @@ func (p *patch) rank(o Opt[string], cur *string) error {
 	if o.Null || !rank.Valid(o.V) {
 		return invalid("rank", "%q is not a rank", o.V)
 	}
-	p.str("rank", o, cur)
+	p.setText("rank", o, cur)
 	return nil
 }
 
-func orStr(a, b string) string {
+func firstNonEmpty(a, b string) string {
 	if a != "" {
 		return a
 	}

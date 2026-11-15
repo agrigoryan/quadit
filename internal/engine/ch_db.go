@@ -87,14 +87,14 @@ func propertyCreate(c *cx, a propertyArgs) error {
 	seq := c.tx.NextSeq()
 	p := core.DBProperty{ID: pid, WorkspaceID: c.ws, DatabaseID: d.ID, Name: name, Type: a.Type.V, Config: a.Config.V, Rank: rk, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, p); err != nil {
-		return taken(err, "id", pid)
+		return alreadyInUse(err, "id", pid)
 	}
 	c.ref = p.ID
 	return c.emitTo(docAudience(d), seq, "property.created", "property", p.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": p})
 }
 
 func (c *cx) propertyDoc(ref string) (core.DBProperty, core.Doc, error) {
-	p, err := get[core.DBProperty](c, "property", "id", ref)
+	p, err := loadLive[core.DBProperty](c, "property", "id", ref)
 	if err != nil {
 		return p, core.Doc{}, err
 	}
@@ -115,7 +115,7 @@ func propertyUpdate(c *cx, a propertyArgs) error {
 		if !contains(PropertyTypes, a.Type.V) {
 			return oneOf("type", "property type", a.Type.V, PropertyTypes)
 		}
-		p.str("type", a.Type, &pr.Type)
+		p.setText("type", a.Type, &pr.Type)
 	}
 	if a.Config.Set && string(a.Config.V) != string(pr.Config) {
 		p.set["config"] = a.Config.V
@@ -332,14 +332,14 @@ func dbviewCreate(c *cx, a dbviewArgs) error {
 	seq := c.tx.NextSeq()
 	v := core.DBView{ID: vid, WorkspaceID: c.ws, DatabaseID: d.ID, Name: name, Type: a.Type.V, Config: a.Config.V, Rank: rk, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, v); err != nil {
-		return taken(err, "id", vid)
+		return alreadyInUse(err, "id", vid)
 	}
 	c.ref = v.ID
 	return c.emitTo(docAudience(d), seq, "dbview.created", "dbview", v.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": v})
 }
 
 func (c *cx) dbviewDoc(ref string) (core.DBView, core.Doc, error) {
-	v, err := get[core.DBView](c, "view", "id", ref)
+	v, err := loadLive[core.DBView](c, "view", "id", ref)
 	if err != nil {
 		return v, core.Doc{}, err
 	}
@@ -360,7 +360,7 @@ func dbviewUpdate(c *cx, a dbviewArgs) error {
 		if !contains(DBViewTypes, a.Type.V) {
 			return oneOf("type", "view type", a.Type.V, DBViewTypes)
 		}
-		p.str("type", a.Type, &v.Type)
+		p.setText("type", a.Type, &v.Type)
 	}
 	if a.Config.Set && string(a.Config.V) != string(v.Config) {
 		p.set["config"] = a.Config.V

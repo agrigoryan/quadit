@@ -52,11 +52,11 @@ func relationAdd(c *cx, a relationArgs) error {
 	}
 	r := core.Relation{ID: rid, WorkspaceID: c.ws, TaskID: t.ID, RelatedTaskID: o.ID, Type: typ, CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, r); err != nil {
-		return taken(err, "id", rid)
+		return alreadyInUse(err, "id", rid)
 	}
 	seq := c.tx.NextSeq()
 	for _, tid := range []string{t.ID, o.ID} {
-		if err := c.touch(tid, seq); err != nil {
+		if err := c.touchTask(tid, seq); err != nil {
 			return err
 		}
 	}
@@ -76,7 +76,7 @@ func (c *cx) related(t, other core.Task, r core.Relation, removed bool) error {
 }
 
 func relationRemove(c *cx, a idArgs) error {
-	r, err := get[core.Relation](c, "relation", "id", a.ID)
+	r, err := loadLive[core.Relation](c, "relation", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func relationRemove(c *cx, a idArgs) error {
 	if err := c.tx.Get(c.ctx, &t, store.Eq("id", r.TaskID)); err != nil {
 		return err
 	}
-	if err := c.gone("relation", r.ID, "task", t.ID, t.ProjectID); err != nil {
+	if err := c.emitDeleted("relation", r.ID, "task", t.ID, t.ProjectID); err != nil {
 		return err
 	}
 	var o core.Task
@@ -96,7 +96,7 @@ func relationRemove(c *cx, a idArgs) error {
 	}
 	seq := c.tx.Seq()
 	for _, tid := range []string{t.ID, o.ID} {
-		if err := c.touch(tid, seq); err != nil {
+		if err := c.touchTask(tid, seq); err != nil {
 			return err
 		}
 	}

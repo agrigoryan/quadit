@@ -43,7 +43,7 @@ func labelCreate(c *cx, a labelCreateArgs) error {
 	l := core.Label{ID: lid, WorkspaceID: c.ws, ProjectID: projectID, Name: strings.TrimSpace(a.Name), Color: a.Color,
 		Description: a.Description, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, l); err != nil {
-		return taken(err, "id", lid)
+		return alreadyInUse(err, "id", lid)
 	}
 	return c.created(seq, "label", l.ID, scopeType, scopeID, projectID, l)
 }
@@ -63,7 +63,7 @@ func labelScope(c *cx, l core.Label) (string, string) {
 }
 
 func labelUpdate(c *cx, a labelUpdateArgs) error {
-	l, err := get[core.Label](c, "label", "id", a.ID)
+	l, err := loadLive[core.Label](c, "label", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -71,14 +71,14 @@ func labelUpdate(c *cx, a labelUpdateArgs) error {
 	if err := p.name("name", a.Name, &l.Name); err != nil {
 		return err
 	}
-	p.str("color", a.Color, &l.Color)
-	p.str("description", a.Description, &l.Description)
+	p.setText("color", a.Color, &l.Color)
+	p.setText("description", a.Description, &l.Description)
 	st, sid := labelScope(c, l)
 	return c.save(p, "labels", "label", l.ID, st, sid, l.ProjectID, nil)
 }
 
 func labelDelete(c *cx, a memberRefArgs) error {
-	l, err := get[core.Label](c, "label", "id", a.ID)
+	l, err := loadLive[core.Label](c, "label", "id", a.ID)
 	if err != nil {
 		return err
 	}

@@ -9,9 +9,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// stale refuses an update based on an old version and says what changed
+// refuseIfStale refuses an update based on an old version and says what changed
 // since, so the caller can decide without reading the task again.
-func (c *cx) stale(t core.Task, base int64) error {
+func (c *cx) refuseIfStale(t core.Task, base int64) error {
 	evs, err := c.tx.Events(c.ctx, store.EventFilter{After: base, ScopeType: "task", ScopeID: t.ID, Types: []string{"task.updated"}, Limit: 20})
 	if err != nil {
 		return err

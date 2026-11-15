@@ -54,7 +54,7 @@ func (c *cx) checkRule(m *core.RuleMatch, a *core.RuleAction) error {
 		}
 	}
 	if a.Kind == "webhook" {
-		if _, err := get[core.Webhook](c, "webhook", "action.webhook_id", a.WebhookID); err != nil {
+		if _, err := loadLive[core.Webhook](c, "webhook", "action.webhook_id", a.WebhookID); err != nil {
 			return err
 		}
 		return nil
@@ -85,13 +85,13 @@ func ruleCreate(c *cx, a ruleArgs) error {
 	r := core.Rule{ID: rid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), Active: a.Active == nil || *a.Active, Match: a.Match,
 		Action: a.Action, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, r); err != nil {
-		return taken(err, "id", rid)
+		return alreadyInUse(err, "id", rid)
 	}
 	return c.created(seq, "rule", r.ID, "workspace", c.ws, "", r)
 }
 
 func ruleUpdate(c *cx, a ruleArgs) error {
-	r, err := get[core.Rule](c, "rule", "id", a.ID)
+	r, err := loadLive[core.Rule](c, "rule", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func ruleUpdate(c *cx, a ruleArgs) error {
 }
 
 func ruleDelete(c *cx, a idArgs) error {
-	r, err := get[core.Rule](c, "rule", "id", a.ID)
+	r, err := loadLive[core.Rule](c, "rule", "id", a.ID)
 	if err != nil {
 		return err
 	}

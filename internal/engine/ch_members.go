@@ -245,7 +245,7 @@ func memberUpdate(c *cx, a memberUpdateArgs) error {
 		}
 		p.put("handle", m.Handle, a.Handle.V)
 	}
-	p.str("title", a.Title, &m.Title)
+	p.setText("title", a.Title, &m.Title)
 	if a.Suspended.Set {
 		if a.Suspended.V && m.SuspendedAt == 0 {
 			if last, err := c.lastOwner(m); err != nil {

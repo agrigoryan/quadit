@@ -77,7 +77,7 @@ func agentCreate(c *cx, a agentCreateArgs) error {
 	u := core.User{ID: uid, Kind: core.KindAgent, Name: name, Description: a.Description, Avatar: a.Avatar, WorkspaceID: c.ws,
 		ResponsibleID: rm.UserID, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, u); err != nil {
-		return taken(err, "id", uid)
+		return alreadyInUse(err, "id", uid)
 	}
 	return c.addMember(core.Member{WorkspaceID: c.ws, UserID: uid, Role: role, Handle: handle, Kind: u.Kind, Name: u.Name,
 		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at, ResponsibleID: rm.UserID,
@@ -218,7 +218,7 @@ func (c *cx) capScope(scope *core.Scope) *core.Scope {
 	}
 	mine := c.actor.Scope
 	if len(mine.Projects) > 0 {
-		scope.Projects = narrow(mine.Projects, orAll(scope.Projects, mine.Projects))
+		scope.Projects = intersectProjects(mine.Projects, orAll(scope.Projects, mine.Projects))
 	}
 	scope.ReadOnly = scope.ReadOnly || mine.ReadOnly
 	for _, t := range mine.NeedsApproval {
@@ -263,11 +263,11 @@ func agentUpdate(c *cx, a agentUpdateArgs) error {
 		userSet["name"] = m.Name
 	}
 	if a.Description.Set {
-		p.str("title", a.Description, &m.Title)
+		p.setText("title", a.Description, &m.Title)
 		userSet["description"] = m.Title
 	}
 	if a.Avatar.Set {
-		p.str("avatar", a.Avatar, &m.Avatar)
+		p.setText("avatar", a.Avatar, &m.Avatar)
 		userSet["avatar"] = m.Avatar
 	}
 	if a.Responsible.Set {

@@ -65,7 +65,7 @@ func projectCreate(c *cx, a projectCreateArgs) error {
 		Icon: a.Icon, Color: a.Color, LeadID: lead, Rank: rk, Settings: a.Settings,
 		CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at, CreatedSeq: seq, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, p); err != nil {
-		return taken(err, "project key", a.Key)
+		return alreadyInUse(err, "project key", a.Key)
 	}
 	if err := c.created(seq, "project", p.ID, "project", p.ID, p.ID, p); err != nil {
 		return err
@@ -110,14 +110,14 @@ func projectUpdate(c *cx, a projectUpdateArgs) error {
 		if !projectKeyRE.MatchString(a.Key.V) {
 			return invalid("key", "a project key is 2 to 10 upper-case letters or digits, starting with a letter")
 		}
-		p.str("key", a.Key, &pr.Key)
+		p.setText("key", a.Key, &pr.Key)
 	}
 	if err := p.name("name", a.Name, &pr.Name); err != nil {
 		return err
 	}
-	p.str("description", a.Description, &pr.Description)
-	p.str("icon", a.Icon, &pr.Icon)
-	p.str("color", a.Color, &pr.Color)
+	p.setText("description", a.Description, &pr.Description)
+	p.setText("icon", a.Icon, &pr.Icon)
+	p.setText("color", a.Color, &pr.Color)
 	if a.Lead.Set {
 		lead := ""
 		if !a.Lead.Null {
@@ -158,7 +158,7 @@ func projectUpdate(c *cx, a projectUpdateArgs) error {
 		p.set["updated_at"] = c.at
 	}
 	if err := c.save(p, "projects", "project", pr.ID, "project", pr.ID, pr.ID, nil); err != nil {
-		return taken(err, "project key", pr.Key)
+		return alreadyInUse(err, "project key", pr.Key)
 	}
 	if pr.Key != oldKey {
 		if err := c.rekeyTasks(pr); err != nil {

@@ -65,7 +65,7 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 	st := core.Status{ID: sid, WorkspaceID: c.ws, ProjectID: p.ID, Name: strings.TrimSpace(a.Name), Color: a.Color,
 		Category: a.Category, Rank: rk, CreatedAt: c.at, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, st); err != nil {
-		return taken(err, "status name", st.Name)
+		return alreadyInUse(err, "status name", st.Name)
 	}
 	return c.created(seq, "status", st.ID, "project", p.ID, p.ID, st)
 }
@@ -80,7 +80,7 @@ type statusUpdateArgs struct {
 }
 
 func statusUpdate(c *cx, a statusUpdateArgs) error {
-	st, err := get[core.Status](c, "status", "id", a.ID)
+	st, err := loadLive[core.Status](c, "status", "id", a.ID)
 	if err != nil {
 		return err
 	}
@@ -92,9 +92,9 @@ func statusUpdate(c *cx, a statusUpdateArgs) error {
 		if !core.ValidCategory(a.Category.V) {
 			return oneOf("category", "category", a.Category.V, core.Categories)
 		}
-		p.str("category", a.Category, &st.Category)
+		p.setText("category", a.Category, &st.Category)
 	}
-	p.str("color", a.Color, &st.Color)
+	p.setText("color", a.Color, &st.Color)
 	if err := p.rank(a.Rank, &st.Rank); err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func statusUpdate(c *cx, a statusUpdateArgs) error {
 		}
 		p.put("is_default", false, true)
 	}
-	return taken(c.save(p, "statuses", "status", st.ID, "project", st.ProjectID, st.ProjectID, nil), "status name", st.Name)
+	return alreadyInUse(c.save(p, "statuses", "status", st.ID, "project", st.ProjectID, st.ProjectID, nil), "status name", st.Name)
 }
 
 type statusDeleteArgs struct {
@@ -124,7 +124,7 @@ type statusDeleteArgs struct {
 }
 
 func statusDelete(c *cx, a statusDeleteArgs) error {
-	st, err := get[core.Status](c, "status", "id", a.ID)
+	st, err := loadLive[core.Status](c, "status", "id", a.ID)
 	if err != nil {
 		return err
 	}
