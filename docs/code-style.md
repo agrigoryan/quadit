@@ -109,7 +109,7 @@ The web app follows common React and TypeScript practice first: the official Rea
 4. Imports go through `@/`. No relative imports, no barrel files. Default exports only for lazy routes.
 
 ### Data and views
-5. A write that carries knowledge (an optimistic row, several changes that belong together, a mapping from what the view has to what the change takes) lives in the folder's `actions.ts`. A write that is one plain change is called where it happens: a wrapper that only passes its arguments on adds nothing. A read or a response shape used twice has a name in the folder's `data.ts`.
+5. A write that carries knowledge (an optimistic row, several changes that belong together, a mapping from what the view has to what the change takes) lives in the folder's `actions.ts`. A write that is one plain change is called where it happens: a wrapper that only passes its arguments on adds nothing. Either way the change's name and arguments are checked against `lib/changes.gen.ts`, generated from the server (`make generate`); arguments built field by field are declared as `Changes["name"]`, never `Record<string, unknown>`. A read or a response shape used twice has a name in the folder's `data.ts`.
 6. Every write is a named change through `mutate` or `send`. Nothing else writes the store.
 7. Data that is not in the store is read with `useLoad` or `useLive`, never in a component's own effect.
 8. An effect synchronises with something outside React, has a complete dependency array and cleans up. State derived from props is computed in render or reset with `key`.
@@ -118,7 +118,7 @@ The web app follows common React and TypeScript practice first: the official Rea
 ### Shape
 10. A component does one thing and does it completely. Take a hook or a child out when it is a thing of its own: a clear name, a small interface, understandable without reading the component it came from. A hook with one user that hands back a dozen values is the component's own state moved to another file: keep it in the component. State that always changes together (the fields of one form) can be one object.
 11. The same goes for plain functions: together or apart by meaning, never by length.
-12. A form that follows the usual pattern (clear errors, mark busy, send, show a refusal, unmark) uses `useSubmit` and `useFieldErrors`. A form whose submit does something different writes it out plainly; do not bend it to fit the hook, and do not give the hook an option for one caller.
+12. A form in a dialog that follows the usual pattern (clear errors, mark busy, send, show a refusal, close) uses `ui/form-dialog`; a check made in the browser throws `refuse(field, message)` so it shows the way a server refusal does. Other forms that follow the pattern use `useSubmit` and `useFieldErrors`. A form whose submit does something different writes it out plainly; do not bend it to fit the hook, and do not give the hook an option for one caller.
 
 ### Types
 13. No `any`, no `!`, no `@ts-ignore`. `as unknown as` only at a third-party boundary, with the reason on the line.
@@ -128,7 +128,7 @@ The web app follows common React and TypeScript practice first: the official Rea
 ### Words, dates, controls
 16. Every word shown goes through `t()`. Strings live in `i18n/en/`.
 17. Dates are `YYYY-MM-DD` strings handled only by `lib/days.ts`; times are milliseconds formatted only by `lib/time.ts`.
-18. Clickable things are `<button>` or `<a>`, or `ui/` components. An icon-only button has a label. Modal forms use `ui/dialog`; a side sheet, a lightbox, a drawer or a command bar is a different thing and is built on the primitive directly.
+18. Clickable things are `<button>` or `<a>`, or `ui/` components. An icon-only button has a label. Modal forms use `ui/form-dialog` (built on `ui/dialog`); a side sheet, a lightbox, a drawer or a command bar is a different thing and is built on the primitive directly.
 
 ### Names and state
 19. Names are words. One letter is allowed for the parameter of a one-expression callback, plus `e` (event), `t` (translate), `s` (store state) and `i`.
@@ -137,6 +137,7 @@ The web app follows common React and TypeScript practice first: the official Rea
 ### Tests and the gate
 21. A test file sits beside the file it checks (`store.test.ts`) and is named after the behaviour. A fix comes with a test that fails without it.
 22. `pnpm check` is clean. A disable comment names the rule and the reason.
+23. An end-to-end test lives in `web/e2e` (Playwright, run with `make e2e`, not part of `pnpm check`): it finds things by role and accessible name, seeds and checks through the CLI or the API, and waits with web-first assertions, never a fixed sleep.
 
 ### Lint warnings still to fix
 
