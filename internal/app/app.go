@@ -130,39 +130,89 @@ func (o *Options) secret() ([]byte, error) {
 
 // Serve runs the server until it is told to stop.
 func Serve(args []string, version string) int {
-	run := &serveRun{version: version}
+	run := &serveRun{}
 	run.parse(args)
-	https := run.flags.tlsDomain != "" || run.flags.tlsCert != ""
+	o := &run.o
 	if (run.flags.tlsCert == "") != (run.flags.tlsKey == "") {
 		fmt.Fprintln(os.Stderr, "--tls-cert and --tls-key go together")
 		return 1
 	}
-	if https && run.o.Listen == ":4780" {
-		run.o.Listen = ":443" // the usual place for HTTPS, unless told otherwise
+	if run.https() && o.Listen == ":4780" {
+		o.Listen = ":443" // the usual place for HTTPS, unless told otherwise
 	}
-	run.https = https
-	run.log = run.newLogger()
+
+	var handler slog.Handler = slog.NewTextHandler(os.Stderr, nil)
+	if run.flags.jsonLog {
+		handler = slog.NewJSONHandler(os.Stderr, nil)
+	}
+	log := slog.New(handler)
+	slog.SetDefault(log)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// One server per data directory: a second one, or an upgrade being
 	// undone, must not run beside it. Several servers may share a Postgres
 	// database; each has its own directory or none to guard.
-	if !strings.HasPrefix(run.o.DB, "postgres") {
-		release, err := lockData(run.o.Data)
+	if !strings.HasPrefix(o.DB, "postgres") {
+		release, err := lockData(o.Data)
 		if err != nil {
-			run.log.Error("cannot start", "err", err)
+			log.Error("cannot start", "err", err)
 			return 1
 		}
 		defer release()
 	}
-	st, sealer, err := run.o.Open(ctx)
+	st, sealer, err := o.Open(ctx)
 	if err != nil {
-		run.log.Error("cannot start", "err", err)
+		log.Error("cannot start", "err", err)
 		return 1
 	}
 	defer st.Close()
-	return run.serve(ctx, st, sealer)
+
+	o.BaseURL = strings.TrimRight(run.baseURL(), "/")
+	files, err := blob.NewDisk(filepath.Join(o.Data, "files"))
+	if err != nil {
+		log.Error("file storage", "err", err)
+		return 1
+	}
+	srv := server.New(server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: version, Log: log}, st, files, sealer)
+	if web := WebHandler(); web != nil {
+		srv.SetWeb(web)
+	}
+	go srv.Run(ctx)
+
+	hs := &http.Server{Addr: o.Listen, Handler: srv.Handler(), ReadHeaderTimeout: readHeaderTimeout}
+	errc := make(chan error, 3)
+	if err := run.listen(hs, errc); err != nil {
+		log.Error("cannot start", "err", err)
+		return 1
+	}
+	if run.https() {
+		// A plain door for the server itself (pictures of pages, health
+		// checks on the machine); nothing outside can reach it.
+		ls := &http.Server{Addr: run.flags.localListen, Handler: srv.Handler(), ReadHeaderTimeout: readHeaderTimeout}
+		go func() { errc <- ls.ListenAndServe() }()
+		defer func() {
+			if err := ls.Close(); err != nil {
+				log.Warn("the local listener did not close", "err", err)
+			}
+		}()
+	}
+	log.Info("quadit is running", "version", version, "listen", o.Listen, "https", run.https(), "url", o.BaseURL, "database", st.Dialect(), "files", files.Kind())
+	select {
+	case err := <-errc:
+		log.Error("server stopped", "err", err)
+		return 1
+	case <-ctx.Done():
+	}
+	log.Info("shutting down")
+	srv.Stop()
+	// ctx is done by now: the time to finish is counted on one that is not.
+	shut, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+	defer cancel()
+	if err := hs.Shutdown(shut); err != nil {
+		log.Warn("requests were cut off", "err", err)
+	}
+	return 0
 }
 
 // serveFlags are what quadit serve is told beside the Options: logging,
@@ -176,15 +226,16 @@ type serveFlags struct {
 	localListen     string // with HTTPS on: the server's own plain address
 }
 
-// serveRun is one run of quadit serve: what it was told, and the server
-// once it is made.
+// serveRun is what one quadit serve was told: the Options and its own flags.
 type serveRun struct {
-	version string
-	o       Options
-	flags   serveFlags
-	https   bool
-	log     *slog.Logger
-	srv     *server.Server
+	o     Options
+	flags serveFlags
+}
+
+// https reports whether the server serves HTTPS: with a certificate given,
+// or with one from an ACME authority.
+func (run *serveRun) https() bool {
+	return run.flags.tlsDomain != "" || run.flags.tlsCert != ""
 }
 
 // The servers' limits: how long a request's headers may take to arrive,
@@ -215,69 +266,6 @@ func (run *serveRun) parse(args []string) {
 	fs.Parse(args)
 }
 
-// newLogger makes the server's logger, in text or JSON as asked, and makes
-// it the default one.
-func (run *serveRun) newLogger() *slog.Logger {
-	var handler slog.Handler = slog.NewTextHandler(os.Stderr, nil)
-	if run.flags.jsonLog {
-		handler = slog.NewJSONHandler(os.Stderr, nil)
-	}
-	log := slog.New(handler)
-	slog.SetDefault(log)
-	return log
-}
-
-// serve makes the server on an open database, listens until ctx is done or
-// a listener fails, and then stops it.
-func (run *serveRun) serve(ctx context.Context, st store.Store, sealer *auth.Sealer) int {
-	o := &run.o
-	o.BaseURL = strings.TrimRight(run.baseURL(), "/")
-	files, err := blob.NewDisk(filepath.Join(o.Data, "files"))
-	if err != nil {
-		run.log.Error("file storage", "err", err)
-		return 1
-	}
-	run.srv = server.New(server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: run.version, Log: run.log}, st, files, sealer)
-	if web := WebHandler(); web != nil {
-		run.srv.SetWeb(web)
-	}
-	go run.srv.Run(ctx)
-
-	hs := &http.Server{Addr: o.Listen, Handler: run.srv.Handler(), ReadHeaderTimeout: readHeaderTimeout}
-	errc := make(chan error, 3)
-	if err := run.listen(hs, errc); err != nil {
-		run.log.Error("cannot start", "err", err)
-		return 1
-	}
-	if run.https {
-		// A plain door for the server itself (pictures of pages, health
-		// checks on the machine); nothing outside can reach it.
-		ls := &http.Server{Addr: run.flags.localListen, Handler: run.srv.Handler(), ReadHeaderTimeout: readHeaderTimeout}
-		go func() { errc <- ls.ListenAndServe() }()
-		defer func() {
-			if err := ls.Close(); err != nil {
-				run.log.Warn("the local listener did not close", "err", err)
-			}
-		}()
-	}
-	run.log.Info("quadit is running", "version", run.version, "listen", o.Listen, "https", run.https, "url", o.BaseURL, "database", st.Dialect(), "files", files.Kind())
-	select {
-	case err := <-errc:
-		run.log.Error("server stopped", "err", err)
-		return 1
-	case <-ctx.Done():
-	}
-	run.log.Info("shutting down")
-	run.srv.Stop()
-	// ctx is done by now: the time to finish is counted on one that is not.
-	shut, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
-	defer cancel()
-	if err := hs.Shutdown(shut); err != nil {
-		run.log.Warn("requests were cut off", "err", err)
-	}
-	return 0
-}
-
 // baseURL is the address people reach the server at: the one it was
 // given, or one made from where it listens.
 func (run *serveRun) baseURL() string {
@@ -291,7 +279,7 @@ func (run *serveRun) baseURL() string {
 	switch {
 	case run.flags.tlsDomain != "":
 		return "https://" + run.flags.tlsDomain
-	case run.https:
+	case run.https():
 		return "https://" + host
 	}
 	return "http://" + host
@@ -300,7 +288,7 @@ func (run *serveRun) baseURL() string {
 // localAddress is where the server reaches itself without TLS, on this
 // machine only.
 func (run *serveRun) localAddress() string {
-	if run.https {
+	if run.https() {
 		return run.flags.localListen
 	}
 	if strings.HasPrefix(run.o.Listen, ":") {
@@ -324,7 +312,7 @@ func (run *serveRun) listen(hs *http.Server, errc chan<- error) error {
 		go func() {
 			errc <- (&http.Server{Addr: run.flags.acmeHTTP, Handler: m.HTTPHandler(nil), ReadHeaderTimeout: readHeaderTimeout}).ListenAndServe()
 		}()
-	case run.https:
+	case run.https():
 		hs.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 		go func() { errc <- hs.ListenAndServeTLS(run.flags.tlsCert, run.flags.tlsKey) }()
 	default:
