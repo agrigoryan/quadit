@@ -62,3 +62,27 @@ func TestAViewOfAnotherProjectIsNotThere(t *testing.T) {
 		}
 	})
 }
+
+// TestTheStartingCopyKeepsRelationsToReadableTasks: a relation is seen by
+// whoever may read the task it is on, in the starting copy as in
+// /list/relations. One made on a task of another project is not brought,
+// though it points at a task the caller may read.
+func TestTheStartingCopyKeepsRelationsToReadableTasks(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		narrow := oneProjectOnly(t, s)
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music"})
+		hidden := s.change(s.owner, "", "relation.add", M{"task": "OPS-1", "type": "duplicates", "other": "SVA-1"})["ref"].(string)
+		shown := s.change(s.owner, "", "relation.add", M{"task": "SVA-1", "type": "blocks", "other": "SVA-2"})["ref"].(string)
+		for _, path := range []string{"/bootstrap", "/bootstrap?part=open", "/list/relations"} {
+			if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); !strings.Contains(out, hidden) || !strings.Contains(out, shown) {
+				t.Fatalf("%s does not give every relation to someone who may read both projects: %s", path, out)
+			}
+			var got struct{ Relations []struct{ ID string } }
+			s.call(nil, narrow, "GET", w+path, nil, 200, &got)
+			if len(got.Relations) != 1 || got.Relations[0].ID != shown {
+				t.Fatalf("%s gives a caller limited to SVA the relations %+v, want only the one made on SVA-1", path, got.Relations)
+			}
+		}
+	})
+}

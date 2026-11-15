@@ -256,7 +256,7 @@ var rowKinds = []rowKind{
 	kindOf("decision_options", wholeOnly[core.Option]()).exported(live("rank")),
 	kindOf("comments", wholeOnly[core.Comment]()).exported(live("created_seq")),
 	kindOf("relations", onTask(func(r core.Relation) string { return r.TaskID })).
-		listed("created_at").exported(store.Q{}),
+		listed("created_at").copied(toEveryone(store.Q{})).exported(store.Q{}),
 	kindOf("links", onTask(func(l core.TaskLink) string { return l.TaskID })).
 		listed("created_at").exported(live("")),
 	filled(kindOf("attachments", rule[core.Attachment](visibleAttachments)), fillAttachments).

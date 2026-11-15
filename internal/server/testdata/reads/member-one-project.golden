@@ -13278,14 +13278,6 @@ seq: 256
    "related_task_id": "<task OPS-1>",
    "task_id": "<task SVA-1>",
    "type": "relates"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<relation OPS-2 duplicates SVA-3>",
-   "related_task_id": "<task SVA-3>",
-   "task_id": "<task OPS-2>",
-   "type": "duplicates"
   }
  ],
  "resources": [
@@ -14742,16 +14734,7 @@ seq: 256
  "attachments": [],
  "decisions": [],
  "part": "rest",
- "relations": [
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<relation OPS-2 duplicates SVA-3>",
-   "related_task_id": "<task SVA-3>",
-   "task_id": "<task OPS-2>",
-   "type": "duplicates"
-  }
- ],
+ "relations": [],
  "seq": 256,
  "tasks": [
   {
@@ -15037,9 +15020,6 @@ seq: 256
   },
   {
    "id": "<relation SVA-1 relates OPS-1>"
-  },
-  {
-   "id": "<relation OPS-2 duplicates SVA-3>"
   }
  ],
  "resources": [
@@ -15380,14 +15360,6 @@ seq: 256
    "related_task_id": "<task OPS-1>",
    "task_id": "<task SVA-1>",
    "type": "relates"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "id": "<relation OPS-2 duplicates SVA-3>",
-   "related_task_id": "<task SVA-3>",
-   "task_id": "<task OPS-2>",
-   "type": "duplicates"
   }
  ],
  "resources": [

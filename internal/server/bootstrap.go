@@ -113,11 +113,7 @@ func (who *viewer) startingCopy(ctx context.Context, part string) (map[string]an
 		decisions[i].Options = optionsOf[decisions[i].ID]
 	}
 	rows["decisions"] = decisions
-	var relations []core.Relation
-	if err := who.db.List(ctx, &relations, store.Q{}); err != nil {
-		return nil, err
-	}
-	rows["relations"] = keep(relations, func(r core.Relation) bool { return brought[r.TaskID] || brought[r.RelatedTaskID] })
+	rows["relations"] = keep(rows["relations"].([]core.Relation), func(r core.Relation) bool { return brought[r.TaskID] || brought[r.RelatedTaskID] })
 	if part == "rest" {
 		return map[string]any{"tasks": tasks, "decisions": decisions, "attachments": rows["attachments"], "relations": rows["relations"]}, nil
 	}
