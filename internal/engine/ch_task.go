@@ -51,7 +51,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	}
 	d := &taskDraft{c: c, a: a, id: tid}
 	steps := []func() error{
-		d.findProject,
+		d.parentAndProject,
 		d.template,
 		d.basics,
 		d.people,
@@ -83,9 +83,9 @@ type taskDraft struct {
 	opens *decisionOpenArgs
 }
 
-// findProject finds the task's parent and its project: the one named, or else the
-// parent's.
-func (d *taskDraft) findProject() error {
+// parentAndProject finds the task's parent, when it has one, and its
+// project: the one named, or else the parent's.
+func (d *taskDraft) parentAndProject() error {
 	c := d.c
 	var err error
 	if d.a.Parent != "" {

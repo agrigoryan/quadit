@@ -267,7 +267,7 @@ func docUpdate(c *cx, a docUpdateArgs) error {
 	}
 	u := &pageEdit{c: c, a: a, d: d, p: newPatch(), wasAudience: docAudience(d)}
 	steps := []func() error{
-		u.updateLook,
+		u.look,
 		u.parent,
 		u.rank,
 		u.project,
@@ -301,7 +301,9 @@ type pageEdit struct {
 	toProject   string   // to this one; none when empty
 }
 
-func (u *pageEdit) updateLook() error {
+// look sets what the page is called and how it looks: its title, icon and
+// cover.
+func (u *pageEdit) look() error {
 	u.p.setText("title", u.a.Title, &u.d.Title)
 	u.p.setText("icon", u.a.Icon, &u.d.Icon)
 	u.p.setText("cover", u.a.Cover, &u.d.Cover)

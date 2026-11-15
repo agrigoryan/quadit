@@ -49,7 +49,7 @@ func taskUpdate(c *cx, a taskUpdateArgs) error {
 		return err
 	}
 	if a.BaseSeq > 0 && t.UpdatedSeq > a.BaseSeq {
-		return c.refuseIfStale(t, a.BaseSeq)
+		return c.staleError(t, a.BaseSeq)
 	}
 	u := &taskEdit{c: c, a: a, before: t, t: t, p: newPatch()}
 	if err := c.tx.Get(c.ctx, &u.pr, store.Eq("id", t.ProjectID)); err != nil {
