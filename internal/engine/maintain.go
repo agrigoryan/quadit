@@ -258,7 +258,7 @@ func (run *purge) docs() error {
 			rowsOf{"watchers", store.Eq("subject_id", doc.ID)}, rowsOf{"refs", store.Eq("from_scope_id", doc.ID)}, rowsOf{"refs", store.Eq("to_id", doc.ID)}, rowsOf{"docs", store.Eq("id", doc.ID)}); err != nil {
 			return err
 		}
-		if err := run.c.emit(event{seq: tx.NextSeq(), typ: "doc.deleted", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: doc.OwnerID, data: core.EventData{ID: doc.ID, Gone: true}}); err != nil {
+		if err := run.c.emit(event{seq: tx.NextSeq(), typ: "doc.deleted", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: docAudience(doc), data: core.EventData{ID: doc.ID, Gone: true}}); err != nil {
 			return err
 		}
 		run.purged++
@@ -367,7 +367,7 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 		if err := tx.Get(ctx, &doc, store.Eq("id", id)); err != nil {
 			return err
 		}
-		if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "doc.restored", entity: "doc", entityID: doc.ID, place: inDoc(doc),
+		if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "doc.restored", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: docAudience(doc),
 			data: core.EventData{Row: doc, FromBackup: true}}); err != nil {
 			return err
 		}
@@ -383,7 +383,7 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 				live = append(live, b)
 			}
 		}
-		if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "doc.edited", entity: "doc", entityID: doc.ID, place: inDoc(doc),
+		if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "doc.edited", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: docAudience(doc),
 			data: core.EventData{ID: doc.ID, Blocks: &live, Deleted: gone, FromBackup: true,
 				Changes: map[string]core.FieldChange{"content_seq": {To: next + 1}}}}); err != nil {
 			return err

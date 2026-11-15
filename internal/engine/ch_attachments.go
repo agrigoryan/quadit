@@ -69,7 +69,7 @@ func (c *cx) attach(a attachArgs, subjectType, subjectID string, t core.Task) (c
 // comment, a page or a task.
 func attachmentAdd(c *cx, a attachArgs) error {
 	var t core.Task
-	var subjectType, subjectID, docID string
+	var subjectType, subjectID string
 	var err error
 	switch {
 	case a.Option != "":
@@ -93,13 +93,19 @@ func attachmentAdd(c *cx, a attachArgs) error {
 		if err != nil {
 			return err
 		}
-		subjectType, subjectID, a.Task, docID = "comment", cm.ID, cm.TaskID, cm.DocID
+		if cm.DocID != "" {
+			// A comment on a page someone else keeps private is not there.
+			if _, err := c.loadDoc("comment", cm.DocID); err != nil {
+				return err
+			}
+		}
+		subjectType, subjectID, a.Task = "comment", cm.ID, cm.TaskID
 	case a.Doc != "":
-		doc, err := loadLive[core.Doc](c, "doc", "doc", a.Doc)
+		doc, err := c.loadDoc("doc", a.Doc)
 		if err != nil {
 			return err
 		}
-		subjectType, subjectID, docID = "doc", doc.ID, doc.ID
+		subjectType, subjectID = "doc", doc.ID
 	case a.Task != "":
 	default:
 		return invalid("task", "say what the file is shown on: task, comment, decision, option or doc")
@@ -124,7 +130,28 @@ func attachmentAdd(c *cx, a attachArgs) error {
 		}
 		return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: inTask(t), data: core.EventData{Row: at, Key: &t.Key}})
 	}
-	return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: place{scopeType: "doc", scopeID: docID}, data: core.EventData{Row: at}})
+	d, err := c.pageOf(at)
+	if err != nil {
+		return err
+	}
+	return c.emit(event{seq: seq, typ: "attachment.created", entity: "attachment", entityID: at.ID, place: inDoc(d), audience: docAudience(d), data: core.EventData{Row: at}})
+}
+
+// pageOf returns the page an attachment on no task is shown on: the page
+// itself, or the page of the comment it is on. Its events belong there, and
+// only those who may see the page see them.
+func (c *cx) pageOf(at core.Attachment) (core.Doc, error) {
+	docID := at.SubjectID
+	if at.SubjectType == "comment" {
+		var cm core.Comment
+		if err := c.tx.Get(c.ctx, &cm, store.Eq("id", at.SubjectID)); err != nil {
+			return core.Doc{}, err
+		}
+		docID = cm.DocID
+	}
+	var d core.Doc
+	err := c.tx.Get(c.ctx, &d, store.Eq("id", docID))
+	return d, err
 }
 
 // attachmentRemove puts an attachment in the trash; its file stays until the
@@ -152,7 +179,11 @@ func attachmentRemove(c *cx, a idArgs) error {
 		}
 		return c.trash(target{table: "attachments", entity: "attachment", id: at.ID, place: inTask(t)})
 	}
-	return c.trash(target{table: "attachments", entity: "attachment", id: at.ID, place: place{scopeType: "doc", scopeID: at.SubjectID}})
+	d, err := c.pageOf(at)
+	if err != nil {
+		return err
+	}
+	return c.trash(target{table: "attachments", entity: "attachment", id: at.ID, place: inDoc(d), audience: docAudience(d)})
 }
 
 // attachmentRestore puts a removed file back where it was, within the 30
@@ -197,7 +228,8 @@ func attachmentRestore(c *cx, a idArgs) error {
 		return err
 	}
 	at.DeletedAt, at.File = 0, &f
-	where := place{scopeType: "doc", scopeID: at.SubjectID}
+	var where place
+	var audience string
 	if at.TaskID != "" {
 		var t core.Task
 		if err := c.tx.Get(c.ctx, &t, store.Eq("id", at.TaskID)); err != nil {
@@ -207,6 +239,12 @@ func attachmentRestore(c *cx, a idArgs) error {
 		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
+	} else {
+		d, err := c.pageOf(at)
+		if err != nil {
+			return err
+		}
+		where, audience = inDoc(d), docAudience(d)
 	}
-	return c.emit(event{seq: seq, typ: "attachment.restored", entity: "attachment", entityID: at.ID, place: where, data: core.EventData{Row: at}})
+	return c.emit(event{seq: seq, typ: "attachment.restored", entity: "attachment", entityID: at.ID, place: where, audience: audience, data: core.EventData{Row: at}})
 }

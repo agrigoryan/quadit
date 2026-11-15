@@ -343,17 +343,26 @@ func docCommentEntry(doc core.Doc, cm core.Comment) store.SearchDoc {
 	return store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "doc", ScopeID: doc.ID, ProjectID: doc.ProjectID, AudienceID: doc.OwnerID, Title: doc.Title, Body: cm.Body}
 }
 
-// commentPlace returns where a comment's events belong, and the key of its
-// task when it is on one.
-func (c *cx) commentPlace(cm core.Comment) (where place, key string, err error) {
+// commentTarget names a comment's row for a save or a trash: its events
+// belong to its task, with the task's key, or to its page, and then only
+// those who may see the page see them.
+func (c *cx) commentTarget(cm core.Comment) (target, error) {
+	row := target{table: "comments", entity: "comment", id: cm.ID}
 	if cm.TaskID != "" {
 		var t core.Task
-		if err = c.tx.Get(c.ctx, &t, store.Eq("id", cm.TaskID)); err != nil {
-			return place{}, "", err
+		if err := c.tx.Get(c.ctx, &t, store.Eq("id", cm.TaskID)); err != nil {
+			return row, err
 		}
-		return inTask(t), t.Key, nil
+		row.place, row.extra.Key = inTask(t), &t.Key
+		return row, nil
 	}
-	return place{scopeType: "doc", scopeID: cm.DocID}, "", nil
+	var d core.Doc
+	if err := c.tx.Get(c.ctx, &d, store.Eq("id", cm.DocID)); err != nil {
+		return row, err
+	}
+	key := ""
+	row.place, row.audience, row.extra.Key = inDoc(d), docAudience(d), &key
+	return row, nil
 }
 
 type commentUpdateArgs struct {
@@ -384,15 +393,15 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 		}
 	}
 	p.setStamp("resolved_at", a.Resolved, cm.ResolvedAt, c.at)
-	where, key, err := c.commentPlace(cm)
+	row, err := c.commentTarget(cm)
 	if err != nil {
 		return err
 	}
-	if err := c.save(p, target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: core.EventData{Key: &key}}); err != nil {
+	if err := c.save(p, row); err != nil {
 		return err
 	}
 	if _, ok := p.set["body"]; ok {
-		if _, err := c.link("comment", cm.ID, where.scopeType, where.scopeID, cm.Body); err != nil {
+		if _, err := c.link("comment", cm.ID, row.place.scopeType, row.place.scopeID, cm.Body); err != nil {
 			return err
 		}
 	}
@@ -407,12 +416,12 @@ func commentDelete(c *cx, a idArgs) error {
 	if cm.AuthorID != c.actor.UserID && !c.actor.Role.AtLeast(core.RoleAdmin) {
 		return forbidden("only its author, or an admin, can delete a comment")
 	}
-	where, key, err := c.commentPlace(cm)
+	row, err := c.commentTarget(cm)
 	if err != nil {
 		return err
 	}
 	if err := c.tx.Unindex(c.ctx, cm.ID); err != nil {
 		return err
 	}
-	return c.trash(target{table: "comments", entity: "comment", id: cm.ID, place: where, extra: core.EventData{Key: &key}})
+	return c.trash(row)
 }

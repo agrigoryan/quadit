@@ -9,6 +9,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -195,5 +196,47 @@ func TestPrivacyReachesTheSubPages(t *testing.T) {
 				t.Fatalf("my page moved into Bea's shared folder has owner %q shared with %v, want Bea's with me", owner, shared)
 			}
 		})
+	})
+}
+
+// TestWhatHappensOnAPrivatePageIsToldToItsReaders: comments, files and
+// their changes on a private page are told only to those who may see it,
+// and someone else cannot put a file on it.
+func TestWhatHappensOnAPrivatePageIsToldToItsReaders(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		ctx := context.Background()
+		me, other := w.owner.ID, w.agent("other")
+		file := func() string {
+			f := core.File{ID: id.New(), WorkspaceID: w.ws.ID, Name: "a.png", ContentType: "image/png", Size: 3, StorageKey: "k/" + id.New(),
+				State: core.FileReady, UploadedBy: me, CreatedAt: w.e.Now()}
+			if err := st.Write(ctx, w.ws.ID, func(tx store.Tx) error { return tx.Insert(ctx, f) }); err != nil {
+				t.Fatal(err)
+			}
+			return f.ID
+		}
+		page := w.do(me, "doc.create", M{"title": "Salaries", "private": true}).Ref
+		var events []core.Event
+		did := func(typ string, args M) string {
+			res := w.do(me, typ, args)
+			events = append(events, res.Events...)
+			return res.Ref
+		}
+		cm := did("comment.create", M{"doc": page, "body": "who earns what"})
+		did("comment.update", M{"id": cm, "body": "who earns what, by month"})
+		did("comment.update", M{"id": cm, "resolved": true})
+		onPage := did("attachment.add", M{"doc": page, "file": file()})
+		did("attachment.add", M{"comment": cm, "file": file()})
+		did("attachment.remove", M{"id": onPage})
+		did("attachment.restore", M{"id": onPage})
+		did("comment.delete", M{"id": cm})
+		for _, ev := range events {
+			if ev.AudienceID != me {
+				t.Errorf("%s on a private page is told to %q, want its owner alone", ev.Type, ev.AudienceID)
+			}
+		}
+		w.refused(engine.CodeNotFound, other, "attachment.add", M{"doc": page, "file": file()})
+		mine := w.do(me, "comment.create", M{"doc": page, "body": "again"}).Ref
+		w.refused(engine.CodeNotFound, other, "attachment.add", M{"comment": mine, "file": file()})
 	})
 }

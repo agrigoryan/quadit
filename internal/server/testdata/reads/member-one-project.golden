@@ -9563,74 +9563,6 @@ nothing found
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #349>",
-   "data": {
-    "row": {
-     "created_at": 1700000000000,
-     "created_by": "<@aram>",
-     "file": {
-      "content_type": "text/plain; charset=utf-8",
-      "created_at": 1700000000000,
-      "id": "<file runbook.txt>",
-      "name": "runbook.txt",
-      "received": 18,
-      "sha256": "4386539aea1c050edc39dfe94916cc347756a6db6d83bcd53f17bcf7b95c9ce7",
-      "size": 18,
-      "state": "ready",
-      "uploaded_by": "<@aram>",
-      "url": "/f/<file runbook.txt>/runbook.txt"
-     },
-     "file_id": "<file runbook.txt>",
-     "id": "<attachment OPS runbook>",
-     "rank": "00000000sg",
-     "subject_id": "<doc OPS runbook>",
-     "subject_type": "doc"
-    }
-   },
-   "entity_id": "<attachment OPS runbook>",
-   "entity_type": "attachment",
-   "scope_id": "<doc OPS runbook>",
-   "scope_type": "doc",
-   "seq": 197,
-   "type": "attachment.created"
-  },
-  {
-   "actor_id": "<@aram>",
-   "at": 1700000000000,
-   "change_id": "<id #350>",
-   "data": {
-    "row": {
-     "created_at": 1700000000000,
-     "created_by": "<@aram>",
-     "file": {
-      "content_type": "text/plain; charset=utf-8",
-      "created_at": 1700000000000,
-      "id": "<file salaries.txt>",
-      "name": "salaries.txt",
-      "received": 14,
-      "sha256": "fa182273c0f8076fbfbc7ef8284dffc6a9aba444e227099dbb13d55bda66cf0e",
-      "size": 14,
-      "state": "ready",
-      "uploaded_by": "<@aram>",
-      "url": "/f/<file salaries.txt>/salaries.txt"
-     },
-     "file_id": "<file salaries.txt>",
-     "id": "<attachment Salary>",
-     "rank": "00000000sg",
-     "subject_id": "<doc Salary notes>",
-     "subject_type": "doc"
-    }
-   },
-   "entity_id": "<attachment Salary>",
-   "entity_type": "attachment",
-   "scope_id": "<doc Salary notes>",
-   "scope_type": "doc",
-   "seq": 198,
-   "type": "attachment.created"
-  },
-  {
-   "actor_id": "<@aram>",
-   "at": 1700000000000,
    "change_id": "<id #351>",
    "data": {
     "row": {
@@ -11059,8 +10991,6 @@ nothing found
 #192 <minute> @aram doc.deleted moved to trash
 #195 <minute> @aram doc.edited 
 #196 <minute> @aram attachment.created
-#197 <minute> @aram attachment.created
-#198 <minute> @aram attachment.created
 #199 <minute> @aram comment : Is this still how we work?  (id=<comment Handbook>)
 #201 <minute> @artist doc.created "Artist: memory"
 #202 <minute> @artist doc.created "Palette"
@@ -11215,8 +11145,6 @@ seq: 256
   "#192 <minute> @aram doc.deleted moved to trash",
   "#195 <minute> @aram doc.edited ",
   "#196 <minute> @aram attachment.created",
-  "#197 <minute> @aram attachment.created",
-  "#198 <minute> @aram attachment.created",
   "#199 <minute> @aram comment : Is this still how we work?  (id=<comment Handbook>)",
   "#201 <minute> @artist doc.created \"Artist: memory\"",
   "#202 <minute> @artist doc.created \"Palette\"",
@@ -12395,8 +12323,6 @@ seq: 256
   "#192 <minute> @aram doc.deleted moved to trash",
   "#195 <minute> @aram doc.edited ",
   "#196 <minute> @aram attachment.created",
-  "#197 <minute> @aram attachment.created",
-  "#198 <minute> @aram attachment.created",
   "#199 <minute> @aram comment : Is this still how we work?  (id=<comment Handbook>)",
   "#201 <minute> @artist doc.created \"Artist: memory\"",
   "#202 <minute> @artist doc.created \"Palette\"",
@@ -21899,12 +21825,6 @@ data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #346>","data":{"
 
 id: 196
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #348>","data":{"row":{"created_at":1700000000000,"created_by":"<@aram>","file":{"content_type":"text/plain; charset=utf-8","created_at":1700000000000,"id":"<file handbook.txt>","name":"handbook.txt","received":19,"sha256":"570db2ccb2b61883b37f030a4bb8e5363eb5ac3bd64dc602de65e7a1b87aacda","size":19,"state":"ready","uploaded_by":"<@aram>","url":"/f/<file handbook.txt>/handbook.txt"},"file_id":"<file handbook.txt>","id":"<attachment Handbook>","rank":"00000000sg","subject_id":"<doc Handbook>","subject_type":"doc"}},"entity_id":"<attachment Handbook>","entity_type":"attachment","scope_id":"<doc Handbook>","scope_type":"doc","seq":196,"type":"attachment.created"}
-
-id: 197
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #349>","data":{"row":{"created_at":1700000000000,"created_by":"<@aram>","file":{"content_type":"text/plain; charset=utf-8","created_at":1700000000000,"id":"<file runbook.txt>","name":"runbook.txt","received":18,"sha256":"4386539aea1c050edc39dfe94916cc347756a6db6d83bcd53f17bcf7b95c9ce7","size":18,"state":"ready","uploaded_by":"<@aram>","url":"/f/<file runbook.txt>/runbook.txt"},"file_id":"<file runbook.txt>","id":"<attachment OPS runbook>","rank":"00000000sg","subject_id":"<doc OPS runbook>","subject_type":"doc"}},"entity_id":"<attachment OPS runbook>","entity_type":"attachment","scope_id":"<doc OPS runbook>","scope_type":"doc","seq":197,"type":"attachment.created"}
-
-id: 198
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #350>","data":{"row":{"created_at":1700000000000,"created_by":"<@aram>","file":{"content_type":"text/plain; charset=utf-8","created_at":1700000000000,"id":"<file salaries.txt>","name":"salaries.txt","received":14,"sha256":"fa182273c0f8076fbfbc7ef8284dffc6a9aba444e227099dbb13d55bda66cf0e","size":14,"state":"ready","uploaded_by":"<@aram>","url":"/f/<file salaries.txt>/salaries.txt"},"file_id":"<file salaries.txt>","id":"<attachment Salary>","rank":"00000000sg","subject_id":"<doc Salary notes>","subject_type":"doc"}},"entity_id":"<attachment Salary>","entity_type":"attachment","scope_id":"<doc Salary notes>","scope_type":"doc","seq":198,"type":"attachment.created"}
 
 id: 199
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #351>","data":{"row":{"author_id":"<@aram>","body":"Is this still how we work?","created_at":1700000000000,"created_seq":199,"doc_id":"<doc Handbook>","id":"<comment Handbook>","kind":"comment","subject_id":"<doc Handbook>","subject_type":"doc","updated_seq":199}},"entity_id":"<comment Handbook>","entity_type":"comment","scope_id":"<doc Handbook>","scope_type":"doc","seq":199,"type":"comment.created"}

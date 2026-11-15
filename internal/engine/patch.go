@@ -115,11 +115,12 @@ func (p *patch) date(col string, o Opt[string], cur *string) error {
 // target names the row a save or a trash writes, and where its event
 // belongs. extra is the event's data beside the id and the changes.
 type target struct {
-	table  string
-	entity string // the kind of thing the row is, in events: "project"
-	id     string
-	place  place
-	extra  core.EventData
+	table    string
+	entity   string // the kind of thing the row is, in events: "project"
+	id       string
+	place    place
+	audience string // the one member who may see its event; "" for all who may see its place
+	extra    core.EventData
 }
 
 // save writes the patch to one row and emits "<entity>.updated" with the
@@ -141,7 +142,7 @@ func (c *cx) save(p *patch, row target) error {
 	}
 	data := row.extra
 	data.ID, data.Changes = row.id, p.changes
-	return c.emit(event{seq: seq, typ: row.entity + ".updated", entity: row.entity, entityID: row.id, place: row.place, data: data})
+	return c.emit(event{seq: seq, typ: row.entity + ".updated", entity: row.entity, entityID: row.id, place: row.place, audience: row.audience, data: data})
 }
 
 // trash moves a row to the trash and emits "<entity>.deleted", and makes
@@ -164,7 +165,7 @@ func (c *cx) trash(row target) error {
 	}
 	data := row.extra
 	data.ID, data.Changes = row.id, map[string]core.FieldChange{"deleted_at": {From: nil, To: c.at}}
-	return c.emit(event{seq: seq, typ: row.entity + ".deleted", entity: row.entity, entityID: row.id, place: row.place, data: data})
+	return c.emit(event{seq: seq, typ: row.entity + ".deleted", entity: row.entity, entityID: row.id, place: row.place, audience: row.audience, data: data})
 }
 
 // emitDeleted emits "<entity>.deleted" for a row that was removed outright.
