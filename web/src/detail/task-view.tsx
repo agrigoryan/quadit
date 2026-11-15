@@ -2,7 +2,7 @@
 // (still looking, the server did not answer, no access, nothing at this
 // address). The panel and the task's own page are both a frame around this.
 
-import { useHotkeys } from "@/lib/hotkeys";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { useTaskByKeyEvenIfGone } from "@/data/selectors";
 import { useTaskDetail } from "@/data/task-detail";

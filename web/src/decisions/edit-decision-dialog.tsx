@@ -3,7 +3,7 @@
 // themselves stay as asked.
 
 import { useId, useState } from "react";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import type { Decision } from "@/types/core";
 import { Input, Textarea } from "@/ui/input";

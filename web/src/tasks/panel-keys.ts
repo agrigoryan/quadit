@@ -5,7 +5,7 @@
 // and previous task, Space puts it away. Escape is the panel's own
 // (detail/task-view.tsx).
 
-import { type Hotkeys, isTyping, useHotkeys } from "@/lib/hotkeys";
+import { type Hotkeys, isTyping, useHotkeys } from "@/hooks/hotkeys";
 import { usePeek } from "@/nav/task-link";
 
 /** What answers Space itself: it presses a button and opens a summary. A link does not take Space. */

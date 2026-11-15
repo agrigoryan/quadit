@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-// Two keys in a row, "G then a letter" (lib/key-sequence.ts).
+// Two keys in a row, "G then a letter" (hooks/key-sequence.ts).
 
 import { fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SEQUENCE_MS, type Sequences, useKeySequences, usePendingKey } from "@/lib/key-sequence";
+import { SEQUENCE_MS, type Sequences, useKeySequences, usePendingKey } from "@/hooks/key-sequence";
 
 function Keys({ sequences }: { sequences: Sequences }) {
   useKeySequences(sequences);

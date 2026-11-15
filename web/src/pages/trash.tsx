@@ -21,7 +21,7 @@ import { keyCell, keyColumn } from "@/tasks/task-row";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
-import { useMinute } from "@/lib/tick";
+import { useMinute } from "@/hooks/tick";
 
 const tasksTrashKey = (slug: string) => [...inWorkspace(slug), "tasks-trash"] as const;
 

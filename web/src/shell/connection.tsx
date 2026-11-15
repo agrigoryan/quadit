@@ -3,7 +3,7 @@
 import { CloudOff, RefreshCw } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useStore } from "@/data/store";
-import { useDelayedFlag } from "@/lib/use-delayed-flag";
+import { useDelayedFlag } from "@/hooks/use-delayed-flag";
 import { Tooltip } from "@/ui/tooltip";
 
 /**

@@ -3,7 +3,7 @@
 import { type MouseEvent, useState } from "react";
 import { Pencil } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/types/core";

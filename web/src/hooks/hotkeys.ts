@@ -1,6 +1,11 @@
 // Single-key shortcuts ("j", "c", "?") and combinations ("mod+k"). A key
 // typed into a field, or while a dialog or menu is open, is left alone.
-// Two keys in a row ("g" then "i") are in lib/key-sequence.ts.
+// Two keys in a row ("g" then "i") are in hooks/key-sequence.ts.
+//
+// The hooks folder: React hooks any part of the app may use, that know
+// nothing of the server's data, the router or any one screen: the keyboard
+// (this file, key-sequence.ts), the minute clock (tick.ts), a media query
+// (use-media.ts), a flag that waits before it shows (use-delayed-flag.ts).
 
 import { useEffect, useEffectEvent } from "react";
 

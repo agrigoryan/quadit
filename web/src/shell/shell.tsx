@@ -1,10 +1,10 @@
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from "react";
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
-import { useMedia } from "@/decisions/data";
+import { useMedia } from "@/hooks/use-media";
 import { ShortcutsSheet } from "@/palette/shortcuts";
 import { ahead } from "@/lib/ahead";
 import { useCan } from "@/data/access";
-import { useHotkeys } from "@/lib/hotkeys";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { useStore } from "@/data/store";
 import { ui, useUi } from "@/lib/ui-state";
 import { InboxPage } from "@/pages/inbox";

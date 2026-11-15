@@ -6,7 +6,7 @@
 // where it was (nav/place.ts).
 
 import { type RefObject, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
-import { type Hotkeys, useHotkeys } from "@/lib/hotkeys";
+import { type Hotkeys, useHotkeys } from "@/hooks/hotkeys";
 import { usePlace } from "@/nav/place";
 import { takeSeen, useTaskOrder } from "@/nav/task-queue";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";

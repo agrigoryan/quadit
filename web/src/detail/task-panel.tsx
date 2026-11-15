@@ -4,7 +4,7 @@
 // detail/task-page.tsx.
 
 import { type RefObject, useEffect, useRef } from "react";
-import { useMedia } from "@/decisions/data";
+import { useMedia } from "@/hooks/use-media";
 import { TaskView } from "@/detail/task-view";
 
 interface Props {

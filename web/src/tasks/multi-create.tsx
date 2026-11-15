@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import { useCan } from "@/data/access";
 import { errorMessage } from "@/data/api";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
 import { toast } from "@/lib/toast";

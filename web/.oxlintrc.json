@@ -133,6 +133,23 @@
       }
     },
     {
+      "files": ["src/hooks/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
+              {
+                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/hooks/**", "!@/test/**"],
+                "message": "hooks are general React hooks: they know neither the server's data nor the router."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["src/nav/**"],
       "rules": {
         "no-restricted-imports": [
@@ -141,7 +158,16 @@
             "patterns": [
               { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
               {
-                "group": ["@/**", "!@/types/**", "!@/i18n/**", "!@/lib/**", "!@/data/**", "!@/nav/**", "!@/test/**"],
+                "group": [
+                  "@/**",
+                  "!@/types/**",
+                  "!@/i18n/**",
+                  "!@/lib/**",
+                  "!@/data/**",
+                  "!@/hooks/**",
+                  "!@/nav/**",
+                  "!@/test/**"
+                ],
                 "message": "nav (the router-aware helpers) sits below ui and every feature."
               }
             ]
@@ -164,6 +190,7 @@
                   "!@/i18n/**",
                   "!@/lib/**",
                   "!@/data/**",
+                  "!@/hooks/**",
                   "!@/nav/**",
                   "!@/ui/**",
                   "!@/test/**"

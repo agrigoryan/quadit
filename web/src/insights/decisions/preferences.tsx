@@ -8,7 +8,7 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useMember, useRow, useRowEvenIfGone } from "@/data/selectors";
-import { useMinute } from "@/lib/tick";
+import { useMinute } from "@/hooks/tick";
 import { ago, exact } from "@/lib/time";
 import { nameOf } from "@/detail/data";
 import { ProjectGlyph } from "@/ui/project-glyph";

@@ -3,7 +3,7 @@
 
 import { type FormEvent, useRef, useState } from "react";
 import { errorMessage } from "@/data/api";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
 import { useCan } from "@/data/access";

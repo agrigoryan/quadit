@@ -1,4 +1,4 @@
-import { useMinute } from "@/lib/tick";
+import { useMinute } from "@/hooks/tick";
 import { ago } from "@/lib/time";
 
 /** A relative time ("just now", "5m", "3h") that keeps itself current. */

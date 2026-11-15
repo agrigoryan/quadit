@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { MessageSquare, SendHorizontal } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/data/selectors";
 import { exact } from "@/lib/time";

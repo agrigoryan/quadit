@@ -2,8 +2,9 @@
 // files on each question and option, the comments of each option, and
 // what the signed-in person may do.
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCan } from "@/data/access";
+import { useMedia } from "@/hooks/use-media";
 import { isImage } from "@/data/files";
 import { useMe, useMember, useRowEvenIfGone, useRows } from "@/data/selectors";
 import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } from "@/types/core";
@@ -172,18 +173,6 @@ export function nameOf(member: Member | undefined, fallback: string): string {
 
 export function useMemberName(userId: string | undefined, fallback: string): string {
   return nameOf(useMember(userId), fallback);
-}
-
-/** Follows a media query, for the few places where layout cannot be done in CSS. */
-export function useMedia(query: string): boolean {
-  return useSyncExternalStore(
-    (notify) => {
-      const list = window.matchMedia(query);
-      list.addEventListener("change", notify);
-      return () => list.removeEventListener("change", notify);
-    },
-    () => window.matchMedia(query).matches,
-  );
 }
 
 export const usePhone = () => useMedia("(max-width: 639px)");

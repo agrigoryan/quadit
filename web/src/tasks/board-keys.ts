@@ -7,7 +7,7 @@
 // quick look, a card is lifted for moving with Shift+Space (tasks/board.tsx).
 
 import { type MouseEvent, type RefObject, useEffect, useEffectEvent, useRef } from "react";
-import { useHotkeys } from "@/lib/hotkeys";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { usePlace } from "@/nav/place";
 import { isDraft } from "@/data/store";
 import type { Task } from "@/types/core";

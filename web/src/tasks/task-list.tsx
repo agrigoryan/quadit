@@ -5,7 +5,7 @@
 // are in tasks/panel-keys.ts.
 
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useHotkeys } from "@/lib/hotkeys";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { usePlace } from "@/nav/place";
 import { useCan } from "@/data/access";
 import { useLookup } from "@/data/selectors";

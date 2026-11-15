@@ -3,7 +3,7 @@
 // the plain "are you sure" before a question is deleted.
 
 import { useId, useState } from "react";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { Textarea } from "@/ui/input";

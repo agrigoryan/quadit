@@ -6,7 +6,7 @@
 
 import { useEffect, useEffectEvent } from "react";
 import { create } from "zustand";
-import { isTyping, overlayOpen } from "@/lib/hotkeys";
+import { isTyping, overlayOpen } from "@/hooks/hotkeys";
 
 /** How long the first key waits for the second. */
 export const SEQUENCE_MS = 1500;

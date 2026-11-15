@@ -6,7 +6,7 @@
 import { useRef, useState } from "react";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
-import { useHotkeys } from "@/lib/hotkeys";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { useNow } from "@/data/live";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/data/selectors";

@@ -1,5 +1,5 @@
 import { Menu as MenuIcon, Plus, Search } from "lucide-react";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
 import { ConnectionIndicator } from "@/shell/connection";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { t } from "@/lib/i18n";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { Button } from "@/ui/button";
 import { MentionTextarea } from "@/ui/mention-textarea";
 

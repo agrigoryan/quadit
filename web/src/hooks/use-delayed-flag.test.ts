@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-// Something shown once a condition has held for a moment (lib/use-delayed-flag.ts).
+// Something shown once a condition has held for a moment (hooks/use-delayed-flag.ts).
 
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useDelayedFlag } from "@/lib/use-delayed-flag";
+import { useDelayedFlag } from "@/hooks/use-delayed-flag";
 
 beforeEach(() => void vi.useFakeTimers());
 afterEach(() => void vi.useRealTimers());

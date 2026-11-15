@@ -5,7 +5,7 @@
 import { useRef, useState } from "react";
 import { CircleSlash, CornerDownRight, Paperclip, X } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMe, useMember, useMembers } from "@/data/selectors";
 import type { FileRow, Task } from "@/types/core";

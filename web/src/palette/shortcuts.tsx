@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { useFocusReturn } from "@/palette/focus-return";
 import { type Key, t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";

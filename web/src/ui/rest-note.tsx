@@ -4,7 +4,7 @@
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useRestLoaded } from "@/data/store";
-import { useDelayedFlag } from "@/lib/use-delayed-flag";
+import { useDelayedFlag } from "@/hooks/use-delayed-flag";
 import { Spinner } from "@/ui/spinner";
 
 /**

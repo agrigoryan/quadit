@@ -13,7 +13,8 @@ import { CompareStage } from "@/decisions/compare-panes";
 import { ComparePhone } from "@/decisions/compare-phone";
 import { type Compare, type CompareProps, useCompare } from "@/decisions/compare-state";
 import { Transport } from "@/decisions/compare-transport";
-import { useMedia, usePhone, useReturnFocus } from "@/decisions/data";
+import { usePhone, useReturnFocus } from "@/decisions/data";
+import { useMedia } from "@/hooks/use-media";
 import { PixelToggle, StageButton, ZoomControls } from "@/decisions/stage-ui";
 
 /** "Pick B: burst?" — what a number key asks before it answers the question. */

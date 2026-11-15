@@ -4,7 +4,7 @@
 import { memo, useState } from "react";
 import { MoreHorizontal, Pencil, Reply, Trash2 } from "lucide-react";
 import { useCan } from "@/data/access";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { useMe, useMember } from "@/data/selectors";
 import type { Dict } from "@/data/store";

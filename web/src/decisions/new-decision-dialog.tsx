@@ -5,7 +5,7 @@
 import { useId, useRef, useState } from "react";
 import { errorMessage } from "@/data/api";
 import { cx } from "@/lib/cx";
-import { MOD } from "@/lib/hotkeys";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
 import { useMe, useMembers, useRow } from "@/data/selectors";
