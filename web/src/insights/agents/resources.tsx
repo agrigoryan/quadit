@@ -18,6 +18,7 @@ import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
+import { REFUSAL_IN_TOAST, useSubmit } from "@/ui/form";
 import { Field, Input, Textarea } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 
@@ -173,25 +174,22 @@ function ResourceCard({
 function AddResource({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [busy, setBusy] = useState(false);
+  // A name already in use is refused by the server; its message shows and the form stays.
+  const { busy, run } = useSubmit(REFUSAL_IN_TOAST);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || busy) return;
     const id = newId();
-    setBusy(true);
-    // A name already in use is refused by the server; its message shows and the form stays.
-    mutate({ type: "resource.create", args: { id, name: trimmed, description: description.trim() } }, (tx) =>
-      tx.insert("resources", { id, name: trimmed, description: description.trim() || undefined }),
-    )
-      .then(() => {
-        setName("");
-        setDescription("");
-        onClose();
-      })
-      .catch(() => {})
-      .finally(() => setBusy(false));
+    await run(async () => {
+      await mutate({ type: "resource.create", args: { id, name: trimmed, description: description.trim() } }, (tx) =>
+        tx.insert("resources", { id, name: trimmed, description: description.trim() || undefined }),
+      );
+      setName("");
+      setDescription("");
+      onClose();
+    });
   }
 
   return (

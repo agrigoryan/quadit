@@ -15,7 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { DropdownMenu as RMenu } from "radix-ui";
-import { ApiError, errorMessage } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { t, tMaybe } from "@/lib/i18n";
 import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
@@ -25,6 +25,7 @@ import { SWATCHES } from "@/lib/swatches";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { StatusIcon } from "@/ui/icons";
+import { useFieldErrors, useSubmit } from "@/ui/form";
 import { Field } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 import { Select } from "@/ui/picker";
@@ -158,27 +159,34 @@ export function StatusMenu({ status, project, onRename }: Props) {
  * reason is shown as it came, with a place to say where those tasks go.
  */
 function DeleteStatus({ status, others, onClose }: { status: Status; others: Status[]; onClose: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [refusal, setRefusal] = useState("");
   const [needsMove, setNeedsMove] = useState(false);
   const [moveTo, setMoveTo] = useState(
     () => (others.find((s) => s.category === status.category) ?? others[0])?.id ?? "",
   );
 
+  // The server's reason is shown as it came, also when it names the field to fill in.
+  const errors = useFieldErrors([], { wholeForm: true });
+  const { busy, run } = useSubmit(
+    {
+      // The last reason stays up while the next try is out; its answer replaces it.
+      clear: () => {},
+      fail: (err) => {
+        errors.fail(err);
+        if (err instanceof ApiError && err.field === "move_to") setNeedsMove(true);
+      },
+    },
+    { once: true },
+  );
+
   async function confirm() {
-    setBusy(true);
-    try {
+    await run(async () => {
       await mutate(
         { type: "status.delete", args: { id: status.id, ...(needsMove && moveTo ? { move_to: moveTo } : {}) } },
         undefined,
         { quiet: true },
       );
       onClose();
-    } catch (err) {
-      setRefusal(errorMessage(err));
-      if (err instanceof ApiError && err.field === "move_to") setNeedsMove(true);
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -200,9 +208,9 @@ function DeleteStatus({ status, others, onClose }: { status: Status; others: Sta
       }
     >
       <div className="flex flex-col gap-3">
-        {refusal && (
+        {errors.form && (
           <p role="alert" className="rounded-md bg-danger-soft px-2.5 py-1.5 text-sm text-danger">
-            {refusal}
+            {errors.form}
           </p>
         )}
         {needsMove && (
