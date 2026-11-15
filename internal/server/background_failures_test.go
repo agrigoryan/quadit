@@ -445,3 +445,24 @@ func TestADeliveryInFlightAtShutdownIsKeptForTheNextStart(t *testing.T) {
 		}
 	})
 }
+
+// TestAQueueThatCannotBeReadIsLogged: a round of the jobs, or of the
+// webhooks' deliveries, that cannot read its queue says so in the log, and
+// the next round goes on.
+func TestAQueueThatCannotBeReadIsLogged(t *testing.T) {
+	for _, c := range []struct{ name, fails, logged string }{
+		{"the due jobs", "list jobs", "jobs: the due jobs could not be read"},
+		{"the webhooks", "list webhooks", "webhook deliveries: the webhooks could not be read"},
+		{"a webhook's queue", "list webhook_deliveries", "webhook deliveries: a webhook's queue could not be read"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			logs := captureLogs(t)
+			st := newFaultyStore(testdb.SQLite(t))
+			s := newSite(t, st)
+			s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})
+			op, table, _ := strings.Cut(c.fails, " ")
+			fired := st.faults.arm(fault{op: op, table: table, times: 1})
+			eventually(t, "the failed read to be logged", func() bool { return fired() == 1 && logs.has(c.logged) })
+		})
+	}
+}

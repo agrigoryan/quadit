@@ -87,6 +87,9 @@ func (s *Server) runDeliveries(ctx context.Context) {
 		}
 		byHook, err := s.waitingDeliveries(ctx, busy)
 		if err != nil {
+			if ctx.Err() == nil {
+				s.log.Error("webhook deliveries: the webhooks could not be read; this round is skipped", "err", err)
+			}
 			continue
 		}
 		now := time.Now().UnixMilli()
@@ -104,8 +107,8 @@ func (s *Server) runDeliveries(ctx context.Context) {
 
 // waitingDeliveries reads the waiting deliveries of each webhook that is
 // not busy, oldest first. Each webhook's own queue is read by itself: one
-// that keeps failing, however long its backlog, takes nothing from the
-// others.
+// that keeps failing, however long its backlog, or that cannot be read this
+// round, takes nothing from the others.
 func (s *Server) waitingDeliveries(ctx context.Context, busy *busyHooks) (map[string][]core.WebhookDelivery, error) {
 	var hooks []core.Webhook
 	if err := s.st.List(ctx, &hooks, store.Where(store.Live)); err != nil {
@@ -118,7 +121,13 @@ func (s *Server) waitingDeliveries(ctx context.Context, busy *busyHooks) (map[st
 		}
 		var list []core.WebhookDelivery
 		q := store.Q{Where: []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", core.DeliveryPending)}, Order: "seq", Limit: deliveryBatch}
-		if err := s.st.List(ctx, &list, q); err == nil && len(list) > 0 {
+		if err := s.st.List(ctx, &list, q); err != nil {
+			if ctx.Err() == nil {
+				s.log.Error("webhook deliveries: a webhook's queue could not be read; it waits for the next round", "webhook", h.ID, "err", err)
+			}
+			continue
+		}
+		if len(list) > 0 {
 			byHook[h.ID] = list
 		}
 	}

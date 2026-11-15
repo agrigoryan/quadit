@@ -62,6 +62,9 @@ func (s *Server) runJobs(ctx context.Context) {
 		now := time.Now().UnixMilli()
 		var due []core.Job
 		if err := s.st.List(ctx, &due, store.Q{Where: []store.Cond{store.Null("done_at"), store.Lte("run_at", now)}, Order: "run_at", Limit: jobBatch}); err != nil {
+			if ctx.Err() == nil {
+				s.log.Error("jobs: the due jobs could not be read; this round is skipped", "err", err)
+			}
 			continue
 		}
 		for _, j := range due {
