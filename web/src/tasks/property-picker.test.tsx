@@ -91,11 +91,12 @@ const theTask = () => getState().collections.tasks.t1 as Task;
 
 function open(kind: PropertyName, tasks: Task[] = [theTask()]) {
   const property = PROPERTIES.find((p) => p.name === kind);
-  if (!property || !("picker" in property)) throw new Error(`${kind} has no picker`);
+  const picker = property?.picker;
+  if (!property || !picker) throw new Error(`${kind} has no picker`);
   render(
     <MemoryRouter>
       <TooltipProvider>
-        <TaskPropertyPicker property={property} tasks={tasks} open onOpenChange={() => {}} />
+        <TaskPropertyPicker property={{ ...property, picker }} tasks={tasks} open onOpenChange={() => {}} />
       </TooltipProvider>
     </MemoryRouter>,
   );

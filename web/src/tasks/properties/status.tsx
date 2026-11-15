@@ -1,10 +1,22 @@
 // A task's status: where it is in its project's workflow.
 
 import { t, tMaybe } from "@/lib/i18n";
-import { useStatuses } from "@/lib/selectors";
+import { useRowEvenIfGone, useStatuses } from "@/lib/selectors";
 import { setStatus } from "@/tasks/actions";
-import { shared, type TaskProperty } from "@/tasks/properties/property";
+import { PickerRow } from "@/tasks/properties/panel-row";
+import { type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { StatusIcon } from "@/ui/icons";
+
+function StatusRow(panel: PanelProps) {
+  // Named even when it is gone, as everything a task is filed under.
+  const s = useRowEvenIfGone("statuses", panel.task.status_id);
+  return (
+    <PickerRow property={status} panel={panel} value={s?.name ?? ""}>
+      {s && <StatusIcon category={s.category} />}
+      <span className="truncate">{s?.name}</span>
+    </PickerRow>
+  );
+}
 
 export const status = {
   name: "status",
@@ -24,4 +36,5 @@ export const status = {
     }),
     pick: setStatus,
   },
+  Panel: StatusRow,
 } satisfies TaskProperty<"status">;

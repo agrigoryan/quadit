@@ -28,6 +28,21 @@ export interface TaskProperty<Name extends string = string> {
   make?: { run: (projectId: string | undefined, name: string) => string; label: (name: string) => string };
   /** The settings page where its values are kept, linked from the foot of its lists. */
   manage?: "labels" | "statuses";
+  /** Its row in the task's property panel; it draws nothing where the task or its project has no such thing. */
+  Panel?: ComponentType<PanelProps>;
+}
+
+/** What the property panel hands each row. */
+export interface PanelProps {
+  task: Task;
+  /** At the side of the task's page, where the column is narrow. */
+  side?: boolean;
+  /** The viewer may not change the task: the row's controls are off. */
+  readOnly: boolean;
+  /** The row's picker, which the panel's keys open too. */
+  picker: { open: boolean; onOpenChange: (open: boolean) => void };
+  /** Takes the value's button, so a key's picker opens next to it. */
+  takeButton: (el: HTMLButtonElement | null) => void;
 }
 
 export interface PickerPart {

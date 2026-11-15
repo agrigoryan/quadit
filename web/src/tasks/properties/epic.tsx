@@ -2,10 +2,22 @@
 
 import { Layers } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useEpics } from "@/lib/selectors";
+import { useEpics, useRowEvenIfGone } from "@/lib/selectors";
 import { setEpic } from "@/tasks/actions";
-import { NONE, shared, type TaskProperty } from "@/tasks/properties/property";
+import { PickerRow } from "@/tasks/properties/panel-row";
+import { NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
+
+function EpicRow(panel: PanelProps) {
+  const e = useRowEvenIfGone("epics", panel.task.epic_id);
+  const name = e ? e.name : t("task.noEpic");
+  return (
+    <PickerRow property={epic} panel={panel} value={name} empty={!e}>
+      <Layers className="size-3.5 shrink-0 text-ink-3" aria-hidden />
+      <span className="truncate">{name}</span>
+    </PickerRow>
+  );
+}
 
 export const epic = {
   name: "epic",
@@ -25,4 +37,5 @@ export const epic = {
     }),
     pick: (tasks, id) => setEpic(tasks, id === NONE ? null : id),
   },
+  Panel: EpicRow,
 } satisfies TaskProperty<"epic">;

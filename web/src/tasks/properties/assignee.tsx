@@ -2,10 +2,42 @@
 
 import { t } from "@/lib/i18n";
 import { useListening } from "@/lib/listening";
-import { useMe, useMembers } from "@/lib/selectors";
+import { useMe, useMember, useMembers } from "@/lib/selectors";
 import { setAssignee } from "@/tasks/actions";
-import { NONE, shared, type TaskProperty } from "@/tasks/properties/property";
+import { PickerRow, PropRow } from "@/tasks/properties/panel-row";
+import { NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { memberItems, noneItem } from "@/tasks/property-picker";
+import { Avatar } from "@/ui/avatar";
+import { Tooltip } from "@/ui/tooltip";
+
+/** Who has the task, and, for an agent, the person it works for. */
+function AssigneeRow(panel: PanelProps) {
+  const person = useMember(panel.task.assignee_id);
+  const askedBy = useMember(panel.task.asked_by);
+  const name = person ? person.name : t("task.unassigned");
+  return (
+    <>
+      <PickerRow property={assignee} panel={panel} value={name} empty={!person}>
+        <Avatar member={person} size="xs" />
+        <span className="truncate">{name}</span>
+      </PickerRow>
+      {askedBy && person?.kind === "agent" && (
+        <PropRow label={t("prop.workingFor")} wide>
+          <Tooltip label={t("prop.workingForHint", { name: askedBy.name })}>
+            <span
+              // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the keyboard can show the tooltip that says whom the agent works for
+              tabIndex={0}
+              className="flex h-7 min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-md text-sm text-ink-2 max-md:h-9"
+            >
+              <Avatar member={askedBy} size="xs" />
+              <span className="truncate">{askedBy.name}</span>
+            </span>
+          </Tooltip>
+        </PropRow>
+      )}
+    </>
+  );
+}
 
 export const assignee = {
   name: "assignee",
@@ -25,4 +57,5 @@ export const assignee = {
     },
     pick: (tasks, id) => setAssignee(tasks, id === NONE ? null : id),
   },
+  Panel: AssigneeRow,
 } satisfies TaskProperty<"assignee">;

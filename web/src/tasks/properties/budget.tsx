@@ -6,7 +6,8 @@ import { type FormEvent, useState } from "react";
 import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
-import { PropButton } from "@/detail/property-fields";
+import { PropButton, PropRow } from "@/tasks/properties/panel-row";
+import type { PanelProps, TaskProperty } from "@/tasks/properties/property";
 import { moneyMicros } from "@/insights/lib/amounts";
 import { setBudget, type TaskBudget } from "@/tasks/actions";
 import { Button } from "@/ui/button";
@@ -30,7 +31,7 @@ function whole(text: string, scale = 1): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * scale) : null;
 }
 
-export function BudgetField({ task }: { task: Task }) {
+function BudgetField({ task }: { task: Task }) {
   const budget = task.budget;
   const [open, setOpen] = useState(false);
   const can = useCan();
@@ -128,3 +129,20 @@ function BudgetForm({ task, budget, onDone }: { task: Task; budget: TaskBudget |
     </form>
   );
 }
+
+/** Admins set a task's budget; the server takes it from any member who may edit the task. */
+function BudgetRow({ task }: PanelProps) {
+  const can = useCan();
+  if (!can.administer) return null;
+  return (
+    <PropRow label={t("prop.budget")}>
+      <BudgetField task={task} />
+    </PropRow>
+  );
+}
+
+export const budget = {
+  name: "budget",
+  title: () => t("prop.budget"),
+  Panel: BudgetRow,
+} satisfies TaskProperty<"budget">;

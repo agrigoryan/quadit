@@ -1,34 +1,19 @@
 // Everything a task is filed under, as one dense block of label and value
 // rows: two columns of rows on a wide panel, one on a phone and at the side
-// of the task's own page. The S, A, P and L keys open the status, assignee,
-// priority and label pickers.
+// of the task's own page. Each property draws its own row (tasks/properties);
+// the keys of those that have one (S, A, P, L) open their pickers.
 
 import { useRef, useState } from "react";
-import { Globe, Layers, RefreshCw, Target } from "lucide-react";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { useHotkeys } from "@/lib/hotkeys";
 import { useNow } from "@/lib/live";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useMe, useMember, useRowEvenIfGone } from "@/lib/selectors";
+import { useMember } from "@/lib/selectors";
 import type { Task } from "@/lib/types";
 import { nameOf } from "@/detail/data";
-import { BudgetField } from "@/detail/budget-field";
-import { DueField, EstimateField, ParentField, PropButton, PropRow, WaitingNote } from "@/detail/property-fields";
-import { waitsOutside } from "@/tasks/actions";
-import { KEYED, type PropertyName } from "@/tasks/properties";
-import { cycle as cycleProperty } from "@/tasks/properties/cycle";
-import { epic as epicProperty } from "@/tasks/properties/epic";
-import { milestone as milestoneProperty } from "@/tasks/properties/milestone";
-import type { PickerProperty } from "@/tasks/properties/property";
-import { waiting } from "@/tasks/properties/waiting";
-import { TaskPropertyPicker } from "@/tasks/property-picker";
+import { KEYED, PROPERTIES, type PropertyName } from "@/tasks/properties";
 import { Avatar } from "@/ui/avatar";
-import { LabelChip } from "@/ui/badge";
-import { PriorityIcon, StatusIcon } from "@/ui/icons";
-import { Tooltip } from "@/ui/tooltip";
-
-const byName = (name: PropertyName) => KEYED.find((p) => p.name === name) as PickerProperty;
 
 interface Props {
   task: Task;
@@ -37,57 +22,30 @@ interface Props {
 }
 
 export function Properties({ task, side }: Props) {
-  const me = useMe();
   const can = useCan();
-  // What the task is filed under is named even when it is gone: an archived project, a deleted label.
-  const project = useRowEvenIfGone("projects", task.project_id);
-  const status = useRowEvenIfGone("statuses", task.status_id);
-  const labels = useLookupEvenIfGone("labels");
-  const epic = useRowEvenIfGone("epics", task.epic_id);
-  const milestone = useRowEvenIfGone("milestones", task.milestone_id);
-  const cycle = useRowEvenIfGone("cycles", task.cycle_id);
-  const assignee = useMember(task.assignee_id);
-  const askedBy = useMember(task.asked_by);
-  const waitingOn = useMember(task.waiting_on_id);
   const holder = useMember(task.lease_holder_id);
   const readOnly = !can.editTask(task);
   const now = useNow();
   const held = holder && (task.lease_until ?? 0) > now;
-  const waitsOnMe = waitingOn?.user_id === me.user_id;
-  const outside = waitsOutside(task);
 
-  // Which picker a key opened, and the buttons they open next to.
-  const [opened, setOpened] = useState<string | null>(null);
-  const triggers = useRef<Partial<Record<string, HTMLButtonElement | null>>>({});
+  // Which row's picker is open, and the buttons a key's picker opens next to.
+  const [opened, setOpened] = useState<PropertyName | null>(null);
+  const buttons = useRef<Partial<Record<PropertyName, HTMLButtonElement | null>>>({});
 
-  const hotkeys = Object.fromEntries(
-    KEYED.map(({ name, picker }) => [
-      picker.hotkey,
-      (e: KeyboardEvent) => {
-        if (readOnly) return;
-        e.preventDefault();
-        triggers.current[name]?.scrollIntoView({ block: "nearest" });
-        setOpened(name);
-      },
-    ]),
+  useHotkeys(
+    Object.fromEntries(
+      KEYED.map(({ name, picker }) => [
+        picker.hotkey,
+        (e: KeyboardEvent) => {
+          if (readOnly) return;
+          e.preventDefault();
+          buttons.current[name]?.scrollIntoView({ block: "nearest" });
+          setOpened(name);
+        },
+      ]),
+    ),
+    { layer: "panel" },
   );
-  useHotkeys(hotkeys, { layer: "panel" });
-
-  const picker = (kind: PropertyName) => ({
-    property: byName(kind),
-    tasks: [task],
-    open: opened === kind,
-    onOpenChange: (open: boolean) => setOpened(open ? kind : null),
-  });
-  const trigger = (kind: PropertyName) => ({
-    ref: (el: HTMLButtonElement | null) => {
-      triggers.current[kind] = el;
-    },
-    disabled: readOnly,
-  });
-
-  const cycleName = cycle ? cycle.name || t("prop.cycleName", { n: String(cycle.number) }) : t("task.noCycle");
-  const taskLabels = (task.label_ids ?? []).map((id) => labels[id]).filter((l) => l !== undefined);
 
   return (
     <section
@@ -103,161 +61,20 @@ export function Properties({ task, side }: Props) {
           side && "lg:grid-cols-1 lg:gap-y-1 lg:[&>*]:col-span-1",
         )}
       >
-        <PropRow label={t("prop.status")}>
-          <TaskPropertyPicker {...picker("status")}>
-            <PropButton {...trigger("status")} aria-label={`${t("prop.status")}: ${status?.name ?? ""}`}>
-              {status && <StatusIcon category={status.category} />}
-              <span className="truncate">{status?.name}</span>
-            </PropButton>
-          </TaskPropertyPicker>
-        </PropRow>
-
-        <PropRow label={t("prop.assignee")}>
-          <TaskPropertyPicker {...picker("assignee")}>
-            <PropButton
-              {...trigger("assignee")}
-              empty={!assignee}
-              aria-label={`${t("prop.assignee")}: ${assignee ? assignee.name : t("task.unassigned")}`}
-            >
-              <Avatar member={assignee} size="xs" />
-              <span className="truncate">{assignee ? assignee.name : t("task.unassigned")}</span>
-            </PropButton>
-          </TaskPropertyPicker>
-        </PropRow>
-
-        {askedBy && assignee?.kind === "agent" && (
-          <PropRow label={t("prop.workingFor")} wide>
-            <Tooltip label={t("prop.workingForHint", { name: askedBy.name })}>
-              <span
-                // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the keyboard can show the tooltip that says whom the agent works for
-                tabIndex={0}
-                className="flex h-7 min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-md text-sm text-ink-2 max-md:h-9"
-              >
-                <Avatar member={askedBy} size="xs" />
-                <span className="truncate">{askedBy.name}</span>
-              </span>
-            </Tooltip>
-          </PropRow>
-        )}
-
-        <PropRow label={t("prop.waitingOn")} wide>
-          <TaskPropertyPicker property={waiting} tasks={[task]}>
-            <PropButton
-              empty={!waitingOn && !outside}
-              disabled={readOnly}
-              aria-label={`${t("prop.waitingOn")}: ${outside ? t("prop.outside") : waitingOn ? nameOf(waitingOn) : t("prop.nobody")}`}
-            >
-              {outside ? (
-                <>
-                  <Globe className="size-3.5 shrink-0 text-wait" aria-hidden />
-                  <span className="truncate">{t("prop.outside.label")}</span>
-                </>
-              ) : waitingOn ? (
-                waitsOnMe ? (
-                  <span className="flex h-5 items-center gap-1.5 rounded-sm bg-move px-1.5 font-semibold text-move-ink">
-                    <Avatar member={waitingOn} size="xs" />
-                    {t("detail.waitingYou")}
-                  </span>
-                ) : (
-                  <>
-                    <Avatar member={waitingOn} size="xs" />
-                    <span className="truncate">{nameOf(waitingOn)}</span>
-                  </>
-                )
-              ) : (
-                t("prop.nobody")
-              )}
-            </PropButton>
-          </TaskPropertyPicker>
-          {(waitingOn || outside) && <WaitingNote task={task} below={side} />}
-        </PropRow>
-
-        <PropRow label={t("prop.priority")}>
-          <TaskPropertyPicker {...picker("priority")}>
-            <PropButton
-              {...trigger("priority")}
-              empty={!task.priority}
-              aria-label={`${t("prop.priority")}: ${t(`priority.${task.priority}` as "priority.0")}`}
-            >
-              <PriorityIcon priority={task.priority} title="" />
-              <span className="truncate">{t(`priority.${task.priority}` as "priority.0")}</span>
-            </PropButton>
-          </TaskPropertyPicker>
-        </PropRow>
-
-        <PropRow label={t("prop.labels")}>
-          <TaskPropertyPicker {...picker("label")}>
-            <PropButton
-              {...trigger("label")}
-              empty={taskLabels.length === 0}
-              aria-label={`${t("prop.labels")}: ${taskLabels.length ? taskLabels.map((l) => l.name).join(", ") : t("task.noLabels")}`}
-              className="h-auto min-h-7 flex-wrap gap-1 py-1 max-md:h-auto max-md:min-h-9"
-            >
-              {taskLabels.length === 0
-                ? t("task.noLabels")
-                : taskLabels.map((l) => <LabelChip key={l.id} name={l.name} color={l.color} />)}
-            </PropButton>
-          </TaskPropertyPicker>
-        </PropRow>
-
-        <PropRow label={t("prop.epic")}>
-          <TaskPropertyPicker property={epicProperty} tasks={[task]}>
-            <PropButton
-              empty={!epic}
-              disabled={readOnly}
-              aria-label={`${t("prop.epic")}: ${epic ? epic.name : t("task.noEpic")}`}
-            >
-              <Layers className="size-3.5 shrink-0 text-ink-3" aria-hidden />
-              <span className="truncate">{epic ? epic.name : t("task.noEpic")}</span>
-            </PropButton>
-          </TaskPropertyPicker>
-        </PropRow>
-
-        {task.epic_id && (
-          <PropRow label={t("prop.milestone")}>
-            <TaskPropertyPicker property={milestoneProperty} tasks={[task]}>
-              <PropButton
-                empty={!milestone}
-                disabled={readOnly}
-                aria-label={`${t("prop.milestone")}: ${milestone ? milestone.name : t("task.noMilestone")}`}
-              >
-                <Target className="size-3.5 shrink-0 text-ink-3" aria-hidden />
-                <span className="truncate">{milestone ? milestone.name : t("task.noMilestone")}</span>
-              </PropButton>
-            </TaskPropertyPicker>
-          </PropRow>
-        )}
-
-        {project?.settings?.cycles && (
-          <PropRow label={t("prop.cycle")}>
-            <TaskPropertyPicker property={cycleProperty} tasks={[task]}>
-              <PropButton empty={!cycle} disabled={readOnly} aria-label={`${t("prop.cycle")}: ${cycleName}`}>
-                <RefreshCw className="size-3.5 shrink-0 text-ink-3" aria-hidden />
-                <span className="truncate">{cycleName}</span>
-              </PropButton>
-            </TaskPropertyPicker>
-          </PropRow>
-        )}
-
-        {project?.settings?.estimates && (
-          <PropRow label={t("prop.estimate")}>
-            <EstimateField task={task} />
-          </PropRow>
-        )}
-
-        <PropRow label={t("prop.due")}>
-          <DueField task={task} />
-        </PropRow>
-
-        <PropRow label={t("prop.parent")}>
-          <ParentField task={task} />
-        </PropRow>
-
-        {/* Admins set a task's budget; the server takes it from any member who may edit the task. */}
-        {can.administer && (
-          <PropRow label={t("prop.budget")}>
-            <BudgetField task={task} />
-          </PropRow>
+        {PROPERTIES.map(
+          ({ name, Panel }) =>
+            Panel && (
+              <Panel
+                key={name}
+                task={task}
+                side={side}
+                readOnly={readOnly}
+                picker={{ open: opened === name, onOpenChange: (open) => setOpened(open ? name : null) }}
+                takeButton={(el) => {
+                  buttons.current[name] = el;
+                }}
+              />
+            ),
         )}
       </dl>
 
