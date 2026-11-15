@@ -178,9 +178,9 @@ interface Submit {
  *     toast.info(t("s.saved"));
  *   });
  *
- * A form that checks its fields in the browser first clears the errors itself
- * before checking, so an old refusal goes even when the check stops it short
- * of `run`.
+ * A form checks its fields in the browser inside the action, with `refuse`,
+ * so the check's message lands where the server's would and `busy` is right
+ * either way.
  *
  * `once` is for a form that is over when its request goes through (its dialog
  * closes, the page moves on): `busy` then stays on, so the button cannot be
