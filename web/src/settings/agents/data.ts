@@ -1,10 +1,8 @@
-// What the Agents pages read beyond the store: what each agent is doing
-// right now and the tokens issued to it.
+// The shapes the Agents pages work with beyond the store (an agent's limits,
+// the tokens issued to it) and how their fields are written. What each agent
+// is doing right now is in lib/listening.ts.
 
-import { useMemo } from "react";
-import { useLive, useNow } from "@/lib/live";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 
 interface Scope {
@@ -33,20 +31,6 @@ export interface AgentMember extends Member {
 /** A person's limits in this workspace: the same shape, without the approvals only agents have. */
 export type ScopedMember = Member & { scope?: Scope };
 
-export interface AgentState {
-  handle: string;
-  user_id: string;
-  state: "working" | "waiting" | "has_work" | "idle";
-  task?: string;
-  doing?: string;
-  waits_on?: string;
-  listening: boolean;
-  open_tasks: number;
-  waiting_on_it: number;
-  cost_week?: string;
-  minutes_week?: number;
-}
-
 export interface Token {
   id: string;
   user_id: string;
@@ -59,41 +43,6 @@ export interface Token {
   created_at: number;
   expires_at?: number;
   last_used_at?: number;
-}
-
-/**
- * What every agent is doing right now, by user id. It is the same reading
- * the Agents page shows (GET /agents, kept current as the feed moves), so
- * "Listening" means the same thing in both places.
- */
-export function useAgentStates(): { data: Record<string, AgentState> | undefined; error: string } {
-  const live = useLive<{ agents: AgentState[] }>("/agents", {
-    only: ["member", "task", "session", "webhook", "decision"],
-  });
-  const data = useMemo(() => {
-    if (!live.data) return undefined;
-    const out: Record<string, AgentState> = {};
-    for (const a of live.data.agents) out[a.user_id] = a;
-    return out;
-  }, [live.data]);
-  return { data, error: live.error };
-}
-
-/**
- * Whether something is listening for a member's work, for lists where
- * people choose one. The server's reading when it is here; until then what
- * the member row says (a held request). Undefined for people.
- */
-export function useListening(): (member: Member | undefined) => boolean | undefined {
-  const states = useAgentStates();
-  const members = useCollection("members");
-  const now = useNow();
-  return (member) => {
-    if (!member || member.kind !== "agent") return undefined;
-    const state = states.data?.[member.user_id];
-    if (state) return state.listening;
-    return (members[member.user_id]?.listening_until ?? 0) > now;
-  };
 }
 
 /** A member in a plain select: "Coder (@coder) · nothing is listening". */

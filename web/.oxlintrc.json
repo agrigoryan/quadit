@@ -105,35 +105,6 @@
     // relative imports and layers, so these files warn on both; take a file
     // off its list once it imports only what its layer allows.
     {
-      "files": ["src/ui/mention-textarea.tsx"],
-      "rules": {
-        "no-restricted-imports": [
-          "warn",
-          {
-            "patterns": [
-              { "group": ["./*", "../*"], "message": "Import through the @/ alias." },
-              {
-                "group": [
-                  "@/admin/**",
-                  "@/auth/**",
-                  "@/decisions/**",
-                  "@/detail/**",
-                  "@/docs/**",
-                  "@/insights/**",
-                  "@/pages/**",
-                  "@/palette/**",
-                  "@/settings/**",
-                  "@/shell/**",
-                  "@/tasks/**"
-                ],
-                "message": "lib, ui and i18n sit below every feature folder."
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
       "files": ["src/insights/plan/cycle-page.tsx", "src/insights/plan/epic-page.tsx"],
       "rules": {
         "no-restricted-imports": [

@@ -8,7 +8,7 @@ import type { ChoicePage } from "@/palette/palette-commands";
 import { matches } from "@/palette/palette-search";
 import { setAssignee, setPriority, setStatus, toggleLabel } from "@/tasks/actions";
 import { createLabel, createLabelText } from "@/tasks/manage";
-import { useListening } from "@/settings/agents/data";
+import { useListening } from "@/lib/listening";
 import { Avatar } from "@/ui/avatar";
 import { ListeningDot } from "@/ui/listening-dot";
 import { PriorityIcon, StatusIcon } from "@/ui/icons";

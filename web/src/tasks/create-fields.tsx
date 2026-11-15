@@ -5,7 +5,7 @@ import { t, tMaybe } from "@/lib/i18n";
 import { useEpics, useLabels, useLiveTasks, useMe, useMembers, useStatuses, useTemplates } from "@/lib/selectors";
 import { formatDay } from "@/lib/time";
 import type { Project } from "@/lib/types";
-import { useListening } from "@/settings/agents/data";
+import { useListening } from "@/lib/listening";
 import { ChoicePicker } from "@/tasks/choice-list";
 import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { memberItems, PRIORITIES } from "@/tasks/property-picker";

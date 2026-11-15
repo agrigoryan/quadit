@@ -8,7 +8,7 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";
-import { useListening } from "@/settings/agents/data";
+import { useListening } from "@/lib/listening";
 import { addHosts, setSecret, useSecrets, validName } from "@/settings/secrets/data";
 import { HostInput } from "@/settings/secrets/host-input";
 import { FormAlert, FormField, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";

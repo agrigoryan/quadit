@@ -13,7 +13,8 @@ import {
   limitsOf,
 } from "@/settings/agents/agent-form";
 import { ListeningMark, StateBadge } from "@/settings/agents/agents";
-import { type AgentMember, useAgentStates } from "@/settings/agents/data";
+import { type AgentMember } from "@/settings/agents/data";
+import { useAgentStates } from "@/lib/listening";
 import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helpers";
 import { AgentTokens } from "@/settings/agents/tokens";
 import { useIsAdmin, useSettingsBase } from "@/settings/base";

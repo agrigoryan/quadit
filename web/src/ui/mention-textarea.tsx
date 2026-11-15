@@ -2,7 +2,7 @@ import { type KeyboardEvent, type Ref, type TextareaHTMLAttributes, useRef, useS
 import { cx } from "@/lib/cx";
 import { useMembers } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
-import { useListening } from "@/settings/agents/data";
+import { useListening } from "@/lib/listening";
 import { Avatar } from "@/ui/avatar";
 import { Textarea } from "@/ui/input";
 import { ListeningDot } from "@/ui/listening-dot";

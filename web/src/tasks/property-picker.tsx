@@ -5,7 +5,7 @@ import { useCycles, useEpics, useLabels, useMe, useMembers, useProjects, useStat
 import { useStore } from "@/lib/store";
 import type { Member, Project, Task } from "@/lib/types";
 import { formatDay } from "@/lib/time";
-import { useListening } from "@/settings/agents/data";
+import { useListening } from "@/lib/listening";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import {
   moveToProject,
@@ -39,7 +39,7 @@ const noneIcon = <CircleSlash className="size-3.5 text-ink-3" aria-hidden />;
 
 export const PRIORITIES = [0, 1, 2, 3, 4];
 
-/** Says whether something is listening for an agent; nothing for a person. From useListening (settings/agents/data). */
+/** Says whether something is listening for an agent; nothing for a person. From useListening (lib/listening.ts). */
 export type Listening = (member: Member | undefined) => boolean | undefined;
 
 /** People and agents as picker rows, "me" first. With `listening`, each agent shows whether anything waits for its work. */
