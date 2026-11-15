@@ -8,17 +8,6 @@ import { isOpenCategory, type Project, type TaskQuery } from "@/lib/types";
 import { comparer, groupTasks, matcher, type QuerySource } from "@/tasks/filters";
 import type { ViewState } from "@/tasks/view-state";
 
-/** The projects a page is about: its own, or those its view's query names (none: every project). */
-function useProjectIds(project: Project | undefined, query: TaskQuery | null, projects: QuerySource["projects"]) {
-  return useMemo(() => {
-    if (project) return [project.id];
-    const keys = (query?.project ?? []).map((k) => k.toLowerCase());
-    return Object.values(projects)
-      .filter((p) => keys.includes(p.key.toLowerCase()) || keys.includes(p.id))
-      .map((p) => p.id);
-  }, [project, query, projects]);
-}
-
 export function usePageTasks(
   state: ViewState,
   project: Project | undefined,
@@ -28,7 +17,15 @@ export function usePageTasks(
   const { statuses, members, epics, labels } = tables;
   const all = useLiveTasks();
   const openDecisions = useOpenDecisions();
-  const projectIds = useProjectIds(project, query, tables.projects);
+  const { projects } = tables;
+  // The projects a page is about: its own, or those its view's query names (none: every project).
+  const projectIds = useMemo(() => {
+    if (project) return [project.id];
+    const keys = (query?.project ?? []).map((k) => k.toLowerCase());
+    return Object.values(projects)
+      .filter((p) => keys.includes(p.key.toLowerCase()) || keys.includes(p.id))
+      .map((p) => p.id);
+  }, [project, query, projects]);
 
   const board = state.layout === "board";
   const tasks = useMemo(() => {

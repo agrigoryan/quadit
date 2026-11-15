@@ -21,7 +21,7 @@ import { usePageTasks } from "@/tasks/page-tasks";
 import { useSavedView } from "@/tasks/saved-view";
 import { TaskList } from "@/tasks/task-list";
 import { DisplayControls, ViewControls } from "@/tasks/view-controls";
-import { defaultViewState, type ViewState } from "@/tasks/view-state";
+import { defaultViewState } from "@/tasks/view-state";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
@@ -35,18 +35,6 @@ interface Props {
   view?: View;
   /** Project pages take their layout from the address (/tasks or /board). */
   layout?: "list" | "board";
-}
-
-/** True when the page shows something else than its view has saved. */
-function changedFrom(saved: ViewState | null, state: ViewState): boolean {
-  return (
-    !!saved &&
-    (!sameFilters(state.filters, saved.filters) ||
-      state.group !== saved.group ||
-      state.boardGroup !== saved.boardGroup ||
-      state.sort !== saved.sort ||
-      state.layout !== saved.layout)
-  );
 }
 
 export function TasksView({ project, view, layout: routeLayout }: Props) {
@@ -78,6 +66,14 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
   const { tasks, groups, projectIds, restLoaded } = usePageTasks(state, project, query, tables);
 
   const board = state.layout === "board";
+  const changed =
+    !!view &&
+    !!saved &&
+    (!sameFilters(state.filters, saved.filters) ||
+      state.group !== saved.group ||
+      state.boardGroup !== saved.boardGroup ||
+      state.sort !== saved.sort ||
+      state.layout !== saved.layout);
   const chosen = useMemo(() => tasks.filter((task) => selected.has(task.id)), [tasks, selected]);
   const add = useCallback(
     (draft: NewTaskDraft = {}) => openNewTask({ projectId: project?.id ?? projectIds[0], ...draft }),
@@ -108,13 +104,7 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
         <FilterBar filters={state.filters} onChange={setFilters} project={project} />
         <div className="ml-auto flex shrink-0 items-center gap-1 pl-2">
           <DisplayControls state={state} onChange={setState} />
-          <ViewControls
-            state={state}
-            scope={scope}
-            project={project}
-            view={view}
-            changed={!!view && changedFrom(saved, state)}
-          />
+          <ViewControls state={state} scope={scope} project={project} view={view} changed={changed} />
         </div>
       </div>
 
