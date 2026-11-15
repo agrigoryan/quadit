@@ -33,6 +33,21 @@ func Read(kind, source string, opts map[string]string) (Plan, error) {
 	case "github":
 		return readGitHub(source, opts["token"], opts["api"])
 	case "markdown", "obsidian":
+		// A folder, or the folder as a zip (how it arrives through the web app).
+		if info, err := os.Stat(source); err == nil && !info.IsDir() && strings.HasSuffix(strings.ToLower(source), ".zip") {
+			dir, err := os.MkdirTemp("", "quadit-"+kind+"-*")
+			if err != nil {
+				return Plan{}, err
+			}
+			if err := unzip(source, dir); err != nil {
+				return Plan{}, err
+			}
+			// A zip of one folder holds that folder: read inside it.
+			if entries, err := os.ReadDir(dir); err == nil && len(entries) == 1 && entries[0].IsDir() {
+				dir = filepath.Join(dir, entries[0].Name())
+			}
+			return readFolder(dir, kind, false)
+		}
 		return readFolder(source, kind, false)
 	case "notion":
 		return readNotion(source)

@@ -596,3 +596,48 @@ func TestSurfaceOnlyGrows(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestImportThroughTheAPI checks that an export uploaded to the server can
+// be imported there, as the web app does it.
+func TestImportThroughTheAPI(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		csv := "\ufeffID,Team,Title,Description,Status,Estimate,Priority,Project,Assignee,Labels,Due Date,Parent issue,Completed,Canceled\n" +
+			"ENG-1,Eng,Login page,\"Build the **login** page\",In Review,3,High,Onboarding,aram,\"bug, frontend\",2026-12-01,,,\n" +
+			"ENG-2,Eng,Password field,,Done,1,No priority,Onboarding,someone.else@example.com,,,ENG-1,2026-11-01,\n"
+		var f struct{ ID string }
+		s.call(s.owner, "", "POST", w+"/files?name=linear.csv", []byte(csv), 201, &f)
+		var res struct {
+			Found, Made     map[string]int
+			UnmatchedPeople []string `json:"unmatched_people"`
+			DryRun          bool     `json:"dry_run"`
+		}
+		// A look first: what is in it, with nothing written.
+		s.call(s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}, "dry_run": true}, 200, &res)
+		if res.Found["tasks"] != 2 || !res.DryRun {
+			t.Fatalf("a look at the export: %+v", res)
+		}
+		s.call(s.owner, "", "GET", w+"/tasks/ENG-1", nil, 404, nil)
+		s.call(s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}}, 200, &res)
+		if res.Made["tasks"] != 2 || len(res.UnmatchedPeople) != 1 {
+			t.Fatalf("the import: %+v", res)
+		}
+		if out := s.call(s.owner, "", "GET", w+"/tasks?project=ENG&format=text", nil, 200, nil); !strings.Contains(out, "Login page") || !strings.Contains(out, "Password field") {
+			t.Fatalf("imported tasks: %s", out)
+		}
+		// Again: nothing twice.
+		s.call(s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}}, 200, &res)
+		var n struct{ Count int }
+		s.call(s.owner, "", "GET", w+"/tasks?project=ENG&count=1", nil, 200, &n)
+		if n.Count != 2 {
+			t.Fatalf("a second run made %d tasks in all", n.Count)
+		}
+		// Not for members, and not with a file that is something else.
+		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coder"}, 201, &tok)
+		s.call(nil, tok.Token, "POST", "/api/v1/w/-/import", M{"kind": "linear", "file": f.ID}, 403, nil)
+		s.call(s.owner, "", "POST", w+"/files?name=notes.json", []byte("not a board"), 201, &f)
+		s.call(s.owner, "", "POST", w+"/import", M{"kind": "trello", "file": f.ID, "options": M{"project": "T"}}, 400, nil)
+	})
+}

@@ -433,6 +433,9 @@ func (s *Server) identify(x *c) error {
 		if now-t.LastUsedAt > 60_000 {
 			s.st.Update(ctx, "api_tokens", map[string]any{"last_used_at": now}, store.Eq("id", t.ID))
 		}
+		if x.r.Context().Value(inProcess{}) != nil {
+			return nil // the server working for the caller, inside one request already counted
+		}
 		return s.limits.check("t:"+t.ID, 1200)
 	}
 	ck, err := x.r.Cookie(sessionCookie)
@@ -464,6 +467,9 @@ func (s *Server) identify(x *c) error {
 	x.sess = &sess
 	if now-sess.LastSeenAt > 60_000 {
 		s.st.Update(ctx, "sessions", map[string]any{"last_seen_at": now}, store.Eq("id", sess.ID))
+	}
+	if x.r.Context().Value(inProcess{}) != nil {
+		return nil
 	}
 	return s.limits.check("u:"+x.user.ID, 3000)
 }
