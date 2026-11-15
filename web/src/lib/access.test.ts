@@ -18,15 +18,15 @@ const who = {
   suspended: member({ suspended_at: 1 }),
 };
 
-/** Each member's answers: write, edit in p1, edit in p2, edit the workspace's own, change their own, change another's, administer, own. */
+/** Each member's answers: write, edit in p1, edit in p2, edit the workspace's own, change their own, change another's, administer, own, change a task in p1. */
 const table: [keyof typeof who, boolean[]][] = [
-  ["owner", [true, true, true, true, true, true, true, true]],
-  ["admin", [true, true, true, true, true, true, true, false]],
-  ["member", [true, true, true, true, true, false, false, false]],
-  ["readOnly", [false, false, false, false, false, false, false, false]],
-  ["readOnlyAdmin", [false, false, false, false, false, false, false, false]],
-  ["limited", [true, true, false, true, true, false, false, false]],
-  ["suspended", [false, false, false, false, false, false, false, false]],
+  ["owner", [true, true, true, true, true, true, true, true, true]],
+  ["admin", [true, true, true, true, true, true, true, false, true]],
+  ["member", [true, true, true, true, true, false, false, false, true]],
+  ["readOnly", [false, false, false, false, false, false, false, false, false]],
+  ["readOnlyAdmin", [false, false, false, false, false, false, false, false, false]],
+  ["limited", [true, true, false, true, true, false, false, false, true]],
+  ["suspended", [false, false, false, false, false, false, false, false, false]],
 ];
 
 describe("can", () => {
@@ -41,14 +41,20 @@ describe("can", () => {
       access.editMadeBy("someone-else", "p1"),
       access.administer,
       access.own,
+      access.editTask({ project_id: "p1" }),
     ]).toEqual(want);
+  });
+
+  it("nobody may change a task in the trash, or one in a project outside their reach", () => {
+    expect(can(who.owner).editTask({ project_id: "p1", deleted_at: 5 })).toBe(false);
+    expect(can(who.limited).editTask({ project_id: "p2" })).toBe(false);
   });
 
   it("a limited member may not change their own thing in a project outside their reach", () => {
     expect(can(who.limited).editMadeBy("me", "p2")).toBe(false);
   });
 
-  it("nobody signed in may do nothing", () => {
+  it("no one signed in: nothing may be done", () => {
     const access = can(null);
     expect([access.write, access.edit(), access.editMadeBy("me"), access.administer, access.own]).toEqual([
       false,

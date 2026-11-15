@@ -11,13 +11,19 @@
 
 import { useMemo } from "react";
 import { useMe } from "@/lib/selectors";
-import type { Member } from "@/lib/types";
+import type { Member, Task } from "@/lib/types";
 
 export interface Access {
   /** May change anything at all: not read-only, not suspended. */
   write: boolean;
   /** May change content in this project (a task, a comment, a page); no project: the workspace's own pages and views. */
   edit(projectId?: string): boolean;
+  /**
+   * May change this task: edit it in its project, and it is not in the
+   * trash (a trashed task is read-only for everyone until it is restored).
+   * The one test every control on a task asks.
+   */
+  editTask(task: Pick<Task, "project_id" | "deleted_at">): boolean;
   /** May take away or change what this person made (a comment, a file, a question, a view): their own, or anyone's as an admin. */
   editMadeBy(userId: string | undefined, projectId?: string): boolean;
   /** May run the workspace: projects, statuses, labels, people, agents, automation, secrets. */
@@ -26,7 +32,14 @@ export interface Access {
   own: boolean;
 }
 
-const NOTHING: Access = { write: false, edit: () => false, editMadeBy: () => false, administer: false, own: false };
+const NOTHING: Access = {
+  write: false,
+  edit: () => false,
+  editTask: () => false,
+  editMadeBy: () => false,
+  administer: false,
+  own: false,
+};
 
 /** What a member may do. Outside a component, pass getState().me. */
 export function can(me: Member | null | undefined): Access {
@@ -38,6 +51,7 @@ export function can(me: Member | null | undefined): Access {
   return {
     write,
     edit,
+    editTask: (task) => !task.deleted_at && edit(task.project_id),
     editMadeBy: (userId, projectId) => edit(projectId) && (admin || (!!userId && userId === me.user_id)),
     administer: admin,
     own: write && me.role === "owner",
