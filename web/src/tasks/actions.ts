@@ -125,8 +125,12 @@ export function toggleLabel(tasks: Task[], labelId: string) {
   );
 }
 
-/** Sets one simple field: the argument name the server takes and the row field it lands in. */
-function setter(arg: keyof Changes["task.update"], field: string) {
+/**
+ * Sets one simple field on every task: the argument name the server takes
+ * and the row field it lands in. A task property that is one plain field
+ * makes its own with this (tasks/properties).
+ */
+export function setter(arg: keyof Changes["task.update"], field: keyof Task) {
   return (tasks: Task[], value: string | number | null) =>
     updateAll(
       tasks,
