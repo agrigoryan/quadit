@@ -63,20 +63,20 @@ export function GoHint() {
     <div
       role="status"
       aria-label={t("goto.title")}
-      className="pointer-events-none fixed bottom-6 left-1/2 z-[60] w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg bg-surface px-3.5 pt-2.5 pb-3 shadow-pop animate-fade"
+      className="pointer-events-none fixed bottom-6 left-1/2 z-[60] w-[min(31rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-white/10 bg-inverse px-4 pt-3 pb-3.5 text-inverse-ink shadow-pop animate-pop"
     >
-      <p className="flex items-center gap-2 text-xs font-medium text-ink-2">
+      <p className="flex items-center gap-2 text-xs font-medium">
         <span className="flex w-5 shrink-0 justify-center">
-          <Kbd>G</Kbd>
+          <Kbd onDark>G</Kbd>
         </span>
         {t("goto.title")}
-        {at.project && <span className="ml-auto truncate font-normal text-ink-3">{t("goto.project", { project: at.project.name })}</span>}
+        {at.project && <span className="ml-auto truncate font-normal opacity-70">{t("goto.project", { project: at.project.name })}</span>}
       </p>
-      <ul className="mt-2 grid grid-cols-2 gap-x-5 gap-y-1 sm:grid-cols-3">
+      <ul className="mt-2.5 grid grid-cols-2 gap-x-5 gap-y-1.5 border-t border-white/10 pt-2.5 sm:grid-cols-3">
         {places.map((place) => (
           <li key={place.id} className="flex min-w-0 items-center gap-2 text-sm">
             <span className="flex w-5 shrink-0 justify-center">
-              <Kbd>{(place.key ?? "").toUpperCase()}</Kbd>
+              <Kbd onDark>{(place.key ?? "").toUpperCase()}</Kbd>
             </span>
             <span className="min-w-0 truncate">{t(place.label)}</span>
           </li>
