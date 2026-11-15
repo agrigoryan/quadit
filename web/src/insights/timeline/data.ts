@@ -4,8 +4,8 @@
 import type { Changes } from "@/lib/changes.gen";
 import { useMemo } from "react";
 import { type ChangeSpec, send } from "@/lib/mutate";
-import { useCollection, useEpics, useLiveTasks } from "@/lib/selectors";
-import type { Category, Epic, Milestone, Task } from "@/lib/types";
+import { useEpics, useLiveTasks, useLookup, useRows } from "@/lib/selectors";
+import { type Category, type Epic, isCanceledCategory, isDoneCategory, type Milestone, type Task } from "@/lib/types";
 import { dayFromNumber, dayNumber } from "@/lib/days";
 import { localDay } from "@/lib/time";
 import type { Extent } from "@/insights/timeline/scale";
@@ -47,8 +47,8 @@ const byDue = (a: TaskLine, b: TaskLine) =>
 export function useTimeline(projectId: string, showCanceled: boolean): TimelineData {
   const epics = useEpics(projectId);
   const tasks = useLiveTasks();
-  const statuses = useCollection("statuses");
-  const milestones = useCollection("milestones");
+  const statuses = useLookup("statuses");
+  const milestones = useRows("milestones");
 
   return useMemo(() => {
     let min = Infinity;
@@ -64,7 +64,7 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
     for (const task of tasks) {
       if (task.project_id !== projectId) continue;
       const category = statuses[task.status_id]?.category ?? "backlog";
-      if (category === "canceled" && !showCanceled) continue;
+      if (isCanceledCategory(category) && !showCanceled) continue;
       const due = task.due_on ? dayNumber(task.due_on) : undefined;
       const began = dayNumber(localDay(task.started_at ?? task.created_at));
       const line: TaskLine = { task, category, start: due === undefined ? began : Math.min(began, due), due };
@@ -80,9 +80,9 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
         if (!showCanceled) continue;
       }
       const own = (byEpic[epic.id] ?? []).sort(byDue);
-      const counted = own.filter((l) => l.category !== "canceled");
-      const marks = Object.values(milestones)
-        .filter((m) => m.epic_id === epic.id && !m.deleted_at && m.target_on)
+      const counted = own.filter((l) => !isCanceledCategory(l.category));
+      const marks = milestones
+        .filter((m) => m.epic_id === epic.id && m.target_on)
         .map((milestone) => ({ milestone, day: dayNumber(milestone.target_on as string) }))
         .sort((a, b) => a.day - b.day);
       const line: EpicLine = {
@@ -95,7 +95,7 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
             : undefined,
         target: epic.target_on ? dayNumber(epic.target_on) : undefined,
         tasks: own,
-        done: counted.filter((l) => l.category === "done").length,
+        done: counted.filter((l) => isDoneCategory(l.category)).length,
         total: counted.length,
         milestones: marks,
       };

@@ -4,7 +4,7 @@
 
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import type { Category } from "@/lib/types";
+import { type Category, isCanceledCategory } from "@/lib/types";
 import { Legend, useWidth } from "@/insights/charts/base";
 import { count } from "@/insights/lib/amounts";
 import type { StatusCount } from "@/insights/lib/types";
@@ -42,7 +42,8 @@ function byProject(rows: StatusCount[]): ProjectRow[] {
       p.total += row.count;
     }
   }
-  for (const row of rows) if (row.category === "canceled") (out.get(row.project) as ProjectRow).canceled += row.count;
+  for (const row of rows)
+    if (isCanceledCategory(row.category)) (out.get(row.project) as ProjectRow).canceled += row.count;
   return [...out.values()];
 }
 

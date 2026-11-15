@@ -4,10 +4,10 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
+import { useArchived, useLookup, useRows } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import { daysUntil } from "@/lib/time";
-import type { Epic, Status, Task } from "@/lib/types";
+import { type Epic, isCanceledCategory, isDoneCategory, type Status, type Task } from "@/lib/types";
 
 export interface Tally {
   total: number;
@@ -24,10 +24,10 @@ export const emptyTally = (): Tally => ({ total: 0, done: 0, started: 0, points:
 
 function addTo(tally: Tally, task: Task, statuses: Dict<Status>) {
   const category = statuses[task.status_id]?.category;
-  if (category === "canceled") return;
+  if (isCanceledCategory(category)) return;
   tally.total++;
   tally.points += task.estimate ?? 0;
-  if (category === "done") {
+  if (isDoneCategory(category)) {
     tally.done++;
     tally.pointsDone += task.estimate ?? 0;
   } else if (category === "started" || category === "waiting") tally.started++;
@@ -40,18 +40,22 @@ export function tallyOf(tasks: Task[], statuses: Dict<Status>): Tally {
   return out;
 }
 
-/** A tally for every epic, milestone or cycle that has tasks, by its id. */
+/**
+ * A tally for every epic, milestone or cycle that has tasks, by its id.
+ * Archived tasks count, as on the server's dashboard; trashed ones do not.
+ */
 export function useTallies(field: "epic_id" | "milestone_id" | "cycle_id"): Dict<Tally> {
-  const tasks = useCollection("tasks");
-  const statuses = useCollection("statuses");
+  const live = useRows("tasks");
+  const archived = useArchived("tasks");
+  const statuses = useLookup("statuses");
   return useMemo(() => {
     const out: Dict<Tally> = {};
-    for (const task of Object.values(tasks)) {
+    for (const task of [...live, ...archived]) {
       const id = task[field];
-      if (id && !task.deleted_at) addTo((out[id] ??= emptyTally()), task, statuses);
+      if (id) addTo((out[id] ??= emptyTally()), task, statuses);
     }
     return out;
-  }, [tasks, statuses, field]);
+  }, [live, archived, statuses, field]);
 }
 
 export type Risk = "" | "past" | "soon" | "stale";

@@ -5,8 +5,8 @@ import { useState } from "react";
 import { ChevronLeft, Ellipsis, Eye, EyeOff, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { t } from "@/lib/i18n";
-import { useMe, useMembers, useProjectByKey, useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { useMe, useMembers, useProjectByKey, useRow, useSlug } from "@/lib/selectors";
 import type { Epic, Project } from "@/lib/types";
 import { ui, usePageTitle } from "@/lib/ui-state";
 import { setWatchingEpic, updateEpic } from "@/insights/plan/actions";
@@ -30,8 +30,8 @@ const NOBODY = "none";
 export function EpicPage() {
   const { key, id } = useParams();
   const project = useProjectByKey(key);
-  const epic = useStore((s) => (id ? s.collections.epics[id] : undefined));
-  if (!project || !epic || epic.deleted_at || epic.project_id !== project.id) return <NotFoundPage />;
+  const epic = useRow("epics", id);
+  if (!project || !epic || epic.project_id !== project.id) return <NotFoundPage />;
   return <EpicView project={project} epic={epic} />;
 }
 
@@ -43,7 +43,9 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
   const members = useMembers();
   const tasks = useTasksBy(project.id, "epic_id")[epic.id] ?? [];
   const tally = useTallies("epic_id")[epic.id] ?? emptyTally();
-  const watching = useStore((s) => !!s.collections.watchers[`${me.user_id}:${epic.id}`]);
+  const watching = !!useRow("watchers", `${me.user_id}:${epic.id}`);
+  const can = useCan();
+  const readOnly = !can.edit(project.id);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const risk = riskOf(epic, tally);
@@ -61,35 +63,41 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
           {t("nav.epics")}
         </Link>
         <span className="flex-1" />
-        <Button variant="ghost" aria-pressed={watching} onClick={() => setWatchingEpic(epic, me.user_id, !watching)}>
-          {watching ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
-          <span className="max-sm:sr-only">{watching ? t("epic.unwatch") : t("epic.watch")}</span>
-        </Button>
-        <Button onClick={() => ui.newTask({ projectId: project.id, epicId: epic.id })}>
-          <Plus className="size-4" aria-hidden />
-          {t("epic.addTask")}
-        </Button>
-        <Menu>
-          <MenuTrigger asChild>
-            <IconButton label={t("epic.actions", { name: epic.name })}>
-              <Ellipsis className="size-4" />
-            </IconButton>
-          </MenuTrigger>
-          <MenuContent align="end">
-            <MenuItem icon={<Pencil />} onSelect={() => setEditing(true)}>
-              {t("common.edit")}
-            </MenuItem>
-            <MenuItem icon={<Trash2 />} danger onSelect={() => setDeleting(true)}>
-              {t("epic.delete")}
-            </MenuItem>
-          </MenuContent>
-        </Menu>
+        {can.write && (
+          <Button variant="ghost" aria-pressed={watching} onClick={() => setWatchingEpic(epic, me.user_id, !watching)}>
+            {watching ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+            <span className="max-sm:sr-only">{watching ? t("epic.unwatch") : t("epic.watch")}</span>
+          </Button>
+        )}
+        {!readOnly && (
+          <Button onClick={() => ui.newTask({ projectId: project.id, epicId: epic.id })}>
+            <Plus className="size-4" aria-hidden />
+            {t("epic.addTask")}
+          </Button>
+        )}
+        {!readOnly && (
+          <Menu>
+            <MenuTrigger asChild>
+              <IconButton label={t("epic.actions", { name: epic.name })}>
+                <Ellipsis className="size-4" />
+              </IconButton>
+            </MenuTrigger>
+            <MenuContent align="end">
+              <MenuItem icon={<Pencil />} onSelect={() => setEditing(true)}>
+                {t("common.edit")}
+              </MenuItem>
+              <MenuItem icon={<Trash2 />} danger onSelect={() => setDeleting(true)}>
+                {t("epic.delete")}
+              </MenuItem>
+            </MenuContent>
+          </Menu>
+        )}
       </PageBar>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-10">
         <div className="px-4 pt-4 pb-4 md:px-6">
           <h1 className="text-lg font-semibold">{epic.name}</h1>
-          <EpicDescription epic={epic} />
+          <EpicDescription epic={epic} readOnly={readOnly} />
 
           <div className="mt-4 flex flex-wrap items-end gap-x-5 gap-y-3">
             <Labelled label={t("epic.state")}>
@@ -98,7 +106,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                 value={epic.state}
                 onPick={(state) => updateEpic(epic, { state })}
                 label={t("epic.state")}
-                buttonProps={{ className: "h-8 min-w-28" }}
+                buttonProps={{ className: "h-8 min-w-28", disabled: readOnly }}
               />
             </Labelled>
             <Labelled label={t("epic.lead")}>
@@ -115,7 +123,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                 value={epic.lead_id ?? NOBODY}
                 onPick={(id) => updateEpic(epic, { lead: id === NOBODY ? null : id })}
                 label={t("epic.lead")}
-                buttonProps={{ className: "h-8 min-w-36" }}
+                buttonProps={{ className: "h-8 min-w-36", disabled: readOnly }}
               />
             </Labelled>
             <Labelled label={t("epic.start")}>
@@ -123,6 +131,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                 type="date"
                 value={epic.start_on ?? ""}
                 max={epic.target_on}
+                disabled={readOnly}
                 onChange={(e) =>
                   !backwards(e.target.value, epic.target_on ?? "") &&
                   updateEpic(epic, { start_on: e.target.value || null })
@@ -135,6 +144,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                 type="date"
                 value={epic.target_on ?? ""}
                 min={epic.start_on}
+                disabled={readOnly}
                 onChange={(e) =>
                   !backwards(epic.start_on ?? "", e.target.value) &&
                   updateEpic(epic, { target_on: e.target.value || null })
@@ -166,7 +176,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
         </div>
 
         <div className="border-t border-line">
-          <EpicMilestones epic={epic} tasks={tasks} />
+          <EpicMilestones epic={epic} tasks={tasks} readOnly={readOnly} />
         </div>
       </div>
 

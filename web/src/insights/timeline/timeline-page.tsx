@@ -8,6 +8,7 @@ import { Link, useParams } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { keep, readKept } from "@/lib/kept";
+import { useCan } from "@/lib/access";
 import { useProjectByKey, useSlug } from "@/lib/selectors";
 import { today } from "@/lib/time";
 import type { Project } from "@/lib/types";
@@ -41,6 +42,7 @@ function Timeline({ project }: { project: Project }) {
   const [showCanceled, setShowCanceled] = useState(false);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const data = useTimeline(project.id, showCanceled);
+  const readOnly = !useCan().edit(project.id);
   const now = dayNumber(today());
 
   // The days shown only ever grow while the page is open, so nothing jumps when a date moves.
@@ -180,6 +182,7 @@ function Timeline({ project }: { project: Project }) {
                   today={now}
                   open={open.has(line.epic.id)}
                   onToggle={() => toggle(line.epic.id)}
+                  readOnly={readOnly}
                 />
                 {open.has(line.epic.id) &&
                   (line.tasks.length === 0 ? (

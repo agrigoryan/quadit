@@ -3,7 +3,7 @@
 import { Pin } from "lucide-react";
 import { Link } from "react-router";
 import { t, tMaybe } from "@/lib/i18n";
-import { useCollection, useSlug } from "@/lib/selectors";
+import { useRowEvenIfGone, useSlug } from "@/lib/selectors";
 import { exact, parseWhen } from "@/lib/time";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { DecisionView } from "@/insights/lib/types";
@@ -52,7 +52,8 @@ function Row({ decision }: { decision: DecisionView }) {
 }
 
 function PreferenceRow({ preference }: { preference: Preference }) {
-  const project = useCollection("projects")[preference.project_id ?? ""];
+  // A preference names its project even when that project is archived.
+  const project = useRowEvenIfGone("projects", preference.project_id);
   return (
     <li className="flex gap-2 border-b border-line/70 px-4 py-1.5 text-sm">
       <Pin className="mt-0.5 size-3.5 shrink-0 text-ink-3" aria-hidden />

@@ -6,6 +6,7 @@ import { useParams } from "react-router";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate } from "@/lib/mutate";
+import { useCan } from "@/lib/access";
 import { useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
 import { useRestLoaded } from "@/lib/store";
 import { daysUntil, formatDay, serverDay } from "@/lib/time";
@@ -54,12 +55,13 @@ function Cycles({ project }: { project: Project }) {
   const now = serverDay();
   const groups = useMemo(() => inGroups(cycles, now), [cycles, now]);
   const [openId, setOpenId] = useState<string | null>(null);
+  const readOnly = !useCan().edit(project.id);
 
   return (
     <div className="flex h-full flex-col">
       <header className="flex min-h-11 shrink-0 items-center gap-3 border-b border-line py-1.5 pr-2 pl-4">
         <p className="flex-1 text-xs text-ink-2 tnum max-sm:hidden">{t("cycles.count", { n: cycles.length })}</p>
-        <NewCycle project={project} cycles={cycles} />
+        {!readOnly && <NewCycle project={project} cycles={cycles} />}
       </header>
       {groups.length === 0 ? (
         <EmptyState icon={<RefreshCw />} title={t("cycles.empty")} hint={t("cycles.emptyHint")} />

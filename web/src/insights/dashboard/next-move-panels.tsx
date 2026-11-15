@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { CircleHelp, Globe } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useCollection, useLiveTasks, useProjects, useSlug } from "@/lib/selectors";
+import { useLiveTasks, useLookup, useProjects, useSlug } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { isOpenCategory, type Task } from "@/lib/types";
 import { count } from "@/insights/lib/amounts";
@@ -20,7 +20,7 @@ type Waiting = Task & { waiting_outside?: boolean };
 
 function useOpenTasks(projectId: string | undefined): Waiting[] {
   const tasks = useLiveTasks();
-  const statuses = useCollection("statuses");
+  const statuses = useLookup("statuses");
   return useMemo(
     () =>
       tasks.filter(

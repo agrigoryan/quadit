@@ -6,7 +6,7 @@ import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
-import { getState } from "@/lib/store";
+import { getRows } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import type { Cycle, Epic, Milestone, Task } from "@/lib/types";
 
@@ -29,10 +29,7 @@ export async function createEpic(projectId: string, f: EpicFields): Promise<stri
   if (f.leadId) args.lead = f.leadId;
   if (f.startOn) args.start_on = f.startOn;
   if (f.targetOn) args.target_on = f.targetOn;
-  const lastRank = Object.values(getState().collections.epics).reduce(
-    (max, e) => (e.project_id === projectId && e.rank > max ? e.rank : max),
-    "",
-  );
+  const lastRank = getRows("epics").reduce((max, e) => (e.project_id === projectId && e.rank > max ? e.rank : max), "");
   await mutate(
     { type: "epic.create", args },
     (tx) =>
@@ -71,7 +68,7 @@ export function updateEpic(
 /** Deletes an epic; its tasks stay, without an epic. */
 export function deleteEpic(epic: Epic) {
   send({ type: "epic.delete", args: { id: epic.id } }, (tx) => {
-    for (const task of Object.values(getState().collections.tasks)) {
+    for (const task of getRows("tasks")) {
       if (task.epic_id === epic.id) tx.patch("tasks", task.id, { epic_id: null, milestone_id: null });
     }
     tx.remove("epics", epic.id);
@@ -122,7 +119,7 @@ export function moveMilestone(ordered: Milestone[], milestone: Milestone, step: 
 /** Deletes a milestone; its tasks stay in the epic. */
 export function deleteMilestone(milestone: Milestone) {
   send({ type: "milestone.delete", args: { id: milestone.id } }, (tx) => {
-    for (const task of Object.values(getState().collections.tasks)) {
+    for (const task of getRows("tasks")) {
       if (task.milestone_id === milestone.id) tx.patch("tasks", task.id, { milestone_id: null });
     }
     tx.remove("milestones", milestone.id);

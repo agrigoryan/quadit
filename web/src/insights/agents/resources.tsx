@@ -8,7 +8,8 @@ import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
-import { useMe, useMember, useTask } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useMember, useRowEvenIfGone } from "@/lib/selectors";
 import { ago, exact, timeOfDay } from "@/lib/time";
 import { nameOf } from "@/detail/data";
 import type { Claim, Resource } from "@/lib/types-agents";
@@ -30,7 +31,8 @@ function release(claim: Claim) {
 }
 
 function ClaimTask({ taskId }: { taskId: string }) {
-  const task = useTask(taskId);
+  // A claim names its task even after the task is archived or trashed.
+  const task = useRowEvenIfGone("tasks", taskId);
   const link = useTaskLink({ key: task?.key ?? "" });
   if (!task) return null;
   return (
@@ -107,7 +109,7 @@ function ResourceCard({
   admin: boolean;
   onDelete: () => void;
 }) {
-  const me = useMe();
+  const can = useCan();
   const holder = claims.find((c) => c.state === "holding");
   const waiting = claims.filter((c) => c.state === "waiting");
   return (
@@ -153,7 +155,7 @@ function ResourceCard({
               resource={resource.name}
               place={0}
               now={now}
-              canRelease={admin || holder.user_id === me.user_id}
+              canRelease={can.editMadeBy(holder.user_id)}
             />
           )}
           {waiting.map((claim, i) => (
@@ -163,7 +165,7 @@ function ResourceCard({
               resource={resource.name}
               place={i + 1}
               now={now}
-              canRelease={admin || claim.user_id === me.user_id}
+              canRelease={can.editMadeBy(claim.user_id)}
             />
           ))}
         </ol>
@@ -273,8 +275,7 @@ interface Props {
 }
 
 export function Resources({ resources, claims, now }: Props) {
-  const me = useMe();
-  const admin = me.role !== "member";
+  const admin = useCan().administer;
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<Resource | null>(null);
   const of = (id: string) => claims.filter((c) => c.resource_id === id);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Ellipsis, Layers, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { t } from "@/lib/i18n";
+import { useCan } from "@/lib/access";
 import { useEpics, useMember, useProjectByKey, useSlug } from "@/lib/selectors";
 import { formatDay } from "@/lib/time";
 import type { Epic, Project } from "@/lib/types";
@@ -46,16 +47,19 @@ function Epics({ project }: { project: Project }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ epic?: Epic } | null>(null);
   const [deleting, setDeleting] = useState<Epic | null>(null);
+  const readOnly = !useCan().edit(project.id);
   const pageOf = (id: string) => `/${slug}/p/${project.key}/epics/${id}`;
 
   return (
     <div className="flex h-full flex-col">
       <header className="flex h-11 shrink-0 items-center gap-3 border-b border-line pr-2 pl-4">
         <p className="flex-1 text-xs text-ink-2 tnum">{t("epics.count", { n: epics.length })}</p>
-        <Button onClick={() => setDialog({})}>
-          <Plus className="size-4" aria-hidden />
-          {t("epic.new")}
-        </Button>
+        {!readOnly && (
+          <Button onClick={() => setDialog({})}>
+            <Plus className="size-4" aria-hidden />
+            {t("epic.new")}
+          </Button>
+        )}
       </header>
       {epics.length === 0 ? (
         <EmptyState
@@ -63,10 +67,12 @@ function Epics({ project }: { project: Project }) {
           title={t("epics.empty")}
           hint={t("epic.emptyHint")}
           action={
-            <Button variant="primary" onClick={() => setDialog({})}>
-              <Plus className="size-4" aria-hidden />
-              {t("epic.new")}
-            </Button>
+            !readOnly && (
+              <Button variant="primary" onClick={() => setDialog({})}>
+                <Plus className="size-4" aria-hidden />
+                {t("epic.new")}
+              </Button>
+            )
           }
         />
       ) : (
@@ -79,21 +85,23 @@ function Epics({ project }: { project: Project }) {
               badge={<EpicBadges epic={epic} tally={tallies[epic.id]} />}
               meta={<EpicMeta epic={epic} />}
               menu={
-                <Menu>
-                  <MenuTrigger asChild>
-                    <IconButton label={t("epic.actions", { name: epic.name })} size="sm">
-                      <Ellipsis className="size-4" />
-                    </IconButton>
-                  </MenuTrigger>
-                  <MenuContent align="end">
-                    <MenuItem icon={<Pencil />} onSelect={() => setDialog({ epic })}>
-                      {t("common.edit")}
-                    </MenuItem>
-                    <MenuItem icon={<Trash2 />} danger onSelect={() => setDeleting(epic)}>
-                      {t("epic.delete")}
-                    </MenuItem>
-                  </MenuContent>
-                </Menu>
+                !readOnly && (
+                  <Menu>
+                    <MenuTrigger asChild>
+                      <IconButton label={t("epic.actions", { name: epic.name })} size="sm">
+                        <Ellipsis className="size-4" />
+                      </IconButton>
+                    </MenuTrigger>
+                    <MenuContent align="end">
+                      <MenuItem icon={<Pencil />} onSelect={() => setDialog({ epic })}>
+                        {t("common.edit")}
+                      </MenuItem>
+                      <MenuItem icon={<Trash2 />} danger onSelect={() => setDeleting(epic)}>
+                        {t("epic.delete")}
+                      </MenuItem>
+                    </MenuContent>
+                  </Menu>
+                )
               }
               tally={tallies[epic.id]}
               tasks={tasksBy[epic.id] ?? []}

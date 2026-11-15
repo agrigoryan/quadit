@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import { Hourglass } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useCollection, useLiveTasks, useMe, useMember } from "@/lib/selectors";
+import { useLiveTasks, useLookup, useMe, useMember, useOpenDecisions } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { type Decision, isOpenCategory, type Task } from "@/lib/types";
 import { MoveCount, Panel, PanelEmpty } from "@/insights/ui/panel";
@@ -26,9 +26,9 @@ interface Item {
 function useWaiting(projectId: string | undefined): Item[] {
   const me = useMe();
   const tasks = useLiveTasks();
-  const all = useCollection("tasks");
-  const statuses = useCollection("statuses");
-  const decisions = useCollection("decisions");
+  const liveTasks = useLookup("tasks");
+  const statuses = useLookup("statuses");
+  const openDecisions = useOpenDecisions();
   return useMemo(() => {
     const out: Item[] = [];
     const inScope = (task: Task) => !projectId || task.project_id === projectId;
@@ -37,14 +37,16 @@ function useWaiting(projectId: string | undefined): Item[] {
         out.push({ id: `t:${task.id}`, task, since: task.updated_at });
       }
     }
-    for (const d of Object.values(decisions)) {
-      if (d.state !== "open" || d.deleted_at || d.asked_id !== me.user_id) continue;
-      const task = all[d.task_id];
-      if (task && !task.deleted_at && inScope(task))
-        out.push({ id: `d:${d.id}`, task, question: d, since: d.created_at });
+    for (const [taskId, open] of Object.entries(openDecisions)) {
+      // Only on a live task: one in the trash or the archive waits on no one.
+      const task = liveTasks[taskId];
+      if (!task || !inScope(task)) continue;
+      for (const d of open) {
+        if (d.asked_id === me.user_id) out.push({ id: `d:${d.id}`, task, question: d, since: d.created_at });
+      }
     }
     return out.sort((a, b) => a.since - b.since);
-  }, [tasks, all, statuses, decisions, me.user_id, projectId]);
+  }, [tasks, liveTasks, statuses, openDecisions, me.user_id, projectId]);
 }
 
 function Row({ item }: { item: Item }) {

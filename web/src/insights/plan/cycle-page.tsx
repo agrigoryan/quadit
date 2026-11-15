@@ -7,8 +7,8 @@ import { ArrowRight, ChevronLeft } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { statusesOf, useCollection, useCycles, useProjectByKey, useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useCan } from "@/lib/access";
+import { statusesOf, useCycles, useLookup, useProjectByKey, useRow, useSlug } from "@/lib/selectors";
 import { daysUntil, formatDay, serverDay } from "@/lib/time";
 import { type Cycle, isOpenCategory, type Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
@@ -40,8 +40,8 @@ export function cyclePhase(cycle: Cycle, now = serverDay()): "current" | "upcomi
 export function CyclePage() {
   const { key, id } = useParams();
   const project = useProjectByKey(key);
-  const cycle = useStore((s) => (id ? s.collections.cycles[id] : undefined));
-  if (!project || !cycle || cycle.deleted_at || cycle.project_id !== project.id) return <NotFoundPage />;
+  const cycle = useRow("cycles", id);
+  if (!project || !cycle || cycle.project_id !== project.id) return <NotFoundPage />;
   return <CycleView project={project} cycle={cycle} />;
 }
 
@@ -49,7 +49,8 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
   const name = cycleName(cycle);
   usePageTitle(name);
   const slug = useSlug();
-  const statuses = useCollection("statuses");
+  const statuses = useLookup("statuses");
+  const readOnly = !useCan().edit(project.id);
   const cycles = useCycles(project.id);
   const tasks = useTasksBy(project.id, "cycle_id")[cycle.id] ?? [];
   const tally = useTallies("cycle_id")[cycle.id] ?? emptyTally();
@@ -76,16 +77,18 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
           {t("nav.cycles")}
         </Link>
         <span className="flex-1" />
-        <Button
-          disabled={!next || unfinished.length === 0}
-          title={!next ? t("cycle.noNext") : undefined}
-          onClick={() => next && moveToCycle(unfinished, next, cycleName(next))}
-        >
-          <ArrowRight className="size-4" aria-hidden />
-          {next && unfinished.length > 0
-            ? t("cycle.moveUnfinished", { n: unfinished.length, name: cycleName(next) })
-            : t("cycle.moveUnfinishedNone")}
-        </Button>
+        {!readOnly && (
+          <Button
+            disabled={!next || unfinished.length === 0}
+            title={!next ? t("cycle.noNext") : undefined}
+            onClick={() => next && moveToCycle(unfinished, next, cycleName(next))}
+          >
+            <ArrowRight className="size-4" aria-hidden />
+            {next && unfinished.length > 0
+              ? t("cycle.moveUnfinished", { n: unfinished.length, name: cycleName(next) })
+              : t("cycle.moveUnfinishedNone")}
+          </Button>
+        )}
       </PageBar>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-10">
@@ -105,6 +108,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
                 required
                 value={cycle.starts_on}
                 max={cycle.ends_on}
+                disabled={readOnly}
                 onChange={(e) =>
                   e.target.value && e.target.value <= cycle.ends_on && updateCycle(cycle, { starts_on: e.target.value })
                 }
@@ -118,6 +122,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
                 required
                 value={cycle.ends_on}
                 min={cycle.starts_on}
+                disabled={readOnly}
                 onChange={(e) =>
                   e.target.value && e.target.value >= cycle.starts_on && updateCycle(cycle, { ends_on: e.target.value })
                 }

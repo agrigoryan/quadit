@@ -2,7 +2,7 @@
 // holds, what waits on it, and its place in the queues of shared resources.
 
 import { useMemo } from "react";
-import { useCollection } from "@/lib/selectors";
+import { useLiveTasks, useLookup, useOpenDecisions, useRows } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import { type Decision, isOpenCategory, type Task } from "@/lib/types";
 import type { Claim, Resource } from "@/lib/types-agents";
@@ -27,10 +27,10 @@ const empty = (): AgentWork => ({ held: [], waiting: [], asked: [], claims: [] }
 
 /** Live claims in queue order: the holder first, then by when each asked. */
 export function useClaims(): Claim[] {
-  const claims = useCollection("claims");
+  const claims = useRows("claims");
   return useMemo(
     () =>
-      Object.values(claims)
+      claims
         .filter((c) => c.state !== "released")
         .sort(
           (a, b) =>
@@ -43,33 +43,29 @@ export function useClaims(): Claim[] {
 }
 
 export function useResources(): Resource[] {
-  const resources = useCollection("resources");
-  return useMemo(
-    () =>
-      Object.values(resources)
-        .filter((r) => !r.deleted_at)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [resources],
-  );
+  const resources = useRows("resources");
+  return useMemo(() => [...resources].sort((a, b) => a.name.localeCompare(b.name)), [resources]);
 }
 
 /** Every agent's work, by user id. */
 export function useAgentWork(claims: Claim[]): Dict<AgentWork> {
-  const tasks = useCollection("tasks");
-  const statuses = useCollection("statuses");
-  const decisions = useCollection("decisions");
+  const tasks = useLiveTasks();
+  const liveTasks = useLookup("tasks");
+  const statuses = useLookup("statuses");
+  const openDecisions = useOpenDecisions();
   return useMemo(() => {
     const out: Dict<AgentWork> = {};
     const of = (id: string) => (out[id] ??= empty());
-    for (const task of Object.values(tasks)) {
-      if (task.deleted_at || task.archived_at || !isOpenCategory(statuses[task.status_id]?.category)) continue;
+    for (const task of tasks) {
+      if (!isOpenCategory(statuses[task.status_id]?.category)) continue;
       if (task.lease_holder_id && task.lease_until) of(task.lease_holder_id).held.push(task);
       if (task.waiting_on_id) of(task.waiting_on_id).waiting.push(task);
     }
-    for (const decision of Object.values(decisions)) {
-      if (decision.state !== "open" || decision.deleted_at || !decision.asked_id) continue;
-      const task = tasks[decision.task_id];
-      if (task && !task.deleted_at) of(decision.asked_id).asked.push({ decision, task });
+    for (const [taskId, open] of Object.entries(openDecisions)) {
+      // Only on a live task: one in the trash or the archive waits on no one.
+      const task = liveTasks[taskId];
+      if (!task) continue;
+      for (const decision of open) if (decision.asked_id) of(decision.asked_id).asked.push({ decision, task });
     }
     for (const claim of claims) of(claim.user_id).claims.push(claim);
     for (const work of Object.values(out)) {
@@ -80,7 +76,7 @@ export function useAgentWork(claims: Claim[]): Dict<AgentWork> {
       work.asked.sort((a, b) => a.decision.created_at - b.decision.created_at);
     }
     return out;
-  }, [tasks, statuses, decisions, claims]);
+  }, [tasks, liveTasks, statuses, openDecisions, claims]);
 }
 
 export const NO_WORK: AgentWork = empty();

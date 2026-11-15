@@ -7,7 +7,7 @@ import { Archive, ChevronRight, MoreHorizontal, Plus, RotateCcw, Trash2 } from "
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useMember } from "@/lib/selectors";
+import { useLookupEvenIfGone, useMember, useRow, useRowEvenIfGone } from "@/lib/selectors";
 import { useMinute } from "@/lib/tick";
 import { ago, exact } from "@/lib/time";
 import { nameOf } from "@/detail/data";
@@ -24,10 +24,11 @@ import type { Preference } from "@/lib/types-plan";
 
 /** The decision a preference came from, as a link that opens its task there. */
 function Source({ decisionId }: { decisionId: string }) {
-  const decision = useCollection("decisions")[decisionId];
-  const task = useCollection("tasks")[decision?.task_id ?? ""];
+  const decision = useRow("decisions", decisionId);
+  // An archived task still opens; a trashed one is not linked to.
+  const task = useRowEvenIfGone("tasks", decision?.task_id);
   const link = useTaskLink({ key: task?.key ?? "" });
-  if (!decision || !task || decision.deleted_at || task.deleted_at) return null;
+  if (!decision || !task || task.deleted_at) return null;
   return (
     <Link
       {...link}
@@ -47,8 +48,9 @@ interface ItemProps {
 
 function PreferenceItem({ pref, canEdit, onDelete }: ItemProps) {
   useMinute();
-  const project = useCollection("projects")[pref.project_id ?? ""];
-  const labels = useCollection("labels");
+  // The rule's scope is named as it was made, an archived project or a deleted label included.
+  const project = useRowEvenIfGone("projects", pref.project_id);
+  const labels = useLookupEvenIfGone("labels");
   const author = useMember(pref.created_by);
   const retired = !!pref.retired_at;
   return (

@@ -8,7 +8,7 @@ import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { ago, exact, parseWhen, timeOfDay } from "@/lib/time";
 import type { AgentSession, Member, Task } from "@/lib/types";
-import { useStore } from "@/lib/store";
+import { useLookup, useRowEvenIfGone } from "@/lib/selectors";
 import { count } from "@/insights/lib/amounts";
 import type { AgentState } from "@/insights/lib/types";
 import type { Claim } from "@/lib/types-agents";
@@ -47,9 +47,9 @@ function Doing({
   running: AgentSession | undefined;
   now: number;
 }) {
-  const tasks = useStore((s) => s.collections.tasks);
   const held = work.held.filter((task) => (task.lease_until ?? 0) > now);
-  const sessionTask = running?.task_id ? tasks[running.task_id] : undefined;
+  // The task a running session is on is named even if it has since been archived or trashed.
+  const sessionTask = useRowEvenIfGone("tasks", running?.task_id);
   const lines: React.ReactNode[] = [];
   if (running) {
     lines.push(
@@ -99,7 +99,7 @@ function Doing({
 /** Tasks handed to the agent and questions asked of it, oldest first. */
 function WaitsOnIt({ work, now }: { work: AgentWork; now: number }) {
   const [all, setAll] = useState(false);
-  const statuses = useStore((s) => s.collections.statuses);
+  const statuses = useLookup("statuses");
   const rows = [
     ...work.asked.map(({ decision, task }) => ({
       id: decision.id,

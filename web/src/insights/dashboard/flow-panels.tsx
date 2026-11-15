@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/lib/selectors";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { statusRows, StatusStack } from "@/insights/charts/status-stack";
 import { WeeklyBars, weeklyRows } from "@/insights/charts/weekly-bars";
@@ -16,7 +16,8 @@ import { Avatar } from "@/ui/avatar";
 
 export function StatusPanel({ rows, className }: { rows: StatusCount[]; className?: string }) {
   const [table, setTable] = useState(false);
-  const projects = useCollection("projects");
+  // The server's counts can name an archived project.
+  const projects = useLookupEvenIfGone("projects");
   const names: Record<string, string> = {};
   for (const p of Object.values(projects)) names[p.key] = p.name;
   const total = rows.reduce((sum, r) => sum + r.count, 0);

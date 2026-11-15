@@ -41,6 +41,8 @@ interface Props {
   /** Written after the bar when nothing is being changed: usually the end date. */
   label?: ReactNode;
   onChange: (next: { start?: number; end?: number }) => void;
+  /** Shown, not changed: the member may not change it. */
+  readOnly?: boolean;
 }
 
 const day = (n: number) => formatDay(dayFromNumber(n));
@@ -51,7 +53,21 @@ function apply(mode: Mode, from: Range, by: number): Range {
   return { s: from.s + by, e: from.e + by };
 }
 
-export function Bar({ name, scale, start, end, edit, color, share, tall, late, describedBy, label, onChange }: Props) {
+export function Bar({
+  name,
+  scale,
+  start,
+  end,
+  edit,
+  color,
+  share,
+  tall,
+  late,
+  describedBy,
+  label,
+  onChange,
+  readOnly,
+}: Props) {
   const hasStart = start !== undefined;
   const hasEnd = end !== undefined;
   const base: Range = { s: start ?? (end ?? 0) - OPEN_DAYS + 1, e: end ?? (start ?? 0) + OPEN_DAYS - 1 };
@@ -93,7 +109,7 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
 
   function down(e: PointerEvent, asked: Mode) {
     // A finger on the middle of a bar scrolls the timeline; only the ends drag.
-    if (e.button !== 0 || (e.pointerType === "touch" && asked === "move")) return;
+    if (readOnly || e.button !== 0 || (e.pointerType === "touch" && asked === "move")) return;
     e.preventDefault();
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -116,6 +132,7 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
   }
 
   function key(e: KeyboardEvent) {
+    if (readOnly) return;
     if (e.key === "Escape" && live.current) {
       e.stopPropagation();
       finish(false);
@@ -167,6 +184,7 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
         aria-valuemax={scale.end}
         aria-valuenow={shown.e}
         aria-valuetext={text}
+        aria-readonly={readOnly || undefined}
         aria-describedby={describedBy}
         title={text}
         onKeyDown={key}
@@ -176,7 +194,7 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
         {...handlers}
         className={cx(
           "absolute inset-0 overflow-hidden rounded-[4px] outline-offset-2",
-          edit === "both" ? "cursor-grab active:cursor-grabbing" : "cursor-ew-resize",
+          readOnly ? "" : edit === "both" ? "cursor-grab active:cursor-grabbing" : "cursor-ew-resize",
           changing && "ring-2 ring-accent/40",
         )}
         style={{
@@ -190,7 +208,7 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
           <div className="h-full" style={{ width: `${Math.min(1, share) * 100}%`, background: color }} />
         )}
       </div>
-      {edit === "both" && (
+      {!readOnly && edit === "both" && (
         <span
           aria-hidden
           className={cx(handle, "-left-2 after:left-2")}
@@ -198,12 +216,14 @@ export function Bar({ name, scale, start, end, edit, color, share, tall, late, d
           {...handlers}
         />
       )}
-      <span
-        aria-hidden
-        className={cx(handle, "-right-2 after:right-2")}
-        onPointerDown={(e) => down(e, "end")}
-        {...handlers}
-      />
+      {!readOnly && (
+        <span
+          aria-hidden
+          className={cx(handle, "-right-2 after:right-2")}
+          onPointerDown={(e) => down(e, "end")}
+          {...handlers}
+        />
+      )}
       <span
         className={cx(
           "pointer-events-none absolute top-1/2 left-full ml-2.5 -translate-y-1/2 text-2xs whitespace-nowrap tnum",

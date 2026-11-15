@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useCollection } from "@/lib/selectors";
+import { useLookupEvenIfGone, useRows } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { Decision, DecisionOption, Outcome, Project, Task } from "@/lib/types";
 import type { Preference } from "@/lib/types-plan";
@@ -35,15 +35,15 @@ export const noFilters: Filters = { q: "", state: "all", project: "", asked: "",
 
 export const isFiltered = (f: Filters) => f.q.trim() !== "" || f.state !== "all" || !!f.project || !!f.asked || !!f.by;
 
-/** Every live decision on a live task, newest first. */
+/** Every live decision on a task not in the trash (an archived one included: the log is history), newest first. */
 export function useEntries(): Entry[] {
-  const decisions = useCollection("decisions");
-  const tasks = useCollection("tasks");
-  const projects = useCollection("projects");
+  const decisions = useRows("decisions");
+  const tasks = useLookupEvenIfGone("tasks");
+  // A task's project is named even when it is archived.
+  const projects = useLookupEvenIfGone("projects");
   return useMemo(() => {
     const out: Entry[] = [];
-    for (const decision of Object.values(decisions)) {
-      if (decision.deleted_at) continue;
+    for (const decision of decisions) {
       const task = tasks[decision.task_id];
       if (!task || task.deleted_at) continue;
       const words = [
@@ -141,11 +141,9 @@ export interface Preferences {
 
 /** Standing preferences, newest first; the retired ones apart. */
 export function usePreferences(): Preferences {
-  const rows = useCollection("preferences");
+  const rows = useRows("preferences");
   return useMemo(() => {
-    const all = Object.values(rows)
-      .filter((p) => !p.deleted_at)
-      .sort((a, b) => b.created_at - a.created_at);
+    const all = [...rows].sort((a, b) => b.created_at - a.created_at);
     const byDecision: Dict<Preference> = {};
     for (const p of all) if (p.decision_id && !p.retired_at) byDecision[p.decision_id] ??= p;
     return { active: all.filter((p) => !p.retired_at), retired: all.filter((p) => p.retired_at), byDecision };

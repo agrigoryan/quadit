@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
-import { useCollection } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useRows } from "@/lib/selectors";
 import type { AgentSession, Task, TaskLink } from "@/lib/types";
 import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
@@ -143,12 +144,10 @@ function Sessions({ sessions }: { sessions: AgentSession[] }) {
 
 /** Agent sessions and code links of a task. Draws nothing when the task has neither. */
 export function TaskWork({ task }: { task: Task }) {
-  const all = useCollection("sessions");
+  const all = useRows("sessions");
+  const readOnly = !useCan().editTask(task);
   const sessions = useMemo(
-    () =>
-      Object.values(all)
-        .filter((s) => s.task_id === task.id)
-        .sort((a, b) => b.started_at - a.started_at),
+    () => all.filter((s) => s.task_id === task.id).sort((a, b) => b.started_at - a.started_at),
     [all, task.id],
   );
   const links = useTaskLinks(task.id);
@@ -160,7 +159,7 @@ export function TaskWork({ task }: { task: Task }) {
         <Section title={t("taskwork.code")} meta={<span className="text-xs text-ink-3 tnum">{code.length}</span>}>
           <ul>
             {code.map((link) => (
-              <CodeLink key={link.id} link={link} readOnly={!!task.deleted_at} />
+              <CodeLink key={link.id} link={link} readOnly={readOnly} />
             ))}
           </ul>
         </Section>

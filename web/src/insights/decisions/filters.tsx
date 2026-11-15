@@ -5,7 +5,7 @@
 import { Search, X } from "lucide-react";
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useCollection, useProjects } from "@/lib/selectors";
+import { useLookupEvenIfGone, useProjects } from "@/lib/selectors";
 import { nameOf } from "@/detail/data";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Avatar } from "@/ui/avatar";
@@ -32,7 +32,8 @@ interface Props {
 
 export function FilterBar({ entries, filters, onChange }: Props) {
   const projects = useProjects();
-  const members = useCollection("members");
+  // Who asked or answered, a member since removed included.
+  const members = useLookupEvenIfGone("members");
   const counts = useMemo(
     () => ({
       state: countBy(entries, filters, "state"),

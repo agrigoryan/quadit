@@ -2,12 +2,13 @@
 // them by id. This finds one from the other.
 
 import { useMemo } from "react";
-import { useCollection } from "@/lib/selectors";
+import { useLookupEvenIfGone } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 
 /** Members by handle, without the "@". */
 export function useMembersByHandle(): (handle: string | undefined) => Member | undefined {
-  const members = useCollection("members");
+  // The endpoints name past work too: a member since removed is still found.
+  const members = useLookupEvenIfGone("members");
   return useMemo(() => {
     const map = new Map<string, Member>();
     for (const m of Object.values(members)) map.set(m.handle.toLowerCase(), m);

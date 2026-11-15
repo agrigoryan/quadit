@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, errorMessage, workspacePath } from "@/lib/api";
-import { useCollection } from "@/lib/selectors";
+import { getRow, useRows } from "@/lib/selectors";
 import { getState, mergeRows, useStore } from "@/lib/store";
 import type { AgentSession } from "@/lib/types";
 
@@ -33,10 +33,9 @@ export function useSessions(
       .then((out) => {
         if (getState().slug !== slug) return;
         // A session the store already has is newer there: the feed has been at it.
-        const have = getState().collections.sessions;
         mergeRows(
           "sessions",
-          out.sessions.filter((s) => !have[s.id]),
+          out.sessions.filter((s) => !getRow("sessions", s.id)),
         );
         if (current) setError("");
       })
@@ -53,12 +52,9 @@ export function useSessions(
     // `live` is here so that a copy fetched afresh after a long gap gets its older sessions back.
   }, [slug, query, live]);
 
-  const stored = useCollection("sessions");
+  const stored = useRows("sessions");
   const sessions = useMemo(
-    () =>
-      Object.values(stored)
-        .filter(keep)
-        .sort((a, b) => b.started_at - a.started_at),
+    () => stored.filter(keep).sort((a, b) => b.started_at - a.started_at),
     // `keep` is a new function each render; what it selects by is in `query`.
     [stored, query],
   );

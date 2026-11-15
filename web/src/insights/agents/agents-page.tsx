@@ -7,7 +7,8 @@ import { useMemo, useState } from "react";
 import { Bot } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useCollection, useMe, useMembers, useSlug } from "@/lib/selectors";
+import { useCan } from "@/lib/access";
+import { useLookupEvenIfGone, useMembers, useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { AgentSession } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
@@ -32,7 +33,7 @@ const ORDER = { working: 0, has_work: 1, waiting: 2, idle: 3 } as const;
 export function AgentsPage() {
   usePageTitle(t("nav.agents"));
   const slug = useSlug();
-  const me = useMe();
+  const can = useCan();
   const members = useMembers();
   const now = useNow(15_000);
   const live = useLive<{ agents: AgentState[] }>("/agents");
@@ -68,7 +69,8 @@ export function AgentsPage() {
   const resourceNames = useMemo(() => Object.fromEntries(resources.map((r) => [r.id, r.name])), [resources]);
   // A helper (an agent made for one task) is shown inside its maker's card; one whose task has closed is hidden until asked for.
   const [showFinished, setShowFinished] = useState(false);
-  const tasks = useCollection("tasks");
+  // A helper's task is named even when it has since been archived or trashed.
+  const tasks = useLookupEvenIfGone("tasks");
   const helperLabel = useHelperLabel();
   const finished = agents.filter(isFinishedHelper).length;
   const active = agents.filter((a) => !isFinishedHelper(a));
@@ -123,9 +125,9 @@ export function AgentsPage() {
             <EmptyState
               icon={<Bot />}
               title={t("agents.empty")}
-              hint={t(me.role === "member" ? "agents.emptyHintMember" : "agents.emptyHint")}
+              hint={t(can.administer ? "agents.emptyHint" : "agents.emptyHintMember")}
               action={
-                me.role !== "member" && (
+                can.administer && (
                   <Link
                     to={`/${slug}/settings/agents`}
                     className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"

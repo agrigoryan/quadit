@@ -5,7 +5,7 @@ import { CornerDownRight } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useCollection, useSlug, useTaskByKey } from "@/lib/selectors";
+import { useLookupEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/lib/selectors";
 import type { Member } from "@/lib/types";
 import { useMembersByHandle } from "@/insights/lib/members";
 import type { AgentState } from "@/insights/lib/types";
@@ -17,7 +17,8 @@ import { Avatar } from "@/ui/avatar";
 
 function TaskRef({ taskKey, title }: { taskKey: string; title?: string }) {
   const link = useTaskLink({ key: taskKey });
-  const task = useTaskByKey(taskKey);
+  // The server names the task; its title is shown even if it has since been archived or trashed.
+  const task = useTaskByKeyEvenIfGone(taskKey);
   return (
     <Link {...link} className="min-w-0 truncate text-ink-2 underline-offset-2 hover:text-ink hover:underline">
       <span className="tnum">{taskKey}</span> {title || task?.title}
@@ -81,7 +82,8 @@ function Row({
 
 export function AgentsPanel({ agents: all, className }: { agents: AgentState[]; className?: string }) {
   const slug = useSlug();
-  const members = useCollection("members");
+  // The server names the agents; one since removed is still found by id.
+  const members = useLookupEvenIfGone("members");
   const byHandle = useMembersByHandle();
   const helperLabel = useHelperLabel();
   const memberOf = (a: AgentState) => members[a.user_id] ?? byHandle(a.handle);

@@ -7,7 +7,7 @@ import { Check, ChevronRight, Loader, Square, X } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMember, useTask } from "@/lib/selectors";
+import { useMember, useRowEvenIfGone } from "@/lib/selectors";
 import { ago, exact } from "@/lib/time";
 import type { AgentSession } from "@/lib/types";
 import { moneyMicros, short } from "@/insights/lib/amounts";
@@ -49,7 +49,8 @@ function StateMark({ session }: { session: AgentSession }) {
 }
 
 function TaskKey({ taskId }: { taskId: string }) {
-  const task = useTask(taskId);
+  // A past session names its task even after the task is archived or trashed.
+  const task = useRowEvenIfGone("tasks", taskId);
   const link = useTaskLink({ key: task?.key ?? "" });
   if (!task) return null;
   return (

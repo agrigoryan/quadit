@@ -11,7 +11,8 @@ import { Button, IconButton } from "@/ui/button";
 import { Textarea } from "@/ui/input";
 import { Markdown } from "@/ui/markdown";
 
-export function EpicDescription({ epic }: { epic: Epic }) {
+/** readOnly: shown, not edited (the member may not change this project). */
+export function EpicDescription({ epic, readOnly }: { epic: Epic; readOnly: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const text = epic.description ?? "";
 
@@ -54,6 +55,7 @@ export function EpicDescription({ epic }: { epic: Epic }) {
   }
 
   if (!text) {
+    if (readOnly) return null;
     return (
       <button
         type="button"
@@ -68,15 +70,17 @@ export function EpicDescription({ epic }: { epic: Epic }) {
   return (
     <div className="group relative mt-2 max-w-3xl pr-8">
       <Markdown text={text} />
-      <IconButton
-        label={t("epic.editDescription")}
-        size="sm"
-        variant="secondary"
-        onClick={() => setDraft(text)}
-        className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
-      >
-        <Pencil className="size-3" />
-      </IconButton>
+      {!readOnly && (
+        <IconButton
+          label={t("epic.editDescription")}
+          size="sm"
+          variant="secondary"
+          onClick={() => setDraft(text)}
+          className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+        >
+          <Pencil className="size-3" />
+        </IconButton>
+      )}
     </div>
   );
 }

@@ -7,9 +7,10 @@ import { ChevronRight, Plus } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { useCan } from "@/lib/access";
 import { useSlug } from "@/lib/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
-import type { Category, Epic } from "@/lib/types";
+import { type Category, type Epic, isClosedCategory } from "@/lib/types";
 import { count } from "@/insights/lib/amounts";
 import { dayFromNumber } from "@/lib/days";
 import { Bar } from "@/insights/timeline/bar";
@@ -67,9 +68,11 @@ interface EpicProps {
   today: number;
   open: boolean;
   onToggle: () => void;
+  /** Dates are shown, not changed: the member may not change this project. */
+  readOnly: boolean;
 }
 
-export function EpicRow({ line, projectKey, scale, today, open, onToggle }: EpicProps) {
+export function EpicRow({ line, projectKey, scale, today, open, onToggle, readOnly }: EpicProps) {
   const slug = useSlug();
   const { epic } = line;
   const closed = epic.state === "done" || epic.state === "canceled";
@@ -138,18 +141,21 @@ export function EpicRow({ line, projectKey, scale, today, open, onToggle }: Epic
               </>
             }
             onChange={(next) => setEpicDates(epic, next)}
+            readOnly={readOnly}
           />
         ) : (
           <TrackNote>
             {t("timeline.noDates")}
-            <button
-              type="button"
-              className={ghostButton}
-              onClick={() => setEpicDates(epic, { start: today, end: today + 13 })}
-            >
-              <Plus className="size-3" aria-hidden />
-              {t("timeline.setDates")}
-            </button>
+            {!readOnly && (
+              <button
+                type="button"
+                className={ghostButton}
+                onClick={() => setEpicDates(epic, { start: today, end: today + 13 })}
+              >
+                <Plus className="size-3" aria-hidden />
+                {t("timeline.setDates")}
+              </button>
+            )}
           </TrackNote>
         )}
         {line.milestones.map(({ milestone, day }) => (
@@ -190,7 +196,8 @@ interface TaskProps {
 export function TaskLineRow({ line, scale, today }: TaskProps) {
   const { task, category } = line;
   const link = useTaskLink(task);
-  const closed = category === "done" || category === "canceled";
+  const readOnly = !useCan().editTask(task);
+  const closed = isClosedCategory(category);
   const late = closed ? 0 : lateBy(line.due);
 
   return (
@@ -229,11 +236,12 @@ export function TaskLineRow({ line, scale, today }: TaskProps) {
               </>
             }
             onChange={(next) => next.end !== undefined && setDue([task], dayFromNumber(next.end))}
+            readOnly={readOnly}
           />
         ) : (
           <TrackNote>
             {t("timeline.noDue")}
-            {!closed && (
+            {!closed && !readOnly && (
               <button
                 type="button"
                 className={cx(

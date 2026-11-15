@@ -8,6 +8,7 @@ import { MessageCircleQuestion, SearchX } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { useCan } from "@/lib/access";
 import { useMe } from "@/lib/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { useAttachmentsBySubject } from "@/detail/data";
@@ -53,7 +54,7 @@ export function DecisionLogPage() {
   const [limit, setLimit] = useState(PAGE);
   const [pane, setPane] = useState<Pane>("log");
   const [making, setMaking] = useState<Making>(null);
-  const canEdit = me.role !== "member";
+  const canEdit = useCan().administer;
 
   const found = useMemo(() => entries.filter((e) => matches(e, filters)), [entries, filters]);
   const shown = found.slice(0, limit);

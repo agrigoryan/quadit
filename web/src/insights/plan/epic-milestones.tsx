@@ -7,8 +7,7 @@ import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Diamond, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { findTaskByKey, sortByRank, useCollection } from "@/lib/selectors";
-import { getState } from "@/lib/store";
+import { getTaskByKey, sortByRank, useLookup, useRows } from "@/lib/selectors";
 import type { Epic, Milestone, Task } from "@/lib/types";
 import { count } from "@/insights/lib/amounts";
 import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from "@/insights/plan/actions";
@@ -25,7 +24,7 @@ import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/me
 async function addTask(epic: Epic, milestone: Milestone | undefined, title: string) {
   try {
     const key = await createTask({ projectId: epic.project_id, title, epicId: epic.id });
-    const task = findTaskByKey(getState().collections.tasks, key);
+    const task = getTaskByKey(key);
     if (task && milestone) setMilestone([task], milestone.id);
   } catch {
     // The server's reason is already shown.
@@ -70,10 +69,12 @@ interface GroupProps {
   milestone?: Milestone;
   ordered: Milestone[];
   tasks: Task[];
+  /** Shown, not changed: the member may not change this project. */
+  readOnly: boolean;
 }
 
-function Group({ epic, milestone, ordered, tasks }: GroupProps) {
-  const statuses = useCollection("statuses");
+function Group({ epic, milestone, ordered, tasks, readOnly }: GroupProps) {
+  const statuses = useLookup("statuses");
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const tally = tallyOf(tasks, statuses);
@@ -125,6 +126,7 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
             <Input
               type="date"
               value={milestone.target_on ?? ""}
+              disabled={readOnly}
               onChange={(e) => updateMilestone(milestone, { target_on: e.target.value || null })}
               className="h-6 w-[7.75rem] px-1.5 text-xs tnum"
             />
@@ -132,10 +134,12 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
         )}
         <span className="flex-1 sm:hidden" />
         <ProgressCount done={tally.done} started={tally.started} total={tally.total} />
-        <IconButton size="sm" label={t("list.addTo", { name })} onClick={() => setAdding(true)}>
-          <Plus className="size-3.5" />
-        </IconButton>
-        {milestone && (
+        {!readOnly && (
+          <IconButton size="sm" label={t("list.addTo", { name })} onClick={() => setAdding(true)}>
+            <Plus className="size-3.5" />
+          </IconButton>
+        )}
+        {milestone && !readOnly && (
           <Menu>
             <MenuTrigger asChild>
               <IconButton size="sm" label={t("epic.milestoneActions", { name })}>
@@ -174,7 +178,7 @@ function Group({ epic, milestone, ordered, tasks }: GroupProps) {
           <div className="min-w-0 flex-1">
             <TaskRow task={task} hide={{ epic: true }} />
           </div>
-          {ordered.length > 0 && (
+          {ordered.length > 0 && !readOnly && (
             <div className="flex items-center border-b border-line/70 pr-2">
               <TaskPropertyPicker kind="milestone" tasks={[task]} align="end">
                 <IconButton size="sm" label={t("epic.moveTask", { key: task.key })}>
@@ -228,12 +232,9 @@ function NewMilestone({ epic, last }: { epic: Epic; last: Milestone | undefined 
   );
 }
 
-export function EpicMilestones({ epic, tasks }: { epic: Epic; tasks: Task[] }) {
-  const all = useCollection("milestones");
-  const ordered = useMemo(
-    () => sortByRank(Object.values(all).filter((m) => m.epic_id === epic.id && !m.deleted_at)),
-    [all, epic.id],
-  );
+export function EpicMilestones({ epic, tasks, readOnly }: { epic: Epic; tasks: Task[]; readOnly: boolean }) {
+  const milestones = useRows("milestones");
+  const ordered = useMemo(() => sortByRank(milestones.filter((m) => m.epic_id === epic.id)), [milestones, epic.id]);
   const known = new Set(ordered.map((m) => m.id));
   const loose = tasks.filter((task) => !task.milestone_id || !known.has(task.milestone_id));
   return (
@@ -245,10 +246,13 @@ export function EpicMilestones({ epic, tasks }: { epic: Epic; tasks: Task[] }) {
           milestone={m}
           ordered={ordered}
           tasks={tasks.filter((task) => task.milestone_id === m.id)}
+          readOnly={readOnly}
         />
       ))}
-      {(loose.length > 0 || ordered.length === 0) && <Group epic={epic} ordered={ordered} tasks={loose} />}
-      <NewMilestone epic={epic} last={ordered[ordered.length - 1]} />
+      {(loose.length > 0 || ordered.length === 0) && (
+        <Group epic={epic} ordered={ordered} tasks={loose} readOnly={readOnly} />
+      )}
+      {!readOnly && <NewMilestone epic={epic} last={ordered[ordered.length - 1]} />}
     </div>
   );
 }
