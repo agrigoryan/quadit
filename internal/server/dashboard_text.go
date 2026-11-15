@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// dashboardText is the dashboard in the compact text form.
+// dashboardText is the dashboard in the compact text form: what waits on
+// the caller, epics, tasks by status, the longest waits, agents and health.
 func (d *dashboard) dashboardText() string {
-	raw, _ := json.Marshal(d.machinery)
+	raw, _ := json.Marshal(d.machinery) // cannot fail: numbers, strings and bools
 	var b strings.Builder
 	fmt.Fprintf(&b, "== waiting on you (%d)\n%s", len(d.waiting), lines(d.waiting, taskView.line, "nothing"))
 	b.WriteString("== epics\n")
@@ -23,14 +24,14 @@ func (d *dashboard) dashboardText() string {
 		b.WriteString("\n")
 	}
 	b.WriteString("== status\n")
-	for _, c := range d.byStatus {
-		if c.Count > 0 {
-			fmt.Fprintf(&b, "%s %s: %d\n", c.Project, c.Status, c.Count)
+	for _, status := range d.byStatus {
+		if status.Count > 0 {
+			fmt.Fprintf(&b, "%s %s: %d\n", status.Project, status.Status, status.Count)
 		}
 	}
 	b.WriteString("== waiting longest\n")
-	for _, wt := range d.waits {
-		fmt.Fprintf(&b, "%s  %d tasks, oldest %.1fh, average %.1fh\n", wt.Member, wt.Tasks, wt.Oldest, wt.Hours)
+	for _, wait := range d.waits {
+		fmt.Fprintf(&b, "%s  %d tasks, oldest %.1fh, average %.1fh\n", wait.Member, wait.Tasks, wait.Oldest, wait.Hours)
 	}
 	b.WriteString("== agents\n")
 	for _, a := range d.agents {

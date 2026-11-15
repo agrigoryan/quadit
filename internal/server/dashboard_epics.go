@@ -1,11 +1,15 @@
+// The dashboard's epics part: each epic's progress, and whether it is at risk.
+
 package server
 
 import (
 	"sort"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
+// epicProgress is one epic with how far along it is.
 type epicProgress struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -25,40 +29,41 @@ type epicProgress struct {
 	AtRiskCode string `json:"at_risk_code,omitempty"`
 }
 
-// epicProgress fills in the epics with their progress.
+// epicProgress fills in the epics with their progress: the tasks and points
+// done and started, leaving out canceled tasks and canceled epics.
 func (d *dashboard) epicProgress() error {
 	names := d.names
 	byEpic := map[string]*epicProgress{}
-	for _, e := range names.epics {
-		if e.DeletedAt != 0 || (len(d.projects) > 0 && !has(d.projects, e.ProjectID)) || e.State == core.EpicCanceled {
+	for _, epic := range names.epics {
+		if epic.DeletedAt != 0 || (len(d.projects) > 0 && !has(d.projects, epic.ProjectID)) || epic.State == core.EpicCanceled {
 			continue
 		}
-		byEpic[e.ID] = &epicProgress{ID: e.ID, Name: e.Name, Project: names.projects[e.ProjectID].Key, State: e.State, Lead: names.handle(e.LeadID), TargetOn: e.TargetOn}
+		byEpic[epic.ID] = &epicProgress{ID: epic.ID, Name: epic.Name, Project: names.projects[epic.ProjectID].Key, State: epic.State, Lead: names.handle(epic.LeadID), TargetOn: epic.TargetOn}
 	}
 	lastMove := map[string]int64{}
 	for _, t := range d.tasks {
-		cat := names.statuses[t.StatusID].Category
-		ep, ok := byEpic[t.EpicID]
-		if !ok || cat == core.CatCanceled {
+		category := names.statuses[t.StatusID].Category
+		progress, ok := byEpic[t.EpicID]
+		if !ok || category == core.CatCanceled {
 			continue
 		}
-		ep.Total++
-		ep.Points += t.Estimate
-		switch cat {
+		progress.Total++
+		progress.Points += t.Estimate
+		switch category {
 		case core.CatDone:
-			ep.Done++
-			ep.PointsOK += t.Estimate
+			progress.Done++
+			progress.PointsOK += t.Estimate
 		case core.CatStarted, core.CatWaiting:
-			ep.Started++
+			progress.Started++
 		}
 		if t.UpdatedAt > lastMove[t.EpicID] {
 			lastMove[t.EpicID] = t.UpdatedAt
 		}
 	}
 	var epics []epicProgress
-	for id, ep := range byEpic {
-		d.markAtRisk(ep, lastMove[id])
-		epics = append(epics, *ep)
+	for epicID, progress := range byEpic {
+		d.markAtRisk(progress, lastMove[epicID])
+		epics = append(epics, *progress)
 	}
 	sort.Slice(epics, func(i, j int) bool { return epicBefore(epics[i], epics[j]) })
 	d.epics = epics
@@ -83,17 +88,17 @@ func epicBefore(a, b epicProgress) bool {
 
 // markAtRisk says on an epic why it is at risk, if it is. lastMove is when
 // one of its tasks last changed.
-func (d *dashboard) markAtRisk(ep *epicProgress, lastMove int64) {
-	today := d.now.UTC().Format("2006-01-02")
-	soon := d.now.AddDate(0, 0, 7).UTC().Format("2006-01-02")
-	left := ep.Total - ep.Done
+func (d *dashboard) markAtRisk(progress *epicProgress, lastMove int64) {
+	today := d.now.UTC().Format(time.DateOnly)
+	soon := d.now.AddDate(0, 0, 7).UTC().Format(time.DateOnly)
+	left := progress.Total - progress.Done
 	switch {
-	case ep.State == core.EpicDone || left == 0:
-	case ep.TargetOn != "" && ep.TargetOn < today:
-		ep.AtRisk, ep.AtRiskCode = "past its target date", "past_target"
-	case ep.TargetOn != "" && ep.TargetOn <= soon && ep.Done*2 < ep.Total:
-		ep.AtRisk, ep.AtRiskCode = "due within a week and less than half done", "due_soon"
-	case ep.State == core.EpicActive && lastMove != 0 && d.now.UnixMilli()-lastMove > 14*24*3600_000:
-		ep.AtRisk, ep.AtRiskCode = "nothing has moved in two weeks", "stalled"
+	case progress.State == core.EpicDone || left == 0:
+	case progress.TargetOn != "" && progress.TargetOn < today:
+		progress.AtRisk, progress.AtRiskCode = "past its target date", "past_target"
+	case progress.TargetOn != "" && progress.TargetOn <= soon && progress.Done*2 < progress.Total:
+		progress.AtRisk, progress.AtRiskCode = "due within a week and less than half done", "due_soon"
+	case progress.State == core.EpicActive && lastMove != 0 && d.now.UnixMilli()-lastMove > (14*24*time.Hour).Milliseconds():
+		progress.AtRisk, progress.AtRiskCode = "nothing has moved in two weeks", "stalled"
 	}
 }

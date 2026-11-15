@@ -1,7 +1,9 @@
+// Pages: the page tree, one page, its versions and who else has it open;
+// pages built from data; and an agent's memory pages.
+
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,19 +34,21 @@ func init() {
 	})
 }
 
-// docByID loads a page the caller may see.
+// docByID loads a page the caller may see. A page the caller may not see
+// is not found, as one that does not exist.
 func (x *c) docByID(ref string) (core.Doc, error) {
-	var d core.Doc
-	err := x.db.Get(x.ctx(), &d, store.Eq("id", ref), store.Live)
+	var doc core.Doc
+	err := x.db.Get(x.ctx(), &doc, store.Eq("id", ref), store.Live)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		return d, err
+		return doc, err
 	}
-	if err != nil || !engine.CanSeeDoc(d, x.member.UserID) || !x.canProject(d.ProjectID) {
-		return d, errNotFound("doc " + ref)
+	if err != nil || !engine.CanSeeDoc(doc, x.member.UserID) || !x.canProject(doc.ProjectID) {
+		return doc, errNotFound("doc " + ref)
 	}
-	return d, nil
+	return doc, nil
 }
 
+// visibleDocs lists, in their order, the pages the caller may see.
 func (x *c) visibleDocs() ([]core.Doc, error) {
 	var docs []core.Doc
 	if err := x.db.List(x.ctx(), &docs, store.Q{Where: []store.Cond{store.Live}, Order: "rank"}); err != nil {
@@ -71,14 +75,14 @@ func (s *Server) handleListPages(x *c) error {
 	}
 	docs = keep(docs, func(d core.Doc) bool { return d.Kind != core.DocRow })
 	if ref := x.r.URL.Query().Get("project"); ref != "" {
-		p, err := x.resolver().Project(ref)
+		project, err := x.resolver().Project(ref)
 		if err != nil {
 			return err
 		}
-		if !x.canProject(p.ID) {
+		if !x.canProject(project.ID) {
 			return errNotFound("project " + ref)
 		}
-		docs = pagesOfProject(docs, p.ID)
+		docs = pagesOfProject(docs, project.ID)
 	}
 	if since := int64(x.intParam("since", -1)); since >= 0 && x.wantText() {
 		// Only the pages changed after that position, as a flat list.
@@ -103,7 +107,7 @@ func pagesOfProject(docs []core.Doc, projectID string) []core.Doc {
 		byID[d.ID] = d
 	}
 	within := func(d core.Doc) bool {
-		for depth := 0; depth < 60; depth++ {
+		for range maxPageDepth {
 			if d.ProjectID == projectID {
 				return true
 			}
@@ -117,6 +121,10 @@ func pagesOfProject(docs []core.Doc, projectID string) []core.Doc {
 	}
 	return keep(docs, within)
 }
+
+// maxPageDepth is deeper than any page tree goes: a walk up that long has
+// met a loop.
+const maxPageDepth = 60
 
 // pageOutline writes pages as an indented tree with their ids. A page whose
 // parent is not among them stands at the top. A page says its project
@@ -165,106 +173,137 @@ func pageOutline(docs []core.Doc, projects map[string]core.Project) string {
 }
 
 // handleShowPage returns one page: as rows for the editor, or as Markdown.
+// A page built from data is rebuilt first when its data changed.
 func (s *Server) handleShowPage(x *c) error {
-	ctx := x.ctx()
-	d, err := x.docByID(x.r.PathValue("id"))
+	page, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
 		return err
 	}
-	if d.Generated != "" {
-		if err := s.regenerate(x, &d); err != nil {
-			s.log.Error("generated page", "doc", d.ID, "err", err)
+	if page.Generated != "" {
+		if err := s.regenerate(x, &page); err != nil {
+			s.log.Error("generated page", "doc", page.ID, "err", err)
 		}
 	}
 	var blocks []core.Block
-	if err := x.db.List(ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Live}, Order: "rank"}); err != nil {
+	if err := x.db.List(x.ctx(), &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", page.ID), store.Live}, Order: "rank"}); err != nil {
 		return err
 	}
-	format := x.r.URL.Query().Get("format")
-	if format == "md" || x.wantText() {
-		body := md.Render(engine.BlockTree(blocks))
-		text, cutOff := truncate(body, x.maxChars())
-		if cutOff {
-			text += "\n… (cut; add full=1)\n"
-		}
-		if format == "md" {
-			return x.text(text)
-		}
-		return x.text(fmt.Sprintf("# %s\n(doc %s, seq %d)\n\n%s", firstNonEmpty(d.Title, "Untitled"), d.ID, d.ContentSeq, text))
+	if format := x.r.URL.Query().Get("format"); format == "md" || x.wantText() {
+		return x.text(pageText(page, blocks, format, x.maxChars()))
 	}
-	out := map[string]any{"doc": d, "blocks": blocks}
-	var children []core.Doc
-	if err := x.db.List(ctx, &children, store.Q{Where: []store.Cond{store.Eq("parent_id", d.ID), store.Live}, Order: "rank"}); err != nil {
-		return err
-	}
-	if d.Kind == core.DocDatabase {
-		var props []core.DBProperty
-		var views []core.DBView
-		if err := x.db.List(ctx, &props, store.Q{Where: []store.Cond{store.Eq("database_id", d.ID), store.Live}, Order: "rank"}); err != nil {
-			return err
-		}
-		if err := x.db.List(ctx, &views, store.Q{Where: []store.Cond{store.Eq("database_id", d.ID), store.Live}, Order: "rank"}); err != nil {
-			return err
-		}
-		out["properties"], out["views"] = props, views
-		out["rows"] = keep(children, func(c core.Doc) bool { return c.Kind == core.DocRow })
-		children = keep(children, func(c core.Doc) bool { return c.Kind != core.DocRow })
-	}
-	out["children"] = children
-	var comments []core.Comment
-	if err := x.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Live}, Order: "created_seq"}); err != nil {
-		return err
-	}
-	out["comments"] = comments
-	// What mentions this page, and what it mentions.
-	var back, fwd []core.Ref
-	if err := x.db.List(ctx, &back, store.Where(store.Eq("to_id", d.ID))); err != nil {
-		return err
-	}
-	if err := x.db.List(ctx, &fwd, store.Where(store.Eq("from_scope_id", d.ID))); err != nil {
-		return err
-	}
-	out["mentioned_in"], out["mentions"] = back, fwd
-	_, atts, err := x.attachments(store.Eq("subject_id", d.ID))
+	out, err := x.pageRows(page, blocks)
 	if err != nil {
 		return err
-	}
-	out["attachments"] = atts
-	if d.SourceID != "" {
-		var src core.DocSource
-		err := x.db.Get(ctx, &src, store.Eq("id", d.SourceID))
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return err
-		}
-		if err == nil {
-			out["source"] = src
-		}
 	}
 	return x.ok(out)
 }
 
-func (s *Server) handleListPageVersions(x *c) error {
-	d, err := x.docByID(x.r.PathValue("id"))
-	if err != nil {
-		return err
+// pageText is a page as Markdown, cut at maxChars: alone for format=md,
+// else under a heading that names the page.
+func pageText(page core.Doc, blocks []core.Block, format string, maxChars int) string {
+	body := md.Render(engine.BlockTree(blocks))
+	text, cutOff := truncate(body, maxChars)
+	if cutOff {
+		text += "\n… (cut; add full=1)\n"
 	}
-	var vs []core.DocVersion
-	if err := x.db.List(x.ctx(), &vs, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "-seq", Limit: 500}); err != nil {
-		return err
+	if format == "md" {
+		return text
 	}
-	for i := range vs {
-		vs[i].Snapshot = nil // listed without their content
-	}
-	return x.ok(map[string]any{"versions": vs})
+	return fmt.Sprintf("# %s\n(doc %s, seq %d)\n\n%s", firstNonEmpty(page.Title, "Untitled"), page.ID, page.ContentSeq, text)
 }
 
-func (s *Server) handleShowPageVersion(x *c) error {
-	d, err := x.docByID(x.r.PathValue("id"))
+// pageRows is a page as rows for the editor: with its blocks, its
+// sub-pages, a database's properties, views and rows, its comments, what
+// mentions it and what it mentions, its files, and the source it is synced
+// from.
+func (x *c) pageRows(page core.Doc, blocks []core.Block) (map[string]any, error) {
+	ctx := x.ctx()
+	out := map[string]any{"doc": page, "blocks": blocks}
+	var children []core.Doc
+	if err := x.db.List(ctx, &children, store.Q{Where: []store.Cond{store.Eq("parent_id", page.ID), store.Live}, Order: "rank"}); err != nil {
+		return nil, err
+	}
+	if page.Kind == core.DocDatabase {
+		var err error
+		if children, err = x.addDatabaseRows(page, children, out); err != nil {
+			return nil, err
+		}
+	}
+	out["children"] = children
+	var comments []core.Comment
+	if err := x.db.List(ctx, &comments, store.Q{Where: []store.Cond{store.Eq("doc_id", page.ID), store.Live}, Order: "created_seq"}); err != nil {
+		return nil, err
+	}
+	out["comments"] = comments
+	// What mentions this page, and what it mentions.
+	var back, fwd []core.Ref
+	if err := x.db.List(ctx, &back, store.Where(store.Eq("to_id", page.ID))); err != nil {
+		return nil, err
+	}
+	if err := x.db.List(ctx, &fwd, store.Where(store.Eq("from_scope_id", page.ID))); err != nil {
+		return nil, err
+	}
+	out["mentioned_in"], out["mentions"] = back, fwd
+	_, atts, err := x.attachments(store.Eq("subject_id", page.ID))
+	if err != nil {
+		return nil, err
+	}
+	out["attachments"] = atts
+	if page.SourceID != "" {
+		var source core.DocSource
+		err := x.db.Get(ctx, &source, store.Eq("id", page.SourceID))
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return nil, err
+		}
+		if err == nil {
+			out["source"] = source
+		}
+	}
+	return out, nil
+}
+
+// addDatabaseRows adds a database's properties, views and rows to its
+// answer, and returns its children without the rows: its sub-pages.
+func (x *c) addDatabaseRows(database core.Doc, children []core.Doc, out map[string]any) ([]core.Doc, error) {
+	var props []core.DBProperty
+	var views []core.DBView
+	if err := x.db.List(x.ctx(), &props, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
+		return nil, err
+	}
+	if err := x.db.List(x.ctx(), &views, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
+		return nil, err
+	}
+	out["properties"], out["views"] = props, views
+	out["rows"] = keep(children, func(child core.Doc) bool { return child.Kind == core.DocRow })
+	return keep(children, func(child core.Doc) bool { return child.Kind != core.DocRow }), nil
+}
+
+// handleListPageVersions lists a page's saved versions, newest first,
+// without their content.
+func (s *Server) handleListPageVersions(x *c) error {
+	page, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
 		return err
 	}
-	var v core.DocVersion
-	err = x.db.Get(x.ctx(), &v, store.Eq("id", x.r.PathValue("version")), store.Eq("doc_id", d.ID))
+	var versions []core.DocVersion
+	if err := x.db.List(x.ctx(), &versions, store.Q{Where: []store.Cond{store.Eq("doc_id", page.ID)}, Order: "-seq", Limit: 500}); err != nil {
+		return err
+	}
+	for i := range versions {
+		versions[i].Snapshot = nil // listed without their content
+	}
+	return x.ok(map[string]any{"versions": versions})
+}
+
+// handleShowPageVersion returns one saved version of a page: as blocks and
+// Markdown, or as Markdown alone.
+func (s *Server) handleShowPageVersion(x *c) error {
+	page, err := x.docByID(x.r.PathValue("id"))
+	if err != nil {
+		return err
+	}
+	var version core.DocVersion
+	err = x.db.Get(x.ctx(), &version, store.Eq("id", x.r.PathValue("version")), store.Eq("doc_id", page.ID))
 	if errors.Is(err, store.ErrNotFound) {
 		return errNotFound("version")
 	}
@@ -272,24 +311,24 @@ func (s *Server) handleShowPageVersion(x *c) error {
 		return err
 	}
 	var tree []md.Block
-	json.Unmarshal(v.Snapshot, &tree)
+	readStored(version.Snapshot, &tree)
 	if x.wantText() || x.r.URL.Query().Get("format") == "md" {
 		return x.text(md.Render(tree))
 	}
-	return x.ok(map[string]any{"version": v, "blocks": tree, "markdown": md.Render(tree)})
+	return x.ok(map[string]any{"version": version, "blocks": tree, "markdown": md.Render(tree)})
 }
 
 // handleReportPagePresence says "I am here, in this block" and returns who else is. A
 // client calls it every few seconds while a page is open.
 func (s *Server) handleReportPagePresence(x *c) error {
-	var b struct {
+	var body struct {
 		Block string `json:"block"`
 		Leave bool   `json:"leave"`
 	}
-	if err := x.body(&b); err != nil {
+	if err := x.body(&body); err != nil {
 		return err
 	}
-	d, err := x.docByID(x.r.PathValue("id"))
+	page, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
 		return err
 	}
@@ -297,19 +336,19 @@ func (s *Server) handleReportPagePresence(x *c) error {
 	// people. A row is worth knowing for a few seconds only.
 	now := time.Now().UnixMilli()
 	ctx := x.ctx()
-	if b.Leave {
-		if _, err := x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Eq("user_id", x.member.UserID)); err != nil {
-			// Best effort: the row is swept once it is 15 seconds old.
-			s.log.Warn("presence not cleared", "doc", d.ID, "err", err)
+	if body.Leave {
+		if _, err := x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", page.ID), store.Eq("user_id", x.member.UserID)); err != nil {
+			// Best effort: the row is swept once it is presenceKept old.
+			s.log.Warn("presence not cleared", "doc", page.ID, "err", err)
 		}
-	} else if err := x.db.Upsert(ctx, core.Presence{WorkspaceID: x.ws.ID, DocID: d.ID, UserID: x.member.UserID, Block: b.Block, At: now}, "doc_id", "user_id"); err != nil {
+	} else if err := x.db.Upsert(ctx, core.Presence{WorkspaceID: x.ws.ID, DocID: page.ID, UserID: x.member.UserID, Block: body.Block, At: now}, "doc_id", "user_id"); err != nil {
 		return err
 	}
-	if _, err := x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", d.ID), store.Lt("at", now-15_000)); err != nil {
-		s.log.Warn("old presence not swept", "doc", d.ID, "err", err) // best effort: swept again on the next call
+	if _, err := x.db.Delete(ctx, "doc_presence", store.Eq("doc_id", page.ID), store.Lt("at", now-presenceKept.Milliseconds())); err != nil {
+		s.log.Warn("old presence not swept", "doc", page.ID, "err", err) // best effort: swept again on the next call
 	}
 	var here []core.Presence
-	if err := x.db.List(ctx, &here, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID), store.Ne("user_id", x.member.UserID)}, Order: "user_id"}); err != nil {
+	if err := x.db.List(ctx, &here, store.Q{Where: []store.Cond{store.Eq("doc_id", page.ID), store.Ne("user_id", x.member.UserID)}, Order: "user_id"}); err != nil {
 		return err
 	}
 	others := here
@@ -319,19 +358,22 @@ func (s *Server) handleReportPagePresence(x *c) error {
 	return x.ok(map[string]any{"others": others})
 }
 
+// presenceKept is how long a "here" from a reader stands without a new one.
+const presenceKept = 15 * time.Second
+
 // ---- generated pages ----
 
 // regenerate rebuilds a page that is made from data, when the data it shows
 // has changed since it was last built.
-func (s *Server) regenerate(x *c, d *core.Doc) error {
+func (s *Server) regenerate(x *c, page *core.Doc) error {
 	ctx := x.ctx()
 	var meta struct {
 		BuiltSeq int64 `json:"built_seq"`
 	}
-	json.Unmarshal(d.Props, &meta)
+	readStored(page.Props, &meta)
 	var projects []string
-	if d.ProjectID != "" {
-		projects = []string{d.ProjectID}
+	if page.ProjectID != "" {
+		projects = []string{page.ProjectID}
 	}
 	if meta.BuiltSeq > 0 {
 		news, err := x.db.Events(ctx, store.EventFilter{After: meta.BuiltSeq, ProjectIDs: projects, Limit: 1,
@@ -340,7 +382,7 @@ func (s *Server) regenerate(x *c, d *core.Doc) error {
 			return err
 		}
 	}
-	body, err := s.generated(x, *d)
+	body, err := s.generated(x, *page)
 	if err != nil {
 		return err
 	}
@@ -348,32 +390,35 @@ func (s *Server) regenerate(x *c, d *core.Doc) error {
 	if err := s.st.Get(ctx, &ws, store.Eq("id", x.ws.ID)); err != nil {
 		return err
 	}
-	props, _ := json.Marshal(map[string]int64{"built_seq": ws.Seq})
-	err = s.eng.System(ctx, x.ws.ID, d.CreatedBy, func(sys *engine.Sys) error {
-		if err := sys.Do("doc.write", map[string]any{"doc": d.ID, "markdown": body}); err != nil {
+	props, _ := json.Marshal(map[string]int64{"built_seq": ws.Seq}) // cannot fail: a map of numbers
+	err = s.eng.System(ctx, x.ws.ID, page.CreatedBy, func(sys *engine.Sys) error {
+		if err := sys.Do("doc.write", map[string]any{"doc": page.ID, "markdown": body}); err != nil {
 			return err
 		}
-		_, err := sys.Tx().Update(ctx, "docs", map[string]any{"props": json.RawMessage(props)}, store.Eq("id", d.ID))
+		_, err := sys.Tx().Update(ctx, "docs", map[string]any{"props": json.RawMessage(props)}, store.Eq("id", page.ID))
 		return err
 	})
 	if err == nil {
-		d.Props = props
+		page.Props = props
 	}
 	return err
 }
 
-// generated writes the Markdown of a page built from data.
-func (s *Server) generated(x *c, d core.Doc) (string, error) {
+// generated writes the Markdown of a page built from data: a changelog (the
+// tasks done, by week), a decision log (the answered decisions, by month) or
+// the open questions, each kept to the page's project when it has one.
+func (s *Server) generated(x *c, page core.Doc) (string, error) {
 	ctx := x.ctx()
 	names, err := x.names()
 	if err != nil {
 		return "", err
 	}
-	inProject := func(projectID string) bool { return d.ProjectID == "" || d.ProjectID == projectID }
+	inProject := func(projectID string) bool { return page.ProjectID == "" || page.ProjectID == projectID }
 	var b strings.Builder
-	switch d.Generated {
+	switch page.Generated {
 	case "changelog":
-		tasks, err := x.db.Tasks(ctx, store.TaskFilter{Categories: []string{core.CatDone}, Archived: true, Limit: 5000})
+		// The done tasks, newest first, under a heading for each week.
+		tasks, err := x.db.Tasks(ctx, store.TaskFilter{Categories: []string{core.CatDone}, Archived: true, Limit: maxTasksByID})
 		if err != nil {
 			return "", err
 		}
@@ -396,28 +441,30 @@ func (s *Server) generated(x *c, d core.Doc) (string, error) {
 			b.WriteString("Nothing is done yet.\n")
 		}
 	case "decision_log", "open_questions":
+		// The decisions, with their answer or who they wait on, and their
+		// options.
 		conds := []store.Cond{store.Live, store.Ne("state", core.StateOpen)}
-		if d.Generated == "open_questions" {
+		if page.Generated == "open_questions" {
 			conds = []store.Cond{store.Live, store.Eq("state", core.StateOpen)}
 		}
-		var ds []core.Decision
-		if err := x.db.List(ctx, &ds, store.Q{Where: conds, Order: "-updated_seq", Limit: 2000}); err != nil {
+		var decisions []core.Decision
+		if err := x.db.List(ctx, &decisions, store.Q{Where: conds, Order: "-updated_seq", Limit: 2000}); err != nil {
 			return "", err
 		}
-		views, err := x.decisionViews(ds, false)
+		views, err := x.decisionViews(decisions)
 		if err != nil {
 			return "", err
 		}
 		projectOf := map[string]string{}
-		var tids []string
-		for _, dc := range ds {
-			tids = append(tids, dc.TaskID)
+		var taskIDs []string
+		for _, decision := range decisions {
+			taskIDs = append(taskIDs, decision.TaskID)
 		}
-		ts, err := x.db.Tasks(ctx, store.TaskFilter{IDs: tids, Archived: true, Limit: 5000})
+		tasks, err := x.db.Tasks(ctx, store.TaskFilter{IDs: taskIDs, Archived: true, Limit: maxTasksByID})
 		if err != nil {
 			return "", err
 		}
-		for _, t := range ts {
+		for _, t := range tasks {
 			projectOf[t.Key] = t.ProjectID
 		}
 		month, n := "", 0
@@ -427,7 +474,7 @@ func (s *Server) generated(x *c, d core.Doc) (string, error) {
 			}
 			n++
 			at := firstNonEmpty(v.DecidedAt, v.AskedAt)
-			if m := at[:min(7, len(at))]; m != month && d.Generated == "decision_log" {
+			if m := at[:min(7, len(at))]; m != month && page.Generated == "decision_log" {
 				month = m
 				fmt.Fprintf(&b, "\n## %s\n\n", m)
 			}
@@ -476,29 +523,30 @@ func (x *c) memoryRoot(agentID string) (core.Doc, bool, error) {
 	return roots[0], true, nil
 }
 
+// memoryAgent is the agent whose memory is asked for: agent=, or the caller.
 func (x *c) memoryAgent() (core.Member, error) {
 	ref := x.r.URL.Query().Get("agent")
 	if ref == "" {
 		ref = "me"
 	}
-	m, err := x.resolver().Member("agent", ref)
+	agent, err := x.resolver().Member("agent", ref)
 	if err != nil {
-		return m, err
+		return agent, err
 	}
-	if m.Kind != core.KindAgent {
-		return m, errBad("@%s is a person; memory pages belong to agents", m.Handle)
+	if agent.Kind != core.KindAgent {
+		return agent, errBad("@%s is a person; memory pages belong to agents", agent.Handle)
 	}
-	return m, nil
+	return agent, nil
 }
 
 // handleShowAgentMemory returns an agent's notes: every page under its memory root, as
 // Markdown. It is what an agent reads to pick up where it left off.
 func (s *Server) handleShowAgentMemory(x *c) error {
-	m, err := x.memoryAgent()
+	agent, err := x.memoryAgent()
 	if err != nil {
 		return err
 	}
-	root, ok, err := x.memoryRoot(m.UserID)
+	root, ok, err := x.memoryRoot(agent.UserID)
 	if err != nil {
 		return err
 	}
@@ -509,7 +557,7 @@ func (s *Server) handleShowAgentMemory(x *c) error {
 		return x.text("no notes yet; write one with POST /memory {title, markdown}\n")
 	}
 	var pages []core.Doc
-	if err := x.db.List(x.ctx(), &pages, store.Q{Where: []store.Cond{store.Eq("memory_of", m.UserID), store.Live}, Order: "rank"}); err != nil {
+	if err := x.db.List(x.ctx(), &pages, store.Q{Where: []store.Cond{store.Eq("memory_of", agent.UserID), store.Live}, Order: "rank"}); err != nil {
 		return err
 	}
 	type page struct {
@@ -519,22 +567,22 @@ func (s *Server) handleShowAgentMemory(x *c) error {
 		Seq      int64  `json:"seq"`
 	}
 	var out []page
-	for _, p := range pages {
-		if p.ID == root.ID {
+	for _, doc := range pages {
+		if doc.ID == root.ID {
 			continue
 		}
 		var blocks []core.Block
-		if err := x.db.List(x.ctx(), &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", p.ID), store.Live}, Order: "rank"}); err != nil {
+		if err := x.db.List(x.ctx(), &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", doc.ID), store.Live}, Order: "rank"}); err != nil {
 			return err
 		}
-		out = append(out, page{ID: p.ID, Title: p.Title, Markdown: md.Render(engine.BlockTree(blocks)), Seq: p.ContentSeq})
+		out = append(out, page{ID: doc.ID, Title: doc.Title, Markdown: md.Render(engine.BlockTree(blocks)), Seq: doc.ContentSeq})
 	}
 	if !x.wantText() {
-		return x.ok(map[string]any{"agent": "@" + m.Handle, "pages": out})
+		return x.ok(map[string]any{"agent": "@" + agent.Handle, "pages": out})
 	}
 	var b strings.Builder
-	for _, p := range out {
-		fmt.Fprintf(&b, "# %s\n\n%s\n", p.Title, p.Markdown)
+	for _, note := range out {
+		fmt.Fprintf(&b, "# %s\n\n%s\n", note.Title, note.Markdown)
 	}
 	if b.Len() == 0 {
 		b.WriteString("no notes yet\n")
@@ -560,8 +608,8 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 		return errBad("a note needs a title")
 	}
 	ctx := x.ctx()
-	mk := func(typ string, args map[string]any) (*engine.Result, error) {
-		raw, _ := json.Marshal(args)
+	apply := func(typ string, args map[string]any) (*engine.Result, error) {
+		raw, _ := json.Marshal(args) // cannot fail: strings
 		return s.eng.Apply(ctx, x.ws.ID, x.actor, engine.Change{ID: id.New(), Type: typ, Args: raw})
 	}
 	root, ok, err := x.memoryRoot(x.member.UserID)
@@ -569,7 +617,7 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 		return err
 	}
 	if !ok {
-		res, err := mk("doc.create", map[string]any{"title": x.member.Name + ": memory", "memory_of": "me", "icon": "brain"})
+		res, err := apply("doc.create", map[string]any{"title": x.member.Name + ": memory", "memory_of": "me", "icon": "brain"})
 		if err != nil {
 			return err
 		}
@@ -581,17 +629,15 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 		return err
 	}
 	if err != nil {
-		res, err := mk("doc.create", map[string]any{"parent": root.ID, "title": strings.TrimSpace(b.Title), "markdown": b.Markdown})
+		res, err := apply("doc.create", map[string]any{"parent": root.ID, "title": strings.TrimSpace(b.Title), "markdown": b.Markdown})
 		if err != nil {
 			return err
 		}
-		return x.json(201, map[string]any{"doc": res.Ref, "seq": res.Seq})
+		return x.json(http.StatusCreated, map[string]any{"doc": res.Ref, "seq": res.Seq})
 	}
-	res, err := mk("doc.write", map[string]any{"doc": page.ID, "markdown": b.Markdown, "mode": b.Mode})
+	res, err := apply("doc.write", map[string]any{"doc": page.ID, "markdown": b.Markdown, "mode": b.Mode})
 	if err != nil {
 		return err
 	}
 	return x.ok(map[string]any{"doc": page.ID, "seq": res.Seq})
 }
-
-var _ = context.Background

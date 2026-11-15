@@ -35,16 +35,16 @@ func (d *dashboard) flowByStatus() []flowStatus {
 			count[t.StatusID]++
 		}
 	}
-	var sts []core.Status
-	for _, st := range names.statuses {
-		if st.DeletedAt == 0 && (len(d.projects) == 0 || has(d.projects, st.ProjectID)) && d.x.canProject(st.ProjectID) {
-			sts = append(sts, st)
+	var statuses []core.Status
+	for _, status := range names.statuses {
+		if status.DeletedAt == 0 && (len(d.projects) == 0 || has(d.projects, status.ProjectID)) && d.x.canProject(status.ProjectID) {
+			statuses = append(statuses, status)
 		}
 	}
-	sort.Slice(sts, func(i, j int) bool { return statusBefore(sts[i], sts[j]) })
+	sort.Slice(statuses, func(i, j int) bool { return statusBefore(statuses[i], statuses[j]) })
 	var out []flowStatus
-	for _, st := range sts {
-		out = append(out, flowStatus{Status: st.Name, Category: st.Category, Project: names.projects[st.ProjectID].Key, Count: count[st.ID]})
+	for _, status := range statuses {
+		out = append(out, flowStatus{Status: status.Name, Category: status.Category, Project: names.projects[status.ProjectID].Key, Count: count[status.ID]})
 	}
 	return out
 }
@@ -76,13 +76,14 @@ type flowWeek struct {
 func weekOf(ms int64) string {
 	t := time.UnixMilli(ms).UTC()
 	t = t.AddDate(0, 0, -((int(t.Weekday()) + 6) % 7))
-	return t.Format("2006-01-02")
+	return t.Format(time.DateOnly)
 }
 
-// flowWeekly counts the last twelve weeks.
+// flowWeekly counts the tasks opened and closed in each of the last
+// flowWeeks weeks.
 func (d *dashboard) flowWeekly() []flowWeek {
 	weeks := map[string][2]int{} // opened, closed
-	cutoff := d.now.AddDate(0, 0, -7*12).UnixMilli()
+	cutoff := d.now.AddDate(0, 0, -7*flowWeeks).UnixMilli()
 	for _, t := range d.tasks {
 		if t.CreatedAt >= cutoff {
 			w := weeks[weekOf(t.CreatedAt)]
@@ -96,12 +97,19 @@ func (d *dashboard) flowWeekly() []flowWeek {
 		}
 	}
 	var out []flowWeek
-	for day := d.now.AddDate(0, 0, -7*11); !day.After(d.now); day = day.AddDate(0, 0, 7) {
+	for day := d.now.AddDate(0, 0, -7*(flowWeeks-1)); !day.After(d.now); day = day.AddDate(0, 0, 7) {
 		k := weekOf(day.UnixMilli())
 		out = append(out, flowWeek{Week: k, Opened: weeks[k][0], Closed: weeks[k][1]})
 	}
 	return out
 }
+
+// flowWeeks is how many weeks back the dashboard's flow counts; flowEvents
+// how many of the latest task events it reads for the waits.
+const (
+	flowWeeks  = 12
+	flowEvents = 2000
+)
 
 // flowWait is the open tasks that wait on one member, and for how long.
 type flowWait struct {
@@ -113,11 +121,13 @@ type flowWait struct {
 }
 
 // flowWaiting says how long each open task has waited on its member: since
-// the last change that handed it to them.
+// the last change that handed it to them, as the latest flowEvents task
+// events tell, or else since the task last changed. Hours are given to a
+// tenth, the members longest waited on first.
 func (d *dashboard) flowWaiting() ([]flowWait, error) {
 	names := d.names
 	since := map[string]int64{}
-	evs, err := d.x.db.Events(d.x.ctx(), store.EventFilter{Types: []string{"task.updated", "task.created"}, ProjectIDs: d.projects, Desc: true, Limit: 2000})
+	evs, err := d.x.db.Events(d.x.ctx(), store.EventFilter{Types: []string{"task.updated", "task.created"}, ProjectIDs: d.projects, Desc: true, Limit: flowEvents})
 	if err != nil {
 		return nil, err
 	}
@@ -136,21 +146,21 @@ func (d *dashboard) flowWaiting() ([]flowWait, error) {
 		if at == 0 {
 			at = t.UpdatedAt
 		}
-		h := float64(d.now.UnixMilli()-at) / 3600_000
-		wt := waits[t.WaitingOnID]
-		if wt == nil {
-			wt = &flowWait{Member: names.handle(t.WaitingOnID), Kind: names.members[t.WaitingOnID].Kind}
-			waits[t.WaitingOnID] = wt
+		hours := float64(d.now.UnixMilli()-at) / float64(time.Hour.Milliseconds())
+		wait := waits[t.WaitingOnID]
+		if wait == nil {
+			wait = &flowWait{Member: names.handle(t.WaitingOnID), Kind: names.members[t.WaitingOnID].Kind}
+			waits[t.WaitingOnID] = wait
 		}
-		wt.Tasks++
-		wt.Hours += h
-		wt.Oldest = max(wt.Oldest, h)
+		wait.Tasks++
+		wait.Hours += hours
+		wait.Oldest = max(wait.Oldest, hours)
 	}
 	var out []flowWait
-	for _, wt := range waits {
-		wt.Hours = float64(int(wt.Hours/float64(wt.Tasks)*10)) / 10
-		wt.Oldest = float64(int(wt.Oldest*10)) / 10
-		out = append(out, *wt)
+	for _, wait := range waits {
+		wait.Hours = float64(int(wait.Hours/float64(wait.Tasks)*10)) / 10
+		wait.Oldest = float64(int(wait.Oldest*10)) / 10
+		out = append(out, *wait)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Oldest != out[j].Oldest {

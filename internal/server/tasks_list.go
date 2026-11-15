@@ -10,15 +10,16 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// listFields are the fields of a listed task when the request names none.
 var listFields = []string{"key", "title", "status", "priority", "assignee", "waiting_on", "held_by", "labels", "due_on", "parent", "seq"}
 
 // handleListTasks answers a task query. count=1 returns only how many match.
 func (s *Server) handleListTasks(x *c) error {
-	q, err := x.queryFromRequest()
+	query, err := x.queryFromRequest()
 	if err != nil {
 		return err
 	}
-	f, err := x.filter(q)
+	f, err := x.filter(query)
 	if err != nil {
 		return err
 	}
@@ -27,10 +28,10 @@ func (s *Server) handleListTasks(x *c) error {
 		return x.taskCount(f)
 	}
 	if f.Limit <= 0 {
-		f.Limit = 50
+		f.Limit = defaultTaskPage
 	}
-	if f.Limit > 1000 {
-		f.Limit = 1000
+	if f.Limit > maxTaskPage {
+		f.Limit = maxTaskPage
 	}
 	if tok := v.Get("cursor"); tok != "" {
 		cur, err := parseTaskCursor(tok, f.Sort)
@@ -48,7 +49,11 @@ func (s *Server) handleListTasks(x *c) error {
 	}
 	x.narrowedAlready()
 	fields := splitList(v.Get("fields"))
-	views, err := x.taskViews(page.tasks, has(fields, "description") || has(fields, "id") || has(fields, "project"))
+	viewsOf := x.taskViews
+	if has(fields, "description") || has(fields, "id") || has(fields, "project") {
+		viewsOf = x.detailedTaskViews
+	}
+	views, err := viewsOf(page.tasks)
 	if err != nil {
 		return err
 	}
@@ -73,6 +78,13 @@ func (s *Server) handleListTasks(x *c) error {
 	}
 	return x.ok(out)
 }
+
+// A page of tasks is defaultTaskPage long unless limit= says otherwise, and
+// never more than maxTaskPage.
+const (
+	defaultTaskPage = 50
+	maxTaskPage     = 1000
+)
 
 // taskCount answers a task query with only how many tasks match.
 func (x *c) taskCount(f store.TaskFilter) error {
@@ -123,7 +135,7 @@ func parseTaskCursor(tok, sortedBy string) (taskCursor, error) {
 
 // token is the cursor as a list gives it, to be sent back in cursor=.
 func (cur taskCursor) token() string {
-	raw, _ := json.Marshal(cur)
+	raw, _ := json.Marshal(cur) // cannot fail: numbers and strings
 	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
@@ -141,38 +153,38 @@ type taskPage struct {
 // readTaskPage reads the page a filter asks for: up to f.Limit tasks, and
 // whether more follow.
 func (x *c) readTaskPage(f store.TaskFilter) (taskPage, error) {
-	var p taskPage
+	var page taskPage
 	limit := f.Limit
 	f.Limit++ // one extra row says whether there are more
 	tasks, err := x.db.Tasks(x.ctx(), f)
 	if err != nil {
-		return p, err
+		return page, err
 	}
-	p.tasks = tasks
-	if p.more = len(p.tasks) > limit; p.more {
-		p.tasks = p.tasks[:limit]
-		next, err := x.cursorAfter(f, p.tasks[limit-1])
+	page.tasks = tasks
+	if page.more = len(page.tasks) > limit; page.more {
+		page.tasks = page.tasks[:limit]
+		next, err := x.cursorAfter(f, page.tasks[limit-1])
 		if err != nil {
-			return p, err
+			return page, err
 		}
-		p.next = next.token()
-		return p, nil
+		page.next = next.token()
+		return page, nil
 	}
 	if len(f.After) > 0 && f.MadeUpTo > 0 {
-		moved, err := x.changedDuringWalk(f, p.tasks)
+		moved, err := x.changedDuringWalk(f, page.tasks)
 		if err != nil {
-			return p, err
+			return page, err
 		}
-		p.tasks, p.changedMeanwhile = append(p.tasks, moved...), len(moved)
+		page.tasks, page.changedMeanwhile = append(page.tasks, moved...), len(moved)
 	}
-	return p, nil
+	return page, nil
 }
 
 // changedDuringWalk finds the tasks of a list that changed since a walk
 // through it by cursor began, leaving out those of its last page.
 func (x *c) changedDuringWalk(f store.TaskFilter, lastPage []core.Task) ([]core.Task, error) {
 	again := f
-	again.After, again.Offset, again.Limit, again.UpdatedAfter = nil, 0, 1000, max(f.UpdatedAfter, f.MadeUpTo)
+	again.After, again.Offset, again.Limit, again.UpdatedAfter = nil, 0, maxTaskPage, max(f.UpdatedAfter, f.MadeUpTo)
 	moved, err := x.db.Tasks(x.ctx(), again)
 	if err != nil {
 		return nil, err
@@ -203,16 +215,16 @@ func (x *c) cursorAfter(f store.TaskFilter, last core.Task) (taskCursor, error) 
 
 // text is the page as lines, one task each. note says a view named in the
 // query was out of date.
-func (p taskPage) text(views []taskView, note string) string {
+func (page taskPage) text(views []taskView, note string) string {
 	out := lines(views, taskView.line, "no tasks match")
-	if p.more {
-		out += fmt.Sprintf("… more: add cursor=%s\n", p.next)
+	if page.more {
+		out += fmt.Sprintf("… more: add cursor=%s\n", page.next)
 	}
 	if note != "" {
 		out = "note: " + note + "\n" + out
 	}
-	if p.changedMeanwhile > 0 {
-		out += fmt.Sprintf("… the last %d changed while you were reading; you may have seen them before\n", p.changedMeanwhile)
+	if page.changedMeanwhile > 0 {
+		out += fmt.Sprintf("… the last %d changed while you were reading; you may have seen them before\n", page.changedMeanwhile)
 	}
 	return out
 }

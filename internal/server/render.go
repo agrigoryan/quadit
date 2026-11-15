@@ -1,9 +1,14 @@
+// The compact forms of tasks, decisions, comments and feed events: the
+// views a read answers with, and their lines of text.
+
 package server
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,28 +64,30 @@ func formatTime(ms int64) string {
 	return time.UnixMilli(ms).UTC().Format("2006-01-02 15:04")
 }
 
-// truncate shortens text to max bytes on a rune boundary.
-func truncate(s string, max int) (string, bool) {
-	if max <= 0 || len(s) <= max {
+// truncate shortens text to limit bytes on a rune boundary, and says
+// whether it did. A limit of 0 or less keeps it whole.
+func truncate(s string, limit int) (string, bool) {
+	if limit <= 0 || len(s) <= limit {
 		return s, false
 	}
-	for max > 0 && !utf8.RuneStart(s[max]) {
-		max--
+	for limit > 0 && !utf8.RuneStart(s[limit]) {
+		limit--
 	}
-	return s[:max], true
+	return s[:limit], true
 }
 
-func oneLine(s string, max int) string {
+// oneLine is text on one line, its runs of white space made one space, cut
+// at limit bytes with "…" when it was longer.
+func oneLine(s string, limit int) string {
 	s = strings.Join(strings.Fields(s), " ")
-	if out, was := truncate(s, max); was {
+	if out, was := truncate(s, limit); was {
 		return out + "…"
 	}
 	return s
 }
 
-// taskViews turns tasks into their listed form. detail adds the fields a
-// list leaves out.
-func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
+// taskViews turns tasks into their listed form.
+func (x *c) taskViews(tasks []core.Task) ([]taskView, error) {
 	names, err := x.names()
 	if err != nil {
 		return nil, err
@@ -94,19 +101,19 @@ func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
 	}
 	parentKey := map[string]string{}
 	if len(parentIDs) > 0 {
-		ps, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: parentIDs, Archived: true, Limit: 5000})
+		parents, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: parentIDs, Archived: true, Limit: maxTasksByID})
 		if err != nil {
 			return nil, err
 		}
-		for _, p := range ps {
-			parentKey[p.ID] = p.Key
+		for _, parent := range parents {
+			parentKey[parent.ID] = parent.Key
 		}
 	}
 	now := time.Now().UnixMilli()
 	out := make([]taskView, len(tasks))
 	for i, t := range tasks {
-		st := names.statuses[t.StatusID]
-		v := taskView{Key: t.Key, Title: t.Title, Status: st.Name, Category: st.Category, Assignee: names.handle(t.AssigneeID),
+		status := names.statuses[t.StatusID]
+		v := taskView{Key: t.Key, Title: t.Title, Status: status.Name, Category: status.Category, Assignee: names.handle(t.AssigneeID),
 			WaitingOn: waitsOn(names, t), WaitingOnNote: t.WaitingOnNote, Labels: names.labelNames(t.LabelIDs),
 			Epic: names.epics[t.EpicID].Name, Milestone: names.milestones[t.MilestoneID], Budget: t.Budget, Cycle: names.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
 			Estimate: t.Estimate, Seq: t.ActivitySeq, UpdatedSeq: t.UpdatedSeq, Trashed: t.DeletedAt != 0, Archived: t.ArchivedAt != 0}
@@ -116,21 +123,40 @@ func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
 		if t.LeaseHolderID != "" && t.LeaseUntil > now {
 			v.HeldBy = names.handle(t.LeaseHolderID)
 		}
-		if detail {
-			v.ID, v.Project, v.Description = t.ID, names.projects[t.ProjectID].Key, t.Description
-			v.CreatedBy, v.CreatedAt = names.handle(t.CreatedBy), formatTime(t.CreatedAt)
-		}
 		out[i] = v
 	}
 	return out, nil
 }
+
+// detailedTaskViews turns tasks into their listed form with the fields a
+// list leaves out: the id, the project, the description, and who made the
+// task and when.
+func (x *c) detailedTaskViews(tasks []core.Task) ([]taskView, error) {
+	views, err := x.taskViews(tasks)
+	if err != nil {
+		return nil, err
+	}
+	names, err := x.names()
+	if err != nil {
+		return nil, err
+	}
+	for i, t := range tasks {
+		views[i].ID, views[i].Project, views[i].Description = t.ID, names.projects[t.ProjectID].Key, t.Description
+		views[i].CreatedBy, views[i].CreatedAt = names.handle(t.CreatedBy), formatTime(t.CreatedAt)
+	}
+	return views, nil
+}
+
+// maxTasksByID is the most tasks one read by id brings: more than a
+// request ever names.
+const maxTasksByID = 5000
 
 // pickFields keeps only the named fields of each item, for callers that asked.
 func pickFields(items any, fields []string) any {
 	if len(fields) == 0 {
 		return items
 	}
-	raw, _ := json.Marshal(items)
+	raw, _ := json.Marshal(items) // cannot fail: views are plain fields
 	var rows []map[string]any
 	if json.Unmarshal(raw, &rows) != nil {
 		return items
@@ -399,20 +425,20 @@ func (d taskDetail) text() string {
 	if t.Milestone != "" {
 		meta = append(meta, "milestone: "+t.Milestone)
 	}
-	if b := t.Budget; b != nil {
+	if budget := t.Budget; budget != nil {
 		var parts []string
 		spent := core.Budget{}
 		if t.Spent != nil {
 			spent = *t.Spent
 		}
-		if b.CostMicros > 0 {
-			parts = append(parts, fmt.Sprintf("$%.2f of $%.2f", float64(spent.CostMicros)/1e6, float64(b.CostMicros)/1e6))
+		if budget.CostMicros > 0 {
+			parts = append(parts, fmt.Sprintf("$%.2f of $%.2f", float64(spent.CostMicros)/1e6, float64(budget.CostMicros)/1e6))
 		}
-		if b.Minutes > 0 {
-			parts = append(parts, fmt.Sprintf("%d of %d min", spent.Minutes, b.Minutes))
+		if budget.Minutes > 0 {
+			parts = append(parts, fmt.Sprintf("%d of %d min", spent.Minutes, budget.Minutes))
 		}
-		if b.Handoffs > 0 {
-			parts = append(parts, fmt.Sprintf("%d hand-offs at most", b.Handoffs))
+		if budget.Handoffs > 0 {
+			parts = append(parts, fmt.Sprintf("%d hand-offs at most", budget.Handoffs))
 		}
 		meta = append(meta, "budget: "+strings.Join(parts, ", "))
 	}
@@ -464,54 +490,58 @@ func (d taskDetail) text() string {
 	return b.String()
 }
 
-// eventLine says what one event did, on one line.
+// eventLine says what one event did, on one line: its number, time and
+// actor, then what happened in words. Tasks, comments, decisions, claims and
+// inbox items each have their own wording; any other event says its type
+// and its changed fields (changeText), or the name of what it made.
 func (x *c) eventLine(ev core.Event, names *nameLookup) string {
-	var d struct {
+	var data struct {
 		Key     string                      `json:"key"`
 		Row     json.RawMessage             `json:"row"`
 		Changes map[string]core.FieldChange `json:"changes"`
 		Deleted bool                        `json:"deleted"`
 	}
-	json.Unmarshal(ev.Data, &d)
+	readStored(ev.Data, &data)
 	head := fmt.Sprintf("#%d %s %s", ev.Seq, time.UnixMilli(ev.At).UTC().Format("01-02 15:04"), names.handle(ev.ActorID))
 	what := ev.Type
-	if d.Key != "" {
-		what += " " + d.Key
+	if data.Key != "" {
+		what += " " + data.Key
 	}
 	switch ev.Type {
 	case "task.created":
 		var t core.Task
-		json.Unmarshal(d.Row, &t)
+		readStored(data.Row, &t)
 		what = fmt.Sprintf("task.created %s %q [%s]", t.Key, t.Title, names.statuses[t.StatusID].Name)
 		if t.AssigneeID != "" {
 			what += " " + names.handle(t.AssigneeID)
 		}
 	case "task.updated":
-		what += " " + x.changeText(d.Changes, names)
+		what += " " + x.changeText(data.Changes, names)
 	case "comment.created":
 		var cm core.Comment
-		json.Unmarshal(d.Row, &cm)
+		readStored(data.Row, &cm)
 		kind := "comment"
 		if cm.Kind == "result" {
 			kind = "RESULT"
 		}
 		on := ""
-		if cm.SubjectType == "decision_option" {
+		switch cm.SubjectType {
+		case "decision_option":
 			on = " on an option"
-		} else if cm.SubjectType == "decision" {
+		case "decision":
 			on = " on a decision"
 		}
-		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, d.Key, on, oneLine(cm.Body, 240), cm.ID)
+		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, data.Key, on, oneLine(cm.Body, 240), cm.ID)
 	case "decision.opened", "decision.picked", "decision.unclear":
-		var dc core.Decision
-		json.Unmarshal(d.Row, &dc)
-		what = fmt.Sprintf("%s %s %q", ev.Type, d.Key, oneLine(dc.Question, 120))
+		var decision core.Decision
+		readStored(data.Row, &decision)
+		what = fmt.Sprintf("%s %s %q", ev.Type, data.Key, oneLine(decision.Question, 120))
 		switch ev.Type {
 		case "decision.opened":
 			var opts []string
-			for i, o := range dc.Options {
+			for i, o := range decision.Options {
 				mark := ""
-				if o.ID == dc.RecommendedOptionID {
+				if o.ID == decision.RecommendedOptionID {
 					mark = "*"
 				}
 				opts = append(opts, fmt.Sprintf("%d) %s%s", i+1, o.Label, mark))
@@ -519,26 +549,26 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 			if len(opts) > 0 {
 				what += " [" + strings.Join(opts, "  ") + "]"
 			}
-			if dc.AskedID != "" {
-				what += " asked " + names.handle(dc.AskedID)
+			if decision.AskedID != "" {
+				what += " asked " + names.handle(decision.AskedID)
 			}
 		case "decision.picked":
-			ans := dc.Outcome
-			for i, o := range dc.Options {
-				if o.ID == dc.PickedOptionID {
-					ans = fmt.Sprintf("%d) %s (%s)", i+1, o.Label, dc.Outcome)
+			ans := decision.Outcome
+			for i, o := range decision.Options {
+				if o.ID == decision.PickedOptionID {
+					ans = fmt.Sprintf("%d) %s (%s)", i+1, o.Label, decision.Outcome)
 				}
 			}
 			what += " -> " + ans
-			if dc.OutcomeNote != "" {
-				what += ": " + oneLine(dc.OutcomeNote, 240)
+			if decision.OutcomeNote != "" {
+				what += ": " + oneLine(decision.OutcomeNote, 240)
 			}
 		default:
-			what += " unclear: " + oneLine(dc.UnclearNote, 240)
+			what += " unclear: " + oneLine(decision.UnclearNote, 240)
 		}
-		what += "  (id=" + dc.ID + ")"
+		what += "  (id=" + decision.ID + ")"
 	case "claim.created", "claim.updated":
-		var cd struct {
+		var claim struct {
 			Row        core.ResourceClaim `json:"row"`
 			Resource   string             `json:"resource"`
 			Why        string             `json:"why"`
@@ -546,51 +576,51 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 			UserID     string             `json:"user_id"`
 			TaskID     string             `json:"task_id"`
 		}
-		json.Unmarshal(ev.Data, &cd)
+		readStored(ev.Data, &claim)
 		switch {
 		case ev.Type == "claim.updated":
 			// Whose hold on what: the one acting may be an admin, or the
 			// server handing the resource to the next in line.
-			what = "claim " + firstNonEmpty(cd.Why, "changed")
-			var res core.Resource
-			if cd.ResourceID != "" && x.foundForLine(&res, store.Eq("id", cd.ResourceID)) {
-				what += ": " + res.Name
+			what = "claim " + firstNonEmpty(claim.Why, "changed")
+			var resource core.Resource
+			if claim.ResourceID != "" && x.foundForLine(&resource, store.Eq("id", claim.ResourceID)) {
+				what += ": " + resource.Name
 			}
-			if cd.UserID != "" {
-				what += " (" + names.handle(cd.UserID) + ")"
+			if claim.UserID != "" {
+				what += " (" + names.handle(claim.UserID) + ")"
 			}
-			cd.Row.TaskID = cd.TaskID
-		case cd.Row.State == "holding":
-			what = "claim: took " + cd.Resource
+			claim.Row.TaskID = claim.TaskID
+		case claim.Row.State == "holding":
+			what = "claim: took " + claim.Resource
 		default:
-			what = "claim: waits for " + cd.Resource
+			what = "claim: waits for " + claim.Resource
 		}
-		if cd.Row.TaskID != "" {
-			var tk core.Task
-			if x.foundForLine(&tk, store.Eq("id", cd.Row.TaskID)) {
-				what += " for " + tk.Key
+		if claim.Row.TaskID != "" {
+			var t core.Task
+			if x.foundForLine(&t, store.Eq("id", claim.Row.TaskID)) {
+				what += " for " + t.Key
 			}
 		}
-		if cd.Row.Note != "" {
-			what += ": " + oneLine(cd.Row.Note, 120)
+		if claim.Row.Note != "" {
+			what += ": " + oneLine(claim.Row.Note, 120)
 		}
 	case "notification.created":
-		var n core.Notification
-		json.Unmarshal(d.Row, &n)
-		what = fmt.Sprintf("inbox %s: %s", n.Type, oneLine(n.Title, 100))
-		if n.Snippet != "" {
-			what += " — " + oneLine(n.Snippet, 160)
+		var note core.Notification
+		readStored(data.Row, &note)
+		what = fmt.Sprintf("inbox %s: %s", note.Type, oneLine(note.Title, 100))
+		if note.Snippet != "" {
+			what += " — " + oneLine(note.Snippet, 160)
 		}
 	default:
 		if ev.EntityType == "member" && ev.Type != "member.created" {
 			what += " " + names.handle(ev.EntityID) // whose membership it is
 		}
-		if len(d.Changes) > 0 {
-			what += " " + x.changeText(d.Changes, names)
-		} else if d.Key == "" && len(d.Row) > 0 {
+		if len(data.Changes) > 0 {
+			what += " " + x.changeText(data.Changes, names)
+		} else if data.Key == "" && len(data.Row) > 0 {
 			// Something new that the cases above do not know: its name.
 			var row map[string]any
-			json.Unmarshal(d.Row, &row)
+			readStored(data.Row, &row)
 			for _, k := range []string{"key", "name", "title", "slug", "handle", "repo", "body"} {
 				if v, _ := row[k].(string); v != "" {
 					what += " " + strconv.Quote(oneLine(v, 80))
@@ -600,6 +630,14 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		}
 	}
 	return head + " " + what
+}
+
+// readStored decodes JSON the server itself wrote: an event's data, a row's
+// properties, a property's config, a page's props or snapshot. What cannot
+// be read is left at its zero value, and the reader shows less (an emptier
+// feed line, empty cells, a page built again) rather than fail.
+func readStored(raw []byte, dst any) {
+	_ = json.Unmarshal(raw, dst) //nolint:errcheck // deliberate, as said above
 }
 
 // foundForLine reads one row that a line of text names, if it can, and
@@ -630,8 +668,8 @@ func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) s
 		case "epic_id":
 			return names.epics[s].Name
 		case "cycle_id":
-			if c, ok := names.cycles[s]; ok {
-				return fmt.Sprintf("%d", c.Number)
+			if cycle, ok := names.cycles[s]; ok {
+				return fmt.Sprintf("%d", cycle.Number)
 			}
 			return ""
 		case "label_ids":
@@ -681,25 +719,20 @@ func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) s
 						continue
 					}
 				}
-				raw, _ := json.Marshal(val)
+				raw, _ := json.Marshal(val) // cannot fail: it was read from JSON
 				parts = append(parts, strings.ReplaceAll(k, "_", " ")+" "+strings.Trim(string(raw), `"`))
 			}
 			sort.Strings(parts)
 			return oneLine(strings.Join(parts, "; "), 300)
 		case []any:
-			raw, _ := json.Marshal(t)
+			raw, _ := json.Marshal(t) // cannot fail: it was read from JSON
 			return oneLine(string(raw), 80)
 		case float64:
 			return strconv.FormatFloat(t, 'f', -1, 64)
 		}
 		return fmt.Sprint(v)
 	}
-	keys := make([]string, 0, len(changes))
-	for k := range changes {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, f := range keys {
+	for _, f := range slices.Sorted(maps.Keys(changes)) {
 		ch := changes[f]
 		if quietFields[f] {
 			if f == "deleted_at" {

@@ -75,14 +75,14 @@ func (x *c) newDashboard() (*dashboard, error) {
 	}
 	projects := x.projects
 	if ref := x.r.URL.Query().Get("project"); ref != "" {
-		p, err := x.resolver().Project(ref)
+		project, err := x.resolver().Project(ref)
 		if err != nil {
 			return nil, err
 		}
-		if !x.canProject(p.ID) {
+		if !x.canProject(project.ID) {
 			return nil, errNotFound("project " + ref)
 		}
-		projects = []string{p.ID}
+		projects = []string{project.ID}
 	}
 	tasks, err := x.everyTask(store.TaskFilter{ProjectIDs: projects, Archived: true})
 	if err != nil {
@@ -121,7 +121,7 @@ func (d *dashboard) waitingOnMe() error {
 	}
 	sort.Slice(waiting, func(i, j int) bool { return waiting[i].UpdatedAt < waiting[j].UpdatedAt })
 	var err error
-	if d.waiting, err = x.taskViews(waiting, false); err != nil {
+	if d.waiting, err = x.taskViews(waiting); err != nil {
 		return err
 	}
 	var asked []core.Decision
@@ -130,8 +130,8 @@ func (d *dashboard) waitingOnMe() error {
 	}
 	// Only questions on the tasks the dashboard covers: one narrowed to a
 	// project leaves out what is asked on another's.
-	asked = keep(asked, func(q core.Decision) bool { return d.covered[q.TaskID] })
-	d.asked, err = x.decisionViews(asked, false)
+	asked = keep(asked, func(question core.Decision) bool { return d.covered[question.TaskID] })
+	d.asked, err = x.decisionViews(asked)
 	return err
 }
 
@@ -143,27 +143,31 @@ func (d *dashboard) recentDecisions() error {
 	if err := x.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: 60}); err != nil {
 		return err
 	}
-	picked = keep(picked, func(p core.Decision) bool { return d.covered[p.TaskID] })
-	if len(picked) > 8 {
-		picked = picked[:8]
+	picked = keep(picked, func(decision core.Decision) bool { return d.covered[decision.TaskID] })
+	if len(picked) > dashboardDecisions {
+		picked = picked[:dashboardDecisions]
 	}
 	var err error
-	if d.decided, err = x.decisionViews(picked, false); err != nil {
+	if d.decided, err = x.decisionViews(picked); err != nil {
 		return err
 	}
 	var prefs []core.Preference
 	if err := x.db.List(ctx, &prefs, store.Q{Where: []store.Cond{store.Live, store.Null("retired_at")}, Order: "-created_at", Limit: 5}); err != nil {
 		return err
 	}
-	d.prefs = keep(prefs, func(p core.Preference) bool {
-		return len(d.projects) == 0 || p.ProjectID == "" || has(d.projects, p.ProjectID)
+	d.prefs = keep(prefs, func(pref core.Preference) bool {
+		return len(d.projects) == 0 || pref.ProjectID == "" || has(d.projects, pref.ProjectID)
 	})
 	return nil
 }
 
+// dashboardDecisions is how many of the latest answered decisions the
+// dashboard shows.
+const dashboardDecisions = 8
+
 // everyTask reads all the tasks a filter matches, however many there are.
 func (x *c) everyTask(f store.TaskFilter) ([]core.Task, error) {
-	f.Sort, f.Limit = "created", 5000
+	f.Sort, f.Limit = "created", maxTasksByID
 	var all []core.Task
 	for {
 		page, err := x.db.Tasks(x.ctx(), f)

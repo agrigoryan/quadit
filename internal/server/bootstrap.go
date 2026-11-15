@@ -21,21 +21,21 @@ func (s *Server) handleBootstrapLocalCopy(x *c) error {
 		return err
 	}
 	out := map[string]any{"seq": ws.Seq, "workspace": ws, "me": x.member, "user": x.user, "server_time": time.Now().UnixMilli(), "version": s.cfg.Version}
-	b := &bootstrapRows{x: x, part: x.r.URL.Query().Get("part")}
-	for _, load := range []func() error{b.loadLists, b.loadTasks, b.loadAttachments} {
+	rows := &bootstrapRows{x: x, part: x.r.URL.Query().Get("part")}
+	for _, load := range []func() error{rows.loadLists, rows.loadTasks, rows.loadAttachments} {
 		if err := load(); err != nil {
 			return err
 		}
 	}
-	b.keepToTasks()
-	if b.part == "rest" {
+	rows.keepToTasks()
+	if rows.part == "rest" {
 		// Only what part=open left out: the closed tasks and what hangs on them.
-		return x.ok(map[string]any{"seq": out["seq"], "part": b.part, "tasks": b.tasks, "decisions": b.decisions, "attachments": b.attachments, "relations": b.relations})
+		return x.ok(map[string]any{"seq": out["seq"], "part": rows.part, "tasks": rows.tasks, "decisions": rows.decisions, "attachments": rows.attachments, "relations": rows.relations})
 	}
-	b.keepToCaller()
-	b.fill(out)
-	if b.part == "open" {
-		out["part"] = b.part
+	rows.keepToCaller()
+	rows.fill(out)
+	if rows.part == "open" {
+		out["part"] = rows.part
 		rest, err := x.db.CountTasks(ctx, store.TaskFilter{ProjectIDs: x.projects, Archived: true, Closed: true})
 		if err != nil {
 			return err
@@ -88,6 +88,7 @@ func (b *bootstrapRows) loadLists() error {
 	live := func(order string) store.Q { return store.Q{Where: []store.Cond{store.Live}, Order: order} }
 	mine := store.Eq("user_id", x.member.UserID)
 	weekAgo := time.Now().Add(-7 * 24 * time.Hour).UnixMilli()
+	const most = 300 // the latest notifications and agent sessions it brings
 	for _, list := range []struct {
 		into any
 		q    store.Q
@@ -105,12 +106,12 @@ func (b *bootstrapRows) loadLists() error {
 		{&b.decisions, live("created_seq")},
 		{&b.options, live("rank")},
 		{&b.relations, store.Q{}},
-		{&b.notes, store.Q{Where: []store.Cond{mine, store.Null("archived_at")}, Order: "-seq", Limit: 300}},
+		{&b.notes, store.Q{Where: []store.Cond{mine, store.Null("archived_at")}, Order: "-seq", Limit: most}},
 		{&b.watchers, store.Where(mine)},
 		{&b.resources, live("")},
 		{&b.claims, store.Where(store.Ne("state", "released"))},
 		{&b.docs, live("rank")},
-		{&b.sessions, store.Q{Where: []store.Cond{store.Gte("started_at", weekAgo)}, Order: "-started_at", Limit: 300}},
+		{&b.sessions, store.Q{Where: []store.Cond{store.Gte("started_at", weekAgo)}, Order: "-started_at", Limit: most}},
 	} {
 		if err := x.db.List(x.ctx(), list.into, list.q); err != nil {
 			return err
@@ -184,10 +185,10 @@ func (b *bootstrapRows) loadAttachments() error {
 // bring, and gives each decision its options.
 func (b *bootstrapRows) keepToTasks() {
 	byDecision := map[string][]core.Option{}
-	for _, o := range b.options {
-		byDecision[o.DecisionID] = append(byDecision[o.DecisionID], o)
+	for _, option := range b.options {
+		byDecision[option.DecisionID] = append(byDecision[option.DecisionID], option)
 	}
-	b.decisions = keep(b.decisions, func(d core.Decision) bool { return b.taskIDs[d.TaskID] })
+	b.decisions = keep(b.decisions, func(decision core.Decision) bool { return b.taskIDs[decision.TaskID] })
 	for i := range b.decisions {
 		b.decisions[i].Options = byDecision[b.decisions[i].ID]
 	}
@@ -206,7 +207,7 @@ func (b *bootstrapRows) keepToCaller() {
 	for _, e := range b.epics {
 		epicOK[e.ID] = inScope(e.ProjectID)
 	}
-	b.projects = keep(b.projects, func(p core.Project) bool { return inScope(p.ID) })
+	b.projects = keep(b.projects, func(project core.Project) bool { return inScope(project.ID) })
 	b.statuses = keep(b.statuses, func(v core.Status) bool { return inScope(v.ProjectID) })
 	b.labels = keep(b.labels, func(v core.Label) bool { return inScope(v.ProjectID) })
 	b.epics = keep(b.epics, func(v core.Epic) bool { return inScope(v.ProjectID) })
@@ -216,7 +217,7 @@ func (b *bootstrapRows) keepToCaller() {
 	b.templates = keep(b.templates, func(v core.Template) bool { return inScope(v.ProjectID) })
 	b.prefs = keep(b.prefs, func(v core.Preference) bool { return inScope(v.ProjectID) })
 	b.claims = keepByTask(x, b.claims, func(v core.ResourceClaim) string { return v.TaskID })
-	b.docs = keep(b.docs, func(d core.Doc) bool { return engine.CanSeeDoc(d, x.member.UserID) && inScope(d.ProjectID) })
+	b.docs = keep(b.docs, func(doc core.Doc) bool { return engine.CanSeeDoc(doc, x.member.UserID) && inScope(doc.ProjectID) })
 	b.sessions = keepByTask(x, b.sessions, func(v core.AgentSession) string { return v.TaskID })
 }
 

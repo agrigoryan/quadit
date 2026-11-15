@@ -19,44 +19,60 @@ import (
 // task filter, so the feed can be narrowed exactly like a task query.
 var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox"}
 
-// events writes a list of events in the form asked for.
-func (x *c) events(evs []core.Event, seq int64, more bool) error {
-	if x.wantText() || truthyParam(x.r.URL.Query(), "compact") {
-		names, err := x.names()
-		if err != nil {
-			return err
+// eventPage is one answer of the feed: the events, the position to read on
+// from, and whether more are already there.
+type eventPage struct {
+	events []core.Event
+	seq    int64
+	more   bool
+}
+
+// events writes a page of events in the form asked for: rows, or one line
+// each (compact=1), or text.
+func (x *c) events(page eventPage) error {
+	if !x.wantText() && !truthyParam(x.r.URL.Query(), "compact") {
+		evs := page.events
+		if evs == nil {
+			evs = []core.Event{}
 		}
-		ls := make([]string, len(evs))
-		for i, ev := range evs {
-			ls[i] = x.eventLine(ev, names)
-		}
-		if x.wantText() {
-			out := strings.Join(ls, "\n")
-			if out != "" {
-				out += "\n"
-			}
-			out += fmt.Sprintf("seq: %d", seq)
-			if more {
-				out += "  (more: ask again with after=" + strconv.FormatInt(seq, 10) + ")"
-			}
-			return x.text(out + "\n")
-		}
-		return x.ok(map[string]any{"events": ls, "seq": seq, "more": more})
+		return x.ok(map[string]any{"events": evs, "seq": page.seq, "more": page.more})
 	}
-	if evs == nil {
-		evs = []core.Event{}
+	names, err := x.names()
+	if err != nil {
+		return err
 	}
-	return x.ok(map[string]any{"events": evs, "seq": seq, "more": more})
+	eventLines := make([]string, len(page.events))
+	for i, ev := range page.events {
+		eventLines[i] = x.eventLine(ev, names)
+	}
+	if !x.wantText() {
+		return x.ok(map[string]any{"events": eventLines, "seq": page.seq, "more": page.more})
+	}
+	out := strings.Join(eventLines, "\n")
+	if out != "" {
+		out += "\n"
+	}
+	out += fmt.Sprintf("seq: %d", page.seq)
+	if page.more {
+		out += "  (more: ask again with after=" + strconv.FormatInt(page.seq, 10) + ")"
+	}
+	return x.text(out + "\n")
 }
 
 // handleReadFeed reads the feed after a position. With wait=N the request is held
 // for up to N seconds until something matching arrives, so an agent waits
 // with one call instead of polling. With cursor=NAME the position is the one
 // the server keeps for the caller; ack=SEQ moves it first.
+//
+// It first sets the filter from the request (the position; others=, inbox=,
+// task=, doc=; any task filter, or mine=), then reads in rounds: each round
+// checks the caller's access is unchanged, reads, and answers when there is
+// something, when it was not asked to wait, or when the wait is over;
+// otherwise it sleeps until the feed moves.
 func (s *Server) handleReadFeed(x *c) error {
 	ctx := x.ctx()
 	v := x.r.URL.Query()
-	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: nil, Limit: min(x.intParam("limit", 200), 2000), Types: splitList(v.Get("types"))}
+	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: nil, Limit: min(x.intParam("limit", defaultFeedPage), maxFeedPage), Types: splitList(v.Get("types"))}
 	cursor := v.Get("cursor")
 	if cursor != "" {
 		if ack := x.intParam("ack", 0); ack > 0 {
@@ -65,12 +81,12 @@ func (s *Server) handleReadFeed(x *c) error {
 			}
 		}
 		// A cursor not moved yet stands at the start.
-		var cu core.Cursor
-		err := x.db.Get(ctx, &cu, store.Eq("user_id", x.member.UserID), store.Eq("name", cursor))
+		var saved core.Cursor
+		err := x.db.Get(ctx, &saved, store.Eq("user_id", x.member.UserID), store.Eq("name", cursor))
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return err
 		}
-		f.After = cu.Seq
+		f.After = saved.Seq
 	}
 	if v.Has("after") {
 		f.After = int64(x.intParam("after", 0))
@@ -95,16 +111,17 @@ func (s *Server) handleReadFeed(x *c) error {
 		}
 		f.ScopeType, f.ScopeID = "doc", d.ID
 	}
-	q, err := x.queryFromRequest(feedParams...)
+	// Any task filter narrows the feed to the events of those tasks.
+	query, err := x.queryFromRequest(feedParams...)
 	if err != nil {
 		return err
 	}
 	if truthyParam(v, "mine") {
-		q.Watching = true // tasks assigned to or mentioning the caller are watched
+		query.Watching = true // tasks assigned to or mentioning the caller are watched
 	}
-	if q.Watching || len(v) > 0 && hasTaskFilter(q) {
-		q.Archived = true
-		tf, err := x.filter(q)
+	if query.Watching || len(v) > 0 && hasTaskFilter(query) {
+		query.Archived = true
+		tf, err := x.filter(query)
 		if err != nil {
 			return err
 		}
@@ -115,7 +132,8 @@ func (s *Server) handleReadFeed(x *c) error {
 		// workspace, members), exactly as the live stream gives it.
 		f.ProjectIDs, f.AllowNoProject = x.projects, true
 	}
-	wait := min(x.intParam("wait", 0), 55)
+	// The rounds.
+	wait := min(x.intParam("wait", 0), maxFeedWait)
 	deadline := time.Now().Add(time.Duration(wait) * time.Second)
 	if wait > 0 {
 		s.listening(x, wait+5)
@@ -128,7 +146,7 @@ func (s *Server) handleReadFeed(x *c) error {
 			if now, ok := s.recheckAccess(x); !ok {
 				return errUnauthorized("your access ended while this request was waiting")
 			} else if now != opened {
-				return &httpError{Status: 409, Code: "access_changed", Message: "what you may see changed while this request was waiting; ask again"}
+				return &httpError{Status: http.StatusConflict, Code: "access_changed", Message: "what you may see changed while this request was waiting; ask again"}
 			}
 		}
 		var ws core.Workspace
@@ -149,7 +167,7 @@ func (s *Server) handleReadFeed(x *c) error {
 			} else if n := len(evs); n > 0 && evs[n-1].Seq > seq {
 				seq = evs[n-1].Seq
 			}
-			return x.events(evs, seq, more)
+			return x.events(eventPage{events: evs, seq: seq, more: more})
 		}
 		// Nothing yet. Events up to ws.Seq did not match, so skip past them
 		// and sleep until the feed moves.
@@ -170,14 +188,23 @@ func (s *Server) handleReadFeed(x *c) error {
 	}
 }
 
+// The feed gives defaultFeedPage events unless limit= says otherwise, and
+// never more than maxFeedPage; a request waits maxFeedWait seconds at most.
+const (
+	defaultFeedPage = 200
+	maxFeedPage     = 2000
+	maxFeedWait     = 55
+)
+
 // hasTaskFilter reports whether a query narrows tasks at all.
 func hasTaskFilter(q TaskQuery) bool {
-	raw, _ := json.Marshal(q)
+	raw, _ := json.Marshal(q) // cannot fail: plain fields
 	return string(raw) != "{}"
 }
 
 // listening marks a member as having something waiting on the feed, which
-// is what "is this agent running?" shows.
+// is what "is this agent running?" shows. It is best effort: a sign of life
+// that is written again on the next wait, so a failed write is only logged.
 func (s *Server) listening(x *c, seconds int) {
 	until := time.Now().Add(time.Duration(seconds) * time.Second).UnixMilli()
 	set := map[string]any{"listening_until": until, "last_seen_at": time.Now().UnixMilli()}
@@ -215,24 +242,26 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 		"workspace_id", "user_id", "name")
 }
 
+// handleShowFeedCursor says where one of the caller's cursors stands; one
+// never moved stands at 0.
 func (s *Server) handleShowFeedCursor(x *c) error {
-	var cu core.Cursor
-	err := x.db.Get(x.ctx(), &cu, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name")))
+	var cursor core.Cursor
+	err := x.db.Get(x.ctx(), &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name")))
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
-	return x.ok(map[string]any{"name": x.r.PathValue("name"), "seq": cu.Seq})
+	return x.ok(map[string]any{"name": x.r.PathValue("name"), "seq": cursor.Seq})
 }
 
 // handleMoveFeedCursor marks everything up to seq as handled.
 func (s *Server) handleMoveFeedCursor(x *c) error {
-	var b struct {
+	var body struct {
 		Seq int64 `json:"seq"`
 	}
-	if err := x.body(&b); err != nil {
+	if err := x.body(&body); err != nil {
 		return err
 	}
-	if err := s.setCursor(x, x.r.PathValue("name"), b.Seq); err != nil {
+	if err := s.setCursor(x, x.r.PathValue("name"), body.Seq); err != nil {
 		return err
 	}
 	return s.handleShowFeedCursor(x)
@@ -263,11 +292,11 @@ func (s *Server) handleStreamFeed(x *c) error {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no") // tell proxies not to hold the stream back
-	x.w.WriteHeader(200)
+	x.w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(x.w, "retry: 2000\n\n")
 	flusher.Flush()
-	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: x.projects, AllowNoProject: true, Limit: 500}
-	beat := time.NewTicker(25 * time.Second)
+	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: x.projects, AllowNoProject: true, Limit: streamBatch}
+	beat := time.NewTicker(streamBeat)
 	defer beat.Stop()
 	opened, _ := s.recheckAccess(x)
 	for {
@@ -308,14 +337,14 @@ func (s *Server) handleStreamFeed(x *c) error {
 				continue // the top of the loop says how it ends
 			}
 		}
-		if len(evs) == f.Limit && evs[len(evs)-1].Seq-after > 5000 {
+		if len(evs) == f.Limit && evs[len(evs)-1].Seq-after > streamReplay {
 			// Too far behind to replay: tell the client to start over.
 			fmt.Fprintf(x.w, "event: reset\ndata: {}\n\n")
 			flusher.Flush()
 			return nil
 		}
 		for _, ev := range evs {
-			raw, _ := json.Marshal(ev)
+			raw, _ := json.Marshal(ev) // cannot fail: a row read from the database
 			fmt.Fprintf(x.w, "id: %d\ndata: %s\n\n", ev.Seq, raw)
 			after = ev.Seq
 		}
@@ -326,7 +355,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 			}
 		}
 		if x.member.Kind == core.KindAgent {
-			s.listening(x, 40)
+			s.listening(x, streamListening)
 		}
 		woke := make(chan bool, 1)
 		wctx, cancel := context.WithCancel(ctx)
@@ -346,10 +375,22 @@ func (s *Server) handleStreamFeed(x *c) error {
 	}
 }
 
+// The live stream sends streamBatch events at a time, a heartbeat every
+// streamBeat, and tells a client more than streamReplay events behind to
+// start over. An agent with a stream open counts as listening for
+// streamListening seconds at a time.
+const (
+	streamBatch     = 500
+	streamBeat      = 25 * time.Second
+	streamReplay    = 5000
+	streamListening = 40
+)
+
 // recheckAccess says whether the caller of a held connection may still be here,
 // and a fingerprint of what they may see. A connection that stays open for
 // minutes must not outlive the access it was opened with: it is asked again
-// before anything more is sent on it.
+// before anything more is sent on it. Access fails closed: a read that fails
+// counts as access ended.
 func (s *Server) recheckAccess(x *c) (fingerprint string, ok bool) {
 	ctx := context.WithoutCancel(x.ctx())
 	now := time.Now().UnixMilli()
@@ -360,24 +401,24 @@ func (s *Server) recheckAccess(x *c) (fingerprint string, ok bool) {
 		}
 	}
 	if x.sess != nil {
-		var se core.Session
-		if err := s.st.Get(ctx, &se, store.Eq("id", x.sess.ID), store.Null("revoked_at")); err != nil || se.ExpiresAt < now {
+		var session core.Session
+		if err := s.st.Get(ctx, &session, store.Eq("id", x.sess.ID), store.Null("revoked_at")); err != nil || session.ExpiresAt < now {
 			return "", false
 		}
 	}
-	var u core.User
-	if err := s.st.Get(ctx, &u, store.Eq("id", x.user.ID), store.Live); err != nil || u.DisabledAt != 0 {
+	var user core.User
+	if err := s.st.Get(ctx, &user, store.Eq("id", x.user.ID), store.Live); err != nil || user.DisabledAt != 0 {
 		return "", false
 	}
 	if n, err := s.st.Count(ctx, "workspaces", store.Eq("id", x.ws.ID), store.Live); err != nil || n == 0 {
 		return "", false // the workspace itself is gone
 	}
-	var m core.Member
-	if err := x.db.Get(ctx, &m, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil || m.SuspendedAt != 0 {
+	var member core.Member
+	if err := x.db.Get(ctx, &member, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil || member.SuspendedAt != 0 {
 		return "", false
 	}
-	scope, _ := json.Marshal(m.Scope)
-	return string(m.Role) + " " + string(scope), true
+	scope, _ := json.Marshal(member.Scope) // cannot fail: plain fields
+	return string(member.Role) + " " + string(scope), true
 }
 
 // accessChanged wakes every held connection, on this server and the others,
@@ -385,11 +426,11 @@ func (s *Server) recheckAccess(x *c) (fingerprint string, ok bool) {
 // token revoked, an account disabled.
 func (s *Server) accessChanged() {
 	s.hub.PokeAll()
-	if p, ok := s.st.(interface{ Poke(context.Context) error }); ok {
+	if poker, ok := s.st.(interface{ Poke(context.Context) error }); ok {
 		// Detached: the change that ended the access is done, and no request
 		// waits on this. Best effort: a held connection on another server
 		// still asks again before it sends anything.
-		if err := p.Poke(context.Background()); err != nil {
+		if err := poker.Poke(context.Background()); err != nil {
 			s.log.Warn("other servers not woken", "err", err)
 		}
 	}

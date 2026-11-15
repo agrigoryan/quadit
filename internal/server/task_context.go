@@ -1,8 +1,11 @@
+// The context pack: one task with what surrounds it, for an agent about to work on it.
+
 package server
 
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -17,21 +20,21 @@ func (s *Server) handleShowTaskContext(x *c) error {
 	if err != nil {
 		return err
 	}
-	d, err := x.buildTaskDetail(t, x.maxChars())
+	detail, err := x.buildTaskDetail(t, x.maxChars())
 	if err != nil {
 		return err
 	}
-	p := &contextPack{x: x, t: t, out: map[string]any{"task": d}}
-	p.text.WriteString(d.text())
-	for _, part := range []func() error{p.parents, p.epic, p.preferences, p.recentDecisions, p.docs} {
+	pack := &contextPack{x: x, t: t, out: map[string]any{"task": detail}}
+	pack.text.WriteString(detail.text())
+	for _, part := range []func() error{pack.parents, pack.epic, pack.preferences, pack.recentDecisions, pack.docs} {
 		if err := part(); err != nil {
 			return err
 		}
 	}
 	if x.wantText() {
-		return x.text(p.text.String())
+		return x.text(pack.text.String())
 	}
-	return x.ok(p.out)
+	return x.ok(pack.out)
 }
 
 // contextPack is one task's context pack in the making, in both its forms:
@@ -43,11 +46,23 @@ type contextPack struct {
 	text strings.Builder
 }
 
+// The pack stays a size an agent reads in one go: how far up the chain of
+// parents it looks, how much of each description it keeps, and how many
+// earlier decisions it shows.
+const (
+	packParentDepth      = 5
+	packParentChars      = 1500
+	packEpicChars        = 2000
+	packRecentDecisions  = 8
+	packDecisionsToCheck = 200
+)
+
 // parents adds the chain of parents, which says what this task is part of.
-func (p *contextPack) parents() error {
-	x := p.x
+// A parent that is gone ends the chain.
+func (pack *contextPack) parents() error {
+	x := pack.x
 	var parents []taskView
-	for cur, depth := p.t.ParentID, 0; cur != "" && depth < 5; depth++ {
+	for cur, depth := pack.t.ParentID, 0; cur != "" && depth < packParentDepth; depth++ {
 		var up core.Task
 		err := x.db.Get(x.ctx(), &up, store.Eq("id", cur))
 		if errors.Is(err, store.ErrNotFound) {
@@ -56,123 +71,118 @@ func (p *contextPack) parents() error {
 		if err != nil {
 			return err
 		}
-		pv, err := x.taskViews([]core.Task{up}, true)
+		views, err := x.detailedTaskViews([]core.Task{up})
 		if err != nil {
 			return err
 		}
-		pv[0].Description, pv[0].Truncated = truncate(pv[0].Description, 1500)
-		parents = append(parents, pv[0])
+		parent := views[0]
+		parent.Description, parent.Truncated = truncate(parent.Description, packParentChars)
+		parents = append(parents, parent)
 		cur = up.ParentID
 	}
 	if len(parents) > 0 {
-		p.out["parents"] = parents
-		p.text.WriteString("=== part of\n")
+		pack.out["parents"] = parents
+		pack.text.WriteString("=== part of\n")
 		for _, v := range parents {
-			fmt.Fprintf(&p.text, "%s\n%s\n", v.line(), v.Description)
+			fmt.Fprintf(&pack.text, "%s\n%s\n", v.line(), v.Description)
 		}
 	}
 	return nil
 }
 
 // epic adds the epic the task is in.
-func (p *contextPack) epic() error {
-	names, err := p.x.names()
+func (pack *contextPack) epic() error {
+	names, err := pack.x.names()
 	if err != nil {
 		return err
 	}
-	if e, ok := names.epics[p.t.EpicID]; ok {
-		desc, _ := truncate(e.Description, 2000)
-		p.out["epic"] = map[string]any{"name": e.Name, "state": e.State, "target_on": e.TargetOn, "description": desc}
-		fmt.Fprintf(&p.text, "=== epic: %s (%s", e.Name, e.State)
+	if e, ok := names.epics[pack.t.EpicID]; ok {
+		desc, _ := truncate(e.Description, packEpicChars)
+		pack.out["epic"] = map[string]any{"name": e.Name, "state": e.State, "target_on": e.TargetOn, "description": desc}
+		fmt.Fprintf(&pack.text, "=== epic: %s (%s", e.Name, e.State)
 		if e.TargetOn != "" {
-			p.text.WriteString(", target " + e.TargetOn)
+			pack.text.WriteString(", target " + e.TargetOn)
 		}
-		p.text.WriteString(")\n" + desc + "\n")
+		pack.text.WriteString(")\n" + desc + "\n")
 	}
 	return nil
 }
 
 // preferences adds the standing preferences: the workspace's, the
 // project's, and those tied to this task's labels.
-func (p *contextPack) preferences() error {
-	t := p.t
+func (pack *contextPack) preferences() error {
+	t := pack.t
 	var prefs []core.Preference
-	if err := p.x.db.List(p.x.ctx(), &prefs, store.Where(store.Live, store.Null("retired_at"))); err != nil {
+	if err := pack.x.db.List(pack.x.ctx(), &prefs, store.Where(store.Live, store.Null("retired_at"))); err != nil {
 		return err
 	}
 	var rules []string
-	for _, pr := range prefs {
-		if pr.ProjectID != "" && pr.ProjectID != t.ProjectID {
+	for _, pref := range prefs {
+		if pref.ProjectID != "" && pref.ProjectID != t.ProjectID {
 			continue
 		}
-		if len(pr.LabelIDs) > 0 {
-			match := false
-			for _, l := range pr.LabelIDs {
-				match = match || has(t.LabelIDs, l)
-			}
-			if !match {
-				continue
-			}
+		if len(pref.LabelIDs) > 0 && !slices.ContainsFunc(pref.LabelIDs, func(l string) bool { return has(t.LabelIDs, l) }) {
+			continue
 		}
-		rules = append(rules, pr.Body)
+		rules = append(rules, pref.Body)
 	}
 	if len(rules) > 0 {
-		p.out["standing_preferences"] = rules
-		p.text.WriteString("=== standing preferences\n- " + strings.Join(rules, "\n- ") + "\n")
+		pack.out["standing_preferences"] = rules
+		pack.text.WriteString("=== standing preferences\n- " + strings.Join(rules, "\n- ") + "\n")
 	}
 	return nil
 }
 
 // recentDecisions adds earlier answers in the same project, which guide
 // later work.
-func (p *contextPack) recentDecisions() error {
-	x, ctx, t := p.x, p.x.ctx(), p.t
+func (pack *contextPack) recentDecisions() error {
+	x, ctx, t := pack.x, pack.x.ctx(), pack.t
 	var picked []core.Decision
-	if err := x.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: 200}); err != nil {
+	if err := x.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: packDecisionsToCheck}); err != nil {
 		return err
 	}
 	var recent []core.Decision
-	for _, dc := range picked {
-		if dc.TaskID == t.ID || len(recent) >= 8 {
+	for _, decision := range picked {
+		if decision.TaskID == t.ID || len(recent) >= packRecentDecisions {
 			continue
 		}
-		var dt core.Task
-		err := x.db.Get(ctx, &dt, store.Eq("id", dc.TaskID))
+		var asker core.Task // the task the decision was asked on
+		err := x.db.Get(ctx, &asker, store.Eq("id", decision.TaskID))
 		if errors.Is(err, store.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		if dt.ProjectID == t.ProjectID {
-			recent = append(recent, dc)
+		if asker.ProjectID == t.ProjectID {
+			recent = append(recent, decision)
 		}
 	}
-	rv, err := x.decisionViews(recent, false)
+	views, err := x.decisionViews(recent)
 	if err != nil {
 		return err
 	}
-	if len(rv) > 0 {
-		p.out["recent_decisions"] = rv
-		p.text.WriteString("=== recent decisions in this project\n")
-		for _, r := range rv {
-			ans := r.Outcome
-			if r.PickedLabel != "" {
-				ans = r.PickedLabel
+	if len(views) > 0 {
+		pack.out["recent_decisions"] = views
+		pack.text.WriteString("=== recent decisions in this project\n")
+		for _, view := range views {
+			answer := view.Outcome
+			if view.PickedLabel != "" {
+				answer = view.PickedLabel
 			}
-			fmt.Fprintf(&p.text, "%s %q -> %s", r.Task, oneLine(r.Question, 100), ans)
-			if r.Note != "" {
-				p.text.WriteString(": " + oneLine(r.Note, 160))
+			fmt.Fprintf(&pack.text, "%s %q -> %s", view.Task, oneLine(view.Question, 100), answer)
+			if view.Note != "" {
+				pack.text.WriteString(": " + oneLine(view.Note, 160))
 			}
-			p.text.WriteString("\n")
+			pack.text.WriteString("\n")
 		}
 	}
 	return nil
 }
 
 // docs adds the docs this task mentions, or that mention it.
-func (p *contextPack) docs() error {
-	x, ctx, t := p.x, p.x.ctx(), p.t
+func (pack *contextPack) docs() error {
+	x, ctx, t := pack.x, pack.x.ctx(), pack.t
 	var refs []core.Ref
 	if err := x.db.List(ctx, &refs, store.Where(store.Eq("from_scope_id", t.ID), store.Eq("to_type", "doc"))); err != nil {
 		return err
@@ -189,9 +199,9 @@ func (p *contextPack) docs() error {
 		docIDs[r.FromScopeID] = true
 	}
 	var docs []map[string]any
-	for did := range docIDs {
+	for docID := range docIDs {
 		var doc core.Doc
-		err := x.db.Get(ctx, &doc, store.Eq("id", did), store.Live)
+		err := x.db.Get(ctx, &doc, store.Eq("id", docID), store.Live)
 		if errors.Is(err, store.ErrNotFound) {
 			continue
 		}
@@ -203,10 +213,10 @@ func (p *contextPack) docs() error {
 		}
 	}
 	if len(docs) > 0 {
-		p.out["docs"] = docs
-		p.text.WriteString("=== linked docs\n")
-		for _, dc := range docs {
-			fmt.Fprintf(&p.text, "%s  (doc %s)\n", dc["title"], dc["id"])
+		pack.out["docs"] = docs
+		pack.text.WriteString("=== linked docs\n")
+		for _, doc := range docs {
+			fmt.Fprintf(&pack.text, "%s  (doc %s)\n", doc["title"], doc["id"])
 		}
 	}
 	return nil
@@ -226,25 +236,25 @@ type namedRef struct {
 func (x *c) namedRefs(refs []core.Ref) ([]namedRef, error) {
 	out := []namedRef{}
 	ctx := x.ctx()
-	for _, r := range refs {
-		nr := namedRef{Ref: r}
-		switch r.FromScopeType {
+	for _, ref := range refs {
+		named := namedRef{Ref: ref}
+		switch ref.FromScopeType {
 		case "doc":
-			var d core.Doc
-			err := x.db.Get(ctx, &d, store.Eq("id", r.FromScopeID), store.Live)
+			var doc core.Doc
+			err := x.db.Get(ctx, &doc, store.Eq("id", ref.FromScopeID), store.Live)
 			if errors.Is(err, store.ErrNotFound) {
 				continue
 			}
 			if err != nil {
 				return nil, err
 			}
-			if !engine.CanSeeDoc(d, x.member.UserID) || !x.canProject(d.ProjectID) {
+			if !engine.CanSeeDoc(doc, x.member.UserID) || !x.canProject(doc.ProjectID) {
 				continue
 			}
-			nr.Title = d.Title
+			named.Title = doc.Title
 		case "task":
 			var t core.Task
-			err := x.db.Get(ctx, &t, store.Eq("id", r.FromScopeID), store.Live)
+			err := x.db.Get(ctx, &t, store.Eq("id", ref.FromScopeID), store.Live)
 			if errors.Is(err, store.ErrNotFound) {
 				continue
 			}
@@ -254,9 +264,9 @@ func (x *c) namedRefs(refs []core.Ref) ([]namedRef, error) {
 			if !x.canProject(t.ProjectID) {
 				continue
 			}
-			nr.Title, nr.Key = t.Title, t.Key
+			named.Title, named.Key = t.Title, t.Key
 		}
-		out = append(out, nr)
+		out = append(out, named)
 	}
 	return out, nil
 }

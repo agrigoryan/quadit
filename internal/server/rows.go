@@ -1,10 +1,13 @@
+// Database pages: every cell worked out (stored values, formulas, rollups),
+// and the rows of GET /docs/ID/rows filtered and sorted.
+
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -23,20 +26,22 @@ type loadedDatabase struct {
 	values map[string]map[string]any // row id -> property id -> stored value
 }
 
-func (x *c) loadTable(d core.Doc) (*loadedDatabase, error) {
-	t := &loadedDatabase{doc: d, values: map[string]map[string]any{}}
-	if err := x.db.List(x.ctx(), &t.props, store.Q{Where: []store.Cond{store.Eq("database_id", d.ID), store.Live}, Order: "rank"}); err != nil {
+// loadTable reads a database's properties and rows, and each row's stored
+// values.
+func (x *c) loadTable(database core.Doc) (*loadedDatabase, error) {
+	t := &loadedDatabase{doc: database, values: map[string]map[string]any{}}
+	if err := x.db.List(x.ctx(), &t.props, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
-	if err := x.db.List(x.ctx(), &t.rows, store.Q{Where: []store.Cond{store.Eq("parent_id", d.ID), store.Eq("kind", core.DocRow), store.Live}, Order: "rank"}); err != nil {
+	if err := x.db.List(x.ctx(), &t.rows, store.Q{Where: []store.Cond{store.Eq("parent_id", database.ID), store.Eq("kind", core.DocRow), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
-	for _, r := range t.rows {
+	for _, row := range t.rows {
 		vals := map[string]any{}
-		if len(r.Props) > 0 {
-			json.Unmarshal(r.Props, &vals)
+		if len(row.Props) > 0 {
+			readStored(row.Props, &vals)
 		}
-		t.values[r.ID] = vals
+		t.values[row.ID] = vals
 	}
 	return t, nil
 }
@@ -50,16 +55,21 @@ type propConfig struct {
 	Fn       string `json:"fn"`       // rollup: count, sum, avg, min, max, percent_checked, values
 }
 
-// computed works out every cell of a database: stored values as they are,
-// and formulas, rollups and the built-in columns from them.
+// computed works out every cell of a database, by row id and property id:
+// stored values as they are, and formulas, rollups and the built-in columns
+// (created_at, updated_at, created_by, member) from them. A formula reads
+// other cells through prop(), to a depth of formulaDepth; a relation is read
+// as the titles of the rows it points to, in a database loaded when first
+// needed. A database the caller may not see, or that is gone, reads as
+// empty; one that cannot be read fails the whole answer.
 func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
 	byName := map[string]core.DBProperty{}
-	for _, p := range t.props {
-		byName[strings.ToLower(p.Name)] = p
+	for _, prop := range t.props {
+		byName[strings.ToLower(prop.Name)] = prop
 	}
 	// Other databases, loaded when a relation needs them. A read that fails
 	// is kept in readErr and fails the answer once every cell is done.
@@ -69,23 +79,24 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 		if dbID == t.doc.ID {
 			return t
 		}
-		if rt, ok := related[dbID]; ok {
-			return rt
+		if loaded, ok := related[dbID]; ok {
+			return loaded
 		}
-		var d core.Doc
-		var rt *loadedDatabase
-		err := x.db.Get(x.ctx(), &d, store.Eq("id", dbID), store.Live)
+		var database core.Doc
+		var loaded *loadedDatabase
+		err := x.db.Get(x.ctx(), &database, store.Eq("id", dbID), store.Live)
 		switch {
-		case err == nil && engine.CanSeeDoc(d, x.member.UserID):
-			if rt, err = x.loadTable(d); err != nil && readErr == nil {
+		case err == nil && engine.CanSeeDoc(database, x.member.UserID):
+			if loaded, err = x.loadTable(database); err != nil && readErr == nil {
 				readErr = err
 			}
 		case err != nil && !errors.Is(err, store.ErrNotFound) && readErr == nil:
 			readErr = err
 		}
-		related[dbID] = rt
-		return rt
+		related[dbID] = loaded
+		return loaded
 	}
+	// titles are the titles of the rows a relation cell points to.
 	titles := func(dbID string, ids any) []any {
 		rt := other(dbID)
 		list, _ := ids.([]any)
@@ -103,10 +114,11 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 		return out
 	}
 	out := map[string]map[string]any{}
+	// cell works out one cell; depth counts the formulas it went through.
 	var cell func(row core.Doc, p core.DBProperty, depth int) any
 	cell = func(row core.Doc, p core.DBProperty, depth int) any {
 		var cfg propConfig
-		json.Unmarshal(p.Config, &cfg)
+		readStored(p.Config, &cfg)
 		stored := t.values[row.ID][p.ID]
 		switch p.Type {
 		case "created_at":
@@ -121,7 +133,7 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 			}
 			return nil
 		case "formula":
-			if depth > 8 {
+			if depth > formulaDepth {
 				return "#loop"
 			}
 			v, err := formula.Eval(cfg.Formula, formula.Env{Prop: func(name string) any {
@@ -137,7 +149,7 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 				v := cell(row, q, depth+1)
 				if q.Type == "relation" {
 					var qc propConfig
-					json.Unmarshal(q.Config, &qc)
+					readStored(q.Config, &qc)
 					return titles(qc.Database, v)
 				}
 				return v
@@ -157,7 +169,7 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 				}
 			}
 			var relCfg propConfig
-			json.Unmarshal(rel.Config, &relCfg)
+			readStored(rel.Config, &relCfg)
 			rt := other(relCfg.Database)
 			ids, _ := t.values[row.ID][rel.ID].([]any)
 			if rt == nil {
@@ -186,14 +198,14 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 		}
 		return stored
 	}
-	for _, r := range t.rows {
+	for _, row := range t.rows {
 		cells := map[string]any{}
-		for _, p := range t.props {
-			if v := cell(r, p, 0); v != nil {
-				cells[p.ID] = v
+		for _, prop := range t.props {
+			if v := cell(row, prop, 0); v != nil {
+				cells[prop.ID] = v
 			}
 		}
-		out[r.ID] = cells
+		out[row.ID] = cells
 	}
 	if readErr != nil {
 		return nil, readErr
@@ -201,6 +213,13 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 	return out, nil
 }
 
+// formulaDepth is how many formulas deep a formula may read before it is
+// taken for a loop.
+const formulaDepth = 8
+
+// rollup sums up the values a rollup gathered by its function: count, sum,
+// avg, min, max, percent_checked or values. related is how many rows the
+// relation points to.
 func rollup(fn string, vals []any, related int) any {
 	nums := func() []float64 {
 		var out []float64
@@ -357,7 +376,7 @@ func (s *Server) handleListDatabaseRows(x *c) error {
 		for _, dv := range views {
 			names = append(names, dv.Name)
 			if dv.ID == name || strings.EqualFold(dv.Name, name) {
-				json.Unmarshal(dv.Config, &cfg)
+				readStored(dv.Config, &cfg)
 				found = true
 			}
 		}
@@ -413,14 +432,18 @@ func (s *Server) handleListDatabaseRows(x *c) error {
 		}
 		rows = kept
 	}
-	for i := len(cfg.Sorts) - 1; i >= 0; i-- {
-		so := cfg.Sorts[i]
+	for _, so := range slices.Backward(cfg.Sorts) {
 		if _, err := value(core.Doc{}, so.Prop); err != nil {
 			return err
 		}
+		sortValue := map[string]any{} // by row id
+		for _, r := range rows {
+			if sortValue[r.ID], err = value(r, so.Prop); err != nil {
+				return err
+			}
+		}
 		sort.SliceStable(rows, func(a, b int) bool {
-			va, _ := value(rows[a], so.Prop)
-			vb, _ := value(rows[b], so.Prop)
+			va, vb := sortValue[rows[a].ID], sortValue[rows[b].ID]
 			fa, aNum := va.(float64)
 			fb, bNum := vb.(float64)
 			less := formula.Text(va) < formula.Text(vb)

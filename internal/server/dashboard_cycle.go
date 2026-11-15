@@ -11,19 +11,19 @@ import (
 // handleShowCycleChart returns a cycle's scope against done, day by day, in tasks
 // and in points.
 func (s *Server) handleShowCycleChart(x *c) error {
-	var cy core.Cycle
-	err := x.db.Get(x.ctx(), &cy, store.Eq("id", x.r.PathValue("id")), store.Live)
+	var cycle core.Cycle
+	err := x.db.Get(x.ctx(), &cycle, store.Eq("id", x.r.PathValue("id")), store.Live)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
-	if err != nil || !x.canProject(cy.ProjectID) {
+	if err != nil || !x.canProject(cycle.ProjectID) {
 		return errNotFound("cycle")
 	}
 	names, err := x.names()
 	if err != nil {
 		return err
 	}
-	tasks, err := x.db.Tasks(x.ctx(), store.TaskFilter{CycleIDs: []string{cy.ID}, Archived: true, Limit: 5000})
+	tasks, err := x.db.Tasks(x.ctx(), store.TaskFilter{CycleIDs: []string{cycle.ID}, Archived: true, Limit: maxTasksByID})
 	if err != nil {
 		return err
 	}
@@ -34,20 +34,20 @@ func (s *Server) handleShowCycleChart(x *c) error {
 		Points     int    `json:"points"`
 		PointsDone int    `json:"points_done"`
 	}
-	start, err := time.Parse("2006-01-02", cy.StartsOn)
+	start, err := time.Parse(time.DateOnly, cycle.StartsOn)
 	if err != nil {
 		return err
 	}
-	end, err := time.Parse("2006-01-02", cy.EndsOn)
+	end, err := time.Parse(time.DateOnly, cycle.EndsOn)
 	if err != nil {
 		return err
 	}
 	today := time.Now().UTC()
 	var days []day
-	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-		eod := d.AddDate(0, 0, 1).UnixMilli()
-		row := day{Date: d.Format("2006-01-02")}
-		if d.After(today) {
+	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
+		eod := date.AddDate(0, 0, 1).UnixMilli()
+		row := day{Date: date.Format(time.DateOnly)}
+		if date.After(today) {
 			days = append(days, day{Date: row.Date, Scope: -1}) // the future: nothing to plot yet
 			continue
 		}
@@ -74,5 +74,5 @@ func (s *Server) handleShowCycleChart(x *c) error {
 			done++
 		}
 	}
-	return x.ok(map[string]any{"cycle": cy, "days": days, "total": total, "done": done})
+	return x.ok(map[string]any{"cycle": cycle, "days": days, "total": total, "done": done})
 }

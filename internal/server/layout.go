@@ -13,21 +13,21 @@ import (
 // handleShowProjectLayout describes one project: its statuses, labels, members, epics,
 // cycles and templates, by name.
 func (s *Server) handleShowProjectLayout(x *c) error {
-	p, err := x.resolver().Project(x.r.PathValue("key"))
+	project, err := x.resolver().Project(x.r.PathValue("key"))
 	if err != nil {
 		return err
 	}
-	if !x.canProject(p.ID) {
-		return errNotFound("project " + p.Key)
+	if !x.canProject(project.ID) {
+		return errNotFound("project " + project.Key)
 	}
-	out, err := x.layout(p)
+	out, err := x.layout(project)
 	if err != nil {
 		return err
 	}
 	if x.wantText() {
-		return x.text(layoutText(p, out))
+		return x.text(layoutText(project, out))
 	}
-	return x.ok(map[string]any{"project": map[string]string{"key": p.Key, "name": p.Name, "description": p.Description}, "layout": out})
+	return x.ok(map[string]any{"project": map[string]string{"key": project.Key, "name": project.Name, "description": project.Description}, "layout": out})
 }
 
 // layoutItem is one thing a project has, by name, with what its kind of
@@ -44,55 +44,29 @@ type layoutItem struct {
 }
 
 // layout gathers what a project has: its statuses in their own order, the
-// other lists by name.
-func (x *c) layout(p core.Project) (map[string][]layoutItem, error) {
+// other lists by name. A list the project has nothing in is left out.
+func (x *c) layout(project core.Project) (map[string][]layoutItem, error) {
 	names, err := x.names()
 	if err != nil {
 		return nil, err
 	}
-	out := map[string][]layoutItem{}
-	var sts []core.Status
-	for _, st := range names.statuses {
-		if st.ProjectID == p.ID && st.DeletedAt == 0 {
-			sts = append(sts, st)
-		}
-	}
-	sort.Slice(sts, func(i, j int) bool { return sts[i].Rank < sts[j].Rank })
-	for _, st := range sts {
-		out["statuses"] = append(out["statuses"], layoutItem{Name: st.Name, Category: st.Category, Default: st.IsDefault})
-	}
-	for _, l := range names.labels {
-		if (l.ProjectID == "" || l.ProjectID == p.ID) && l.DeletedAt == 0 {
-			out["labels"] = append(out["labels"], layoutItem{Name: l.Name})
-		}
-	}
-	for _, m := range names.members {
-		if m.RemovedAt == 0 {
-			out["members"] = append(out["members"], layoutItem{Name: "@" + m.Handle, Role: string(m.Role), Kind: m.Kind, Title: m.Name})
-		}
-	}
-	for _, e := range names.epics {
-		if e.ProjectID == p.ID && e.DeletedAt == 0 {
-			out["epics"] = append(out["epics"], layoutItem{Name: e.Name, State: e.State, Dates: e.TargetOn})
-		}
-	}
-	today := time.Now().UTC().Format("2006-01-02")
-	for _, cy := range names.cycles {
-		if cy.ProjectID == p.ID && cy.DeletedAt == 0 && cy.EndsOn >= today {
-			out["cycles"] = append(out["cycles"], layoutItem{Name: fmt.Sprint(cy.Number), Dates: cy.StartsOn + " to " + cy.EndsOn})
-		}
-	}
-	var tpls []core.Template
-	if err := x.db.List(x.ctx(), &tpls, store.Where(store.Live)); err != nil {
+	var templates []core.Template
+	if err := x.db.List(x.ctx(), &templates, store.Where(store.Live)); err != nil {
 		return nil, err
 	}
-	for _, t := range tpls {
-		if t.ProjectID == "" || t.ProjectID == p.ID {
-			out["templates"] = append(out["templates"], layoutItem{Name: t.Name})
-		}
+	out := map[string][]layoutItem{
+		"statuses":  layoutStatuses(names, project.ID),
+		"labels":    layoutLabels(names, project.ID),
+		"members":   layoutMembers(names),
+		"epics":     layoutEpics(names, project.ID),
+		"cycles":    layoutCycles(names, project.ID),
+		"templates": layoutTemplates(templates, project.ID),
 	}
-	for k := range out {
-		list := out[k]
+	for k, list := range out {
+		if len(list) == 0 {
+			delete(out, k)
+			continue
+		}
 		if k != "statuses" {
 			sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 		}
@@ -100,24 +74,96 @@ func (x *c) layout(p core.Project) (map[string][]layoutItem, error) {
 	return out, nil
 }
 
+// layoutStatuses lists the project's statuses in the order it ranks them.
+func layoutStatuses(names *nameLookup, projectID string) []layoutItem {
+	var statuses []core.Status
+	for _, status := range names.statuses {
+		if status.ProjectID == projectID && status.DeletedAt == 0 {
+			statuses = append(statuses, status)
+		}
+	}
+	sort.Slice(statuses, func(i, j int) bool { return statuses[i].Rank < statuses[j].Rank })
+	var out []layoutItem
+	for _, status := range statuses {
+		out = append(out, layoutItem{Name: status.Name, Category: status.Category, Default: status.IsDefault})
+	}
+	return out
+}
+
+// layoutLabels lists the project's labels and the workspace's.
+func layoutLabels(names *nameLookup, projectID string) []layoutItem {
+	var out []layoutItem
+	for _, label := range names.labels {
+		if (label.ProjectID == "" || label.ProjectID == projectID) && label.DeletedAt == 0 {
+			out = append(out, layoutItem{Name: label.Name})
+		}
+	}
+	return out
+}
+
+// layoutMembers lists the workspace's members: every project has them all.
+func layoutMembers(names *nameLookup) []layoutItem {
+	var out []layoutItem
+	for _, member := range names.members {
+		if member.RemovedAt == 0 {
+			out = append(out, layoutItem{Name: "@" + member.Handle, Role: string(member.Role), Kind: member.Kind, Title: member.Name})
+		}
+	}
+	return out
+}
+
+// layoutEpics lists the project's epics with their state and target date.
+func layoutEpics(names *nameLookup, projectID string) []layoutItem {
+	var out []layoutItem
+	for _, epic := range names.epics {
+		if epic.ProjectID == projectID && epic.DeletedAt == 0 {
+			out = append(out, layoutItem{Name: epic.Name, State: epic.State, Dates: epic.TargetOn})
+		}
+	}
+	return out
+}
+
+// layoutCycles lists the project's cycles that have not ended, by number.
+func layoutCycles(names *nameLookup, projectID string) []layoutItem {
+	today := time.Now().UTC().Format("2006-01-02")
+	var out []layoutItem
+	for _, cycle := range names.cycles {
+		if cycle.ProjectID == projectID && cycle.DeletedAt == 0 && cycle.EndsOn >= today {
+			out = append(out, layoutItem{Name: fmt.Sprint(cycle.Number), Dates: cycle.StartsOn + " to " + cycle.EndsOn})
+		}
+	}
+	return out
+}
+
+// layoutTemplates lists the project's templates and the workspace's.
+func layoutTemplates(templates []core.Template, projectID string) []layoutItem {
+	var out []layoutItem
+	for _, template := range templates {
+		if template.ProjectID == "" || template.ProjectID == projectID {
+			out = append(out, layoutItem{Name: template.Name})
+		}
+	}
+	return out
+}
+
 // layoutText is a layout as lines of text, one list on each.
-func layoutText(p core.Project, out map[string][]layoutItem) string {
+func layoutText(project core.Project, out map[string][]layoutItem) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "project %s  %s\n", p.Key, p.Name)
+	fmt.Fprintf(&b, "project %s  %s\n", project.Key, project.Name)
 	for _, k := range []string{"statuses", "labels", "members", "epics", "cycles", "templates"} {
 		var parts []string
-		for _, n := range out[k] {
-			s := n.Name
-			if n.Category != "" {
-				s += " (" + n.Category + ")"
+		for _, item := range out[k] {
+			part := item.Name
+			if item.Category != "" {
+				part += " (" + item.Category + ")"
 			}
-			if n.Kind == core.KindAgent {
-				s += " (agent)"
+			if item.Kind == core.KindAgent {
+				part += " (agent)"
 			}
-			if n.Dates != "" {
-				s += " (" + n.Dates + ")"
+			if item.Dates != "" {
+				part += " (" + item.Dates + ")"
 			}
-			parts = append(parts, s)
+			parts = append(parts, part)
 		}
 		if len(parts) > 0 {
 			fmt.Fprintf(&b, "%s: %s\n", k, strings.Join(parts, ", "))

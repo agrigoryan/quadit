@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,63 +32,57 @@ type nameLookup struct {
 	milestones map[string]string
 }
 
-// names loads the workspace's small tables once per request.
+// names returns the request's nameLookup: the workspace's small tables
+// (members, statuses, labels, projects, epics, cycles, milestones), every
+// row of them, deleted ones too, read on the first call and kept for the
+// rest of the request.
 func (x *c) names() (*nameLookup, error) {
 	if x.nameCache != nil {
 		return x.nameCache, nil
 	}
-	n := &nameLookup{members: map[string]core.Member{}, statuses: map[string]core.Status{}, labels: map[string]core.Label{},
-		projects: map[string]core.Project{}, epics: map[string]core.Epic{}, cycles: map[string]core.Cycle{}}
-	var ms []core.Member
-	var ss []core.Status
-	var ls []core.Label
-	var ps []core.Project
-	var es []core.Epic
-	var cs []core.Cycle
+	lookup := &nameLookup{members: map[string]core.Member{}, statuses: map[string]core.Status{}, labels: map[string]core.Label{},
+		projects: map[string]core.Project{}, epics: map[string]core.Epic{}, cycles: map[string]core.Cycle{}, milestones: map[string]string{}}
+	var members []core.Member
+	var statuses []core.Status
+	var labels []core.Label
+	var projects []core.Project
+	var epics []core.Epic
+	var cycles []core.Cycle
+	var milestones []core.Milestone
 	ctx := x.ctx()
-	for _, load := range []func() error{
-		func() error { return x.db.List(ctx, &ms, store.Q{}) },
-		func() error { return x.db.List(ctx, &ss, store.Q{Order: "rank"}) },
-		func() error { return x.db.List(ctx, &ls, store.Q{}) },
-		func() error { return x.db.List(ctx, &ps, store.Q{Order: "rank"}) },
-		func() error { return x.db.List(ctx, &es, store.Q{}) },
-		func() error { return x.db.List(ctx, &cs, store.Q{}) },
-		func() error {
-			var mls []core.Milestone
-			if err := x.db.List(ctx, &mls, store.Q{}); err != nil {
-				return err
-			}
-			n.milestones = map[string]string{}
-			for _, m := range mls {
-				n.milestones[m.ID] = m.Name
-			}
-			return nil
-		},
+	for _, list := range []struct {
+		into  any
+		order string
+	}{
+		{&members, ""}, {&statuses, "rank"}, {&labels, ""}, {&projects, "rank"}, {&epics, ""}, {&cycles, ""}, {&milestones, ""},
 	} {
-		if err := load(); err != nil {
+		if err := x.db.List(ctx, list.into, store.Q{Order: list.order}); err != nil {
 			return nil, err
 		}
 	}
-	for _, m := range ms {
-		n.members[m.UserID] = m
+	for _, member := range members {
+		lookup.members[member.UserID] = member
 	}
-	for _, s := range ss {
-		n.statuses[s.ID] = s
+	for _, status := range statuses {
+		lookup.statuses[status.ID] = status
 	}
-	for _, l := range ls {
-		n.labels[l.ID] = l
+	for _, label := range labels {
+		lookup.labels[label.ID] = label
 	}
-	for _, p := range ps {
-		n.projects[p.ID] = p
+	for _, project := range projects {
+		lookup.projects[project.ID] = project
 	}
-	for _, e := range es {
-		n.epics[e.ID] = e
+	for _, epic := range epics {
+		lookup.epics[epic.ID] = epic
 	}
-	for _, cy := range cs {
-		n.cycles[cy.ID] = cy
+	for _, cycle := range cycles {
+		lookup.cycles[cycle.ID] = cycle
 	}
-	x.nameCache = n
-	return n, nil
+	for _, milestone := range milestones {
+		lookup.milestones[milestone.ID] = milestone.Name
+	}
+	x.nameCache = lookup
+	return lookup, nil
 }
 
 // handle returns "@handle" for a user id, or "" for none.
@@ -157,8 +152,8 @@ func fromURL(v url.Values, dst any, skip ...string) error {
 	rt := rv.Type()
 	fields := map[string]int{}
 	var known []string
-	for i := 0; i < rt.NumField(); i++ {
-		name := strings.Split(rt.Field(i).Tag.Get("json"), ",")[0]
+	for i := range rt.NumField() {
+		name, _, _ := strings.Cut(rt.Field(i).Tag.Get("json"), ",")
 		if name == "" || name == "-" {
 			continue // a field that is not a parameter
 		}
@@ -182,15 +177,15 @@ func fromURL(v url.Values, dst any, skip ...string) error {
 		case []string:
 			f.Set(reflect.ValueOf(splitList(raw)))
 		case []int:
-			var ns []int
-			for _, p := range splitList(raw) {
-				n, err := strconv.Atoi(p)
+			var numbers []int
+			for _, part := range splitList(raw) {
+				n, err := strconv.Atoi(part)
 				if err != nil {
-					return errBad("%s: %q is not a number", name, p)
+					return errBad("%s: %q is not a number", name, part)
 				}
-				ns = append(ns, n)
+				numbers = append(numbers, n)
 			}
-			f.Set(reflect.ValueOf(ns))
+			f.Set(reflect.ValueOf(numbers))
 		case int, int64:
 			n, err := strconv.ParseInt(raw, 10, 64)
 			if err != nil {
@@ -207,18 +202,22 @@ func fromURL(v url.Values, dst any, skip ...string) error {
 	return nil
 }
 
+// truthy reads a flag's value: given without a value, or as 1, true or yes.
 func truthy(s string) bool { return s == "1" || s == "true" || s == "yes" || s == "" }
 
+// splitList reads a comma-separated list, leaving out empty items.
 func splitList(s string) []string {
 	var out []string
-	for _, p := range strings.Split(s, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
+	for item := range strings.SplitSeq(s, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
 		}
 	}
 	return out
 }
 
+// nearestOf is the allowed name closest to what was given, for "did you
+// mean", or "" when none is close (within two edits, ignoring case).
 func nearestOf(got string, allowed []string) string {
 	best, bestD := "", 3
 	for _, a := range allowed {
@@ -263,32 +262,33 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 	if err != nil {
 		return f, err
 	}
-	rs := x.resolver()
+	resolve := x.resolver()
+	// The projects asked for, or every one the caller may read.
 	var projects []core.Project
 	for _, ref := range q.Project {
-		p, err := rs.Project(ref)
+		project, err := resolve.Project(ref)
 		if err != nil {
 			return f, err
 		}
-		if !x.canProject(p.ID) {
-			return f, errForbidden("your access does not include project %s", p.Key)
+		if !x.canProject(project.ID) {
+			return f, errForbidden("your access does not include project %s", project.Key)
 		}
-		projects = append(projects, p)
-		f.ProjectIDs = append(f.ProjectIDs, p.ID)
+		projects = append(projects, project)
+		f.ProjectIDs = append(f.ProjectIDs, project.ID)
 	}
 	if len(projects) == 0 {
-		for _, p := range names.projects {
-			if p.DeletedAt == 0 && x.canProject(p.ID) {
-				projects = append(projects, p)
+		for _, project := range names.projects {
+			if project.DeletedAt == 0 && x.canProject(project.ID) {
+				projects = append(projects, project)
 			}
 		}
 		if x.projects != nil {
 			f.ProjectIDs = x.projects
 		}
 	}
-	for _, c := range q.Category {
-		if !core.ValidCategory(c) {
-			return f, &engine.Error{Code: engine.CodeInvalid, Field: "category", Message: "unknown category " + strconv.Quote(c), Allowed: core.Categories}
+	for _, category := range q.Category {
+		if !core.ValidCategory(category) {
+			return f, &engine.Error{Code: engine.CodeInvalid, Field: "category", Message: "unknown category " + strconv.Quote(category), Allowed: core.Categories}
 		}
 	}
 	if q.Open != nil {
@@ -298,12 +298,13 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 			f.Categories = append(f.Categories, core.CatDone, core.CatCanceled)
 		}
 	}
+	// Members, by handle or "me".
 	member := func(field, ref string) (string, error) {
 		if ref == "" {
 			return "", nil
 		}
-		m, err := rs.Member(field, ref)
-		return m.UserID, err
+		found, err := resolve.Member(field, ref)
+		return found.UserID, err
 	}
 	for _, a := range q.Assignee {
 		if a == "none" {
@@ -340,28 +341,25 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 	if q.Watching {
 		f.WatchedBy = x.member.UserID
 	}
+	// Statuses, labels and epics by name, among those of the projects; a
+	// status may also be a category.
 	inScope := func(projectID string) bool {
-		for _, p := range projects {
-			if p.ID == projectID {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(projects, func(project core.Project) bool { return project.ID == projectID })
 	}
 	for _, ref := range q.Status {
 		low := strings.ToLower(ref)
 		var found bool
 		var allowed []string
-		for _, s := range names.statuses {
-			if s.DeletedAt != 0 || !inScope(s.ProjectID) {
+		for _, status := range names.statuses {
+			if status.DeletedAt != 0 || !inScope(status.ProjectID) {
 				continue
 			}
-			if s.ID == ref || strings.ToLower(s.Name) == low {
-				f.StatusIDs = append(f.StatusIDs, s.ID)
+			if status.ID == ref || strings.ToLower(status.Name) == low {
+				f.StatusIDs = append(f.StatusIDs, status.ID)
 				found = true
 			}
-			if !has(allowed, s.Name) {
-				allowed = append(allowed, s.Name)
+			if !has(allowed, status.Name) {
+				allowed = append(allowed, status.Name)
 			}
 		}
 		if !found && core.ValidCategory(low) {
@@ -431,14 +429,15 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 			return f, &engine.Error{Code: engine.CodeInvalid, Field: "epic", Message: "no epic " + strconv.Quote(ref), Allowed: allowed, Nearest: nearestOf(ref, allowed)}
 		}
 	}
+	// Cycles, by number or as current or next, in each of the projects.
 	for _, ref := range q.Cycle {
 		if ref == "none" {
 			f.NoCycle = true
 			continue
 		}
 		var found bool
-		for _, p := range projects {
-			if cy, err := rs.Cycle(p, ref); err == nil {
+		for _, project := range projects {
+			if cy, err := resolve.Cycle(project, ref); err == nil {
 				f.CycleIDs = append(f.CycleIDs, cy.ID)
 				found = true
 			}
@@ -455,26 +454,26 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 	if q.Milestone != "" {
 		// By id, or by name (among the milestones of the projects asked for).
 		f.MilestoneID = q.Milestone
-		if len(q.Milestone) != 36 {
-			var ms []core.Milestone
-			if err := x.db.List(x.ctx(), &ms, store.Where(store.Live)); err != nil {
+		if len(q.Milestone) != idLength {
+			var milestones []core.Milestone
+			if err := x.db.List(x.ctx(), &milestones, store.Where(store.Live)); err != nil {
 				return f, err
 			}
-			var names []string
+			var allowed []string
 			f.MilestoneID = ""
-			for _, m := range ms {
-				names = append(names, m.Name)
-				if strings.EqualFold(m.Name, q.Milestone) {
-					f.MilestoneID = m.ID
+			for _, milestone := range milestones {
+				allowed = append(allowed, milestone.Name)
+				if strings.EqualFold(milestone.Name, q.Milestone) {
+					f.MilestoneID = milestone.ID
 				}
 			}
 			if f.MilestoneID == "" {
-				return f, &engine.Error{Code: engine.CodeNotFound, Field: "milestone", Message: "no milestone " + strconv.Quote(q.Milestone), Allowed: names, Nearest: nearestOf(q.Milestone, names)}
+				return f, &engine.Error{Code: engine.CodeNotFound, Field: "milestone", Message: "no milestone " + strconv.Quote(q.Milestone), Allowed: allowed, Nearest: nearestOf(q.Milestone, allowed)}
 			}
 		}
 	}
 	if q.Parent != "" {
-		t, err := rs.Task(q.Parent)
+		t, err := resolve.Task(q.Parent)
 		if err != nil {
 			return f, err
 		}
@@ -499,15 +498,24 @@ func upperAll(list []string) []string {
 	return out
 }
 
+// idLength is the length of an id (a UUID): a reference that long is taken
+// as an id, any other as a name.
+const idLength = 36
+
 // queryFromRequest builds a TaskQuery from a saved view (when view= names
-// one) overlaid with the URL's own parameters.
+// one) overlaid with the URL's own parameters. skip names the endpoint's
+// own parameters, which are not task filters. The view is found by id, by
+// slug, or by its name as the sidebar shows it, among the caller's own
+// views and the shared ones. since= is read as changed_since=, and a
+// priority may be given by name.
 func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 	var q TaskQuery
 	v := x.r.URL.Query()
 	if slug := v.Get("view"); slug != "" {
+		// The saved view: its filter is the base the URL adds to.
 		var view core.View
 		cond := store.Eq("slug", slug)
-		if len(slug) == 36 {
+		if len(slug) == idLength {
 			cond = store.Eq("id", slug)
 		}
 		err := x.db.Get(x.ctx(), &view, cond, store.Live)
@@ -520,9 +528,9 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 			if err := x.db.List(x.ctx(), &named, store.Where(store.Live)); err != nil {
 				return q, err
 			}
-			for _, nv := range named {
-				if strings.EqualFold(nv.Name, slug) && (nv.Shared || nv.OwnerID == x.member.UserID) {
-					view, err = nv, nil
+			for _, candidate := range named {
+				if strings.EqualFold(candidate.Name, slug) && (candidate.Shared || candidate.OwnerID == x.member.UserID) {
+					view, err = candidate, nil
 					break
 				}
 			}
@@ -533,9 +541,9 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 				return q, err
 			}
 			var slugs []string
-			for _, a := range all {
-				if a.Shared || a.OwnerID == x.member.UserID {
-					slugs = append(slugs, a.Slug)
+			for _, other := range all {
+				if other.Shared || other.OwnerID == x.member.UserID {
+					slugs = append(slugs, other.Slug)
 				}
 			}
 			return q, &engine.Error{Code: engine.CodeNotFound, Field: "view", Message: "no view " + strconv.Quote(slug), Allowed: slugs, Nearest: nearestOf(slug, slugs)}
@@ -557,20 +565,20 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		v.Set("changed_since", s)
 	}
 	// A priority may be asked for by name.
-	if ps := v["priority"]; len(ps) > 0 {
+	if priorities := v["priority"]; len(priorities) > 0 {
 		var nums []string
-		for _, p := range splitList(strings.Join(ps, ",")) {
+		for _, priority := range splitList(strings.Join(priorities, ",")) {
 			found := false
 			for n, name := range engine.PriorityNames {
-				if strings.EqualFold(p, name) {
+				if strings.EqualFold(priority, name) {
 					nums, found = append(nums, strconv.Itoa(n)), true
 				}
 			}
-			if _, err := strconv.Atoi(p); err == nil {
-				nums, found = append(nums, p), true
+			if _, err := strconv.Atoi(priority); err == nil {
+				nums, found = append(nums, priority), true
 			}
 			if !found {
-				return q, &engine.Error{Code: engine.CodeInvalid, Field: "priority", Message: "unknown priority " + strconv.Quote(p), Allowed: engine.PriorityNames, Nearest: nearestOf(p, engine.PriorityNames)}
+				return q, &engine.Error{Code: engine.CodeInvalid, Field: "priority", Message: "unknown priority " + strconv.Quote(priority), Allowed: engine.PriorityNames, Nearest: nearestOf(priority, engine.PriorityNames)}
 			}
 		}
 		v = cloneValues(v)
@@ -608,11 +616,11 @@ func init() {
 		if project != "" && len(q.Project) == 0 {
 			q.Project = []string{project}
 		}
-		if _, err := x.filter(q); err != nil {
+		if _, err := x.filter(q); err != nil { //nolint:contextcheck // x carries ctx in its request, as every handler's does
 			return err
 		}
 		for _, key := range q.Keys {
-			if _, err := x.resolver().Task(key); err != nil {
+			if _, err := x.resolver().Task(key); err != nil { //nolint:contextcheck // x carries ctx in its request
 				return err
 			}
 		}

@@ -83,8 +83,8 @@ func (x *c) agentWork(tasks []core.Task, names *nameLookup, projects []string) (
 	w.sessions = keepByTask(x, w.sessions, func(v core.AgentSession) string { return v.TaskID })
 	if len(projects) > 0 {
 		w.keys = map[string]bool{}
-		for _, id := range projects {
-			w.keys[names.projects[id].Key] = true
+		for _, projectID := range projects {
+			w.keys[names.projects[projectID].Key] = true
 		}
 		var err error
 		if w.sessions, err = x.sessionsIn(w.sessions, projects); err != nil {
@@ -95,11 +95,11 @@ func (x *c) agentWork(tasks []core.Task, names *nameLookup, projects []string) (
 	if err := x.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
 		return nil, err
 	}
-	for _, h := range hooks {
-		if h.Failures >= 3 {
+	for _, hook := range hooks {
+		if hook.Failures >= 3 {
 			continue // it keeps failing: nothing is hearing these
 		}
-		w.pushed[h.UserID] = true
+		w.pushed[hook.UserID] = true
 	}
 	for _, t := range tasks {
 		w.keyOf[t.ID] = t
@@ -115,50 +115,78 @@ func (x *c) agentWork(tasks []core.Task, names *nameLookup, projects []string) (
 // sessionsIn keeps the sessions on tasks of the projects.
 func (x *c) sessionsIn(sessions []core.AgentSession, projects []string) ([]core.AgentSession, error) {
 	var ids []string
-	for _, se := range sessions {
-		if se.TaskID != "" {
-			ids = append(ids, se.TaskID)
+	for _, session := range sessions {
+		if session.TaskID != "" {
+			ids = append(ids, session.TaskID)
 		}
 	}
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	ts, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: ids, ProjectIDs: projects, Archived: true, Limit: 5000})
+	tasks, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: ids, ProjectIDs: projects, Archived: true, Limit: maxTasksByID})
 	if err != nil {
 		return nil, err
 	}
-	in := map[string]bool{}
-	for _, t := range ts {
-		in[t.ID] = true
+	inProjects := map[string]bool{}
+	for _, t := range tasks {
+		inProjects[t.ID] = true
 	}
-	return keep(sessions, func(se core.AgentSession) bool { return in[se.TaskID] }), nil
+	return keep(sessions, func(session core.AgentSession) bool { return inProjects[session.TaskID] }), nil
 }
 
 // actsIn reports whether a last action ("comment.create SVA-12") was on a
 // task of the projects with these keys: it names one, and none elsewhere.
 func actsIn(action string, keys map[string]bool) bool {
 	found := taskKeyIn.FindAllStringSubmatch(action, -1)
-	for _, m := range found {
-		if !keys[m[1]] {
+	for _, match := range found {
+		if !keys[match[1]] {
 			return false
 		}
 	}
 	return len(found) > 0
 }
 
-// stateOf says what one agent is doing.
+// stateOf says what one agent is doing: working (it holds a task, or runs a
+// session), has_work (something waits on it), waiting (all its open work
+// waits on others), or idle; and what it has spent this week.
 func (w *agentWork) stateOf(m core.Member) (agentState, error) {
-	x, names, now := w.x, w.names, w.now
-	shown := []core.Member{m}
-	x.hideActions(shown)
-	if w.keys != nil && !actsIn(shown[0].LastAction, w.keys) {
-		shown[0].LastAction = ""
+	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: w.lastAction(m),
+		Listening: m.ListeningUntil > w.now.UnixMilli() || w.pushed[m.UserID]}
+	mine, waitsOnOthers := w.countTasks(m, &a)
+	a.Open = mine
+	w.countAsked(m, &a)
+	w.findSession(m, &a)
+	switch {
+	case a.State == "working":
+	case a.Queue > 0:
+		a.State = "has_work"
+	case mine > 0 && waitsOnOthers == mine:
+		a.State = "waiting"
 	}
-	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: shown[0].LastAction,
-		Listening: m.ListeningUntil > now.UnixMilli() || w.pushed[m.UserID]}
-	var waitsOnOthers, mine int
+	if a.State != "waiting" {
+		a.WaitsOn = ""
+	}
+	err := w.addSpending(m, &a)
+	return a, err
+}
+
+// lastAction is the agent's last action as the caller may see it: only
+// when it was on a task of the projects the agents are seen in.
+func (w *agentWork) lastAction(m core.Member) string {
+	shown := []core.Member{m}
+	w.x.hideActions(shown)
+	if w.keys != nil && !actsIn(shown[0].LastAction, w.keys) {
+		return ""
+	}
+	return shown[0].LastAction
+}
+
+// countTasks goes through the open tasks for one agent: what waits on it
+// (into a.Queue), what is its own, which of those wait on someone else, and
+// the task it holds (which makes it working).
+func (w *agentWork) countTasks(m core.Member, a *agentState) (mine, waitsOnOthers int) {
 	for _, t := range w.tasks {
-		if !core.OpenCategory(names.statuses[t.StatusID].Category) {
+		if !core.OpenCategory(w.names.statuses[t.StatusID].Category) {
 			continue
 		}
 		if t.WaitingOnID == m.UserID {
@@ -170,49 +198,54 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 		mine++
 		if t.WaitingOnID != "" && t.WaitingOnID != m.UserID {
 			waitsOnOthers++
-			a.WaitsOn = names.handle(t.WaitingOnID)
+			a.WaitsOn = w.names.handle(t.WaitingOnID)
 		}
-		if t.LeaseHolderID == m.UserID && t.LeaseUntil > now.UnixMilli() && a.Task == "" {
+		if t.LeaseHolderID == m.UserID && t.LeaseUntil > w.now.UnixMilli() && a.Task == "" {
 			a.State, a.Task, a.Doing = "working", t.Key, t.Title
 		}
 	}
-	a.Open = mine
-	for _, d := range w.asked {
-		if t, ok := w.keyOf[d.TaskID]; ok && d.AskedID == m.UserID && t.WaitingOnID != m.UserID {
+	return mine, waitsOnOthers
+}
+
+// countAsked adds to the queue the open questions asked of the agent on
+// tasks that do not already wait on it.
+func (w *agentWork) countAsked(m core.Member, a *agentState) {
+	for _, question := range w.asked {
+		if t, ok := w.keyOf[question.TaskID]; ok && question.AskedID == m.UserID && t.WaitingOnID != m.UserID {
 			a.Queue++
 		}
 	}
-	for _, se := range w.sessions {
-		if se.AgentID == m.UserID {
-			a.State, a.Doing, a.Since = "working", firstNonEmpty(se.Title, a.Doing), formatTime(se.StartedAt)
-			if t, ok := w.keyOf[se.TaskID]; ok {
+}
+
+// findSession marks the agent working when it runs a session, on the
+// session's task.
+func (w *agentWork) findSession(m core.Member, a *agentState) {
+	for _, session := range w.sessions {
+		if session.AgentID == m.UserID {
+			a.State, a.Doing, a.Since = "working", firstNonEmpty(session.Title, a.Doing), formatTime(session.StartedAt)
+			if t, ok := w.keyOf[session.TaskID]; ok {
 				a.Task = t.Key
 			}
-			break
+			return
 		}
 	}
-	switch {
-	case a.State == "working":
-	case a.Queue > 0:
-		a.State = "has_work"
-	case mine > 0 && waitsOnOthers == mine:
-		a.State = "waiting"
-	}
-	if a.State != "waiting" {
-		a.WaitsOn = ""
-	}
-	cost, minutes, err := x.s.eng.Usage(x.ctx(), x.db, m.UserID, weekStart(now))
+}
+
+// addSpending adds what the agent has spent this week, and its budget.
+func (w *agentWork) addSpending(m core.Member, a *agentState) error {
+	x := w.x
+	cost, minutes, err := x.s.eng.Usage(x.ctx(), x.db, m.UserID, weekStart(w.now))
 	if err != nil {
-		return a, err
+		return err
 	}
 	if cost > 0 {
 		a.CostWeek = formatMoney(cost)
 	}
 	a.MinWeek = minutes
-	if b := m.Budget; b != nil && b.CostMicros > 0 {
-		a.Budget = formatMoney(b.CostMicros)
+	if budget := m.Budget; budget != nil && budget.CostMicros > 0 {
+		a.Budget = formatMoney(budget.CostMicros)
 	}
-	return a, nil
+	return nil
 }
 
 // handleListAgents is the live view of agents: who is doing what, who is waiting,
@@ -232,17 +265,17 @@ func (s *Server) handleListAgents(x *c) error {
 	}
 	if x.wantText() {
 		return x.text(lines(agents, func(a agentState) string {
-			l := fmt.Sprintf("%s  %s", a.Handle, strings.ReplaceAll(a.State, "_", " "))
+			line := fmt.Sprintf("%s  %s", a.Handle, strings.ReplaceAll(a.State, "_", " "))
 			if a.Task != "" {
-				l += " on " + a.Task
+				line += " on " + a.Task
 			}
 			if a.WaitsOn != "" {
-				l += " on " + a.WaitsOn
+				line += " on " + a.WaitsOn
 			}
 			if !a.Listening {
-				l += "  (nothing is listening for it)"
+				line += "  (nothing is listening for it)"
 			}
-			return l + fmt.Sprintf("  open=%d queue=%d", a.Open, a.Queue)
+			return line + fmt.Sprintf("  open=%d queue=%d", a.Open, a.Queue)
 		}, "no agents"))
 	}
 	return x.ok(map[string]any{"agents": agents})
