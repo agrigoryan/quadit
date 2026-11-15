@@ -3,6 +3,7 @@
 // (secret.created, secret.updated, secret.deleted). A value is sent to the
 // server and never comes back.
 
+import type { Changes } from "@/lib/changes.gen";
 import { useMemo } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { mutate } from "@/lib/mutate";
@@ -76,7 +77,7 @@ export interface SecretInput {
 
 /** Makes a secret, or changes the one with that name. A refusal is thrown for the form to show. */
 export function setSecret(input: SecretInput) {
-  const args: Record<string, unknown> = {
+  const args: Changes["secret.set"] = {
     name: input.name,
     description: input.description,
     hosts: input.hosts,

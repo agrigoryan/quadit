@@ -1,6 +1,7 @@
 // Making a label where it is first needed, and the way from a picker to the
 // page where a project's labels and statuses are kept.
 
+import type { Changes } from "@/lib/changes.gen";
 import { useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -18,7 +19,7 @@ export function createLabel(projectId: string | undefined, name: string): string
   const id = newId();
   const used = Object.values(getState().collections.labels).filter((l) => !l.deleted_at).length;
   const color = SWATCHES[(used + 2) % SWATCHES.length];
-  const args: Record<string, unknown> = { id, name, color };
+  const args: Changes["label.create"] = { id, name, color };
   if (projectId) args.project = projectId;
   send({ type: "label.create", args }, (tx) => tx.insert("labels", { id, project_id: projectId, name, color }));
   return id;

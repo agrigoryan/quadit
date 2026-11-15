@@ -1,3 +1,4 @@
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -39,7 +40,7 @@ export function CreateAgentDialog({
     if (!draft.name.trim()) return errors.set("name", t("s.required"));
     const limits = limitsOf(draft, true);
     if ("bad" in limits) return errors.set(limits.bad, t("agent.budgetBad"));
-    const args: Record<string, unknown> = {
+    const args: Changes["agent.create"] = {
       id,
       name: draft.name.trim(),
       description: draft.description.trim(),

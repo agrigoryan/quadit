@@ -1,6 +1,7 @@
 // Every way the app changes a page, in one place. Each function shows the
 // change at once and sends it as a named change (see lib/mutate.ts).
 
+import type { Changes } from "@/lib/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
@@ -47,7 +48,7 @@ export function createDoc(input: NewDoc = {}): string {
   const parent = input.parentId ? getDoc(input.parentId) : undefined;
   const rank = input.rank ?? lastRank(input.parentId);
   const kind: DocKind = parent?.kind === "database" && input.kind !== "database" ? "row" : (input.kind ?? "page");
-  const args: Fields = { id, title: input.title ?? "", rank };
+  const args: Changes["doc.create"] = { id, title: input.title ?? "", rank };
   if (input.parentId) args.parent = input.parentId;
   if (input.kind === "database") args.kind = "database";
   if (input.icon) args.icon = input.icon;
@@ -100,7 +101,7 @@ export function updateDoc(id: string, fields: Partial<Pick<Doc, "title" | "icon"
 export function moveDoc(id: string, parentId: string | null, rank: string) {
   const doc = getDoc(id);
   if (!doc) return;
-  const args: Fields = { id, rank };
+  const args: Changes["doc.update"] = { id, rank };
   if ((doc.parent_id ?? null) !== parentId) args.parent = parentId;
   send({ type: "doc.update", args }, (tx) => tx.patch("docs", id, { parent_id: parentId, rank }));
 }
@@ -108,7 +109,7 @@ export function moveDoc(id: string, parentId: string | null, rank: string) {
 /** Makes a page private to its owner (and those it is shared with) or visible to the team. */
 export function setSharing(id: string, sharing: { private?: boolean; sharedWith?: string[] }) {
   const { me } = getState();
-  const args: Fields = { id };
+  const args: Changes["doc.update"] = { id };
   const local: Fields = {};
   if (sharing.private !== undefined) {
     args.private = sharing.private;
@@ -224,7 +225,7 @@ export interface NewDocComment {
 export function addComment({ docId, blockId, parentId, body }: NewDocComment) {
   const { me } = getState();
   const id = newId();
-  const args: Fields = { id, doc: docId, body };
+  const args: Changes["comment.create"] = { id, doc: docId, body };
   if (blockId) args.block = blockId;
   if (parentId) args.parent = parentId;
   send({ type: "comment.create", args }, (tx) =>

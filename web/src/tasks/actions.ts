@@ -2,6 +2,7 @@
 // change at once and sends it as a named change; several tasks go as one
 // all-or-nothing batch. Always pass ids from the store.
 
+import type { Changes } from "@/lib/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
@@ -14,7 +15,7 @@ import { isOpenCategory, type Status, type Task } from "@/lib/types";
 type Fields = Record<string, unknown>;
 
 /** Sends task.update for each task with the same arguments, patching the store with `local`. */
-function updateAll(tasks: Task[], args: (task: Task) => Fields | null, local: (task: Task) => Fields) {
+function updateAll(tasks: Task[], args: (task: Task) => Changes["task.update"] | null, local: (task: Task) => Fields) {
   const changes: ChangeSpec[] = [];
   const patches: [string, Fields][] = [];
   for (const task of tasks) {
@@ -122,7 +123,7 @@ export function toggleLabel(tasks: Task[], labelId: string) {
 }
 
 /** Sets one simple field: the argument name the server takes and the row field it lands in. */
-function setter(arg: string, field: string) {
+function setter(arg: keyof Changes["task.update"], field: string) {
   return (tasks: Task[], value: string | number | null) =>
     updateAll(
       tasks,
@@ -155,7 +156,7 @@ export interface CardMove {
  * All of it goes out as one task.update.
  */
 export function moveCard(task: Task, rank: string | undefined, move: CardMove = {}) {
-  const args: Fields = { id: task.id };
+  const args: Changes["task.update"] = { id: task.id };
   const local: Fields = {};
   if (rank && rank !== task.rank) args.rank = local.rank = rank;
   if (move.statusId && move.statusId !== task.status_id) {
@@ -252,7 +253,7 @@ function creation(input: NewTask, number: number, rank: string): { change: Chang
   const id = newId();
   const statuses = statusesOf(c.statuses, project.id);
   const status = (input.statusId && c.statuses[input.statusId]) || statuses.find((s) => s.is_default) || statuses[0];
-  const args: Fields = { id, project: project.id, title: input.title.trim() };
+  const args: Changes["task.create"] = { id, project: project.id, title: input.title.trim() };
   if (input.description?.trim()) args.description = input.description;
   if (input.statusId) args.status = input.statusId;
   if (input.assigneeId) args.assignee = input.assigneeId;

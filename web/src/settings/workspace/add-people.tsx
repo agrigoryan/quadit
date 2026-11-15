@@ -1,6 +1,7 @@
 // "Add people": invite someone by mail or by a link, or add someone who
 // already has an account on this install by their email address.
 
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Link2, Mail, UserCheck } from "lucide-react";
 import { api, ApiError, workspacePath } from "@/lib/api";
@@ -62,7 +63,7 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
     setBusy(true);
     try {
       if (mode === "account") {
-        const args: Record<string, unknown> = { user: address, role };
+        const args: Changes["member.add"] = { user: address, role };
         const limit = role === "owner" ? null : scopeArg(scope);
         if (limit) args.scope = limit;
         await mutate({ type: "member.add", args }, undefined, { quiet: true });

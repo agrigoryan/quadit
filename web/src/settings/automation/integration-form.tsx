@@ -1,3 +1,4 @@
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { t, tMaybe } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -58,7 +59,7 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
       config.issues_label = issuesLabel.trim();
       if (issuesProject) config.issues_project = issuesProject;
     }
-    const args: Record<string, unknown> = {
+    const args: Changes["integration.create" | "integration.update"] = {
       id: it?.id ?? newId(),
       kind: "github",
       name: name.trim() || cleanRepo,

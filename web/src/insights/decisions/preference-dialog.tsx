@@ -3,6 +3,7 @@
 // whole workspace. It can start from an answered decision, whose question
 // and answer become the first draft of the rule.
 
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useId, useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -33,7 +34,7 @@ interface NewPreference {
 /** Saves a preference; it shows at once. Rejects (the server's message is shown) if refused. */
 function createPreference(input: NewPreference): Promise<unknown> {
   const id = newId();
-  const args: Record<string, unknown> = { id, body: input.body };
+  const args: Changes["preference.create"] = { id, body: input.body };
   if (input.decisionId) args.decision = input.decisionId;
   // Labels belong to a project, so a workspace-wide rule carries none.
   if (input.projectId) {

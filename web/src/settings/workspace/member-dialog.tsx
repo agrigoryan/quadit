@@ -1,3 +1,4 @@
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
@@ -20,7 +21,7 @@ export function EditMemberDialog({ member, onClose }: { member: Member; onClose:
   async function save(e: FormEvent) {
     e.preventDefault();
     await run(async () => {
-      const args: Record<string, unknown> = { id: member.user_id, handle: handle.trim(), title: title.trim() };
+      const args: Changes["member.update"] = { id: member.user_id, handle: handle.trim(), title: title.trim() };
       if (!owner && !sameScope(scope, scopeDraftOf(member))) args.scope = scopeArg(scope);
       await mutate({ type: "member.update", args }, undefined, { quiet: true });
       onClose();

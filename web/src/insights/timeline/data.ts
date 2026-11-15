@@ -1,6 +1,7 @@
 // What the timeline draws, read from the store: a project's epics with
 // their tasks, progress and milestones, and the dated tasks with no epic.
 
+import type { Changes } from "@/lib/changes.gen";
 import { useMemo } from "react";
 import { type ChangeSpec, send } from "@/lib/mutate";
 import { useCollection, useEpics, useLiveTasks } from "@/lib/selectors";
@@ -120,7 +121,7 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
 
 /** Changes an epic's dates: only the ones that differ are sent. */
 export function setEpicDates(epic: Epic, next: { start?: number; end?: number }) {
-  const fields: Record<string, string> = {};
+  const fields: Changes["epic.update"] = {};
   if (next.start !== undefined && dayFromNumber(next.start) !== epic.start_on)
     fields.start_on = dayFromNumber(next.start);
   if (next.end !== undefined && dayFromNumber(next.end) !== epic.target_on) fields.target_on = dayFromNumber(next.end);

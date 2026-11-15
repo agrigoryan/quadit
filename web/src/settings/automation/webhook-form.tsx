@@ -1,3 +1,4 @@
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -60,7 +61,7 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
         onSaved();
       } else {
         const secret = randomSecret();
-        const args: Record<string, unknown> = { id: newId(), name: name.trim(), url: url.trim(), secret, active };
+        const args: Changes["webhook.create"] = { id: newId(), name: name.trim(), url: url.trim(), secret, active };
         if (scope === "member") args.for = memberId;
         else {
           args.event_types = events;

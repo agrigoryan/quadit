@@ -1,6 +1,7 @@
 // Where the work for this task lives outside Quadit: branches, commits,
 // pull requests and plain web addresses, each as a chip that opens it.
 
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -19,7 +20,7 @@ const isWeb = (url: string) => /^https?:\/\//i.test(url);
 
 function addLink(task: Task, url: string, title: string) {
   const id = newId();
-  const args: Record<string, unknown> = { id, task: task.id, kind: "url", url };
+  const args: Changes["link.set"] = { id, task: task.id, kind: "url", url };
   if (title) args.title = title;
   send({ type: "link.set", args }, (tx) =>
     tx.insert("links", { id, task_id: task.id, kind: "url", url, title: title || undefined }),

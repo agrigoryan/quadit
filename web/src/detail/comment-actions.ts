@@ -2,6 +2,7 @@
 // the app is open, so moving between tasks loses nothing), and the changes
 // that post, edit and delete a comment.
 
+import type { Changes } from "@/lib/changes.gen";
 import { create } from "zustand";
 import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
@@ -63,7 +64,7 @@ export function createComment({ task, body, parentId, files = [], handTo }: NewC
   const id = newId();
   const now = Date.now();
   const attachments = files.map((file) => ({ id: newId(), file }));
-  const args: Record<string, unknown> = { id, task: task.id, body };
+  const args: Changes["comment.create"] = { id, task: task.id, body };
   if (parentId) args.parent = parentId;
   if (attachments.length) args.attachments = attachments.map((a) => ({ id: a.id, file: a.file.id }));
   if (handTo) args.waiting_on = handTo;

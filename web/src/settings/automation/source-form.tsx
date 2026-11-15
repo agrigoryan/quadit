@@ -1,3 +1,4 @@
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -31,7 +32,7 @@ export function SourceForm({ source, onClose, onSaved }: Props) {
     e.preventDefault();
     errors.clear();
     if (!repo.trim()) return errors.set("repo", t("auto.src.repoMissing"));
-    const args: Record<string, unknown> = {
+    const args: Changes["source.create" | "source.update"] = {
       id: source?.id ?? newId(),
       repo: repo.trim(),
       branch: branch.trim(),

@@ -1,3 +1,4 @@
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { t } from "@/lib/i18n";
@@ -75,7 +76,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
     if (!draft.name.trim()) return errors.set("name", t("s.required"));
     const limits = limitsOf(draft);
     if ("bad" in limits) return errors.set(limits.bad, t("agent.budgetBad"));
-    const args: Record<string, unknown> = {
+    const args: Changes["agent.update"] = {
       id: agent.user_id,
       name: draft.name.trim(),
       description: draft.description.trim(),

@@ -2,6 +2,7 @@
 // Each shows at once and goes out as a named change; a refusal puts things
 // back. Row values and rows themselves are pages (docs/actions.ts).
 
+import type { Changes } from "@/lib/changes.gen";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
@@ -51,7 +52,7 @@ export function createProperty(databaseId: string, name: string, type: PropertyT
     rank: lastRank("props", databaseId),
   };
   putRow("props", row);
-  const args: Fields = { id, database: databaseId, name: row.name, type, rank: row.rank };
+  const args: Changes["property.create"] = { id, database: databaseId, name: row.name, type, rank: row.rank };
   if (config) args.config = config;
   mutate({ type: "property.create", args }).catch(() => dropRow("props", id));
   return id;
@@ -83,7 +84,7 @@ export function createView(databaseId: string, type: ViewType, name: string, con
   const id = newId();
   const row: DBView = { id, database_id: databaseId, name, type, config, rank: lastRank("views", databaseId) };
   putRow("views", row);
-  const args: Fields = { id, database: databaseId, name, type, rank: row.rank };
+  const args: Changes["dbview.create"] = { id, database: databaseId, name, type, rank: row.rank };
   if (config) args.config = config;
   mutate({ type: "dbview.create", args }).catch(() => dropRow("views", id));
   return id;
@@ -140,7 +141,7 @@ export function renameOption(prop: DBProperty, from: string, to: string) {
 
 /** Moves a row on a board: a new place in the order and, when it changed column, a new value. */
 export function moveRow(row: Doc, rank: string, values?: Fields) {
-  const args: Fields = { id: row.id };
+  const args: Changes["doc.update"] = { id: row.id };
   const local: Fields = {};
   if (rank !== row.rank) {
     args.rank = rank;

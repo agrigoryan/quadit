@@ -1,6 +1,7 @@
 // Every write a decision takes: answering, reopening, deleting, commenting
 // and asking. Each shows at once and is undone if the server refuses it.
 
+import type { Changes } from "@/lib/changes.gen";
 import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { after } from "@/lib/rank";
@@ -21,7 +22,7 @@ export interface Answer {
 export function pick(decision: Decision, answer: Answer) {
   const outcome: Outcome = answer.outcome ?? "as_is";
   const note = answer.note?.trim() ?? "";
-  const args: Record<string, unknown> = { id: decision.id };
+  const args: Changes["decision.pick"] = { id: decision.id };
   if (answer.option) args.option = answer.option;
   if (answer.outcome) args.outcome = answer.outcome;
   if (note) args.note = note;
@@ -67,7 +68,7 @@ export interface DecisionEdit {
  * it is refused.
  */
 export async function updateDecision(decision: Decision, edit: DecisionEdit): Promise<void> {
-  const args: Record<string, unknown> = { id: decision.id };
+  const args: Changes["decision.update"] = { id: decision.id };
   const local: Record<string, unknown> = {};
   if (edit.question !== decision.question) args.question = local.question = edit.question;
   if (edit.details !== (decision.details ?? "")) {
@@ -172,7 +173,7 @@ export async function openDecision(draft: NewDecision): Promise<void> {
   const siblings = Object.values(getState().collections.decisions).filter((d) => d.task_id === draft.taskId);
   const lastRank = siblings.reduce((max, d) => (d.rank > max ? d.rank : max), "");
 
-  const args: Record<string, unknown> = {
+  const args: Changes["decision.open"] = {
     id,
     task: draft.taskId,
     kind: draft.kind,
@@ -243,7 +244,7 @@ export function attachToOption(decision: Decision, optionId: string, file: FileR
   for (const a of Object.values(getState().collections.attachments)) {
     if (a.subject_id === optionId && a.rank > last) last = a.rank;
   }
-  const args: Record<string, unknown> = { id, file: file.id, option: optionId };
+  const args: Changes["attachment.add"] = { id, file: file.id, option: optionId };
   if (role) args.role = role;
   send({ type: "attachment.add", args }, (tx) =>
     tx.insert("attachments", {

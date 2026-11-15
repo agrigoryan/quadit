@@ -1,6 +1,7 @@
 // Every way these pages change an epic, a milestone or a cycle. Each shows
 // the change at once and sends it as a named change (lib/mutate.ts).
 
+import type { Changes } from "@/lib/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/lib/mutate";
@@ -23,7 +24,7 @@ export interface EpicFields {
 /** Creates an epic and resolves with its id; rejects (after a toast) if the server refuses. */
 export async function createEpic(projectId: string, f: EpicFields): Promise<string> {
   const id = newId();
-  const args: Fields = { id, project: projectId, name: f.name.trim(), state: f.state };
+  const args: Changes["epic.create"] = { id, project: projectId, name: f.name.trim(), state: f.state };
   if (f.description.trim()) args.description = f.description;
   if (f.leadId) args.lead = f.leadId;
   if (f.startOn) args.start_on = f.startOn;
@@ -84,7 +85,7 @@ export function setWatchingEpic(epic: Epic, userId: string, watching: boolean) {
 export function createMilestone(epic: Epic, name: string, targetOn: string, after: Milestone | undefined) {
   const id = newId();
   const rank = rankBetween(after?.rank, undefined);
-  const args: Fields = { id, epic: epic.id, name: name.trim(), rank };
+  const args: Changes["milestone.create"] = { id, epic: epic.id, name: name.trim(), rank };
   if (targetOn) args.target_on = targetOn;
   send({ type: "milestone.create", args }, (tx) =>
     tx.insert("milestones", { id, epic_id: epic.id, name: args.name, target_on: targetOn || undefined, rank }),

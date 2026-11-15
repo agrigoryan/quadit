@@ -1,3 +1,4 @@
+import type { Changes } from "@/lib/changes.gen";
 import { type FormEvent, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -103,7 +104,7 @@ function AddLabel({ project, used }: { project: Project; used: number }) {
     errors.clear();
     if (!name.trim()) return errors.set("name", t("s.required"));
     await run(async () => {
-      const args: Record<string, unknown> = {
+      const args: Changes["label.create"] = {
         id: newId(),
         name: name.trim(),
         color: SWATCHES[(used + 2) % SWATCHES.length],
