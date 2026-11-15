@@ -1,6 +1,10 @@
 // The one place that talks HTTP. Every call is same-origin and carries the
 // session cookie. A 401 anywhere means the session ended: the handler set
 // with onUnauthorized sends the person to the sign-in page.
+//
+// Because every call passes through here, this is also where it is known
+// whether the server can be reached, and where the one rule for trying again
+// lives: whenReachable.
 
 /** A refusal from the server, in the one shape every error has. */
 export class ApiError extends Error {
@@ -48,7 +52,10 @@ interface RequestOptions {
   quiet401?: boolean;
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+const request = <T>(method: string, path: string, opts: RequestOptions = {}) =>
+  noted(fetchAnswer<T>(method, path, opts));
+
+async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   let body: BodyInit | undefined;
   if (opts.raw) {
@@ -111,7 +118,10 @@ interface SendOptions {
  * Sends raw bytes (a file, or one part of one) and reports how far it has
  * got, which fetch cannot do. Errors are the same as for every other call.
  */
-function sendBytes<T>(method: string, path: string, bytes: Blob, opts: SendOptions = {}): Promise<T> {
+const sendBytes = <T>(method: string, path: string, bytes: Blob, opts: SendOptions = {}) =>
+  noted(sendWithProgress<T>(method, path, bytes, opts));
+
+function sendWithProgress<T>(method: string, path: string, bytes: Blob, opts: SendOptions): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(method, path);
@@ -145,6 +155,85 @@ function sendBytes<T>(method: string, path: string, bytes: Blob, opts: SendOptio
     if (opts.signal?.aborted) return reject(new DOMException("aborted", "AbortError"));
     opts.signal?.addEventListener("abort", abort);
     xhr.send(bytes);
+  });
+}
+
+// ---- whether the server can be reached, and when to try again ----
+
+/** True from a call that got no answer until the server is next heard from. */
+let away = false;
+/** The waits of whenReachable under way; calling one ends it. */
+const waits = new Set<() => void>();
+const backAgainListeners = new Set<() => void>();
+
+/** Notes how a call ended (an answer, even a refusal, means the server is there) and passes its outcome on. */
+async function noted<T>(call: Promise<T>): Promise<T> {
+  try {
+    const result = await call;
+    heardFromServer();
+    return result;
+  } catch (err) {
+    if (err instanceof NetworkError) away = true;
+    else if (err instanceof ApiError) heardFromServer();
+    throw err;
+  }
+}
+
+function heardFromServer() {
+  if (!away) return;
+  noteReachable();
+  for (const listener of [...backAgainListeners]) listener();
+}
+
+/**
+ * Says the server was reached by other means than a call here (the live
+ * stream opened): whoever waits in whenReachable tries again now.
+ */
+export function noteReachable() {
+  away = false;
+  for (const end of [...waits]) end();
+}
+
+/**
+ * Hear when a call gets an answer after one that got none: the server was
+ * away and is back. (Not called for noteReachable: whoever says that knows.)
+ */
+export function onReachableAgain(listener: () => void): () => void {
+  backAgainListeners.add(listener);
+  return () => backAgainListeners.delete(listener);
+}
+
+/** The first wait before trying again; each one after is twice as long, up to the longest. */
+const RETRY_FIRST_MS = 1000;
+const RETRY_LONGEST_MS = 15_000;
+
+/**
+ * Waits until it is worth trying again something the server could not be
+ * reached for. `attempt` counts the tries in a row that failed before this
+ * wait, from 0: the wait is about 1 s, 2 s, 4 s, 8 s, then 15 s each time,
+ * shortened at random by up to half so that everything cut off by one outage
+ * does not come back in the same instant. It ends early as soon as there is
+ * reason to think the server is back: the browser comes online, a call gets
+ * an answer, or the live stream opens. Rejects with the signal's reason if
+ * `signal` is aborted first.
+ */
+export function whenReachable(attempt: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const longest = Math.min(RETRY_FIRST_MS * 2 ** attempt, RETRY_LONGEST_MS);
+    const timer = setTimeout(end, longest / 2 + Math.random() * (longest / 2));
+    const browser = typeof window === "undefined" ? undefined : window;
+    function end() {
+      clearTimeout(timer);
+      waits.delete(end);
+      browser?.removeEventListener("online", end);
+      signal?.removeEventListener("abort", end);
+      if (signal?.aborted) reject(signal.reason);
+      else resolve();
+    }
+    waits.add(end);
+    browser?.addEventListener("online", end);
+    signal?.addEventListener("abort", end);
   });
 }
 
