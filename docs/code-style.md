@@ -10,7 +10,7 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 3. Packages below `server` never import it. `server` holds routing, the request context, sign-in and thin handlers; a feature with logic of its own is a package.
 
 ### Functions
-4. A function stays under 80 lines, cyclomatic complexity 20 and nesting depth 4. Longer work becomes a struct for one run with small named methods, run as a list of steps.
+4. A function stays under 80 lines and cyclomatic complexity 20. Longer work becomes a struct for one run with small named methods, run as a list of steps. There is no limit on nesting depth: nesting that follows the shape of the data or the problem (a loop in a loop over a tree, a switch inside a range) is fine. Prefer an early return to an `else` where that reads better, but do not split a function only to flatten it.
 5. At most 6 parameters, and no two bools side by side; beyond that, pass a struct.
 6. Every exported name, and every function of 20 lines or more, has a comment saying what it is for, starting with its name. A comment sits on the declaration it describes: moving code moves its comment.
 7. Comments say what a thing is for, in plain words. They do not restate the code, and they do not tell the history of a change.

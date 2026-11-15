@@ -36,7 +36,6 @@ linters:
     # size
     - funlen
     - gocyclo
-    - nestif
   settings:
     govet:
       enable-all: true
@@ -102,8 +101,6 @@ linters:
       ignore-comments: true
     gocyclo:
       min-complexity: 20
-    nestif:
-      min-complexity: 6
     nolintlint:
       require-explanation: true
       require-specific: true
@@ -115,7 +112,7 @@ linters:
       # Tests tell a story top to bottom: size limits and bare errors in
       # set-up are not what we police there.
       - path: _test\.go
-        linters: [funlen, gocyclo, nestif, errcheck, noctx, unparam, contextcheck, bodyclose]
+        linters: [funlen, gocyclo, errcheck, noctx, unparam, contextcheck, bodyclose]
       - path: _test\.go
         linters: [revive]
         text: "(exported|unused-parameter|argument-limit|flag-parameter)"
