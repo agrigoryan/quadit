@@ -51,9 +51,9 @@ type importAPI struct{ c *Client }
 
 func (a importAPI) Call(method, path string, q url.Values, body []byte) ([]byte, error) {
 	if body == nil {
-		return a.c.do(method, path, q, nil, "", "application/json")
+		return a.c.workspaceRequest(method, path, q, nil, "", "application/json")
 	}
-	return a.c.do(method, path, q, bytes.NewReader(body), "application/json", "application/json")
+	return a.c.workspaceRequest(method, path, q, bytes.NewReader(body), "application/json", "application/json")
 }
 
 func (a importAPI) SendFile(fileID, path string) (string, error) {

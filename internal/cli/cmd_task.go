@@ -40,7 +40,7 @@ func (r *runner) status(in input) error {
 }
 
 func (r *runner) assign(in input) error {
-	_, err := r.change("task.update", map[string]any{"id": in.pos[0], "assignee": value("", in.pos[1])}, in.approval)
+	_, err := r.change("task.update", map[string]any{"id": in.pos[0], "assignee": apiValue("", in.pos[1])}, in.approval)
 	return err
 }
 

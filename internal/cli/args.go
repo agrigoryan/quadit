@@ -52,7 +52,7 @@ type input struct {
 }
 
 func readInput(name string, rest []string) input {
-	pos, f := kv(rest)
+	pos, f := splitFields(rest)
 	approval := ""
 	if a := f["approval"]; len(a) > 0 {
 		approval = a[0]
@@ -66,8 +66,8 @@ var listKeys = map[string]bool{"labels": true, "add_labels": true, "remove_label
 var intKeys = map[string]bool{"priority": true, "estimate": true, "base_seq": true, "minutes": true, "recommended": true}
 var boolKeys = map[string]bool{"archived": true, "resolved": true, "active": true, "shared": true}
 
-// kv splits "field=value" arguments from positional ones.
-func kv(args []string) (pos []string, fields map[string][]string) {
+// splitFields splits "field=value" arguments from positional ones.
+func splitFields(args []string) (pos []string, fields map[string][]string) {
 	fields = map[string][]string{}
 	for _, a := range args {
 		if i := strings.Index(a, "="); i > 0 && !strings.ContainsAny(a[:i], " \t\n/:") {
@@ -79,8 +79,8 @@ func kv(args []string) (pos []string, fields map[string][]string) {
 	return
 }
 
-// value turns a command-line value into what the API takes.
-func value(key, v string) any {
+// apiValue turns a command-line value into what the API takes.
+func apiValue(key, v string) any {
 	switch {
 	case v == "null":
 		return nil
@@ -127,13 +127,13 @@ func argsFrom(fields map[string][]string, skip ...string) map[string]any {
 			raw, _ := io.ReadAll(os.Stdin)
 			v = string(raw)
 		}
-		out[k] = value(k, v)
+		out[k] = apiValue(k, v)
 	}
 	return out
 }
 
-// query turns the field=value arguments into the filters of a read.
-func query(fields map[string][]string) url.Values {
+// readFilters turns the field=value arguments into the filters of a read.
+func readFilters(fields map[string][]string) url.Values {
 	q := url.Values{}
 	for k, vs := range fields {
 		q.Set(k, strings.Join(vs, ","))
@@ -141,8 +141,8 @@ func query(fields map[string][]string) url.Values {
 	return q
 }
 
-// first is the first value given for a field, or nothing.
-func first(vals []string) string {
+// firstValue is the first value given for a field, or nothing.
+func firstValue(vals []string) string {
 	if len(vals) == 0 {
 		return ""
 	}

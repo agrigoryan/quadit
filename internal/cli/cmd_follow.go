@@ -41,7 +41,7 @@ func (r *runner) markRead(in input) error {
 		a["ids"] = in.pos
 	}
 	if v := in.f["up_to"]; len(v) > 0 {
-		a["up_to"] = value("base_seq", v[0])
+		a["up_to"] = apiValue("base_seq", v[0])
 	}
 	_, err := r.change("notification.read", a, "")
 	return err

@@ -15,7 +15,7 @@ func (r *runner) ask(in input) error {
 	if in.name == "approval" {
 		a["kind"] = "approval"
 		// args='{"id":"SVA-12"}': what exactly is to be approved.
-		if raw := first(in.f["args"]); raw != "" {
+		if raw := firstValue(in.f["args"]); raw != "" {
 			var args map[string]any
 			if err := json.Unmarshal([]byte(raw), &args); err != nil {
 				return fmt.Errorf("args must be a JSON object, the arguments the change will be sent with: %w", err)

@@ -20,11 +20,11 @@ type command struct {
 // is a server to talk to.)
 var commands = []command{
 	// orient (cmd_read.go)
-	{names: []string{"me", "whoami"}, run: reads("/me")},
-	{names: []string{"work"}, run: reads("/my-work")},
-	{names: []string{"layout"}, args: 1, usage: "layout PROJECT", run: reads("/projects/%s/layout")},
+	{names: []string{"me", "whoami"}, run: readCommand("/me")},
+	{names: []string{"work"}, run: readCommand("/my-work")},
+	{names: []string{"layout"}, args: 1, usage: "layout PROJECT", run: readCommand("/projects/%s/layout")},
 	{names: []string{"dashboard"}, run: readsWithFilters("/dashboard")},
-	{names: []string{"agents"}, run: reads("/agents")},
+	{names: []string{"agents"}, run: readCommand("/agents")},
 
 	// find (cmd_read.go)
 	{names: []string{"tasks", "ls"}, run: readsWithFilters("/tasks")},
@@ -64,10 +64,10 @@ var commands = []command{
 
 	// any change (cmd_do.go)
 	{names: []string{"do"}, args: 1, usage: "do TYPE [JSON]", run: (*runner).do},
-	{names: []string{"changes"}, run: reads("/api/v1/changes")},
+	{names: []string{"changes"}, run: readCommand("/api/v1/changes")},
 
 	// secrets (cmd_secrets.go)
-	{names: []string{"secrets"}, run: reads("/secrets")},
+	{names: []string{"secrets"}, run: readCommand("/secrets")},
 	{names: []string{"request"}, args: 2, usage: "request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]", run: (*runner).request},
 	{names: []string{"run"}, run: (*runner).runWithSecrets},
 
@@ -88,8 +88,8 @@ var commands = []command{
 	{names: []string{"import"}, args: 2, usage: "import KIND SOURCE [project=KEY]", run: (*runner).importFrom},
 }
 
-// find gives the command a name or an alias stands for.
-func find(name string) (command, bool) {
+// findCommand gives the command a name or an alias stands for.
+func findCommand(name string) (command, bool) {
 	for _, c := range commands {
 		for _, n := range c.names {
 			if n == name {

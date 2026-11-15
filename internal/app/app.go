@@ -45,16 +45,16 @@ type Options struct {
 	BaseURL string
 }
 
-func env(name, def string) string {
+func envOr(name, def string) string {
 	if v := os.Getenv(name); v != "" {
 		return v
 	}
 	return def
 }
 
-func (o *Options) flags(fs *flag.FlagSet) {
-	fs.StringVar(&o.Data, "data", env("QUADIT_DATA", "./data"), "directory for the database, files and the install secret (QUADIT_DATA)")
-	fs.StringVar(&o.DB, "db", env("QUADIT_DB", ""), "database: a SQLite file path or a postgres:// URL; default is quadit.sqlite in the data directory (QUADIT_DB)")
+func (o *Options) registerFlags(fs *flag.FlagSet) {
+	fs.StringVar(&o.Data, "data", envOr("QUADIT_DATA", "./data"), "directory for the database, files and the install secret (QUADIT_DATA)")
+	fs.StringVar(&o.DB, "db", envOr("QUADIT_DB", ""), "database: a SQLite file path or a postgres:// URL; default is quadit.sqlite in the data directory (QUADIT_DB)")
 }
 
 // Open opens the database and everything beside it.
@@ -114,17 +114,17 @@ func (o *Options) secret() ([]byte, error) {
 func Serve(args []string, version string) int {
 	var o Options
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	o.flags(fs)
-	fs.StringVar(&o.Listen, "listen", env("QUADIT_LISTEN", ":4780"), "address to listen on (QUADIT_LISTEN)")
-	fs.StringVar(&o.BaseURL, "url", env("QUADIT_BASE_URL", ""), "the address people use to reach the server, e.g. https://quadit.example.com (QUADIT_BASE_URL)")
-	jsonLog := fs.Bool("log-json", env("QUADIT_LOG", "") == "json", "write logs as JSON (QUADIT_LOG=json)")
-	tlsCert := fs.String("tls-cert", env("QUADIT_TLS_CERT", ""), "serve HTTPS with this certificate file (QUADIT_TLS_CERT), with --tls-key")
-	tlsKey := fs.String("tls-key", env("QUADIT_TLS_KEY", ""), "the certificate's private key file (QUADIT_TLS_KEY)")
-	tlsDomain := fs.String("tls-domain", env("QUADIT_TLS_DOMAIN", ""), "serve HTTPS for this name with a free certificate from Let's Encrypt, got and renewed by itself; needs ports 443 and 80 reachable (QUADIT_TLS_DOMAIN)")
-	acmeDir := fs.String("acme-directory", env("QUADIT_ACME_DIRECTORY", ""), "with --tls-domain: another certificate authority that speaks ACME (a company's own, or a test one); default Let's Encrypt (QUADIT_ACME_DIRECTORY)")
-	acmeCA := fs.String("acme-ca", env("QUADIT_ACME_CA", ""), "a PEM file to trust when talking to that authority, when its own certificate is not publicly trusted (QUADIT_ACME_CA)")
-	acmeHTTP := fs.String("acme-http-listen", env("QUADIT_ACME_HTTP_LISTEN", ":80"), "with --tls-domain: where the plain-HTTP side listens, which answers the authority's checks and sends everyone else to HTTPS (QUADIT_ACME_HTTP_LISTEN)")
-	localListen := fs.String("local-listen", env("QUADIT_LOCAL_LISTEN", "127.0.0.1:4781"), "with HTTPS on: a plain address on this machine only, for the server's own use (QUADIT_LOCAL_LISTEN)")
+	o.registerFlags(fs)
+	fs.StringVar(&o.Listen, "listen", envOr("QUADIT_LISTEN", ":4780"), "address to listen on (QUADIT_LISTEN)")
+	fs.StringVar(&o.BaseURL, "url", envOr("QUADIT_BASE_URL", ""), "the address people use to reach the server, e.g. https://quadit.example.com (QUADIT_BASE_URL)")
+	jsonLog := fs.Bool("log-json", envOr("QUADIT_LOG", "") == "json", "write logs as JSON (QUADIT_LOG=json)")
+	tlsCert := fs.String("tls-cert", envOr("QUADIT_TLS_CERT", ""), "serve HTTPS with this certificate file (QUADIT_TLS_CERT), with --tls-key")
+	tlsKey := fs.String("tls-key", envOr("QUADIT_TLS_KEY", ""), "the certificate's private key file (QUADIT_TLS_KEY)")
+	tlsDomain := fs.String("tls-domain", envOr("QUADIT_TLS_DOMAIN", ""), "serve HTTPS for this name with a free certificate from Let's Encrypt, got and renewed by itself; needs ports 443 and 80 reachable (QUADIT_TLS_DOMAIN)")
+	acmeDir := fs.String("acme-directory", envOr("QUADIT_ACME_DIRECTORY", ""), "with --tls-domain: another certificate authority that speaks ACME (a company's own, or a test one); default Let's Encrypt (QUADIT_ACME_DIRECTORY)")
+	acmeCA := fs.String("acme-ca", envOr("QUADIT_ACME_CA", ""), "a PEM file to trust when talking to that authority, when its own certificate is not publicly trusted (QUADIT_ACME_CA)")
+	acmeHTTP := fs.String("acme-http-listen", envOr("QUADIT_ACME_HTTP_LISTEN", ":80"), "with --tls-domain: where the plain-HTTP side listens, which answers the authority's checks and sends everyone else to HTTPS (QUADIT_ACME_HTTP_LISTEN)")
+	localListen := fs.String("local-listen", envOr("QUADIT_LOCAL_LISTEN", "127.0.0.1:4781"), "with HTTPS on: a plain address on this machine only, for the server's own use (QUADIT_LOCAL_LISTEN)")
 	fs.Parse(args)
 	https := *tlsDomain != "" || *tlsCert != ""
 	if (*tlsCert == "") != (*tlsKey == "") {
@@ -308,7 +308,7 @@ func Admin(args []string, version string) int {
 	}
 	var o Options
 	fs := flag.NewFlagSet("admin "+args[0], flag.ExitOnError)
-	o.flags(fs)
+	o.registerFlags(fs)
 	name := fs.String("name", "", "the person's name")
 	email := fs.String("email", "", "the person's email")
 	password := fs.String("password", "", "the person's password")

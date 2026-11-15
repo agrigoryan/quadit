@@ -8,7 +8,7 @@ import (
 // render saves a picture of a task or a page as a person sees it, in
 // render.png or the file named with out=FILE.
 func (r *runner) render(in input) error {
-	q := query(in.f)
+	q := readFilters(in.f)
 	out := "render.png"
 	if o := in.f["out"]; len(o) > 0 {
 		out = o[0]
@@ -17,7 +17,7 @@ func (r *runner) render(in input) error {
 	if len(in.pos) > 0 {
 		q.Set("task", in.pos[0])
 	}
-	png, err := r.c.do("GET", "/render", q, nil, "", "image/png")
+	png, err := r.c.workspaceRequest("GET", "/render", q, nil, "", "image/png")
 	if err != nil {
 		return err
 	}

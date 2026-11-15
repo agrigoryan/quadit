@@ -22,7 +22,7 @@ func init() {
 func Upgrade(args []string, version string) int {
 	var o Options
 	fs := flag.NewFlagSet("upgrade", flag.ExitOnError)
-	o.flags(fs)
+	o.registerFlags(fs)
 	undo := fs.Bool("undo", false, "put back the copy made before the last upgrade; then run the older binary")
 	fs.Parse(args)
 	ctx := context.Background()

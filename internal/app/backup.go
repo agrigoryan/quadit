@@ -61,7 +61,7 @@ func Backup(args []string, version string) int {
 	}
 	var o Options
 	fs := flag.NewFlagSet("backup", flag.ExitOnError)
-	o.flags(fs)
+	o.registerFlags(fs)
 	out := fs.String("out", "", "the file to write; default quadit-<time>.tar.gz in the current directory")
 	fs.Usage = func() { fmt.Fprint(os.Stderr, backupHelp) }
 	fs.Parse(args)
@@ -112,7 +112,7 @@ func Backup(args []string, version string) int {
 func Restore(args []string, version string) int {
 	var o Options
 	fs := flag.NewFlagSet("restore", flag.ExitOnError)
-	o.flags(fs)
+	o.registerFlags(fs)
 	workspace := fs.String("workspace", "", "the workspace of the task or page to bring back")
 	task := fs.String("task", "", "bring back one task, by key")
 	doc := fs.String("doc", "", "bring back one page, by id")

@@ -91,8 +91,8 @@ func (e *APIError) Error() string {
 	return msg
 }
 
-// do sends a request inside the token's workspace and returns the body.
-func (c *Client) do(method, path string, query url.Values, body io.Reader, contentType, accept string) ([]byte, error) {
+// workspaceRequest sends a request inside the token's workspace and returns the body.
+func (c *Client) workspaceRequest(method, path string, query url.Values, body io.Reader, contentType, accept string) ([]byte, error) {
 	u := c.URL + "/api/v1/w/-" + path
 	if strings.HasPrefix(path, "/api/") {
 		u = c.URL + path
@@ -135,13 +135,13 @@ func (c *Client) do(method, path string, query url.Values, body io.Reader, conte
 
 // Text gets a path in the compact text form.
 func (c *Client) Text(path string, q url.Values) (string, error) {
-	raw, err := c.do("GET", path, q, nil, "", "text/plain")
+	raw, err := c.workspaceRequest("GET", path, q, nil, "", "text/plain")
 	return string(raw), err
 }
 
 // JSON gets a path as JSON.
 func (c *Client) JSON(path string, q url.Values) ([]byte, error) {
-	return c.do("GET", path, q, nil, "", "application/json")
+	return c.workspaceRequest("GET", path, q, nil, "", "application/json")
 }
 
 // Result is what a change returned.
@@ -176,7 +176,7 @@ func (c *Client) Change(typ string, args any, approval string, dry bool) (*Resul
 	var out []byte
 	var err error
 	for attempt := 0; attempt < 3; attempt++ {
-		out, err = c.do("POST", "/changes", nil, bytes.NewReader(raw), "application/json", "application/json")
+		out, err = c.workspaceRequest("POST", "/changes", nil, bytes.NewReader(raw), "application/json", "application/json")
 		var ae *APIError
 		if err == nil || errors.As(err, &ae) {
 			break
@@ -224,7 +224,7 @@ func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
 		Received int64  `json:"received"`
 		State    string `json:"state"`
 	}
-	raw, err := c.do("POST", "/files", q, io.LimitReader(f, part), "application/octet-stream", "")
+	raw, err := c.workspaceRequest("POST", "/files", q, io.LimitReader(f, part), "application/octet-stream", "")
 	if err != nil {
 		return "", "", err
 	}
@@ -235,7 +235,7 @@ func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
 		if _, err := f.Seek(meta.Received, io.SeekStart); err != nil {
 			return "", "", err
 		}
-		raw, err = c.do("PATCH", "/files/"+meta.ID, url.Values{"offset": {fmt.Sprint(meta.Received)}}, io.LimitReader(f, part), "application/octet-stream", "")
+		raw, err = c.workspaceRequest("PATCH", "/files/"+meta.ID, url.Values{"offset": {fmt.Sprint(meta.Received)}}, io.LimitReader(f, part), "application/octet-stream", "")
 		if err != nil {
 			return "", "", err
 		}

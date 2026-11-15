@@ -12,7 +12,7 @@ import (
 
 var branchKey = regexp.MustCompile(`(?i)\b([a-z][a-z0-9]{1,9}-\d+)\b`)
 
-func gitOut(args ...string) (string, error) {
+func gitOutput(args ...string) (string, error) {
 	out, err := exec.Command("git", args...).Output()
 	return strings.TrimSpace(string(out)), err
 }
@@ -26,7 +26,7 @@ func (r *runner) link(in input) error {
 		_, err := r.change("link.set", map[string]any{"task": pos[0], "kind": "url", "url": pos[1]}, in.approval)
 		return err
 	}
-	branch, err := gitOut("rev-parse", "--abbrev-ref", "HEAD")
+	branch, err := gitOutput("rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return errors.New("this is not a git repository; run it inside one, or give a URL: quadit link KEY URL")
 	}
@@ -45,7 +45,7 @@ func (r *runner) link(in input) error {
 	if base != "" {
 		commits = gitAhead(base)
 		if len(commits) == 0 && branch != strings.TrimPrefix(base, "origin/") {
-			if _, err := gitOut("merge-base", "--is-ancestor", "HEAD", base); err == nil {
+			if _, err := gitOutput("merge-base", "--is-ancestor", "HEAD", base); err == nil {
 				state = "merged"
 			}
 		}
@@ -64,7 +64,7 @@ func (r *runner) link(in input) error {
 // gitRepo is the repository as its origin names it (owner/name), or the
 // name of its folder when it has no origin.
 func gitRepo() string {
-	repo, _ := gitOut("remote", "get-url", "origin")
+	repo, _ := gitOutput("remote", "get-url", "origin")
 	repo = strings.TrimSuffix(repo, ".git")
 	if i := strings.LastIndexAny(repo, ":"); i >= 0 && !strings.Contains(repo, "://") {
 		repo = repo[i+1:] // git@host:owner/name
@@ -72,7 +72,7 @@ func gitRepo() string {
 		repo = strings.Trim(u.Path, "/")
 	}
 	if repo == "" {
-		top, _ := gitOut("rev-parse", "--show-toplevel")
+		top, _ := gitOutput("rev-parse", "--show-toplevel")
 		repo = filepath.Base(top)
 	}
 	return repo
@@ -82,7 +82,7 @@ func gitRepo() string {
 // from: the first of the usual names that exists, or "" when none does.
 func gitBase() string {
 	for _, cand := range []string{"origin/HEAD", "origin/main", "origin/master", "main", "master"} {
-		if _, err := gitOut("rev-parse", "--verify", "--quiet", cand); err == nil {
+		if _, err := gitOutput("rev-parse", "--verify", "--quiet", cand); err == nil {
 			return cand
 		}
 	}
@@ -98,7 +98,7 @@ type gitCommit struct {
 // fifty at most.
 func gitAhead(base string) []gitCommit {
 	var commits []gitCommit
-	log, _ := gitOut("log", "--format=%h%x09%s", "-n", "50", base+"..HEAD")
+	log, _ := gitOutput("log", "--format=%h%x09%s", "-n", "50", base+"..HEAD")
 	for _, line := range strings.Split(log, "\n") {
 		if sha, subject, ok := strings.Cut(line, "\t"); ok {
 			commits = append(commits, gitCommit{sha, subject})

@@ -66,7 +66,7 @@ type runner struct {
 
 // run finds a command by its name and runs it on what was typed after it.
 func (r *runner) run(name string, rest []string) error {
-	cmd, ok := find(name)
+	cmd, ok := findCommand(name)
 	if !ok {
 		return fmt.Errorf("unknown command %q; run: quadit help", name)
 	}
@@ -77,8 +77,8 @@ func (r *runner) run(name string, rest []string) error {
 	return cmd.run(r, in)
 }
 
-// get prints a read in text form, or as JSON when asked.
-func (r *runner) get(path string, q url.Values) error {
+// printRead prints a read in text form, or as JSON when asked.
+func (r *runner) printRead(path string, q url.Values) error {
 	if r.json {
 		raw, err := r.c.JSON(path, q)
 		if err != nil {
@@ -125,5 +125,5 @@ func (r *runner) change(typ string, args map[string]any, approval string) (*Resu
 // to memory, a request with a secret) and returns the answer.
 func (r *runner) send(method, path string, q url.Values, body any, accept string) ([]byte, error) {
 	raw, _ := json.Marshal(body)
-	return r.c.do(method, path, q, bytes.NewReader(raw), "application/json", accept)
+	return r.c.workspaceRequest(method, path, q, bytes.NewReader(raw), "application/json", accept)
 }
