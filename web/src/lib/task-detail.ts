@@ -2,6 +2,7 @@
 // links, files and watchers (merged into the store, which owns them), and
 // its history and what mentions it (which only the panel reads: they are the
 // query's own data, and live events are added to the history as they come).
+// Also the keys a task's reads are cached under (taskKeys).
 
 import { useQuery } from "@tanstack/react-query";
 import { api, workspacePath } from "@/lib/api";

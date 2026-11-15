@@ -2,7 +2,7 @@
 // cost), kept fresh: read through the query cache when the page opens, and
 // asked again, at most once every couple of seconds, whenever the feed moves
 // (the cache asks again when the stream comes back). Two pages reading the
-// same path share one answer.
+// same path share one answer. The key they are cached under is here.
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";

@@ -1,6 +1,7 @@
 // An audit log: who did what, when and from where. The admin area shows the
 // whole install's; workspace settings show one workspace's. Both read the
-// same shape with the same filters, newest first, a page at a time.
+// same shape with the same filters, newest first, a page at a time. The key
+// the pages are cached under (by endpoint and filters) is here.
 
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";

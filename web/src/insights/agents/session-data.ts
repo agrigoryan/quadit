@@ -2,7 +2,7 @@
 // the last days from the start, and the feed keeps each one whole: an update
 // carries the new list of steps and links. Older sessions a page asks for
 // are fetched once and put into the store, where the feed keeps them current
-// like the rest.
+// like the rest. The key those fetches are cached under is here.
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";

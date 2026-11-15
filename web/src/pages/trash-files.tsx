@@ -1,7 +1,8 @@
 // Removed files in the trash: every attachment taken off a task, a comment,
 // a question or one of its options, each with a way back. The starting copy
 // of the workspace leaves them out, so they are asked for here, and again
-// whenever a file is removed or restored while the page is open.
+// whenever a file is removed or restored while the page is open. The key
+// the list is cached under is here.
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";

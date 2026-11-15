@@ -1,7 +1,7 @@
 // The vault's list. It is not in the workspace's starting copy: the page
 // fetches it into the store, and from then on the feed keeps it current
 // (secret.created, secret.updated, secret.deleted). A value is sent to the
-// server and never comes back.
+// server and never comes back. The key that read is cached under is here.
 
 import { useQuery } from "@tanstack/react-query";
 import type { Changes } from "@/lib/changes.gen";

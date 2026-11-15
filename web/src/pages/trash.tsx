@@ -1,3 +1,6 @@
+// The trash page. Deleted tasks are read here into the store, under the key
+// below; questions and files are read by their own modules.
+
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { MessageCircleQuestion, Trash2, Undo2 } from "lucide-react";
@@ -19,6 +22,8 @@ import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 import { useMinute } from "@/lib/tick";
+
+const tasksTrashKey = (slug: string) => [...inWorkspace(slug), "tasks-trash"] as const;
 
 function Group({ title, count, children }: { title: string; count: number; children: ReactNode }) {
   return (
@@ -72,7 +77,7 @@ export function TrashPage() {
   // Everything in the trash, a thousand at a time, into the store: the page
   // shows what has arrived and goes on reading.
   const read = useQuery({
-    queryKey: [...inWorkspace(slug), "tasks-trash"],
+    queryKey: tasksTrashKey(slug),
     queryFn: async ({ signal }) => {
       for (let offset = 0; offset < 50_000; offset += 1000) {
         const out = await api.get<{ tasks: Task[]; more?: boolean }>(

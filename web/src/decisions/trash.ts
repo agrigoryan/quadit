@@ -1,7 +1,7 @@
 // The trash for questions. The workspace's starting copy leaves deleted
 // decisions out, so the server is asked for them. A question deleted or restored
 // while the app is open is in the copy and shows up or drops out at once,
-// and the list is asked for again.
+// and the list is asked for again. The key the list is cached under is here.
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";

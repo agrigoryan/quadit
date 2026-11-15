@@ -1,6 +1,7 @@
 // What the two token pages share (a person's own tokens under Me, an agent's
 // on its page): the list, the dialog that makes a token, revoking one, and a
 // token's scopes as badges. Each page brings its own words and its own fields.
+// The key the token list is cached under is here too.
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { type ComponentType, type Dispatch, type ReactNode, type SetStateAction, useState } from "react";
