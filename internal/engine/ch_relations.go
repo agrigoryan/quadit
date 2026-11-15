@@ -50,9 +50,14 @@ func relationAdd(c *cx, a relationArgs) error {
 	default:
 		return oneOf("type", "relation type", a.Type, []string{core.RelBlocks, "blocked_by", core.RelRelates, core.RelDuplicates})
 	}
-	n, err := c.tx.Count(c.ctx, "task_relations", store.Eq("task_id", t.ID), store.Eq("related_task_id", o.ID), store.Eq("type", typ))
-	if err != nil || n > 0 {
-		return err // already there
+	var there core.Relation
+	found, err := store.Find(c.ctx, c.tx, &there, store.Eq("task_id", t.ID), store.Eq("related_task_id", o.ID), store.Eq("type", typ))
+	if err != nil {
+		return err
+	}
+	if found {
+		c.ref = there.ID // already there: the answer is the one there
+		return nil
 	}
 	r := core.Relation{ID: rid, WorkspaceID: c.ws, TaskID: t.ID, RelatedTaskID: o.ID, Type: typ, CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, r); err != nil {
