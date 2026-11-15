@@ -4,15 +4,15 @@ import { useMemo } from "react";
 import { CircleDot } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { getRowEvenIfGone, useRowEvenIfGone, useStatuses } from "@/lib/selectors";
+import { CATEGORIES } from "@/lib/types";
+import { setStatus } from "@/tasks/actions";
 import { useManageLinks } from "@/tasks/manage";
 import { leaving, Pill, pill } from "@/tasks/properties/create-pill";
-import { Picker } from "@/ui/picker";
-import { setStatus } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
 import { asText, type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
-import { StatusIcon } from "@/ui/icons";
 import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
-import { CATEGORIES } from "@/lib/types";
+import { StatusIcon } from "@/ui/icons";
+import { Picker } from "@/ui/picker";
 
 function StatusRow(panel: PanelProps) {
   // Named even when it is gone, as everything a task is filed under.

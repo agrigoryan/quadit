@@ -15,9 +15,9 @@ import {
   shared,
   type TaskProperty,
 } from "@/tasks/properties/property";
+import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
 import { noneItem } from "@/tasks/property-picker";
 import { Picker } from "@/ui/picker";
-import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
 
 function EpicRow(panel: PanelProps) {
   const e = useRowEvenIfGone("epics", panel.task.epic_id);

@@ -22,12 +22,12 @@ import {
   shared,
   type TaskProperty,
 } from "@/tasks/properties/property";
+import { memberOf, memberWord } from "@/tasks/properties/query-words";
 import { memberItems, noneItem } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input, Textarea } from "@/ui/input";
 import { PickerList } from "@/ui/picker";
-import { memberOf, memberWord } from "@/tasks/properties/query-words";
 
 function useItems(tasks: Task[]) {
   const members = useMembers();

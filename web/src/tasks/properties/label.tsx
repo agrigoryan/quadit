@@ -16,9 +16,9 @@ import {
   type PanelProps,
   type TaskProperty,
 } from "@/tasks/properties/property";
+import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
 import { LabelChip } from "@/ui/badge";
 import { Picker } from "@/ui/picker";
-import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
 
 function LabelRow(panel: PanelProps) {
   // A deleted label the task still has is named.

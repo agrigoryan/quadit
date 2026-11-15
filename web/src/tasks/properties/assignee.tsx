@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import { CircleSlash, UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
-import type { Task } from "@/lib/types";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
+import type { Task } from "@/lib/types";
 import { who } from "@/detail/data";
 import { setAssignee } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
@@ -20,12 +20,12 @@ import {
   shared,
   type TaskProperty,
 } from "@/tasks/properties/property";
+import { memberOf, memberWord } from "@/tasks/properties/query-words";
 import { memberItems, noneItem } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { ListeningDot } from "@/ui/listening-dot";
 import { Picker } from "@/ui/picker";
 import { Tooltip } from "@/ui/tooltip";
-import { memberOf, memberWord } from "@/tasks/properties/query-words";
 
 /** Who has the task, and, for an agent, the person it works for. */
 function AssigneeRow(panel: PanelProps) {
@@ -81,7 +81,7 @@ function AssigneePill({ value, onChange }: CreateProps) {
   );
 }
 
-/** Unassigned, then me, then the rest by handle; a suspended member only while it has the task. */
+/** Unassigned, then me, then everyone else with their handle; a suspended member only while it has the task. */
 function useChoices(task: Task): Choice[] {
   const members = useMembers();
   const me = useMe();
