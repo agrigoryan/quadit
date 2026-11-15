@@ -1,11 +1,12 @@
 // Pages, their blocks and databases as the server sends them
-// (internal/core/work.go, internal/engine/ch_db.go).
+// (internal/core/pages.go; Ref in internal/core/tasks.go).
 
 import type { Comment } from "@/lib/types";
 
 export type DocKind = "page" | "database" | "row";
 
-export interface Doc {
+/** A page, a database or a row of one (core.Doc). */
+export type Doc = {
   id: string;
   parent_id?: string;
   kind: DocKind;
@@ -30,13 +31,17 @@ export interface Doc {
   created_at: number;
   updated_by?: string;
   updated_at: number;
+  /** The seq fields are absent on a page made here until the server's row arrives. */
+  created_seq?: number;
+  updated_seq?: number;
+  /** The last change to its blocks. */
   content_seq?: number;
   archived_at?: number;
   deleted_at?: number;
-}
+};
 
-/** One stored block of a page: a flat row with its parent and place. */
-export interface BlockRow {
+/** One stored block of a page: a flat row with its parent and place (core.Block). */
+export type BlockRow = {
   id: string;
   doc_id: string;
   parent_id?: string;
@@ -44,11 +49,12 @@ export interface BlockRow {
   type: string;
   props?: Record<string, unknown>;
   content?: unknown;
-  created_by?: string;
-  updated_by?: string;
+  created_by: string;
+  updated_by: string;
+  created_seq: number;
   updated_seq: number;
   deleted_at?: number;
-}
+};
 
 /** A block with its nested blocks, as versions and Markdown conversion give it. */
 export interface BlockTree {
@@ -59,6 +65,7 @@ export interface BlockTree {
   children?: BlockTree[];
 }
 
+/** A saved snapshot of a page, listed without the snapshot itself (core.DocVersion). */
 export interface DocVersion {
   id: string;
   doc_id: string;
@@ -108,6 +115,7 @@ export interface PropConfig {
   fn?: string;
 }
 
+/** A column of a database (core.DBProperty). */
 export interface DBProperty {
   id: string;
   database_id: string;
@@ -115,6 +123,8 @@ export interface DBProperty {
   type: PropertyType;
   config?: PropConfig;
   rank: string;
+  /** Absent on one made here until the server's row arrives. */
+  updated_seq?: number;
   deleted_at?: number;
 }
 
@@ -156,6 +166,7 @@ export interface ViewConfig {
   form_intro?: string;
 }
 
+/** A saved way to show a database (core.DBView). */
 export interface DBView {
   id: string;
   database_id: string;
@@ -163,10 +174,12 @@ export interface DBView {
   type: ViewType;
   config?: ViewConfig;
   rank: string;
+  /** Absent on one made here until the server's row arrives. */
+  updated_seq?: number;
   deleted_at?: number;
 }
 
-/** A mention or link between two things (internal/core Ref). */
+/** A mention or link between two things (core.Ref). */
 export interface DocRef {
   from_type: string;
   from_id: string;
@@ -176,6 +189,7 @@ export interface DocRef {
   to_id: string;
 }
 
+/** A tree of pages synced with a folder of Markdown in a git repository (core.DocSource). */
 export interface DocSource {
   id: string;
   root_doc_id: string;
@@ -187,10 +201,14 @@ export interface DocSource {
   last_commit?: string;
   last_sync_at?: number;
   last_error?: string;
+  created_by: string;
+  created_at: number;
+  updated_seq: number;
+  deleted_at?: number;
 }
 
-/** A comment on a page or one of its blocks. */
-export type DocComment = Comment & { doc_id?: string; resolved_at?: number };
+/** A comment on a page or one of its blocks: one with `doc_id` set. */
+export type DocComment = Comment;
 
 /** What GET /docs/{id} answers. */
 export interface PageData {
@@ -206,6 +224,7 @@ export interface PageData {
   rows?: Doc[];
 }
 
+/** A member with a page open, and the block they are in (core.Presence). */
 export interface PresenceEntry {
   user_id: string;
   block?: string;

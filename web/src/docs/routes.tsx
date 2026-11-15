@@ -4,7 +4,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "re
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useProjectByKey, useSlug } from "@/lib/selectors";
-import { type Dict, useStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { usePageTitle } from "@/lib/ui-state";
 import { DocsAreaProvider, projectDocs, useDocsArea, workspaceDocs } from "@/docs/area";
 import { inProject, treeIsEmpty, useDocTree } from "@/docs/data";
@@ -13,7 +13,6 @@ import { DocPage } from "@/docs/page/doc-page";
 import { ProjectDocsHome } from "@/docs/project-home";
 import { DocsTree } from "@/docs/tree/docs-tree";
 import { createAndOpen } from "@/docs/tree/new-page";
-import type { Doc } from "@/docs/types";
 import { NotFoundPage } from "@/ui/not-found";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
@@ -51,8 +50,8 @@ function Area() {
   // A page that is not one of this project's (its project was just changed, or the address is old)
   // goes on where it is now: in its own project's Docs, or in the workspace's.
   const elsewhere = useStore((s) => {
-    const doc = id ? (s.collections.docs[id] as unknown as Doc | undefined) : undefined;
-    if (!project || !doc || inProject(s.collections.docs as unknown as Dict<Doc>, doc.id, project.id)) return undefined;
+    const doc = id ? s.collections.docs[id] : undefined;
+    if (!project || !doc || inProject(s.collections.docs, doc.id, project.id)) return undefined;
     const own = doc.project_id ? s.collections.projects[doc.project_id] : undefined;
     return own ? projectDocs(slug, own) : workspaceDocs(slug);
   });

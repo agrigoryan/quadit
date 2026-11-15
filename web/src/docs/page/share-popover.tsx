@@ -8,7 +8,7 @@ import { t } from "@/lib/i18n";
 import { useMe, useMembers, useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { setSharing } from "@/docs/actions";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";

@@ -22,9 +22,9 @@ import {
   listWebhooks,
   randomSecret,
   type TestResult,
-  type Webhook,
   type WebhookRow,
 } from "@/settings/automation/data";
+import type { Webhook } from "@/lib/types-automation";
 import { DeliveriesDialog } from "@/settings/automation/deliveries";
 import { EventBadges } from "@/settings/automation/event-picker";
 import { WebhookForm } from "@/settings/automation/webhook-form";

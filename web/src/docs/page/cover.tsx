@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { localPath } from "@/lib/url";
 import { updateDoc } from "@/docs/actions";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 
 /** A hidden file input and the function that opens it; the picked image becomes the page's cover. */
 function useCoverUpload(docId: string): { busy: boolean; pick: () => void; input: ReactNode } {

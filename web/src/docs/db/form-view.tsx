@@ -7,7 +7,7 @@ import { SelfCell } from "@/docs/db/cell";
 import type { Value } from "@/docs/db/formula";
 import { isComputed, PropIcon } from "@/docs/db/prop-meta";
 import type { ViewProps } from "@/docs/db/use-table";
-import type { DBProperty, DBView } from "@/docs/types";
+import type { DBProperty, DBView } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

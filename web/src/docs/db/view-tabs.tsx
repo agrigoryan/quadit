@@ -5,7 +5,7 @@ import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
 import { createView, deleteView, updateView } from "@/docs/db/actions";
 import { VIEW_ICONS, viewTypeName } from "@/docs/db/prop-meta";
-import { type DBView, VIEW_TYPES, type ViewType } from "@/docs/types";
+import { type DBView, VIEW_TYPES, type ViewType } from "@/lib/types-docs";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/ui/menu";
 
 interface Props {

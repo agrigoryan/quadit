@@ -8,7 +8,7 @@ import { setRowProps, trashDoc, updateDoc } from "@/docs/actions";
 import { Cell, CellInput } from "@/docs/db/cell";
 import type { Value } from "@/docs/db/formula";
 import { TITLE_WIDTH } from "@/docs/db/prop-meta";
-import type { DBProperty, Doc } from "@/docs/types";
+import type { DBProperty, Doc } from "@/lib/types-docs";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 
 export const TITLE = "title";

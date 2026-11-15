@@ -26,7 +26,6 @@ import { canSee, docTitle, pathTo } from "@/docs/data";
 import { mentionable } from "@/docs/editor/decision-refs";
 import type { AnyEditor } from "@/docs/editor/sync";
 import { PageIcon } from "@/docs/page-icon";
-import type { Doc } from "@/docs/types";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
 
@@ -136,9 +135,8 @@ export function pageTitleItems(editor: AnyEditor, query: string, self?: string):
   // Still typing inside the brackets: what follows a closing bracket is not part of a title.
   if (query.includes("]") || query.includes("\uFFFC")) return [];
   const { collections: c, me } = getState();
-  const docs = c.docs as unknown as Record<string, Doc>;
   const q = query.trim().toLowerCase();
-  const pages = Object.values(docs)
+  const pages = Object.values(c.docs)
     .filter(
       (d) =>
         d.id !== self &&
@@ -159,7 +157,7 @@ export function pageTitleItems(editor: AnyEditor, query: string, self?: string):
   const items = pages.map((doc) => ({
     title: docTitle(doc),
     subtext:
-      pathTo(docs, doc.id)
+      pathTo(c.docs, doc.id)
         .map((d) => docTitle(d))
         .join(" / ") || undefined,
     group: t("docs.mention.pages"),

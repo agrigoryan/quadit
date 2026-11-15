@@ -12,7 +12,7 @@ import { docTitle, type DocTree, useDocTree } from "@/docs/data";
 import { PageIcon } from "@/docs/page-icon";
 import { marksProject, ProjectMark } from "@/docs/project-mark";
 import { setOpen, useTreeState } from "@/docs/tree/state";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 import { NavSection } from "@/ui/nav-item";
 
 const MAX_DEPTH = 3;

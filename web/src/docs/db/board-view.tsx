@@ -30,7 +30,7 @@ import type { Value } from "@/docs/db/formula";
 import { OptionChip, optionsOf } from "@/docs/db/options";
 import { RowCardBody } from "@/docs/db/row-card";
 import { shownProps, type ViewProps } from "@/docs/db/use-table";
-import type { DBProperty, Doc, SelectOption } from "@/docs/types";
+import type { DBProperty, Doc, SelectOption } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 

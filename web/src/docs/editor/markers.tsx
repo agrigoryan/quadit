@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { useStore } from "@/lib/store";
 import { tintOf } from "@/docs/presence-tint";
 import type { AnyEditor } from "@/docs/editor/sync";
-import type { PresenceEntry } from "@/docs/types";
+import type { PresenceEntry } from "@/lib/types-docs";
 
 interface Box {
   top: number;

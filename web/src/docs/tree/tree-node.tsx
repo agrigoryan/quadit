@@ -20,7 +20,7 @@ import { marksProject, ProjectMark } from "@/docs/project-mark";
 import { IconPicker } from "@/docs/tree/icon-picker";
 import { createAndOpen, NewPageItems } from "@/docs/tree/new-page";
 import { setOpen, startRename, useTreeState } from "@/docs/tree/state";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 
 export type DropZone = "before" | "inside" | "after";

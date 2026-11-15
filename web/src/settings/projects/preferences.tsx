@@ -5,6 +5,7 @@ import { newId } from "@/lib/ids";
 import { mutate, send } from "@/lib/mutate";
 import { useCollection, useLabels } from "@/lib/selectors";
 import type { Project } from "@/lib/types";
+import type { Preference } from "@/lib/types-plan";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { Dot } from "@/ui/dot";
 import { When } from "@/ui/when";
@@ -16,21 +17,9 @@ import { Button, IconButton } from "@/ui/button";
 import { Textarea } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 
-interface Preference {
-  id: string;
-  project_id?: string;
-  body: string;
-  decision_id?: string;
-  label_ids?: string[];
-  created_by: string;
-  created_at: number;
-  retired_at?: number;
-  deleted_at?: number;
-}
-
 /** The standing preferences of a project: what the team has settled, for agents to read before they work. */
 export function ProjectPreferences({ project, admin }: { project: Project; admin: boolean }) {
-  const rows = useCollection("preferences") as unknown as Record<string, Preference>;
+  const rows = useCollection("preferences");
   const members = useCollection("members");
   const labels = useCollection("labels");
   const [deleting, setDeleting] = useState<Preference | null>(null);

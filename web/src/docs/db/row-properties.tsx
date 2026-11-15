@@ -8,7 +8,7 @@ import { SelfCell } from "@/docs/db/cell";
 import { PropIcon } from "@/docs/db/prop-meta";
 import { PropertyPopover } from "@/docs/db/property-editor";
 import { ensureDatabase, useDatabase } from "@/docs/db/use-table";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 
 /**
  * A database row's values as a list: the property's name, then its value,

@@ -48,11 +48,11 @@ export function knownRows(events: FeedEvent[]): Known {
       if (comment) known.comments[ev.entity_id] = { ...comment, deleted_at: ev.at };
       continue;
     }
-    if (ev.entity_type === "comment") known.comments[ev.entity_id] = row as unknown as Comment;
-    else if (ev.entity_type === "attachment") known.attachments[ev.entity_id] = row as unknown as Attachment;
-    else if (ev.entity_type === "link") known.links[ev.entity_id] = row as unknown as TaskLink;
-    else if (ev.entity_type === "relation") known.relations[ev.entity_id] = row as unknown as Relation;
-    else if (ev.entity_type === "decision") decision(row as unknown as Decision);
+    if (ev.entity_type === "comment") known.comments[ev.entity_id] = row as Comment;
+    else if (ev.entity_type === "attachment") known.attachments[ev.entity_id] = row as Attachment;
+    else if (ev.entity_type === "link") known.links[ev.entity_id] = row as TaskLink;
+    else if (ev.entity_type === "relation") known.relations[ev.entity_id] = row as Relation;
+    else if (ev.entity_type === "decision") decision(row as Decision);
   }
   return known;
 }

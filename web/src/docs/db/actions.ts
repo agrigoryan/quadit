@@ -16,8 +16,8 @@ import type {
   SelectOption,
   ViewConfig,
   ViewType,
-} from "@/docs/types";
-import { OPTION_COLORS } from "@/docs/types";
+} from "@/lib/types-docs";
+import { OPTION_COLORS } from "@/lib/types-docs";
 
 type Fields = Record<string, unknown>;
 

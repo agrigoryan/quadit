@@ -3,7 +3,7 @@ import { Command } from "cmdk";
 import { Check } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { OptionChip, optionsOf } from "@/docs/db/options";
-import { type DBProperty, OPTION_COLORS } from "@/docs/types";
+import { type DBProperty, OPTION_COLORS } from "@/lib/types-docs";
 
 interface Props {
   prop: DBProperty;

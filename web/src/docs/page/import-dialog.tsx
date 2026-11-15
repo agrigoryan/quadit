@@ -5,7 +5,7 @@ import { toast } from "@/lib/toast";
 import { writeMarkdown } from "@/docs/actions";
 import { pickMarkdown, titleOf } from "@/docs/files";
 import { createAndOpen } from "@/docs/tree/new-page";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 

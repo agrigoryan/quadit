@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useCollection } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import { type Decision, isOpenCategory, type Task } from "@/lib/types";
-import type { Claim, Resource } from "@/insights/lib/types";
+import type { Claim, Resource } from "@/lib/types-agents";
 
 interface Asked {
   decision: Decision;
@@ -30,7 +30,7 @@ export function useClaims(): Claim[] {
   const claims = useCollection("claims");
   return useMemo(
     () =>
-      (Object.values(claims) as unknown as Claim[])
+      Object.values(claims)
         .filter((c) => c.state !== "released")
         .sort(
           (a, b) =>
@@ -46,7 +46,7 @@ export function useResources(): Resource[] {
   const resources = useCollection("resources");
   return useMemo(
     () =>
-      (Object.values(resources) as unknown as Resource[])
+      Object.values(resources)
         .filter((r) => !r.deleted_at)
         .sort((a, b) => a.name.localeCompare(b.name)),
     [resources],

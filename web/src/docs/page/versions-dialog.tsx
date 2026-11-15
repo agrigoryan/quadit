@@ -11,7 +11,7 @@ import { useCollection, useSlug } from "@/lib/selectors";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { keepVersion, revertTo } from "@/docs/actions";
-import type { BlockTree, Doc, DocVersion } from "@/docs/types";
+import type { BlockTree, Doc, DocVersion } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

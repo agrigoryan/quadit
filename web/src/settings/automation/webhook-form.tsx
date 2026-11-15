@@ -8,7 +8,8 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
-import { change, randomSecret, type Webhook } from "@/settings/automation/data";
+import { change, randomSecret } from "@/settings/automation/data";
+import type { Webhook } from "@/lib/types-automation";
 import { EventPicker } from "@/settings/automation/event-picker";
 
 type Scope = "all" | "project" | "member";

@@ -9,7 +9,7 @@ import { useMembers } from "@/lib/selectors";
 import { setViewConfig } from "@/docs/db/actions";
 import { optionsOf } from "@/docs/db/options";
 import { PropIcon } from "@/docs/db/prop-meta";
-import type { DBProperty, DBView, FilterOp, RowFilter, RowSort } from "@/docs/types";
+import type { DBProperty, DBView, FilterOp, RowFilter, RowSort } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { Select } from "@/ui/picker";
 

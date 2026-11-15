@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, errorMessage } from "@/lib/api";
 import { forgetIfUnshared, loadPage } from "@/docs/store";
-import type { BlockRow } from "@/docs/types";
+import type { BlockRow } from "@/lib/types-docs";
 
 export type PageState =
   | { status: "loading" }

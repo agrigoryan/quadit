@@ -27,7 +27,7 @@ export interface User {
   is_admin?: boolean;
 }
 
-export interface Member {
+export type Member = {
   workspace_id: string;
   user_id: string;
   role: Role;
@@ -50,9 +50,9 @@ export interface Member {
   listening_until?: number;
   suspended_at?: number;
   removed_at?: number;
-}
+};
 
-export interface Project {
+export type Project = {
   id: string;
   key: string;
   name: string;
@@ -64,9 +64,9 @@ export interface Project {
   settings?: { cycles?: boolean; cycle_days?: number; estimates?: boolean };
   archived_at?: number;
   deleted_at?: number;
-}
+};
 
-export interface Status {
+export type Status = {
   id: string;
   project_id: string;
   name: string;
@@ -75,17 +75,17 @@ export interface Status {
   rank: string;
   is_default?: boolean;
   deleted_at?: number;
-}
+};
 
-export interface Label {
+export type Label = {
   id: string;
   project_id?: string;
   name: string;
   color?: string;
   deleted_at?: number;
-}
+};
 
-export interface Task {
+export type Task = {
   id: string;
   project_id: string;
   number: number;
@@ -122,33 +122,37 @@ export interface Task {
   updated_seq: number;
   archived_at?: number;
   deleted_at?: number;
-}
+};
 
-export interface Relation {
+export type Relation = {
   id: string;
   task_id: string;
   related_task_id: string;
   type: "blocks" | "relates" | "duplicates";
   created_by: string;
   created_at: number;
-}
+};
 
 export type SubjectType = "task" | "comment" | "decision" | "decision_option" | "doc" | "doc_block";
 
-export interface Comment {
+export type Comment = {
   id: string;
   task_id?: string;
+  /** Set on a comment on a page or one of its blocks. */
+  doc_id?: string;
   subject_type: SubjectType;
   subject_id: string;
   kind: "comment" | "result";
   evidence?: { checked?: string; measured?: string; not_verified?: string };
+  /** A page comment's thread was closed. */
+  resolved_at?: number;
   parent_id?: string;
   author_id: string;
   body: string;
   created_at: number;
   edited_at?: number;
   deleted_at?: number;
-}
+};
 
 export type Outcome = "as_is" | "with_changes" | "none" | "approved" | "declined";
 
@@ -160,7 +164,7 @@ export interface DecisionOption {
   rank: string;
 }
 
-export interface Decision {
+export type Decision = {
   id: string;
   task_id: string;
   kind: "choice" | "approval";
@@ -182,7 +186,7 @@ export interface Decision {
   created_at: number;
   deleted_at?: number;
   options?: DecisionOption[];
-}
+};
 
 export interface FileRow {
   id: string;
@@ -197,7 +201,7 @@ export interface FileRow {
   preview_url?: string;
 }
 
-export interface Attachment {
+export type Attachment = {
   id: string;
   file_id: string;
   subject_type: SubjectType;
@@ -210,9 +214,9 @@ export interface Attachment {
   created_at: number;
   deleted_at?: number;
   file?: FileRow;
-}
+};
 
-export interface AgentSession {
+export type AgentSession = {
   id: string;
   agent_id: string;
   task_id?: string;
@@ -228,10 +232,10 @@ export interface AgentSession {
   tokens_out?: number;
   started_at: number;
   ended_at?: number;
-}
+};
 
 /** A key or password agents can use but never read. Its value is never sent to the browser. */
-export interface Secret {
+export type Secret = {
   id: string;
   name: string;
   description?: string;
@@ -246,7 +250,7 @@ export interface Secret {
   updated_at: number;
   last_used_at?: number;
   deleted_at?: number;
-}
+};
 
 export * from "@/lib/types-feed";
 export * from "@/lib/types-plan";

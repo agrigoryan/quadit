@@ -7,7 +7,7 @@ import type { Dict } from "@/lib/store";
 import { byRank, canSee, useDocs } from "@/docs/data";
 import { type Cells, computeCells, type TableData, type World } from "@/docs/db/compute";
 import { loadPage, useDocsStore } from "@/docs/store";
-import type { DBProperty, DBView, Doc } from "@/docs/types";
+import type { DBProperty, DBView, Doc } from "@/lib/types-docs";
 
 /** Databases whose properties have been asked for, so each is fetched once. */
 const asked = new Set<string>();

@@ -12,7 +12,8 @@ import { ConfirmDialog } from "@/ui/settings-dialogs";
 import { Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/settings-layout";
 import { useLoad } from "@/lib/use-load";
-import { change, listRows, type Rule, type Webhook } from "@/settings/automation/data";
+import { change, listRows } from "@/settings/automation/data";
+import type { Rule, Webhook } from "@/lib/types-automation";
 import { RuleForm } from "@/settings/automation/rule-form";
 import { RuleSentence } from "@/settings/automation/rule-text";
 

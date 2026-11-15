@@ -60,7 +60,7 @@ type Atom =
   | (Base & { kind: "files"; place: FilePlace; names: string[] })
   | { kind: "comment"; at: number; seq: number; comment: Comment; replies: Comment[] };
 
-const row = <T>(ev: FeedEvent) => ev.data.row as unknown as T | undefined;
+const row = <T>(ev: FeedEvent) => ev.data.row as T | undefined;
 
 /** Where a file was put, if that is something the timeline says: on the task, a question or one of its options. */
 function placeOf(a: Attachment, taskId: string, known: Known): FilePlace | null {

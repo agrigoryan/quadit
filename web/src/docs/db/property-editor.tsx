@@ -11,7 +11,7 @@ import { FormulaEditor } from "@/docs/db/formula-editor";
 import { OptionsEditor } from "@/docs/db/options-editor";
 import { PropIcon, propTypeName } from "@/docs/db/prop-meta";
 import { ensureDatabase } from "@/docs/db/use-table";
-import { type DBProperty, type DBView, type PropConfig, PROPERTY_TYPES, type PropertyType } from "@/docs/types";
+import { type DBProperty, type DBView, type PropConfig, PROPERTY_TYPES, type PropertyType } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { Select } from "@/ui/picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";

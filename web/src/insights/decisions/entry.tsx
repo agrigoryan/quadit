@@ -23,7 +23,7 @@ import { MediaThumb } from "@/ui/media";
 import type { Dict } from "@/lib/store";
 import { type Entry, optionsOf, outcomeOf, pickedOption } from "@/insights/decisions/data";
 import { revealDecision } from "@/insights/decisions/reveal";
-import type { Preference } from "@/insights/lib/types";
+import type { Preference } from "@/lib/types-plan";
 import { Ago } from "@/ui/ago";
 
 const SHOWN_OPTIONS = 4;

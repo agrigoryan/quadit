@@ -11,7 +11,8 @@ import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
 import { EmptyRow, Rows } from "@/ui/settings-layout";
 import { useLoad } from "@/lib/use-load";
-import { type Delivery, isTest, listRows, type Webhook } from "@/settings/automation/data";
+import { isTest, listRows } from "@/settings/automation/data";
+import type { Delivery, Webhook } from "@/lib/types-automation";
 
 const tones = { pending: "wait", ok: "ok", dead: "danger" } as const;
 

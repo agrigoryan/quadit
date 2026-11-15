@@ -5,7 +5,7 @@
 
 import { evalFormula, type Value } from "@/docs/db/formula";
 import { compareText, formulaText } from "@/docs/db/formula-values";
-import type { DBProperty, Doc, RowFilter, RowSort } from "@/docs/types";
+import type { DBProperty, Doc, RowFilter, RowSort } from "@/lib/types-docs";
 
 /** A database loaded for reading: its columns and its rows, both in order. */
 export interface TableData {

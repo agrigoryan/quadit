@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createProperty } from "@/docs/db/actions";
 import { PropIcon, propTypeName } from "@/docs/db/prop-meta";
-import { PROPERTY_TYPES, type PropertyType } from "@/docs/types";
+import { PROPERTY_TYPES, type PropertyType } from "@/lib/types-docs";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "@/ui/menu";
 import { t } from "@/lib/i18n";
 

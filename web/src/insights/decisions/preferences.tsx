@@ -20,7 +20,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import type { Preferences } from "@/insights/decisions/data";
 import { deletePreference, setRetired } from "@/insights/decisions/preference-dialog";
 import { revealDecision } from "@/insights/decisions/reveal";
-import type { Preference } from "@/insights/lib/types";
+import type { Preference } from "@/lib/types-plan";
 
 /** The decision a preference came from, as a link that opens its task there. */
 function Source({ decisionId }: { decisionId: string }) {

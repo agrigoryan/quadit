@@ -17,7 +17,8 @@ import { ConfirmDialog, CopyField } from "@/ui/settings-dialogs";
 import { Note, Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/settings-layout";
 import { useLoad } from "@/lib/use-load";
-import { change, type HookInfo, type Integration, listRows } from "@/settings/automation/data";
+import { change, type HookInfo, listRows } from "@/settings/automation/data";
+import type { Integration } from "@/lib/types-automation";
 import { IntegrationForm } from "@/settings/automation/integration-form";
 import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
 

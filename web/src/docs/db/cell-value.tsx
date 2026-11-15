@@ -9,7 +9,7 @@ import { docTitle, useDocs } from "@/docs/data";
 import type { Value } from "@/docs/db/formula";
 import { formulaText } from "@/docs/db/formula-values";
 import { findOption, OptionChip } from "@/docs/db/options";
-import type { DBProperty } from "@/docs/types";
+import type { DBProperty } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
 
 const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);

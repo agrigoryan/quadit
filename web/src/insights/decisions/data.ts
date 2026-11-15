@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n";
 import { useCollection } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { Decision, DecisionOption, Outcome, Project, Task } from "@/lib/types";
-import type { Preference } from "@/insights/lib/types";
+import type { Preference } from "@/lib/types-plan";
 
 export interface Entry {
   decision: Decision;
@@ -143,7 +143,7 @@ export interface Preferences {
 export function usePreferences(): Preferences {
   const rows = useCollection("preferences");
   return useMemo(() => {
-    const all = (Object.values(rows) as unknown as Preference[])
+    const all = Object.values(rows)
       .filter((p) => !p.deleted_at)
       .sort((a, b) => b.created_at - a.created_at);
     const byDecision: Dict<Preference> = {};

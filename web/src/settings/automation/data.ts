@@ -1,42 +1,11 @@
-// The rows behind the automation pages, as the server sends them, and the
-// calls that read and change them. None of these lists is in the store:
-// each page fetches its own and fetches again after a change.
+// The calls that read and change the rows behind the automation pages
+// (their types are in lib/types-automation.ts). None of these lists is in
+// the store: each page fetches its own and fetches again after a change.
 
 import { api, workspacePath } from "@/lib/api";
 import { mutate } from "@/lib/mutate";
-import type { Category, Outcome } from "@/lib/types";
-
-export interface Webhook {
-  id: string;
-  name: string;
-  url: string;
-  /** Empty means every event. */
-  event_types?: string[];
-  project_id?: string;
-  /** Set when it only gets what lands in this member's inbox. */
-  user_id?: string;
-  active: boolean;
-  /** Deliveries that failed in a row since the last one that worked. */
-  failures: number;
-  last_status?: string;
-  last_at?: number;
-  created_at: number;
-}
-
-export interface Delivery {
-  id: string;
-  webhook_id: string;
-  seq: number;
-  event_type: string;
-  state: "pending" | "ok" | "dead";
-  attempts: number;
-  status_code?: number;
-  error?: string;
-  duration_ms?: number;
-  created_at: number;
-  next_at?: number;
-  done_at?: number;
-}
+import type { Outcome } from "@/lib/types";
+import type { ActionKind, Delivery, Webhook } from "@/lib/types-automation";
 
 export interface TestResult {
   ok: boolean;
@@ -46,62 +15,8 @@ export interface TestResult {
   ms: number;
 }
 
-export type ActionKind = "notify" | "webhook" | "assign" | "wait_on";
 export const ACTION_KINDS: ActionKind[] = ["notify", "webhook", "assign", "wait_on"];
 export const OUTCOMES: Outcome[] = ["as_is", "with_changes", "none", "approved", "declined"];
-
-export interface RuleMatch {
-  event_types?: string[];
-  project_id?: string;
-  actor_id?: string;
-  actor_kind?: "person" | "agent" | "";
-  outcome?: Outcome | "";
-  to_category?: Category | "";
-  label_id?: string;
-}
-
-export interface RuleAction {
-  kind: ActionKind;
-  user_id?: string;
-  webhook_id?: string;
-  message?: string;
-}
-
-export interface Rule {
-  id: string;
-  name: string;
-  active: boolean;
-  match?: RuleMatch;
-  action?: RuleAction;
-  created_at: number;
-}
-
-export interface GitHubConfig {
-  /** owner/name */
-  repo?: string;
-  /** GitHub Enterprise only. */
-  api_url?: string;
-  on_open?: Category | "";
-  on_merge?: Category | "";
-  comment_back?: boolean;
-  /** Issues with this label become tasks and stay in step with the issue; "*" means every issue. */
-  issues_label?: string;
-  /** The key of the project those tasks are made in; empty means the integration's own project. */
-  issues_project?: string;
-}
-
-export interface Integration {
-  id: string;
-  kind: "github";
-  name?: string;
-  project_id?: string;
-  config?: GitHubConfig;
-  active: boolean;
-  has_secret: boolean;
-  last_sync_at?: number;
-  last_error?: string;
-  created_at: number;
-}
 
 export interface HookInfo {
   url: string;

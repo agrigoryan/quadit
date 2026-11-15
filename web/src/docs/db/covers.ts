@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { getState } from "@/lib/store";
 import { localPath } from "@/lib/url";
-import type { BlockRow, Doc } from "@/docs/types";
+import type { BlockRow, Doc } from "@/lib/types-docs";
 
 const found = new Map<string, { seq: number; url: string | null }>();
 const waiting: (() => void)[] = [];

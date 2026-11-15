@@ -1,55 +1,9 @@
-// How rows get into the collections: which collection a kind of row lives
-// in, what its key is, and how one feed event changes the copy.
+// How rows get into the collections: how a row is filed and how one feed
+// event changes the copy (lib/collections.ts says where each kind lives).
 
-import type { CollectionName, Collections, Dict } from "@/lib/store";
+import { type AnyRow, COLLECTION_OF, type CollectionName, type Collections, type Dict, keyOf } from "@/lib/collections";
 import type { FeedEvent } from "@/lib/types";
 import { localPath } from "@/lib/url";
-
-export type AnyRow = Record<string, unknown>;
-
-/** Which collection an event's entity_type lives in. */
-const COLLECTION_OF: Record<string, CollectionName> = {
-  task: "tasks",
-  comment: "comments",
-  decision: "decisions",
-  project: "projects",
-  status: "statuses",
-  label: "labels",
-  member: "members",
-  epic: "epics",
-  milestone: "milestones",
-  cycle: "cycles",
-  view: "views",
-  template: "templates",
-  preference: "preferences",
-  attachment: "attachments",
-  relation: "relations",
-  link: "links",
-  notification: "notifications",
-  watcher: "watchers",
-  session: "sessions",
-  resource: "resources",
-  claim: "claims",
-  doc: "docs",
-  block: "blocks",
-  webhook: "webhooks",
-  rule: "rules",
-  integration: "integrations",
-  secret: "secrets",
-};
-
-export const emptyCollections = (): Collections => {
-  const c = {} as Record<CollectionName, Dict<never>>;
-  for (const name of new Set(Object.values(COLLECTION_OF))) c[name] = {};
-  return c;
-};
-
-/** Members are keyed by user id; a watcher has no id of its own. */
-export function keyOf(collection: CollectionName, row: AnyRow): string {
-  if (collection === "members") return String(row.user_id);
-  if (collection === "watchers") return `${String(row.user_id)}:${String(row.subject_id)}`;
-  return String(row.id);
-}
 
 export function normalize(collection: CollectionName, row: AnyRow): AnyRow {
   if (collection !== "attachments" || !row.file) return row;
@@ -71,7 +25,7 @@ export class CopyOnWrite {
     return (this.next[name] ??= { ...(this.base[name] as Dict<AnyRow>) });
   }
   peek(name: CollectionName): Dict<AnyRow> {
-    return this.next[name] ?? (this.base[name] as Dict<AnyRow>);
+    return this.next[name] ?? this.base[name];
   }
   put(name: CollectionName, row: AnyRow) {
     this.table(name)[keyOf(name, row)] = normalize(name, row);
@@ -109,7 +63,7 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
   const wanted = (collection: CollectionName, key: string) => !only || only(collection, key);
 
   for (const att of data.attachments ?? []) {
-    const row = att as unknown as AnyRow;
+    const row: AnyRow = att;
     if (wanted("attachments", keyOf("attachments", row))) d.put("attachments", row);
   }
 

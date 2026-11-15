@@ -18,7 +18,7 @@ import { Dialog } from "@/ui/dialog";
 import { Field, Textarea } from "@/ui/input";
 import { Picker, Select } from "@/ui/picker";
 import { prefillRule } from "@/insights/decisions/data";
-import type { Preference } from "@/insights/lib/types";
+import type { Preference } from "@/lib/types-plan";
 
 const WORKSPACE = "workspace";
 

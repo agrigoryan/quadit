@@ -7,7 +7,7 @@
 import { findTaskByKey } from "@/lib/selectors";
 import { type Collections, getState } from "@/lib/store";
 import { findDecision } from "@/docs/editor/decision-refs";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 
 const REF =
   /(^|[\s(])(?:@([a-z0-9][a-z0-9_-]*)|([A-Z][A-Z0-9]{1,9}-\d{1,6}#\d{1,3})|([A-Z][A-Z0-9]{1,9}-\d{1,6})|doc:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}))(?![\w-])|\[\[([^[\]\n]{1,200})\]\]/g;
@@ -21,9 +21,7 @@ export function pageByTitle(c: Collections, title: string): Doc | undefined {
   if (!want) return undefined;
   // The exact title first; then, as the server does, the same title in
   // another case. Several pages either way and it stays text.
-  const docs = Object.values(c.docs)
-    .map((row) => row as unknown as Doc)
-    .filter((doc) => !doc.deleted_at);
+  const docs = Object.values(c.docs).filter((doc) => !doc.deleted_at);
   const exact = docs.filter((doc) => doc.title === want);
   if (exact.length > 0) return exact.length === 1 ? exact[0] : undefined;
   const lower = want.toLowerCase();

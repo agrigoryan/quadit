@@ -17,7 +17,7 @@ import { setRowProps } from "@/docs/actions";
 import { createProperty, setViewConfig } from "@/docs/db/actions";
 import { addDays, addMonths, isDay, monthName, monthStart, weekday, WEEKDAYS } from "@/docs/db/dates";
 import type { ViewProps } from "@/docs/db/use-table";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 import { Button, IconButton } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 

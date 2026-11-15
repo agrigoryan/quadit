@@ -1,7 +1,7 @@
 // Rows around tasks: epics, milestones, cycles, saved views and their
-// queries, watchers, inbox items, links and templates.
+// queries, watchers, inbox items, links, templates and preferences.
 
-export interface Epic {
+export type Epic = {
   id: string;
   project_id: string;
   name: string;
@@ -14,9 +14,9 @@ export interface Epic {
   rank: string;
   created_at?: number;
   deleted_at?: number;
-}
+};
 
-export interface Milestone {
+export type Milestone = {
   id: string;
   epic_id: string;
   name: string;
@@ -24,9 +24,9 @@ export interface Milestone {
   target_on?: string;
   rank: string;
   deleted_at?: number;
-}
+};
 
-export interface Cycle {
+export type Cycle = {
   id: string;
   project_id: string;
   number: number;
@@ -35,9 +35,9 @@ export interface Cycle {
   ends_on: string;
   closed_at?: number;
   deleted_at?: number;
-}
+};
 
-export interface View {
+export type View = {
   id: string;
   project_id?: string;
   name: string;
@@ -49,7 +49,7 @@ export interface View {
   display?: ViewDisplay;
   rank: string;
   deleted_at?: number;
-}
+};
 
 /** The server's TaskQuery (internal/server/query.go), the part the app uses. */
 export interface TaskQuery {
@@ -75,12 +75,12 @@ export interface ViewDisplay {
   sort?: SortBy;
 }
 
-export interface Watcher {
+export type Watcher = {
   user_id: string;
   subject_type: string;
   subject_id: string;
   created_at: number;
-}
+};
 
 export type NotificationType =
   | "assigned"
@@ -95,7 +95,7 @@ export type NotificationType =
   | "status"
   | "budget";
 
-export interface Notification {
+export type Notification = {
   id: string;
   user_id: string;
   seq: number;
@@ -109,9 +109,9 @@ export interface Notification {
   created_at: number;
   read_at?: number;
   archived_at?: number;
-}
+};
 
-export interface TaskLink {
+export type TaskLink = {
   id: string;
   task_id: string;
   kind: "branch" | "commit" | "pr" | "url";
@@ -122,9 +122,9 @@ export interface TaskLink {
   state?: string;
   checks?: string;
   deleted_at?: number;
-}
+};
 
-export interface Template {
+export type Template = {
   id: string;
   project_id?: string;
   name: string;
@@ -132,4 +132,18 @@ export interface Template {
   description?: string;
   preset?: { status?: string; priority?: number; labels?: string[]; assignee?: string; estimate?: number };
   deleted_at?: number;
-}
+};
+
+/** A standing rule, often made from a decision, for agents to read before they work (core.Preference). */
+export type Preference = {
+  id: string;
+  project_id?: string;
+  body: string;
+  decision_id?: string;
+  label_ids?: string[];
+  created_by: string;
+  created_at: number;
+  updated_seq: number;
+  retired_at?: number;
+  deleted_at?: number;
+};

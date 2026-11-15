@@ -9,17 +9,8 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
-import {
-  ACTION_KINDS,
-  type ActionKind,
-  change,
-  OUTCOMES,
-  type Rule,
-  type RuleAction,
-  type RuleMatch,
-  typeMatches,
-  type Webhook,
-} from "@/settings/automation/data";
+import { ACTION_KINDS, change, OUTCOMES, typeMatches } from "@/settings/automation/data";
+import type { ActionKind, Rule, RuleAction, RuleMatch, Webhook } from "@/lib/types-automation";
 import { EventPicker } from "@/settings/automation/event-picker";
 
 interface Props {

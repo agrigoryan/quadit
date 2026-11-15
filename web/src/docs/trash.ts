@@ -8,7 +8,7 @@ import { api, workspacePath } from "@/lib/api";
 import { useMe } from "@/lib/selectors";
 import { getState, mergeRows, useStore } from "@/lib/store";
 import { canSee, useDocs } from "@/docs/data";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 
 export interface Trashed {
   id: string;

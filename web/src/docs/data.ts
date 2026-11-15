@@ -6,7 +6,7 @@ import { t } from "@/lib/i18n";
 import { useCollection, useMe } from "@/lib/selectors";
 import { type Dict, getState, useStore } from "@/lib/store";
 import { useDocsStore } from "@/docs/store";
-import type { DBProperty, DBView, Doc, DocComment } from "@/docs/types";
+import type { DBProperty, DBView, Doc, DocComment } from "@/lib/types-docs";
 
 export const byRank = (a: { rank: string; id: string }, b: { rank: string; id: string }) =>
   a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.id < b.id ? -1 : 1;
@@ -14,15 +14,15 @@ export const byRank = (a: { rank: string; id: string }, b: { rank: string; id: s
 export const docTitle = (doc: Pick<Doc, "title"> | undefined) => doc?.title?.trim() || t("docs.untitled");
 
 export function useDocs(): Dict<Doc> {
-  return useCollection("docs") as unknown as Dict<Doc>;
+  return useCollection("docs");
 }
 
 export function useDoc(id: string | undefined): Doc | undefined {
-  return useStore((s) => (id ? (s.collections.docs[id] as unknown as Doc | undefined) : undefined));
+  return useStore((s) => (id ? s.collections.docs[id] : undefined));
 }
 
-export const getDoc = (id: string) => getState().collections.docs[id] as unknown as Doc | undefined;
-export const getDocs = () => getState().collections.docs as unknown as Dict<Doc>;
+export const getDoc = (id: string): Doc | undefined => getState().collections.docs[id];
+export const getDocs = (): Dict<Doc> => getState().collections.docs;
 
 /**
  * True unless the person is limited to some projects and the page is tied
@@ -201,7 +201,7 @@ export function useViews(databaseId: string | undefined): DBView[] {
 
 /** The comments of a page and its blocks, oldest first. */
 export function useDocComments(docId: string): DocComment[] {
-  const comments = useCollection("comments") as unknown as Dict<DocComment>;
+  const comments = useCollection("comments");
   return useMemo(
     () =>
       Object.values(comments)

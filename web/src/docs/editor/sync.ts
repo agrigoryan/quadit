@@ -24,7 +24,7 @@ import { diff, flatten, type Known } from "@/docs/editor/diff";
 import { keepCursor } from "@/docs/editor/cursor";
 import { placeBlock } from "@/docs/editor/place";
 import { loadPage } from "@/docs/store";
-import type { BlockRow, Doc } from "@/docs/types";
+import type { BlockRow } from "@/lib/types-docs";
 
 // oxlint-disable-next-line typescript/no-explicit-any -- BlockNote's editor type is generic over the page's schema, and this works with any schema
 export type AnyEditor = BlockNoteEditor<any, any, any>;
@@ -84,7 +84,7 @@ export class DocSync {
 
   /** Records a server row as the known state of its block, as the editor now shows it. */
   private remember(row: BlockRow) {
-    const block = this.editor.getBlock(row.id) as unknown as EdBlock | undefined;
+    const block = this.editor.getBlock(row.id) as unknown as EdBlock | undefined; // BlockNote types blocks by schema generics
     if (!block) return; // not on screen (its parent is gone): leave it alone on the server too
     this.known.set(row.id, {
       parent: row.parent_id ?? "",
@@ -200,7 +200,7 @@ export class DocSync {
   private onStore = () => {
     if (this.dead) return;
     setTimeout(() => {
-      const doc = useStore.getState().collections.docs[this.docId] as unknown as Doc | undefined;
+      const doc = useStore.getState().collections.docs[this.docId];
       if (this.dead || this.pending > 0 || !doc || (doc.content_seq ?? 0) <= this.seq) return;
       this.seq = doc.content_seq ?? 0;
       void this.resync(false);
@@ -251,7 +251,7 @@ export class DocSync {
       this.held.set(row.id, row);
       return;
     }
-    const cur = this.editor.getBlock(row.id) as unknown as EdBlock | undefined;
+    const cur = this.editor.getBlock(row.id) as unknown as EdBlock | undefined; // BlockNote types blocks by schema generics
     if (cur && k && this.sigOf(cur) !== k.sig) {
       // Unsent local edits in this block: keep them; they are sent next and win.
       this.known.set(row.id, {

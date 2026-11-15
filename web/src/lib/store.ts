@@ -5,66 +5,19 @@
 // the server for a list.
 
 import { create } from "zustand";
-import { type AnyRow, applyEvent, CopyOnWrite, emptyCollections, keyOf, normalize, targetsOf } from "@/lib/apply";
-import type {
-  AgentSession,
-  Attachment,
-  Comment,
-  Cycle,
-  Decision,
-  Epic,
-  FeedEvent,
-  Label,
-  Member,
-  Milestone,
-  Notification,
-  Project,
-  Relation,
-  Secret,
-  Status,
-  Task,
-  TaskLink,
-  Template,
-  User,
-  View,
-  Watcher,
-  Workspace,
-} from "@/lib/types";
+import { applyEvent, CopyOnWrite, normalize, targetsOf } from "@/lib/apply";
+import {
+  type AnyRow,
+  type CollectionName,
+  type Collections,
+  type Dict,
+  emptyCollections,
+  keyOf,
+} from "@/lib/collections";
+import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
 
-export type Dict<T> = Record<string, T>;
-
-export interface Collections {
-  tasks: Dict<Task>;
-  comments: Dict<Comment>;
-  decisions: Dict<Decision>;
-  projects: Dict<Project>;
-  statuses: Dict<Status>;
-  labels: Dict<Label>;
-  members: Dict<Member>;
-  epics: Dict<Epic>;
-  milestones: Dict<Milestone>;
-  cycles: Dict<Cycle>;
-  views: Dict<View>;
-  templates: Dict<Template>;
-  preferences: Dict<AnyRow>;
-  attachments: Dict<Attachment>;
-  relations: Dict<Relation>;
-  links: Dict<TaskLink>;
-  notifications: Dict<Notification>;
-  watchers: Dict<Watcher>;
-  sessions: Dict<AgentSession>;
-  resources: Dict<AnyRow>;
-  claims: Dict<AnyRow>;
-  docs: Dict<AnyRow>;
-  blocks: Dict<AnyRow>;
-  webhooks: Dict<AnyRow>;
-  rules: Dict<AnyRow>;
-  integrations: Dict<AnyRow>;
-  /** Not in the starting copy: the secrets page fetches them (settings/secrets/data.ts). */
-  secrets: Dict<Secret>;
-}
-
-export type CollectionName = keyof Collections;
+// The collections' types are declared in lib/collections.ts; the app reads them from the store.
+export type { CollectionName, Collections, Dict };
 
 export type StreamState = "connecting" | "live" | "down";
 
@@ -401,7 +354,7 @@ export function clearDrafts(ids: string[]) {
 export function mergeRows<K extends CollectionName>(name: K, rows: Collections[K][string][]) {
   if (rows.length === 0) return;
   const d = new CopyOnWrite(getState().collections);
-  for (const row of rows) d.put(name, row as unknown as AnyRow);
+  for (const row of rows) d.put(name, row);
   useStore.setState({ collections: d.done() });
 }
 

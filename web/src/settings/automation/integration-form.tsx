@@ -7,7 +7,8 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
-import { change, type GitHubConfig, type Integration } from "@/settings/automation/data";
+import { change } from "@/settings/automation/data";
+import type { GitHubConfig, Integration } from "@/lib/types-automation";
 
 interface Props {
   /** The integration to edit; none to connect a repository. */

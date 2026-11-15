@@ -15,7 +15,6 @@ import { getState, useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { Section } from "@/detail/section";
 import { PageIcon } from "@/docs/page-icon";
-import type { Doc } from "@/docs/types";
 import { useTaskLink } from "@/lib/task-link";
 import { StatusIcon } from "@/ui/icons";
 
@@ -99,7 +98,7 @@ function TaskMention({ mention }: { mention: Mention }) {
 
 function DocMention({ mention }: { mention: Mention }) {
   const slug = useSlug();
-  const doc = useStore((s) => s.collections.docs[mention.id]) as unknown as Doc | undefined;
+  const doc = useStore((s) => s.collections.docs[mention.id]);
   return (
     <li className={rowStyle}>
       <span className="flex size-6 shrink-0 items-center justify-center">

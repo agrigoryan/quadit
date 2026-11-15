@@ -11,7 +11,7 @@ import { mutate, send } from "@/lib/mutate";
 import { useMe, useMember, useTask } from "@/lib/selectors";
 import { ago, exact, timeOfDay } from "@/lib/time";
 import { nameOf } from "@/detail/data";
-import type { Claim, Resource } from "@/insights/lib/types";
+import type { Claim, Resource } from "@/lib/types-agents";
 import { Panel } from "@/insights/ui/panel";
 import { useTaskLink } from "@/lib/task-link";
 import { Avatar } from "@/ui/avatar";

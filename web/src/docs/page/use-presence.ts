@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { getState } from "@/lib/store";
 import { setPresence } from "@/docs/store";
-import type { PresenceEntry } from "@/docs/types";
+import type { PresenceEntry } from "@/lib/types-docs";
 
 const EVERY_MS = 4_000;
 

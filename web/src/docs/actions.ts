@@ -9,7 +9,7 @@ import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { getDoc, getDocs, sameProjectBelow } from "@/docs/data";
 import { loadPage } from "@/docs/store";
-import type { Doc, DocComment, DocKind } from "@/docs/types";
+import type { Doc, DocComment, DocKind } from "@/lib/types-docs";
 
 type Fields = Record<string, unknown>;
 
@@ -86,8 +86,7 @@ export function updateDoc(id: string, fields: Partial<Pick<Doc, "title" | "icon"
   if (!doc) return;
   const changed: Fields = {};
   for (const [key, value] of Object.entries(fields)) {
-    if ((doc as unknown as Fields)[key] !== value && !(value === "" && (doc as unknown as Fields)[key] === undefined))
-      changed[key] = value;
+    if ((doc as Fields)[key] !== value && !(value === "" && (doc as Fields)[key] === undefined)) changed[key] = value;
   }
   if (Object.keys(changed).length === 0) return;
   const local: Fields = {};

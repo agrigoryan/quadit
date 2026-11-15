@@ -1,6 +1,6 @@
 import { Brain, Database, FileText, GitBranch, Sparkles } from "lucide-react";
 import { cx } from "@/lib/cx";
-import type { Doc } from "@/docs/types";
+import type { Doc } from "@/lib/types-docs";
 
 /** Names the server gives pages it makes itself, instead of an emoji. */
 const NAMED = { git: GitBranch, brain: Brain } as const;

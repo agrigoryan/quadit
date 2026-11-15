@@ -1,7 +1,7 @@
-// What the insight endpoints answer (internal/server/dashboard.go), and the
-// rows the store keeps untyped that these pages read.
+// What the insight endpoints answer (internal/server/dashboard.go).
 
 import type { Category } from "@/lib/types";
+import type { Preference } from "@/lib/types-plan";
 
 /** A task as the server lists it: names instead of ids. */
 interface TaskView {
@@ -109,18 +109,6 @@ export interface Health {
   last_backup_ok?: boolean;
 }
 
-export interface Preference {
-  id: string;
-  project_id?: string;
-  body: string;
-  decision_id?: string;
-  label_ids?: string[];
-  created_by: string;
-  created_at: number;
-  retired_at?: number;
-  deleted_at?: number;
-}
-
 export interface Dashboard {
   waiting_on_me: TaskView[];
   asked_of_me: DecisionView[];
@@ -145,26 +133,4 @@ export interface CycleChart {
   days: ChartDay[];
   total: number;
   done: number;
-}
-
-/** A shared machine or device agents take turns on. */
-export interface Resource {
-  id: string;
-  name: string;
-  description?: string;
-  deleted_at?: number;
-}
-
-/** One place in a resource's queue. A released claim stays in the store; skip it. */
-export interface Claim {
-  id: string;
-  resource_id: string;
-  user_id: string;
-  task_id?: string;
-  note?: string;
-  state: "holding" | "waiting" | "released";
-  requested_at: number;
-  acquired_at?: number;
-  /** While holding: when the hold ends. While waiting: the minutes asked for. */
-  lease_until?: number;
 }

@@ -7,7 +7,7 @@ import { create } from "zustand";
 import { api, workspacePath } from "@/lib/api";
 import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/lib/store";
 import type { FeedEvent } from "@/lib/types";
-import type { DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/docs/types";
+import type { DBProperty, DBView, DocRef, DocSource, PageData, PresenceEntry } from "@/lib/types-docs";
 
 interface PageMeta {
   mentioned_in: DocRef[];
@@ -61,7 +61,7 @@ function applyDocEvents(events: FeedEvent[]) {
     if (!table) continue;
     const data = ev.data ?? {};
     if (data.row) {
-      putRow(table, data.row as unknown as DBProperty & DBView);
+      putRow(table, data.row as DBProperty & DBView); // a feed row is JSON, unchecked
     } else if (data.changes) {
       const fields: Record<string, unknown> = {};
       for (const [field, change] of Object.entries(data.changes)) fields[field] = change.to ?? undefined;

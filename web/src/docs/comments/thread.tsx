@@ -7,7 +7,7 @@ import { exact } from "@/lib/time";
 import { addComment, deleteComment, resolveComment } from "@/docs/actions";
 import { Composer } from "@/docs/comments/composer";
 import type { ThreadData } from "@/docs/comments/panel";
-import type { DocComment } from "@/docs/types";
+import type { DocComment } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";
