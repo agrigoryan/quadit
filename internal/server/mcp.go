@@ -23,7 +23,7 @@ import (
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("POST /mcp", s.handleServeMCP)
-		m.HandleFunc("GET /mcp", func(w http.ResponseWriter, r *http.Request) {
+		m.HandleFunc("GET /mcp", func(w http.ResponseWriter, _ *http.Request) {
 			// No server-to-client stream is offered; clients poll with tools.
 			w.Header().Set("Allow", "POST")
 			http.Error(w, "this server answers each request directly; use POST", http.StatusMethodNotAllowed)
@@ -31,6 +31,7 @@ func init() {
 	})
 }
 
+// rpcRequest is one JSON-RPC 2.0 request.
 type rpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -38,11 +39,13 @@ type rpcRequest struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
+// rpcError is the error a JSON-RPC request ends in.
 type rpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+// rpcResponse is the answer to one JSON-RPC request.
 type rpcResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id"`
@@ -50,14 +53,19 @@ type rpcResponse struct {
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
+// mcpVersions are the versions of MCP spoken, newest first.
 var mcpVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
 
+// mcpBodyLimit is the largest request read.
+const mcpBodyLimit = 32 << 20
+
+// handleServeMCP answers one JSON-RPC request posted to /mcp.
 func (s *Server) handleServeMCP(w http.ResponseWriter, r *http.Request) {
 	token, ok := s.mcpSignIn(w, r)
 	if !ok {
 		return
 	}
-	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 32<<20))
+	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, mcpBodyLimit))
 	if err != nil {
 		http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
 		return
@@ -95,8 +103,9 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 		http.Error(w, "sign in, or send a token", http.StatusUnauthorized)
 		return "", false
 	}
-	if n, _ := s.st.Count(r.Context(), "api_tokens", store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at")); n == 0 {
-		// Guesses are counted by where they come from.
+	// Guesses are counted by where they come from; a token that cannot be
+	// looked up is counted as one.
+	if n, err := s.st.Count(r.Context(), "api_tokens", store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at")); err != nil || n == 0 {
 		if err := s.limits.check("bad:"+clientIP(r), 120); err != nil {
 			s.fail(w, r, err)
 			return "", false
@@ -125,13 +134,14 @@ func (s *Server) mcpAnswer(token string, req rpcRequest) (any, *rpcError) {
 	return nil, &rpcError{Code: -32601, Message: "method not found: " + req.Method}
 }
 
+// mcpInitialize answers initialize: the version spoken (the client's, when
+// it is one of ours, else the newest), and what the server offers.
 func (s *Server) mcpInitialize(params json.RawMessage) map[string]any {
 	var p struct {
 		ProtocolVersion string `json:"protocolVersion"`
 	}
-	json.Unmarshal(params, &p)
 	version := mcpVersions[0]
-	if has(mcpVersions, p.ProtocolVersion) {
+	if err := json.Unmarshal(params, &p); err == nil && has(mcpVersions, p.ProtocolVersion) {
 		version = p.ProtocolVersion
 	}
 	return map[string]any{"protocolVersion": version, "capabilities": map[string]any{"tools": map[string]any{}},
@@ -146,7 +156,9 @@ func (s *Server) mcpCallTool(token string, params json.RawMessage) (any, *rpcErr
 		Name      string         `json:"name"`
 		Arguments map[string]any `json:"arguments"`
 	}
-	json.Unmarshal(params, &p)
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, &rpcError{Code: -32602, Message: "the params do not read: " + err.Error()}
+	}
 	var tool *mcpTool
 	for i := range mcpTools {
 		if mcpTools[i].Name == p.Name {

@@ -200,7 +200,9 @@ func toolUpload(s *Server, token string, a map[string]any) (string, bool) {
 		return out, false
 	}
 	var f struct{ ID, URL string }
-	json.Unmarshal([]byte(out), &f)
+	if json.Unmarshal([]byte(out), &f) != nil {
+		return out, true // stored; the answer is passed on as it came
+	}
 	return fmt.Sprintf("file id=%s %s", f.ID, f.URL), true
 }
 
@@ -224,7 +226,9 @@ func (s *Server) uploadPart(token string, a map[string]any) (string, bool) {
 		ID, State, URL string
 		Received, Size int64
 	}
-	json.Unmarshal([]byte(out), &f)
+	if json.Unmarshal([]byte(out), &f) != nil {
+		return out, true // taken; the answer is passed on as it came
+	}
 	if f.State == "ready" {
 		return fmt.Sprintf("file id=%s ready %s", f.ID, f.URL), true
 	}

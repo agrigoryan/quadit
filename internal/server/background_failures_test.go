@@ -533,3 +533,20 @@ func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
 		t.Fatalf("the fault fired %d times", fired())
 	}
 }
+
+func TestAToolCallWhoseParamsDoNotReadIsToldSo(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	var tok struct{ Token string }
+	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+	var answer struct {
+		Error struct {
+			Code    int
+			Message string
+		}
+	}
+	s.call(nil, tok.Token, "POST", "/mcp", []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":["whoami"]}`), 200, &answer)
+	if answer.Error.Code != -32602 || !strings.Contains(answer.Error.Message, "the params do not read") {
+		t.Fatalf("the answer's error: %+v", answer.Error)
+	}
+}

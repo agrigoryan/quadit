@@ -171,7 +171,7 @@ func objectArg(a map[string]any, k string, out any) error {
 		raw = []byte(text)
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
-		return fmt.Errorf("%s does not read as JSON of the right shape: %v", k, err)
+		return fmt.Errorf("%s does not read as JSON of the right shape: %w", k, err)
 	}
 	return nil
 }
@@ -191,9 +191,9 @@ func idList(v any) []string {
 		if json.Unmarshal([]byte(l), &list) == nil {
 			return idList(list)
 		}
-		for _, s := range strings.Split(l, ",") {
-			if s = strings.TrimSpace(s); s != "" {
-				out = append(out, s)
+		for part := range strings.SplitSeq(l, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				out = append(out, part)
 			}
 		}
 	}
