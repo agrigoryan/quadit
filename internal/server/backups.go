@@ -56,6 +56,7 @@ func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		m.HandleFunc("GET /api/v1/admin/backups", s.signed(s.installAdmin(s.hBackups)))
 		m.HandleFunc("POST /api/v1/admin/backups", s.signed(s.installAdmin(s.hBackupNow)))
+		m.HandleFunc("POST /api/v1/admin/backups/{id}/restore-item", s.signed(s.installAdmin(s.hBackupRestoreItem)))
 		m.HandleFunc("GET /api/v1/admin/backups/{id}/download", s.signed(s.installAdmin(s.hBackupDownload)))
 	})
 }
@@ -220,4 +221,82 @@ func (s *Server) hBackupDownload(x *c) error {
 	x.w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(b.Location)+`"`)
 	http.ServeContent(x.w, x.r, "", time.UnixMilli(b.FinishedAt), f)
 	return nil
+}
+
+// hBackupRestoreItem brings one task or one page back from a backup, as it
+// was then, into the install as it is now. Body: {workspace: slug, task:
+// key or id} or {workspace, doc: page id}.
+func (s *Server) hBackupRestoreItem(x *c) error {
+	var b struct {
+		Workspace string `json:"workspace"`
+		Task      string `json:"task"`
+		Doc       string `json:"doc"`
+	}
+	if err := x.body(&b); err != nil {
+		return err
+	}
+	ctx := x.ctx()
+	var bk core.Backup
+	if err := s.st.Get(ctx, &bk, store.Eq("id", x.r.PathValue("id"))); err != nil || bk.FinishedAt == 0 || bk.Error != "" {
+		return errNotFound("backup")
+	}
+	it := backup.Item{Workspace: b.Workspace, Kind: "task", Ref: b.Task}
+	if b.Doc != "" {
+		it.Kind, it.Ref = "doc", b.Doc
+	}
+	if it.Workspace == "" || it.Ref == "" {
+		return errBad("say which workspace, and which task (its key) or page (its id)")
+	}
+	f, err := os.Open(bk.Location)
+	if err != nil {
+		return errNotFound("backup file")
+	}
+	defer f.Close()
+	rid, err := backup.RestoreItem(ctx, s.st, s.fileStore(), f, it)
+	if err != nil {
+		return &engine.Error{Code: engine.CodeNotFound, Message: err.Error()}
+	}
+	var ws core.Workspace
+	if err := s.st.Get(ctx, &ws, store.Eq("slug", it.Workspace), store.Live); err != nil {
+		return errNotFound("workspace " + it.Workspace)
+	}
+	// Tell open browsers, and put the text back in the search index.
+	var owner core.Member
+	if err := s.st.In(ws.ID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner)), store.Null("removed_at")); err == nil {
+		err = s.eng.System(ctx, ws.ID, owner.UserID, func(sys *engine.Sys) error {
+			if it.Kind == "task" {
+				var t core.Task
+				if err := sys.Tx().Get(ctx, &t, store.Eq("id", rid)); err != nil {
+					return err
+				}
+				return sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, map[string]any{"row": t, "key": t.Key, "from_backup": true})
+			}
+			var d core.Doc
+			if err := sys.Tx().Get(ctx, &d, store.Eq("id", rid)); err != nil {
+				return err
+			}
+			if err := sys.Emit("doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": d, "from_backup": true}); err != nil {
+				return err
+			}
+			var all []core.Block
+			if err := sys.Tx().List(ctx, &all, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "rank"}); err != nil {
+				return err
+			}
+			live, gone := []core.Block{}, []string{}
+			for _, bl := range all {
+				if bl.DeletedAt != 0 {
+					gone = append(gone, bl.ID)
+				} else {
+					live = append(live, bl)
+				}
+			}
+			return sys.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true})
+		})
+		if err != nil {
+			return err
+		}
+	}
+	s.eng.Reindex(ctx, ws.ID)
+	s.audit(x.r, ws.ID, x.user, it.Kind+".restored_from_backup", it.Kind, rid, map[string]string{"backup": bk.ID, "ref": it.Ref})
+	return x.ok(map[string]any{"restored": it.Kind, "id": rid, "workspace": ws.Slug})
 }

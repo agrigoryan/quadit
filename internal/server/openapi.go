@@ -121,6 +121,7 @@ var installOps = []op{
 	{"GET", "/admin/health", "What is failing or waiting behind the scenes.", "", "install"},
 	{"GET", "/admin/backups", "The backups taken.", "", "install"},
 	{"POST", "/admin/backups", "Take a backup now.", "", "install"},
+	{"POST", "/admin/backups/{id}/restore-item", "Bring one task or page back from a backup, as it was then. Body: {workspace, task} or {workspace, doc}.", "", "install"},
 }
 
 func (s *Server) hOpenAPI(w http.ResponseWriter, r *http.Request) {

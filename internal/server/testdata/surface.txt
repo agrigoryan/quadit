@@ -49,6 +49,7 @@ api PATCH /api/v1/admin/users/{id}
 api PATCH /api/v1/auth/me
 api PATCH /api/v1/w/{workspace}/files/{id}
 api POST /api/v1/admin/backups
+api POST /api/v1/admin/backups/{id}/restore-item
 api POST /api/v1/admin/mail/test
 api POST /api/v1/admin/workspaces/{id}/join
 api POST /api/v1/admin/workspaces/{id}/restore

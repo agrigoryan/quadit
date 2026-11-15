@@ -688,3 +688,31 @@ func TestPagesDoNotShift(t *testing.T) {
 		s.call(s.owner, "", "GET", w+"/tasks?cursor=nonsense", nil, 400, nil)
 	})
 }
+
+// TestRestoreOneThingFromTheAdminArea checks that one task can be brought
+// back from a backup without a shell.
+func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		var made struct {
+			Backup struct{ ID string }
+			ID     string
+		}
+		s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
+		bid := made.Backup.ID
+		if bid == "" {
+			bid = made.ID
+		}
+		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "title": "Changed since the backup"})
+		s.call(s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 200, nil)
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "Boss design") {
+			t.Fatalf("the task after restoring it from the backup: %s", out)
+		}
+		s.call(s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-99"}, 404, nil)
+		if out := s.call(s.owner, "", "GET", w+"/audit?action=task.restored_from_backup", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+			t.Fatalf("the restore is not on the record: %s", out)
+		}
+	})
+}
