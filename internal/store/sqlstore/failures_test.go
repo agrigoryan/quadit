@@ -110,7 +110,9 @@ func TestUndoUpgradeGivesTheNameBackWhenTheCopyIsInUse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
+	// Cleanups run last first: the databases are dropped, then the
+	// connection that drops them is closed.
+	t.Cleanup(func() { admin.Close() })
 	_, latest, err := sqlstore.New(admin, sqlstore.Postgres).Pending(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +123,9 @@ func TestUndoUpgradeGivesTheNameBackWhenTheCopyIsInUse(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		for _, d := range []string{name, postgres.Before(name, latest), fmt.Sprintf("%s_after_v%d", name, latest)} {
-			admin.Exec(`DROP DATABASE IF EXISTS ` + d + ` WITH (FORCE)`)
+			if _, err := admin.Exec(`DROP DATABASE IF EXISTS ` + d + ` WITH (FORCE)`); err != nil {
+				t.Logf("database %s is left behind: %v", d, err)
+			}
 		}
 	})
 	urlOf := func(database string) string {

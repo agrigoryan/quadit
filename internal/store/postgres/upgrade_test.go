@@ -27,11 +27,21 @@ func TestUpgradeAndBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
+	// Cleanups run last first: the databases are dropped, then the
+	// connection that drops them is closed.
+	t.Cleanup(func() { admin.Close() })
 	name := fmt.Sprintf("quadit_upg_%d", time.Now().UnixNano())
 	if _, err := admin.Exec(`CREATE DATABASE ` + name); err != nil {
 		t.Fatal(err)
 	}
+	latest := 0 // the newest schema version, once known: the copies are named after it
+	t.Cleanup(func() {
+		for _, d := range []string{name, Before(name, latest), fmt.Sprintf("%s_after_v%d", name, latest)} {
+			if _, err := admin.Exec(`DROP DATABASE IF EXISTS ` + d + ` WITH (FORCE)`); err != nil {
+				t.Logf("database %s is left behind: %v", d, err)
+			}
+		}
+	})
 	u, _ := url.Parse(base)
 	u.Path = "/" + name
 	dbURL := u.String()
@@ -55,7 +65,7 @@ func TestUpgradeAndBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, latest, _ := old.Pending(ctx)
+	_, latest, _ = old.Pending(ctx)
 	old.Close()
 	if old, err = OpenAt(ctx, dbURL, latest-1); err != nil {
 		t.Fatal(err)
@@ -65,11 +75,6 @@ func TestUpgradeAndBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	old.Close()
-	t.Cleanup(func() {
-		for _, d := range []string{name, Before(name, latest), fmt.Sprintf("%s_after_v%d", name, latest)} {
-			admin.Exec(`DROP DATABASE IF EXISTS ` + d + ` WITH (FORCE)`)
-		}
-	})
 
 	// The new binary upgrades it, and leaves a copy as it was.
 	st, err := Open(ctx, dbURL)
