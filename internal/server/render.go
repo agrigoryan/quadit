@@ -229,6 +229,9 @@ type decisionView struct {
 	AskedAt        string           `json:"asked_at,omitempty"`
 }
 
+// fileLine is a file of a decision in text: its name and address.
+func fileLine(a attachmentView) string { return "file: " + a.Name + " " + a.URL }
+
 func (d decisionView) text() string {
 	var b strings.Builder
 	head := fmt.Sprintf("--- decision %d (%s", d.N, d.State)
@@ -243,7 +246,7 @@ func (d decisionView) text() string {
 		b.WriteString("approval for: " + d.Action + "\n")
 	}
 	for _, a := range d.Attachments {
-		fmt.Fprintf(&b, "file: %s %s\n", a.Name, a.URL)
+		b.WriteString(fileLine(a) + "\n")
 	}
 	for _, o := range d.Options {
 		fmt.Fprintf(&b, "  %d) %s", o.N, o.Label)
@@ -260,7 +263,7 @@ func (d decisionView) text() string {
 			b.WriteString("   <- PICKED")
 		}
 		for _, a := range o.Attachments {
-			fmt.Fprintf(&b, "\n       file: %s %s", a.Name, a.URL)
+			b.WriteString("\n       " + fileLine(a))
 		}
 		b.WriteString("\n")
 	}

@@ -68,7 +68,8 @@ func (s *Server) handleSearch(x *c) error {
 }
 
 // handleListDecisions is the decision log: every question with the options shown,
-// the choice, the reason and the date.
+// the choice, the reason and the date, and the files on the question and on
+// each option, as on the task.
 func (s *Server) handleListDecisions(x *c) error {
 	v := x.r.URL.Query()
 	conds, err := x.decisionConds()
@@ -82,7 +83,7 @@ func (s *Server) handleListDecisions(x *c) error {
 	if ds, err = x.decisionsInProjects(ds, splitList(v.Get("project"))); err != nil {
 		return err
 	}
-	views, err := x.decisionViews(ds, false)
+	views, err := x.decisionViews(ds, true)
 	if err != nil {
 		return err
 	}
@@ -174,6 +175,14 @@ func decisionLogLine(d decisionView) string {
 	l := fmt.Sprintf("%s  %s  %q -> %s", at, d.Task, oneLine(d.Question, 100), ans)
 	if d.Note != "" {
 		l += ": " + oneLine(d.Note, 200)
+	}
+	for _, a := range d.Attachments {
+		l += "\n    " + fileLine(a)
+	}
+	for _, o := range d.Options {
+		for _, a := range o.Attachments {
+			l += fmt.Sprintf("\n    option %d %s", o.N, fileLine(a))
+		}
 	}
 	return l
 }

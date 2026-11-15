@@ -74,7 +74,9 @@ func (x *c) attachments(conds ...store.Cond) (map[string][]attachmentView, []cor
 	return out, atts, nil
 }
 
-// decisionViews names decisions, numbering them within their task.
+// decisionViews names decisions, numbering them within their task. With
+// files, each comes with the files on its question and on each option, and
+// each option with how many comments it has.
 func (x *c) decisionViews(ds []core.Decision, withFiles bool) ([]decisionView, error) {
 	if len(ds) == 0 {
 		return nil, nil
@@ -100,7 +102,11 @@ func (x *c) decisionViews(ds []core.Decision, withFiles bool) ([]decisionView, e
 		tids = append(tids, t)
 	}
 	if withFiles {
-		if files, _, err = x.attachments(store.In("task_id", tids)); err != nil {
+		subjects := append([]string(nil), ids...)
+		for _, o := range opts {
+			subjects = append(subjects, o.ID)
+		}
+		if files, _, err = x.attachments(store.In("subject_id", subjects)); err != nil {
 			return nil, err
 		}
 		rows, err := x.db.Tally(x.ctx(), "comments", []string{"subject_id"}, store.In("task_id", tids), store.Eq("subject_type", "decision_option"), store.Live)
