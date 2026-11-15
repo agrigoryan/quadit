@@ -78,7 +78,7 @@ describe("join", () => {
 
   it("drops what cannot be said without an error", async () => {
     const a = join<unknown>(NAME, { onLead() {}, onFollow() {}, onMessage() {} });
-    joined.push(a as TabShare<string>);
+    joined.push(a);
     expect(() => a.post(() => {})).not.toThrow();
   });
 
