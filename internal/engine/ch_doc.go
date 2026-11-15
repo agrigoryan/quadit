@@ -447,8 +447,8 @@ func (u *pageEdit) save() error {
 	if err := c.tellReaders(seq, u.was, d, p.changes); err != nil {
 		return err
 	}
-	readers := !sameReaders(u.was, d)
-	if readers {
+	readersChanged := !sameReaders(u.was, d)
+	if readersChanged {
 		if err := c.passReadersDown(u.was, d); err != nil {
 			return err
 		}
@@ -464,7 +464,7 @@ func (u *pageEdit) save() error {
 		d.ProjectID = u.toProject
 	}
 	// Search knows a page by its title, and keeps it to those who may see it.
-	if _, ok := p.set["title"]; ok || u.moved || readers {
+	if _, ok := p.set["title"]; ok || u.moved || readersChanged {
 		return c.reindexDoc(d)
 	}
 	return nil
