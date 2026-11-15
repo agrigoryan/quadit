@@ -80,3 +80,28 @@ func without(list []string, v string) []string {
 	}
 	return out
 }
+
+func validSlug(s string) bool {
+	if len(s) < 2 || len(s) > 40 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+// checkHandle checks an @handle: what people type to mention someone.
+func checkHandle(h string) error {
+	if len(h) < 2 || len(h) > 32 {
+		return invalid("handle", "a handle is 2 to 32 characters")
+	}
+	for _, r := range h {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return invalid("handle", "a handle uses lower-case letters, digits, - and _ only: %q", h)
+		}
+	}
+	return nil
+}
