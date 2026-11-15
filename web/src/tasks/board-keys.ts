@@ -6,7 +6,7 @@
 // and the left and right arrows to the column beside it. Space being the
 // quick look, a card is lifted for moving with Shift+Space (tasks/board.tsx).
 
-import { type MouseEvent, type RefObject, useEffect, useRef } from "react";
+import { type MouseEvent, type RefObject, useEffect, useEffectEvent, useRef } from "react";
 import { useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
 import { isDraft } from "@/lib/store";
@@ -14,14 +14,8 @@ import type { Task } from "@/lib/types";
 import type { TaskGroup } from "@/tasks/filters";
 import { usePeek, useTaskNav } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";
+import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 
-/** Space on a focused button presses it. A card is a link: Space is free there. */
-const onButton = (e: KeyboardEvent) =>
-  e.target instanceof HTMLElement && e.target.closest("button, summary, input, select, textarea") !== null;
-/** Enter on any other link or button than a card is that control's. */
-const onOtherControl = (e: KeyboardEvent) =>
-  e.target instanceof HTMLElement &&
-  e.target.closest("a:not([data-task]), button, [role=button]:not([data-task])") !== null;
 /** The id of the task whose card has the focus. */
 const focusedCard = (e: KeyboardEvent) =>
   e.target instanceof HTMLElement ? e.target.closest<HTMLElement>("[data-task]")?.dataset.task : undefined;
@@ -60,12 +54,13 @@ export function useBoardKeys(groups: TaskGroup[], scroller: RefObject<HTMLElemen
   const saved = usePlace(scroller, () => ({ focus: focusedId() }));
   // A task's page opened from here steps down each column in turn; come back to from one that stepped on, the focus is on the task it ended at.
   const boardStep = useTaskOrder(() => groups.flatMap((g) => g.tasks.map((tk) => tk.key)));
-  useEffect(() => {
-    const key = takeSeen(boardStep);
+  const focusSeen = useEffectEvent((step: string) => {
+    const key = takeSeen(step);
     const seen = key ? groups.flatMap((g) => g.tasks).find((tk) => tk.key === key)?.id : undefined;
     const id = seen ?? saved?.focus;
     if (id) focusCard(id, !seen);
-  }, [boardStep]);
+  });
+  useEffect(() => focusSeen(boardStep), [boardStep]);
 
   /** The task a key means: the card with the focus, else the one under the pointer. */
   const meant = (e: KeyboardEvent): Task | undefined => {
@@ -81,13 +76,13 @@ export function useBoardKeys(groups: TaskGroup[], scroller: RefObject<HTMLElemen
   useHotkeys({
     " ": (e) => {
       const task = meant(e);
-      if (!task || onButton(e)) return;
+      if (!task || isOnControl(e)) return;
       e.preventDefault();
       open.peek(task.key);
     },
     Enter: (e) => {
       const task = meant(e);
-      if (!task || onOtherControl(e)) return;
+      if (!task || isOnControl(e)) return;
       e.preventDefault();
       // The card opened is the one to come back to.
       cardOf(task.id)?.focus({ preventScroll: true });
@@ -96,8 +91,7 @@ export function useBoardKeys(groups: TaskGroup[], scroller: RefObject<HTMLElemen
   });
 
   /** Moves the panel within its column (`down`), or to the same height in a column beside it (`across`). */
-  const step = (down: number, across: number) => (e: KeyboardEvent) => {
-    e.preventDefault();
+  const step = (down: number, across: number) => {
     const col = groups.findIndex((g) => g.tasks.some((tk) => tk.key === peek.key));
     const row = groups[col]?.tasks.findIndex((tk) => tk.key === peek.key) ?? -1;
     if (col < 0 || row < 0) return;
@@ -108,25 +102,16 @@ export function useBoardKeys(groups: TaskGroup[], scroller: RefObject<HTMLElemen
     const next = tasks[Math.min(Math.max(row + down, 0), tasks.length - 1)];
     if (next && next.key !== peek.key && !isDraft(next.id)) open.peek(next.key);
   };
-  useHotkeys(
-    {
-      j: step(1, 0),
-      k: step(-1, 0),
-      ArrowDown: step(1, 0),
-      ArrowUp: step(-1, 0),
-      ArrowRight: step(0, 1),
-      ArrowLeft: step(0, -1),
-      " ": (e) => {
-        if (onButton(e)) return;
-        e.preventDefault();
-        // On another card than the one in the panel, Space shows that one; on the same, or on none, it puts the panel away.
-        const task = meant(e);
-        if (task && task.key !== peek.key) open.peek(task.key);
-        else peek.close();
-      },
+  usePanelStepKeys({
+    onStep: (by) => step(by, 0),
+    onStepAcross: (by) => step(0, by),
+    // On another card than the one in the panel, Space shows that one; on the same, or on none, it puts the panel away.
+    onSpace: (e) => {
+      const task = meant(e);
+      if (task && task.key !== peek.key) open.peek(task.key);
+      else peek.close();
     },
-    { layer: "panel", enabled: peek.key !== undefined },
-  );
+  });
 
   return {
     onMouseOver: (e: MouseEvent) => {

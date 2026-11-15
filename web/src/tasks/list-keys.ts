@@ -5,15 +5,11 @@
 // while the page is open do not move it; left and come back to, the page is
 // where it was (lib/place.ts).
 
-import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { type Hotkeys, useHotkeys } from "@/lib/hotkeys";
 import { usePlace } from "@/lib/place";
-import { usePeek } from "@/lib/task-link";
 import { takeSeen, useTaskOrder } from "@/lib/task-queue";
-
-/** A focused link or button answers Enter and Space itself. */
-const onControl = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("a, button") !== null;
-const onButton = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("button") !== null;
+import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 
 /** How a row is opened: in the panel over the list, or as the task's own page. */
 export type OpenAs = "peek" | "page";
@@ -32,8 +28,6 @@ interface Options<Row> {
 
 /** Returns the id of the focused row, or null before the keyboard is used. */
 export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys = {} }: Options<Row>): string | null {
-  const peek = usePeek();
-  const peeking = peek.key !== undefined;
   const place = useRef<{ focus: string | null }>({ focus: null });
   const saved = usePlace(scroller, () => place.current);
   const [focusId, setFocusId] = useState<string | null>(saved?.focus ?? null);
@@ -42,11 +36,12 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
 
   // Come back to from a task's page that stepped on to another task, the focus is on the task it ended at.
   const listStep = useTaskOrder(() => rows.map(taskKeyOf));
-  useLayoutEffect(() => {
-    const key = takeSeen(listStep);
+  const focusSeen = useEffectEvent((step: string) => {
+    const key = takeSeen(step);
     const row = key ? rows.find((r) => taskKeyOf(r) === key) : undefined;
     if (row) setFocusId(idOf(row));
-  }, [listStep]);
+  });
+  useLayoutEffect(() => focusSeen(listStep), [listStep]);
 
   let index = focusId === null ? -1 : rows.findIndex((row) => idOf(row) === focusId);
   // The focused row left the list (archived, answered): stay where it was.
@@ -71,12 +66,12 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
     j: () => move(1),
     k: () => move(index < 0 ? 1 : -1),
     Enter: (e) => {
-      if (!current || onControl(e)) return;
+      if (!current || isOnControl(e)) return;
       e.preventDefault();
       onOpen(current, "page");
     },
     " ": (e) => {
-      if (!current || onButton(e)) return;
+      if (!current || isOnControl(e)) return;
       e.preventDefault();
       onOpen(current, "peek");
     },
@@ -88,26 +83,13 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
   }
   useHotkeys(hotkeys);
 
-  // The same keys while the panel is open: they move it to the next row, and Space puts it away.
-  const step = (by: number) => (e: KeyboardEvent) => {
-    e.preventDefault();
-    const next = move(by);
-    if (next && next !== current) onOpen(next, "peek");
-  };
-  useHotkeys(
-    {
-      j: step(1),
-      k: step(-1),
-      ArrowDown: step(1),
-      ArrowUp: step(-1),
-      " ": (e) => {
-        if (onButton(e)) return;
-        e.preventDefault();
-        peek.close();
-      },
+  // While the panel is open the same keys move it to the next row.
+  usePanelStepKeys({
+    onStep: (by) => {
+      const next = move(by);
+      if (next && next !== current) onOpen(next, "peek");
     },
-    { layer: "panel", enabled: peeking },
-  );
+  });
 
   useEffect(() => {
     if (currentId) document.querySelector("main [data-focused]")?.scrollIntoView({ block: "nearest" });
