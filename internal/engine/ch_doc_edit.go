@@ -149,7 +149,7 @@ func signature(b md.Block) string {
 	// Content is compared in one canonical spelling: a database may hand
 	// JSON back with its keys in another order than it was given.
 	var content any
-	json.Unmarshal(b.Content, &content) //nolint:errcheck // unreadable content compares as null: such a block is never taken for another
+	_ = json.Unmarshal(b.Content, &content) // deliberate: unreadable content compares as null, and such a block is never taken for another
 	canon, _ := json.Marshal(content)
 	if _, inline := content.([]any); inline {
 		// Text is compared as the Markdown it reads as: a mention chip and

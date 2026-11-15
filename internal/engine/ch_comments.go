@@ -373,7 +373,7 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 		p.setText("body", a.Body, &cm.Body)
 		if !p.empty() {
 			p.set["edited_at"] = c.at
-			p.changes["edited_at"] = core.FieldChange{From: zeroNil(cm.EditedAt), To: c.at}
+			p.changes["edited_at"] = core.FieldChange{From: nullIfEmpty(cm.EditedAt), To: c.at}
 		}
 	}
 	p.setStamp("resolved_at", a.Resolved, cm.ResolvedAt, c.at)

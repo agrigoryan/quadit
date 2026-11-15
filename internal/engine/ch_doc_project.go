@@ -61,7 +61,7 @@ func (c *cx) moveSubPages(root core.Doc, toProject string) error {
 	if err != nil {
 		return err
 	}
-	change := map[string]core.FieldChange{"project_id": {From: zeroNil(root.ProjectID), To: zeroNil(toProject)}}
+	change := map[string]core.FieldChange{"project_id": {From: nullIfEmpty(root.ProjectID), To: nullIfEmpty(toProject)}}
 	for _, d := range below {
 		seq := c.tx.NextSeq()
 		if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"project_id": toProject, "updated_seq": seq}, store.Eq("id", d.ID)); err != nil {

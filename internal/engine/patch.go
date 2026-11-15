@@ -29,11 +29,11 @@ func (p *patch) put(col string, from, to any) {
 		return
 	}
 	p.set[col] = to
-	p.changes[col] = core.FieldChange{From: zeroNil(from), To: zeroNil(to)}
+	p.changes[col] = core.FieldChange{From: nullIfEmpty(from), To: nullIfEmpty(to)}
 }
 
-// zeroNil shows an unset reference as null in events.
-func zeroNil(v any) any {
+// nullIfEmpty shows an unset reference as null in events.
+func nullIfEmpty(v any) any {
 	if s, ok := v.(string); ok && s == "" {
 		return nil
 	}

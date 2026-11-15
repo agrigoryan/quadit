@@ -32,7 +32,7 @@ func BlockTree(rows []core.Block) []md.Block {
 		for _, r := range list {
 			b := md.Block{ID: r.ID, Type: r.Type, Content: r.Content, Children: build(r.ID)}
 			if len(r.Props) > 0 {
-				json.Unmarshal(r.Props, &b.Props) //nolint:errcheck // the engine wrote these props as JSON; a block whose props cannot be read shows without them
+				_ = json.Unmarshal(r.Props, &b.Props) // deliberate: the engine wrote these props as JSON; a block whose props cannot be read shows without them
 			}
 			out = append(out, b)
 		}
