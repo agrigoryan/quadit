@@ -499,32 +499,7 @@ const shapeDashboardOPS = `{
    "waiting_on_it": 1
   }
  ],
- "asked_of_me": [
-  {
-   "n": 1,
-   "id": "ID",
-   "task": "SVA-1",
-   "task_id": "ID",
-   "kind": "choice",
-   "question": "How many phases?",
-   "state": "open",
-   "by": "@artist",
-   "asked": "@aram",
-   "options": [
-    {
-     "n": 1,
-     "id": "ID",
-     "label": "Three"
-    },
-    {
-     "n": 2,
-     "id": "ID",
-     "label": "Four"
-    }
-   ],
-   "asked_at": "TIME"
-  }
- ],
+ "asked_of_me": [],
  "epics": [],
  "flow": {
   "by_status": [

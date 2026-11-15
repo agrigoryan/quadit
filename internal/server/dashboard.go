@@ -50,8 +50,9 @@ type dashboard struct {
 	x        *c
 	nm       *names
 	now      time.Time
-	projects []string    // the projects it covers; none means all the caller may read
-	tasks    []core.Task // every task of those projects, archived ones too
+	projects []string        // the projects it covers; none means all the caller may read
+	tasks    []core.Task     // every task of those projects, archived ones too
+	covered  map[string]bool // the ids of those tasks
 
 	waiting   []taskView     // tasks that wait on the caller, oldest first
 	asked     []decisionView // open questions asked of the caller
@@ -87,7 +88,11 @@ func (x *c) newDashboard() (*dashboard, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard{x: x, nm: nm, now: time.Now(), projects: projects, tasks: tasks}, nil
+	covered := make(map[string]bool, len(tasks))
+	for _, t := range tasks {
+		covered[t.ID] = true
+	}
+	return &dashboard{x: x, nm: nm, now: time.Now(), projects: projects, tasks: tasks, covered: covered}, nil
 }
 
 // answer is the dashboard as it is sent.
@@ -123,6 +128,9 @@ func (d *dashboard) waitingOnMe() error {
 	if err := x.db.List(x.ctx(), &asked, store.Q{Where: []store.Cond{store.Eq("asked_id", me), store.Eq("state", core.StateOpen), store.Live}, Order: "created_seq"}); err != nil {
 		return err
 	}
+	// Only questions on the tasks the dashboard covers: one narrowed to a
+	// project leaves out what is asked on another's.
+	asked = keep(asked, func(q core.Decision) bool { return d.covered[q.TaskID] })
 	d.asked, err = x.decisionViews(asked, false)
 	return err
 }
@@ -135,11 +143,7 @@ func (d *dashboard) recentDecisions() error {
 	if err := x.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: 60}); err != nil {
 		return err
 	}
-	inScope := map[string]bool{}
-	for _, t := range d.tasks {
-		inScope[t.ID] = true
-	}
-	picked = keep(picked, func(p core.Decision) bool { return inScope[p.TaskID] })
+	picked = keep(picked, func(p core.Decision) bool { return d.covered[p.TaskID] })
 	if len(picked) > 8 {
 		picked = picked[:8]
 	}
