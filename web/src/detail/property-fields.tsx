@@ -12,6 +12,7 @@ import type { Task } from "@/lib/types";
 import { setDue, setEstimate, setParent, setWaitingOn, setWaitingOutside, waitsOutside } from "@/tasks/actions";
 import { useTaskLink } from "@/tasks/task-link";
 import { TaskPicker } from "@/detail/task-picker";
+import { Textarea } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";
 
 /** One property: its name at the left, its value at the right. */
@@ -43,14 +44,18 @@ const inlineField =
   "-ml-1.5 h-7 min-w-0 rounded-md border border-transparent bg-transparent px-1.5 text-sm text-ink outline-none max-md:h-9 " +
   "hover:bg-hover focus:border-accent focus:bg-surface focus:ring-2 focus:ring-accent/25 read-only:pointer-events-none";
 
-/** The note that says what whoever the task waits on should do. Saved on Enter or on leaving the box. */
-export function WaitingNote({ task }: { task: Task }) {
+/**
+ * The note that says what whoever the task waits on should do. Saved on
+ * Enter or on leaving the box. It grows to show a long note whole; `below`
+ * puts it on a line of its own under the name, where the column is narrow.
+ */
+export function WaitingNote({ task, below }: { task: Task; below?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const saved = task.waiting_on_note ?? "";
 
   function save() {
     if (draft === null) return;
-    const next = draft.trim();
+    const next = draft.replace(/\s+/g, " ").trim();
     if (next !== saved) {
       if (waitsOutside(task)) setWaitingOutside([task], next);
       else setWaitingOn([task], task.waiting_on_id ?? null, next);
@@ -59,7 +64,10 @@ export function WaitingNote({ task }: { task: Task }) {
   }
 
   return (
-    <input
+    <Textarea
+      bare
+      autoGrow
+      rows={1}
       aria-label={t("detail.waitingNote")}
       placeholder={waitsOutside(task) ? t("prop.outside.placeholder") : t("detail.waitingNotePlaceholder")}
       readOnly={!!task.deleted_at}
@@ -67,13 +75,19 @@ export function WaitingNote({ task }: { task: Task }) {
       onChange={(e) => setDraft(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        else if (e.key === "Escape") {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
           e.stopPropagation();
           setDraft(null);
         }
       }}
-      className={cx(inlineField, "ml-0 min-w-32 flex-1 text-ink-2 focus:text-ink max-sm:-ml-1.5 max-sm:basis-full")}
+      className={cx(
+        "w-auto min-w-32 flex-1 rounded-md border border-transparent px-1.5 py-[3px] text-sm leading-5 not-focus:text-ink-2 max-md:py-[7px] max-sm:-ml-1.5 max-sm:basis-full",
+        "hover:bg-hover focus:border-accent focus:bg-surface focus:ring-2 focus:ring-accent/25 read-only:pointer-events-none",
+        below && "lg:-ml-1.5 lg:basis-full",
+      )}
     />
   );
 }
@@ -196,7 +210,13 @@ export function ParentField({ task }: { task: Task }) {
         label={t("prop.set.parent")}
         onPick={(id) => setParent([task], id === NO_PARENT ? null : id)}
       >
-        <PropButton empty={!parent} disabled={!!task.deleted_at} aria-label={`${t("prop.parent")}: ${parent ? parent.key : t("task.noParent")}`}>
+        <PropButton
+          empty={!parent}
+          disabled={!!task.deleted_at}
+          aria-label={`${t("prop.parent")}: ${parent ? parent.key : t("task.noParent")}`}
+          // Room is left for the arrow that opens the parent, so a long title does not push it onto a line of its own.
+          className={parent ? "max-w-[calc(100%-1.75rem)]" : undefined}
+        >
           {parent ? (
             <>
               <span className="shrink-0 text-xs text-ink-3 tnum">{parent.key}</span>

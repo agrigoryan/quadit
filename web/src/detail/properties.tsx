@@ -141,7 +141,7 @@ export function Properties({ task, side }: Props) {
               )}
             </PropButton>
           </TaskPropertyPicker>
-          {(waitingOn || outside) && <WaitingNote task={task} />}
+          {(waitingOn || outside) && <WaitingNote task={task} below={side} />}
         </PropRow>
 
         <PropRow label={t("prop.priority")}>
