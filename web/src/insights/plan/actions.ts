@@ -33,19 +33,23 @@ export async function createEpic(projectId: string, f: EpicFields): Promise<stri
     (max, e) => (e.project_id === projectId && e.rank > max ? e.rank : max),
     "",
   );
-  await mutate({ type: "epic.create", args }, (tx) =>
-    tx.insert("epics", {
-      id,
-      project_id: projectId,
-      name: args.name,
-      description: args.description,
-      state: f.state,
-      lead_id: f.leadId || undefined,
-      start_on: f.startOn || undefined,
-      target_on: f.targetOn || undefined,
-      rank: `${lastRank}z`,
-      created_at: Date.now(),
-    }),
+  await mutate(
+    { type: "epic.create", args },
+    (tx) =>
+      tx.insert("epics", {
+        id,
+        project_id: projectId,
+        name: args.name,
+        description: args.description,
+        state: f.state,
+        lead_id: f.leadId || undefined,
+        start_on: f.startOn || undefined,
+        target_on: f.targetOn || undefined,
+        rank: `${lastRank}z`,
+        created_at: Date.now(),
+      }),
+    // The dialog shows the refusal.
+    { quiet: true },
   );
   return id;
 }

@@ -1,104 +1,73 @@
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { AuthLayout } from "@/auth/auth-layout";
 import { slugFrom, useCanCreateWorkspace } from "@/auth/config";
 import { createWorkspace, signOut, useSession } from "@/auth/session";
 import { ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FormAlert, FormField, useFieldErrors } from "@/ui/form";
+import { FormField, refuse, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
 import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 
-interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-/** Makes another workspace on this install, owned by the person signed in, and goes to it. */
-export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
+/** Makes another workspace on this install, owned by the person signed in, and goes to it. Mount it only while it is open. */
+export function CreateWorkspaceDialog({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   /** Empty until the person types their own; the address then follows the name. */
   const [slug, setSlug] = useState("");
-  const [busy, setBusy] = useState(false);
   // The server names the address "slug" (or "workspace_slug") and the name "name" (or "workspace_name").
   const errors = useFieldErrors(["slug", "workspace_slug", "name", "workspace_name"]);
   const address = slug || slugFrom(name);
 
-  function change(next: boolean) {
-    if (!next) {
-      setName("");
-      setSlug("");
-      errors.clear();
-    }
-    onOpenChange(next);
-  }
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) {
-      errors.set("name", t("auth.workspace.nameNeeded"));
-      return;
-    }
-    setBusy(true);
-    errors.clear();
+  async function submit() {
+    if (!name.trim()) refuse("name", t("auth.workspace.nameNeeded"));
+    let made: string;
     try {
-      const made = await createWorkspace(name, address);
-      change(false);
-      void navigate(`/${made}`);
+      made = await createWorkspace(name, address);
     } catch (err) {
       // An older server refuses a taken address without naming the field; it is the address that needs changing.
-      if (err instanceof ApiError && err.code === "conflict" && !err.field) errors.set("slug", err.message);
-      else errors.fail(err);
-    } finally {
-      setBusy(false);
+      if (err instanceof ApiError && err.code === "conflict" && !err.field) refuse("slug", err.message);
+      throw err;
     }
+    void navigate(`/${made}`);
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={change}
+    <FormDialog
       title={t("auth.workspace.create")}
       description={t("auth.workspace.lead")}
       size="sm"
-      footer={
-        <>
-          <Button onClick={() => change(false)}>{t("common.cancel")}</Button>
-          <Button type="submit" form="create-workspace" variant="primary" disabled={busy}>
-            {busy ? t("auth.setup.busy") : t("auth.workspace.create")}
-          </Button>
-        </>
-      }
+      submit={t("auth.workspace.create")}
+      submitting={t("auth.setup.busy")}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="create-workspace" onSubmit={submit} className="flex flex-col gap-3.5">
-        <FormField
-          label={t("auth.setup.workspace")}
-          htmlFor="ws-name"
-          error={errors.fields.name || errors.fields.workspace_name}
-        >
-          <Input id="ws-name" required autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
-        </FormField>
-        <FormField
-          label={t("auth.workspace.address")}
-          htmlFor="ws-slug"
-          error={errors.fields.slug || errors.fields.workspace_slug}
-          hint={t("auth.workspace.addressHint", { address: `${window.location.host}/${address}` })}
-        >
-          <Input
-            id="ws-slug"
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            placeholder={slugFrom(name)}
-            value={slug}
-            onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
-          />
-        </FormField>
-        <FormAlert>{errors.form}</FormAlert>
-      </form>
-    </Dialog>
+      <FormField
+        label={t("auth.setup.workspace")}
+        htmlFor="ws-name"
+        error={errors.fields.name || errors.fields.workspace_name}
+      >
+        <Input id="ws-name" required autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
+      </FormField>
+      <FormField
+        label={t("auth.workspace.address")}
+        htmlFor="ws-slug"
+        error={errors.fields.slug || errors.fields.workspace_slug}
+        hint={t("auth.workspace.addressHint", { address: `${window.location.host}/${address}` })}
+      >
+        <Input
+          id="ws-slug"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          placeholder={slugFrom(name)}
+          value={slug}
+          onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+        />
+      </FormField>
+    </FormDialog>
   );
 }
 
@@ -132,7 +101,7 @@ export function NoWorkspacePage() {
         )}
         <p className="text-sm text-ink-2">{t(canCreate ? "auth.noWorkspace.invite" : "auth.noWorkspace.inviteOnly")}</p>
       </div>
-      {canCreate && <CreateWorkspaceDialog open={open} onOpenChange={setOpen} />}
+      {canCreate && open && <CreateWorkspaceDialog onClose={() => setOpen(false)} />}
     </AuthLayout>
   );
 }

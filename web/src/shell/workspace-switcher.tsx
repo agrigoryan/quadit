@@ -53,7 +53,7 @@ export function WorkspaceSwitcher() {
           </>
         )}
       </MenuContent>
-      {canCreate && <CreateWorkspaceDialog open={creating} onOpenChange={setCreating} />}
+      {canCreate && creating && <CreateWorkspaceDialog onClose={() => setCreating(false)} />}
     </Menu>
   );
 }

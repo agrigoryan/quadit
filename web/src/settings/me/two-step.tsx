@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { Download } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -7,11 +7,11 @@ import { toast } from "@/lib/toast";
 import type { Account } from "@/settings/me/account";
 import { QrCode } from "@/settings/me/qr";
 import { CopyField, RevealDialog } from "@/ui/settings-dialogs";
-import { FormAlert, FormField, useFieldErrors, useSubmit } from "@/ui/form";
+import { FormAlert, FormField, refuse, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
 import { Card, Section } from "@/ui/settings-layout";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 
 const TOTP = "/api/v1/auth/totp";
@@ -69,54 +69,49 @@ function SetupDialog({
   onEnabled: (codes: string[]) => void;
 }) {
   const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const errors = useFieldErrors(["code"]);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
+  async function submit() {
+    let out: { recovery_codes: string[] };
     try {
-      const out = await api.post<{ recovery_codes: string[] }>(`${TOTP}/enable`, { code: code.trim() });
-      onEnabled(out.recovery_codes);
+      out = await api.post<{ recovery_codes: string[] }>(`${TOTP}/enable`, { code: code.trim() });
     } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
+      // Whatever went wrong, the code is what to try again.
+      refuse("code", errorMessage(err));
     }
+    onEnabled(out.recovery_codes);
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={t("me.twoStep.setupTitle")}
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button type="submit" form="totp-setup" variant="primary" disabled={busy || code.trim().length < 6}>
-            {t("me.twoStep.turnOn")}
-          </Button>
-        </>
-      }
+      submit={t("me.twoStep.turnOn")}
+      ready={code.trim().length >= 6}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="totp-setup" onSubmit={submit} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium">{t("me.twoStep.step1")}</p>
-          <div className="flex flex-col items-start gap-4 sm:flex-row">
-            <QrCode value={setup.url} label={t("me.twoStep.qrLabel")} />
-            <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch">
-              <p className="text-sm text-ink-2">{t("me.twoStep.step1Hint")}</p>
-              <CopyField label={t("me.twoStep.secret")} value={setup.secret} />
-            </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-medium">{t("me.twoStep.step1")}</p>
+        <div className="flex flex-col items-start gap-4 sm:flex-row">
+          <QrCode value={setup.url} label={t("me.twoStep.qrLabel")} />
+          <div className="flex min-w-0 flex-1 flex-col gap-2 self-stretch">
+            <p className="text-sm text-ink-2">{t("me.twoStep.step1Hint")}</p>
+            <CopyField label={t("me.twoStep.secret")} value={setup.secret} />
           </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium">{t("me.twoStep.step2")}</p>
-          <CodeField id="totp-code" label={t("me.twoStep.code")} value={code} onChange={setCode} error={error} />
-        </div>
-      </form>
-    </Dialog>
+      </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-medium">{t("me.twoStep.step2")}</p>
+        <CodeField
+          id="totp-code"
+          label={t("me.twoStep.code")}
+          value={code}
+          onChange={setCode}
+          error={errors.fields.code}
+        />
+      </div>
+    </FormDialog>
   );
 }
 
@@ -133,65 +128,49 @@ function ConfirmCodeDialog({
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const errors = useFieldErrors(["code", "password"]);
-  const { busy, run } = useSubmit(errors);
   const off = mode === "off";
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    await run(async () => {
-      if (off) {
-        await api.post(`${TOTP}/disable`, { code: code.trim(), password });
-        onDone();
-      } else {
-        const out = await api.post<{ recovery_codes: string[] }>("/api/v1/auth/recovery-codes", { code: code.trim() });
-        onDone(out.recovery_codes);
-      }
-    });
+  async function submit() {
+    if (off) {
+      await api.post(`${TOTP}/disable`, { code: code.trim(), password });
+      onDone();
+    } else {
+      const out = await api.post<{ recovery_codes: string[] }>("/api/v1/auth/recovery-codes", { code: code.trim() });
+      onDone(out.recovery_codes);
+    }
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={off ? t("me.twoStep.offTitle") : t("me.twoStep.renewTitle")}
       size="sm"
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button
-            type="submit"
-            form="totp-confirm"
-            variant={off ? "danger" : "primary"}
-            disabled={busy || (!code.trim() && !password)}
-          >
-            {off ? t("me.twoStep.turnOff") : t("me.twoStep.renew")}
-          </Button>
-        </>
-      }
+      submit={off ? t("me.twoStep.turnOff") : t("me.twoStep.renew")}
+      tone={off ? "danger" : "primary"}
+      ready={!!code.trim() || !!password}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="totp-confirm" onSubmit={submit} className="flex flex-col gap-3.5">
-        <p className="text-sm text-ink-2">{off ? t("me.twoStep.offBody") : t("me.twoStep.renewBody")}</p>
-        <CodeField
-          id="totp-confirm-code"
-          label={off ? t("me.twoStep.codeOrRecovery") : t("me.twoStep.code")}
-          value={code}
-          onChange={setCode}
-          error={errors.fields.code}
-        />
-        {off && (
-          <FormField label={t("me.twoStep.orPassword")} htmlFor="totp-confirm-pw" error={errors.fields.password}>
-            <Input
-              id="totp-confirm-pw"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </FormField>
-        )}
-        <FormAlert>{errors.form}</FormAlert>
-      </form>
-    </Dialog>
+      <p className="text-sm text-ink-2">{off ? t("me.twoStep.offBody") : t("me.twoStep.renewBody")}</p>
+      <CodeField
+        id="totp-confirm-code"
+        label={off ? t("me.twoStep.codeOrRecovery") : t("me.twoStep.code")}
+        value={code}
+        onChange={setCode}
+        error={errors.fields.code}
+      />
+      {off && (
+        <FormField label={t("me.twoStep.orPassword")} htmlFor="totp-confirm-pw" error={errors.fields.password}>
+          <Input
+            id="totp-confirm-pw"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </FormField>
+      )}
+    </FormDialog>
   );
 }
 

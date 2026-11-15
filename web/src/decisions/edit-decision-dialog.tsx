@@ -6,14 +6,12 @@ import { useId, useState } from "react";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import type { Decision } from "@/lib/types";
-import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { Input, Textarea } from "@/ui/input";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { updateDecision } from "@/decisions/actions";
 import { optionsOf, useReturnFocus } from "@/decisions/data";
-import { sendOnModEnter } from "@/lib/mod-enter";
-import { FormAlert, FormField, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
+import { FormField, NativeSelect, refuse, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
 
 const NONE = "";
 
@@ -25,103 +23,85 @@ export function EditDecisionDialog({ decision, onClose }: { decision: Decision; 
   const [recommended, setRecommended] = useState(decision.recommended_option_id ?? NONE);
   const [recommendation, setRecommendation] = useState(decision.recommendation ?? "");
   const errors = useFieldErrors(["question", "details", "recommended", "recommendation"]);
-  const { busy, run } = useSubmit(errors, { once: true });
   const id = useId();
   useReturnFocus();
 
   async function submit() {
-    if (busy) return;
-    errors.clear();
-    if (!question.trim()) return errors.set("question", t("decision.new.needQuestion"));
-    await run(async () => {
-      await updateDecision(decision, {
-        question: question.trim(),
-        details: details.trim(),
-        recommended: recommended || null,
-        // A reason with nothing recommended would say nothing.
-        recommendation: recommended ? recommendation.trim() : "",
-      });
-      onClose();
+    if (!question.trim()) refuse("question", t("decision.new.needQuestion"));
+    await updateDecision(decision, {
+      question: question.trim(),
+      details: details.trim(),
+      recommended: recommended || null,
+      // A reason with nothing recommended would say nothing.
+      recommendation: recommended ? recommendation.trim() : "",
     });
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={t("decision.edit.title")}
       description={t("decision.edit.lead")}
-      footer={
-        <>
-          <Button variant="ghost" className="max-sm:h-10" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button variant="primary" className="max-sm:h-10 max-sm:flex-1" disabled={busy} onClick={() => void submit()}>
-            {t("common.save")}
-          </Button>
-        </>
-      }
+      submit={t("common.save")}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <div className="flex flex-col gap-4" onKeyDown={(e) => sendOnModEnter(e, submit)}>
-        <FormField label={t("decision.new.question")} htmlFor={`${id}-q`} error={errors.fields.question}>
-          <Input
-            id={`${id}-q`}
-            autoFocus
-            value={question}
-            onChange={(e) => {
-              setQuestion(e.target.value);
-              errors.set("question", "");
-            }}
-            aria-invalid={!!errors.fields.question}
-            className="h-9! text-base! font-medium max-sm:h-10!"
-          />
-        </FormField>
-        <FormField
-          label={t("decision.new.details")}
-          htmlFor={`${id}-d`}
-          hint={t("decision.edit.detailsHint", { mod: MOD })}
-          error={errors.fields.details}
-        >
-          <MentionTextarea
-            id={`${id}-d`}
-            value={details}
-            onChange={setDetails}
-            rows={3}
-            placeholder={t("decision.new.detailsPlaceholder")}
-            className="min-h-20 max-sm:text-base"
-          />
-        </FormField>
-        {decision.kind === "choice" && options.length > 0 && (
-          <>
-            <FormField label={t("decision.edit.recommended")} htmlFor={`${id}-r`} error={errors.fields.recommended}>
-              <NativeSelect
-                id={`${id}-r`}
-                value={recommended}
-                onChange={setRecommended}
-                options={[
-                  { value: NONE, label: t("decision.edit.noRecommendation") },
-                  ...options.map((o) => ({ value: o.id, label: o.label })),
-                ]}
-                className="max-sm:[&>select]:h-10 sm:max-w-xs"
+      <FormField label={t("decision.new.question")} htmlFor={`${id}-q`} error={errors.fields.question}>
+        <Input
+          id={`${id}-q`}
+          autoFocus
+          value={question}
+          onChange={(e) => {
+            setQuestion(e.target.value);
+            errors.set("question", "");
+          }}
+          className="h-9! text-base! font-medium max-sm:h-10!"
+        />
+      </FormField>
+      <FormField
+        label={t("decision.new.details")}
+        htmlFor={`${id}-d`}
+        hint={t("decision.edit.detailsHint", { mod: MOD })}
+        error={errors.fields.details}
+      >
+        <MentionTextarea
+          id={`${id}-d`}
+          value={details}
+          onChange={setDetails}
+          rows={3}
+          placeholder={t("decision.new.detailsPlaceholder")}
+          className="min-h-20 max-sm:text-base"
+        />
+      </FormField>
+      {decision.kind === "choice" && options.length > 0 && (
+        <>
+          <FormField label={t("decision.edit.recommended")} htmlFor={`${id}-r`} error={errors.fields.recommended}>
+            <NativeSelect
+              id={`${id}-r`}
+              value={recommended}
+              onChange={setRecommended}
+              options={[
+                { value: NONE, label: t("decision.edit.noRecommendation") },
+                ...options.map((o) => ({ value: o.id, label: o.label })),
+              ]}
+              className="max-sm:[&>select]:h-10 sm:max-w-xs"
+            />
+          </FormField>
+          {recommended && (
+            <FormField label={t("decision.edit.reason")} htmlFor={`${id}-why`} error={errors.fields.recommendation}>
+              <Textarea
+                id={`${id}-why`}
+                autoGrow
+                rows={2}
+                value={recommendation}
+                onChange={(e) => setRecommendation(e.target.value)}
+                placeholder={t("decision.new.reason")}
+                className="max-sm:text-base"
               />
             </FormField>
-            {recommended && (
-              <FormField label={t("decision.edit.reason")} htmlFor={`${id}-why`} error={errors.fields.recommendation}>
-                <Textarea
-                  id={`${id}-why`}
-                  autoGrow
-                  rows={2}
-                  value={recommendation}
-                  onChange={(e) => setRecommendation(e.target.value)}
-                  placeholder={t("decision.new.reason")}
-                  className="max-sm:text-base"
-                />
-              </FormField>
-            )}
-          </>
-        )}
-        <FormAlert>{errors.form}</FormAlert>
-      </div>
-    </Dialog>
+          )}
+        </>
+      )}
+    </FormDialog>
   );
 }

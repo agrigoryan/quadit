@@ -2,7 +2,7 @@
 // it was then. Deleted ones return and changed ones are set back; a page's
 // newer blocks go to its trash. Everything else stays as it is now.
 
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
@@ -10,10 +10,9 @@ import { toast } from "@/lib/toast";
 import type { Backup } from "@/admin/backups";
 import { fetchWorkspaces } from "@/admin/workspaces";
 import { Segmented } from "@/settings/me/segmented";
-import { FormAlert, FormField, NativeSelect, Note, useFieldErrors, useSubmit } from "@/ui/form";
+import { FormField, NativeSelect, Note, refuse, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
 import { useLoad } from "@/lib/use-load";
-import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 
 type Kind = "task" | "doc";
@@ -36,7 +35,6 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
   const [kind, setKind] = useState<Kind>("task");
   const [ref, setRef] = useState("");
   const errors = useFieldErrors(["ref"]);
-  const { busy, run } = useSubmit(errors, { once: true });
   const workspace = slug || workspaces.data?.[0]?.slug || "";
 
   function pickKind(next: Kind) {
@@ -45,85 +43,69 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
     errors.clear();
   }
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    errors.clear();
+  async function submit() {
     const key = taskKeyOf(ref);
     const doc = pageIdOf(ref);
-    if (kind === "task" && !key) return errors.set("ref", t("admin.restoreItem.taskBad"));
-    if (kind === "doc" && !doc) return errors.set("ref", t("admin.restoreItem.pageBad"));
-    await run(async () => {
-      await api.post(
-        `/api/v1/admin/backups/${backup.id}/restore-item`,
-        kind === "task" ? { workspace, task: key } : { workspace, doc },
-      );
-      toast.info(kind === "task" ? t("admin.restoreItem.doneTask", { key }) : t("admin.restoreItem.donePage"));
-      onClose();
-    });
+    if (kind === "task" && !key) refuse("ref", t("admin.restoreItem.taskBad"));
+    if (kind === "doc" && !doc) refuse("ref", t("admin.restoreItem.pageBad"));
+    await api.post(
+      `/api/v1/admin/backups/${backup.id}/restore-item`,
+      kind === "task" ? { workspace, task: key } : { workspace, doc },
+    );
+    toast.info(kind === "task" ? t("admin.restoreItem.doneTask", { key }) : t("admin.restoreItem.donePage"));
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={t("admin.restoreItem.title")}
       description={t("admin.restoreItem.from", { when: exact(backup.started_at) })}
       size="sm"
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button variant="primary" type="submit" form="restore-item" disabled={busy || !workspace}>
-            {busy ? t("admin.restoreItem.busy") : t("admin.restoreItem.restore")}
-          </Button>
-        </>
-      }
+      submit={t("admin.restoreItem.restore")}
+      submitting={t("admin.restoreItem.busy")}
+      ready={!!workspace}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="restore-item" onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
-        <FormField
-          label={t("admin.restoreItem.workspace")}
-          htmlFor="ri-workspace"
-          error={workspaces.error || undefined}
-        >
-          <NativeSelect
-            id="ri-workspace"
-            value={workspace}
-            onChange={setSlug}
-            options={(workspaces.data ?? []).map((w) => ({ value: w.slug, label: `${w.name} (/${w.slug})` }))}
-          />
-        </FormField>
-        <Segmented
-          label={t("admin.restoreItem.what")}
-          value={kind}
-          onChange={pickKind}
-          options={[
-            { value: "task", label: t("admin.restoreItem.task") },
-            { value: "doc", label: t("admin.restoreItem.page") },
-          ]}
+      <FormField label={t("admin.restoreItem.workspace")} htmlFor="ri-workspace" error={workspaces.error || undefined}>
+        <NativeSelect
+          id="ri-workspace"
+          value={workspace}
+          onChange={setSlug}
+          options={(workspaces.data ?? []).map((w) => ({ value: w.slug, label: `${w.name} (/${w.slug})` }))}
         />
-        <FormField
-          label={kind === "task" ? t("admin.restoreItem.taskKey") : t("admin.restoreItem.pageLink")}
-          htmlFor="ri-ref"
-          hint={kind === "task" ? t("admin.restoreItem.taskHint") : t("admin.restoreItem.pageHint")}
-          error={errors.fields.ref}
-        >
-          <Input
-            id="ri-ref"
-            autoFocus
-            value={ref}
-            onChange={(e) => {
-              setRef(e.target.value);
-              errors.clear();
-            }}
-            placeholder={kind === "task" ? "SVA-12" : "https://…/docs/…"}
-            spellCheck={false}
-            autoCapitalize="none"
-            autoComplete="off"
-            className={kind === "task" ? "font-mono uppercase placeholder:normal-case" : undefined}
-          />
-        </FormField>
-        <Note>{kind === "task" ? t("admin.restoreItem.noteTask") : t("admin.restoreItem.notePage")}</Note>
-        <FormAlert>{errors.form}</FormAlert>
-      </form>
-    </Dialog>
+      </FormField>
+      <Segmented
+        label={t("admin.restoreItem.what")}
+        value={kind}
+        onChange={pickKind}
+        options={[
+          { value: "task", label: t("admin.restoreItem.task") },
+          { value: "doc", label: t("admin.restoreItem.page") },
+        ]}
+      />
+      <FormField
+        label={kind === "task" ? t("admin.restoreItem.taskKey") : t("admin.restoreItem.pageLink")}
+        htmlFor="ri-ref"
+        hint={kind === "task" ? t("admin.restoreItem.taskHint") : t("admin.restoreItem.pageHint")}
+        error={errors.fields.ref}
+      >
+        <Input
+          id="ri-ref"
+          autoFocus
+          value={ref}
+          onChange={(e) => {
+            setRef(e.target.value);
+            errors.clear();
+          }}
+          placeholder={kind === "task" ? "SVA-12" : "https://…/docs/…"}
+          spellCheck={false}
+          autoCapitalize="none"
+          autoComplete="off"
+          className={kind === "task" ? "font-mono uppercase placeholder:normal-case" : undefined}
+        />
+      </FormField>
+      <Note>{kind === "task" ? t("admin.restoreItem.noteTask") : t("admin.restoreItem.notePage")}</Note>
+    </FormDialog>
   );
 }

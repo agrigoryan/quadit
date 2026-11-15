@@ -2,7 +2,7 @@
 // each one and until when, and who waits behind them, in order. An admin can
 // release a hold, take someone out of a queue, and add or remove resources.
 
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { Ellipsis, Plus, Server, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
@@ -18,7 +18,9 @@ import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { Field, Input, Textarea } from "@/ui/input";
+import { FormField, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
+import { Input, Textarea } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 
 function release(claim: Claim) {
@@ -170,69 +172,59 @@ function ResourceCard({
   );
 }
 
-function AddResource({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** Mount it only while it is open, so each opening starts empty. */
+function AddResource({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [busy, setBusy] = useState(false);
+  const errors = useFieldErrors(["name", "description"]);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed || busy) return;
+  async function submit() {
     const id = newId();
-    setBusy(true);
-    try {
-      await mutate({ type: "resource.create", args: { id, name: trimmed, description: description.trim() } }, (tx) =>
-        tx.insert("resources", { id, name: trimmed, description: description.trim() || undefined }),
-      );
-      setName("");
-      setDescription("");
-      onClose();
-    } catch {
-      // A name already in use is refused by the server; its message shows and the form stays.
-    } finally {
-      setBusy(false);
-    }
+    const fields = { name: name.trim(), description: description.trim() };
+    await mutate(
+      { type: "resource.create", args: { id, ...fields } },
+      (tx) => tx.insert("resources", { id, name: fields.name, description: fields.description || undefined }),
+      // A name already in use is refused: the dialog says so and stays.
+      { quiet: true },
+    );
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => !next && onClose()}
+    <FormDialog
       title={t("agents.res.addTitle")}
       description={t("agents.res.addLead")}
       size="sm"
-      footer={
-        <>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button variant="primary" type="submit" form="add-resource" disabled={!name.trim() || busy}>
-            {t("agents.res.add")}
-          </Button>
-        </>
-      }
+      submit={t("agents.res.add")}
+      ready={!!name.trim()}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="add-resource" onSubmit={submit} className="flex flex-col gap-3">
-        <Field label={t("agents.res.name")} htmlFor="resource-name" hint={t("agents.res.nameHint")}>
-          <Input
-            id="resource-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={60}
-            autoComplete="off"
-            required
-          />
-        </Field>
-        <Field label={t("agents.res.description")} htmlFor="resource-description">
-          <Textarea
-            id="resource-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            maxLength={300}
-          />
-        </Field>
-      </form>
-    </Dialog>
+      <FormField
+        label={t("agents.res.name")}
+        htmlFor="resource-name"
+        hint={t("agents.res.nameHint")}
+        error={errors.fields.name}
+      >
+        <Input
+          id="resource-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={60}
+          autoComplete="off"
+          required
+        />
+      </FormField>
+      <FormField label={t("agents.res.description")} htmlFor="resource-description" error={errors.fields.description}>
+        <Textarea
+          id="resource-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          maxLength={300}
+        />
+      </FormField>
+    </FormDialog>
   );
 }
 
@@ -317,7 +309,7 @@ export function Resources({ resources, claims, now }: Props) {
           ))}
         </div>
       )}
-      <AddResource open={adding} onClose={() => setAdding(false)} />
+      {adding && <AddResource onClose={() => setAdding(false)} />}
       <ConfirmDelete
         resource={deleting}
         claims={deleting ? of(deleting.id).length : 0}

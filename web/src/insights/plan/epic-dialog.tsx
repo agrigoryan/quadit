@@ -1,16 +1,16 @@
 // The dialog that creates an epic or edits one: its name, what it is for,
 // its state, who leads it and the dates it runs between.
 
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useMembers } from "@/lib/selectors";
 import type { Epic } from "@/lib/types";
 import { createEpic, type EpicFields, updateEpic } from "@/insights/plan/actions";
 import { EPIC_STATES, epicStateName } from "@/insights/plan/stats";
 import { Avatar } from "@/ui/avatar";
-import { Button } from "@/ui/button";
-import { Dialog } from "@/ui/dialog";
-import { Field, Input, Textarea } from "@/ui/input";
+import { FormField, useFieldErrors } from "@/ui/form";
+import { FormDialog } from "@/ui/form-dialog";
+import { Input, Textarea } from "@/ui/input";
 import { Select } from "@/ui/picker";
 
 const NOBODY = "none";
@@ -33,14 +33,12 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
     startOn: epic?.start_on ?? "",
     targetOn: epic?.target_on ?? "",
   });
-  const [busy, setBusy] = useState(false);
+  const errors = useFieldErrors(["name"]);
   const set = (patch: Partial<EpicFields>) => setF((cur) => ({ ...cur, ...patch }));
   const backwards = !!f.startOn && !!f.targetOn && f.targetOn < f.startOn;
   const ok = f.name.trim() !== "" && !backwards;
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!ok || busy) return;
+  async function submit() {
     if (epic) {
       const args: Parameters<typeof updateEpic>[1] = {};
       if (f.name.trim() !== epic.name) args.name = f.name.trim();
@@ -49,104 +47,91 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
       if (f.leadId !== (epic.lead_id ?? "")) args.lead = f.leadId || null;
       if (f.startOn !== (epic.start_on ?? "")) args.start_on = f.startOn || null;
       if (f.targetOn !== (epic.target_on ?? "")) args.target_on = f.targetOn || null;
+      // Shown at once; a refusal is a toast and puts it back.
       updateEpic(epic, args);
-      onClose();
       return;
     }
-    setBusy(true);
-    try {
-      const id = await createEpic(projectId, f);
-      onClose();
-      onCreated?.(id);
-    } catch {
-      // The server's reason is already shown; the form stays to be fixed.
-      setBusy(false);
-    }
+    onCreated?.(await createEpic(projectId, f));
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => !open && onClose()}
+    <FormDialog
       title={epic ? t("epic.edit") : t("epic.new")}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button variant="primary" type="submit" form="epic-form" disabled={!ok || busy}>
-            {epic ? t("common.save") : t("epics.create")}
-          </Button>
-        </>
-      }
+      submit={epic ? t("common.save") : t("epics.create")}
+      ready={ok}
+      errors={errors}
+      onSubmit={submit}
+      onClose={onClose}
     >
-      <form id="epic-form" onSubmit={submit} className="flex flex-col gap-3">
-        <Field label={t("epic.name")} htmlFor="epic-name">
+      <FormField label={t("epic.name")} htmlFor="epic-name" error={errors.fields.name}>
+        <Input
+          id="epic-name"
+          value={f.name}
+          onChange={(e) => set({ name: e.target.value })}
+          maxLength={120}
+          placeholder={t("epic.namePlaceholder")}
+        />
+      </FormField>
+      <FormField label={t("epic.description")} htmlFor="epic-description" hint={t("epic.descriptionHint")}>
+        <Textarea
+          id="epic-description"
+          value={f.description}
+          onChange={(e) => set({ description: e.target.value })}
+          rows={4}
+        />
+      </FormField>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label={t("epic.state")}>
+          <Select
+            items={EPIC_STATES.map((s) => ({ id: s, label: epicStateName(s) }))}
+            value={f.state}
+            onPick={(id) => set({ state: id as Epic["state"] })}
+            label={t("epic.state")}
+            buttonProps={{ className: "h-8 w-full" }}
+          />
+        </FormField>
+        <FormField label={t("epic.lead")}>
+          <Select
+            items={[
+              { id: NOBODY, label: t("epic.noLead"), icon: <Avatar member={undefined} size="xs" /> },
+              ...members.map((m) => ({
+                id: m.user_id,
+                label: m.name,
+                icon: <Avatar member={m} size="xs" />,
+                keywords: m.handle,
+              })),
+            ]}
+            value={f.leadId || NOBODY}
+            onPick={(id) => set({ leadId: id === NOBODY ? "" : id })}
+            label={t("epic.lead")}
+            buttonProps={{ className: "h-8 w-full" }}
+          />
+        </FormField>
+        <FormField label={t("epic.start")} htmlFor="epic-start">
           <Input
-            id="epic-name"
-            value={f.name}
-            onChange={(e) => set({ name: e.target.value })}
-            maxLength={120}
-            placeholder={t("epic.namePlaceholder")}
+            id="epic-start"
+            type="date"
+            value={f.startOn}
+            max={f.targetOn || undefined}
+            onChange={(e) => set({ startOn: e.target.value })}
+            className="tnum"
           />
-        </Field>
-        <Field label={t("epic.description")} htmlFor="epic-description" hint={t("epic.descriptionHint")}>
-          <Textarea
-            id="epic-description"
-            value={f.description}
-            onChange={(e) => set({ description: e.target.value })}
-            rows={4}
+        </FormField>
+        <FormField
+          label={t("epic.target")}
+          htmlFor="epic-target"
+          hint={backwards ? t("epic.datesBackwards") : undefined}
+        >
+          <Input
+            id="epic-target"
+            type="date"
+            value={f.targetOn}
+            min={f.startOn || undefined}
+            onChange={(e) => set({ targetOn: e.target.value })}
+            className="tnum"
           />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t("epic.state")}>
-            <Select
-              items={EPIC_STATES.map((s) => ({ id: s, label: epicStateName(s) }))}
-              value={f.state}
-              onPick={(id) => set({ state: id as Epic["state"] })}
-              label={t("epic.state")}
-              buttonProps={{ className: "h-8 w-full" }}
-            />
-          </Field>
-          <Field label={t("epic.lead")}>
-            <Select
-              items={[
-                { id: NOBODY, label: t("epic.noLead"), icon: <Avatar member={undefined} size="xs" /> },
-                ...members.map((m) => ({
-                  id: m.user_id,
-                  label: m.name,
-                  icon: <Avatar member={m} size="xs" />,
-                  keywords: m.handle,
-                })),
-              ]}
-              value={f.leadId || NOBODY}
-              onPick={(id) => set({ leadId: id === NOBODY ? "" : id })}
-              label={t("epic.lead")}
-              buttonProps={{ className: "h-8 w-full" }}
-            />
-          </Field>
-          <Field label={t("epic.start")} htmlFor="epic-start">
-            <Input
-              id="epic-start"
-              type="date"
-              value={f.startOn}
-              max={f.targetOn || undefined}
-              onChange={(e) => set({ startOn: e.target.value })}
-              className="tnum"
-            />
-          </Field>
-          <Field label={t("epic.target")} htmlFor="epic-target" hint={backwards ? t("epic.datesBackwards") : undefined}>
-            <Input
-              id="epic-target"
-              type="date"
-              value={f.targetOn}
-              min={f.startOn || undefined}
-              onChange={(e) => set({ targetOn: e.target.value })}
-              className="tnum"
-            />
-          </Field>
-        </div>
-      </form>
-    </Dialog>
+        </FormField>
+      </div>
+    </FormDialog>
   );
 }
