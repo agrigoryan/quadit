@@ -168,9 +168,33 @@ func listOf[T any](order string, conds ...store.Cond) func(x *c) (any, error) {
 		if err := x.db.List(x.ctx(), &rows, store.Q{Where: where, Order: order, Limit: min(x.intParam("limit", 1000), 5000), Offset: x.intParam("offset", 0)}); err != nil {
 			return nil, err
 		}
-		// Keep a narrowed caller inside its projects.
-		if f, ok := t.FieldByName("ProjectID"); ok && x.projects != nil {
-			rows = keep(rows, func(r T) bool { return x.canProject(reflect.ValueOf(r).FieldByIndex(f.Index).String()) })
+		// Keep a narrowed caller inside its projects: by the row's own
+		// project, by being a project, or by the task it hangs on.
+		if x.projects != nil {
+			if f, ok := t.FieldByName("ProjectID"); ok {
+				rows = keep(rows, func(r T) bool { return x.canProject(reflect.ValueOf(r).FieldByIndex(f.Index).String()) })
+			} else if t == reflect.TypeFor[core.Project]() {
+				rows = keep(rows, func(r T) bool { return x.canProject(reflect.ValueOf(r).FieldByName("ID").String()) })
+			} else if f, ok := t.FieldByName("TaskID"); ok {
+				projectOf := map[string]string{}
+				rows = keep(rows, func(r T) bool {
+					tid := reflect.ValueOf(r).FieldByIndex(f.Index).String()
+					if tid == "" {
+						return true
+					}
+					pid, seen := projectOf[tid]
+					if !seen {
+						var tk core.Task
+						if err := x.db.Get(x.ctx(), &tk, store.Eq("id", tid)); err != nil {
+							pid = "none"
+						} else {
+							pid = tk.ProjectID
+						}
+						projectOf[tid] = pid
+					}
+					return x.canProject(pid)
+				})
+			}
 		}
 		if rows == nil {
 			rows = []T{}
@@ -306,12 +330,26 @@ func (s *Server) hList(x *c) error {
 				continue
 			}
 			var words []string
-			for _, k := range []string{"key", "handle", "slug", "name", "title", "kind", "type", "state", "category", "role", "url"} {
+			for _, k := range []string{"key", "handle", "slug", "name", "title", "text", "kind", "type", "state", "category", "role", "url", "starts_on", "ends_on", "ref"} {
 				if v, ok := r[k].(string); ok && v != "" {
 					if k == "handle" {
 						v = "@" + v
 					}
-					words = append(words, v)
+					words = append(words, oneLine(v, 80))
+				}
+			}
+			if n, ok := r["number"].(float64); ok {
+				words = append([]string{fmt.Sprintf("#%d", int(n))}, words...)
+			}
+			// What it hangs on, when it has no name of its own.
+			for _, k := range []string{"task_id", "related_task_id", "resource_id", "user_id", "file_id"} {
+				if v, ok := r[k].(string); ok && v != "" && len(words) < 4 {
+					words = append(words, strings.TrimSuffix(k, "_id")+"="+v)
+				}
+			}
+			if f, ok := r["file"].(map[string]any); ok {
+				if n, _ := f["name"].(string); n != "" {
+					words = append([]string{n}, words...)
 				}
 			}
 			id, _ := r["id"].(string)

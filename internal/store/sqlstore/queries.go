@@ -175,18 +175,6 @@ func (c conn) taskWhere(f store.TaskFilter) *clause {
 	return w
 }
 
-var taskSorts = map[string]string{
-	"":          "t.id",
-	"created":   "t.id",
-	"-created":  "t.id DESC",
-	"rank":      "t.rank, t.id",
-	"priority":  "CASE t.priority WHEN 0 THEN 5 ELSE t.priority END, t.id",
-	"due":       "CASE WHEN t.due_on IS NULL THEN 1 ELSE 0 END, t.due_on, t.id",
-	"-activity": "t.activity_seq DESC",
-	"-updated":  "t.updated_seq DESC",
-	"key":       "t.project_id, t.number",
-}
-
 // TaskSorts lists the accepted values of TaskFilter.Sort.
 func TaskSorts() []string {
 	return []string{"created", "-created", "rank", "priority", "due", "-activity", "-updated", "key"}
@@ -197,15 +185,45 @@ func (c conn) Tasks(ctx context.Context, f store.TaskFilter) ([]core.Task, error
 	if err != nil {
 		return nil, err
 	}
-	order, ok := taskSorts[f.Sort]
+	keys, ok := store.TaskSortKeys[f.Sort]
 	if !ok {
 		return nil, fmt.Errorf("unknown sort %q", f.Sort)
 	}
+	var orders []string
+	for _, k := range keys {
+		if k.Desc {
+			orders = append(orders, k.Expr+" DESC")
+		} else {
+			orders = append(orders, k.Expr)
+		}
+	}
+	order := strings.Join(orders, ", ")
 	limit := f.Limit
 	if limit <= 0 || limit > 5000 {
 		limit = 100
 	}
 	w := c.taskWhere(f)
+	if len(f.After) == len(keys) && len(keys) > 0 {
+		// Past the last row read: later in the first key, or equal there and
+		// later in the next, and so on.
+		var alts []string
+		var args []any
+		for i, k := range keys {
+			var parts []string
+			for j := 0; j < i; j++ {
+				parts = append(parts, keys[j].Expr+" = ?")
+				args = append(args, f.After[j])
+			}
+			op := " > ?"
+			if k.Desc {
+				op = " < ?"
+			}
+			parts = append(parts, k.Expr+op)
+			args = append(args, f.After[i])
+			alts = append(alts, "("+strings.Join(parts, " AND ")+")")
+		}
+		w.add("("+strings.Join(alts, " OR ")+")", args...)
+	}
 	query := "SELECT t." + strings.ReplaceAll(m.cols, ", ", ", t.") + " FROM tasks t WHERE " + w.sql() +
 		" ORDER BY " + order + fmt.Sprintf(" LIMIT %d", limit)
 	if f.Offset > 0 {

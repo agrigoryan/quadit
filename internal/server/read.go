@@ -542,19 +542,29 @@ func (s *Server) hTasks(x *c) error {
 	if f.Limit > 1000 {
 		f.Limit = 1000
 	}
-	// cursor= continues a list from where the last page ended. The token
-	// also holds where the feed stood when the first page was read: tasks
-	// made since are left out, so pages do not shift under the reader.
+	// cursor= continues a list from where the last page ended: after the
+	// last row it gave, in the list's own order. Whatever changes, closes or
+	// is reordered meanwhile, no row comes twice and none in between is
+	// skipped. The token also holds where the feed stood when the first page
+	// was read: tasks made since are left for the next read.
+	type cursor struct {
+		K    []any  `json:"k"`
+		S    int64  `json:"s"`
+		Sort string `json:"q"`
+	}
 	if tok := v.Get("cursor"); tok != "" {
-		var cur struct {
-			O int   `json:"o"`
-			S int64 `json:"s"`
-		}
+		var cur cursor
 		raw, err := base64.RawURLEncoding.DecodeString(tok)
-		if err != nil || json.Unmarshal(raw, &cur) != nil {
-			return &engine.Error{Code: engine.CodeInvalid, Field: "cursor", Message: "this cursor cannot be read; start the list again without one"}
+		if err != nil || json.Unmarshal(raw, &cur) != nil || len(cur.K) != len(store.TaskSortKeys[f.Sort]) || cur.Sort != f.Sort {
+			return &engine.Error{Code: engine.CodeInvalid, Field: "cursor", Message: "this cursor does not belong to this list (same filters and sort as the page it came from); start again without one"}
 		}
-		f.Offset, f.MadeUpTo = cur.O, cur.S
+		for i, k := range cur.K {
+			// Whole numbers went through JSON as floats.
+			if n, ok := k.(float64); ok && n == float64(int64(n)) {
+				cur.K[i] = int64(n)
+			}
+		}
+		f.After, f.MadeUpTo, f.Offset = cur.K, cur.S, 0
 	}
 	limit := f.Limit
 	f.Limit++ // one extra row says whether there are more
@@ -563,20 +573,24 @@ func (s *Server) hTasks(x *c) error {
 		return err
 	}
 	more := len(tasks) > limit
-	next := ""
-	if more {
-		upTo := f.MadeUpTo
-		if upTo == 0 {
-			var ws core.Workspace
-			if err := x.s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err == nil {
-				upTo = ws.Seq
-			}
-		}
-		raw, _ := json.Marshal(map[string]any{"o": f.Offset + limit, "s": upTo})
-		next = base64.RawURLEncoding.EncodeToString(raw)
-	}
 	if more {
 		tasks = tasks[:limit]
+	}
+	next := ""
+	if more {
+		cur := cursor{S: f.MadeUpTo, Sort: f.Sort}
+		if cur.S == 0 {
+			var ws core.Workspace
+			if err := x.s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err == nil {
+				cur.S = ws.Seq
+			}
+		}
+		last := tasks[len(tasks)-1]
+		for _, k := range store.TaskSortKeys[f.Sort] {
+			cur.K = append(cur.K, k.Val(last))
+		}
+		raw, _ := json.Marshal(cur)
+		next = base64.RawURLEncoding.EncodeToString(raw)
 	}
 	if truthyParam(v, "raw") {
 		return x.ok(map[string]any{"tasks": tasks, "more": more})
@@ -734,6 +748,24 @@ func (x *c) detail(t core.Task, maxChars int) (taskDetail, error) {
 		return d, err
 	}
 	d.Task = tv[0]
+	if t.Budget != nil {
+		// What agents have spent of the task's own budget so far.
+		var runs []core.AgentSession
+		if err := x.db.List(ctx, &runs, store.Where(store.Eq("task_id", t.ID))); err != nil {
+			return d, err
+		}
+		spent := core.Budget{}
+		now := time.Now().UnixMilli()
+		for _, r := range runs {
+			spent.CostMicros += r.CostMicros
+			end := r.EndedAt
+			if end == 0 {
+				end = now
+			}
+			spent.Minutes += (end - r.StartedAt) / 60_000
+		}
+		d.Task.Spent = &spent
+	}
 	d.Task.Description, d.Task.Truncated = cut(d.Task.Description, maxChars)
 	subs, err := x.db.Tasks(ctx, store.TaskFilter{ParentID: t.ID, Sort: "rank", Limit: 500})
 	if err != nil {

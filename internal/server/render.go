@@ -30,19 +30,23 @@ type taskView struct {
 	HeldBy        string   `json:"held_by,omitempty"`
 	Labels        []string `json:"labels,omitempty"`
 	Epic          string   `json:"epic,omitempty"`
-	Cycle         int      `json:"cycle,omitempty"`
-	Parent        string   `json:"parent,omitempty"`
-	DueOn         string   `json:"due_on,omitempty"`
-	Estimate      int      `json:"estimate,omitempty"`
-	Project       string   `json:"project,omitempty"`
-	Description   string   `json:"description,omitempty"`
-	Truncated     bool     `json:"description_truncated,omitempty"`
-	ID            string   `json:"id,omitempty"`
-	CreatedBy     string   `json:"created_by,omitempty"`
-	CreatedAt     string   `json:"created_at,omitempty"`
-	Seq           int64    `json:"seq"`         // moves on anything in the task
-	UpdatedSeq    int64    `json:"updated_seq"` // moves when its own fields change
-	Trashed       bool     `json:"trashed,omitempty"`
+	Milestone     string   `json:"milestone,omitempty"`
+	// Budget is the task's own limit; Spent what agents have used of it.
+	Budget      *core.Budget `json:"budget,omitempty"`
+	Spent       *core.Budget `json:"spent,omitempty"`
+	Cycle       int          `json:"cycle,omitempty"`
+	Parent      string       `json:"parent,omitempty"`
+	DueOn       string       `json:"due_on,omitempty"`
+	Estimate    int          `json:"estimate,omitempty"`
+	Project     string       `json:"project,omitempty"`
+	Description string       `json:"description,omitempty"`
+	Truncated   bool         `json:"description_truncated,omitempty"`
+	ID          string       `json:"id,omitempty"`
+	CreatedBy   string       `json:"created_by,omitempty"`
+	CreatedAt   string       `json:"created_at,omitempty"`
+	Seq         int64        `json:"seq"`         // moves on anything in the task
+	UpdatedSeq  int64        `json:"updated_seq"` // moves when its own fields change
+	Trashed     bool         `json:"trashed,omitempty"`
 }
 
 func when(ms int64) string {
@@ -101,7 +105,7 @@ func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
 		st := nm.statuses[t.StatusID]
 		v := taskView{Key: t.Key, Title: t.Title, Status: st.Name, Category: st.Category, Assignee: nm.handle(t.AssigneeID),
 			WaitingOn: waitsOn(nm, t), WaitingOnNote: t.WaitingOnNote, Labels: nm.labelNames(t.LabelIDs),
-			Epic: nm.epics[t.EpicID].Name, Cycle: nm.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
+			Epic: nm.epics[t.EpicID].Name, Milestone: nm.milestones[t.MilestoneID], Budget: t.Budget, Cycle: nm.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
 			Estimate: t.Estimate, Seq: t.ActivitySeq, UpdatedSeq: t.UpdatedSeq, Trashed: t.DeletedAt != 0}
 		if t.Priority > 0 && t.Priority < len(priorityNames) {
 			v.Priority = priorityNames[t.Priority]
@@ -371,6 +375,26 @@ func (d taskDetail) text() string {
 	}
 	if t.Epic != "" {
 		meta = append(meta, "epic: "+t.Epic)
+	}
+	if t.Milestone != "" {
+		meta = append(meta, "milestone: "+t.Milestone)
+	}
+	if b := t.Budget; b != nil {
+		var parts []string
+		spent := core.Budget{}
+		if t.Spent != nil {
+			spent = *t.Spent
+		}
+		if b.CostMicros > 0 {
+			parts = append(parts, fmt.Sprintf("$%.2f of $%.2f", float64(spent.CostMicros)/1e6, float64(b.CostMicros)/1e6))
+		}
+		if b.Minutes > 0 {
+			parts = append(parts, fmt.Sprintf("%d of %d min", spent.Minutes, b.Minutes))
+		}
+		if b.Handoffs > 0 {
+			parts = append(parts, fmt.Sprintf("%d hand-offs at most", b.Handoffs))
+		}
+		meta = append(meta, "budget: "+strings.Join(parts, ", "))
 	}
 	if t.Cycle != 0 {
 		meta = append(meta, fmt.Sprintf("cycle: %d", t.Cycle))

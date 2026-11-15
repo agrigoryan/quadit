@@ -686,6 +686,45 @@ func TestPagesDoNotShift(t *testing.T) {
 				t.Fatalf("%s came %d times", key, n)
 			}
 		}
+		// A task on the first page is closed before the second is read: the
+		// rest still come, each once.
+		read := func(query string, between func()) map[string]int {
+			got := map[string]int{}
+			var p page
+			s.call(s.owner, "", "GET", w+"/tasks?"+query, nil, 200, &p)
+			for round := 0; round < 20; round++ {
+				for _, tk := range p.Tasks {
+					got[tk.Key]++
+				}
+				if p.NextCursor == "" {
+					break
+				}
+				if round == 0 {
+					between()
+				}
+				next := p.NextCursor
+				p = page{}
+				s.call(s.owner, "", "GET", w+"/tasks?"+query+"&cursor="+next, nil, 200, &p)
+			}
+			return got
+		}
+		got := read("project=SVA&open=1&limit=4", func() { s.change(s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"}) })
+		for i := 1; i <= 7; i++ {
+			if key := fmt.Sprintf("SVA-%d", i); got[key] != 1 {
+				t.Fatalf("after one closed between pages, %s came %d times: %v", key, got[key], got)
+			}
+		}
+		// A task further down jumps to the top between pages: nothing repeats.
+		got = read("project=SVA&sort=priority&limit=3", func() { s.change(s.owner, "", "task.update", M{"id": "SVA-6", "priority": "urgent"}) })
+		for key, n := range got {
+			if n != 1 {
+				t.Fatalf("after a reorder between pages, %s came %d times: %v", key, n, got)
+			}
+		}
+		// A cursor belongs to its list.
+		var first page
+		s.call(s.owner, "", "GET", w+"/tasks?sort=priority&limit=2", nil, 200, &first)
+		s.call(s.owner, "", "GET", w+"/tasks?sort=-created&limit=2&cursor="+first.NextCursor, nil, 400, nil)
 		if out := s.call(s.owner, "", "GET", w+"/tasks?limit=3&format=text", nil, 200, nil); !strings.Contains(out, "more: add cursor=") {
 			t.Fatalf("the text form does not say how to go on: %s", out)
 		}

@@ -160,7 +160,12 @@ type TaskFilter struct {
 	Closed         bool     // done, canceled or archived: everything Open with Archived off leaves out
 	// MadeUpTo keeps to tasks made at or before a feed position, so a list
 	// read page by page does not shift when tasks are added meanwhile.
-	MadeUpTo      int64
+	MadeUpTo int64
+	// After continues a sorted list past its last row: the values of that
+	// row's sort keys, in order (see TaskSortKeys). A row is returned only
+	// when it sorts after them, so a list read page by page neither repeats
+	// nor skips a row when others change, close or are added meanwhile.
+	After         []any
 	LabelIDs      []string // has every one of these
 	ParentID      string
 	TopLevel      bool // no parent
@@ -245,4 +250,40 @@ type SearchHit struct {
 type TallyRow struct {
 	Keys  []string
 	Count int
+}
+
+// SortKey is one column a task list is ordered by.
+type SortKey struct {
+	Expr string              // SQL over the tasks table "t"; never NULL
+	Desc bool                // largest first
+	Val  func(core.Task) any // the same value, from a row
+}
+
+// TaskSortKeys are the orderings a task list can have. Each ends in a key
+// no two tasks share, so "after this row" is always well defined.
+var TaskSortKeys = map[string][]SortKey{
+	"":         {{Expr: "t.id", Val: func(t core.Task) any { return t.ID }}},
+	"created":  {{Expr: "t.id", Val: func(t core.Task) any { return t.ID }}},
+	"-created": {{Expr: "t.id", Desc: true, Val: func(t core.Task) any { return t.ID }}},
+	"rank": {{Expr: "t.rank", Val: func(t core.Task) any { return t.Rank }},
+		{Expr: "t.id", Val: func(t core.Task) any { return t.ID }}},
+	"priority": {{Expr: "CASE t.priority WHEN 0 THEN 5 ELSE t.priority END", Val: func(t core.Task) any {
+		if t.Priority == 0 {
+			return 5
+		}
+		return t.Priority
+	}}, {Expr: "t.id", Val: func(t core.Task) any { return t.ID }}},
+	"due": {{Expr: "CASE WHEN t.due_on IS NULL THEN 1 ELSE 0 END", Val: func(t core.Task) any {
+		if t.DueOn == "" {
+			return 1
+		}
+		return 0
+	}}, {Expr: "COALESCE(t.due_on, '')", Val: func(t core.Task) any { return t.DueOn }},
+		{Expr: "t.id", Val: func(t core.Task) any { return t.ID }}},
+	"-activity": {{Expr: "t.activity_seq", Desc: true, Val: func(t core.Task) any { return t.ActivitySeq }},
+		{Expr: "t.id", Desc: true, Val: func(t core.Task) any { return t.ID }}},
+	"-updated": {{Expr: "t.updated_seq", Desc: true, Val: func(t core.Task) any { return t.UpdatedSeq }},
+		{Expr: "t.id", Desc: true, Val: func(t core.Task) any { return t.ID }}},
+	"key": {{Expr: "t.project_id", Val: func(t core.Task) any { return t.ProjectID }},
+		{Expr: "t.number", Val: func(t core.Task) any { return t.Number }}},
 }

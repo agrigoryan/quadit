@@ -24,6 +24,8 @@ type names struct {
 	projects map[string]core.Project
 	epics    map[string]core.Epic
 	cycles   map[string]core.Cycle
+	// milestones holds each milestone's name, by id.
+	milestones map[string]string
 }
 
 // names loads the workspace's small tables once per request.
@@ -47,6 +49,17 @@ func (x *c) names() (*names, error) {
 		func() error { return x.db.List(ctx, &ps, store.Q{Order: "rank"}) },
 		func() error { return x.db.List(ctx, &es, store.Q{}) },
 		func() error { return x.db.List(ctx, &cs, store.Q{}) },
+		func() error {
+			var mls []core.Milestone
+			if err := x.db.List(ctx, &mls, store.Q{}); err != nil {
+				return err
+			}
+			n.milestones = map[string]string{}
+			for _, m := range mls {
+				n.milestones[m.ID] = m.Name
+			}
+			return nil
+		},
 	} {
 		if err := load(); err != nil {
 			return nil, err
@@ -414,7 +427,25 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 		}
 	}
 	if q.Milestone != "" {
+		// By id, or by name (among the milestones of the projects asked for).
 		f.MilestoneID = q.Milestone
+		if len(q.Milestone) != 36 {
+			var ms []core.Milestone
+			if err := x.db.List(x.ctx(), &ms, store.Where(store.Live)); err != nil {
+				return f, err
+			}
+			var names []string
+			f.MilestoneID = ""
+			for _, m := range ms {
+				names = append(names, m.Name)
+				if strings.EqualFold(m.Name, q.Milestone) {
+					f.MilestoneID = m.ID
+				}
+			}
+			if f.MilestoneID == "" {
+				return f, &engine.Error{Code: engine.CodeNotFound, Field: "milestone", Message: "no milestone " + strconv.Quote(q.Milestone), Allowed: names, Nearest: nearestOf(q.Milestone, names)}
+			}
+		}
 	}
 	if q.Parent != "" {
 		t, err := rs.Task(q.Parent)
@@ -423,14 +454,13 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 		}
 		f.ParentID = t.ID
 	}
-	if _, ok := taskSorts[f.Sort]; !ok {
+	if _, ok := store.TaskSortKeys[f.Sort]; !ok {
 		return f, &engine.Error{Code: engine.CodeInvalid, Field: "sort", Message: "unknown sort " + strconv.Quote(f.Sort), Allowed: sortNames}
 	}
 	return f, nil
 }
 
 var sortNames = []string{"created", "-created", "rank", "priority", "due", "-activity", "-updated", "key"}
-var taskSorts = map[string]bool{"": true, "created": true, "-created": true, "rank": true, "priority": true, "due": true, "-activity": true, "-updated": true, "key": true}
 
 // Priorities returns the priority filter.
 func (q TaskQuery) Priorities() []int { return q.Priority }
@@ -454,7 +484,19 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		if len(slug) == 36 {
 			cond = store.Eq("id", slug)
 		}
-		if err := x.db.Get(x.ctx(), &view, cond, store.Live); err != nil || (!view.Shared && view.OwnerID != x.member.UserID) {
+		err := x.db.Get(x.ctx(), &view, cond, store.Live)
+		if err != nil {
+			// By its name, as it reads in the sidebar.
+			var named []core.View
+			x.db.List(x.ctx(), &named, store.Where(store.Live))
+			for _, nv := range named {
+				if strings.EqualFold(nv.Name, slug) && (nv.Shared || nv.OwnerID == x.member.UserID) {
+					view, err = nv, nil
+					break
+				}
+			}
+		}
+		if err != nil || (!view.Shared && view.OwnerID != x.member.UserID) {
 			var all []core.View
 			x.db.List(x.ctx(), &all, store.Where(store.Live))
 			var slugs []string
@@ -473,6 +515,12 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		if view.ProjectID != "" && len(q.Project) == 0 {
 			q.Project = []string{view.ProjectID}
 		}
+	}
+	// since= means the same here as on every list: what changed after that
+	// position in the feed.
+	if s := v.Get("since"); s != "" && v.Get("changed_since") == "" {
+		v = cloneValues(v)
+		v.Set("changed_since", s)
 	}
 	// A priority may be asked for by name.
 	if ps := v["priority"]; len(ps) > 0 {

@@ -441,6 +441,9 @@ func (s *Server) hFileServe(x *c) error {
 	if x.token != nil && x.token.WorkspaceID != f.WorkspaceID {
 		return errNotFound("file")
 	}
+	if !s.maySeeFile(x, f) {
+		return errNotFound("file")
+	}
 	key, ctype, name := f.StorageKey, f.ContentType, f.Name
 	if x.r.PathValue("name") == "preview" && x.r.URL.Query().Get("o") == "" {
 		if f.PreviewKey == "" {
@@ -496,4 +499,69 @@ func looksUUID(s string) bool {
 		}
 	}
 	return true
+}
+
+// maySeeFile reports whether a member limited to some projects, or to
+// reading with a token for some projects, may have a file: it is theirs, or
+// it is attached to a task of a project they are in, or to a page they can
+// see. A member with no limit sees every file of the workspace.
+func (s *Server) maySeeFile(x *c, f core.File) bool {
+	ctx := x.ctx()
+	db := s.st.In(f.WorkspaceID)
+	var m core.Member
+	if err := db.Get(ctx, &m, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
+		return false
+	}
+	var allowed []string
+	if m.Scope != nil {
+		allowed = m.Scope.Projects
+	}
+	if x.token != nil {
+		var mine []string
+		for _, sc := range strings.Fields(x.token.Scopes) {
+			if p, ok := strings.CutPrefix(sc, "project:"); ok {
+				mine = append(mine, p)
+			}
+		}
+		if len(mine) > 0 {
+			if len(allowed) == 0 {
+				allowed = mine
+			} else {
+				allowed = keep(allowed, func(p string) bool { return has(mine, p) })
+				if len(allowed) == 0 {
+					allowed = []string{"none"}
+				}
+			}
+		}
+	}
+	var atts []core.Attachment
+	if err := db.List(ctx, &atts, store.Where(store.Eq("file_id", f.ID))); err != nil {
+		return false
+	}
+	// A page's own files follow the page: a private page's are private.
+	for _, a := range atts {
+		if a.TaskID == "" && a.SubjectID != "" {
+			var d core.Doc
+			if db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && !engine.CanSeeDoc(d, x.user.ID) && f.UploadedBy != x.user.ID {
+				return false
+			}
+		}
+	}
+	if len(allowed) == 0 || f.UploadedBy == x.user.ID {
+		return true
+	}
+	for _, a := range atts {
+		if a.TaskID != "" {
+			var t core.Task
+			if db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && has(allowed, t.ProjectID) {
+				return true
+			}
+			continue
+		}
+		var d core.Doc
+		if db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && (d.ProjectID == "" || has(allowed, d.ProjectID)) {
+			return true
+		}
+	}
+	return false
 }
