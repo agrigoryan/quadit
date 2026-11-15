@@ -37,12 +37,11 @@ var (
 	secretHost = regexp.MustCompile(`^(http://)?(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$`)
 )
 
+// Seal encrypts a secret before it is stored. The server sets it.
+var Seal = func(plain string) (string, error) { return plain, nil }
+
 // secretSet makes a secret or changes the one with that name.
-func secretSet(c *cx) error {
-	var a secretArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func secretSet(c *cx, a secretArgs) error {
 	if !secretName.MatchString(a.Name) {
 		return invalid("name", "a secret's name is letters, digits and _, starting with a letter (like GITHUB_TOKEN)")
 	}
@@ -114,11 +113,7 @@ func secretSet(c *cx) error {
 	return c.save(p, "secrets", "secret", cur.ID, "workspace", c.ws, "", nil)
 }
 
-func secretDelete(c *cx) error {
-	var a idArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func secretDelete(c *cx, a idArgs) error {
 	var s core.Secret
 	if err := c.tx.Get(c.ctx, &s, store.Eq("id", a.ID), store.Live); err != nil {
 		if err := c.tx.Get(c.ctx, &s, store.Eq("name", a.ID), store.Live); err != nil {

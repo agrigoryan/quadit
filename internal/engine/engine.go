@@ -3,6 +3,20 @@
 // the caller. The engine checks it, writes the rows and the events in one
 // transaction, and remembers the id so the same change sent twice is applied
 // once.
+//
+// How the changes are laid out:
+//
+//	engine.go      a change, its result and its refusals; register, which
+//	               adds a kind of change, and Batch, which applies them
+//	catalog.go     the list of change types and their arguments, for callers
+//	ch_<what>.go   the changes to one kind of thing (ch_labels.go: label.*),
+//	               registered in the file's init, with what only they use;
+//	               a large kind takes several files (ch_task*.go, ch_doc*.go)
+//	ch_shared.go   what the handlers of several files use
+//
+// A handler is a func(c *cx, a Args) error. Its arguments arrive read, with
+// unknown fields refused, and the catalog describes the change by the
+// fields of Args.
 package engine
 
 import (
@@ -159,15 +173,24 @@ func (e *Engine) Now() int64 { return e.now().UnixMilli() }
 
 // handler is one kind of change.
 type handler struct {
-	min core.Role // the least role that may send it
-	fn  func(*cx) error
-	doc string
+	min  core.Role    // the least role that may send it
+	args reflect.Type // the struct its arguments are read into
+	fn   func(*cx) error
+	doc  string
 }
 
 var handlers = map[string]handler{}
 
-func register(name string, min core.Role, fn func(*cx) error) {
-	handlers[name] = handler{min: min, fn: fn}
+// register adds a kind of change. Its arguments are read into an A before
+// fn runs, and the catalog describes the change by A's fields.
+func register[A any](name string, min core.Role, fn func(c *cx, a A) error) {
+	handlers[name] = handler{min: min, args: reflect.TypeFor[A](), fn: func(c *cx) error {
+		var a A
+		if err := c.args(&a); err != nil {
+			return err
+		}
+		return fn(c, a)
+	}}
 }
 
 // ChangeTypes lists the changes the engine accepts.

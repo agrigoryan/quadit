@@ -1,0 +1,137 @@
+package engine
+
+import (
+	"encoding/json"
+
+	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/store"
+)
+
+func init() {
+	register("session.start", core.RoleMember, sessionStart)
+	register("session.update", core.RoleMember, sessionUpdate)
+}
+
+type sessionStartArgs struct {
+	ID           string `json:"id"`
+	Task         string `json:"task"`
+	Title        string `json:"title"`
+	Instructions string `json:"instructions"` // what the run was asked to do
+}
+
+func sessionStart(c *cx, a sessionStartArgs) error {
+	sid, err := newID("id", a.ID)
+	if err != nil {
+		return err
+	}
+	if err := c.checkBudget(); err != nil {
+		return err
+	}
+	seq := c.tx.NextSeq()
+	s := core.AgentSession{ID: sid, WorkspaceID: c.ws, AgentID: c.actor.UserID, Title: a.Title, Instructions: a.Instructions,
+		State: "running", StartedAt: c.at, UpdatedSeq: seq}
+	scopeType, scopeID, projectID, key := "workspace", c.ws, "", ""
+	if a.Task != "" {
+		t, err := c.task("task", a.Task)
+		if err != nil {
+			return err
+		}
+		s.TaskID, scopeType, scopeID, projectID, key = t.ID, "task", t.ID, t.ProjectID, t.Key
+		if s.Title == "" {
+			s.Title = t.Title
+		}
+		// A task can carry its own limit on what may be spent on it.
+		if err := c.checkTaskBudget(t); err != nil {
+			return err
+		}
+	}
+	if err := c.tx.Insert(c.ctx, s); err != nil {
+		return taken(err, "id", sid)
+	}
+	c.ref = s.ID
+	return c.emit(seq, "session.created", "session", s.ID, scopeType, scopeID, projectID, map[string]any{"row": s, "key": key})
+}
+
+type sessionUpdateArgs struct {
+	ID      string      `json:"id"`
+	Title   Opt[string] `json:"title"`
+	Summary Opt[string] `json:"summary"`
+	// State: running, done, failed or stopped. Anything but running ends
+	// the session.
+	State Opt[string] `json:"state"`
+	// AddSteps appends to what the run did, in order.
+	AddSteps []json.RawMessage `json:"add_steps"`
+	// AddLinks appends commits, files or URLs the run produced.
+	AddLinks []json.RawMessage `json:"add_links"`
+	// Totals so far, not increments.
+	CostMicros Opt[int] `json:"cost_micros"`
+	TokensIn   Opt[int] `json:"tokens_in"`
+	TokensOut  Opt[int] `json:"tokens_out"`
+}
+
+func appendJSON(cur json.RawMessage, add []json.RawMessage) json.RawMessage {
+	var list []json.RawMessage
+	if len(cur) > 0 {
+		_ = json.Unmarshal(cur, &list)
+	}
+	list = append(list, add...)
+	out, _ := json.Marshal(list)
+	return out
+}
+
+func sessionUpdate(c *cx, a sessionUpdateArgs) error {
+	s, err := get[core.AgentSession](c, "session", "id", a.ID)
+	if err != nil {
+		return err
+	}
+	if s.AgentID != c.actor.UserID && !c.system {
+		return forbidden("a session is updated by the agent that started it")
+	}
+	p := newPatch()
+	p.str("title", a.Title, &s.Title)
+	p.str("summary", a.Summary, &s.Summary)
+	if a.State.Set {
+		states := []string{"running", "done", "failed", "stopped"}
+		if !contains(states, a.State.V) {
+			return oneOf("state", "session state", a.State.V, states)
+		}
+		p.str("state", a.State, &s.State)
+		if s.State != "running" && s.EndedAt == 0 {
+			p.put("ended_at", int64(0), c.at)
+		}
+	}
+	// The event carries the whole new list, so a reader's copy stays right
+	// without asking again.
+	if len(a.AddSteps) > 0 {
+		all := appendJSON(s.Steps, a.AddSteps)
+		p.set["steps"] = all
+		p.changes["steps"] = core.FieldChange{To: all}
+	}
+	if len(a.AddLinks) > 0 {
+		all := appendJSON(s.Links, a.AddLinks)
+		p.set["links"] = all
+		p.changes["links"] = core.FieldChange{To: all}
+	}
+	before := s.CostMicros
+	total := func(col string, o Opt[int], cur *int64) {
+		if o.Set && int64(o.V) != *cur {
+			p.put(col, *cur, int64(o.V))
+			*cur = int64(o.V)
+		}
+	}
+	total("cost_micros", a.CostMicros, &s.CostMicros)
+	total("tokens_in", a.TokensIn, &s.TokensIn)
+	total("tokens_out", a.TokensOut, &s.TokensOut)
+	scopeType, scopeID, projectID := "workspace", c.ws, ""
+	if s.TaskID != "" {
+		var t core.Task
+		if err := c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)); err == nil {
+			scopeType, scopeID, projectID = "task", t.ID, t.ProjectID
+		}
+	}
+	if err := c.save(p, "agent_sessions", "session", s.ID, scopeType, scopeID, projectID, nil); err != nil {
+		return err
+	}
+	_ = before
+	return c.budgetWarnings(s)
+}

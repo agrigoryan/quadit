@@ -15,9 +15,6 @@ func init() {
 	register("dbview.create", core.RoleMember, dbviewCreate)
 	register("dbview.update", core.RoleMember, dbviewUpdate)
 	register("dbview.delete", core.RoleMember, dbviewDelete)
-	register("source.create", core.RoleAdmin, sourceCreate)
-	register("source.update", core.RoleAdmin, sourceUpdate)
-	register("source.delete", core.RoleAdmin, sourceDelete)
 }
 
 // PropertyTypes are the kinds of column a database can have.
@@ -56,11 +53,7 @@ type renameOption struct {
 	To   string `json:"to"`
 }
 
-func propertyCreate(c *cx) error {
-	var a propertyArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func propertyCreate(c *cx, a propertyArgs) error {
 	pid, err := newID("id", a.ID)
 	if err != nil {
 		return err
@@ -108,11 +101,7 @@ func (c *cx) propertyDoc(ref string) (core.DBProperty, core.Doc, error) {
 	return p, d, err
 }
 
-func propertyUpdate(c *cx) error {
-	var a propertyArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func propertyUpdate(c *cx, a propertyArgs) error {
 	pr, d, err := c.propertyDoc(a.ID)
 	if err != nil {
 		return err
@@ -199,29 +188,6 @@ func renamedOption(pr core.DBProperty, from, to string) ([]byte, error) {
 // renameInRows carries an option's new name into every row that holds the
 // old one, the trash included, and into the filters of the database's views.
 func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error {
-	// swap returns the value with the name replaced, and whether it changed.
-	swap := func(raw json.RawMessage) (json.RawMessage, bool) {
-		var one string
-		if json.Unmarshal(raw, &one) == nil {
-			if one != from {
-				return raw, false
-			}
-			out, _ := json.Marshal(to)
-			return out, true
-		}
-		var many []string
-		if json.Unmarshal(raw, &many) != nil {
-			return raw, false
-		}
-		hit := false
-		for i, v := range many {
-			if v == from {
-				many[i], hit = to, true
-			}
-		}
-		out, _ := json.Marshal(many)
-		return out, hit
-	}
 	var rows []core.Doc
 	if err := c.tx.List(c.ctx, &rows, store.Where(store.Eq("parent_id", d.ID), store.Eq("kind", core.DocRow))); err != nil {
 		return err
@@ -231,7 +197,7 @@ func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error
 		if len(row.Props) == 0 || json.Unmarshal(row.Props, &props) != nil {
 			continue
 		}
-		next, hit := swap(props[pr.ID])
+		next, hit := swapOption(props[pr.ID], from, to)
 		if !hit {
 			continue
 		}
@@ -246,6 +212,37 @@ func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error
 			return err
 		}
 	}
+	return c.renameInFilters(pr, d, from, to)
+}
+
+// swapOption returns a select's value, one name or a list of them, with
+// the name replaced, and whether it changed.
+func swapOption(raw json.RawMessage, from, to string) (json.RawMessage, bool) {
+	var one string
+	if json.Unmarshal(raw, &one) == nil {
+		if one != from {
+			return raw, false
+		}
+		out, _ := json.Marshal(to)
+		return out, true
+	}
+	var many []string
+	if json.Unmarshal(raw, &many) != nil {
+		return raw, false
+	}
+	hit := false
+	for i, v := range many {
+		if v == from {
+			many[i], hit = to, true
+		}
+	}
+	out, _ := json.Marshal(many)
+	return out, hit
+}
+
+// renameInFilters carries an option's new name into the filters of the
+// database's views.
+func (c *cx) renameInFilters(pr core.DBProperty, d core.Doc, from, to string) error {
 	var views []core.DBView
 	if err := c.tx.List(c.ctx, &views, store.Where(store.Eq("database_id", d.ID), store.Live)); err != nil {
 		return err
@@ -262,7 +259,7 @@ func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error
 			if json.Unmarshal(f["prop"], &prop) != nil || (prop != pr.ID && prop != pr.Name) {
 				continue
 			}
-			if next, ok := swap(f["value"]); ok {
+			if next, ok := swapOption(f["value"], from, to); ok {
 				f["value"], hit = next, true
 			}
 		}
@@ -283,11 +280,7 @@ func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error
 	return nil
 }
 
-func propertyDelete(c *cx) error {
-	var a idArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func propertyDelete(c *cx, a idArgs) error {
 	pr, d, err := c.propertyDoc(a.ID)
 	if err != nil {
 		return err
@@ -310,11 +303,7 @@ type dbviewArgs struct {
 	Rank     Opt[string]          `json:"rank"`
 }
 
-func dbviewCreate(c *cx) error {
-	var a dbviewArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func dbviewCreate(c *cx, a dbviewArgs) error {
 	vid, err := newID("id", a.ID)
 	if err != nil {
 		return err
@@ -357,11 +346,7 @@ func (c *cx) dbviewDoc(ref string) (core.DBView, core.Doc, error) {
 	return v, d, err
 }
 
-func dbviewUpdate(c *cx) error {
-	var a dbviewArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func dbviewUpdate(c *cx, a dbviewArgs) error {
 	v, d, err := c.dbviewDoc(a.ID)
 	if err != nil {
 		return err
@@ -395,11 +380,7 @@ func dbviewUpdate(c *cx) error {
 	return c.emitTo(docAudience(d), seq, "dbview.updated", "dbview", v.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": v.ID, "changes": p.changes})
 }
 
-func dbviewDelete(c *cx) error {
-	var a idArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
+func dbviewDelete(c *cx, a idArgs) error {
 	v, d, err := c.dbviewDoc(a.ID)
 	if err != nil {
 		return err
@@ -411,136 +392,6 @@ func dbviewDelete(c *cx) error {
 	c.ref = v.ID
 	return c.emitTo(docAudience(d), seq, "dbview.deleted", "dbview", v.ID, "doc", d.ID, d.ProjectID,
 		map[string]any{"id": v.ID, "changes": map[string]core.FieldChange{"deleted_at": {To: c.at}}})
-}
-
-// ---- repository sync ----
-
-type sourceArgs struct {
-	ID string `json:"id"`
-	// Root is the page the repository's files appear under. Leave it out on
-	// create to have one made, named by Title.
-	Root   string      `json:"root"`
-	Title  string      `json:"title"`
-	Repo   Opt[string] `json:"repo"` // a path on the server, or a URL git can clone
-	Branch Opt[string] `json:"branch"`
-	Subdir Opt[string] `json:"subdir"`
-	// Authority says who wins when a file and its page both changed since
-	// the last sync: repo (default) or pages.
-	Authority Opt[string] `json:"authority"`
-	// WriteMode says what happens to page edits: commit (default) pushes
-	// them to the branch, propose pushes them to a side branch for review,
-	// none leaves the repository alone (pages are read-only).
-	WriteMode Opt[string] `json:"write_mode"`
-}
-
-var (
-	authorities = []string{"repo", "pages"}
-	writeModes  = []string{"commit", "propose", "none"}
-)
-
-func sourceCreate(c *cx) error {
-	var a sourceArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
-	sid, err := newID("id", a.ID)
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(a.Repo.V) == "" {
-		return invalid("repo", "give the repository: a path on the server, or a URL git can clone")
-	}
-	if err := checkSubdir(a.Subdir.V); err != nil {
-		return err
-	}
-	src := core.DocSource{ID: sid, WorkspaceID: c.ws, Repo: strings.TrimSpace(a.Repo.V), Branch: a.Branch.V, Subdir: strings.Trim(a.Subdir.V, "/"),
-		Authority: orStr(a.Authority.V, "repo"), WriteMode: orStr(a.WriteMode.V, "commit"), CreatedBy: c.actor.UserID, CreatedAt: c.at}
-	if !contains(authorities, src.Authority) {
-		return oneOf("authority", "authority", src.Authority, authorities)
-	}
-	if !contains(writeModes, src.WriteMode) {
-		return oneOf("write_mode", "write mode", src.WriteMode, writeModes)
-	}
-	if a.Root != "" {
-		root, err := c.doc("root", a.Root)
-		if err != nil {
-			return err
-		}
-		src.RootDocID = root.ID
-	} else {
-		title := a.Title
-		if title == "" {
-			title = strings.TrimSuffix(src.Repo[strings.LastIndexAny(src.Repo, "/:")+1:], ".git")
-		}
-		if err := c.sub("doc.create", docCreateArgs{Title: title, Icon: "git"}); err != nil {
-			return err
-		}
-		src.RootDocID = c.subRef
-	}
-	seq := c.tx.NextSeq()
-	src.UpdatedSeq = seq
-	if err := c.tx.Insert(c.ctx, src); err != nil {
-		return taken(err, "id", sid)
-	}
-	if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"source_id": src.ID}, store.Eq("id", src.RootDocID)); err != nil {
-		return err
-	}
-	return c.created(seq, "source", src.ID, "doc", src.RootDocID, "", src)
-}
-
-func sourceUpdate(c *cx) error {
-	var a sourceArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
-	src, err := get[core.DocSource](c, "source", "id", a.ID)
-	if err != nil {
-		return err
-	}
-	if a.Title != "" || a.Root != "" {
-		return invalid("title", "a source keeps the page it was made under; to rename that page use doc.update {\"id\": %q, \"title\": …}", src.RootDocID)
-	}
-	p := newPatch()
-	if err := p.name("repo", a.Repo, &src.Repo); err != nil {
-		return err
-	}
-	p.str("branch", a.Branch, &src.Branch)
-	if a.Subdir.Set {
-		if err := checkSubdir(a.Subdir.V); err != nil {
-			return err
-		}
-		a.Subdir.V = strings.Trim(a.Subdir.V, "/")
-	}
-	p.str("subdir", a.Subdir, &src.Subdir)
-	if a.Authority.Set {
-		if !contains(authorities, a.Authority.V) {
-			return oneOf("authority", "authority", a.Authority.V, authorities)
-		}
-		p.str("authority", a.Authority, &src.Authority)
-	}
-	if a.WriteMode.Set {
-		if !contains(writeModes, a.WriteMode.V) {
-			return oneOf("write_mode", "write mode", a.WriteMode.V, writeModes)
-		}
-		p.str("write_mode", a.WriteMode, &src.WriteMode)
-	}
-	return c.save(p, "doc_sources", "source", src.ID, "doc", src.RootDocID, "", nil)
-}
-
-// sourceDelete stops mirroring a repository. The pages stay as ordinary pages.
-func sourceDelete(c *cx) error {
-	var a idArgs
-	if err := c.args(&a); err != nil {
-		return err
-	}
-	src, err := get[core.DocSource](c, "source", "id", a.ID)
-	if err != nil {
-		return err
-	}
-	if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"source_id": "", "source_path": "", "source_hash": ""}, store.Eq("source_id", src.ID)); err != nil {
-		return err
-	}
-	return c.trash("doc_sources", "source", src.ID, "doc", src.RootDocID, "", nil)
 }
 
 // rowProps turns a row's values as a caller sends them (by property name or
@@ -665,15 +516,4 @@ func (c *cx) addOptions(p *core.DBProperty, vals []string) error {
 	}
 	return c.emitTo(docAudience(d), seq, "property.updated", "property", p.ID, "doc", d.ID, d.ProjectID,
 		map[string]any{"id": p.ID, "changes": map[string]core.FieldChange{"config": {From: old, To: json.RawMessage(raw)}}})
-}
-
-// checkSubdir keeps a source's folder inside its repository: no way up and
-// out of it, and nothing of git's own.
-func checkSubdir(dir string) error {
-	for _, part := range strings.FieldsFunc(dir, func(r rune) bool { return r == '/' || r == '\\' }) {
-		if part == ".." || part == ".git" {
-			return invalid("subdir", "the folder is a path inside the repository, such as docs or docs/handbook; %q leads out of it", dir)
-		}
-	}
-	return nil
 }
