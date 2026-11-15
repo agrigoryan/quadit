@@ -1,0 +1,1 @@
+Quadit end-to-end fixture: a small text file to attach.
