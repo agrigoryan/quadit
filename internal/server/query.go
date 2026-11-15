@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -196,51 +197,43 @@ func (who *viewer) taskFilter(ctx context.Context, q core.TaskQuery) (f store.Ta
 // as an id, any other as a name.
 const idLength = 36
 
+// savedView finds a saved view the viewer may see, by id, by slug, or by its
+// name as the sidebar shows it. One that is not there, or not the viewer's
+// to see, is answered with the views that are.
+func (who *viewer) savedView(ctx context.Context, ref string) (core.View, error) {
+	var views []core.View
+	if err := who.db.List(ctx, &views, store.Where(store.Live)); err != nil {
+		return core.View{}, err
+	}
+	views = keep(views, who.canSeeView)
+	for _, match := range []func(core.View) bool{
+		func(view core.View) bool { return len(ref) == idLength && view.ID == ref },
+		func(view core.View) bool { return len(ref) != idLength && view.Slug == ref },
+		func(view core.View) bool { return strings.EqualFold(view.Name, ref) },
+	} {
+		if i := slices.IndexFunc(views, match); i >= 0 {
+			return views[i], nil
+		}
+	}
+	slugs := make([]string, len(views))
+	for i, view := range views {
+		slugs[i] = view.Slug
+	}
+	return core.View{}, &engine.Error{Code: engine.CodeNotFound, Field: "view", Message: "no view " + strconv.Quote(ref), Allowed: slugs, Nearest: engine.Nearest(ref, slugs)}
+}
+
 // queryFromRequest builds a task query from a saved view (when view= names
-// one) overlaid with the URL's own parameters. skip names the endpoint's
-// own parameters, which are not task filters. The view is found by id, by
-// slug, or by its name as the sidebar shows it, among the caller's own
-// views and the shared ones. since= is read as changed_since=, and a
-// priority may be given by name.
+// one the caller may see) overlaid with the URL's own parameters. skip
+// names the endpoint's own parameters, which are not task filters. since=
+// is read as changed_since=, and a priority may be given by name.
 func (x *c) queryFromRequest(skip ...string) (core.TaskQuery, error) {
 	var q core.TaskQuery
 	v := x.r.URL.Query()
-	if slug := v.Get("view"); slug != "" {
+	if ref := v.Get("view"); ref != "" {
 		// The saved view: its filter is the base the URL adds to.
-		var view core.View
-		cond := store.Eq("slug", slug)
-		if len(slug) == idLength {
-			cond = store.Eq("id", slug)
-		}
-		there, err := store.Find(x.ctx(), x.db, &view, cond, store.Live)
+		view, err := x.savedView(x.ctx(), ref)
 		if err != nil {
 			return q, err
-		}
-		if !there {
-			// By its name, as it reads in the sidebar.
-			var named []core.View
-			if err := x.db.List(x.ctx(), &named, store.Where(store.Live)); err != nil {
-				return q, err
-			}
-			for _, candidate := range named {
-				if strings.EqualFold(candidate.Name, slug) && (candidate.Shared || candidate.OwnerID == x.member.UserID) {
-					view, there = candidate, true
-					break
-				}
-			}
-		}
-		if !there || (!view.Shared && view.OwnerID != x.member.UserID) {
-			var all []core.View
-			if err := x.db.List(x.ctx(), &all, store.Where(store.Live)); err != nil {
-				return q, err
-			}
-			var slugs []string
-			for _, other := range all {
-				if other.Shared || other.OwnerID == x.member.UserID {
-					slugs = append(slugs, other.Slug)
-				}
-			}
-			return q, &engine.Error{Code: engine.CodeNotFound, Field: "view", Message: "no view " + strconv.Quote(slug), Allowed: slugs, Nearest: engine.Nearest(slug, slugs)}
 		}
 		if len(view.Query) > 0 {
 			if err := json.Unmarshal(view.Query, &q); err != nil {
