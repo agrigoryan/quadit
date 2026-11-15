@@ -3,9 +3,14 @@
 // removes them as the server answers; on start it takes over what an earlier
 // page left behind.
 //
-// Everything here is best effort: where the browser has no IndexedDB (or
-// refuses it, as some private windows do) every call quietly does nothing
-// and the queue lives in memory only, as it did before.
+// A page that reloads or closes a moment after a change cannot count on
+// IndexedDB: a write the page has not finished when it goes is dropped with
+// it. So what this tab holds is also copied to localStorage, which is
+// written at once, with every change; the next page takes from there too.
+//
+// Everything here is best effort: where the browser has no IndexedDB or
+// localStorage (or refuses them, as some private windows do) the calls
+// quietly do without, and with neither the queue lives in memory only.
 
 import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
@@ -47,6 +52,59 @@ if (hasLocks) {
   } catch {
     // No locks after all: every tab then takes over whatever it finds.
   }
+}
+
+/** What this tab has kept and not yet seen answered. Changed by put, remove, clear and takeOver, each of which then copies it. */
+const held = new Map<string, OutboxItem>();
+
+/** Where each tab's copy of what it holds is kept in localStorage: under its own name, so tabs do not write over each other. */
+const COPY = "quadit.outbox.tab.";
+
+function copyHeld() {
+  try {
+    if (held.size > 0) localStorage.setItem(COPY + TAB, JSON.stringify([...held.values()]));
+    else localStorage.removeItem(COPY + TAB);
+  } catch {
+    // No storage: only what reached IndexedDB is kept.
+  }
+}
+
+/** The copies in localStorage, each with its tab, leaving out this tab's own and those of `living` tabs. */
+function copies(living: Set<string> | null): { name: string; items: OutboxItem[] }[] {
+  const found: { name: string; items: OutboxItem[] }[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const name = localStorage.key(i);
+      const tab = name?.startsWith(COPY) ? name.slice(COPY.length) : undefined;
+      if (!name || !tab || tab === TAB || living?.has(tab)) continue;
+      try {
+        found.push({ name, items: JSON.parse(localStorage.getItem(name) ?? "[]") as OutboxItem[] });
+      } catch {
+        found.push({ name, items: [] });
+      }
+    }
+  } catch {
+    // No storage: no copies.
+  }
+  return found;
+}
+
+function forget(names: string[]) {
+  try {
+    for (const name of names) localStorage.removeItem(name);
+  } catch {
+    // No storage: nothing to forget.
+  }
+}
+
+/** The items in IndexedDB, and those only in the copies of the tabs that are not `living`. */
+async function everything(living: Set<string> | null) {
+  const kept = await all();
+  const keys = new Set(kept.map((item) => item.key));
+  const found = copies(living);
+  // A change that reached IndexedDB too is the same change: the one there counts.
+  const onlyCopied = found.flatMap((copy) => copy.items).filter((item) => !keys.has(item.key));
+  return { items: [...kept, ...onlyCopied], onlyCopied, names: found.map((copy) => copy.name) };
 }
 
 let opening: Promise<IDBDatabase | null> | null = null;
@@ -124,8 +182,8 @@ async function livingTabs(): Promise<Set<string> | null> {
 }
 
 async function takeOver(slug: string, user: string): Promise<OutboxItem[]> {
-  const items = await all();
   const living = await livingTabs();
+  const { items, onlyCopied, names } = await everything(living);
   const now = Date.now();
   const mine: OutboxItem[] = [];
   const stale: string[] = [];
@@ -134,16 +192,22 @@ async function takeOver(slug: string, user: string): Promise<OutboxItem[]> {
     else if (item.slug === slug && item.user === user && item.tab !== TAB && !living?.has(item.tab))
       mine.push({ ...item, tab: TAB });
   }
-  if (mine.length || stale.length) {
+  // What a tab that is gone left only in its copy, and is not taken now (another workspace, another person), moves to IndexedDB.
+  const taken = new Set(mine.map((item) => item.key));
+  const moved = onlyCopied.filter((item) => !taken.has(item.key) && !stale.includes(item.key));
+  if (mine.length || stale.length || moved.length) {
     await run<undefined>(
       "readwrite",
       (s) => {
         for (const key of stale) s.delete(key);
-        for (const item of mine) s.put(item);
+        for (const item of [...mine, ...moved]) s.put(item);
       },
       undefined,
     );
   }
+  forget(names);
+  for (const item of mine) held.set(item.key, item);
+  copyHeld();
   return mine.sort((a, b) => (a.key < b.key ? -1 : 1));
 }
 
@@ -160,6 +224,8 @@ export const outbox = {
     } catch {
       // No storage: the count on the waiting screen is then left out.
     }
+    held.set(item.key, { ...item, tab: TAB });
+    copyHeld();
     void inOrder(() => run<undefined>("readwrite", (s) => void s.put({ ...item, tab: TAB }), undefined));
   },
 
@@ -173,6 +239,8 @@ export const outbox = {
   },
 
   remove(key: string): void {
+    held.delete(key);
+    copyHeld();
     void inOrder(() => run<undefined>("readwrite", (s) => void s.delete(key), undefined));
   },
 
@@ -194,7 +262,7 @@ export const outbox = {
 
   /** How many edits are kept for this workspace and person, whichever tab holds them. A batch counts once, as in the top bar. */
   async count(slug: string, user: string): Promise<number> {
-    const items = await inOrder(all);
+    const { items } = await inOrder(() => everything(null));
     let n = 0;
     for (const item of items) if (item.slug === slug && item.user === user) n++;
     return n;
@@ -207,6 +275,9 @@ export const outbox = {
     } catch {
       // Nothing was remembered.
     }
+    held.clear();
+    forget(copies(null).map((copy) => copy.name));
+    copyHeld();
     return inOrder(() => run<undefined>("readwrite", (s) => void s.clear(), undefined));
   },
 };
