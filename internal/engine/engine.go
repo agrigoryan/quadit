@@ -232,9 +232,55 @@ func (c *cx) args(v any) error {
 			return &Error{Code: CodeInvalid, Field: name, Message: fmt.Sprintf("%s has no field %q", c.change.Type, name),
 				Allowed: allowed, Nearest: nearest(name, allowed)}
 		}
+		var te *json.UnmarshalTypeError
+		if errors.As(err, &te) {
+			field := te.Field
+			if i := strings.LastIndex(field, "."); i >= 0 && !strings.Contains(field, "[") {
+				field = field[i+1:]
+			}
+			field = strings.TrimSuffix(strings.TrimSuffix(field, ".V"), ".Value")
+			return &Error{Code: CodeInvalid, Field: field, Message: fmt.Sprintf("%s: %s takes %s, and was given %s", c.change.Type, field, jsonKind(te.Type), jsonGiven(te.Value)),
+				Allowed: jsonFields(v)}
+		}
 		return invalid("args", "%s: %v", c.change.Type, err)
 	}
 	return nil
+}
+
+// jsonKind says, in a caller's words, what a field takes.
+func jsonKind(t reflect.Type) string {
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	switch t.Kind() {
+	case reflect.String:
+		return "text"
+	case reflect.Bool:
+		return "true or false"
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Float32, reflect.Float64:
+		return "a number"
+	case reflect.Slice, reflect.Array:
+		return "a list ([…])"
+	case reflect.Map, reflect.Struct:
+		return "an object ({…})"
+	}
+	return "another kind of value"
+}
+
+func jsonGiven(v string) string {
+	switch v {
+	case "string":
+		return "text"
+	case "number":
+		return "a number"
+	case "bool":
+		return "true or false"
+	case "array":
+		return "a list"
+	case "object":
+		return "an object"
+	}
+	return v
 }
 
 // emit records an event under a sequence number from this transaction.

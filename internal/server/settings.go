@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/mail"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -141,6 +144,15 @@ func (s *Server) saveSetting(ctx context.Context, name string, value json.RawMes
 	if !json.Valid(value) {
 		return errBad("a setting's value must be JSON")
 	}
+	if strings.TrimSpace(string(value)) == "null" {
+		// null takes the setting back to its default.
+		_, err := s.st.Delete(ctx, "settings", store.Eq("name", name))
+		s.forgetSetting(name)
+		return err
+	}
+	if err := checkSettingShape(name, value); err != nil {
+		return err
+	}
 	if len(secrets) > 0 {
 		var obj map[string]any
 		if err := json.Unmarshal(value, &obj); err != nil {
@@ -255,4 +267,47 @@ func linkify(s string) string {
 		}
 	}
 	return strings.Join(words, " ")
+}
+
+// settingShapes says what each setting holds, so that a value of another
+// shape is refused instead of stored: a secret under a wrong key would not
+// be recognised as one, and would be shown.
+var settingShapes = map[string]func() any{
+	"install.name":                 func() any { return new(string) },
+	"auth.password":                func() any { return new(bool) },
+	"auth.passkeys":                func() any { return new(bool) },
+	"auth.registration":            func() any { return new(bool) },
+	"auth.require_2fa":             func() any { return new(bool) },
+	"workspaces.anyone_can_create": func() any { return new(bool) },
+	"auth.allowed_domains":         func() any { return new([]string) },
+	"auth.google":                  func() any { return new(oauthSetting) },
+	"auth.github":                  func() any { return new(oauthSetting) },
+	"auth.oidc":                    func() any { return new(oauthSetting) },
+	"mail":                         func() any { return new(mail.Config) },
+	"files":                        func() any { return new(blob.Config) },
+	"files.max_mb":                 func() any { return new(int) },
+	"limits.api_per_minute":        func() any { return new(int) },
+	"metrics.token":                func() any { return new(string) },
+	"backup":                       func() any { return new(backupSetting) },
+	"push":                         func() any { return new(pushKeys) },
+}
+
+func checkSettingShape(name string, value json.RawMessage) error {
+	mk, ok := settingShapes[name]
+	if !ok {
+		return nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(value))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(mk()); err != nil {
+		return &engine.Error{Code: engine.CodeInvalid, Field: name, Message: fmt.Sprintf("this is not what the setting %s holds: %s", name, strings.TrimPrefix(err.Error(), "json: "))}
+	}
+	return nil
+}
+
+// forgetSetting drops a setting from the short-lived cache.
+func (s *Server) forgetSetting(name string) {
+	s.setMu.Lock()
+	delete(s.setTTL, name)
+	s.setMu.Unlock()
 }

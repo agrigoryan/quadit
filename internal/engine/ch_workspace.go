@@ -570,6 +570,11 @@ func agentCreate(c *cx) error {
 		if role != core.RoleMember {
 			return invalid("role", "a sub-agent made for a task is a member")
 		}
+		if n, err := c.tx.Count(c.ctx, "members", store.Eq("delegated_task", forTask.ID), store.Null("suspended_at"), store.Null("removed_at")); err != nil {
+			return err
+		} else if n >= maxHelpers {
+			return conflictErr("%s already has %d helpers at work; that is the most a task takes", forTask.Key, n)
+		}
 	} else if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
 		return forbidden("agent.create needs the admin role; you are a %s. To get help on one task, make a sub-agent for it: add \"task\": \"SVA-12\"", c.actor.Role)
 	}
@@ -624,6 +629,9 @@ func agentCreate(c *cx) error {
 		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at, ResponsibleID: rm.UserID,
 		DelegatedBy: delegatedBy(c, forTask), DelegatedTask: forTask.ID})
 }
+
+// maxHelpers is how many sub-agents may be at work on one task at a time.
+const maxHelpers = 3
 
 func delegatedBy(c *cx, t core.Task) string {
 	if t.ID == "" {
@@ -742,6 +750,15 @@ func agentUpdate(c *cx) error {
 		if !a.Scope.Null {
 			if sc, err = c.scopeArg(&a.Scope.V); err != nil {
 				return err
+			}
+			// What needs approval stays as it was unless the list is given
+			// (an empty list lifts it): narrowing projects must not quietly
+			// let an agent do more.
+			if a.Scope.V.NeedsApproval == nil && m.Scope != nil && len(m.Scope.NeedsApproval) > 0 {
+				if sc == nil {
+					sc = &core.Scope{}
+				}
+				sc.NeedsApproval = append([]string(nil), m.Scope.NeedsApproval...)
 			}
 		}
 		sc = c.capScope(sc)

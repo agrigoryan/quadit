@@ -392,6 +392,14 @@ func commentCreate(c *cx) error {
 	// whoever answered last.
 	handTo, handNote := "", a.WaitingOnNote
 	switch {
+	case a.WaitingOn.Set && isOutside(a.WaitingOn.V):
+		// The next move is nobody's here: the note says what it waits for.
+		if strings.TrimSpace(a.WaitingOnNote) == "" {
+			return invalid("waiting_on_note", "say what outside event the task waits for, in waiting_on_note")
+		}
+		if err := c.setWaitingOutside(t, a.WaitingOnNote); err != nil {
+			return err
+		}
 	case a.WaitingOn.Set && !a.WaitingOn.Null && a.WaitingOn.V != "":
 		if handTo, err = c.optMember("waiting_on", a.WaitingOn.V); err != nil {
 			return err
@@ -671,6 +679,11 @@ func decisionOpen(c *cx) error {
 		}
 		asked = self.ResponsibleID
 	}
+	if kind == core.DecisionApproval && a.Action != "" && asked != "" {
+		if m, err := c.memberRef("ask", asked); err == nil && m.Kind != core.KindPerson {
+			return invalid("ask", "an approval for a change is asked of a person; @%s is an agent", m.Handle)
+		}
+	}
 
 	d := core.Decision{ID: did, WorkspaceID: c.ws, TaskID: t.ID, Kind: kind, Question: strings.TrimSpace(a.Question), Details: a.Details,
 		Action: a.Action, ActionArgs: a.Args, State: core.StateOpen, AskedID: asked, Recommendation: a.Recommendation,
@@ -858,6 +871,9 @@ func decisionPick(c *cx) error {
 	}
 	if d.CreatedBy == c.actor.UserID {
 		return forbidden("you asked this question, so someone else has to answer it")
+	}
+	if d.Kind == core.DecisionApproval && d.Action != "" && c.actor.Kind != core.KindPerson && !c.system {
+		return forbidden("an approval for a change is a person's to give, not an agent's")
 	}
 	if c.actor.Kind == core.KindAgent && d.AskedID != "" && d.AskedID != c.actor.UserID {
 		return forbidden("this question was asked of someone else")

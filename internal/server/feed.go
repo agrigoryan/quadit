@@ -181,6 +181,9 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 	if err := s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err != nil {
 		return err
 	}
+	if seq < 0 {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "seq", Message: "a feed position is zero or more"}
+	}
 	if seq > ws.Seq {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "seq", Message: fmt.Sprintf("the feed is at %d; %d has not happened yet", ws.Seq, seq)}
 	}

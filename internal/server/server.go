@@ -416,6 +416,10 @@ func (s *Server) identify(x *c) error {
 		tok := strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
 		var t core.APIToken
 		if err := s.st.Get(ctx, &t, store.Eq("token_hash", auth.Hash(tok)), store.Null("revoked_at")); err != nil {
+			// Guesses are counted by where they come from.
+			if lerr := s.limits.check("bad:"+clientIP(x.r), 120); lerr != nil && x.r.RemoteAddr != "127.0.0.1:0" {
+				return lerr
+			}
 			return errUnauthorized("this token is not valid, or was revoked")
 		}
 		if t.ExpiresAt != 0 && t.ExpiresAt < now {

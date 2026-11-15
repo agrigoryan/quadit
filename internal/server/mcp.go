@@ -10,8 +10,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // The MCP server gives any MCP client the same surface as the API, under
@@ -460,6 +462,13 @@ func (s *Server) hMCP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+s.cfg.BaseURL+`/.well-known/oauth-protected-resource"`)
 		http.Error(w, "sign in, or send a token", http.StatusUnauthorized)
 		return
+	}
+	if n, _ := s.st.Count(r.Context(), "api_tokens", store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at")); n == 0 {
+		// Guesses are counted by where they come from.
+		if err := s.limits.check("bad:"+clientIP(r), 120); err != nil {
+			s.fail(w, r, err)
+			return
+		}
 	}
 	if _, ok := s.internal(token, "GET", "/me", url.Values{"format": {"text"}}, nil); !ok {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token", resource_metadata="`+s.cfg.BaseURL+`/.well-known/oauth-protected-resource"`)

@@ -461,6 +461,14 @@ func taskUpdate(c *cx) error {
 		t.WaitingOnID = ""
 	} else if err := member("waiting_on_id", "waiting_on", a.WaitingOn, &t.WaitingOnID); err != nil {
 		return err
+	} else if a.WaitingOn.Set && t.WaitingOutside {
+		// Named a member, or nobody: it no longer waits on the outside. With
+		// nobody named and no new note, the old note goes with it.
+		p.put("waiting_outside", true, false)
+		if t.WaitingOnID == "" && !a.WaitingOnNote.Set {
+			p.put("waiting_on_note", t.WaitingOnNote, "")
+			t.WaitingOnNote = ""
+		}
 	}
 	p.str("waiting_on_note", a.WaitingOnNote, &t.WaitingOnNote)
 	if a.Parent.Set {
@@ -635,10 +643,24 @@ func (c *cx) checkParent(t core.Task, parentID string) error {
 
 // setWaitingOn hands a task to userID ("" = nobody) as part of another
 // change, and says so in the feed.
+// setWaitingOutside makes a task wait on an outside event, as part of
+// another change.
+func (c *cx) setWaitingOutside(t core.Task, note string) error {
+	p := newPatch()
+	p.put("waiting_on_id", t.WaitingOnID, "")
+	p.put("waiting_on_note", t.WaitingOnNote, note)
+	p.put("waiting_outside", t.WaitingOutside, true)
+	ref, key := c.ref, c.key
+	err := c.saveTask(t, p, nil)
+	c.ref, c.key = ref, key
+	return err
+}
+
 func (c *cx) setWaitingOn(t core.Task, userID, note string) error {
 	p := newPatch()
 	p.put("waiting_on_id", t.WaitingOnID, userID)
 	p.put("waiting_on_note", t.WaitingOnNote, note)
+	p.put("waiting_outside", t.WaitingOutside, false)
 	ref, key := c.ref, c.key
 	err := c.saveTask(t, p, nil)
 	c.ref, c.key = ref, key
@@ -662,6 +684,9 @@ func taskDelete(c *cx) error {
 	p.put("deleted_at", int64(0), c.at)
 	p.set["deleted_by"] = c.actor.UserID
 	if err := c.saveTask(t, p, map[string]any{"deleted": true}); err != nil {
+		return err
+	}
+	if err := c.endDelegates(t); err != nil {
 		return err
 	}
 	return c.tx.Unindex(c.ctx, t.ID)
