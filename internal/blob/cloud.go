@@ -1,3 +1,6 @@
+// The cloud stores through gocloud.dev, the Config that picks one, and
+// Layered and Move for going from one store to another.
+
 package blob
 
 import (
@@ -75,6 +78,7 @@ func (c Config) need(what, v string) error {
 	return nil
 }
 
+// orDefault is v, or def when v is empty.
 func orDefault(v, def string) string {
 	if v == "" {
 		return def
@@ -94,20 +98,22 @@ func FromBucket(b *gcblob.Bucket, kind, prefix string) Store {
 	return &cloud{b: b, kind: kind, prefix: prefix}
 }
 
+// Kind names the cloud: s3, gcs or azure.
 func (c *cloud) Kind() string { return c.kind }
 
+// Put writes everything read from r under key.
 func (c *cloud) Put(ctx context.Context, key string, r io.Reader, contentType string) error {
 	w, err := c.b.NewWriter(ctx, c.prefix+key, &gcblob.WriterOptions{ContentType: contentType})
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(w, r); err != nil {
-		w.Close()
-		return err
+		return errors.Join(err, w.Close())
 	}
 	return w.Close()
 }
 
+// Open reads key, with the time it was last written.
 func (c *cloud) Open(ctx context.Context, key string) (io.ReadSeekCloser, time.Time, error) {
 	// The reader outlives this call, so it must not die with the request
 	// that opened it being a little slow: the caller closes it.
@@ -121,6 +127,7 @@ func (c *cloud) Open(ctx context.Context, key string) (io.ReadSeekCloser, time.T
 	return r, r.ModTime(), nil
 }
 
+// Delete removes key; a key that holds nothing is not an error.
 func (c *cloud) Delete(ctx context.Context, key string) error {
 	if err := c.b.Delete(ctx, c.prefix+key); err != nil && gcerrors.Code(err) != gcerrors.NotFound {
 		return err
@@ -128,11 +135,12 @@ func (c *cloud) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+// List calls each with every key under prefix, and its size.
 func (c *cloud) List(ctx context.Context, prefix string, each func(string, int64) error) error {
 	it := c.b.List(&gcblob.ListOptions{Prefix: c.prefix + prefix})
 	for {
 		obj, err := it.Next(ctx)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
@@ -156,12 +164,16 @@ type Layered struct {
 	Old     Store
 }
 
+// Kind is the kind of the store written to.
 func (l Layered) Kind() string { return l.Primary.Kind() }
 
+// Put writes to the primary store.
 func (l Layered) Put(ctx context.Context, key string, r io.Reader, ct string) error {
 	return l.Primary.Put(ctx, key, r, ct)
 }
 
+// Open reads from the primary store, or from the old one when the primary
+// has nothing under key.
 func (l Layered) Open(ctx context.Context, key string) (io.ReadSeekCloser, time.Time, error) {
 	r, t, err := l.Primary.Open(ctx, key)
 	if errors.Is(err, ErrNotFound) {
@@ -170,10 +182,12 @@ func (l Layered) Open(ctx context.Context, key string) (io.ReadSeekCloser, time.
 	return r, t, err
 }
 
+// Delete removes key from both stores.
 func (l Layered) Delete(ctx context.Context, key string) error {
 	return errors.Join(l.Primary.Delete(ctx, key), l.Old.Delete(ctx, key))
 }
 
+// List lists the keys of both stores, each once.
 func (l Layered) List(ctx context.Context, prefix string, each func(string, int64) error) error {
 	seen := map[string]bool{}
 	if err := l.Primary.List(ctx, prefix, func(k string, n int64) error { seen[k] = true; return each(k, n) }); err != nil {
@@ -205,11 +219,11 @@ func Move(ctx context.Context, from, to Store) (int, error) {
 		if err != nil {
 			return moved, fmt.Errorf("copy %s: %w", k, err)
 		}
-		if check, _, err := to.Open(ctx, k); err != nil {
+		check, _, err := to.Open(ctx, k)
+		if err != nil {
 			return moved, fmt.Errorf("check %s: %w", k, err)
-		} else {
-			check.Close()
 		}
+		check.Close()
 		if err := from.Delete(ctx, k); err != nil {
 			return moved, err
 		}

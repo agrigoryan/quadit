@@ -1,3 +1,5 @@
+// AWS S3 and the stores that speak its API: opening a bucket.
+
 package blob
 
 import (

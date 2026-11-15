@@ -1,5 +1,9 @@
 // Package blob stores file contents. Local disk is the default; cloud
 // stores implement the same interface.
+//
+//	blob.go          the Store interface, and Disk
+//	cloud.go         the Config, the cloud stores, Layered and Move
+//	cloud_<kind>.go  opening each cloud: s3, gcs, azure
 package blob
 
 import (
@@ -39,8 +43,10 @@ func NewDisk(dir string) (*Disk, error) {
 	return &Disk{Root: dir}, nil
 }
 
+// Kind is "disk".
 func (d *Disk) Kind() string { return "disk" }
 
+// path is where key is kept; a key that climbs out of the root is refused.
 func (d *Disk) path(key string) (string, error) {
 	clean := filepath.Clean("/" + key)
 	if strings.Contains(key, "..") || clean == "/" {
@@ -49,6 +55,8 @@ func (d *Disk) path(key string) (string, error) {
 	return filepath.Join(d.Root, filepath.FromSlash(clean)), nil
 }
 
+// Put writes everything read from r under key, all at once: a reader
+// never sees half a file.
 func (d *Disk) Put(_ context.Context, key string, r io.Reader, _ string) error {
 	p, err := d.path(key)
 	if err != nil {
@@ -73,6 +81,7 @@ func (d *Disk) Put(_ context.Context, key string, r io.Reader, _ string) error {
 	return os.Rename(tmp.Name(), p)
 }
 
+// Open opens the file kept under key, with the time it was last written.
 func (d *Disk) Open(_ context.Context, key string) (io.ReadSeekCloser, time.Time, error) {
 	p, err := d.path(key)
 	if err != nil {
@@ -93,6 +102,7 @@ func (d *Disk) Open(_ context.Context, key string) (io.ReadSeekCloser, time.Time
 	return f, st.ModTime(), nil
 }
 
+// Delete removes key; a key that holds nothing is not an error.
 func (d *Disk) Delete(_ context.Context, key string) error {
 	p, err := d.path(key)
 	if err != nil {
@@ -104,12 +114,17 @@ func (d *Disk) Delete(_ context.Context, key string) error {
 	return nil
 }
 
+// List calls each with every key under prefix, and its size, leaving out
+// files being written.
 func (d *Disk) List(_ context.Context, prefix string, each func(string, int64) error) error {
 	return filepath.WalkDir(d.Root, func(p string, e os.DirEntry, err error) error {
 		if err != nil || e.IsDir() || strings.HasPrefix(e.Name(), ".put-") {
 			return err
 		}
-		rel, _ := filepath.Rel(d.Root, p)
+		rel, err := filepath.Rel(d.Root, p)
+		if err != nil {
+			return err
+		}
 		key := filepath.ToSlash(rel)
 		if !strings.HasPrefix(key, prefix) {
 			return nil

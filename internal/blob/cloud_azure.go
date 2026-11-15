@@ -1,3 +1,5 @@
+// Azure Blob Storage: opening a container.
+
 package blob
 
 import (
