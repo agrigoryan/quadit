@@ -24,6 +24,7 @@ import { Dialog } from "@/ui/dialog";
 import { Kbd } from "@/ui/kbd";
 import { Markdown } from "@/ui/markdown";
 import { MentionTextarea } from "@/ui/mention-textarea";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 
 /** The "new task" dialog (C), for one task or, on request, for several at once. */
 export function CreateTaskDialog({ draft }: { draft: NewTaskDraft }) {
@@ -150,19 +151,22 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
             <span className="max-sm:hidden">{t("multi.open")}</span>
             <span className="sm:hidden">{t("multi.openShort")}</span>
           </Button>
-          <div className="flex rounded-md bg-sunken p-0.5 text-xs">
-            {[false, true].map((p) => (
-              <button
-                key={String(p)}
-                type="button"
-                aria-pressed={preview === p}
-                onClick={() => setPreview(p)}
-                className={`h-5 rounded-sm px-2 font-medium ${preview === p ? "bg-surface text-ink shadow-card" : "text-ink-2"}`}
+          <RadioGroup
+            label={t("create.descriptionMode")}
+            value={preview ? "preview" : "write"}
+            onChange={(mode) => setPreview(mode === "preview")}
+            className="flex rounded-md bg-sunken p-0.5 text-xs"
+          >
+            {(["write", "preview"] as const).map((mode) => (
+              <Radio
+                key={mode}
+                value={mode}
+                className={`h-5 rounded-sm px-2 font-medium ${preview === (mode === "preview") ? "bg-surface text-ink shadow-card" : "text-ink-2"}`}
               >
-                {p ? t("create.preview") : t("create.write")}
-              </button>
+                {t(`create.${mode}`)}
+              </Radio>
             ))}
-          </div>
+          </RadioGroup>
         </div>
         <input
           ref={titleBox}

@@ -60,3 +60,27 @@ test("the API tokens list catches up after the browser was offline, without a re
   await context.setOffline(false);
   await expect(page.getByRole("main").getByText(tokenName)).toBeVisible({ timeout: 15_000 });
 });
+
+// Every set of choices drawn as buttons is a radio group (ui/radio-group.tsx):
+// one Tab stop, the arrows move and pick, Home and End go to the ends.
+test("the import source is picked from the keyboard", async ({ page }) => {
+  await page.goto("/e2e/settings/import");
+  const sources = page.getByRole("radiogroup", { name: "Where from" });
+  const source = (name: string) => sources.getByRole("radio", { name: new RegExp(`^${name}`) });
+  await source("Linear").click();
+  await expect(source("Linear")).toBeChecked();
+  await page.keyboard.press("ArrowRight");
+  await expect(source("Asana")).toBeFocused();
+  await expect(source("Asana")).toBeChecked();
+  await page.keyboard.press("End");
+  await expect(source("Orbit")).toBeFocused();
+  await expect(source("Orbit")).toBeChecked();
+  await page.keyboard.press("ArrowDown");
+  await expect(source("Linear")).toBeChecked();
+  await page.keyboard.press("ArrowLeft");
+  await expect(source("Orbit")).toBeChecked();
+  await page.keyboard.press("Home");
+  await expect(source("Linear")).toBeFocused();
+  await expect(source("Linear")).toBeChecked();
+  await expect(source("Asana")).not.toBeChecked();
+});

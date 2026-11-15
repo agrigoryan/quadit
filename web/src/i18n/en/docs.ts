@@ -169,6 +169,7 @@ export const docs = {
   "docs.comment.add": "Comment",
   "docs.comment.open": "Open",
   "docs.comment.resolved": "Resolved",
+  "docs.comment.which": "Which comments",
   "docs.comment.none": "No open comments.",
   "docs.comment.noneResolved": "Nothing resolved yet.",
   "docs.comment.hint": "Select text in a block and choose Comment, or use the menu on a block's handle.",

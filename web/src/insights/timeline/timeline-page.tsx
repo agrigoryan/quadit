@@ -23,6 +23,7 @@ import { DAY_WIDTH, frame, grow, type Scale, widthOf, xOf, type Zoom } from "@/i
 import { NotFoundPage } from "@/ui/not-found";
 import { Button, IconButton } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 
 const ZOOM_KEY = "quadit.timeline.zoom";
 const LOOSE = "no-epic";
@@ -95,28 +96,25 @@ function Timeline({ project }: { project: Project }) {
     <div className="flex h-full flex-col">
       <div className="flex h-10 shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-2 no-scrollbar md:px-3">
         <LayoutTabs projectKey={project.key} />
-        <div
-          role="radiogroup"
-          aria-label={t("timeline.zoom")}
+        <RadioGroup
+          label={t("timeline.zoom")}
+          value={zoom}
+          onChange={pickZoom}
           className="flex shrink-0 items-center rounded-md border border-line p-0.5"
         >
           {(["weeks", "months"] as const).map((z) => (
-            <button
+            <Radio
               key={z}
-              type="button"
-              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
-              role="radio"
-              aria-checked={zoom === z}
-              onClick={() => pickZoom(z)}
+              value={z}
               className={cx(
                 "h-5.5 rounded-sm px-2 text-xs font-medium",
                 zoom === z ? "bg-press text-ink" : "text-ink-2 hover:text-ink",
               )}
             >
               {t(`timeline.zoom.${z}`)}
-            </button>
+            </Radio>
           ))}
-        </div>
+        </RadioGroup>
         <Button onClick={goToday}>{t("timeline.today")}</Button>
         {data.canceled > 0 && (
           <Button variant="ghost" aria-pressed={showCanceled} onClick={() => setShowCanceled(!showCanceled)}>

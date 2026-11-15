@@ -29,6 +29,15 @@ interface Call {
 /** Stands in for the server: every batch of changes waits until the test answers it. */
 let calls: Call[] = [];
 
+beforeAll(() => {
+  // The Write/Preview switch is a radio group in a form, which measures itself; jsdom cannot.
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
+
 beforeEach(() => {
   calls = [];
   vi.spyOn(api, "post").mockImplementation(

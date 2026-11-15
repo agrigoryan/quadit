@@ -208,6 +208,7 @@ export const tasks = {
   "create.needTitle": "Give the task a title",
   "create.noProject": "Create a project first",
   "create.preview": "Preview",
+  "create.descriptionMode": "Write or preview the description",
   "create.write": "Write",
 
   "multi.open": "Several at once…",

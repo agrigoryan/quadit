@@ -15,6 +15,7 @@ import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import type { DocComment } from "@/lib/types-docs";
 import { IconButton } from "@/ui/button";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 
 export interface ThreadData {
   root: DocComment;
@@ -91,23 +92,28 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
     >
       <header className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-3">
         <h2 className="flex-1 text-sm font-semibold">{t("docs.comment.title")}</h2>
-        <div className="flex rounded-md bg-sunken p-0.5 text-xs font-medium">
-          {([false, true] as const).map((res) => (
-            <button
-              key={String(res)}
-              type="button"
-              aria-pressed={showResolved === res}
-              onClick={() => pageUi.setShowResolved(res)}
+        <RadioGroup
+          label={t("docs.comment.which")}
+          value={showResolved ? "resolved" : "open"}
+          onChange={(which) => pageUi.setShowResolved(which === "resolved")}
+          className="flex rounded-md bg-sunken p-0.5 text-xs font-medium"
+        >
+          {(["open", "resolved"] as const).map((which) => (
+            <Radio
+              key={which}
+              value={which}
               className={cx(
                 "h-5 rounded-sm px-2",
-                showResolved === res ? "bg-surface text-ink shadow-card" : "text-ink-2 hover:text-ink",
+                showResolved === (which === "resolved")
+                  ? "bg-surface text-ink shadow-card"
+                  : "text-ink-2 hover:text-ink",
               )}
             >
-              {t(res ? "docs.comment.resolved" : "docs.comment.open")}{" "}
-              <span className="text-ink-3 tnum">{res ? resolved.length : open.length}</span>
-            </button>
+              {t(`docs.comment.${which}`)}{" "}
+              <span className="text-ink-3 tnum">{which === "resolved" ? resolved.length : open.length}</span>
+            </Radio>
           ))}
-        </div>
+        </RadioGroup>
         <IconButton label={t("common.close")} onClick={pageUi.closeComments}>
           <X className="size-4" />
         </IconButton>

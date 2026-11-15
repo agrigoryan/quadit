@@ -3,6 +3,7 @@
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { SWATCHES } from "@/lib/swatches";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 
 interface ColorProps {
   value: string;
@@ -14,16 +15,17 @@ interface ColorProps {
 export function ColorPicker({ value, onChange, label }: ColorProps) {
   const custom = !!value && !SWATCHES.includes(value.toLowerCase());
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap items-center gap-1.5">
+    <RadioGroup
+      label={label}
+      value={value.toLowerCase()}
+      onChange={onChange}
+      className="flex flex-wrap items-center gap-1.5"
+    >
       {SWATCHES.map((color) => (
-        <button
+        <Radio
           key={color}
-          type="button"
-          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
-          role="radio"
-          aria-checked={value.toLowerCase() === color}
+          value={color}
           aria-label={tMaybe(`swatch.${color}`, color)}
-          onClick={() => onChange(color)}
           className={cx(
             "size-5 rounded-full ring-offset-2 ring-offset-surface transition-shadow",
             value.toLowerCase() === color ? "ring-2 ring-ink" : "hover:ring-2 hover:ring-line-strong",
@@ -48,6 +50,6 @@ export function ColorPicker({ value, onChange, label }: ColorProps) {
           className="absolute inset-0 cursor-pointer opacity-0"
         />
       </label>
-    </div>
+    </RadioGroup>
   );
 }

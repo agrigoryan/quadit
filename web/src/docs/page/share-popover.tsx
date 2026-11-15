@@ -13,6 +13,7 @@ import type { Doc } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 import { docPath } from "@/docs/area";
 
 export function SharePopover({ doc }: { doc: Doc }) {
@@ -41,24 +42,29 @@ export function SharePopover({ doc }: { doc: Doc }) {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" aria-label={t("docs.share.title")} className="w-80 p-1.5">
-        <div role="radiogroup" aria-label={t("docs.share.title")}>
+        <RadioGroup
+          label={t("docs.share.title")}
+          value={isPrivate ? "private" : "team"}
+          onChange={(to) => setSharing(doc.id, { private: to === "private" })}
+          disabled={!mayChange}
+        >
           <Choice
+            value="team"
             checked={!isPrivate}
             disabled={!mayChange}
             icon={<Users />}
             title={t("docs.share.team")}
             hint={t("docs.share.teamHint")}
-            onPick={() => setSharing(doc.id, { private: false })}
           />
           <Choice
+            value="private"
             checked={isPrivate}
             disabled={!mayChange}
             icon={<Lock />}
             title={t("docs.share.private")}
             hint={t("docs.share.privateHint")}
-            onPick={() => setSharing(doc.id, { private: true })}
           />
-        </div>
+        </RadioGroup>
         {isPrivate && (
           <div className="mt-1 border-t border-line pt-1.5">
             <p className="px-2 pb-1 text-xs font-medium text-ink-3">
@@ -108,28 +114,23 @@ export function SharePopover({ doc }: { doc: Doc }) {
 }
 
 function Choice({
+  value,
   checked,
   disabled,
   icon,
   title,
   hint,
-  onPick,
 }: {
+  value: string;
   checked: boolean;
   disabled: boolean;
   icon: React.ReactNode;
   title: string;
   hint: string;
-  onPick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
-      role="radio"
-      aria-checked={checked}
-      disabled={disabled || checked}
-      onClick={onPick}
+    <Radio
+      value={value}
       className={cx(
         "flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-hover disabled:hover:bg-transparent [&>svg]:mt-0.5 [&>svg]:size-4 [&>svg]:shrink-0",
         checked ? "[&>svg]:text-accent-text" : "[&>svg]:text-ink-3",
@@ -142,6 +143,6 @@ function Choice({
         <span className="block text-xs text-ink-2">{hint}</span>
       </span>
       <Check className={cx("!text-accent-text", !checked && "invisible")} />
-    </button>
+    </Radio>
   );
 }

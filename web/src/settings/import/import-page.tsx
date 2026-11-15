@@ -20,6 +20,7 @@ import {
 } from "@/settings/import/data";
 import { ImportOutcome } from "@/settings/import/result";
 import { type Uploaded, UploadField } from "@/settings/import/upload-field";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 import { FormAlert, FormField, FormFoot, NativeSelect, Note, useFieldErrors } from "@/ui/form";
 import { Card, Page, Section } from "@/ui/page-layout";
 import { Button } from "@/ui/button";
@@ -41,16 +42,17 @@ function SourceCards({
   disabled: boolean;
 }) {
   return (
-    <div role="radiogroup" aria-label={t("import.from")} className="grid gap-2 sm:grid-cols-2">
+    <RadioGroup
+      label={t("import.from")}
+      value={value}
+      onChange={onPick}
+      disabled={disabled}
+      className="grid gap-2 sm:grid-cols-2"
+    >
       {SOURCES.map((s) => (
-        <button
+        <Radio
           key={s.kind}
-          type="button"
-          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
-          role="radio"
-          aria-checked={value === s.kind}
-          disabled={disabled}
-          onClick={() => onPick(s.kind)}
+          value={s.kind}
           className={cx(
             "flex flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-60",
             value === s.kind
@@ -65,9 +67,9 @@ function SourceCards({
             )}
           </span>
           <span className="text-xs text-ink-2">{t(`import.how.${s.kind}`)}</span>
-        </button>
+        </Radio>
       ))}
-    </div>
+    </RadioGroup>
   );
 }
 

@@ -1,4 +1,5 @@
 import { cx } from "@/lib/cx";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 
 interface Option<T extends string> {
   value: T;
@@ -14,48 +15,28 @@ interface Props<T extends string> {
   disabled?: boolean;
 }
 
-/** A few choices side by side, one picked: theme, how much mail. Arrow keys move the pick. */
+/** A few choices side by side, one picked: theme, how much mail. */
 export function Segmented<T extends string>({ label, value, onChange, options, disabled }: Props<T>) {
-  function onKey(e: React.KeyboardEvent) {
-    const step =
-      e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
-    if (!step) return;
-    e.preventDefault();
-    const i = options.findIndex((o) => o.value === value);
-    const next = options[(i + step + options.length) % options.length];
-    if (next) onChange(next.value);
-    const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>("button");
-    buttons[(i + step + options.length) % options.length]?.focus();
-  }
   return (
-    // oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the focus is on the picked radio inside (one Tab stop); the arrows move it
-    <div
-      role="radiogroup"
-      aria-label={label}
-      onKeyDown={onKey}
+    <RadioGroup
+      label={label}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
       className="inline-flex max-w-full rounded-md border border-line-strong bg-sunken p-0.5"
     >
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
-            role="radio"
-            aria-checked={on}
-            tabIndex={on ? 0 : -1}
-            disabled={disabled}
-            onClick={() => onChange(o.value)}
-            className={cx(
-              "h-6 min-w-0 truncate rounded-sm px-3 text-sm transition-colors disabled:opacity-60",
-              on ? "bg-surface font-medium text-ink shadow-card" : "text-ink-2 hover:text-ink",
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
+      {options.map((o) => (
+        <Radio
+          key={o.value}
+          value={o.value}
+          className={cx(
+            "h-6 min-w-0 truncate rounded-sm px-3 text-sm transition-colors disabled:opacity-60",
+            o.value === value ? "bg-surface font-medium text-ink shadow-card" : "text-ink-2 hover:text-ink",
+          )}
+        >
+          {o.label}
+        </Radio>
+      ))}
+    </RadioGroup>
   );
 }

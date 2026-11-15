@@ -29,6 +29,7 @@ import { Button } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
 import { Input } from "@/ui/input";
 import { Spinner } from "@/ui/spinner";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 
 export const cycleName = (cycle: Cycle) => cycle.name || t("prop.cycleName", { n: String(cycle.number) });
 
@@ -186,27 +187,25 @@ function BurnPanel({ cycle, hasPoints }: { cycle: Cycle; hasPoints: boolean }) {
       action={
         <span className="flex items-center gap-2">
           {hasPoints && (
-            <span
-              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a set of buttons, not form fields: <fieldset> is for those
-              role="group"
-              aria-label={t("cycle.chart.unit")}
+            <RadioGroup
+              label={t("cycle.chart.unit")}
+              value={shown}
+              onChange={setUnit}
               className="flex items-center rounded-md bg-sunken p-0.5"
             >
               {units.map((u) => (
-                <button
+                <Radio
                   key={u}
-                  type="button"
-                  aria-pressed={shown === u}
-                  onClick={() => setUnit(u)}
+                  value={u}
                   className={cx(
                     "h-6 rounded-sm px-2 text-xs font-medium",
                     shown === u ? "bg-surface text-ink shadow-card" : "text-ink-2 hover:text-ink",
                   )}
                 >
                   {t(`cycle.chart.${u}`)}
-                </button>
+                </Radio>
               ))}
-            </span>
+            </RadioGroup>
           )}
           <TableSwitch on={table} onChange={setTable} />
         </span>

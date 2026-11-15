@@ -8,6 +8,7 @@ import { createAndOpen } from "@/docs/tree/new-page";
 import type { Doc } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
+import { Radio, RadioGroup } from "@/ui/radio-group";
 
 type Mode = "replace" | "append" | "subpage";
 const MODES: Mode[] = ["replace", "append", "subpage"];
@@ -48,15 +49,11 @@ export function ImportDialog({ doc, open, onClose }: { doc: Doc; open: boolean; 
         </>
       }
     >
-      <div role="radiogroup" aria-label={t("docs.import.title")} className="flex flex-col gap-1">
+      <RadioGroup label={t("docs.import.title")} value={mode} onChange={setMode} className="flex flex-col gap-1">
         {MODES.map((m) => (
-          <button
+          <Radio
             key={m}
-            type="button"
-            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a button drawn as one of a set of choices; a native radio would need a hidden input and a label
-            role="radio"
-            aria-checked={mode === m}
-            onClick={() => setMode(m)}
+            value={m}
             className={cx(
               "rounded-md border px-3 py-2 text-left",
               mode === m ? "border-accent bg-accent-soft" : "border-line hover:bg-hover",
@@ -64,9 +61,9 @@ export function ImportDialog({ doc, open, onClose }: { doc: Doc; open: boolean; 
           >
             <span className="block text-sm font-medium">{t(`docs.import.${m}`)}</span>
             <span className="block text-xs text-ink-2">{t(`docs.import.${m}Hint`)}</span>
-          </button>
+          </Radio>
         ))}
-      </div>
+      </RadioGroup>
     </Dialog>
   );
 }
