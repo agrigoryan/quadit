@@ -19,7 +19,6 @@ import (
 // to an API token: with session=TOKEN they are fetched too (orbit_files.go).
 type orbit struct{}
 
-// Kind is "orbit".
 func (orbit) Kind() string { return "orbit" }
 
 // Read reads the workspace named by workspace=ID from the server at origin.

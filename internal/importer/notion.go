@@ -14,7 +14,6 @@ import (
 // is a CSV file.
 type notion struct{}
 
-// Kind is "notion".
 func (notion) Kind() string { return "notion" }
 
 // Read reads the export at source: the zip, or a folder it was unpacked into.

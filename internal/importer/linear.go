@@ -12,7 +12,6 @@ import (
 // linear reads the CSV that Linear exports.
 type linear struct{}
 
-// Kind is "linear".
 func (linear) Kind() string { return "linear" }
 
 // Read reads the CSV file at path.

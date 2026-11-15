@@ -14,7 +14,6 @@ import (
 // comments, from GitHub's API. The source is owner/repo.
 type github struct{}
 
-// Kind is "github".
 func (github) Kind() string { return "github" }
 
 // githubIssue is an issue as GitHub's API lists it: only the fields

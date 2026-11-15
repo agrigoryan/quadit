@@ -94,12 +94,13 @@ type Comment struct {
 	Files  []string // the plan's files attached to the comment there
 }
 
-// Doc is one page.
+// Doc is one page, with the page it sits under at the source (ParentExt,
+// empty for a top-level page).
 type Doc struct {
 	Ext       string
 	ParentExt string
 	Title     string
-	Markdown  string
+	Markdown  string // its text; [[wiki links]] to other pages of the plan become links here
 	Dir       string // where its relative images are, for Markdown folders
 }
 

@@ -11,7 +11,6 @@ import (
 // asana reads the CSV that Asana exports.
 type asana struct{}
 
-// Kind is "asana".
 func (asana) Kind() string { return "asana" }
 
 // Read reads the CSV file at path.

@@ -15,7 +15,6 @@ import (
 // trello reads the JSON that a Trello board exports.
 type trello struct{}
 
-// Kind is "trello".
 func (trello) Kind() string { return "trello" }
 
 // trelloBoard is the part of a board export that is brought over.
