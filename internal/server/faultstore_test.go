@@ -25,6 +25,8 @@ type fault struct {
 	// times is how many calls fail before the fault is spent; 0 fails every
 	// call until the faults are cleared.
 	times int
+	// err is what a failed call answers; nil answers errOutage.
+	err error
 
 	hits int
 }
@@ -74,6 +76,9 @@ func (f *faults) check(op, table string, set map[string]any, where []store.Cond)
 		}
 		if ft.match == nil || ft.match(set, where) {
 			ft.hits++
+			if ft.err != nil {
+				return ft.err
+			}
 			return errOutage
 		}
 	}

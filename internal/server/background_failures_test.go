@@ -466,3 +466,21 @@ func TestAQueueThatCannotBeReadIsLogged(t *testing.T) {
 		})
 	}
 }
+
+// TestADeliveryWhoseWorkspaceIsGoneIsEnded: a delivery of a workspace
+// that is not there any more is ended and says why; one whose workspace
+// cannot be read for a moment is tried again.
+func TestADeliveryWhoseWorkspaceIsGoneIsEnded(t *testing.T) {
+	st := newFaultyStore(testdb.SQLite(t))
+	s := newSite(t, st)
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
+	wsID := siteWorkspaceID(t, st.Store)
+	gone := st.faults.arm(fault{op: "get", table: "workspaces", err: &store.NotFoundError{What: "workspace"},
+		match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "id", wsID) }})
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
+	eventually(t, "the delivery to be ended", func() bool { return deliveryOf(t, st.Store, hook).State == core.DeliveryDead })
+	if d := deliveryOf(t, st.Store, hook); d.Error != "the workspace is gone" || gone() != 1 {
+		t.Fatalf("the delivery ended with %q after %d reads of its workspace; want it ended at the first, saying the workspace is gone", d.Error, gone())
+	}
+}

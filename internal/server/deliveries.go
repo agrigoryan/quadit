@@ -163,7 +163,7 @@ func backoff(attempts int) time.Duration {
 
 // deliver sends one event to one webhook and records what happened. It
 // reports whether the delivery is finished, so the next one may go. A
-// delivery whose webhook or event is gone is given up; one that could not
+// delivery whose webhook, event or workspace is gone is given up; one that could not
 // be read for any other reason waits for its claim to run out and is tried
 // again. When ctx ends during the send, the send is cut off and the
 // delivery is put back as it was before this attempt, to go first thing
@@ -191,9 +191,13 @@ func (s *Server) deliver(ctx context.Context, d core.WebhookDelivery) bool {
 		return s.giveUpDelivery(ctx, db, d, "the event is gone")
 	}
 	var ws core.Workspace
-	if err := s.st.Get(ctx, &ws, store.Eq("id", h.WorkspaceID)); err != nil {
+	there, err = store.Find(ctx, s.st, &ws, store.Eq("id", h.WorkspaceID))
+	if err != nil {
 		s.log.Error("webhook delivery: reading its workspace", "delivery", d.ID, "err", err)
 		return false
+	}
+	if !there {
+		return s.giveUpDelivery(ctx, db, d, "the workspace is gone")
 	}
 	status, errText, took := s.sendDelivery(sendCtx, ws, h, d.ID, evs[0])
 	now := time.Now().UnixMilli()
