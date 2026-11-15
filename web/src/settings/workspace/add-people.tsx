@@ -139,14 +139,16 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <FormField
           label={t("invites.role")}
+          htmlFor="inv-role"
           error={errors.fields.role}
           className={mode === "email" ? "" : "col-span-2"}
         >
-          <NativeSelect value={role} onChange={(v) => setRole(v as Role)} options={roleChoices(roles)} />
+          <NativeSelect id="inv-role" value={role} onChange={(v) => setRole(v as Role)} options={roleChoices(roles)} />
         </FormField>
         {mode !== "account" && (
-          <FormField label={t("invites.expires")}>
+          <FormField label={t("invites.expires")} htmlFor="inv-expires">
             <NativeSelect
+              id="inv-expires"
               value={String(days)}
               onChange={(v) => setDays(Number(v))}
               options={DAYS.map((n) => ({ value: String(n), label: t("invites.days", { n }) }))}
@@ -154,8 +156,9 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
           </FormField>
         )}
         {mode === "link" && (
-          <FormField label={t("invites.uses")}>
+          <FormField label={t("invites.uses")} htmlFor="inv-uses">
             <NativeSelect
+              id="inv-uses"
               value={String(uses)}
               onChange={(v) => setUses(Number(v))}
               options={USES.map((n) => ({ value: String(n), label: t("invites.usesN", { n }) }))}
