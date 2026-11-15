@@ -11,6 +11,7 @@ import {
   markDrafts,
   markOpened,
   mergeRest,
+  mergeRows,
 } from "@/lib/store";
 import type { FeedEvent, Member, User, Workspace } from "@/lib/types";
 
@@ -219,5 +220,25 @@ describe("mergeRest", () => {
     expect(mergeRest("other", { seq: 10, tasks: [{ id: "t1" }] })).toEqual([]);
     expect(getState().collections.tasks).toEqual({});
     expect(getState().restLoaded).toBe(false);
+  });
+});
+
+describe("mergeRows", () => {
+  it("takes a fetched row, and what it carries that the lists leave out", () => {
+    loadBootstrap("acme", boot({ tasks: [{ id: "t1", title: "old", updated_seq: 5 }] }));
+    mergeRows("tasks", [{ id: "t1", title: "newer", description: "whole", updated_seq: 9 } as never]);
+    expect(getState().collections.tasks.t1).toMatchObject({ title: "newer", description: "whole", updated_seq: 9 });
+  });
+
+  it("does not undo a change that came through the feed while the row was being fetched", () => {
+    loadBootstrap("acme", boot({ tasks: [{ id: "t1", title: "old", updated_seq: 5 }] }));
+    applyEvents([retitle(12, "t1", "changed by the feed")], true);
+    // Read before that change, answered after it.
+    mergeRows("tasks", [{ id: "t1", title: "old", description: "whole", updated_seq: 5 } as never]);
+    expect(getState().collections.tasks.t1).toMatchObject({
+      title: "changed by the feed",
+      description: "whole",
+      updated_seq: 12,
+    });
   });
 });

@@ -354,11 +354,24 @@ export function clearDrafts(ids: string[]) {
   useStore.setState({ drafts: next });
 }
 
-/** Adds or replaces rows fetched outside the feed (an opened task, the trash). */
+/**
+ * Adds or replaces rows fetched outside the feed (an opened task, the trash).
+ * A row the feed has moved on since it was read (a change arrived while the
+ * fetch was on its way) keeps what the feed gave it; the fetched copy only
+ * fills in what the held one does not carry, like a task's description.
+ */
 export function mergeRows<K extends CollectionName>(name: K, rows: Collections[K][string][]) {
   if (rows.length === 0) return;
   const d = new CopyOnWrite(getState().collections);
-  for (const row of rows) d.put(name, row);
+  for (const row of rows) {
+    const fetched: AnyRow = row;
+    const held = d.peek(name)[keyOf(name, fetched)];
+    const heldIsNewer =
+      typeof held?.updated_seq === "number" &&
+      typeof fetched.updated_seq === "number" &&
+      held.updated_seq > fetched.updated_seq;
+    d.put(name, heldIsNewer ? { ...fetched, ...held } : fetched);
+  }
   useStore.setState({ collections: d.done() });
 }
 

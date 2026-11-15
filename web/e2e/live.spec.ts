@@ -32,17 +32,11 @@ test("a change an agent makes from the CLI shows without a reload", async ({ pag
   await expect(properties.getByRole("button", { name: "Status: In Progress" })).toBeVisible();
 });
 
-// Product bug: opening a task fetches it whole (lib/task-detail.ts loadTask)
-// and merges the answer over the store's row unconditionally. A change that
-// arrives through the live stream while that fetch is on its way is then
-// overwritten by the older copy: the activity shows the change, the title
-// and status do not, until the next change. Here the fetch is held until the
+// Opening a task fetches it whole (lib/task-detail.ts loadTask). A change that
+// arrives through the live stream while that fetch is on its way must not be
+// overwritten by the older fetched copy. Here the fetch is held until the
 // change has arrived, which makes the race certain.
-test.fixme("a change that arrives while the task is loading is not undone by the load", async ({
-  page,
-  project,
-  quadit,
-}) => {
+test("a change that arrives while the task is loading is not undone by the load", async ({ page, project, quadit }) => {
   const key = await project.newTask("Book the hotel");
   let release = () => {};
   const held = new Promise<void>((done) => (release = done));
