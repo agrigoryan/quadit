@@ -24,7 +24,7 @@ func init() {
 
 type viewCreateArgs struct {
 	ID          string          `json:"id"`
-	Name        string          `json:"name"`
+	Name        string          `json:"name" quadit:"required,handler"`
 	Project     string          `json:"project"`
 	Description string          `json:"description"`
 	Icon        string          `json:"icon"`
@@ -109,7 +109,7 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 }
 
 type viewUpdateArgs struct {
-	ID          string               `json:"id"` // id or slug
+	ID          string               `json:"id" quadit:"required,handler"` // id or slug
 	Name        Opt[string]          `json:"name"`
 	Description Opt[string]          `json:"description"`
 	Icon        Opt[string]          `json:"icon"`

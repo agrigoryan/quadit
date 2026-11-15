@@ -584,7 +584,7 @@ export interface Changes {
   };
   "view.create": {
     id?: string;
-    name?: string;
+    name: string;
     project?: string;
     description?: string;
     icon?: string;
@@ -598,7 +598,7 @@ export interface Changes {
     id: string;
   };
   "view.update": {
-    id?: string;
+    id: string;
     name?: string | null;
     description?: string | null;
     icon?: string | null;

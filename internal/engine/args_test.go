@@ -67,8 +67,6 @@ func TestRequiredArgumentsAreTheOnesRefused(t *testing.T) {
 		"notification.read all":    "or ids, or task",
 		"link.set url":             "only for a url link; the others need ref",
 		"secret.set value":         "only for a new secret",
-		"view.create name":         "required; its tag waits for a change of ch_views.go",
-		"view.update id":           "required; its tag waits for a change of ch_views.go",
 		"integration.create kind":  "integration.update reads the same arguments, where it may be left out",
 		"rule.create name":         "rule.update reads the same arguments, where it may be left out",
 		"rule.create action":       "rule.update reads the same arguments, where it may be left out",
