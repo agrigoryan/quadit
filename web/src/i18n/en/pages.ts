@@ -148,6 +148,7 @@ export const pages = {
   "shortcuts.back": "Page: back to where you were",
   "shortcuts.pageNext": "Page: next or previous task of the list",
   "shortcuts.select": "Select the task",
+  "shortcuts.fold": "Task list: fold or unfold sub-tasks",
   "shortcuts.status": "Change status",
   "shortcuts.assignee": "Change assignee",
   "shortcuts.priority": "Change priority",

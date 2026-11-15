@@ -41,6 +41,7 @@ const sections: Section[] = [
       { what: "shortcuts.open", keys: ["Enter"] },
       { what: "shortcuts.newTab", keys: [`${MOD} Click`] },
       { what: "shortcuts.select", keys: ["X"] },
+      { what: "shortcuts.fold", keys: ["←", "→"], join: "or" },
       { what: "shortcuts.status", keys: ["S"] },
       { what: "shortcuts.assignee", keys: ["A"] },
       { what: "shortcuts.priority", keys: ["P"] },
