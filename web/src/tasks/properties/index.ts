@@ -1,7 +1,9 @@
 // Every task property, in the order the task's property panel shows them.
 // Each is described in a file of its own beside this one (property.ts says
 // what a description holds); this table is the one list of them. Adding a
-// property is a new file here and a line in this table.
+// property is a new file here and a line in this table, and in the lists
+// below it belongs in: a few places show the properties in an order of their
+// own, and these lists keep those orders as they are.
 
 import type { ComponentType } from "react";
 import { assignee } from "@/tasks/properties/assignee";

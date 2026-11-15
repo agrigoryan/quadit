@@ -99,8 +99,8 @@ export interface QueryContext {
   inScope: (projectId: string | undefined) => boolean;
 }
 
-/** The words of a task query that filter by a property. */
-export type FilterWord = "assignee" | "status" | "category" | "label" | "priority" | "epic" | "cycle" | "waiting_on";
+/** The words of a task query that filter by a property: all but the project, the open question, the text and the order. */
+export type FilterWord = Exclude<keyof TaskQuery, "project" | "has_open_decision" | "q" | "sort">;
 
 export interface FilterPart {
   /** Its word in a task query: a saved view's query, the page's address (?label=bug). */
@@ -224,12 +224,15 @@ export interface PickerPart {
   title: () => string;
   /** The key that opens the picker on a list's current row and on the open task, and what the shortcuts sheet calls it. */
   hotkey?: { key: string; shortcut: Key };
-  /** The rows offered for these tasks, and what they all have now. A hook: it reads only what this kind needs. */
+  /**
+   * The rows offered for these tasks, and what they all have now: one value,
+   * or, for a kind that holds several (labels), a list, where a pick adds or
+   * takes away one and the list stays open. A hook: it reads only what this
+   * kind needs.
+   */
   useItems: (tasks: Task[]) => { items: PickerItem[]; value: string | string[] | undefined };
   /** Sets the picked value on every one of the tasks. */
   pick: (tasks: Task[], id: string) => void;
-  /** It holds several values: a pick adds or takes away one, and the list stays open. */
-  multiple?: boolean;
   /** Its own list, where picking a row may do more than set the value (an outside wait asks what it waits for). */
   List?: ComponentType<PickerListProps>;
 }

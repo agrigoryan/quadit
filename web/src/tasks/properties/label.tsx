@@ -94,7 +94,6 @@ export const label = {
   picker: {
     title: () => t("prop.set.labels"),
     hotkey: { key: "l", shortcut: "shortcuts.labels" },
-    multiple: true,
     useItems: (tasks) => {
       const labels = useLabels(tasks[0]?.project_id);
       return {

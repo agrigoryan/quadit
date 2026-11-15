@@ -61,7 +61,7 @@ function Choices({ property, tasks, close }: { property: PickerProperty } & Pick
       placeholder={picker.title()}
       onPick={(id) => {
         picker.pick(tasks, id);
-        if (!picker.multiple) close();
+        if (!Array.isArray(value)) close();
       }}
       onCreate={make && ((name) => picker.pick(tasks, make.run(projectId, name)))}
       createLabel={make?.label}
