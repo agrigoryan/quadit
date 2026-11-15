@@ -221,7 +221,7 @@ func restoreItem(ctx context.Context, st store.Store, files blob.Store, archive 
 	var ws core.Workspace
 	switch err := st.Get(ctx, &ws, store.Eq("slug", it.Workspace)); {
 	case err == nil:
-		eng := engine.New(st)
+		eng := engine.New(st, nil) // it only announces and reindexes: no secret to seal
 		if err := eng.AnnounceRestored(ctx, ws.ID, it.Kind, rid); err != nil {
 			fmt.Fprintln(os.Stderr, "restored, but open browsers were not told:", err)
 		}
@@ -249,7 +249,7 @@ func restoreAll(ctx context.Context, st store.Store, files blob.Store, archive i
 		fmt.Fprintln(os.Stderr, "restored, but rebuilding search failed:", err)
 		return 1
 	}
-	eng := engine.New(st)
+	eng := engine.New(st, nil) // it only reindexes: no secret to seal
 	for _, ws := range wss {
 		if err := eng.Reindex(ctx, ws.ID); err != nil {
 			fmt.Fprintln(os.Stderr, "rebuilding search:", err)

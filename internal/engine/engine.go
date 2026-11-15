@@ -39,6 +39,7 @@
 package engine
 
 import (
+	"errors"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/store"
@@ -48,14 +49,30 @@ import (
 type Engine struct {
 	st  store.Store
 	now func() time.Time
+	// seal encrypts a secret before it is stored; nil keeps none.
+	seal func(plain string) (string, error)
 	// OnCommit, when set, is called after a write commits with the
 	// workspace and its new position in the feed.
 	OnCommit func(workspaceID string, seq int64)
 }
 
-// New returns an engine over st.
-func New(st store.Store) *Engine {
-	return &Engine{st: st, now: time.Now}
+// New returns an engine over st. seal encrypts a secret (a workspace
+// secret, an integration's token) before it is stored; an engine made with
+// a nil seal refuses every change that would store one, rather than store it
+// as sent.
+func New(st store.Store, seal func(plain string) (string, error)) *Engine {
+	return &Engine{st: st, now: time.Now, seal: seal}
+}
+
+// errNoSealer refuses a secret to an engine made without a way to seal it.
+var errNoSealer = errors.New("this engine was made without a way to encrypt secrets, so it keeps none")
+
+// sealSecret encrypts a secret before it is stored.
+func (e *Engine) sealSecret(plain string) (string, error) {
+	if e.seal == nil {
+		return "", errNoSealer
+	}
+	return e.seal(plain)
 }
 
 // Store returns the store, for reads.

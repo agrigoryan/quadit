@@ -24,7 +24,7 @@ type M = map[string]any
 func fill(t *testing.T, st store.Store, files blob.Store) (core.Workspace, core.User, *engine.Engine) {
 	t.Helper()
 	ctx := context.Background()
-	e := engine.New(st)
+	e := engine.New(st, nil)
 	ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", WorkspaceSlug: "games", WorkspaceName: "Games"})
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +110,7 @@ func TestBackupMovesBetweenDatabases(t *testing.T) {
 				t.Fatalf("file after restore = %q", got)
 			}
 			// The restored install works: the next change continues the sequence.
-			e := engine.New(dst)
+			e := engine.New(dst, nil)
 			if err := e.Reindex(ctx, ws.ID); err != nil {
 				t.Fatal(err)
 			}

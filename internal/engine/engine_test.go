@@ -30,7 +30,7 @@ var slugN int
 
 func newWorld(t *testing.T, st store.Store) *world {
 	t.Helper()
-	e := engine.New(st)
+	e := engine.New(st, nil)
 	slugN++
 	ws, owner, err := e.Bootstrap(context.Background(), engine.BootstrapArgs{
 		OwnerName: "Aram", OwnerEmail: fmt.Sprintf("aram%d@example.com", slugN), OwnerHandle: "aram",

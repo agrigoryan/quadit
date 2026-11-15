@@ -130,11 +130,10 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	s := &Server{cfg: cfg, st: st, eng: engine.New(st), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
+	s := &Server{cfg: cfg, st: st, eng: engine.New(st, sealer.Seal), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
 		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{})}
 	s.eng.OnCommit = s.hub.Notify
 	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}
-	engine.Seal = sealer.Seal
 	s.routes()
 	return s
 }

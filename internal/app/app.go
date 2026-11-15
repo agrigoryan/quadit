@@ -518,7 +518,7 @@ func (run *adminRun) setup() error {
 	if n > 0 {
 		return errors.New("this install is already set up")
 	}
-	eng := engine.New(st)
+	eng := engine.New(st, nil) // a new workspace and its owner hold no secret to seal
 	slug := strings.ToLower(strings.Join(strings.Fields(run.workspace), "-"))
 	ws, owner, err := eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: run.name, OwnerEmail: run.email, WorkspaceSlug: slug, WorkspaceName: run.workspace})
 	if err != nil {

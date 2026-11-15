@@ -50,7 +50,7 @@ func integrationCreate(c *cx, a integrationArgs) error {
 		in.ProjectID = project.ID
 	}
 	if a.Secret.V != "" {
-		if in.Secret, err = Seal(a.Secret.V); err != nil {
+		if in.Secret, err = c.e.sealSecret(a.Secret.V); err != nil {
 			return err
 		}
 		in.HasSecret = true
@@ -90,7 +90,7 @@ func integrationUpdate(c *cx, a integrationArgs) error {
 	if a.Secret.Set {
 		sealed := ""
 		if a.Secret.V != "" {
-			if sealed, err = Seal(a.Secret.V); err != nil {
+			if sealed, err = c.e.sealSecret(a.Secret.V); err != nil {
 				return err
 			}
 		}

@@ -110,7 +110,8 @@ func TestQuietEveryEvent(t *testing.T) {
 // and the ids of the changes it applied, each quiet if asked.
 func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, applied map[string]bool) {
 	ctx := context.Background()
-	e := New(st)
+	// The scenario keeps secrets too; sealing is not what it is about.
+	e := New(st, func(plain string) (string, error) { return plain, nil })
 	clock := time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC)
 	e.now = func() time.Time {
 		clock = clock.Add(time.Second)

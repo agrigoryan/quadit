@@ -40,9 +40,6 @@ var (
 	secretHost = regexp.MustCompile(`^(http://)?(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$`)
 )
 
-// Seal encrypts a secret before it is stored. The server sets it.
-var Seal = func(plain string) (string, error) { return plain, nil }
-
 // secretSet makes a secret or changes the one with that name.
 func secretSet(c *cx, a secretArgs) error {
 	if !secretName.MatchString(a.Name) {
@@ -93,7 +90,7 @@ func (c *cx) secretNew(a secretArgs, hosts, agents []string) error {
 	if err != nil {
 		return err
 	}
-	sealed, err := Seal(a.Value.V)
+	sealed, err := c.e.sealSecret(a.Value.V)
 	if err != nil {
 		return err
 	}
@@ -120,7 +117,7 @@ func (c *cx) secretChange(cur core.Secret, a secretArgs, hosts, agents []string)
 	}
 	p.setFlag("env", a.Env, &cur.Env)
 	if a.Value.Set && a.Value.V != "" {
-		sealed, err := Seal(a.Value.V)
+		sealed, err := c.e.sealSecret(a.Value.V)
 		if err != nil {
 			return err
 		}
