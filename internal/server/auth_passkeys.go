@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -140,6 +141,9 @@ func (s *Server) handleStartPasskeyRegistration(x *c) error {
 func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	ctx := x.ctx()
 	spent, err := s.useOneTime(ctx, "passkey_register", x.r.URL.Query().Get("state"), false)
+	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
+		return err
+	}
 	if err != nil || spent.UserID != x.user.ID {
 		return errBad("this passkey setup has expired; start again")
 	}
@@ -269,6 +273,9 @@ func (s *Server) handleFinishPasskeySignIn(x *c) error {
 		return err
 	}
 	spent, err := s.useOneTime(ctx, "passkey_login", x.r.URL.Query().Get("state"), false)
+	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
+		return err
+	}
 	if err != nil {
 		return errBad("this sign-in has expired; try again")
 	}

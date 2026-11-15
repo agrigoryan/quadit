@@ -106,18 +106,26 @@ func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, lif
 	return token, s.st.Insert(ctx, row)
 }
 
-// useOneTime spends a one-time secret. It works once and only while fresh.
+// useOneTime spends a one-time secret. It works once and only while fresh: a
+// secret that is unknown, stale or spent is a refusal (*engine.Error), and
+// any other error is a failure to read or spend it.
 //
 //nolint:unparam // keep is in the signature picture.go calls too; dropping it belongs to the unit that owns that file
 func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) (core.OneTimeToken, error) {
 	var spent core.OneTimeToken
 	err := s.st.Get(ctx, &spent, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return spent, err
+	}
 	if err != nil || spent.ExpiresAt < time.Now().UnixMilli() {
 		return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link is no longer valid; ask for a new one"}
 	}
 	if !keep {
 		n, err := s.st.Update(ctx, "one_time_tokens", map[string]any{"used_at": time.Now().UnixMilli()}, store.Eq("id", spent.ID), store.Null("used_at"))
-		if err != nil || n != 1 {
+		if err != nil {
+			return spent, err
+		}
+		if n != 1 {
 			return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link was already used"}
 		}
 	}
@@ -324,9 +332,15 @@ func (s *Server) memberships(ctx context.Context, userID string) ([]membership, 
 	out := []membership{}
 	for _, m := range ms {
 		var ws core.Workspace
-		if err := s.st.Get(ctx, &ws, store.Eq("id", m.WorkspaceID), store.Live); err == nil {
-			out = append(out, membership{ID: ws.ID, Slug: ws.Slug, Name: ws.Name, Icon: ws.Icon, Role: m.Role, Handle: m.Handle})
+		// A workspace that was deleted is left out.
+		err := s.st.Get(ctx, &ws, store.Eq("id", m.WorkspaceID), store.Live)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
 		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, membership{ID: ws.ID, Slug: ws.Slug, Name: ws.Name, Icon: ws.Icon, Role: m.Role, Handle: m.Handle})
 	}
 	return out, nil
 }

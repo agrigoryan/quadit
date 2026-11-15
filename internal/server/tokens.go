@@ -3,6 +3,7 @@ package server
 // API tokens: making, listing and revoking them.
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -172,8 +173,10 @@ func (s *Server) handleListTokens(x *c) error {
 // handleRevokeToken ends a token at once.
 func (s *Server) handleRevokeToken(x *c) error {
 	var token core.APIToken
-	if err := x.db.Get(x.ctx(), &token, store.Eq("id", x.r.PathValue("id")), store.Null("revoked_at")); err != nil {
+	if err := x.db.Get(x.ctx(), &token, store.Eq("id", x.r.PathValue("id")), store.Null("revoked_at")); errors.Is(err, store.ErrNotFound) {
 		return errNotFound("token")
+	} else if err != nil {
+		return err
 	}
 	if token.UserID != x.member.UserID {
 		if err := x.admin(); err != nil {

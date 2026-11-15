@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -182,8 +183,10 @@ func (s *Server) handleUpdateUser(x *c) error {
 	}
 	ctx := x.ctx()
 	var u core.User
-	if err := s.st.Get(ctx, &u, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+	if err := s.st.Get(ctx, &u, store.Eq("id", x.r.PathValue("id")), store.Live); errors.Is(err, store.ErrNotFound) {
 		return errNotFound("user")
+	} else if err != nil {
+		return err
 	}
 	set := map[string]any{}
 	if b.Disabled != nil {

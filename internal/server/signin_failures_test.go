@@ -301,7 +301,7 @@ func TestARefreshFailsWhenTheOldTokenCannotBeRevoked(t *testing.T) {
 		form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "client_id": {clientID}}
 		fs.faults.set("update api_tokens")
 		defer fs.faults.clear()
-		s.tokenCall(t, form, 400, nil)
+		s.tokenCall(t, form, 500, nil)
 		fs.faults.clear()
 		// The refresh token was not spent, so it works once, now.
 		s.tokenCall(t, form, 200, nil)
@@ -401,5 +401,58 @@ func TestARefreshTokenSpentByAnotherRefreshIsRefused(t *testing.T) {
 		refresh, clientID := s.oauthTokens(t)
 		racing.armed.Store(true)
 		s.tokenCall(t, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "client_id": {clientID}}, 400, nil)
+	})
+}
+
+func TestSignInReadsDoNotTakeAnOutageForAbsence(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		fs := newFaultyStore(st)
+		s := newSite(t, fs)
+		var inv struct{ Link string }
+		s.call(s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
+		someone := id.New()
+		cases := []struct {
+			name, method, path string
+			body               any
+			fault              fault
+			signedOut          bool
+		}{
+			{"a password reset", "POST", "/api/v1/auth/reset/confirm", M{"token": "x", "password": "another-long-password"},
+				fault{op: "get", table: "one_time_tokens"}, false},
+			{"a token's revoke", "DELETE", w + "/tokens/" + someone, nil, fault{op: "get", table: "api_tokens"}, false},
+			{"a change to an account", "PATCH", "/api/v1/admin/users/" + someone, M{"disabled": true},
+				fault{op: "get", table: "users", match: idIs(someone)}, false},
+			{"the account's workspaces", "GET", "/api/v1/auth/me", nil, fault{op: "get", table: "workspaces"}, false},
+			{"an account made on an invitation", "POST", "/api/v1/auth/invite/" + inv.Link[strings.LastIndex(inv.Link, "/")+1:],
+				M{"name": "Bea", "email": "bea@example.com", "password": "another-long-password"}, fault{op: "insert", table: "users"}, true},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				s := s.in(t)
+				fs.faults.arm(tc.fault)
+				defer fs.faults.clear()
+				hc := s.owner
+				if tc.signedOut {
+					hc = browser()
+				}
+				s.call(hc, "", tc.method, tc.path, tc.body, 500, nil)
+			})
+		}
+		t.Run("an OAuth client trading", func(t *testing.T) {
+			for _, tc := range []struct {
+				name  string
+				form  url.Values
+				fault string
+			}{
+				{"a code", url.Values{"grant_type": {"authorization_code"}, "code": {"x"}}, "get one_time_tokens"},
+				{"a refresh token", url.Values{"grant_type": {"refresh_token"}, "refresh_token": {"x"}}, "get api_tokens"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					fs.faults.set(tc.fault)
+					defer fs.faults.clear()
+					s.tokenCall(t, tc.form, 500, nil)
+				})
+			}
+		})
 	})
 }

@@ -58,8 +58,10 @@ func (s *Server) newPerson(ctx context.Context, name, email, password string) (c
 		}
 		u.PasswordHash = hash
 	}
-	if err := s.st.Insert(ctx, u); err != nil {
+	if err := s.st.Insert(ctx, u); errors.Is(err, store.ErrConflict) {
 		return u, &engine.Error{Code: engine.CodeConflict, Field: "email", Message: "there is already an account with this email; sign in instead"}
+	} else if err != nil {
+		return u, err
 	}
 	return u, nil
 }

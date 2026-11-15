@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -224,6 +226,9 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 		return errUnauthorized("sign in first")
 	}
 	spent, err := s.useOneTime(ctx, "oauth_consent", x.r.PostForm.Get("request"), false)
+	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
+		return err
+	}
 	if err != nil || spent.UserID != x.user.ID {
 		return errBad("this request has expired; start again from the client")
 	}
@@ -286,8 +291,13 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
+	// A refusal is 400; a failure on this side is server_error, 500.
 	fail := func(code, desc string) {
-		w.WriteHeader(http.StatusBadRequest)
+		status := http.StatusBadRequest
+		if code == "server_error" {
+			status = http.StatusInternalServerError
+		}
+		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(map[string]string{"error": code, "error_description": desc})
 	}
 	if err := r.ParseForm(); err != nil {
@@ -320,6 +330,11 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 	switch form.Get("grant_type") {
 	case "authorization_code":
 		spent, err := s.useOneTime(ctx, "oauth_code", form.Get("code"), false)
+		if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
+			s.log.Error("oauth token: the code could not be spent", "err", err)
+			fail("server_error", "the code could not be spent; try again")
+			return
+		}
 		if err != nil {
 			fail("invalid_grant", "the code is not valid or was already used")
 			return
@@ -338,7 +353,13 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 		issue(firstNonEmpty(req.ActAs, req.UserID), req.WorkspaceID, req.ClientID, req.Scope)
 	case "refresh_token":
 		var old core.APIToken
-		if err := s.st.Get(ctx, &old, store.Eq("refresh_hash", auth.Hash(form.Get("refresh_token"))), store.Null("revoked_at")); err != nil ||
+		err := s.st.Get(ctx, &old, store.Eq("refresh_hash", auth.Hash(form.Get("refresh_token"))), store.Null("revoked_at"))
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			s.log.Error("oauth token: the refresh token could not be read", "err", err)
+			fail("server_error", "the refresh token could not be read; try again")
+			return
+		}
+		if err != nil ||
 			old.CreatedAt < time.Now().Add(-refreshLife).UnixMilli() || (form.Get("client_id") != "" && form.Get("client_id") != old.ClientID) {
 			fail("invalid_grant", "the refresh token is not valid; sign in again")
 			return
