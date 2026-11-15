@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -9,8 +10,11 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -254,4 +258,68 @@ func TestMCPWithOAuth(t *testing.T) {
 		}
 		rpc(next.Access, "ping", nil)
 	})
+}
+
+// feedReads is a store that, once armed, keeps the context of the first
+// read of the feed.
+type feedReads struct {
+	store.Store
+	armed atomic.Bool
+	mu    sync.Mutex
+	first context.Context
+}
+
+func (s *feedReads) In(workspaceID string) store.DB {
+	return feedReadsDB{DB: s.Store.In(workspaceID), reads: s}
+}
+
+// read is the context of the first read since the store was armed, nil
+// before it.
+func (s *feedReads) read() context.Context {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.first
+}
+
+type feedReadsDB struct {
+	store.DB
+	reads *feedReads
+}
+
+func (d feedReadsDB) Events(ctx context.Context, f store.EventFilter) ([]core.Event, error) {
+	if d.reads.armed.Load() {
+		d.reads.mu.Lock()
+		if d.reads.first == nil {
+			d.reads.first = ctx
+		}
+		d.reads.mu.Unlock()
+	}
+	return d.DB.Events(ctx, f)
+}
+
+func TestAToolCallEndsWhenItsClientGoesAway(t *testing.T) {
+	reads := &feedReads{Store: testdb.SQLite(t)}
+	s := newSite(t, reads)
+	token := s.agentToken("artist")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reads.armed.Store(true)
+	gone := make(chan struct{})
+	go func() {
+		defer close(gone)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.url+"/mcp",
+			strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"events","arguments":{"wait":50}}}`))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		if resp, err := http.DefaultClient.Do(req); err == nil {
+			resp.Body.Close()
+		}
+	}()
+	eventually(t, "the tool to read the feed", func() bool { return reads.read() != nil })
+	cancel()
+	<-gone
+	eventually(t, "the tool's work to end with its client", func() bool { return reads.read().Err() != nil })
 }

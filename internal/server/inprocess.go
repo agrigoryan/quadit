@@ -30,15 +30,11 @@ type selfCaller struct {
 }
 
 // bearerOf is the bearer of a token calling from this machine, in the
-// token's own workspace. Each call is counted against the token's rate
-// limit like one from outside.
-//
-// The call is detached: an MCP tool reaches here without the context of
-// the MCP request it serves (mcpCallTool takes none), so a call keeps
-// running when that client goes away, up to the end of its own work (a
-// feed wait is at most 55 seconds).
-func bearerOf(token string) selfCaller {
-	return selfCaller{ctx: context.Background(), base: "/api/v1/w/-",
+// token's own workspace, for as long as ctx lasts: an MCP tool's calls end
+// when the client that asked for them goes away. Each call is counted
+// against the token's rate limit like one from outside.
+func bearerOf(ctx context.Context, token string) selfCaller {
+	return selfCaller{ctx: ctx, base: "/api/v1/w/-",
 		signIn: http.Header{"Authorization": {"Bearer " + token}}, remoteAddr: selfCallAddr}
 }
 

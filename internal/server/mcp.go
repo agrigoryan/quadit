@@ -81,7 +81,7 @@ func (s *Server) handleServeMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := rpcResponse{JSONRPC: "2.0", ID: req.ID}
-	resp.Result, resp.Error = s.mcpAnswer(token, req)
+	resp.Result, resp.Error = s.mcpAnswer(bearerOf(r.Context(), token), req)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
@@ -111,7 +111,7 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 			return "", false
 		}
 	}
-	if _, ok := s.callAPI(token, "GET", "/me", url.Values{"format": {"text"}}, nil); !ok {
+	if _, ok := s.callAPI(bearerOf(r.Context(), token), "GET", "/me", url.Values{"format": {"text"}}, nil); !ok {
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token", resource_metadata="`+s.cfg.BaseURL+`/.well-known/oauth-protected-resource"`)
 		http.Error(w, "this token is not valid", http.StatusUnauthorized)
 		return "", false
@@ -120,7 +120,7 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 }
 
 // mcpAnswer is the result of one request, or the error it ends in.
-func (s *Server) mcpAnswer(token string, req rpcRequest) (any, *rpcError) {
+func (s *Server) mcpAnswer(who selfCaller, req rpcRequest) (any, *rpcError) {
 	switch req.Method {
 	case "initialize":
 		return s.mcpInitialize(req.Params), nil
@@ -129,7 +129,7 @@ func (s *Server) mcpAnswer(token string, req rpcRequest) (any, *rpcError) {
 	case "tools/list":
 		return mcpToolList(), nil
 	case "tools/call":
-		return s.mcpCallTool(token, req.Params)
+		return s.mcpCallTool(who, req.Params)
 	}
 	return nil, &rpcError{Code: -32601, Message: "method not found: " + req.Method}
 }
@@ -150,8 +150,8 @@ func (s *Server) mcpInitialize(params json.RawMessage) map[string]any {
 			"Write with change; a refusal says how to fix the call."}
 }
 
-// mcpCallTool runs the tool a tools/call names, as the bearer of token.
-func (s *Server) mcpCallTool(token string, params json.RawMessage) (any, *rpcError) {
+// mcpCallTool runs the tool a tools/call names, as who.
+func (s *Server) mcpCallTool(who selfCaller, params json.RawMessage) (any, *rpcError) {
 	var p struct {
 		Name      string         `json:"name"`
 		Arguments map[string]any `json:"arguments"`
@@ -172,7 +172,7 @@ func (s *Server) mcpCallTool(token string, params json.RawMessage) (any, *rpcErr
 	if p.Arguments == nil {
 		p.Arguments = map[string]any{}
 	}
-	text, ok := tool.Run(s, token, p.Arguments)
+	text, ok := tool.Run(s, who, p.Arguments)
 	if data, isPicture := strings.CutPrefix(text, pictureMark); ok && isPicture {
 		// A picture goes back as a picture, which a model can look at.
 		return map[string]any{"content": []map[string]any{{"type": "image", "data": data, "mimeType": "image/png"}}, "isError": false}, nil

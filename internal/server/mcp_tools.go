@@ -15,7 +15,7 @@ type mcpTool struct {
 	Name  string
 	Desc  string
 	Props map[string]string // argument -> description; a leading "!" marks it required
-	Run   func(s *Server, token string, a map[string]any) (string, bool)
+	Run   func(s *Server, who selfCaller, a map[string]any) (string, bool)
 }
 
 // pictureMark starts the result of a tool that answers with a PNG, base64 after it.
@@ -160,8 +160,8 @@ func toolSchema(t mcpTool) map[string]any {
 
 // readPathTool makes a tool that reads one API path in text form. Arguments named
 // in path are filled into it; the rest become URL parameters.
-func readPathTool(path string, pathArgs ...string) func(s *Server, token string, a map[string]any) (string, bool) {
-	return func(s *Server, token string, a map[string]any) (string, bool) {
+func readPathTool(path string, pathArgs ...string) func(s *Server, who selfCaller, a map[string]any) (string, bool) {
+	return func(s *Server, who selfCaller, a map[string]any) (string, bool) {
 		p := path
 		q := url.Values{"format": {"text"}}
 		for k := range a {
@@ -179,7 +179,7 @@ func readPathTool(path string, pathArgs ...string) func(s *Server, token string,
 		if strings.Contains(p, "{") {
 			return "missing argument: " + p[strings.Index(p, "{")+1:strings.Index(p, "}")], false
 		}
-		return s.callAPI(token, "GET", p, q, nil)
+		return s.callAPI(who, "GET", p, q, nil)
 	}
 }
 
