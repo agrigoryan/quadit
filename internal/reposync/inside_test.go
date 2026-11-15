@@ -1,4 +1,4 @@
-package server
+package reposync
 
 import (
 	"os"

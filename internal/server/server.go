@@ -31,7 +31,7 @@
 //	  run.go         Run and the list of background loops
 //	  jobs.go, dispatch.go, deliveries.go, push.go, backups.go
 //	Integrations
-//	  github*.go, reposync*.go (pages kept in a git repository), secrets.go
+//	  github*.go, reposync.go (routes of package reposync: pages kept in a git repository), secrets.go
 //	MCP
 //	  mcp.go, mcp_tools.go, mcp_calls.go, mcp_ask.go, oauth_server.go
 //	Import and export
@@ -61,6 +61,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/hub"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/reposync"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -101,6 +102,9 @@ type Server struct {
 	quit     chan struct{}
 	quitOnce sync.Once // Stop closes quit once
 	stats    stats     // request counts for /metrics
+
+	// repos mirrors folders of git repositories as pages (reposync.go).
+	repos *reposync.Syncer
 }
 
 // Stop ends the connections the server holds open for its callers, so a
@@ -129,6 +133,7 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 	s := &Server{cfg: cfg, st: st, eng: engine.New(st), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
 		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{})}
 	s.eng.OnCommit = s.hub.Notify
+	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}
 	engine.Seal = sealer.Seal
 	s.routes()
 	return s
