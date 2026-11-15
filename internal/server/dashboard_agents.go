@@ -85,7 +85,7 @@ func (who *viewer) agentWork(ctx context.Context, tasks []core.Task, names *name
 		Order: "-started_at"}); err != nil {
 		return nil, err
 	}
-	w.sessions = keepByTask(ctx, who, w.sessions, func(v core.AgentSession) string { return v.TaskID })
+	w.sessions = onTask(func(session core.AgentSession) string { return session.TaskID })(ctx, who, w.sessions)
 	if len(projects) > 0 {
 		w.keys = map[string]bool{}
 		for _, projectID := range projects {

@@ -127,7 +127,7 @@ func (s *Server) oauthActors(ctx context.Context, u core.User) ([]struct {
 		if err := s.st.In(ws.ID).List(ctx, &members, store.Q{Where: []store.Cond{store.Eq("kind", core.KindAgent), store.Null("removed_at"), store.Null("suspended_at")}, Order: "name"}); err != nil {
 			return nil, err
 		}
-		s.withResponsible(ctx, members)
+		withResponsible(ctx, s.st, s.log, members)
 		group := struct {
 			Name   string
 			Actors []oauthActor

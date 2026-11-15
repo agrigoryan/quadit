@@ -5,10 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"net/http"
-	"reflect"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -20,7 +17,8 @@ import (
 )
 
 // The core routes of the API, and /list/{collection}: one kind of row as
-// stored. Other files add their own routes through extraRoutes.
+// stored (the kinds are in rowkinds.go). Other files add their own routes
+// through extraRoutes.
 
 // routes makes the server's mux: the routes listed here, then those the
 // feature files add (addFeatureRoutes).
@@ -164,65 +162,35 @@ func (s *Server) handleDescribeChangeTypes(x *c) error {
 	return x.ok(map[string]any{"changes": cat, "surface": engine.Surface})
 }
 
-// collection is one kind of row a caller can list as stored.
-type collection struct {
-	admin bool                    // only admins may list it
-	load  func(x *c) (any, error) // reads the rows the caller may see
-}
-
-// listOf loads a collection of rows of type T in an order, with conds. The
-// URL narrows it by the columns most lists have (project=, task=, epic=, …),
-// trash=1 lists the deleted rows instead of the live ones, and limit= and
-// offset= page it (at most 5000 rows). A caller limited to some projects
-// gets only the rows of those projects.
-func listOf[T any](order string, conds ...store.Cond) func(x *c) (any, error) {
-	return func(x *c) (any, error) {
-		var rows []T
-		where, err := listConditions[T](x, conds)
-		if err != nil {
-			return nil, err
-		}
-		if err := x.db.List(x.ctx(), &rows, store.Q{Where: where, Order: order, Limit: min(x.intParam("limit", 1000), 5000), Offset: x.intParam("offset", 0)}); err != nil {
-			return nil, err
-		}
-		if x.limited() {
-			rows = keepInProjects(x.ctx(), &x.viewer, rows)
-		}
-		if rows == nil {
-			rows = []T{}
-		}
-		return rows, nil
-	}
-}
-
 // narrowingParams are the URL parameters a list is narrowed by, and the
 // field of the row each one matches.
 var narrowingParams = map[string]string{"project": "ProjectID", "task": "TaskID", "epic": "EpicID", "database": "DatabaseID", "doc": "DocID", "webhook": "WebhookID", "agent": "AgentID"}
 
-// listConditions is conds with the URL's narrowing added, for rows of
-// type T: a parameter counts when T has its field. A project or a task may
-// be named by its key.
-func listConditions[T any](x *c, conds []store.Cond) ([]store.Cond, error) {
-	where := append([]store.Cond(nil), conds...)
+// listQuery reads from the request which rows of a kind /list is asked
+// for. The URL narrows the list by the columns most kinds have (project=,
+// task=, epic=, …; one counts when the kind has its column, and a project or
+// a task may be named by its key), trash=1 lists the deleted rows with the
+// live ones, and limit= and offset= page it (at most 5000 rows).
+func (x *c) listQuery(kind rowKind) (store.Q, error) {
+	where := append([]store.Cond(nil), kind.list.conds...)
 	v := x.r.URL.Query()
-	t := reflect.TypeFor[T]()
 	for param, field := range narrowingParams {
 		val := v.Get(param)
-		f, ok := t.FieldByName(field)
+		f, ok := kind.row.FieldByName(field)
 		if val == "" || !ok {
 			continue
 		}
 		col, _, _ := strings.Cut(f.Tag.Get("db"), ",")
 		id, err := x.narrowingID(x.ctx(), param, val)
 		if err != nil {
-			return nil, err
+			return store.Q{}, err
 		}
 		where = append(where, store.Eq(col, id))
 	}
-	if _, ok := t.FieldByName("DeletedAt"); ok && !truthyParam(v, "trash") {
+	if _, ok := kind.row.FieldByName("DeletedAt"); ok && !truthyParam(v, "trash") {
 		where = append(where, store.Live)
 	}
-	return where, nil
+	return store.Q{Where: where, Order: kind.list.order, Limit: min(x.intParam("limit", 1000), 5000), Offset: x.intParam("offset", 0)}, nil
 }
 
 // narrowingID is the id a narrowing parameter's value names: a project or
@@ -243,212 +211,6 @@ func (who *viewer) narrowingID(ctx context.Context, param, val string) (string, 
 		return tk.ID, nil
 	}
 	return val, nil
-}
-
-// keepInProjects keeps a narrowed caller inside its projects: by the row's
-// own project, by being a project, by the task it hangs on, or by its epic's
-// project. Rows of a type with none of these are all kept.
-func keepInProjects[T any](ctx context.Context, who *viewer, rows []T) []T {
-	t := reflect.TypeFor[T]()
-	if f, ok := t.FieldByName("ProjectID"); ok {
-		return keep(rows, func(r T) bool { return who.canProject(reflect.ValueOf(r).FieldByIndex(f.Index).String()) })
-	}
-	if t == reflect.TypeFor[core.Project]() {
-		return keep(rows, func(r T) bool { return who.canProject(reflect.ValueOf(r).FieldByName("ID").String()) })
-	}
-	if f, ok := t.FieldByName("TaskID"); ok {
-		return keepByTask(ctx, who, rows, func(r T) string { return reflect.ValueOf(r).FieldByIndex(f.Index).String() })
-	}
-	if f, ok := t.FieldByName("EpicID"); ok {
-		return keepByEpic(ctx, who, rows, func(r T) string { return reflect.ValueOf(r).FieldByIndex(f.Index).String() })
-	}
-	return rows
-}
-
-// keepByEpic keeps the rows whose epic is in a project the caller may read.
-// An epic that cannot be read counts as in no project.
-func keepByEpic[T any](ctx context.Context, who *viewer, rows []T, epicOf func(T) string) []T {
-	projectOf := map[string]string{}
-	return keep(rows, func(r T) bool {
-		eid := epicOf(r)
-		pid, seen := projectOf[eid]
-		if !seen {
-			var e core.Epic
-			pid = "none"
-			if who.db.Get(ctx, &e, store.Eq("id", eid)) == nil {
-				pid = e.ProjectID
-			}
-			projectOf[eid] = pid
-		}
-		return who.canProject(pid)
-	})
-}
-
-// keepByTask keeps, for a caller limited to some projects, the rows that
-// hang on a task of those projects, and the rows on no task.
-func keepByTask[T any](ctx context.Context, who *viewer, rows []T, taskOf func(T) string) []T {
-	if !who.limited() {
-		return rows
-	}
-	projectOf := map[string]string{}
-	return keep(rows, func(r T) bool {
-		tid := taskOf(r)
-		if tid == "" {
-			return true
-		}
-		pid, seen := projectOf[tid]
-		if !seen {
-			var tk core.Task
-			pid = "none"
-			if who.db.Get(ctx, &tk, store.Eq("id", tid)) == nil {
-				pid = tk.ProjectID
-			}
-			projectOf[tid] = pid
-		}
-		return who.canProject(pid)
-	})
-}
-
-// taskKeyIn finds a task key ("SVA-12") in a line of text.
-var taskKeyIn = regexp.MustCompile(`\b([A-Z][A-Z0-9]{1,9})-\d+\b`)
-
-// hideActions blanks, for a caller limited to some projects, what a member
-// last did when it names a task of another project.
-func (who *viewer) hideActions(ctx context.Context, members []core.Member) {
-	if !who.limited() {
-		return
-	}
-	// When the projects cannot be read, mine stays empty and every action
-	// that names a task is hidden: this fails closed.
-	mine := map[string]bool{}
-	var projects []core.Project
-	if err := who.db.List(ctx, &projects, store.Q{}); err == nil {
-		for _, p := range projects {
-			mine[p.Key] = who.canProject(p.ID)
-		}
-	}
-	for i := range members {
-		for _, m := range taskKeyIn.FindAllStringSubmatch(members[i].LastAction, -1) {
-			if !mine[m[1]] {
-				members[i].LastAction = ""
-				break
-			}
-		}
-	}
-}
-
-// collections are the kinds of row /list/{collection} lists, by name.
-var collections = map[string]collection{
-	"members":     {load: loadMembers},
-	"projects":    {load: listOf[core.Project]("rank")},
-	"statuses":    {load: listOf[core.Status]("rank")},
-	"labels":      {load: listOf[core.Label]("name")},
-	"epics":       {load: listOf[core.Epic]("rank")},
-	"milestones":  {load: listOf[core.Milestone]("rank")},
-	"cycles":      {load: listOf[core.Cycle]("starts_on")},
-	"templates":   {load: listOf[core.Template]("name")},
-	"preferences": {load: listOf[core.Preference]("created_at")},
-	"resources":   {load: listOf[core.Resource]("name")},
-	"secrets":     {admin: true, load: listOf[core.Secret]("name")},
-	"claims":      {load: listOf[core.ResourceClaim]("requested_at", store.Ne("state", core.ClaimReleased))},
-	"sessions":    {load: listOf[core.AgentSession]("-started_at")},
-	"relations":   {load: listOf[core.Relation]("created_at")},
-	"attachments": {load: loadAttachments},
-	"links":       {load: listOf[core.TaskLink]("created_at")},
-	"webhooks":    {admin: true, load: listOf[core.Webhook]("name")},
-	"deliveries":  {admin: true, load: listOf[core.WebhookDelivery]("-created_at")},
-	"rules":       {admin: true, load: listOf[core.Rule]("name")},
-	"integrations": {admin: true, load: func(x *c) (any, error) {
-		rows, err := listOf[core.Integration]("created_at")(x)
-		if err != nil {
-			return nil, err
-		}
-		list := rows.([]core.Integration)
-		for i := range list {
-			list[i].HasSecret = list[i].Secret != ""
-		}
-		return list, nil
-	}},
-	// Shared views, and the caller's own.
-	"views": {load: func(x *c) (any, error) {
-		rows, err := listOf[core.View]("rank")(x)
-		if err != nil {
-			return nil, err
-		}
-		return keep(rows.([]core.View), x.canSeeView), nil
-	}},
-}
-
-// loadMembers lists the workspace's members with who is responsible for
-// each agent. Admins also see people's addresses: they invite and import
-// by them.
-func loadMembers(x *c) (any, error) {
-	rows, err := listOf[core.Member]("handle")(x)
-	if err != nil {
-		return nil, err
-	}
-	ms := rows.([]core.Member)
-	x.s.withResponsible(x.ctx(), ms)
-	x.hideActions(x.ctx(), ms)
-	if !x.member.Role.AtLeast(core.RoleAdmin) {
-		return ms, nil
-	}
-	var ids []string
-	for _, m := range ms {
-		if m.Kind == core.KindPerson {
-			ids = append(ids, m.UserID)
-		}
-	}
-	var users []core.User
-	if len(ids) > 0 && x.s.st.List(x.ctx(), &users, store.Where(store.In("id", ids))) == nil {
-		by := map[string]string{}
-		for _, u := range users {
-			by[u.ID] = u.Email
-		}
-		for i := range ms {
-			ms[i].Email = by[ms[i].UserID]
-		}
-	}
-	return ms, nil
-}
-
-// loadAttachments lists the files attached to tasks, decisions, options,
-// comments and pages, each with its file; task= narrows to one task, and
-// trash=1 lists the removed ones, which attachment.restore puts back.
-func loadAttachments(x *c) (any, error) {
-	conds := []store.Cond{store.Live}
-	if truthyParam(x.r.URL.Query(), "trash") {
-		conds = []store.Cond{store.NotNull("deleted_at")}
-	}
-	if ref := x.r.URL.Query().Get("task"); ref != "" {
-		t, err := x.taskByRef(x.ctx(), ref)
-		if err != nil {
-			return nil, err
-		}
-		conds = append(conds, store.Eq("task_id", t.ID))
-	}
-	var atts []core.Attachment
-	if err := x.db.List(x.ctx(), &atts, store.Q{Where: conds, Order: "-created_at", Limit: 1000}); err != nil {
-		return nil, err
-	}
-	byID, err := x.attachedFiles(x.ctx(), atts)
-	if err != nil {
-		return nil, err
-	}
-	out := atts[:0]
-	for _, a := range atts {
-		if a.TaskID != "" {
-			var t core.Task
-			if err := x.db.Get(x.ctx(), &t, store.Eq("id", a.TaskID)); err != nil || !x.canProject(t.ProjectID) {
-				continue
-			}
-		}
-		if f, ok := byID[a.FileID]; ok {
-			a.File = &f
-		}
-		out = append(out, a)
-	}
-	return out, nil
 }
 
 // attachedFiles loads the files of attachments, with their addresses, by id.
@@ -475,19 +237,36 @@ func (who *viewer) attachedFiles(ctx context.Context, atts []core.Attachment) (m
 // handleListCollection returns one kind of row as stored: members, labels, epics and so on.
 func (s *Server) handleListCollection(x *c) error {
 	name := x.r.PathValue("collection")
-	col, ok := collections[name]
-	if !ok {
-		all := slices.Sorted(maps.Keys(collections))
+	kind, ok := rowKindNamed(name)
+	if !ok || kind.list == nil {
+		var all []string
+		for _, kind := range rowKinds {
+			if kind.list != nil {
+				all = append(all, kind.name)
+			}
+		}
+		slices.Sort(all)
 		return &engine.Error{Code: engine.CodeNotFound, Message: "no list " + name, Allowed: all, Nearest: engine.Nearest(name, all)}
 	}
-	if col.admin {
+	if kind.list.admin {
 		if err := x.admin(); err != nil {
 			return err
 		}
 	}
-	rows, err := col.load(x)
+	query := x.listQuery
+	if kind.list.query != nil {
+		query = func(rowKind) (store.Q, error) { return kind.list.query(x) }
+	}
+	q, err := query(kind)
 	if err != nil {
 		return err
+	}
+	rows, err := kind.read(x.ctx(), &x.viewer, q)
+	if err != nil {
+		return err
+	}
+	if kind.list.also != nil {
+		kind.list.also(x.ctx(), &x.viewer, rows)
 	}
 	if x.wantText() {
 		text, err := collectionText(rows, int64(x.intParam("since", -1)))

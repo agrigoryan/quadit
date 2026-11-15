@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -177,7 +178,7 @@ func (who *viewer) decisionViewsOf(ctx context.Context, decisions []core.Decisio
 
 // withResponsible fills in, for each agent, the person who answers for it.
 // The lists it fills are shown without that when it cannot be read.
-func (s *Server) withResponsible(ctx context.Context, members []core.Member) {
+func withResponsible(ctx context.Context, st store.Store, log *slog.Logger, members []core.Member) {
 	var ids []string
 	for _, m := range members {
 		if m.Kind == core.KindAgent {
@@ -188,8 +189,8 @@ func (s *Server) withResponsible(ctx context.Context, members []core.Member) {
 		return
 	}
 	var users []core.User
-	if err := s.st.List(ctx, &users, store.Where(store.In("id", ids))); err != nil {
-		s.log.Warn("agents listed without who answers for them", "err", err)
+	if err := st.List(ctx, &users, store.Where(store.In("id", ids))); err != nil {
+		log.Warn("agents listed without who answers for them", "err", err)
 		return
 	}
 	responsible := map[string]string{}

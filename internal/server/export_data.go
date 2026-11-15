@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"reflect"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -25,45 +24,33 @@ type exportRows struct {
 	tasks     []core.Task
 }
 
-// exportTable is one kind of row in data/: the name of its file, a pointer
-// to the list of its rows, and how they are read (tasks and events are read
-// page by page, and have none).
+// exportTable is one kind of row in data/: the name of its file, and the
+// list of its rows.
 type exportTable struct {
 	name string
 	rows any
-	q    store.Q
 }
 
-// load reads every row of the workspace the export holds.
+// load reads every row of the workspace the export holds: each kind that
+// data/ has (rowKinds), as stored, then the tasks and the events, which are
+// read page by page and go last.
 func (e *exporter) load() (*exportRows, error) {
-	r, live := &exportRows{}, store.Where(store.Live)
-	r.tables = []exportTable{
-		{"members", new([]core.Member), store.Q{}},
-		{"projects", new([]core.Project), live},
-		{"statuses", new([]core.Status), live},
-		{"labels", new([]core.Label), live},
-		{"epics", new([]core.Epic), live},
-		{"milestones", new([]core.Milestone), live},
-		{"cycles", new([]core.Cycle), live},
-		{"decisions", &r.decisions, store.Q{Where: live.Where, Order: "created_seq"}},
-		{"decision_options", &r.options, store.Q{Where: live.Where, Order: "rank"}},
-		{"comments", &r.comments, store.Q{Where: live.Where, Order: "created_seq"}},
-		{"relations", new([]core.Relation), store.Q{}},
-		{"links", new([]core.TaskLink), live},
-		{"attachments", &r.atts, live},
-		{"files", &r.files, live},
-		{"docs", &r.docs, store.Q{Where: live.Where, Order: "rank"}},
-		{"blocks", &r.blocks, store.Q{Where: live.Where, Order: "rank"}},
-		{"properties", new([]core.DBProperty), store.Q{Where: live.Where, Order: "rank"}},
-		{"preferences", new([]core.Preference), live},
-		{"views", new([]core.View), live},
-	}
-	for _, t := range r.tables {
-		if err := e.who.db.List(e.ctx, t.rows, t.q); err != nil {
+	r := &exportRows{}
+	byName := map[string]any{}
+	for _, kind := range rowKinds {
+		if kind.exportQuery == nil {
+			continue
+		}
+		rows, err := kind.all(e.ctx, e.who.db, *kind.exportQuery)
+		if err != nil {
 			return nil, err
 		}
+		r.tables = append(r.tables, exportTable{kind.name, rows})
+		byName[kind.name] = rows
 	}
-	// Tasks and events are read page by page, and go last.
+	r.decisions, r.options, r.comments = byName["decisions"].([]core.Decision), byName["decision_options"].([]core.Option), byName["comments"].([]core.Comment)
+	r.atts, r.files = byName["attachments"].([]core.Attachment), byName["files"].([]core.File)
+	r.docs, r.blocks = byName["docs"].([]core.Doc), byName["blocks"].([]core.Block)
 	var err error
 	if r.tasks, err = e.everyTaskByKey(); err != nil {
 		return nil, err
@@ -72,14 +59,14 @@ func (e *exporter) load() (*exportRows, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.tables = append(r.tables, exportTable{name: "tasks", rows: &r.tasks}, exportTable{name: "events", rows: &evs})
+	r.tables = append(r.tables, exportTable{"tasks", r.tasks}, exportTable{"events", evs})
 	return r, nil
 }
 
 // data writes data/: every workspace table as JSON.
 func (e *exporter) data(r *exportRows) error {
 	for _, t := range r.tables {
-		if err := e.dump(t.name, reflect.ValueOf(t.rows).Elem().Interface()); err != nil {
+		if err := e.dump(t.name, t.rows); err != nil {
 			return err
 		}
 	}
