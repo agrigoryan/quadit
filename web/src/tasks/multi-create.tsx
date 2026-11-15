@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { useProjects } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { createTasks } from "@/tasks/actions";
 import { CreateFields, type TaskFields } from "@/tasks/create-fields";
 import type { NewTaskDraft } from "@/tasks/draft";

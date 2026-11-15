@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 import type { Member, Task } from "@/lib/types";
 import { formatDay } from "@/lib/time";
 import { useListening } from "@/settings/agents/data";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import {
   moveToProject,
   OUTSIDE,

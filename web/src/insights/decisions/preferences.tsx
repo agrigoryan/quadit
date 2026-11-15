@@ -11,7 +11,7 @@ import { useCollection, useMember } from "@/lib/selectors";
 import { useMinute } from "@/lib/tick";
 import { ago, exact } from "@/lib/time";
 import { nameOf } from "@/detail/data";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { useTaskLink } from "@/tasks/task-link";
 import { LabelChip } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";

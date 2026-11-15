@@ -8,7 +8,7 @@ import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Project, Template } from "@/lib/types";
 import { ui } from "@/lib/ui-state";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { createTask } from "@/tasks/actions";
 import { CreateFields, type TaskFields } from "@/tasks/create-fields";
 import type { NewTaskDraft } from "@/tasks/draft";

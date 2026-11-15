@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { t } from "@/lib/i18n";
 import { useCollection, useProjects } from "@/lib/selectors";
 import { nameOf } from "@/detail/data";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";

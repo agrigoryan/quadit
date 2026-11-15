@@ -18,7 +18,7 @@ import { WaitingPanel } from "@/insights/dashboard/waiting-panel";
 import { useLive } from "@/insights/lib/live";
 import type { Dashboard } from "@/insights/lib/types";
 import { PageBar } from "@/insights/ui/panel";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { Select } from "@/ui/picker";
 import { Loading } from "@/ui/spinner";
 

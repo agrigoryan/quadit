@@ -8,7 +8,7 @@ import { type AgentMember, dollars, toMicros, toMinutes } from "@/settings/agent
 import { AvatarInput } from "@/settings/ui/avatar-input";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { type FieldErrors, FormField, NativeSelect, SwitchRow } from "@/settings/ui/form";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { Input, Textarea } from "@/ui/input";
 
 export interface AgentDraft {

@@ -9,7 +9,7 @@ import { ProjectPreferences } from "@/settings/projects/preferences";
 import { ProjectStatuses } from "@/settings/projects/statuses";
 import { ProjectTemplates } from "@/settings/projects/templates";
 import { Page } from "@/settings/ui/layout";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { Badge } from "@/ui/badge";
 import { EmptyState } from "@/ui/empty";
 

@@ -11,7 +11,7 @@ import { FormAlert, FormField, NativeSelect, SwitchRow } from "@/settings/ui/for
 import { EmptyRow, Row, Rows, Section } from "@/settings/ui/layout";
 import { CreateTokenDialog, ScopeBadges, type TokenFieldsProps } from "@/settings/ui/tokens";
 import { useLoad } from "@/settings/ui/use-load";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";

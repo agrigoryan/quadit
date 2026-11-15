@@ -11,7 +11,7 @@ import { exact } from "@/lib/time";
 import { isOpenCategory, type Task } from "@/lib/types";
 import { count } from "@/insights/lib/format";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { useTaskLink } from "@/tasks/task-link";
 import { Ago } from "@/ui/ago";
 

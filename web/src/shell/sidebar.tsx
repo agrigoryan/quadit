@@ -10,6 +10,7 @@ import { type DestinationGroup, destinationPath, goKeys, placesIn } from "@/shel
 import { NavItem, NavSection } from "@/shell/nav-item";
 import { WorkspaceSwitcher } from "@/shell/workspace-switcher";
 import { IconButton } from "@/ui/button";
+import { ProjectGlyph } from "@/ui/project-glyph";
 
 // What the sidebar lists is the table in shell/destinations.tsx; this file only lays it out.
 
@@ -60,19 +61,6 @@ function Places({ group, slug, collapsed }: { group: DestinationGroup; slug: str
         );
       })}
     </>
-  );
-}
-
-/** A project's key in a small square: its mark wherever the project is named. */
-export function ProjectGlyph({ project }: { project: Pick<Project, "key" | "color"> }) {
-  return (
-    <span
-      className="flex size-4 shrink-0 items-center justify-center rounded-xs text-[8px] leading-none font-bold text-white"
-      style={{ background: project.color || "var(--ink-2)" }}
-      aria-hidden
-    >
-      {project.key.slice(0, 2)}
-    </span>
   );
 }
 

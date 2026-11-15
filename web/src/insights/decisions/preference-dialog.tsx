@@ -11,7 +11,7 @@ import { useLabels, useProjects } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import type { Decision } from "@/lib/types";
-import { ProjectGlyph } from "@/shell/sidebar";
+import { ProjectGlyph } from "@/ui/project-glyph";
 import { LabelChip } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
