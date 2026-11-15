@@ -414,3 +414,55 @@ func TestRestoreAFile(t *testing.T) {
 		}
 	})
 }
+
+// TestSubAgents checks delegation: an agent makes a helper for one task,
+// which is held to that task's project and ends with the task.
+func TestSubAgents(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Draw the boss"})
+		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
+		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		var art struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &art)
+		do := func(token, typ string, args M, want int) string {
+			return s.call(nil, token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
+		}
+		// A member agent cannot make a standing agent, but can make a helper for a task.
+		if out := do(art.Token, "agent.create", M{"name": "Standing", "handle": "standing"}, 403); !strings.Contains(out, "sub-agent") {
+			t.Fatalf("a member making a standing agent: %s", out)
+		}
+		do(art.Token, "agent.create", M{"name": "Inker", "handle": "inker", "task": "SVA-1", "role": "admin"}, 403)
+		do(art.Token, "agent.create", M{"name": "Inker", "handle": "inker", "task": "SVA-1", "description": "Inks the boss frames"}, 200)
+		var ink struct{ Token string }
+		s.call(nil, art.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@inker"}, 201, &ink)
+		// The helper works on its task's project and nowhere else.
+		do(ink.Token, "comment.create", M{"task": "SVA-1", "body": "Frames inked."}, 200)
+		s.call(nil, ink.Token, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
+		if out := s.call(nil, ink.Token, "GET", "/api/v1/w/-/me?format=text", nil, 200, nil); !strings.Contains(out, "@inker") {
+			t.Fatalf("the helper is: %s", out)
+		}
+		// It has its own name on what it does, and the same person answers for it.
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "@inker") {
+			t.Fatalf("the helper's comment: %s", out)
+		}
+		// The task is done: the helper is finished, and its token with it.
+		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "status": "done"})
+		s.call(nil, ink.Token, "GET", "/api/v1/w/-/me", nil, 401, nil)
+		var list struct {
+			Members []struct {
+				Handle      string
+				SuspendedAt int64  `json:"suspended_at"`
+				Delegated   string `json:"delegated_by"`
+			}
+		}
+		s.call(s.owner, "", "GET", w+"/list/members", nil, 200, &list)
+		for _, m := range list.Members {
+			if m.Handle == "inker" && (m.SuspendedAt == 0 || m.Delegated == "") {
+				t.Fatalf("the helper after its task closed: %+v", m)
+			}
+		}
+	})
+}

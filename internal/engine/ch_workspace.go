@@ -20,7 +20,8 @@ func init() {
 	register("member.add", core.RoleAdmin, memberAdd)
 	register("member.update", core.RoleAdmin, memberUpdate)
 	register("member.remove", core.RoleAdmin, memberRemove)
-	register("agent.create", core.RoleAdmin, agentCreate)
+	// Members may make a sub-agent for a task; a standing agent needs an admin.
+	register("agent.create", core.RoleMember, agentCreate)
 	register("agent.update", core.RoleAdmin, agentUpdate)
 	register("project.create", core.RoleAdmin, projectCreate)
 	register("project.update", core.RoleAdmin, projectUpdate)
@@ -529,6 +530,10 @@ type agentCreateArgs struct {
 	Responsible string       `json:"responsible"` // the person who answers for it; default: the caller
 	Scope       *scopeArgs   `json:"scope"`
 	Budget      *core.Budget `json:"budget"`
+	// Task makes a sub-agent for one task: any agent or member may make one.
+	// It is a member limited to that task's project and to its maker's own
+	// limits, and it is suspended when the task is done or dropped.
+	Task string `json:"task"`
 }
 
 func agentCreate(c *cx) error {
@@ -556,6 +561,17 @@ func agentCreate(c *cx) error {
 	role, err := c.roleArg(a.Role, true)
 	if err != nil {
 		return err
+	}
+	var forTask core.Task
+	if a.Task != "" {
+		if forTask, err = c.task("task", a.Task); err != nil {
+			return err
+		}
+		if role != core.RoleMember {
+			return invalid("role", "a sub-agent made for a task is a member")
+		}
+	} else if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
+		return forbidden("agent.create needs the admin role; you are a %s. To get help on one task, make a sub-agent for it: add \"task\": \"SVA-12\"", c.actor.Role)
 	}
 	// Someone answers for every agent. By default that is the person who
 	// creates it; an agent that creates another passes on its own.
@@ -592,13 +608,51 @@ func agentCreate(c *cx) error {
 		scope.NeedsApproval = append([]string(nil), AsksFirst...)
 	}
 	scope = c.capScope(scope)
+	if forTask.ID != "" {
+		// Whatever was asked for, a sub-agent works in its task's project only.
+		if scope == nil {
+			scope = &core.Scope{}
+		}
+		scope.Projects = []string{forTask.ProjectID}
+	}
 	u := core.User{ID: uid, Kind: core.KindAgent, Name: name, Description: a.Description, Avatar: a.Avatar, WorkspaceID: c.ws,
 		ResponsibleID: rm.UserID, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, u); err != nil {
 		return taken(err, "id", uid)
 	}
 	return c.addMember(core.Member{WorkspaceID: c.ws, UserID: uid, Role: role, Handle: handle, Kind: u.Kind, Name: u.Name,
-		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at, ResponsibleID: rm.UserID})
+		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at, ResponsibleID: rm.UserID,
+		DelegatedBy: delegatedBy(c, forTask), DelegatedTask: forTask.ID})
+}
+
+func delegatedBy(c *cx, t core.Task) string {
+	if t.ID == "" {
+		return ""
+	}
+	return c.actor.UserID
+}
+
+// endDelegates suspends the sub-agents made for a task once it is done or
+// dropped, and ends their tokens: they were made for that work only.
+func (c *cx) endDelegates(t core.Task) error {
+	var subs []core.Member
+	if err := c.tx.List(c.ctx, &subs, store.Where(store.Eq("delegated_task", t.ID), store.Null("suspended_at"), store.Null("removed_at"))); err != nil {
+		return err
+	}
+	for _, m := range subs {
+		seq := c.tx.NextSeq()
+		if _, err := c.tx.Update(c.ctx, "members", map[string]any{"suspended_at": c.at, "updated_seq": seq}, store.Eq("user_id", m.UserID)); err != nil {
+			return err
+		}
+		if _, err := c.tx.Update(c.ctx, "api_tokens", map[string]any{"revoked_at": c.at}, store.Eq("user_id", m.UserID), store.Null("revoked_at")); err != nil {
+			return err
+		}
+		if err := c.emit(seq, "member.updated", "member", m.UserID, "workspace", c.ws, "", map[string]any{"id": m.UserID, "user_id": m.UserID,
+			"changes": map[string]core.FieldChange{"suspended_at": {To: c.at}}, "reason": "its task " + t.Key + " is closed"}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // capScope holds a scope an agent hands out to the agent's own: an agent

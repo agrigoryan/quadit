@@ -327,7 +327,16 @@ func (c *cx) saveTask(t core.Task, p *patch, extra map[string]any) error {
 	for k, v := range extra {
 		data[k] = v
 	}
-	return c.emit(seq, "task.updated", "task", t.ID, "task", t.ID, t.ProjectID, data)
+	if err := c.emit(seq, "task.updated", "task", t.ID, "task", t.ID, t.ProjectID, data); err != nil {
+		return err
+	}
+	// The task is done or dropped: the sub-agents made for it are finished too.
+	for _, col := range []string{"completed_at", "canceled_at"} {
+		if at, ok := p.set[col].(int64); ok && at != 0 {
+			return c.endDelegates(t)
+		}
+	}
+	return nil
 }
 
 // touch records that something happened inside a task.

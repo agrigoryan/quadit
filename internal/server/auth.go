@@ -469,8 +469,12 @@ func (s *Server) hTokenCreate(x *c) error {
 		return err
 	}
 	if m.UserID != x.member.UserID {
-		if err := x.admin(); err != nil {
-			return err
+		// An admin makes tokens for agents; anyone makes them for a
+		// sub-agent they made themselves.
+		if m.DelegatedBy != x.member.UserID {
+			if err := x.admin(); err != nil {
+				return err
+			}
 		}
 		if m.Kind != core.KindAgent {
 			return errForbidden("a person's tokens are made by that person")

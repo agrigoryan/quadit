@@ -76,6 +76,9 @@ CREATE TABLE members (
     created_at    {{TS}} NOT NULL,
     updated_seq   {{BIGINT}} NOT NULL,
     suspended_at  {{TS}},
+    -- a sub-agent: the agent that made it, and the task it was made for
+    delegated_by    {{ID}},
+    delegated_task  {{ID}},
     removed_at    {{TS}},
     PRIMARY KEY (workspace_id, user_id)
 );

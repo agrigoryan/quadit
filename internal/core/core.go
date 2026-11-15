@@ -132,7 +132,11 @@ type Member struct {
 	CreatedAt      int64   `json:"created_at" db:"created_at"`
 	UpdatedSeq     int64   `json:"updated_seq" db:"updated_seq"`
 	SuspendedAt    int64   `json:"suspended_at,omitempty" db:"suspended_at,null"`
-	RemovedAt      int64   `json:"removed_at,omitempty" db:"removed_at,null"`
+	// DelegatedBy and DelegatedTask mark a sub-agent: the agent that made
+	// it and the task it was made for. It ends when that task does.
+	DelegatedBy   string `json:"delegated_by,omitempty" db:"delegated_by,null"`
+	DelegatedTask string `json:"delegated_task,omitempty" db:"delegated_task,null"`
+	RemovedAt     int64  `json:"removed_at,omitempty" db:"removed_at,null"`
 	// ResponsibleID is the person who answers for an agent. It is kept on
 	// the user and filled in when members are read.
 	ResponsibleID string `json:"responsible_id,omitempty"`
