@@ -4,9 +4,11 @@ import { Layers } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useEpics, useRowEvenIfGone } from "@/lib/selectors";
 import { setEpic } from "@/tasks/actions";
+import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow } from "@/tasks/properties/panel-row";
-import { NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import { type CreateProps, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
+import { Picker } from "@/ui/picker";
 
 function EpicRow(panel: PanelProps) {
   const e = useRowEvenIfGone("epics", panel.task.epic_id);
@@ -16,6 +18,28 @@ function EpicRow(panel: PanelProps) {
       <Layers className="size-3.5 shrink-0 text-ink-3" aria-hidden />
       <span className="truncate">{name}</span>
     </PickerRow>
+  );
+}
+
+/** Offered where the project has epics. */
+function EpicPill({ project, value, onChange }: CreateProps) {
+  const epics = useEpics(project.id);
+  const e = epics.find((x) => x.id === value.epicId);
+  if (epics.length === 0) return null;
+  return (
+    <Picker
+      label={t("prop.epic")}
+      placeholder={t("prop.set.epic")}
+      value={value.epicId || NONE}
+      items={[noneItem(t("task.noEpic")), ...epics.map((x) => ({ id: x.id, label: x.name }))]}
+      onPick={(id) => onChange({ epicId: orNone(id) })}
+    >
+      <button type="button" className={pill}>
+        <Pill icon={<Layers className="size-3.5" aria-hidden />} set={!!e}>
+          {e?.name ?? t("prop.epic")}
+        </Pill>
+      </button>
+    </Picker>
   );
 }
 
@@ -38,5 +62,6 @@ export const epic = {
     pick: (tasks, id) => setEpic(tasks, id === NONE ? null : id),
   },
   Panel: EpicRow,
+  Create: EpicPill,
   bulk: { place: "menu", icon: <Layers />, label: () => t("prop.set.epic") },
 } satisfies TaskProperty<"epic">;

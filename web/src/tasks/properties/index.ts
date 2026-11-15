@@ -3,6 +3,7 @@
 // what a description holds); this table is the one list of them. Adding a
 // property is a new file here and a line in this table.
 
+import type { ComponentType } from "react";
 import { assignee } from "@/tasks/properties/assignee";
 import { budget } from "@/tasks/properties/budget";
 import { cycle } from "@/tasks/properties/cycle";
@@ -14,7 +15,7 @@ import { milestone } from "@/tasks/properties/milestone";
 import { parent } from "@/tasks/properties/parent";
 import { priority } from "@/tasks/properties/priority";
 import { project } from "@/tasks/properties/project";
-import type { BulkPart, PickerProperty, TaskProperty } from "@/tasks/properties/property";
+import type { BulkPart, CreateProps, PickerProperty, TaskProperty } from "@/tasks/properties/property";
 import { status } from "@/tasks/properties/status";
 import { waiting } from "@/tasks/properties/waiting";
 
@@ -53,6 +54,17 @@ export const BULK: (TaskProperty<PropertyName> & { bulk: BulkPart })[] = [
   due,
   estimate,
   project,
+];
+
+/** The create dialog's, in its order: the parent before the due date, where the panel has them the other way round. */
+export const CREATE: (TaskProperty<PropertyName> & { Create: ComponentType<CreateProps> })[] = [
+  status,
+  assignee,
+  priority,
+  label,
+  epic,
+  parent,
+  due,
 ];
 
 /** The properties a key opens the picker of (S, A, P, L), in the table's order. */

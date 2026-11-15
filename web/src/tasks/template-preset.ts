@@ -3,7 +3,7 @@
 
 import { getRows } from "@/lib/selectors";
 import type { Project, Template } from "@/lib/types";
-import type { TaskFields } from "@/tasks/create-fields";
+import type { TaskFields } from "@/tasks/properties/property";
 
 /** What a template fills in, looked up by the names it stores. */
 export function presetOf(template: Template | undefined, project: Project): Partial<TaskFields> {

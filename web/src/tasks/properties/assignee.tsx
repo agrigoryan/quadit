@@ -5,10 +5,12 @@ import { t } from "@/lib/i18n";
 import { useListening } from "@/lib/listening";
 import { useMe, useMember, useMembers } from "@/lib/selectors";
 import { setAssignee } from "@/tasks/actions";
+import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PickerRow, PropRow } from "@/tasks/properties/panel-row";
-import { NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import { type CreateProps, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { memberItems, noneItem } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
+import { Picker } from "@/ui/picker";
 import { Tooltip } from "@/ui/tooltip";
 
 /** Who has the task, and, for an agent, the person it works for. */
@@ -40,6 +42,31 @@ function AssigneeRow(panel: PanelProps) {
   );
 }
 
+function AssigneePill({ value, onChange }: CreateProps) {
+  const members = useMembers();
+  const me = useMe();
+  const listening = useListening();
+  const person = members.find((m) => m.user_id === value.assigneeId);
+  return (
+    <Picker
+      label={t("prop.assignee")}
+      placeholder={t("prop.set.assignee")}
+      value={value.assigneeId || NONE}
+      items={[noneItem(t("task.unassigned")), ...memberItems(members, me.user_id, listening)]}
+      onPick={(id) => onChange({ assigneeId: orNone(id) })}
+    >
+      <button type="button" className={pill}>
+        <Pill
+          icon={person ? <Avatar member={person} size="xs" /> : <UserRound className="size-3.5" aria-hidden />}
+          set={!!person}
+        >
+          {person?.name ?? t("prop.assignee")}
+        </Pill>
+      </button>
+    </Picker>
+  );
+}
+
 export const assignee = {
   name: "assignee",
   title: () => t("prop.assignee"),
@@ -59,5 +86,6 @@ export const assignee = {
     pick: (tasks, id) => setAssignee(tasks, id === NONE ? null : id),
   },
   Panel: AssigneeRow,
+  Create: AssigneePill,
   bulk: { place: "bar", icon: <UserRound className="size-3.5" aria-hidden /> },
 } satisfies TaskProperty<"assignee">;

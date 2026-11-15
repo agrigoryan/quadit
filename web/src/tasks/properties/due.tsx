@@ -5,10 +5,12 @@ import { CalendarDays, X } from "lucide-react";
 import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { formatDay } from "@/lib/time";
 import type { Task } from "@/lib/types";
 import { setDue } from "@/tasks/actions";
+import { Pill, pill } from "@/tasks/properties/create-pill";
 import { inlineField, PropRow } from "@/tasks/properties/panel-row";
-import { type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
+import { type CreateProps, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";
@@ -82,9 +84,29 @@ function DueForm({ tasks, onDone }: { tasks: Task[]; onDone: () => void }) {
   );
 }
 
+/** The browser's own date picker, under a pill that shows the day. */
+function DuePill({ value, onChange }: CreateProps) {
+  return (
+    <label className={cx(pill, "relative cursor-pointer focus-within:border-accent")}>
+      <Pill icon={<CalendarDays className="size-3.5" aria-hidden />} set={!!value.dueOn}>
+        {value.dueOn ? formatDay(value.dueOn) : t("prop.due")}
+      </Pill>
+      <input
+        type="date"
+        value={value.dueOn}
+        onChange={(e) => onChange({ dueOn: e.target.value })}
+        onClick={(e) => e.currentTarget.showPicker?.()}
+        aria-label={t("prop.due")}
+        className="absolute inset-0 cursor-pointer opacity-0"
+      />
+    </label>
+  );
+}
+
 export const due = {
   name: "due",
   title: () => t("prop.due"),
   Panel: DueRow,
+  Create: DuePill,
   bulk: { place: "menu", icon: <CalendarDays />, label: () => t("bulk.due"), Form: DueForm },
 } satisfies TaskProperty<"due">;

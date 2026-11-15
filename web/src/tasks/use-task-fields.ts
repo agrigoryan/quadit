@@ -3,7 +3,7 @@
 // old one.
 
 import { useState } from "react";
-import type { TaskFields } from "@/tasks/create-fields";
+import type { TaskFields } from "@/tasks/properties/property";
 import { useCreatableProjects } from "@/tasks/data";
 import type { NewTaskDraft } from "@/tasks/draft";
 

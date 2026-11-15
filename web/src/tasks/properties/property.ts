@@ -30,6 +30,8 @@ export interface TaskProperty<Name extends string = string> {
   manage?: "labels" | "statuses";
   /** Its row in the task's property panel; it draws nothing where the task or its project has no such thing. */
   Panel?: ComponentType<PanelProps>;
+  /** Its pill in the create dialog. */
+  Create?: ComponentType<CreateProps>;
   /** Changing it on every task of a selection, from the bulk bar. */
   bulk?: BulkPart;
 }
@@ -44,6 +46,29 @@ export interface BulkPart {
   offered?: (project: Project | undefined) => boolean;
   /** For a value typed rather than picked: the form that sets it on them all. */
   Form?: ComponentType<{ tasks: Task[]; onDone: () => void }>;
+}
+
+/** What the create dialog collects besides the title and description. */
+export interface TaskFields {
+  statusId: string;
+  assigneeId: string;
+  priority: number;
+  labelIds: string[];
+  epicId: string;
+  parentId: string;
+  dueOn: string;
+  templateId: string;
+}
+
+/** What the create dialog hands each property's pill. */
+export interface CreateProps {
+  project: Project;
+  value: TaskFields;
+  onChange: (patch: Partial<TaskFields>) => void;
+  /** For several tasks at once, which leave out what only one task can have (a parent). */
+  shared?: boolean;
+  /** Called before leaving for a settings page, so the dialog can close. */
+  onLeave?: () => void;
 }
 
 /** What the property panel hands each row. */

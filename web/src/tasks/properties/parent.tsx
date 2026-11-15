@@ -2,17 +2,20 @@
 // its sub-tasks.
 
 import { useCallback, useMemo } from "react";
-import { ArrowUpRight, CircleSlash } from "lucide-react";
+import { ArrowUpRight, CircleSlash, CornerLeftUp } from "lucide-react";
 import { Link } from "react-router";
 import { useCan } from "@/lib/access";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
+import { useLiveTasks, useLookupEvenIfGone, useRowEvenIfGone } from "@/lib/selectors";
 import { useTaskLink } from "@/lib/task-link";
 import type { Task } from "@/lib/types";
 import { TaskPicker } from "@/detail/task-picker";
 import { setParent } from "@/tasks/actions";
+import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
 import { PropButton, PropRow } from "@/tasks/properties/panel-row";
-import type { PanelProps, TaskProperty } from "@/tasks/properties/property";
+import type { CreateProps, PanelProps, TaskProperty } from "@/tasks/properties/property";
+import { noneItem } from "@/tasks/property-picker";
+import { Picker } from "@/ui/picker";
 import { Tooltip } from "@/ui/tooltip";
 
 const NO_PARENT = "none";
@@ -108,8 +111,36 @@ function ParentRow({ task }: PanelProps) {
   );
 }
 
+/** Any task of the project; left out when several tasks are made at once. */
+function ParentPill({ project, value, onChange, shared }: CreateProps) {
+  const tasks = useLiveTasks();
+  if (shared) return null;
+  const chosen = tasks.find((task) => task.id === value.parentId);
+  return (
+    <Picker
+      label={t("prop.parent")}
+      placeholder={t("prop.set.parent")}
+      value={value.parentId || NO_PARENT}
+      items={[
+        noneItem(t("task.noParent")),
+        ...tasks
+          .filter((task) => task.project_id === project.id)
+          .map((task) => ({ id: task.id, label: task.title, hint: task.key, keywords: task.key })),
+      ]}
+      onPick={(id) => onChange({ parentId: orNone(id) })}
+    >
+      <button type="button" className={pill}>
+        <Pill icon={<CornerLeftUp className="size-3.5" aria-hidden />} set={!!chosen}>
+          {chosen ? chosen.key : t("prop.parent")}
+        </Pill>
+      </button>
+    </Picker>
+  );
+}
+
 export const parent = {
   name: "parent",
   title: () => t("prop.parent"),
   Panel: ParentRow,
+  Create: ParentPill,
 } satisfies TaskProperty<"parent">;
