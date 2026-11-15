@@ -15577,7 +15577,7 @@ doc  doc <doc Decision log>  Decision log — 2026-11 OPS-1 Which **vault**? →
    "change_id": "<id #405>",
    "data": {
     "row": {
-     "active": true,
+     "active": false,
      "created_at": 1700000000000,
      "created_by": "<@aram>",
      "has_secret": true,
@@ -15601,7 +15601,7 @@ doc  doc <doc Decision log>  Decision log — 2026-11 OPS-1 Which **vault**? →
    "change_id": "<id #406>",
    "data": {
     "row": {
-     "active": true,
+     "active": false,
      "created_at": 1700000000000,
      "created_by": "<@aram>",
      "has_secret": true,
@@ -25444,7 +25444,7 @@ tell the owner  id=<rule notify>
 {
  "integrations": [
   {
-   "active": true,
+   "active": false,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "has_secret": true,
@@ -25455,7 +25455,7 @@ tell the owner  id=<rule notify>
    "updated_seq": 240
   },
   {
-   "active": true,
+   "active": false,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "has_secret": true,
@@ -25478,7 +25478,7 @@ ops on github  github  id=<integration OPS>
 {
  "integrations": [
   {
-   "active": true,
+   "active": false,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "has_secret": true,
@@ -25489,7 +25489,7 @@ ops on github  github  id=<integration OPS>
    "updated_seq": 240
   },
   {
-   "active": true,
+   "active": false,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "has_secret": true,
@@ -26022,7 +26022,7 @@ stale  Stale  id=<view Stale>
 {
  "integrations": [
   {
-   "active": true,
+   "active": false,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "has_secret": true,
@@ -26040,7 +26040,7 @@ stale  Stale  id=<view Stale>
 {
  "integrations": [
   {
-   "active": true,
+   "active": false,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "has_secret": true,
@@ -31639,6 +31639,7 @@ DEPLOY_KEY  for the staging box
    "actor_name": "Aram",
    "at": 1700000000000,
    "data": {
+    "active": false,
     "kind": "github",
     "name": "ops on github",
     "project": "OPS",
@@ -31657,6 +31658,7 @@ DEPLOY_KEY  for the staging box
    "actor_name": "Aram",
    "at": 1700000000000,
    "data": {
+    "active": false,
     "kind": "github",
     "name": "sva on github",
     "project": "SVA",
@@ -32459,10 +32461,10 @@ id: 239
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #404>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<webhook gone>"},"entity_id":"<webhook gone>","entity_type":"webhook","scope_id":"<id #147>","scope_type":"workspace","seq":239,"type":"webhook.deleted"}
 
 id: 240
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #405>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration github>","kind":"github","name":"sva on github","project_id":"<project SVA>","updated_seq":240}},"entity_id":"<integration github>","entity_type":"integration","scope_id":"<id #147>","scope_type":"workspace","seq":240,"type":"integration.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #405>","data":{"row":{"active":false,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration github>","kind":"github","name":"sva on github","project_id":"<project SVA>","updated_seq":240}},"entity_id":"<integration github>","entity_type":"integration","scope_id":"<id #147>","scope_type":"workspace","seq":240,"type":"integration.created"}
 
 id: 241
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #406>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration OPS>","kind":"github","name":"ops on github","project_id":"<project OPS>","updated_seq":241}},"entity_id":"<integration OPS>","entity_type":"integration","scope_id":"<id #147>","scope_type":"workspace","seq":241,"type":"integration.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #406>","data":{"row":{"active":false,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration OPS>","kind":"github","name":"ops on github","project_id":"<project OPS>","updated_seq":241}},"entity_id":"<integration OPS>","entity_type":"integration","scope_id":"<id #147>","scope_type":"workspace","seq":241,"type":"integration.created"}
 
 id: 242
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #407>","data":{"row":{"agents":["<@ops>"],"created_at":1700000000000,"created_by":"<@aram>","description":"for the staging box","env":false,"id":"<secret DEPLOY_KEY>","name":"DEPLOY_KEY","updated_at":1700000000000,"updated_seq":242}},"entity_id":"<secret DEPLOY_KEY>","entity_type":"secret","scope_id":"<id #147>","scope_type":"workspace","seq":242,"type":"secret.created"}
@@ -41996,7 +41998,7 @@ Nothing here needs this product to be read.
   "change_id": "<id #405>",
   "data": {
    "row": {
-    "active": true,
+    "active": false,
     "created_at": 1700000000000,
     "created_by": "<@aram>",
     "has_secret": true,
@@ -42020,7 +42022,7 @@ Nothing here needs this product to be read.
   "change_id": "<id #406>",
   "data": {
    "row": {
-    "active": true,
+    "active": false,
     "created_at": 1700000000000,
     "created_by": "<@aram>",
     "has_secret": true,

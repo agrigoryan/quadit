@@ -18,9 +18,11 @@ import (
 // the viewer is part of the request context c), the dispatcher and a
 // webhook's delivery (viewerFor), and none of them needs a request to exist.
 //
-// What a viewer may see is decided here and nowhere else: canProject for a
-// project and what belongs to one, and the methods beside it for the kinds
-// of row whose rule is their own.
+// What a viewer may see is asked of it: canProject for a project and what
+// belongs to one, canSeeDoc, canSeeView and canSeeFile for the things with
+// a rule of their own, readable, taskFilter, feed and search for reads of
+// many, and for rows given as they are stored the rule of each kind
+// (rowkinds.go). A read does not compare project ids itself.
 type viewer struct {
 	ws     core.Workspace
 	member core.Member
@@ -44,8 +46,9 @@ type viewer struct {
 // viewerFor returns the viewer a member of a workspace is, with the limits
 // of the membership. A request narrows it further by its token
 // (enterWorkspace); work the server does on its own reads as the member
-// itself. A zero member is nobody in particular: it sees every project, and
-// nothing that is one person's own.
+// itself. With a zero member it is nobody: good for naming things (the line
+// of text a webhook is sent), and not to be asked for what is one member's
+// own, since the feed's filter takes no member to mean every member.
 func (s *Server) viewerFor(ws core.Workspace, member core.Member) *viewer {
 	who := &viewer{ws: ws, member: member, db: s.st.In(ws.ID), st: s.st, baseURL: s.cfg.BaseURL, log: s.log, agentUsage: s.eng.Usage}
 	if member.Scope != nil {

@@ -496,8 +496,10 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	do("webhook OPS", "webhook.create", M{"name": "ops events", "url": rw.hook.srv.URL + "/ops", "event_types": []string{"never.matches"}, "project": "OPS"})
 	do("webhook gone", "webhook.create", M{"name": "gone", "url": rw.hook.srv.URL + "/gone", "event_types": []string{"never.matches"}})
 	change(owner, "", "webhook.delete", M{"id": rw.id("webhook gone")})
-	do("integration github", "integration.create", M{"kind": "github", "name": "sva on github", "project": "SVA", "secret": "ghp_secret"})
-	do("integration OPS", "integration.create", M{"kind": "github", "name": "ops on github", "project": "OPS", "secret": "ghp_other"})
+	// The integrations are off, so that nothing in the background tries to
+	// reach GitHub for them while the reads are recorded.
+	do("integration github", "integration.create", M{"kind": "github", "name": "sva on github", "project": "SVA", "secret": "ghp_secret", "active": false})
+	do("integration OPS", "integration.create", M{"kind": "github", "name": "ops on github", "project": "OPS", "secret": "ghp_other", "active": false})
 	do("secret DEPLOY_KEY", "secret.set", M{"name": "DEPLOY_KEY", "value": "s3cret", "description": "for the staging box", "agents": []string{"@ops"}})
 
 	// What the dispatcher makes of the feed. A watched view: a task that
@@ -733,8 +735,8 @@ var notRecorded = map[string]string{
 	"GET /api/v1/w/{ws}/export":        "recorded by its own reader (export), which unpacks the archive",
 }
 
-// collectionNames are the lists /list/{collection} has, as routes.go
-// names them.
+// collectionNames are the lists /list/{collection} has, in the order they
+// are asked; everyGetRouteWasCalled holds them to the ones the server has.
 var collectionNames = []string{"members", "projects", "statuses", "labels", "epics", "milestones", "cycles", "templates", "preferences", "resources", "secrets", "claims",
 	"sessions", "relations", "attachments", "links", "webhooks", "deliveries", "rules", "integrations", "views"}
 
@@ -772,6 +774,16 @@ func (rw *richWorkspace) everyGetRouteWasCalled() {
 	}
 	if n < 50 {
 		rw.t.Fatalf("found only %d GET routes in the source", n)
+	}
+	// The lists: a wrong name is answered with the names there are.
+	var refusal struct {
+		Error struct{ Allowed []string }
+	}
+	rw.s.call(rw.s.owner, "", "GET", w+"/list/nope", nil, 404, &refusal)
+	asked := append([]string(nil), collectionNames...)
+	sort.Strings(asked)
+	if has := refusal.Error.Allowed; strings.Join(has, " ") != strings.Join(asked, " ") {
+		rw.t.Errorf("the recording asks the lists %v, and the server has %v: bring collectionNames in line", asked, has)
 	}
 	for route := range rw.called {
 		if notRecorded[route] != "" {
