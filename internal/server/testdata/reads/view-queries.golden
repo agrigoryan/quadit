@@ -1,0 +1,2423 @@
+
+=== admin view.create {"name":"view 1","query":{}}
+200
+saved as view-1
+
+=== admin view.update {"id":"art-bugs","query":{}}
+200
+saved
+
+=== admin view.create {"name":"view 2","query":{"project":["SVA"]}}
+200
+saved as view-2
+
+=== admin view.update {"id":"art-bugs","query":{"project":["SVA"]}}
+200
+saved
+
+=== admin view.create {"name":"view 3","query":{"project":["SVA","OPS"]}}
+200
+saved as view-3
+
+=== admin view.update {"id":"art-bugs","query":{"project":["SVA","OPS"]}}
+200
+saved
+
+=== admin view.create {"name":"view 4","query":{"project":["<project OPS>"]}}
+200
+saved as view-4
+
+=== admin view.update {"id":"art-bugs","query":{"project":["<project OPS>"]}}
+200
+saved
+
+=== admin view.create {"name":"view 5","query":{"assignee":["me","none","@bea"]}}
+200
+saved as view-5
+
+=== admin view.update {"id":"art-bugs","query":{"assignee":["me","none","@bea"]}}
+200
+saved
+
+=== admin view.create {"name":"view 6","query":{"creator":"@aram"}}
+200
+saved as view-6
+
+=== admin view.update {"id":"art-bugs","query":{"creator":"@aram"}}
+200
+saved
+
+=== admin view.create {"name":"view 7","query":{"creator":"me"}}
+200
+saved as view-7
+
+=== admin view.update {"id":"art-bugs","query":{"creator":"me"}}
+200
+saved
+
+=== admin view.create {"name":"view 8","query":{"status":["todo"]}}
+200
+saved as view-8
+
+=== admin view.update {"id":"art-bugs","query":{"status":["todo"]}}
+200
+saved
+
+=== admin view.create {"name":"view 9","query":{"status":["Review"]}}
+200
+saved as view-9
+
+=== admin view.update {"id":"art-bugs","query":{"status":["Review"]}}
+200
+saved
+
+=== admin view.create {"name":"view 10","query":{"status":["started"]}}
+200
+saved as view-10
+
+=== admin view.update {"id":"art-bugs","query":{"status":["started"]}}
+200
+saved
+
+=== admin view.create {"name":"view 11","query":{"status":["<status Review>"]}}
+200
+saved as view-11
+
+=== admin view.update {"id":"art-bugs","query":{"status":["<status Review>"]}}
+200
+saved
+
+=== admin view.create {"name":"view 12","query":{"category":["started","done"]}}
+200
+saved as view-12
+
+=== admin view.update {"id":"art-bugs","query":{"category":["started","done"]}}
+200
+saved
+
+=== admin view.create {"name":"view 13","query":{"open":true}}
+200
+saved as view-13
+
+=== admin view.update {"id":"art-bugs","query":{"open":true}}
+200
+saved
+
+=== admin view.create {"name":"view 14","query":{"open":false}}
+200
+saved as view-14
+
+=== admin view.update {"id":"art-bugs","query":{"open":false}}
+200
+saved
+
+=== admin view.create {"name":"view 15","query":{"waiting_on":"me"}}
+200
+saved as view-15
+
+=== admin view.update {"id":"art-bugs","query":{"waiting_on":"me"}}
+200
+saved
+
+=== admin view.create {"name":"view 16","query":{"waiting_on":"@bea"}}
+200
+saved as view-16
+
+=== admin view.update {"id":"art-bugs","query":{"waiting_on":"@bea"}}
+200
+saved
+
+=== admin view.create {"name":"view 17","query":{"waiting_on":"outside"}}
+200
+saved as view-17
+
+=== admin view.update {"id":"art-bugs","query":{"waiting_on":"outside"}}
+200
+saved
+
+=== admin view.create {"name":"view 18","query":{"waiting_on":"none"}}
+200
+saved as view-18
+
+=== admin view.update {"id":"art-bugs","query":{"waiting_on":"none"}}
+200
+saved
+
+=== admin view.create {"name":"view 19","query":{"held_by":"@artist"}}
+200
+saved as view-19
+
+=== admin view.update {"id":"art-bugs","query":{"held_by":"@artist"}}
+200
+saved
+
+=== admin view.create {"name":"view 20","query":{"label":["art"]}}
+200
+saved as view-20
+
+=== admin view.update {"id":"art-bugs","query":{"label":["art"]}}
+200
+saved
+
+=== admin view.create {"name":"view 21","query":{"label":["bug"]}}
+200
+saved as view-21
+
+=== admin view.update {"id":"art-bugs","query":{"label":["bug"]}}
+200
+saved
+
+=== admin view.create {"name":"view 22","query":{"label":["infra"]}}
+200
+saved as view-22
+
+=== admin view.update {"id":"art-bugs","query":{"label":["infra"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"infra\""
+}
+
+=== admin view.create {"name":"view 23","query":{"label":["<label art>"]}}
+200
+saved as view-23
+
+=== admin view.update {"id":"art-bugs","query":{"label":["<label art>"]}}
+200
+saved
+
+=== admin view.create {"name":"view 24","query":{"epic":["Boss fight","none"]}}
+200
+saved as view-24
+
+=== admin view.update {"id":"art-bugs","query":{"epic":["Boss fight","none"]}}
+200
+saved
+
+=== admin view.create {"name":"view 25","query":{"epic":["Hardening"]}}
+200
+saved as view-25
+
+=== admin view.update {"id":"art-bugs","query":{"epic":["Hardening"]}}
+400
+{
+ "allowed": [
+  "Boss fight"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Hardening\""
+}
+
+=== admin view.create {"name":"view 26","query":{"epic":["<epic Boss fight>"]}}
+200
+saved as view-26
+
+=== admin view.update {"id":"art-bugs","query":{"epic":["<epic Boss fight>"]}}
+200
+saved
+
+=== admin view.create {"name":"view 27","query":{"cycle":["current"]}}
+200
+saved as view-27
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["current"]}}
+200
+saved
+
+=== admin view.create {"name":"view 28","query":{"cycle":["next"]}}
+200
+saved as view-28
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["next"]}}
+200
+saved
+
+=== admin view.create {"name":"view 29","query":{"cycle":["none"]}}
+200
+saved as view-29
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["none"]}}
+200
+saved
+
+=== admin view.create {"name":"view 30","query":{"cycle":["1"]}}
+200
+saved as view-30
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["1"]}}
+200
+saved
+
+=== admin view.create {"name":"view 31","query":{"cycle":["<cycle SVA now>"]}}
+200
+saved as view-31
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["<cycle SVA now>"]}}
+200
+saved
+
+=== admin view.create {"name":"view 32","query":{"milestone":"Alpha"}}
+200
+saved as view-32
+
+=== admin view.update {"id":"art-bugs","query":{"milestone":"Alpha"}}
+200
+saved
+
+=== admin view.create {"name":"view 33","query":{"milestone":"<milestone Audit>"}}
+200
+saved as view-33
+
+=== admin view.update {"id":"art-bugs","query":{"milestone":"<milestone Audit>"}}
+200
+saved
+
+=== admin view.create {"name":"view 34","query":{"priority":[1,2]}}
+200
+saved as view-34
+
+=== admin view.update {"id":"art-bugs","query":{"priority":[1,2]}}
+200
+saved
+
+=== admin view.create {"name":"view 35","query":{"priority":[0]}}
+200
+saved as view-35
+
+=== admin view.update {"id":"art-bugs","query":{"priority":[0]}}
+200
+saved
+
+=== admin view.create {"name":"view 36","query":{"due_before":"2026-03-31"}}
+200
+saved as view-36
+
+=== admin view.update {"id":"art-bugs","query":{"due_before":"2026-03-31"}}
+200
+saved
+
+=== admin view.create {"name":"view 37","query":{"due_after":"2026-03-31"}}
+200
+saved as view-37
+
+=== admin view.update {"id":"art-bugs","query":{"due_after":"2026-03-31"}}
+200
+saved
+
+=== admin view.create {"name":"view 38","query":{"mentions":"@bea"}}
+200
+saved as view-38
+
+=== admin view.update {"id":"art-bugs","query":{"mentions":"@bea"}}
+200
+saved
+
+=== admin view.create {"name":"view 39","query":{"mentions":"me"}}
+200
+saved as view-39
+
+=== admin view.update {"id":"art-bugs","query":{"mentions":"me"}}
+200
+saved
+
+=== admin view.create {"name":"view 40","query":{"watching":true}}
+200
+saved as view-40
+
+=== admin view.update {"id":"art-bugs","query":{"watching":true}}
+200
+saved
+
+=== admin view.create {"name":"view 41","query":{"has_open_decision":true}}
+200
+saved as view-41
+
+=== admin view.update {"id":"art-bugs","query":{"has_open_decision":true}}
+200
+saved
+
+=== admin view.create {"name":"view 42","query":{"asked":"me"}}
+200
+saved as view-42
+
+=== admin view.update {"id":"art-bugs","query":{"asked":"me"}}
+200
+saved
+
+=== admin view.create {"name":"view 43","query":{"asked":"@cy"}}
+200
+saved as view-43
+
+=== admin view.update {"id":"art-bugs","query":{"asked":"@cy"}}
+200
+saved
+
+=== admin view.create {"name":"view 44","query":{"changed_since":5}}
+200
+saved as view-44
+
+=== admin view.update {"id":"art-bugs","query":{"changed_since":5}}
+200
+saved
+
+=== admin view.create {"name":"view 45","query":{"updated_since":5}}
+200
+saved as view-45
+
+=== admin view.update {"id":"art-bugs","query":{"updated_since":5}}
+200
+saved
+
+=== admin view.create {"name":"view 46","query":{"parent":"SVA-1"}}
+200
+saved as view-46
+
+=== admin view.update {"id":"art-bugs","query":{"parent":"SVA-1"}}
+200
+saved
+
+=== admin view.create {"name":"view 47","query":{"parent":"<task OPS-1>"}}
+200
+saved as view-47
+
+=== admin view.update {"id":"art-bugs","query":{"parent":"<task OPS-1>"}}
+200
+saved
+
+=== admin view.create {"name":"view 48","query":{"top_level":true}}
+200
+saved as view-48
+
+=== admin view.update {"id":"art-bugs","query":{"top_level":true}}
+200
+saved
+
+=== admin view.create {"name":"view 49","query":{"q":"boss"}}
+200
+saved as view-49
+
+=== admin view.update {"id":"art-bugs","query":{"q":"boss"}}
+200
+saved
+
+=== admin view.create {"name":"view 50","query":{"keys":["SVA-1","ops-1"]}}
+200
+saved as view-50
+
+=== admin view.update {"id":"art-bugs","query":{"keys":["SVA-1","ops-1"]}}
+200
+saved
+
+=== admin view.create {"name":"view 51","query":{"trash":true}}
+200
+saved as view-51
+
+=== admin view.update {"id":"art-bugs","query":{"trash":true}}
+200
+saved
+
+=== admin view.create {"name":"view 52","query":{"archived":true}}
+200
+saved as view-52
+
+=== admin view.update {"id":"art-bugs","query":{"archived":true}}
+200
+saved
+
+=== admin view.create {"name":"view 53","query":{"sort":"priority"}}
+200
+saved as view-53
+
+=== admin view.update {"id":"art-bugs","query":{"sort":"priority"}}
+200
+saved
+
+=== admin view.create {"name":"view 54","query":{"sort":"-updated"}}
+200
+saved as view-54
+
+=== admin view.update {"id":"art-bugs","query":{"sort":"-updated"}}
+200
+saved
+
+=== admin view.create {"name":"view 55","query":{"limit":10,"offset":5}}
+200
+saved as view-55
+
+=== admin view.update {"id":"art-bugs","query":{"limit":10,"offset":5}}
+200
+saved
+
+=== admin view.create {"name":"view 56","query":{"assignee":["me"],"label":["art"],"open":true,"sort":"due","status":["todo"]}}
+200
+saved as view-56
+
+=== admin view.update {"id":"art-bugs","query":{"assignee":["me"],"label":["art"],"open":true,"sort":"due","status":["todo"]}}
+200
+saved
+
+=== admin view.create {"name":"view 57","query":{"project":["NOPE"]}}
+400
+{
+ "allowed": [
+  "ARC",
+  "OPS",
+  "SVA"
+ ],
+ "code": "invalid",
+ "field": "query.project",
+ "message": "project \"NOPE\" does not exist in this workspace",
+ "nearest": "OPS"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"project":["NOPE"]}}
+400
+{
+ "allowed": [
+  "ARC",
+  "OPS",
+  "SVA"
+ ],
+ "code": "invalid",
+ "field": "query.project",
+ "message": "project \"NOPE\" does not exist in this workspace",
+ "nearest": "OPS"
+}
+
+=== admin view.create {"name":"view 58","query":{"project":["DEL"]}}
+400
+{
+ "allowed": [
+  "ARC",
+  "OPS",
+  "SVA"
+ ],
+ "code": "invalid",
+ "field": "query.project",
+ "message": "project \"DEL\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"project":["DEL"]}}
+400
+{
+ "allowed": [
+  "ARC",
+  "OPS",
+  "SVA"
+ ],
+ "code": "invalid",
+ "field": "query.project",
+ "message": "project \"DEL\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 59","query":{"project":["ARC"]}}
+200
+saved as view-59
+
+=== admin view.update {"id":"art-bugs","query":{"project":["ARC"]}}
+200
+saved
+
+=== admin view.create {"name":"view 60","query":{"assignee":["@nobody"]}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.assignee",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"assignee":["@nobody"]}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.assignee",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 61","query":{"assignee":["@dee"]}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.assignee",
+ "message": "member \"@dee\" does not exist in this workspace",
+ "nearest": "@bea"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"assignee":["@dee"]}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.assignee",
+ "message": "member \"@dee\" does not exist in this workspace",
+ "nearest": "@bea"
+}
+
+=== admin view.create {"name":"view 62","query":{"creator":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.creator",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"creator":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.creator",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 63","query":{"waiting_on":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.waiting_on",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"waiting_on":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.waiting_on",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 64","query":{"held_by":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.held_by",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"held_by":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.held_by",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 65","query":{"mentions":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.mentions",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"mentions":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.mentions",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 66","query":{"asked":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.asked",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"asked":"@nobody"}}
+400
+{
+ "allowed": [
+  "@aram",
+  "@artist",
+  "@bea",
+  "@cy",
+  "@ops"
+ ],
+ "code": "invalid",
+ "field": "query.asked",
+ "message": "member \"@nobody\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 67","query":{"status":["nope"]}}
+400
+{
+ "allowed": [
+  "Backlog",
+  "Canceled",
+  "Done",
+  "In Progress",
+  "Review",
+  "Todo",
+  "Waiting",
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.status",
+ "message": "no status \"nope\"",
+ "nearest": "Done"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"status":["nope"]}}
+400
+{
+ "allowed": [
+  "Backlog",
+  "Canceled",
+  "Done",
+  "In Progress",
+  "Review",
+  "Todo",
+  "Waiting",
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.status",
+ "message": "no status \"nope\"",
+ "nearest": "Done"
+}
+
+=== admin view.create {"name":"view 68","query":{"status":["todo","nope"]}}
+400
+{
+ "allowed": [
+  "Backlog",
+  "Canceled",
+  "Done",
+  "In Progress",
+  "Review",
+  "Todo",
+  "Waiting",
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.status",
+ "message": "no status \"nope\"",
+ "nearest": "Done"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"status":["todo","nope"]}}
+400
+{
+ "allowed": [
+  "Backlog",
+  "Canceled",
+  "Done",
+  "In Progress",
+  "Review",
+  "Todo",
+  "Waiting",
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.status",
+ "message": "no status \"nope\"",
+ "nearest": "Done"
+}
+
+=== admin view.create {"name":"view 69","query":{"category":["nope"]}}
+400
+{
+ "allowed": [
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.category",
+ "message": "unknown category \"nope\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"category":["nope"]}}
+400
+{
+ "allowed": [
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.category",
+ "message": "unknown category \"nope\""
+}
+
+=== admin view.create {"name":"view 70","query":{"category":["Started"]}}
+400
+{
+ "allowed": [
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.category",
+ "message": "unknown category \"Started\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"category":["Started"]}}
+400
+{
+ "allowed": [
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.category",
+ "message": "unknown category \"Started\""
+}
+
+=== admin view.create {"name":"view 71","query":{"label":["nope"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "infra",
+  "last",
+  "twice",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"nope\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"label":["nope"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"nope\""
+}
+
+=== admin view.create {"name":"view 72","query":{"label":["temp"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "infra",
+  "last",
+  "twice",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"temp\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"label":["temp"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"temp\""
+}
+
+=== admin view.create {"name":"view 73","query":{"label":["gone"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "infra",
+  "last",
+  "twice",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"gone\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"label":["gone"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"gone\""
+}
+
+=== admin view.create {"name":"view 74","query":{"label":["twice"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "several projects have a label \"twice\": add project=KEY"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"label":["twice"]}}
+200
+saved
+
+=== admin view.create {"name":"view 75","query":{"label":["Art"]}}
+200
+saved as view-75
+
+=== admin view.update {"id":"art-bugs","query":{"label":["Art"]}}
+200
+saved
+
+=== admin view.create {"name":"view 76","query":{"epic":["nope"]}}
+400
+{
+ "allowed": [
+  "Boss fight",
+  "Hardening"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"nope\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"epic":["nope"]}}
+400
+{
+ "allowed": [
+  "Boss fight"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"nope\""
+}
+
+=== admin view.create {"name":"view 77","query":{"epic":["Scrapped"]}}
+400
+{
+ "allowed": [
+  "Boss fight",
+  "Hardening"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Scrapped\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"epic":["Scrapped"]}}
+400
+{
+ "allowed": [
+  "Boss fight"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Scrapped\""
+}
+
+=== admin view.create {"name":"view 78","query":{"cycle":["99"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "no cycle \"99\": use current, next, a cycle number or none"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["99"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "no cycle \"99\": use current, next, a cycle number or none"
+}
+
+=== admin view.create {"name":"view 79","query":{"cycle":["nope"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "no cycle \"nope\": use current, next, a cycle number or none"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["nope"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "no cycle \"nope\": use current, next, a cycle number or none"
+}
+
+=== admin view.create {"name":"view 80","query":{"milestone":"nope"}}
+400
+{
+ "allowed": [
+  "Alpha",
+  "Audit",
+  "Dropped"
+ ],
+ "code": "invalid",
+ "field": "query.milestone",
+ "message": "no milestone \"nope\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"milestone":"nope"}}
+400
+{
+ "allowed": [
+  "Alpha",
+  "Audit",
+  "Dropped"
+ ],
+ "code": "invalid",
+ "field": "query.milestone",
+ "message": "no milestone \"nope\""
+}
+
+=== admin view.create {"name":"view 81","query":{"milestone":"Removed"}}
+400
+{
+ "allowed": [
+  "Alpha",
+  "Audit",
+  "Dropped"
+ ],
+ "code": "invalid",
+ "field": "query.milestone",
+ "message": "no milestone \"Removed\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"milestone":"Removed"}}
+400
+{
+ "allowed": [
+  "Alpha",
+  "Audit",
+  "Dropped"
+ ],
+ "code": "invalid",
+ "field": "query.milestone",
+ "message": "no milestone \"Removed\""
+}
+
+=== admin view.create {"name":"view 82","query":{"milestone":"Dropped"}}
+200
+saved as view-82
+
+=== admin view.update {"id":"art-bugs","query":{"milestone":"Dropped"}}
+200
+saved
+
+=== admin view.create {"name":"view 83","query":{"priority":[9]}}
+400
+{
+ "code": "invalid",
+ "field": "query.priority",
+ "message": "priority is 0 (none) to 4 (low): 1 urgent, 2 high, 3 medium, 4 low; 9 is none of them"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"priority":[9]}}
+400
+{
+ "code": "invalid",
+ "field": "query.priority",
+ "message": "priority is 0 (none) to 4 (low): 1 urgent, 2 high, 3 medium, 4 low; 9 is none of them"
+}
+
+=== admin view.create {"name":"view 84","query":{"priority":[-1]}}
+400
+{
+ "code": "invalid",
+ "field": "query.priority",
+ "message": "priority is 0 (none) to 4 (low): 1 urgent, 2 high, 3 medium, 4 low; -1 is none of them"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"priority":[-1]}}
+400
+{
+ "code": "invalid",
+ "field": "query.priority",
+ "message": "priority is 0 (none) to 4 (low): 1 urgent, 2 high, 3 medium, 4 low; -1 is none of them"
+}
+
+=== admin view.create {"name":"view 85","query":{"parent":"NOPE-1"}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"NOPE-1\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"parent":"NOPE-1"}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"NOPE-1\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 86","query":{"parent":"SVA-999"}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"SVA-999\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"parent":"SVA-999"}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"SVA-999\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 87","query":{"parent":"nonsense"}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "\"nonsense\" is not a task: use its key (SVA-12) or id"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"parent":"nonsense"}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "\"nonsense\" is not a task: use its key (SVA-12) or id"
+}
+
+=== admin view.create {"name":"view 88","query":{"parent":"SVA-4"}}
+200
+saved as view-88
+
+=== admin view.update {"id":"art-bugs","query":{"parent":"SVA-4"}}
+200
+saved
+
+=== admin view.create {"name":"view 89","query":{"keys":["SVA-999"]}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"SVA-999\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"keys":["SVA-999"]}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"SVA-999\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 90","query":{"keys":["nonsense"]}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "\"nonsense\" is not a task: use its key (SVA-12) or id"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"keys":["nonsense"]}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "\"nonsense\" is not a task: use its key (SVA-12) or id"
+}
+
+=== admin view.create {"name":"view 91","query":{"keys":["SVA-1","NOPE-1"]}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"NOPE-1\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"keys":["SVA-1","NOPE-1"]}}
+400
+{
+ "code": "invalid",
+ "field": "query.task",
+ "message": "task \"NOPE-1\" does not exist in this workspace"
+}
+
+=== admin view.create {"name":"view 92","query":{"sort":"nope"}}
+400
+{
+ "allowed": [
+  "created",
+  "-created",
+  "rank",
+  "priority",
+  "due",
+  "-activity",
+  "-updated",
+  "key"
+ ],
+ "code": "invalid",
+ "field": "query.sort",
+ "message": "unknown sort \"nope\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"sort":"nope"}}
+400
+{
+ "allowed": [
+  "created",
+  "-created",
+  "rank",
+  "priority",
+  "due",
+  "-activity",
+  "-updated",
+  "key"
+ ],
+ "code": "invalid",
+ "field": "query.sort",
+ "message": "unknown sort \"nope\""
+}
+
+=== admin view.create {"name":"view 93","query":{"sort":"-priority"}}
+400
+{
+ "allowed": [
+  "created",
+  "-created",
+  "rank",
+  "priority",
+  "due",
+  "-activity",
+  "-updated",
+  "key"
+ ],
+ "code": "invalid",
+ "field": "query.sort",
+ "message": "unknown sort \"-priority\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"sort":"-priority"}}
+400
+{
+ "allowed": [
+  "created",
+  "-created",
+  "rank",
+  "priority",
+  "due",
+  "-activity",
+  "-updated",
+  "key"
+ ],
+ "code": "invalid",
+ "field": "query.sort",
+ "message": "unknown sort \"-priority\""
+}
+
+=== admin view.create {"name":"view 94","query":{"label":"art"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (label takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"label":"art"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (label takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 95","query":{"labels":["art"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (there is no field \"labels\"). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"labels":["art"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (there is no field \"labels\"). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 96","query":{"status":"todo"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (status takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"status":"todo"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (status takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 97","query":{"assignee":"me"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (assignee takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"assignee":"me"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (assignee takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 98","query":{"epic":"Boss fight"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (epic takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"epic":"Boss fight"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (epic takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 99","query":{"cycle":1}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (cycle takes a list ([…]), and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":1}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (cycle takes a list ([…]), and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 100","query":{"project":"SVA"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (project takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"project":"SVA"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (project takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 101","query":{"open":"yes"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (open takes true or false, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"open":"yes"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (open takes true or false, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 102","query":{"open":1}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (open takes true or false, and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"open":1}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (open takes true or false, and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 103","query":{"watching":"yes"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (watching takes true or false, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"watching":"yes"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (watching takes true or false, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 104","query":{"priority":"high"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (priority takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"priority":"high"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (priority takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 105","query":{"priority":["high"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (priority takes a number, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"priority":["high"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (priority takes a number, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 106","query":{"priority":[1.5]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (priority takes a whole number, and was given 1.5). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"priority":[1.5]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (priority takes a whole number, and was given 1.5). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 107","query":{"due_before":"tomorrow"}}
+400
+{
+ "code": "invalid",
+ "field": "query.due_before",
+ "message": "due_before takes a date like 2026-03-31, and was given \"tomorrow\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"due_before":"tomorrow"}}
+400
+{
+ "code": "invalid",
+ "field": "query.due_before",
+ "message": "due_before takes a date like 2026-03-31, and was given \"tomorrow\""
+}
+
+=== admin view.create {"name":"view 108","query":{"due_after":"31/03/2026"}}
+400
+{
+ "code": "invalid",
+ "field": "query.due_after",
+ "message": "due_after takes a date like 2026-03-31, and was given \"31/03/2026\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"due_after":"31/03/2026"}}
+400
+{
+ "code": "invalid",
+ "field": "query.due_after",
+ "message": "due_after takes a date like 2026-03-31, and was given \"31/03/2026\""
+}
+
+=== admin view.create {"name":"view 109","query":{"due_before":20260331}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (due_before takes text, and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"due_before":20260331}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (due_before takes text, and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 110","query":{"limit":-1}}
+400
+{
+ "code": "invalid",
+ "field": "query.limit",
+ "message": "limit cannot be less than 0"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"limit":-1}}
+400
+{
+ "code": "invalid",
+ "field": "query.limit",
+ "message": "limit cannot be less than 0"
+}
+
+=== admin view.create {"name":"view 111","query":{"offset":-1}}
+400
+{
+ "code": "invalid",
+ "field": "query.offset",
+ "message": "offset cannot be less than 0"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"offset":-1}}
+400
+{
+ "code": "invalid",
+ "field": "query.offset",
+ "message": "offset cannot be less than 0"
+}
+
+=== admin view.create {"name":"view 112","query":{"changed_since":-1}}
+400
+{
+ "code": "invalid",
+ "field": "query.changed_since",
+ "message": "changed_since cannot be less than 0"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"changed_since":-1}}
+400
+{
+ "code": "invalid",
+ "field": "query.changed_since",
+ "message": "changed_since cannot be less than 0"
+}
+
+=== admin view.create {"name":"view 113","query":{"updated_since":-5}}
+400
+{
+ "code": "invalid",
+ "field": "query.updated_since",
+ "message": "updated_since cannot be less than 0"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"updated_since":-5}}
+400
+{
+ "code": "invalid",
+ "field": "query.updated_since",
+ "message": "updated_since cannot be less than 0"
+}
+
+=== admin view.create {"name":"view 114","query":{"limit":"ten"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (limit takes a number, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"limit":"ten"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (limit takes a number, and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 115","query":{"creator":["me"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (creator takes text, and was given a list). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"creator":["me"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (creator takes text, and was given a list). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 116","query":{"milestone":["Alpha"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (milestone takes text, and was given a list). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"milestone":["Alpha"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (milestone takes text, and was given a list). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 117","query":{"keys":"SVA-1"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (keys takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"keys":"SVA-1"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (keys takes a list ([…]), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 118","query":{"q":5}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (q takes text, and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"q":5}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (q takes text, and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 119","query":{"view":"mine"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (there is no field \"view\"). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"view":"mine"}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (there is no field \"view\"). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 120","query":{"nope":true}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (there is no field \"nope\"). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":{"nope":true}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (there is no field \"nope\"). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 121","query":{"Label":["art"]}}
+200
+saved as view-121
+
+=== admin view.update {"id":"art-bugs","query":{"Label":["art"]}}
+200
+saved
+
+=== admin view.create {"name":"view 122","query":["label"]}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given a list). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":["label"]}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given a list). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 123","query":"label=art"}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":"label=art"}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given text). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 124","query":12}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":12}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given a number). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 125","query":true}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given true or false). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.update {"id":"art-bugs","query":true}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "this filter cannot be read (it takes an object ({…}), and was given true or false). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}"
+}
+
+=== admin view.create {"name":"view 126","query":null}
+200
+saved as view-126
+
+=== admin view.update {"id":"art-bugs","query":null}
+200
+saved
+
+=== admin view.create {"name":"view 127","project":"SVA","query":{}}
+200
+saved as view-127
+
+=== admin view.update {"id":"art-bugs","query":{}}
+200
+saved
+
+=== admin view.create {"name":"view 128","project":"OPS","query":{}}
+200
+saved as view-128
+
+=== admin view.update {"id":"ops-infra","query":{}}
+200
+saved
+
+=== admin view.create {"name":"view 129","project":"SVA","query":{"label":["art"]}}
+200
+saved as view-129
+
+=== admin view.update {"id":"art-bugs","query":{"label":["art"]}}
+200
+saved
+
+=== admin view.create {"name":"view 130","project":"OPS","query":{"label":["art"]}}
+400
+{
+ "allowed": [
+  "bug",
+  "infra",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"art\"",
+ "nearest": "last"
+}
+
+=== admin view.update {"id":"ops-infra","query":{"label":["art"]}}
+400
+{
+ "allowed": [
+  "bug",
+  "infra",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"art\"",
+ "nearest": "last"
+}
+
+=== admin view.create {"name":"view 131","project":"SVA","query":{"label":["infra"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"infra\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"label":["infra"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"infra\""
+}
+
+=== admin view.create {"name":"view 132","project":"OPS","query":{"label":["infra"]}}
+200
+saved as view-132
+
+=== admin view.update {"id":"ops-infra","query":{"label":["infra"]}}
+200
+saved
+
+=== admin view.create {"name":"view 133","project":"SVA","query":{"label":["bug"]}}
+200
+saved as view-133
+
+=== admin view.update {"id":"art-bugs","query":{"label":["bug"]}}
+200
+saved
+
+=== admin view.create {"name":"view 134","project":"OPS","query":{"label":["bug"]}}
+200
+saved as view-134
+
+=== admin view.update {"id":"ops-infra","query":{"label":["bug"]}}
+200
+saved
+
+=== admin view.create {"name":"view 135","project":"SVA","query":{"label":["twice"]}}
+200
+saved as view-135
+
+=== admin view.update {"id":"art-bugs","query":{"label":["twice"]}}
+200
+saved
+
+=== admin view.create {"name":"view 136","project":"OPS","query":{"label":["twice"]}}
+200
+saved as view-136
+
+=== admin view.update {"id":"ops-infra","query":{"label":["twice"]}}
+200
+saved
+
+=== admin view.create {"name":"view 137","project":"SVA","query":{"status":["Review"]}}
+200
+saved as view-137
+
+=== admin view.update {"id":"art-bugs","query":{"status":["Review"]}}
+200
+saved
+
+=== admin view.create {"name":"view 138","project":"OPS","query":{"status":["Review"]}}
+400
+{
+ "allowed": [
+  "Backlog",
+  "Canceled",
+  "Done",
+  "In Progress",
+  "Todo",
+  "Waiting",
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.status",
+ "message": "no status \"Review\""
+}
+
+=== admin view.update {"id":"ops-infra","query":{"status":["Review"]}}
+400
+{
+ "allowed": [
+  "Backlog",
+  "Canceled",
+  "Done",
+  "In Progress",
+  "Todo",
+  "Waiting",
+  "backlog",
+  "unstarted",
+  "started",
+  "waiting",
+  "done",
+  "canceled"
+ ],
+ "code": "invalid",
+ "field": "query.status",
+ "message": "no status \"Review\""
+}
+
+=== admin view.create {"name":"view 139","project":"SVA","query":{"epic":["Boss fight"]}}
+200
+saved as view-139
+
+=== admin view.update {"id":"art-bugs","query":{"epic":["Boss fight"]}}
+200
+saved
+
+=== admin view.create {"name":"view 140","project":"OPS","query":{"epic":["Boss fight"]}}
+400
+{
+ "allowed": [
+  "Hardening"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Boss fight\""
+}
+
+=== admin view.update {"id":"ops-infra","query":{"epic":["Boss fight"]}}
+400
+{
+ "allowed": [
+  "Hardening"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Boss fight\""
+}
+
+=== admin view.create {"name":"view 141","project":"SVA","query":{"epic":["Hardening"]}}
+400
+{
+ "allowed": [
+  "Boss fight"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Hardening\""
+}
+
+=== admin view.update {"id":"art-bugs","query":{"epic":["Hardening"]}}
+400
+{
+ "allowed": [
+  "Boss fight"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Hardening\""
+}
+
+=== admin view.create {"name":"view 142","project":"OPS","query":{"epic":["Hardening"]}}
+200
+saved as view-142
+
+=== admin view.update {"id":"ops-infra","query":{"epic":["Hardening"]}}
+200
+saved
+
+=== admin view.create {"name":"view 143","project":"SVA","query":{"cycle":["current"]}}
+200
+saved as view-143
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["current"]}}
+200
+saved
+
+=== admin view.create {"name":"view 144","project":"OPS","query":{"cycle":["current"]}}
+200
+saved as view-144
+
+=== admin view.update {"id":"ops-infra","query":{"cycle":["current"]}}
+200
+saved
+
+=== admin view.create {"name":"view 145","project":"SVA","query":{"cycle":["2"]}}
+200
+saved as view-145
+
+=== admin view.update {"id":"art-bugs","query":{"cycle":["2"]}}
+200
+saved
+
+=== admin view.create {"name":"view 146","project":"OPS","query":{"cycle":["2"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "no cycle \"2\": use current, next, a cycle number or none"
+}
+
+=== admin view.update {"id":"ops-infra","query":{"cycle":["2"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "no cycle \"2\": use current, next, a cycle number or none"
+}
+
+=== admin view.create {"name":"view 147","project":"SVA","query":{"milestone":"Alpha"}}
+200
+saved as view-147
+
+=== admin view.update {"id":"art-bugs","query":{"milestone":"Alpha"}}
+200
+saved
+
+=== admin view.create {"name":"view 148","project":"OPS","query":{"milestone":"Alpha"}}
+200
+saved as view-148
+
+=== admin view.update {"id":"ops-infra","query":{"milestone":"Alpha"}}
+200
+saved
+
+=== admin view.create {"name":"view 149","project":"SVA","query":{"project":["SVA"]}}
+200
+saved as view-149
+
+=== admin view.update {"id":"art-bugs","query":{"project":["SVA"]}}
+200
+saved
+
+=== admin view.create {"name":"view 150","project":"OPS","query":{"project":["SVA"]}}
+200
+saved as view-150
+
+=== admin view.update {"id":"ops-infra","query":{"project":["SVA"]}}
+200
+saved
+
+=== admin view.create {"name":"view 151","project":"SVA","query":{"project":["OPS"]}}
+200
+saved as view-151
+
+=== admin view.update {"id":"art-bugs","query":{"project":["OPS"]}}
+200
+saved
+
+=== admin view.create {"name":"view 152","project":"OPS","query":{"project":["OPS"]}}
+200
+saved as view-152
+
+=== admin view.update {"id":"ops-infra","query":{"project":["OPS"]}}
+200
+saved
+
+=== admin view.create {"name":"view 153","project":"SVA","query":{"parent":"SVA-1"}}
+200
+saved as view-153
+
+=== admin view.update {"id":"art-bugs","query":{"parent":"SVA-1"}}
+200
+saved
+
+=== admin view.create {"name":"view 154","project":"OPS","query":{"parent":"SVA-1"}}
+200
+saved as view-154
+
+=== admin view.update {"id":"ops-infra","query":{"parent":"SVA-1"}}
+200
+saved
+
+=== admin view.create {"name":"view 155","project":"SVA","query":{"keys":["SVA-1"]}}
+200
+saved as view-155
+
+=== admin view.update {"id":"art-bugs","query":{"keys":["SVA-1"]}}
+200
+saved
+
+=== admin view.create {"name":"view 156","project":"OPS","query":{"keys":["SVA-1"]}}
+200
+saved as view-156
+
+=== admin view.update {"id":"ops-infra","query":{"keys":["SVA-1"]}}
+200
+saved
+
+=== admin view.create {"name":"view 157","project":"NOPE","query":{}}
+400
+{
+ "allowed": [
+  "ARC",
+  "OPS",
+  "SVA"
+ ],
+ "code": "invalid",
+ "field": "query.project",
+ "message": "project \"NOPE\" does not exist in this workspace",
+ "nearest": "OPS"
+}
+
+=== admin view.update {"id":"art-bugs","query":{}}
+200
+saved
+
+=== admin view.create {"name":"view 158","project":"DEL","query":{}}
+400
+{
+ "allowed": [
+  "ARC",
+  "OPS",
+  "SVA"
+ ],
+ "code": "invalid",
+ "field": "query.project",
+ "message": "project \"DEL\" does not exist in this workspace"
+}
+
+=== admin view.update {"id":"art-bugs","query":{}}
+200
+saved
+
+=== member limited to SVA view.create {"name":"view 159","query":{}}
+200
+saved as view-159
+
+=== member limited to SVA view.create {"name":"view 160","query":{"project":["SVA"]}}
+200
+saved as view-160
+
+=== member limited to SVA view.create {"name":"view 161","query":{"project":["OPS"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "your access does not include project OPS"
+}
+
+=== member limited to SVA view.create {"name":"view 162","query":{"project":["SVA","OPS"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "your access does not include project OPS"
+}
+
+=== member limited to SVA view.create {"name":"view 163","query":{"label":["art"]}}
+200
+saved as view-163
+
+=== member limited to SVA view.create {"name":"view 164","query":{"label":["infra"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"infra\""
+}
+
+=== member limited to SVA view.create {"name":"view 165","query":{"label":["bug"]}}
+200
+saved as view-165
+
+=== member limited to SVA view.create {"name":"view 166","query":{"label":["twice"]}}
+200
+saved as view-166
+
+=== member limited to SVA view.create {"name":"view 167","query":{"status":["Review"]}}
+200
+saved as view-167
+
+=== member limited to SVA view.create {"name":"view 168","query":{"epic":["Boss fight"]}}
+200
+saved as view-168
+
+=== member limited to SVA view.create {"name":"view 169","query":{"epic":["Hardening"]}}
+400
+{
+ "allowed": [
+  "Boss fight"
+ ],
+ "code": "invalid",
+ "field": "query.epic",
+ "message": "no epic \"Hardening\""
+}
+
+=== member limited to SVA view.create {"name":"view 170","query":{"cycle":["current"]}}
+200
+saved as view-170
+
+=== member limited to SVA view.create {"name":"view 171","query":{"milestone":"Alpha"}}
+200
+saved as view-171
+
+=== member limited to SVA view.create {"name":"view 172","query":{"milestone":"Audit"}}
+200
+saved as view-172
+
+=== member limited to SVA view.create {"name":"view 173","query":{"parent":"SVA-1"}}
+200
+saved as view-173
+
+=== member limited to SVA view.create {"name":"view 174","query":{"parent":"OPS-1"}}
+200
+saved as view-174
+
+=== member limited to SVA view.create {"name":"view 175","query":{"keys":["OPS-1"]}}
+200
+saved as view-175
+
+=== member limited to SVA view.create {"name":"view 176","query":{"assignee":["me"]}}
+200
+saved as view-176
+
+=== member limited to SVA view.create {"name":"view 177","query":{"label":["nope"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "last",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"nope\""
+}
+
+=== member limited to SVA view.create {"name":"view 178","project":"SVA","query":{"label":["art"]}}
+200
+saved as view-178
+
+=== member limited to SVA view.create {"name":"view 179","project":"OPS","query":{"label":["infra"]}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "your access does not include project OPS"
+}
+
+=== member limited to SVA view.create {"name":"view 180","project":"OPS","query":{}}
+400
+{
+ "code": "invalid",
+ "field": "query",
+ "message": "your access does not include project OPS"
+}
+
+=== admin view.update {"id":"art-bugs","query":null}
+200
+saved
+
+=== admin view.update {"id":"art-bugs","name":"Art","query":{"label":["art"]}}
+200
+saved
+
+=== admin view.update {"id":"stale","name":"Still stale"}
+200
+saved
+
+=== admin view.update {"id":"stale","query":{"label":["temp"]}}
+400
+{
+ "allowed": [
+  "art",
+  "bug",
+  "infra",
+  "last",
+  "twice",
+  "twice"
+ ],
+ "code": "invalid",
+ "field": "query.label",
+ "message": "no label \"temp\""
+}
+
+=== admin view.create {"name":"no query"}
+200
+saved as no-query
+
+=== admin view.create {"name":"no query, in a project","project":"OPS"}
+200
+saved as no-query-in-a-project
