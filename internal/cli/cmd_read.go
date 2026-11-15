@@ -1,3 +1,5 @@
+// The read commands: orient and find, made from an API address each.
+
 package cli
 
 import (
@@ -26,6 +28,8 @@ func readsWithFilters(path string) func(*runner, input) error {
 	}
 }
 
+// address fills the command's first argument into path, where path has a
+// %s for it.
 func address(path string, in input) string {
 	if !strings.Contains(path, "%s") {
 		return path

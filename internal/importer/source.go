@@ -39,11 +39,18 @@ var Kinds = func() []string {
 	return out
 }()
 
-// Read turns a source into a plan.
+// Read turns a source into a plan. A read that fails leaves nothing behind:
+// what it had copied to this machine is removed, so only a plan read
+// without an error needs closing.
 func Read(kind, source string, opts map[string]string) (Plan, error) {
 	for _, s := range sources {
 		if s.Kind() == kind {
-			return s.Read(source, opts)
+			plan, err := s.Read(source, opts)
+			if err != nil {
+				plan.Close()
+				return Plan{}, err
+			}
+			return plan, nil
 		}
 	}
 	return Plan{}, fmt.Errorf("unknown source %q; sources are: %s", kind, strings.Join(Kinds, ", "))

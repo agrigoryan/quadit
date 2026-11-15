@@ -1,3 +1,5 @@
+// The decision commands: ask, approval, pick and unclear.
+
 package cli
 
 import (
@@ -22,14 +24,16 @@ func (r *runner) ask(in input) error {
 	if len(files) > 0 {
 		return r.askWithFiles(a, files, in.approval)
 	}
-	_, err = r.change("decision.open", a, in.approval)
-	return err
+	return r.change("decision.open", a, in.approval)
 }
 
 // decisionArgs are a new decision's arguments from what was typed, less
 // its options and files.
 func decisionArgs(in input) (map[string]any, error) {
-	a := argsFrom(in.f, "option", "why", "file")
+	a, err := argsFrom(in.f, "option", "why", "file")
+	if err != nil {
+		return nil, err
+	}
 	a["task"], a["question"] = in.pos[0], strings.Join(in.pos[1:], " ")
 	if in.name == "approval" {
 		a["kind"] = "approval"
@@ -68,7 +72,10 @@ func options(given []string) []map[string]any {
 // pick answers a decision: with one of its options, by number or label,
 // or with an outcome.
 func (r *runner) pick(in input) error {
-	a := argsFrom(in.f)
+	a, err := argsFrom(in.f)
+	if err != nil {
+		return err
+	}
 	a["id"] = in.pos[0]
 	switch choice := strings.Join(in.pos[1:], " "); choice {
 	case "approved", "declined", "none":
@@ -80,11 +87,10 @@ func (r *runner) pick(in input) error {
 			a["option"] = choice
 		}
 	}
-	_, err := r.change("decision.pick", a, in.approval)
-	return err
+	return r.change("decision.pick", a, in.approval)
 }
 
+// unclear answers a decision by saying the question is not clear, and why.
 func (r *runner) unclear(in input) error {
-	_, err := r.change("decision.unclear", map[string]any{"id": in.pos[0], "note": strings.Join(in.pos[1:], " ")}, in.approval)
-	return err
+	return r.change("decision.unclear", map[string]any{"id": in.pos[0], "note": strings.Join(in.pos[1:], " ")}, in.approval)
 }

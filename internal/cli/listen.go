@@ -1,3 +1,6 @@
+// The listen command: the companion that runs a command for each inbox
+// item.
+
 package cli
 
 import (
@@ -5,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -20,7 +24,7 @@ func (r *runner) listen(in input) error {
 	fmt.Fprintf(r.out, "listening as cursor %q; running %q for each inbox item\n", cursor, strings.Join(command, " "))
 	backoff := time.Second
 	for {
-		raw, err := r.c.JSON("/events", url.Values{"cursor": {cursor}, "inbox": {"1"}, "wait": {"50"}, "types": {"notification.created"}, "compact": {"1"}})
+		raw, err := r.c.JSON(r.ctx, "/events", url.Values{"cursor": {cursor}, "inbox": {"1"}, "wait": {"50"}, "types": {"notification.created"}, "compact": {"1"}})
 		if err != nil {
 			fmt.Fprintln(r.out, "retrying:", err)
 			time.Sleep(backoff)
@@ -85,6 +89,8 @@ func (r *runner) wake(command, secrets []string, line string) error {
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintln(r.out, "command failed:", err)
 	}
-	out.Flush()
+	if err := out.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "the command's output could not be printed:", err)
+	}
 	return nil
 }

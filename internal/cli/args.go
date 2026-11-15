@@ -1,9 +1,14 @@
+// The arguments of a command: switches, field=value arguments and the
+// values the API takes for them.
+
 package cli
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -51,6 +56,7 @@ type input struct {
 	approval string
 }
 
+// readInput reads what was typed after a command's name.
 func readInput(name string, rest []string) input {
 	pos, f := splitFields(rest)
 	approval := ""
@@ -61,10 +67,17 @@ func readInput(name string, rest []string) input {
 	return input{name: name, rest: rest, pos: pos, f: f, approval: approval}
 }
 
+// priorities are the priority names a command takes, and the number the
+// API takes for each.
 var priorities = map[string]int{"none": 0, "urgent": 1, "high": 2, "medium": 3, "low": 4}
-var listKeys = map[string]bool{"labels": true, "add_labels": true, "remove_labels": true, "event_types": true}
-var intKeys = map[string]bool{"priority": true, "estimate": true, "base_seq": true, "minutes": true, "recommended": true}
-var boolKeys = map[string]bool{"archived": true, "resolved": true, "active": true, "shared": true}
+
+// listKeys, intKeys and boolKeys are the fields whose value is sent as a
+// list (written a,b,c), a number or a yes or no; any other is sent as text.
+var (
+	listKeys = map[string]bool{"labels": true, "add_labels": true, "remove_labels": true, "event_types": true}
+	intKeys  = map[string]bool{"priority": true, "estimate": true, "base_seq": true, "minutes": true, "recommended": true}
+	boolKeys = map[string]bool{"archived": true, "resolved": true, "active": true, "shared": true}
+)
 
 // splitFields splits "field=value" arguments from positional ones.
 func splitFields(args []string) (pos []string, fields map[string][]string) {
@@ -140,25 +153,34 @@ func apiValue(key, v string) any {
 }
 
 // argsFrom turns the field=value arguments into a change's arguments,
-// leaving out the fields a command reads itself.
-func argsFrom(fields map[string][]string, skip ...string) map[string]any {
+// leaving out the fields a command reads itself. Of a field given twice,
+// the last value counts; description=- and body=- are read from stdin.
+func argsFrom(fields map[string][]string, skip ...string) (map[string]any, error) {
 	out := map[string]any{}
 	for k, vs := range fields {
-		skipIt := false
-		for _, s := range skip {
-			skipIt = skipIt || s == k
-		}
-		if skipIt {
+		if slices.Contains(skip, k) {
 			continue
 		}
 		v := vs[len(vs)-1]
 		if v == "-" && (k == "description" || k == "body") {
-			raw, _ := io.ReadAll(os.Stdin)
-			v = string(raw)
+			var err error
+			if v, err = readStdin(); err != nil {
+				return nil, fmt.Errorf("%s=-: %w", k, err)
+			}
 		}
 		out[k] = apiValue(k, v)
 	}
-	return out
+	return out, nil
+}
+
+// readStdin reads all of standard input, for a value given as "-" or a
+// command that takes its text from there.
+func readStdin() (string, error) {
+	raw, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return "", fmt.Errorf("reading standard input: %w", err)
+	}
+	return string(raw), nil
 }
 
 // readFilters turns the field=value arguments into the filters of a read.

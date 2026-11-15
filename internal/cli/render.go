@@ -1,7 +1,10 @@
+// The render command: a picture of a task or a page.
+
 package cli
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 )
 
@@ -17,7 +20,7 @@ func (r *runner) render(in input) error {
 	if len(in.pos) > 0 {
 		q.Set("task", in.pos[0])
 	}
-	png, err := r.c.workspaceRequest("GET", "/render", q, nil, "", "image/png")
+	png, err := r.c.workspaceRequest(r.ctx, apiRequest{method: http.MethodGet, path: "/render", query: q, accept: "image/png"})
 	if err != nil {
 		return err
 	}

@@ -1,9 +1,9 @@
+// The page commands: write, remember and row.
+
 package cli
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -11,23 +11,29 @@ import (
 // write writes a page from stdin: a new one under the title given
 // (write new TITLE), or the one named by its id.
 func (r *runner) write(in input) error {
-	raw, _ := io.ReadAll(os.Stdin)
-	if in.pos[0] == "new" {
-		a := argsFrom(in.f)
-		a["title"], a["markdown"] = strings.Join(in.pos[1:], " "), string(raw)
-		_, err := r.change("doc.create", a, in.approval)
+	markdown, err := readStdin()
+	if err != nil {
 		return err
 	}
-	a := argsFrom(in.f)
-	a["doc"], a["markdown"] = in.pos[0], string(raw)
-	_, err := r.change("doc.write", a, in.approval)
-	return err
+	a, err := argsFrom(in.f)
+	if err != nil {
+		return err
+	}
+	if in.pos[0] == "new" {
+		a["title"], a["markdown"] = strings.Join(in.pos[1:], " "), markdown
+		return r.change("doc.create", a, in.approval)
+	}
+	a["doc"], a["markdown"] = in.pos[0], markdown
+	return r.change("doc.write", a, in.approval)
 }
 
 // remember saves a note from stdin to the caller's memory.
 func (r *runner) remember(in input) error {
-	raw, _ := io.ReadAll(os.Stdin)
-	body := map[string]any{"title": strings.Join(in.pos, " "), "markdown": string(raw)}
+	markdown, err := readStdin()
+	if err != nil {
+		return err
+	}
+	body := map[string]any{"title": strings.Join(in.pos, " "), "markdown": markdown}
 	if m := in.f["mode"]; len(m) > 0 {
 		body["mode"] = m[0]
 	}
@@ -44,8 +50,8 @@ func (r *runner) row(in input) error {
 	props := map[string]any{}
 	for k, vs := range in.f {
 		v := vs[len(vs)-1]
-		switch {
-		case v == "true" || v == "false":
+		switch v {
+		case "true", "false":
 			props[k] = v == "true"
 		default:
 			if n, err := strconv.ParseFloat(v, 64); err == nil {
@@ -55,6 +61,5 @@ func (r *runner) row(in input) error {
 			}
 		}
 	}
-	_, err := r.change("doc.create", map[string]any{"parent": in.pos[0], "title": strings.Join(in.pos[1:], " "), "props": props}, in.approval)
-	return err
+	return r.change("doc.create", map[string]any{"parent": in.pos[0], "title": strings.Join(in.pos[1:], " "), "props": props}, in.approval)
 }

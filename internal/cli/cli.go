@@ -18,6 +18,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,8 +27,10 @@ import (
 	"strings"
 )
 
-// Run runs a client command and returns the process exit code.
+// Run runs a client command and returns the process exit code. It is the
+// client's main: the context its requests run under starts here.
 func Run(args []string, stdout, stderr io.Writer) int {
+	ctx := context.Background()
 	sw, rest := takeSwitches(args)
 	if len(rest) == 0 || rest[0] == "help" || rest[0] == "-h" || rest[0] == "--help" {
 		fmt.Fprint(stdout, helpFor(rest))
@@ -35,7 +38,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	cmd, rest := rest[0], rest[1:]
 	if cmd == "login" {
-		return login(rest, stdout, stderr)
+		return login(ctx, rest, stdout, stderr)
 	}
 	c, err := NewClient()
 	if err != nil {
@@ -43,7 +46,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	c.ChangeID, c.For = sw.changeID, sw.actFor
-	r := &runner{c: c, out: stdout, json: sw.json, dry: sw.dry}
+	r := &runner{ctx: ctx, c: c, out: stdout, json: sw.json, dry: sw.dry}
 	if err := r.run(cmd, rest); err != nil {
 		fmt.Fprintln(stderr, err)
 		var ae *APIError
@@ -56,8 +59,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 // runner is one run of a command: the server it talks to, where it prints,
-// and the switches it was given.
+// and the switches it was given. Being one run, it holds the run's context.
 type runner struct {
+	ctx  context.Context
 	c    *Client
 	out  io.Writer
 	json bool
@@ -80,7 +84,7 @@ func (r *runner) run(name string, rest []string) error {
 // printRead prints a read in text form, or as JSON when asked.
 func (r *runner) printRead(path string, q url.Values) error {
 	if r.json {
-		raw, err := r.c.JSON(path, q)
+		raw, err := r.c.JSON(r.ctx, path, q)
 		if err != nil {
 			return err
 		}
@@ -91,21 +95,21 @@ func (r *runner) printRead(path string, q url.Values) error {
 		fmt.Fprintln(r.out, strings.TrimSpace(string(raw)))
 		return nil
 	}
-	text, err := r.c.Text(path, q)
+	text, err := r.c.Text(r.ctx, path, q)
 	fmt.Fprint(r.out, text)
 	return err
 }
 
 // change applies a change and prints one line about it.
-func (r *runner) change(typ string, args map[string]any, approval string) (*Result, error) {
-	res, err := r.c.Change(typ, args, approval, r.dry)
+func (r *runner) change(typ string, args map[string]any, approval string) error {
+	res, err := r.c.Change(r.ctx, typ, args, ChangeOptions{Approval: approval, DryRun: r.dry})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if r.json {
 		raw, _ := json.Marshal(res)
 		fmt.Fprintln(r.out, string(raw))
-		return res, nil
+		return nil
 	}
 	line := "ok " + typ
 	if r.dry {
@@ -118,12 +122,12 @@ func (r *runner) change(typ string, args map[string]any, approval string) (*Resu
 		line += " id=" + res.Ref
 	}
 	fmt.Fprintf(r.out, "%s seq=%d\n", line, res.Seq)
-	return res, nil
+	return nil
 }
 
 // send sends a JSON body to a path that is not a change (a cursor, a note
 // to memory, a request with a secret) and returns the answer.
 func (r *runner) send(method, path string, q url.Values, body any, accept string) ([]byte, error) {
 	raw, _ := json.Marshal(body)
-	return r.c.workspaceRequest(method, path, q, bytes.NewReader(raw), "application/json", accept)
+	return r.c.workspaceRequest(r.ctx, apiRequest{method: method, path: path, query: q, body: bytes.NewReader(raw), contentType: "application/json", accept: accept})
 }

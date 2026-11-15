@@ -15,6 +15,8 @@ import (
 // version is set when a release is built.
 var version = "dev"
 
+// main sends serve, admin, version and the commands run on the server's
+// machine to app, and everything else to the command-line client.
 func main() {
 	args := os.Args[1:]
 	if len(args) > 0 {
@@ -34,6 +36,7 @@ func main() {
 	os.Exit(cli.Run(args, os.Stdout, os.Stderr))
 }
 
+// taskKey is the shape of a task key (SVA-12).
 var taskKey = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+$`)
 
 // restoresTask tells the two meanings of "restore" apart. "quadit restore

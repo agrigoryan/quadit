@@ -1,3 +1,5 @@
+// The follow commands: ack and read, and the cursor they move.
+
 package cli
 
 import (
@@ -43,6 +45,5 @@ func (r *runner) markRead(in input) error {
 	if v := in.f["up_to"]; len(v) > 0 {
 		a["up_to"] = apiValue("base_seq", v[0])
 	}
-	_, err := r.change("notification.read", a, "")
-	return err
+	return r.change("notification.read", a, "")
 }

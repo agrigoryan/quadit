@@ -1,7 +1,10 @@
+// The import command: bringing work in from other tools.
+
 package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -19,10 +22,10 @@ func (r *runner) importFrom(in input) error {
 		opts[k] = v[len(v)-1]
 	}
 	plan, err := importer.Read(kind, source, opts)
-	defer plan.Close()
 	if err != nil {
 		return err
 	}
+	defer plan.Close()
 	if r.json && r.dry {
 		raw, _ := json.Marshal(map[string]any{"dry_run": true, "read": map[string]int{"tasks": len(plan.Tasks), "pages": len(plan.Docs), "databases": len(plan.Tables)}})
 		fmt.Fprintln(r.out, string(raw))
@@ -34,7 +37,7 @@ func (r *runner) importFrom(in input) error {
 	if r.dry {
 		return nil
 	}
-	sum, err := importer.Apply(importer.NewSink(importAPI{r.c}, r.importLog), plan, opts["project"])
+	sum, err := importer.Apply(importer.NewSink(importAPI{ctx: r.ctx, c: r.c}, r.importLog), plan, opts["project"])
 	if r.json {
 		raw, _ := json.Marshal(map[string]any{"made": map[string]int{"tasks": sum.Tasks, "comments": sum.Comments, "pages": sum.Docs, "rows": sum.Rows, "files": sum.Files},
 			"already_there": sum.Already, "unmatched_people": sum.Unmatched})
@@ -46,18 +49,25 @@ func (r *runner) importFrom(in input) error {
 }
 
 // importAPI is the API as an import writes through it: as the caller,
-// over the network.
-type importAPI struct{ c *Client }
-
-func (a importAPI) Call(method, path string, q url.Values, body []byte) ([]byte, error) {
-	if body == nil {
-		return a.c.workspaceRequest(method, path, q, nil, "", "application/json")
-	}
-	return a.c.workspaceRequest(method, path, q, bytes.NewReader(body), "application/json", "application/json")
+// over the network. It serves one import run, so it holds the run's
+// context.
+type importAPI struct {
+	ctx context.Context
+	c   *Client
 }
 
+// Call sends one request of the import, with its JSON body if it has one.
+func (a importAPI) Call(method, path string, q url.Values, body []byte) ([]byte, error) {
+	req := apiRequest{method: method, path: path, query: q, accept: "application/json"}
+	if body != nil {
+		req.body, req.contentType = bytes.NewReader(body), "application/json"
+	}
+	return a.c.workspaceRequest(a.ctx, req)
+}
+
+// SendFile uploads one file of the import, under the import's id for it.
 func (a importAPI) SendFile(fileID, path string) (string, error) {
-	_, u, err := a.c.UploadAs(fileID, path)
+	_, u, err := a.c.UploadAs(a.ctx, fileID, path)
 	return u, err
 }
 

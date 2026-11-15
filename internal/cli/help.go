@@ -1,5 +1,8 @@
+// The help texts: the main one and one for each topic.
+
 package cli
 
+// help is the main help text: every command, by group.
 const help = `quadit: tasks, decisions and docs for people and agents
 
 orient    me                         who am I: role, scope, budget, cursors
@@ -42,6 +45,7 @@ and --for=@WHO (it runs with that member's access).
 Connect with QUADIT_URL and QUADIT_TOKEN, or: quadit login URL TOKEN
 `
 
+// helpTopics are the texts of "quadit help TOPIC".
 var helpTopics = map[string]string{
 	"secrets": `secrets: keys and passwords an agent can use but not read
   An admin sets one:   quadit do secret.set '{"name":"DEPLOY_KEY","value":"…","hosts":["api.example.com"],"agents":["@coder"]}'

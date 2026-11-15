@@ -1,6 +1,11 @@
+// The table of commands: each name, what it needs and what runs.
+
 package cli
 
-import "sort"
+import (
+	"slices"
+	"sort"
+)
 
 // command is one command of the tool. Adding one means writing what it
 // does (in the cmd_*.go file of its group, or a file of its own) and naming
@@ -10,7 +15,8 @@ type command struct {
 	names []string
 	// args is how many arguments it needs at least, field=value ones not
 	// counted. Given fewer, it does nothing and says its usage.
-	args  int
+	args int
+	// usage is what it says it takes, when given too few arguments.
 	usage string
 	run   func(r *runner, in input) error
 }
@@ -91,10 +97,8 @@ var commands = []command{
 // findCommand gives the command a name or an alias stands for.
 func findCommand(name string) (command, bool) {
 	for _, c := range commands {
-		for _, n := range c.names {
-			if n == name {
-				return c, true
-			}
+		if slices.Contains(c.names, name) {
+			return c, true
 		}
 	}
 	return command{}, false

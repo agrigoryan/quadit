@@ -1,3 +1,6 @@
+// Questions with files: uploading them and opening the decision with them
+// in one batch.
+
 package cli
 
 import (
@@ -63,6 +66,8 @@ func readable(files []askFile) error {
 // from it, so the same command sent again uploads and attaches nothing twice.
 type askIDs struct{ base string }
 
+// make is the id of one part of the question: a new one, or, given --id,
+// the same one each time the same command is sent.
 func (k askIDs) make(parts ...string) string {
 	if k.base == "" {
 		return id.New()
@@ -105,7 +110,7 @@ func (r *runner) askWithFiles(a map[string]any, files []askFile, approval string
 	changes := []BatchChange{open}
 	var sent []map[string]string
 	for i, f := range files {
-		fid, furl, err := r.c.UploadAs(ids.uploadName(i), f.path)
+		fid, furl, err := r.c.UploadAs(r.ctx, ids.uploadName(i), f.path)
 		if err != nil {
 			return fmt.Errorf("file %s: %w", f.path, err)
 		}
@@ -120,7 +125,7 @@ func (r *runner) askWithFiles(a map[string]any, files []askFile, approval string
 		att["decision"] = a["id"]
 		changes = append(changes, BatchChange{ID: ids.make("change", "attach", strconv.Itoa(i)), Type: "attachment.add", Args: att})
 	}
-	res, err := r.c.Batch(changes, false)
+	res, err := r.c.Batch(r.ctx, changes)
 	if err != nil {
 		return err
 	}
@@ -130,7 +135,7 @@ func (r *runner) askWithFiles(a map[string]any, files []askFile, approval string
 // askDry checks the question without its files, uploads nothing, and says
 // what would be attached where.
 func (r *runner) askDry(a map[string]any, files []askFile, approval string) error {
-	res, err := r.c.Change("decision.open", a, approval, true)
+	res, err := r.c.Change(r.ctx, "decision.open", a, ChangeOptions{Approval: approval, DryRun: true})
 	if err != nil {
 		return err
 	}

@@ -1,3 +1,6 @@
+// The secret commands: request and run, which use a secret without
+// printing it.
+
 package cli
 
 import (
@@ -67,7 +70,7 @@ func (r *runner) secretEnv(names []string) (map[string]string, error) {
 // flushes the masker.
 func (r *runner) secretCommand(command []string, env map[string]string, more ...string) (*exec.Cmd, *masker) {
 	out := newMasker(r.out, env)
-	cmd := exec.Command(command[0], command[1:]...)
+	cmd := exec.CommandContext(r.ctx, command[0], command[1:]...)
 	cmd.Env = append(os.Environ(), more...)
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)
@@ -102,7 +105,10 @@ func (r *runner) runWithSecrets(in input) error {
 		return err
 	}
 	cmd, out := r.secretCommand(command, env)
-	defer out.Flush()
 	cmd.Stdin = os.Stdin
-	return cmd.Run()
+	err = cmd.Run()
+	if flushErr := out.Flush(); err == nil {
+		err = flushErr
+	}
+	return err
 }

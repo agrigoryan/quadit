@@ -1,20 +1,22 @@
+// The task commands: new, update, status, assign, take and the like, and
+// comments and results.
+
 package cli
 
-import (
-	"io"
-	"os"
-	"strings"
-)
+import "strings"
 
 // newTask makes a task in a project; the words after the project are its
 // title.
 func (r *runner) newTask(in input) error {
-	a := argsFrom(in.f)
+	a, err := argsFrom(in.f)
+	if err != nil {
+		return err
+	}
 	a["project"], a["title"] = in.pos[0], strings.Join(in.pos[1:], " ")
-	_, err := r.change("task.create", a, in.approval)
-	return err
+	return r.change("task.create", a, in.approval)
 }
 
+// update changes a task's fields.
 func (r *runner) update(in input) error {
 	return r.changeTask("task.update", in)
 }
@@ -28,31 +30,37 @@ func (r *runner) changeNamed(in input) error {
 // changeTask sends one change to the task the first argument names, with
 // the field=value arguments as the rest of it.
 func (r *runner) changeTask(typ string, in input) error {
-	a := argsFrom(in.f)
+	a, err := argsFrom(in.f)
+	if err != nil {
+		return err
+	}
 	a["id"] = in.pos[0]
-	_, err := r.change(typ, a, in.approval)
-	return err
+	return r.change(typ, a, in.approval)
 }
 
+// status moves a task to the status named by the words after its key.
 func (r *runner) status(in input) error {
-	_, err := r.change("task.update", map[string]any{"id": in.pos[0], "status": strings.Join(in.pos[1:], " ")}, in.approval)
-	return err
+	return r.change("task.update", map[string]any{"id": in.pos[0], "status": strings.Join(in.pos[1:], " ")}, in.approval)
 }
 
+// assign gives a task to a member, or to nobody.
 func (r *runner) assign(in input) error {
-	_, err := r.change("task.update", map[string]any{"id": in.pos[0], "assignee": apiValue("assignee", in.pos[1])}, in.approval)
-	return err
+	return r.change("task.update", map[string]any{"id": in.pos[0], "assignee": apiValue("assignee", in.pos[1])}, in.approval)
 }
 
 // comment writes a comment on a task, or, called as result, the report of
 // what was done: what was checked, measured and left unverified, and the
 // files that show it.
 func (r *runner) comment(in input) error {
-	a := argsFrom(in.f, "checked", "measured", "not_verified", "file")
+	a, err := argsFrom(in.f, "checked", "measured", "not_verified", "file")
+	if err != nil {
+		return err
+	}
 	a["task"], a["body"] = in.pos[0], strings.Join(in.pos[1:], " ")
 	if a["body"] == "-" {
-		raw, _ := io.ReadAll(os.Stdin)
-		a["body"] = string(raw)
+		if a["body"], err = readStdin(); err != nil {
+			return err
+		}
 	}
 	ev := map[string]string{}
 	for _, k := range []string{"checked", "measured", "not_verified"} {
@@ -71,6 +79,5 @@ func (r *runner) comment(in input) error {
 	} else if len(atts) > 0 {
 		a["attachments"] = atts
 	}
-	_, err := r.change("comment.create", a, in.approval)
-	return err
+	return r.change("comment.create", a, in.approval)
 }

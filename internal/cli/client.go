@@ -1,7 +1,10 @@
+// The API client: requests, changes and uploads.
+
 package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +19,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/id"
 )
 
+// requestTimeout is how long one request to the server may take.
+const requestTimeout = 90 * time.Second
+
 // Client talks to a server as one member.
 type Client struct {
 	// ChangeID, when set, is the id the next change is sent with; sending
@@ -23,19 +29,22 @@ type Client struct {
 	ChangeID string
 	// For names the member a change is made for; it then runs with their access.
 	For   string
-	URL   string
-	Token string
+	URL   string // the server's address, with no trailing slash
+	Token string // the API token the member is signed in with
 	HTTP  *http.Client
 	// Note is what the server had to say beside its last answer (a picture
 	// that stops before the page does, for one).
 	Note string
 }
 
+// savedConfig is the file `quadit login` writes.
 type savedConfig struct {
 	URL   string `json:"url"`
 	Token string `json:"token"`
 }
 
+// configPath is where `quadit login` saves the server and token:
+// QUADIT_CONFIG, or quadit/config.json in the user's config folder.
 func configPath() string {
 	if p := os.Getenv("QUADIT_CONFIG"); p != "" {
 		return p
@@ -50,11 +59,13 @@ func configPath() string {
 // NewClient reads the server address and token from the environment
 // (QUADIT_URL, QUADIT_TOKEN) or from the file `quadit login` wrote.
 func NewClient() (*Client, error) {
-	c := &Client{URL: os.Getenv("QUADIT_URL"), Token: os.Getenv("QUADIT_TOKEN"), HTTP: &http.Client{Timeout: 90 * time.Second}}
+	c := &Client{URL: os.Getenv("QUADIT_URL"), Token: os.Getenv("QUADIT_TOKEN"), HTTP: &http.Client{Timeout: requestTimeout}}
 	if c.URL == "" || c.Token == "" {
 		var sc savedConfig
 		if raw, err := os.ReadFile(configPath()); err == nil {
-			json.Unmarshal(raw, &sc)
+			if err := json.Unmarshal(raw, &sc); err != nil {
+				return nil, fmt.Errorf("%s: %w", configPath(), err)
+			}
 		}
 		if c.URL == "" {
 			c.URL = sc.URL
@@ -80,6 +91,8 @@ type APIError struct {
 	Nearest string   `json:"nearest"`
 }
 
+// Error gives the code and message, with the nearest allowed value and
+// the allowed ones when the server named them.
 func (e *APIError) Error() string {
 	msg := e.Code + ": " + e.Message
 	if e.Nearest != "" {
@@ -91,57 +104,73 @@ func (e *APIError) Error() string {
 	return msg
 }
 
-// workspaceRequest sends a request inside the token's workspace and returns the body.
-func (c *Client) workspaceRequest(method, path string, query url.Values, body io.Reader, contentType, accept string) ([]byte, error) {
-	u := c.URL + "/api/v1/w/-" + path
-	if strings.HasPrefix(path, "/api/") {
-		u = c.URL + path
+// apiRequest is one request to the API: where it goes, what it sends and
+// the form of answer it asks for.
+type apiRequest struct {
+	method string
+	// path is under the token's workspace, unless it starts with /api/.
+	path        string
+	query       url.Values
+	body        io.Reader // nil: no body
+	contentType string    // the body's type
+	accept      string    // the form of answer asked for; empty: any
+}
+
+// workspaceRequest sends a request inside the token's workspace and returns
+// the body of the answer. It is sent once: a request that cannot be sent
+// again safely is the caller's to try again (postChanges does, under the
+// change's id).
+func (c *Client) workspaceRequest(ctx context.Context, r apiRequest) ([]byte, error) {
+	u := c.URL + "/api/v1/w/-" + r.path
+	if strings.HasPrefix(r.path, "/api/") {
+		u = c.URL + r.path
 	}
-	if len(query) > 0 {
-		u += "?" + query.Encode()
+	if len(r.query) > 0 {
+		u += "?" + r.query.Encode()
 	}
-	req, err := http.NewRequest(method, u, body)
+	req, err := http.NewRequestWithContext(ctx, r.method, u, r.body)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
+	if r.contentType != "" {
+		req.Header.Set("Content-Type", r.contentType)
 	}
-	if accept != "" {
-		req.Header.Set("Accept", accept)
+	if r.accept != "" {
+		req.Header.Set("Accept", r.accept)
 	}
-	for attempt := 0; ; attempt++ {
-		resp, err := c.HTTP.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("cannot reach %s: %w", c.URL, err)
-		}
-		raw, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		c.Note = resp.Header.Get("X-Quadit-Note")
-		if resp.StatusCode < 300 {
-			return raw, nil
-		}
-		var wrap struct {
-			Error APIError `json:"error"`
-		}
-		if json.Unmarshal(raw, &wrap) != nil || wrap.Error.Code == "" {
-			return nil, fmt.Errorf("%s %s: %s", method, path, resp.Status)
-		}
-		wrap.Error.Status = resp.StatusCode
-		return nil, &wrap.Error
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cannot reach %s: %w", c.URL, err)
 	}
+	raw, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	c.Note = resp.Header.Get("X-Quadit-Note")
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the answer from %s: %w", c.URL, err)
+	}
+	if resp.StatusCode < 300 {
+		return raw, nil
+	}
+	var wrap struct {
+		Error APIError `json:"error"`
+	}
+	if json.Unmarshal(raw, &wrap) != nil || wrap.Error.Code == "" {
+		return nil, fmt.Errorf("%s %s: %s", r.method, r.path, resp.Status)
+	}
+	wrap.Error.Status = resp.StatusCode
+	return nil, &wrap.Error
 }
 
 // Text gets a path in the compact text form.
-func (c *Client) Text(path string, q url.Values) (string, error) {
-	raw, err := c.workspaceRequest("GET", path, q, nil, "", "text/plain")
+func (c *Client) Text(ctx context.Context, path string, q url.Values) (string, error) {
+	raw, err := c.workspaceRequest(ctx, apiRequest{method: http.MethodGet, path: path, query: q, accept: "text/plain"})
 	return string(raw), err
 }
 
 // JSON gets a path as JSON.
-func (c *Client) JSON(path string, q url.Values) ([]byte, error) {
-	return c.workspaceRequest("GET", path, q, nil, "", "application/json")
+func (c *Client) JSON(ctx context.Context, path string, q url.Values) ([]byte, error) {
+	return c.workspaceRequest(ctx, apiRequest{method: http.MethodGet, path: path, query: q, accept: "application/json"})
 }
 
 // Result is what a change returned.
@@ -154,9 +183,15 @@ type Result struct {
 	Duplicate bool   `json:"duplicate"`
 }
 
+// ChangeOptions are how a change is sent, beside its type and arguments.
+type ChangeOptions struct {
+	Approval string // the id of the decision that approves the change
+	DryRun   bool   // check the change without making it
+}
+
 // Change applies one change. The id is made here, so a retry after a
 // network failure cannot apply it twice.
-func (c *Client) Change(typ string, args any, approval string, dry bool) (*Result, error) {
+func (c *Client) Change(ctx context.Context, typ string, args any, opts ChangeOptions) (*Result, error) {
 	cid := c.ChangeID // one given by the caller makes its own retries safe too
 	if cid == "" {
 		cid = id.New()
@@ -166,13 +201,13 @@ func (c *Client) Change(typ string, args any, approval string, dry bool) (*Resul
 	if c.For != "" {
 		body["for"] = c.For
 	}
-	if approval != "" {
-		body["approval"] = approval
+	if opts.Approval != "" {
+		body["approval"] = opts.Approval
 	}
-	if dry {
+	if opts.DryRun {
 		body["dry_run"] = true
 	}
-	res, err := c.postChanges(body)
+	res, err := c.postChanges(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -189,25 +224,25 @@ type BatchChange struct {
 }
 
 // Batch applies several changes in one go: all of them or none.
-func (c *Client) Batch(changes []BatchChange, dry bool) ([]Result, error) {
+func (c *Client) Batch(ctx context.Context, changes []BatchChange) ([]Result, error) {
 	for i := range changes {
 		changes[i].For = c.For
 	}
-	body := map[string]any{"changes": changes}
-	if dry {
-		body["dry_run"] = true
-	}
-	return c.postChanges(body)
+	return c.postChanges(ctx, map[string]any{"changes": changes})
 }
+
+// changeAttempts is how many times a body of changes is sent before a
+// server that cannot be reached is given up on.
+const changeAttempts = 3
 
 // postChanges sends a body of changes, trying again when the server could
 // not be reached (the ids in it make that safe), and reads the results.
-func (c *Client) postChanges(body map[string]any) ([]Result, error) {
+func (c *Client) postChanges(ctx context.Context, body map[string]any) ([]Result, error) {
 	raw, _ := json.Marshal(body)
 	var out []byte
 	var err error
-	for attempt := 0; attempt < 3; attempt++ {
-		out, err = c.workspaceRequest("POST", "/changes", nil, bytes.NewReader(raw), "application/json", "application/json")
+	for attempt := range changeAttempts {
+		out, err = c.workspaceRequest(ctx, apiRequest{method: http.MethodPost, path: "/changes", body: bytes.NewReader(raw), contentType: "application/json", accept: "application/json"})
 		var ae *APIError
 		if err == nil || errors.As(err, &ae) {
 			break
@@ -226,15 +261,19 @@ func (c *Client) postChanges(body map[string]any) ([]Result, error) {
 	return res.Results, nil
 }
 
+// uploadPart is the most of a file sent in one request; a larger one goes
+// up in parts, each where the server says the last one ended.
+const uploadPart = 16 << 20
+
 // Upload sends a file and returns its id and address.
-func (c *Client) Upload(path string) (fileID, fileURL string, err error) {
-	return c.UploadAs("", path)
+func (c *Client) Upload(ctx context.Context, path string) (fileID, fileURL string, err error) {
+	return c.UploadAs(ctx, "", path)
 }
 
 // UploadAs sends a file under an id of the caller's making (empty: the
 // server makes one). Sent again under the same id, a file is not stored
 // twice: an upload that stopped half way goes on from where it was.
-func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
+func (c *Client) UploadAs(ctx context.Context, id, path string) (fileID, fileURL string, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", "", err
@@ -244,7 +283,6 @@ func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	const part = 16 << 20
 	q := url.Values{"name": {filepath.Base(path)}, "size": {fmt.Sprint(st.Size())}}
 	if id != "" {
 		q.Set("id", id)
@@ -255,7 +293,7 @@ func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
 		Received int64  `json:"received"`
 		State    string `json:"state"`
 	}
-	raw, err := c.workspaceRequest("POST", "/files", q, io.LimitReader(f, part), "application/octet-stream", "")
+	raw, err := c.workspaceRequest(ctx, apiRequest{method: http.MethodPost, path: "/files", query: q, body: io.LimitReader(f, uploadPart), contentType: "application/octet-stream"})
 	if err != nil {
 		return "", "", err
 	}
@@ -266,7 +304,8 @@ func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
 		if _, err := f.Seek(meta.Received, io.SeekStart); err != nil {
 			return "", "", err
 		}
-		raw, err = c.workspaceRequest("PATCH", "/files/"+meta.ID, url.Values{"offset": {fmt.Sprint(meta.Received)}}, io.LimitReader(f, part), "application/octet-stream", "")
+		raw, err = c.workspaceRequest(ctx, apiRequest{method: http.MethodPatch, path: "/files/" + meta.ID, query: url.Values{"offset": {fmt.Sprint(meta.Received)}},
+			body: io.LimitReader(f, uploadPart), contentType: "application/octet-stream"})
 		if err != nil {
 			return "", "", err
 		}
@@ -276,5 +315,3 @@ func (c *Client) UploadAs(id, path string) (fileID, fileURL string, err error) {
 	}
 	return meta.ID, meta.URL, nil
 }
-
-var httpClient = http.Client{Timeout: 90 * time.Second}
