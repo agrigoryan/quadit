@@ -4,12 +4,14 @@
 // one batch with the button off, and a refusal keeps the dialog open.
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { useEffect } from "react";
+import { type Location, MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, loadBootstrap } from "@/lib/store";
 import type { Member, User, Workspace } from "@/lib/types";
+import { useToasts } from "@/lib/toast";
 import { ui, useUi } from "@/lib/ui-state";
 import { CreateTaskDialog } from "@/tasks/create-task";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -64,12 +66,23 @@ function Host() {
   return draft ? <CreateTaskDialog draft={draft} /> : null;
 }
 
-function open(many = false) {
+/** The address the test is at, written down whenever it changes. */
+let here: Location | undefined;
+function Here() {
+  const location = useLocation();
+  useEffect(() => {
+    here = location;
+  }, [location]);
+  return null;
+}
+
+function open(many = false, at: { pathname: string; state?: unknown } = { pathname: "/acme/tasks" }) {
   ui.newTask({ projectId: "p1", ...(many ? { many: true } : {}) });
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[at]}>
       <TooltipProvider>
         <Host />
+        <Here />
       </TooltipProvider>
     </MemoryRouter>,
   );
@@ -111,6 +124,18 @@ describe("CreateTaskDialog, one task", () => {
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]?.changes).toHaveLength(1);
     expect(calls[0]?.changes[0]).toMatchObject({ type: "task.create", args: { title: "Fix the menu" } });
+  });
+
+  it("opens the new task from its toast in the panel, over the page that was under the panel", async () => {
+    open(false, { pathname: "/acme/task/SVA-9", state: { background: { pathname: "/acme/tasks" } } });
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    act(() => calls[0]?.answer());
+    await waitFor(() => expect(useToasts.getState().items.at(-1)?.action).toBeDefined());
+    act(() => useToasts.getState().items.at(-1)?.action?.run());
+    expect(here?.pathname).toBe("/acme/task/SVA-1");
+    expect((here?.state as { background?: Location } | null)?.background?.pathname).toBe("/acme/tasks");
   });
 
   it("creates with Cmd/Ctrl-Enter from the title", async () => {

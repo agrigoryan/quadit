@@ -2,13 +2,12 @@
 // properties, or, on request, several at once (tasks/multi-create.tsx).
 
 import { type FormEvent, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
 import { errorMessage } from "@/lib/api";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
-import { useSlug } from "@/lib/selectors";
 import { getState } from "@/lib/store";
+import { useTaskNav } from "@/lib/task-link";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
 import { createTask } from "@/tasks/actions";
@@ -36,9 +35,7 @@ export function CreateTaskDialog({ draft }: { draft: NewTaskDraft }) {
 
 /** One task. Cmd/Ctrl-Enter creates; "Create more" keeps it open for the next one. */
 function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => void }) {
-  const slug = useSlug();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const nav = useTaskNav();
   const titleBox = useRef<HTMLInputElement>(null);
   const { projectId, project, fields, change: changeFields, changeProject } = useTaskFields(draft);
   const [title, setTitle] = useState("");
@@ -96,7 +93,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
       const key = await createTask(task);
       toast.info(t("create.created", { key }), {
         label: t("create.open"),
-        run: () => void navigate(`/${slug}/task/${key}`, { state: { background: location } }),
+        run: () => nav.peek(key),
       });
     } catch (err) {
       // A refusal is shown as a toast by mutate; anything else is said here.
