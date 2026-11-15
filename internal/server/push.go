@@ -16,7 +16,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"net/url"
 	"time"
@@ -42,8 +41,10 @@ func init() {
 	})
 }
 
+// b64 is the base64 of Web Push: URL-safe, unpadded.
 var b64 = base64.RawURLEncoding
 
+// pushKeys is the install's push key pair, as the "push" setting keeps it.
 type pushKeys struct {
 	PublicKey  string `json:"public_key"`  // uncompressed P-256 point, base64url
 	PrivateKey string `json:"private_key"` // the scalar, base64url
@@ -63,7 +64,7 @@ func (s *Server) pushKey(ctx context.Context) (pushKeys, *ecdsa.PrivateKey, erro
 			return pk, nil, err
 		}
 		pk = pushKeys{PublicKey: b64.EncodeToString(ek.PublicKey().Bytes()), PrivateKey: b64.EncodeToString(ek.Bytes())}
-		raw, _ := json.Marshal(pk)
+		raw, _ := json.Marshal(pk) // two strings: always encodes
 		if err := s.saveSetting(ctx, "push", raw, ""); err != nil {
 			return pk, nil, err
 		}
@@ -73,15 +74,24 @@ func (s *Server) pushKey(ctx context.Context) (pushKeys, *ecdsa.PrivateKey, erro
 		return pk, nil, err
 	}
 	pub, err := b64.DecodeString(pk.PublicKey)
-	if err != nil || len(pub) != 65 {
+	if err != nil || len(pub) != 65 || len(d) > 32 {
 		return pk, nil, errors.New("the stored push key is damaged")
 	}
-	key := &ecdsa.PrivateKey{D: new(big.Int).SetBytes(d)}
-	key.Curve = elliptic.P256()
-	key.X, key.Y = new(big.Int).SetBytes(pub[1:33]), new(big.Int).SetBytes(pub[33:])
+	// The scalar is kept at its full 32 bytes; a shorter one is padded, as
+	// a number it means the same.
+	key, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), append(make([]byte, 32-len(d)), d...))
+	if err != nil {
+		return pk, nil, errors.New("the stored push key is damaged")
+	}
+	// The public half is worked out from the scalar: it must be the one
+	// browsers were given.
+	if ek, err := key.ECDH(); err != nil || !bytes.Equal(ek.PublicKey().Bytes(), pub) {
+		return pk, nil, errors.New("the stored push key is damaged")
+	}
 	return pk, key, nil
 }
 
+// handleShowPushKey answers with the public key browsers subscribe with.
 func (s *Server) handleShowPushKey(x *c) error {
 	pk, _, err := s.pushKey(x.ctx())
 	if err != nil {
@@ -124,22 +134,30 @@ func (s *Server) handleSubscribeToPush(x *c) error {
 	return x.json(201, map[string]any{"ok": true})
 }
 
+// handleUnsubscribeFromPush forgets a browser of the caller's.
 func (s *Server) handleUnsubscribeFromPush(x *c) error {
 	var b pushSubBody
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	s.st.Delete(x.ctx(), "push_subscriptions", store.Eq("endpoint", b.Endpoint), store.Eq("user_id", x.user.ID))
+	if _, err := s.st.Delete(x.ctx(), "push_subscriptions", store.Eq("endpoint", b.Endpoint), store.Eq("user_id", x.user.ID)); err != nil {
+		return err
+	}
 	return x.ok(map[string]any{"ok": true})
 }
 
+// handleSendTestNotification pushes a sample message to the caller's browsers.
 func (s *Server) handleSendTestNotification(x *c) error {
 	n, err := s.pushTo(x.ctx(), x.user.ID, pushMessage{Title: "Push works", Body: "This is what a notification looks like.", URL: "/"})
 	if err != nil {
 		return err
 	}
 	if n == 0 {
-		if have, _ := s.st.Count(x.ctx(), "push_subscriptions", store.Eq("user_id", x.user.ID)); have > 0 {
+		have, err := s.st.Count(x.ctx(), "push_subscriptions", store.Eq("user_id", x.user.ID))
+		if err != nil {
+			return err
+		}
+		if have > 0 {
 			return &httpError{Status: 502, Code: "push_failed", Message: "your browser's push service did not take the message; the server log says why"}
 		}
 		return errBad("no browser of yours has push turned on")
@@ -166,7 +184,7 @@ func (s *Server) pushTo(ctx context.Context, userID string, msg pushMessage) (in
 	if err != nil {
 		return 0, err
 	}
-	payload, _ := json.Marshal(msg)
+	payload, _ := json.Marshal(msg) // strings: always encodes
 	sent := 0
 	for _, sub := range subs {
 		status, err := sendPush(ctx, key, s.cfg.BaseURL, sub, payload)
@@ -174,7 +192,10 @@ func (s *Server) pushTo(ctx context.Context, userID string, msg pushMessage) (in
 		case err != nil:
 			s.log.Warn("push", "err", err)
 		case status == 404 || status == 410:
-			s.st.Delete(ctx, "push_subscriptions", store.Eq("id", sub.ID)) // the browser unsubscribed
+			// The browser unsubscribed. One not forgotten now is on the next push.
+			if _, err := s.st.Delete(ctx, "push_subscriptions", store.Eq("id", sub.ID)); err != nil {
+				s.log.Warn("push: forgetting a browser that unsubscribed", "err", err)
+			}
 		case status >= 200 && status < 300:
 			sent++
 		default:
@@ -198,8 +219,11 @@ func sendPush(ctx context.Context, key *ecdsa.PrivateKey, subject string, sub co
 	if err != nil {
 		return 0, err
 	}
-	ek, _ := key.ECDH()
-	req, err := http.NewRequestWithContext(ctx, "POST", sub.Endpoint, bytes.NewReader(body))
+	ek, err := key.ECDH()
+	if err != nil {
+		return 0, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sub.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return 0, err
 	}
@@ -213,7 +237,7 @@ func sendPush(ctx context.Context, key *ecdsa.PrivateKey, subject string, sub co
 	if err != nil {
 		return 0, err
 	}
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)) //nolint:errcheck // drained only so the connection is reused; the status is the answer
 	resp.Body.Close()
 	return resp.StatusCode, nil
 }
@@ -237,11 +261,21 @@ func vapidToken(key *ecdsa.PrivateKey, audience, subject string) (string, error)
 	return signing + "." + b64.EncodeToString(sig), nil
 }
 
+// decodeKey reads a browser's key, unpadded or padded.
 func decodeKey(s string) ([]byte, error) {
 	if raw, err := b64.DecodeString(s); err == nil {
 		return raw, nil
 	}
 	return base64.StdEncoding.DecodeString(s) // some browsers pad
+}
+
+// hkdfExpand derives n bytes from secret, salt and info (HKDF with SHA-256).
+func hkdfExpand(secret, salt, info []byte, n int) ([]byte, error) {
+	out := make([]byte, n)
+	if _, err := io.ReadFull(hkdf.New(sha256.New, secret, salt, info), out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // encryptPush seals a payload for one browser (RFC 8291, aes128gcm).
@@ -268,19 +302,23 @@ func encryptPush(p256dh, authSecret string, payload []byte) ([]byte, error) {
 		return nil, err
 	}
 	asPub := as.PublicKey().Bytes()
-	expand := func(secret, salt, info []byte, n int) []byte {
-		out := make([]byte, n)
-		io.ReadFull(hkdf.New(sha256.New, secret, salt, info), out)
-		return out
-	}
 	info := append(append([]byte("WebPush: info\x00"), uaPub...), asPub...)
-	ikm := expand(shared, auth, info, 32)
+	ikm, err := hkdfExpand(shared, auth, info, 32)
+	if err != nil {
+		return nil, err
+	}
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return nil, err
 	}
-	cek := expand(ikm, salt, []byte("Content-Encoding: aes128gcm\x00"), 16)
-	nonce := expand(ikm, salt, []byte("Content-Encoding: nonce\x00"), 12)
+	cek, err := hkdfExpand(ikm, salt, []byte("Content-Encoding: aes128gcm\x00"), 16)
+	if err != nil {
+		return nil, err
+	}
+	nonce, err := hkdfExpand(ikm, salt, []byte("Content-Encoding: nonce\x00"), 12)
+	if err != nil {
+		return nil, err
+	}
 	block, err := aes.NewCipher(cek)
 	if err != nil {
 		return nil, err
@@ -292,7 +330,7 @@ func encryptPush(p256dh, authSecret string, payload []byte) ([]byte, error) {
 	sealed := gcm.Seal(nil, nonce, append(append([]byte{}, payload...), 0x02), nil) // 0x02 ends the last record
 	var out bytes.Buffer
 	out.Write(salt)
-	binary.Write(&out, binary.BigEndian, uint32(4096))
+	out.Write(binary.BigEndian.AppendUint32(nil, 4096)) // the record size
 	out.WriteByte(byte(len(asPub)))
 	out.Write(asPub)
 	out.Write(sealed)

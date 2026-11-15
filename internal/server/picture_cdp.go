@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type cdpMsg struct {
 	SessionID string          `json:"sessionId,omitempty"`
 }
 
+// cdpError is the error a command ends in.
 type cdpError struct {
 	Message string `json:"message"`
 }
@@ -40,6 +42,7 @@ type cdp struct {
 	events []cdpMsg // events read while waiting for an answer
 }
 
+// read waits for the next message from the browser.
 func (c *cdp) read(ctx context.Context) (cdpMsg, error) {
 	select {
 	case m, ok := <-c.in:
@@ -60,7 +63,7 @@ func (c *cdp) call(ctx context.Context, session, method string, params any) (jso
 	if err != nil {
 		return nil, err
 	}
-	b, _ := json.Marshal(cdpMsg{ID: id, Method: method, Params: raw, SessionID: session})
+	b, _ := json.Marshal(cdpMsg{ID: id, Method: method, Params: raw, SessionID: session}) // params already encoded: always encodes
 	if _, err := c.out.Write(append(b, 0)); err != nil {
 		return nil, err
 	}
@@ -85,10 +88,8 @@ func (c *cdp) call(ctx context.Context, session, method string, params any) (jso
 // event waits for an event that ok accepts, among those already read and
 // those still to come. It gives up quietly at the deadline.
 func (c *cdp) event(ctx context.Context, wait time.Duration, ok func(cdpMsg) bool) bool {
-	for _, m := range c.events {
-		if ok(m) {
-			return true
-		}
+	if slices.ContainsFunc(c.events, ok) {
+		return true
 	}
 	c.events = nil
 	ctx, cancel := context.WithTimeout(ctx, wait)
@@ -115,7 +116,9 @@ func (c *cdp) evalTrue(ctx context.Context, session, js string) bool {
 			Value any `json:"value"`
 		} `json:"result"`
 	}
-	_ = json.Unmarshal(res, &out)
+	if json.Unmarshal(res, &out) != nil {
+		return false
+	}
 	return out.Result.Value == true
 }
 
@@ -141,156 +144,53 @@ const pageHeight = `(() => {
   return need + extra;
 })()`
 
-// takePicture opens target in a headless browser at exactly width by height
-// CSS pixels and returns a PNG of it.
-func takePicture(ctx context.Context, chrome string, extra []string, profile, target string, width, height int, dark, full bool) (png []byte, pageHeight int, err error) {
-	png, pageHeight, err = takePictureOf(ctx, chrome, extra, profile, target, width, height, dark, full)
-	return
+// Limits and waits of a picture.
+const (
+	pictureMaxHeight = 8000 // a whole page is pictured this tall at most
+	pictureMinHeight = 320
+	phoneWidth       = 600 // narrower is a phone
+	pageLoadWait     = 20 * time.Second
+	pageSettleWait   = 12 * time.Second
+	pageLookEvery    = 250 * time.Millisecond
+	pageFillInWait   = 400 * time.Millisecond // lists that draw only what is in view fill in
+)
+
+// pictureRequest is what to take a picture of, and how.
+type pictureRequest struct {
+	chrome  string   // the browser to run
+	extra   []string // switches for it, besides the ones every picture needs
+	profile string   // a folder of its own for the browser's profile
+	target  string   // the address to open
+	width   int      // CSS pixels
+	height  int      // CSS pixels
+	dark    bool     // the page is told the reader prefers dark
+	full    bool     // the whole page, as tall as it is
 }
 
-// takePictureOf also says how tall the whole page is when full was asked:
-// a picture stops at 8000 pixels, and the caller is told when the page
-// goes on.
-func takePictureOf(ctx context.Context, chrome string, extra []string, profile, target string, width, height int, dark, full bool) ([]byte, int, error) {
-	toBrowser, out, err := os.Pipe()
+// takePicture opens the target in a headless browser at exactly width by
+// height CSS pixels and returns a PNG of it. When the whole page was asked
+// for it also says how tall the page is: a picture stops at 8000 pixels,
+// and the caller is told when the page goes on.
+func takePicture(ctx context.Context, p pictureRequest) (png []byte, whole int, err error) {
+	b, err := startBrowser(ctx, p)
 	if err != nil {
 		return nil, 0, err
 	}
-	in, fromBrowser, err := os.Pipe()
-	if err != nil {
-		toBrowser.Close()
-		out.Close()
-		return nil, 0, err
-	}
-	args := append([]string{"--headless=new", "--remote-debugging-pipe", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
-		"--no-default-browser-check", "--user-data-dir=" + profile}, extra...)
-	cmd := exec.Command(chrome, append(args, "about:blank")...)
-	cmd.ExtraFiles = []*os.File{toBrowser, fromBrowser} // the browser reads commands on 3 and answers on 4
-	err = cmd.Start()
-	toBrowser.Close()
-	fromBrowser.Close()
-	if err != nil {
-		out.Close()
-		in.Close()
-		return nil, 0, err
-	}
-	defer func() {
-		out.Close()
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-		in.Close()
-	}()
-
-	c := &cdp{out: out, in: make(chan cdpMsg, 64)}
-	go func() {
-		defer close(c.in)
-		r := bufio.NewReaderSize(in, 1<<16)
-		for {
-			b, err := r.ReadBytes(0)
-			if err != nil {
-				return
-			}
-			var m cdpMsg
-			if json.Unmarshal(b[:len(b)-1], &m) != nil {
-				continue
-			}
-			select {
-			case c.in <- m:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	res, err := c.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"})
+	defer b.stop()
+	c := b.cdp
+	s, err := openPage(ctx, c, p)
 	if err != nil {
 		return nil, 0, err
 	}
-	var made struct {
-		TargetID string `json:"targetId"`
-	}
-	_ = json.Unmarshal(res, &made)
-	res, err = c.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": made.TargetID, "flatten": true})
-	if err != nil {
+	if err := waitForSettledPage(ctx, c, s); err != nil {
 		return nil, 0, err
 	}
-	var at struct {
-		SessionID string `json:"sessionId"`
-	}
-	_ = json.Unmarshal(res, &at)
-	s := at.SessionID
-
-	phone := width < 600
-	if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
-		"width": width, "height": height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
-		return nil, 0, err
-	}
-	if phone {
-		_, _ = c.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true})
-	}
-	scheme := "light"
-	if dark {
-		scheme = "dark"
-	}
-	_, _ = c.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{
-		"features": []map[string]string{{"name": "prefers-color-scheme", "value": scheme}}})
-	if _, err := c.call(ctx, s, "Page.enable", map[string]any{}); err != nil {
-		return nil, 0, err
-	}
-	res, err = c.call(ctx, s, "Page.navigate", map[string]any{"url": target})
-	if err != nil {
-		return nil, 0, err
-	}
-	var nav struct {
-		ErrorText string `json:"errorText"`
-	}
-	_ = json.Unmarshal(res, &nav)
-	if nav.ErrorText != "" {
-		return nil, 0, fmt.Errorf("the page did not open: %s", nav.ErrorText)
-	}
-	c.event(ctx, 20*time.Second, func(m cdpMsg) bool { return m.Method == "Page.loadEventFired" })
-
-	// Wait for the page to have its data, then for two looks in a row that
-	// agree, so a list that is still filling in is not caught half-way.
-	settled := 0
-	for deadline := time.Now().Add(12 * time.Second); time.Now().Before(deadline) && settled < 2; {
-		if c.evalTrue(ctx, s, pageSettled) {
-			settled++
-		} else {
-			settled = 0
-		}
-		select {
-		case <-time.After(250 * time.Millisecond):
-		case <-ctx.Done():
-			return nil, 0, ctx.Err()
+	if p.full {
+		if whole, err = fitWholePage(ctx, c, s, p); err != nil {
+			return nil, 0, err
 		}
 	}
-
-	whole := 0
-	if full {
-		// The whole page: as tall as its longest scrolling part needs,
-		// within reason, and no taller.
-		res, err := c.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": pageHeight, "returnByValue": true})
-		var out struct {
-			Result struct {
-				Value float64 `json:"value"`
-			} `json:"result"`
-		}
-		if err == nil && json.Unmarshal(res, &out) == nil && out.Result.Value > 0 {
-			whole = int(out.Result.Value) + 1
-			height = min(max(whole, 320), 8000)
-			if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
-				"width": width, "height": height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
-				return nil, 0, err
-			}
-			select {
-			case <-time.After(400 * time.Millisecond): // lists that draw only what is in view fill in
-			case <-ctx.Done():
-				return nil, 0, ctx.Err()
-			}
-		}
-	}
-	res, err = c.call(ctx, s, "Page.captureScreenshot", map[string]any{"format": "png"})
+	res, err := c.call(ctx, s, "Page.captureScreenshot", map[string]any{"format": "png"})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -300,10 +200,185 @@ func takePictureOf(ctx context.Context, chrome string, extra []string, profile, 
 	if err := json.Unmarshal(res, &shot); err != nil {
 		return nil, 0, err
 	}
-	png, err := base64.StdEncoding.DecodeString(shot.Data)
+	png, err = base64.StdEncoding.DecodeString(shot.Data)
 	if err != nil || len(png) == 0 {
 		return nil, 0, errors.New("the browser made no picture")
 	}
-	_, _ = c.call(ctx, "", "Browser.close", map[string]any{})
+	_, _ = c.call(ctx, "", "Browser.close", map[string]any{}) //nolint:errcheck // the browser is stopped below in any case
 	return png, whole, nil
+}
+
+// browser is a headless browser running for one picture, and the pipe it
+// is driven over.
+type browser struct {
+	cmd *exec.Cmd
+	out *os.File // commands to the browser
+	in  *os.File // its answers
+	cdp *cdp
+}
+
+// startBrowser runs the browser with its debugging pipe and starts reading
+// what it says.
+func startBrowser(ctx context.Context, p pictureRequest) (*browser, error) {
+	toBrowser, out, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	in, fromBrowser, err := os.Pipe()
+	if err != nil {
+		toBrowser.Close()
+		out.Close()
+		return nil, err
+	}
+	args := append([]string{"--headless=new", "--remote-debugging-pipe", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
+		"--no-default-browser-check", "--user-data-dir=" + p.profile}, p.extra...)
+	cmd := exec.CommandContext(ctx, p.chrome, append(args, "about:blank")...)
+	cmd.ExtraFiles = []*os.File{toBrowser, fromBrowser} // the browser reads commands on 3 and answers on 4
+	err = cmd.Start()
+	toBrowser.Close()
+	fromBrowser.Close()
+	if err != nil {
+		out.Close()
+		in.Close()
+		return nil, err
+	}
+	b := &browser{cmd: cmd, out: out, in: in, cdp: &cdp{out: out, in: make(chan cdpMsg, 64)}}
+	go b.readAnswers(ctx)
+	return b, nil
+}
+
+// readAnswers passes each message the browser sends to the cdp, until the
+// pipe closes or ctx ends. A message that does not read is skipped.
+func (b *browser) readAnswers(ctx context.Context) {
+	defer close(b.cdp.in)
+	r := bufio.NewReaderSize(b.in, 1<<16)
+	for {
+		raw, err := r.ReadBytes(0)
+		if err != nil {
+			return
+		}
+		var m cdpMsg
+		if json.Unmarshal(raw[:len(raw)-1], &m) != nil {
+			continue
+		}
+		select {
+		case b.cdp.in <- m:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// stop ends the browser and closes the pipe.
+func (b *browser) stop() {
+	b.out.Close()
+	_ = b.cmd.Process.Kill() //nolint:errcheck // it may have exited already; either way it is gone
+	_ = b.cmd.Wait()         //nolint:errcheck // it was killed: its exit says nothing
+	b.in.Close()
+}
+
+// openPage opens a tab with the device and color scheme asked for,
+// goes to the target and waits for it to load. It returns the tab's
+// session.
+func openPage(ctx context.Context, c *cdp, p pictureRequest) (string, error) {
+	res, err := c.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"})
+	if err != nil {
+		return "", err
+	}
+	var made struct {
+		TargetID string `json:"targetId"`
+	}
+	if err := json.Unmarshal(res, &made); err != nil {
+		return "", fmt.Errorf("the browser's answer to opening a tab: %w", err)
+	}
+	res, err = c.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": made.TargetID, "flatten": true})
+	if err != nil {
+		return "", err
+	}
+	var at struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.Unmarshal(res, &at); err != nil {
+		return "", fmt.Errorf("the browser's answer to attaching to the tab: %w", err)
+	}
+	s := at.SessionID
+	phone := p.width < phoneWidth
+	if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
+		"width": p.width, "height": p.height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
+		return "", err
+	}
+	if phone {
+		_, _ = c.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true}) //nolint:errcheck // without touch the page is still a phone's
+	}
+	scheme := "light"
+	if p.dark {
+		scheme = "dark"
+	}
+	_, _ = c.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{ //nolint:errcheck // without it the page shows in its default scheme
+		"features": []map[string]string{{"name": "prefers-color-scheme", "value": scheme}}})
+	if _, err := c.call(ctx, s, "Page.enable", map[string]any{}); err != nil {
+		return "", err
+	}
+	res, err = c.call(ctx, s, "Page.navigate", map[string]any{"url": p.target})
+	if err != nil {
+		return "", err
+	}
+	var nav struct {
+		ErrorText string `json:"errorText"`
+	}
+	if err := json.Unmarshal(res, &nav); err != nil {
+		return "", fmt.Errorf("the browser's answer to opening the page: %w", err)
+	}
+	if nav.ErrorText != "" {
+		return "", fmt.Errorf("the page did not open: %s", nav.ErrorText)
+	}
+	c.event(ctx, pageLoadWait, func(m cdpMsg) bool { return m.Method == "Page.loadEventFired" })
+	return s, nil
+}
+
+// waitForSettledPage waits for the page to have its data, then for two
+// looks in a row that agree, so a list that is still filling in is not
+// caught half-way. A page that does not settle in time is pictured as it is.
+func waitForSettledPage(ctx context.Context, c *cdp, s string) error {
+	settled := 0
+	for deadline := time.Now().Add(pageSettleWait); time.Now().Before(deadline) && settled < 2; {
+		if c.evalTrue(ctx, s, pageSettled) {
+			settled++
+		} else {
+			settled = 0
+		}
+		select {
+		case <-time.After(pageLookEvery):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+// fitWholePage makes the window as tall as the page's longest scrolling
+// part needs, within reason, and no taller, and returns how tall the page
+// is. A page whose height cannot be read is pictured at the size asked.
+func fitWholePage(ctx context.Context, c *cdp, s string, p pictureRequest) (int, error) {
+	res, err := c.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": pageHeight, "returnByValue": true})
+	var out struct {
+		Result struct {
+			Value float64 `json:"value"`
+		} `json:"result"`
+	}
+	if err != nil || json.Unmarshal(res, &out) != nil || out.Result.Value <= 0 {
+		return 0, nil //nolint:nilerr // the height is a nicety: without it the picture is the size asked
+	}
+	whole := int(out.Result.Value) + 1
+	height := min(max(whole, pictureMinHeight), pictureMaxHeight)
+	if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
+		"width": p.width, "height": height, "deviceScaleFactor": 1, "mobile": p.width < phoneWidth}); err != nil {
+		return 0, err
+	}
+	select {
+	case <-time.After(pageFillInWait):
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
+	return whole, nil
 }

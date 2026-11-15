@@ -15,7 +15,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
-	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // The render check lets an agent see a task or page the way a person does:
@@ -49,6 +48,17 @@ func findChrome() string {
 	return ""
 }
 
+// Picture sizes: the default for a desktop and for a phone, and the
+// bounds a caller may ask for.
+const (
+	desktopWidth, desktopHeight = 1280, 900
+	phoneHeight                 = 844
+	minPictureWidth             = 320
+	maxPictureWidth             = 2560
+	minPictureHeight            = 200
+	pictureTimeout              = 45 * time.Second
+)
+
 // handleTakePicture returns a PNG of a task or a page as the caller would see it.
 // width=390 gives a phone, the default 1280 a desktop.
 func (s *Server) handleTakePicture(x *c) error {
@@ -57,38 +67,13 @@ func (s *Server) handleTakePicture(x *c) error {
 		return &httpError{Status: 501, Code: "no_browser", Message: "the server has no Chrome or Chromium to take pictures with; install one, or set QUADIT_CHROME to its path"}
 	}
 	q := x.r.URL.Query()
-	width := x.intParam("width", 1280)
-	if width < 320 || width > 2560 {
-		return errBad("width is from 320 to 2560: 390 for a phone, 1280 for a desktop")
+	width, height, err := pictureSize(x)
+	if err != nil {
+		return err
 	}
-	if h := x.intParam("height", 0); h != 0 && (h < 200 || h > 8000) {
-		return errBad("height is from 200 to 8000; leave it out for the usual size, or use full=1 for the whole page")
-	}
-	height := x.intParam("height", 0)
-	if height == 0 {
-		height = 900
-		if width < 600 {
-			height = 844
-		}
-	}
-	path := "/" + x.ws.Slug
-	switch {
-	case q.Get("task") != "":
-		t, err := x.taskByRef(q.Get("task"))
-		if err != nil {
-			return err
-		}
-		path += "/task/" + t.Key
-	case q.Get("doc") != "":
-		d, err := x.docByID(q.Get("doc"))
-		if err != nil {
-			return err
-		}
-		path += "/docs/" + d.ID
-	case q.Get("path") != "":
-		path += "/" + q.Get("path")
-	default:
-		return errBad("say what to picture: task=KEY, doc=ID or path=…")
+	path, err := picturePath(x)
+	if err != nil {
+		return err
 	}
 	// The browser signs in with a link that works once and can only read.
 	token, err := s.oneTime(x.ctx(), "render", x.user.ID, nil, time.Minute)
@@ -102,21 +87,15 @@ func (s *Server) handleTakePicture(x *c) error {
 		return err
 	}
 	defer os.RemoveAll(dir)
-	var extra []string
-	if os.Geteuid() == 0 {
-		extra = append(extra, "--no-sandbox") // Chrome refuses to sandbox as root, as in a container
-	}
-	// Extra switches for where the server runs: a container usually cannot
-	// give Chrome its own sandbox, and says so with QUADIT_CHROME_ARGS=--no-sandbox.
-	extra = append(extra, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
-	ctx, cancel := context.WithTimeout(x.ctx(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(x.ctx(), pictureTimeout)
 	defer cancel()
-	png, whole, err := takePicture(ctx, chrome, extra, filepath.Join(dir, "profile"), target, width, height, q.Get("theme") == "dark", truthyParam(q, "full") && x.intParam("height", 0) == 0)
+	png, whole, err := takePicture(ctx, pictureRequest{chrome: chrome, extra: chromeSwitches(), profile: filepath.Join(dir, "profile"), target: target,
+		width: width, height: height, dark: q.Get("theme") == "dark", full: truthyParam(q, "full") && x.intParam("height", 0) == 0})
 	if err != nil {
 		s.log.Warn("render", "err", err)
 		return &httpError{Status: 502, Code: "render_failed", Message: "the browser could not take the picture: " + oneLine(err.Error(), 120)}
 	}
-	if whole > 8000 {
+	if whole > pictureMaxHeight {
 		// The page goes on below the picture: say so where a caller reads it.
 		x.w.Header().Set("X-Quadit-Note", fmt.Sprintf("the page is %d pixels tall; the picture stops at 8000", whole))
 	}
@@ -124,6 +103,61 @@ func (s *Server) handleTakePicture(x *c) error {
 	x.w.Header().Set("Cache-Control", "no-store")
 	_, err = x.w.Write(png)
 	return err
+}
+
+// pictureSize reads the size a picture is asked for, with the usual
+// height of a phone or a desktop when none is given.
+func pictureSize(x *c) (width, height int, err error) {
+	width = x.intParam("width", desktopWidth)
+	if width < minPictureWidth || width > maxPictureWidth {
+		return 0, 0, errBad("width is from 320 to 2560: 390 for a phone, 1280 for a desktop")
+	}
+	if h := x.intParam("height", 0); h != 0 && (h < minPictureHeight || h > pictureMaxHeight) {
+		return 0, 0, errBad("height is from 200 to 8000; leave it out for the usual size, or use full=1 for the whole page")
+	}
+	height = x.intParam("height", 0)
+	if height == 0 {
+		height = desktopHeight
+		if width < phoneWidth {
+			height = phoneHeight
+		}
+	}
+	return width, height, nil
+}
+
+// picturePath is the web app's address of what the picture is of: a task,
+// a page, or any path in the workspace.
+func picturePath(x *c) (string, error) {
+	q := x.r.URL.Query()
+	path := "/" + x.ws.Slug
+	switch {
+	case q.Get("task") != "":
+		t, err := x.taskByRef(q.Get("task"))
+		if err != nil {
+			return "", err
+		}
+		return path + "/task/" + t.Key, nil
+	case q.Get("doc") != "":
+		d, err := x.docByID(q.Get("doc"))
+		if err != nil {
+			return "", err
+		}
+		return path + "/docs/" + d.ID, nil
+	case q.Get("path") != "":
+		return path + "/" + q.Get("path"), nil
+	}
+	return "", errBad("say what to picture: task=KEY, doc=ID or path=…")
+}
+
+// chromeSwitches are the switches for where the server runs: Chrome
+// refuses to sandbox as root, as in a container, and a container that
+// cannot give it its own sandbox says so with QUADIT_CHROME_ARGS=--no-sandbox.
+func chromeSwitches() []string {
+	var extra []string
+	if os.Geteuid() == 0 {
+		extra = append(extra, "--no-sandbox")
+	}
+	return append(extra, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
 }
 
 // handleSignInPictureBrowser signs the picture-taking browser in for two minutes,
@@ -149,5 +183,3 @@ func (s *Server) handleSignInPictureBrowser(x *c) error {
 	http.Redirect(x.w, x.r, next, http.StatusFound)
 	return nil
 }
-
-var _ = store.Live

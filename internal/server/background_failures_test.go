@@ -329,7 +329,7 @@ func bgIDIs(rowID string) func(map[string]any, []store.Cond) bool {
 	return func(_ map[string]any, where []store.Cond) bool { return bgWhereHas(where, "id", rowID) }
 }
 
-func TestAReadThatFailsIsNotAnsweredAsNotFound(t *testing.T) {
+func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
 	logs := bgCaptureLogs(t)
 	st := newBgFaultStore(t)
 	s := newSite(t, st)
@@ -362,6 +362,10 @@ func TestAReadThatFailsIsNotAnsweredAsNotFound(t *testing.T) {
 			bgFault{op: "Get", table: "Backup", match: bgIDIs(made.ID)}},
 		{"a webhook's test", "POST", w + "/webhooks/" + hook + "/test", nil,
 			bgFault{op: "Get", table: "Webhook", match: bgIDIs(hook)}},
+		{"a browser turning push off", "DELETE", "/api/v1/push/subscriptions", M{"endpoint": "https://push.example.com/x"},
+			bgFault{op: "Delete", table: "push_subscriptions"}},
+		{"a test push", "POST", "/api/v1/push/test", nil,
+			bgFault{op: "Count", table: "push_subscriptions"}},
 		{"a delivery sent again", "POST", w + "/deliveries/" + id.New() + "/redeliver", nil,
 			bgFault{op: "Count", table: "webhook_deliveries"}},
 	}
