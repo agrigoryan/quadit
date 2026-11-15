@@ -1,3 +1,6 @@
+// The Orbit source: projects, tasks, comments and docs through Orbit's
+// public API.
+
 package importer
 
 import (
@@ -14,8 +17,10 @@ import (
 // to an API token: with session=TOKEN they are fetched too (orbit_files.go).
 type orbit struct{}
 
+// Kind is "orbit".
 func (orbit) Kind() string { return "orbit" }
 
+// Read reads the workspace named by workspace=ID from the server at origin.
 func (orbit) Read(origin string, opts Options) (Plan, error) {
 	r := &orbitReader{
 		origin: strings.TrimRight(origin, "/"), workspace: opts["workspace"], token: opts["token"], session: opts["session"],
@@ -65,15 +70,25 @@ type orbitList[T any] struct {
 
 // orbitCategory gives our kind of status for Orbit's.
 var orbitCategory = map[string]string{"backlog": "backlog", "unstarted": "unstarted", "started": "started", "completed": "done",
-	"cancelled": "canceled", "canceled": "canceled", "duplicate": "canceled"}
+	"cancelled": "canceled", "canceled": "canceled", "duplicate": "canceled"} //nolint:misspell // "cancelled" is how Orbit may spell it
 
+// orbitOptional reads an answer the import can do without, which the
+// token may not be allowed to get: false when it could not be read.
+func orbitOptional(u, token string, dst any) bool {
+	return getJSON(u, token, dst) == nil
+}
+
+// members learns people's names and addresses, when the token may read
+// them; without them people are known by their ids.
 func (r *orbitReader) members() error {
 	var members orbitList[struct {
 		ID, Name, Email string
 		DisplayName     string `json:"display_name"`
 		UserID          string `json:"user_id"`
 	}]
-	getJSON(r.base+"/members", r.token, &members) // names for people, when the token may read them
+	if !orbitOptional(r.base+"/members", r.token, &members) {
+		return nil
+	}
 	for _, m := range members.Items {
 		name := orStr(m.DisplayName, m.Name)
 		for _, k := range []string{m.ID, m.UserID} {
@@ -85,9 +100,10 @@ func (r *orbitReader) members() error {
 	return nil
 }
 
+// projects reads the projects, each with its workflow.
 func (r *orbitReader) projects() error {
 	var projects orbitList[struct{ ID, Name, Key string }]
-	if _, err := getJSON(r.base+"/projects", r.token, &projects); err != nil {
+	if err := getJSON(r.base+"/projects", r.token, &projects); err != nil {
 		return err
 	}
 	for _, p := range projects.Items {
@@ -108,7 +124,7 @@ func (r *orbitReader) workflow(projectID, key string) error {
 		ID, Name, Category, Type, Color string
 		Position                        int
 	}]
-	if _, err := getJSON(at+"/statuses", r.token, &statuses); err != nil {
+	if err := getJSON(at+"/statuses", r.token, &statuses); err != nil {
 		return err
 	}
 	sort.SliceStable(statuses.Items, func(i, j int) bool { return statuses.Items[i].Position < statuses.Items[j].Position })
@@ -126,7 +142,7 @@ func (r *orbitReader) workflow(projectID, key string) error {
 		r.plan.Statuses = append(r.plan.Statuses, st)
 	}
 	var labels orbitList[struct{ ID, Name, Color string }]
-	if _, err := getJSON(at+"/labels", r.token, &labels); err == nil {
+	if err := getJSON(at+"/labels", r.token, &labels); err == nil {
 		for _, l := range labels.Items {
 			r.labelOf[l.ID] = l.Name
 			r.plan.Labels = append(r.plan.Labels, Label{Project: key, Name: l.Name, Color: l.Color})
@@ -135,7 +151,7 @@ func (r *orbitReader) workflow(projectID, key string) error {
 	// Orbit's milestones are stages of a project; here they become epics.
 	// (A release that has none answers "not found", which is no milestones.)
 	var milestones orbitList[struct{ ID, Name string }]
-	if _, err := getJSON(at+"/milestones", r.token, &milestones); err == nil {
+	if err := getJSON(at+"/milestones", r.token, &milestones); err == nil {
 		for _, m := range milestones.Items {
 			r.milestoneOf[m.ID] = m.Name
 		}
@@ -156,6 +172,7 @@ type orbitTask struct {
 	Number                                            int
 }
 
+// tasks reads every task, page by page, in the order of their numbers.
 func (r *orbitReader) tasks() error {
 	var all []orbitTask
 	for cursor := ""; ; {
@@ -164,7 +181,7 @@ func (r *orbitReader) tasks() error {
 		if cursor != "" {
 			u += "&cursor=" + url.QueryEscape(cursor)
 		}
-		if _, err := getJSON(u, r.token, &page); err != nil {
+		if err := getJSON(u, r.token, &page); err != nil {
 			return err
 		}
 		all = append(all, page.Items...)
@@ -221,7 +238,7 @@ func (r *orbitReader) relations(ot orbitTask, t *Task) {
 		Type, Direction string
 		Task            struct{ ID string }
 	}]
-	if _, err := getJSON(r.base+"/tasks/"+ot.Identifier+"/relations", r.token, &rels); err != nil {
+	if err := getJSON(r.base+"/tasks/"+ot.Identifier+"/relations", r.token, &rels); err != nil {
 		return
 	}
 	for _, rel := range rels.Items {
@@ -247,7 +264,7 @@ func (r *orbitReader) comments(ot orbitTask, t *Task) map[string]int {
 		CreatedAt string `json:"created_at"`
 	}]
 	at := map[string]int{}
-	if _, err := getJSON(r.base+"/tasks/"+ot.Identifier+"/comments", r.token, &cs); err != nil {
+	if err := getJSON(r.base+"/tasks/"+ot.Identifier+"/comments", r.token, &cs); err != nil {
 		return at
 	}
 	for _, c := range cs.Items {
@@ -257,17 +274,18 @@ func (r *orbitReader) comments(ot orbitTask, t *Task) map[string]int {
 	return at
 }
 
+// docs reads the workspace's docs, when the token has the scope for them.
 func (r *orbitReader) docs() error {
 	var docs orbitList[struct {
 		ID, Title string
 		ParentID  string `json:"parent_id"`
 	}]
-	if _, err := getJSON(r.base+"/docs", r.token, &docs); err != nil {
-		return nil // docs need a scope the token may not have
+	if !orbitOptional(r.base+"/docs", r.token, &docs) {
+		return nil
 	}
 	for _, d := range docs.Items {
 		var full struct{ Markdown string }
-		if _, err := getJSON(r.base+"/docs/"+d.ID, r.token, &full); err != nil {
+		if !orbitOptional(r.base+"/docs/"+d.ID, r.token, &full) {
 			continue
 		}
 		r.plan.Docs = append(r.plan.Docs, Doc{Ext: d.ID, ParentExt: d.ParentID, Title: d.Title, Markdown: full.Markdown})

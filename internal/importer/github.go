@@ -1,3 +1,5 @@
+// The GitHub source: a repository's issues and their comments.
+
 package importer
 
 import (
@@ -10,8 +12,11 @@ import (
 // comments, from GitHub's API. The source is owner/repo.
 type github struct{}
 
+// Kind is "github".
 func (github) Kind() string { return "github" }
 
+// githubIssue is an issue as GitHub's API lists it: only the fields
+// the import uses.
 type githubIssue struct {
 	Number      int
 	Title, Body string
@@ -25,13 +30,15 @@ type githubIssue struct {
 	StateReason string `json:"state_reason"`
 }
 
+// Read reads every issue of the repository named owner/repo, with its
+// comments, leaving pull requests out. token=TOKEN reads a private one.
 func (github) Read(repo string, opts Options) (Plan, error) {
 	plan := Plan{Source: "github"}
 	token := opts["token"]
 	api := strings.TrimRight(orStr(opts["api"], "https://api.github.com"), "/")
 	for page := 1; page < 200; page++ {
 		var issues []githubIssue
-		if _, err := getJSON(fmt.Sprintf("%s/repos/%s/issues?state=all&per_page=100&direction=asc&page=%d", api, repo, page), token, &issues); err != nil {
+		if err := getJSON(fmt.Sprintf("%s/repos/%s/issues?state=all&per_page=100&direction=asc&page=%d", api, repo, page), token, &issues); err != nil {
 			return plan, err
 		}
 		for _, is := range issues {
@@ -80,7 +87,7 @@ func githubComments(api, repo, token string, issue int) ([]Comment, error) {
 		CreatedAt string `json:"created_at"`
 		User      struct{ Login string }
 	}
-	if _, err := getJSON(fmt.Sprintf("%s/repos/%s/issues/%d/comments?per_page=100", api, repo, issue), token, &cs); err != nil {
+	if err := getJSON(fmt.Sprintf("%s/repos/%s/issues/%d/comments?per_page=100", api, repo, issue), token, &cs); err != nil {
 		return nil, err
 	}
 	var out []Comment

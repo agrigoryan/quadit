@@ -1,6 +1,9 @@
+// The files of an Orbit task, fetched with a signed-in session.
+
 package importer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -52,16 +55,17 @@ func (r *orbitReader) files(ot orbitTask, t *Task, commentAt map[string]int) err
 // and with one wrapped in "items"; both are read.
 func (r *orbitReader) attachments(inner string) ([]orbitAttachment, error) {
 	var raw json.RawMessage
-	if _, err := getJSON(r.origin+inner, r.session, &raw); err != nil {
+	if err := getJSON(r.origin+inner, r.session, &raw); err != nil {
 		return nil, err
 	}
-	var wrapped orbitList[orbitAttachment]
-	if json.Unmarshal(raw, &wrapped) == nil && wrapped.Items != nil {
-		return wrapped.Items, nil
+	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("[")) {
+		var list []orbitAttachment
+		err := json.Unmarshal(raw, &list)
+		return list, err
 	}
-	var list []orbitAttachment
-	json.Unmarshal(raw, &list)
-	return list, nil
+	var wrapped orbitList[orbitAttachment]
+	err := json.Unmarshal(raw, &wrapped)
+	return wrapped.Items, err
 }
 
 // fetch copies one file into the plan's temporary folder, under its id so

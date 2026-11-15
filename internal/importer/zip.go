@@ -1,3 +1,5 @@
+// Unpacking the zips that exports arrive in.
+
 package importer
 
 import (
@@ -9,21 +11,30 @@ import (
 	"strings"
 )
 
+// unzippedLimit is the most of one file unpacked from a zip.
+const unzippedLimit = 2 << 30
+
 // unzip unpacks src into the folder dst, and any zip inside it beside
 // itself.
-func unzip(src, dst string) error {
+func unzip(src, dst string) (err error) {
 	zr, err := zip.OpenReader(src)
 	if err != nil {
 		return fmt.Errorf("%s is not a zip file: %w", src, err)
 	}
-	defer zr.Close()
+	defer func() {
+		if closeErr := zr.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 	for _, f := range zr.File {
 		p := filepath.Join(dst, filepath.FromSlash(f.Name))
 		if !strings.HasPrefix(p, filepath.Clean(dst)+string(os.PathSeparator)) {
 			return fmt.Errorf("the zip holds a path that climbs out of it: %s", f.Name)
 		}
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(p, 0o750)
+			if err := os.MkdirAll(p, 0o750); err != nil {
+				return err
+			}
 			continue
 		}
 		if err := unzipOne(f, p); err != nil {
@@ -40,8 +51,11 @@ func unzip(src, dst string) error {
 	return nil
 }
 
+// unzipOne unpacks one file of a zip to the path to, making its folder.
 func unzipOne(f *zip.File, to string) error {
-	os.MkdirAll(filepath.Dir(to), 0o750)
+	if err := os.MkdirAll(filepath.Dir(to), 0o750); err != nil {
+		return err
+	}
 	in, err := f.Open()
 	if err != nil {
 		return err
@@ -51,7 +65,7 @@ func unzipOne(f *zip.File, to string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, io.LimitReader(in, 2<<30)); err != nil {
+	if _, err := io.Copy(out, io.LimitReader(in, unzippedLimit)); err != nil {
 		out.Close()
 		return err
 	}
