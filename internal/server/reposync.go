@@ -151,6 +151,10 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			return res, err
 		}
 	}
+	// The source may have been pointed at another repository since the clone.
+	if _, err := git(ctx, dir, "remote", "set-url", "origin", src.Repo); err != nil {
+		return res, err
+	}
 	branch := src.Branch
 	if branch == "" {
 		if branch, err = git(ctx, dir, "rev-parse", "--abbrev-ref", "HEAD"); err != nil {
@@ -210,6 +214,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	toWrite := map[string]string{} // path -> text to put in the repository
 	var toRemove []string
 	written := map[string]string{} // doc id -> page hash, set after a push
+	editors := map[string]int64{}  // who last changed the pages being written, and when
 
 	err = s.eng.System(ctx, src.WorkspaceID, src.CreatedBy, func(sys *engine.Sys) error {
 		tx := sys.Tx()
@@ -294,6 +299,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			case pageChanged:
 				toWrite[path] = body
 				written[page.ID] = sha(body)
+				if page.UpdatedBy != "" && page.UpdatedAt >= editors[page.UpdatedBy] {
+					editors[page.UpdatedBy] = page.UpdatedAt
+				}
 			}
 		}
 		// Pages with no file: new here, or their file was deleted there.
@@ -329,6 +337,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 			}
 			toWrite[path] = body
 			written[page.ID] = sha(body)
+			if page.UpdatedBy != "" && page.UpdatedAt >= editors[page.UpdatedBy] {
+				editors[page.UpdatedBy] = page.UpdatedAt
+			}
 		}
 		return nil
 	})
@@ -358,7 +369,18 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		return res, nil
 	}
 	n := len(toWrite) + len(toRemove)
-	if _, err := git(ctx, dir, "commit", "--quiet", "-m", fmt.Sprintf("docs: update %d page(s) from Quadit", n)); err != nil {
+	// The commit carries the name of whoever changed the pages last; the
+	// others who changed pages in it are named in its message.
+	message := fmt.Sprintf("docs: update %d page(s) from Quadit", n)
+	author, others := s.commitAuthor(ctx, db, editors)
+	if len(others) > 0 {
+		message += "\n\nAlso edited by: " + strings.Join(others, ", ")
+	}
+	commit := []string{"commit", "--quiet", "-m", message}
+	if author != "" {
+		commit = append(commit, "--author", author)
+	}
+	if _, err := git(ctx, dir, commit...); err != nil {
 		return res, err
 	}
 	target := branch
@@ -367,6 +389,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	}
 	if _, err := git(ctx, dir, "push", "--quiet", "--force-with-lease", "origin", "HEAD:refs/heads/"+target); err != nil {
 		git(ctx, dir, "reset", "--quiet", "--hard", "origin/"+branch)
+		if strings.Contains(err.Error(), "checked out") {
+			return res, fmt.Errorf("the repository is a working copy with %s checked out, and git lets nobody push to that. Sync with a bare repository or a hosted one, or set write_mode to \"propose\" so page edits go to the branch quadit/docs", target)
+		}
 		return res, fmt.Errorf("the repository refused the push to %s: %w", target, err)
 	}
 	res.FilesWritten, res.Pushed = n, target
@@ -406,4 +431,35 @@ func mdOf(ctx context.Context, tx store.Tx, docID string) (string, error) {
 		return "", err
 	}
 	return md.Render(engine.BlockTree(blocks)), nil
+}
+
+// commitAuthor names the member who changed the pages last as a git author
+// ("Name <email>"), and the names of any others.
+func (s *Server) commitAuthor(ctx context.Context, db store.DB, editors map[string]int64) (author string, others []string) {
+	latest, at := "", int64(-1)
+	for id, when := range editors {
+		if when > at {
+			latest, at = id, when
+		}
+	}
+	for id := range editors {
+		var u core.User
+		if err := s.st.Get(ctx, &u, store.Eq("id", id)); err != nil {
+			continue
+		}
+		if id != latest {
+			others = append(others, u.Name)
+			continue
+		}
+		email := u.Email
+		if email == "" {
+			var m core.Member
+			if db.Get(ctx, &m, store.Eq("user_id", id)) == nil {
+				email = m.Handle + "@quadit.invalid" // an agent has no mailbox
+			}
+		}
+		author = fmt.Sprintf("%s <%s>", strings.NewReplacer("<", "", ">", "").Replace(u.Name), email)
+	}
+	sort.Strings(others)
+	return author, others
 }

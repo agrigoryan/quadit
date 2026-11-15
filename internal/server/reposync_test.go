@@ -99,6 +99,10 @@ func TestRepositorySync(t *testing.T) {
 		if raw, _ := os.ReadFile(filepath.Join(work, "docs/design.md")); !strings.Contains(string(raw), "four phases") {
 			t.Fatalf("the repository did not get the edit: %s", raw)
 		}
+		// The commit is in the name of the person who edited the page.
+		if who := gitIn(t, work, "log", "-1", "--format=%an <%ae>"); !strings.Contains(who, "Aram <owner@example.com>") {
+			t.Fatalf("the commit's author is %q", who)
+		}
 		if !strings.Contains(gitIn(t, work, "log", "-1", "--format=%s"), "from Quadit") {
 			t.Fatal("the commit is not marked as coming from Quadit")
 		}
