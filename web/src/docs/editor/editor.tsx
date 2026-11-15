@@ -87,8 +87,8 @@ export default function Editor({
   const theme = useThemeName();
   const wrap = useRef<HTMLDivElement | null>(null);
   const [picking, setPicking] = useState<ChipKind | null>(null);
-  // The rows are the page as it was when opened; later changes arrive through the sync.
-  const initial = useMemo(() => rowsToEditor(rows, blockSchema), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- the rows are the page as it was when opened; later changes arrive through the sync
+  const initial = useMemo(() => rowsToEditor(rows, blockSchema), []);
 
   const editor = useCreateBlockNote(
     {
@@ -120,8 +120,8 @@ export default function Editor({
       dom?.removeEventListener("input", onInput);
       sync.destroy();
     };
-    // The editor is made once per mounted page; rows and seq are its starting point.
-  }, [editor, docId, readOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the editor is made once per mounted page; rows and seq are its starting point
+  }, [editor, docId, readOnly]);
 
   // Which block the caret is in, for presence.
   useEffect(() => {

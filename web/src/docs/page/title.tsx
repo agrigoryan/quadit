@@ -35,7 +35,8 @@ export function PageTitle({ doc, readOnly, compact, onEnter }: Props) {
   // A page just made starts in its title.
   useEffect(() => {
     if (!readOnly && !doc.title && Date.now() - doc.created_at < 4000) box.current?.focus();
-  }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- only when another page opens, not when its title changes
+  }, [doc.id]);
 
   const save = (title: string) => {
     clearTimeout(timer.current);

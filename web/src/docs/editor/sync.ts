@@ -26,7 +26,7 @@ import { placeBlock } from "@/docs/editor/place";
 import { loadPage } from "@/docs/store";
 import type { BlockRow, Doc } from "@/docs/types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any -- BlockNote's editor type is generic over the page's schema, and this works with any schema
 export type AnyEditor = BlockNoteEditor<any, any, any>;
 
 /** A signature no block has: marks a block whose local text is known to differ from the server's. */

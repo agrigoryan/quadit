@@ -51,7 +51,7 @@ export function useLoad<T>(fetcher: () => Promise<T>, deps: unknown[]): Loaded<T
     return () => {
       run.current++;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the caller passes the dependencies, as with useEffect itself
   }, deps);
 
   return { data, error, loading, reload, set: setData };

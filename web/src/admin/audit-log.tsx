@@ -185,7 +185,7 @@ export function AuditLog({ title, lead, back, endpoint, actors, workspaces }: Pr
   useEffect(() => {
     const timer = setTimeout(() => void load(null), rows === null ? 0 : 250);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the filters are compared by their text (key), not by identity
   }, [key]);
 
   return (

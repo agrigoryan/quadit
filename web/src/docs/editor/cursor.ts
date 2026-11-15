@@ -5,7 +5,7 @@
 
 import { type BlockNoteEditor, getNodeById } from "@blocknote/core";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any -- BlockNote's editor type is generic over the page's schema, and this works with any schema
 type Editor = BlockNoteEditor<any, any, any>;
 
 interface SelectionClass {

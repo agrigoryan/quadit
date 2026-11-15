@@ -68,8 +68,7 @@ function Timeline({ project }: { project: Project }) {
     else if (was.start !== scale.start || was.dayW !== scale.dayW)
       el.scrollLeft = (was.start + was.left / was.dayW - scale.start) * scale.dayW;
     seen.current = { start: scale.start, dayW: scale.dayW, left: el.scrollLeft };
-    // todayLeft reads the scale this effect already depends on.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- todayLeft reads the scale this effect already depends on
   }, [scale.start, scale.dayW]);
 
   function pickZoom(next: Zoom) {
