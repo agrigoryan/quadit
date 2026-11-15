@@ -1,4 +1,4 @@
-package server
+package webpush
 
 import (
 	"crypto/aes"
@@ -20,14 +20,14 @@ import (
 )
 
 // TestPushEncryption plays the browser: it makes a subscription's keys,
-// lets the server encrypt a message for them, and decrypts it the way a
+// lets Send's encryption seal a message for them, and decrypts it the way a
 // browser does (RFC 8291). It also checks the server's signed token.
 func TestPushEncryption(t *testing.T) {
 	ua, _ := ecdh.P256().GenerateKey(rand.Reader)
 	auth := make([]byte, 16)
 	rand.Read(auth)
 	msg := []byte(`{"title":"Aram asked you a question","body":"Which explosion?","url":"/games/task/SVA-1"}`)
-	body, err := encryptPush(base64.RawURLEncoding.EncodeToString(ua.PublicKey().Bytes()), base64.RawURLEncoding.EncodeToString(auth), msg)
+	body, err := encrypt(base64.RawURLEncoding.EncodeToString(ua.PublicKey().Bytes()), base64.RawURLEncoding.EncodeToString(auth), msg)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/mail"
 	"github.com/agrigoryan/quadit/internal/store"
+	"github.com/agrigoryan/quadit/internal/webpush"
 )
 
 // Install settings live in the settings table as JSON, set from the admin
@@ -435,7 +436,7 @@ var settingShapes = map[string]func() any{
 	"limits.api_per_minute":        func() any { return new(int) },
 	"metrics.token":                func() any { return new(string) },
 	"backup":                       func() any { return new(backupSetting) },
-	"push":                         func() any { return new(pushKeys) },
+	"push":                         func() any { return new(webpush.Keys) },
 }
 
 func checkSettingShape(name string, value json.RawMessage) error {

@@ -42,7 +42,9 @@
 //	Background work
 //	  run.go         Run, the list of background loops it starts and the
 //	                 list of kinds of job
-//	  jobs.go, dispatch.go, deliveries.go, push.go, backups.go
+//	  jobs.go, dispatch.go, deliveries.go, backups.go
+//	  push.go        browser push: the key and the browsers (package webpush
+//	                 sends)
 //	Integrations
 //	  github*.go, reposync.go (routes of package reposync: pages kept in a git repository), secrets.go
 //	MCP
