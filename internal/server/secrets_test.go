@@ -641,3 +641,50 @@ func TestImportThroughTheAPI(t *testing.T) {
 		s.call(s.owner, "", "POST", w+"/import", M{"kind": "trello", "file": f.ID, "options": M{"project": "T"}}, 400, nil)
 	})
 }
+
+// TestPagesDoNotShift checks paging by cursor: a task added between two
+// pages neither repeats one nor skips one.
+func TestPagesDoNotShift(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		for i := 1; i <= 7; i++ {
+			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i)})
+		}
+		type page struct {
+			Tasks      []struct{ Key string }
+			NextCursor string `json:"next_cursor"`
+		}
+		seen := map[string]int{}
+		var p page
+		s.call(s.owner, "", "GET", w+"/tasks?sort=-created&limit=3", nil, 200, &p)
+		for round := 0; ; round++ {
+			for _, tk := range p.Tasks {
+				seen[tk.Key]++
+			}
+			if p.NextCursor == "" {
+				break
+			}
+			// Someone adds a task while the list is being read.
+			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Added meanwhile"})
+			next := p.NextCursor
+			p = page{}
+			s.call(s.owner, "", "GET", w+"/tasks?sort=-created&limit=3&cursor="+next, nil, 200, &p)
+			if round > 10 {
+				t.Fatal("paging never ends")
+			}
+		}
+		if len(seen) != 7 {
+			t.Fatalf("read %d different tasks, want the 7 that were there: %v", len(seen), seen)
+		}
+		for key, n := range seen {
+			if n != 1 {
+				t.Fatalf("%s came %d times", key, n)
+			}
+		}
+		if out := s.call(s.owner, "", "GET", w+"/tasks?limit=3&format=text", nil, 200, nil); !strings.Contains(out, "more: add cursor=") {
+			t.Fatalf("the text form does not say how to go on: %s", out)
+		}
+		s.call(s.owner, "", "GET", w+"/tasks?cursor=nonsense", nil, 400, nil)
+	})
+}

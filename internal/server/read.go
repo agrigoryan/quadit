@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -541,6 +542,20 @@ func (s *Server) hTasks(x *c) error {
 	if f.Limit > 1000 {
 		f.Limit = 1000
 	}
+	// cursor= continues a list from where the last page ended. The token
+	// also holds where the feed stood when the first page was read: tasks
+	// made since are left out, so pages do not shift under the reader.
+	if tok := v.Get("cursor"); tok != "" {
+		var cur struct {
+			O int   `json:"o"`
+			S int64 `json:"s"`
+		}
+		raw, err := base64.RawURLEncoding.DecodeString(tok)
+		if err != nil || json.Unmarshal(raw, &cur) != nil {
+			return &engine.Error{Code: engine.CodeInvalid, Field: "cursor", Message: "this cursor cannot be read; start the list again without one"}
+		}
+		f.Offset, f.MadeUpTo = cur.O, cur.S
+	}
 	limit := f.Limit
 	f.Limit++ // one extra row says whether there are more
 	tasks, err := x.db.Tasks(x.ctx(), f)
@@ -548,6 +563,18 @@ func (s *Server) hTasks(x *c) error {
 		return err
 	}
 	more := len(tasks) > limit
+	next := ""
+	if more {
+		upTo := f.MadeUpTo
+		if upTo == 0 {
+			var ws core.Workspace
+			if err := x.s.st.Get(x.ctx(), &ws, store.Eq("id", x.ws.ID)); err == nil {
+				upTo = ws.Seq
+			}
+		}
+		raw, _ := json.Marshal(map[string]any{"o": f.Offset + limit, "s": upTo})
+		next = base64.RawURLEncoding.EncodeToString(raw)
+	}
 	if more {
 		tasks = tasks[:limit]
 	}
@@ -563,7 +590,7 @@ func (s *Server) hTasks(x *c) error {
 	if x.wantText() {
 		out := lines(views, taskView.line, "no tasks match")
 		if more {
-			out += fmt.Sprintf("… more: add offset=%d\n", f.Offset+limit)
+			out += fmt.Sprintf("… more: add cursor=%s\n", next)
 		}
 		return x.text(out)
 	}
@@ -573,6 +600,7 @@ func (s *Server) hTasks(x *c) error {
 	out := map[string]any{"tasks": pick(views, fields)}
 	if more {
 		out["next_offset"] = f.Offset + limit
+		out["next_cursor"] = next
 	}
 	return x.ok(out)
 }

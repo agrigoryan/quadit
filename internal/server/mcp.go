@@ -120,7 +120,7 @@ var mcpTools = []mcpTool{
 			"changed_since": "feed position: tasks with any activity after it", "mentions": "me or @handle", "q": "text in the title", "parent": "task key",
 			"creator": "me or @handle", "held_by": "who has taken it: me or @handle", "due_before": "YYYY-MM-DD", "due_after": "YYYY-MM-DD",
 			"fields": "comma-separated fields to return instead of the line, e.g. key,title,status",
-			"view":   "a saved view's slug", "sort": "created, -created, rank, priority, due, -activity, -updated, key", "limit": "default 50", "offset": "", "count": "true"},
+			"view":   "a saved view's slug", "sort": "created, -created, rank, priority, due, -activity, -updated, key", "limit": "default 50", "cursor": "the cursor the last page ended with, to read on", "offset": "", "count": "true"},
 		Run: get("/tasks")},
 	{Name: "task", Desc: "One task with its description, decisions (with numbered options), comments, sub-tasks, links and files. since=<seq> returns only what changed after that feed position.",
 		Props: map[string]string{"!key": "task key, e.g. SVA-12", "since": "feed position", "full": "true to not cut long text"}, Run: get("/tasks/{key}", "key")},

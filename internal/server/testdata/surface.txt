@@ -1,5 +1,20 @@
 # What agents are built against, surface 1.x. Lines are only ever added here.
+api DELETE /api/v1/auth/sessions/{id}
 api DELETE /api/v1/w/{workspace}/tokens/{id}
+api GET /api/v1/admin/audit
+api GET /api/v1/admin/backups
+api GET /api/v1/admin/health
+api GET /api/v1/admin/settings
+api GET /api/v1/admin/users
+api GET /api/v1/admin/workspaces
+api GET /api/v1/auth/config
+api GET /api/v1/auth/identities
+api GET /api/v1/auth/invite/{token}
+api GET /api/v1/auth/me
+api GET /api/v1/auth/oauth/{provider}/start
+api GET /api/v1/auth/passkeys
+api GET /api/v1/auth/sessions
+api GET /api/v1/push/key
 api GET /api/v1/w/{workspace}/agents
 api GET /api/v1/w/{workspace}/audit
 api GET /api/v1/w/{workspace}/bootstrap
@@ -30,15 +45,39 @@ api GET /api/v1/w/{workspace}/tasks
 api GET /api/v1/w/{workspace}/tasks/{ref}
 api GET /api/v1/w/{workspace}/tasks/{ref}/context
 api GET /api/v1/w/{workspace}/tokens
+api PATCH /api/v1/admin/users/{id}
+api PATCH /api/v1/auth/me
 api PATCH /api/v1/w/{workspace}/files/{id}
+api POST /api/v1/admin/backups
+api POST /api/v1/admin/mail/test
+api POST /api/v1/admin/workspaces/{id}/join
+api POST /api/v1/admin/workspaces/{id}/restore
+api POST /api/v1/auth/invite/{token}
+api POST /api/v1/auth/login
+api POST /api/v1/auth/logout
+api POST /api/v1/auth/password
+api POST /api/v1/auth/recovery-codes
+api POST /api/v1/auth/register
+api POST /api/v1/auth/reset/confirm
+api POST /api/v1/auth/reset/request
+api POST /api/v1/auth/second-step
+api POST /api/v1/auth/setup
+api POST /api/v1/auth/totp/disable
+api POST /api/v1/auth/totp/enable
+api POST /api/v1/auth/totp/start
+api POST /api/v1/push/subscriptions
+api POST /api/v1/push/test
 api POST /api/v1/w/{workspace}/changes
 api POST /api/v1/w/{workspace}/docs/{id}/presence
 api POST /api/v1/w/{workspace}/files
+api POST /api/v1/w/{workspace}/import
 api POST /api/v1/w/{workspace}/invites
 api POST /api/v1/w/{workspace}/memory
 api POST /api/v1/w/{workspace}/secrets/env
 api POST /api/v1/w/{workspace}/secrets/{name}/request
 api POST /api/v1/w/{workspace}/tokens
+api POST /api/v1/workspaces
+api PUT /api/v1/admin/settings/{name}
 api PUT /api/v1/w/{workspace}/cursors/{name}
 change agent.create
 change agent.create arg avatar
@@ -706,6 +745,7 @@ mcp tasks arg assignee
 mcp tasks arg changed_since
 mcp tasks arg count
 mcp tasks arg creator
+mcp tasks arg cursor
 mcp tasks arg cycle
 mcp tasks arg due_after
 mcp tasks arg due_before

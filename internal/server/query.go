@@ -494,7 +494,7 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		v = cloneValues(v)
 		v["priority"] = []string{strings.Join(nums, ",")}
 	}
-	err := fromURL(v, &q, append(skip, "view", "format", "fields", "count", "raw", "since")...)
+	err := fromURL(v, &q, append(skip, "view", "format", "fields", "count", "raw", "since", "cursor")...)
 	return q, err
 }
 

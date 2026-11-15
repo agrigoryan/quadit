@@ -38,6 +38,8 @@ var apiOps = []op{
 	{"GET", "/tasks/{ref}/context", "The context pack: the task, its parents, epic, standing preferences, recent decisions, linked docs.", "full: true", "find"},
 	{"GET", "/search", "Full-text search across tasks, decisions, comments and docs.", "q: text; kind: task, comment, decision, doc; limit", "find"},
 	{"GET", "/decisions", "The decision log.", "state: answered, open, picked, sent_back, all; project; q; asked; trash: true for deleted ones; limit; offset", "find"},
+	{"POST", "/import", "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace}, dry_run}. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
+	{"GET", "/audit", "This workspace's part of the audit log, newest first. Admins.", "action; actor; cursor: the last id seen; limit; format: csv", "admin"},
 	{"GET", "/secrets", "The secrets the caller may use: names, hosts and what they are for. Values are never returned.", "", "secrets"},
 	{"POST", "/secrets/{name}/request", "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; the value is blanked out of the answer.", "", "secrets"},
 	{"POST", "/secrets/env", "For a companion's token made for secrets: the values of secrets marked env. Body: {names}.", "", "secrets"},
@@ -77,8 +79,74 @@ var apiOps = []op{
 
 // hOpenAPI describes the API as an OpenAPI 3.1 document, built from the
 // routes above and the engine's catalog of changes.
+// installOps are the calls outside any workspace: accounts and sign-in, and
+// the install's own administration. An agent seldom needs them; a script
+// that sets an install up does.
+var installOps = []op{
+	{"GET", "/auth/config", "What this install offers for signing in, and whether it has been set up.", "", "account"},
+	{"POST", "/auth/setup", "First run: make the first person and workspace. Body: {name, email, password, workspace_name}.", "", "account"},
+	{"POST", "/auth/login", "Sign in with email and password. Body: {email, password}. Answers with a session cookie; with two-step on, the second step follows.", "", "account"},
+	{"POST", "/auth/second-step", "Finish signing in with an authenticator code or a recovery code. Body: {code}.", "", "account"},
+	{"POST", "/auth/logout", "Sign out of this session.", "", "account"},
+	{"GET", "/auth/me", "The signed-in account and the workspaces it is in.", "", "account"},
+	{"PATCH", "/auth/me", "Change the profile: {name, avatar, timezone, theme, locale}; {email, password} changes the sign-in address.", "", "account"},
+	{"POST", "/auth/password", "Change the password. Body: {current, password}. Signed in only.", "", "account"},
+	{"POST", "/auth/register", "Make an account, when open registration is on. Body: {name, email, password}.", "", "account"},
+	{"GET", "/auth/invite/{token}", "What an invitation is for.", "", "account"},
+	{"POST", "/auth/invite/{token}", "Accept an invitation, making an account if needed. Body: {name, email, password}.", "", "account"},
+	{"POST", "/auth/reset/request", "Ask for a password reset by mail. Body: {email}.", "", "account"},
+	{"POST", "/auth/reset/confirm", "Set a new password with the mailed token. Body: {token, password}.", "", "account"},
+	{"GET", "/auth/sessions", "The devices signed in to this account.", "", "account"},
+	{"DELETE", "/auth/sessions/{id}", "Sign one device out.", "", "account"},
+	{"POST", "/auth/totp/start", "Begin setting up two-step codes; answers with the secret to scan.", "", "account"},
+	{"POST", "/auth/totp/enable", "Turn two-step on with a first code. Body: {code}. Answers with recovery codes.", "", "account"},
+	{"POST", "/auth/totp/disable", "Turn two-step off. Body: {password}.", "", "account"},
+	{"POST", "/auth/recovery-codes", "Make a new set of recovery codes.", "", "account"},
+	{"GET", "/auth/passkeys", "The account's passkeys.", "", "account"},
+	{"GET", "/auth/identities", "The provider accounts (Google, GitHub, OpenID Connect) linked to this one.", "", "account"},
+	{"GET", "/auth/oauth/{provider}/start", "Begin signing in with a provider: google, github or oidc.", "", "account"},
+	{"POST", "/workspaces", "Make a workspace. Body: {name, slug}.", "", "account"},
+	{"GET", "/push/key", "The key a browser needs to subscribe to push notifications.", "", "account"},
+	{"POST", "/push/subscriptions", "Register this browser for push. Body: the browser's subscription {endpoint, keys}.", "", "account"},
+	{"POST", "/push/test", "Send a test notification to this account's browsers.", "", "account"},
+	{"GET", "/admin/settings", "The install's settings; secrets are blanked.", "", "install"},
+	{"PUT", "/admin/settings/{name}", "Set one setting. Body: its JSON value.", "", "install"},
+	{"POST", "/admin/mail/test", "Send a test message through the mail server. Body: {to}.", "", "install"},
+	{"GET", "/admin/users", "Every account on the install.", "kind: person or agent", "install"},
+	{"PATCH", "/admin/users/{id}", "Disable or enable an account, or change who runs the install. Body: {disabled, is_admin}.", "", "install"},
+	{"GET", "/admin/workspaces", "Every workspace, deleted ones included for the 30 days they can be restored.", "", "install"},
+	{"POST", "/admin/workspaces/{id}/join", "Become an admin of a workspace, on the record.", "", "install"},
+	{"POST", "/admin/workspaces/{id}/restore", "Bring a deleted workspace back.", "", "install"},
+	{"GET", "/admin/audit", "The install's audit log, newest first.", "action: a name, * for any run of letters; actor; workspace; cursor: the last id seen; limit; format: csv", "install"},
+	{"GET", "/admin/health", "What is failing or waiting behind the scenes.", "", "install"},
+	{"GET", "/admin/backups", "The backups taken.", "", "install"},
+	{"POST", "/admin/backups", "Take a backup now.", "", "install"},
+}
+
 func (s *Server) hOpenAPI(w http.ResponseWriter, r *http.Request) {
 	paths := map[string]map[string]any{}
+	for _, o := range installOps {
+		path := "/api/v1" + o.Path
+		params := []map[string]any{}
+		for _, seg := range strings.Split(o.Path, "/") {
+			if strings.HasPrefix(seg, "{") {
+				params = append(params, map[string]any{"name": strings.Trim(seg, "{}"), "in": "path", "required": true, "schema": map[string]string{"type": "string"}})
+			}
+		}
+		for _, q := range strings.Split(o.Query, ";") {
+			if name, desc, _ := strings.Cut(strings.TrimSpace(q), ":"); name != "" {
+				params = append(params, map[string]any{"name": name, "in": "query", "schema": map[string]string{"type": "string"}, "description": strings.TrimSpace(desc)})
+			}
+		}
+		if paths[path] == nil {
+			paths[path] = map[string]any{}
+		}
+		paths[path][strings.ToLower(o.Method)] = map[string]any{"summary": o.Summary, "tags": []string{o.Tag}, "parameters": params,
+			"responses": map[string]any{
+				"200":     map[string]any{"description": "JSON."},
+				"default": map[string]any{"description": "A refusal.", "content": map[string]any{"application/json": map[string]any{"schema": map[string]string{"$ref": "#/components/schemas/Error"}}}},
+			}}
+	}
 	for _, o := range apiOps {
 		path := "/api/v1/w/{workspace}" + o.Path
 		params := []map[string]any{{"name": "workspace", "in": "path", "required": true, "schema": map[string]string{"type": "string"},
