@@ -5,6 +5,7 @@ export const docs = {
   "docs.title": "Docs",
   "docs.untitled": "Untitled",
   "docs.title.label": "Page title",
+  "docs.body.label": "Page text",
   "docs.copyLink": "Copy link",
   "docs.delete": "Delete",
   "docs.deleted": "Page moved to the trash",
