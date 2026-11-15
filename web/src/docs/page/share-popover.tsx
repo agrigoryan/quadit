@@ -6,7 +6,7 @@ import { useCan } from "@/lib/access";
 import { cx } from "@/lib/cx";
 import { copyText } from "@/lib/files";
 import { t } from "@/lib/i18n";
-import { useMe, useMembers, useSlug } from "@/lib/selectors";
+import { useMe, useMember, useMembers, useSlug } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { setSharing } from "@/docs/actions";
 import type { Doc } from "@/lib/types-docs";
@@ -24,7 +24,8 @@ export function SharePopover({ doc }: { doc: Doc }) {
   const can = useCan();
   const mayChange = mine && can.edit(doc.project_id);
   const shared = doc.shared_with ?? [];
-  const owner = members.find((m) => m.user_id === doc.owner_id);
+  // The owner may have left the workspace since: they are still named.
+  const owner = useMember(doc.owner_id ?? undefined);
 
   const toggle = (userId: string) =>
     setSharing(doc.id, {
