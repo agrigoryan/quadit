@@ -20,8 +20,9 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
           delete KEY | restore KEY   to the trash, and back from it
           comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID]
           result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
-          ask KEY QUESTION option=A option=B [recommended=2] [why=...] [ask=@WHO]
-          approval KEY QUESTION [action=task.delete [args=JSON]] [ask=@WHO]
+          ask KEY QUESTION option=A [file=PATH ...] option=B [file=PATH ...] [recommended=2] [why=...] [ask=@WHO]
+                                     a file= is shown on the option before it; before any option, on the question
+          approval KEY QUESTION [action=task.delete [args=JSON]] [ask=@WHO] [file=PATH ...]
           pick DECISION OPTION|approved|declined|none [note=...]
           unclear DECISION NOTE
           attach KEY PATH ... [option=ID] | upload PATH | read [all | ID ...]

@@ -45,14 +45,15 @@ When a choice is the person's to make, ask in the task instead of guessing or as
 
 ```bash
 quadit ask SVA-12 "Which explosion?" \
-  option="A: ring::classic shockwave" option="B: burst::reads best at small size" option="C: smoke" \
+  option="A: ring::classic shockwave" file=ring.gif option="B: burst::reads best at small size" file=burst.gif option="C: smoke" \
   recommended=2 why="clearest at 1x"
-quadit attach SVA-12 ring.png option=OPTION_ID     # show each option; ids are in: quadit --json show SVA-12
 ```
+
+- Show each option: a `file=PATH` belongs to the `option=` before it (several allowed); one before the first option goes with the question. The files go up first and the question goes out with them, once even if you resend it with the same `--id`.
 
 - One question per decision. Several questions are several decisions, or sub-tasks.
 - Always give a recommendation and the reason when you have one.
-- For a plain yes or no: `quadit approval SVA-12 "Merge this into main?"`.
+- For a plain yes or no: `quadit approval SVA-12 "Merge this into main?"` (`file=PATH` works here too).
 - The task now waits on them. Wait with `quadit events cursor=main mine=1 others=1 wait=50` (it returns as soon as something happens), or stop and pick it up next session from `quadit work`.
 - The answer arrives as `decision.picked … -> 2) B: burst (with_changes): Make it 20% larger.` Follow the note exactly.
 - If the answer does not settle it, say what is unclear in one line: `quadit unclear DECISION_ID "Larger in radius, or in duration?"`. Do not guess.

@@ -64,8 +64,7 @@ Every write is a named change with an id you make. Sending the same id again app
 quadit new SVA "Hit flash is too subtle" labels=art priority=high assignee=@artist
 quadit update SVA-12 status="In Progress" waiting_on=@aram
 quadit comment SVA-12 "Which frame is the peak?" waiting_on=@aram
-quadit ask SVA-12 "Which explosion?" option="A: ring" option="B: burst::reads best small" recommended=2 why="clearer at 1x"
-quadit attach SVA-12 ring.png option=OPTION_ID
+quadit ask SVA-12 "Which explosion?" option="A: ring" file=ring.gif option="B: burst::reads best small" file=burst.gif recommended=2 why="clearer at 1x"
 quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 ```
 
@@ -79,6 +78,8 @@ quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 ## Decisions
 
 Ask with `decision.open`: a question, two or more options (each can carry files), an optional recommendation, and whom to ask. If you name nobody, the person responsible for you is asked. The task then waits on them.
+
+`quadit ask` reads `file=PATH` in order: a file after an `option=` is shown on that option, a file before the first option on the question. The files are uploaded first and the decision opens with them in one batch; with `--id` a resend uploads and attaches nothing twice, `--dry-run` uploads nothing and says where each file would go, and `--json` gives the decision and the files' ids. `quadit approval` takes `file=` for the question too.
 
 When they answer, the task waits on you again and the answer is in your inbox and feed:
 

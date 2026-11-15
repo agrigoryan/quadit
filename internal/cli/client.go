@@ -172,6 +172,37 @@ func (c *Client) Change(typ string, args any, approval string, dry bool) (*Resul
 	if dry {
 		body["dry_run"] = true
 	}
+	res, err := c.postChanges(body)
+	if err != nil {
+		return nil, err
+	}
+	return &res[0], nil
+}
+
+// BatchChange is one change of a batch. Its id is the caller's to make.
+type BatchChange struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Args     any    `json:"args"`
+	Approval string `json:"approval,omitempty"`
+	For      string `json:"for,omitempty"`
+}
+
+// Batch applies several changes in one go: all of them or none.
+func (c *Client) Batch(changes []BatchChange, dry bool) ([]Result, error) {
+	for i := range changes {
+		changes[i].For = c.For
+	}
+	body := map[string]any{"changes": changes}
+	if dry {
+		body["dry_run"] = true
+	}
+	return c.postChanges(body)
+}
+
+// postChanges sends a body of changes, trying again when the server could
+// not be reached (the ids in it make that safe), and reads the results.
+func (c *Client) postChanges(body map[string]any) ([]Result, error) {
 	raw, _ := json.Marshal(body)
 	var out []byte
 	var err error
@@ -192,7 +223,7 @@ func (c *Client) Change(typ string, args any, approval string, dry bool) (*Resul
 	if err := json.Unmarshal(out, &res); err != nil || len(res.Results) == 0 {
 		return nil, fmt.Errorf("unexpected answer: %s", out)
 	}
-	return &res.Results[0], nil
+	return res.Results, nil
 }
 
 // Upload sends a file and returns its id and address.

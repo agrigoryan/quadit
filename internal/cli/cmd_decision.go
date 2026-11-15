@@ -8,9 +8,28 @@ import (
 )
 
 // ask opens a decision on a task: a question with options or, called as
-// approval, a yes or no to a change.
+// approval, a yes or no to a change. Files given with file=PATH go up first
+// and come with the question (see askFiles).
 func (r *runner) ask(in input) error {
-	a := argsFrom(in.f, "option", "why")
+	a, err := decisionArgs(in)
+	if err != nil {
+		return err
+	}
+	labels, files := questionParts(fieldsInOrder(in.rest))
+	if opts := options(labels); len(opts) > 0 {
+		a["options"] = opts
+	}
+	if len(files) > 0 {
+		return r.askWithFiles(a, files, in.approval)
+	}
+	_, err = r.change("decision.open", a, in.approval)
+	return err
+}
+
+// decisionArgs are a new decision's arguments from what was typed, less
+// its options and files.
+func decisionArgs(in input) (map[string]any, error) {
+	a := argsFrom(in.f, "option", "why", "file")
 	a["task"], a["question"] = in.pos[0], strings.Join(in.pos[1:], " ")
 	if in.name == "approval" {
 		a["kind"] = "approval"
@@ -18,21 +37,17 @@ func (r *runner) ask(in input) error {
 		if raw := firstValue(in.f["args"]); raw != "" {
 			var args map[string]any
 			if err := json.Unmarshal([]byte(raw), &args); err != nil {
-				return fmt.Errorf("args must be a JSON object, the arguments the change will be sent with: %w", err)
+				return nil, fmt.Errorf("args must be a JSON object, the arguments the change will be sent with: %w", err)
 			}
 			a["args"] = args
 		} else if _, ok := a["action"]; ok {
 			a["args"] = map[string]any{"id": in.pos[0]} // the usual case: the action is on this task
 		}
 	}
-	if opts := options(in.f["option"]); len(opts) > 0 {
-		a["options"] = opts
-	}
 	if w := in.f["why"]; len(w) > 0 {
 		a["recommendation"] = w[0]
 	}
-	_, err := r.change("decision.open", a, in.approval)
-	return err
+	return a, nil
 }
 
 // options reads a question's options, each written option=LABEL or

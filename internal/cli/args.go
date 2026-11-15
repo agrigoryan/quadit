@@ -70,13 +70,37 @@ var boolKeys = map[string]bool{"archived": true, "resolved": true, "active": tru
 func splitFields(args []string) (pos []string, fields map[string][]string) {
 	fields = map[string][]string{}
 	for _, a := range args {
-		if i := strings.Index(a, "="); i > 0 && !strings.ContainsAny(a[:i], " \t\n/:") {
-			fields[a[:i]] = append(fields[a[:i]], a[i+1:])
+		if k, v, ok := asField(a); ok {
+			fields[k] = append(fields[k], v)
 			continue
 		}
 		pos = append(pos, a)
 	}
 	return
+}
+
+// asField reads one argument as field=value; ok is false for a positional
+// one (a path or a URL with = in it is positional).
+func asField(a string) (key, value string, ok bool) {
+	if i := strings.Index(a, "="); i > 0 && !strings.ContainsAny(a[:i], " \t\n/:") {
+		return a[:i], a[i+1:], true
+	}
+	return "", "", false
+}
+
+// field is one field=value argument.
+type field struct{ key, value string }
+
+// fieldsInOrder gives the field=value arguments in the order they were
+// typed, for a command where that order says what belongs to what.
+func fieldsInOrder(args []string) []field {
+	var out []field
+	for _, a := range args {
+		if k, v, ok := asField(a); ok {
+			out = append(out, field{k, v})
+		}
+	}
+	return out
 }
 
 // apiValue turns a command-line value into what the API takes.
