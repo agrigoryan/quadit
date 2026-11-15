@@ -44,7 +44,7 @@ export function ProjectField({ doc }: { doc: Doc }) {
         </PopoverTrigger>
       </Tooltip>
       {open && (
-        <PopoverContent align="end" className="p-0">
+        <PopoverContent align="end" aria-label={label} className="p-0">
           <ProjectChoices doc={doc} close={() => setOpen(false)} />
         </PopoverContent>
       )}

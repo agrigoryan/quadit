@@ -48,7 +48,7 @@ export function UploadsIndicator() {
             </span>
           </button>
         </PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-80 p-3">
+        <PopoverContent side="top" align="start" aria-label={t("upload.title")} className="w-80 p-3">
           <p className="mb-2 text-xs font-semibold text-ink-2">{t("upload.title")}</p>
           <ul className="flex flex-col gap-2.5">
             {items.map((it) => (

@@ -26,7 +26,7 @@ export function ColorButton({
           <Dot color={value} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-3">
+      <PopoverContent aria-label={label} className="w-56 p-3">
         <ColorPicker value={value ?? ""} onChange={onChange} label={label} />
       </PopoverContent>
     </Popover>

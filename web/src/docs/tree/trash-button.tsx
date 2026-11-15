@@ -25,7 +25,7 @@ export function TrashButton({ projectId }: { projectId?: string }) {
           {trashed.length > 0 && <span className="text-xs text-ink-3 tnum">{trashed.length}</span>}
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-72 p-1">
+      <PopoverContent side="top" align="start" aria-label={t("docs.trash.title")} className="w-72 p-1">
         {trashed.length === 0 ? (
           <p className="px-3 py-4 text-center text-sm text-ink-3">{t("docs.trash.empty")}</p>
         ) : (

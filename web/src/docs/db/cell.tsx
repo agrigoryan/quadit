@@ -233,6 +233,7 @@ export function Cell({
         </div>
       </PopoverAnchor>
       <PopoverContent
+        aria-label={prop.name}
         className="p-0"
         onCloseAutoFocus={(e) => e.preventDefault()}
         onKeyDown={(e) => e.stopPropagation()}

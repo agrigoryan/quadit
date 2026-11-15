@@ -210,7 +210,7 @@ export function PropertyPopover({ prop, view, open, onOpenChange, children }: Po
     <>
       <Popover open={open && !formula} onOpenChange={onOpenChange}>
         <PopoverTrigger asChild>{children}</PopoverTrigger>
-        <PopoverContent className="p-0">
+        <PopoverContent aria-label={prop.name} className="p-0">
           <PropertyEditor
             prop={prop}
             view={view}

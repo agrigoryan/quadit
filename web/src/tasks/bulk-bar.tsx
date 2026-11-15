@@ -132,7 +132,12 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
       {(more === "due" || more === "estimate") && (
         <Popover open onOpenChange={(next) => !next && close()}>
           <PopoverAnchor virtualRef={moreButton} />
-          <PopoverContent side="top" align="end" className="w-60 p-3">
+          <PopoverContent
+            side="top"
+            align="end"
+            aria-label={t(more === "due" ? "bulk.due" : "bulk.estimate")}
+            className="w-60 p-3"
+          >
             {more === "due" ? <DueForm tasks={tasks} onDone={close} /> : <EstimateForm tasks={tasks} onDone={close} />}
           </PopoverContent>
         </Popover>

@@ -48,7 +48,7 @@ function ToolButton({
           {!!count && <span className="tnum">{formatNumber(count)}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="p-0">
+      <PopoverContent align="end" aria-label={label} className="p-0">
         {children}
       </PopoverContent>
     </Popover>

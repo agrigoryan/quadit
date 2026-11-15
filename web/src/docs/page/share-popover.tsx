@@ -39,7 +39,7 @@ export function SharePopover({ doc }: { doc: Doc }) {
           <span className="max-sm:sr-only">{t("docs.share.button")}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-1.5">
+      <PopoverContent align="end" aria-label={t("docs.share.title")} className="w-80 p-1.5">
         <div role="radiogroup" aria-label={t("docs.share.title")}>
           <Choice
             checked={!isPrivate}

@@ -46,7 +46,7 @@ export function BudgetField({ task }: { task: Task }) {
           <span className="truncate tnum">{text || t("prop.budget.none")}</span>
         </PropButton>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-3">
+      <PopoverContent aria-label={t("prop.budget")} className="w-64 p-3">
         {open && <BudgetForm task={task} budget={budget} onDone={() => setOpen(false)} />}
       </PopoverContent>
     </Popover>

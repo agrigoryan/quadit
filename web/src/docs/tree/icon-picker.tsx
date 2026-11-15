@@ -23,7 +23,7 @@ export function IconPicker({ docId, current, children, open, onOpenChange }: Pro
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-64 p-2">
+      <PopoverContent aria-label={t("docs.icon.pick")} className="w-64 p-2">
         <div className="grid grid-cols-8 gap-0.5" role="listbox" aria-label={t("docs.icon.pick")}>
           {EMOJI.map((emoji) => (
             <PopoverClose asChild key={emoji}>
