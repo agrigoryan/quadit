@@ -185,7 +185,7 @@ func (s *Server) handleShowConsentPage(x *c) error {
 	if q.Get("response_type") != "code" || q.Get("code_challenge") == "" || (q.Get("code_challenge_method") != "S256" && q.Get("code_challenge_method") != "") {
 		return errBad("this server takes response_type=code with a S256 code_challenge")
 	}
-	if signedIn := s.identify(x) == nil && x.sess != nil && x.user.Kind == core.KindPerson; !signedIn {
+	if signedIn := s.identify(x.ctx(), x) == nil && x.sess != nil && x.user.Kind == core.KindPerson; !signedIn {
 		http.Redirect(x.w, x.r, "/login?next="+url.QueryEscape(x.r.URL.RequestURI()), http.StatusFound)
 		return nil
 	}
@@ -227,7 +227,7 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 	if err := x.r.ParseForm(); err != nil {
 		return errBad("bad form")
 	}
-	if err := s.identify(x); err != nil || x.sess == nil {
+	if err := s.identify(x.ctx(), x); err != nil || x.sess == nil {
 		return errUnauthorized("sign in first")
 	}
 	spent, err := s.useOneTime(ctx, core.OneTimeOAuthConsent, x.r.PostForm.Get("request"), false)

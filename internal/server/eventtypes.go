@@ -11,7 +11,9 @@ func init() {
 }
 
 // eventTypes lists the kinds of event the feed carries, for pickers in
-// webhook and rule forms. A family can be chosen whole as "task.*".
+// webhook and rule forms. A family can be chosen whole as "task.*". A test
+// holds the list to the types the engine writes
+// (TestEventTypesAreTheOnesTheEngineWrites).
 var eventTypes = []string{
 	"task.created", "task.updated", "task.restored", "task.related",
 	"comment.created", "comment.updated", "comment.deleted",

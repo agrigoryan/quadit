@@ -20,6 +20,13 @@
 //	  auth_passkeys.go, auth_oauth.go, signin_provider.go,
 //	  signin_github.go, signin_oidc.go, tokens.go
 //	Reads
+//	  viewer.go      the viewer: who a read is made for, and what they may
+//	                 see. Every read below is a method of it that takes a
+//	                 ctx; a handler reads the request, asks the viewer, and
+//	                 writes the answer
+//	  rowkinds.go    the kinds of row a workspace holds, each with its rule
+//	                 for who may see a row: what /list, the starting copy
+//	                 and the export give
 //	  orient.go (who am I, my work), layout.go, tasks_list.go,
 //	  task_detail.go, task_context.go, query.go, render.go, views_shared.go,
 //	  search.go, feed.go, bootstrap.go, docs.go, rows.go, files.go,
@@ -504,7 +511,7 @@ func (s *Server) public(h handler) http.HandlerFunc {
 func (s *Server) signedIn(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
-		if err := s.identify(x); err != nil { //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
+		if err := s.identify(r.Context(), x); err != nil {
 			s.fail(w, r, err)
 			return
 		}
@@ -520,7 +527,7 @@ func (s *Server) signedIn(h handler) http.HandlerFunc {
 func (s *Server) firstStepPassed(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r, firstStepEnough: true}
-		if err := s.identify(x); err != nil { //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
+		if err := s.identify(r.Context(), x); err != nil {
 			s.fail(w, r, err)
 			return
 		}
@@ -540,9 +547,9 @@ func (s *Server) firstStepPassed(h handler) http.HandlerFunc {
 func (s *Server) workspaceMember(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
-		err := s.identify(x) //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
+		err := s.identify(r.Context(), x)
 		if err == nil {
-			err = s.enterWorkspace(x, r.PathValue("ws")) //nolint:contextcheck // x carries r: every context below is x.ctx(), which is r.Context()
+			err = s.enterWorkspace(r.Context(), x, r.PathValue("ws"))
 		}
 		if err == nil {
 			err = checkParams(r.URL.Query())
@@ -562,18 +569,17 @@ const sessionCookie = "quadit_session"
 // session cookie. It fills in x.user and x.token or x.sess, and counts the
 // request against the caller's rate limit unless it is made inside another
 // request (inProcess).
-func (s *Server) identify(x *c) error {
+func (s *Server) identify(ctx context.Context, x *c) error {
 	now := time.Now().UnixMilli()
 	if h := x.r.Header.Get("Authorization"); h != "" {
-		return s.identifyByToken(x, h, now)
+		return s.identifyByToken(ctx, x, h, now)
 	}
-	return s.identifyBySession(x, now)
+	return s.identifyBySession(ctx, x, now)
 }
 
 // identifyByToken signs the caller in with the token in an Authorization
 // header.
-func (s *Server) identifyByToken(x *c, header string, now int64) error {
-	ctx := x.ctx()
+func (s *Server) identifyByToken(ctx context.Context, x *c, header string, now int64) error {
 	tok := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
 	var t core.APIToken
 	there, err := store.Find(ctx, s.st, &t, store.Eq("token_hash", auth.Hash(tok)), store.Null("revoked_at"))
@@ -602,15 +608,14 @@ func (s *Server) identifyByToken(x *c, header string, now int64) error {
 	if now-t.LastUsedAt > signInWriteEvery {
 		_, _ = s.st.Update(ctx, "api_tokens", map[string]any{"last_used_at": now}, store.Eq("id", t.ID)) // best effort: last use is shown to people, and written again on the next call
 	}
-	if x.r.Context().Value(inProcess{}) != nil {
+	if ctx.Value(inProcess{}) != nil {
 		return nil // the server working for the caller, inside one request already counted
 	}
 	return s.limits.check("t:"+t.ID, limitPerToken)
 }
 
 // identifyBySession signs the caller in with the session cookie.
-func (s *Server) identifyBySession(x *c, now int64) error {
-	ctx := x.ctx()
+func (s *Server) identifyBySession(ctx context.Context, x *c, now int64) error {
 	ck, err := x.r.Cookie(sessionCookie)
 	if err != nil || ck.Value == "" {
 		return errUnauthorized("sign in, or send a token in the Authorization header")
@@ -633,7 +638,7 @@ func (s *Server) identifyBySession(x *c, now int64) error {
 	if now-sess.LastSeenAt > signInWriteEvery {
 		_, _ = s.st.Update(ctx, "sessions", map[string]any{"last_seen_at": now}, store.Eq("id", sess.ID)) // best effort: last seen is shown to people, and written again on the next call
 	}
-	if x.r.Context().Value(inProcess{}) != nil {
+	if ctx.Value(inProcess{}) != nil {
 		return nil
 	}
 	return s.limits.check("u:"+x.user.ID, limitPerSignedIn)
@@ -678,8 +683,7 @@ func (s *Server) loadAccount(ctx context.Context, x *c, userID, disabledMsg stri
 // enterWorkspace binds the request to a workspace the caller belongs to. "-" means
 // the workspace of the token used. It fills in the viewer (x.ws, x.db,
 // x.member, x.projects) and x.actor, and records the member's presence.
-func (s *Server) enterWorkspace(x *c, ref string) error {
-	ctx := x.ctx()
+func (s *Server) enterWorkspace(ctx context.Context, x *c, ref string) error {
 	if err := s.loadMembership(ctx, x, ref); err != nil {
 		return err
 	}
@@ -693,7 +697,7 @@ func (s *Server) enterWorkspace(x *c, ref string) error {
 	if x.token != nil {
 		x.applyTokenScopes()
 	}
-	s.touchPresence(x, "")
+	s.touchPresence(ctx, x, "")
 	return nil
 }
 
@@ -763,7 +767,7 @@ func has(list []string, v string) bool {
 // touchPresence records that a member was just here, at most every 20
 // seconds, and what it did when that is worth showing. The write is
 // detached from the request's end: the member was here either way.
-func (s *Server) touchPresence(x *c, action string) {
+func (s *Server) touchPresence(ctx context.Context, x *c, action string) {
 	now := time.Now().UnixMilli()
 	s.seenMu.Lock()
 	last := s.seen[x.member.UserID+x.ws.ID]
@@ -779,7 +783,7 @@ func (s *Server) touchPresence(x *c, action string) {
 	if action != "" {
 		set["last_action"] = action
 	}
-	_, _ = x.db.Update(context.WithoutCancel(x.ctx()), "members", set, store.Eq("user_id", x.member.UserID)) // best effort: presence is written again on the next request
+	_, _ = x.db.Update(context.WithoutCancel(ctx), "members", set, store.Eq("user_id", x.member.UserID)) // best effort: presence is written again on the next request
 }
 
 // clientIP returns the caller's address, trusting a proxy's header only

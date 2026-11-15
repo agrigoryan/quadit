@@ -278,7 +278,7 @@ func (s *Server) handleAcceptInvite(x *c) error {
 		return err
 	}
 	var u core.User
-	if s.identify(x) == nil && x.user.Kind == core.KindPerson {
+	if s.identify(x.ctx(), x) == nil && x.user.Kind == core.KindPerson {
 		u = x.user
 	} else if u, err = s.newInvitedPerson(x, inv, b); err != nil {
 		return err

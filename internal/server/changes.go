@@ -84,7 +84,7 @@ func (s *Server) handleApplyChanges(x *c) error {
 	}
 	if !dry && len(res) > 0 {
 		last := res[len(res)-1]
-		s.touchPresence(x, strings.TrimSpace(last.Type+" "+last.Key))
+		s.touchPresence(x.ctx(), x, strings.TrimSpace(last.Type+" "+last.Key))
 	}
 	out := map[string]any{"results": res, "seq": seq}
 	if dry {

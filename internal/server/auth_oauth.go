@@ -63,7 +63,7 @@ func (s *Server) handleStartProviderSignIn(x *c) error {
 		state.Next = "/"
 	}
 	// Someone already signed in is adding this provider to their account.
-	if s.identify(x) == nil && x.sess != nil && x.r.URL.Query().Has("link") {
+	if s.identify(x.ctx(), x) == nil && x.sess != nil && x.r.URL.Query().Has("link") {
 		state.LinkUser = x.user.ID
 	}
 	stateToken, err := s.oneTime(ctx, core.OneTimeOAuth, "", state, approvalLife)
