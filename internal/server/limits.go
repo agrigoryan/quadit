@@ -57,7 +57,7 @@ func (l *limiter) shareCounts(ctx context.Context, st store.Store) {
 		totals[key] = int(total)
 	}
 	if len(mine) > 0 {
-		_, _ = st.Delete(ctx, "rate_counters", store.Like("name", "api:%"), store.Lt("bucket", window-1)) //nolint:errcheck // best effort: old counters are deleted again in two seconds
+		_, _ = st.Delete(ctx, "rate_counters", store.Like("name", "api:%"), store.Lt("bucket", window-1)) // best effort: old counters are deleted again in two seconds
 	}
 	// And what the other servers counted this minute, for every caller: a
 	// caller this server has not seen lately may be busy on another.

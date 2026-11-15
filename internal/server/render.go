@@ -655,7 +655,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 // be read is left at its zero value, and the reader shows less (an emptier
 // feed line, empty cells, a page built again) rather than fail.
 func readStored(raw []byte, dst any) {
-	_ = json.Unmarshal(raw, dst) //nolint:errcheck // deliberate, as said above
+	_ = json.Unmarshal(raw, dst) // deliberate, as said above
 }
 
 // foundForLine reads one row that a line of text names, if it can, and

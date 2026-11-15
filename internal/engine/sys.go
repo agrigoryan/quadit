@@ -77,7 +77,7 @@ func (s *Sys) From(ruleID string) { s.c.origin = ruleID }
 func (s *Sys) Tx() store.Tx { return s.c.tx }
 
 // Emit records an event from a system write.
-func (s *Sys) Emit(typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error { //nolint:revive // argument-limit: exported and called by the server, so its signature stays this round
+func (s *Sys) Emit(typ, entityType, entityID, scopeType, scopeID, projectID string, data any) error {
 	return s.c.emit(event{seq: s.c.tx.NextSeq(), typ: typ, entity: entityType, entityID: entityID, place: place{scopeType: scopeType, scopeID: scopeID, projectID: projectID}, data: data})
 }
 

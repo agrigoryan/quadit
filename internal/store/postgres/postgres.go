@@ -90,7 +90,7 @@ func maintenance(ctx context.Context, url string) (*pgx.Conn, string, error) {
 
 // closeConn ends a connection of ours, even when ctx has ended.
 func closeConn(ctx context.Context, conn *pgx.Conn) {
-	_ = conn.Close(context.WithoutCancel(ctx)) //nolint:errcheck // the work on it is done, or failed with an error of its own
+	_ = conn.Close(context.WithoutCancel(ctx)) // the work on it is done, or failed with an error of its own
 }
 
 // quote makes a database name safe to put in a statement.

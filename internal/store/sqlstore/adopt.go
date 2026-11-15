@@ -25,7 +25,7 @@ func (s *Store) adopt(ctx context.Context) error {
 		return err
 	}
 	defer func() {
-		_ = conn.Close() //nolint:errcheck // it only goes back to the pool: nothing is lost if that fails
+		_ = conn.Close() // it only goes back to the pool: nothing is lost if that fails
 	}()
 	unlock, err := s.lockMigrations(ctx, conn)
 	if err != nil {

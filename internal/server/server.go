@@ -156,7 +156,7 @@ func (s *Server) useFiles(ctx context.Context, c blob.Config) error {
 		if err := cloud.Put(ctx, probe, strings.NewReader("ok"), "text/plain"); err != nil {
 			return fmt.Errorf("file storage: the store refused a test write: %w", err)
 		}
-		_ = cloud.Delete(ctx, probe) //nolint:errcheck // best effort: a leftover probe is a two-byte file and harms nothing
+		_ = cloud.Delete(ctx, probe) // best effort: a leftover probe is a two-byte file and harms nothing
 		next = blob.Layered{Primary: cloud, Old: s.disk}
 		s.enqueue(ctx, "files.move", "", "files.move", nil, time.Now().Add(5*time.Second))
 	}
@@ -324,7 +324,7 @@ type rowSelector struct {
 func newRowSelector(fields []string, since string) rowSelector {
 	// A since that is not a number reads as 0; the workspace routes refuse
 	// one before this, in checkParams.
-	after, _ := strconv.ParseInt(since, 10, 64) //nolint:errcheck // a bad since reads as 0 (see above)
+	after, _ := strconv.ParseInt(since, 10, 64) // a bad since reads as 0 (see above)
 	sel := rowSelector{since: since != "", after: after}
 	if len(fields) > 0 {
 		sel.fields = map[string]bool{"id": true, "key": true}
@@ -602,7 +602,7 @@ func (s *Server) identifyByToken(x *c, header string, now int64) error {
 		s.audit(x.r, t.WorkspaceID, x.user, "token.used", "token", t.ID, map[string]string{"name": t.Name})
 	}
 	if now-t.LastUsedAt > signInWriteEvery {
-		_, _ = s.st.Update(ctx, "api_tokens", map[string]any{"last_used_at": now}, store.Eq("id", t.ID)) //nolint:errcheck // best effort: last use is shown to people, and written again on the next call
+		_, _ = s.st.Update(ctx, "api_tokens", map[string]any{"last_used_at": now}, store.Eq("id", t.ID)) // best effort: last use is shown to people, and written again on the next call
 	}
 	if x.r.Context().Value(inProcess{}) != nil {
 		return nil // the server working for the caller, inside one request already counted
@@ -633,7 +633,7 @@ func (s *Server) identifyBySession(x *c, now int64) error {
 	}
 	x.sess = &sess
 	if now-sess.LastSeenAt > signInWriteEvery {
-		_, _ = s.st.Update(ctx, "sessions", map[string]any{"last_seen_at": now}, store.Eq("id", sess.ID)) //nolint:errcheck // best effort: last seen is shown to people, and written again on the next call
+		_, _ = s.st.Update(ctx, "sessions", map[string]any{"last_seen_at": now}, store.Eq("id", sess.ID)) // best effort: last seen is shown to people, and written again on the next call
 	}
 	if x.r.Context().Value(inProcess{}) != nil {
 		return nil
@@ -799,7 +799,7 @@ func (s *Server) touchPresence(x *c, action string) {
 	if action != "" {
 		set["last_action"] = action
 	}
-	_, _ = x.db.Update(context.WithoutCancel(x.ctx()), "members", set, store.Eq("user_id", x.member.UserID)) //nolint:errcheck // best effort: presence is written again on the next request
+	_, _ = x.db.Update(context.WithoutCancel(x.ctx()), "members", set, store.Eq("user_id", x.member.UserID)) // best effort: presence is written again on the next request
 }
 
 // clientIP returns the caller's address, trusting a proxy's header only

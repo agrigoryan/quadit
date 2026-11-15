@@ -42,7 +42,7 @@ func TestAutomaticCertificate(t *testing.T) {
 	deadline := time.Now().Add(90 * time.Second)
 	for {
 		// The authority's root is not known here; the chain is checked by name below.
-		conn, err := tls.Dial("tcp", listen, &tls.Config{ServerName: name, InsecureSkipVerify: true, NextProtos: []string{"h2", "http/1.1"}}) //nolint:gosec
+		conn, err := tls.Dial("tcp", listen, &tls.Config{ServerName: name, InsecureSkipVerify: true, NextProtos: []string{"h2", "http/1.1"}})
 		if err == nil {
 			state = conn.ConnectionState()
 			conn.Close()

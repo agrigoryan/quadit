@@ -17,7 +17,7 @@ import (
 // gzipPool keeps gzip writers for reuse: making one costs more than the
 // answers it usually compresses.
 var gzipPool = sync.Pool{New: func() any {
-	w, _ := gzip.NewWriterLevel(nil, gzip.BestSpeed) //nolint:errcheck // cannot fail: BestSpeed is a valid level
+	w, _ := gzip.NewWriterLevel(nil, gzip.BestSpeed) // cannot fail: BestSpeed is a valid level
 	return w
 }}
 
@@ -85,7 +85,7 @@ func (g *gzipWriter) Write(b []byte) (int, error) {
 // Flush sends what was compressed so far, for answers that stream.
 func (g *gzipWriter) Flush() {
 	if g.gz != nil {
-		_ = g.gz.Flush() //nolint:errcheck // Flush cannot report it; the next Write fails the same way
+		_ = g.gz.Flush() // Flush cannot report it; the next Write fails the same way
 	}
 	if f, ok := g.ResponseWriter.(http.Flusher); ok {
 		f.Flush()

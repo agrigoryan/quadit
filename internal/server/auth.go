@@ -108,7 +108,7 @@ func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, lif
 
 // useOneTime spends a one-time secret. It works once and only while fresh.
 //
-//nolint:revive,unparam // keep is in the signature picture.go calls too; dropping it belongs to the unit that owns that file
+//nolint:unparam // keep is in the signature picture.go calls too; dropping it belongs to the unit that owns that file
 func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) (core.OneTimeToken, error) {
 	var spent core.OneTimeToken
 	err := s.st.Get(ctx, &spent, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
