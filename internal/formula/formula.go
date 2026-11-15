@@ -7,12 +7,20 @@
 //
 // Values are numbers, text, true/false and empty. A formula that cannot be
 // worked out gives an error to show in the cell, never a crash.
+//
+// The parser works the formula out as it reads it, and reports a mistake
+// (a syntax error, an unknown function, text where a number goes) by
+// panicking with the error. Eval recovers it and returns it: the panic
+// never leaves this package. That keeps each step of the recursive descent
+// to one value and no error checks, at the cost that every function here
+// that panics must only ever be called under Eval.
 package formula
 
 import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +35,8 @@ type Env struct {
 
 // Eval works out a formula.
 func Eval(src string, env Env) (v any, err error) {
+	// Mistakes in the formula come up as panics from the parser (see the
+	// package comment); here they become the error the cell shows.
 	defer func() {
 		if r := recover(); r != nil {
 			v, err = nil, fmt.Errorf("%v", r)
@@ -43,11 +53,15 @@ func Eval(src string, env Env) (v any, err error) {
 	return v, nil
 }
 
+// token is one word of a formula: a number, a text in quotes, a name or an
+// operator.
 type token struct {
 	kind string // num, str, id, op
 	text string
 }
 
+// lex splits a formula into tokens. A text with no closing quote or a
+// character that belongs to no token panics (see the package comment).
 func lex(s string) []token {
 	var out []token
 	for i := 0; i < len(s); {
@@ -105,24 +119,23 @@ func lex(s string) []token {
 	return out
 }
 
+// parser reads and works out one formula, by recursive descent: or, and,
+// cmp, add, mul, unary, primary, from the loosest binding to the tightest.
 type parser struct {
 	toks []token
 	pos  int
 	env  Env
 }
 
+// peek says whether the next token is an operator or name among texts.
 func (p *parser) peek(texts ...string) bool {
 	if p.pos >= len(p.toks) || p.toks[p.pos].kind == "str" {
 		return false
 	}
-	for _, t := range texts {
-		if p.toks[p.pos].text == t {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(texts, p.toks[p.pos].text)
 }
 
+// take moves past the next token if it is one of texts, and gives it.
 func (p *parser) take(texts ...string) (string, bool) {
 	if p.peek(texts...) {
 		p.pos++
@@ -131,6 +144,7 @@ func (p *parser) take(texts ...string) (string, bool) {
 	return "", false
 }
 
+// or works out a chain of "or".
 func (p *parser) or() any {
 	v := p.and()
 	for {
@@ -142,6 +156,7 @@ func (p *parser) or() any {
 	}
 }
 
+// and works out a chain of "and".
 func (p *parser) and() any {
 	v := p.cmp()
 	for {
@@ -153,6 +168,7 @@ func (p *parser) and() any {
 	}
 }
 
+// cmp works out a comparison: =, !=, <, <=, > or >=.
 func (p *parser) cmp() any {
 	l := p.add()
 	op, ok := p.take("==", "=", "!=", "<", "<=", ">", ">=")
@@ -176,6 +192,7 @@ func (p *parser) cmp() any {
 	return c >= 0
 }
 
+// add works out a chain of + and -; + of two texts joins them.
 func (p *parser) add() any {
 	v := p.mul()
 	for {
@@ -200,6 +217,7 @@ func (p *parser) add() any {
 	}
 }
 
+// mul works out a chain of *, / and %.
 func (p *parser) mul() any {
 	v := p.unary()
 	for {
@@ -223,6 +241,7 @@ func (p *parser) mul() any {
 	}
 }
 
+// unary works out "not" and a leading minus.
 func (p *parser) unary() any {
 	if _, ok := p.take("-"); ok {
 		return -num(p.unary())
@@ -233,6 +252,8 @@ func (p *parser) unary() any {
 	return p.primary()
 }
 
+// primary works out a number, a text, true, false, a call or a formula in
+// brackets.
 func (p *parser) primary() any {
 	if p.pos >= len(p.toks) {
 		panic(errors.New("the formula ends too soon"))
@@ -288,6 +309,7 @@ func (p *parser) primary() any {
 var Functions = []string{"prop", "if", "concat", "length", "lower", "upper", "contains", "empty", "round", "floor", "ceil", "abs", "min", "max", "sum",
 	"toNumber", "format", "now", "today", "dateAdd", "dateDiff"}
 
+// call works out a function of Functions on its arguments.
 func (p *parser) call(name string, a []any) any {
 	arg := func(i int) any {
 		if i >= len(a) {
@@ -401,6 +423,8 @@ func (p *parser) call(name string, a []any) any {
 	panic(fmt.Errorf("unknown function %s; functions are: %s", name, strings.Join(Functions, ", ")))
 }
 
+// unit is the unit of time argument i names, in lower case and plural;
+// days when it names none.
 func unit(a []any, i int) string {
 	if i < len(a) {
 		u := strings.ToLower(text(a[i]))
@@ -412,6 +436,8 @@ func unit(a []any, i int) string {
 	return "days"
 }
 
+// flatten spreads list arguments out among the others, leaving empty
+// values out.
 func flatten(a []any) []any {
 	var out []any
 	for _, v := range a {
@@ -424,6 +450,7 @@ func flatten(a []any) []any {
 	return out
 }
 
+// isEmpty says whether a value is empty: nothing, no text or an empty list.
 func isEmpty(v any) bool {
 	switch x := v.(type) {
 	case nil:
@@ -436,6 +463,7 @@ func isEmpty(v any) bool {
 	return false
 }
 
+// truthy is a value taken as a yes or no.
 func truthy(v any) bool {
 	switch x := v.(type) {
 	case bool:
@@ -446,6 +474,8 @@ func truthy(v any) bool {
 	return !isEmpty(v)
 }
 
+// num is a value taken as a number; text that is not one panics (see the
+// package comment).
 func num(v any) float64 {
 	switch x := v.(type) {
 	case float64:
@@ -473,6 +503,7 @@ func num(v any) float64 {
 // Text shows a value the way a cell does.
 func Text(v any) string { return text(v) }
 
+// text is a value as a cell shows it.
 func text(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -496,6 +527,7 @@ func text(v any) string {
 	return fmt.Sprint(v)
 }
 
+// date is a value taken as a time, if it is one.
 func date(v any) (time.Time, bool) {
 	s, ok := v.(string)
 	if !ok || s == "" {
@@ -509,6 +541,8 @@ func date(v any) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+// compare orders two values: texts as texts, yes and no with no first,
+// and anything else as numbers.
 func compare(l, r any) int {
 	if isEmpty(l) && isEmpty(r) {
 		return 0

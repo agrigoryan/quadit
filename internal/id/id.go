@@ -77,7 +77,7 @@ func Valid(s string) bool {
 	if len(s) != 36 {
 		return false
 	}
-	for i := 0; i < 36; i++ {
+	for i := range 36 {
 		c := s[i]
 		switch i {
 		case 8, 13, 18, 23:
@@ -85,7 +85,7 @@ func Valid(s string) bool {
 				return false
 			}
 		default:
-			if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 				return false
 			}
 		}
@@ -94,7 +94,7 @@ func Valid(s string) bool {
 }
 
 // From returns the same id for the same parts every time. It is used where
-// doing something twice must be recognised as the same thing.
+// doing something twice must be recognized as the same thing.
 func From(parts ...string) string {
 	h := sha256.New()
 	for _, p := range parts {

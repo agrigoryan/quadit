@@ -1,3 +1,6 @@
+// Two-step codes: TOTP secrets, the address an app scans, and checking a
+// code.
+
 package auth
 
 import (
@@ -15,13 +18,14 @@ import (
 // Two-step codes are standard TOTP (RFC 6238): six digits, 30 seconds,
 // SHA-1, which is what every authenticator app speaks.
 
+// b32 is the base32 form authenticator apps take secrets in: no padding.
 var b32 = base32.StdEncoding.WithPadding(base32.NoPadding)
 
 // NewTOTPSecret returns a new secret in the text form apps accept.
 func NewTOTPSecret() string {
 	raw := make([]byte, 20)
 	if _, err := rand.Read(raw); err != nil {
-		panic(err)
+		panic(err) // the system has no randomness: nothing safe can be done
 	}
 	return b32.EncodeToString(raw)
 }

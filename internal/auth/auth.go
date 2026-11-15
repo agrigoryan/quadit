@@ -1,5 +1,8 @@
 // Package auth holds the credential primitives: password hashes, random
 // tokens and their stored hashes, and sealing secrets at rest.
+//
+//	auth.go   passwords, tokens and the Sealer
+//	totp.go   two-step codes (TOTP)
 package auth
 
 import (

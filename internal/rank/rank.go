@@ -52,7 +52,7 @@ func Before(b string) string { return Between("", b) }
 
 // ForNumber returns the rank a new row gets when it is added at the end and
 // rows are numbered 1, 2, 3... Ranks made this way have one width, sort in
-// number order, and leave room between neighbours for later moves, so
+// number order, and leave room between neighbors for later moves, so
 // appending never makes ranks longer.
 func ForNumber(n int) string {
 	if n < 0 {

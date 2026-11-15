@@ -1,5 +1,5 @@
 // Package testdb opens every kind of database for tests, so one test body
-// proves the same behaviour on each.
+// proves the same behavior on each.
 //
 // SQLite always runs, in a temporary file. Postgres runs when
 // QUADIT_TEST_POSTGRES holds a connection URL, for example
@@ -34,24 +34,29 @@ func Each(t *testing.T, fn func(t *testing.T, st store.Store)) {
 			t.Skip("QUADIT_TEST_POSTGRES is not set")
 		}
 		schema := fmt.Sprintf("t%d", time.Now().UnixNano())
+		ctx := context.Background()
 		admin, err := sql.Open("pgx", url)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := admin.Exec(`CREATE SCHEMA ` + schema); err != nil {
+		if _, err := admin.ExecContext(ctx, `CREATE SCHEMA `+schema); err != nil {
 			t.Fatal(err)
 		}
 		sep := "?"
 		if strings.Contains(url, "?") {
 			sep = "&"
 		}
-		st, err := postgres.Open(context.Background(), url+sep+"search_path="+schema)
+		st, err := postgres.Open(ctx, url+sep+"search_path="+schema)
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() {
-			st.Close()
-			admin.Exec(`DROP SCHEMA ` + schema + ` CASCADE`)
+			if err := st.Close(); err != nil {
+				t.Logf("closing the test database: %v", err)
+			}
+			if _, err := admin.ExecContext(ctx, `DROP SCHEMA `+schema+` CASCADE`); err != nil {
+				t.Logf("schema %s is left behind: %v", schema, err)
+			}
 			admin.Close()
 		})
 		fn(t, st)
@@ -65,6 +70,10 @@ func SQLite(t *testing.T) store.Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { st.Close() })
+	t.Cleanup(func() {
+		if err := st.Close(); err != nil {
+			t.Logf("closing the test database: %v", err)
+		}
+	})
 	return st
 }
