@@ -15,6 +15,8 @@ interface ProviderSetting {
   /** OpenID Connect only. */
   issuer?: string;
   name?: string;
+  /** OpenID Connect only: an address the provider does not say it verified is taken as verified. */
+  trust_email?: boolean;
 }
 
 const empty: ProviderSetting = { enabled: false, client_id: "", client_secret: "" };
@@ -57,6 +59,15 @@ export function ProviderForm({ provider, name }: Props) {
           <TextField label={t("admin.provider.issuer")} value={d.issuer ?? ""} onChange={(issuer) => form.set({ issuer })} error={e.issuer} placeholder="https://id.example.com" hint={t("admin.provider.issuerHint")} />
           <TextField label={t("admin.provider.button")} value={d.name ?? ""} onChange={(v) => form.set({ name: v })} placeholder={t("admin.provider.buttonDefault")} hint={t("admin.provider.buttonHint")} />
         </div>
+      )}
+      {oidc && (
+        <SwitchRow
+          title={t("admin.provider.trustEmail")}
+          hint={t("admin.provider.trustEmailHint")}
+          checked={d.trust_email ?? false}
+          disabled={form.locked}
+          onChange={(trust_email) => form.set({ trust_email })}
+        />
       )}
       <div className="grid gap-3.5 sm:grid-cols-2">
         <TextField label={t("admin.provider.clientId")} value={d.client_id} onChange={(client_id) => form.set({ client_id })} error={e.client_id} mono />

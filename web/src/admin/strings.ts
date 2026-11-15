@@ -72,6 +72,8 @@ export const adminStrings = {
   "admin.provider.clientSecret": "Client secret",
   "admin.provider.issuer": "Issuer",
   "admin.provider.issuerHint": "The provider's address. Its configuration is read from there.",
+  "admin.provider.trustEmail": "Trust its email addresses",
+  "admin.provider.trustEmailHint": "Only for a provider that checks every address but does not say so.",
   "admin.provider.button": "Button name",
   "admin.provider.buttonDefault": "Single sign-on",
   "admin.provider.buttonHint": "What the sign-in button says after “Continue with”.",

@@ -25,7 +25,8 @@ func (p oidcSignIn) ID() string { return p.id }
 
 func (p oidcSignIn) Configured(cfg *oauthSetting) bool {
 	if p.issuer != "" {
-		cfg.Name, cfg.Issuer = p.name, p.issuer
+		// A known provider says itself whether it verified an address.
+		cfg.Name, cfg.Issuer, cfg.TrustEmail = p.name, p.issuer, false
 		return true
 	}
 	if cfg.Name == "" {
@@ -91,9 +92,19 @@ func (p oidcSignIn) Identity(ctx context.Context, cfg oauthSetting, _ *oauth2.Co
 	if err := idt.Claims(&claims); err != nil {
 		return who, err
 	}
-	who = outsider{Subject: idt.Subject, Email: strings.ToLower(claims.Email), Name: claims.Name, Verified: claims.Verified == nil || *claims.Verified}
+	who = outsider{Subject: idt.Subject, Email: strings.ToLower(claims.Email), Name: claims.Name, Verified: emailVerified(claims.Verified, cfg.TrustEmail)}
 	if who.Name == "" {
 		who.Name = claims.Username
 	}
 	return who, nil
+}
+
+// emailVerified says whether the provider's address is taken as verified:
+// when the provider says so, or, when it says nothing, when the admin trusts
+// its addresses.
+func emailVerified(said *bool, trust bool) bool {
+	if said == nil {
+		return trust
+	}
+	return *said
 }

@@ -59,6 +59,9 @@ type oauthSetting struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	Issuer       string `json:"issuer"` // OpenID Connect providers
+	// TrustEmail takes the address of a general OpenID Connect provider as
+	// verified when the provider does not say whether it is.
+	TrustEmail bool `json:"trust_email"`
 	// For GitHub Enterprise, or tests: where the provider lives.
 	AuthURL  string `json:"auth_url"`
 	TokenURL string `json:"token_url"`

@@ -33,7 +33,7 @@ Everything else is set in the admin area of the web app. Each setting can also c
 | `auth.allowed_domains` | `["example.com"]` limits new accounts to these email domains |
 | `auth.require_2fa` | `true` requires a second step (codes or a passkey) from everyone |
 | `auth.google`, `auth.github` | `{"enabled": true, "client_id": "…", "client_secret": "…"}`. Redirect address: `<url>/api/v1/auth/oauth/google/callback` |
-| `auth.oidc` | The same, plus `"issuer"` and a `"name"` for the button. Any OpenID Connect provider |
+| `auth.oidc` | The same, plus `"issuer"` and a `"name"` for the button. Any OpenID Connect provider. Add `"trust_email": true` only if the provider checks every address but does not say so: an address it does not call verified is otherwise not enough to sign in to the account that has it |
 | `mail` | `{"host", "port", "username", "password", "from", "tls"}`. `tls` is `starttls` (default), `tls` or `none` |
 | `files` | Where uploads go: see below |
 | `files.max_mb` | Largest upload, default 250 |
