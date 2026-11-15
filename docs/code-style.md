@@ -10,8 +10,8 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 3. Packages below `server` never import it. `server` holds routing, the request context, sign-in and thin handlers; a feature with logic of its own is a package.
 
 ### Functions
-4. A function stays under 80 lines and cyclomatic complexity 20. Longer work becomes a struct for one run with small named methods, run as a list of steps. There is no limit on nesting depth: nesting that follows the shape of the data or the problem (a loop in a loop over a tree, a switch inside a range) is fine. Prefer an early return to an `else` where that reads better, but do not split a function only to flatten it.
-5. At most 6 parameters, and no two bools side by side; beyond that, pass a struct.
+4. A function does one thing a reader can name. There are no limits on its length, its nesting or its number of branches: a long function that reads top to bottom as one story is fine, and so is deep nesting that follows the shape of the data. Split a function when a part of it has a name of its own and the whole reads better with that name in its place; when work has many steps that share state, a struct for one run with named methods is the usual form (see `internal/importer`). Never split only to make something shorter or flatter.
+5. A call should read as what it says. When a function's parameters are hard to tell apart at the call site (several of the same type in a row, or bare `true, false`), pass a struct with named fields instead.
 6. Every exported name, and every function of 20 lines or more, has a comment saying what it is for, starting with its name. A comment sits on the declaration it describes: moving code moves its comment.
 7. Comments say what a thing is for, in plain words. They do not restate the code, and they do not tell the history of a change.
 
@@ -62,9 +62,9 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 8. An effect synchronises with something outside React, has a complete dependency array and cleans up. State derived from props is computed in render or reset with `key`.
 9. No `Date.now()` or `Math.random()` in render. Use `useNow`, `useMinute` or an event handler.
 
-### Size
-10. A component stays under 150 lines, 8 props and 5 `useState`. Beyond that, extract a hook or a child, or use one state object.
-11. A function stays under 80 lines.
+### Shape
+10. A component does one thing a reader can name. There are no limits on its length, its props or its state. Extract a hook or a child when that part has a name of its own; when several pieces of state always change together (the fields of one form), hold them as one state object.
+11. The same goes for plain functions: split by meaning, never by length.
 12. A form uses `useSubmit` and `useFieldErrors`. No hand-rolled busy flag.
 
 ### Types

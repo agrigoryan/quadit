@@ -33,9 +33,6 @@ linters:
     - modernize
     - nolintlint
     - gochecknoinits
-    # size
-    - funlen
-    - gocyclo
   settings:
     govet:
       enable-all: true
@@ -89,18 +86,6 @@ linters:
         - name: unused-parameter
         - name: blank-imports
         - name: redefines-builtin-id
-        - name: argument-limit
-          arguments: [6]
-        - name: function-result-limit
-          arguments: [3]
-        - name: flag-parameter
-          severity: warning
-    funlen:
-      lines: 80
-      statements: 60
-      ignore-comments: true
-    gocyclo:
-      min-complexity: 20
     nolintlint:
       require-explanation: true
       require-specific: true
@@ -109,16 +94,13 @@ linters:
   exclusions:
     generated: lax
     rules:
-      # Tests tell a story top to bottom: size limits and bare errors in
-      # set-up are not what we police there.
+      # Tests tell a story top to bottom: bare errors in set-up are not what
+      # we police there.
       - path: _test\.go
-        linters: [funlen, gocyclo, errcheck, noctx, unparam, contextcheck, bodyclose]
+        linters: [errcheck, noctx, unparam, contextcheck, bodyclose]
       - path: _test\.go
         linters: [revive]
-        text: "(exported|unused-parameter|argument-limit|flag-parameter)"
-      # The formula parser reports syntax errors by panic and recovers at Eval.
-      - path: internal/formula/
-        linters: [funlen, gocyclo]
+        text: "(exported|unused-parameter)"
       # main and the command table.
       - path: cmd/
         linters: [gochecknoinits]
