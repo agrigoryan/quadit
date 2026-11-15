@@ -1,9 +1,30 @@
 // Package store defines the data layer in the product's own terms. The rest
 // of the code talks to these interfaces and never to SQL; each database is an
-// implementation that must pass the same tests.
+// implementation that must pass the same tests (package sqlstore, opened by
+// package sqlite or postgres).
+//
+// Three interfaces:
+//
+//	DB     reads and writes rows: by conditions (Cond, Q), and the task list,
+//	       the feed and full-text search, which conditions cannot express.
+//	Tx     the DB of one write to one workspace, inside Store.Write: it
+//	       hands out the workspace's event numbers and stores events.
+//	Store  one database: a DB that sees every row, plus Write and Atomic
+//	       (transactions), Dump, Load and Overwrite (backups), and In.
+//
+// In(workspaceID) returns a DB bound to that workspace, and that is the
+// guarantee the rest of the code relies on: every statement it runs on a
+// workspace table is limited to rows of that workspace, so a row of
+// another workspace is ErrNotFound and is never counted, listed, changed
+// or deleted, and a row inserted through it is put in that workspace
+// whatever its WorkspaceID says. Global tables (tables.go) are not
+// limited. A Tx is bound the same way.
 //
 // Rows are the structs in package core. A struct's table is registered in
 // tables.go; its db tags name the columns.
+//
+// The files: store.go holds the interfaces, conditions and filters;
+// tables.go the registry of tables.
 package store
 
 import (
@@ -37,16 +58,38 @@ type Cond struct {
 	Val any
 }
 
-func Eq(col string, v any) Cond            { return Cond{col, "=", v} }
-func Ne(col string, v any) Cond            { return Cond{col, "!=", v} }
-func Gt(col string, v any) Cond            { return Cond{col, ">", v} }
-func Gte(col string, v any) Cond           { return Cond{col, ">=", v} }
-func Lt(col string, v any) Cond            { return Cond{col, "<", v} }
-func Lte(col string, v any) Cond           { return Cond{col, "<=", v} }
-func In(col string, vals []string) Cond    { return Cond{col, "in", vals} }
-func NotIn(col string, v []string) Cond    { return Cond{col, "notin", v} }
-func Null(col string) Cond                 { return Cond{col, "null", nil} }
-func NotNull(col string) Cond              { return Cond{col, "notnull", nil} }
+// Eq is col = v; with a nil v, col IS NULL.
+func Eq(col string, v any) Cond { return Cond{col, "=", v} }
+
+// Ne is col != v; with a nil v, col IS NOT NULL.
+func Ne(col string, v any) Cond { return Cond{col, "!=", v} }
+
+// Gt is col > v.
+func Gt(col string, v any) Cond { return Cond{col, ">", v} }
+
+// Gte is col >= v.
+func Gte(col string, v any) Cond { return Cond{col, ">=", v} }
+
+// Lt is col < v.
+func Lt(col string, v any) Cond { return Cond{col, "<", v} }
+
+// Lte is col <= v.
+func Lte(col string, v any) Cond { return Cond{col, "<=", v} }
+
+// In is col IN (vals). An empty list selects nothing.
+func In(col string, vals []string) Cond { return Cond{col, "in", vals} }
+
+// NotIn is col NOT IN (v). An empty list leaves every row in.
+func NotIn(col string, v []string) Cond { return Cond{col, "notin", v} }
+
+// Null is col IS NULL.
+func Null(col string) Cond { return Cond{col, "null", nil} }
+
+// NotNull is col IS NOT NULL.
+func NotNull(col string) Cond { return Cond{col, "notnull", nil} }
+
+// Like is a LIKE in any case: the column and the pattern are compared in
+// lowercase. % and _ in the pattern are LIKE's wildcards.
 func Like(col string, pattern string) Cond { return Cond{col, "like", pattern} }
 
 // Live selects rows that are not in the trash.
@@ -228,6 +271,9 @@ type SearchDoc struct {
 	Body       string
 }
 
+// SearchQuery asks the full-text index for the entries that hold every word
+// of Text, of the Kinds and in the ProjectIDs when they are set, that Viewer
+// may see; at most Limit of them.
 type SearchQuery struct {
 	Text       string
 	Kinds      []string
@@ -236,6 +282,8 @@ type SearchQuery struct {
 	Limit      int
 }
 
+// SearchHit is one entry Search found, with a snippet of its body around
+// the words found, which are marked with **.
 type SearchHit struct {
 	Kind      string `json:"kind"`
 	EntityID  string `json:"entity_id"`
