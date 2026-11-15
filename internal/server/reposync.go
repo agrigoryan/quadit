@@ -116,6 +116,7 @@ type syncResult struct {
 	PagesCreated int    `json:"pages_created"`
 	PagesTrashed int    `json:"pages_trashed"`
 	FilesWritten int    `json:"files_written"`
+	FilesRemoved int    `json:"files_removed,omitempty"`
 	Commit       string `json:"commit"`
 	Pushed       string `json:"pushed,omitempty"`
 	Note         string `json:"note,omitempty"`
@@ -195,6 +196,7 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	if _, err := git(ctx, dir, "clean", "--quiet", "-fd"); err != nil {
 		return res, err
 	}
+	noFolder := "" // said while the folder is missing; taken back once this sync has made it
 	root := filepath.Join(dir, filepath.FromSlash(src.Subdir))
 	// Whatever is stored, and whatever links the repository holds, nothing
 	// outside the checkout is ever read or written.
@@ -206,7 +208,8 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 	} else if src.Subdir != "" && serr != nil {
 		// Said, and not the end of it: pages written here may be what
 		// makes the folder.
-		res.Note = "the repository has no folder " + src.Subdir + " on " + branch + " yet"
+		noFolder = "the repository has no folder " + src.Subdir + " on " + branch + " yet"
+		res.Note = noFolder
 	}
 	files := map[string]string{} // path under the folder -> text
 	err = filepath.WalkDir(root, func(p string, e os.DirEntry, werr error) error {
@@ -378,6 +381,32 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 				dirOf = parent.SourcePath
 			}
 			path := dirOf + slugFrom(orText(page.Title, "untitled")) + ".md"
+			// The file by its name is about to be removed, because the page
+			// that had it went to the trash: this page takes the file over
+			// instead, so the repository never sees it go and come back.
+			if at := indexOf(toRemove, path); at >= 0 {
+				body, err := pageMD(page.ID)
+				if err != nil {
+					return err
+				}
+				toRemove = append(toRemove[:at], toRemove[at+1:]...)
+				if owner, ok := byPath[path]; ok && owner.ID != page.ID {
+					if _, err := tx.Update(ctx, "docs", map[string]any{"source_path": "", "source_hash": ""}, store.Eq("id", owner.ID)); err != nil {
+						return err
+					}
+				}
+				set := map[string]any{"source_id": src.ID, "source_path": path}
+				if strings.TrimSpace(files[path]) == strings.TrimSpace(body) {
+					set["source_hash"] = sha(files[path]) + ":" + sha(body) // already the same: nothing to write
+				} else {
+					toWrite[path] = body
+					written[page.ID] = sha(body)
+				}
+				if _, err := tx.Update(ctx, "docs", set, store.Eq("id", page.ID)); err != nil {
+					return err
+				}
+				continue
+			}
 			// A name no file has, and that no link in the repository stands
 			// on (a link is not a page, and is not written through).
 			taken := func(p string) bool {
@@ -506,7 +535,10 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		}
 		return res, fmt.Errorf("the repository refused the push to %s: %w", target, err)
 	}
-	res.FilesWritten, res.Pushed = n, target
+	res.FilesWritten, res.FilesRemoved, res.Pushed = len(toWrite), len(toRemove), target
+	if noFolder != "" && len(toWrite) > 0 {
+		res.Note = strings.TrimSpace(strings.Replace(res.Note, noFolder, "", 1)) // it has the folder now
+	}
 	res.Commit, _ = git(ctx, dir, "rev-parse", "--short", "HEAD")
 	// What was pushed is now the common ground for those pages.
 	for docID, pageHash := range written {
@@ -607,4 +639,13 @@ func staysInside(dir, path string) bool {
 		}
 	}
 	return true
+}
+
+func indexOf(list []string, v string) int {
+	for i, x := range list {
+		if x == v {
+			return i
+		}
+	}
+	return -1
 }

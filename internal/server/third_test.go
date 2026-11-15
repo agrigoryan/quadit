@@ -553,6 +553,50 @@ func TestSyncAwkwardRepositories(t *testing.T) {
 	} else {
 		t.Fatal("the page trashed with its file is not in the trash")
 	}
+	// Two pages saying the same, one of them unwritten: throwing away the
+	// one that has the file hands the file to the other. The repository
+	// never sees the file go and come back.
+	twin := func(title, id string) string {
+		var docs struct{ Docs []struct{ ID, Title string } }
+		s.call(s.owner, "", "GET", w+"/docs", nil, 200, &docs)
+		for _, d := range docs.Docs {
+			if d.Title == title && d.ID != id {
+				return d.ID
+			}
+		}
+		t.Fatalf("no other page %q", title)
+		return ""
+	}
+	git(work, "pull", "-q", "origin", "main")
+	os.WriteFile(filepath.Join(work, "docs", "solo.md"), []byte("solo text\n"), 0o644)
+	git(work, "add", "-A")
+	git(work, "commit", "-q", "-m", "solo")
+	git(work, "push", "-q", "origin", "main")
+	sync(200)
+	first := page("solo")
+	git(work, "rm", "-q", "docs/solo.md")
+	git(work, "commit", "-q", "-m", "solo deleted")
+	git(work, "push", "-q", "origin", "main")
+	sync(200)
+	git(work, "revert", "--no-edit", "HEAD")
+	git(work, "push", "-q", "origin", "main")
+	sync(200)
+	s.change(s.owner, "", "doc.restore", M{"id": first})
+	sync(200)
+	s.change(s.owner, "", "doc.delete", M{"id": twin("solo", first)})
+	out1 := sync(200)
+	sync(200)
+	if n := strings.Count(strings.TrimSpace(git(bare, "log", "--oneline", "main", "--", "docs/solo.md")), "\n") + 1; n != 3 {
+		t.Fatalf("the file was removed and written again: %d commits touch it (want the 3 made in the repository); first sync said %s\n%s", n, out1, git(bare, "log", "--oneline", "main", "--", "docs/solo.md"))
+	}
+	if got := git(bare, "show", "main:docs/solo.md"); got != "solo text\n" {
+		t.Fatalf("the file after its page changed hands: %q", got)
+	}
+	s.change(s.owner, "", "doc.write", M{"doc": first, "markdown": "solo, edited by its new owner\n"})
+	sync(200)
+	if got := git(bare, "show", "main:docs/solo.md"); !strings.Contains(got, "edited by its new owner") {
+		t.Fatalf("the page that took the file over does not write to it: %q", got)
+	}
 	var live struct{ Docs []struct{ Title string } }
 	s.call(s.owner, "", "GET", w+"/docs", nil, 200, &live)
 	found := false
