@@ -36,6 +36,13 @@ func ChangeTypes() []string {
 	return slices.Sorted(maps.Keys(handlers))
 }
 
+// ArgsType returns the struct a change's arguments are read into, for a
+// tool that needs their Go types in full rather than the catalog's summary.
+func ArgsType(changeType string) (reflect.Type, bool) {
+	h, ok := handlers[changeType]
+	return h.args, ok
+}
+
 // MinRole returns the least role that may send a change type.
 func MinRole(changeType string) (core.Role, bool) {
 	h, ok := handlers[changeType]

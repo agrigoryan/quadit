@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build server web test test-all lint dev seed clean fmt release image
+.PHONY: all build server web generate test test-all lint dev seed clean fmt release image
 
 all: build
 
@@ -17,6 +17,11 @@ server:
 
 web:
 	cd web && pnpm install --frozen-lockfile && pnpm build
+
+# The web app's types for every change and its arguments, from the engine.
+# A test (cmd/webchanges) fails until this is run after an argument changes.
+generate:
+	go run ./cmd/webchanges
 
 test:
 	go test ./...
