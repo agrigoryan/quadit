@@ -36,13 +36,30 @@ const sections: Section[] = [
     rows: [
       { what: "shortcuts.down", keys: ["J"] },
       { what: "shortcuts.up", keys: ["K"] },
+      { what: "shortcuts.peek", keys: ["Space"] },
       { what: "shortcuts.open", keys: ["Enter"] },
+      { what: "shortcuts.newTab", keys: [`${MOD} Click`] },
       { what: "shortcuts.select", keys: ["X"] },
       { what: "shortcuts.status", keys: ["S"] },
       { what: "shortcuts.assignee", keys: ["A"] },
       { what: "shortcuts.priority", keys: ["P"] },
       { what: "shortcuts.labels", keys: ["L"] },
       { what: "shortcuts.clear", keys: ["Esc"] },
+    ],
+  },
+  {
+    title: "shortcuts.group.panel",
+    hint: "shortcuts.group.panelHint",
+    rows: [
+      { what: "shortcuts.peekNext", keys: ["J", "K"], join: "or" },
+      { what: "shortcuts.openPage", keys: ["Enter"] },
+      { what: "shortcuts.peekClose", keys: ["Space", "Esc"], join: "or" },
+      { what: "shortcuts.back", keys: ["Esc"] },
+      { what: "shortcuts.status", keys: ["S"] },
+      { what: "shortcuts.assignee", keys: ["A"] },
+      { what: "shortcuts.priority", keys: ["P"] },
+      { what: "shortcuts.labels", keys: ["L"] },
+      { what: "shortcuts.send", keys: [`${MOD} Enter`] },
     ],
   },
   {
@@ -59,16 +76,6 @@ const sections: Section[] = [
     rows: [
       { what: "shortcuts.archive", keys: ["E"] },
       { what: "shortcuts.toggleRead", keys: ["U"] },
-    ],
-  },
-  {
-    title: "shortcuts.group.panel",
-    rows: [
-      { what: "shortcuts.status", keys: ["S"] },
-      { what: "shortcuts.assignee", keys: ["A"] },
-      { what: "shortcuts.priority", keys: ["P"] },
-      { what: "shortcuts.labels", keys: ["L"] },
-      { what: "shortcuts.send", keys: [`${MOD} Enter`] },
     ],
   },
   {
