@@ -3,7 +3,6 @@
 // in pixels down the full height of the list. Only the rows on screen are
 // drawn; this says which those are, and where the row at a position is.
 
-import { useMemo } from "react";
 import type { Task } from "@/lib/types";
 import type { TaskGroup } from "@/tasks/filters";
 
@@ -64,11 +63,6 @@ export function layOut(groups: TaskGroup[], folded: ReadonlySet<string>): ListLa
     top += height;
   }
   return { sections, rows, indexOf, total: top };
-}
-
-/** The layout, worked out again only when the groups or the folding change. */
-export function useListLayout(groups: TaskGroup[], folded: ReadonlySet<string>): ListLayout {
-  return useMemo(() => layOut(groups, folded), [groups, folded]);
 }
 
 /**

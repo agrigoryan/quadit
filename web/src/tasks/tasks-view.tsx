@@ -1,23 +1,22 @@
 // A page of tasks: the toolbar (layout, filters, grouping, views) over a
-// list or a board. What it starts from is tasks/saved-view.ts, how its
-// filters follow the address tasks/page-state.ts, and which tasks it shows
-// tasks/page-tasks.ts.
+// list or a board. What it starts from is tasks/saved-view.ts, and how its
+// filters follow the address tasks/page-state.ts.
 
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { FileWarning, ListTodo, Plus, SearchX } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { send } from "@/lib/mutate";
-import { useCollection, useMe } from "@/lib/selectors";
+import { useCollection, useLiveTasks, useMe, useOpenDecisions } from "@/lib/selectors";
+import { useRestLoaded } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { Project, View } from "@/lib/types";
+import { isOpenCategory, type Project, type View } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { BulkBar } from "@/tasks/bulk-bar";
 import { type NewTaskDraft, openNewTask } from "@/tasks/draft";
 import { FilterBar } from "@/tasks/filter-bar";
-import { countFilters, emptyFilters, type Filters, sameFilters } from "@/tasks/filters";
+import { comparer, countFilters, emptyFilters, type Filters, groupTasks, matcher, sameFilters } from "@/tasks/filters";
 import { LayoutTabs } from "@/tasks/layout-tabs";
 import { usePageState } from "@/tasks/page-state";
-import { usePageTasks } from "@/tasks/page-tasks";
 import { useSavedView } from "@/tasks/saved-view";
 import { TaskList } from "@/tasks/task-list";
 import { DisplayControls, ViewControls } from "@/tasks/view-controls";
@@ -63,9 +62,36 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
     routeLayout,
   });
   usePageTitle(view ? view.name : (project?.name ?? ""));
-  const { tasks, groups, projectIds, restLoaded } = usePageTasks(state, project, query, tables);
+  const all = useLiveTasks();
+  const openDecisions = useOpenDecisions();
+
+  // The projects a page is about: its own, or those its view's query names (none: every project).
+  const projectIds = useMemo(() => {
+    if (project) return [project.id];
+    const keys = (query?.project ?? []).map((k) => k.toLowerCase());
+    return Object.values(projects)
+      .filter((p) => keys.includes(p.key.toLowerCase()) || keys.includes(p.id))
+      .map((p) => p.id);
+  }, [project, query, projects]);
 
   const board = state.layout === "board";
+  const tasks = useMemo(() => {
+    const match = matcher(state.filters, { statuses }, openDecisions);
+    const scoped = new Set(projectIds);
+    const inScope = all.filter((task) => (scoped.size === 0 || scoped.has(task.project_id)) && match(task));
+    return inScope.sort(comparer(board ? "manual" : state.sort));
+  }, [all, state.filters, state.sort, board, statuses, openDecisions, projectIds]);
+
+  // The board keeps every column; the list leaves out sections with nothing in them. Finished work arrives
+  // after the rest: until it has, the Done and Canceled sections stay, saying so, instead of looking empty.
+  const restLoaded = useRestLoaded();
+  const groups = useMemo(() => {
+    const by = board ? state.boardGroup : state.group;
+    const made = groupTasks(tasks, by, { statuses, members, epics, labels }, project?.id, board || !restLoaded);
+    if (board || restLoaded) return made;
+    return made.filter((g) => g.tasks.length > 0 || (g.kind === "status" && !isOpenCategory(g.category)));
+  }, [tasks, state.group, state.boardGroup, board, restLoaded, statuses, members, epics, labels, project?.id]);
+
   const changed =
     !!view &&
     !!saved &&
