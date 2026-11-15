@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -86,8 +85,7 @@ func (s *Server) handleReadFeed(x *c) error {
 		}
 		// A cursor not moved yet stands at the start.
 		var saved core.Cursor
-		err := x.db.Get(ctx, &saved, store.Eq("user_id", x.member.UserID), store.Eq("name", cursor))
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		if _, err := store.Find(ctx, x.db, &saved, store.Eq("user_id", x.member.UserID), store.Eq("name", cursor)); err != nil {
 			return err
 		}
 		f.After = saved.Seq
@@ -235,11 +233,11 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "seq", Message: fmt.Sprintf("the feed is at %d; %d has not happened yet", ws.Seq, seq)}
 	}
 	var cur core.Cursor
-	err := x.db.Get(x.ctx(), &cur, store.Eq("user_id", x.member.UserID), store.Eq("name", name))
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(x.ctx(), x.db, &cur, store.Eq("user_id", x.member.UserID), store.Eq("name", name))
+	if err != nil {
 		return err
 	}
-	if err == nil && cur.Seq >= seq {
+	if there && cur.Seq >= seq {
 		return nil
 	}
 	return x.db.Upsert(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
@@ -250,8 +248,7 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 // never moved stands at 0.
 func (s *Server) handleShowFeedCursor(x *c) error {
 	var cursor core.Cursor
-	err := x.db.Get(x.ctx(), &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name")))
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if _, err := store.Find(x.ctx(), x.db, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name"))); err != nil {
 		return err
 	}
 	return x.ok(map[string]any{"name": x.r.PathValue("name"), "seq": cursor.Seq})

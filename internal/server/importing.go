@@ -108,11 +108,10 @@ func (s *Server) importSource(x *c, b importBody) (source string, cleanup func()
 	}
 	ctx := x.ctx()
 	var f core.File
-	there, err := rowFound(x.db.Get(ctx, &f, store.Eq("id", b.File), store.Live))
-	if err != nil {
+	if err := x.db.Get(ctx, &f, store.Eq("id", b.File), store.Live); err != nil {
 		return "", cleanup, err
 	}
-	if !there || f.State != core.FileReady {
+	if f.State != core.FileReady {
 		return "", cleanup, errNotFound("file")
 	}
 	dir, err := os.MkdirTemp("", "quadit-import-*")

@@ -4,7 +4,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -84,14 +83,16 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 		}
 		var database core.Doc
 		var loaded *loadedDatabase
-		err := x.db.Get(x.ctx(), &database, store.Eq("id", dbID), store.Live)
+		there, err := store.Find(x.ctx(), x.db, &database, store.Eq("id", dbID), store.Live)
 		switch {
-		case err == nil && engine.CanSeeDoc(database, x.member.UserID):
+		case err != nil:
+			if readErr == nil {
+				readErr = err
+			}
+		case there && engine.CanSeeDoc(database, x.member.UserID):
 			if loaded, err = x.loadTable(database); err != nil && readErr == nil {
 				readErr = err
 			}
-		case err != nil && !errors.Is(err, store.ErrNotFound) && readErr == nil:
-			readErr = err
 		}
 		related[dbID] = loaded
 		return loaded

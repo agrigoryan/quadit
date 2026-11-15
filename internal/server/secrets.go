@@ -90,9 +90,13 @@ func (s *Server) handleListSecrets(x *c) error {
 // secret loads a secret by name for use, and its value.
 func (s *Server) secret(x *c, name string) (core.Secret, string, error) {
 	var sec core.Secret
-	if err := x.db.Get(x.ctx(), &sec, store.Eq("name", name), store.Live); err != nil {
+	there, err := store.Find(x.ctx(), x.db, &sec, store.Eq("name", name), store.Live)
+	if err != nil {
+		return sec, "", err
+	}
+	if !there {
 		if err := x.db.Get(x.ctx(), &sec, store.Eq("id", name), store.Live); err != nil {
-			return sec, "", errNotFound("secret")
+			return sec, "", err
 		}
 	}
 	if !x.mayUseSecret(sec) {

@@ -5,7 +5,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -654,11 +653,11 @@ func readStored(raw []byte, dst any) {
 // says whether it was found. The line is written without it otherwise; a
 // read that failed is logged, since a line cannot report it.
 func (x *c) foundForLine(dst any, where ...store.Cond) bool {
-	err := x.db.Get(x.ctx(), dst, where...)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(x.ctx(), x.db, dst, where...)
+	if err != nil {
 		x.s.log.Warn("a feed line left out a name it could not read", "err", err)
 	}
-	return err == nil
+	return there
 }
 
 // quietFields say nothing a reader needs on a feed line.

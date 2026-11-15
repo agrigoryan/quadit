@@ -175,10 +175,10 @@ func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watche
 	db := s.st.In(ws.ID)
 	var view core.View
 	var m core.Member
-	if there, err := rowFound(db.Get(ctx, &view, store.Eq("id", vw.SubjectID), store.Live)); err != nil || !there {
+	if there, err := store.Find(ctx, db, &view, store.Eq("id", vw.SubjectID), store.Live); err != nil || !there {
 		return err
 	}
-	if there, err := rowFound(db.Get(ctx, &m, store.Eq("user_id", vw.UserID), store.Null("removed_at"))); err != nil || !there {
+	if there, err := store.Find(ctx, db, &m, store.Eq("user_id", vw.UserID), store.Null("removed_at")); err != nil || !there {
 		return err
 	}
 	q, ok := viewQuery(view)
@@ -293,7 +293,7 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 	d, _ := ev.Payload() // data that does not read matches no condition on it
 	if m.ActorKind != "" {
 		var actor core.Member
-		if there, err := rowFound(db.Get(ctx, &actor, store.Eq("user_id", ev.ActorID))); err != nil || !there || actor.Kind != m.ActorKind {
+		if there, err := store.Find(ctx, db, &actor, store.Eq("user_id", ev.ActorID)); err != nil || !there || actor.Kind != m.ActorKind {
 			return false, err
 		}
 	}
@@ -306,7 +306,7 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 			return false, nil
 		}
 		var status core.Status
-		if there, err := rowFound(db.Get(ctx, &status, store.Eq("id", to))); err != nil || !there || status.Category != m.ToCategory {
+		if there, err := store.Find(ctx, db, &status, store.Eq("id", to)); err != nil || !there || status.Category != m.ToCategory {
 			return false, err
 		}
 	}
@@ -315,7 +315,7 @@ func ruleMatches(ctx context.Context, db store.DB, m *core.RuleMatch, ev core.Ev
 			return false, nil
 		}
 		var t core.Task
-		if there, err := rowFound(db.Get(ctx, &t, store.Eq("id", ev.ScopeID))); err != nil || !there || !slices.Contains(t.LabelIDs, m.LabelID) {
+		if there, err := store.Find(ctx, db, &t, store.Eq("id", ev.ScopeID)); err != nil || !there || !slices.Contains(t.LabelIDs, m.LabelID) {
 			return false, err
 		}
 	}

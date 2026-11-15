@@ -202,18 +202,18 @@ func (s *Server) invite(ctx context.Context, token string) (core.Invite, core.Wo
 	var inv core.Invite
 	var ws core.Workspace
 	gone := &engine.Error{Code: engine.CodeNotFound, Message: "this invitation is no longer valid; ask for a new one"}
-	if err := s.st.Get(ctx, &inv, store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at")); errors.Is(err, store.ErrNotFound) {
-		return inv, ws, gone
-	} else if err != nil {
+	there, err := store.Find(ctx, s.st, &inv, store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at"))
+	if err != nil {
 		return inv, ws, err
 	}
-	if inv.ExpiresAt < time.Now().UnixMilli() || inv.Uses >= inv.MaxUses {
+	if !there || inv.ExpiresAt < time.Now().UnixMilli() || inv.Uses >= inv.MaxUses {
 		return inv, ws, gone
 	}
-	if err := s.st.Get(ctx, &ws, store.Eq("id", inv.WorkspaceID), store.Live); errors.Is(err, store.ErrNotFound) {
-		return inv, ws, gone
-	} else if err != nil {
+	if there, err = store.Find(ctx, s.st, &ws, store.Eq("id", inv.WorkspaceID), store.Live); err != nil {
 		return inv, ws, err
+	}
+	if !there {
+		return inv, ws, gone
 	}
 	return inv, ws, nil
 }
@@ -226,17 +226,17 @@ func (s *Server) handleShowInvite(x *c) error {
 	}
 	// An inviter whose account is gone leaves the name blank.
 	var inviter core.User
-	if err := s.st.Get(x.ctx(), &inviter, store.Eq("id", inv.CreatedBy)); err != nil && !errors.Is(err, store.ErrNotFound) {
+	if _, err := store.Find(x.ctx(), s.st, &inviter, store.Eq("id", inv.CreatedBy)); err != nil {
 		return err
 	}
 	out := map[string]any{"workspace": map[string]string{"name": ws.Name, "slug": ws.Slug}, "role": inv.Role, "email": inv.Email, "invited_by": inviter.Name}
 	if inv.Email != "" {
 		var u core.User
-		there, err := rowFound(s.st.Get(x.ctx(), &u, store.Eq("email", inv.Email), store.Live))
+		hasAccount, err := store.Find(x.ctx(), s.st, &u, store.Eq("email", inv.Email), store.Live)
 		if err != nil {
 			return err
 		}
-		out["has_account"] = there
+		out["has_account"] = hasAccount
 	}
 	return x.ok(out)
 }

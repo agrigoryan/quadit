@@ -125,14 +125,8 @@ func githubStateOf(raw json.RawMessage) githubState {
 // integrationOf reads the integration a request names.
 func integrationOf(x *c) (core.Integration, error) {
 	var in core.Integration
-	there, err := rowFound(x.db.Get(x.ctx(), &in, store.Eq("id", x.r.PathValue("id")), store.Live))
-	if err != nil {
-		return in, err
-	}
-	if !there {
-		return in, errNotFound("integration")
-	}
-	return in, nil
+	err := x.db.Get(x.ctx(), &in, store.Eq("id", x.r.PathValue("id")), store.Live)
+	return in, err
 }
 
 // handleSyncIntegration syncs an integration now and says how many pull
@@ -178,7 +172,7 @@ func (s *Server) handleShowIntegrationWebhook(x *c) error {
 func (s *Server) handleReceiveGitHubEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var in core.Integration
-	there, err := rowFound(s.st.Get(ctx, &in, store.Eq("id", r.PathValue("id")), store.Eq("kind", "github"), store.Live))
+	there, err := store.Find(ctx, s.st, &in, store.Eq("id", r.PathValue("id")), store.Eq("kind", "github"), store.Live)
 	if err != nil {
 		s.fail(w, r, err)
 		return

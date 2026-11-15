@@ -161,11 +161,11 @@ func (s *Server) jobNotify(ctx context.Context, j core.Job) error {
 	}
 	db := s.st.In(j.WorkspaceID)
 	var n core.Notification
-	if there, err := rowFound(db.Get(ctx, &n, store.Eq("id", p.ID))); err != nil || !there || n.ReadAt != 0 {
+	if there, err := store.Find(ctx, db, &n, store.Eq("id", p.ID)); err != nil || !there || n.ReadAt != 0 {
 		return err
 	}
 	var u core.User
-	if there, err := rowFound(s.st.Get(ctx, &u, store.Eq("id", n.UserID), store.Live)); err != nil || !there {
+	if there, err := store.Find(ctx, s.st, &u, store.Eq("id", n.UserID), store.Live); err != nil || !there {
 		return err
 	}
 	if u.Kind != core.KindPerson || u.DisabledAt != 0 {
@@ -181,7 +181,7 @@ func (s *Server) jobNotify(ctx context.Context, j core.Job) error {
 		return err
 	}
 	// An actor who is no longer a member is named by nobody.
-	if _, err := rowFound(db.Get(ctx, &actor, store.Eq("user_id", n.ActorID))); err != nil {
+	if _, err := store.Find(ctx, db, &actor, store.Eq("user_id", n.ActorID)); err != nil {
 		return err
 	}
 	link := s.cfg.BaseURL + "/" + ws.Slug + "/inbox"

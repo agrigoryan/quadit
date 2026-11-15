@@ -3,7 +3,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -64,12 +63,12 @@ func (pack *contextPack) parents() error {
 	var parents []taskView
 	for cur, depth := pack.t.ParentID, 0; cur != "" && depth < packParentDepth; depth++ {
 		var up core.Task
-		err := x.db.Get(x.ctx(), &up, store.Eq("id", cur))
-		if errors.Is(err, store.ErrNotFound) {
-			break
-		}
+		there, err := store.Find(x.ctx(), x.db, &up, store.Eq("id", cur))
 		if err != nil {
 			return err
+		}
+		if !there {
+			break
 		}
 		views, err := x.detailedTaskViews([]core.Task{up})
 		if err != nil {
@@ -147,12 +146,12 @@ func (pack *contextPack) recentDecisions() error {
 			continue
 		}
 		var asker core.Task // the task the decision was asked on
-		err := x.db.Get(ctx, &asker, store.Eq("id", decision.TaskID))
-		if errors.Is(err, store.ErrNotFound) {
-			continue
-		}
+		there, err := store.Find(ctx, x.db, &asker, store.Eq("id", decision.TaskID))
 		if err != nil {
 			return err
+		}
+		if !there {
+			continue
 		}
 		if asker.ProjectID == t.ProjectID {
 			recent = append(recent, decision)
@@ -201,12 +200,12 @@ func (pack *contextPack) docs() error {
 	var docs []map[string]any
 	for docID := range docIDs {
 		var doc core.Doc
-		err := x.db.Get(ctx, &doc, store.Eq("id", docID), store.Live)
-		if errors.Is(err, store.ErrNotFound) {
-			continue
-		}
+		there, err := store.Find(ctx, x.db, &doc, store.Eq("id", docID), store.Live)
 		if err != nil {
 			return err
+		}
+		if !there {
+			continue
 		}
 		if engine.CanSeeDoc(doc, x.member.UserID) {
 			docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": x.s.cfg.BaseURL + "/" + x.ws.Slug + "/docs/" + doc.ID})
@@ -241,12 +240,12 @@ func (x *c) namedRefs(refs []core.Ref) ([]namedRef, error) {
 		switch ref.FromScopeType {
 		case "doc":
 			var doc core.Doc
-			err := x.db.Get(ctx, &doc, store.Eq("id", ref.FromScopeID), store.Live)
-			if errors.Is(err, store.ErrNotFound) {
-				continue
-			}
+			there, err := store.Find(ctx, x.db, &doc, store.Eq("id", ref.FromScopeID), store.Live)
 			if err != nil {
 				return nil, err
+			}
+			if !there {
+				continue
 			}
 			if !engine.CanSeeDoc(doc, x.member.UserID) || !x.canProject(doc.ProjectID) {
 				continue
@@ -254,12 +253,12 @@ func (x *c) namedRefs(refs []core.Ref) ([]namedRef, error) {
 			named.Title = doc.Title
 		case "task":
 			var t core.Task
-			err := x.db.Get(ctx, &t, store.Eq("id", ref.FromScopeID), store.Live)
-			if errors.Is(err, store.ErrNotFound) {
-				continue
-			}
+			there, err := store.Find(ctx, x.db, &t, store.Eq("id", ref.FromScopeID), store.Live)
 			if err != nil {
 				return nil, err
+			}
+			if !there {
+				continue
 			}
 			if !x.canProject(t.ProjectID) {
 				continue

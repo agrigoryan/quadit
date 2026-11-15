@@ -3,7 +3,6 @@
 package server
 
 import (
-	"errors"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -14,11 +13,10 @@ import (
 // and in points.
 func (s *Server) handleShowCycleChart(x *c) error {
 	var cycle core.Cycle
-	err := x.db.Get(x.ctx(), &cycle, store.Eq("id", x.r.PathValue("id")), store.Live)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err := x.db.Get(x.ctx(), &cycle, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return err
 	}
-	if err != nil || !x.canProject(cycle.ProjectID) {
+	if !x.canProject(cycle.ProjectID) {
 		return errNotFound("cycle")
 	}
 	names, err := x.names()

@@ -172,7 +172,11 @@ func (s *Server) handleShowConsentPage(x *c) error {
 	q := x.r.URL.Query()
 	ctx := x.ctx()
 	var client core.OAuthClient
-	if err := s.st.Get(ctx, &client, store.Eq("id", q.Get("client_id"))); err != nil {
+	there, err := store.Find(ctx, s.st, &client, store.Eq("id", q.Get("client_id")))
+	if err != nil {
+		return err
+	}
+	if !there {
 		return errBad("unknown client; the client must register first")
 	}
 	if !slices.Contains(client.RedirectURIs, q.Get("redirect_uri")) {
@@ -354,13 +358,13 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 		issue(firstNonEmpty(req.ActAs, req.UserID), req.WorkspaceID, req.ClientID, req.Scope)
 	case "refresh_token":
 		var old core.APIToken
-		err := s.st.Get(ctx, &old, store.Eq("refresh_hash", auth.Hash(form.Get("refresh_token"))), store.Null("revoked_at"))
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		there, err := store.Find(ctx, s.st, &old, store.Eq("refresh_hash", auth.Hash(form.Get("refresh_token"))), store.Null("revoked_at"))
+		if err != nil {
 			s.log.Error("oauth token: the refresh token could not be read", "err", err)
 			fail("server_error", "the refresh token could not be read; try again")
 			return
 		}
-		if err != nil ||
+		if !there ||
 			old.CreatedAt < time.Now().Add(-refreshLife).UnixMilli() || (form.Get("client_id") != "" && form.Get("client_id") != old.ClientID) {
 			fail("invalid_grant", "the refresh token is not valid; sign in again")
 			return

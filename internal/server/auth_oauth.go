@@ -156,12 +156,12 @@ type providerSignIn struct {
 // when not empty, is what the person is told instead of being signed in.
 func (s *Server) oauthAccount(x *c, in providerSignIn) (u core.User, refusal string, err error) {
 	var ident core.Identity
-	err = s.st.Get(x.ctx(), &ident, store.Eq("provider", in.provider), store.Eq("subject", in.who.Subject))
+	there, err := store.Find(x.ctx(), s.st, &ident, store.Eq("provider", in.provider), store.Eq("subject", in.who.Subject))
 	switch {
-	case err == nil:
-		return s.connectedAccount(x.ctx(), in, ident)
-	case !errors.Is(err, store.ErrNotFound):
+	case err != nil:
 		return u, "", err
+	case there:
+		return s.connectedAccount(x.ctx(), in, ident)
 	case in.state.LinkUser != "":
 		return s.connectingAccount(x, in)
 	default:
@@ -174,23 +174,26 @@ func (s *Server) connectedAccount(ctx context.Context, in providerSignIn, ident 
 	if in.state.LinkUser != "" && in.state.LinkUser != ident.UserID {
 		return u, "That " + in.providerName + " account is already connected to someone else.", nil
 	}
-	err = s.st.Get(ctx, &u, store.Eq("id", ident.UserID), store.Live)
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(ctx, s.st, &u, store.Eq("id", ident.UserID), store.Live)
+	if err != nil {
+		return u, "", err
+	}
+	if !there {
 		return u, "That account no longer exists.", nil
 	}
-	return u, "", err
+	return u, "", nil
 }
 
 // connectingAccount is the signed-in account that is connecting the
 // provider's account, which is connected to it now.
 func (s *Server) connectingAccount(x *c, in providerSignIn) (u core.User, refusal string, err error) {
 	ctx := x.ctx()
-	err = s.st.Get(ctx, &u, store.Eq("id", in.state.LinkUser), store.Live)
-	if errors.Is(err, store.ErrNotFound) {
-		return u, "Sign in first, then connect the provider.", nil
-	}
+	there, err := store.Find(ctx, s.st, &u, store.Eq("id", in.state.LinkUser), store.Live)
 	if err != nil {
 		return u, "", err
+	}
+	if !there {
+		return u, "Sign in first, then connect the provider.", nil
 	}
 	if err := s.linkIdentity(ctx, in, u.ID); err != nil {
 		return u, "", err
@@ -206,14 +209,15 @@ func (s *Server) accountByEmail(x *c, in providerSignIn) (u core.User, refusal s
 	if in.who.Email == "" || !in.who.Verified {
 		return u, "Your " + in.providerName + " account has no verified email address.", nil
 	}
-	err = s.st.Get(x.ctx(), &u, store.Eq("email", in.who.Email), store.Live)
-	if errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(x.ctx(), s.st, &u, store.Eq("email", in.who.Email), store.Live)
+	if err != nil {
+		return u, "", err
+	}
+	if !there {
 		// Nobody here yet: allowed only by an invitation or open registration.
 		if u, refusal, err = s.newProviderAccount(x, in); err != nil || refusal != "" {
 			return u, refusal, err
 		}
-	} else if err != nil {
-		return u, "", err
 	}
 	if err := s.linkIdentity(x.ctx(), in, u.ID); err != nil {
 		return u, "", err

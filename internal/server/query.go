@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -532,11 +531,11 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		if len(slug) == idLength {
 			cond = store.Eq("id", slug)
 		}
-		err := x.db.Get(x.ctx(), &view, cond, store.Live)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		there, err := store.Find(x.ctx(), x.db, &view, cond, store.Live)
+		if err != nil {
 			return q, err
 		}
-		if err != nil {
+		if !there {
 			// By its name, as it reads in the sidebar.
 			var named []core.View
 			if err := x.db.List(x.ctx(), &named, store.Where(store.Live)); err != nil {
@@ -544,12 +543,12 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 			}
 			for _, candidate := range named {
 				if strings.EqualFold(candidate.Name, slug) && (candidate.Shared || candidate.OwnerID == x.member.UserID) {
-					view, err = candidate, nil
+					view, there = candidate, true
 					break
 				}
 			}
 		}
-		if err != nil || (!view.Shared && view.OwnerID != x.member.UserID) {
+		if !there || (!view.Shared && view.OwnerID != x.member.UserID) {
 			var all []core.View
 			if err := x.db.List(x.ctx(), &all, store.Where(store.Live)); err != nil {
 				return q, err

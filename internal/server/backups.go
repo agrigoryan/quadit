@@ -302,11 +302,10 @@ func (s *Server) handleDownloadBackup(x *c) error {
 // other is not found.
 func (s *Server) finishedBackup(ctx context.Context, backupID string) (core.Backup, error) {
 	var b core.Backup
-	there, err := rowFound(s.st.Get(ctx, &b, store.Eq("id", backupID)))
-	if err != nil {
+	if err := s.st.Get(ctx, &b, store.Eq("id", backupID)); err != nil {
 		return b, err
 	}
-	if !there || b.FinishedAt == 0 || b.Error != "" {
+	if b.FinishedAt == 0 || b.Error != "" {
 		return b, errNotFound("backup")
 	}
 	return b, nil
@@ -346,7 +345,7 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 		return &engine.Error{Code: engine.CodeNotFound, Message: err.Error()}
 	}
 	var ws core.Workspace
-	there, err := rowFound(s.st.Get(ctx, &ws, store.Eq("slug", it.Workspace), store.Live))
+	there, err := store.Find(ctx, s.st, &ws, store.Eq("slug", it.Workspace), store.Live)
 	if err != nil {
 		return err
 	}

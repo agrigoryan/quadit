@@ -5,7 +5,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -40,11 +39,11 @@ func init() {
 // is not found, as one that does not exist.
 func (x *c) docByID(ref string) (core.Doc, error) {
 	var doc core.Doc
-	err := x.db.Get(x.ctx(), &doc, store.Eq("id", ref), store.Live)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(x.ctx(), x.db, &doc, store.Eq("id", ref), store.Live)
+	if err != nil {
 		return doc, err
 	}
-	if err != nil || !engine.CanSeeDoc(doc, x.member.UserID) || !x.canProject(doc.ProjectID) {
+	if !there || !engine.CanSeeDoc(doc, x.member.UserID) || !x.canProject(doc.ProjectID) {
 		return doc, errNotFound("doc " + ref)
 	}
 	return doc, nil
@@ -261,11 +260,11 @@ func (x *c) pageAnswer(page core.Doc, blocks []core.Block) (map[string]any, erro
 	out["attachments"] = atts
 	if page.SourceID != "" {
 		var source core.DocSource
-		err := x.db.Get(ctx, &source, store.Eq("id", page.SourceID))
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
+		there, err := store.Find(ctx, x.db, &source, store.Eq("id", page.SourceID))
+		if err != nil {
 			return nil, err
 		}
-		if err == nil {
+		if there {
 			out["source"] = source
 		}
 	}
@@ -297,11 +296,7 @@ func (s *Server) handleShowPageVersion(x *c) error {
 		return err
 	}
 	var version core.DocVersion
-	err = x.db.Get(x.ctx(), &version, store.Eq("id", x.r.PathValue("version")), store.Eq("doc_id", page.ID))
-	if errors.Is(err, store.ErrNotFound) {
-		return errNotFound("version")
-	}
-	if err != nil {
+	if err := x.db.Get(x.ctx(), &version, store.Eq("id", x.r.PathValue("version")), store.Eq("doc_id", page.ID)); err != nil {
 		return err
 	}
 	var tree []md.Block
@@ -619,11 +614,11 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 		root.ID = res.Ref
 	}
 	var page core.Doc
-	err = x.db.Get(ctx, &page, store.Eq("parent_id", root.ID), store.Eq("title", strings.TrimSpace(b.Title)), store.Live)
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(ctx, x.db, &page, store.Eq("parent_id", root.ID), store.Eq("title", strings.TrimSpace(b.Title)), store.Live)
+	if err != nil {
 		return err
 	}
-	if err != nil {
+	if !there {
 		res, err := apply("doc.create", map[string]any{"parent": root.ID, "title": strings.TrimSpace(b.Title), "markdown": b.Markdown})
 		if err != nil {
 			return err

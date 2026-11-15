@@ -219,7 +219,7 @@ func (s *Server) startedUpload(x *c, fid string) (core.File, bool, error) {
 	if !id.Valid(fid) {
 		return had, false, errBad("id must be a UUID made by the caller")
 	}
-	there, err := rowFound(x.db.Get(x.ctx(), &had, store.Eq("id", fid)))
+	there, err := store.Find(x.ctx(), x.db, &had, store.Eq("id", fid))
 	if err != nil || !there {
 		return had, false, err
 	}
@@ -281,12 +281,8 @@ func (s *Server) receiveFirstPart(ctx context.Context, f *core.File, src io.Read
 func (s *Server) handleUploadFilePart(x *c) error {
 	ctx := x.ctx()
 	var f core.File
-	there, err := rowFound(x.db.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live))
-	if err != nil {
+	if err := x.db.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return err
-	}
-	if !there {
-		return errNotFound("file")
 	}
 	if f.State != core.FileUploading {
 		return x.ok(s.fileOut(x, f))
@@ -299,7 +295,7 @@ func (s *Server) handleUploadFilePart(x *c) error {
 		return &httpError{Status: 409, Code: "conflict", Message: fmt.Sprintf("offset %d does not match the %d bytes received; continue from %d", offset, f.Received, f.Received)}
 	}
 	body := &counter{r: io.LimitReader(x.r.Body, f.Size-f.Received+1)}
-	err = s.fileStore().Put(ctx, partKey(f, offset), body, "application/octet-stream")
+	err := s.fileStore().Put(ctx, partKey(f, offset), body, "application/octet-stream")
 	n := body.n
 	if err != nil {
 		// A part cut short is not kept: the caller sends it again from the
@@ -548,7 +544,7 @@ func atoiOrZero(s string) int {
 func (s *Server) handleShowFile(x *c) error {
 	var f core.File
 	if err := x.db.Get(x.ctx(), &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
-		return errNotFound("file")
+		return err
 	}
 	if !s.maySeeFile(x, f) {
 		return errNotFound("file")
@@ -568,7 +564,10 @@ func inlineType(ct string) bool {
 func (s *Server) handleServeFile(x *c) error {
 	ctx := x.ctx()
 	var f core.File
-	if err := s.st.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil || f.State != core.FileReady {
+	if err := s.st.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+		return err
+	}
+	if f.State != core.FileReady {
 		return errNotFound("file")
 	}
 	if n, err := s.st.Count(ctx, "members", store.Eq("workspace_id", f.WorkspaceID), store.Eq("user_id", x.user.ID), store.Null("removed_at"),
@@ -698,7 +697,7 @@ func onHiddenPage(ctx context.Context, db store.DB, atts []core.Attachment, user
 	for _, a := range atts {
 		if a.TaskID == "" && a.SubjectID != "" {
 			var d core.Doc
-			there, err := rowFound(db.Get(ctx, &d, store.Eq("id", a.SubjectID)))
+			there, err := store.Find(ctx, db, &d, store.Eq("id", a.SubjectID))
 			if err != nil || (there && !engine.CanSeeDoc(d, userID)) {
 				return true // a page that cannot be read is taken to be one the user cannot see
 			}

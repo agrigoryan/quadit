@@ -155,7 +155,7 @@ func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) stri
 // says how it and its checks stand. A key with no task is passed over.
 func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks string) error {
 	var t core.Task
-	if there, err := rowFound(g.db.Get(ctx, &t, store.Eq("key", key), store.Live)); err != nil || !there {
+	if there, err := store.Find(ctx, g.db, &t, store.Eq("key", key), store.Live); err != nil || !there {
 		return err
 	}
 	num := fmt.Sprint(pr.Number)
@@ -172,7 +172,7 @@ func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks
 			to = g.cfg.OnMerge
 		case (state == "open" || state == "draft") && g.cfg.OnOpen != "":
 			var cur core.Status
-			there, err := rowFound(sys.Tx().Get(ctx, &cur, store.Eq("id", t.StatusID)))
+			there, err := store.Find(ctx, sys.Tx(), &cur, store.Eq("id", t.StatusID))
 			if err != nil {
 				return err
 			}

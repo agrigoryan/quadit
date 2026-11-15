@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -112,12 +111,12 @@ func (s *Server) readSetting(ctx context.Context, name string) (json.RawMessage,
 		return raw, true, nil
 	}
 	var row core.Setting
-	err := s.st.Get(ctx, &row, store.Eq("name", name))
+	there, err := store.Find(ctx, s.st, &row, store.Eq("name", name))
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return nil, false, nil
 	case err != nil:
 		return nil, false, fmt.Errorf("reading the setting %s: %w", name, err)
+	case !there:
+		return nil, false, nil
 	}
 	return s.unsealFields(name, row.Value), false, nil
 }
@@ -313,12 +312,12 @@ func (s *Server) sealSecrets(ctx context.Context, name string, secrets []string,
 // secrets sealed; nil when it is not set.
 func (s *Server) storedSetting(ctx context.Context, name string) (map[string]any, error) {
 	var row core.Setting
-	err := s.st.Get(ctx, &row, store.Eq("name", name))
+	there, err := store.Find(ctx, s.st, &row, store.Eq("name", name))
 	switch {
-	case errors.Is(err, store.ErrNotFound):
-		return nil, nil
 	case err != nil:
 		return nil, fmt.Errorf("reading the setting %s before saving it: %w", name, err)
+	case !there:
+		return nil, nil
 	}
 	var old map[string]any
 	if err := json.Unmarshal(row.Value, &old); err != nil {

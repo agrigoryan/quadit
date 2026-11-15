@@ -40,7 +40,7 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 		there := false
 		if g.in.ProjectID != "" {
 			var err error
-			if there, err = rowFound(g.db.Get(ctx, &p, store.Eq("id", g.in.ProjectID), store.Live)); err != nil {
+			if there, err = store.Find(ctx, g.db, &p, store.Eq("id", g.in.ProjectID), store.Live); err != nil {
 				return 0, err
 			}
 		}
@@ -90,13 +90,13 @@ func (g *githubSync) taskOfIssue(ctx context.Context, sys *engine.Sys, project s
 	num := strconv.Itoa(is.Number)
 	var t core.Task
 	if known := g.state.IssueTasks[num]; known != "" {
-		there, err := rowFound(sys.Tx().Get(ctx, &t, store.Eq("id", known)))
+		there, err := store.Find(ctx, sys.Tx(), &t, store.Eq("id", known))
 		if err != nil || there {
 			return t, err
 		}
 	}
 	tid := id.From("github-issue", g.in.ID, num) // the same issue is the same task, whatever happens between
-	there, err := rowFound(sys.Tx().Get(ctx, &t, store.Eq("id", tid)))
+	there, err := store.Find(ctx, sys.Tx(), &t, store.Eq("id", tid))
 	if err != nil {
 		return t, err
 	}

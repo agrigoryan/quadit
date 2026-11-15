@@ -33,7 +33,11 @@ func (s *Server) handleRequestPasswordReset(x *c) error {
 	}
 	email := strings.ToLower(strings.TrimSpace(b.Email))
 	var u core.User
-	if err := s.st.Get(ctx, &u, store.Eq("email", email), store.Live); err == nil && u.Kind == core.KindPerson && u.DisabledAt == 0 {
+	there, err := store.Find(ctx, s.st, &u, store.Eq("email", email), store.Live)
+	if err != nil {
+		return err
+	}
+	if there && u.Kind == core.KindPerson && u.DisabledAt == 0 {
 		token, err := s.oneTime(ctx, core.OneTimeReset, u.ID, nil, time.Hour)
 		if err != nil {
 			return err

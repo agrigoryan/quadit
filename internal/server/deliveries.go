@@ -165,13 +165,13 @@ func (s *Server) deliver(ctx context.Context, d core.WebhookDelivery) bool {
 	sendCtx, ctx := ctx, context.WithoutCancel(ctx)
 	db := s.st.In(d.WorkspaceID)
 	var h core.Webhook
-	err := db.Get(ctx, &h, store.Eq("id", d.WebhookID), store.Live)
-	if errors.Is(err, store.ErrNotFound) {
-		return s.giveUpDelivery(ctx, db, d, "the webhook was deleted")
-	}
+	there, err := store.Find(ctx, db, &h, store.Eq("id", d.WebhookID), store.Live)
 	if err != nil {
 		s.log.Error("webhook delivery: reading its webhook", "delivery", d.ID, "err", err)
 		return false
+	}
+	if !there {
+		return s.giveUpDelivery(ctx, db, d, "the webhook was deleted")
 	}
 	evs, err := db.Events(ctx, store.EventFilter{After: d.Seq - 1, Limit: 1})
 	if err != nil {
@@ -338,11 +338,7 @@ func (s *Server) handleSendTestWebhook(x *c) error {
 		return err
 	}
 	var h core.Webhook
-	err := x.db.Get(x.ctx(), &h, store.Eq("id", x.r.PathValue("id")), store.Live)
-	if errors.Is(err, store.ErrNotFound) {
-		return errNotFound("webhook")
-	}
-	if err != nil {
+	if err := x.db.Get(x.ctx(), &h, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return err
 	}
 	sample := plainjson.Marshal(map[string]any{"test": true})

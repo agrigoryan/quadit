@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -183,9 +182,7 @@ func (s *Server) handleUpdateUser(x *c) error {
 	}
 	ctx := x.ctx()
 	var u core.User
-	if err := s.st.Get(ctx, &u, store.Eq("id", x.r.PathValue("id")), store.Live); errors.Is(err, store.ErrNotFound) {
-		return errNotFound("user")
-	} else if err != nil {
+	if err := s.st.Get(ctx, &u, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return err
 	}
 	set := map[string]any{}
@@ -286,7 +283,7 @@ func (s *Server) handleRestoreWorkspace(x *c) error {
 	ctx := x.ctx()
 	var ws core.Workspace
 	if err := s.st.Get(ctx, &ws, store.Eq("id", x.r.PathValue("id"))); err != nil {
-		return errNotFound("workspace")
+		return err
 	}
 	if ws.DeletedAt == 0 {
 		return x.ok(map[string]any{"workspace": ws})
@@ -310,9 +307,13 @@ func (s *Server) handleRestoreWorkspace(x *c) error {
 func (s *Server) handleJoinWorkspace(x *c) error {
 	ctx := x.ctx()
 	var ws core.Workspace
-	if err := s.st.Get(ctx, &ws, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
+	there, err := store.Find(ctx, s.st, &ws, store.Eq("id", x.r.PathValue("id")), store.Live)
+	if err != nil {
+		return err
+	}
+	if !there {
 		if err := s.st.Get(ctx, &ws, store.Eq("slug", x.r.PathValue("id")), store.Live); err != nil {
-			return errNotFound("workspace")
+			return err
 		}
 	}
 	db := s.st.In(ws.ID)
@@ -329,7 +330,7 @@ func (s *Server) handleJoinWorkspace(x *c) error {
 	if len(owners) == 0 {
 		return errBad("this workspace has no owner to act for")
 	}
-	err := s.eng.System(ctx, ws.ID, owners[0].UserID, func(sys *engine.Sys) error {
+	err = s.eng.System(ctx, ws.ID, owners[0].UserID, func(sys *engine.Sys) error {
 		return sys.Do("member.add", map[string]any{"user": x.user.ID, "role": string(core.RoleAdmin)})
 	})
 	if err != nil {

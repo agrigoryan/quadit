@@ -5,7 +5,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"slices"
 	"strings"
@@ -107,11 +106,11 @@ func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, lif
 //nolint:unparam // keep is in the signature picture.go calls too; dropping it belongs to the unit that owns that file
 func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) (core.OneTimeToken, error) {
 	var spent core.OneTimeToken
-	err := s.st.Get(ctx, &spent, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
+	there, err := store.Find(ctx, s.st, &spent, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
+	if err != nil {
 		return spent, err
 	}
-	if err != nil || spent.ExpiresAt < time.Now().UnixMilli() {
+	if !there || spent.ExpiresAt < time.Now().UnixMilli() {
 		return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link is no longer valid; ask for a new one"}
 	}
 	if !keep {
@@ -261,9 +260,12 @@ func (s *Server) handleSignIn(x *c) error {
 		return err
 	}
 	var u core.User
-	err := s.st.Get(ctx, &u, store.Eq("email", email), store.Live)
-	if err != nil || u.Kind != core.KindPerson || u.PasswordHash == "" || !auth.CheckPassword(u.PasswordHash, b.Password) {
-		if err != nil {
+	there, err := store.Find(ctx, s.st, &u, store.Eq("email", email), store.Live)
+	if err != nil {
+		return err
+	}
+	if !there || u.Kind != core.KindPerson || u.PasswordHash == "" || !auth.CheckPassword(u.PasswordHash, b.Password) {
+		if !there {
 			auth.CheckPassword("$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", b.Password) // same time as a real check
 		}
 		s.audit(x.r, "", core.User{ID: u.ID, Name: email}, "signin.failed", "user", u.ID, nil)
@@ -327,12 +329,12 @@ func (s *Server) memberships(ctx context.Context, userID string) ([]membership, 
 	for _, m := range ms {
 		var ws core.Workspace
 		// A workspace that was deleted is left out.
-		err := s.st.Get(ctx, &ws, store.Eq("id", m.WorkspaceID), store.Live)
-		if errors.Is(err, store.ErrNotFound) {
-			continue
-		}
+		there, err := store.Find(ctx, s.st, &ws, store.Eq("id", m.WorkspaceID), store.Live)
 		if err != nil {
 			return nil, err
+		}
+		if !there {
+			continue
 		}
 		out = append(out, membership{ID: ws.ID, Slug: ws.Slug, Name: ws.Name, Icon: ws.Icon, Role: m.Role, Handle: m.Handle})
 	}

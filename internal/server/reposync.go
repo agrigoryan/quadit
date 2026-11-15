@@ -35,12 +35,8 @@ func (s *Server) handleSyncSource(x *c) error {
 		return err
 	}
 	var src core.DocSource
-	there, err := rowFound(x.db.Get(x.ctx(), &src, store.Eq("id", x.r.PathValue("id")), store.Live))
-	if err != nil {
+	if err := x.db.Get(x.ctx(), &src, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return err
-	}
-	if !there {
-		return errNotFound("source")
 	}
 	res, err := s.repos.Sync(x.ctx(), src)
 	if err != nil {
