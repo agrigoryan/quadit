@@ -2,33 +2,15 @@
 // refuses every change from them, so the app offers no control that makes one.
 
 import type { APIRequestContext, Browser } from "@playwright/test";
-import { currentRun, WORKSPACE } from "./run";
-import { expect, type Project, type Quadit, test } from "./quadit";
+import { expect, invitedMember, type Project, type Quadit, test } from "./quadit";
 
 /**
  * A new person, invited by the owner as a member, made read-only, and
  * signed in in a browser of their own. `owner` is the owner's signed-in page's requests.
  */
 async function readOnlyMember(browser: Browser, owner: APIRequestContext, quadit: Quadit, project: Project) {
-  const invite = await owner.post(`/api/v1/w/${WORKSPACE.slug}/invites`, { data: { role: "member" } });
-  expect(invite.ok()).toBe(true);
-  const { link } = (await invite.json()) as { link: string };
-
-  const context = await browser.newContext({
-    baseURL: currentRun().url,
-    storageState: { cookies: [], origins: [] },
-    serviceWorkers: "block",
-  });
-  const accepted = await context.request.post(`/api/v1/auth/invite/${link.slice(link.lastIndexOf("/") + 1)}`, {
-    data: {
-      name: `Reader ${project.key}`,
-      email: `reader-${project.key.toLowerCase()}@example.com`,
-      password: "a-long-reader-password",
-    },
-  });
-  expect(accepted.ok()).toBe(true);
-  const { user } = (await accepted.json()) as { user: { id: string } };
-  await quadit.cli("do", "member.update", JSON.stringify({ id: user.id, scope: { read_only: true } }));
+  const { context, userID } = await invitedMember(browser, owner, `Reader ${project.key}`);
+  await quadit.cli("do", "member.update", JSON.stringify({ id: userID, scope: { read_only: true } }));
   return context;
 }
 

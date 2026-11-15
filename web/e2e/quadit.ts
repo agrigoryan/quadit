@@ -8,8 +8,8 @@
 //             state never meet
 
 import { createHash } from "node:crypto";
-import { test as base } from "@playwright/test";
-import { currentRun, quadit } from "./run";
+import { type APIRequestContext, type Browser, expect, test as base } from "@playwright/test";
+import { currentRun, quadit, WORKSPACE } from "./run";
 
 export { expect } from "@playwright/test";
 
@@ -67,4 +67,27 @@ export const test = base.extend<{ quadit: Quadit; project: Project }>({
 function projectKey(seed: string) {
   const digest = createHash("sha256").update(seed).digest();
   return "P" + Array.from(digest.subarray(0, 5), (byte) => String.fromCharCode(65 + (byte % 26))).join("");
+}
+
+/**
+ * A new person, invited by the owner as a member and signed in in a browser
+ * of their own. `owner` is the owner's signed-in page's requests; `name`
+ * makes their email too, so it must be new to the run.
+ */
+export async function invitedMember(browser: Browser, owner: APIRequestContext, name: string) {
+  const invite = await owner.post(`/api/v1/w/${WORKSPACE.slug}/invites`, { data: { role: "member" } });
+  expect(invite.ok()).toBe(true);
+  const { link } = (await invite.json()) as { link: string };
+
+  const context = await browser.newContext({
+    baseURL: currentRun().url,
+    storageState: { cookies: [], origins: [] },
+    serviceWorkers: "block",
+  });
+  const accepted = await context.request.post(`/api/v1/auth/invite/${link.slice(link.lastIndexOf("/") + 1)}`, {
+    data: { name, email: `${name.toLowerCase().replaceAll(" ", "-")}@example.com`, password: "a-long-member-password" },
+  });
+  expect(accepted.ok()).toBe(true);
+  const { user } = (await accepted.json()) as { user: { id: string } };
+  return { context, userID: user.id };
 }
