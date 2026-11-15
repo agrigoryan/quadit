@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/agrigoryan/quadit/internal/app"
 	"github.com/agrigoryan/quadit/internal/cli"
@@ -26,9 +27,29 @@ func main() {
 			fmt.Println("quadit", version, "(agent surface "+engine.Surface+")")
 			return
 		}
-		if run, ok := app.Commands[args[0]]; ok {
+		if run, ok := app.Commands[args[0]]; ok && !restoresTask(args) {
 			os.Exit(run(args[1:], version))
 		}
 	}
 	os.Exit(cli.Run(args, os.Stdout, os.Stderr))
+}
+
+var taskKey = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+$`)
+
+// restoresTask tells the two meanings of "restore" apart. "quadit restore
+// FILE" brings an install, a task or a page back from a backup, on the
+// server's machine; "quadit restore SVA-12" brings a task back from the
+// trash, through the API like any other command. It is the second when the
+// one thing named has the shape of a task key and is not a file here.
+func restoresTask(args []string) bool {
+	if len(args) < 2 || args[0] != "restore" || !taskKey.MatchString(args[1]) {
+		return false
+	}
+	for _, a := range args[2:] {
+		if a == "--task" || a == "--doc" || a == "--workspace" || a == "--data" || a == "--db" {
+			return false
+		}
+	}
+	_, err := os.Stat(args[1])
+	return err != nil
 }

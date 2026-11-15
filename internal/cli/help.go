@@ -17,6 +17,7 @@ follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=K
 act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
           status KEY NAME | assign KEY @WHO | take KEY | release KEY
+          delete KEY | restore KEY   to the trash, and back from it
           comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID]
           result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
           ask KEY QUESTION option=A option=B [recommended=2] [why=...] [ask=@WHO]
