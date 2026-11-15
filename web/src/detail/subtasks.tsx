@@ -6,6 +6,7 @@ import { Plus, X } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { useSubtaskProgress } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import type { Task } from "@/lib/types";
 import { rowAction } from "@/detail/row-action";
@@ -107,12 +108,8 @@ interface Props {
 }
 
 export function Subtasks({ task, subtasks, focusAdd }: Props) {
-  const statuses = useStore((s) => s.collections.statuses);
-  const total = subtasks.length;
-  const done = subtasks.filter((tk) => {
-    const category = statuses[tk.status_id]?.category;
-    return category === "done" || category === "canceled";
-  }).length;
+  // The same count as the pill on the task's row: canceled sub-tasks are in neither number.
+  const { done, total } = useSubtaskProgress(task.id) ?? { done: 0, total: 0 };
 
   return (
     <Section
@@ -138,7 +135,7 @@ export function Subtasks({ task, subtasks, focusAdd }: Props) {
         )
       }
     >
-      {total > 0 && (
+      {subtasks.length > 0 && (
         <ul>
           {subtasks.map((sub) => (
             <SubtaskRow key={sub.id} task={sub} />
