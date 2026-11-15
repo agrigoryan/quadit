@@ -85,16 +85,6 @@ func missing(err error, what, ref string) error {
 	return err
 }
 
-// found answers "is the row there?" from the error of a store read: false
-// for not found, and any other error returned, so that a read that failed
-// is never taken for a row that is absent.
-func found(err error) (bool, error) {
-	if errors.Is(err, store.ErrNotFound) {
-		return false, nil
-	}
-	return err == nil, err
-}
-
 // isRefusal reports whether err is a refusal: the answer that a reference
 // names nothing usable, as opposed to a failure to read.
 func isRefusal(err error) bool {

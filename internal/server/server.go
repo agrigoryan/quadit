@@ -748,15 +748,6 @@ func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 	return nil
 }
 
-// notFoundOr is the refusal for a row that is not there, or err itself
-// when the store failed in another way.
-func notFoundOr(err error, what string) error {
-	if errors.Is(err, store.ErrNotFound) {
-		return errNotFound(what)
-	}
-	return err
-}
-
 // applyTokenScopes narrows the actor and the readable projects by the
 // token's scopes: "read" makes the actor read-only, and "project:ID" limits
 // the actor to those projects, and what the caller may read to those of

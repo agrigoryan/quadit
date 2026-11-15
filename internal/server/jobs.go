@@ -209,12 +209,3 @@ func (s *Server) jobNotify(ctx context.Context, j core.Job) error {
 	}
 	return nil
 }
-
-// rowFound reads the error of a store Get used to ask whether a row is
-// there: found, not there, or the read failed.
-func rowFound(err error) (bool, error) {
-	if errors.Is(err, store.ErrNotFound) {
-		return false, nil
-	}
-	return err == nil, err
-}
