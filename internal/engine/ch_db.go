@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -211,7 +212,7 @@ func (c *cx) renameInRows(pr core.DBProperty, d core.Doc, from, to string) error
 			continue
 		}
 		props[pr.ID] = next
-		raw, _ := json.Marshal(props)
+		raw := plainjson.Marshal(props)
 		seq := c.tx.NextSeq()
 		if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"props": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", row.ID)); err != nil {
 			return err
@@ -231,7 +232,7 @@ func swapOption(raw json.RawMessage, from, to string) (json.RawMessage, bool) {
 		if one != from {
 			return raw, false
 		}
-		out, _ := json.Marshal(to)
+		out := plainjson.Marshal(to)
 		return out, true
 	}
 	var many []string
@@ -244,7 +245,7 @@ func swapOption(raw json.RawMessage, from, to string) (json.RawMessage, bool) {
 			many[i], hit = to, true
 		}
 	}
-	out, _ := json.Marshal(many)
+	out := plainjson.Marshal(many)
 	return out, hit
 }
 
@@ -274,8 +275,8 @@ func (c *cx) renameInFilters(pr core.DBProperty, d core.Doc, from, to string) er
 		if !hit {
 			continue
 		}
-		cfg["filters"], _ = json.Marshal(filters)
-		raw, _ := json.Marshal(cfg)
+		cfg["filters"] = plainjson.Marshal(filters)
+		raw := plainjson.Marshal(cfg)
 		seq := c.tx.NextSeq()
 		if _, err := c.tx.Update(c.ctx, "db_views", map[string]any{"config": json.RawMessage(raw), "updated_seq": seq}, store.Eq("id", v.ID)); err != nil {
 			return err
@@ -538,7 +539,7 @@ func (c *cx) addOptions(prop *core.DBProperty, vals []string) error {
 		return nil
 	}
 	cfg["options"] = opts
-	raw, _ := json.Marshal(cfg)
+	raw := plainjson.Marshal(cfg)
 	old := prop.Config
 	prop.Config = raw
 	var d core.Doc

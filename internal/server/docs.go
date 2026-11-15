@@ -17,6 +17,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/md"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -383,7 +384,7 @@ func (s *Server) regenerate(x *c, page *core.Doc) error {
 	if err := s.st.Get(ctx, &ws, store.Eq("id", x.ws.ID)); err != nil {
 		return err
 	}
-	props, _ := json.Marshal(map[string]int64{"built_seq": ws.Seq}) // cannot fail: a map of numbers
+	props := plainjson.Marshal(map[string]int64{"built_seq": ws.Seq})
 	err = s.eng.System(ctx, x.ws.ID, page.CreatedBy, func(sys *engine.Sys) error {
 		if err := sys.Do("doc.write", map[string]any{"doc": page.ID, "markdown": body}); err != nil {
 			return err
@@ -603,7 +604,7 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 	}
 	ctx := x.ctx()
 	apply := func(typ string, args map[string]any) (*engine.Result, error) {
-		raw, _ := json.Marshal(args) // cannot fail: strings
+		raw := plainjson.Marshal(args)
 		return s.eng.Apply(ctx, x.ws.ID, x.actor, engine.Change{ID: id.New(), Type: typ, Args: raw})
 	}
 	root, ok, err := x.memoryRoot(x.member.UserID)

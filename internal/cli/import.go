@@ -5,12 +5,12 @@ package cli
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 
 	"github.com/agrigoryan/quadit/internal/importer"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // importFrom reads a source of another tool into a plan and makes what is
@@ -27,7 +27,7 @@ func (r *runner) importFrom(in input) error {
 	}
 	defer plan.Close()
 	if r.json && r.dry {
-		raw, _ := json.Marshal(map[string]any{"dry_run": true, "read": map[string]int{"tasks": len(plan.Tasks), "pages": len(plan.Docs), "databases": len(plan.Tables)}})
+		raw := plainjson.Marshal(map[string]any{"dry_run": true, "read": map[string]int{"tasks": len(plan.Tasks), "pages": len(plan.Docs), "databases": len(plan.Tables)}})
 		fmt.Fprintln(r.out, string(raw))
 		return nil
 	}
@@ -39,7 +39,7 @@ func (r *runner) importFrom(in input) error {
 	}
 	sum, err := importer.Apply(importer.NewSink(importAPI{ctx: r.ctx, c: r.c}, r.importLog), plan, opts["project"])
 	if r.json {
-		raw, _ := json.Marshal(map[string]any{"made": map[string]int{"tasks": sum.Tasks, "comments": sum.Comments, "pages": sum.Docs, "rows": sum.Rows, "files": sum.Files},
+		raw := plainjson.Marshal(map[string]any{"made": map[string]int{"tasks": sum.Tasks, "comments": sum.Comments, "pages": sum.Docs, "rows": sum.Rows, "files": sum.Files},
 			"already_there": sum.Already, "unmatched_people": sum.Unmatched})
 		fmt.Fprintln(r.out, string(raw))
 		return err

@@ -3,15 +3,16 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // dashboardText is the dashboard in the compact text form: what waits on
 // the caller, epics, tasks by status, the longest waits, agents and health.
 func (d *dashboard) dashboardText() string {
-	raw, _ := json.Marshal(d.machinery) // cannot fail: numbers, strings and bools
+	raw := plainjson.Marshal(d.machinery)
 	var b strings.Builder
 	fmt.Fprintf(&b, "== waiting on you (%d)\n%s", len(d.waiting), lines(d.waiting, taskView.line, "nothing"))
 	b.WriteString("== epics\n")

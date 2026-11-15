@@ -9,6 +9,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/md"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/rank"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -179,7 +180,7 @@ func (e *editor) insert(b md.Block, parent, rk string) error {
 	}
 	var props json.RawMessage
 	if len(b.Props) > 0 {
-		props, _ = json.Marshal(b.Props)
+		props = plainjson.Marshal(b.Props)
 	}
 	if old, ok := e.rows[bid]; ok {
 		// The same insert sent twice, or a block coming back: bring it up to date.

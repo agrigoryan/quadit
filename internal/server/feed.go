@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -202,7 +202,7 @@ const (
 
 // hasTaskFilter reports whether a query narrows tasks at all.
 func hasTaskFilter(q TaskQuery) bool {
-	raw, _ := json.Marshal(q) // cannot fail: plain fields
+	raw := plainjson.Marshal(q)
 	return string(raw) != "{}"
 }
 
@@ -352,7 +352,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 			return nil
 		}
 		for _, ev := range evs {
-			raw, _ := json.Marshal(ev) // cannot fail: a row read from the database
+			raw := plainjson.Marshal(ev)
 			fmt.Fprintf(x.w, "id: %d\ndata: %s\n\n", ev.Seq, raw)
 			after = ev.Seq
 		}
@@ -425,7 +425,7 @@ func (s *Server) recheckAccess(x *c) (fingerprint string, ok bool) {
 	if err := x.db.Get(ctx, &member, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil || member.SuspendedAt != 0 {
 		return "", false
 	}
-	scope, _ := json.Marshal(member.Scope) // cannot fail: plain fields
+	scope := plainjson.Marshal(member.Scope)
 	return string(member.Role) + " " + string(scope), true
 }
 

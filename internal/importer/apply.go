@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // Apply makes everything in a plan. project is the key that tasks with no
@@ -127,7 +128,7 @@ func (a *applier) uid(kind, ext string) string {
 // false when an earlier run of the same import had made it, which is
 // counted in the summary.
 func (a *applier) change(typ string, args map[string]any) (made bool, err error) {
-	raw, _ := json.Marshal(args)
+	raw := plainjson.Marshal(args)
 	made, err = a.sink.Change(id.From("import-change", a.plan.Source, typ, string(raw)), typ, args)
 	// The same thing from an earlier run, but changed at the source since
 	// (an edited description, say): what is here stays as it is.

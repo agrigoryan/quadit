@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -256,7 +256,7 @@ func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Web
 	if !isNews(ev) {
 		payload["quiet"] = true // history brought in, not done now: the receiver may want to hold back
 	}
-	body, _ := json.Marshal(payload) // plain values and a stored event: always encodes
+	body := plainjson.Marshal(payload)
 	rctx, cancel := context.WithTimeout(ctx, deliveryTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(rctx, http.MethodPost, h.URL, bytes.NewReader(body))
@@ -345,7 +345,7 @@ func (s *Server) handleSendTestWebhook(x *c) error {
 	if err != nil {
 		return err
 	}
-	sample, _ := json.Marshal(map[string]any{"test": true}) // a constant: always encodes
+	sample := plainjson.Marshal(map[string]any{"test": true})
 	ev := core.Event{WorkspaceID: x.ws.ID, At: time.Now().UnixMilli(), ActorID: x.member.UserID, Type: "webhook.test", EntityType: "webhook",
 		EntityID: h.ID, ScopeType: "workspace", ScopeID: x.ws.ID, Data: sample}
 	did := id.New()

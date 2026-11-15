@@ -15,6 +15,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -94,7 +95,7 @@ func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, lif
 	now := time.Now()
 	row := core.OneTimeToken{ID: id.New(), Kind: kind, TokenHash: auth.Hash(token), UserID: userID, CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(life).UnixMilli()}
 	if data != nil {
-		row.Data, _ = json.Marshal(data)
+		row.Data = plainjson.Marshal(data)
 	}
 	return token, s.st.Insert(ctx, row)
 }

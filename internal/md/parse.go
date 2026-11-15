@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // The patterns of the lines that start a block.
@@ -23,7 +25,7 @@ var (
 
 // inline is the inline content of a run of Markdown, as JSON.
 func inline(text string) json.RawMessage {
-	raw, _ := json.Marshal(ParseInline(text))
+	raw := plainjson.Marshal(ParseInline(text))
 	return raw
 }
 
@@ -172,7 +174,7 @@ func (p *parser) code(fence, lang string) Block {
 		}
 		body = append(body, l)
 	}
-	b := Block{Type: "codeBlock", Content: mustJSON([]Inline{{Type: "text", Text: strings.Join(body, "\n")}})}
+	b := Block{Type: "codeBlock", Content: plainjson.Marshal([]Inline{{Type: "text", Text: strings.Join(body, "\n")}})}
 	if lang != "" {
 		b.Props = map[string]any{"language": lang}
 	}
@@ -248,5 +250,5 @@ func (p *parser) table() Block {
 		row(p.lines[p.pos])
 		p.pos++
 	}
-	return Block{Type: "table", Content: mustJSON(t)}
+	return Block{Type: "table", Content: plainjson.Marshal(t)}
 }

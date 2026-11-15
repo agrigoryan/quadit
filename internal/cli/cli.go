@@ -25,6 +25,8 @@ import (
 	"io"
 	"net/url"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // Run runs a client command and returns the process exit code. It is the
@@ -107,7 +109,7 @@ func (r *runner) change(typ string, args map[string]any, approval string) error 
 		return err
 	}
 	if r.json {
-		raw, _ := json.Marshal(res)
+		raw := plainjson.Marshal(res)
 		fmt.Fprintln(r.out, string(raw))
 		return nil
 	}
@@ -128,6 +130,6 @@ func (r *runner) change(typ string, args map[string]any, approval string) error 
 // send sends a JSON body to a path that is not a change (a cursor, a note
 // to memory, a request with a secret) and returns the answer.
 func (r *runner) send(method, path string, q url.Values, body any, accept string) ([]byte, error) {
-	raw, _ := json.Marshal(body)
+	raw := plainjson.Marshal(body)
 	return r.c.workspaceRequest(r.ctx, apiRequest{method: method, path: path, query: q, body: bytes.NewReader(raw), contentType: "application/json", accept: accept})
 }

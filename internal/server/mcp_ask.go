@@ -8,6 +8,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // The ask tool: a question to a person in one call, as quadit ask and
@@ -125,7 +126,7 @@ func (s *Server) askWithFiles(who selfCaller, a, open map[string]any, onOptions 
 	if b, _ := a["dry_run"].(bool); b || argText(a, "dry_run") == "true" {
 		req["dry_run"] = true
 	}
-	body, _ := json.Marshal(req)
+	body := plainjson.Marshal(req)
 	out, ok := s.callAPI(who, "POST", "/changes", nil, body)
 	if !ok {
 		return out, false
@@ -168,7 +169,7 @@ func objectArg(a map[string]any, k string, out any) error {
 	if !ok || v == nil || v == "" {
 		return nil
 	}
-	raw, _ := json.Marshal(v)
+	raw := plainjson.Marshal(v)
 	if text, isText := v.(string); isText {
 		raw = []byte(text)
 	}

@@ -61,6 +61,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/hub"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/reposync"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -840,7 +841,7 @@ func (s *Server) audit(r *http.Request, workspaceID string, actor core.User, act
 		}
 	}
 	if data != nil {
-		e.Data, _ = json.Marshal(data)
+		e.Data = plainjson.Marshal(data)
 	}
 	ctx := context.Background() //nolint:contextcheck // detached: no request, work the server does on its own
 	if r != nil {

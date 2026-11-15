@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // API is the workspace's API as an import uses it. The command-line tool
@@ -45,7 +46,7 @@ func (s *apiSink) Change(changeID, typ string, args any) (bool, error) {
 	if s.mayBeQuiet() {
 		change["quiet"] = true
 	}
-	raw, _ := json.Marshal(map[string]any{"changes": []any{change}})
+	raw := plainjson.Marshal(map[string]any{"changes": []any{change}})
 	out, err := s.api.Call("POST", "/changes", nil, raw)
 	if err != nil {
 		return false, err

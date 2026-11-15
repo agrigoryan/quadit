@@ -12,7 +12,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -64,7 +64,7 @@ func (s *Server) pushKey(ctx context.Context) (pushKeys, *ecdsa.PrivateKey, erro
 			return pk, nil, err
 		}
 		pk = pushKeys{PublicKey: b64.EncodeToString(ek.PublicKey().Bytes()), PrivateKey: b64.EncodeToString(ek.Bytes())}
-		raw, _ := json.Marshal(pk) // two strings: always encodes
+		raw := plainjson.Marshal(pk)
 		if err := s.saveSetting(ctx, "push", raw, ""); err != nil {
 			return pk, nil, err
 		}
@@ -184,7 +184,7 @@ func (s *Server) pushTo(ctx context.Context, userID string, msg pushMessage) (in
 	if err != nil {
 		return 0, err
 	}
-	payload, _ := json.Marshal(msg) // strings: always encodes
+	payload := plainjson.Marshal(msg)
 	sent := 0
 	for _, sub := range subs {
 		status, err := sendPush(ctx, key, s.cfg.BaseURL, sub, payload)
@@ -248,7 +248,7 @@ func vapidToken(key *ecdsa.PrivateKey, audience, subject string) (string, error)
 		subject = "mailto:admin@localhost" // push services want a contact; a local install has none to give
 	}
 	head := b64.EncodeToString([]byte(`{"typ":"JWT","alg":"ES256"}`))
-	claims, _ := json.Marshal(map[string]any{"aud": audience, "exp": time.Now().Add(12 * time.Hour).Unix(), "sub": subject})
+	claims := plainjson.Marshal(map[string]any{"aud": audience, "exp": time.Now().Add(12 * time.Hour).Unix(), "sub": subject})
 	signing := head + "." + b64.EncodeToString(claims)
 	sum := sha256.Sum256([]byte(signing))
 	r, sgn, err := ecdsa.Sign(rand.Reader, key, sum[:])

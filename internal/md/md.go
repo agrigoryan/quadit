@@ -66,12 +66,6 @@ type TableRow struct {
 	Cells []json.RawMessage `json:"cells"`
 }
 
-// mustJSON is v as JSON, for values made here that always encode.
-func mustJSON(v any) json.RawMessage {
-	raw, _ := json.Marshal(v)
-	return raw
-}
-
 // Plain returns a block's text with no markup, for search and previews.
 func Plain(b Block) string {
 	if b.Type == "table" {

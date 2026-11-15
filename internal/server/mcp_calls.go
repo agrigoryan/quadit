@@ -10,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // How a tool reaches the API, and the tools that do more than read one
@@ -51,12 +52,12 @@ func toolAck(s *Server, who selfCaller, a map[string]any) (string, bool) {
 	if name == "" {
 		name = "main"
 	}
-	body, _ := json.Marshal(map[string]any{"seq": a["seq"]})
+	body := plainjson.Marshal(map[string]any{"seq": a["seq"]})
 	return s.callAPI(who, "PUT", "/cursors/"+url.PathEscape(name), nil, body)
 }
 
 func toolRemember(s *Server, who selfCaller, a map[string]any) (string, bool) {
-	body, _ := json.Marshal(map[string]any{"title": a["title"], "markdown": a["markdown"], "mode": argText(a, "mode")})
+	body := plainjson.Marshal(map[string]any{"title": a["title"], "markdown": a["markdown"], "mode": argText(a, "mode")})
 	return s.callAPI(who, "POST", "/memory", nil, body)
 }
 
@@ -88,7 +89,7 @@ func toolChange(s *Server, who selfCaller, a map[string]any) (string, bool) {
 			req["args"] = obj
 		}
 	}
-	body, _ := json.Marshal(req)
+	body := plainjson.Marshal(req)
 	out, ok := s.callAPI(who, "POST", "/changes", nil, body)
 	if !ok {
 		return out, false
@@ -129,7 +130,7 @@ func toolChangeBatch(s *Server, who selfCaller, a map[string]any, list []any) (s
 	if b, _ := a["dry_run"].(bool); b {
 		req["dry_run"] = true
 	}
-	body, _ := json.Marshal(req)
+	body := plainjson.Marshal(req)
 	out, ok := s.callAPI(who, "POST", "/changes", nil, body)
 	if !ok {
 		return out, false
@@ -175,7 +176,7 @@ func toolSecretRequest(s *Server, who selfCaller, a map[string]any) (string, boo
 			req["headers"] = m
 		}
 	}
-	raw, _ := json.Marshal(req)
+	raw := plainjson.Marshal(req)
 	return s.callAPI(who, "POST", "/secrets/"+url.PathEscape(argText(a, "name"))+"/request", url.Values{"format": {"text"}}, raw)
 }
 

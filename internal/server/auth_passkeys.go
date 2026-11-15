@@ -163,7 +163,10 @@ func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	if err != nil {
 		return errBad("the passkey could not be verified: %v", err)
 	}
-	raw, _ := json.Marshal(cred)
+	raw, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
 	name := strings.TrimSpace(x.r.URL.Query().Get("name"))
 	if name == "" {
 		name = "Passkey " + time.Now().UTC().Format(time.DateOnly)

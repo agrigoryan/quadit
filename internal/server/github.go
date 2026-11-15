@@ -18,6 +18,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -164,7 +165,7 @@ func (s *Server) handleShowIntegrationWebhook(x *c) error {
 	state := githubStateOf(in.State)
 	if state.HookSecret == "" {
 		state.HookSecret = auth.Random(24)
-		raw, _ := json.Marshal(state) // plain fields: always encodes
+		raw := plainjson.Marshal(state)
 		if _, err := x.db.Update(x.ctx(), "integrations", map[string]any{"state": json.RawMessage(raw)}, store.Eq("id", in.ID)); err != nil {
 			return err
 		}
@@ -241,7 +242,7 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 	if err != nil {
 		set["last_error"] = oneLine(err.Error(), lastErrorSize)
 	}
-	raw, _ := json.Marshal(state) // plain fields: always encodes
+	raw := plainjson.Marshal(state)
 	set["state"] = json.RawMessage(raw)
 	// Not remembered, what was done is done again on the next pass (a
 	// second comment on a pull request), so the write is retried, and a

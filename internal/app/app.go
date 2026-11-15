@@ -34,6 +34,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/server"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/store/postgres"
@@ -646,7 +647,7 @@ func shellAudit(ctx context.Context, st store.Store, a shellAction) {
 		e.ActorName = "server shell (" + u.Username + ")"
 	}
 	if a.data != nil {
-		e.Data, _ = json.Marshal(a.data)
+		e.Data = plainjson.Marshal(a.data)
 	}
 	if err := st.Insert(ctx, e); err != nil {
 		fmt.Fprintln(os.Stderr, "audit log:", err)

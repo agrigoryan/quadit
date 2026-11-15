@@ -9,6 +9,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -158,7 +159,7 @@ func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks
 		return err
 	}
 	num := fmt.Sprint(pr.Number)
-	data, _ := json.Marshal(map[string]any{"branch": pr.Head.Ref, "author": pr.User.Login, "sha": pr.Head.SHA}) // strings: always encodes
+	data := plainjson.Marshal(map[string]any{"branch": pr.Head.Ref, "author": pr.User.Login, "sha": pr.Head.SHA})
 	err := g.s.eng.System(ctx, g.in.WorkspaceID, g.in.CreatedBy, func(sys *engine.Sys) error {
 		if err := sys.Do("link.set", map[string]any{"task": t.ID, "kind": "pr", "repo": g.cfg.Repo, "ref": num, "url": pr.HTMLURL, "title": pr.Title,
 			"state": state, "checks": checks, "data": json.RawMessage(data)}); err != nil {

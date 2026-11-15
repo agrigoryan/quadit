@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // requestTimeout is how long one request to the server may take.
@@ -238,7 +239,7 @@ const changeAttempts = 3
 // postChanges sends a body of changes, trying again when the server could
 // not be reached (the ids in it make that safe), and reads the results.
 func (c *Client) postChanges(ctx context.Context, body map[string]any) ([]Result, error) {
-	raw, _ := json.Marshal(body)
+	raw := plainjson.Marshal(body)
 	var out []byte
 	var err error
 	for attempt := range changeAttempts {

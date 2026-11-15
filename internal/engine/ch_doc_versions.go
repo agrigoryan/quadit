@@ -8,6 +8,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/md"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/rank"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -34,7 +35,7 @@ func (c *cx) keepVersionIfDue(d core.Doc, rows []core.Block) error {
 
 // keepVersion stores the page as it stands.
 func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string) error {
-	snap, _ := json.Marshal(BlockTree(rows))
+	snap := plainjson.Marshal(BlockTree(rows))
 	return c.tx.Insert(c.ctx, core.DocVersion{ID: id.New(), WorkspaceID: c.ws, DocID: d.ID, Seq: c.tx.Seq(), Label: label, Title: d.Title,
 		Snapshot: snap, CreatedBy: firstNonEmpty(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at})
 }

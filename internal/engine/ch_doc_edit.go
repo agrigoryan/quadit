@@ -10,6 +10,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/md"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -145,12 +146,12 @@ type docWriteArgs struct {
 // signature is what makes two blocks "the same" when a page is rewritten.
 func signature(b md.Block) string {
 	var sb strings.Builder
-	props, _ := json.Marshal(b.Props)
+	props := plainjson.Marshal(b.Props)
 	// Content is compared in one canonical spelling: a database may hand
 	// JSON back with its keys in another order than it was given.
 	var content any
 	_ = json.Unmarshal(b.Content, &content) // deliberate: unreadable content compares as null, and such a block is never taken for another
-	canon, _ := json.Marshal(content)
+	canon := plainjson.Marshal(content)
 	if _, inline := content.([]any); inline {
 		// Text is compared as the Markdown it reads as: a mention chip and
 		// the plain "@name" an agent wrote back are the same block, and the

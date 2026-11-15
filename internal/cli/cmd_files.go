@@ -3,8 +3,9 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // attach uploads files and attaches each to a task, or to the decision or
@@ -41,7 +42,7 @@ func (r *runner) upload(in input) error {
 			return err
 		}
 		if r.json {
-			raw, _ := json.Marshal(map[string]string{"id": fid, "url": furl})
+			raw := plainjson.Marshal(map[string]string{"id": fid, "url": furl})
 			fmt.Fprintln(r.out, string(raw))
 			continue
 		}

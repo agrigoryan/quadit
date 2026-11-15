@@ -10,6 +10,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -44,7 +45,7 @@ var jobKinds = map[string]func(s *Server, ctx context.Context, j core.Job) error
 // enqueue adds a job. With a dedupe name, a second job of the same name is
 // not added while the first still waits, and that is not an error.
 func (s *Server) enqueue(ctx context.Context, kind, workspaceID, dedupe string, payload any, runAt time.Time) error {
-	raw, _ := json.Marshal(payload) // the callers' payloads are plain values: always encodes
+	raw := plainjson.Marshal(payload)
 	j := core.Job{ID: id.New(), Kind: kind, WorkspaceID: workspaceID, Dedupe: dedupe, Payload: raw, RunAt: runAt.UnixMilli(), CreatedAt: time.Now().UnixMilli()}
 	if err := s.st.Insert(ctx, j); err != nil && !errors.Is(err, store.ErrConflict) {
 		return fmt.Errorf("queueing a %s job: %w", kind, err)

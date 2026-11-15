@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -159,7 +160,7 @@ func pickFields(items any, fields []string) any {
 	if len(fields) == 0 {
 		return items
 	}
-	raw, _ := json.Marshal(items) // cannot fail: views are plain fields
+	raw := plainjson.Marshal(items)
 	var rows []map[string]any
 	if json.Unmarshal(raw, &rows) != nil {
 		return items
@@ -733,13 +734,13 @@ func (x *c) changeText(changes map[string]core.FieldChange, names *nameLookup) s
 						continue
 					}
 				}
-				raw, _ := json.Marshal(val) // cannot fail: it was read from JSON
+				raw := plainjson.Marshal(val)
 				parts = append(parts, strings.ReplaceAll(k, "_", " ")+" "+strings.Trim(string(raw), `"`))
 			}
 			sort.Strings(parts)
 			return oneLine(strings.Join(parts, "; "), 300)
 		case []any:
-			raw, _ := json.Marshal(t) // cannot fail: it was read from JSON
+			raw := plainjson.Marshal(t)
 			return oneLine(string(raw), 80)
 		case float64:
 			return strconv.FormatFloat(t, 'f', -1, 64)

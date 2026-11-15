@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"slices"
 	"time"
+
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // The picture is taken by driving the browser over its debugging pipe, not
@@ -64,7 +66,7 @@ func (c *cdp) call(ctx context.Context, session, method string, params any) (jso
 	if err != nil {
 		return nil, err
 	}
-	b, _ := json.Marshal(cdpMsg{ID: id, Method: method, Params: raw, SessionID: session}) // params already encoded: always encodes
+	b := plainjson.Marshal(cdpMsg{ID: id, Method: method, Params: raw, SessionID: session})
 	if _, err := c.out.Write(append(b, 0)); err != nil {
 		return nil, err
 	}

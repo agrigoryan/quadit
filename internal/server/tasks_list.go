@@ -10,6 +10,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -138,7 +139,7 @@ func parseTaskCursor(tok, sortedBy string) (taskCursor, error) {
 
 // token is the cursor as a list gives it, to be sent back in cursor=.
 func (cur taskCursor) token() string {
-	raw, _ := json.Marshal(cur) // cannot fail: numbers and strings
+	raw := plainjson.Marshal(cur)
 	return base64.RawURLEncoding.EncodeToString(raw)
 }
 

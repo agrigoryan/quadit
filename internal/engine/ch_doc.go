@@ -9,6 +9,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/md"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/rank"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -143,7 +144,7 @@ func (c *cx) newDocProps(d *core.Doc, a docCreateArgs) error {
 		if given, err = c.rowProps(d.ParentID, given); err != nil {
 			return err
 		}
-		d.Props, _ = json.Marshal(given)
+		d.Props = plainjson.Marshal(given)
 	}
 	return nil
 }
@@ -424,7 +425,7 @@ func (u *pageEdit) props() error {
 		}
 	}
 	if len(changed) > 0 {
-		raw, _ := json.Marshal(cur)
+		raw := plainjson.Marshal(cur)
 		p.set["props"] = json.RawMessage(raw)
 		// The event carries only the keys that changed, to merge.
 		p.changes["props"] = core.FieldChange{To: json.RawMessage(raw)}

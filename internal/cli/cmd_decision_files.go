@@ -4,12 +4,12 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 )
 
 // askFile is a picture or clip given with a question, and what it is shown
@@ -144,7 +144,7 @@ func (r *runner) askDry(a map[string]any, files []askFile, approval string) erro
 		would = append(would, map[string]string{"path": f.path, "on": f.on()})
 	}
 	if r.json {
-		raw, _ := json.Marshal(map[string]any{"decision": res, "files": would, "dry_run": true})
+		raw := plainjson.Marshal(map[string]any{"decision": res, "files": would, "dry_run": true})
 		fmt.Fprintln(r.out, string(raw))
 		return nil
 	}
@@ -159,7 +159,7 @@ func (r *runner) askDry(a map[string]any, files []askFile, approval string) erro
 // each file with its id and what it is shown on.
 func (r *runner) printAsked(res Result, files []map[string]string) error {
 	if r.json {
-		raw, _ := json.Marshal(map[string]any{"decision": res, "files": files})
+		raw := plainjson.Marshal(map[string]any{"decision": res, "files": files})
 		fmt.Fprintln(r.out, string(raw))
 		return nil
 	}

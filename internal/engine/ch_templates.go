@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -48,7 +49,7 @@ func templateCreate(c *cx, a templateCreateArgs) error {
 	}
 	tp := core.Template{ID: tid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), Title: a.Title, Description: a.Description, CreatedAt: c.at}
 	if a.Preset != nil {
-		tp.Preset, _ = json.Marshal(a.Preset)
+		tp.Preset = plainjson.Marshal(a.Preset)
 	}
 	if a.Project != "" {
 		project, err := c.project(a.Project)
@@ -87,7 +88,7 @@ func templateUpdate(c *cx, a templateUpdateArgs) error {
 	p.setText("title", a.Title, &tp.Title)
 	p.setText("description", a.Description, &tp.Description)
 	if a.Preset.Set {
-		raw, _ := json.Marshal(a.Preset.V)
+		raw := plainjson.Marshal(a.Preset.V)
 		if a.Preset.Null {
 			raw = nil
 		}
