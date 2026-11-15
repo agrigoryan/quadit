@@ -87,7 +87,11 @@ func (s *Server) handleListPasskeys(x *c) error {
 }
 
 func (s *Server) passkeysOn(x *c) error {
-	if !s.settingBool(x.ctx(), "auth.passkeys", true) {
+	on, err := s.checkedSettingBool(x.ctx(), "auth.passkeys", true)
+	if err != nil {
+		return err
+	}
+	if !on {
 		return errForbidden("passkeys are turned off on this install")
 	}
 	return nil
@@ -182,14 +186,33 @@ func (s *Server) handleRenamePasskey(x *c) error {
 
 // signInWayCount counts how a person can still sign in, so the last one is not
 // taken away.
-func (s *Server) signInWayCount(ctx context.Context, u core.User) int {
+func (s *Server) signInWayCount(ctx context.Context, u core.User) (int, error) {
 	n := 0
 	if u.PasswordHash != "" {
 		n++
 	}
-	p, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", u.ID))
-	i, _ := s.st.Count(ctx, "identities", store.Eq("user_id", u.ID))
-	return n + p + i
+	passkeys, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", u.ID))
+	if err != nil {
+		return 0, err
+	}
+	identities, err := s.st.Count(ctx, "identities", store.Eq("user_id", u.ID))
+	if err != nil {
+		return 0, err
+	}
+	return n + passkeys + identities, nil
+}
+
+// keepsAWayIn refuses taking a way of signing in from a person who has no
+// other; refusal is what they are told then.
+func (s *Server) keepsAWayIn(ctx context.Context, u core.User, refusal string) error {
+	n, err := s.signInWayCount(ctx, u)
+	if err != nil {
+		return err
+	}
+	if n <= 1 {
+		return &engine.Error{Code: engine.CodeConflict, Message: refusal}
+	}
+	return nil
 }
 
 func (s *Server) handleDeletePasskey(x *c) error {
@@ -197,8 +220,8 @@ func (s *Server) handleDeletePasskey(x *c) error {
 	if x.sess == nil {
 		return errForbidden("a passkey is removed by its person, signed in")
 	}
-	if s.signInWayCount(ctx, x.user) <= 1 {
-		return &engine.Error{Code: engine.CodeConflict, Message: "this is your only way to sign in; set a password or add another passkey first"}
+	if err := s.keepsAWayIn(ctx, x.user, "this is your only way to sign in; set a password or add another passkey first"); err != nil {
+		return err
 	}
 	n, err := s.st.Delete(ctx, "passkeys", store.Eq("id", x.r.PathValue("id")), store.Eq("user_id", x.user.ID))
 	if err != nil {
@@ -250,7 +273,7 @@ func (s *Server) handleFinishPasskeySignIn(x *c) error {
 		return err
 	}
 	var found core.User
-	_, cred, err := wa.FinishPasskeyLogin(func(rawID, userHandle []byte) (webauthn.User, error) {
+	_, cred, err := wa.FinishPasskeyLogin(func(_, userHandle []byte) (webauthn.User, error) {
 		if err := s.st.Get(ctx, &found, store.Eq("id", string(userHandle)), store.Live); err != nil {
 			return nil, err
 		}
@@ -264,8 +287,20 @@ func (s *Server) handleFinishPasskeySignIn(x *c) error {
 		return errUnauthorized("this account is disabled")
 	}
 	// Keep the use counter, which lets a copied passkey be noticed.
-	raw, _ := json.Marshal(cred)
-	s.st.Update(ctx, "passkeys", map[string]any{"credential": json.RawMessage(raw), "last_used_at": time.Now().UnixMilli()},
-		store.Eq("credential_id", base64.RawURLEncoding.EncodeToString(cred.ID)))
+	if err := s.recordPasskeyUse(ctx, cred); err != nil {
+		s.log.Error("passkey use not recorded; a copy of it is noticed later", "err", err)
+	}
 	return s.finishSignIn(x, found, "passkey")
+}
+
+// recordPasskeyUse stores a passkey's credential as of its last use, with
+// its counter.
+func (s *Server) recordPasskeyUse(ctx context.Context, cred *webauthn.Credential) error {
+	raw, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	_, err = s.st.Update(ctx, "passkeys", map[string]any{"credential": json.RawMessage(raw), "last_used_at": time.Now().UnixMilli()},
+		store.Eq("credential_id", base64.RawURLEncoding.EncodeToString(cred.ID)))
+	return err
 }

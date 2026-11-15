@@ -71,10 +71,9 @@ func (s *Server) handleConfirmPasswordReset(x *c) error {
 	if err != nil {
 		return err
 	}
-	if _, err := s.st.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", ot.UserID)); err != nil {
+	if err := s.setPassword(ctx, ot.UserID, hash); err != nil {
 		return err
 	}
-	s.st.Update(ctx, "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("user_id", ot.UserID), store.Null("revoked_at"))
 	s.accessChanged()
 	s.audit(x.r, "", core.User{ID: ot.UserID}, "password.reset", "user", ot.UserID, nil)
 	return x.ok(map[string]any{"ok": true})

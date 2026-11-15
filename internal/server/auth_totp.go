@@ -138,20 +138,39 @@ func (s *Server) handleDisableTwoStep(x *c) error {
 	if x.sess == nil {
 		return errForbidden("two-step verification is changed by its person, signed in")
 	}
-	if !s.checkSecond(ctx, x.user, b.Code) && !(x.user.PasswordHash != "" && auth.CheckPassword(x.user.PasswordHash, b.Password)) {
+	if !s.checkSecond(ctx, x.user, b.Code) && (x.user.PasswordHash == "" || !auth.CheckPassword(x.user.PasswordHash, b.Password)) {
 		return &engine.Error{Code: engine.CodeForbidden, Field: "code", Message: "confirm with a current code or your password"}
 	}
-	if s.settingBool(ctx, "auth.require_2fa", false) {
-		if n, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); n == 0 {
-			return errForbidden("this install requires two-step verification; add a passkey before turning codes off")
-		}
+	if err := s.secondStepNotRequired(ctx, x.user); err != nil {
+		return err
 	}
 	if _, err := s.st.Update(ctx, "users", map[string]any{"totp_at": 0, "totp_secret": ""}, store.Eq("id", x.user.ID)); err != nil {
 		return err
 	}
-	s.st.Delete(ctx, "recovery_codes", store.Eq("user_id", x.user.ID))
+	// Without the app's secret the codes let nobody in; they go on the
+	// next setup if not now.
+	if _, err := s.st.Delete(ctx, "recovery_codes", store.Eq("user_id", x.user.ID)); err != nil {
+		s.log.Warn("recovery codes not removed with two-step verification", "err", err)
+	}
 	s.audit(x.r, "", x.user, "second_step.disabled", "user", x.user.ID, nil)
 	return x.ok(map[string]any{"ok": true})
+}
+
+// secondStepNotRequired refuses turning codes off where the install requires
+// a second step and the person has no passkey to be it.
+func (s *Server) secondStepNotRequired(ctx context.Context, u core.User) error {
+	required, err := s.checkedSettingBool(ctx, "auth.require_2fa", false)
+	if err != nil || !required {
+		return err
+	}
+	passkeys, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", u.ID))
+	if err != nil {
+		return err
+	}
+	if passkeys == 0 {
+		return errForbidden("this install requires two-step verification; add a passkey before turning codes off")
+	}
+	return nil
 }
 
 // handleRenewRecoveryCodes replaces the recovery codes with ten new ones.

@@ -40,24 +40,46 @@ func init() {
 const sessionLife = 30 * 24 * time.Hour
 
 // throttle counts an attempt under a name and refuses when there were more
-// than max in the window. The count is in the database, so every server
-// sharing it sees the same number.
-func (s *Server) throttle(ctx context.Context, name string, max int, window time.Duration) error {
+// than limit in the window. The count is in the database, so every server
+// sharing it sees the same number. An attempt that cannot be counted is
+// refused: a limit that cannot be checked lets nobody through.
+func (s *Server) throttle(ctx context.Context, name string, limit int, window time.Duration) error {
 	bucket := time.Now().Unix() / int64(window.Seconds())
 	var rc core.RateCounter
 	err := s.st.Get(ctx, &rc, store.Eq("name", name), store.Eq("bucket", bucket))
-	if errors.Is(err, store.ErrNotFound) {
-		s.st.Upsert(ctx, core.RateCounter{Name: name, Bucket: bucket, Hits: 1}, "name", "bucket")
-		s.st.Delete(ctx, "rate_counters", store.Lt("bucket", bucket-2)) // old windows
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		if err := s.st.Upsert(ctx, core.RateCounter{Name: name, Bucket: bucket, Hits: 1}, "name", "bucket"); err != nil {
+			return s.uncounted(name, err)
+		}
+		if _, err := s.st.Delete(ctx, "rate_counters", store.Lt("bucket", bucket-2)); err != nil {
+			s.log.Warn("old rate-limit windows not cleared; the next first attempt tries again", "err", err)
+		}
 		return nil
+	case err != nil:
+		return s.uncounted(name, err)
 	}
-	if rc.Hits >= max {
+	if rc.Hits >= limit {
 		wait := int(int64(window.Seconds()) - time.Now().Unix()%int64(window.Seconds()))
 		return &httpError{Status: 429, Code: "rate_limited", RetryAfter: wait, Message: "too many attempts; try again in a few minutes"}
 	}
-	s.st.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", name), store.Eq("bucket", bucket))
+	if _, err := s.st.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", name), store.Eq("bucket", bucket)); err != nil {
+		return s.uncounted(name, err)
+	}
 	return nil
 }
+
+// uncounted logs why an attempt could not be counted and refuses it.
+func (s *Server) uncounted(name string, err error) error {
+	kind, _, _ := strings.Cut(name, ":")
+	s.log.Error("an attempt could not be counted, so it is refused", "limit", kind, "err", err)
+	return &httpError{Status: 429, Code: "rate_limited", RetryAfter: uncountedRetry,
+		Message: "attempts cannot be counted right now; try again in a few minutes"}
+}
+
+// uncountedRetry is how long, in seconds, a client is asked to wait when an
+// attempt could not be counted.
+const uncountedRetry = 60
 
 // oneTime makes a short-lived secret and stores its hash with some data.
 func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, life time.Duration) (string, error) {
@@ -207,7 +229,9 @@ func (s *Server) handleSignIn(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
-	if !s.settingBool(ctx, "auth.password", true) {
+	if on, err := s.checkedSettingBool(ctx, "auth.password", true); err != nil {
+		return err
+	} else if !on {
 		return errForbidden("signing in with a password is turned off on this install")
 	}
 	email := strings.ToLower(strings.TrimSpace(b.Email))
@@ -246,13 +270,20 @@ func (s *Server) finishSignIn(x *c, u core.User, method string) error {
 		return x.ok(map[string]any{"second_step": true})
 	}
 	s.audit(x.r, "", u, "signin", "user", u.ID, map[string]string{"method": method})
-	s.st.Update(x.ctx(), "users", map[string]any{"last_seen_at": time.Now().UnixMilli()}, store.Eq("id", u.ID))
+	if _, err := s.st.Update(x.ctx(), "users", map[string]any{"last_seen_at": time.Now().UnixMilli()}, store.Eq("id", u.ID)); err != nil {
+		s.log.Warn("last seen not recorded at sign-in", "err", err) // the next request records it
+	}
 	return x.ok(map[string]any{"user": u})
 }
 
+// handleSignOut ends the browser's session. When the session cannot be
+// ended the cookie is still cleared, and the answer says it failed.
 func (s *Server) handleSignOut(x *c) error {
 	if ck, err := x.r.Cookie(sessionCookie); err == nil {
-		s.st.Update(x.ctx(), "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("token_hash", auth.Hash(ck.Value)))
+		if _, err := s.st.Update(x.ctx(), "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("token_hash", auth.Hash(ck.Value))); err != nil {
+			s.clearCookie(x)
+			return err
+		}
 		s.accessChanged()
 	}
 	s.clearCookie(x)
@@ -289,7 +320,10 @@ func (s *Server) handleShowAccount(x *c) error {
 	if err != nil {
 		return err
 	}
-	passkeys, _ := s.st.Count(x.ctx(), "passkeys", store.Eq("user_id", x.user.ID))
+	passkeys, err := s.st.Count(x.ctx(), "passkeys", store.Eq("user_id", x.user.ID))
+	if err != nil {
+		return err
+	}
 	return x.ok(map[string]any{"user": x.user, "workspaces": ws, "has_password": x.user.PasswordHash != "", "passkeys": passkeys})
 }
 
@@ -354,7 +388,9 @@ func (s *Server) handleUpdateProfile(x *c) error {
 		if x.user.PasswordHash != "" && !auth.CheckPassword(x.user.PasswordHash, b.Password) {
 			return &engine.Error{Code: engine.CodeForbidden, Field: "password", Message: "confirm with your current password"}
 		}
-		if n, _ := s.st.Count(ctx, "users", store.Eq("email", email), store.Live); n > 0 {
+		if n, err := s.st.Count(ctx, "users", store.Eq("email", email), store.Live); err != nil {
+			return err
+		} else if n > 0 {
 			return &engine.Error{Code: engine.CodeConflict, Field: "email", Message: "another account uses this address"}
 		}
 		set["email"] = email
@@ -419,15 +455,28 @@ func (s *Server) handleChangePassword(x *c) error {
 	if err != nil {
 		return err
 	}
-	ctx := x.ctx()
-	if _, err := s.st.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", x.user.ID)); err != nil {
+	// Every other browser is signed out, in the same write: the password
+	// does not change while they stay signed in.
+	err = s.setPassword(x.ctx(), x.user.ID, hash, store.Ne("id", x.sess.ID))
+	if err != nil {
 		return err
 	}
-	// Every other browser is signed out.
-	s.st.Update(ctx, "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("user_id", x.user.ID), store.Ne("id", x.sess.ID), store.Null("revoked_at"))
 	s.accessChanged()
 	s.audit(x.r, "", x.user, "password.changed", "user", x.user.ID, nil)
 	return x.ok(map[string]any{"ok": true})
+}
+
+// setPassword changes a person's password and, in the same write, ends
+// their sessions; which narrows the sessions that end.
+func (s *Server) setPassword(ctx context.Context, userID, hash string, which ...store.Cond) error {
+	return s.st.Atomic(ctx, func(db store.DB) error {
+		if _, err := db.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", userID)); err != nil {
+			return err
+		}
+		where := append([]store.Cond{store.Eq("user_id", userID)}, which...)
+		_, err := db.Update(ctx, "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, append(where, store.Null("revoked_at"))...)
+		return err
+	})
 }
 
 func (s *Server) handleListSessions(x *c) error {
@@ -475,8 +524,12 @@ func (s *Server) handleCreateWorkspace(x *c) error {
 	if x.user.Kind != core.KindPerson || !x.hasFullAccess() {
 		return errForbidden("a workspace is created by a person: signed in, or with a personal token that is not narrowed")
 	}
-	if !x.user.IsAdmin && !s.settingBool(x.ctx(), "workspaces.anyone_can_create", true) {
-		return errForbidden("only an install admin can create workspaces here")
+	if !x.user.IsAdmin {
+		if anyone, err := s.checkedSettingBool(x.ctx(), "workspaces.anyone_can_create", true); err != nil {
+			return err
+		} else if !anyone {
+			return errForbidden("only an install admin can create workspaces here")
+		}
 	}
 	if b.Slug == "" {
 		b.Slug = slugFrom(b.Name)

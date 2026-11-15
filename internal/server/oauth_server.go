@@ -34,13 +34,13 @@ func init() {
 	})
 }
 
-func (s *Server) handleDescribeProtectedResource(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDescribeProtectedResource(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"resource": s.cfg.BaseURL + "/mcp", "authorization_servers": []string{s.cfg.BaseURL},
 		"bearer_methods_supported": []string{"header"}})
 }
 
-func (s *Server) handleDescribeAuthorizationServer(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDescribeAuthorizationServer(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	b := s.cfg.BaseURL
 	json.NewEncoder(w).Encode(map[string]any{"issuer": b, "authorization_endpoint": b + "/oauth/authorize", "token_endpoint": b + "/oauth/token",
@@ -176,7 +176,7 @@ func (s *Server) handleShowConsentPage(x *c) error {
 	if q.Get("response_type") != "code" || q.Get("code_challenge") == "" || (q.Get("code_challenge_method") != "S256" && q.Get("code_challenge_method") != "") {
 		return errBad("this server takes response_type=code with a S256 code_challenge")
 	}
-	if err := s.identify(x); err != nil || x.sess == nil || x.user.Kind != core.KindPerson {
+	if signedIn := s.identify(x) == nil && x.sess != nil && x.user.Kind == core.KindPerson; !signedIn {
 		http.Redirect(x.w, x.r, "/login?next="+url.QueryEscape(x.r.URL.RequestURI()), http.StatusFound)
 		return nil
 	}
@@ -226,8 +226,13 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 		return errBad("this request has expired; start again from the client")
 	}
 	var req authRequest
-	json.Unmarshal(ot.Data, &req)
-	back, _ := url.Parse(req.RedirectURI)
+	if err := json.Unmarshal(ot.Data, &req); err != nil {
+		return err
+	}
+	back, err := url.Parse(req.RedirectURI)
+	if err != nil {
+		return err
+	}
 	q := back.Query()
 	if req.State != "" {
 		q.Set("state", req.State)
@@ -294,7 +299,9 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 			scopes = "read"
 		}
 		var cl core.OAuthClient
-		s.st.Get(ctx, &cl, store.Eq("id", clientID))
+		if err := s.st.Get(ctx, &cl, store.Eq("id", clientID)); err != nil {
+			s.log.Warn("oauth token: the client's name is not known; the token gets a plain one", "err", err)
+		}
 		t := core.APIToken{ID: id.New(), WorkspaceID: workspaceID, UserID: userID, Name: firstNonEmpty(cl.Name, "MCP client"), TokenHash: auth.Hash(access), Prefix: prefix,
 			Scopes: scopes, Kind: "oauth", ClientID: clientID, RefreshHash: auth.Hash(refresh), CreatedBy: userID, CreatedAt: now.UnixMilli(),
 			ExpiresAt: now.Add(accessLife).UnixMilli()}
@@ -313,7 +320,11 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var req authRequest
-		json.Unmarshal(ot.Data, &req)
+		if err := json.Unmarshal(ot.Data, &req); err != nil {
+			s.log.Error("oauth token: the stored request does not read", "err", err)
+			fail("server_error", "the code could not be read")
+			return
+		}
 		sum := sha256.Sum256([]byte(f.Get("code_verifier")))
 		if req.ClientID != f.Get("client_id") || req.RedirectURI != f.Get("redirect_uri") || base64.RawURLEncoding.EncodeToString(sum[:]) != req.Challenge {
 			fail("invalid_grant", "the client, redirect URI or code verifier does not match the request")
@@ -327,8 +338,13 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 			fail("invalid_grant", "the refresh token is not valid; sign in again")
 			return
 		}
-		// A refresh token works once: the old pair ends as the new one starts.
-		s.st.Update(ctx, "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", old.ID))
+		// A refresh token works once: the old pair ends as the new one
+		// starts, and no new one starts while the old one cannot end.
+		if _, err := s.st.Update(ctx, "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", old.ID)); err != nil {
+			s.log.Error("oauth token: the old pair could not be revoked, so no new one is issued", "err", err)
+			fail("server_error", "the refresh token could not be spent; try again")
+			return
+		}
 		scope := ""
 		if old.Scopes == "read" {
 			scope = "read"

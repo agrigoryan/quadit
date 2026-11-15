@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,20 +14,23 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// emailAllowed checks an address against the allowed-domains list.
-func (s *Server) emailAllowed(ctx context.Context, email string) bool {
+// emailAllowed checks an address against the allowed-domains list. When
+// the list cannot be read, the error says so and no address is allowed.
+func (s *Server) emailAllowed(ctx context.Context, email string) (bool, error) {
 	var domains []string
-	s.setting(ctx, "auth.allowed_domains", &domains)
+	if err := s.checkedSetting(ctx, "auth.allowed_domains", &domains); err != nil {
+		return false, err
+	}
 	if len(domains) == 0 {
-		return true
+		return true, nil
 	}
 	at := strings.LastIndex(email, "@")
 	for _, d := range domains {
 		if at >= 0 && strings.EqualFold(email[at+1:], strings.TrimPrefix(strings.TrimSpace(d), "@")) {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // newPerson makes a person's account.
@@ -71,10 +75,14 @@ func (s *Server) handleRegisterAccount(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
-	if !s.settingBool(ctx, "auth.registration", false) {
+	if open, err := s.checkedSettingBool(ctx, "auth.registration", false); err != nil {
+		return err
+	} else if !open {
 		return errForbidden("registration is closed on this install; ask for an invitation")
 	}
-	if !s.emailAllowed(ctx, b.Email) {
+	if allowed, err := s.emailAllowed(ctx, b.Email); err != nil {
+		return err
+	} else if !allowed {
 		return errForbidden("accounts here are limited to certain email domains")
 	}
 	if err := s.throttle(ctx, "register:ip:"+clientIP(x.r), 10, time.Hour); err != nil {
@@ -181,18 +189,25 @@ func (s *Server) handleRevokeInvite(x *c) error {
 	return x.ok(map[string]any{"ok": true})
 }
 
+// invite finds the invitation a link's token is for, and its workspace. An
+// invitation that is revoked, spent, expired or for a workspace that is gone
+// is the engine's not-found error.
 func (s *Server) invite(ctx context.Context, token string) (core.Invite, core.Workspace, error) {
 	var inv core.Invite
 	var ws core.Workspace
 	gone := &engine.Error{Code: engine.CodeNotFound, Message: "this invitation is no longer valid; ask for a new one"}
-	if err := s.st.Get(ctx, &inv, store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at")); err != nil {
+	if err := s.st.Get(ctx, &inv, store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at")); errors.Is(err, store.ErrNotFound) {
 		return inv, ws, gone
+	} else if err != nil {
+		return inv, ws, err
 	}
 	if inv.ExpiresAt < time.Now().UnixMilli() || inv.Uses >= inv.MaxUses {
 		return inv, ws, gone
 	}
-	if err := s.st.Get(ctx, &ws, store.Eq("id", inv.WorkspaceID), store.Live); err != nil {
+	if err := s.st.Get(ctx, &ws, store.Eq("id", inv.WorkspaceID), store.Live); errors.Is(err, store.ErrNotFound) {
 		return inv, ws, gone
+	} else if err != nil {
+		return inv, ws, err
 	}
 	return inv, ws, nil
 }
@@ -203,8 +218,11 @@ func (s *Server) handleShowInvite(x *c) error {
 	if err != nil {
 		return err
 	}
+	// An inviter whose account is gone leaves the name blank.
 	var inviter core.User
-	s.st.Get(x.ctx(), &inviter, store.Eq("id", inv.CreatedBy))
+	if err := s.st.Get(x.ctx(), &inviter, store.Eq("id", inv.CreatedBy)); err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	out := map[string]any{"workspace": map[string]string{"name": ws.Name, "slug": ws.Slug}, "role": inv.Role, "email": inv.Email, "invited_by": inviter.Name}
 	if inv.Email != "" {
 		var u core.User
@@ -235,7 +253,9 @@ func (s *Server) handleAcceptInvite(x *c) error {
 		if inv.Email != "" {
 			email = inv.Email
 		}
-		if !s.emailAllowed(ctx, email) {
+		if allowed, err := s.emailAllowed(ctx, email); err != nil {
+			return err
+		} else if !allowed {
 			return errForbidden("accounts here are limited to certain email domains")
 		}
 		if b.Password == "" {
@@ -251,7 +271,9 @@ func (s *Server) handleAcceptInvite(x *c) error {
 	if inv.Email != "" && !strings.EqualFold(inv.Email, u.Email) {
 		return errForbidden("this invitation is for %s; you are signed in as %s", inv.Email, u.Email)
 	}
-	if n, _ := s.st.Count(ctx, "members", store.Eq("workspace_id", ws.ID), store.Eq("user_id", u.ID), store.Null("removed_at")); n > 0 {
+	if n, err := s.st.Count(ctx, "members", store.Eq("workspace_id", ws.ID), store.Eq("user_id", u.ID), store.Null("removed_at")); err != nil {
+		return err
+	} else if n > 0 {
 		return x.ok(map[string]any{"workspace": ws, "already_member": true})
 	}
 	// Count the use first, so a link good for one person admits one.

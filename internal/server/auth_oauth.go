@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -82,14 +83,17 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 	}
 	q := x.r.URL.Query()
 	if e := q.Get("error"); e != "" {
-		return back("The sign-in was cancelled.")
+		return back("The sign-in was cancelled.") //nolint:misspell // the words the person is shown; changing them is not this unit's to do
 	}
 	ot, err := s.useOneTime(ctx, "oauth", q.Get("state"), false)
 	if err != nil {
 		return back("This sign-in has expired. Try again.")
 	}
 	var st oauthState
-	json.Unmarshal(ot.Data, &st)
+	if err := json.Unmarshal(ot.Data, &st); err != nil {
+		s.log.Error("oauth sign-in: the stored state does not read", "provider", provider, "err", err)
+		return back("This sign-in has expired. Try again.")
+	}
 	p, cfg, ok := s.signInWith(ctx, provider)
 	if !ok || st.Provider != provider {
 		return back("This sign-in provider is not available.")
@@ -99,7 +103,7 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 		s.log.Error("oauth sign-in", "provider", provider, "err", err)
 		return back(couldNotConfirm)
 	}
-	u, refusal, err := s.oauthAccount(ctx, x, provider, cfg.Name, st, who)
+	u, refusal, err := s.oauthAccount(x, providerSignIn{provider: provider, providerName: cfg.Name, state: st, who: who})
 	if err != nil {
 		return err
 	}
@@ -131,62 +135,143 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 	return nil
 }
 
+// providerSignIn is one sign-in coming back from a provider: who the
+// provider says signed in, and what the sign-in was started for.
+type providerSignIn struct {
+	provider     string // the provider's id
+	providerName string
+	state        oauthState
+	who          outsider
+}
+
 // oauthAccount finds the account a sign-in belongs to: the one the
 // provider's account is already connected to, the one that is connecting
 // it, or the one with the address the provider vouches for. Where there is
 // none, it makes one if an invitation or open registration allows. refusal,
 // when not empty, is what the person is told instead of being signed in.
-func (s *Server) oauthAccount(ctx context.Context, x *c, provider, providerName string, st oauthState, who outsider) (core.User, string, error) {
-	var u core.User
+func (s *Server) oauthAccount(x *c, in providerSignIn) (u core.User, refusal string, err error) {
 	var ident core.Identity
-	link := func(userID string) error {
-		return s.st.Insert(ctx, core.Identity{ID: id.New(), UserID: userID, Provider: provider, Subject: who.Subject, Email: who.Email, CreatedAt: time.Now().UnixMilli()})
-	}
-	switch err := s.st.Get(ctx, &ident, store.Eq("provider", provider), store.Eq("subject", who.Subject)); {
+	err = s.st.Get(x.ctx(), &ident, store.Eq("provider", in.provider), store.Eq("subject", in.who.Subject))
+	switch {
 	case err == nil:
-		if st.LinkUser != "" && st.LinkUser != ident.UserID {
-			return u, "That " + providerName + " account is already connected to someone else.", nil
-		}
-		if err := s.st.Get(ctx, &u, store.Eq("id", ident.UserID), store.Live); err != nil {
-			return u, "That account no longer exists.", nil
-		}
-	case st.LinkUser != "":
-		if err := s.st.Get(ctx, &u, store.Eq("id", st.LinkUser), store.Live); err != nil {
-			return u, "Sign in first, then connect the provider.", nil
-		}
-		if err := link(u.ID); err != nil {
-			return u, "", err
-		}
-		s.audit(x.r, "", u, "identity.linked", "user", u.ID, map[string]string{"provider": provider})
+		return s.connectedAccount(x.ctx(), in, ident)
+	case !errors.Is(err, store.ErrNotFound):
+		return u, "", err
+	case in.state.LinkUser != "":
+		return s.connectingAccount(x, in)
 	default:
-		if who.Email == "" || !who.Verified {
-			return u, "Your " + providerName + " account has no verified email address.", nil
+		return s.accountByEmail(x, in)
+	}
+}
+
+// connectedAccount is the account a provider's account is connected to.
+func (s *Server) connectedAccount(ctx context.Context, in providerSignIn, ident core.Identity) (u core.User, refusal string, err error) {
+	if in.state.LinkUser != "" && in.state.LinkUser != ident.UserID {
+		return u, "That " + in.providerName + " account is already connected to someone else.", nil
+	}
+	err = s.st.Get(ctx, &u, store.Eq("id", ident.UserID), store.Live)
+	if errors.Is(err, store.ErrNotFound) {
+		return u, "That account no longer exists.", nil
+	}
+	return u, "", err
+}
+
+// connectingAccount is the signed-in account that is connecting the
+// provider's account, which is connected to it now.
+func (s *Server) connectingAccount(x *c, in providerSignIn) (u core.User, refusal string, err error) {
+	ctx := x.ctx()
+	err = s.st.Get(ctx, &u, store.Eq("id", in.state.LinkUser), store.Live)
+	if errors.Is(err, store.ErrNotFound) {
+		return u, "Sign in first, then connect the provider.", nil
+	}
+	if err != nil {
+		return u, "", err
+	}
+	if err := s.linkIdentity(ctx, in, u.ID); err != nil {
+		return u, "", err
+	}
+	s.audit(x.r, "", u, "identity.linked", "user", u.ID, map[string]string{"provider": in.provider})
+	return u, "", nil
+}
+
+// accountByEmail is the account with the address the provider vouches for,
+// made when there is none and an invitation or open registration allows.
+// The provider's account is connected to it.
+func (s *Server) accountByEmail(x *c, in providerSignIn) (u core.User, refusal string, err error) {
+	if in.who.Email == "" || !in.who.Verified {
+		return u, "Your " + in.providerName + " account has no verified email address.", nil
+	}
+	err = s.st.Get(x.ctx(), &u, store.Eq("email", in.who.Email), store.Live)
+	if errors.Is(err, store.ErrNotFound) {
+		// Nobody here yet: allowed only by an invitation or open registration.
+		if u, refusal, err = s.newProviderAccount(x, in); err != nil || refusal != "" {
+			return u, refusal, err
 		}
-		if err := s.st.Get(ctx, &u, store.Eq("email", who.Email), store.Live); err != nil {
-			// Nobody here yet: allowed only by an invitation or open registration.
-			invited := false
-			if st.Invite != "" {
-				if inv, _, ierr := s.invite(ctx, st.Invite); ierr == nil && (inv.Email == "" || strings.EqualFold(inv.Email, who.Email)) {
-					invited = true
-				}
-			}
-			if !invited && (!s.settingBool(ctx, "auth.registration", false) || !s.emailAllowed(ctx, who.Email)) {
-				return u, "There is no account for " + who.Email + ". Ask for an invitation.", nil
-			}
-			name := who.Name
-			if name == "" {
-				name = strings.SplitN(who.Email, "@", 2)[0]
-			}
-			if u, err = s.newPerson(ctx, name, who.Email, ""); err != nil {
-				return u, "An account could not be made for " + who.Email + ".", nil
-			}
-			s.audit(x.r, "", u, "account.registered", "user", u.ID, map[string]string{"provider": provider})
-		}
-		if err := link(u.ID); err != nil {
-			return u, "", err
-		}
+	} else if err != nil {
+		return u, "", err
+	}
+	if err := s.linkIdentity(x.ctx(), in, u.ID); err != nil {
+		return u, "", err
 	}
 	return u, "", nil
+}
+
+// newProviderAccount makes an account for someone a provider vouches for,
+// when an invitation or open registration allows.
+func (s *Server) newProviderAccount(x *c, in providerSignIn) (u core.User, refusal string, err error) {
+	ctx := x.ctx()
+	email := in.who.Email
+	invited, err := s.invitedAs(ctx, in.state.Invite, email)
+	if err != nil {
+		return u, "", err
+	}
+	if !invited {
+		open, err := s.checkedSettingBool(ctx, "auth.registration", false)
+		if err != nil {
+			return u, "", err
+		}
+		allowed := false
+		if open {
+			if allowed, err = s.emailAllowed(ctx, email); err != nil {
+				return u, "", err
+			}
+		}
+		if !allowed {
+			return u, "There is no account for " + email + ". Ask for an invitation.", nil
+		}
+	}
+	name := in.who.Name
+	if name == "" {
+		name = strings.SplitN(email, "@", 2)[0]
+	}
+	if u, err = s.newPerson(ctx, name, email, ""); err != nil {
+		s.log.Warn("oauth sign-in: no account made", "provider", in.provider, "err", err)
+		return u, "An account could not be made for " + email + ".", nil
+	}
+	s.audit(x.r, "", u, "account.registered", "user", u.ID, map[string]string{"provider": in.provider})
+	return u, "", nil
+}
+
+// invitedAs reports whether an invitation's token, when there is one, lets
+// in the person with this address.
+func (s *Server) invitedAs(ctx context.Context, token, email string) (bool, error) {
+	if token == "" {
+		return false, nil
+	}
+	inv, _, err := s.invite(ctx, token)
+	var refusal *engine.Error
+	if errors.As(err, &refusal) && refusal.Code == engine.CodeNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return inv.Email == "" || strings.EqualFold(inv.Email, email), nil
+}
+
+// linkIdentity connects the provider's account to a person's.
+func (s *Server) linkIdentity(ctx context.Context, in providerSignIn, userID string) error {
+	return s.st.Insert(ctx, core.Identity{ID: id.New(), UserID: userID, Provider: in.provider, Subject: in.who.Subject, Email: in.who.Email, CreatedAt: time.Now().UnixMilli()})
 }
 
 func (s *Server) handleListIdentities(x *c) error {
@@ -202,8 +287,8 @@ func (s *Server) handleUnlinkIdentity(x *c) error {
 	if x.sess == nil {
 		return errForbidden("a connected account is removed by its person, signed in")
 	}
-	if s.signInWayCount(ctx, x.user) <= 1 {
-		return &engine.Error{Code: engine.CodeConflict, Message: "this is your only way to sign in; set a password or add a passkey first"}
+	if err := s.keepsAWayIn(ctx, x.user, "this is your only way to sign in; set a password or add a passkey first"); err != nil {
+		return err
 	}
 	n, err := s.st.Delete(ctx, "identities", store.Eq("id", x.r.PathValue("id")), store.Eq("user_id", x.user.ID))
 	if err != nil {

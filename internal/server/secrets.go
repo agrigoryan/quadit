@@ -52,12 +52,7 @@ func (x *c) mayUseSecret(sec core.Secret) bool {
 	if len(sec.Agents) == 0 || x.member.Kind != core.KindAgent {
 		return true
 	}
-	for _, id := range sec.Agents {
-		if id == x.member.UserID {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(sec.Agents, x.member.UserID)
 }
 
 // handleListSecrets lists the secrets the caller may use: names and what they are
@@ -203,7 +198,7 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	}
 	started := time.Now()
 	resp, err := secretRequestClient.Do(req)
-	x.db.Update(x.ctx(), "secrets", map[string]any{"last_used_at": started.UnixMilli()}, store.Eq("id", sec.ID))
+	s.markSecretUsed(x, sec, started)
 	s.audit(x.r, x.ws.ID, x.user, "secret.used", "secret", sec.ID, map[string]string{"name": sec.Name, "method": method, "host": u.Host, "path": u.Path})
 	// mask blanks the value out of anything that goes back to the caller.
 	mask := func(v string) string {
@@ -215,7 +210,10 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	}
 	defer resp.Body.Close()
 	const limit = 1 << 20
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil {
+		return x.ok(map[string]any{"ok": false, "error": mask(err.Error()), "ms": time.Since(started).Milliseconds()})
+	}
 	cut := len(raw) > limit
 	if cut {
 		raw = raw[:limit]
@@ -261,6 +259,14 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	return x.ok(out)
 }
 
+// markSecretUsed notes when a secret was last used. The audit log has
+// every use, so a failure here is only logged.
+func (s *Server) markSecretUsed(x *c, sec core.Secret, at time.Time) {
+	if _, err := x.db.Update(x.ctx(), "secrets", map[string]any{"last_used_at": at.UnixMilli()}, store.Eq("id", sec.ID)); err != nil {
+		s.log.Warn("secret's last use not recorded", "secret", sec.Name, "err", err)
+	}
+}
+
 // isText reports whether an answer can be shown as text.
 func isText(contentType string, raw []byte) bool {
 	ct := strings.ToLower(contentType)
@@ -295,7 +301,7 @@ func (s *Server) handleListEnvSecrets(x *c) error {
 			return errForbidden("the secret %s is not marked for use in an environment; use it through secrets/%s/request, or ask an admin", sec.Name, sec.Name)
 		}
 		out[sec.Name] = value
-		x.db.Update(x.ctx(), "secrets", map[string]any{"last_used_at": time.Now().UnixMilli()}, store.Eq("id", sec.ID))
+		s.markSecretUsed(x, sec, time.Now())
 		s.audit(x.r, x.ws.ID, x.user, "secret.given_to_companion", "secret", sec.ID, map[string]string{"name": sec.Name})
 	}
 	x.w.Header().Set("Cache-Control", "no-store")

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -42,7 +43,11 @@ func (s *Server) installAdmin(h handler) handler {
 }
 
 func (s *Server) handleListSettings(x *c) error {
-	return x.ok(map[string]any{"settings": s.maskedSettings(x.ctx())})
+	settings, err := s.maskedSettings(x.ctx())
+	if err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"settings": settings})
 }
 
 // handleUpdateSetting sets one install setting. The body is its JSON value.
@@ -61,8 +66,13 @@ func (s *Server) handleUpdateSetting(x *c) error {
 	if err := s.saveSetting(x.ctx(), name, value, x.user.ID); err != nil {
 		return err
 	}
-	// The record says what it was set to, with anything secret blanked.
-	s.audit(x.r, "", x.user, "setting.changed", "setting", name, s.maskedSettings(x.ctx())[name])
+	// The record says what it was set to, with anything secret blanked;
+	// a setting that cannot be read back is recorded without its value.
+	settings, err := s.maskedSettings(x.ctx())
+	s.audit(x.r, "", x.user, "setting.changed", "setting", name, settings[name])
+	if err != nil {
+		return err
+	}
 	return s.handleListSettings(x)
 }
 
@@ -186,7 +196,11 @@ func (s *Server) handleUpdateUser(x *c) error {
 	}
 	if b.IsAdmin != nil {
 		if !*b.IsAdmin && u.ID == x.user.ID {
-			if n, _ := s.st.Count(ctx, "users", store.Eq("is_admin", true), store.Live, store.Null("disabled_at")); n <= 1 {
+			admins, err := s.st.Count(ctx, "users", store.Eq("is_admin", true), store.Live, store.Null("disabled_at"))
+			if err != nil {
+				return err
+			}
+			if admins <= 1 {
 				return &engine.Error{Code: engine.CodeConflict, Message: "an install needs someone to run it: make someone else an admin first"}
 			}
 		}
@@ -195,18 +209,39 @@ func (s *Server) handleUpdateUser(x *c) error {
 	if len(set) == 0 {
 		return x.ok(u)
 	}
-	if _, err := s.st.Update(ctx, "users", set, store.Eq("id", u.ID)); err != nil {
+	disabling := b.Disabled != nil && *b.Disabled
+	// A disabled account is signed out everywhere and its tokens end, in
+	// the same write: it is not disabled while they still work.
+	err := s.st.Atomic(ctx, func(db store.DB) error {
+		if _, err := db.Update(ctx, "users", set, store.Eq("id", u.ID)); err != nil {
+			return err
+		}
+		if disabling {
+			return revokeAccess(ctx, db, u.ID)
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
-	if b.Disabled != nil && *b.Disabled {
-		now := time.Now().UnixMilli()
-		s.st.Update(ctx, "sessions", map[string]any{"revoked_at": now}, store.Eq("user_id", u.ID), store.Null("revoked_at"))
-		s.st.Update(ctx, "api_tokens", map[string]any{"revoked_at": now}, store.Eq("user_id", u.ID), store.Null("revoked_at"))
+	if disabling {
 		s.accessChanged()
 	}
 	s.audit(x.r, "", x.user, "user.changed", "user", u.ID, b)
-	s.st.Get(ctx, &u, store.Eq("id", u.ID))
+	if err := s.st.Get(ctx, &u, store.Eq("id", u.ID)); err != nil {
+		return err
+	}
 	return x.ok(u)
+}
+
+// revokeAccess ends every session and token of a person.
+func revokeAccess(ctx context.Context, db store.DB, userID string) error {
+	now := time.Now().UnixMilli()
+	if _, err := db.Update(ctx, "sessions", map[string]any{"revoked_at": now}, store.Eq("user_id", userID), store.Null("revoked_at")); err != nil {
+		return err
+	}
+	_, err := db.Update(ctx, "api_tokens", map[string]any{"revoked_at": now}, store.Eq("user_id", userID), store.Null("revoked_at"))
+	return err
 }
 
 func (s *Server) handleListWorkspaces(x *c) error {
@@ -227,8 +262,13 @@ func (s *Server) handleListWorkspaces(x *c) error {
 	out := make([]row, len(wss))
 	for i, ws := range wss {
 		out[i].Workspace, out[i].DeletedAt = ws, ws.DeletedAt
-		out[i].Members, _ = s.st.Count(ctx, "members", store.Eq("workspace_id", ws.ID), store.Null("removed_at"))
-		out[i].Tasks, _ = s.st.Count(ctx, "tasks", store.Eq("workspace_id", ws.ID), store.Live)
+		var err error
+		if out[i].Members, err = s.st.Count(ctx, "members", store.Eq("workspace_id", ws.ID), store.Null("removed_at")); err != nil {
+			return err
+		}
+		if out[i].Tasks, err = s.st.Count(ctx, "tasks", store.Eq("workspace_id", ws.ID), store.Live); err != nil {
+			return err
+		}
 	}
 	return x.ok(map[string]any{"workspaces": out})
 }
@@ -244,7 +284,9 @@ func (s *Server) handleRestoreWorkspace(x *c) error {
 	if ws.DeletedAt == 0 {
 		return x.ok(map[string]any{"workspace": ws})
 	}
-	if n, _ := s.st.Count(ctx, "workspaces", store.Eq("slug", ws.Slug), store.Live); n > 0 {
+	if n, err := s.st.Count(ctx, "workspaces", store.Eq("slug", ws.Slug), store.Live); err != nil {
+		return err
+	} else if n > 0 {
 		return &engine.Error{Code: engine.CodeConflict, Message: fmt.Sprintf("another workspace uses the address %q now; rename that one first", ws.Slug)}
 	}
 	if _, err := s.st.Update(ctx, "workspaces", map[string]any{"deleted_at": 0}, store.Eq("id", ws.ID)); err != nil {
@@ -267,7 +309,9 @@ func (s *Server) handleJoinWorkspace(x *c) error {
 		}
 	}
 	db := s.st.In(ws.ID)
-	if n, _ := db.Count(ctx, "members", store.Eq("user_id", x.user.ID), store.Null("removed_at")); n > 0 {
+	if n, err := db.Count(ctx, "members", store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
+		return err
+	} else if n > 0 {
 		return x.ok(map[string]any{"workspace": ws, "already_member": true})
 	}
 	// The change is made in the name of the workspace's longest-standing owner.
@@ -292,17 +336,30 @@ func (s *Server) handleJoinWorkspace(x *c) error {
 func (s *Server) handleShowInstallHealth(x *c) error {
 	ctx := x.ctx()
 	out := map[string]any{"version": s.cfg.Version, "database": s.st.Dialect(), "files": s.fileStore().Kind(), "mail": s.mailReady(ctx)}
-	out["jobs_waiting"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"))
-	out["jobs_failing"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"), store.Gt("attempts", 2))
-	out["webhooks_failing"], _ = s.st.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0))
+	counts := []struct {
+		key   string
+		table string
+		where []store.Cond
+	}{
+		{"jobs_waiting", "jobs", []store.Cond{store.Null("done_at")}},
+		{"jobs_failing", "jobs", []store.Cond{store.Null("done_at"), store.Gt("attempts", 2)}},
+		{"webhooks_failing", "webhooks", []store.Cond{store.Live, store.Gt("failures", 0)}},
+		{"sources_failing", "doc_sources", []store.Cond{store.Live, store.Ne("last_error", "")}},
+		{"integrations_failing", "integrations", []store.Cond{store.Live, store.Ne("last_error", "")}},
+	}
+	for _, count := range counts {
+		n, err := s.st.Count(ctx, count.table, count.where...)
+		if err != nil {
+			return err
+		}
+		out[count.key] = n
+	}
 	out["deliveries_dead"] = liveDeliveries(ctx, s.st, store.Eq("state", "dead"))
 	out["deliveries_pending"] = liveDeliveries(ctx, s.st, store.Eq("state", "pending"))
 	var backups []core.Backup
 	if err := s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err == nil && len(backups) > 0 {
 		out["last_backup"] = backups[0]
 	}
-	out["sources_failing"], _ = s.st.Count(ctx, "doc_sources", store.Live, store.Ne("last_error", ""))
-	out["integrations_failing"], _ = s.st.Count(ctx, "integrations", store.Live, store.Ne("last_error", ""))
 	return x.ok(out)
 }
 
@@ -310,48 +367,81 @@ func (s *Server) handleShowInstallHealth(x *c) error {
 // one making it with no way to sign in: turning passwords off needs a
 // passkey or a provider account of theirs that still works.
 func (s *Server) keepsADoor(x *c, name string, value json.RawMessage) error {
-	ctx := x.ctx()
-	on := func(setting string, def bool) bool {
-		if setting == name {
-			if strings.TrimSpace(string(value)) == "null" {
-				// Back to the default: passwords and passkeys on, a provider off.
-				return (setting == "auth.password" || setting == "auth.passkeys") && def
-			}
-			var v struct {
-				Enabled *bool `json:"enabled"`
-			}
-			var b bool
-			if json.Unmarshal(value, &b) == nil {
-				return b
-			}
-			if json.Unmarshal(value, &v) == nil && v.Enabled != nil {
-				return *v.Enabled
-			}
-			return false
-		}
-		if signInSetting(setting) {
-			cfg, ok := s.oauthConfig(ctx, strings.TrimPrefix(setting, "auth."))
-			return ok && cfg.Enabled
-		}
-		return s.settingBool(ctx, setting, def)
-	}
 	if name != "auth.password" && name != "auth.passkeys" && !signInSetting(name) {
 		return nil
 	}
-	if on("auth.password", true) && x.user.PasswordHash != "" {
+	ctx := x.ctx()
+	change := settingChange{name: name, value: value}
+	if on, err := s.doorOn(ctx, change, "auth.password", true); err != nil {
+		return err
+	} else if on && x.user.PasswordHash != "" {
 		return nil
 	}
-	if on("auth.passkeys", true) {
-		if n, _ := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); n > 0 {
+	if on, err := s.doorOn(ctx, change, "auth.passkeys", true); err != nil {
+		return err
+	} else if on {
+		n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID))
+		if err != nil {
+			return err
+		}
+		if n > 0 {
 			return nil
 		}
 	}
 	for _, p := range signInProviders {
-		if on("auth."+p.ID(), false) {
-			if n, _ := s.st.Count(ctx, "identities", store.Eq("user_id", x.user.ID), store.Eq("provider", p.ID())); n > 0 {
-				return nil
-			}
+		on, err := s.doorOn(ctx, change, "auth."+p.ID(), false)
+		if err != nil {
+			return err
+		}
+		if !on {
+			continue
+		}
+		n, err := s.st.Count(ctx, "identities", store.Eq("user_id", x.user.ID), store.Eq("provider", p.ID()))
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			return nil
 		}
 	}
 	return &engine.Error{Code: engine.CodeConflict, Message: "this would leave you with no way to sign in: first add a passkey, or sign in once with a provider that stays on"}
+}
+
+// settingChange is a setting about to be saved with a new value.
+type settingChange struct {
+	name  string
+	value json.RawMessage
+}
+
+// doorOn reports whether a way of signing in would be on after a change:
+// the setting being changed as it would be, any other as it is.
+func (s *Server) doorOn(ctx context.Context, change settingChange, setting string, def bool) (bool, error) {
+	if setting == change.name {
+		return changedSettingOn(setting, change.value, def), nil
+	}
+	if signInSetting(setting) {
+		cfg, ok := s.oauthConfig(ctx, strings.TrimPrefix(setting, "auth."))
+		return ok && cfg.Enabled, nil
+	}
+	return s.checkedSettingBool(ctx, setting, def)
+}
+
+// changedSettingOn reads whether a sign-in setting's new value turns it on:
+// a bool, or an object with "enabled".
+func changedSettingOn(setting string, value json.RawMessage, def bool) bool {
+	if strings.TrimSpace(string(value)) == "null" {
+		// Back to the default: passwords and passkeys on, a provider off.
+		return (setting == "auth.password" || setting == "auth.passkeys") && def
+	}
+	var b bool
+	if json.Unmarshal(value, &b) == nil {
+		return b
+	}
+	var v struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if json.Unmarshal(value, &v) == nil && v.Enabled != nil {
+		return *v.Enabled
+	}
+	return false
 }

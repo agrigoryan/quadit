@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,45 +43,98 @@ var settingSecrets = map[string][]string{
 	"push":                         {"private_key"},
 }
 
+// cachedSetting is a setting as last read. Until until it is answered from
+// here; after that it is read again, and kept only as the last good value
+// for when the database cannot be read.
 type cachedSetting struct {
 	raw     json.RawMessage
 	fromEnv bool
 	until   time.Time
 }
 
+// settingFresh is how long a setting read is answered from the cache.
+const settingFresh = 3 * time.Second
+
+// settingWhenUnreadable is what a setting that decides access reads as when
+// the database cannot be read and no earlier value is known: the answer that
+// lets fewer people in. Other settings read as their default then.
+var settingWhenUnreadable = map[string]json.RawMessage{
+	"auth.password":                json.RawMessage(`false`),
+	"auth.passkeys":                json.RawMessage(`false`),
+	"auth.registration":            json.RawMessage(`false`),
+	"auth.require_2fa":             json.RawMessage(`true`),
+	"workspaces.anyone_can_create": json.RawMessage(`false`),
+}
+
 func envName(setting string) string {
 	return "QUADIT_SETTING_" + strings.ToUpper(strings.NewReplacer(".", "_").Replace(setting))
 }
 
-// rawSetting returns a setting's JSON with its secrets readable, from the
-// environment or the database. It is cached for a few seconds, so reading a
-// setting on every request costs nothing.
-func (s *Server) rawSetting(ctx context.Context, name string) (json.RawMessage, bool) {
+// loadSetting returns a setting's JSON with its secrets readable, from the
+// environment or the database. A read is cached for settingFresh, so reading
+// a setting on every request costs nothing. err is set when the database
+// could not be read; raw is then the last good value, or, when there is
+// none, what settingWhenUnreadable says. A failed read is not cached.
+func (s *Server) loadSetting(ctx context.Context, name string) (raw json.RawMessage, fromEnv bool, err error) {
 	s.settingsMu.Lock()
-	if cs, ok := s.settingsCache[name]; ok && time.Now().Before(cs.until) {
-		s.settingsMu.Unlock()
-		return cs.raw, cs.fromEnv
-	}
+	cached, known := s.settingsCache[name]
 	s.settingsMu.Unlock()
-	var raw json.RawMessage
-	fromEnv := false
-	if v := os.Getenv(envName(name)); v != "" {
-		raw, fromEnv = json.RawMessage(v), true
-		if !json.Valid(raw) { // a bare word is taken as a string
-			raw, _ = json.Marshal(v)
-		}
-	} else {
-		var st core.Setting
-		if err := s.st.Get(ctx, &st, store.Eq("name", name)); err == nil {
-			raw = s.unsealFields(name, st.Value)
-		}
+	if known && time.Now().Before(cached.until) {
+		return cached.raw, cached.fromEnv, nil
 	}
+	raw, fromEnv, err = s.readSetting(ctx, name)
+	if err != nil {
+		if known {
+			return cached.raw, cached.fromEnv, err
+		}
+		return settingWhenUnreadable[name], false, err
+	}
+	s.cacheSetting(name, cachedSetting{raw: raw, fromEnv: fromEnv, until: time.Now().Add(settingFresh)})
+	return raw, fromEnv, nil
+}
+
+// readSetting reads a setting from the environment or the database, past
+// the cache. A setting that is not set is nil, without an error.
+func (s *Server) readSetting(ctx context.Context, name string) (json.RawMessage, bool, error) {
+	if v := os.Getenv(envName(name)); v != "" {
+		raw := json.RawMessage(v)
+		if !json.Valid(raw) { // a bare word is taken as a string
+			quoted, err := json.Marshal(v)
+			if err != nil {
+				return nil, true, err
+			}
+			raw = quoted
+		}
+		return raw, true, nil
+	}
+	var st core.Setting
+	err := s.st.Get(ctx, &st, store.Eq("name", name))
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, false, nil
+	case err != nil:
+		return nil, false, fmt.Errorf("reading the setting %s: %w", name, err)
+	}
+	return s.unsealFields(name, st.Value), false, nil
+}
+
+// cacheSetting keeps a setting as read or saved.
+func (s *Server) cacheSetting(name string, cs cachedSetting) {
 	s.settingsMu.Lock()
+	defer s.settingsMu.Unlock()
 	if s.settingsCache == nil {
 		s.settingsCache = map[string]cachedSetting{}
 	}
-	s.settingsCache[name] = cachedSetting{raw: raw, fromEnv: fromEnv, until: time.Now().Add(3 * time.Second)}
-	s.settingsMu.Unlock()
+	s.settingsCache[name] = cs
+}
+
+// rawSetting is loadSetting for callers that cannot act on a failed read:
+// the failure is logged, and the value is what loadSetting gives then.
+func (s *Server) rawSetting(ctx context.Context, name string) (json.RawMessage, bool) {
+	raw, fromEnv, err := s.loadSetting(ctx, name)
+	if err != nil {
+		s.log.Error("setting unreadable; using the last good value or the safe default", "setting", name, "err", err)
+	}
 	return raw, fromEnv
 }
 
@@ -99,13 +154,42 @@ func (s *Server) unsealFields(name string, raw json.RawMessage) json.RawMessage 
 			}
 		}
 	}
-	out, _ := json.Marshal(obj)
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return raw
+	}
 	return out
 }
 
-// setting reads one install setting into dst; a missing one leaves dst alone.
+// setting reads one install setting into dst; a missing one leaves dst
+// alone. When the database cannot be read it reads the last good value, or
+// for a setting that decides access, the answer that lets fewer people in
+// (settingWhenUnreadable), and logs the failure. A check that decides
+// access uses checkedSetting instead, to refuse outright.
 func (s *Server) setting(ctx context.Context, name string, dst any) bool {
 	raw, _ := s.rawSetting(ctx, name)
+	return decodeSetting(raw, dst)
+}
+
+// checkedSetting is setting for a check that decides access: when the
+// database cannot be read it returns the error, and the caller refuses.
+func (s *Server) checkedSetting(ctx context.Context, name string, dst any) error {
+	raw, _, err := s.loadSetting(ctx, name)
+	if err != nil {
+		return err
+	}
+	decodeSetting(raw, dst)
+	return nil
+}
+
+// checkedSettingBool is settingBool for a check that decides access.
+func (s *Server) checkedSettingBool(ctx context.Context, name string, def bool) (bool, error) {
+	err := s.checkedSetting(ctx, name, &def)
+	return def, err
+}
+
+// decodeSetting reads a setting's JSON into dst, reporting whether it was set.
+func decodeSetting(raw json.RawMessage, dst any) bool {
 	if len(raw) == 0 {
 		return false
 	}
@@ -134,97 +218,148 @@ const masked = "********"
 func (s *Server) saveSetting(ctx context.Context, name string, value json.RawMessage, by string) error {
 	secrets, known := settingSecrets[name]
 	if !known {
-		names := make([]string, 0, len(settingSecrets))
-		for k := range settingSecrets {
-			names = append(names, k)
-		}
-		sort.Strings(names)
-		return errBad("unknown setting %q; settings are: %s", name, strings.Join(names, ", "))
+		return errBad("unknown setting %q; settings are: %s", name, strings.Join(slices.Sorted(maps.Keys(settingSecrets)), ", "))
 	}
 	if !json.Valid(value) {
 		return errBad("a setting's value must be JSON")
 	}
 	if strings.TrimSpace(string(value)) == "null" {
-		// null takes the setting back to its default.
-		_, err := s.st.Delete(ctx, "settings", store.Eq("name", name))
-		s.forgetSetting(name)
-		if name == "limits.api_per_minute" {
-			s.applyLimits(ctx)
-		}
-		return err
+		return s.resetSetting(ctx, name)
 	}
 	if err := checkSettingShape(name, value); err != nil {
 		return err
 	}
 	if len(secrets) > 0 {
-		var obj map[string]any
-		if err := json.Unmarshal(value, &obj); err != nil {
-			return errBad("setting %s must be a JSON object", name)
+		sealed, err := s.sealSecrets(ctx, name, secrets, value)
+		if err != nil {
+			return err
 		}
-		var old map[string]any
-		var st core.Setting
-		if err := s.st.Get(ctx, &st, store.Eq("name", name)); err == nil {
-			json.Unmarshal(st.Value, &old)
-		}
-		for _, f := range secrets {
-			v, _ := obj[f].(string)
-			switch {
-			case v == masked || (v == "" && obj[f] == nil):
-				if old[f] != nil {
-					obj[f] = old[f]
-				} else {
-					delete(obj, f)
-				}
-			case v != "":
-				sealed, err := s.sealer.Seal(v)
-				if err != nil {
-					return err
-				}
-				obj[f] = sealed
-			}
-		}
-		value, _ = json.Marshal(obj)
+		value = sealed
 	}
 	if name == "files" {
-		// Open the store with the new values before keeping them, so a typo
-		// in a key does not leave the install unable to store files.
-		var fc blob.Config
-		json.Unmarshal(s.unsealFields(name, value), &fc)
-		if err := s.useFiles(ctx, fc); err != nil {
-			return errBad("%v", err)
+		if err := s.tryFiles(ctx, value); err != nil {
+			return err
 		}
 	}
 	err := s.st.Upsert(ctx, core.Setting{Name: name, Value: value, UpdatedAt: time.Now().UnixMilli(), UpdatedBy: by}, "name")
-	s.settingsMu.Lock()
-	delete(s.settingsCache, name)
-	s.settingsMu.Unlock()
+	if err != nil {
+		s.forgetSetting(name)
+	} else {
+		s.settingSaved(name, s.unsealFields(name, value))
+	}
 	if name == "limits.api_per_minute" {
 		s.applyLimits(ctx)
 	}
 	return err
 }
 
+// resetSetting takes a setting back to its default, which a null does.
+func (s *Server) resetSetting(ctx context.Context, name string) error {
+	_, err := s.st.Delete(ctx, "settings", store.Eq("name", name))
+	if err != nil {
+		s.forgetSetting(name)
+	} else {
+		s.settingSaved(name, nil)
+	}
+	if name == "limits.api_per_minute" {
+		s.applyLimits(ctx)
+	}
+	return err
+}
+
+// sealSecrets encrypts the secret fields of a setting's new value. A field
+// sent as the mask, or left out, keeps the stored value, so the stored
+// value must be read: when it cannot be, the save fails rather than lose
+// the secrets.
+func (s *Server) sealSecrets(ctx context.Context, name string, secrets []string, value json.RawMessage) (json.RawMessage, error) {
+	var obj map[string]any
+	if err := json.Unmarshal(value, &obj); err != nil {
+		return nil, errBad("setting %s must be a JSON object", name)
+	}
+	old, err := s.storedSetting(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range secrets {
+		v, _ := obj[f].(string)
+		switch {
+		case v == masked || (v == "" && obj[f] == nil):
+			if old[f] != nil {
+				obj[f] = old[f]
+			} else {
+				delete(obj, f)
+			}
+		case v != "":
+			sealed, err := s.sealer.Seal(v)
+			if err != nil {
+				return nil, err
+			}
+			obj[f] = sealed
+		}
+	}
+	return json.Marshal(obj)
+}
+
+// storedSetting reads a setting's stored object as it is in the database,
+// secrets sealed; nil when it is not set.
+func (s *Server) storedSetting(ctx context.Context, name string) (map[string]any, error) {
+	var st core.Setting
+	err := s.st.Get(ctx, &st, store.Eq("name", name))
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("reading the setting %s before saving it: %w", name, err)
+	}
+	var old map[string]any
+	if err := json.Unmarshal(st.Value, &old); err != nil {
+		return nil, fmt.Errorf("the stored setting %s: %w", name, err)
+	}
+	return old, nil
+}
+
+// tryFiles opens the file store with a new "files" setting before it is
+// kept, so a typo in a key does not leave the install unable to store files.
+func (s *Server) tryFiles(ctx context.Context, value json.RawMessage) error {
+	var fc blob.Config
+	if err := json.Unmarshal(s.unsealFields("files", value), &fc); err != nil {
+		return errBad("%v", err)
+	}
+	if err := s.useFiles(ctx, fc); err != nil {
+		return errBad("%v", err)
+	}
+	return nil
+}
+
 // applyLimits scales the request limits to the admin's number.
 func (s *Server) applyLimits(ctx context.Context) {
-	n := s.settingInt(ctx, "limits.api_per_minute", 1200)
-	if n < 10 {
-		n = 10
-	}
+	n := max(s.settingInt(ctx, "limits.api_per_minute", defaultAPIPerMinute), minAPIPerMinute)
 	s.limits.mu.Lock()
-	s.limits.factor = float64(n) / 1200
+	s.limits.factor = float64(n) / defaultAPIPerMinute
 	s.limits.mu.Unlock()
 }
 
+// The request limit an admin can set, in requests a minute.
+const (
+	defaultAPIPerMinute = 1200
+	minAPIPerMinute     = 10
+)
+
 // maskedSettings returns every setting for the admin area, secrets hidden,
 // each marked when the environment sets it.
-func (s *Server) maskedSettings(ctx context.Context) map[string]any {
+func (s *Server) maskedSettings(ctx context.Context) (map[string]any, error) {
 	out := map[string]any{}
 	for name, secrets := range settingSecrets {
-		raw, fromEnv := s.rawSetting(ctx, name)
+		raw, fromEnv, err := s.loadSetting(ctx, name)
+		if err != nil {
+			return nil, err
+		}
 		entry := map[string]any{"from_env": fromEnv}
 		if len(raw) > 0 {
 			var v any
-			json.Unmarshal(raw, &v)
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return nil, fmt.Errorf("the setting %s: %w", name, err)
+			}
 			if obj, ok := v.(map[string]any); ok {
 				for _, f := range secrets {
 					if sv, _ := obj[f].(string); sv != "" {
@@ -236,7 +371,7 @@ func (s *Server) maskedSettings(ctx context.Context) map[string]any {
 		}
 		out[name] = entry
 	}
-	return out
+	return out, nil
 }
 
 // sendMail sends one email through the install's mail server.
@@ -263,7 +398,7 @@ func htmlEscape(s string) string {
 func linkify(s string) string {
 	words := strings.Split(s, " ")
 	for i, w := range words {
-		for _, line := range strings.Split(w, "\n") {
+		for line := range strings.SplitSeq(w, "\n") {
 			if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
 				words[i] = strings.Replace(words[i], line, "<a href=\""+line+"\">"+line+"</a>", 1)
 			}
@@ -274,7 +409,7 @@ func linkify(s string) string {
 
 // settingShapes says what each setting holds, so that a value of another
 // shape is refused instead of stored: a secret under a wrong key would not
-// be recognised as one, and would be shown.
+// be recognized as one, and would be shown.
 var settingShapes = map[string]func() any{
 	"install.name":                 func() any { return new(string) },
 	"auth.password":                func() any { return new(bool) },
@@ -307,16 +442,26 @@ func checkSettingShape(name string, value json.RawMessage) error {
 	}
 	if name == "limits.api_per_minute" {
 		var n int
-		if json.Unmarshal(value, &n) == nil && n < 10 {
+		if json.Unmarshal(value, &n) == nil && n < minAPIPerMinute {
 			return &engine.Error{Code: engine.CodeInvalid, Field: name, Message: "the least is 10 requests a minute; null takes it back to the default of 1200"}
 		}
 	}
 	return nil
 }
 
-// forgetSetting drops a setting from the short-lived cache.
+// forgetSetting makes a setting be read again on next use; what was read
+// last stays as its last good value.
 func (s *Server) forgetSetting(name string) {
 	s.settingsMu.Lock()
-	delete(s.settingsCache, name)
-	s.settingsMu.Unlock()
+	defer s.settingsMu.Unlock()
+	if cs, ok := s.settingsCache[name]; ok {
+		cs.until = time.Time{}
+		s.settingsCache[name] = cs
+	}
+}
+
+// settingSaved notes a setting just written: it is read again on next use,
+// and until then raw is its last good value.
+func (s *Server) settingSaved(name string, raw json.RawMessage) {
+	s.cacheSetting(name, cachedSetting{raw: raw})
 }
