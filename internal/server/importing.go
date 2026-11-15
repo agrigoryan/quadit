@@ -93,7 +93,11 @@ func (s *Server) hImport(x *c) error {
 	}
 	plan, err := importer.Read(b.Kind, source, b.Options)
 	if err != nil {
-		return &engine.Error{Code: engine.CodeInvalid, Field: "file", Message: "this could not be read as a " + b.Kind + " export: " + err.Error()}
+		field, what := "file", "this could not be read as a "+b.Kind+" export: "
+		if b.File == "" {
+			field, what = "source", "could not read from "+b.Kind+": "
+		}
+		return &engine.Error{Code: engine.CodeInvalid, Field: field, Message: what + err.Error()}
 	}
 	found := map[string]int{"tasks": len(plan.Tasks), "pages": len(plan.Docs), "databases": len(plan.Tables)}
 	if b.DryRun {
@@ -106,7 +110,7 @@ func (s *Server) hImport(x *c) error {
 		return &engine.Error{Code: engine.CodeInvalid, Message: "the import stopped: " + err.Error() + " (what was made so far stays; running it again continues without making anything twice)"}
 	}
 	return x.ok(map[string]any{"found": found, "made": map[string]int{"tasks": sum.Tasks, "comments": sum.Comments, "pages": sum.Docs, "rows": sum.Rows, "files": sum.Files},
-		"unmatched_people": sum.Unmatched, "summary": sum.String(), "log": sink.log})
+		"already_there": sum.Already, "unmatched_people": sum.Unmatched, "summary": sum.String(), "log": sink.log})
 }
 
 // serverSink writes an import through the server's own API as the caller.
@@ -114,6 +118,7 @@ type serverSink struct {
 	s   *Server
 	x   *c
 	log []string
+	dup bool
 }
 
 func (k *serverSink) do(method, path string, q url.Values, body []byte, contentType string) ([]byte, error) {
@@ -152,9 +157,18 @@ func (k *serverSink) do(method, path string, q url.Values, body []byte, contentT
 
 func (k *serverSink) Change(changeID, typ string, args any) error {
 	raw, _ := json.Marshal(map[string]any{"id": changeID, "type": typ, "args": args})
-	_, err := k.do("POST", "/changes", nil, raw, "application/json")
+	out, err := k.do("POST", "/changes", nil, raw, "application/json")
+	var res struct {
+		Results []struct {
+			Duplicate bool `json:"duplicate"`
+		} `json:"results"`
+	}
+	k.dup = err == nil && json.Unmarshal(out, &res) == nil && len(res.Results) > 0 && res.Results[0].Duplicate
 	return err
 }
+
+// WasDuplicate reports whether the last change had been made before.
+func (k *serverSink) WasDuplicate() bool { return k.dup }
 
 func (k *serverSink) Get(path string, q url.Values) ([]byte, error) {
 	return k.do("GET", path, q, nil, "")

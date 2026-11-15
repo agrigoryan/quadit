@@ -172,41 +172,11 @@ func Restore(args []string, version string) int {
 		// Tell open browsers, and put the text back in the search index.
 		var ws core.Workspace
 		if err := st.Get(ctx, &ws, store.Eq("slug", it.Workspace)); err == nil {
-			var owner core.Member
-			if st.In(ws.ID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner))) == nil {
-				eng.System(ctx, ws.ID, owner.UserID, func(s *engine.Sys) error {
-					if it.Kind == "task" {
-						var t core.Task
-						if err := s.Tx().Get(ctx, &t, store.Eq("id", rid)); err != nil {
-							return err
-						}
-						return s.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, map[string]any{"row": t, "key": t.Key, "from_backup": true})
-					}
-					var d core.Doc
-					if err := s.Tx().Get(ctx, &d, store.Eq("id", rid)); err != nil {
-						return err
-					}
-					if err := s.Emit("doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": d, "from_backup": true}); err != nil {
-						return err
-					}
-					// And the page's text as it stands now, so an open editor follows.
-					var all []core.Block
-					if err := s.Tx().List(ctx, &all, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "rank"}); err != nil {
-						return err
-					}
-					live, gone := []core.Block{}, []string{}
-					for _, b := range all {
-						if b.DeletedAt != 0 {
-							gone = append(gone, b.ID)
-						} else {
-							live = append(live, b)
-						}
-					}
-					return s.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true})
-				})
+			if err := eng.AnnounceRestored(ctx, ws.ID, it.Kind, rid); err != nil {
+				fmt.Fprintln(os.Stderr, "restored, but open browsers were not told:", err)
 			}
-			shellAudit(ctx, st, ws.ID, it.Kind+".restored_from_backup", it.Kind, rid, map[string]string{"archive": file})
 			eng.Reindex(ctx, ws.ID)
+			shellAudit(ctx, st, ws.ID, it.Kind+".restored_from_backup", it.Kind, rid, map[string]string{"archive": file})
 		}
 		fmt.Printf("brought back %s %s\n", it.Kind, it.Ref)
 		return 0

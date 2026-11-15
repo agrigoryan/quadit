@@ -625,8 +625,12 @@ func TestImportThroughTheAPI(t *testing.T) {
 		if out := s.call(s.owner, "", "GET", w+"/tasks?project=ENG&format=text", nil, 200, nil); !strings.Contains(out, "Login page") || !strings.Contains(out, "Password field") {
 			t.Fatalf("imported tasks: %s", out)
 		}
-		// Again: nothing twice.
+		// Again: nothing twice, and the answer says so.
+		res.Made = nil
 		s.call(s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}}, 200, &res)
+		if res.Made["tasks"] != 0 {
+			t.Fatalf("a second run says it made %d tasks", res.Made["tasks"])
+		}
 		var n struct{ Count int }
 		s.call(s.owner, "", "GET", w+"/tasks?project=ENG&count=1", nil, 200, &n)
 		if n.Count != 2 {

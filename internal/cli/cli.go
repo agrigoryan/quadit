@@ -645,7 +645,7 @@ func (r *runner) run(cmd string, rest []string) error {
 		if r.dry {
 			return nil
 		}
-		sum, err := importer.Apply(clientSink{r}, plan, opts["project"])
+		sum, err := importer.Apply(clientSink{r, new(bool)}, plan, opts["project"])
 		fmt.Fprintln(r.out, sum)
 		return err
 	case "link":
@@ -876,13 +876,25 @@ func (r *runner) link(pos []string, approval string) error {
 }
 
 // clientSink lets an import write through the API as the caller.
-type clientSink struct{ r *runner }
+type clientSink struct {
+	r   *runner
+	dup *bool
+}
 
 func (s clientSink) Change(changeID, typ string, args any) error {
 	raw, _ := json.Marshal(map[string]any{"id": changeID, "type": typ, "args": args})
-	_, err := s.r.c.do("POST", "/changes", nil, bytes.NewReader(raw), "application/json", "application/json")
+	out, err := s.r.c.do("POST", "/changes", nil, bytes.NewReader(raw), "application/json", "application/json")
+	var res struct {
+		Results []struct {
+			Duplicate bool `json:"duplicate"`
+		} `json:"results"`
+	}
+	*s.dup = err == nil && json.Unmarshal(out, &res) == nil && len(res.Results) > 0 && res.Results[0].Duplicate
 	return err
 }
+
+// WasDuplicate reports whether the last change had been made before.
+func (s clientSink) WasDuplicate() bool { return *s.dup }
 
 func (s clientSink) Get(path string, q url.Values) ([]byte, error) { return s.r.c.JSON(path, q) }
 

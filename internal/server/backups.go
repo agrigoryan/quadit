@@ -261,40 +261,8 @@ func (s *Server) hBackupRestoreItem(x *c) error {
 		return errNotFound("workspace " + it.Workspace)
 	}
 	// Tell open browsers, and put the text back in the search index.
-	var owner core.Member
-	if err := s.st.In(ws.ID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner)), store.Null("removed_at")); err == nil {
-		err = s.eng.System(ctx, ws.ID, owner.UserID, func(sys *engine.Sys) error {
-			if it.Kind == "task" {
-				var t core.Task
-				if err := sys.Tx().Get(ctx, &t, store.Eq("id", rid)); err != nil {
-					return err
-				}
-				return sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, map[string]any{"row": t, "key": t.Key, "from_backup": true})
-			}
-			var d core.Doc
-			if err := sys.Tx().Get(ctx, &d, store.Eq("id", rid)); err != nil {
-				return err
-			}
-			if err := sys.Emit("doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": d, "from_backup": true}); err != nil {
-				return err
-			}
-			var all []core.Block
-			if err := sys.Tx().List(ctx, &all, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "rank"}); err != nil {
-				return err
-			}
-			live, gone := []core.Block{}, []string{}
-			for _, bl := range all {
-				if bl.DeletedAt != 0 {
-					gone = append(gone, bl.ID)
-				} else {
-					live = append(live, bl)
-				}
-			}
-			return sys.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true})
-		})
-		if err != nil {
-			return err
-		}
+	if err := s.eng.AnnounceRestored(ctx, ws.ID, it.Kind, rid); err != nil {
+		return err
 	}
 	s.eng.Reindex(ctx, ws.ID)
 	s.audit(x.r, ws.ID, x.user, it.Kind+".restored_from_backup", it.Kind, rid, map[string]string{"backup": bk.ID, "ref": it.Ref})

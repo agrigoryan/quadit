@@ -251,3 +251,55 @@ func (e *Engine) PurgeWorkspaces(ctx context.Context, keep time.Duration) (prefi
 	}
 	return prefixes, nil
 }
+
+// AnnounceRestored tells the feed that a task or a page was set back from a
+// backup. The rows get new positions in the feed, so every copy that
+// compares positions takes them as the newest state, and an open editor
+// gets the page's text as it stands now.
+func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id string) error {
+	var owner core.Member
+	if err := e.st.In(workspaceID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner)), store.Null("removed_at")); err != nil {
+		return err
+	}
+	return e.System(ctx, workspaceID, owner.UserID, func(sys *Sys) error {
+		tx := sys.Tx()
+		next := tx.Seq() + 1 // the position the next event takes
+		if kind == "task" {
+			if _, err := tx.Update(ctx, "tasks", map[string]any{"updated_seq": next, "activity_seq": next}, store.Eq("id", id)); err != nil {
+				return err
+			}
+			var t core.Task
+			if err := tx.Get(ctx, &t, store.Eq("id", id)); err != nil {
+				return err
+			}
+			return sys.Emit("task.restored", "task", t.ID, "task", t.ID, t.ProjectID, map[string]any{"row": t, "key": t.Key, "from_backup": true})
+		}
+		if _, err := tx.Update(ctx, "docs", map[string]any{"updated_seq": next, "content_seq": next + 1}, store.Eq("id", id)); err != nil {
+			return err
+		}
+		if _, err := tx.Update(ctx, "doc_blocks", map[string]any{"updated_seq": next + 1}, store.Eq("doc_id", id)); err != nil {
+			return err
+		}
+		var d core.Doc
+		if err := tx.Get(ctx, &d, store.Eq("id", id)); err != nil {
+			return err
+		}
+		if err := sys.Emit("doc.restored", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"row": d, "from_backup": true}); err != nil {
+			return err
+		}
+		var all []core.Block
+		if err := tx.List(ctx, &all, store.Q{Where: []store.Cond{store.Eq("doc_id", d.ID)}, Order: "rank"}); err != nil {
+			return err
+		}
+		live, gone := []core.Block{}, []string{}
+		for _, b := range all {
+			if b.DeletedAt != 0 {
+				gone = append(gone, b.ID)
+			} else {
+				live = append(live, b)
+			}
+		}
+		return sys.Emit("doc.edited", "doc", d.ID, "doc", d.ID, d.ProjectID, map[string]any{"id": d.ID, "blocks": live, "deleted": gone, "from_backup": true,
+			"changes": map[string]core.FieldChange{"content_seq": {To: next + 1}}})
+	})
+}

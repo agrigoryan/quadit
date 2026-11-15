@@ -94,10 +94,15 @@ type Sink interface {
 type Summary struct {
 	Tasks, Comments, Docs, Rows, Files int
 	Unmatched                          []string // assignees with no member here
+	// Already counts what an earlier run of the same import had made.
+	Already int
 }
 
 func (s Summary) String() string {
 	out := fmt.Sprintf("imported %d tasks, %d comments, %d pages, %d rows, %d files", s.Tasks, s.Comments, s.Docs, s.Rows, s.Files)
+	if s.Already > 0 {
+		out += fmt.Sprintf("\n%d things were here already from an earlier run and were left as they are", s.Already)
+	}
 	if len(s.Unmatched) > 0 {
 		out += "\nno member here for: " + strings.Join(s.Unmatched, ", ") + " (their tasks are unassigned and say who had them)"
 	}
@@ -126,9 +131,18 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		sink.Logf("note: %s", n)
 	}
 	uid := func(kind, ext string) string { return id.From("import", plan.Source, kind, ext) }
+	// fresh says whether the last change made something, or found it there
+	// already from an earlier run of the same import.
+	fresh := true
 	change := func(typ string, args map[string]any) error {
 		raw, _ := json.Marshal(args)
-		return sink.Change(id.From("import-change", plan.Source, typ, string(raw)), typ, args)
+		err := sink.Change(id.From("import-change", plan.Source, typ, string(raw)), typ, args)
+		fresh = true
+		if d, ok := sink.(interface{ WasDuplicate() bool }); ok && d.WasDuplicate() {
+			fresh = false
+			sum.Already++
+		}
+		return err
 	}
 	project = strings.ToUpper(project)
 
@@ -311,7 +325,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		if err := change("task.create", args); err != nil {
 			return fmt.Errorf("task %q: %w", t.Title, err)
 		}
-		sum.Tasks++
+		if fresh {
+			sum.Tasks++
+		}
 		for i, cm := range t.Comments {
 			if strings.TrimSpace(cm.Body) == "" {
 				continue
@@ -327,7 +343,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 			if err := change("comment.create", map[string]any{"id": uid("comment", fmt.Sprintf("%s/%d", t.Ext, i)), "task": uid("task", t.Ext), "body": body}); err != nil {
 				return fmt.Errorf("comment on %q: %w", t.Title, err)
 			}
-			sum.Comments++
+			if fresh {
+				sum.Comments++
+			}
 		}
 		return nil
 	}
@@ -414,7 +432,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		if err := change("doc.create", args); err != nil {
 			return fmt.Errorf("page %q: %w", d.Title, err)
 		}
-		sum.Docs++
+		if fresh {
+			sum.Docs++
+		}
 		return nil
 	}
 	for _, d := range plan.Docs {
@@ -431,7 +451,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		if err := change("doc.create", args); err != nil {
 			return sum, fmt.Errorf("database %q: %w", tb.Title, err)
 		}
-		sum.Docs++
+		if fresh {
+			sum.Docs++
+		}
 		cols := tb.Columns
 		if len(cols) > 0 {
 			cols = cols[1:] // the first column is the row's title
@@ -455,7 +477,9 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 			if err := change("doc.create", map[string]any{"id": uid("row", fmt.Sprintf("%s/%d", tb.Ext, i)), "parent": dbID, "title": title, "props": props}); err != nil {
 				return sum, fmt.Errorf("row %d of %q: %w", i+1, tb.Title, err)
 			}
-			sum.Rows++
+			if fresh {
+				sum.Rows++
+			}
 		}
 	}
 	return sum, nil
