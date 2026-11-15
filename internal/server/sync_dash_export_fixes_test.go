@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,5 +102,36 @@ func TestDashboardOfOneProjectAsksOnlyItsQuestions(t *testing.T) {
 	}
 	if got := asked("?project=OPS"); len(got) != 0 {
 		t.Fatalf("the dashboard of OPS asks what is asked on SVA: %+v", got)
+	}
+}
+
+// TestDashboardSameEveryTime: epics and statuses whose order would tie
+// (the same name, the same rank) come in the same order on every call.
+func TestDashboardSameEveryTime(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+	for _, p := range []string{"SVA", "OPS", "SVA", "OPS"} {
+		s.change(s.owner, "", "epic.create", M{"project": p, "name": "Same"})
+		s.change(s.owner, "", "epic.create", M{"project": p, "name": "Dated", "target_on": "2030-01-01"})
+	}
+	for _, name := range []string{"Polish", "Review", "Check"} {
+		s.change(s.owner, "", "status.create", M{"project": "SVA", "name": name, "category": "started", "rank": "m"})
+	}
+	order := func() string {
+		var out struct {
+			Epics json.RawMessage `json:"epics"`
+			Flow  struct {
+				ByStatus json.RawMessage `json:"by_status"`
+			} `json:"flow"`
+		}
+		s.call(s.owner, "", "GET", w+"/dashboard", nil, 200, &out)
+		return string(out.Epics) + "\n" + string(out.Flow.ByStatus)
+	}
+	first := order()
+	for i := 0; i < 40; i++ {
+		if got := order(); got != first {
+			t.Fatalf("call %d answered in another order:\n%s\nthan the first:\n%s", i+2, got, first)
+		}
 	}
 }

@@ -41,12 +41,28 @@ func (d *dashboard) flowByStatus() []flowStatus {
 			sts = append(sts, st)
 		}
 	}
-	sort.Slice(sts, func(i, j int) bool { return sts[i].ProjectID+sts[i].Rank < sts[j].ProjectID+sts[j].Rank })
+	sort.Slice(sts, func(i, j int) bool { return statusBefore(sts[i], sts[j]) })
 	var out []flowStatus
 	for _, st := range sts {
 		out = append(out, flowStatus{Status: st.Name, Category: st.Category, Project: nm.projects[st.ProjectID].Key, Count: count[st.ID]})
 	}
 	return out
+}
+
+// statusBefore orders statuses by project, then as the project ranks them,
+// then by name and id where two have the same rank, so the same dashboard
+// lists them in the same order every time.
+func statusBefore(a, b core.Status) bool {
+	if a.ProjectID != b.ProjectID {
+		return a.ProjectID < b.ProjectID
+	}
+	if a.Rank != b.Rank {
+		return a.Rank < b.Rank
+	}
+	if a.Name != b.Name {
+		return a.Name < b.Name
+	}
+	return a.ID < b.ID
 }
 
 // flowWeek is the tasks opened and closed in one week, named by its Monday.

@@ -60,14 +60,25 @@ func (d *dashboard) epicProgress() error {
 		d.markAtRisk(ep, lastMove[id])
 		epics = append(epics, *ep)
 	}
-	sort.Slice(epics, func(i, j int) bool {
-		if (epics[i].TargetOn == "") != (epics[j].TargetOn == "") {
-			return epics[i].TargetOn != ""
-		}
-		return epics[i].TargetOn+epics[i].Name < epics[j].TargetOn+epics[j].Name
-	})
+	sort.Slice(epics, func(i, j int) bool { return epicBefore(epics[i], epics[j]) })
 	d.epics = epics
 	return nil
+}
+
+// epicBefore orders epics: those with a target date first, the nearest
+// first, then by name, and by id where even the names are the same, so the
+// same dashboard lists them in the same order every time.
+func epicBefore(a, b epicProgress) bool {
+	if (a.TargetOn == "") != (b.TargetOn == "") {
+		return a.TargetOn != ""
+	}
+	if a.TargetOn != b.TargetOn {
+		return a.TargetOn < b.TargetOn
+	}
+	if a.Name != b.Name {
+		return a.Name < b.Name
+	}
+	return a.ID < b.ID
 }
 
 // markAtRisk says on an epic why it is at risk, if it is. lastMove is when
