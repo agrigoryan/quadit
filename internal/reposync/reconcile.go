@@ -129,7 +129,8 @@ func reconcile(src core.DocSource, f folder, pages []syncedPage) plan {
 	}
 	// A path cannot be given to a page's file when a file is there (by
 	// being there, not by having text: an empty file is a file), when
-	// another page is written there, or when a link or a folder stands on it.
+	// another page is written there, or when something that is no page
+	// stands on it (folder.taken).
 	taken := func(filePath string) bool {
 		_, isFile := f.files[filePath]
 		return isFile || writing[filePath] || f.taken[filePath]
@@ -247,8 +248,8 @@ func reconcile(src core.DocSource, f folder, pages []syncedPage) plan {
 			continue
 		}
 
-		// A name no file has, and that no link or folder in the repository
-		// stands on: a link is not a page, and is not written through.
+		// A name nothing in the repository has yet: a link is not a page,
+		// and is not written through.
 		natural := filePath
 		for n := 2; taken(filePath); n++ {
 			filePath = fmt.Sprintf("%s%s-%d.md", dirOf, fileSlug(page.Title), n)
