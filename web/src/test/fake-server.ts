@@ -66,6 +66,8 @@ export interface FakeServer {
   get(path: string | RegExp, answer: Answer): void;
   /** The same for POST; a function is given the request's body. */
   post(path: string | RegExp, answer: Answer): void;
+  /** The same for DELETE. */
+  del(path: string | RegExp, answer: Answer): void;
   /** Holds back the answers to this path (GET unless said otherwise): each request waits in `calls` for the test. */
   hold(path: string | RegExp, method?: string): { calls: HeldCall[] };
   /** How many requests were made to this path, with any method. */
@@ -89,6 +91,7 @@ export function fakeServer(): FakeServer {
     unexpected: [],
     get: (path, answer) => set("GET", path, answer),
     post: (path, answer) => set("POST", path, answer),
+    del: (path, answer) => set("DELETE", path, answer),
     hold(path, method = "GET") {
       const held: HeldCall[] = [];
       routes.push({ method, path, answer: undefined, held });
