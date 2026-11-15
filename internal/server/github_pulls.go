@@ -12,6 +12,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// Pull requests and their checks, onto the tasks they name.
+
+// ghPull is a pull request as GitHub's API gives it.
 type ghPull struct {
 	Number    int    `json:"number"`
 	Title     string `json:"title"`
@@ -30,6 +33,7 @@ type ghPull struct {
 	} `json:"user"`
 }
 
+// ghKeyRE finds task keys (SVA-12) in text.
 var ghKeyRE = regexp.MustCompile(`(?i)\b([A-Z][A-Z0-9]{1,9})-(\d+)\b`)
 
 // syncPulls goes through the pull requests that changed since the last
@@ -137,7 +141,7 @@ func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) stri
 				if checks != "failing" {
 					checks = "pending"
 				}
-			case r.Conclusion == "failure" || r.Conclusion == "timed_out" || r.Conclusion == "cancelled" || r.Conclusion == "action_required":
+			case r.Conclusion == "failure" || r.Conclusion == "timed_out" || r.Conclusion == "cancelled" || r.Conclusion == "action_required": //nolint:misspell // GitHub's own spelling of the conclusion
 				checks = "failing"
 			}
 		}
@@ -150,11 +154,11 @@ func (g *githubSync) checksOf(ctx context.Context, pr ghPull, state string) stri
 // says how it and its checks stand. A key with no task is passed over.
 func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks string) error {
 	var t core.Task
-	if err := g.db.Get(ctx, &t, store.Eq("key", key), store.Live); err != nil {
-		return nil
+	if there, err := rowFound(g.db.Get(ctx, &t, store.Eq("key", key), store.Live)); err != nil || !there {
+		return err
 	}
 	num := fmt.Sprint(pr.Number)
-	data, _ := json.Marshal(map[string]any{"branch": pr.Head.Ref, "author": pr.User.Login, "sha": pr.Head.SHA})
+	data, _ := json.Marshal(map[string]any{"branch": pr.Head.Ref, "author": pr.User.Login, "sha": pr.Head.SHA}) // strings: always encodes
 	err := g.s.eng.System(ctx, g.in.WorkspaceID, g.in.CreatedBy, func(sys *engine.Sys) error {
 		if err := sys.Do("link.set", map[string]any{"task": t.ID, "kind": "pr", "repo": g.cfg.Repo, "ref": num, "url": pr.HTMLURL, "title": pr.Title,
 			"state": state, "checks": checks, "data": json.RawMessage(data)}); err != nil {
@@ -167,7 +171,11 @@ func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks
 			to = g.cfg.OnMerge
 		case (state == "open" || state == "draft") && g.cfg.OnOpen != "":
 			var cur core.Status
-			if sys.Tx().Get(ctx, &cur, store.Eq("id", t.StatusID)) == nil && (cur.Category == core.CatBacklog || cur.Category == core.CatUnstarted) {
+			there, err := rowFound(sys.Tx().Get(ctx, &cur, store.Eq("id", t.StatusID)))
+			if err != nil {
+				return err
+			}
+			if there && (cur.Category == core.CatBacklog || cur.Category == core.CatUnstarted) {
 				to = g.cfg.OnOpen
 			}
 		}
@@ -179,21 +187,26 @@ func (g *githubSync) linkPull(ctx context.Context, pr ghPull, key, state, checks
 	if err != nil {
 		return fmt.Errorf("%s: %w", key, err)
 	}
-	g.commentBack(ctx, pr, key, t)
-	return nil
+	return g.commentBack(ctx, pr, key, t)
 }
 
 // commentBack posts a link to the task on the pull request, once, when the
-// integration is set to and has a token to write with.
-func (g *githubSync) commentBack(ctx context.Context, pr ghPull, key string, t core.Task) {
+// integration is set to and has a token to write with. When the workspace
+// cannot be read there is no link to give: that is an error, and the pass
+// is done again. A comment GitHub does not take is tried again on the next
+// pass that looks at the pull request.
+func (g *githubSync) commentBack(ctx context.Context, pr ghPull, key string, t core.Task) error {
 	mark := fmt.Sprint(pr.Number) + " " + key
 	if !g.cfg.CommentBack || g.st.Commented[mark] || g.token == "" {
-		return
+		return nil
 	}
 	var ws core.Workspace
-	g.s.st.Get(ctx, &ws, store.Eq("id", g.in.WorkspaceID))
+	if err := g.s.st.Get(ctx, &ws, store.Eq("id", g.in.WorkspaceID)); err != nil {
+		return fmt.Errorf("%s: commenting on #%d: %w", key, pr.Number, err)
+	}
 	body := fmt.Sprintf("Linked to **%s** %s — %s/%s/task/%s", key, t.Title, g.s.cfg.BaseURL, ws.Slug, key)
 	if err := g.gh.call(ctx, "POST", fmt.Sprintf("/repos/%s/issues/%d/comments", g.cfg.Repo, pr.Number), map[string]string{"body": body}, nil); err == nil {
 		g.st.Commented[mark] = true
 	}
+	return nil
 }

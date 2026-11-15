@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,7 +32,7 @@ import (
 //	github.go         what an integration is set to do and remembers, when
 //	                  it syncs (the timer, the button, the webhook), one pass
 //	github_pulls.go   pull requests and their checks, onto the tasks they name
-//	github_issues.go  labelled issues, made into tasks
+//	github_issues.go  labeled issues, made into tasks
 //	github_client.go  asking GitHub's REST API; sign-in with GitHub uses it too
 
 func init() {
@@ -73,10 +74,21 @@ type githubState struct {
 	IssueTasks    map[string]string `json:"issue_tasks"`    // issue number -> the task made from it
 }
 
+// ghLocks holds a mutex for each integration, so one integration is
+// synced by one pass at a time.
 var ghLocks sync.Map
 
+// How often integrations are looked at, and how often each one syncs.
+const (
+	githubTick  = 20 * time.Second
+	githubEvery = time.Minute
+	// githubHookBodyLimit is the largest webhook call from GitHub read.
+	githubHookBodyLimit = 5 << 20
+)
+
+// runGitHub syncs each active GitHub integration once a minute until ctx ends.
 func (s *Server) runGitHub(ctx context.Context) {
-	tick := time.NewTicker(20 * time.Second)
+	tick := time.NewTicker(githubTick)
 	defer tick.Stop()
 	for {
 		select {
@@ -89,7 +101,7 @@ func (s *Server) runGitHub(ctx context.Context) {
 			continue
 		}
 		for _, in := range list {
-			if time.Now().UnixMilli()-in.LastSyncAt < 60_000 {
+			if time.Now().UnixMilli()-in.LastSyncAt < githubEvery.Milliseconds() {
 				continue
 			}
 			if _, err := s.syncGitHub(ctx, in); err != nil {
@@ -99,13 +111,38 @@ func (s *Server) runGitHub(ctx context.Context) {
 	}
 }
 
+// githubStateOf reads what an integration remembers. State that does not
+// read is taken as nothing remembered: the next pass starts afresh.
+func githubStateOf(raw json.RawMessage) githubState {
+	var st githubState
+	if len(raw) > 0 && json.Unmarshal(raw, &st) != nil {
+		return githubState{}
+	}
+	return st
+}
+
+// integrationOf reads the integration a request names.
+func integrationOf(x *c) (core.Integration, error) {
+	var in core.Integration
+	there, err := rowFound(x.db.Get(x.ctx(), &in, store.Eq("id", x.r.PathValue("id")), store.Live))
+	if err != nil {
+		return in, err
+	}
+	if !there {
+		return in, errNotFound("integration")
+	}
+	return in, nil
+}
+
+// handleSyncIntegration syncs an integration now and says how many pull
+// requests and issues it handled.
 func (s *Server) handleSyncIntegration(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
-	var in core.Integration
-	if err := x.db.Get(x.ctx(), &in, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
-		return errNotFound("integration")
+	in, err := integrationOf(x)
+	if err != nil {
+		return err
 	}
 	n, err := s.syncGitHub(x.ctx(), in)
 	if err != nil {
@@ -120,15 +157,14 @@ func (s *Server) handleShowIntegrationWebhook(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
-	var in core.Integration
-	if err := x.db.Get(x.ctx(), &in, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
-		return errNotFound("integration")
+	in, err := integrationOf(x)
+	if err != nil {
+		return err
 	}
-	var st githubState
-	json.Unmarshal(in.State, &st)
+	st := githubStateOf(in.State)
 	if st.HookSecret == "" {
 		st.HookSecret = auth.Random(24)
-		raw, _ := json.Marshal(st)
+		raw, _ := json.Marshal(st) // plain fields: always encodes
 		if _, err := x.db.Update(x.ctx(), "integrations", map[string]any{"state": json.RawMessage(raw)}, store.Eq("id", in.ID)); err != nil {
 			return err
 		}
@@ -141,13 +177,21 @@ func (s *Server) handleShowIntegrationWebhook(x *c) error {
 func (s *Server) handleReceiveGitHubEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var in core.Integration
-	if err := s.st.Get(ctx, &in, store.Eq("id", r.PathValue("id")), store.Eq("kind", "github"), store.Live); err != nil {
+	there, err := rowFound(s.st.Get(ctx, &in, store.Eq("id", r.PathValue("id")), store.Eq("kind", "github"), store.Live))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if !there {
 		http.Error(w, "unknown integration", http.StatusNotFound)
 		return
 	}
-	body, _ := io.ReadAll(http.MaxBytesReader(w, r.Body, 5<<20))
-	var st githubState
-	json.Unmarshal(in.State, &st)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, githubHookBodyLimit))
+	if err != nil {
+		http.Error(w, "the body could not be read: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	st := githubStateOf(in.State)
 	mac := hmac.New(sha256.New, []byte(st.HookSecret))
 	mac.Write(body)
 	if st.HookSecret == "" || !hmac.Equal([]byte(r.Header.Get("X-Hub-Signature-256")), []byte("sha256="+hex.EncodeToString(mac.Sum(nil)))) {
@@ -175,24 +219,40 @@ func (s *Server) syncGitHub(ctx context.Context, in core.Integration) (int, erro
 	if err := db.Get(ctx, &in, store.Eq("id", in.ID)); err != nil { // the freshest state
 		return 0, err
 	}
-	var cfg githubConfig
-	var st githubState
-	json.Unmarshal(in.Config, &cfg)
-	json.Unmarshal(in.State, &st)
+	st := githubStateOf(in.State)
 	if st.Heads == nil {
 		st.Heads, st.Commented, st.PendingChecks = map[string]string{}, map[string]bool{}, map[string]bool{}
 	}
 	if st.PendingChecks == nil {
 		st.PendingChecks = map[string]bool{}
 	}
-	n, err := s.githubPass(ctx, db, in, cfg, &st)
+	n := 0
+	var cfg githubConfig
+	var err error
+	if len(in.Config) > 0 {
+		err = json.Unmarshal(in.Config, &cfg)
+	}
+	if err != nil {
+		err = fmt.Errorf("the integration's settings do not read: %w", err)
+	} else {
+		n, err = s.githubPass(ctx, db, in, cfg, &st)
+	}
 	set := map[string]any{"last_sync_at": time.Now().UnixMilli(), "last_error": ""}
 	if err != nil {
 		set["last_error"] = oneLine(err.Error(), 400)
 	}
-	raw, _ := json.Marshal(st)
+	raw, _ := json.Marshal(st) // plain fields: always encodes
 	set["state"] = json.RawMessage(raw)
-	db.Update(context.WithoutCancel(ctx), "integrations", set, store.Eq("id", in.ID))
+	// Not remembered, what was done is done again on the next pass (a
+	// second comment on a pull request), so the write is retried, and a
+	// failure is told.
+	recorded := s.recordOutcome(context.WithoutCancel(ctx), "github sync", func(ctx context.Context) error {
+		_, err := db.Update(ctx, "integrations", set, store.Eq("id", in.ID))
+		return err
+	}, "integration", in.ID)
+	if !recorded && err == nil {
+		err = errors.New("what was synced could not be remembered; it is done again on the next pass")
+	}
 	return n, err
 }
 
@@ -210,6 +270,7 @@ type githubSync struct {
 	token string
 }
 
+// ghRepoRE is the shape of a repository's name: owner/name.
 var ghRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
 
 // githubPass looks at the repository once: its pull requests

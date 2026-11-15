@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// Labeled issues, made into tasks and kept in step with them.
+
+// ghIssue is an issue as GitHub's API gives it.
 type ghIssue struct {
 	Number      int    `json:"number"`
 	Title       string `json:"title"`
@@ -24,7 +28,7 @@ type ghIssue struct {
 	PullRequest any    `json:"pull_request"` // set when the "issue" is a pull request
 }
 
-// syncIssues makes a task of each labelled issue and keeps it in step
+// syncIssues makes a task of each labeled issue and keeps it in step
 // with the issue: its title and text, and whether it is closed.
 func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 	if g.cfg.IssuesLabel == "" {
@@ -33,7 +37,14 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 	project := g.cfg.IssuesProject
 	if project == "" {
 		var p core.Project
-		if g.in.ProjectID == "" || g.db.Get(ctx, &p, store.Eq("id", g.in.ProjectID), store.Live) != nil {
+		there := false
+		if g.in.ProjectID != "" {
+			var err error
+			if there, err = rowFound(g.db.Get(ctx, &p, store.Eq("id", g.in.ProjectID), store.Live)); err != nil {
+				return 0, err
+			}
+		}
+		if !there {
 			return 0, errors.New("issues are turned into tasks in a project: set issues_project to its key")
 		}
 		project = p.Key
@@ -54,8 +65,7 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 	}
 	newest, handled := g.st.IssuesSince, 0
 	// Oldest first, so tasks are numbered in the order the issues changed.
-	for i := len(issues) - 1; i >= 0; i-- {
-		is := issues[i]
+	for _, is := range slices.Backward(issues) {
 		if is.PullRequest != nil || is.UpdatedAt <= g.st.IssuesSince {
 			continue
 		}
@@ -74,6 +84,37 @@ func (g *githubSync) syncIssues(ctx context.Context) (int, error) {
 	return handled, nil
 }
 
+// taskOfIssue finds the task made from an issue, or makes it, in the given
+// project, with the issue's text and a link to it.
+func (g *githubSync) taskOfIssue(ctx context.Context, sys *engine.Sys, project string, is ghIssue, text string) (core.Task, error) {
+	num := strconv.Itoa(is.Number)
+	var t core.Task
+	if known := g.st.IssueTasks[num]; known != "" {
+		there, err := rowFound(sys.Tx().Get(ctx, &t, store.Eq("id", known)))
+		if err != nil || there {
+			return t, err
+		}
+	}
+	tid := id.From("github-issue", g.in.ID, num) // the same issue is the same task, whatever happens between
+	there, err := rowFound(sys.Tx().Get(ctx, &t, store.Eq("id", tid)))
+	if err != nil {
+		return t, err
+	}
+	if !there {
+		if err := sys.Do("task.create", map[string]any{"id": tid, "project": project, "title": is.Title, "description": text}); err != nil {
+			return t, err
+		}
+		if err := sys.Do("link.set", map[string]any{"task": tid, "kind": "issue", "repo": g.cfg.Repo, "ref": num, "url": is.HTMLURL, "title": is.Title, "state": is.State}); err != nil {
+			return t, err
+		}
+		if err := sys.Tx().Get(ctx, &t, store.Eq("id", tid)); err != nil {
+			return t, err
+		}
+	}
+	g.st.IssueTasks[num] = t.ID
+	return t, nil
+}
+
 // issueTask makes the task of one issue, in the given project, when the
 // issue has none yet, and brings a task it has up to date with the issue.
 func (g *githubSync) issueTask(ctx context.Context, sys *engine.Sys, project string, is ghIssue) error {
@@ -83,22 +124,9 @@ func (g *githubSync) issueTask(ctx context.Context, sys *engine.Sys, project str
 		text += "\n\n"
 	}
 	text += fmt.Sprintf("From GitHub issue [%s#%d](%s).", g.cfg.Repo, is.Number, is.HTMLURL)
-	var t core.Task
-	known := g.st.IssueTasks[num] != "" && sys.Tx().Get(ctx, &t, store.Eq("id", g.st.IssueTasks[num])) == nil
-	if !known {
-		tid := id.From("github-issue", g.in.ID, num) // the same issue is the same task, whatever happens between
-		if sys.Tx().Get(ctx, &t, store.Eq("id", tid)) != nil {
-			if err := sys.Do("task.create", map[string]any{"id": tid, "project": project, "title": is.Title, "description": text}); err != nil {
-				return err
-			}
-			if err := sys.Do("link.set", map[string]any{"task": tid, "kind": "issue", "repo": g.cfg.Repo, "ref": num, "url": is.HTMLURL, "title": is.Title, "state": is.State}); err != nil {
-				return err
-			}
-			if err := sys.Tx().Get(ctx, &t, store.Eq("id", tid)); err != nil {
-				return err
-			}
-		}
-		g.st.IssueTasks[num] = t.ID
+	t, err := g.taskOfIssue(ctx, sys, project, is, text)
+	if err != nil {
+		return err
 	}
 	if t.DeletedAt != 0 {
 		return nil // deleted here on purpose: the issue does not bring it back

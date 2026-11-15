@@ -48,7 +48,10 @@ func (s *Server) githubAPI(api, token string) *githubClient {
 func (g *githubClient) call(ctx context.Context, method, path string, body any, dst any) error {
 	var rd io.Reader
 	if body != nil {
-		raw, _ := json.Marshal(body)
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
 		rd = strings.NewReader(string(raw))
 	}
 	ctx, cancel := context.WithTimeout(ctx, githubTimeout)
@@ -66,7 +69,10 @@ func (g *githubClient) call(ctx context.Context, method, path string, body any, 
 		return err
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, githubAnswerLimit))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, githubAnswerLimit))
+	if err != nil {
+		return fmt.Errorf("reading GitHub's answer to %s %s: %w", method, path, err)
+	}
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("GitHub answered %s to %s %s: %s", resp.Status, method, path, oneLine(string(raw), 160))
 	}
