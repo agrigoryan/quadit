@@ -99,7 +99,7 @@ export function AddPeopleDialog({ onClose, onCreated, onAdded }: Props) {
       onSubmit={submit}
       onClose={onClose}
     >
-      <div role="tablist" className="flex gap-0.5 rounded-md bg-sunken p-0.5">
+      <div role="tablist" aria-label={t("invites.how")} className="flex gap-0.5 rounded-md bg-sunken p-0.5">
         {tab("email", t("invites.byEmail"), <Mail className="size-3.5" aria-hidden />)}
         {tab("link", t("invites.byLink"), <Link2 className="size-3.5" aria-hidden />)}
         {tab("account", t("members.byAccount"), <UserCheck className="size-3.5" aria-hidden />)}

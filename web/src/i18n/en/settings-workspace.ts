@@ -69,6 +69,7 @@ export const workspaceStrings = {
   "invites.lead": "An invitation is a link. Whoever opens it joins this workspace with the role you choose.",
   "invites.new": "Add people",
   "invites.none": "No open invitations.",
+  "invites.how": "How to add them",
   "invites.byEmail": "Invite by email",
   "invites.byLink": "Invite link",
   "invites.email": "Email",

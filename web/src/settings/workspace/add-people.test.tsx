@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// Add people (settings/workspace/add-people.tsx): each of its selects is named by its field.
+// Add people (settings/workspace/add-people.tsx): its ways to add are a named
+// set of tabs, and each of its selects is named by its field.
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -13,12 +14,13 @@ beforeAll(() => {
 });
 
 describe("AddPeopleDialog", () => {
-  it("names the role, expiry and uses selects", () => {
+  it("names its tabs and its role, expiry and uses selects", () => {
     render(
       <TooltipProvider>
         <AddPeopleDialog onClose={() => {}} onCreated={() => {}} onAdded={() => {}} />
       </TooltipProvider>,
     );
+    expect(screen.getByRole("tablist", { name: "How to add them" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Good for" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Invite link" }));
