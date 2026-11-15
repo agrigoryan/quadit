@@ -18,10 +18,11 @@ describe("auditQuery", () => {
     expect(q.get("before")).toBe(String(Date.UTC(2026, 10, 3, 23)));
   });
 
-  it("starts a day at the person's midnight on the day the clocks change, and ends it 24 hours later", () => {
+  it("ends a day at the person's next midnight, also on the day the clocks change and the day is 23 hours long", () => {
     const q = query("2026-03-29", "2026-03-29");
     expect(q.get("after")).toBe(String(Date.UTC(2026, 2, 28, 23) - 1));
-    expect(q.get("before")).toBe(String(Date.UTC(2026, 2, 28, 23) + 24 * HOUR));
+    // Berlin is two hours ahead of UTC from 02:00 that day: its next midnight is 22:00 UTC, 23 hours on.
+    expect(q.get("before")).toBe(String(Date.UTC(2026, 2, 28, 23) + 23 * HOUR));
   });
 
   it("leaves out a day that is not chosen", () => {

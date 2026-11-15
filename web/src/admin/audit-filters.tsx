@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import { X } from "lucide-react";
+import { addDays } from "@/lib/days";
 import { t } from "@/lib/i18n";
 import { localMidnight } from "@/lib/time";
 import { Button } from "@/ui/button";
@@ -34,7 +35,8 @@ export function auditQuery(f: AuditFilters, extra: Record<string, string | numbe
   if (f.actor) q.set("actor", f.actor);
   if (f.workspace) q.set("workspace", f.workspace);
   if (f.from) q.set("after", String(localMidnight(f.from) - 1));
-  if (f.to) q.set("before", String(localMidnight(f.to) + 24 * 3600_000));
+  // The day ends at the next local midnight, which is not always 24 hours on.
+  if (f.to) q.set("before", String(localMidnight(addDays(f.to, 1))));
   for (const [key, value] of Object.entries(extra)) q.set(key, String(value));
   return q.toString();
 }
