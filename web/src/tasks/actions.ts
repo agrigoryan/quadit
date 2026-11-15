@@ -11,6 +11,7 @@ import { statusesOf } from "@/lib/selectors";
 import { draftKey, getState } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { isOpenCategory, type Status, type Task } from "@/lib/types";
+import { OUTSIDE } from "@/tasks/filters";
 
 type Fields = Record<string, unknown>;
 
@@ -68,9 +69,6 @@ export function setAssignee(tasks: Task[], userId: string | null) {
 }
 
 export type TaskBudget = NonNullable<Task["budget"]>;
-
-/** The picker id that stands for "an outside event" where a member's id would be. */
-export const OUTSIDE = "outside";
 
 /** True when the task's next move is nobody's here: it waits on something outside (a build, a reply, a date). */
 export const waitsOutside = (task: Task) => task.waiting_outside === true;

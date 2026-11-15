@@ -8,7 +8,10 @@ import { CATEGORIES, type Category, type GroupBy, type SortBy, type Task, type T
 import { serverDay } from "@/lib/time";
 
 export const NONE = "none";
-/** In the "waiting on" filter: tasks that wait on an outside event. */
+/**
+ * The server's word for "an outside event" where a member's id would be: in
+ * the "waiting on" filter, in a picker, and in the change that sets it.
+ */
 export const OUTSIDE = "outside";
 
 /** How a page groups its tasks: the server's groupings, and by label. */

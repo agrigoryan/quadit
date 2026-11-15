@@ -9,7 +9,6 @@ import { useListening } from "@/lib/listening";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import {
   moveToProject,
-  OUTSIDE,
   setAssignee,
   setCycle,
   setEpic,
@@ -22,6 +21,7 @@ import {
   waitsOutside,
 } from "@/tasks/actions";
 import { ChoiceList } from "@/tasks/choice-list";
+import { OUTSIDE } from "@/tasks/filters";
 import { createLabel, createLabelText, useManageLinks } from "@/tasks/manage";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
