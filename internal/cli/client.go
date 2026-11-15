@@ -1,5 +1,3 @@
-// Package cli is the command-line tool: one binary for people and agents.
-// Its output is short on purpose; --json gives the full data.
 package cli
 
 import (

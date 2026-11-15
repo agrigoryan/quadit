@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/cli"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -537,20 +538,11 @@ func TestSurfaceOnlyGrows(t *testing.T) {
 			now = append(now, "mcp "+tool.Name+" arg "+arg)
 		}
 	}
-	// The command-line tool's commands, read from its source.
-	src, err := os.ReadFile("../cli/cli.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	body := string(src)
-	body = body[strings.Index(body, "func (r *runner) run("):]
-	body = body[:strings.Index(body[1:], "\nfunc ")+1]
+	// The command-line tool's commands, as its own table lists them.
 	cmds := 0
-	for _, m := range regexp.MustCompile(`(?m)^\tcase ((?:"[a-z-]+"(?:, )?)+):`).FindAllStringSubmatch(body, -1) {
-		for _, name := range strings.Split(m[1], ", ") {
-			now = append(now, "cli "+strings.Trim(name, `"`))
-			cmds++
-		}
+	for _, name := range cli.Commands() {
+		now = append(now, "cli "+name)
+		cmds++
 	}
 	if cmds < 20 {
 		t.Fatalf("could not read the command-line tool's commands: %d", cmds)
