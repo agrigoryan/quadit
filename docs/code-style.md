@@ -73,7 +73,7 @@ Signs, when reading or reviewing, that a design needs another look:
 The aim is few places that deal with errors (see "Define errors out of existence"): operations defined so the common odd case is not an error, failures handled where the knowledge is, and the rest gathered at one place per entry point (the HTTP error path, a job's retry). Within that:
 
 11. An error is returned, logged with `slog`, or discarded with `_ =` and the reason on the same line. Nothing else.
-12. A store `Get` used to ask "is it there?" checks `errors.Is(err, store.ErrNotFound)`; any other error is returned. A database outage is never answered as "not found".
+12. Ask whether a row is there with `store.Find`: false for a row that is missing, an error only when the read failed. Use `Get` when the row must be there and return its error as it is; it names the row ("task not found") and is answered 404. Never test a `Get` error for absence by hand: a database outage is never answered as "not found".
 13. A count, a limit or a setting that decides access fails closed: when it cannot be read, the answer is no.
 14. Errors are matched with `errors.Is` or `errors.As`, never by their text. Wrapping uses `%w`.
 
