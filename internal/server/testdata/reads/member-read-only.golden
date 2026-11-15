@@ -187,9 +187,9 @@ task.update (member): id (required), base_seq, title, description, status, prior
 template.create (member): id, project, name (required), title, description, preset
 template.delete (member): id (required)
 template.update (member): id (required), name, title, description, preset
-view.create (member): id, name, project, description, icon, query, layout, display, shared, rank
+view.create (member): id, name (required), project, description, icon, query, layout, display, shared, rank
 view.delete (member): id (required)
-view.update (member): id, name, description, icon, query, layout, display, shared, rank
+view.update (member): id (required), name, description, icon, query, layout, display, shared, rank
 watch.set (member): type, subject (required), watching, user
 webhook.create (admin): id, name, url (required), secret, event_types, project, for, active
 webhook.delete (admin): id (required)
