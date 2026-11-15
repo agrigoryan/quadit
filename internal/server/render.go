@@ -528,6 +528,30 @@ func (x *c) eventLine(ev core.Event, nm *names) string {
 			what += " unclear: " + oneLine(dc.UnclearNote, 240)
 		}
 		what += "  (id=" + dc.ID + ")"
+	case "claim.created", "claim.updated":
+		var cd struct {
+			Row      core.ResourceClaim `json:"row"`
+			Resource string             `json:"resource"`
+			Why      string             `json:"why"`
+		}
+		json.Unmarshal(ev.Data, &cd)
+		switch {
+		case ev.Type == "claim.updated":
+			what = "claim " + orText(cd.Why, "changed")
+		case cd.Row.State == "holding":
+			what = "claim: took " + cd.Resource
+		default:
+			what = "claim: waits for " + cd.Resource
+		}
+		if cd.Row.TaskID != "" {
+			var tk core.Task
+			if x.db.Get(x.ctx(), &tk, store.Eq("id", cd.Row.TaskID)) == nil {
+				what += " for " + tk.Key
+			}
+		}
+		if cd.Row.Note != "" {
+			what += ": " + oneLine(cd.Row.Note, 120)
+		}
 	case "notification.created":
 		var n core.Notification
 		json.Unmarshal(d.Row, &n)

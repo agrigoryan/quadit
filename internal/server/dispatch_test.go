@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -184,4 +186,24 @@ func TestWatchedView(t *testing.T) {
 			t.Fatalf("view query:\n%s", out)
 		}
 	})
+}
+
+// TestAFailingWebhookDoesNotHoldUpTheOthers: one webhook that cannot be
+// reached, with a backlog of thousands, takes nothing from another's queue.
+func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Talked about"})
+	fine := newReceiver(t, "")
+	s.change(s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x", "event_types": []string{"task.*"}})
+	s.change(s.owner, "", "webhook.create", M{"name": "fine", "url": fine.srv.URL, "event_types": []string{"comment.created"}})
+	for b := 0; b < 7; b++ {
+		batch := make([]M, 300)
+		for i := range batch {
+			batch[i] = M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": fmt.Sprintf("Backlog %d-%d", b, i)}}
+		}
+		s.call(s.owner, "", "POST", w+"/changes", M{"changes": batch}, 200, nil)
+	}
+	s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the backlog"})
+	eventually(t, "the working webhook to hear the comment", func() bool { return strings.Contains(fine.types(), "comment.created") })
 }

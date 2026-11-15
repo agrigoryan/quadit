@@ -312,15 +312,26 @@ func (s *Server) runDeliveries(ctx context.Context) {
 			return
 		case <-tick.C:
 		}
-		var pending []core.WebhookDelivery
-		if err := s.st.List(ctx, &pending, store.Q{Where: []store.Cond{store.Eq("state", "pending")}, Order: "seq", Limit: 2000}); err != nil {
+		// Each webhook's own queue is read by itself: one that keeps
+		// failing, however long its backlog, takes nothing from the others.
+		var hooks []core.Webhook
+		if err := s.st.List(ctx, &hooks, store.Where(store.Live)); err != nil {
 			continue
 		}
 		// A webhook gets its events in order: one at a time, and nothing
 		// overtakes a delivery that is waiting to be retried.
 		byHook := map[string][]core.WebhookDelivery{}
-		for _, d := range pending {
-			byHook[d.WebhookID] = append(byHook[d.WebhookID], d)
+		for _, h := range hooks {
+			mu.Lock()
+			at := busy[h.ID]
+			mu.Unlock()
+			if at {
+				continue
+			}
+			var list []core.WebhookDelivery
+			if err := s.st.List(ctx, &list, store.Q{Where: []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", "pending")}, Order: "seq", Limit: 200}); err == nil && len(list) > 0 {
+				byHook[h.ID] = list
+			}
 		}
 		now := time.Now().UnixMilli()
 		for hookID, list := range byHook {

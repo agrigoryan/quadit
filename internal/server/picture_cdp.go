@@ -143,16 +143,24 @@ const pageHeight = `(() => {
 
 // takePicture opens target in a headless browser at exactly width by height
 // CSS pixels and returns a PNG of it.
-func takePicture(ctx context.Context, chrome string, extra []string, profile, target string, width, height int, dark, full bool) ([]byte, error) {
+func takePicture(ctx context.Context, chrome string, extra []string, profile, target string, width, height int, dark, full bool) (png []byte, pageHeight int, err error) {
+	png, pageHeight, err = takePictureOf(ctx, chrome, extra, profile, target, width, height, dark, full)
+	return
+}
+
+// takePictureOf also says how tall the whole page is when full was asked:
+// a picture stops at 8000 pixels, and the caller is told when the page
+// goes on.
+func takePictureOf(ctx context.Context, chrome string, extra []string, profile, target string, width, height int, dark, full bool) ([]byte, int, error) {
 	toBrowser, out, err := os.Pipe()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	in, fromBrowser, err := os.Pipe()
 	if err != nil {
 		toBrowser.Close()
 		out.Close()
-		return nil, err
+		return nil, 0, err
 	}
 	args := append([]string{"--headless=new", "--remote-debugging-pipe", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
 		"--no-default-browser-check", "--user-data-dir=" + profile}, extra...)
@@ -164,7 +172,7 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 	if err != nil {
 		out.Close()
 		in.Close()
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() {
 		out.Close()
@@ -196,7 +204,7 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 
 	res, err := c.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var made struct {
 		TargetID string `json:"targetId"`
@@ -204,7 +212,7 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 	_ = json.Unmarshal(res, &made)
 	res, err = c.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": made.TargetID, "flatten": true})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var at struct {
 		SessionID string `json:"sessionId"`
@@ -215,7 +223,7 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 	phone := width < 600
 	if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
 		"width": width, "height": height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if phone {
 		_, _ = c.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true})
@@ -227,18 +235,18 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 	_, _ = c.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{
 		"features": []map[string]string{{"name": "prefers-color-scheme", "value": scheme}}})
 	if _, err := c.call(ctx, s, "Page.enable", map[string]any{}); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	res, err = c.call(ctx, s, "Page.navigate", map[string]any{"url": target})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var nav struct {
 		ErrorText string `json:"errorText"`
 	}
 	_ = json.Unmarshal(res, &nav)
 	if nav.ErrorText != "" {
-		return nil, fmt.Errorf("the page did not open: %s", nav.ErrorText)
+		return nil, 0, fmt.Errorf("the page did not open: %s", nav.ErrorText)
 	}
 	c.event(ctx, 20*time.Second, func(m cdpMsg) bool { return m.Method == "Page.loadEventFired" })
 
@@ -254,10 +262,11 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 		select {
 		case <-time.After(250 * time.Millisecond):
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, 0, ctx.Err()
 		}
 	}
 
+	whole := 0
 	if full {
 		// The whole page: as tall as its longest scrolling part needs,
 		// within reason, and no taller.
@@ -268,32 +277,33 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 			} `json:"result"`
 		}
 		if err == nil && json.Unmarshal(res, &out) == nil && out.Result.Value > 0 {
-			height = min(max(int(out.Result.Value)+1, 320), 8000)
+			whole = int(out.Result.Value) + 1
+			height = min(max(whole, 320), 8000)
 			if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
 				"width": width, "height": height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			select {
 			case <-time.After(400 * time.Millisecond): // lists that draw only what is in view fill in
 			case <-ctx.Done():
-				return nil, ctx.Err()
+				return nil, 0, ctx.Err()
 			}
 		}
 	}
 	res, err = c.call(ctx, s, "Page.captureScreenshot", map[string]any{"format": "png"})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var shot struct {
 		Data string `json:"data"`
 	}
 	if err := json.Unmarshal(res, &shot); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	png, err := base64.StdEncoding.DecodeString(shot.Data)
 	if err != nil || len(png) == 0 {
-		return nil, errors.New("the browser made no picture")
+		return nil, 0, errors.New("the browser made no picture")
 	}
 	_, _ = c.call(ctx, "", "Browser.close", map[string]any{})
-	return png, nil
+	return png, whole, nil
 }

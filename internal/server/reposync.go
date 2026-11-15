@@ -100,7 +100,8 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 	if err != nil {
 		said := oneLine(strings.TrimSpace(string(out)), 300)
 		switch {
-		case strings.Contains(said, "does not exist") || strings.Contains(said, "not found") && args[0] == "clone" || strings.Contains(said, "Could not resolve host"):
+		case strings.Contains(said, "does not exist") || strings.Contains(said, "not found") && args[0] == "clone" || strings.Contains(said, "Could not resolve host") ||
+			strings.Contains(said, "does not appear to be a git repository") || strings.Contains(said, "unable to access") || strings.Contains(said, "Could not read from remote"):
 			return "", fmt.Errorf("the repository could not be found at that address; check it, and that the server may read it (git %s: %s)", args[0], said)
 		case strings.Contains(said, "Authentication failed") || strings.Contains(said, "could not read Username") || strings.Contains(said, "Permission denied"):
 			return "", fmt.Errorf("the repository refused the server; give the source a token or key that may read it (git %s: %s)", args[0], said)

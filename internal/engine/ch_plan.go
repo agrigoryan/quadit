@@ -925,6 +925,10 @@ func (c *cx) checkViewValues(raw json.RawMessage) error {
 		Epic     []string `json:"epic"`
 		Priority []int    `json:"priority"`
 		Category []string `json:"category"`
+		Creator  string   `json:"creator"`
+		Parent   string   `json:"parent"`
+		Asked    string   `json:"asked"`
+		Mentions string   `json:"mentions"`
 	}
 	if json.Unmarshal(raw, &q) != nil {
 		return nil // CheckViewQuery has said so already
@@ -939,14 +943,26 @@ func (c *cx) checkViewValues(raw json.RawMessage) error {
 			return oneOf("query.category", "category", cat, core.Categories)
 		}
 	}
-	for _, ref := range q.Assignee {
-		if ref == "me" || ref == "none" {
-			continue
+	people := map[string][]string{"query.assignee": q.Assignee, "query.creator": {q.Creator}, "query.asked": {q.Asked}, "query.mentions": {q.Mentions}}
+	for field, refs := range people {
+		for _, ref := range refs {
+			if ref == "" || ref == "me" || ref == "none" {
+				continue
+			}
+			if _, err := c.memberRef(field, ref); err != nil {
+				var e *Error
+				if errors.As(err, &e) {
+					e.Code = CodeInvalid // the view is what is wrong, not the address asked
+				}
+				return err
+			}
 		}
-		if _, err := c.memberRef("query.assignee", ref); err != nil {
+	}
+	if q.Parent != "" {
+		if _, err := c.anyTask("query.parent", q.Parent); err != nil {
 			var e *Error
 			if errors.As(err, &e) {
-				e.Code = CodeInvalid // the view is what is wrong, not the address asked
+				e.Code = CodeInvalid
 			}
 			return err
 		}

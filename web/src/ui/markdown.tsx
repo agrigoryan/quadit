@@ -21,8 +21,11 @@ const refPattern = /(^|[^A-Za-z0-9_@/])(@[a-z0-9][a-z0-9_-]{1,31}|[A-Z][A-Z0-9]{
 function splitText(value: string): Node[] {
   const out: Node[] = [];
   let last = 0;
+  // Only a key of a project there is: "UTF-8" and "SHA-256" are words.
+  const projects = new Set(Object.values(useStore.getState().c.projects).map((p) => p.key));
   for (const m of value.matchAll(refPattern)) {
     const ref = m[2] as string;
+    if (!ref.startsWith("@") && !projects.has(ref.slice(0, ref.lastIndexOf("-")))) continue;
     const start = (m.index ?? 0) + (m[1]?.length ?? 0);
     if (start > last) out.push({ type: "text", value: value.slice(last, start) });
     const url = ref.startsWith("@") ? `mention:${ref.slice(1)}` : `task:${ref}`;

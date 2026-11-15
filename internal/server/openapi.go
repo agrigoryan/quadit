@@ -53,7 +53,7 @@ var apiOps = []op{
 	{"GET", "/inbox", "The caller's inbox.", "all: true to include read items; limit", "find"},
 	{"GET", "/events", "The change feed after a position. wait holds the request until something matching arrives. Task filters narrow it to the events of matching tasks.",
 		"after: feed position; cursor: name of a server-kept cursor; ack: move that cursor to this position first; wait: seconds, up to 55; mine: true; others: true; " +
-			"inbox: true; task: key; types: comma-separated; compact: true for one line per event; limit; " + taskFilters, "follow"},
+			"inbox: true; task: key; types: comma-separated; compact: true for one line per event; " + taskFilters, "follow"},
 	{"GET", "/events/stream", "The live stream (server-sent events), one message per feed event.", "after: feed position", "follow"},
 	{"GET", "/cursors/{name}", "Where a server-kept cursor stands.", "", "follow"},
 	{"PUT", "/cursors/{name}", "Mark the feed handled up to a position. Body: {seq}. A cursor never moves back.", "", "follow"},

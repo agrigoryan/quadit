@@ -28,6 +28,9 @@ type Client struct {
 	URL   string
 	Token string
 	HTTP  *http.Client
+	// Note is what the server had to say beside its last answer (a picture
+	// that stops before the page does, for one).
+	Note string
 }
 
 type savedConfig struct {
@@ -117,6 +120,7 @@ func (c *Client) do(method, path string, query url.Values, body io.Reader, conte
 		}
 		raw, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		c.Note = resp.Header.Get("X-Quadit-Note")
 		if resp.StatusCode < 300 {
 			return raw, nil
 		}

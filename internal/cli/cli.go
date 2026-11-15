@@ -688,6 +688,9 @@ func (r *runner) run(cmd string, rest []string) error {
 			return err
 		}
 		fmt.Fprintln(r.out, out)
+		if r.c.Note != "" {
+			fmt.Fprintln(os.Stderr, "note: "+r.c.Note)
+		}
 		return nil
 	case "upload":
 		if err := need(pos, 1, "upload PATH"); err != nil {

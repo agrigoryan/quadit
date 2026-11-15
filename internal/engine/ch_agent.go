@@ -376,7 +376,13 @@ func (c *cx) setClaim(cl core.ResourceClaim, set map[string]any, why string) err
 	for k, v := range set {
 		changes[k] = core.FieldChange{To: v}
 	}
-	return c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"id": cl.ID, "changes": changes, "why": why})
+	// Letting go of a hold, or having it run out, is never refused: also
+	// not to someone limited to other projects since they took it.
+	was := c.system
+	c.system = true
+	err := c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"id": cl.ID, "changes": changes, "why": why, "resource": cl.ResourceID})
+	c.system = was
+	return err
 }
 
 // claimProject is the project of the task a claim was made for, so that a

@@ -579,6 +579,7 @@ func liveDeliveries(ctx context.Context, db store.DB, conds ...store.Cond) int {
 	for i, h := range hooks {
 		ids[i] = h.ID
 	}
-	n, _ := db.Count(ctx, "webhook_deliveries", append(conds, store.In("webhook_id", ids))...)
+	// A press of "Test" is in the log, and is not a delivery that was lost.
+	n, _ := db.Count(ctx, "webhook_deliveries", append(conds, store.In("webhook_id", ids), store.Ne("event_type", "webhook.test"))...)
 	return n
 }

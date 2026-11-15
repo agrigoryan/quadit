@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -57,7 +58,10 @@ func (s *Server) hRender(x *c) error {
 	}
 	q := x.r.URL.Query()
 	width := min(max(x.intParam("width", 1280), 320), 2560)
-	height := min(max(x.intParam("height", 0), 0), 8000)
+	if h := x.intParam("height", 0); h != 0 && (h < 200 || h > 8000) {
+		return errBad("height is from 200 to 8000; leave it out for the usual size, or use full=1 for the whole page")
+	}
+	height := x.intParam("height", 0)
 	if height == 0 {
 		height = 900
 		if width < 600 {
@@ -104,10 +108,14 @@ func (s *Server) hRender(x *c) error {
 	extra = append(extra, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
 	ctx, cancel := context.WithTimeout(x.ctx(), 45*time.Second)
 	defer cancel()
-	png, err := takePicture(ctx, chrome, extra, filepath.Join(dir, "profile"), target, width, height, q.Get("theme") == "dark", truthyParam(q, "full") && x.intParam("height", 0) == 0)
+	png, whole, err := takePicture(ctx, chrome, extra, filepath.Join(dir, "profile"), target, width, height, q.Get("theme") == "dark", truthyParam(q, "full") && x.intParam("height", 0) == 0)
 	if err != nil {
 		s.log.Warn("render", "err", err)
 		return &httpError{Status: 502, Code: "render_failed", Message: "the browser could not take the picture: " + oneLine(err.Error(), 120)}
+	}
+	if whole > 8000 {
+		// The page goes on below the picture: say so where a caller reads it.
+		x.w.Header().Set("X-Quadit-Note", fmt.Sprintf("the page is %d pixels tall; the picture stops at 8000", whole))
 	}
 	x.w.Header().Set("Content-Type", "image/png")
 	x.w.Header().Set("Cache-Control", "no-store")

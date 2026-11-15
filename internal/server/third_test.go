@@ -236,6 +236,27 @@ func TestThirdAuditFindings(t *testing.T) {
 			t.Fatalf("archiving has no words in the feed: %s", out[max(0, len(out)-400):])
 		}
 
+		// What a fifth check found. Someone limited after taking a shared
+		// resource can still let go of it.
+		do(wide, "resource.acquire", M{"resource": "minipc", "task": "SVA-1"}, 200)
+		s.change(s.owner, "", "agent.update", M{"id": "@wide", "scope": M{"projects": []string{"OPS"}}})
+		do(wide, "resource.release", M{"resource": "minipc"}, 200)
+		s.change(s.owner, "", "agent.update", M{"id": "@wide", "scope": nil})
+		// More that a saved view cannot name, and parameters of the wrong kind.
+		for _, q := range []M{{"creator": "@nobody"}, {"parent": "SVA-999"}} {
+			s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "view.create", "args": M{"name": "Bad", "query": q}}, 400, nil)
+		}
+		for _, q := range []string{"/events?after=-5", "/tasks?due_before=notadate", "/events?compact=maybe", "/render?task=SVA-1&height=10"} {
+			s.call(nil, wide, "GET", "/api/v1/w/-"+q, nil, 400, nil)
+		}
+		// A failed press of "Test" is in the log, not among the lost.
+		hook := s.change(s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x"})["ref"].(string)
+		s.call(s.owner, "", "POST", w+"/webhooks/"+hook+"/test", nil, 200, nil)
+		if out := s.call(s.owner, "", "GET", w+"/dashboard", nil, 200, nil); !strings.Contains(out, `"deliveries_dead":0`) {
+			t.Fatalf("a failed test send counts as a lost delivery: %s", out[max(0, len(out)-300):])
+		}
+		s.change(s.owner, "", "webhook.delete", M{"id": hook})
+
 		// A call to MCP with no token at all is counted like a wrong one.
 		limited := false
 		for i := 0; i < 140 && !limited; i++ {
