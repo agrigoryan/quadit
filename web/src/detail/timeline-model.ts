@@ -71,6 +71,20 @@ function placeOf(a: Attachment, taskId: string, known: Known): FilePlace | null 
   return null;
 }
 
+/** How long after a question is asked its asker's files still count as part of asking it. */
+const WITH_THE_QUESTION_MS = 60_000;
+
+/**
+ * True for a file the asker put on a question or an option while asking. The
+ * question's card shows those, so the timeline does not repeat them; a file
+ * added later, or by someone else, is news and gets its line.
+ */
+function cameWithTheQuestion(ev: FeedEvent, place: FilePlace, known: Known): boolean {
+  if (place.on === "task") return false;
+  const asked = known.asked[place.id];
+  return !!asked && asked.by === ev.actor_id && ev.at >= asked.at && ev.at - asked.at < WITH_THE_QUESTION_MS;
+}
+
 function atomsOf(ev: FeedEvent, taskId: string, known: Known, withDecision: Set<string>): Atom[] {
   const base: Base = { at: ev.at, seq: ev.seq, actorId: ev.actor_id };
   const line = (phrase: string | null, opts: { note?: string; joins?: boolean; quiet?: boolean } = {}): Atom[] =>
@@ -78,7 +92,8 @@ function atomsOf(ev: FeedEvent, taskId: string, known: Known, withDecision: Set<
   const files = (list: Attachment[]): Atom[] =>
     list.flatMap((a): Atom[] => {
       const place = placeOf(a, taskId, known);
-      return place ? [{ kind: "files", ...base, place, names: [a.file?.name ?? t("timeline.aFile")] }] : [];
+      if (!place || cameWithTheQuestion(ev, place, known)) return [];
+      return [{ kind: "files", ...base, place, names: [a.file?.name ?? t("timeline.aFile")] }];
     });
 
   switch (ev.type) {

@@ -14,6 +14,8 @@ export interface Known {
   options: Dict<string>;
   /** Questions, by decision id. */
   questions: Dict<string>;
+  /** When and by whom a question was asked, by decision id and by the id of each of its options. */
+  asked: Dict<{ at: number; by: string }>;
 }
 
 export function knownRows(events: FeedEvent[]): Known {
@@ -25,10 +27,16 @@ export function knownRows(events: FeedEvent[]): Known {
     relations: { ...c.relations },
     options: {},
     questions: {},
+    asked: {},
   };
   const decision = (d: Decision) => {
     known.questions[d.id] = d.question;
-    for (const o of d.options ?? []) known.options[o.id] = o.label;
+    const asked = { at: d.created_at, by: d.created_by };
+    known.asked[d.id] = asked;
+    for (const o of d.options ?? []) {
+      known.options[o.id] = o.label;
+      known.asked[o.id] = asked;
+    }
   };
   for (const d of Object.values(c.decisions)) decision(d);
 
