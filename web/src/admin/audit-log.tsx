@@ -12,8 +12,8 @@ import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading, Spinner } from "@/ui/spinner";
 import { AuditFilterBar, type AuditFilters, anyFilter, auditQuery, type Named, noFilters } from "@/admin/audit-filters";
-import { download } from "@/settings/ui/bits";
-import { EmptyRow, Page } from "@/settings/ui/layout";
+import { download } from "@/lib/download";
+import { EmptyRow, Page } from "@/ui/settings-layout";
 
 export interface AuditEntry {
   id: string;

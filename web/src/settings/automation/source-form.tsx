@@ -4,7 +4,7 @@ import { newId } from "@/lib/ids";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { FormAlert, FormField, NativeSelect, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
 import { type Authority, change, type Source, type WriteMode } from "@/settings/automation/data";
 
 interface Props {

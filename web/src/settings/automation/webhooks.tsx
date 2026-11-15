@@ -9,11 +9,13 @@ import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 import { useSettingsBase } from "@/settings/base";
-import { Fact, LoadGate, When } from "@/settings/ui/bits";
-import { ConfirmDialog, RevealDialog } from "@/settings/ui/dialogs";
-import { Switch } from "@/settings/ui/form";
-import { EmptyRow, Page, Rows } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { Fact } from "@/ui/fact";
+import { LoadGate } from "@/ui/load-gate";
+import { When } from "@/ui/when";
+import { ConfirmDialog, RevealDialog } from "@/ui/settings-dialogs";
+import { Switch } from "@/ui/form";
+import { EmptyRow, Page, Rows } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 import {
   change,
   lastSent,

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { AuthLayout, FormError } from "@/auth/auth-layout";
 import { authConfig, setUp } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { FormField, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormField, useFieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

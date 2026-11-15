@@ -1,4 +1,5 @@
-import { ColorPicker, Dot } from "@/settings/ui/bits";
+import { ColorPicker } from "@/ui/color-picker";
+import { Dot } from "@/ui/dot";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** A row's colour as a dot that opens the swatches. */

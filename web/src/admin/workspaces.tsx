@@ -8,10 +8,11 @@ import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Fact, LoadGate } from "@/settings/ui/bits";
-import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { EmptyRow, Page, Row, Rows, Section } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { Fact } from "@/ui/fact";
+import { LoadGate } from "@/ui/load-gate";
+import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { EmptyRow, Page, Row, Rows, Section } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 
 export interface AdminWorkspace {
   id: string;

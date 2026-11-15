@@ -2,8 +2,8 @@ import { type FormEvent, useState } from "react";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { FormAlert, FormField, FormFoot, useFieldErrors } from "@/settings/ui/form";
-import { Card, Section } from "@/settings/ui/layout";
+import { FormAlert, FormField, FormFoot, useFieldErrors } from "@/ui/form";
+import { Card, Section } from "@/ui/settings-layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

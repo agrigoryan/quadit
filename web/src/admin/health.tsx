@@ -9,9 +9,9 @@ import { exact } from "@/lib/time";
 import { Button } from "@/ui/button";
 import type { Backup } from "@/admin/backups";
 import { loadChangeCatalog } from "@/settings/agents/asks-before";
-import { LoadGate } from "@/settings/ui/bits";
-import { Page, Rows, Section } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { LoadGate } from "@/ui/load-gate";
+import { Page, Rows, Section } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 import { Ago } from "@/ui/ago";
 
 interface Health {

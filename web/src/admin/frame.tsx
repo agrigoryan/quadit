@@ -25,9 +25,9 @@ import { Avatar } from "@/ui/avatar";
 import { EmptyState } from "@/ui/empty";
 import { QuadMark } from "@/ui/icons";
 import { fetchSettings, SettingsContext, type SettingsMap } from "@/admin/settings";
-import { LoadGate } from "@/settings/ui/bits";
-import { type NavGroup, NavLayout } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { LoadGate } from "@/ui/load-gate";
+import { type NavGroup, NavLayout } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 
 function useGroups(): NavGroup[] {
   return useMemo(

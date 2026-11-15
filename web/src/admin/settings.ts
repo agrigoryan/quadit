@@ -5,7 +5,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { type FieldErrors, useFieldErrors } from "@/settings/ui/form";
+import { type FieldErrors, useFieldErrors } from "@/ui/form";
 
 interface SettingEntry {
   value?: unknown;

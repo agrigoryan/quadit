@@ -12,7 +12,7 @@ import { Input, Textarea } from "@/ui/input";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { updateDecision } from "@/decisions/actions";
 import { optionsOf, useReturnFocus } from "@/decisions/data";
-import { FormAlert, FormField, NativeSelect, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, useFieldErrors } from "@/ui/form";
 
 const NONE = "";
 

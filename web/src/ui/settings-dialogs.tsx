@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { FormAlert } from "@/settings/ui/form";
+import { FormAlert } from "@/ui/form";
 
 interface ConfirmProps {
   open: boolean;

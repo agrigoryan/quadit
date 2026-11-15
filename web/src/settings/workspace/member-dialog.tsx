@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import type { Member } from "@/lib/types";
-import { FormAlert, FormField, Note, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormAlert, FormField, Note, useFieldErrors, useSubmit } from "@/ui/form";
 import { MemberScopeFields, sameScope, scopeArg, scopeDraftOf } from "@/settings/workspace/scope-fields";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

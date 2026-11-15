@@ -5,7 +5,7 @@ import { slugFrom, useCanCreateWorkspace } from "@/auth/config";
 import { createWorkspace, signOut, useSession } from "@/auth/session";
 import { ApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FormAlert, FormField, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";

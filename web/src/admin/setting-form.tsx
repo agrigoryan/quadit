@@ -7,8 +7,8 @@ import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 import { Input, Textarea } from "@/ui/input";
 import { type Draft, MASK } from "@/admin/settings";
-import { FormAlert, FormField, FormFoot } from "@/settings/ui/form";
-import { Card } from "@/settings/ui/layout";
+import { FormAlert, FormField, FormFoot } from "@/ui/form";
+import { Card } from "@/ui/settings-layout";
 
 /** Says a setting comes from the environment and names the variable to change. */
 function LockNote({ env }: { env: string }) {

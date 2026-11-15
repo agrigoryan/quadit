@@ -3,7 +3,7 @@ import { AuthLayout, FormError } from "@/auth/auth-layout";
 import { secondStep, signOut } from "@/auth/session";
 import { ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FormField } from "@/settings/ui/form";
+import { FormField } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

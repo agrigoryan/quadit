@@ -5,8 +5,8 @@ import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { countList, foundText, type ImportResult } from "@/settings/import/data";
-import { Note } from "@/settings/ui/form";
-import { Card } from "@/settings/ui/layout";
+import { Note } from "@/ui/form";
+import { Card } from "@/ui/settings-layout";
 import { Button } from "@/ui/button";
 
 interface Props {

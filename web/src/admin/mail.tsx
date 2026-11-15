@@ -6,8 +6,8 @@ import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { NumberField, SecretField, SettingForm, TextField } from "@/admin/setting-form";
 import { useDraft, useSetting } from "@/admin/settings";
-import { FormField, NativeSelect, Note } from "@/settings/ui/form";
-import { Card, Page, Section } from "@/settings/ui/layout";
+import { FormField, NativeSelect, Note } from "@/ui/form";
+import { Card, Page, Section } from "@/ui/settings-layout";
 
 interface MailSetting {
   host: string;

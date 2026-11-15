@@ -4,11 +4,13 @@ import { createPasskey, passkeyCanceled, passkeysSupported } from "@/auth/webaut
 import { api, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { summariseAgent } from "@/settings/me/user-agent";
-import { Fact, LoadGate, When } from "@/settings/ui/bits";
-import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { FormAlert, FormField, Note } from "@/settings/ui/form";
-import { EmptyRow, Row, Rows, Section } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { Fact } from "@/ui/fact";
+import { LoadGate } from "@/ui/load-gate";
+import { When } from "@/ui/when";
+import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { FormAlert, FormField, Note } from "@/ui/form";
+import { EmptyRow, Row, Rows, Section } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";

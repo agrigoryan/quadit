@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { t, tMaybe } from "@/lib/i18n";
-import { Checkbox } from "@/settings/ui/form";
+import { Checkbox } from "@/ui/form";
 import { MultiPick } from "@/settings/ui/multi-pick";
 
 interface Ask {

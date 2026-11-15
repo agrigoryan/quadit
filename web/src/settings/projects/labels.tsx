@@ -7,10 +7,10 @@ import { useCollection } from "@/lib/selectors";
 import type { Label, Project } from "@/lib/types";
 import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";
-import { SWATCHES } from "@/settings/ui/bits";
-import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { FormAlert, NativeSelect, useFieldErrors, useSubmit } from "@/settings/ui/form";
-import { EmptyRow, Rows, Section } from "@/settings/ui/layout";
+import { SWATCHES } from "@/lib/swatches";
+import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { FormAlert, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
+import { EmptyRow, Rows, Section } from "@/ui/settings-layout";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 

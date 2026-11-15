@@ -5,8 +5,8 @@ import { Lock } from "lucide-react";
 import { ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useSetting } from "@/admin/settings";
-import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { SwitchRow } from "@/settings/ui/form";
+import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { SwitchRow } from "@/ui/form";
 
 interface Props {
   name: string;

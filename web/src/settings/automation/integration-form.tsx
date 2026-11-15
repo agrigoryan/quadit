@@ -6,7 +6,7 @@ import { CATEGORIES } from "@/lib/types";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
 import { change, type GitHubConfig, type Integration } from "@/settings/automation/data";
 
 interface Props {

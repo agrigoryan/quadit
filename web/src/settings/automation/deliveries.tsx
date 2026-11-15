@@ -7,9 +7,10 @@ import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { LoadGate, When } from "@/settings/ui/bits";
-import { EmptyRow, Rows } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { LoadGate } from "@/ui/load-gate";
+import { When } from "@/ui/when";
+import { EmptyRow, Rows } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 import { type Delivery, isTest, listRows, type Webhook } from "@/settings/automation/data";
 
 const tones = { pending: "wait", ok: "ok", dead: "danger" } as const;

@@ -12,10 +12,12 @@ import { Tooltip } from "@/ui/tooltip";
 import { useSettingsBase } from "@/settings/base";
 import { deleteSecret, loadSecrets, useSecrets } from "@/settings/secrets/data";
 import { SecretForm } from "@/settings/secrets/secret-form";
-import { Fact, LoadGate, When } from "@/settings/ui/bits";
-import { ConfirmDialog, CopyField } from "@/settings/ui/dialogs";
-import { EmptyRow, Page, Rows, Section } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { Fact } from "@/ui/fact";
+import { LoadGate } from "@/ui/load-gate";
+import { When } from "@/ui/when";
+import { ConfirmDialog, CopyField } from "@/ui/settings-dialogs";
+import { EmptyRow, Page, Rows, Section } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 
 /** Who may use a secret: everyone, or the few it names. */
 function UsedBy({ ids }: { ids: string[] }) {

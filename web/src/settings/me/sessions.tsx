@@ -3,10 +3,12 @@ import { MonitorSmartphone } from "lucide-react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { summariseAgent } from "@/settings/me/user-agent";
-import { Fact, LoadGate, When } from "@/settings/ui/bits";
-import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { Row, Rows, Section } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { Fact } from "@/ui/fact";
+import { LoadGate } from "@/ui/load-gate";
+import { When } from "@/ui/when";
+import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { Row, Rows, Section } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 

@@ -19,8 +19,8 @@ import {
 } from "@/settings/import/data";
 import { ImportOutcome } from "@/settings/import/result";
 import { type Uploaded, UploadField } from "@/settings/import/upload-field";
-import { FormAlert, FormField, FormFoot, NativeSelect, Note, useFieldErrors } from "@/settings/ui/form";
-import { Card, Page, Section } from "@/settings/ui/layout";
+import { FormAlert, FormField, FormFoot, NativeSelect, Note, useFieldErrors } from "@/ui/form";
+import { Card, Page, Section } from "@/ui/settings-layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Spinner } from "@/ui/spinner";

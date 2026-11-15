@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
-import { FormField, NativeSelect } from "@/settings/ui/form";
+import { FormField, NativeSelect } from "@/ui/form";
 
 export interface Named {
   id: string;

@@ -7,9 +7,9 @@ import { useAuthConfig } from "@/auth/config";
 import { useSettingsBase } from "@/settings/base";
 import { type Account, type EmailChoice, type NotifyPrefs, saveAccount, useAccount } from "@/settings/me/account";
 import { type PushState, pushState, sendTestPush, turnPushOff, turnPushOn } from "@/settings/me/push";
-import { LoadGate } from "@/settings/ui/bits";
-import { FormAlert, Note, SwitchRow } from "@/settings/ui/form";
-import { Card, Page, Rows, Section } from "@/settings/ui/layout";
+import { LoadGate } from "@/ui/load-gate";
+import { FormAlert, Note, SwitchRow } from "@/ui/form";
+import { Card, Page, Rows, Section } from "@/ui/settings-layout";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 

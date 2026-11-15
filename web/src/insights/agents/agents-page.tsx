@@ -11,7 +11,7 @@ import { useCollection, useMe, useMembers, useSlug } from "@/lib/selectors";
 import type { Dict } from "@/lib/store";
 import type { AgentSession } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
-import { useLive, useNow } from "@/insights/lib/live";
+import { useLive, useNow } from "@/lib/live";
 import type { AgentState } from "@/insights/lib/types";
 import { isStranded } from "@/insights/ui/agent-bits";
 import { PageBar } from "@/insights/ui/panel";
@@ -20,7 +20,7 @@ import { NO_WORK, useAgentWork, useClaims, useResources } from "@/insights/agent
 import { Resources } from "@/insights/agents/resources";
 import { useSessions } from "@/insights/agents/session-data";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helpers";
-import { Checkbox } from "@/settings/ui/form";
+import { Checkbox } from "@/ui/form";
 import { EmptyState } from "@/ui/empty";
 
 const NO_SESSIONS: AgentSession[] = [];

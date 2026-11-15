@@ -7,7 +7,7 @@ import { newId } from "@/lib/ids";
 import { send } from "@/lib/mutate";
 import { useMe } from "@/lib/selectors";
 import { getState, useStore } from "@/lib/store";
-import { SWATCHES } from "@/settings/ui/bits";
+import { SWATCHES } from "@/lib/swatches";
 
 /**
  * Creates a label in the project (or for the whole workspace when there is

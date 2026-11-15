@@ -9,10 +9,11 @@ import { Badge } from "@/ui/badge";
 import { IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
-import { LoadGate, When } from "@/settings/ui/bits";
-import { ConfirmDialog } from "@/settings/ui/dialogs";
-import { EmptyRow, Page, Row, Rows, Section } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { LoadGate } from "@/ui/load-gate";
+import { When } from "@/ui/when";
+import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { EmptyRow, Page, Row, Rows, Section } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 
 export interface AdminUser {
   id: string;

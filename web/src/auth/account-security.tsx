@@ -4,9 +4,9 @@ import { t } from "@/lib/i18n";
 import { useAccount } from "@/settings/me/account";
 import { PasskeysSection } from "@/settings/me/passkeys";
 import { TwoStepSection } from "@/settings/me/two-step";
-import { LoadGate } from "@/settings/ui/bits";
-import { Note } from "@/settings/ui/form";
-import { Page } from "@/settings/ui/layout";
+import { LoadGate } from "@/ui/load-gate";
+import { Note } from "@/ui/form";
+import { Page } from "@/ui/settings-layout";
 
 /**
  * Two-step verification and passkeys on a page of their own, outside any

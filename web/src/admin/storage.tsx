@@ -1,8 +1,8 @@
 import { t } from "@/lib/i18n";
 import { NumberField, SecretField, SettingForm, TextField } from "@/admin/setting-form";
 import { useDraft, useSetting } from "@/admin/settings";
-import { Checkbox, FormField, NativeSelect, Note } from "@/settings/ui/form";
-import { Page, Section } from "@/settings/ui/layout";
+import { Checkbox, FormField, NativeSelect, Note } from "@/ui/form";
+import { Page, Section } from "@/ui/settings-layout";
 
 type Kind = "disk" | "s3" | "gcs" | "azure";
 

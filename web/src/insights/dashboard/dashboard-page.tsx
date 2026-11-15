@@ -15,7 +15,7 @@ import { StatusPanel, WaitsPanel, WeeklyPanel } from "@/insights/dashboard/flow-
 import { HealthPanel } from "@/insights/dashboard/health-panel";
 import { NobodyPanel, OutsidePanel } from "@/insights/dashboard/next-move-panels";
 import { WaitingPanel } from "@/insights/dashboard/waiting-panel";
-import { useLive } from "@/insights/lib/live";
+import { useLive } from "@/lib/live";
 import type { Dashboard } from "@/insights/lib/types";
 import { PageBar } from "@/insights/ui/panel";
 import { ProjectGlyph } from "@/ui/project-glyph";

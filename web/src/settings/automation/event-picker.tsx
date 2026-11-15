@@ -8,7 +8,7 @@ import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { Badge } from "@/ui/badge";
 import { Input } from "@/ui/input";
-import { Checkbox } from "@/settings/ui/form";
+import { Checkbox } from "@/ui/form";
 import { EVENT_GROUPS, FALLBACK_EVENTS, loadEventTypes } from "@/settings/automation/data";
 
 /** "a task changes" for "task.updated"; the bare type when it has no name here. */

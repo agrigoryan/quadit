@@ -24,7 +24,7 @@ import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
 import { moneyMicros } from "@/insights/lib/format";
-import { useNow } from "@/insights/lib/live";
+import { useNow } from "@/lib/live";
 import { SessionRow } from "@/insights/agents/session-row";
 import { Badge } from "@/ui/badge";
 import { IconButton } from "@/ui/button";

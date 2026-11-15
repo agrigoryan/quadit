@@ -37,7 +37,7 @@ import { MyTokensPage } from "@/settings/me/tokens";
 import { ProjectPage } from "@/settings/projects/project";
 import { ProjectsPage } from "@/settings/projects/projects";
 import { SecretsPage } from "@/settings/secrets/secrets";
-import { type NavGroup, NavLayout } from "@/settings/ui/layout";
+import { type NavGroup, NavLayout } from "@/ui/settings-layout";
 import { GeneralPage } from "@/settings/workspace/general";
 import { MembersPage } from "@/settings/workspace/members";
 import { EmptyState } from "@/ui/empty";

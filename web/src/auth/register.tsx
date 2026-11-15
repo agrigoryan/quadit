@@ -5,7 +5,7 @@ import { safeNext, useAuthConfig } from "@/auth/config";
 import { ProviderButtons } from "@/auth/providers";
 import { register, useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
-import { FormField, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormField, useFieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Loading } from "@/ui/spinner";

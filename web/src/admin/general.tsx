@@ -2,7 +2,7 @@ import { t } from "@/lib/i18n";
 import { SettingForm, TextField } from "@/admin/setting-form";
 import { SettingSwitch } from "@/admin/setting-switch";
 import { useDraft } from "@/admin/settings";
-import { Page, Rows, Section } from "@/settings/ui/layout";
+import { Page, Rows, Section } from "@/ui/settings-layout";
 
 export function GeneralPage() {
   const name = useDraft<string>("install.name", "Quadit", {

@@ -6,7 +6,7 @@ import { loadSession } from "@/auth/session";
 import { api } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import type { User } from "@/lib/types";
-import { type Loaded, useLoad } from "@/settings/ui/use-load";
+import { type Loaded, useLoad } from "@/lib/use-load";
 
 export type EmailChoice = "all" | "important" | "none";
 

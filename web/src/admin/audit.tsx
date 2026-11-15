@@ -3,7 +3,7 @@ import { t } from "@/lib/i18n";
 import { AuditLog } from "@/admin/audit-log";
 import { fetchUsers } from "@/admin/users";
 import { fetchWorkspaces } from "@/admin/workspaces";
-import { useLoad } from "@/settings/ui/use-load";
+import { useLoad } from "@/lib/use-load";
 
 /** The whole install's audit log. */
 export function AdminAuditPage() {

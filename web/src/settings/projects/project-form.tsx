@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n";
-import { ColorPicker } from "@/settings/ui/bits";
-import { type FieldErrors, FormField } from "@/settings/ui/form";
+import { ColorPicker } from "@/ui/color-picker";
+import { type FieldErrors, FormField } from "@/ui/form";
 import { Input, Textarea } from "@/ui/input";
 
 export interface ProjectDraft {

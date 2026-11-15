@@ -2,7 +2,7 @@
 // right now and the tokens issued to it.
 
 import { useMemo } from "react";
-import { useLive, useNow } from "@/insights/lib/live";
+import { useLive, useNow } from "@/lib/live";
 import { t } from "@/lib/i18n";
 import { useCollection } from "@/lib/selectors";
 import type { Member } from "@/lib/types";

@@ -4,7 +4,7 @@ import { AuthLayout, FormError, TextLink } from "@/auth/auth-layout";
 import { useAuthConfig } from "@/auth/config";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { FormField, Note } from "@/settings/ui/form";
+import { FormField, Note } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Field, Input } from "@/ui/input";
 

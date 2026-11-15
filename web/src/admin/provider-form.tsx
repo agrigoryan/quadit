@@ -5,8 +5,8 @@
 import { t } from "@/lib/i18n";
 import { SecretField, SettingForm, TextField } from "@/admin/setting-form";
 import { useDraft, useSetting } from "@/admin/settings";
-import { CopyField } from "@/settings/ui/dialogs";
-import { SwitchRow } from "@/settings/ui/form";
+import { CopyField } from "@/ui/settings-dialogs";
+import { SwitchRow } from "@/ui/form";
 
 interface ProviderSetting {
   enabled: boolean;

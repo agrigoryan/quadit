@@ -14,7 +14,7 @@ import { api, ws } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
-import { type FieldErrors, FormAlert, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { type FieldErrors, FormAlert, useFieldErrors, useSubmit } from "@/ui/form";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";

@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import { useMe, useSlug } from "@/lib/selectors";
 import type { Role } from "@/lib/types";
-import { FormAlert, FormField, NativeSelect, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, useFieldErrors } from "@/ui/form";
 import type { Created } from "@/settings/workspace/invites";
 import { roleChoices, ROLES } from "@/settings/workspace/roles";
 import { MemberScopeFields, scopeArg, type ScopeDraft } from "@/settings/workspace/scope-fields";

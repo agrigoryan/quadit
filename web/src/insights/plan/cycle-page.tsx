@@ -15,7 +15,7 @@ import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { BurnUp, burnRows } from "@/insights/charts/burn-up";
 import { count } from "@/insights/lib/format";
-import { useLive } from "@/insights/lib/live";
+import { useLive } from "@/lib/live";
 import type { CycleChart } from "@/insights/lib/types";
 import { moveToCycle, updateCycle } from "@/insights/plan/actions";
 import { emptyTally, useTallies } from "@/insights/plan/stats";

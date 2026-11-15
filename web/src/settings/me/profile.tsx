@@ -9,9 +9,9 @@ import { useSettingsBase } from "@/settings/base";
 import { type Account, saveAccount, useAccount } from "@/settings/me/account";
 import { Segmented } from "@/settings/me/segmented";
 import { AvatarInput } from "@/settings/ui/avatar-input";
-import { LoadGate } from "@/settings/ui/bits";
-import { FormAlert, FormField, FormFoot, NativeSelect, useFieldErrors, useSubmit } from "@/settings/ui/form";
-import { Card, Page, Section } from "@/settings/ui/layout";
+import { LoadGate } from "@/ui/load-gate";
+import { FormAlert, FormField, FormFoot, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
+import { Card, Page, Section } from "@/ui/settings-layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

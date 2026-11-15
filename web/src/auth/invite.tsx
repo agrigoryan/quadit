@@ -7,7 +7,7 @@ import { loadSession, signOut, useSession } from "@/auth/session";
 import { api, errorMessage } from "@/lib/api";
 import { t, tMaybe } from "@/lib/i18n";
 import type { Role } from "@/lib/types";
-import { FormField, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormField, useFieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Loading } from "@/ui/spinner";

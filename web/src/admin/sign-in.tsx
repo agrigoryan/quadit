@@ -7,8 +7,8 @@ import { ProviderForm } from "@/admin/provider-form";
 import { SettingForm } from "@/admin/setting-form";
 import { SettingSwitch } from "@/admin/setting-switch";
 import { useDraft } from "@/admin/settings";
-import { FormField } from "@/settings/ui/form";
-import { Page, Rows, Section } from "@/settings/ui/layout";
+import { FormField } from "@/ui/form";
+import { Page, Rows, Section } from "@/ui/settings-layout";
 
 const cleanDomain = (raw: string) => raw.trim().toLowerCase().replace(/^@/, "");
 

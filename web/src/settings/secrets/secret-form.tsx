@@ -11,7 +11,7 @@ import { Tooltip } from "@/ui/tooltip";
 import { useListening } from "@/settings/agents/data";
 import { addHosts, setSecret, useSecrets, validName } from "@/settings/secrets/data";
 import { HostInput } from "@/settings/secrets/host-input";
-import { FormAlert, FormField, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormAlert, FormField, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
 import { MultiPick } from "@/settings/ui/multi-pick";
 
 interface Props {

@@ -21,7 +21,7 @@ import { mutate, send } from "@/lib/mutate";
 import { rankBetween } from "@/lib/rank";
 import { useStatuses } from "@/lib/selectors";
 import { CATEGORIES, type Category, type Project, type Status } from "@/lib/types";
-import { SWATCHES } from "@/settings/ui/bits";
+import { SWATCHES } from "@/lib/swatches";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { StatusIcon } from "@/ui/icons";

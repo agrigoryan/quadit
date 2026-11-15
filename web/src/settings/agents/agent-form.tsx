@@ -7,7 +7,7 @@ import { ASKS_FIRST, AsksBefore } from "@/settings/agents/asks-before";
 import { type AgentMember, dollars, toMicros, toMinutes } from "@/settings/agents/data";
 import { AvatarInput } from "@/settings/ui/avatar-input";
 import { MultiPick } from "@/settings/ui/multi-pick";
-import { type FieldErrors, FormField, NativeSelect, SwitchRow } from "@/settings/ui/form";
+import { type FieldErrors, FormField, NativeSelect, SwitchRow } from "@/ui/form";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Input, Textarea } from "@/ui/input";
 

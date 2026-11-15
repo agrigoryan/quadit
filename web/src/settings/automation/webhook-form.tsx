@@ -6,7 +6,7 @@ import { memberChoiceLabel, useListening } from "@/settings/agents/data";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
-import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/settings/ui/form";
+import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
 import { change, randomSecret, type Webhook } from "@/settings/automation/data";
 import { EventPicker } from "@/settings/automation/event-picker";
 

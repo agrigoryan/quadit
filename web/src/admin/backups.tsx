@@ -10,10 +10,11 @@ import { Button, IconButton } from "@/ui/button";
 import { RestoreItemDialog } from "@/admin/restore-item";
 import { NumberField, SettingForm } from "@/admin/setting-form";
 import { useDraft } from "@/admin/settings";
-import { download, LoadGate } from "@/settings/ui/bits";
-import { FormAlert, SwitchRow } from "@/settings/ui/form";
-import { EmptyRow, Page, Row, Rows, Section } from "@/settings/ui/layout";
-import { useLoad } from "@/settings/ui/use-load";
+import { download } from "@/lib/download";
+import { LoadGate } from "@/ui/load-gate";
+import { FormAlert, SwitchRow } from "@/ui/form";
+import { EmptyRow, Page, Row, Rows, Section } from "@/ui/settings-layout";
+import { useLoad } from "@/lib/use-load";
 
 export interface Backup {
   id: string;

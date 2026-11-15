@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { mutate } from "@/lib/mutate";
 import { toast } from "@/lib/toast";
 import type { Workspace } from "@/lib/types";
-import { FormAlert, FormField, useFieldErrors } from "@/settings/ui/form";
+import { FormAlert, FormField, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
