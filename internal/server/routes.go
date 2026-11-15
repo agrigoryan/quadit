@@ -150,7 +150,11 @@ func (s *Server) handleDescribeChangeTypes(x *c) error {
 		for _, ci := range cat {
 			var args []string
 			for _, a := range ci.Args {
-				args = append(args, a.Name)
+				if a.Required {
+					args = append(args, a.Name+" (required)")
+				} else {
+					args = append(args, a.Name)
+				}
 			}
 			fmt.Fprintf(&b, "%s (%s): %s\n", ci.Type, ci.Role, strings.Join(args, ", "))
 		}

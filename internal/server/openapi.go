@@ -265,13 +265,21 @@ func apiComponents() map[string]any {
 	changes := []map[string]any{}
 	for _, ci := range engine.Catalog() {
 		props := map[string]any{}
+		var required []string
 		for _, a := range ci.Args {
 			props[a.Name] = map[string]string{"description": a.Type}
+			if a.Required {
+				required = append(required, a.Name)
+			}
+		}
+		args := map[string]any{"type": "object", "properties": props, "additionalProperties": false}
+		if len(required) > 0 {
+			args["required"] = required
 		}
 		changes = append(changes, map[string]any{"title": ci.Type, "description": "Least role: " + string(ci.Role), "type": "object", "properties": map[string]any{
 			"id":   map[string]string{"type": "string", "description": "A UUID made by the caller."},
 			"type": map[string]any{"const": ci.Type},
-			"args": map[string]any{"type": "object", "properties": props, "additionalProperties": false},
+			"args": args,
 		}, "required": []string{"id", "type"}})
 	}
 	return map[string]any{
