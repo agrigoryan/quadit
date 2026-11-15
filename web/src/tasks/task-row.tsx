@@ -4,13 +4,14 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/lib/access";
-import { useDecisionFlag, useLookup, useRow } from "@/lib/selectors";
+import { useDecisionFlag, useLookup, useMember, useRow } from "@/lib/selectors";
 import { useIsDraft } from "@/lib/store";
 import { isClosedCategory, type Task } from "@/lib/types";
 import { useTaskLink } from "@/lib/task-link";
 import type { Branch } from "@/tasks/list-layout";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
-import { AssigneeAvatar, DueChip, EpicChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
+import { DueChip, EpicChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
+import { Avatar } from "@/ui/avatar";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon, StatusIcon } from "@/ui/icons";
 
@@ -75,6 +76,7 @@ export const TaskRow = memo(function TaskRow({
   const status = useRow("statuses", task.status_id);
   const epic = useRow("epics", task.epic_id);
   const labels = useLookup("labels");
+  const assignee = useMember(task.assignee_id);
   const decision = useDecisionFlag(task.id);
   const link = useTaskLink(task);
   // Just made here and not yet numbered by the server: there is no address to open it at.
@@ -188,8 +190,13 @@ export const TaskRow = memo(function TaskRow({
         {task.due_on && <DueChip day={task.due_on} done={closed} className="max-sm:hidden" />}
         {!hide?.assignee && (
           <TaskPropertyPicker kind="assignee" tasks={[task]} align="end">
-            <button type="button" className={iconButton} disabled={readOnly} aria-label={t("prop.assignee")}>
-              <AssigneeAvatar userId={task.assignee_id} />
+            <button
+              type="button"
+              className={iconButton}
+              disabled={readOnly}
+              aria-label={`${t("prop.assignee")}: ${assignee ? assignee.name : t("task.unassigned")}`}
+            >
+              <Avatar member={assignee} size="sm" />
             </button>
           </TaskPropertyPicker>
         )}

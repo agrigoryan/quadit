@@ -40,6 +40,7 @@ test("P, A and S change the focused row", async ({ page, project, quadit }) => {
   await pickWithKey(page, "p", "Urgent");
   await expect(page.getByRole("button", { name: "Priority: Urgent" })).toBeVisible();
   await pickWithKey(page, "a", "Ann");
+  await expect(page.getByRole("button", { name: "Assignee: Ann Owner" })).toBeVisible();
   // Last: grouped by status, the row moves to another group (see the test below).
   await pickWithKey(page, "s", "In Progress");
   await expect(page.getByRole("button", { name: "Status: In Progress" })).toBeVisible();

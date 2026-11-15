@@ -258,6 +258,11 @@ describe("TaskList sub-tasks", () => {
     expect(screen.getByRole("button", { name: "Show the sub-tasks of SVA-10", expanded: false })).toBeTruthy();
   });
 
+  it("names each row's assignee control after who it is", () => {
+    renderList(NESTED);
+    expect(screen.getAllByRole("button", { name: "Assignee: Unassigned" }).length).toBeGreaterThan(0);
+  });
+
   it("lists every task as its own row when flat", () => {
     renderList(NESTED, false);
     expect(screen.queryByRole("listitem")).toBeNull();
