@@ -174,4 +174,15 @@ describe("CreateTaskDialog, several tasks", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Write at least one title");
     expect(api.post).not.toHaveBeenCalled();
   });
+
+  it("replaces a refusal with what is missing when the next try has no title", async () => {
+    open(true);
+    fireEvent.change(titles(), { target: { value: "one" } });
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await act(async () => calls[0]?.fail(new ApiError(400, { message: "title is too long" })));
+    fireEvent.change(titles(), { target: { value: "" } });
+    fireEvent.keyDown(titles(), { key: "Enter", ctrlKey: true });
+    expect(screen.getByRole("alert")).toHaveTextContent("Write at least one title");
+  });
 });

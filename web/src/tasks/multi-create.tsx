@@ -3,21 +3,20 @@
 // are sent as one batch, so either all of them are made or none.
 
 import { useMemo, useState } from "react";
-import { errorMessage } from "@/lib/api";
 import { MOD } from "@/lib/hotkeys";
 import { t } from "@/lib/i18n";
-import { useProjects } from "@/lib/selectors";
 import { toast } from "@/lib/toast";
 import { ui } from "@/lib/ui-state";
-import { ProjectGlyph } from "@/ui/project-glyph";
 import { createTasks } from "@/tasks/actions";
-import { CreateFields, type TaskFields } from "@/tasks/create-fields";
+import { CreateFields } from "@/tasks/create-fields";
 import type { NewTaskDraft } from "@/tasks/draft";
+import { ProjectSelect } from "@/tasks/project-select";
+import { useTaskFields } from "@/tasks/use-task-fields";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
+import { useFieldErrors, useSubmit } from "@/ui/form";
 import { Textarea } from "@/ui/input";
 import { Kbd } from "@/ui/kbd";
-import { Select } from "@/ui/picker";
 
 /** A pasted list often brings its bullets, numbers and check boxes along; a title does not need them. */
 const MARKER = /^\s*(?:[-*+•–]\s+|\d+[.)]\s+)?(?:\[[ xX]?\]\s+)?/;
@@ -37,37 +36,20 @@ interface Props {
 }
 
 export function MultiCreateDialog({ draft, onSingle }: Props) {
-  const projects = useProjects();
-  const [projectId, setProjectId] = useState(draft.projectId ?? projects[0]?.id ?? "");
+  const { projectId, project, fields, change, changeProject } = useTaskFields(draft, { shared: true });
   const [text, setText] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [fields, setFields] = useState<TaskFields>({
-    statusId: draft.statusId ?? "",
-    assigneeId: draft.assigneeId ?? "",
-    priority: 0,
-    labelIds: draft.labelIds ?? [],
-    epicId: draft.epicId ?? "",
-    parentId: "",
-    dueOn: "",
-    templateId: "",
-  });
-  const project = projects.find((p) => p.id === projectId);
+  // The dialog stays open with the list as typed, and says in one line why nothing was made.
+  const errors = useFieldErrors([], { wholeForm: true });
+  const { busy, run } = useSubmit(errors, { once: true });
   const titles = useMemo(() => titlesOf(text), [text]);
-
-  function changeProject(id: string) {
-    setProjectId(id);
-    // Status, labels and epic belong to a project.
-    setFields((f) => ({ ...f, statusId: "", labelIds: [], epicId: "" }));
-  }
+  const error = errors.form || errors.fields.project || errors.fields.titles;
 
   async function submit() {
     if (busy) return;
-    if (!project) return setError(t("create.noProject"));
-    if (titles.length === 0) return setError(t("multi.needTitles"));
-    setError("");
-    setBusy(true);
-    try {
+    errors.clear();
+    if (!project) return errors.set("project", t("create.noProject"));
+    if (titles.length === 0) return errors.set("titles", t("multi.needTitles"));
+    await run(async () => {
       const n = await createTasks(
         {
           projectId: project.id,
@@ -83,11 +65,7 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
       );
       ui.closeNewTask();
       toast.info(t("multi.created", { n, project: project.name }));
-    } catch (err) {
-      // The dialog stays open with the list as typed, and says why nothing was made.
-      setError(errorMessage(err));
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -130,13 +108,7 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
         className="flex flex-col gap-2.5"
       >
         <div className="flex items-center gap-2">
-          <Select
-            label={t("prop.project")}
-            value={projectId}
-            items={projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, hint: p.key }))}
-            onPick={changeProject}
-            buttonProps={{ size: "sm" }}
-          />
+          <ProjectSelect value={projectId} onPick={changeProject} />
           <span className="text-xs text-ink-3">{t("multi.title")}</span>
           <Button variant="ghost" size="sm" className="ml-auto" onClick={onSingle}>
             {t("multi.single")}
@@ -162,13 +134,7 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
           </p>
         )}
         {project && (
-          <CreateFields
-            project={project}
-            value={fields}
-            onChange={(patch) => setFields((f) => ({ ...f, ...patch }))}
-            shared
-            onLeave={ui.closeNewTask}
-          />
+          <CreateFields project={project} value={fields} onChange={change} shared onLeave={ui.closeNewTask} />
         )}
       </form>
     </Dialog>
