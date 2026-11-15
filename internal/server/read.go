@@ -77,10 +77,14 @@ func (s *Server) hChanges(x *c) error {
 			s.audit(x.r, x.ws.ID, x.user, "approval.used", "decision", b.Changes[i].Approval, map[string]string{"change": r.Type})
 		}
 	}
-	if !withEvents {
-		for _, r := range res {
+	for _, r := range res {
+		if !withEvents {
 			r.Events = nil
+			continue
 		}
+		// The sender gets back what its change did, less what was written
+		// for someone else alone (a notice in another member's inbox).
+		r.Events = keep(r.Events, func(ev core.Event) bool { return ev.AudienceID == "" || ev.AudienceID == x.member.UserID })
 	}
 	if !dry && len(res) > 0 {
 		last := res[len(res)-1]
@@ -200,6 +204,7 @@ func (s *Server) hBootstrap(x *c) error {
 		decisions[i].Options = byDecision[decisions[i].ID]
 	}
 	s.withResponsible(ctx, members)
+	x.hideActions(members)
 	out["members"] = members
 	out["projects"] = keep(projects, func(p core.Project) bool { return inScope(p.ID) })
 	out["statuses"] = keep(statuses, func(v core.Status) bool { return inScope(v.ProjectID) })
@@ -260,9 +265,9 @@ func (s *Server) hBootstrap(x *c) error {
 	out["notifications"] = notes
 	out["watchers"] = watchers
 	out["resources"] = resources
-	out["claims"] = claims
+	out["claims"] = keepByTask(x, claims, func(v core.ResourceClaim) string { return v.TaskID })
 	out["docs"] = keep(docs, func(d core.Doc) bool { return engine.CanSeeDoc(d, x.member.UserID) && inScope(d.ProjectID) })
-	out["sessions"] = sessions
+	out["sessions"] = keepByTask(x, sessions, func(v core.AgentSession) string { return v.TaskID })
 	return x.ok(out)
 }
 
@@ -365,11 +370,25 @@ func (s *Server) hMe(x *c) error {
 		if out["read_only"] == true {
 			b.WriteString("read-only\n")
 		}
-		if v, ok := out["budget"]; ok {
-			raw, _ := json.Marshal(v)
-			fmt.Fprintf(&b, "budget: %s\n", raw)
+		if bud, ok := out["budget"].(map[string]any); ok {
+			var parts []string
+			if _, ok := bud["cost_limit"]; ok {
+				parts = append(parts, fmt.Sprintf("cost %v of %v used (%v left)", bud["cost_used"], bud["cost_limit"], bud["cost_left"]))
+			}
+			if _, ok := bud["minutes_limit"]; ok {
+				parts = append(parts, fmt.Sprintf("%v of %v minutes used (%v left)", bud["minutes_used"], bud["minutes_limit"], bud["minutes_left"]))
+			}
+			fmt.Fprintf(&b, "budget this week: %s; resets %v\n", strings.Join(parts, ", "), bud["resets"])
 		}
-		fmt.Fprintf(&b, "unread: %d   seq: %d   cursors: %v\n", unread, ws.Seq, cm)
+		fmt.Fprintf(&b, "unread: %d   seq: %d\n", unread, ws.Seq)
+		if len(cm) > 0 {
+			var names []string
+			for name, seq := range cm {
+				names = append(names, fmt.Sprintf("%s=%d", name, seq))
+			}
+			sort.Strings(names)
+			fmt.Fprintf(&b, "cursors: %s\n", strings.Join(names, " "))
+		}
 		for _, r := range rules {
 			b.WriteString("rule: " + r + "\n")
 		}
@@ -543,10 +562,14 @@ func (s *Server) hTasks(x *c) error {
 		f.Limit = 1000
 	}
 	// cursor= continues a list from where the last page ended: after the
-	// last row it gave, in the list's own order. Whatever changes, closes or
-	// is reordered meanwhile, no row comes twice and none in between is
-	// skipped. The token also holds where the feed stood when the first page
-	// was read: tasks made since are left for the next read.
+	// last row it gave, in the list's own order, so rows that close or are
+	// added meanwhile shift nothing. The token also holds where the feed
+	// stood when the first page was read: tasks made since are left for the
+	// next read. A task whose own place in the order changes during the walk
+	// (its priority is raised while the list is read by priority) could
+	// have moved behind the reader; the last page therefore ends with every
+	// matching task that changed since the walk began. Nothing is missed; a
+	// task that changed may come a second time, with its new values.
 	type cursor struct {
 		K    []any  `json:"k"`
 		S    int64  `json:"s"`
@@ -575,6 +598,25 @@ func (s *Server) hTasks(x *c) error {
 	more := len(tasks) > limit
 	if more {
 		tasks = tasks[:limit]
+	}
+	changedMeanwhile := 0
+	if len(f.After) > 0 && !more && f.MadeUpTo > 0 {
+		again := f
+		again.After, again.Offset, again.Limit, again.UpdatedAfter = nil, 0, 1000, max(f.UpdatedAfter, f.MadeUpTo)
+		moved, err := x.db.Tasks(x.ctx(), again)
+		if err != nil {
+			return err
+		}
+		here := map[string]bool{}
+		for _, t := range tasks {
+			here[t.ID] = true
+		}
+		for _, t := range moved {
+			if !here[t.ID] {
+				tasks = append(tasks, t)
+				changedMeanwhile++
+			}
+		}
 	}
 	next := ""
 	if more {
@@ -606,6 +648,12 @@ func (s *Server) hTasks(x *c) error {
 		if more {
 			out += fmt.Sprintf("… more: add cursor=%s\n", next)
 		}
+		if x.staleView != "" {
+			out = "note: " + x.staleView + "\n" + out
+		}
+		if changedMeanwhile > 0 {
+			out += fmt.Sprintf("… the last %d changed while you were reading; you may have seen them before\n", changedMeanwhile)
+		}
 		return x.text(out)
 	}
 	if len(fields) == 0 {
@@ -613,8 +661,16 @@ func (s *Server) hTasks(x *c) error {
 	}
 	out := map[string]any{"tasks": pick(views, fields)}
 	if more {
-		out["next_offset"] = f.Offset + limit
+		if len(f.After) == 0 {
+			out["next_offset"] = f.Offset + limit
+		}
 		out["next_cursor"] = next
+	}
+	if changedMeanwhile > 0 {
+		out["changed_while_reading"] = changedMeanwhile
+	}
+	if x.staleView != "" {
+		out["note"] = x.staleView
 	}
 	return x.ok(out)
 }

@@ -163,8 +163,8 @@ type TaskFilter struct {
 	MadeUpTo int64
 	// After continues a sorted list past its last row: the values of that
 	// row's sort keys, in order (see TaskSortKeys). A row is returned only
-	// when it sorts after them, so a list read page by page neither repeats
-	// nor skips a row when others change, close or are added meanwhile.
+	// when it sorts after them, so a list read page by page is not shifted
+	// by rows that close or are added meanwhile.
 	After         []any
 	LabelIDs      []string // has every one of these
 	ParentID      string

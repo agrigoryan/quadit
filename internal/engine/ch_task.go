@@ -48,6 +48,9 @@ type taskCreateArgs struct {
 	Rank          string       `json:"rank"`
 	Template      string       `json:"template"`
 	Budget        *core.Budget `json:"budget"`
+	// Number gives the task this number instead of the next one, so an
+	// import keeps SVA-12 as SVA-12. For admins; the number must be free.
+	Number int `json:"number"`
 }
 
 func taskCreate(c *cx) error {
@@ -151,9 +154,48 @@ func taskCreate(c *cx) error {
 		}
 		t.CycleID = cy.ID
 	}
-	n, err := c.tx.Incr(c.ctx, "projects", "task_counter", 1, store.Eq("id", p.ID))
-	if err != nil {
-		return err
+	var n int64
+	if a.Number != 0 {
+		if a.Number < 0 {
+			return invalid("number", "a task's number is 1 or more")
+		}
+		if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
+			return forbidden("choosing a task's number is for imports and needs the admin role; leave number out and the task gets the next one")
+		}
+		key := p.Key + "-" + itoa(a.Number)
+		taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", p.ID), store.Eq("number", a.Number))
+		if err != nil {
+			return err
+		}
+		was, err := c.tx.Count(c.ctx, "task_keys", store.Eq("key", key))
+		if err != nil {
+			return err
+		}
+		if taken+was > 0 {
+			return conflictErr("%s is taken; leave number out and the task gets the next one", key)
+		}
+		// The project's own count moves past it, so the next task made the
+		// usual way does not land on it.
+		if over := a.Number - p.TaskCounter; over > 0 {
+			if _, err := c.tx.Incr(c.ctx, "projects", "task_counter", int64(over), store.Eq("id", p.ID)); err != nil {
+				return err
+			}
+		}
+		n = int64(a.Number)
+	} else {
+		// The next number, past any a task was given by hand.
+		for {
+			if n, err = c.tx.Incr(c.ctx, "projects", "task_counter", 1, store.Eq("id", p.ID)); err != nil {
+				return err
+			}
+			taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", p.ID), store.Eq("number", int(n)))
+			if err != nil {
+				return err
+			}
+			if taken == 0 {
+				break
+			}
+		}
 	}
 	t.Number = int(n)
 	t.Key = p.Key + "-" + itoa(t.Number)
@@ -645,6 +687,16 @@ func (c *cx) checkParent(t core.Task, parentID string) error {
 // change, and says so in the feed.
 // setWaitingOutside makes a task wait on an outside event, as part of
 // another change.
+// saveOther saves a task changed as a side effect of a change to something
+// else (its label was deleted, its epic removed): the change's answer still
+// names what was asked for, not the last task it touched.
+func (c *cx) saveOther(t core.Task, p *patch, extra map[string]any) error {
+	ref, key := c.ref, c.key
+	err := c.saveTask(t, p, extra)
+	c.ref, c.key = ref, key
+	return err
+}
+
 func (c *cx) setWaitingOutside(t core.Task, note string) error {
 	p := newPatch()
 	p.put("waiting_on_id", t.WaitingOnID, "")
@@ -854,6 +906,9 @@ func taskMove(c *cx) error {
 		return err
 	}
 	oldKey, oldProject := t.Key, t.ProjectID
+	if err := c.tx.Upsert(c.ctx, core.TaskKey{WorkspaceID: c.ws, Key: oldKey, TaskID: t.ID, At: c.at}, "workspace_id", "key"); err != nil {
+		return err
+	}
 	p := newPatch()
 	p.put("project_id", t.ProjectID, to.ID)
 	p.put("number", t.Number, int(n))

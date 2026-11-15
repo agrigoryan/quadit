@@ -214,16 +214,16 @@ func TestImports(t *testing.T) {
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "lb1", "name": "art"}}})
 			case p == "/tasks":
 				json.NewEncoder(rw).Encode(M{"items": []M{
-					{"id": "t2", "identifier": "SVA-2", "project_id": "p1", "status_id": "s2", "title": "Second", "priority": "none", "parent_task_id": "t1"},
-					{"id": "t1", "identifier": "SVA-1", "project_id": "p1", "status_id": "s1", "title": "First", "description": "From Orbit", "priority": "urgent", "label_ids": []string{"lb1"}, "url": "https://orbit.example/tasks/t1", "milestone_id": "m1"},
+					{"id": "t2", "identifier": "SVA-2", "number": 2, "project_id": "p1", "status_id": "s2", "title": "Second", "priority": "none", "parent_task_id": "t9"},
+					{"id": "t9", "identifier": "SVA-9", "number": 9, "project_id": "p1", "status_id": "s1", "title": "First", "description": "From Orbit", "priority": "urgent", "label_ids": []string{"lb1"}, "url": "https://orbit.example/tasks/t1", "milestone_id": "m1"},
 				}, "next_cursor": nil})
 			case p == "/projects/p1/milestones":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "m1", "name": "Vertical slice"}}})
-			case p == "/tasks/SVA-1/relations":
+			case p == "/tasks/SVA-9/relations":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"type": "blocks", "direction": "outgoing", "task": M{"id": "t2"}}}})
 			case p == "/tasks/SVA-2/relations":
-				json.NewEncoder(rw).Encode(M{"items": []M{{"type": "blocks", "direction": "incoming", "task": M{"id": "t1"}}}})
-			case p == "/tasks/SVA-1/comments":
+				json.NewEncoder(rw).Encode(M{"items": []M{{"type": "blocks", "direction": "incoming", "task": M{"id": "t9"}}}})
+			case p == "/tasks/SVA-9/comments":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"body": "Owner comment", "author_id": "u1", "created_at": "2026-11-01T00:00:00Z"}}})
 			case p == "/docs":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "d1", "title": "Game design"}}})
@@ -238,11 +238,11 @@ func TestImports(t *testing.T) {
 			t.Fatalf("orbit: %+v", sum)
 		}
 		got = tasks("project=SVA")
-		if !strings.Contains(got, "SVA-1  [In Review]  !urgent  First  #art") || !strings.Contains(got, "SVA-2  [Done]  Second  in SVA-1") {
-			t.Fatalf("orbit tasks (numbers should follow the order they were made in):\n%s", got)
+		if !strings.Contains(got, "SVA-9  [In Review]  !urgent  First  #art") || !strings.Contains(got, "SVA-2  [Done]  Second  in SVA-9") {
+			t.Fatalf("orbit tasks (each keeps the number it had there):\n%s", got)
 		}
 		// Its milestone came along as an epic, and what it blocks as a relation.
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "Vertical slice") || !strings.Contains(out, "blocks SVA-2") {
+		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-9?format=text", nil, 200, nil); !strings.Contains(out, "Vertical slice") || !strings.Contains(out, "blocks SVA-2") {
 			t.Fatalf("an Orbit task's epic and relations:\n%s", out)
 		}
 	})

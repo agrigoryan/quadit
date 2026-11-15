@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -176,21 +177,19 @@ func listOf[T any](order string, conds ...store.Cond) func(x *c) (any, error) {
 			} else if t == reflect.TypeFor[core.Project]() {
 				rows = keep(rows, func(r T) bool { return x.canProject(reflect.ValueOf(r).FieldByName("ID").String()) })
 			} else if f, ok := t.FieldByName("TaskID"); ok {
+				rows = keepByTask(x, rows, func(r T) string { return reflect.ValueOf(r).FieldByIndex(f.Index).String() })
+			} else if f, ok := t.FieldByName("EpicID"); ok {
 				projectOf := map[string]string{}
 				rows = keep(rows, func(r T) bool {
-					tid := reflect.ValueOf(r).FieldByIndex(f.Index).String()
-					if tid == "" {
-						return true
-					}
-					pid, seen := projectOf[tid]
+					eid := reflect.ValueOf(r).FieldByIndex(f.Index).String()
+					pid, seen := projectOf[eid]
 					if !seen {
-						var tk core.Task
-						if err := x.db.Get(x.ctx(), &tk, store.Eq("id", tid)); err != nil {
-							pid = "none"
-						} else {
-							pid = tk.ProjectID
+						var e core.Epic
+						pid = "none"
+						if x.db.Get(x.ctx(), &e, store.Eq("id", eid)) == nil {
+							pid = e.ProjectID
 						}
-						projectOf[tid] = pid
+						projectOf[eid] = pid
 					}
 					return x.canProject(pid)
 				})
@@ -203,6 +202,56 @@ func listOf[T any](order string, conds ...store.Cond) func(x *c) (any, error) {
 	}
 }
 
+// keepByTask keeps, for a caller limited to some projects, the rows that
+// hang on a task of those projects, and the rows on no task.
+func keepByTask[T any](x *c, rows []T, taskOf func(T) string) []T {
+	if x.projects == nil {
+		return rows
+	}
+	projectOf := map[string]string{}
+	return keep(rows, func(r T) bool {
+		tid := taskOf(r)
+		if tid == "" {
+			return true
+		}
+		pid, seen := projectOf[tid]
+		if !seen {
+			var tk core.Task
+			pid = "none"
+			if x.db.Get(x.ctx(), &tk, store.Eq("id", tid)) == nil {
+				pid = tk.ProjectID
+			}
+			projectOf[tid] = pid
+		}
+		return x.canProject(pid)
+	})
+}
+
+// taskKeyIn finds a task key ("SVA-12") in a line of text.
+var taskKeyIn = regexp.MustCompile(`\b([A-Z][A-Z0-9]{1,9})-\d+\b`)
+
+// hideActions blanks, for a caller limited to some projects, what a member
+// last did when it names a task of another project.
+func (x *c) hideActions(members []core.Member) {
+	if x.projects == nil {
+		return
+	}
+	var projects []core.Project
+	_ = x.db.List(x.ctx(), &projects, store.Q{})
+	mine := map[string]bool{}
+	for _, p := range projects {
+		mine[p.Key] = x.canProject(p.ID)
+	}
+	for i := range members {
+		for _, m := range taskKeyIn.FindAllStringSubmatch(members[i].LastAction, -1) {
+			if !mine[m[1]] {
+				members[i].LastAction = ""
+				break
+			}
+		}
+	}
+}
+
 var collections = map[string]collection{
 	"members": {load: func(x *c) (any, error) {
 		rows, err := listOf[core.Member]("handle")(x)
@@ -211,6 +260,7 @@ var collections = map[string]collection{
 		}
 		ms := rows.([]core.Member)
 		x.s.withResponsible(x.ctx(), ms)
+		x.hideActions(ms)
 		if x.member.Role.AtLeast(core.RoleAdmin) {
 			// Admins see people's addresses: they invite and import by them.
 			var ids []string
@@ -350,7 +400,7 @@ func (s *Server) hList(x *c) error {
 				continue
 			}
 			var words []string
-			for _, k := range []string{"key", "handle", "slug", "name", "title", "text", "kind", "type", "state", "category", "role", "url", "starts_on", "ends_on", "ref"} {
+			for _, k := range []string{"key", "handle", "slug", "name", "title", "text", "body", "kind", "type", "state", "category", "role", "url", "starts_on", "ends_on", "ref"} {
 				if v, ok := r[k].(string); ok && v != "" {
 					if k == "handle" {
 						v = "@" + v

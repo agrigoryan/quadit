@@ -69,6 +69,7 @@ func (x *c) agentStates(tasks []core.Task, nm *names) ([]agentState, error) {
 		Order: "-started_at"}); err != nil {
 		return nil, err
 	}
+	sessions = keepByTask(x, sessions, func(v core.AgentSession) string { return v.TaskID })
 	var hooks []core.Webhook
 	if err := x.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
 		return nil, err
@@ -92,10 +93,12 @@ func (x *c) agentStates(tasks []core.Task, nm *names) ([]agentState, error) {
 	}
 	var out []agentState
 	for _, m := range nm.members {
-		if m.Kind != core.KindAgent || m.RemovedAt != 0 {
-			continue
+		if m.Kind != core.KindAgent || m.RemovedAt != 0 || m.SuspendedAt != 0 {
+			continue // a suspended agent is not idle: it is not there
 		}
-		a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: when(m.LastSeenAt), LastDid: m.LastAction,
+		shown := []core.Member{m}
+		x.hideActions(shown)
+		a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: when(m.LastSeenAt), LastDid: shown[0].LastAction,
 			Listening: m.ListeningUntil > now.UnixMilli() || pushed[m.UserID]}
 		var waitsOnOthers, mine int
 		for _, t := range tasks {

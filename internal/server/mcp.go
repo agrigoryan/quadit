@@ -458,6 +458,13 @@ func toolSchema(t mcpTool) map[string]any {
 func (s *Server) hMCP(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 	if token == "" {
+		// Calls with no token are counted by where they come from, like
+		// wrong ones: a client asks once to learn where to sign in, not
+		// hundreds of times.
+		if err := s.limits.check("anon:"+clientIP(r), 120); err != nil {
+			s.fail(w, r, err)
+			return
+		}
 		// Tell an MCP client where to sign its user in.
 		w.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+s.cfg.BaseURL+`/.well-known/oauth-protected-resource"`)
 		http.Error(w, "sign in, or send a token", http.StatusUnauthorized)

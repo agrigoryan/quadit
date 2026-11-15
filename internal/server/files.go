@@ -416,6 +416,9 @@ func (s *Server) hFileMeta(x *c) error {
 	if err := x.db.Get(x.ctx(), &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return errNotFound("file")
 	}
+	if !s.maySeeFile(x, f) {
+		return errNotFound("file")
+	}
 	return x.ok(s.fileOut(x, f))
 }
 

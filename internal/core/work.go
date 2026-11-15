@@ -634,6 +634,14 @@ type Secret struct {
 }
 
 // Presence is one member with a page open, and the block they are in.
+// TaskKey is a key a task had before it moved to another project.
+type TaskKey struct {
+	WorkspaceID string `json:"-" db:"workspace_id"`
+	Key         string `json:"key" db:"key"`
+	TaskID      string `json:"task_id" db:"task_id"`
+	At          int64  `json:"at" db:"at"`
+}
+
 type Presence struct {
 	WorkspaceID string `json:"-" db:"workspace_id"`
 	DocID       string `json:"-" db:"doc_id"`

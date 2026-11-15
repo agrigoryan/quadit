@@ -243,6 +243,7 @@ func Serve(args []string, version string) int {
 	case <-ctx.Done():
 	}
 	log.Info("shutting down")
+	srv.Stop()
 	shut, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	hs.Shutdown(shut)

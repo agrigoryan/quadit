@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -203,7 +204,7 @@ func epicDelete(c *cx) error {
 		tp := newPatch()
 		tp.put("epic_id", t.EpicID, "")
 		tp.put("milestone_id", t.MilestoneID, "")
-		if err := c.saveTask(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, nil); err != nil {
 			return err
 		}
 	}
@@ -314,7 +315,7 @@ func milestoneDelete(c *cx) error {
 	for _, t := range tasks {
 		tp := newPatch()
 		tp.put("milestone_id", t.MilestoneID, "")
-		if err := c.saveTask(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, nil); err != nil {
 			return err
 		}
 	}
@@ -434,7 +435,7 @@ func cycleDelete(c *cx) error {
 	for _, t := range tasks {
 		tp := newPatch()
 		tp.put("cycle_id", t.CycleID, "")
-		if err := c.saveTask(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, nil); err != nil {
 			return err
 		}
 	}
@@ -517,7 +518,7 @@ func (c *cx) rollProject(p core.Project, today string) error {
 		for _, t := range open {
 			tp := newPatch()
 			tp.put("cycle_id", t.CycleID, next)
-			if err := c.saveTask(t, tp, map[string]any{"rolled_over": true}); err != nil {
+			if err := c.saveOther(t, tp, map[string]any{"rolled_over": true}); err != nil {
 				return err
 			}
 		}
@@ -598,6 +599,9 @@ func viewCreate(c *cx) error {
 	if len(a.Query) > 0 {
 		if err := CheckViewQuery(a.Query); err != nil {
 			return invalid("query", "%v", err)
+		}
+		if err := c.checkViewValues(a.Query); err != nil {
+			return err
 		}
 	}
 	scopeType, scopeID := "workspace", c.ws
@@ -708,6 +712,9 @@ func viewUpdate(c *cx) error {
 	if a.Query.Set && len(a.Query.V) > 0 {
 		if err := CheckViewQuery(a.Query.V); err != nil {
 			return invalid("query", "%v", err)
+		}
+		if err := c.checkViewValues(a.Query.V); err != nil {
+			return err
 		}
 	}
 	if err := raw("query", a.Query, v.Query); err != nil {
@@ -904,6 +911,69 @@ func (c *cx) applyTemplate(p core.Project, a *taskCreateArgs) (*decisionOpenArgs
 		a.Estimate = ps.Estimate
 	}
 	return ps.Decision, nil
+}
+
+// checkViewValues refuses a filter that names a status or a label the
+// workspace does not have, or an ordering there is none of: such a view
+// would save and then fail every time it is opened.
+func (c *cx) checkViewValues(raw json.RawMessage) error {
+	var q struct {
+		Status []string `json:"status"`
+		Label  []string `json:"label"`
+		Sort   string   `json:"sort"`
+	}
+	if json.Unmarshal(raw, &q) != nil {
+		return nil // CheckViewQuery has said so already
+	}
+	if _, ok := store.TaskSortKeys[q.Sort]; !ok {
+		var sorts []string
+		for k := range store.TaskSortKeys {
+			if k != "" {
+				sorts = append(sorts, k)
+			}
+		}
+		sort.Strings(sorts)
+		return oneOf("query.sort", "sort", q.Sort, sorts)
+	}
+	if len(q.Status) > 0 {
+		var all []core.Status
+		if err := c.tx.List(c.ctx, &all, store.Where(store.Live)); err != nil {
+			return err
+		}
+		for _, ref := range q.Status {
+			names, found := []string{}, core.ValidCategory(strings.ToLower(ref))
+			for _, s := range all {
+				found = found || s.ID == ref || strings.EqualFold(s.Name, ref)
+				if !contains(names, s.Name) {
+					names = append(names, s.Name)
+				}
+			}
+			if !found {
+				sort.Strings(names)
+				return oneOf("query.status", "status", ref, append(names, core.Categories...))
+			}
+		}
+	}
+	if len(q.Label) > 0 {
+		var all []core.Label
+		if err := c.tx.List(c.ctx, &all, store.Where(store.Live)); err != nil {
+			return err
+		}
+		for _, ref := range q.Label {
+			names, found := []string{}, false
+			for _, l := range all {
+				found = found || l.ID == ref || strings.EqualFold(l.Name, ref)
+				if !contains(names, l.Name) {
+					names = append(names, l.Name)
+				}
+			}
+			if !found {
+				sort.Strings(names)
+				return oneOf("query.label", "label", ref, names)
+			}
+		}
+	}
+	return nil
 }
 
 // CheckViewQuery says whether a saved view's filter can be read. The server

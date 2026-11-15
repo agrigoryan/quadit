@@ -215,6 +215,7 @@ func TestSmallGuards(t *testing.T) {
 		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "view.create", "args": M{"name": "Art", "query": M{"label": "art"}}}, 400, nil); !strings.Contains(out, "lists") {
 			t.Fatalf("a view with a broken filter: %s", out)
 		}
+		s.change(s.owner, "", "label.create", M{"project": "SVA", "name": "art"})
 		s.change(s.owner, "", "view.create", M{"name": "Art", "query": M{"label": []string{"art"}}})
 		// Turning passwords off with no other way in is refused.
 		if out := s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.password", false, 409, nil); !strings.Contains(out, "no way to sign in") {

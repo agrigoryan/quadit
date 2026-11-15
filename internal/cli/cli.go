@@ -137,7 +137,13 @@ func value(key, v string) any {
 		}
 		return strings.Split(v, ",")
 	case boolKeys[key]:
-		return v == "true" || v == "1" || v == "yes"
+		switch strings.ToLower(v) {
+		case "true", "1", "yes", "on":
+			return true
+		case "false", "0", "no", "off":
+			return false
+		}
+		return v // neither: the server says what the field takes
 	}
 	if intKeys[key] {
 		if n, err := strconv.Atoi(v); err == nil {
@@ -641,7 +647,14 @@ func (r *runner) run(cmd string, rest []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(r.out, "read %d tasks, %d pages, %d databases from %s\n", len(plan.Tasks), len(plan.Docs), len(plan.Tables), pos[0])
+		if r.json && r.dry {
+			raw, _ := json.Marshal(map[string]any{"dry_run": true, "read": map[string]int{"tasks": len(plan.Tasks), "pages": len(plan.Docs), "databases": len(plan.Tables)}})
+			fmt.Fprintln(r.out, string(raw))
+			return nil
+		}
+		if !r.json {
+			fmt.Fprintf(r.out, "read %d tasks, %d pages, %d databases from %s\n", len(plan.Tasks), len(plan.Docs), len(plan.Tables), pos[0])
+		}
 		if r.dry {
 			return nil
 		}
@@ -909,7 +922,13 @@ func (s clientSink) Upload(path string) (string, error) {
 	return u, err
 }
 
-func (s clientSink) Logf(format string, a ...any) { fmt.Fprintf(s.r.out, format+"\n", a...) }
+func (s clientSink) Logf(format string, a ...any) {
+	if s.r.json {
+		fmt.Fprintf(os.Stderr, format+"\n", a...) // --json keeps standard output to the one JSON answer
+		return
+	}
+	fmt.Fprintf(s.r.out, format+"\n", a...)
+}
 
 // secretEnv asks the server for the secrets a companion may put in a
 // command's environment.

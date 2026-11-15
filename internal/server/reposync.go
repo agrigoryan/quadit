@@ -144,11 +144,9 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		if err := os.MkdirAll(filepath.Dir(dir), 0o750); err != nil {
 			return res, err
 		}
-		args := []string{"clone", "--quiet"}
-		if src.Branch != "" {
-			args = append(args, "--branch", src.Branch)
-		}
-		if _, err := git(ctx, "", append(args, src.Repo, dir)...); err != nil {
+		// The branch is fetched below: naming it here would fail on a
+		// repository that does not have it yet.
+		if _, err := git(ctx, "", "clone", "--quiet", "--no-checkout", src.Repo, dir); err != nil {
 			return res, err
 		}
 	}
@@ -175,6 +173,10 @@ func (s *Server) syncSource(ctx context.Context, src core.DocSource) (res syncRe
 		}
 	}
 	if _, err := git(ctx, dir, "fetch", "--quiet", "origin", branch); err != nil {
+		if strings.Contains(err.Error(), "couldn't find remote ref") {
+			res.Note = "the repository has no branch " + branch + " yet; pages will sync once it has"
+			return res, nil
+		}
 		return res, err
 	}
 	if _, err := git(ctx, dir, "reset", "--quiet", "--hard", "origin/"+branch); err != nil {

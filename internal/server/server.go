@@ -57,16 +57,38 @@ type Server struct {
 	setMu  sync.Mutex
 	setTTL map[string]cachedSetting
 	limits *limiter
-	stats  stats
+	// quit is closed when the server is told to stop: held connections
+	// (live streams, waits for the next event) end then, at once.
+	quit     chan struct{}
+	quitOnce sync.Once
+	stats    stats
 }
 
 // New wires a server. Call Handler to serve it and Run for background work.
+// Stop ends the connections the server holds open for its callers, so a
+// shutdown does not wait out their timeouts. Requests in progress finish.
+func (s *Server) Stop() { s.quitOnce.Do(func() { close(s.quit) }) }
+
+// held returns a context for a connection that is kept open: it ends with
+// the request, and when the server stops.
+func (s *Server) held(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+	go func() {
+		select {
+		case <-s.quit:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
+
 func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Server {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
 	s := &Server{cfg: cfg, st: st, eng: engine.New(st), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
-		seen: map[string]int64{}, limits: newLimiter()}
+		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{})}
 	s.eng.OnCommit = s.hub.Notify
 	engine.Seal = sealer.Seal
 	s.routes()
@@ -148,15 +170,18 @@ var statusOf = map[string]int{
 // c is one request with who is asking.
 type c struct {
 	narrowed bool // fields= and since= were applied by the handler
-	s        *Server
-	w        http.ResponseWriter
-	r        *http.Request
-	user     core.User
-	sess     *core.Session
-	token    *core.APIToken
-	ws       core.Workspace
-	member   core.Member
-	actor    engine.Actor
+	// staleView says what a saved view filters by that is gone, when the
+	// list was read without that part.
+	staleView string
+	s         *Server
+	w         http.ResponseWriter
+	r         *http.Request
+	user      core.User
+	sess      *core.Session
+	token     *core.APIToken
+	ws        core.Workspace
+	member    core.Member
+	actor     engine.Actor
 	// projects, when not nil, are the only projects this caller may read.
 	projects []string
 	db       store.DB // bound to the workspace
@@ -272,7 +297,7 @@ func (x *c) body(v any) error {
 	dec := json.NewDecoder(http.MaxBytesReader(x.w, x.r.Body, 16<<20))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		return errBad("request body: %v", err)
+		return errBad("request body: %s", engine.PlainJSON(err))
 	}
 	return nil
 }

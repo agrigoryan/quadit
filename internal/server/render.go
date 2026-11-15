@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -573,6 +574,42 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 		}
 		if s != "" {
 			return oneLine(s, 80)
+		}
+		switch t := v.(type) {
+		case map[string]any:
+			// A budget or a set of limits: its parts in words, not as Go prints a map.
+			if len(t) == 0 {
+				return ""
+			}
+			var parts []string
+			for k, val := range t {
+				switch k {
+				case "cost_micros":
+					if n, ok := val.(float64); ok {
+						parts = append(parts, "cost "+money(int64(n)))
+						continue
+					}
+				case "projects":
+					if ids, ok := val.([]any); ok {
+						var keys []string
+						for _, id := range ids {
+							pid, _ := id.(string)
+							keys = append(keys, orText(nm.projects[pid].Key, pid))
+						}
+						parts = append(parts, "projects "+strings.Join(keys, ","))
+						continue
+					}
+				}
+				raw, _ := json.Marshal(val)
+				parts = append(parts, strings.ReplaceAll(k, "_", " ")+" "+strings.Trim(string(raw), `"`))
+			}
+			sort.Strings(parts)
+			return oneLine(strings.Join(parts, "; "), 120)
+		case []any:
+			raw, _ := json.Marshal(t)
+			return oneLine(string(raw), 80)
+		case float64:
+			return strconv.FormatFloat(t, 'f', -1, 64)
 		}
 		return fmt.Sprint(v)
 	}

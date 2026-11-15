@@ -299,7 +299,7 @@ func memberAdd(c *cx) error {
 			return err
 		}
 	}
-	scope, err := c.scopeArg(a.Scope)
+	scope, err := c.scopeArg(a.Scope, nil)
 	if err != nil {
 		return err
 	}
@@ -394,14 +394,11 @@ func memberUpdate(c *cx) error {
 		}
 		var sc *core.Scope
 		if !a.Scope.Null {
-			if sc, err = c.scopeArg(&a.Scope.V); err != nil {
+			if sc, err = c.scopeArg(&a.Scope.V, m.Scope); err != nil {
 				return err
 			}
-			if len(sc.NeedsApproval) > 0 {
+			if sc != nil && len(sc.NeedsApproval) > 0 {
 				return invalid("scope.needs_approval", "approvals are for agents; a person's scope is projects and read-only")
-			}
-			if len(sc.Projects) == 0 && !sc.ReadOnly {
-				sc = nil
 			}
 		}
 		sc = c.capScope(sc)
@@ -483,24 +480,41 @@ func memberRemove(c *cx) error {
 	for _, t := range open {
 		tp := newPatch()
 		tp.put("assignee_id", t.AssigneeID, "")
-		if err := c.saveTask(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// scopeArgs sets limits. In an update, a part that is left out stays as it
+// was: narrowing the projects does not lift read-only, and the other way
+// round. An empty list clears that part; "scope": null lifts all of it.
 type scopeArgs struct {
 	Projects      []string `json:"projects"` // keys or ids; empty = all
-	ReadOnly      bool     `json:"read_only"`
+	ReadOnly      *bool    `json:"read_only"`
 	NeedsApproval []string `json:"needs_approval"`
 }
 
-func (c *cx) scopeArg(a *scopeArgs) (*core.Scope, error) {
+// scopeArg reads limits, on top of the ones there already (nil for a new
+// member).
+func (c *cx) scopeArg(a *scopeArgs, base *core.Scope) (*core.Scope, error) {
 	if a == nil {
 		return nil, nil
 	}
-	s := &core.Scope{ReadOnly: a.ReadOnly}
+	s := &core.Scope{}
+	if base != nil {
+		s.ReadOnly = base.ReadOnly
+		if a.Projects == nil {
+			s.Projects = append([]string(nil), base.Projects...)
+		}
+		if a.NeedsApproval == nil {
+			s.NeedsApproval = append([]string(nil), base.NeedsApproval...)
+		}
+	}
+	if a.ReadOnly != nil {
+		s.ReadOnly = *a.ReadOnly
+	}
 	for _, ref := range a.Projects {
 		p, err := c.project(ref)
 		if err != nil {
@@ -570,6 +584,14 @@ func agentCreate(c *cx) error {
 		if role != core.RoleMember {
 			return invalid("role", "a sub-agent made for a task is a member")
 		}
+		// Help does not nest: a helper was made for one task and does not
+		// hand it, or another, further down.
+		if !c.system && c.actor.Kind == core.KindAgent {
+			var me core.Member
+			if err := c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)); err == nil && me.DelegatedTask != "" {
+				return forbidden("a helper made for a task cannot make helpers of its own; ask the agent that made you")
+			}
+		}
 		if n, err := c.tx.Count(c.ctx, "members", store.Eq("delegated_task", forTask.ID), store.Null("suspended_at"), store.Null("removed_at")); err != nil {
 			return err
 		} else if n >= maxHelpers {
@@ -599,7 +621,7 @@ func agentCreate(c *cx) error {
 	if rm.Kind != core.KindPerson {
 		return invalid("responsible", "the one responsible for an agent must be a person, not another agent")
 	}
-	scope, err := c.scopeArg(a.Scope)
+	scope, err := c.scopeArg(a.Scope, nil)
 	if err != nil {
 		return err
 	}
@@ -748,17 +770,8 @@ func agentUpdate(c *cx) error {
 	if a.Scope.Set {
 		var sc *core.Scope
 		if !a.Scope.Null {
-			if sc, err = c.scopeArg(&a.Scope.V); err != nil {
+			if sc, err = c.scopeArg(&a.Scope.V, m.Scope); err != nil {
 				return err
-			}
-			// What needs approval stays as it was unless the list is given
-			// (an empty list lifts it): narrowing projects must not quietly
-			// let an agent do more.
-			if a.Scope.V.NeedsApproval == nil && m.Scope != nil && len(m.Scope.NeedsApproval) > 0 {
-				if sc == nil {
-					sc = &core.Scope{}
-				}
-				sc.NeedsApproval = append([]string(nil), m.Scope.NeedsApproval...)
 			}
 		}
 		sc = c.capScope(sc)
@@ -1142,7 +1155,7 @@ func statusDelete(c *cx) error {
 		for _, t := range tasks {
 			tp := newPatch()
 			c.setStatus(tp, &t, to)
-			if err := c.saveTask(t, tp, nil); err != nil {
+			if err := c.saveOther(t, tp, nil); err != nil {
 				return err
 			}
 		}
@@ -1248,7 +1261,7 @@ func labelDelete(c *cx) error {
 		if err := c.setLabels(tp, &t, without(t.LabelIDs, l.ID)); err != nil {
 			return err
 		}
-		if err := c.saveTask(t, tp, nil); err != nil {
+		if err := c.saveOther(t, tp, nil); err != nil {
 			return err
 		}
 	}

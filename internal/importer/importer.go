@@ -20,6 +20,9 @@ import (
 
 // Task is one task as it comes from another tool.
 type Task struct {
+	// Number is the task's number where it lived; it keeps it here when
+	// that number is free.
+	Number      int
 	Ext         string // its id there
 	Project     string // key of the project it goes in; empty = the one asked for
 	Title       string
@@ -328,7 +331,17 @@ func Apply(sink Sink, plan Plan, project string) (Summary, error) {
 		if t.Estimate > 0 {
 			args["estimate"] = t.Estimate
 		}
-		if err := change("task.create", args); err != nil {
+		if t.Number > 0 {
+			args["number"] = t.Number
+		}
+		err := change("task.create", args)
+		if err != nil && t.Number > 0 && strings.Contains(err.Error(), "is taken") {
+			// Someone here has that number already: it gets the next one,
+			// and its description says what it was called.
+			delete(args, "number")
+			err = change("task.create", args)
+		}
+		if err != nil {
 			return fmt.Errorf("task %q: %w", t.Title, err)
 		}
 		if fresh {

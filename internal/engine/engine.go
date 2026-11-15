@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"sort"
 	"strconv"
@@ -239,7 +240,11 @@ func (c *cx) args(v any) error {
 				field = field[i+1:]
 			}
 			field = strings.TrimSuffix(strings.TrimSuffix(field, ".V"), ".Value")
-			return &Error{Code: CodeInvalid, Field: field, Message: fmt.Sprintf("%s: %s takes %s, and was given %s", c.change.Type, field, jsonKind(te.Type), jsonGiven(te.Value)),
+			if field == "" || field == "V" || field == "Value" {
+				return &Error{Code: CodeInvalid, Field: "args", Message: fmt.Sprintf("%s: its arguments are %s, and %s was given", c.change.Type, jsonKind(te.Type), jsonGiven(te.Value)),
+					Allowed: jsonFields(v)}
+			}
+			return &Error{Code: CodeInvalid, Field: field, Message: fmt.Sprintf("%s: %s takes %s, and was given %s", c.change.Type, field, jsonTakes(te), jsonGiven(te.Value)),
 				Allowed: jsonFields(v)}
 		}
 		return invalid("args", "%s: %v", c.change.Type, err)
@@ -267,7 +272,46 @@ func jsonKind(t reflect.Type) string {
 	return "another kind of value"
 }
 
+// jsonTakes is jsonKind, exact about whole numbers when a fraction was sent.
+func jsonTakes(te *json.UnmarshalTypeError) string {
+	t := te.Type
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if k := t.Kind(); k >= reflect.Int && k <= reflect.Uint64 && strings.HasPrefix(te.Value, "number") {
+		return "a whole number"
+	}
+	return jsonKind(te.Type)
+}
+
+// PlainJSON says what was wrong with a JSON body in a caller's words, with
+// none of the decoder's own vocabulary.
+func PlainJSON(err error) string {
+	var te *json.UnmarshalTypeError
+	if errors.As(err, &te) {
+		field := te.Field
+		if i := strings.LastIndex(field, "."); i >= 0 && !strings.Contains(field, "[") {
+			field = field[i+1:]
+		}
+		if field == "" {
+			return fmt.Sprintf("it takes %s, and was given %s", jsonTakes(te), jsonGiven(te.Value))
+		}
+		return fmt.Sprintf("%s takes %s, and was given %s", field, jsonTakes(te), jsonGiven(te.Value))
+	}
+	msg := strings.TrimPrefix(err.Error(), "json: ")
+	if name, ok := strings.CutPrefix(msg, "unknown field "); ok {
+		return "there is no field " + name
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return "the JSON is empty or cut short"
+	}
+	return "this is not JSON that can be read: " + msg
+}
+
 func jsonGiven(v string) string {
+	if n, ok := strings.CutPrefix(v, "number "); ok {
+		return n
+	}
 	switch v {
 	case "string":
 		return "text"

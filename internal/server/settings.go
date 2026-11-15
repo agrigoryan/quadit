@@ -148,6 +148,9 @@ func (s *Server) saveSetting(ctx context.Context, name string, value json.RawMes
 		// null takes the setting back to its default.
 		_, err := s.st.Delete(ctx, "settings", store.Eq("name", name))
 		s.forgetSetting(name)
+		if name == "limits.api_per_minute" {
+			s.applyLimits(ctx)
+		}
 		return err
 	}
 	if err := checkSettingShape(name, value); err != nil {
@@ -300,7 +303,13 @@ func checkSettingShape(name string, value json.RawMessage) error {
 	dec := json.NewDecoder(bytes.NewReader(value))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(mk()); err != nil {
-		return &engine.Error{Code: engine.CodeInvalid, Field: name, Message: fmt.Sprintf("this is not what the setting %s holds: %s", name, strings.TrimPrefix(err.Error(), "json: "))}
+		return &engine.Error{Code: engine.CodeInvalid, Field: name, Message: fmt.Sprintf("this is not what the setting %s holds: %s", name, engine.PlainJSON(err))}
+	}
+	if name == "limits.api_per_minute" {
+		var n int
+		if json.Unmarshal(value, &n) == nil && n < 10 {
+			return &engine.Error{Code: engine.CodeInvalid, Field: name, Message: "the least is 10 requests a minute; null takes it back to the default of 1200"}
+		}
 	}
 	return nil
 }

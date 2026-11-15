@@ -94,6 +94,13 @@ func (c *Resolver) anyTask(field, ref string) (core.Task, error) {
 		return t, invalid(field, "%q is not a task: use its key (SVA-12) or id", ref)
 	}
 	err := c.db.Get(c.ctx, &t, cond)
+	if errors.Is(err, store.ErrNotFound) && !isID(ref) {
+		// The key it had before it moved to another project still finds it.
+		var was core.TaskKey
+		if c.db.Get(c.ctx, &was, store.Eq("key", strings.ToUpper(ref))) == nil {
+			err = c.db.Get(c.ctx, &t, store.Eq("id", was.TaskID))
+		}
+	}
 	if errors.Is(err, store.ErrNotFound) {
 		e := notFound("task", ref)
 		e.Field = field

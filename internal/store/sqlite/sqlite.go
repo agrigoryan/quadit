@@ -44,15 +44,25 @@ func UndoUpgrade(ctx context.Context, path string) (from, to string, err error) 
 		return "", "", fmt.Errorf("%s is not a copy of the database (%w); nothing was changed", newest, err)
 	}
 	aside := strings.Replace(newest, ".before-v", ".after-v", 1)
-	for _, suffix := range []string{"-wal", "-shm"} {
-		os.Remove(path + suffix) // the upgraded database's side files do not belong to the copy
-	}
+	// Each database keeps its own side files: the upgraded one's go aside
+	// with it, and the copy's come back with the copy, so nothing a file
+	// had not yet folded in is lost and nothing is left lying about.
+	side := []string{"-wal", "-shm"}
 	if err := os.Rename(path, aside); err != nil {
 		return "", "", err
 	}
+	for _, suffix := range side {
+		os.Rename(path+suffix, aside+suffix)
+	}
 	if err := os.Rename(newest, path); err != nil {
 		os.Rename(aside, path)
+		for _, suffix := range side {
+			os.Rename(aside+suffix, path+suffix)
+		}
 		return "", "", err
+	}
+	for _, suffix := range side {
+		os.Rename(newest+suffix, path+suffix)
 	}
 	return newest, aside, nil
 }

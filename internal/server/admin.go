@@ -313,6 +313,10 @@ func (s *Server) keepsADoor(x *c, name string, value json.RawMessage) error {
 	ctx := x.ctx()
 	on := func(setting string, def bool) bool {
 		if setting == name {
+			if strings.TrimSpace(string(value)) == "null" {
+				// Back to the default: passwords and passkeys on, a provider off.
+				return (setting == "auth.password" || setting == "auth.passkeys") && def
+			}
 			var v struct {
 				Enabled *bool `json:"enabled"`
 			}

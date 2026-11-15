@@ -141,6 +141,9 @@ type TaskQuery struct {
 	Sort         string   `json:"sort,omitempty"`
 	Limit        int      `json:"limit,omitempty"`
 	Offset       int      `json:"offset,omitempty"`
+	// view is the saved view the filter came from. What such a filter
+	// names may have been deleted since it was saved.
+	view string
 }
 
 // fromURL fills a struct from URL parameters named like its JSON fields.
@@ -359,6 +362,10 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 			f.Categories = append(f.Categories, low)
 			found = true
 		}
+		if !found && q.view != "" {
+			x.stale(q.view, "a status")
+			continue
+		}
 		if !found {
 			sort.Strings(allowed)
 			return f, &engine.Error{Code: engine.CodeInvalid, Field: "status", Message: "no status " + strconv.Quote(ref),
@@ -381,6 +388,10 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 		case 1:
 			f.LabelIDs = append(f.LabelIDs, ids[0])
 		case 0:
+			if q.view != "" {
+				x.stale(q.view, "a label")
+				continue
+			}
 			sort.Strings(allowed)
 			return f, &engine.Error{Code: engine.CodeInvalid, Field: "label", Message: "no label " + strconv.Quote(ref), Allowed: allowed, Nearest: nearestOf(ref, allowed)}
 		default:
@@ -404,6 +415,10 @@ func (x *c) filter(q TaskQuery) (store.TaskFilter, error) {
 				found = true
 			}
 			allowed = append(allowed, e.Name)
+		}
+		if !found && q.view != "" {
+			x.stale(q.view, "an epic")
+			continue
 		}
 		if !found {
 			sort.Strings(allowed)
@@ -509,12 +524,13 @@ func (x *c) queryFromRequest(skip ...string) (TaskQuery, error) {
 		}
 		if len(view.Query) > 0 {
 			if err := json.Unmarshal(view.Query, &q); err != nil {
-				return q, &engine.Error{Code: engine.CodeInvalid, Field: "view", Message: fmt.Sprintf("the view %s has a filter that cannot be read (%s); save it again with view.update", view.Slug, strings.TrimPrefix(err.Error(), "json: "))}
+				return q, &engine.Error{Code: engine.CodeInvalid, Field: "view", Message: fmt.Sprintf("the view %s has a filter that cannot be read (%s); save it again with view.update", view.Slug, engine.PlainJSON(err))}
 			}
 		}
 		if view.ProjectID != "" && len(q.Project) == 0 {
 			q.Project = []string{view.ProjectID}
 		}
+		q.view = view.Slug
 	}
 	// since= means the same here as on every list: what changed after that
 	// position in the feed.
@@ -553,9 +569,17 @@ func init() {
 		dec := json.NewDecoder(bytes.NewReader(raw))
 		dec.DisallowUnknownFields() // "labels" for "label" would otherwise match everything
 		if err := dec.Decode(&q); err != nil {
-			return fmt.Errorf("this filter cannot be read (%s). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}", strings.TrimPrefix(err.Error(), "json: "))
+			return fmt.Errorf("this filter cannot be read (%s). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}", engine.PlainJSON(err))
 		}
 		return nil
+	}
+}
+
+// stale notes that a saved view names something deleted since it was saved.
+// The list is read without that part, as the web app shows it, and says so.
+func (x *c) stale(view, what string) {
+	if x.staleView == "" {
+		x.staleView = fmt.Sprintf("the view %s filters by %s that no longer exists; that part was left out. Save the view again (view.update) to drop it", view, what)
 	}
 }
 

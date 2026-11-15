@@ -148,10 +148,17 @@ func (s *Server) hEvents(x *c) error {
 		// and sleep until the feed moves.
 		f.After = max(f.After, ws.Seq)
 		wctx, cancel := context.WithDeadline(ctx, deadline)
-		s.hub.Wait(wctx, x.ws.ID, ws.Seq)
+		hctx, release := s.held(wctx)
+		s.hub.Wait(hctx, x.ws.ID, ws.Seq)
+		release()
 		cancel()
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+		select {
+		case <-s.quit:
+			deadline = time.Now() // the server is stopping: answer with what there is
+		default:
 		}
 	}
 }
@@ -229,7 +236,8 @@ func (s *Server) hStream(x *c) error {
 		x.w.WriteHeader(http.StatusNoContent)
 		return nil
 	}
-	ctx := x.ctx()
+	ctx, release := s.held(x.ctx())
+	defer release()
 	after := int64(x.intParam("after", 0))
 	if last := x.r.Header.Get("Last-Event-ID"); last != "" {
 		if n, err := strconv.ParseInt(last, 10, 64); err == nil {

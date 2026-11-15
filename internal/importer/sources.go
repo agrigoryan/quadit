@@ -572,7 +572,7 @@ func readOrbit(origin, workspace, token string) (Plan, error) {
 		st := statusOf[ot.StatusID]
 		t := Task{Ext: ot.ID, Project: KeyFrom(keyOf[ot.ProjectID]), Title: ot.Title, Description: ot.Description, Status: st[0], Category: st[1],
 			Priority: priorityNames[ot.Priority], DueOn: ot.DueAt, Estimate: ot.Estimate, ParentExt: ot.ParentTaskID, URL: ot.URL,
-			Epic: milestoneOf[ot.MilestoneID], WasKey: ot.Identifier}
+			Epic: milestoneOf[ot.MilestoneID], WasKey: ot.Identifier, Number: ot.Number}
 		// What it blocks and what it relates to. Each pair is listed on both
 		// tasks there; it is taken from the side that says "outgoing".
 		var rels page[struct {
