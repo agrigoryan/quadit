@@ -32,8 +32,7 @@ test("a trashed task leaves the list, the board, My work and the palette", async
   await expectGoneEverywhere(page, project, (key) => trash(quadit, key));
 });
 
-// Fails today: the palette's search offers an archived task.
-test.fixme("an archived task leaves the list, the board, My work and the palette", async ({
+test("an archived task leaves the list, the board, My work and the palette", async ({
   page,
   project,
   quadit,

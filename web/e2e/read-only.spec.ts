@@ -32,8 +32,7 @@ async function readOnlyMember(browser: Browser, owner: APIRequestContext, quadit
   return context;
 }
 
-// Fails today: a read-only member is offered every edit control, and learns only from the server's refusal.
-test.fixme("a read-only member sees a task but no control that changes it, and cannot make one", async ({
+test("a read-only member sees a task but no control that changes it, and cannot make one", async ({
   browser,
   page: ownerPage,
   project,
