@@ -553,7 +553,11 @@ func (s *Server) hTasks(x *c) error {
 		if x.wantText() {
 			return x.text(fmt.Sprintf("%d\n", n))
 		}
-		return x.ok(map[string]any{"count": n})
+		out := map[string]any{"count": n}
+		if x.staleView != "" {
+			out["note"] = x.staleView
+		}
+		return x.ok(out)
 	}
 	if f.Limit <= 0 {
 		f.Limit = 50

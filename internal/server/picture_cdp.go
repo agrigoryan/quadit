@@ -129,9 +129,21 @@ const pageSettled = `(() => {
   return Array.from(document.images).every((i) => i.complete);
 })()`
 
+// pageHeight is how tall the window must be to show everything: for each
+// part of the page that scrolls, how much of it is out of view.
+const pageHeight = `(() => {
+  let need = Math.max(document.documentElement.scrollHeight, innerHeight);
+  let extra = 0;
+  for (const el of document.querySelectorAll("*")) {
+    const over = el.scrollHeight - el.clientHeight;
+    if (over > 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowY)) extra = Math.max(extra, over);
+  }
+  return need + extra;
+})()`
+
 // takePicture opens target in a headless browser at exactly width by height
 // CSS pixels and returns a PNG of it.
-func takePicture(ctx context.Context, chrome string, extra []string, profile, target string, width, height int, dark bool) ([]byte, error) {
+func takePicture(ctx context.Context, chrome string, extra []string, profile, target string, width, height int, dark, full bool) ([]byte, error) {
 	toBrowser, out, err := os.Pipe()
 	if err != nil {
 		return nil, err
@@ -246,6 +258,28 @@ func takePicture(ctx context.Context, chrome string, extra []string, profile, ta
 		}
 	}
 
+	if full {
+		// The whole page: as tall as its longest scrolling part needs,
+		// within reason, and no taller.
+		res, err := c.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": pageHeight, "returnByValue": true})
+		var out struct {
+			Result struct {
+				Value float64 `json:"value"`
+			} `json:"result"`
+		}
+		if err == nil && json.Unmarshal(res, &out) == nil && out.Result.Value > 0 {
+			height = min(max(int(out.Result.Value)+1, 320), 8000)
+			if _, err := c.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
+				"width": width, "height": height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
+				return nil, err
+			}
+			select {
+			case <-time.After(400 * time.Millisecond): // lists that draw only what is in view fill in
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+	}
 	res, err = c.call(ctx, s, "Page.captureScreenshot", map[string]any{"format": "png"})
 	if err != nil {
 		return nil, err

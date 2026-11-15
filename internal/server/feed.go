@@ -131,6 +131,9 @@ func (s *Server) hEvents(x *c) error {
 		if err := s.st.Get(ctx, &ws, store.Eq("id", x.ws.ID)); err != nil {
 			return err
 		}
+		if round == 0 && v.Has("after") && f.After > ws.Seq {
+			return &engine.Error{Code: engine.CodeInvalid, Field: "after", Message: fmt.Sprintf("after=%d is past the end of the feed, which stands at %d; read from there, or from 0 for everything", f.After, ws.Seq)}
+		}
 		evs, err := x.db.Events(ctx, f)
 		if err != nil {
 			return err

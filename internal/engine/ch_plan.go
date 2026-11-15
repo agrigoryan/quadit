@@ -918,12 +918,55 @@ func (c *cx) applyTemplate(p core.Project, a *taskCreateArgs) (*decisionOpenArgs
 // would save and then fail every time it is opened.
 func (c *cx) checkViewValues(raw json.RawMessage) error {
 	var q struct {
-		Status []string `json:"status"`
-		Label  []string `json:"label"`
-		Sort   string   `json:"sort"`
+		Status   []string `json:"status"`
+		Label    []string `json:"label"`
+		Sort     string   `json:"sort"`
+		Assignee []string `json:"assignee"`
+		Epic     []string `json:"epic"`
+		Priority []int    `json:"priority"`
+		Category []string `json:"category"`
 	}
 	if json.Unmarshal(raw, &q) != nil {
 		return nil // CheckViewQuery has said so already
+	}
+	for _, p := range q.Priority {
+		if p < 0 || p > 4 {
+			return invalid("query.priority", "priority is 0 (none) to 4 (low): 1 urgent, 2 high, 3 medium, 4 low; %d is none of them", p)
+		}
+	}
+	for _, cat := range q.Category {
+		if !core.ValidCategory(strings.ToLower(cat)) {
+			return oneOf("query.category", "category", cat, core.Categories)
+		}
+	}
+	for _, ref := range q.Assignee {
+		if ref == "me" || ref == "none" {
+			continue
+		}
+		if _, err := c.memberRef("query.assignee", ref); err != nil {
+			var e *Error
+			if errors.As(err, &e) {
+				e.Code = CodeInvalid // the view is what is wrong, not the address asked
+			}
+			return err
+		}
+	}
+	if len(q.Epic) > 0 {
+		var all []core.Epic
+		if err := c.tx.List(c.ctx, &all, store.Where(store.Live)); err != nil {
+			return err
+		}
+		for _, ref := range q.Epic {
+			names, found := []string{}, ref == "none"
+			for _, e := range all {
+				found = found || e.ID == ref || strings.EqualFold(e.Name, ref)
+				names = append(names, e.Name)
+			}
+			if !found {
+				sort.Strings(names)
+				return oneOf("query.epic", "epic", ref, append(names, "none"))
+			}
+		}
 	}
 	if _, ok := store.TaskSortKeys[q.Sort]; !ok {
 		var sorts []string

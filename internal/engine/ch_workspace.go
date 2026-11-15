@@ -598,6 +598,10 @@ func agentCreate(c *cx) error {
 			return conflictErr("%s already has %d helpers at work; that is the most a task takes", forTask.Key, n)
 		}
 	} else if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
+		var me core.Member
+		if c.actor.Kind == core.KindAgent && c.tx.Get(c.ctx, &me, store.Eq("user_id", c.actor.UserID)) == nil && me.DelegatedTask != "" {
+			return forbidden("a helper made for a task cannot make agents; ask the agent that made you")
+		}
 		return forbidden("agent.create needs the admin role; you are a %s. To get help on one task, make a sub-agent for it: add \"task\": \"SVA-12\"", c.actor.Role)
 	}
 	// Someone answers for every agent. By default that is the person who

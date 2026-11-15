@@ -88,7 +88,8 @@ var helpTopics = map[string]string{
   link [KEY]                   link the current git branch and its commits to a task;
                                the key is read from the branch name when left out
   link KEY URL                 link a URL to a task
-  render KEY|doc=ID [width=390] [out=FILE]   a picture of how it looks to a person
+  render KEY|doc=ID [width=390] [height=N | full=1] [theme=dark] [out=FILE]
+                               a picture of how it looks to a person; full=1 takes the whole page
 `,
 	"import": `bring work in (safe to run twice: nothing is added a second time)
   import linear FILE.csv project=KEY       import trello BOARD.json project=KEY
@@ -724,7 +725,7 @@ func (r *runner) run(cmd string, rest []string) error {
 		a := map[string]any{}
 		if len(pos) > 1 {
 			if err := json.Unmarshal([]byte(strings.Join(pos[1:], " ")), &a); err != nil {
-				return fmt.Errorf("the arguments must be a JSON object: %w", err)
+				return fmt.Errorf("the arguments must be a JSON object, like '{\"id\":\"SVA-12\",\"title\":\"New title\"}'; what was given is not one")
 			}
 		}
 		for k, v := range argsFrom(f) {

@@ -48,6 +48,7 @@ type taskView struct {
 	Seq         int64        `json:"seq"`         // moves on anything in the task
 	UpdatedSeq  int64        `json:"updated_seq"` // moves when its own fields change
 	Trashed     bool         `json:"trashed,omitempty"`
+	Archived    bool         `json:"archived,omitempty"`
 }
 
 func when(ms int64) string {
@@ -107,7 +108,7 @@ func (x *c) taskViews(tasks []core.Task, detail bool) ([]taskView, error) {
 		v := taskView{Key: t.Key, Title: t.Title, Status: st.Name, Category: st.Category, Assignee: nm.handle(t.AssigneeID),
 			WaitingOn: waitsOn(nm, t), WaitingOnNote: t.WaitingOnNote, Labels: nm.labelNames(t.LabelIDs),
 			Epic: nm.epics[t.EpicID].Name, Milestone: nm.milestones[t.MilestoneID], Budget: t.Budget, Cycle: nm.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
-			Estimate: t.Estimate, Seq: t.ActivitySeq, UpdatedSeq: t.UpdatedSeq, Trashed: t.DeletedAt != 0}
+			Estimate: t.Estimate, Seq: t.ActivitySeq, UpdatedSeq: t.UpdatedSeq, Trashed: t.DeletedAt != 0, Archived: t.ArchivedAt != 0}
 		if t.Priority > 0 && t.Priority < len(priorityNames) {
 			v.Priority = priorityNames[t.Priority]
 		}
@@ -149,6 +150,9 @@ func pick(items any, fields []string) any {
 func (v taskView) line() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s  [%s]", v.Key, v.Status)
+	if v.Archived {
+		b.WriteString("  (archived)")
+	}
 	if v.Priority != "" {
 		b.WriteString("  !" + v.Priority)
 	}
@@ -354,6 +358,12 @@ func (d taskDetail) text() string {
 	t := d.Task
 	fmt.Fprintf(&b, "%s  %s\n", t.Key, t.Title)
 	fmt.Fprintf(&b, "status: %s", t.Status)
+	if t.Archived {
+		b.WriteString(" (archived)")
+	}
+	if t.Trashed {
+		b.WriteString(" (in the trash)")
+	}
 	if t.Priority != "" {
 		b.WriteString("   priority: " + t.Priority)
 	}
@@ -626,6 +636,13 @@ func (x *c) changeText(changes map[string]core.FieldChange, nm *names) string {
 					parts = append(parts, "moved to trash")
 				} else {
 					parts = append(parts, "restored")
+				}
+			}
+			if f == "archived_at" {
+				if ch.To != nil && ch.To != float64(0) {
+					parts = append(parts, "archived")
+				} else {
+					parts = append(parts, "taken out of the archive")
 				}
 			}
 			continue

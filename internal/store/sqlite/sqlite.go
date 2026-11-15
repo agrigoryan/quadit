@@ -44,6 +44,9 @@ func UndoUpgrade(ctx context.Context, path string) (from, to string, err error) 
 		return "", "", fmt.Errorf("%s is not a copy of the database (%w); nothing was changed", newest, err)
 	}
 	aside := strings.Replace(newest, ".before-v", ".after-v", 1)
+	if _, err := os.Stat(aside); err == nil {
+		return "", "", fmt.Errorf("%s from an earlier undo is in the way; move it away first (nothing was changed)", aside)
+	}
 	// Each database keeps its own side files: the upgraded one's go aside
 	// with it, and the copy's come back with the copy, so nothing a file
 	// had not yet folded in is lost and nothing is left lying about.

@@ -63,9 +63,6 @@ func (s *Server) hRender(x *c) error {
 		if width < 600 {
 			height = 844
 		}
-		if truthyParam(q, "full") {
-			height = 3000
-		}
 	}
 	path := "/" + x.ws.Slug
 	switch {
@@ -107,7 +104,7 @@ func (s *Server) hRender(x *c) error {
 	extra = append(extra, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
 	ctx, cancel := context.WithTimeout(x.ctx(), 45*time.Second)
 	defer cancel()
-	png, err := takePicture(ctx, chrome, extra, filepath.Join(dir, "profile"), target, width, height, q.Get("theme") == "dark")
+	png, err := takePicture(ctx, chrome, extra, filepath.Join(dir, "profile"), target, width, height, q.Get("theme") == "dark", truthyParam(q, "full") && x.intParam("height", 0) == 0)
 	if err != nil {
 		s.log.Warn("render", "err", err)
 		return &httpError{Status: 502, Code: "render_failed", Message: "the browser could not take the picture: " + oneLine(err.Error(), 120)}

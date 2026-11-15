@@ -202,6 +202,40 @@ func TestThirdAuditFindings(t *testing.T) {
 		// (empty) expiry: a real phone's was refused for that field.
 		s.call(s.owner, "", "POST", "/api/v1/push/subscriptions", json.RawMessage(`{"endpoint":"https://fcm.googleapis.com/fcm/send/abc","expirationTime":null,"keys":{"p256dh":"BPk","auth":"x1"}}`), 201, nil)
 
+		// What a fourth check found. A claim made for another project's
+		// task does not reach a limited member through the feed.
+		s.change(s.owner, "", "agent.update", M{"id": "@narrow", "scope": M{"projects": []string{"OPS"}}})
+		s.change(s.owner, "", "resource.create", M{"name": "minipc"})
+		s.change(s.owner, "", "resource.acquire", M{"resource": "minipc", "task": "SVA-1", "note": "secret playtest"})
+		if out := s.call(nil, narrow, "GET", "/api/v1/w/-/events?after=0&limit=2000", nil, 200, nil); strings.Contains(out, "secret playtest") {
+			t.Fatalf("a claim on an SVA task reached an agent limited to OPS: %s", out)
+		}
+		s.change(s.owner, "", "agent.update", M{"id": "@narrow", "scope": nil})
+		// A misspelt part of the limits is refused, not dropped.
+		s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "agent.update", "args": M{"id": "@narrow", "scope": M{"projcts": []string{"OPS"}}}}, 400, nil)
+		// More values a saved view cannot name.
+		for _, q := range []M{{"assignee": []string{"@nobody"}}, {"epic": []string{"Nope epic"}}, {"priority": []int{9}}} {
+			s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "view.create", "args": M{"name": "Bad", "query": q}}, 400, nil)
+		}
+		s.change(s.owner, "", "view.create", M{"name": "Mine", "query": M{"assignee": []string{"me", "@wide", "none"}, "epic": []string{"Boss fight", "none"}, "priority": []int{1, 2}}})
+		// Numbers and yes/no parameters of another kind are refused.
+		for _, q := range []string{"/events?after=abc", "/events?wait=abc", "/events?limit=abc", "/tasks?offset=-1", "/tasks?has_open_decision=maybe", "/tasks?count=maybe", "/events?after=99999999"} {
+			if out := s.call(nil, wide, "GET", "/api/v1/w/-"+q, nil, 400, nil); strings.Contains(out, "Go ") {
+				t.Fatalf("%s: %s", q, out)
+			}
+		}
+		// An archived task says so.
+		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Put away"})
+		var made struct{ Tasks []struct{ Key string } }
+		s.call(s.owner, "", "GET", w+"/tasks?q=Put+away", nil, 200, &made)
+		s.change(s.owner, "", "task.update", M{"id": made.Tasks[0].Key, "archived": true})
+		if out := s.call(s.owner, "", "GET", w+"/tasks/"+made.Tasks[0].Key+"?format=text", nil, 200, nil); !strings.Contains(out, "archived") {
+			t.Fatalf("an archived task does not say so: %s", out)
+		}
+		if out := s.call(s.owner, "", "GET", w+"/events?format=text&after=0&limit=2000", nil, 200, nil); !strings.Contains(out, made.Tasks[0].Key+" archived") {
+			t.Fatalf("archiving has no words in the feed: %s", out[max(0, len(out)-400):])
+		}
+
 		// A call to MCP with no token at all is counted like a wrong one.
 		limited := false
 		for i := 0; i < 140 && !limited; i++ {

@@ -139,6 +139,9 @@ func (s *Server) hPushTest(x *c) error {
 		return err
 	}
 	if n == 0 {
+		if have, _ := s.st.Count(x.ctx(), "push_subscriptions", store.Eq("user_id", x.user.ID)); have > 0 {
+			return &httpError{Status: 502, Code: "push_failed", Message: "your browser's push service did not take the message; the server log says why"}
+		}
 		return errBad("no browser of yours has push turned on")
 	}
 	return x.ok(map[string]any{"sent": n})

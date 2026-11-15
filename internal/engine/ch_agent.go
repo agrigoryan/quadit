@@ -376,7 +376,20 @@ func (c *cx) setClaim(cl core.ResourceClaim, set map[string]any, why string) err
 	for k, v := range set {
 		changes[k] = core.FieldChange{To: v}
 	}
-	return c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, "", map[string]any{"id": cl.ID, "changes": changes, "why": why})
+	return c.emit(c.tx.NextSeq(), "claim.updated", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"id": cl.ID, "changes": changes, "why": why})
+}
+
+// claimProject is the project of the task a claim was made for, so that a
+// member limited to other projects is not told of it.
+func (c *cx) claimProject(cl core.ResourceClaim) string {
+	if cl.TaskID == "" {
+		return ""
+	}
+	var t core.Task
+	if err := c.tx.Get(c.ctx, &t, store.Eq("id", cl.TaskID)); err != nil {
+		return ""
+	}
+	return t.ProjectID
 }
 
 // promote gives a free resource to the first in its queue.
@@ -452,7 +465,7 @@ func resourceAcquire(c *cx) error {
 		return taken(err, "id", cid)
 	}
 	c.ref, c.key = cl.ID, cl.State
-	if err := c.emit(c.tx.NextSeq(), "claim.created", "claim", cl.ID, "workspace", c.ws, "", map[string]any{"row": cl, "resource": r.Name}); err != nil {
+	if err := c.emit(c.tx.NextSeq(), "claim.created", "claim", cl.ID, "workspace", c.ws, c.claimProject(cl), map[string]any{"row": cl, "resource": r.Name}); err != nil {
 		return err
 	}
 	if cl.State == "waiting" {

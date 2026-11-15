@@ -422,6 +422,9 @@ func (s *Server) in(h handler) http.HandlerFunc {
 			err = s.enter(x, r.PathValue("ws"))
 		}
 		if err == nil {
+			err = checkParams(r.URL.Query())
+		}
+		if err == nil {
 			err = h(x)
 		}
 		if err != nil {
