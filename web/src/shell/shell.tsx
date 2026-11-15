@@ -27,19 +27,20 @@ const InsightRoutes = lazy(() => import("@/insights/routes"));
 const EpicsPage = lazy(() => import("@/pages/epics").then((m) => ({ default: m.EpicsPage })));
 const CyclesPage = lazy(() => import("@/pages/cycles").then((m) => ({ default: m.CyclesPage })));
 
-// So are the parts drawn over the page. These three are also fetched ahead,
-// once the first page is up, so that opening a task, the palette or the
-// new-task dialog does not wait on the network.
+// So are the parts drawn over the page, and a task's own page. These are
+// also fetched ahead, once the first page is up, so that opening a task,
+// the palette or the new-task dialog does not wait on the network.
 const loadTaskPanel = () => import("@/detail/task-panel");
+const loadTaskPage = () => import("@/detail/task-page");
 const loadPalette = () => import("@/palette/palette");
 const loadCreateTask = () => import("@/tasks/create-task");
 const TaskPanel = lazy(() => loadTaskPanel().then((m) => ({ default: m.TaskPanel })));
-const TaskPage = lazy(() => import("@/detail/task-page").then((m) => ({ default: m.TaskPage })));
+const TaskPage = lazy(() => loadTaskPage().then((m) => ({ default: m.TaskPage })));
 const CommandPalette = lazy(() => loadPalette().then((m) => ({ default: m.CommandPalette })));
 const CreateTaskDialog = lazy(() => loadCreateTask().then((m) => ({ default: m.CreateTaskDialog })));
 
 function fetchAhead() {
-  for (const load of [loadTaskPanel, loadPalette, loadCreateTask]) load().catch(() => {});
+  for (const load of [loadTaskPanel, loadTaskPage, loadPalette, loadCreateTask]) load().catch(() => {});
 }
 
 function Later({ children }: { children: ReactNode }) {

@@ -15,12 +15,15 @@ import {
   Reply,
   UserPlus,
 } from "lucide-react";
+import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/lib/selectors";
+import { useStore } from "@/lib/store";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/lib/types";
 import { archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
+import { useTaskLink } from "@/tasks/task-link";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { DecisionMark } from "@/ui/icons";
@@ -62,6 +65,19 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
   // A type this version does not know yet reads as a plain comment.
   const sentence = t(item.type in icons ? (`inbox.type.${item.type}` as "inbox.type.comment") : "inbox.type.comment", { who });
   const snippet = item.snippet ? plain(item.snippet) : "";
+  // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
+  const taskKey = useStore((s) => (item.task_id ? s.c.tasks[item.task_id]?.key : undefined)) ?? key;
+  const link = useTaskLink({ key: taskKey ?? "" });
+  const what = (
+    <>
+      {key && <span className="shrink-0 text-xs text-ink-3 tnum">{key}</span>}
+      <span className={cx("min-w-0 truncate", unread ? "font-medium text-ink" : "text-ink-2")}>{title}</span>
+      {snippet && <span className="min-w-0 flex-1 basis-0 truncate text-ink-3 max-md:hidden">{snippet}</span>}
+    </>
+  );
+  const whatStyle =
+    "flex min-w-0 items-baseline gap-2 text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent max-md:mt-0.5 max-md:w-full md:flex-1";
+  const label = `${sentence}. ${item.title ?? ""}`;
 
   return (
     <div
@@ -88,16 +104,15 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen }: Props)
           )}
           <span className="truncate">{sentence}</span>
         </p>
-        <button
-          type="button"
-          onClick={() => onOpen(item)}
-          aria-label={`${sentence}. ${item.title ?? ""}`}
-          className="flex min-w-0 items-baseline gap-2 text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent max-md:mt-0.5 max-md:w-full md:flex-1"
-        >
-          {key && <span className="shrink-0 text-xs text-ink-3 tnum">{key}</span>}
-          <span className={cx("min-w-0 truncate", unread ? "font-medium text-ink" : "text-ink-2")}>{title}</span>
-          {snippet && <span className="min-w-0 flex-1 basis-0 truncate text-ink-3 max-md:hidden">{snippet}</span>}
-        </button>
+        {taskKey ? (
+          <Link {...link} onClick={() => unread && markRead([item.id])} aria-label={label} className={whatStyle}>
+            {what}
+          </Link>
+        ) : (
+          <button type="button" onClick={() => onOpen(item)} aria-label={label} className={whatStyle}>
+            {what}
+          </button>
+        )}
         {snippet && <p className="mt-0.5 truncate text-ink-3 md:hidden">{snippet}</p>}
       </div>
 
