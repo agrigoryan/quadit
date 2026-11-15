@@ -34,7 +34,7 @@ cycle.created {"row":{"id":"#26","project_id":"#5","number":3,"name":"Later","st
 cycle.updated {"changes":{"name":{"from":"Later","to":"Much later"}},"id":"#26"}
 template.created {"row":{"id":"#27","project_id":"#5","name":"Bug","title":"Bug: ","created_at":1767603623000,"updated_seq":35}}
 template.updated {"changes":{"description":{"from":null,"to":"what broke"}},"id":"#27"}
-view.created {"row":{"id":"#28","project_id":"#5","name":"Mine","slug":"mine","owner_id":"#3","shared":true,"query":{"assignee":"me"},"layout":"list","rank":"00000000sg","created_at":1767603625000,"updated_seq":37}}
+view.created {"row":{"id":"#28","project_id":"#5","name":"Mine","slug":"mine","owner_id":"#3","shared":true,"query":{"assignee":["me"]},"layout":"list","rank":"00000000sg","created_at":1767603625000,"updated_seq":37}}
 view.updated {"changes":{"description":{"from":null,"to":"my tasks"}},"id":"#28"}
 preference.created {"row":{"id":"#29","project_id":"#5","body":"Prefer small commits","created_by":"#3","created_at":1767603627000,"updated_seq":39}}
 preference.updated {"changes":{"body":{"from":"Prefer small commits","to":"Prefer small, clear commits"}},"id":"#29"}

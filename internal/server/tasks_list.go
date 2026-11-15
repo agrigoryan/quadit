@@ -23,13 +23,13 @@ func (s *Server) handleListTasks(x *c) error {
 	if err != nil {
 		return err
 	}
-	f, err := x.filter(query)
+	f, stale, err := x.taskFilter(query)
 	if err != nil {
 		return err
 	}
 	v := x.r.URL.Query()
 	if truthyParam(v, "count") {
-		return x.taskCount(f)
+		return x.taskCount(f, stale)
 	}
 	if f.Limit <= 0 {
 		f.Limit = defaultTaskPage
@@ -62,7 +62,7 @@ func (s *Server) handleListTasks(x *c) error {
 		return err
 	}
 	if x.wantText() {
-		return x.text(page.text(views, x.staleView))
+		return x.text(page.text(views, stale))
 	}
 	if len(fields) == 0 {
 		fields = listFields
@@ -77,8 +77,8 @@ func (s *Server) handleListTasks(x *c) error {
 	if page.changedMeanwhile > 0 {
 		out["changed_while_reading"] = page.changedMeanwhile
 	}
-	if x.staleView != "" {
-		out["note"] = x.staleView
+	if stale != "" {
+		out["note"] = stale
 	}
 	return x.ok(out)
 }
@@ -90,8 +90,9 @@ const (
 	maxTaskPage     = 1000
 )
 
-// taskCount answers a task query with only how many tasks match.
-func (x *c) taskCount(f store.TaskFilter) error {
+// taskCount answers a task query with only how many tasks match. note says
+// a view named in the query was out of date.
+func (x *c) taskCount(f store.TaskFilter, note string) error {
 	n, err := x.db.CountTasks(x.ctx(), f)
 	if err != nil {
 		return err
@@ -100,8 +101,8 @@ func (x *c) taskCount(f store.TaskFilter) error {
 		return x.text(fmt.Sprintf("%d\n", n))
 	}
 	out := map[string]any{"count": n}
-	if x.staleView != "" {
-		out["note"] = x.staleView
+	if note != "" {
+		out["note"] = note
 	}
 	return x.ok(out)
 }

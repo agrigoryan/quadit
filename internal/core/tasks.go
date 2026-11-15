@@ -89,6 +89,48 @@ type View struct {
 	DeletedAt   int64           `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
 
+// TaskQuery is how tasks are asked for: in the URL of a task list, in the
+// feed, and as the Query of a saved view. Names work everywhere ids do. The
+// engine turns one into the store's filter (Resolver.TaskFilter).
+type TaskQuery struct {
+	Project      []string `json:"project,omitempty"`
+	Assignee     []string `json:"assignee,omitempty"` // me, @handle, none
+	Creator      string   `json:"creator,omitempty"`
+	Status       []string `json:"status,omitempty"`
+	Category     []string `json:"category,omitempty"`
+	Open         *bool    `json:"open,omitempty"`
+	WaitingOn    string   `json:"waiting_on,omitempty"`
+	HeldBy       string   `json:"held_by,omitempty"`
+	Label        []string `json:"label,omitempty"`
+	Epic         []string `json:"epic,omitempty"`  // names or ids, or none
+	Cycle        []string `json:"cycle,omitempty"` // current, next, a number, an id, or none
+	Milestone    string   `json:"milestone,omitempty"`
+	Priority     []int    `json:"priority,omitempty"`
+	DueBefore    string   `json:"due_before,omitempty"`
+	DueAfter     string   `json:"due_after,omitempty"`
+	Mentions     string   `json:"mentions,omitempty"`
+	Watching     bool     `json:"watching,omitempty"`
+	OpenDecision bool     `json:"has_open_decision,omitempty"`
+	Asked        string   `json:"asked,omitempty"` // has an open decision asked of this member
+	ChangedSince int64    `json:"changed_since,omitempty"`
+	UpdatedSince int64    `json:"updated_since,omitempty"`
+	Parent       string   `json:"parent,omitempty"`
+	TopLevel     bool     `json:"top_level,omitempty"`
+	Q            string   `json:"q,omitempty"`
+	Keys         []string `json:"keys,omitempty"`
+	Trash        bool     `json:"trash,omitempty"`
+	Archived     bool     `json:"archived,omitempty"`
+	Sort         string   `json:"sort,omitempty"`
+	Limit        int      `json:"limit,omitempty"`
+	Offset       int      `json:"offset,omitempty"`
+	// SavedAs is the slug of the saved view the query was read from, when it
+	// was. What such a query names may have been deleted since it was
+	// saved: a status, label or epic that is gone is then left out and
+	// noted, where a query asked afresh is refused. It is not part of the
+	// query as stored.
+	SavedAs string `json:"-"`
+}
+
 // Task link kinds.
 const (
 	LinkBranch = "branch"

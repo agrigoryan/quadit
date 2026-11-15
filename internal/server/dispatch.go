@@ -192,7 +192,7 @@ func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watche
 	if m.Scope != nil {
 		x.projects = m.Scope.Projects
 	}
-	f, err := x.filter(q) //nolint:contextcheck // x carries ctx in its made-up request
+	f, _, err := x.taskFilter(q) //nolint:contextcheck // x carries ctx in its made-up request
 	if _, refused := errors.AsType[*engine.Error](err); refused {
 		return nil // the view names something that is gone, or out of the watcher's reach: nothing to watch
 	}
@@ -214,8 +214,8 @@ func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watche
 
 // viewQuery reads a saved view's query, with the view's project when the
 // query names none. It reports false when the query does not read.
-func viewQuery(view core.View) (TaskQuery, bool) {
-	var q TaskQuery
+func viewQuery(view core.View) (core.TaskQuery, bool) {
+	var q core.TaskQuery
 	if len(view.Query) > 0 {
 		if err := json.Unmarshal(view.Query, &q); err != nil {
 			return q, false

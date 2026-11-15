@@ -3,12 +3,13 @@
 package engine
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"slices"
-	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -67,9 +68,6 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 		OwnerID: c.actor.UserID, Shared: a.Shared == nil || *a.Shared, Query: a.Query, Layout: a.Layout, Display: a.Display, CreatedAt: c.at}
 	if len(a.Query) > 0 {
 		if err := c.checkViewQuery(a.Project, a.Query); err != nil {
-			return err
-		}
-		if err := c.checkViewValues(a.Query); err != nil {
 			return err
 		}
 	}
@@ -175,9 +173,6 @@ func viewUpdate(c *cx, a viewUpdateArgs) error {
 		if err := c.checkViewQuery(v.ProjectID, a.Query.V); err != nil {
 			return err
 		}
-		if err := c.checkViewValues(a.Query.V); err != nil {
-			return err
-		}
 	}
 	if err := raw("query", a.Query, v.Query); err != nil {
 		return err
@@ -200,194 +195,27 @@ func viewDelete(c *cx, a idArgs) error {
 	return c.trash(target{table: "views", entity: "view", id: v.ID, place: c.inProjectOrWorkspace(v.ProjectID)})
 }
 
-// checkViewValues refuses a filter that names a status or a label the
-// workspace does not have, or an ordering there is none of: such a view
-// would save and then fail every time it is opened.
-func (c *cx) checkViewValues(raw json.RawMessage) error {
-	var q struct {
-		Status   []string `json:"status"`
-		Label    []string `json:"label"`
-		Sort     string   `json:"sort"`
-		Assignee []string `json:"assignee"`
-		Epic     []string `json:"epic"`
-		Priority []int    `json:"priority"`
-		Category []string `json:"category"`
-		Creator  string   `json:"creator"`
-		Parent   string   `json:"parent"`
-		Asked    string   `json:"asked"`
-		Mentions string   `json:"mentions"`
+// checkViewQuery refuses a saved view's filter that a task list could not
+// read as it stands: a field there is none of, a value of the wrong type, a
+// date that is not one, a count below zero, a priority there is none of, or
+// a member, status, label, epic, cycle, milestone or task that is not
+// there. It reads the filter the way it will be read when the view is
+// opened, as the one saving it (TaskFilter), so a view that saves is a view
+// that opens. project is the view's own, which bounds the names when the
+// filter names no project. Whatever is wrong, it is the view that is wrong:
+// every refusal is "invalid" and names its field under "query".
+func (c *cx) checkViewQuery(project string, raw json.RawMessage) error {
+	var q core.TaskQuery
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields() // "labels" for "label" would otherwise match everything
+	if err := dec.Decode(&q); err != nil {
+		return invalid("query", "this filter cannot be read (%s). It is an object of task filters; lists such as label, status and assignee are written as lists: {\"label\": [\"art\"]}", PlainJSON(err))
 	}
-	if err := json.Unmarshal(raw, &q); err != nil {
-		return nil //nolint:nilerr // a query of another shape is CheckViewQuery's to refuse, and it has had its say
-	}
-	for _, p := range q.Priority {
-		if !priorityOK(p) {
-			return invalid("query.priority", "priority is 0 (none) to 4 (low): 1 urgent, 2 high, 3 medium, 4 low; %d is none of them", p)
-		}
-	}
-	for _, cat := range q.Category {
-		if !core.ValidCategory(strings.ToLower(cat)) {
-			return oneOf("query.category", "category", cat, core.Categories)
-		}
-	}
-	people := []viewPeople{{"query.assignee", q.Assignee}, {"query.creator", []string{q.Creator}},
-		{"query.asked", []string{q.Asked}}, {"query.mentions", []string{q.Mentions}}}
-	if err := c.checkViewPeople(people, q.Parent); err != nil {
-		return err
-	}
-	if err := c.checkViewEpics(q.Epic); err != nil {
-		return err
-	}
-	if err := checkViewSort(q.Sort); err != nil {
-		return err
-	}
-	if err := c.checkViewStatuses(q.Status); err != nil {
-		return err
-	}
-	return c.checkViewLabels(q.Label)
-}
-
-// viewPeople is one filter of a view that names members.
-type viewPeople struct {
-	field string
-	refs  []string
-}
-
-// checkViewPeople refuses a filter on a member, or on a parent task, that
-// is not there. The filters are checked in the order given, so a view with
-// more than one wrong is always told of the same one.
-func (c *cx) checkViewPeople(people []viewPeople, parent string) error {
-	for _, f := range people {
-		for _, ref := range f.refs {
-			if ref == "" || ref == "me" || ref == "none" {
-				continue
-			}
-			if _, err := c.memberRef(f.field, ref); err != nil {
-				if e, ok := errors.AsType[*Error](err); ok {
-					e.Code = CodeInvalid // the view is what is wrong, not the address asked
-				}
-				return err
-			}
-		}
-	}
-	if parent != "" {
-		if _, err := c.anyTask("query.parent", parent); err != nil {
-			if e, ok := errors.AsType[*Error](err); ok {
-				e.Code = CodeInvalid
-			}
+	wrong := func(err error) error {
+		e, refused := errors.AsType[*Error](err)
+		if !refused {
 			return err
 		}
-	}
-	return nil
-}
-
-// checkViewEpics refuses a filter on an epic that does not exist.
-func (c *cx) checkViewEpics(refs []string) error {
-	if len(refs) == 0 {
-		return nil
-	}
-	var all []core.Epic
-	if err := c.tx.List(c.ctx, &all, store.Where(store.Live)); err != nil {
-		return err
-	}
-	for _, ref := range refs {
-		names, found := []string{}, ref == "none"
-		for _, e := range all {
-			found = found || e.ID == ref || strings.EqualFold(e.Name, ref)
-			names = append(names, e.Name)
-		}
-		if !found {
-			sort.Strings(names)
-			return oneOf("query.epic", "epic", ref, append(names, "none"))
-		}
-	}
-	return nil
-}
-
-func checkViewSort(by string) error {
-	if _, ok := store.TaskSortKeys[by]; !ok {
-		var sorts []string
-		for k := range store.TaskSortKeys {
-			if k != "" {
-				sorts = append(sorts, k)
-			}
-		}
-		sort.Strings(sorts)
-		return oneOf("query.sort", "sort", by, sorts)
-	}
-	return nil
-}
-
-// checkViewStatuses refuses a filter on a status, or a category, that no
-// project has.
-func (c *cx) checkViewStatuses(refs []string) error {
-	if len(refs) == 0 {
-		return nil
-	}
-	var all []core.Status
-	if err := c.tx.List(c.ctx, &all, store.Where(store.Live)); err != nil {
-		return err
-	}
-	for _, ref := range refs {
-		names, found := []string{}, core.ValidCategory(strings.ToLower(ref))
-		for _, s := range all {
-			found = found || s.ID == ref || strings.EqualFold(s.Name, ref)
-			if !slices.Contains(names, s.Name) {
-				names = append(names, s.Name)
-			}
-		}
-		if !found {
-			sort.Strings(names)
-			return oneOf("query.status", "status", ref, append(names, core.Categories...))
-		}
-	}
-	return nil
-}
-
-// checkViewLabels refuses a filter on a label that does not exist.
-func (c *cx) checkViewLabels(refs []string) error {
-	if len(refs) == 0 {
-		return nil
-	}
-	var all []core.Label
-	if err := c.tx.List(c.ctx, &all, store.Where(store.Live)); err != nil {
-		return err
-	}
-	for _, ref := range refs {
-		names, found := []string{}, false
-		for _, l := range all {
-			found = found || l.ID == ref || strings.EqualFold(l.Name, ref)
-			if !slices.Contains(names, l.Name) {
-				names = append(names, l.Name)
-			}
-		}
-		if !found {
-			sort.Strings(names)
-			return oneOf("query.label", "label", ref, names)
-		}
-	}
-	return nil
-}
-
-// CheckViewQuery says whether a saved view's filter can be read and run as
-// it stands: every field known, every member, status, label, epic, task
-// and date in it real. The server sets it, because the filter's fields are
-// its task queries' and it resolves them the same way when the view is
-// opened; a view that saves is then a view that opens.
-var CheckViewQuery = func(_ context.Context, _ store.DB, _ core.Member, _ string, q json.RawMessage) error {
-	if !json.Valid(q) {
-		return errors.New("query must be a JSON object")
-	}
-	return nil
-}
-
-func (c *cx) checkViewQuery(project string, q json.RawMessage) error {
-	err := CheckViewQuery(c.ctx, c.tx, c.actor, project, q)
-	if err == nil {
-		return nil
-	}
-	if e, ok := errors.AsType[*Error](err); ok {
-		// What is wrong is the view, whatever the lookup inside called it.
 		out := *e
 		out.Code = CodeInvalid
 		if !strings.HasPrefix(out.Field, "query") {
@@ -395,5 +223,38 @@ func (c *cx) checkViewQuery(project string, q json.RawMessage) error {
 		}
 		return &out
 	}
-	return invalid("query", "%v", err)
+	for _, date := range []struct{ name, day string }{{"due_before", q.DueBefore}, {"due_after", q.DueAfter}} {
+		if _, err := time.Parse("2006-01-02", date.day); date.day != "" && err != nil {
+			return invalid("query."+date.name, "%s takes a date like 2026-03-31, and was given %s", date.name, strconv.Quote(date.day))
+		}
+	}
+	for _, count := range []struct {
+		name string
+		n    int64
+	}{{"changed_since", q.ChangedSince}, {"updated_since", q.UpdatedSince}, {"limit", int64(q.Limit)}, {"offset", int64(q.Offset)}} {
+		if count.n < 0 {
+			return invalid("query."+count.name, "%s cannot be less than 0", count.name)
+		}
+	}
+	var readable []string
+	if c.actor.Scope != nil && len(c.actor.Scope.Projects) > 0 {
+		readable = c.actor.Scope.Projects
+	}
+	if project != "" && len(q.Project) == 0 {
+		q.Project = []string{project}
+	}
+	if _, _, err := c.TaskFilter(q, readable); err != nil {
+		return wrong(err)
+	}
+	for _, key := range q.Keys {
+		if _, err := c.anyTask("task", key); err != nil {
+			return wrong(err)
+		}
+	}
+	for _, p := range q.Priority {
+		if !priorityOK(p) {
+			return invalid("query.priority", "priority is 0 (none) to 4 (low): 1 urgent, 2 high, 3 medium, 4 low; %d is none of them", p)
+		}
+	}
+	return nil
 }

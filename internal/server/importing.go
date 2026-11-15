@@ -56,7 +56,7 @@ func (s *Server) handleImportWork(x *c) error {
 		return err
 	}
 	if !slices.Contains(importer.Kinds, b.Kind) {
-		return &engine.Error{Code: engine.CodeInvalid, Field: "kind", Message: "unknown source " + b.Kind, Allowed: importer.Kinds, Nearest: nearestOf(b.Kind, importer.Kinds)}
+		return &engine.Error{Code: engine.CodeInvalid, Field: "kind", Message: "unknown source " + b.Kind, Allowed: importer.Kinds, Nearest: engine.Nearest(b.Kind, importer.Kinds)}
 	}
 	source, cleanup, err := s.importSource(x, b)
 	if err != nil {

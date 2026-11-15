@@ -389,7 +389,7 @@ func (s *Server) handleListDatabaseRows(x *c) error {
 			}
 		}
 		if !found {
-			return &engine.Error{Code: engine.CodeNotFound, Field: "view", Message: "no view " + name, Allowed: names, Nearest: nearestOf(name, names)}
+			return &engine.Error{Code: engine.CodeNotFound, Field: "view", Message: "no view " + name, Allowed: names, Nearest: engine.Nearest(name, names)}
 		}
 	}
 	for _, part := range splitList(v.Get("filter")) {
@@ -423,7 +423,7 @@ func (s *Server) handleListDatabaseRows(x *c) error {
 			for _, q := range t.props {
 				names = append(names, q.Name)
 			}
-			return nil, &engine.Error{Code: engine.CodeInvalid, Field: "prop", Message: "no property " + ref, Allowed: append(names, "title"), Nearest: nearestOf(ref, names)}
+			return nil, &engine.Error{Code: engine.CodeInvalid, Field: "prop", Message: "no property " + ref, Allowed: append(names, "title"), Nearest: engine.Nearest(ref, names)}
 		}
 		return cells[r.ID][p.ID], nil
 	}

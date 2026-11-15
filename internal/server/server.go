@@ -228,17 +228,14 @@ var statusOf = map[string]int{
 // outside a request (dispatch.go, query.go) set only what that work reads.
 type c struct {
 	narrowed bool // fields= and since= were applied by the handler (narrowedAlready)
-	// staleView says what a saved view filters by that is gone, when the
-	// list was read without that part. Set while a view's query is read.
-	staleView string
-	s         *Server
-	w         http.ResponseWriter
-	r         *http.Request
-	user      core.User      // the account asking (identify)
-	sess      *core.Session  // the session, when signed in by cookie (identify)
-	token     *core.APIToken // the token, when signed in by one (identify)
-	ws        core.Workspace // the workspace in the path (enterWorkspace)
-	member    core.Member    // the caller's membership in ws (enterWorkspace)
+	s        *Server
+	w        http.ResponseWriter
+	r        *http.Request
+	user     core.User      // the account asking (identify)
+	sess     *core.Session  // the session, when signed in by cookie (identify)
+	token    *core.APIToken // the token, when signed in by one (identify)
+	ws       core.Workspace // the workspace in the path (enterWorkspace)
+	member   core.Member    // the caller's membership in ws (enterWorkspace)
 	// actor is who the engine applies changes as, read-only or limited to
 	// projects by the token's scopes (enterWorkspace).
 	actor engine.Actor

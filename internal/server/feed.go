@@ -123,7 +123,7 @@ func (s *Server) handleReadFeed(x *c) error {
 	}
 	if query.Watching || len(v) > 0 && hasTaskFilter(query) {
 		query.Archived = true
-		tf, err := x.filter(query)
+		tf, _, err := x.taskFilter(query)
 		if err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ const (
 )
 
 // hasTaskFilter reports whether a query narrows tasks at all.
-func hasTaskFilter(q TaskQuery) bool {
+func hasTaskFilter(q core.TaskQuery) bool {
 	raw := plainjson.Marshal(q)
 	return string(raw) != "{}"
 }

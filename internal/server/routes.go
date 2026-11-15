@@ -478,7 +478,7 @@ func (s *Server) handleListCollection(x *c) error {
 	col, ok := collections[name]
 	if !ok {
 		all := slices.Sorted(maps.Keys(collections))
-		return &engine.Error{Code: engine.CodeNotFound, Message: "no list " + name, Allowed: all, Nearest: nearestOf(name, all)}
+		return &engine.Error{Code: engine.CodeNotFound, Message: "no list " + name, Allowed: all, Nearest: engine.Nearest(name, all)}
 	}
 	if col.admin {
 		if err := x.admin(); err != nil {

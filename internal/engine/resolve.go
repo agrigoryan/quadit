@@ -417,17 +417,23 @@ func jsonFields(v any) []string {
 	return out
 }
 
-// nearest returns the allowed value closest to got, or "" if none is close.
+// Nearest returns the allowed value closest to got, for a refusal's "did
+// you mean", or "" if none is close: more than two edits away and more than
+// half of got's length. Case is ignored, so a value right but for its case
+// is answered with the value as it is written.
+func Nearest(got string, allowed []string) string { return nearest(got, allowed) }
+
+// nearest is Nearest, under the name the changes call it by.
 func nearest(got string, allowed []string) string {
-	got = strings.ToLower(got)
+	low := strings.ToLower(got)
 	best, bestD := "", 1<<30
 	for _, a := range allowed {
-		distance := editDistance(got, strings.ToLower(a))
+		distance := editDistance(low, strings.ToLower(a))
 		if distance < bestD {
 			best, bestD = a, distance
 		}
 	}
-	if bestD == 0 || bestD > max(2, len(got)/2) {
+	if best == got || bestD > max(2, len(low)/2) {
 		return ""
 	}
 	return best
