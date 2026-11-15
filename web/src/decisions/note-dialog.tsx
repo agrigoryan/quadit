@@ -10,6 +10,7 @@ import { Dialog } from "@/ui/dialog";
 import { Textarea } from "@/ui/input";
 import { Kbd } from "@/ui/kbd";
 import { useReturnFocus } from "@/decisions/data";
+import { sendOnModEnter } from "@/decisions/mod-enter";
 
 export interface NotePrompt {
   title: string;
@@ -79,12 +80,7 @@ export function NoteDialog({ prompt, onClose }: { prompt: NotePrompt; onClose: (
               setNote(e.target.value);
               setMissing(false);
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                submit();
-              }
-            }}
+            onKeyDown={(e) => sendOnModEnter(e, submit)}
             className="min-h-20 max-sm:text-base"
           />
           {missing && (

@@ -139,4 +139,16 @@ describe("NewDecisionDialog", () => {
     fireEvent.click(ask());
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("drops the server's refusal also when the next try stops at a missing question", async () => {
+    show();
+    compose();
+    fireEvent.click(ask());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await act(async () => calls[0]?.fail(new ApiError(400, { message: "the task is closed" })));
+    fireEvent.change(screen.getByLabelText("Question"), { target: { value: "" } });
+    fireEvent.click(ask());
+    expect(screen.queryByText("the task is closed")).toBeNull();
+    expect(screen.getByText("Write the question first.")).toBeInTheDocument();
+  });
 });

@@ -12,7 +12,8 @@ import { Input, Textarea } from "@/ui/input";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { updateDecision } from "@/decisions/actions";
 import { optionsOf, useReturnFocus } from "@/decisions/data";
-import { FormAlert, FormField, NativeSelect, useFieldErrors } from "@/ui/form";
+import { sendOnModEnter } from "@/decisions/mod-enter";
+import { FormAlert, FormField, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
 
 const NONE = "";
 
@@ -23,8 +24,8 @@ export function EditDecisionDialog({ decision, onClose }: { decision: Decision; 
   const [details, setDetails] = useState(decision.details ?? "");
   const [recommended, setRecommended] = useState(decision.recommended_option_id ?? NONE);
   const [recommendation, setRecommendation] = useState(decision.recommendation ?? "");
-  const [busy, setBusy] = useState(false);
   const errors = useFieldErrors(["question", "details", "recommended", "recommendation"]);
+  const { busy, run } = useSubmit(errors, { once: true });
   const id = useId();
   useReturnFocus();
 
@@ -32,8 +33,7 @@ export function EditDecisionDialog({ decision, onClose }: { decision: Decision; 
     if (busy) return;
     errors.clear();
     if (!question.trim()) return errors.set("question", t("decision.new.needQuestion"));
-    setBusy(true);
-    try {
+    await run(async () => {
       await updateDecision(decision, {
         question: question.trim(),
         details: details.trim(),
@@ -42,10 +42,7 @@ export function EditDecisionDialog({ decision, onClose }: { decision: Decision; 
         recommendation: recommended ? recommendation.trim() : "",
       });
       onClose();
-    } catch (err) {
-      errors.fail(err);
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -65,15 +62,7 @@ export function EditDecisionDialog({ decision, onClose }: { decision: Decision; 
         </>
       }
     >
-      <div
-        className="flex flex-col gap-4"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            void submit();
-          }
-        }}
-      >
+      <div className="flex flex-col gap-4" onKeyDown={(e) => sendOnModEnter(e, submit)}>
         <FormField label={t("decision.new.question")} htmlFor={`${id}-q`} error={errors.fields.question}>
           <Input
             id={`${id}-q`}
