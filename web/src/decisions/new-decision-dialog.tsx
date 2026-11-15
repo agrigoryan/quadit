@@ -11,7 +11,8 @@ import { sendOnModEnter } from "@/lib/mod-enter";
 import { useMe, useMembers, useTask } from "@/lib/selectors";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
-import { Field, Input } from "@/ui/input";
+import { FormField } from "@/ui/form";
+import { Input } from "@/ui/input";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { type NewDecision, type NewOptionFile, openDecision } from "@/decisions/actions";
 import { useReturnFocus } from "@/decisions/data";
@@ -152,24 +153,18 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
       }
     >
       <div ref={form} className="flex flex-col gap-4" onKeyDown={(e) => sendOnModEnter(e, submit)}>
-        <Field label={t("decision.new.question")} htmlFor={ids.question}>
+        <FormField label={t("decision.new.question")} htmlFor={ids.question} error={questionError}>
           <Input
             id={ids.question}
             autoFocus
             value={draft.question}
             onChange={(e) => set({ question: e.target.value })}
             placeholder={t("decision.new.questionPlaceholder")}
-            aria-invalid={!!questionError}
             className={cx("h-9! text-base! font-medium max-sm:h-10!", questionError && "border-danger!")}
           />
-          {questionError && (
-            <p role="alert" className="text-xs text-danger">
-              {questionError}
-            </p>
-          )}
-        </Field>
+        </FormField>
 
-        <Field
+        <FormField
           label={t("decision.new.details")}
           htmlFor={ids.details}
           hint={t("decision.new.detailsHint", { mod: MOD })}
@@ -182,7 +177,7 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
             placeholder={t("decision.new.detailsPlaceholder")}
             className="min-h-14 max-sm:text-base"
           />
-        </Field>
+        </FormField>
 
         <HowToAnswer
           kind={draft.kind}

@@ -6,7 +6,7 @@ import { api, ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { FormField, Note, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
-import { Field, Input } from "@/ui/input";
+import { Input } from "@/ui/input";
 
 const backToSignIn = () => (
   <p>
@@ -73,7 +73,7 @@ export function ResetRequestPage() {
   return (
     <AuthLayout title={t("auth.reset.title")} lead={t("auth.reset.lead")} footer={backToSignIn()}>
       <form onSubmit={submit} className="flex flex-col gap-3.5">
-        <Field label={t("auth.email")} htmlFor="email">
+        <FormField label={t("auth.email")} htmlFor="email">
           <Input
             id="email"
             type="email"
@@ -84,7 +84,7 @@ export function ResetRequestPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-        </Field>
+        </FormField>
         {noMail && (
           <div role="alert" className="first-letter:uppercase">
             <Note tone="wait">{noMail}</Note>

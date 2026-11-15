@@ -8,7 +8,8 @@ import { signIn, useSession } from "@/auth/session";
 import { errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
-import { Field, Input } from "@/ui/input";
+import { FormField } from "@/ui/form";
+import { Input } from "@/ui/input";
 
 /**
  * The sign-in page. It offers what the install has turned on: a password,
@@ -79,7 +80,7 @@ export function LoginPage() {
         <FormNotice>{notice}</FormNotice>
         {withPassword && (
           <form onSubmit={submit} className="flex flex-col gap-3.5">
-            <Field label={t("auth.email")} htmlFor="email">
+            <FormField label={t("auth.email")} htmlFor="email">
               <Input
                 id="email"
                 type="email"
@@ -90,8 +91,8 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-            </Field>
-            <Field label={t("auth.password")} htmlFor="password">
+            </FormField>
+            <FormField label={t("auth.password")} htmlFor="password">
               <Input
                 id="password"
                 type="password"
@@ -101,7 +102,7 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-            </Field>
+            </FormField>
             <FormError>{error}</FormError>
             <Button type="submit" variant="primary" size="lg" disabled={busy} className="mt-1 w-full">
               {busy ? t("auth.signIn.busy") : t("auth.signIn.submit")}

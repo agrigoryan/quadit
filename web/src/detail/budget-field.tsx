@@ -9,7 +9,8 @@ import { PropButton } from "@/detail/property-fields";
 import { moneyMicros } from "@/insights/lib/amounts";
 import { setBudget, type TaskBudget } from "@/tasks/actions";
 import { Button } from "@/ui/button";
-import { Field, Input } from "@/ui/input";
+import { FormField } from "@/ui/form";
+import { Input } from "@/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** "$5.00 · 120 min · 3 hand-offs", leaving out what has no limit. */
@@ -69,7 +70,7 @@ function BudgetForm({ task, budget, onDone }: { task: Task; budget: TaskBudget |
   return (
     <form onSubmit={save} className="flex flex-col gap-2.5">
       <p className="text-xs text-ink-2">{t("prop.budget.lead")}</p>
-      <Field label={t("prop.budget.money")} htmlFor="budget-money">
+      <FormField label={t("prop.budget.money")} htmlFor="budget-money">
         <Input
           id="budget-money"
           autoFocus
@@ -78,8 +79,8 @@ function BudgetForm({ task, budget, onDone }: { task: Task; budget: TaskBudget |
           onChange={(e) => setMoney(e.target.value)}
           placeholder="0"
         />
-      </Field>
-      <Field label={t("prop.budget.minutes")} htmlFor="budget-minutes">
+      </FormField>
+      <FormField label={t("prop.budget.minutes")} htmlFor="budget-minutes">
         <Input
           id="budget-minutes"
           inputMode="numeric"
@@ -87,8 +88,8 @@ function BudgetForm({ task, budget, onDone }: { task: Task; budget: TaskBudget |
           onChange={(e) => setMinutes(e.target.value)}
           placeholder="0"
         />
-      </Field>
-      <Field label={t("prop.budget.handoffs")} htmlFor="budget-handoffs">
+      </FormField>
+      <FormField label={t("prop.budget.handoffs")} htmlFor="budget-handoffs">
         <Input
           id="budget-handoffs"
           inputMode="numeric"
@@ -96,7 +97,7 @@ function BudgetForm({ task, budget, onDone }: { task: Task; budget: TaskBudget |
           onChange={(e) => setHandoffs(e.target.value)}
           placeholder="0"
         />
-      </Field>
+      </FormField>
       {error && (
         <p role="alert" className="text-xs text-danger">
           {error}

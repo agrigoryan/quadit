@@ -1,5 +1,6 @@
 import { type InputHTMLAttributes, type Ref, type TextareaHTMLAttributes, useLayoutEffect, useRef } from "react";
 import { cx } from "@/lib/cx";
+import { FormField, useFieldControl } from "@/ui/form";
 
 const field =
   "w-full rounded-md border border-line-strong bg-surface px-2.5 text-sm text-ink outline-none transition-colors " +
@@ -10,7 +11,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Input({ className, ...rest }: InputProps) {
-  return <input className={cx(field, "h-8", className)} {...rest} />;
+  return <input className={cx(field, "h-8", className)} {...useFieldControl(rest.id)} {...rest} />;
 }
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -23,6 +24,7 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 
 export function Textarea({ className, autoGrow = false, bare = false, ref, value, ...rest }: TextareaProps) {
   const own = useRef<HTMLTextAreaElement | null>(null);
+  const described = useFieldControl(rest.id);
 
   useLayoutEffect(() => {
     const el = own.current;
@@ -44,30 +46,14 @@ export function Textarea({ className, autoGrow = false, bare = false, ref, value
         autoGrow && "resize-none overflow-hidden",
         className,
       )}
+      {...described}
       {...rest}
     />
   );
 }
 
-/** A label above a field. */
-export function Field({
-  label,
-  htmlFor,
-  children,
-  hint,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-ink-2">
-        {label}
-      </label>
-      {children}
-      {hint && <p className="text-xs text-ink-3">{hint}</p>}
-    </div>
-  );
-}
+/**
+ * The old name of FormField, kept only until tasks/view-controls.tsx (being
+ * changed in another branch) imports FormField; remove it then.
+ */
+export const Field = FormField;

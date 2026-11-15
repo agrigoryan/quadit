@@ -25,7 +25,7 @@ import { SWATCHES } from "@/lib/swatches";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { StatusIcon } from "@/ui/icons";
-import { Field } from "@/ui/input";
+import { FormField } from "@/ui/form";
 import { Menu, MenuContent, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 import { Select } from "@/ui/picker";
 
@@ -207,7 +207,7 @@ function DeleteStatus({ status, others, onClose }: { status: Status; others: Sta
           </p>
         )}
         {needsMove && (
-          <Field label={t("col.delete.moveTo")}>
+          <FormField label={t("col.delete.moveTo")}>
             <Select
               label={t("col.delete.moveTo")}
               value={moveTo}
@@ -215,7 +215,7 @@ function DeleteStatus({ status, others, onClose }: { status: Status; others: Sta
               onPick={setMoveTo}
               buttonProps={{ className: "h-8 w-full justify-between!" }}
             />
-          </Field>
+          </FormField>
         )}
       </div>
     </Dialog>

@@ -2,7 +2,15 @@
 // select, the hook that puts the server's refusal next to the field it names,
 // and the hook that runs a form's request.
 
-import { type ReactNode, type SelectHTMLAttributes, useCallback, useId, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  useCallback,
+  useContext,
+  useId,
+  useState,
+} from "react";
 import { Checkbox as RCheckbox, Switch as RSwitch } from "radix-ui";
 import { Check, ChevronDown } from "lucide-react";
 import { ApiError, errorMessage } from "@/lib/api";
@@ -10,22 +18,50 @@ import { cx } from "@/lib/cx";
 
 interface FieldProps {
   label: string;
+  /** The id of the one control the label names. Left out (a row of swatches, a picker), the field is a named group. */
   htmlFor?: string;
   hint?: ReactNode;
-  /** What is wrong with the value; replaces the hint and turns the label red. */
+  /** What is wrong with the value; replaces the hint, turns the label red and marks the control invalid. */
   error?: string;
   children: ReactNode;
   className?: string;
 }
 
+/** What a field tells the control it names: the line that describes it, and whether its value is wrong. */
+interface FieldControl {
+  id: string;
+  describedBy?: string;
+  invalid: boolean;
+}
+
+const FieldContext = createContext<FieldControl | null>(null);
+
+/**
+ * The aria-describedby and aria-invalid a control takes from the FormField
+ * around it, when the field's htmlFor is this control's id. Input, Textarea
+ * and NativeSelect use it, so a field's hint and error are read with the
+ * control without each form wiring ids by hand.
+ */
+export function useFieldControl(id: string | undefined): {
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
+} {
+  const field = useContext(FieldContext);
+  if (!field || !id || field.id !== id) return {};
+  return { "aria-describedby": field.describedBy, "aria-invalid": field.invalid || undefined };
+}
+
 /** A label above a field, with a hint or an error under it. */
 export function FormField({ label, htmlFor, hint, error, children, className }: FieldProps) {
-  const labelId = useId();
+  const own = useId();
+  const labelId = `${own}-label`;
+  const noteId = `${own}-note`;
+  const describedBy = error || hint ? noteId : undefined;
   const labelClass = cx("text-xs font-medium", error ? "text-danger" : "text-ink-2");
   return (
     <div
       className={cx("flex min-w-0 flex-col gap-1", className)}
-      {...(htmlFor ? {} : { role: "group", "aria-labelledby": labelId })}
+      {...(htmlFor ? {} : { role: "group", "aria-labelledby": labelId, "aria-describedby": describedBy })}
     >
       {htmlFor ? (
         <label htmlFor={htmlFor} className={labelClass}>
@@ -37,13 +73,17 @@ export function FormField({ label, htmlFor, hint, error, children, className }: 
           {label}
         </span>
       )}
-      {children}
+      <FieldContext value={htmlFor ? { id: htmlFor, describedBy, invalid: !!error } : null}>{children}</FieldContext>
       {error ? (
-        <p role="alert" className="text-xs text-danger first-letter:uppercase">
+        <p id={noteId} role="alert" className="text-xs text-danger first-letter:uppercase">
           {error}
         </p>
       ) : (
-        hint && <p className="text-xs text-ink-3">{hint}</p>
+        hint && (
+          <p id={noteId} className="text-xs text-ink-3">
+            {hint}
+          </p>
+        )
       )}
     </div>
   );
@@ -110,6 +150,16 @@ export function useFieldErrors(known: string[] = []): FieldErrors {
     setForm("");
   }, []);
   return { fields, form, fail, set, clear };
+}
+
+/**
+ * Stops a form's request from a check made in the browser, the same way a
+ * server refusal does: thrown inside `run` (or a FormDialog's onSubmit), the
+ * message lands on `field`, or above the buttons when the form does not show
+ * that field.
+ */
+export function refuse(field: string, message: string): never {
+  throw new ApiError(400, { code: "invalid", field, message });
 }
 
 interface Submit {
@@ -249,6 +299,7 @@ interface NativeSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>
 
 /** The browser's own select, styled like the other fields: right on a phone, quick with keys. */
 export function NativeSelect({ value, onChange, options, className, ...rest }: NativeSelectProps) {
+  const field = useFieldControl(rest.id);
   return (
     <span className={cx("relative inline-flex min-w-0", className)}>
       <select
@@ -258,6 +309,7 @@ export function NativeSelect({ value, onChange, options, className, ...rest }: N
           "h-8 w-full min-w-0 appearance-none rounded-md border border-line-strong bg-surface pr-7 pl-2.5 text-sm text-ink outline-none " +
           "transition-colors hover:border-ink-3 focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
         }
+        {...field}
         {...rest}
       >
         {options.map((o) => (
