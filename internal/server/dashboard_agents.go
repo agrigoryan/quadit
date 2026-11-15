@@ -155,39 +155,10 @@ func actsIn(action string, keys map[string]bool) bool {
 func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: w.lastAction(m),
 		Listening: m.ListeningUntil > w.now.UnixMilli() || w.pushed[m.UserID]}
-	mine, waitsOnOthers := w.countTasks(m, &a)
-	a.Open = mine
-	w.countAsked(m, &a)
-	w.findSession(m, &a)
-	switch {
-	case a.State == "working":
-	case a.Queue > 0:
-		a.State = "has_work"
-	case mine > 0 && waitsOnOthers == mine:
-		a.State = "waiting"
-	}
-	if a.State != "waiting" {
-		a.WaitsOn = ""
-	}
-	err := w.addSpending(m, &a)
-	return a, err
-}
 
-// lastAction is the agent's last action as the caller may see it: only
-// when it was on a task of the projects the agents are seen in.
-func (w *agentWork) lastAction(m core.Member) string {
-	shown := []core.Member{m}
-	w.x.hideActions(shown)
-	if w.keys != nil && !actsIn(shown[0].LastAction, w.keys) {
-		return ""
-	}
-	return shown[0].LastAction
-}
-
-// countTasks goes through the open tasks for one agent: what waits on it
-// (into a.Queue), what is its own, which of those wait on someone else, and
-// the task it holds (which makes it working).
-func (w *agentWork) countTasks(m core.Member, a *agentState) (mine, waitsOnOthers int) {
+	// The open tasks: what waits on it, what is its own, which of those wait
+	// on someone else, and the task it holds (which makes it working).
+	var mine, waitsOnOthers int
 	for _, t := range w.tasks {
 		if !core.OpenCategory(w.names.statuses[t.StatusID].Category) {
 			continue
@@ -207,39 +178,42 @@ func (w *agentWork) countTasks(m core.Member, a *agentState) (mine, waitsOnOther
 			a.State, a.Task, a.Doing = "working", t.Key, t.Title
 		}
 	}
-	return mine, waitsOnOthers
-}
+	a.Open = mine
 
-// countAsked adds to the queue the open questions asked of the agent on
-// tasks that do not already wait on it.
-func (w *agentWork) countAsked(m core.Member, a *agentState) {
+	// Open questions asked of it wait on it too, on tasks that do not
+	// already.
 	for _, question := range w.asked {
 		if t, ok := w.keyOf[question.TaskID]; ok && question.AskedID == m.UserID && t.WaitingOnID != m.UserID {
 			a.Queue++
 		}
 	}
-}
 
-// findSession marks the agent working when it runs a session, on the
-// session's task.
-func (w *agentWork) findSession(m core.Member, a *agentState) {
+	// A running session makes it working, on the session's task.
 	for _, session := range w.sessions {
 		if session.AgentID == m.UserID {
 			a.State, a.Doing, a.Since = "working", firstNonEmpty(session.Title, a.Doing), formatTime(session.StartedAt)
 			if t, ok := w.keyOf[session.TaskID]; ok {
 				a.Task = t.Key
 			}
-			return
+			break
 		}
 	}
-}
 
-// addSpending adds what the agent has spent this week, and its budget.
-func (w *agentWork) addSpending(m core.Member, a *agentState) error {
-	x := w.x
-	cost, minutes, err := x.s.eng.Usage(x.ctx(), x.db, m.UserID, weekStart(w.now))
+	switch {
+	case a.State == "working":
+	case a.Queue > 0:
+		a.State = "has_work"
+	case mine > 0 && waitsOnOthers == mine:
+		a.State = "waiting"
+	}
+	if a.State != "waiting" {
+		a.WaitsOn = ""
+	}
+
+	// What it has spent this week, and its budget.
+	cost, minutes, err := w.x.s.eng.Usage(w.x.ctx(), w.x.db, m.UserID, weekStart(w.now))
 	if err != nil {
-		return err
+		return a, err
 	}
 	if cost > 0 {
 		a.CostWeek = formatMoney(cost)
@@ -248,7 +222,18 @@ func (w *agentWork) addSpending(m core.Member, a *agentState) error {
 	if budget := m.Budget; budget != nil && budget.CostMicros > 0 {
 		a.Budget = formatMoney(budget.CostMicros)
 	}
-	return nil
+	return a, nil
+}
+
+// lastAction is the agent's last action as the caller may see it: only
+// when it was on a task of the projects the agents are seen in.
+func (w *agentWork) lastAction(m core.Member) string {
+	shown := []core.Member{m}
+	w.x.hideActions(shown)
+	if w.keys != nil && !actsIn(shown[0].LastAction, w.keys) {
+		return ""
+	}
+	return shown[0].LastAction
 }
 
 // handleListAgents is the live view of agents: who is doing what, who is waiting,
