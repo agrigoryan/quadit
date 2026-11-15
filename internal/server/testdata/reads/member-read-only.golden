@@ -22935,27 +22935,6 @@ duplicates  task=<task OPS-2>  related_task=<task SVA-3>  id=<relation OPS-2 dup
    "file": {
     "content_type": "text/plain; charset=utf-8",
     "created_at": 1700000000000,
-    "id": "<file salaries.txt>",
-    "name": "salaries.txt",
-    "received": 14,
-    "sha256": "fa182273c0f8076fbfbc7ef8284dffc6a9aba444e227099dbb13d55bda66cf0e",
-    "size": 14,
-    "state": "ready",
-    "uploaded_by": "<@aram>",
-    "url": "http://quadit.test/f/<file salaries.txt>/salaries.txt"
-   },
-   "file_id": "<file salaries.txt>",
-   "id": "<attachment Salary>",
-   "rank": "00000000sg",
-   "subject_id": "<doc Salary notes>",
-   "subject_type": "doc"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "file": {
-    "content_type": "text/plain; charset=utf-8",
-    "created_at": 1700000000000,
     "id": "<file runbook.txt>",
     "name": "runbook.txt",
     "received": 18,
@@ -23109,7 +23088,6 @@ duplicates  task=<task OPS-2>  related_task=<task SVA-3>  id=<relation OPS-2 dup
 
 === GET /api/v1/w/games/list/attachments?format=text
 200
-salaries.txt  file=<file salaries.txt>  id=<attachment Salary>
 runbook.txt  file=<file runbook.txt>  id=<attachment OPS runbook>
 handbook.txt  file=<file handbook.txt>  id=<attachment Handbook>
 nights.txt  task=<task OPS-1>  file=<file nights.txt>  id=<attachment OPS decision>

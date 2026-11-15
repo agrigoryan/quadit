@@ -380,15 +380,21 @@ func (who *viewer) hideActions(ctx context.Context, members []core.Member) {
 
 // Attachments.
 
-// visibleAttachments is the rule of attachments: one on a task is seen by
-// whoever may read the task's project; a task that cannot be read hides it.
+// visibleAttachments is the rule of attachments. One on a task (on the
+// task itself, or on a comment, a decision or an option of it) is seen by
+// whoever may read the task's project; one on a page by whoever may see
+// the page. A task or a page that cannot be read hides what is on it.
 func visibleAttachments(ctx context.Context, who *viewer, atts []core.Attachment) []core.Attachment {
 	return keep(atts, func(a core.Attachment) bool {
-		if a.TaskID == "" {
+		if a.TaskID != "" {
+			var t core.Task
+			return who.db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && who.canProject(t.ProjectID)
+		}
+		if a.SubjectType != "doc" {
 			return true
 		}
-		var t core.Task
-		return who.db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && who.canProject(t.ProjectID)
+		var page core.Doc
+		return who.db.Get(ctx, &page, store.Eq("id", a.SubjectID)) == nil && who.canSeeDoc(page)
 	})
 }
 

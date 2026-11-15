@@ -86,3 +86,39 @@ func TestTheStartingCopyKeepsRelationsToReadableTasks(t *testing.T) {
 		}
 	})
 }
+
+// TestListedAttachmentsFollowTheirPage: /list/attachments gives a file on
+// a page only to those who may see the page. One on someone's private
+// page, or on a page of a project the caller may not read, is not listed.
+func TestListedAttachmentsFollowTheirPage(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		narrow := oneProjectOnly(t, s)
+		attach := func(name string, to M) {
+			var f struct{ ID string }
+			s.call(s.owner, "", "POST", w+"/files?name="+name, []byte("x"), 201, &f)
+			to["file"] = f.ID
+			s.change(s.owner, "", "attachment.add", to)
+		}
+		page := func(args M) string { return s.change(s.owner, "", "doc.create", args)["ref"].(string) }
+		attach("handbook.txt", M{"doc": page(M{"title": "Handbook"})})
+		attach("design.txt", M{"doc": page(M{"title": "Design", "project": "SVA"})})
+		attach("salaries.txt", M{"doc": page(M{"title": "Salaries", "private": true})})
+		attach("runbook.txt", M{"doc": page(M{"title": "Runbook", "project": "OPS"})})
+		attach("boss.txt", M{"task": "SVA-1"})
+		attach("keys.txt", M{"task": "OPS-1"})
+
+		all := s.call(s.owner, "", "GET", w+"/list/attachments", nil, 200, nil)
+		for _, name := range []string{"handbook.txt", "design.txt", "salaries.txt", "runbook.txt", "boss.txt", "keys.txt"} {
+			if !strings.Contains(all, name) {
+				t.Fatalf("the owner's list leaves out %s: %s", name, all)
+			}
+		}
+		out := s.call(nil, narrow, "GET", w+"/list/attachments", nil, 200, nil)
+		for name, listed := range map[string]bool{"handbook.txt": true, "design.txt": true, "boss.txt": true, "salaries.txt": false, "runbook.txt": false, "keys.txt": false} {
+			if strings.Contains(out, name) != listed {
+				t.Errorf("%s listed for a caller limited to SVA: %v, want %v", name, !listed, listed)
+			}
+		}
+	})
+}

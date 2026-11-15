@@ -16625,48 +16625,6 @@ relates  task=<task SVA-1>  related_task=<task OPS-1>  id=<relation SVA-1 relate
    "file": {
     "content_type": "text/plain; charset=utf-8",
     "created_at": 1700000000000,
-    "id": "<file salaries.txt>",
-    "name": "salaries.txt",
-    "received": 14,
-    "sha256": "fa182273c0f8076fbfbc7ef8284dffc6a9aba444e227099dbb13d55bda66cf0e",
-    "size": 14,
-    "state": "ready",
-    "uploaded_by": "<@aram>",
-    "url": "http://quadit.test/f/<file salaries.txt>/salaries.txt"
-   },
-   "file_id": "<file salaries.txt>",
-   "id": "<attachment Salary>",
-   "rank": "00000000sg",
-   "subject_id": "<doc Salary notes>",
-   "subject_type": "doc"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "file": {
-    "content_type": "text/plain; charset=utf-8",
-    "created_at": 1700000000000,
-    "id": "<file runbook.txt>",
-    "name": "runbook.txt",
-    "received": 18,
-    "sha256": "4386539aea1c050edc39dfe94916cc347756a6db6d83bcd53f17bcf7b95c9ce7",
-    "size": 18,
-    "state": "ready",
-    "uploaded_by": "<@aram>",
-    "url": "http://quadit.test/f/<file runbook.txt>/runbook.txt"
-   },
-   "file_id": "<file runbook.txt>",
-   "id": "<attachment OPS runbook>",
-   "rank": "00000000sg",
-   "subject_id": "<doc OPS runbook>",
-   "subject_type": "doc"
-  },
-  {
-   "created_at": 1700000000000,
-   "created_by": "<@aram>",
-   "file": {
-    "content_type": "text/plain; charset=utf-8",
-    "created_at": 1700000000000,
     "id": "<file handbook.txt>",
     "name": "handbook.txt",
     "received": 19,
@@ -16755,8 +16713,6 @@ relates  task=<task SVA-1>  related_task=<task OPS-1>  id=<relation SVA-1 relate
 
 === GET /api/v1/w/games/list/attachments?format=text
 200
-salaries.txt  file=<file salaries.txt>  id=<attachment Salary>
-runbook.txt  file=<file runbook.txt>  id=<attachment OPS runbook>
 handbook.txt  file=<file handbook.txt>  id=<attachment Handbook>
 ring.txt  task=<task SVA-1>  file=<file ring.txt>  id=<attachment option>
 notes.txt  task=<task SVA-1>  file=<file notes.txt>  id=<attachment SVA-1>
