@@ -158,6 +158,10 @@ func listen(ctx context.Context, url string, each func(workspaceID string, seq i
 		if err != nil {
 			return err
 		}
+		if n.Payload == "poke" {
+			each("", -1) // no feed moved: wake everyone to look again
+			continue
+		}
 		if ws, seq, ok := strings.Cut(n.Payload, ":"); ok {
 			if v, err := strconv.ParseInt(seq, 10, 64); err == nil {
 				each(ws, v)

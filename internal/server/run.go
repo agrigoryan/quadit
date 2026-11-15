@@ -79,7 +79,13 @@ func (s *Server) hearOtherServers(ctx context.Context) {
 		return
 	}
 	for ctx.Err() == nil {
-		err := l.Listen(ctx, s.hub.Notify)
+		err := l.Listen(ctx, func(ws string, seq int64) {
+			if seq < 0 {
+				s.hub.PokeAll()
+				return
+			}
+			s.hub.Notify(ws, seq)
+		})
 		if errors.Is(err, store.ErrNoListen) || ctx.Err() != nil {
 			return
 		}

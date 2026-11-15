@@ -289,6 +289,7 @@ func (s *Server) hResetConfirm(x *c) error {
 		return err
 	}
 	s.st.Update(ctx, "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("user_id", ot.UserID), store.Null("revoked_at"))
+	s.accessChanged()
 	s.audit(x.r, "", core.User{ID: ot.UserID}, "password.reset", "user", ot.UserID, nil)
 	return x.ok(map[string]any{"ok": true})
 }

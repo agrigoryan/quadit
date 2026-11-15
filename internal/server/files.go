@@ -27,6 +27,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -137,7 +138,25 @@ func (s *Server) hUpload(x *c) error {
 	if size > maxSize {
 		return errBad("files can be up to %d MB; this one is %d MB", maxSize>>20, size>>20)
 	}
-	f := core.File{ID: id.New(), WorkspaceID: x.ws.ID, Name: name, ContentType: ctype, Size: size, State: "uploading",
+	// The caller may name the file's id itself (?id=): if the answer to this
+	// first request is lost, asking for that file says how far it got, and
+	// starting again with the same id does not make a second one.
+	fid := v.Get("id")
+	if fid != "" {
+		if !looksUUID(fid) {
+			return errBad("id must be a UUID made by the caller")
+		}
+		var had core.File
+		if err := x.db.Get(ctx, &had, store.Eq("id", fid)); err == nil {
+			if had.UploadedBy != x.member.UserID {
+				return &engine.Error{Code: engine.CodeConflict, Message: "that file id is taken"}
+			}
+			return x.ok(s.fileOut(x, had))
+		}
+	} else {
+		fid = id.New()
+	}
+	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: name, ContentType: ctype, Size: size, State: "uploading",
 		UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
 	f.StorageKey = x.ws.ID + "/" + f.ID
 	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
@@ -459,4 +478,22 @@ func (s *Server) hFileServe(x *c) error {
 	h.Set("Content-Disposition", mime.FormatMediaType(disp, map[string]string{"filename": name}))
 	http.ServeContent(x.w, x.r, "", mod, rd)
 	return nil
+}
+
+// looksUUID reports whether s has the shape of a lower-case UUID.
+func looksUUID(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i, r := range s {
+		switch {
+		case i == 8 || i == 13 || i == 18 || i == 23:
+			if r != '-' {
+				return false
+			}
+		case (r < '0' || r > '9') && (r < 'a' || r > 'f'):
+			return false
+		}
+	}
+	return true
 }

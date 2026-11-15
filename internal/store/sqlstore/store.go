@@ -71,6 +71,16 @@ func (s *Store) Listen(ctx context.Context, each func(workspaceID string, seq in
 	return s.listen(ctx, each)
 }
 
+// Poke tells every server sharing the database to wake its waiters with no
+// news in the feed. It does nothing on a database only one server uses.
+func (s *Store) Poke(ctx context.Context) error {
+	if s.d.Name != "postgres" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx, `SELECT pg_notify('`+FeedChannel+`', 'poke')`)
+	return err
+}
+
 // SetListen gives the store its way to hear of other servers' writes.
 func (s *Store) SetListen(fn func(ctx context.Context, each func(workspaceID string, seq int64)) error) {
 	s.listen = fn

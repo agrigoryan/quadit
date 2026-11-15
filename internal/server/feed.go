@@ -107,7 +107,9 @@ func (s *Server) hEvents(x *c) error {
 		tf.Limit, tf.Sort = 0, ""
 		f.Tasks = &tf
 	} else if x.projects != nil {
-		f.ProjectIDs = x.projects
+		// Their projects, and what belongs to no project (labels of the
+		// workspace, members), exactly as the live stream gives it.
+		f.ProjectIDs, f.AllowNoProject = x.projects, true
 	}
 	wait := min(x.intParam("wait", 0), 55)
 	deadline := time.Now().Add(time.Duration(wait) * time.Second)
@@ -290,7 +292,9 @@ func (s *Server) hStream(x *c) error {
 		select {
 		case <-woke:
 		case <-beat.C:
-			fmt.Fprintf(x.w, ": beat\n\n")
+			// Both a comment and a named event: the second is what a browser's
+			// own EventSource lets a page see, to tell a live stream from a dead one.
+			fmt.Fprintf(x.w, ": beat\n\nevent: beat\ndata: {}\n\n")
 			flusher.Flush()
 		case <-ctx.Done():
 			cancel()
@@ -332,4 +336,14 @@ func (s *Server) access(x *c) (fingerprint string, ok bool) {
 	}
 	scope, _ := json.Marshal(m.Scope)
 	return string(m.Role) + " " + string(scope), true
+}
+
+// accessChanged wakes every held connection, on this server and the others,
+// to ask again whether its caller may still be here: a session was ended, a
+// token revoked, an account disabled.
+func (s *Server) accessChanged() {
+	s.hub.PokeAll()
+	if p, ok := s.st.(interface{ Poke(context.Context) error }); ok {
+		p.Poke(context.Background())
+	}
 }

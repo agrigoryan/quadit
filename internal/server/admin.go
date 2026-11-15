@@ -202,6 +202,7 @@ func (s *Server) hUserPatch(x *c) error {
 		now := time.Now().UnixMilli()
 		s.st.Update(ctx, "sessions", map[string]any{"revoked_at": now}, store.Eq("user_id", u.ID), store.Null("revoked_at"))
 		s.st.Update(ctx, "api_tokens", map[string]any{"revoked_at": now}, store.Eq("user_id", u.ID), store.Null("revoked_at"))
+		s.accessChanged()
 	}
 	s.audit(x.r, "", x.user, "user.changed", "user", u.ID, b)
 	s.st.Get(ctx, &u, store.Eq("id", u.ID))

@@ -204,6 +204,7 @@ func (s *Server) finishSignIn(x *c, u core.User, method string) error {
 func (s *Server) hLogout(x *c) error {
 	if ck, err := x.r.Cookie(sessionCookie); err == nil {
 		s.st.Update(x.ctx(), "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("token_hash", auth.Hash(ck.Value)))
+		s.accessChanged()
 	}
 	s.clearCookie(x)
 	return x.ok(map[string]any{"ok": true})
@@ -375,6 +376,7 @@ func (s *Server) hPassword(x *c) error {
 	}
 	// Every other browser is signed out.
 	s.st.Update(ctx, "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("user_id", x.user.ID), store.Ne("id", x.sess.ID), store.Null("revoked_at"))
+	s.accessChanged()
 	s.audit(x.r, "", x.user, "password.changed", "user", x.user.ID, nil)
 	return x.ok(map[string]any{"ok": true})
 }
@@ -402,6 +404,7 @@ func (s *Server) hSessionRevoke(x *c) error {
 	if err != nil {
 		return err
 	}
+	s.accessChanged()
 	if n == 0 {
 		return errNotFound("session")
 	}
@@ -580,6 +583,7 @@ func (s *Server) hTokenRevoke(x *c) error {
 	if _, err := x.db.Update(x.ctx(), "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", t.ID)); err != nil {
 		return err
 	}
+	s.accessChanged()
 	s.audit(x.r, x.ws.ID, x.user, "token.revoked", "token", t.ID, nil)
 	return x.ok(map[string]any{"ok": true})
 }
