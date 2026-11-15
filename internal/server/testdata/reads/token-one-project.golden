@@ -59,7 +59,7 @@ ready
    "current": false,
    "expires_at": 1700000000000,
    "id": "<id #148>",
-   "ip": "127.0.0.1",
+   "ip": "<loopback>",
    "last_seen_at": 1700000000000,
    "stage": "full",
    "user_agent": "Go-http-client/1.1",
@@ -103,99 +103,99 @@ ready
 
 === GET /api/v1/changes?format=text
 200
-agent.create (member): id, name, handle, description, avatar, role, responsible, scope, budget, task
-agent.update (admin): id, name, description, avatar, responsible, scope, budget
-attachment.add (member): id, file, role, caption, task, comment, decision, option, doc
-attachment.remove (member): id
-attachment.restore (member): id
-comment.create (member): id, task, doc, body, decision, option, block, parent, kind, evidence, attachments, waiting_on, waiting_on_note
-comment.delete (member): id
-comment.update (member): id, body, resolved
-cycle.create (member): id, project, name, starts_on, ends_on
-cycle.delete (member): id
-cycle.update (member): id, name, starts_on, ends_on
+agent.create (member): id, name (required), handle, description, avatar, role, responsible, scope, budget, task
+agent.update (admin): id (required), name, description, avatar, responsible, scope, budget
+attachment.add (member): id, file (required), role, caption, task, comment, decision, option, doc
+attachment.remove (member): id (required)
+attachment.restore (member): id (required)
+comment.create (member): id, task, doc, body (required), decision, option, block, parent, kind, evidence, attachments, waiting_on, waiting_on_note
+comment.delete (member): id (required)
+comment.update (member): id (required), body, resolved
+cycle.create (member): id, project (required), name, starts_on (required), ends_on (required)
+cycle.delete (member): id (required)
+cycle.update (member): id (required), name, starts_on, ends_on
 dbview.create (member): id, database, name, type, config, rank
-dbview.delete (member): id
+dbview.delete (member): id (required)
 dbview.update (member): id, database, name, type, config, rank
-decision.delete (member): id
-decision.open (member): id, task, kind, question, details, options, recommended, recommendation, ask, action, args
-decision.pick (member): id, option, outcome, note
-decision.restore (member): id
-decision.unclear (member): id, note
-decision.update (member): id, question, details, recommendation, recommended
+decision.delete (member): id (required)
+decision.open (member): id, task (required), kind, question (required), details, options, recommended, recommendation, ask, action, args
+decision.pick (member): id (required), option, outcome, note
+decision.restore (member): id (required)
+decision.unclear (member): id (required), note (required)
+decision.update (member): id (required), question, details, recommendation, recommended
 doc.create (member): id, parent, title, icon, kind, project, private, shared_with, generated, memory_of, rank, markdown, blocks, props
-doc.delete (member): id
-doc.edit (member): doc, ops
-doc.restore (member): id
-doc.revert (member): doc, version
-doc.snapshot (member): doc, label
-doc.update (member): id, title, icon, cover, parent, rank, project, private, shared_with, archived, props
-doc.write (member): doc, markdown, mode
-epic.create (member): id, project, name, description, state, lead, color, icon, start_on, target_on, rank
-epic.delete (member): id
-epic.update (member): id, name, description, state, lead, color, icon, start_on, target_on, rank
+doc.delete (member): id (required)
+doc.edit (member): doc (required), ops (required)
+doc.restore (member): id (required)
+doc.revert (member): doc (required), version (required)
+doc.snapshot (member): doc (required), label
+doc.update (member): id (required), title, icon, cover, parent, rank, project, private, shared_with, archived, props
+doc.write (member): doc (required), markdown, mode
+epic.create (member): id, project (required), name (required), description, state, lead, color, icon, start_on, target_on, rank
+epic.delete (member): id (required)
+epic.update (member): id (required), name, description, state, lead, color, icon, start_on, target_on, rank
 integration.create (admin): id, kind, name, project, config, secret, active
-integration.delete (admin): id
+integration.delete (admin): id (required)
 integration.update (admin): id, kind, name, project, config, secret, active
-label.create (member): id, name, color, description, project
-label.delete (admin): id
-label.update (admin): id, name, color, description
-link.remove (member): id
-link.set (member): id, task, kind, url, title, repo, ref, state, checks, data
-member.add (admin): user, handle, role, title, scope
-member.remove (admin): id
-member.update (admin): id, role, handle, title, suspended, scope
-milestone.create (member): id, epic, name, description, target_on, rank
-milestone.delete (member): id
-milestone.update (member): id, name, description, target_on, rank
+label.create (member): id, name (required), color, description, project
+label.delete (admin): id (required)
+label.update (admin): id (required), name, color, description
+link.remove (member): id (required)
+link.set (member): id, task (required), kind (required), url, title, repo, ref, state, checks, data
+member.add (admin): user (required), handle, role, title, scope
+member.remove (admin): id (required)
+member.update (admin): id (required), role, handle, title, suspended, scope
+milestone.create (member): id, epic (required), name (required), description, target_on, rank
+milestone.delete (member): id (required)
+milestone.update (member): id (required), name, description, target_on, rank
 notification.read (member): ids, task, all, up_to, unread, archive
-notify (member): user, task, message
-preference.create (admin): id, body, project, decision, labels
-preference.delete (admin): id
-preference.update (admin): id, body, retired
-project.create (admin): id, key, name, description, icon, color, lead, settings
-project.delete (admin): id
-project.update (admin): id, key, name, description, icon, color, lead, rank, settings, archived
+notify (member): user (required), task, message (required)
+preference.create (admin): id, body (required), project, decision, labels
+preference.delete (admin): id (required)
+preference.update (admin): id (required), body, retired
+project.create (admin): id, key (required), name (required), description, icon, color, lead, settings
+project.delete (admin): id (required)
+project.update (admin): id (required), key, name, description, icon, color, lead, rank, settings, archived
 property.create (member): id, database, name, type, config, rank, rename_option
-property.delete (member): id
+property.delete (member): id (required)
 property.update (member): id, database, name, type, config, rank, rename_option
-relation.add (member): id, task, type, other
-relation.remove (member): id
-resource.acquire (member): id, resource, task, note, minutes
-resource.create (admin): id, name, description
-resource.delete (admin): id
-resource.release (member): resource, user
+relation.add (member): id, task (required), type, other (required)
+relation.remove (member): id (required)
+resource.acquire (member): id, resource (required), task, note, minutes
+resource.create (admin): id, name (required), description
+resource.delete (admin): id (required)
+resource.release (member): resource (required), user
 rule.create (admin): id, name, active, match, action
-rule.delete (admin): id
+rule.delete (admin): id (required)
 rule.update (admin): id, name, active, match, action
-secret.delete (admin): id
-secret.set (admin): id, name, description, value, hosts, agents, env
+secret.delete (admin): id (required)
+secret.set (admin): id, name (required), description, value, hosts, agents, env
 session.start (member): id, task, title, instructions
-session.update (member): id, title, summary, state, add_steps, add_links, cost_micros, tokens_in, tokens_out
+session.update (member): id (required), title, summary, state, add_steps, add_links, cost_micros, tokens_in, tokens_out
 source.create (admin): id, root, title, repo, branch, subdir, authority, write_mode
-source.delete (admin): id
+source.delete (admin): id (required)
 source.update (admin): id, root, title, repo, branch, subdir, authority, write_mode
-status.create (admin): id, project, name, category, color, rank
-status.delete (admin): id, move_to
-status.update (admin): id, name, category, color, rank, is_default
+status.create (admin): id, project (required), name (required), category (required), color, rank
+status.delete (admin): id (required), move_to
+status.update (admin): id (required), name, category, color, rank, is_default
 task.create (member): id, project, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, labels, due_on, rank, template, budget, number
-task.delete (member): id
-task.move (member): id, project
-task.release (member): id
-task.restore (member): id
-task.take (member): id, minutes
-task.update (member): id, base_seq, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, due_on, rank, labels, add_labels, remove_labels, archived, budget
-template.create (member): id, project, name, title, description, preset
-template.delete (member): id
-template.update (member): id, name, title, description, preset
+task.delete (member): id (required)
+task.move (member): id (required), project (required)
+task.release (member): id (required)
+task.restore (member): id (required)
+task.take (member): id (required), minutes
+task.update (member): id (required), base_seq, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, due_on, rank, labels, add_labels, remove_labels, archived, budget
+template.create (member): id, project, name (required), title, description, preset
+template.delete (member): id (required)
+template.update (member): id (required), name, title, description, preset
 view.create (member): id, name, project, description, icon, query, layout, display, shared, rank
-view.delete (member): id
+view.delete (member): id (required)
 view.update (member): id, name, description, icon, query, layout, display, shared, rank
-watch.set (member): type, subject, watching, user
-webhook.create (admin): id, name, url, secret, event_types, project, for, active
-webhook.delete (admin): id
-webhook.update (admin): id, name, url, secret, event_types, project, for, active
-workspace.delete (owner): confirm
+watch.set (member): type, subject (required), watching, user
+webhook.create (admin): id, name, url (required), secret, event_types, project, for, active
+webhook.delete (admin): id (required)
+webhook.update (admin): id (required), name, url, secret, event_types, project, for, active
+workspace.delete (owner): confirm (required)
 workspace.update (admin): name, icon, settings
 surface: 1.0 (within 1.x nothing is removed or renamed)
 
@@ -22286,7 +22286,7 @@ DEPLOY_KEY  for the staging box
     "name": "sva only"
    },
    "id": "<id #454>",
-   "ip": "127.0.0.1",
+   "ip": "<loopback>",
    "target_id": "<id #415>",
    "target_type": "token",
    "user_agent": "Go-http-client/1.1",
@@ -22298,7 +22298,7 @@ DEPLOY_KEY  for the staging box
    "actor_name": "Aram",
    "at": 1700000000000,
    "id": "<id #455>",
-   "ip": "127.0.0.1",
+   "ip": "<loopback>",
    "target_id": "<id #147>",
    "target_type": "workspace",
    "user_agent": "Go-http-client/1.1",
@@ -22317,7 +22317,7 @@ DEPLOY_KEY  for the staging box
     "url": "http://receiver.test/comments"
    },
    "id": "<id #418>",
-   "ip": "127.0.0.1",
+   "ip": "<loopback>",
    "target_id": "<webhook comments>",
    "target_type": "webhook",
    "user_agent": "Go-http-client/1.1",
@@ -22337,7 +22337,7 @@ DEPLOY_KEY  for the staging box
     "value": "•••"
    },
    "id": "<id #419>",
-   "ip": "127.0.0.1",
+   "ip": "<loopback>",
    "target_id": "<secret DEPLOY_KEY>",
    "target_type": "secret",
    "user_agent": "Go-http-client/1.1",
@@ -22356,7 +22356,7 @@ DEPLOY_KEY  for the staging box
     "secret": "<secret>"
    },
    "id": "<id #420>",
-   "ip": "127.0.0.1",
+   "ip": "<loopback>",
    "target_id": "<integration OPS>",
    "target_type": "integration",
    "user_agent": "Go-http-client/1.1",
@@ -22376,7 +22376,7 @@ DEPLOY_KEY  for the staging box
    "actor_name": "Aram",
    "at": 1700000000000,
    "id": "<id #455>",
-   "ip": "127.0.0.1",
+   "ip": "<loopback>",
    "target_id": "<id #147>",
    "target_type": "workspace",
    "user_agent": "Go-http-client/1.1",

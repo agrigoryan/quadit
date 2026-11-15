@@ -989,6 +989,8 @@ var (
 	cursorRE  = regexp.MustCompile(`cursor=[A-Za-z0-9_-]{20,}`)
 	weekRE    = regexp.MustCompile(`\b\d{4}, week \d+\b`)
 	isoWeekRE = regexp.MustCompile(`\b\d{4}-W\d\d\b`)
+	// A session remembers the address it was started from: the test's client reaches the server over either loopback.
+	loopbackRE = regexp.MustCompile(`"ip":\s*"(127\.0\.0\.1|::1)"`)
 )
 
 // text makes one piece of text the same on every run.
@@ -1015,6 +1017,7 @@ func (n *normaliser) text(s string) string {
 	s = tokenRE.ReplaceAllString(s, "qd_<prefix>")
 	s = weekRE.ReplaceAllString(s, "<week>")
 	s = isoWeekRE.ReplaceAllString(s, "<week>")
+	s = loopbackRE.ReplaceAllString(s, `"ip":"<loopback>"`)
 	return s
 }
 
