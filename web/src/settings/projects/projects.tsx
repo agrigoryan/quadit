@@ -63,6 +63,7 @@ export function ProjectsPage() {
   // The first-run call on My work links here with ?new=1.
   useEffect(() => {
     if (params.get("new") && admin) {
+      // oxlint-disable-next-line react/set-state-in-effect -- the link is used up as it is followed, opening the dialog and leaving the address; taken off on close instead, it would undo the move to a project just made
       setCreating(true);
       setParams({}, { replace: true });
     }

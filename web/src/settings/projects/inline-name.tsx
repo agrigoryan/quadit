@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { cx } from "@/lib/cx";
 
 interface Props {
@@ -13,7 +13,12 @@ interface Props {
 /** A name edited in place: Enter or leaving the field saves, Escape puts the old name back. */
 export function InlineName({ value, onSave, label, disabled, className }: Props) {
   const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
+  // The name changed elsewhere (another tab, another person): show the new one.
+  const [shown, setShown] = useState(value);
+  if (shown !== value) {
+    setShown(value);
+    setText(value);
+  }
 
   function commit() {
     const next = text.trim();
