@@ -7,9 +7,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// hCycleChart returns a cycle's scope against done, day by day, in tasks
+// handleShowCycleChart returns a cycle's scope against done, day by day, in tasks
 // and in points.
-func (s *Server) hCycleChart(x *c) error {
+func (s *Server) handleShowCycleChart(x *c) error {
 	var cy core.Cycle
 	if err := x.db.Get(x.ctx(), &cy, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil || !x.canProject(cy.ProjectID) {
 		return errNotFound("cycle")

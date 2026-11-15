@@ -24,23 +24,23 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /.well-known/oauth-protected-resource", s.hOAuthResource)
-		m.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", s.hOAuthResource)
-		m.HandleFunc("GET /.well-known/oauth-authorization-server", s.hOAuthMeta)
-		m.HandleFunc("POST /oauth/register", s.open(s.hOAuthRegister))
-		m.HandleFunc("GET /oauth/authorize", s.open(s.hOAuthAuthorize))
-		m.HandleFunc("POST /oauth/authorize", s.open(s.hOAuthApprove))
-		m.HandleFunc("POST /oauth/token", s.hOAuthToken)
+		m.HandleFunc("GET /.well-known/oauth-protected-resource", s.handleDescribeProtectedResource)
+		m.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", s.handleDescribeProtectedResource)
+		m.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleDescribeAuthorizationServer)
+		m.HandleFunc("POST /oauth/register", s.open(s.handleRegisterOAuthClient))
+		m.HandleFunc("GET /oauth/authorize", s.open(s.handleShowConsentPage))
+		m.HandleFunc("POST /oauth/authorize", s.open(s.handleAnswerConsentPage))
+		m.HandleFunc("POST /oauth/token", s.handleIssueOAuthToken)
 	})
 }
 
-func (s *Server) hOAuthResource(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDescribeProtectedResource(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"resource": s.cfg.BaseURL + "/mcp", "authorization_servers": []string{s.cfg.BaseURL},
 		"bearer_methods_supported": []string{"header"}})
 }
 
-func (s *Server) hOAuthMeta(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDescribeAuthorizationServer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	b := s.cfg.BaseURL
 	json.NewEncoder(w).Encode(map[string]any{"issuer": b, "authorization_endpoint": b + "/oauth/authorize", "token_endpoint": b + "/oauth/token",
@@ -49,8 +49,8 @@ func (s *Server) hOAuthMeta(w http.ResponseWriter, r *http.Request) {
 		"token_endpoint_auth_methods_supported": []string{"none"}, "scopes_supported": []string{"read", "write"}})
 }
 
-// hOAuthRegister lets a client introduce itself (RFC 7591).
-func (s *Server) hOAuthRegister(x *c) error {
+// handleRegisterOAuthClient lets a client introduce itself (RFC 7591).
+func (s *Server) handleRegisterOAuthClient(x *c) error {
 	var b struct {
 		Name         string   `json:"client_name"`
 		RedirectURIs []string `json:"redirect_uris"`
@@ -161,9 +161,9 @@ You can take this back at any time in Settings, under tokens.</p>
 <div class="row"><button name="answer" value="deny">Cancel</button><button class="go" name="answer" value="allow">Allow</button></div>
 </form></body></html>`))
 
-// hOAuthAuthorize shows the person what a client is asking for. Someone not
+// handleShowConsentPage shows the person what a client is asking for. Someone not
 // signed in is sent to sign in and comes back here.
-func (s *Server) hOAuthAuthorize(x *c) error {
+func (s *Server) handleShowConsentPage(x *c) error {
 	q := x.r.URL.Query()
 	ctx := x.ctx()
 	var cl core.OAuthClient
@@ -211,9 +211,9 @@ func originOf(raw string) string {
 	return u.Scheme + "://" + u.Host
 }
 
-// hOAuthApprove takes the person's answer and sends the browser back to the
+// handleAnswerConsentPage takes the person's answer and sends the browser back to the
 // client with a one-time code.
-func (s *Server) hOAuthApprove(x *c) error {
+func (s *Server) handleAnswerConsentPage(x *c) error {
 	ctx := x.ctx()
 	if err := x.r.ParseForm(); err != nil {
 		return errBad("bad form")
@@ -271,8 +271,8 @@ const (
 	refreshLife = 90 * 24 * time.Hour
 )
 
-// hOAuthToken trades a code, or a refresh token, for an access token.
-func (s *Server) hOAuthToken(w http.ResponseWriter, r *http.Request) {
+// handleIssueOAuthToken trades a code, or a refresh token, for an access token.
+func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")

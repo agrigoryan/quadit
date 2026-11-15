@@ -19,10 +19,10 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", s.open(s.hOAuthStart))
-		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", s.open(s.hOAuthCallback))
-		m.HandleFunc("GET /api/v1/auth/identities", s.signed(s.hIdentities))
-		m.HandleFunc("DELETE /api/v1/auth/identities/{id}", s.signed(s.hIdentityDelete))
+		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", s.open(s.handleStartProviderSignIn))
+		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", s.open(s.handleFinishProviderSignIn))
+		m.HandleFunc("GET /api/v1/auth/identities", s.signed(s.handleListIdentities))
+		m.HandleFunc("DELETE /api/v1/auth/identities/{id}", s.signed(s.handleUnlinkIdentity))
 	})
 }
 
@@ -35,8 +35,8 @@ type oauthState struct {
 	LinkUser string `json:"link_user"`
 }
 
-// hOAuthStart sends the browser to the provider to sign in.
-func (s *Server) hOAuthStart(x *c) error {
+// handleStartProviderSignIn sends the browser to the provider to sign in.
+func (s *Server) handleStartProviderSignIn(x *c) error {
 	ctx := x.ctx()
 	provider := x.r.PathValue("provider")
 	p, cfg, ok := s.signInWith(ctx, provider)
@@ -63,9 +63,9 @@ func (s *Server) hOAuthStart(x *c) error {
 	return nil
 }
 
-// hOAuthCallback is where the provider sends the browser back. It finds or
+// handleFinishProviderSignIn is where the provider sends the browser back. It finds or
 // makes the account, signs it in, and returns to the app.
-func (s *Server) hOAuthCallback(x *c) error {
+func (s *Server) handleFinishProviderSignIn(x *c) error {
 	ctx := x.ctx()
 	provider := x.r.PathValue("provider")
 	back := func(msg string) error {
@@ -181,7 +181,7 @@ func (s *Server) oauthAccount(ctx context.Context, x *c, provider, providerName 
 	return u, "", nil
 }
 
-func (s *Server) hIdentities(x *c) error {
+func (s *Server) handleListIdentities(x *c) error {
 	var rows []core.Identity
 	if err := s.st.List(x.ctx(), &rows, store.Q{Where: []store.Cond{store.Eq("user_id", x.user.ID)}, Order: "created_at"}); err != nil {
 		return err
@@ -189,7 +189,7 @@ func (s *Server) hIdentities(x *c) error {
 	return x.ok(map[string]any{"identities": rows})
 }
 
-func (s *Server) hIdentityDelete(x *c) error {
+func (s *Server) handleUnlinkIdentity(x *c) error {
 	ctx := x.ctx()
 	if x.sess == nil {
 		return errForbidden("a connected account is removed by its person, signed in")

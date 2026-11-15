@@ -36,8 +36,8 @@ func auditArgs(raw json.RawMessage) any {
 	return args
 }
 
-// hChanges applies one change or a batch. A batch is all or nothing.
-func (s *Server) hChanges(x *c) error {
+// handleApplyChanges applies one change or a batch. A batch is all or nothing.
+func (s *Server) handleApplyChanges(x *c) error {
 	var b changesBody
 	if err := x.body(&b); err != nil {
 		return err

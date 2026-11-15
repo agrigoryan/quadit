@@ -24,7 +24,7 @@ import (
 // any other work, and running the same import twice adds nothing twice.
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/import", s.in(s.hImport))
+		m.HandleFunc("POST /api/v1/w/{ws}/import", s.in(s.handleImportWork))
 	})
 }
 
@@ -38,7 +38,7 @@ type importBody struct {
 	DryRun  bool              `json:"dry_run"`
 }
 
-func (s *Server) hImport(x *c) error {
+func (s *Server) handleImportWork(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}

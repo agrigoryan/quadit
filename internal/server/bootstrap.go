@@ -9,10 +9,10 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// hBootstrap returns the workspace as rows, for a client that keeps a local
+// handleBootstrapLocalCopy returns the workspace as rows, for a client that keeps a local
 // copy and then follows the feed from "seq". The rows are loaded, kept to
 // the tasks of the part asked for and to what the caller may see, and given.
-func (s *Server) hBootstrap(x *c) error {
+func (s *Server) handleBootstrapLocalCopy(x *c) error {
 	ctx := x.ctx()
 	// Read the position first: anything committed after it will also come
 	// through the feed, and applying an event twice is harmless.

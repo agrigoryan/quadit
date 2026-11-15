@@ -24,8 +24,8 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/render", s.in(s.hRender))
-		m.HandleFunc("GET /api/v1/auth/render-session", s.open(s.hRenderSession))
+		m.HandleFunc("GET /api/v1/w/{ws}/render", s.in(s.handleTakePicture))
+		m.HandleFunc("GET /api/v1/auth/render-session", s.open(s.handleSignInPictureBrowser))
 	})
 }
 
@@ -49,9 +49,9 @@ func findChrome() string {
 	return ""
 }
 
-// hRender returns a PNG of a task or a page as the caller would see it.
+// handleTakePicture returns a PNG of a task or a page as the caller would see it.
 // width=390 gives a phone, the default 1280 a desktop.
-func (s *Server) hRender(x *c) error {
+func (s *Server) handleTakePicture(x *c) error {
 	chrome := findChrome()
 	if chrome == "" {
 		return &httpError{Status: 501, Code: "no_browser", Message: "the server has no Chrome or Chromium to take pictures with; install one, or set QUADIT_CHROME to its path"}
@@ -126,9 +126,9 @@ func (s *Server) hRender(x *c) error {
 	return err
 }
 
-// hRenderSession signs the picture-taking browser in for two minutes,
+// handleSignInPictureBrowser signs the picture-taking browser in for two minutes,
 // read-only, and sends it to the page.
-func (s *Server) hRenderSession(x *c) error {
+func (s *Server) handleSignInPictureBrowser(x *c) error {
 	q := x.r.URL.Query()
 	ot, err := s.useOneTime(x.ctx(), "render", q.Get("token"), false)
 	if err != nil {

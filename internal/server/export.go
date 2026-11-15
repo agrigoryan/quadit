@@ -13,7 +13,7 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/export", s.in(s.hExport))
+		m.HandleFunc("GET /api/v1/w/{ws}/export", s.in(s.handleExportWorkspace))
 	})
 }
 
@@ -45,9 +45,9 @@ func fileSafe(s string) string {
 	return s
 }
 
-// hExport writes the whole workspace as a zip of Markdown, JSON and the
+// handleExportWorkspace writes the whole workspace as a zip of Markdown, JSON and the
 // original files.
-func (s *Server) hExport(x *c) error {
+func (s *Server) handleExportWorkspace(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}

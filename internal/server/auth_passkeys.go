@@ -21,13 +21,13 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/auth/passkeys", s.signed(s.hPasskeys))
-		m.HandleFunc("POST /api/v1/auth/passkeys/register/start", s.signed(s.hPasskeyRegisterStart))
-		m.HandleFunc("POST /api/v1/auth/passkeys/register/finish", s.signed(s.hPasskeyRegisterFinish))
-		m.HandleFunc("PATCH /api/v1/auth/passkeys/{id}", s.signed(s.hPasskeyRename))
-		m.HandleFunc("DELETE /api/v1/auth/passkeys/{id}", s.signed(s.hPasskeyDelete))
-		m.HandleFunc("POST /api/v1/auth/passkeys/login/start", s.open(s.hPasskeyLoginStart))
-		m.HandleFunc("POST /api/v1/auth/passkeys/login/finish", s.open(s.hPasskeyLoginFinish))
+		m.HandleFunc("GET /api/v1/auth/passkeys", s.signed(s.handleListPasskeys))
+		m.HandleFunc("POST /api/v1/auth/passkeys/register/start", s.signed(s.handleStartPasskeyRegistration))
+		m.HandleFunc("POST /api/v1/auth/passkeys/register/finish", s.signed(s.handleFinishPasskeyRegistration))
+		m.HandleFunc("PATCH /api/v1/auth/passkeys/{id}", s.signed(s.handleRenamePasskey))
+		m.HandleFunc("DELETE /api/v1/auth/passkeys/{id}", s.signed(s.handleDeletePasskey))
+		m.HandleFunc("POST /api/v1/auth/passkeys/login/start", s.open(s.handleStartPasskeySignIn))
+		m.HandleFunc("POST /api/v1/auth/passkeys/login/finish", s.open(s.handleFinishPasskeySignIn))
 	})
 }
 
@@ -78,7 +78,7 @@ func (s *Server) passkeyUser(ctx context.Context, u core.User) (waUser, error) {
 	return w, nil
 }
 
-func (s *Server) hPasskeys(x *c) error {
+func (s *Server) handleListPasskeys(x *c) error {
 	var rows []core.Passkey
 	if err := s.st.List(x.ctx(), &rows, store.Q{Where: []store.Cond{store.Eq("user_id", x.user.ID)}, Order: "created_at"}); err != nil {
 		return err
@@ -93,8 +93,8 @@ func (s *Server) passkeysOn(x *c) error {
 	return nil
 }
 
-// hPasskeyRegisterStart begins adding a passkey to the signed-in account.
-func (s *Server) hPasskeyRegisterStart(x *c) error {
+// handleStartPasskeyRegistration begins adding a passkey to the signed-in account.
+func (s *Server) handleStartPasskeyRegistration(x *c) error {
 	if err := s.passkeysOn(x); err != nil {
 		return err
 	}
@@ -125,9 +125,9 @@ func (s *Server) hPasskeyRegisterStart(x *c) error {
 	return x.ok(map[string]any{"options": opts, "state": state})
 }
 
-// hPasskeyRegisterFinish stores the passkey the browser made. The body is
+// handleFinishPasskeyRegistration stores the passkey the browser made. The body is
 // the browser's credential; the state comes in the query.
-func (s *Server) hPasskeyRegisterFinish(x *c) error {
+func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	ctx := x.ctx()
 	ot, err := s.useOneTime(ctx, "passkey_register", x.r.URL.Query().Get("state"), false)
 	if err != nil || ot.UserID != x.user.ID {
@@ -163,7 +163,7 @@ func (s *Server) hPasskeyRegisterFinish(x *c) error {
 	return x.json(201, pk)
 }
 
-func (s *Server) hPasskeyRename(x *c) error {
+func (s *Server) handleRenamePasskey(x *c) error {
 	var b struct {
 		Name string `json:"name"`
 	}
@@ -192,7 +192,7 @@ func (s *Server) waysIn(ctx context.Context, u core.User) int {
 	return n + p + i
 }
 
-func (s *Server) hPasskeyDelete(x *c) error {
+func (s *Server) handleDeletePasskey(x *c) error {
 	ctx := x.ctx()
 	if x.sess == nil {
 		return errForbidden("a passkey is removed by its person, signed in")
@@ -211,9 +211,9 @@ func (s *Server) hPasskeyDelete(x *c) error {
 	return x.ok(map[string]any{"ok": true})
 }
 
-// hPasskeyLoginStart begins a sign-in with a passkey. No name is asked for:
+// handleStartPasskeySignIn begins a sign-in with a passkey. No name is asked for:
 // the passkey says who it belongs to.
-func (s *Server) hPasskeyLoginStart(x *c) error {
+func (s *Server) handleStartPasskeySignIn(x *c) error {
 	if err := s.passkeysOn(x); err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func (s *Server) hPasskeyLoginStart(x *c) error {
 	return x.ok(map[string]any{"options": opts, "state": state})
 }
 
-func (s *Server) hPasskeyLoginFinish(x *c) error {
+func (s *Server) handleFinishPasskeySignIn(x *c) error {
 	ctx := x.ctx()
 	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), 30, 15*time.Minute); err != nil {
 		return err

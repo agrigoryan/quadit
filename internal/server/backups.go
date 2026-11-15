@@ -54,10 +54,10 @@ func init() {
 		return err
 	}
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/admin/backups", s.signed(s.installAdmin(s.hBackups)))
-		m.HandleFunc("POST /api/v1/admin/backups", s.signed(s.installAdmin(s.hBackupNow)))
-		m.HandleFunc("POST /api/v1/admin/backups/{id}/restore-item", s.signed(s.installAdmin(s.hBackupRestoreItem)))
-		m.HandleFunc("GET /api/v1/admin/backups/{id}/download", s.signed(s.installAdmin(s.hBackupDownload)))
+		m.HandleFunc("GET /api/v1/admin/backups", s.signed(s.installAdmin(s.handleListBackups)))
+		m.HandleFunc("POST /api/v1/admin/backups", s.signed(s.installAdmin(s.handleCreateBackup)))
+		m.HandleFunc("POST /api/v1/admin/backups/{id}/restore-item", s.signed(s.installAdmin(s.handleRestoreItemFromBackup)))
+		m.HandleFunc("GET /api/v1/admin/backups/{id}/download", s.signed(s.installAdmin(s.handleDownloadBackup)))
 	})
 }
 
@@ -186,7 +186,7 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 	return finish(nil)
 }
 
-func (s *Server) hBackups(x *c) error {
+func (s *Server) handleListBackups(x *c) error {
 	var list []core.Backup
 	if err := s.st.List(x.ctx(), &list, store.Q{Order: "-started_at", Limit: 100}); err != nil {
 		return err
@@ -196,8 +196,8 @@ func (s *Server) hBackups(x *c) error {
 	return x.ok(map[string]any{"backups": list, "schedule": bs, "directory": s.backupDir()})
 }
 
-// hBackupNow writes a backup right away and waits for it.
-func (s *Server) hBackupNow(x *c) error {
+// handleCreateBackup writes a backup right away and waits for it.
+func (s *Server) handleCreateBackup(x *c) error {
 	b, err := s.runBackup(x.ctx())
 	if err != nil {
 		return &engine.Error{Code: engine.CodeConflict, Message: "the backup failed: " + err.Error()}
@@ -206,7 +206,7 @@ func (s *Server) hBackupNow(x *c) error {
 	return x.json(201, b)
 }
 
-func (s *Server) hBackupDownload(x *c) error {
+func (s *Server) handleDownloadBackup(x *c) error {
 	var b core.Backup
 	if err := s.st.Get(x.ctx(), &b, store.Eq("id", x.r.PathValue("id"))); err != nil || b.FinishedAt == 0 || b.Error != "" {
 		return errNotFound("backup")
@@ -223,10 +223,10 @@ func (s *Server) hBackupDownload(x *c) error {
 	return nil
 }
 
-// hBackupRestoreItem brings one task or one page back from a backup, as it
+// handleRestoreItemFromBackup brings one task or one page back from a backup, as it
 // was then, into the install as it is now. Body: {workspace: slug, task:
 // key or id} or {workspace, doc: page id}.
-func (s *Server) hBackupRestoreItem(x *c) error {
+func (s *Server) handleRestoreItemFromBackup(x *c) error {
 	var b struct {
 		Workspace string `json:"workspace"`
 		Task      string `json:"task"`

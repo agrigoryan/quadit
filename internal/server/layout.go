@@ -10,9 +10,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// hLayout describes one project: its statuses, labels, members, epics,
+// handleShowProjectLayout describes one project: its statuses, labels, members, epics,
 // cycles and templates, by name.
-func (s *Server) hLayout(x *c) error {
+func (s *Server) handleShowProjectLayout(x *c) error {
 	p, err := x.resolver().Project(x.r.PathValue("key"))
 	if err != nil {
 		return err

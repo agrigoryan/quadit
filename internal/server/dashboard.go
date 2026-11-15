@@ -11,16 +11,16 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/dashboard", s.in(s.hDashboard))
-		m.HandleFunc("GET /api/v1/w/{ws}/cycles/{id}/chart", s.in(s.hCycleChart)) // dashboard_cycle.go
-		m.HandleFunc("GET /api/v1/w/{ws}/agents", s.in(s.hAgents))                // dashboard_agents.go
+		m.HandleFunc("GET /api/v1/w/{ws}/dashboard", s.in(s.handleShowDashboard))
+		m.HandleFunc("GET /api/v1/w/{ws}/cycles/{id}/chart", s.in(s.handleShowCycleChart)) // dashboard_cycle.go
+		m.HandleFunc("GET /api/v1/w/{ws}/agents", s.in(s.handleListAgents))                // dashboard_agents.go
 	})
 }
 
-// hDashboard is where everything stands, in one call: what waits on the
+// handleShowDashboard is where everything stands, in one call: what waits on the
 // caller, epics, flow, agents, recent decisions and the health of the
 // machinery. project=KEY narrows it to one project.
-func (s *Server) hDashboard(x *c) error {
+func (s *Server) handleShowDashboard(x *c) error {
 	d, err := x.newDashboard()
 	if err != nil {
 		return err

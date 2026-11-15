@@ -64,8 +64,8 @@ type registerBody struct {
 	Password string `json:"password"`
 }
 
-// hRegister makes an account when open registration is on.
-func (s *Server) hRegister(x *c) error {
+// handleRegisterAccount makes an account when open registration is on.
+func (s *Server) handleRegisterAccount(x *c) error {
 	var b registerBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -101,10 +101,10 @@ type inviteBody struct {
 	MaxUses     int    `json:"max_uses"`
 }
 
-// hInviteCreate makes an invitation: a link that lets someone join this
+// handleCreateInvite makes an invitation: a link that lets someone join this
 // workspace with a role. With an email it is for that address only and is
 // mailed when the install can send mail.
-func (s *Server) hInviteCreate(x *c) error {
+func (s *Server) handleCreateInvite(x *c) error {
 	var b inviteBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -152,7 +152,7 @@ func (s *Server) hInviteCreate(x *c) error {
 	return x.json(201, map[string]any{"invite": inv, "link": link, "mailed": mailed})
 }
 
-func (s *Server) hInvites(x *c) error {
+func (s *Server) handleListInvites(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (s *Server) hInvites(x *c) error {
 	return x.ok(map[string]any{"invites": list})
 }
 
-func (s *Server) hInviteRevoke(x *c) error {
+func (s *Server) handleRevokeInvite(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
@@ -197,8 +197,8 @@ func (s *Server) invite(ctx context.Context, token string) (core.Invite, core.Wo
 	return inv, ws, nil
 }
 
-// hInviteShow says what an invitation is for, before anyone signs in.
-func (s *Server) hInviteShow(x *c) error {
+// handleShowInvite says what an invitation is for, before anyone signs in.
+func (s *Server) handleShowInvite(x *c) error {
 	inv, ws, err := s.invite(x.ctx(), x.r.PathValue("token"))
 	if err != nil {
 		return err
@@ -213,9 +213,9 @@ func (s *Server) hInviteShow(x *c) error {
 	return x.ok(out)
 }
 
-// hInviteAccept joins the workspace: as the person signed in, or as a new
+// handleAcceptInvite joins the workspace: as the person signed in, or as a new
 // account made from the name and password sent along.
-func (s *Server) hInviteAccept(x *c) error {
+func (s *Server) handleAcceptInvite(x *c) error {
 	var b registerBody
 	if x.r.ContentLength != 0 {
 		if err := x.body(&b); err != nil {

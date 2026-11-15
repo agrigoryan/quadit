@@ -211,9 +211,9 @@ func (x *c) maxChars() int {
 	return x.intParam("max_chars", 6000)
 }
 
-// hTask returns one task with everything in it. since=N returns only what
+// handleShowTask returns one task with everything in it. since=N returns only what
 // happened in it after feed position N. raw=1 returns rows, for the web app.
-func (s *Server) hTask(x *c) error {
+func (s *Server) handleShowTask(x *c) error {
 	t, err := x.taskByRef(x.r.PathValue("ref"))
 	if err != nil {
 		return err

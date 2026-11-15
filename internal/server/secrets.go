@@ -32,9 +32,9 @@ import (
 // Every use is written to the audit log.
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/secrets", s.in(s.hSecrets))
-		m.HandleFunc("POST /api/v1/w/{ws}/secrets/{name}/request", s.in(s.hSecretRequest))
-		m.HandleFunc("POST /api/v1/w/{ws}/secrets/env", s.in(s.hSecretEnv))
+		m.HandleFunc("GET /api/v1/w/{ws}/secrets", s.in(s.handleListSecrets))
+		m.HandleFunc("POST /api/v1/w/{ws}/secrets/{name}/request", s.in(s.handleSendRequestWithSecret))
+		m.HandleFunc("POST /api/v1/w/{ws}/secrets/env", s.in(s.handleListEnvSecrets))
 	})
 }
 
@@ -60,9 +60,9 @@ func (x *c) mayUseSecret(sec core.Secret) bool {
 	return false
 }
 
-// hSecrets lists the secrets the caller may use: names and what they are
+// handleListSecrets lists the secrets the caller may use: names and what they are
 // for, never values.
-func (s *Server) hSecrets(x *c) error {
+func (s *Server) handleListSecrets(x *c) error {
 	var rows []core.Secret
 	if err := x.db.List(x.ctx(), &rows, store.Q{Where: []store.Cond{store.Live}, Order: "name", Limit: 1000}); err != nil {
 		return err
@@ -141,9 +141,9 @@ type secretRequest struct {
 	BodyBase64 string `json:"body_base64"`
 }
 
-// hSecretRequest makes an HTTP request for the caller with the secret put
+// handleSendRequestWithSecret makes an HTTP request for the caller with the secret put
 // where {{secret}} is written, in the URL, a header or the body.
-func (s *Server) hSecretRequest(x *c) error {
+func (s *Server) handleSendRequestWithSecret(x *c) error {
 	var b secretRequest
 	if err := x.body(&b); err != nil {
 		return err
@@ -270,9 +270,9 @@ func isText(contentType string, raw []byte) bool {
 	return ct == "" && json.Valid(raw)
 }
 
-// hSecretEnv hands secrets marked env to a companion, for the environment
+// handleListEnvSecrets hands secrets marked env to a companion, for the environment
 // of the command it runs. Only a token made for this may ask.
-func (s *Server) hSecretEnv(x *c) error {
+func (s *Server) handleListEnvSecrets(x *c) error {
 	if x.token == nil || !slices.Contains(strings.Fields(x.token.Scopes), "secrets") {
 		return errForbidden("only a companion's token made for secrets may receive them; an admin makes one with secrets=true")
 	}

@@ -15,17 +15,17 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/admin/settings", s.signed(s.installAdmin(s.hSettings)))
-		m.HandleFunc("PUT /api/v1/admin/settings/{name}", s.signed(s.installAdmin(s.hSettingPut)))
-		m.HandleFunc("POST /api/v1/admin/mail/test", s.signed(s.installAdmin(s.hMailTest)))
-		m.HandleFunc("GET /api/v1/admin/audit", s.signed(s.installAdmin(s.hAudit)))
-		m.HandleFunc("GET /api/v1/admin/users", s.signed(s.installAdmin(s.hUsers)))
-		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signed(s.installAdmin(s.hUserPatch)))
-		m.HandleFunc("GET /api/v1/admin/workspaces", s.signed(s.installAdmin(s.hWorkspaces)))
-		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/join", s.signed(s.installAdmin(s.hWorkspaceJoin)))
-		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/restore", s.signed(s.installAdmin(s.hWorkspaceRestore)))
-		m.HandleFunc("GET /api/v1/admin/health", s.signed(s.installAdmin(s.hHealth)))
-		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.in(s.hWorkspaceAudit))
+		m.HandleFunc("GET /api/v1/admin/settings", s.signed(s.installAdmin(s.handleListSettings)))
+		m.HandleFunc("PUT /api/v1/admin/settings/{name}", s.signed(s.installAdmin(s.handleUpdateSetting)))
+		m.HandleFunc("POST /api/v1/admin/mail/test", s.signed(s.installAdmin(s.handleSendTestMail)))
+		m.HandleFunc("GET /api/v1/admin/audit", s.signed(s.installAdmin(s.handleListInstallAuditLog)))
+		m.HandleFunc("GET /api/v1/admin/users", s.signed(s.installAdmin(s.handleListUsers)))
+		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signed(s.installAdmin(s.handleUpdateUser)))
+		m.HandleFunc("GET /api/v1/admin/workspaces", s.signed(s.installAdmin(s.handleListWorkspaces)))
+		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/join", s.signed(s.installAdmin(s.handleJoinWorkspace)))
+		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/restore", s.signed(s.installAdmin(s.handleRestoreWorkspace)))
+		m.HandleFunc("GET /api/v1/admin/health", s.signed(s.installAdmin(s.handleShowInstallHealth)))
+		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.in(s.handleListWorkspaceAuditLog))
 	})
 }
 
@@ -41,12 +41,12 @@ func (s *Server) installAdmin(h handler) handler {
 	}
 }
 
-func (s *Server) hSettings(x *c) error {
+func (s *Server) handleListSettings(x *c) error {
 	return x.ok(map[string]any{"settings": s.maskedSettings(x.ctx())})
 }
 
-// hSettingPut sets one install setting. The body is its JSON value.
-func (s *Server) hSettingPut(x *c) error {
+// handleUpdateSetting sets one install setting. The body is its JSON value.
+func (s *Server) handleUpdateSetting(x *c) error {
 	name := x.r.PathValue("name")
 	var value json.RawMessage
 	if err := json.NewDecoder(http.MaxBytesReader(x.w, x.r.Body, 1<<20)).Decode(&value); err != nil {
@@ -63,10 +63,10 @@ func (s *Server) hSettingPut(x *c) error {
 	}
 	// The record says what it was set to, with anything secret blanked.
 	s.audit(x.r, "", x.user, "setting.changed", "setting", name, s.maskedSettings(x.ctx())[name])
-	return s.hSettings(x)
+	return s.handleListSettings(x)
 }
 
-func (s *Server) hMailTest(x *c) error {
+func (s *Server) handleSendTestMail(x *c) error {
 	var b struct {
 		To string `json:"to"`
 	}
@@ -135,17 +135,17 @@ func (s *Server) auditQuery(x *c, workspaceID string) error {
 	return x.ok(out)
 }
 
-func (s *Server) hAudit(x *c) error { return s.auditQuery(x, "") }
+func (s *Server) handleListInstallAuditLog(x *c) error { return s.auditQuery(x, "") }
 
-// hWorkspaceAudit is a workspace's own slice of the audit log, for its admins.
-func (s *Server) hWorkspaceAudit(x *c) error {
+// handleListWorkspaceAuditLog is a workspace's own slice of the audit log, for its admins.
+func (s *Server) handleListWorkspaceAuditLog(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
 	return s.auditQuery(x, x.ws.ID)
 }
 
-func (s *Server) hUsers(x *c) error {
+func (s *Server) handleListUsers(x *c) error {
 	var us []core.User
 	conds := []store.Cond{store.Live}
 	if k := x.r.URL.Query().Get("kind"); k != "" {
@@ -162,8 +162,8 @@ type userPatch struct {
 	IsAdmin  *bool `json:"is_admin"`
 }
 
-// hUserPatch disables or enables an account, or changes who runs the install.
-func (s *Server) hUserPatch(x *c) error {
+// handleUpdateUser disables or enables an account, or changes who runs the install.
+func (s *Server) handleUpdateUser(x *c) error {
 	var b userPatch
 	if err := x.body(&b); err != nil {
 		return err
@@ -209,7 +209,7 @@ func (s *Server) hUserPatch(x *c) error {
 	return x.ok(u)
 }
 
-func (s *Server) hWorkspaces(x *c) error {
+func (s *Server) handleListWorkspaces(x *c) error {
 	ctx := x.ctx()
 	var wss []core.Workspace
 	// Deleted ones are listed too, marked, for the 30 days they can come back.
@@ -233,9 +233,9 @@ func (s *Server) hWorkspaces(x *c) error {
 	return x.ok(map[string]any{"workspaces": out})
 }
 
-// hWorkspaceRestore brings a deleted workspace back, within the 30 days
+// handleRestoreWorkspace brings a deleted workspace back, within the 30 days
 // before it is removed for good.
-func (s *Server) hWorkspaceRestore(x *c) error {
+func (s *Server) handleRestoreWorkspace(x *c) error {
 	ctx := x.ctx()
 	var ws core.Workspace
 	if err := s.st.Get(ctx, &ws, store.Eq("id", x.r.PathValue("id"))); err != nil {
@@ -255,10 +255,10 @@ func (s *Server) hWorkspaceRestore(x *c) error {
 	return x.ok(map[string]any{"workspace": ws})
 }
 
-// hWorkspaceJoin makes the one who runs the install an admin of a workspace
+// handleJoinWorkspace makes the one who runs the install an admin of a workspace
 // they are not in, so they can look after it. It is written to the audit
 // log of the install and of the workspace, and its members see them join.
-func (s *Server) hWorkspaceJoin(x *c) error {
+func (s *Server) handleJoinWorkspace(x *c) error {
 	ctx := x.ctx()
 	var ws core.Workspace
 	if err := s.st.Get(ctx, &ws, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
@@ -288,8 +288,8 @@ func (s *Server) hWorkspaceJoin(x *c) error {
 	return x.ok(map[string]any{"workspace": ws})
 }
 
-// hHealth is the health panel: what is failing or waiting behind the scenes.
-func (s *Server) hHealth(x *c) error {
+// handleShowInstallHealth is the health panel: what is failing or waiting behind the scenes.
+func (s *Server) handleShowInstallHealth(x *c) error {
 	ctx := x.ctx()
 	out := map[string]any{"version": s.cfg.Version, "database": s.st.Dialect(), "files": s.fileStore().Kind(), "mail": s.mailReady(ctx)}
 	out["jobs_waiting"], _ = s.st.Count(ctx, "jobs", store.Null("done_at"))

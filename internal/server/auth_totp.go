@@ -39,8 +39,8 @@ type codeBody struct {
 	Password string `json:"password"`
 }
 
-// hSecondStep finishes a sign-in that is waiting for its second step.
-func (s *Server) hSecondStep(x *c) error {
+// handleFinishSecondStep finishes a sign-in that is waiting for its second step.
+func (s *Server) handleFinishSecondStep(x *c) error {
 	var b codeBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -63,9 +63,9 @@ func (s *Server) hSecondStep(x *c) error {
 	return x.ok(map[string]any{"user": x.user})
 }
 
-// hTOTPStart makes a new secret for the person to add to their app. It is
-// not in force until they prove the app works with hTOTPEnable.
-func (s *Server) hTOTPStart(x *c) error {
+// handleStartTwoStepSetup makes a new secret for the person to add to their app. It is
+// not in force until they prove the app works with handleEnableTwoStep.
+func (s *Server) handleStartTwoStepSetup(x *c) error {
 	if x.sess == nil {
 		return errForbidden("two-step verification is set up by its person, signed in")
 	}
@@ -100,9 +100,9 @@ func (s *Server) newRecoveryCodes(ctx context.Context, userID string) ([]string,
 	return codes, err
 }
 
-// hTOTPEnable turns two-step verification on once a code from the app
+// handleEnableTwoStep turns two-step verification on once a code from the app
 // checks out, and returns the recovery codes, shown this once.
-func (s *Server) hTOTPEnable(x *c) error {
+func (s *Server) handleEnableTwoStep(x *c) error {
 	var b codeBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -129,7 +129,7 @@ func (s *Server) hTOTPEnable(x *c) error {
 	return x.ok(map[string]any{"recovery_codes": codes})
 }
 
-func (s *Server) hTOTPDisable(x *c) error {
+func (s *Server) handleDisableTwoStep(x *c) error {
 	var b codeBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -154,8 +154,8 @@ func (s *Server) hTOTPDisable(x *c) error {
 	return x.ok(map[string]any{"ok": true})
 }
 
-// hRecoveryCodes replaces the recovery codes with ten new ones.
-func (s *Server) hRecoveryCodes(x *c) error {
+// handleRenewRecoveryCodes replaces the recovery codes with ten new ones.
+func (s *Server) handleRenewRecoveryCodes(x *c) error {
 	var b codeBody
 	if err := x.body(&b); err != nil {
 		return err

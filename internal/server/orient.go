@@ -10,9 +10,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// hMe answers "who am I": identity, role, scope, what needs approval, the
+// handleShowWhoAmI answers "who am I": identity, role, scope, what needs approval, the
 // budget left, and where the caller's cursors stand.
-func (s *Server) hMe(x *c) error {
+func (s *Server) handleShowWhoAmI(x *c) error {
 	ctx := x.ctx()
 	nm, err := x.names()
 	if err != nil {
@@ -124,7 +124,7 @@ func (x *c) workspaceRules() ([]string, error) {
 	return rules, nil
 }
 
-// meText is hMe's answer as lines of text.
+// meText is handleShowWhoAmI's answer as lines of text.
 func meText(out map[string]any, ws core.Workspace, keys []string, cursors map[string]int64, rules []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "you are %s (%s, %s) in %s\n", out["handle"], out["kind"], out["role"], ws.Slug)
@@ -215,9 +215,9 @@ func (x *c) inboxItems(unreadOnly bool, limit int) ([]inboxItem, error) {
 	return out, nil
 }
 
-// hInbox lists what concerns the caller: mentions, assignments, picks,
+// handleListInbox lists what concerns the caller: mentions, assignments, picks,
 // replies. Unread only unless all=1.
-func (s *Server) hInbox(x *c) error {
+func (s *Server) handleListInbox(x *c) error {
 	items, err := x.inboxItems(!truthyParam(x.r.URL.Query(), "all"), min(x.intParam("limit", 50), 500))
 	if err != nil {
 		return err
@@ -231,9 +231,9 @@ func (s *Server) hInbox(x *c) error {
 	return x.ok(map[string]any{"inbox": items})
 }
 
-// hMyWork is the one call that starts a session: what is assigned to the
+// handleShowMyWork is the one call that starts a session: what is assigned to the
 // caller, what waits on it, the questions asked of it, and its unread inbox.
-func (s *Server) hMyWork(x *c) error {
+func (s *Server) handleShowMyWork(x *c) error {
 	ctx := x.ctx()
 	me := x.member.UserID
 	assigned, err := x.db.Tasks(ctx, store.TaskFilter{AssigneeIDs: []string{me}, Open: true, ProjectIDs: x.projects, Sort: "priority", Limit: 200})

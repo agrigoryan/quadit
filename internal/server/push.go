@@ -35,10 +35,10 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/push/key", s.signed(s.hPushKey))
-		m.HandleFunc("POST /api/v1/push/subscriptions", s.signed(s.hPushSubscribe))
-		m.HandleFunc("DELETE /api/v1/push/subscriptions", s.signed(s.hPushUnsubscribe))
-		m.HandleFunc("POST /api/v1/push/test", s.signed(s.hPushTest))
+		m.HandleFunc("GET /api/v1/push/key", s.signed(s.handleShowPushKey))
+		m.HandleFunc("POST /api/v1/push/subscriptions", s.signed(s.handleSubscribeToPush))
+		m.HandleFunc("DELETE /api/v1/push/subscriptions", s.signed(s.handleUnsubscribeFromPush))
+		m.HandleFunc("POST /api/v1/push/test", s.signed(s.handleSendTestNotification))
 	})
 }
 
@@ -82,7 +82,7 @@ func (s *Server) pushKey(ctx context.Context) (pushKeys, *ecdsa.PrivateKey, erro
 	return pk, key, nil
 }
 
-func (s *Server) hPushKey(x *c) error {
+func (s *Server) handleShowPushKey(x *c) error {
 	pk, _, err := s.pushKey(x.ctx())
 	if err != nil {
 		return err
@@ -103,8 +103,8 @@ type pushSubBody struct {
 	} `json:"keys"`
 }
 
-// hPushSubscribe remembers a browser that agreed to receive push.
-func (s *Server) hPushSubscribe(x *c) error {
+// handleSubscribeToPush remembers a browser that agreed to receive push.
+func (s *Server) handleSubscribeToPush(x *c) error {
 	var b pushSubBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -124,7 +124,7 @@ func (s *Server) hPushSubscribe(x *c) error {
 	return x.json(201, map[string]any{"ok": true})
 }
 
-func (s *Server) hPushUnsubscribe(x *c) error {
+func (s *Server) handleUnsubscribeFromPush(x *c) error {
 	var b pushSubBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -133,7 +133,7 @@ func (s *Server) hPushUnsubscribe(x *c) error {
 	return x.ok(map[string]any{"ok": true})
 }
 
-func (s *Server) hPushTest(x *c) error {
+func (s *Server) handleSendTestNotification(x *c) error {
 	n, err := s.pushTo(x.ctx(), x.user.ID, pushMessage{Title: "Push works", Body: "This is what a notification looks like.", URL: "/"})
 	if err != nil {
 		return err

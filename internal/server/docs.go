@@ -20,14 +20,14 @@ import (
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
 		const w = "/api/v1/w/{ws}"
-		m.HandleFunc("GET "+w+"/docs", s.in(s.hDocs))
-		m.HandleFunc("GET "+w+"/docs/{id}", s.in(s.hDoc))
-		m.HandleFunc("GET "+w+"/docs/{id}/versions", s.in(s.hDocVersions))
-		m.HandleFunc("GET "+w+"/docs/{id}/versions/{version}", s.in(s.hDocVersion))
-		m.HandleFunc("POST "+w+"/docs/{id}/presence", s.in(s.hDocPresence))
-		m.HandleFunc("GET "+w+"/docs/{id}/rows", s.in(s.hRows))
-		m.HandleFunc("GET "+w+"/memory", s.in(s.hMemory))
-		m.HandleFunc("POST "+w+"/memory", s.in(s.hMemoryWrite))
+		m.HandleFunc("GET "+w+"/docs", s.in(s.handleListPages))
+		m.HandleFunc("GET "+w+"/docs/{id}", s.in(s.handleShowPage))
+		m.HandleFunc("GET "+w+"/docs/{id}/versions", s.in(s.handleListPageVersions))
+		m.HandleFunc("GET "+w+"/docs/{id}/versions/{version}", s.in(s.handleShowPageVersion))
+		m.HandleFunc("POST "+w+"/docs/{id}/presence", s.in(s.handleReportPagePresence))
+		m.HandleFunc("GET "+w+"/docs/{id}/rows", s.in(s.handleListDatabaseRows))
+		m.HandleFunc("GET "+w+"/memory", s.in(s.handleShowAgentMemory))
+		m.HandleFunc("POST "+w+"/memory", s.in(s.handleSaveAgentMemory))
 	})
 }
 
@@ -48,8 +48,8 @@ func (x *c) visibleDocs() ([]core.Doc, error) {
 	return keep(docs, func(d core.Doc) bool { return engine.CanSeeDoc(d, x.member.UserID) && x.canProject(d.ProjectID) }), nil
 }
 
-// hDocs lists the page tree. The text form is an indented outline with ids.
-func (s *Server) hDocs(x *c) error {
+// handleListPages lists the page tree. The text form is an indented outline with ids.
+func (s *Server) handleListPages(x *c) error {
 	if truthyParam(x.r.URL.Query(), "trash") {
 		var gone []core.Doc
 		if err := x.db.List(x.ctx(), &gone, store.Q{Where: []store.Cond{store.NotNull("deleted_at")}, Order: "-deleted_at", Limit: 1000}); err != nil {
@@ -103,8 +103,8 @@ func (s *Server) hDocs(x *c) error {
 	return x.text(b.String())
 }
 
-// hDoc returns one page: as rows for the editor, or as Markdown.
-func (s *Server) hDoc(x *c) error {
+// handleShowPage returns one page: as rows for the editor, or as Markdown.
+func (s *Server) handleShowPage(x *c) error {
 	ctx := x.ctx()
 	d, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
@@ -178,7 +178,7 @@ func (s *Server) hDoc(x *c) error {
 	return x.ok(out)
 }
 
-func (s *Server) hDocVersions(x *c) error {
+func (s *Server) handleListPageVersions(x *c) error {
 	d, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func (s *Server) hDocVersions(x *c) error {
 	return x.ok(map[string]any{"versions": vs})
 }
 
-func (s *Server) hDocVersion(x *c) error {
+func (s *Server) handleShowPageVersion(x *c) error {
 	d, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
 		return err
@@ -210,9 +210,9 @@ func (s *Server) hDocVersion(x *c) error {
 	return x.ok(map[string]any{"version": v, "blocks": tree, "markdown": md.Render(tree)})
 }
 
-// hDocPresence says "I am here, in this block" and returns who else is. A
+// handleReportPagePresence says "I am here, in this block" and returns who else is. A
 // client calls it every few seconds while a page is open.
-func (s *Server) hDocPresence(x *c) error {
+func (s *Server) handleReportPagePresence(x *c) error {
 	var b struct {
 		Block string `json:"block"`
 		Leave bool   `json:"leave"`
@@ -414,9 +414,9 @@ func (x *c) memoryAgent() (core.Member, error) {
 	return m, nil
 }
 
-// hMemory returns an agent's notes: every page under its memory root, as
+// handleShowAgentMemory returns an agent's notes: every page under its memory root, as
 // Markdown. It is what an agent reads to pick up where it left off.
-func (s *Server) hMemory(x *c) error {
+func (s *Server) handleShowAgentMemory(x *c) error {
 	m, err := x.memoryAgent()
 	if err != nil {
 		return err
@@ -462,9 +462,9 @@ func (s *Server) hMemory(x *c) error {
 	return x.text(b.String())
 }
 
-// hMemoryWrite saves a note: the page with this title under the caller's
+// handleSaveAgentMemory saves a note: the page with this title under the caller's
 // memory, made if it is not there. Mode append adds to it.
-func (s *Server) hMemoryWrite(x *c) error {
+func (s *Server) handleSaveAgentMemory(x *c) error {
 	var b struct {
 		Title    string `json:"title"`
 		Markdown string `json:"markdown"`

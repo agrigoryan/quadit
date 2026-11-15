@@ -21,9 +21,9 @@ type tokenBody struct {
 	Secrets bool `json:"secrets"`
 }
 
-// hTokenCreate issues a token for an agent (admins) or for oneself. The
+// handleCreateToken issues a token for an agent (admins) or for oneself. The
 // token is in the answer and nowhere else afterwards.
-func (s *Server) hTokenCreate(x *c) error {
+func (s *Server) handleCreateToken(x *c) error {
 	var b tokenBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -125,7 +125,7 @@ func (s *Server) hTokenCreate(x *c) error {
 	return x.json(201, map[string]any{"token": token, "info": t, "note": "this is the only time the token is shown"})
 }
 
-func (s *Server) hTokens(x *c) error {
+func (s *Server) handleListTokens(x *c) error {
 	conds := []store.Cond{store.Null("revoked_at")}
 	if !x.member.Role.AtLeast(core.RoleAdmin) {
 		conds = append(conds, store.Eq("user_id", x.member.UserID))
@@ -137,8 +137,8 @@ func (s *Server) hTokens(x *c) error {
 	return x.ok(map[string]any{"tokens": ts})
 }
 
-// hTokenRevoke ends a token at once.
-func (s *Server) hTokenRevoke(x *c) error {
+// handleRevokeToken ends a token at once.
+func (s *Server) handleRevokeToken(x *c) error {
 	var t core.APIToken
 	if err := x.db.Get(x.ctx(), &t, store.Eq("id", x.r.PathValue("id")), store.Null("revoked_at")); err != nil {
 		return errNotFound("token")

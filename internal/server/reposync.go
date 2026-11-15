@@ -35,7 +35,7 @@ import (
 func init() {
 	runners = append(runners, (*Server).runSources)
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/sources/{id}/sync", s.in(s.hSourceSync))
+		m.HandleFunc("POST /api/v1/w/{ws}/sources/{id}/sync", s.in(s.handleSyncSource))
 		m.HandleFunc("GET /api/v1/w/{ws}/sources", s.in(func(x *c) error {
 			var list []core.DocSource
 			if err := x.db.List(x.ctx(), &list, store.Where(store.Live)); err != nil {
@@ -72,7 +72,7 @@ func (s *Server) runSources(ctx context.Context) {
 	}
 }
 
-func (s *Server) hSourceSync(x *c) error {
+func (s *Server) handleSyncSource(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}

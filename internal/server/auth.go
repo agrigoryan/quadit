@@ -20,20 +20,20 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/auth/second-step", s.half(s.hSecondStep))
-		m.HandleFunc("POST /api/v1/auth/totp/start", s.signed(s.hTOTPStart))
-		m.HandleFunc("POST /api/v1/auth/totp/enable", s.signed(s.hTOTPEnable))
-		m.HandleFunc("POST /api/v1/auth/totp/disable", s.signed(s.hTOTPDisable))
-		m.HandleFunc("POST /api/v1/auth/recovery-codes", s.signed(s.hRecoveryCodes))
-		m.HandleFunc("POST /api/v1/auth/reset/request", s.open(s.hResetRequest))
-		m.HandleFunc("POST /api/v1/auth/reset/confirm", s.open(s.hResetConfirm))
-		m.HandleFunc("POST /api/v1/auth/register", s.open(s.hRegister))
-		m.HandleFunc("GET /api/v1/auth/invite/{token}", s.open(s.hInviteShow))
-		m.HandleFunc("POST /api/v1/auth/invite/{token}", s.open(s.hInviteAccept))
+		m.HandleFunc("POST /api/v1/auth/second-step", s.half(s.handleFinishSecondStep))
+		m.HandleFunc("POST /api/v1/auth/totp/start", s.signed(s.handleStartTwoStepSetup))
+		m.HandleFunc("POST /api/v1/auth/totp/enable", s.signed(s.handleEnableTwoStep))
+		m.HandleFunc("POST /api/v1/auth/totp/disable", s.signed(s.handleDisableTwoStep))
+		m.HandleFunc("POST /api/v1/auth/recovery-codes", s.signed(s.handleRenewRecoveryCodes))
+		m.HandleFunc("POST /api/v1/auth/reset/request", s.open(s.handleRequestPasswordReset))
+		m.HandleFunc("POST /api/v1/auth/reset/confirm", s.open(s.handleConfirmPasswordReset))
+		m.HandleFunc("POST /api/v1/auth/register", s.open(s.handleRegisterAccount))
+		m.HandleFunc("GET /api/v1/auth/invite/{token}", s.open(s.handleShowInvite))
+		m.HandleFunc("POST /api/v1/auth/invite/{token}", s.open(s.handleAcceptInvite))
 		const w = "/api/v1/w/{ws}"
-		m.HandleFunc("GET "+w+"/invites", s.in(s.hInvites))
-		m.HandleFunc("POST "+w+"/invites", s.in(s.hInviteCreate))
-		m.HandleFunc("DELETE "+w+"/invites/{id}", s.in(s.hInviteRevoke))
+		m.HandleFunc("GET "+w+"/invites", s.in(s.handleListInvites))
+		m.HandleFunc("POST "+w+"/invites", s.in(s.handleCreateInvite))
+		m.HandleFunc("DELETE "+w+"/invites/{id}", s.in(s.handleRevokeInvite))
 	})
 }
 
@@ -109,8 +109,8 @@ func (s *Server) clearCookie(x *c) {
 	http.SetCookie(x.w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", HttpOnly: true, MaxAge: -1})
 }
 
-// hAuthConfig tells the sign-in page what it can offer.
-func (s *Server) hAuthConfig(x *c) error {
+// handleShowSignInOptions tells the sign-in page what it can offer.
+func (s *Server) handleShowSignInOptions(x *c) error {
 	ctx := x.ctx()
 	people, err := s.st.Count(ctx, "users", store.Eq("kind", core.KindPerson))
 	if err != nil {
@@ -139,9 +139,9 @@ type setupBody struct {
 	WorkspaceSlug string `json:"workspace_slug"`
 }
 
-// hSetup makes the first person and the first workspace on a new install.
+// handleSetUpInstall makes the first person and the first workspace on a new install.
 // It works once.
-func (s *Server) hSetup(x *c) error {
+func (s *Server) handleSetUpInstall(x *c) error {
 	var b setupBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -199,9 +199,9 @@ type loginBody struct {
 	Password string `json:"password"`
 }
 
-// hLogin signs a person in with email and password. When they have a second
+// handleSignIn signs a person in with email and password. When they have a second
 // step set up the session waits for it.
-func (s *Server) hLogin(x *c) error {
+func (s *Server) handleSignIn(x *c) error {
 	var b loginBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -250,7 +250,7 @@ func (s *Server) finishSignIn(x *c, u core.User, method string) error {
 	return x.ok(map[string]any{"user": u})
 }
 
-func (s *Server) hLogout(x *c) error {
+func (s *Server) handleSignOut(x *c) error {
 	if ck, err := x.r.Cookie(sessionCookie); err == nil {
 		s.st.Update(x.ctx(), "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("token_hash", auth.Hash(ck.Value)))
 		s.accessChanged()
@@ -283,8 +283,8 @@ func (s *Server) memberships(ctx context.Context, userID string) ([]membership, 
 	return out, nil
 }
 
-// hAuthMe says who is signed in and which workspaces they are in.
-func (s *Server) hAuthMe(x *c) error {
+// handleShowAccount says who is signed in and which workspaces they are in.
+func (s *Server) handleShowAccount(x *c) error {
 	ws, err := s.memberships(x.ctx(), x.user.ID)
 	if err != nil {
 		return err
@@ -306,8 +306,8 @@ type profileBody struct {
 	Password string  `json:"password"`
 }
 
-// hProfile changes the signed-in person's own profile.
-func (s *Server) hProfile(x *c) error {
+// handleUpdateProfile changes the signed-in person's own profile.
+func (s *Server) handleUpdateProfile(x *c) error {
 	var b profileBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -361,7 +361,7 @@ func (s *Server) hProfile(x *c) error {
 		s.audit(x.r, "", x.user, "email.changed", "user", x.user.ID, map[string]string{"from": x.user.Email, "to": email})
 	}
 	if len(set) == 0 {
-		return s.hAuthMe(x)
+		return s.handleShowAccount(x)
 	}
 	set["updated_at"] = time.Now().UnixMilli()
 	if _, err := s.st.Update(ctx, "users", set, store.Eq("id", x.user.ID)); err != nil {
@@ -393,7 +393,7 @@ func (s *Server) hProfile(x *c) error {
 	if err := s.st.Get(ctx, &x.user, store.Eq("id", x.user.ID)); err != nil {
 		return err
 	}
-	return s.hAuthMe(x)
+	return s.handleShowAccount(x)
 }
 
 type passwordBody struct {
@@ -401,7 +401,7 @@ type passwordBody struct {
 	New     string `json:"new"`
 }
 
-func (s *Server) hPassword(x *c) error {
+func (s *Server) handleChangePassword(x *c) error {
 	var b passwordBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -430,7 +430,7 @@ func (s *Server) hPassword(x *c) error {
 	return x.ok(map[string]any{"ok": true})
 }
 
-func (s *Server) hSessions(x *c) error {
+func (s *Server) handleListSessions(x *c) error {
 	var ss []core.Session
 	now := time.Now().UnixMilli()
 	if err := s.st.List(x.ctx(), &ss, store.Q{Where: []store.Cond{store.Eq("user_id", x.user.ID), store.Null("revoked_at"), store.Gt("expires_at", now)}, Order: "-last_seen_at"}); err != nil {
@@ -447,7 +447,7 @@ func (s *Server) hSessions(x *c) error {
 	return x.ok(map[string]any{"sessions": list})
 }
 
-func (s *Server) hSessionRevoke(x *c) error {
+func (s *Server) handleRevokeSession(x *c) error {
 	n, err := s.st.Update(x.ctx(), "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()},
 		store.Eq("id", x.r.PathValue("id")), store.Eq("user_id", x.user.ID))
 	if err != nil {
@@ -465,9 +465,9 @@ type workspaceBody struct {
 	Slug string `json:"slug"`
 }
 
-// hWorkspaceCreate makes another workspace on the install, owned by the
+// handleCreateWorkspace makes another workspace on the install, owned by the
 // person signed in.
-func (s *Server) hWorkspaceCreate(x *c) error {
+func (s *Server) handleCreateWorkspace(x *c) error {
 	var b workspaceBody
 	if err := x.body(&b); err != nil {
 		return err

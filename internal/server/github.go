@@ -37,9 +37,9 @@ import (
 func init() {
 	runners = append(runners, (*Server).runGitHub)
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /hooks/github/{id}", s.hGitHubHook)
-		m.HandleFunc("POST /api/v1/w/{ws}/integrations/{id}/sync", s.in(s.hIntegrationSync))
-		m.HandleFunc("GET /api/v1/w/{ws}/integrations/{id}/webhook", s.in(s.hIntegrationWebhook))
+		m.HandleFunc("POST /hooks/github/{id}", s.handleReceiveGitHubEvent)
+		m.HandleFunc("POST /api/v1/w/{ws}/integrations/{id}/sync", s.in(s.handleSyncIntegration))
+		m.HandleFunc("GET /api/v1/w/{ws}/integrations/{id}/webhook", s.in(s.handleShowIntegrationWebhook))
 	})
 }
 
@@ -99,7 +99,7 @@ func (s *Server) runGitHub(ctx context.Context) {
 	}
 }
 
-func (s *Server) hIntegrationSync(x *c) error {
+func (s *Server) handleSyncIntegration(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
@@ -114,9 +114,9 @@ func (s *Server) hIntegrationSync(x *c) error {
 	return x.ok(map[string]any{"pull_requests": n})
 }
 
-// hIntegrationWebhook returns the address and secret to enter in the
+// handleShowIntegrationWebhook returns the address and secret to enter in the
 // repository's webhook settings on GitHub.
-func (s *Server) hIntegrationWebhook(x *c) error {
+func (s *Server) handleShowIntegrationWebhook(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
@@ -137,8 +137,8 @@ func (s *Server) hIntegrationWebhook(x *c) error {
 		"events": []string{"pull_request", "check_suite", "check_run", "status"}})
 }
 
-// hGitHubHook takes a signed call from GitHub and syncs at once.
-func (s *Server) hGitHubHook(w http.ResponseWriter, r *http.Request) {
+// handleReceiveGitHubEvent takes a signed call from GitHub and syncs at once.
+func (s *Server) handleReceiveGitHubEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var in core.Integration
 	if err := s.st.Get(ctx, &in, store.Eq("id", r.PathValue("id")), store.Eq("kind", "github"), store.Live); err != nil {

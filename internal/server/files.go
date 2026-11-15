@@ -99,10 +99,10 @@ func (s *Server) gather(ctx context.Context, f core.File) error {
 	return nil
 }
 
-// hUpload stores a file. The body is the file itself (name it with ?name=),
+// handleUploadFile stores a file. The body is the file itself (name it with ?name=),
 // or a multipart form with a "file" field. A large file can come in parts:
 // give its full size with ?size= and send the rest with PATCH.
-func (s *Server) hUpload(x *c) error {
+func (s *Server) handleUploadFile(x *c) error {
 	if x.actor.ReadOnly {
 		return errForbidden("this credential is read-only")
 	}
@@ -205,10 +205,10 @@ func (s *Server) hUpload(x *c) error {
 	return x.json(201, s.fileOut(x, f))
 }
 
-// hUploadPart appends the next part of a file. offset must be where the
+// handleUploadFilePart appends the next part of a file. offset must be where the
 // last part ended; the answer says how much has arrived, so a broken upload
 // resumes from there.
-func (s *Server) hUploadPart(x *c) error {
+func (s *Server) handleUploadFilePart(x *c) error {
 	ctx := x.ctx()
 	var f core.File
 	if err := x.db.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
@@ -411,7 +411,7 @@ func videoSheet(ctx context.Context, path string) (w, h int, durationMS int64, s
 	return w, h, durationMS, sheet
 }
 
-func (s *Server) hFileMeta(x *c) error {
+func (s *Server) handleShowFile(x *c) error {
 	var f core.File
 	if err := x.db.Get(x.ctx(), &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
 		return errNotFound("file")
@@ -428,10 +428,10 @@ func inlineType(ct string) bool {
 		ct == "application/pdf" || strings.HasPrefix(ct, "text/plain")
 }
 
-// hFileServe sends a file's bytes, or with /preview its reduced copy. The
+// handleServeFile sends a file's bytes, or with /preview its reduced copy. The
 // address never changes and neither do the bytes, so browsers keep them;
 // ranges work, so a clip can be scrubbed without downloading it whole.
-func (s *Server) hFileServe(x *c) error {
+func (s *Server) handleServeFile(x *c) error {
 	ctx := x.ctx()
 	var f core.File
 	if err := s.st.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil || f.State != "ready" {

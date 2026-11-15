@@ -22,7 +22,7 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /mcp", s.hMCP)
+		m.HandleFunc("POST /mcp", s.handleServeMCP)
 		m.HandleFunc("GET /mcp", func(w http.ResponseWriter, r *http.Request) {
 			// No server-to-client stream is offered; clients poll with tools.
 			w.Header().Set("Allow", "POST")
@@ -52,7 +52,7 @@ type rpcResponse struct {
 
 var mcpVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
 
-func (s *Server) hMCP(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleServeMCP(w http.ResponseWriter, r *http.Request) {
 	token, ok := s.mcpSignIn(w, r)
 	if !ok {
 		return

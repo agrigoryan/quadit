@@ -162,9 +162,9 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 	return a, nil
 }
 
-// hAgents is the live view of agents: who is doing what, who is waiting,
+// handleListAgents is the live view of agents: who is doing what, who is waiting,
 // who is not reachable.
-func (s *Server) hAgents(x *c) error {
+func (s *Server) handleListAgents(x *c) error {
 	nm, err := x.names()
 	if err != nil {
 		return err

@@ -12,8 +12,8 @@ import (
 
 var listFields = []string{"key", "title", "status", "priority", "assignee", "waiting_on", "held_by", "labels", "due_on", "parent", "seq"}
 
-// hTasks answers a task query. count=1 returns only how many match.
-func (s *Server) hTasks(x *c) error {
+// handleListTasks answers a task query. count=1 returns only how many match.
+func (s *Server) handleListTasks(x *c) error {
 	q, err := x.queryFromRequest()
 	if err != nil {
 		return err

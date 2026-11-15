@@ -210,8 +210,8 @@ func plainNetError(err error) string {
 	return "could not connect: " + oneLine(said, 200)
 }
 
-// hRedeliver sends a delivery again, whatever became of it.
-func (s *Server) hRedeliver(x *c) error {
+// handleResendDelivery sends a delivery again, whatever became of it.
+func (s *Server) handleResendDelivery(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
@@ -229,9 +229,9 @@ func (s *Server) hRedeliver(x *c) error {
 	return x.ok(map[string]any{"ok": true})
 }
 
-// hWebhookTest posts a sample event to a webhook right now and returns what
+// handleSendTestWebhook posts a sample event to a webhook right now and returns what
 // the receiver answered.
-func (s *Server) hWebhookTest(x *c) error {
+func (s *Server) handleSendTestWebhook(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}

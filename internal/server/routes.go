@@ -20,45 +20,45 @@ func (s *Server) routes() {
 	m := http.NewServeMux()
 	s.mux = m
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
-	m.HandleFunc("GET /readyz", s.hReady)
-	m.HandleFunc("GET /metrics", s.hMetrics)
+	m.HandleFunc("GET /readyz", s.handleCheckReadiness)
+	m.HandleFunc("GET /metrics", s.handleShowMetrics)
 
-	m.HandleFunc("GET /api/v1/auth/config", s.open(s.hAuthConfig))
-	m.HandleFunc("POST /api/v1/auth/setup", s.open(s.hSetup))
-	m.HandleFunc("POST /api/v1/auth/login", s.open(s.hLogin))
-	m.HandleFunc("POST /api/v1/auth/logout", s.open(s.hLogout))
-	m.HandleFunc("GET /api/v1/auth/me", s.signed(s.hAuthMe))
-	m.HandleFunc("PATCH /api/v1/auth/me", s.signed(s.hProfile))
-	m.HandleFunc("POST /api/v1/auth/password", s.signed(s.hPassword))
-	m.HandleFunc("GET /api/v1/auth/sessions", s.signed(s.hSessions))
-	m.HandleFunc("DELETE /api/v1/auth/sessions/{id}", s.signed(s.hSessionRevoke))
-	m.HandleFunc("POST /api/v1/workspaces", s.signed(s.hWorkspaceCreate))
-	m.HandleFunc("GET /api/v1/changes", s.open(s.hCatalog))
+	m.HandleFunc("GET /api/v1/auth/config", s.open(s.handleShowSignInOptions))
+	m.HandleFunc("POST /api/v1/auth/setup", s.open(s.handleSetUpInstall))
+	m.HandleFunc("POST /api/v1/auth/login", s.open(s.handleSignIn))
+	m.HandleFunc("POST /api/v1/auth/logout", s.open(s.handleSignOut))
+	m.HandleFunc("GET /api/v1/auth/me", s.signed(s.handleShowAccount))
+	m.HandleFunc("PATCH /api/v1/auth/me", s.signed(s.handleUpdateProfile))
+	m.HandleFunc("POST /api/v1/auth/password", s.signed(s.handleChangePassword))
+	m.HandleFunc("GET /api/v1/auth/sessions", s.signed(s.handleListSessions))
+	m.HandleFunc("DELETE /api/v1/auth/sessions/{id}", s.signed(s.handleRevokeSession))
+	m.HandleFunc("POST /api/v1/workspaces", s.signed(s.handleCreateWorkspace))
+	m.HandleFunc("GET /api/v1/changes", s.open(s.handleDescribeChangeTypes))
 
 	const w = "/api/v1/w/{ws}"
-	m.HandleFunc("POST "+w+"/changes", s.in(s.hChanges))
-	m.HandleFunc("GET "+w+"/bootstrap", s.in(s.hBootstrap))
-	m.HandleFunc("GET "+w+"/me", s.in(s.hMe))
-	m.HandleFunc("GET "+w+"/my-work", s.in(s.hMyWork))
-	m.HandleFunc("GET "+w+"/events", s.in(s.hEvents))
-	m.HandleFunc("GET "+w+"/events/stream", s.in(s.hStream))
-	m.HandleFunc("GET "+w+"/cursors/{name}", s.in(s.hCursorGet))
-	m.HandleFunc("PUT "+w+"/cursors/{name}", s.in(s.hCursorPut))
-	m.HandleFunc("GET "+w+"/tasks", s.in(s.hTasks))
-	m.HandleFunc("GET "+w+"/tasks/{ref}", s.in(s.hTask))
-	m.HandleFunc("GET "+w+"/tasks/{ref}/context", s.in(s.hContext))
-	m.HandleFunc("GET "+w+"/inbox", s.in(s.hInbox))
-	m.HandleFunc("GET "+w+"/search", s.in(s.hSearch))
-	m.HandleFunc("GET "+w+"/decisions", s.in(s.hDecisions))
-	m.HandleFunc("GET "+w+"/projects/{key}/layout", s.in(s.hLayout))
-	m.HandleFunc("GET "+w+"/list/{collection}", s.in(s.hList))
-	m.HandleFunc("GET "+w+"/tokens", s.in(s.hTokens))
-	m.HandleFunc("POST "+w+"/tokens", s.in(s.hTokenCreate))
-	m.HandleFunc("DELETE "+w+"/tokens/{id}", s.in(s.hTokenRevoke))
-	m.HandleFunc("POST "+w+"/files", s.in(s.hUpload))
-	m.HandleFunc("PATCH "+w+"/files/{id}", s.in(s.hUploadPart))
-	m.HandleFunc("GET "+w+"/files/{id}", s.in(s.hFileMeta))
-	m.HandleFunc("GET /f/{id}/{name...}", s.signed(s.hFileServe))
+	m.HandleFunc("POST "+w+"/changes", s.in(s.handleApplyChanges))
+	m.HandleFunc("GET "+w+"/bootstrap", s.in(s.handleBootstrapLocalCopy))
+	m.HandleFunc("GET "+w+"/me", s.in(s.handleShowWhoAmI))
+	m.HandleFunc("GET "+w+"/my-work", s.in(s.handleShowMyWork))
+	m.HandleFunc("GET "+w+"/events", s.in(s.handleReadFeed))
+	m.HandleFunc("GET "+w+"/events/stream", s.in(s.handleStreamFeed))
+	m.HandleFunc("GET "+w+"/cursors/{name}", s.in(s.handleShowFeedCursor))
+	m.HandleFunc("PUT "+w+"/cursors/{name}", s.in(s.handleMoveFeedCursor))
+	m.HandleFunc("GET "+w+"/tasks", s.in(s.handleListTasks))
+	m.HandleFunc("GET "+w+"/tasks/{ref}", s.in(s.handleShowTask))
+	m.HandleFunc("GET "+w+"/tasks/{ref}/context", s.in(s.handleShowTaskContext))
+	m.HandleFunc("GET "+w+"/inbox", s.in(s.handleListInbox))
+	m.HandleFunc("GET "+w+"/search", s.in(s.handleSearch))
+	m.HandleFunc("GET "+w+"/decisions", s.in(s.handleListDecisions))
+	m.HandleFunc("GET "+w+"/projects/{key}/layout", s.in(s.handleShowProjectLayout))
+	m.HandleFunc("GET "+w+"/list/{collection}", s.in(s.handleListCollection))
+	m.HandleFunc("GET "+w+"/tokens", s.in(s.handleListTokens))
+	m.HandleFunc("POST "+w+"/tokens", s.in(s.handleCreateToken))
+	m.HandleFunc("DELETE "+w+"/tokens/{id}", s.in(s.handleRevokeToken))
+	m.HandleFunc("POST "+w+"/files", s.in(s.handleUploadFile))
+	m.HandleFunc("PATCH "+w+"/files/{id}", s.in(s.handleUploadFilePart))
+	m.HandleFunc("GET "+w+"/files/{id}", s.in(s.handleShowFile))
+	m.HandleFunc("GET /f/{id}/{name...}", s.signed(s.handleServeFile))
 	s.moreRoutes(m)
 }
 
@@ -72,7 +72,7 @@ func (s *Server) moreRoutes(m *http.ServeMux) {
 // extraRoutes lets each feature file add its routes from an init function.
 var extraRoutes []func(s *Server, m *http.ServeMux)
 
-func (s *Server) hReady(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCheckReadiness(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 	if err := s.st.Ping(ctx); err != nil {
@@ -82,8 +82,8 @@ func (s *Server) hReady(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "ready")
 }
 
-// hMetrics writes counters in the Prometheus text format.
-func (s *Server) hMetrics(w http.ResponseWriter, r *http.Request) {
+// handleShowMetrics writes counters in the Prometheus text format.
+func (s *Server) handleShowMetrics(w http.ResponseWriter, r *http.Request) {
 	if tok := s.settingStr(r.Context(), "metrics.token", ""); tok != "" && r.Header.Get("Authorization") != "Bearer "+tok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -119,8 +119,8 @@ func (s *Server) hMetrics(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "# TYPE quadit_info gauge\nquadit_info{version=%q,database=%q,files=%q} 1\n", s.cfg.Version, s.st.Dialect(), s.fileStore().Kind())
 }
 
-// hCatalog lists every change type with its arguments.
-func (s *Server) hCatalog(x *c) error {
+// handleDescribeChangeTypes lists every change type with its arguments.
+func (s *Server) handleDescribeChangeTypes(x *c) error {
 	cat := engine.Catalog()
 	if x.wantText() {
 		var b strings.Builder
@@ -375,8 +375,8 @@ var collections = map[string]collection{
 	}},
 }
 
-// hList returns one kind of row as stored: members, labels, epics and so on.
-func (s *Server) hList(x *c) error {
+// handleListCollection returns one kind of row as stored: members, labels, epics and so on.
+func (s *Server) handleListCollection(x *c) error {
 	name := x.r.PathValue("collection")
 	col, ok := collections[name]
 	if !ok {

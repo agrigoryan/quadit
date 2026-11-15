@@ -10,7 +10,7 @@ import (
 
 func init() {
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/openapi.json", s.hOpenAPI)
+		m.HandleFunc("GET /api/v1/openapi.json", s.handleDescribeAPI)
 	})
 }
 
@@ -84,8 +84,6 @@ var apiOps = []op{
 	{"GET", "/export", "The whole workspace as a zip of Markdown, JSON and the original files.", "", "admin"},
 }
 
-// hOpenAPI describes the API as an OpenAPI 3.1 document, built from the
-// routes above and the engine's catalog of changes.
 // installOps are the calls outside any workspace: accounts and sign-in, and
 // the install's own administration. An agent seldom needs them; a script
 // that sets an install up does.
@@ -164,7 +162,9 @@ var rootOps = []op{
 	{"GET", "/metrics", "Counters in the Prometheus text format.", "", "monitoring"},
 }
 
-func (s *Server) hOpenAPI(w http.ResponseWriter, r *http.Request) {
+// handleDescribeAPI describes the API as an OpenAPI 3.1 document, built from the
+// routes above and the engine's catalog of changes.
+func (s *Server) handleDescribeAPI(w http.ResponseWriter, r *http.Request) {
 	paths := map[string]map[string]any{}
 	prefixed := make([]op, 0, len(installOps)+len(rootOps))
 	for _, o := range installOps {

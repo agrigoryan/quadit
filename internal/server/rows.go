@@ -302,10 +302,10 @@ func matchRow(f rowFilter, v any) bool {
 	return true
 }
 
-// hRows returns a database's rows with every cell worked out, by property
+// handleListDatabaseRows returns a database's rows with every cell worked out, by property
 // name. view=NAME applies a saved view's filters and sorts; filter and sort
 // in the URL do the same for one query: filter=Status:is:Done,Points:gt:3.
-func (s *Server) hRows(x *c) error {
+func (s *Server) handleListDatabaseRows(x *c) error {
 	d, err := x.docByID(x.r.PathValue("id"))
 	if err != nil {
 		return err

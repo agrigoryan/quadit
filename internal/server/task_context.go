@@ -9,9 +9,9 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// hContext is the context pack: one call with everything an agent needs to
+// handleShowTaskContext is the context pack: one call with everything an agent needs to
 // work on a task.
-func (s *Server) hContext(x *c) error {
+func (s *Server) handleShowTaskContext(x *c) error {
 	t, err := x.taskByRef(x.r.PathValue("ref"))
 	if err != nil {
 		return err

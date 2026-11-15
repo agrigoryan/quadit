@@ -9,7 +9,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-func (s *Server) hSearch(x *c) error {
+func (s *Server) handleSearch(x *c) error {
 	v := x.r.URL.Query()
 	hits, err := x.db.Search(x.ctx(), store.SearchQuery{Text: v.Get("q"), Kinds: splitList(v.Get("kind")), ProjectIDs: x.projects,
 		Viewer: x.member.UserID, Limit: x.intParam("limit", 20)})
@@ -67,9 +67,9 @@ func (s *Server) hSearch(x *c) error {
 	return x.ok(map[string]any{"hits": out})
 }
 
-// hDecisions is the decision log: every question with the options shown,
+// handleListDecisions is the decision log: every question with the options shown,
 // the choice, the reason and the date.
-func (s *Server) hDecisions(x *c) error {
+func (s *Server) handleListDecisions(x *c) error {
 	v := x.r.URL.Query()
 	conds, err := x.decisionConds()
 	if err != nil {

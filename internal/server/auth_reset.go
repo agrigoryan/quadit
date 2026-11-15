@@ -15,9 +15,9 @@ type resetRequestBody struct {
 	Email string `json:"email"`
 }
 
-// hResetRequest mails a reset link. The answer is the same whether or not
+// handleRequestPasswordReset mails a reset link. The answer is the same whether or not
 // the address has an account, so it tells an outsider nothing.
-func (s *Server) hResetRequest(x *c) error {
+func (s *Server) handleRequestPasswordReset(x *c) error {
 	var b resetRequestBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -54,7 +54,7 @@ type resetConfirmBody struct {
 	Password string `json:"password"`
 }
 
-func (s *Server) hResetConfirm(x *c) error {
+func (s *Server) handleConfirmPasswordReset(x *c) error {
 	var b resetConfirmBody
 	if err := x.body(&b); err != nil {
 		return err

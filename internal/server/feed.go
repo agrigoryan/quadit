@@ -48,11 +48,11 @@ func (x *c) events(evs []core.Event, seq int64, more bool) error {
 	return x.ok(map[string]any{"events": evs, "seq": seq, "more": more})
 }
 
-// hEvents reads the feed after a position. With wait=N the request is held
+// handleReadFeed reads the feed after a position. With wait=N the request is held
 // for up to N seconds until something matching arrives, so an agent waits
 // with one call instead of polling. With cursor=NAME the position is the one
 // the server keeps for the caller; ack=SEQ moves it first.
-func (s *Server) hEvents(x *c) error {
+func (s *Server) handleReadFeed(x *c) error {
 	ctx := x.ctx()
 	v := x.r.URL.Query()
 	f := store.EventFilter{Viewer: x.member.UserID, ProjectIDs: nil, Limit: min(x.intParam("limit", 200), 2000), Types: splitList(v.Get("types"))}
@@ -206,14 +206,14 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 		"workspace_id", "user_id", "name")
 }
 
-func (s *Server) hCursorGet(x *c) error {
+func (s *Server) handleShowFeedCursor(x *c) error {
 	var cu core.Cursor
 	x.db.Get(x.ctx(), &cu, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name")))
 	return x.ok(map[string]any{"name": x.r.PathValue("name"), "seq": cu.Seq})
 }
 
-// hCursorPut marks everything up to seq as handled.
-func (s *Server) hCursorPut(x *c) error {
+// handleMoveFeedCursor marks everything up to seq as handled.
+func (s *Server) handleMoveFeedCursor(x *c) error {
 	var b struct {
 		Seq int64 `json:"seq"`
 	}
@@ -223,12 +223,12 @@ func (s *Server) hCursorPut(x *c) error {
 	if err := s.setCursor(x, x.r.PathValue("name"), b.Seq); err != nil {
 		return err
 	}
-	return s.hCursorGet(x)
+	return s.handleShowFeedCursor(x)
 }
 
-// hStream is the live stream: server-sent events, one per feed event, from
+// handleStreamFeed is the live stream: server-sent events, one per feed event, from
 // a position. The web app keeps one open; an agent can too.
-func (s *Server) hStream(x *c) error {
+func (s *Server) handleStreamFeed(x *c) error {
 	flusher, ok := x.w.(http.Flusher)
 	if !ok {
 		return errBad("this connection cannot stream")

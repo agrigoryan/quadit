@@ -24,8 +24,8 @@ import (
 func init() {
 	runners = append(runners, (*Server).runDispatcher, (*Server).runDeliveries, (*Server).runJobs)
 	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/deliveries/{id}/redeliver", s.in(s.hRedeliver))
-		m.HandleFunc("POST /api/v1/w/{ws}/webhooks/{id}/test", s.in(s.hWebhookTest))
+		m.HandleFunc("POST /api/v1/w/{ws}/deliveries/{id}/redeliver", s.in(s.handleResendDelivery))
+		m.HandleFunc("POST /api/v1/w/{ws}/webhooks/{id}/test", s.in(s.handleSendTestWebhook))
 	})
 }
 
