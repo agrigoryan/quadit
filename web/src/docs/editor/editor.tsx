@@ -34,6 +34,7 @@ import {
   pageTitleItems,
   QuietMenu,
 } from "@/docs/editor/menus";
+import { openChipAtCaret } from "@/docs/editor/chips";
 import { type ChipKind, ChipPicker } from "@/docs/editor/pickers";
 import { schema } from "@/docs/editor/schema";
 import { DocSync, type SaveState } from "@/docs/editor/sync";
@@ -103,6 +104,7 @@ export default function Editor({
       tables: { headers: true },
       animations: false,
       domAttributes: { editor: { "aria-label": t("docs.body.label") } },
+      extensions: [openChipAtCaret],
     },
     [],
   );

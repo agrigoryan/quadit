@@ -24,17 +24,17 @@ const mention = createReactInlineContentSpec(
 
 const taskChip = createReactInlineContentSpec(
   { type: "taskChip", propSchema: { key: { default: "" } }, content: "none" },
-  { render: (p) => <TaskChip taskKey={p.inlineContent.props.key} /> },
+  { render: (p) => <TaskChip taskKey={p.inlineContent.props.key} editable={p.editor.isEditable} /> },
 );
 
 const decisionChip = createReactInlineContentSpec(
   { type: "decisionChip", propSchema: { key: { default: "" } }, content: "none" },
-  { render: (p) => <DecisionChip decisionRef={p.inlineContent.props.key} /> },
+  { render: (p) => <DecisionChip decisionRef={p.inlineContent.props.key} editable={p.editor.isEditable} /> },
 );
 
 const pageLink = createReactInlineContentSpec(
   { type: "pageLink", propSchema: { doc: { default: "" } }, content: "none" },
-  { render: (p) => <PageChip docId={p.inlineContent.props.doc} /> },
+  { render: (p) => <PageChip docId={p.inlineContent.props.doc} editable={p.editor.isEditable} /> },
 );
 
 export const schema = BlockNoteSchema.create({
