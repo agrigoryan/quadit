@@ -1,11 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 import {
+  type Announcements,
   closestCorners,
   DndContext,
   type DragEndEvent,
   type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
+  type UniqueIdentifier,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -165,6 +167,33 @@ export function Board({ groups, project }: Props) {
     moveCard(task, inPlace ? undefined : rankBetween(above?.rank, below?.rank), change);
   }
 
+  // What a screen reader hears while a card moves: the task and the column, in words. A card that
+  // crossed into a column is drawn there and is over itself, so a column is looked up in `order`;
+  // over itself it has not gone anywhere new, and the last words stand.
+  const taskName = (id: UniqueIdentifier) => {
+    const task = cards.get(String(id))?.task;
+    return task ? `${task.key} ${task.title}` : "";
+  };
+  const columnName = (id: UniqueIdentifier) => {
+    const col = (order && columnOf(order, String(id))) ?? cards.get(String(id))?.group.id ?? String(id);
+    return groups.find((g) => g.id === col)?.title ?? "";
+  };
+  const back = (active: { id: UniqueIdentifier }) =>
+    t("board.drag.cancel", { task: taskName(active.id), column: cards.get(String(active.id))?.group.title ?? "" });
+  const announcements: Announcements = {
+    onDragStart: ({ active }) =>
+      t("board.drag.start", { task: taskName(active.id), column: cards.get(String(active.id))?.group.title ?? "" }),
+    onDragOver: ({ active, over }) =>
+      over?.id === active.id
+        ? undefined
+        : over
+          ? t("board.drag.over", { task: taskName(active.id), column: columnName(over.id) })
+          : t("board.drag.away", { task: taskName(active.id) }),
+    onDragEnd: ({ active, over }) =>
+      over ? t("board.drag.end", { task: taskName(active.id), column: columnName(over.id) }) : back(active),
+    onDragCancel: ({ active }) => back(active),
+  };
+
   const active = activeId ? cards.get(activeId)?.task : undefined;
   // Statuses are edited where they are used: on a project's board, by those who may.
   const editable = !!project && can.administer && groups[0]?.kind === "status";
@@ -176,7 +205,7 @@ export function Board({ groups, project }: Props) {
       onDragStart={start}
       onDragOver={over}
       onDragEnd={end}
-      accessibility={{ screenReaderInstructions: { draggable: t("board.dragKeys") } }}
+      accessibility={{ announcements, screenReaderInstructions: { draggable: t("board.dragKeys") } }}
       onDragCancel={() => {
         setActiveId(null);
         setOrder(null);

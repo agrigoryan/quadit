@@ -11,7 +11,8 @@ test("a card moves to the next column from the keyboard", async ({ page, project
 
   await card("Todo").focus();
   await page.keyboard.press("Shift+Space");
-  await expect(page.getByRole("main").getByRole("status")).toHaveText(/Picked up|moved over/);
+  const said = page.getByRole("main").getByRole("status");
+  await expect(said).toHaveText(`Picked up ${key} Paint the fence in Todo.`);
   // While lifted the card is drawn in the column it is over. dnd-kit measures
   // the columns after the lift, and an arrow pressed before that is lost (a
   // person presses it again), so the arrow is pressed until the card is across.
@@ -19,7 +20,9 @@ test("a card moves to the next column from the keyboard", async ({ page, project
     if ((await card("In Progress").count()) === 0) await page.keyboard.press("ArrowRight");
     await expect(card("In Progress")).toBeVisible({ timeout: 1_000 });
   }).toPass();
+  await expect(said).toHaveText(`${key} Paint the fence is over In Progress.`);
   await page.keyboard.press("Space");
+  await expect(said).toHaveText(`${key} Paint the fence dropped in In Progress.`);
   await expect.poll(async () => (await quadit.task(key)).status).toBe("In Progress");
   await page.reload();
   await expect(card("In Progress")).toBeVisible();

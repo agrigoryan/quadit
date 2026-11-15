@@ -187,6 +187,11 @@ export const tasks = {
   "board.empty": "Nothing here",
   "board.dragKeys":
     "To move a card, press Shift and Space. Use the arrow keys to move it, Space to drop it, or Escape to put it back.",
+  "board.drag.start": "Picked up {task} in {column}.",
+  "board.drag.over": "{task} is over {column}.",
+  "board.drag.away": "{task} is not over a column.",
+  "board.drag.end": "{task} dropped in {column}.",
+  "board.drag.cancel": "{task} put back in {column}.",
 
   "create.title": "New task",
   "create.titlePlaceholder": "Task title",
