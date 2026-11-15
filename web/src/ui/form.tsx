@@ -1,6 +1,6 @@
-// Form parts for settings pages: a field that can show what is wrong with
-// it, a switch, a plain select, the hook that puts the server's refusal
-// next to the field it names, and the hook that runs a form's request.
+// Form parts: a field that can show what is wrong with it, a switch, a plain
+// select, the hook that puts the server's refusal next to the field it names,
+// and the hook that runs a form's request.
 
 import { type ReactNode, type SelectHTMLAttributes, useCallback, useId, useState } from "react";
 import { Checkbox as RCheckbox, Switch as RSwitch } from "radix-ui";

@@ -50,8 +50,12 @@ export interface EditorHandle {
 
 interface Props {
   docId: string;
+  /**
+   * The page's blocks as fetched, and its content position then: where the
+   * editor and its sync start. Read when the editor is made; changing them
+   * later does not load the page again (give the Editor a new key for that).
+   */
   rows: BlockRow[];
-  /** The page's content position when the rows were fetched. */
   seq: number;
   readOnly: boolean;
   handle?: Ref<EditorHandle>;

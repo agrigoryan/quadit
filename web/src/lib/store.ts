@@ -100,7 +100,11 @@ export const useRestLoaded = (): boolean => useStore((s) => s.restLoaded);
 type EventListener = (events: FeedEvent[]) => void;
 const listeners = new Set<EventListener>();
 
-/** Hear every event the store applies (a task's timeline follows along this way). */
+/**
+ * Hear every event the store applies (a task's timeline follows along this
+ * way). An event of this tab's own write can be heard twice: early, with the
+ * write's answer, and again when the live stream delivers it in its place.
+ */
 export function onEvents(listener: EventListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

@@ -5,10 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, errorMessage } from "@/lib/api";
 
 export interface Loaded<T> {
-  /** Undefined until the first answer. */
+  /** Undefined until the first answer; then the last good answer, kept through a reload and a failure. */
   data: T | undefined;
-  /** The server's message when the fetch failed. */
+  /** The server's message when the last fetch failed; "" once one succeeds. */
   error: string;
+  /** True while a fetch is out: the first one, and every reload too, while `data` stays. */
   loading: boolean;
   /** Fetches again, keeping what is shown until the new answer is here. */
   reload: () => Promise<void>;

@@ -13,7 +13,11 @@ export function useCollection<K extends keyof Collections>(name: K): Collections
   return useStore((s) => s.collections[name]);
 }
 
-/** The signed-in member. Pages render only once the store is ready, so it is there. */
+/**
+ * The signed-in member. It is there only because the shell draws no page
+ * until the store is ready (shell/workspace.tsx); outside that gate it is
+ * undefined despite the type.
+ */
 export function useMe(): Member {
   return useStore((s) => s.me) as Member;
 }
