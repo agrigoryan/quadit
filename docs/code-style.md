@@ -6,7 +6,7 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 
 ### Packages and files
 1. Every package has one doc comment saying what it is for and how its files are laid out.
-2. Every file other than the package's doc file opens with one line saying what is in it. One topic per file; the file's name is the topic.
+2. Every file other than the package's doc file opens with one line saying what is in it. One topic per file; the file's name is the topic. There is no limit on a file's length: a file is split when it holds more than one topic, never because it is long. A long file about one thing stays one file.
 3. Packages below `server` never import it. `server` holds routing, the request context, sign-in and thin handlers; a feature with logic of its own is a package.
 
 ### Functions
@@ -50,7 +50,7 @@ What "readable" means in this repository, as rules a reviewer can check. `make l
 `pnpm check` checks the rules a tool can (types, lint, format, tests). The folders under `web/src` are layers: `lib`, `i18n` and `ui` at the bottom; the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`) above them; `shell`, `pages` and `palette` on top.
 
 ### Files and layers
-1. One topic per file, and the file's name is the topic. No `bits`, `parts`, `more`, `helpers` or `utils`.
+1. One topic per file, and the file's name is the topic. No `bits`, `parts`, `more`, `helpers` or `utils`. A file is split when it holds more than one topic, never because it is long.
 2. Every file opens with a comment saying what it is for.
 3. `lib`, `i18n` and `ui` import no feature folder; features do not import `shell`, `pages` or `palette`. Lint enforces it.
 4. Imports go through `@/`. No relative imports, no barrel files. Default exports only for lazy routes.
