@@ -344,10 +344,17 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// A refresh token works once: the old pair ends as the new one
-		// starts, and no new one starts while the old one cannot end.
-		if _, err := s.st.Update(ctx, "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", old.ID)); err != nil {
+		// starts, and no new one starts while the old one cannot end. The
+		// revoke only takes a pair that is still live, so of two refreshes
+		// racing with one token exactly one spends it.
+		spent, err := s.st.Update(ctx, "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", old.ID), store.Null("revoked_at"))
+		if err != nil {
 			s.log.Error("oauth token: the old pair could not be revoked, so no new one is issued", "err", err)
 			fail("server_error", "the refresh token could not be spent; try again")
+			return
+		}
+		if spent == 0 {
+			fail("invalid_grant", "the refresh token is not valid; sign in again")
 			return
 		}
 		scope := ""

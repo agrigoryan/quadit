@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -373,5 +374,32 @@ func TestASecretRequestWhoseAnswerBreaksOffIsNotOK(t *testing.T) {
 		if out.OK || out.Error == "" {
 			t.Fatalf("an answer cut short reads as %+v; want ok false with the error", out)
 		}
+	})
+}
+
+// spendFirst is a store in which, once armed, another refresh spends a token
+// just before this one revokes it: the moment two refreshes with one token
+// race for.
+type spendFirst struct {
+	store.Store
+	armed atomic.Bool
+}
+
+func (s *spendFirst) Update(ctx context.Context, table string, set map[string]any, where ...store.Cond) (int64, error) {
+	if table == "api_tokens" && s.armed.CompareAndSwap(true, false) {
+		if _, err := s.Store.Update(ctx, table, map[string]any{"revoked_at": time.Now().UnixMilli()}, where...); err != nil {
+			return 0, err
+		}
+	}
+	return s.Store.Update(ctx, table, set, where...)
+}
+
+func TestARefreshTokenSpentByAnotherRefreshIsRefused(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		racing := &spendFirst{Store: st}
+		s := newSite(t, racing)
+		refresh, clientID := s.oauthTokens(t)
+		racing.armed.Store(true)
+		s.tokenCall(t, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "client_id": {clientID}}, 400, nil)
 	})
 }
