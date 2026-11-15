@@ -6,15 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
-	"os/exec"
-	"runtime"
-	"strings"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/picture"
 )
 
 // The render check lets an agent see a task or page the way a person does:
@@ -29,35 +26,13 @@ func (s *Server) pictureRoutes() []route {
 	}
 }
 
-// findChrome returns a Chrome or Chromium to run, or "".
-func findChrome() string {
-	if p := os.Getenv("QUADIT_CHROME"); p != "" {
-		return p
-	}
-	for _, name := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome", "headless-shell"} {
-		if p, err := exec.LookPath(name); err == nil {
-			return p
-		}
-	}
-	if runtime.GOOS == "darwin" {
-		for _, p := range []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"} {
-			if _, err := os.Stat(p); err == nil {
-				return p
-			}
-		}
-	}
-	return ""
-}
-
-// Picture sizes: the default for a desktop and for a phone, and the
-// bounds a caller may ask for.
+// Picture sizes: the default width, and the bounds a caller may ask for.
 const (
-	desktopWidth, desktopHeight = 1280, 900
-	phoneHeight                 = 844
-	minPictureWidth             = 320
-	maxPictureWidth             = 2560
-	minPictureHeight            = 200
-	pictureTimeout              = 45 * time.Second
+	desktopWidth     = 1280
+	minPictureWidth  = 320
+	maxPictureWidth  = 2560
+	minPictureHeight = 200
+	pictureTimeout   = 45 * time.Second
 )
 
 // handleTakePicture returns a PNG of a task or a page as the caller would see it.
@@ -81,16 +56,16 @@ func (s *Server) handleTakePicture(x *c) error {
 	target := base + "/api/v1/auth/render-session?token=" + url.QueryEscape(token) + "&next=" + url.QueryEscape(path)
 	ctx, cancel := context.WithTimeout(x.ctx(), pictureTimeout)
 	defer cancel()
-	png, whole, err := takePicture(ctx, pictureRequest{target: target,
-		width: width, height: height, dark: q.Get("theme") == "dark", full: truthyParam(q, "full") && x.intParam("height", 0) == 0})
-	if errors.Is(err, errNoBrowser) {
+	png, whole, err := picture.Take(ctx, picture.Request{Target: target,
+		Width: width, Height: height, Dark: q.Get("theme") == "dark", Full: truthyParam(q, "full") && height == 0})
+	if errors.Is(err, picture.ErrNoBrowser) {
 		return &httpError{Status: 501, Code: "no_browser", Message: "the server has no Chrome or Chromium to take pictures with; install one, or set QUADIT_CHROME to its path"}
 	}
 	if err != nil {
 		s.log.Warn("render", "err", err)
 		return &httpError{Status: 502, Code: "render_failed", Message: "the browser could not take the picture: " + oneLine(err.Error(), 120)}
 	}
-	if whole > pictureMaxHeight {
+	if whole > picture.MaxHeight {
 		// The page goes on below the picture: say so where a caller reads it.
 		x.w.Header().Set("X-Quadit-Note", fmt.Sprintf("the page is %d pixels tall; the picture stops at 8000", whole))
 	}
@@ -100,22 +75,16 @@ func (s *Server) handleTakePicture(x *c) error {
 	return err
 }
 
-// pictureSize reads the size a picture is asked for, with the usual
-// height of a phone or a desktop when none is given.
+// pictureSize reads the size a picture is asked for. A height of 0, none
+// given, is the usual height of a phone or a desktop.
 func pictureSize(x *c) (width, height int, err error) {
 	width = x.intParam("width", desktopWidth)
 	if width < minPictureWidth || width > maxPictureWidth {
 		return 0, 0, errBad("width is from 320 to 2560: 390 for a phone, 1280 for a desktop")
 	}
-	if h := x.intParam("height", 0); h != 0 && (h < minPictureHeight || h > pictureMaxHeight) {
-		return 0, 0, errBad("height is from 200 to 8000; leave it out for the usual size, or use full=1 for the whole page")
-	}
 	height = x.intParam("height", 0)
-	if height == 0 {
-		height = desktopHeight
-		if width < phoneWidth {
-			height = phoneHeight
-		}
+	if height != 0 && (height < minPictureHeight || height > picture.MaxHeight) {
+		return 0, 0, errBad("height is from 200 to 8000; leave it out for the usual size, or use full=1 for the whole page")
 	}
 	return width, height, nil
 }
@@ -142,17 +111,6 @@ func picturePath(x *c) (string, error) {
 		return path + "/" + q.Get("path"), nil
 	}
 	return "", errBad("say what to picture: task=KEY, doc=ID or path=…")
-}
-
-// chromeSwitches are the switches for where the server runs: Chrome
-// refuses to sandbox as root, as in a container, and a container that
-// cannot give it its own sandbox says so with QUADIT_CHROME_ARGS=--no-sandbox.
-func chromeSwitches() []string {
-	var extra []string
-	if os.Geteuid() == 0 {
-		extra = append(extra, "--no-sandbox")
-	}
-	return append(extra, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
 }
 
 // handleSignInPictureBrowser signs the picture-taking browser in for two minutes,

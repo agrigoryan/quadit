@@ -1,4 +1,9 @@
-package server
+// Package picture takes a picture of a web page as a person sees it: it
+// finds Chrome or Chromium on the machine, runs it headless with a profile
+// of its own, and drives it over the DevTools protocol to open the page at
+// exactly the size asked and capture it as a PNG. Take is all of it; the
+// browser, the protocol, and when a page counts as drawn are hidden here.
+package picture
 
 import (
 	"bufio"
@@ -10,7 +15,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/plainjson"
@@ -147,39 +154,49 @@ const pageHeight = `(() => {
   return need + extra;
 })()`
 
+// MaxHeight is how tall a picture of a whole page is at most, in CSS pixels.
+const MaxHeight = 8000
+
 // Limits and waits of a picture.
 const (
-	pictureMaxHeight = 8000 // a whole page is pictured this tall at most
 	pictureMinHeight = 320
 	phoneWidth       = 600 // narrower is a phone
+	desktopHeight    = 900 // the usual height on a desktop
+	phoneHeight      = 844 // the usual height on a phone
 	pageLoadWait     = 20 * time.Second
 	pageSettleWait   = 12 * time.Second
 	pageLookEvery    = 250 * time.Millisecond
 	pageFillInWait   = 400 * time.Millisecond // lists that draw only what is in view fill in
 )
 
-// pictureRequest is what to take a picture of, and how.
-type pictureRequest struct {
-	target string // the address to open
-	width  int    // CSS pixels
-	height int    // CSS pixels
-	dark   bool   // the page is told the reader prefers dark
-	full   bool   // the whole page, as tall as it is
+// Request is what to take a picture of, and how.
+type Request struct {
+	Target string // the address to open
+	Width  int    // CSS pixels; narrower than 600 is a phone
+	Height int    // CSS pixels; 0 is the usual height of a phone or a desktop
+	Dark   bool   // the page is told the reader prefers dark
+	Full   bool   // the whole page, as tall as it is
 }
 
-// errNoBrowser is takePicture finding no Chrome or Chromium on the server.
-var errNoBrowser = errors.New("no Chrome or Chromium to take pictures with")
+// ErrNoBrowser is Take finding no Chrome or Chromium on the machine.
+var ErrNoBrowser = errors.New("no Chrome or Chromium to take pictures with")
 
-// takePicture opens the target in a headless browser at exactly width by
-// height CSS pixels and returns a PNG of it. When the whole page was asked
-// for it also says how tall the page is: a picture stops at 8000 pixels,
-// and the caller is told when the page goes on. It finds the browser
-// itself (errNoBrowser when there is none) and runs it with a profile of
-// its own, removed afterwards.
-func takePicture(ctx context.Context, p pictureRequest) (png []byte, whole int, err error) {
+// Take opens the target in a headless browser at exactly width by height
+// CSS pixels and returns a PNG of it. When the whole page was asked for it
+// also says how tall the page is: a picture stops at MaxHeight, and the
+// caller can tell when the page goes on. It finds the browser itself
+// (ErrNoBrowser when there is none; QUADIT_CHROME names one) and runs it
+// with a profile of its own, removed afterwards.
+func Take(ctx context.Context, p Request) (png []byte, whole int, err error) {
 	chrome := findChrome()
 	if chrome == "" {
-		return nil, 0, errNoBrowser
+		return nil, 0, ErrNoBrowser
+	}
+	if p.Height == 0 {
+		p.Height = desktopHeight
+		if p.Width < phoneWidth {
+			p.Height = phoneHeight
+		}
 	}
 	dir, err := os.MkdirTemp("", "quadit-render-*")
 	if err != nil {
@@ -199,7 +216,7 @@ func takePicture(ctx context.Context, p pictureRequest) (png []byte, whole int, 
 	if err := waitForSettledPage(ctx, devtools, s); err != nil {
 		return nil, 0, err
 	}
-	if p.full {
+	if p.Full {
 		if whole, err = fitWholePage(ctx, devtools, s, p); err != nil {
 			return nil, 0, err
 		}
@@ -294,7 +311,7 @@ func (b *browser) stop() {
 // openPage opens a tab with the device and color scheme asked for,
 // goes to the target and waits for it to load. It returns the tab's
 // session.
-func openPage(ctx context.Context, devtools *cdp, p pictureRequest) (string, error) {
+func openPage(ctx context.Context, devtools *cdp, p Request) (string, error) {
 	res, err := devtools.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"})
 	if err != nil {
 		return "", err
@@ -316,16 +333,16 @@ func openPage(ctx context.Context, devtools *cdp, p pictureRequest) (string, err
 		return "", fmt.Errorf("the browser's answer to attaching to the tab: %w", err)
 	}
 	s := at.SessionID
-	phone := p.width < phoneWidth
+	phone := p.Width < phoneWidth
 	if _, err := devtools.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
-		"width": p.width, "height": p.height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
+		"width": p.Width, "height": p.Height, "deviceScaleFactor": 1, "mobile": phone}); err != nil {
 		return "", err
 	}
 	if phone {
 		_, _ = devtools.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true}) //nolint:errcheck // without touch the page is still a phone's
 	}
 	scheme := "light"
-	if p.dark {
+	if p.Dark {
 		scheme = "dark"
 	}
 	_, _ = devtools.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{ //nolint:errcheck // without it the page shows in its default scheme
@@ -333,7 +350,7 @@ func openPage(ctx context.Context, devtools *cdp, p pictureRequest) (string, err
 	if _, err := devtools.call(ctx, s, "Page.enable", map[string]any{}); err != nil {
 		return "", err
 	}
-	res, err = devtools.call(ctx, s, "Page.navigate", map[string]any{"url": p.target})
+	res, err = devtools.call(ctx, s, "Page.navigate", map[string]any{"url": p.Target})
 	if err != nil {
 		return "", err
 	}
@@ -373,7 +390,7 @@ func waitForSettledPage(ctx context.Context, devtools *cdp, s string) error {
 // fitWholePage makes the window as tall as the page's longest scrolling
 // part needs, within reason, and no taller, and returns how tall the page
 // is. A page whose height cannot be read is pictured at the size asked.
-func fitWholePage(ctx context.Context, devtools *cdp, s string, p pictureRequest) (int, error) {
+func fitWholePage(ctx context.Context, devtools *cdp, s string, p Request) (int, error) {
 	res, err := devtools.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": pageHeight, "returnByValue": true})
 	var out struct {
 		Result struct {
@@ -384,9 +401,9 @@ func fitWholePage(ctx context.Context, devtools *cdp, s string, p pictureRequest
 		return 0, nil //nolint:nilerr // the height is a nicety: without it the picture is the size asked
 	}
 	whole := int(out.Result.Value) + 1
-	height := min(max(whole, pictureMinHeight), pictureMaxHeight)
+	height := min(max(whole, pictureMinHeight), MaxHeight)
 	if _, err := devtools.call(ctx, s, "Emulation.setDeviceMetricsOverride", map[string]any{
-		"width": p.width, "height": height, "deviceScaleFactor": 1, "mobile": p.width < phoneWidth}); err != nil {
+		"width": p.Width, "height": height, "deviceScaleFactor": 1, "mobile": p.Width < phoneWidth}); err != nil {
 		return 0, err
 	}
 	select {
@@ -395,4 +412,35 @@ func fitWholePage(ctx context.Context, devtools *cdp, s string, p pictureRequest
 		return 0, ctx.Err()
 	}
 	return whole, nil
+}
+
+// findChrome returns a Chrome or Chromium to run, or "".
+func findChrome() string {
+	if p := os.Getenv("QUADIT_CHROME"); p != "" {
+		return p
+	}
+	for _, name := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome", "headless-shell"} {
+		if p, err := exec.LookPath(name); err == nil {
+			return p
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		for _, p := range []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"} {
+			if _, err := os.Stat(p); err == nil {
+				return p
+			}
+		}
+	}
+	return ""
+}
+
+// chromeSwitches are the switches for where the server runs: Chrome
+// refuses to sandbox as root, as in a container, and a container that
+// cannot give it its own sandbox says so with QUADIT_CHROME_ARGS=--no-sandbox.
+func chromeSwitches() []string {
+	var extra []string
+	if os.Geteuid() == 0 {
+		extra = append(extra, "--no-sandbox")
+	}
+	return append(extra, strings.Fields(os.Getenv("QUADIT_CHROME_ARGS"))...)
 }

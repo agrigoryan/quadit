@@ -33,7 +33,9 @@
 //	  orient.go (who am I, my work), layout.go, tasks_list.go,
 //	  task_detail.go, task_context.go, query.go, render.go, views_shared.go,
 //	  search.go, feed.go, bootstrap.go, docs.go, rows.go, files.go,
-//	  picture.go, picture_cdp.go, dashboard*.go
+//	  dashboard*.go
+//	  picture.go     a picture of a page as the caller sees it (package
+//	                 picture drives the browser)
 //	Changes
 //	  changes.go     POST /changes: the engine applies, this audits
 //	  eventtypes.go  the event types the feed carries
