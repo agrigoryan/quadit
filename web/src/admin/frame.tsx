@@ -24,10 +24,9 @@ import { usePageTitle } from "@/lib/ui-state";
 import { Avatar } from "@/ui/avatar";
 import { EmptyState } from "@/ui/empty";
 import { QuadMark } from "@/ui/icons";
-import { fetchSettings, SettingsContext, type SettingsMap } from "@/admin/settings";
+import { useSettings } from "@/admin/settings";
 import { LoadGate } from "@/ui/load-gate";
 import { type NavGroup, NavLayout } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
 
 function useGroups(): NavGroup[] {
   return useMemo(
@@ -116,11 +115,7 @@ export function AdminFrame({ children }: { children: ReactNode }) {
   usePageTitle(t("admin.title"));
   const isAdmin = useSession((s) => !!s.user?.is_admin);
   const groups = useGroups();
-  const settings = useLoad(() => (isAdmin ? fetchSettings() : Promise.resolve({} as SettingsMap)), [isAdmin]);
-  const ctx = useMemo(
-    () => (settings.data ? { settings: settings.data, replace: settings.set } : null),
-    [settings.data, settings.set],
-  );
+  const settings = useSettings(isAdmin);
 
   if (!isAdmin) return <NotForYou />;
   const name = settings.data?.["install.name"]?.value;
@@ -130,11 +125,9 @@ export function AdminFrame({ children }: { children: ReactNode }) {
       <main className="min-h-0 flex-1">
         <LoadGate of={settings}>
           {() => (
-            <SettingsContext.Provider value={ctx}>
-              <NavLayout base="/admin" label={t("admin.title")} groups={groups}>
-                {children}
-              </NavLayout>
-            </SettingsContext.Provider>
+            <NavLayout base="/admin" label={t("admin.title")} groups={groups}>
+              {children}
+            </NavLayout>
           )}
         </LoadGate>
       </main>

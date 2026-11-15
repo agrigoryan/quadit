@@ -1,16 +1,30 @@
 // What a page shows while a read is on its way, or failed.
 
+import type { UseQueryResult } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { t } from "@/lib/i18n";
-import type { Loaded } from "@/lib/use-load";
+import { readError } from "@/lib/query";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading } from "@/ui/spinner";
 
-/** Shows the spinner, the error with "Try again", or the page once its list is here. */
-export function LoadGate<T>({ of, children }: { of: Loaded<T>; children: (data: T) => ReactNode }) {
+/**
+ * Shows the spinner, the error with "Try again", or the page once its read
+ * is here. The last good answer stays on screen through a later failure. A
+ * read refused with 401 shows nothing: the person is on the way to sign in.
+ */
+export function LoadGate<T>({
+  of,
+  children,
+}: {
+  of: Pick<UseQueryResult<T>, "data" | "error" | "refetch">;
+  children: (data: T) => ReactNode;
+}) {
   if (of.data !== undefined) return <>{children(of.data)}</>;
-  if (of.error) return <LoadFailed error={of.error} onRetry={() => void of.reload()} />;
+  if (of.error) {
+    const error = readError(of.error);
+    return error ? <LoadFailed error={error} onRetry={() => void of.refetch()} /> : null;
+  }
   return <Loading />;
 }
 

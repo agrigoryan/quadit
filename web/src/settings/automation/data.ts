@@ -1,10 +1,12 @@
 // The calls that read and change the rows behind the automation pages
-// (their types are in lib/types-automation.ts). None of these lists is in
-// the store: each page fetches its own and fetches again after a change.
+// (their types are in lib/types-automation.ts), and the keys they are cached
+// under. None of these lists is in the store: each page reads its own and it
+// is asked again after a change.
 
 import { api, workspacePath } from "@/lib/api";
 import type { Changes } from "@/lib/changes.gen";
 import { type ChangeSpec, type ChangeType, mutate } from "@/lib/mutate";
+import { inWorkspace } from "@/lib/query";
 import type { Outcome } from "@/lib/types";
 import type { ActionKind, Delivery, Webhook } from "@/lib/types-automation";
 
@@ -54,21 +56,32 @@ export interface SyncResult {
   note?: string;
 }
 
+export const automationKeys = {
+  /** The webhooks list; each webhook's delivery log sits under it, so asking it again asks the logs too. */
+  webhooks: (slug: string) => [...inWorkspace(slug), "webhooks"] as const,
+  deliveries: (slug: string, hookId: string) => [...inWorkspace(slug), "webhooks", hookId, "deliveries"] as const,
+  rules: (slug: string) => [...inWorkspace(slug), "rules"] as const,
+  sources: (slug: string) => [...inWorkspace(slug), "sources"] as const,
+  /** The integrations list; each one's webhook address sits under it. */
+  integrations: (slug: string) => [...inWorkspace(slug), "integrations"] as const,
+  integrationHook: (slug: string, id: string) => [...inWorkspace(slug), "integrations", id, "webhook"] as const,
+};
+
 /** One of the lists the server keeps for admins: webhooks, rules, integrations, deliveries. */
-export async function listRows<T>(slug: string, name: string, query = ""): Promise<T[]> {
-  const out = await api.get<Record<string, T[]>>(workspacePath(slug, `/list/${name}${query}`));
+export async function listRows<T>(slug: string, name: string, query = "", signal?: AbortSignal): Promise<T[]> {
+  const out = await api.get<Record<string, T[]>>(workspacePath(slug, `/list/${name}${query}`), signal);
   return out[name] ?? [];
 }
 
 /** A webhook with the newest entry of its delivery log. A test is logged there and nowhere else. */
 export type WebhookRow = Webhook & { newest?: Delivery };
 
-export async function listWebhooks(slug: string): Promise<WebhookRow[]> {
-  const hooks = await listRows<Webhook>(slug, "webhooks");
+export async function listWebhooks(slug: string, signal?: AbortSignal): Promise<WebhookRow[]> {
+  const hooks = await listRows<Webhook>(slug, "webhooks", "", signal);
   return Promise.all(
     hooks.map(async (hook) => {
       // Without its log a webhook still shows, with what its own record says.
-      const log = await listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=1`).catch(
+      const log = await listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=1`, signal).catch(
         (): Delivery[] => [],
       );
       return { ...hook, newest: log[0] };
@@ -89,8 +102,8 @@ export function lastSent(hook: WebhookRow): { at: number; result: string; failed
   return { at: hook.last_at, result: hook.last_status ?? "", failed: hook.failures > 0, test: false };
 }
 
-export const listSources = (slug: string) =>
-  api.get<{ sources: Source[] }>(workspacePath(slug, "/sources")).then((r) => r.sources ?? []);
+export const listSources = (slug: string, signal?: AbortSignal) =>
+  api.get<{ sources: Source[] }>(workspacePath(slug, "/sources"), signal).then((r) => r.sources ?? []);
 
 /** Sends one named change. A refusal is thrown for the form to show; no toast. */
 export function change<K extends ChangeType>(type: K, args: Changes[K]) {

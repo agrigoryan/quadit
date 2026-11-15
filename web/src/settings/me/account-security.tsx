@@ -1,7 +1,7 @@
 import { ShieldCheck } from "lucide-react";
 import { useAuthConfig } from "@/auth/config";
 import { t } from "@/lib/i18n";
-import { useAccount } from "@/settings/me/account";
+import { accountChanged, useAccount } from "@/settings/me/account";
 import { PasskeysSection } from "@/settings/me/passkeys";
 import { TwoStepSection } from "@/settings/me/two-step";
 import { LoadGate } from "@/ui/load-gate";
@@ -17,7 +17,6 @@ export function AccountSecurityPage() {
   const account = useAccount();
   // Said only where it is true: an install that does not ask for a second step has nothing to warn about.
   const required = useAuthConfig()?.require_2fa !== false;
-  const refresh = () => void account.reload();
   return (
     <main className="h-dvh overflow-y-auto bg-surface">
       <Page title={t("auth.account.title")} lead={t("auth.account.lead")} back="/" backLabel={t("auth.account.back")}>
@@ -32,8 +31,8 @@ export function AccountSecurityPage() {
               ) : (
                 required && <Note tone="wait">{t("auth.account.required")}</Note>
               )}
-              <TwoStepSection account={a} onChanged={refresh} />
-              <PasskeysSection onChanged={refresh} />
+              <TwoStepSection account={a} onChanged={accountChanged} />
+              <PasskeysSection />
             </>
           )}
         </LoadGate>

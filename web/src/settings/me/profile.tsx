@@ -6,7 +6,7 @@ import { useMe } from "@/lib/selectors";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import { useSettingsBase } from "@/settings/base";
-import { type Account, saveAccount, useAccount } from "@/settings/me/account";
+import { type Account, useAccount, useSaveAccount } from "@/settings/me/account";
 import { Segmented } from "@/settings/me/segmented";
 import { AvatarInput } from "@/settings/ui/avatar-input";
 import { LoadGate } from "@/ui/load-gate";
@@ -37,19 +37,23 @@ function useZones(current: string) {
   }, [current]);
 }
 
-function AvatarField({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
+function AvatarField({ account }: { account: Account }) {
   const me = useMe();
+  const saveAccount = useSaveAccount();
   return (
     <AvatarInput
       member={{ user_id: me.user_id, name: account.user.name, kind: "person" }}
       value={account.user.avatar ?? ""}
-      onChange={async (next) => onSaved(await saveAccount({ avatar: next }))}
+      onChange={async (next) => {
+        await saveAccount.mutateAsync({ avatar: next });
+      }}
       hint={t("me.profile.avatarHint")}
     />
   );
 }
 
-function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
+function ProfileForm({ account }: { account: Account }) {
+  const saveAccount = useSaveAccount();
   const [name, setName] = useState(account.user.name);
   const [zone, setZone] = useState(account.user.timezone || browserZone());
   const errors = useFieldErrors(["name", "timezone"]);
@@ -65,7 +69,7 @@ function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Acco
       return;
     }
     await run(async () => {
-      onSaved(await saveAccount({ name: name.trim(), timezone: zone }));
+      await saveAccount.mutateAsync({ name: name.trim(), timezone: zone });
       toast.info(t("s.saved"));
     });
   }
@@ -73,7 +77,7 @@ function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Acco
   return (
     <Card>
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <AvatarField account={account} onSaved={onSaved} />
+        <AvatarField account={account} />
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label={t("me.profile.name")} htmlFor="me-name" error={errors.fields.name}>
             <Input id="me-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -99,7 +103,8 @@ function ProfileForm({ account, onSaved }: { account: Account; onSaved: (a: Acco
 }
 
 /** The sign-in address, and the way to change it: the new address, confirmed with the current password. */
-function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
+function EmailSection({ account }: { account: Account }) {
+  const saveAccount = useSaveAccount();
   const current = account.user.email ?? "";
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -122,7 +127,7 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
     if (next.toLowerCase() === current.toLowerCase()) return errors.set("email", t("me.email.same"));
     if (account.has_password && !password) return errors.set("password", t("me.email.passwordRequired"));
     await run(async () => {
-      onSaved(await saveAccount(account.has_password ? { email: next, password } : { email: next }));
+      await saveAccount.mutateAsync(account.has_password ? { email: next, password } : { email: next });
       toast.info(t("me.email.changed"));
       close();
     });
@@ -223,8 +228,8 @@ export function ProfilePage() {
       <LoadGate of={account}>
         {(a) => (
           <>
-            <ProfileForm account={a} onSaved={account.set} />
-            <EmailSection account={a} onSaved={account.set} />
+            <ProfileForm account={a} />
+            <EmailSection account={a} />
             <ThemeSection />
           </>
         )}

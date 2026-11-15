@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { RefreshCw, RotateCw, Send } from "lucide-react";
 import { api, errorMessage, workspacePath } from "@/lib/api";
@@ -10,9 +11,12 @@ import { Dialog } from "@/ui/dialog";
 import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
 import { EmptyRow, Rows } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
-import { isTest, listRows } from "@/settings/automation/data";
+import { queryClient } from "@/lib/query";
+import { automationKeys, isTest, listRows } from "@/settings/automation/data";
 import type { Delivery, Webhook } from "@/lib/types-automation";
+
+/** A failed redelivery is said in a toast (onError); the row only waits for it to end. */
+const noop = () => {};
 
 const tones = { pending: "wait", ok: "ok", dead: "danger" } as const;
 
@@ -73,33 +77,31 @@ function DeliveryRow({ d, onRedeliver }: { d: Delivery; onRedeliver: () => Promi
 /** What was sent to one webhook, newest first, with a way to send any of it again. */
 export function DeliveriesDialog({ hook, onClose }: { hook: Webhook; onClose: () => void }) {
   const slug = useSlug();
-  const log = useLoad(() => listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=100`), [slug, hook.id]);
-  const [testing, setTesting] = useState(false);
+  const key = automationKeys.deliveries(slug, hook.id);
+  const log = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) => listRows<Delivery>(slug, "deliveries", `?webhook=${hook.id}&limit=100`, signal),
+  });
+  // A test and a redelivery are logged like any delivery: the webhooks list (and this log under it) is asked again.
+  const logged = () => queryClient.invalidateQueries({ queryKey: automationKeys.webhooks(slug) });
 
-  /** Sends a sample event; it is logged like any delivery, so the list shows how it went. */
-  async function sendTest() {
-    setTesting(true);
-    try {
-      await api.post(workspacePath(slug, `/webhooks/${hook.id}/test`));
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setTesting(false);
-    }
-    await log.reload();
-  }
+  /** Sends a sample event; the list then shows how it went. */
+  const sendTest = useMutation({
+    mutationFn: () => api.post(workspacePath(slug, `/webhooks/${hook.id}/test`)),
+    onError: (err) => toast.error(errorMessage(err)),
+    onSettled: logged,
+  });
 
-  async function redeliver(id: string) {
-    try {
-      await api.post(workspacePath(slug, `/deliveries/${id}/redeliver`));
+  const redeliver = useMutation({
+    mutationFn: (id: string) => api.post(workspacePath(slug, `/deliveries/${id}/redeliver`)),
+    onSuccess() {
       toast.info(t("auto.delivery.queued"));
       // The sender picks it up within a couple of seconds.
-      setTimeout(() => void log.reload(), 2500);
-    } catch (err) {
-      toast.error(errorMessage(err));
-    }
-    await log.reload();
-  }
+      setTimeout(() => void logged(), 2500);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+    onSettled: logged,
+  });
 
   return (
     <Dialog
@@ -111,11 +113,11 @@ export function DeliveriesDialog({ hook, onClose }: { hook: Webhook; onClose: ()
       footer={
         <>
           <span className="mr-auto flex items-center gap-2">
-            <Button onClick={() => void log.reload()} disabled={log.loading}>
+            <Button onClick={() => void log.refetch()} disabled={log.isFetching}>
               <RefreshCw className="size-3.5" aria-hidden />
               {t("s.refresh")}
             </Button>
-            <Button onClick={() => void sendTest()} disabled={testing}>
+            <Button onClick={() => sendTest.mutate()} disabled={sendTest.isPending}>
               <Send className="size-3.5" aria-hidden />
               {t("auto.hook.sendTest")}
             </Button>
@@ -133,7 +135,7 @@ export function DeliveriesDialog({ hook, onClose }: { hook: Webhook; onClose: ()
           ) : (
             <Rows>
               {rows.map((d) => (
-                <DeliveryRow key={d.id} d={d} onRedeliver={() => redeliver(d.id)} />
+                <DeliveryRow key={d.id} d={d} onRedeliver={() => redeliver.mutateAsync(d.id).then(noop, noop)} />
               ))}
             </Rows>
           )

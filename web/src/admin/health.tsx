@@ -11,8 +11,9 @@ import type { Backup } from "@/admin/backups";
 import { loadChangeCatalog } from "@/settings/agents/asks-before";
 import { LoadGate } from "@/ui/load-gate";
 import { Page, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
 import { useNow } from "@/lib/live";
+import { useQuery } from "@tanstack/react-query";
+import { adminKeys } from "@/admin/data";
 import { Ago } from "@/ui/ago";
 
 interface Health {
@@ -160,9 +161,15 @@ function BackupLine({ backup }: { backup: Backup | undefined }) {
 }
 
 export function HealthPage() {
-  const health = useLoad(() => api.get<Health>("/api/v1/admin/health"), []);
+  const health = useQuery({
+    queryKey: adminKeys.health,
+    queryFn: ({ signal }) => api.get<Health>("/api/v1/admin/health", signal),
+  });
   // What agents can call has a version of its own, apart from the server's.
-  const surface = useLoad(() => loadChangeCatalog().then((c) => c.surface), []);
+  const surface = useQuery({
+    queryKey: adminKeys.changeSurface,
+    queryFn: () => loadChangeCatalog().then((c) => c.surface),
+  });
   const count = (n: number) => (n === 0 ? t("admin.health.zero") : formatNumber(n));
   return (
     <Page
@@ -170,8 +177,8 @@ export function HealthPage() {
       lead={t("admin.health.lead")}
       back="/admin"
       actions={
-        <Button onClick={() => void health.reload()} disabled={health.loading}>
-          <RefreshCw className={cx("size-3.5", health.loading && "animate-spin")} aria-hidden />
+        <Button onClick={() => void health.refetch()} disabled={health.isFetching}>
+          <RefreshCw className={cx("size-3.5", health.isFetching && "animate-spin")} aria-hidden />
           {t("s.refresh")}
         </Button>
       }

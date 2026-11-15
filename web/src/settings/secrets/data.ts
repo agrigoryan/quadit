@@ -3,19 +3,31 @@
 // (secret.created, secret.updated, secret.deleted). A value is sent to the
 // server and never comes back.
 
+import { useQuery } from "@tanstack/react-query";
 import type { Changes } from "@/lib/changes.gen";
 import { useMemo } from "react";
 import { api, workspacePath } from "@/lib/api";
 import { mutate } from "@/lib/mutate";
-import { useRows } from "@/lib/selectors";
+import { inWorkspace } from "@/lib/query";
+import { useRows, useSlug } from "@/lib/selectors";
 import { getState, mergeRows } from "@/lib/store";
 import type { Secret } from "@/lib/types";
 
-/** Fetches every secret into the store. "Last used" is only as fresh as this call: using a secret is not an event. */
-export async function loadSecrets(slug: string): Promise<true> {
-  const out = await api.get<{ secrets?: Secret[] }>(workspacePath(slug, "/list/secrets"));
-  if (getState().slug === slug) mergeRows("secrets", out.secrets ?? []);
-  return true;
+/**
+ * Fetches every secret into the store (asked again each time the page opens
+ * and when the stream comes back); its data is only "done". "Last used" is
+ * only as fresh as this call: using a secret is not an event.
+ */
+export function useLoadSecrets() {
+  const slug = useSlug();
+  return useQuery({
+    queryKey: [...inWorkspace(slug), "secrets"],
+    queryFn: async ({ signal }) => {
+      const out = await api.get<{ secrets?: Secret[] }>(workspacePath(slug, "/list/secrets"), signal);
+      if (getState().slug === slug) mergeRows("secrets", out.secrets ?? []);
+      return true;
+    },
+  });
 }
 
 /** The secrets that exist, by name. */

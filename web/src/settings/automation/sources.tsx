@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { FolderGit2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Link } from "react-router";
@@ -13,8 +14,8 @@ import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { EmptyRow, Page, Rows } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
-import { change, listSources, type Source, type SyncResult } from "@/settings/automation/data";
+import { queryClient } from "@/lib/query";
+import { automationKeys, change, listSources, type Source, type SyncResult } from "@/settings/automation/data";
 import { SourceForm } from "@/settings/automation/source-form";
 import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
 import { docPath } from "@/docs/area";
@@ -117,21 +118,20 @@ function SourceItem({ src, sync, onSync, onEdit, onDelete }: ItemProps) {
 export function SourcesPage() {
   const slug = useSlug();
   const base = useSettingsBase();
-  const list = useLoad(() => listSources(slug), [slug]);
+  const key = automationKeys.sources(slug);
+  const list = useQuery({ queryKey: key, queryFn: ({ signal }) => listSources(slug, signal) });
+  const changed = () => queryClient.invalidateQueries({ queryKey: key });
   const [form, setForm] = useState<{ src?: Source } | null>(null);
   const [removing, setRemoving] = useState<Source | null>(null);
   const [syncs, setSyncs] = useState<Record<string, SyncState>>({});
 
-  async function sync(src: Source) {
-    setSyncs((s) => ({ ...s, [src.id]: { busy: true } }));
-    try {
-      const out = await api.post<SyncResult>(workspacePath(slug, `/sources/${src.id}/sync`));
-      setSyncs((s) => ({ ...s, [src.id]: { busy: false, ok: true, text: syncText(out) } }));
-    } catch (err) {
-      setSyncs((s) => ({ ...s, [src.id]: { busy: false, ok: false, text: errorMessage(err) } }));
-    }
-    await list.reload();
-  }
+  const sync = useMutation({
+    mutationFn: (src: Source) => api.post<SyncResult>(workspacePath(slug, `/sources/${src.id}/sync`)),
+    onMutate: (src) => setSyncs((s) => ({ ...s, [src.id]: { busy: true } })),
+    onSuccess: (out, src) => setSyncs((s) => ({ ...s, [src.id]: { busy: false, ok: true, text: syncText(out) } })),
+    onError: (err, src) => setSyncs((s) => ({ ...s, [src.id]: { busy: false, ok: false, text: errorMessage(err) } })),
+    onSettled: changed,
+  });
 
   return (
     <Page
@@ -156,7 +156,7 @@ export function SourcesPage() {
                   key={src.id}
                   src={src}
                   sync={syncs[src.id]}
-                  onSync={() => void sync(src)}
+                  onSync={() => sync.mutate(src)}
                   onEdit={() => setForm({ src })}
                   onDelete={() => setRemoving(src)}
                 />
@@ -172,7 +172,7 @@ export function SourcesPage() {
           onClose={() => setForm(null)}
           onSaved={() => {
             setForm(null);
-            void list.reload();
+            void changed();
           }}
         />
       )}
@@ -184,7 +184,7 @@ export function SourcesPage() {
         confirm={t("auto.src.deleteConfirm")}
         onConfirm={async () => {
           if (removing) await change("source.delete", { id: removing.id });
-          await list.reload();
+          await changed();
         }}
       />
     </Page>

@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { t } from "@/lib/i18n";
 import { useSettingsBase } from "@/settings/base";
-import { useAccount } from "@/settings/me/account";
+import { accountChanged, useAccount } from "@/settings/me/account";
 import { IdentitiesSection } from "@/settings/me/identities";
 import { PasskeysSection } from "@/settings/me/passkeys";
 import { PasswordSection } from "@/settings/me/password";
@@ -14,24 +13,16 @@ import { Page } from "@/ui/page-layout";
 export function SecurityPage() {
   const base = useSettingsBase();
   const account = useAccount();
-  const [stamp, setStamp] = useState(0);
-  const refresh = () => void account.reload();
   return (
     <Page title={t("settings.nav.security")} lead={t("me.security.lead")} back={base}>
       <LoadGate of={account}>
         {(a) => (
           <>
-            <PasswordSection
-              hasPassword={a.has_password}
-              onChanged={() => {
-                refresh();
-                setStamp((n) => n + 1);
-              }}
-            />
-            <TwoStepSection account={a} onChanged={refresh} />
-            <PasskeysSection onChanged={refresh} />
-            <IdentitiesSection onChanged={refresh} />
-            <SessionsSection stamp={stamp} />
+            <PasswordSection hasPassword={a.has_password} onChanged={accountChanged} />
+            <TwoStepSection account={a} onChanged={accountChanged} />
+            <PasskeysSection />
+            <IdentitiesSection />
+            <SessionsSection />
           </>
         )}
       </LoadGate>

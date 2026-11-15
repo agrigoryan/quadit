@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Ellipsis, Search, ShieldCheck, ShieldOff, UserCheck, UserX } from "lucide-react";
 import { loadSession, useSession } from "@/auth/session";
@@ -13,7 +14,8 @@ import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { adminKeys } from "@/admin/data";
+import { queryClient } from "@/lib/query";
 
 export interface AdminUser {
   id: string;
@@ -29,7 +31,12 @@ export interface AdminUser {
   disabled_at?: number;
 }
 
-export const fetchUsers = () => api.get<{ users: AdminUser[] }>("/api/v1/admin/users").then((r) => r.users);
+/** Every account on the install. */
+export const useAdminUsers = () =>
+  useQuery({
+    queryKey: adminKeys.users,
+    queryFn: ({ signal }) => api.get<{ users: AdminUser[] }>("/api/v1/admin/users", signal).then((r) => r.users),
+  });
 
 type Kind = "all" | "person" | "agent";
 type Action = "disable" | "enable" | "admin" | "unadmin";
@@ -78,7 +85,7 @@ function KindTabs({
 
 export function UsersPage() {
   const me = useSession((s) => s.user?.id);
-  const users = useLoad(fetchUsers, []);
+  const users = useAdminUsers();
   const [kind, setKind] = useState<Kind>("all");
   const [q, setQ] = useState("");
   const [pending, setPending] = useState<{ user: AdminUser; action: Action } | null>(null);
@@ -101,11 +108,16 @@ export function UsersPage() {
     );
   }, [all, kind, q]);
 
+  const change = useMutation({
+    mutationFn: ({ user, action }: { user: AdminUser; action: Action }) =>
+      api.patch<AdminUser>(`/api/v1/admin/users/${user.id}`, patches[action]),
+    // The answer to "enable" still carries the old disabled_at, so read the list again.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: adminKeys.users }),
+  });
+
   async function apply() {
     if (!pending) return;
-    await api.patch<AdminUser>(`/api/v1/admin/users/${pending.user.id}`, patches[pending.action]);
-    // The answer to "enable" still carries the old disabled_at, so read the list again.
-    await users.reload();
+    await change.mutateAsync(pending);
     // Giving up your own admin rights changes what this browser may open.
     if (pending.user.id === me) await loadSession();
   }

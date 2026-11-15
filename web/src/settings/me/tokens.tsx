@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
-import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { fullDate } from "@/lib/time";
-import { useLookupEvenIfGone, useMe, useProjects, useSlug } from "@/lib/selectors";
+import { useLookupEvenIfGone, useMe, useProjects } from "@/lib/selectors";
 import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";
@@ -12,24 +11,18 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { RevealDialog } from "@/ui/reveal-dialog";
 import { Checkbox, FormField, NativeSelect } from "@/ui/form";
 import { EmptyRow, Page, Row, Rows } from "@/ui/page-layout";
-import { type CreatedToken, CreateTokenDialog, ScopeBadges, type TokenFieldsProps } from "@/settings/ui/tokens";
-import { useLoad } from "@/lib/use-load";
+import {
+  type CreatedToken,
+  CreateTokenDialog,
+  ScopeBadges,
+  type TokenFieldsProps,
+  useRevokeToken,
+  useTokens,
+} from "@/settings/ui/tokens";
+import type { Token } from "@/settings/agents/data";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
-
-interface Token {
-  id: string;
-  user_id: string;
-  name: string;
-  prefix: string;
-  /** Space-separated: "read" and "project:<id>" entries. Empty means everything the member may do. */
-  scopes?: string;
-  kind: string;
-  created_at: number;
-  expires_at?: number;
-  last_used_at?: number;
-}
 
 const expiryChoices = ["0", "30", "90", "365"] as const;
 
@@ -92,17 +85,11 @@ function MyTokenFields({
 /** Me → API tokens: the person's own tokens in this workspace, for the CLI and scripts acting as them. */
 export function MyTokensPage() {
   const base = useSettingsBase();
-  const slug = useSlug();
   const me = useMe();
   // A token may name a project since archived: still show its key.
   const projects = useLookupEvenIfGone("projects");
-  const list = useLoad(
-    () =>
-      api
-        .get<{ tokens: Token[] }>(workspacePath(slug, "/tokens"))
-        .then((r) => r.tokens.filter((tk) => tk.user_id === me.user_id)),
-    [slug, me.user_id],
-  );
+  const list = useTokens(me.user_id);
+  const revoke = useRevokeToken();
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<CreatedToken | null>(null);
   const [revoking, setRevoking] = useState<Token | null>(null);
@@ -184,7 +171,6 @@ export function MyTokensPage() {
           onCreated={(c) => {
             setCreating(false);
             setCreated(c);
-            void list.reload();
           }}
         />
       )}
@@ -209,8 +195,7 @@ export function MyTokensPage() {
         body={t("me.tokens.revokeBody")}
         confirm={t("s.revoke")}
         onConfirm={async () => {
-          await api.del(workspacePath(slug, `/tokens/${revoking?.id}`));
-          await list.reload();
+          if (revoking) await revoke.mutateAsync(revoking.id);
         }}
       />
     </Page>

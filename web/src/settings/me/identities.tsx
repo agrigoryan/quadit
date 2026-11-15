@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link2 } from "lucide-react";
 import { authConfig } from "@/auth/session";
@@ -7,7 +8,7 @@ import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { EmptyRow, Row, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { accountChanged, accountKeys } from "@/settings/me/account";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 
@@ -27,14 +28,21 @@ function connect(provider: string) {
 }
 
 /** Accounts elsewhere (Google, GitHub, single sign-on) that can sign in to this one. */
-export function IdentitiesSection({ onChanged }: { onChanged: () => void }) {
-  const data = useLoad(async () => {
-    const [config, ids] = await Promise.all([
-      authConfig(),
-      api.get<{ identities: Identity[] }>("/api/v1/auth/identities"),
-    ]);
-    return { providers: config.providers, identities: ids.identities };
-  }, []);
+export function IdentitiesSection() {
+  const data = useQuery({
+    queryKey: accountKeys.identities,
+    queryFn: async ({ signal }) => {
+      const [config, ids] = await Promise.all([
+        authConfig(),
+        api.get<{ identities: Identity[] }>("/api/v1/auth/identities", signal),
+      ]);
+      return { providers: config.providers, identities: ids.identities };
+    },
+  });
+  const disconnect = useMutation({
+    mutationFn: (id: string) => api.del(`/api/v1/auth/identities/${id}`),
+    onSettled: accountChanged,
+  });
   const [removing, setRemoving] = useState<{ identity: Identity; name: string } | null>(null);
 
   return (
@@ -86,9 +94,7 @@ export function IdentitiesSection({ onChanged }: { onChanged: () => void }) {
         body={t("me.identities.disconnectBody", { name: removing?.name ?? "" })}
         confirm={t("me.identities.disconnect")}
         onConfirm={async () => {
-          await api.del(`/api/v1/auth/identities/${removing?.identity.id}`);
-          void data.reload();
-          onChanged();
+          if (removing) await disconnect.mutateAsync(removing.identity.id);
         }}
       />
     </Section>

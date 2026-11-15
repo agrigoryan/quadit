@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { GitPullRequest, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2, Webhook as WebhookIcon } from "lucide-react";
 import { api, errorMessage, workspacePath } from "@/lib/api";
@@ -17,8 +18,8 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { CopyField } from "@/ui/reveal-dialog";
 import { Note, Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
-import { change, type HookInfo, listRows } from "@/settings/automation/data";
+import { queryClient } from "@/lib/query";
+import { automationKeys, change, type HookInfo, listRows } from "@/settings/automation/data";
 import type { Integration } from "@/lib/types-automation";
 import { IntegrationForm } from "@/settings/automation/integration-form";
 import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
@@ -26,10 +27,10 @@ import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
 /** The address and secret to paste into the repository's webhook settings on GitHub. */
 function HookDialog({ integration, onClose }: { integration: Integration; onClose: () => void }) {
   const slug = useSlug();
-  const info = useLoad(
-    () => api.get<HookInfo>(workspacePath(slug, `/integrations/${integration.id}/webhook`)),
-    [slug, integration.id],
-  );
+  const info = useQuery({
+    queryKey: automationKeys.integrationHook(slug, integration.id),
+    queryFn: ({ signal }) => api.get<HookInfo>(workspacePath(slug, `/integrations/${integration.id}/webhook`), signal),
+  });
   return (
     <Dialog
       open
@@ -144,34 +145,38 @@ function IntegrationItem({ it, sync, onSync, onToggle, onEdit, onHook, onDelete 
 export function IntegrationsPage() {
   const slug = useSlug();
   const base = useSettingsBase();
-  const list = useLoad(() => listRows<Integration>(slug, "integrations"), [slug]);
+  const key = automationKeys.integrations(slug);
+  const list = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) => listRows<Integration>(slug, "integrations", "", signal),
+  });
+  const changed = () => queryClient.invalidateQueries({ queryKey: key });
   const [form, setForm] = useState<{ it?: Integration } | null>(null);
   const [hookFor, setHookFor] = useState<Integration | null>(null);
   const [removing, setRemoving] = useState<Integration | null>(null);
   const [syncs, setSyncs] = useState<Record<string, SyncState>>({});
 
-  async function sync(it: Integration) {
-    setSyncs((s) => ({ ...s, [it.id]: { busy: true } }));
-    try {
-      const out = await api.post<{ pull_requests: number }>(workspacePath(slug, `/integrations/${it.id}/sync`));
+  const sync = useMutation({
+    mutationFn: (it: Integration) =>
+      api.post<{ pull_requests: number }>(workspacePath(slug, `/integrations/${it.id}/sync`)),
+    onMutate: (it) => setSyncs((s) => ({ ...s, [it.id]: { busy: true } })),
+    onSuccess: (out, it) =>
       setSyncs((s) => ({
         ...s,
         [it.id]: { busy: false, ok: true, text: t("auto.gh.synced", { n: out.pull_requests }) },
-      }));
-    } catch (err) {
-      setSyncs((s) => ({ ...s, [it.id]: { busy: false, ok: false, text: errorMessage(err) } }));
-    }
-    await list.reload();
-  }
+      })),
+    onError: (err, it) => setSyncs((s) => ({ ...s, [it.id]: { busy: false, ok: false, text: errorMessage(err) } })),
+    onSettled: changed,
+  });
 
   async function toggle(it: Integration, active: boolean) {
-    list.set((rows) => rows?.map((r) => (r.id === it.id ? { ...r, active } : r)));
+    queryClient.setQueryData<Integration[]>(key, (rows) => rows?.map((r) => (r.id === it.id ? { ...r, active } : r)));
     try {
       await change("integration.update", { id: it.id, kind: it.kind, active });
     } catch (err) {
       toast.error(errorMessage(err));
     }
-    await list.reload();
+    await changed();
   }
 
   return (
@@ -197,7 +202,7 @@ export function IntegrationsPage() {
                   key={it.id}
                   it={it}
                   sync={syncs[it.id]}
-                  onSync={() => void sync(it)}
+                  onSync={() => sync.mutate(it)}
                   onToggle={(active) => void toggle(it, active)}
                   onEdit={() => setForm({ it })}
                   onHook={() => setHookFor(it)}
@@ -215,7 +220,7 @@ export function IntegrationsPage() {
           onClose={() => setForm(null)}
           onSaved={() => {
             setForm(null);
-            void list.reload();
+            void changed();
           }}
         />
       )}
@@ -228,7 +233,7 @@ export function IntegrationsPage() {
         confirm={t("s.delete")}
         onConfirm={async () => {
           if (removing) await change("integration.delete", { id: removing.id });
-          await list.reload();
+          await changed();
         }}
       />
     </Page>

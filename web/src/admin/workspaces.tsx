@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ArrowUpRight, LogIn, Undo2 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
@@ -12,7 +13,8 @@ import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { adminKeys } from "@/admin/data";
+import { queryClient } from "@/lib/query";
 
 export interface AdminWorkspace {
   id: string;
@@ -37,22 +39,39 @@ function deletedText(at: number): string {
   return `${when}, ${left === 0 ? t("admin.workspaces.goneSoon") : t("admin.workspaces.goneIn", { n: left })}`;
 }
 
-export const fetchWorkspaces = () =>
-  api.get<{ workspaces: AdminWorkspace[] }>("/api/v1/admin/workspaces").then((r) => r.workspaces);
+/** Every workspace on the install, the deleted ones still kept among them. */
+export const useAdminWorkspaces = () =>
+  useQuery({
+    queryKey: adminKeys.workspaces,
+    queryFn: ({ signal }) =>
+      api.get<{ workspaces: AdminWorkspace[] }>("/api/v1/admin/workspaces", signal).then((r) => r.workspaces),
+  });
+
+const workspacesChanged = () => queryClient.invalidateQueries({ queryKey: adminKeys.workspaces });
 
 export function WorkspacesPage() {
-  const list = useLoad(fetchWorkspaces, []);
+  const list = useAdminWorkspaces();
   const mine = useSession((s) => s.workspaces);
   const navigate = useNavigate();
   const [joining, setJoining] = useState<AdminWorkspace | null>(null);
   const [restoring, setRestoring] = useState<AdminWorkspace | null>(null);
 
   /** Makes the install admin an admin of the workspace; the server records it where its members can see. */
-  async function join(w: AdminWorkspace) {
-    await api.post<{ workspace: AdminWorkspace; already_member?: boolean }>(`/api/v1/admin/workspaces/${w.id}/join`);
+  const joinWorkspace = useMutation({
+    mutationFn: (w: AdminWorkspace) =>
+      api.post<{ workspace: AdminWorkspace; already_member?: boolean }>(`/api/v1/admin/workspaces/${w.id}/join`),
     // The switcher and this list both read the session's workspaces.
-    await loadSession();
-    void list.reload();
+    onSuccess: () => loadSession(),
+    onSettled: workspacesChanged,
+  });
+  const restoreWorkspace = useMutation({
+    mutationFn: (w: AdminWorkspace) => api.post(`/api/v1/admin/workspaces/${w.id}/restore`),
+    onSuccess: () => loadSession(),
+    onSettled: workspacesChanged,
+  });
+
+  async function join(w: AdminWorkspace) {
+    await joinWorkspace.mutateAsync(w);
     toast.info(t("admin.workspaces.joined", { name: w.name }), {
       label: t("admin.workspaces.open"),
       run: () => void navigate(`/${w.slug}`),
@@ -61,9 +80,7 @@ export function WorkspacesPage() {
 
   /** Brings a deleted workspace back. The server refuses (409) when another workspace took its address meanwhile. */
   async function restore(w: AdminWorkspace) {
-    await api.post(`/api/v1/admin/workspaces/${w.id}/restore`);
-    await loadSession();
-    await list.reload();
+    await restoreWorkspace.mutateAsync(w);
     toast.info(t("admin.workspaces.restored", { name: w.name }));
   }
 

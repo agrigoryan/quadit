@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import { useLookup, useSlug } from "@/lib/selectors";
-import { useStore } from "@/lib/store";
+import { useLookup } from "@/lib/selectors";
 import type { Secret } from "@/lib/types";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
@@ -10,7 +9,7 @@ import { Button, IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 import { Tooltip } from "@/ui/tooltip";
 import { useSettingsBase } from "@/settings/base";
-import { deleteSecret, loadSecrets, useSecrets } from "@/settings/secrets/data";
+import { deleteSecret, useLoadSecrets, useSecrets } from "@/settings/secrets/data";
 import { SecretForm } from "@/settings/secrets/secret-form";
 import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";
@@ -18,7 +17,6 @@ import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { CopyField } from "@/ui/reveal-dialog";
 import { EmptyRow, Page, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
 
 /** Who may use a secret: everyone, or the few it names. */
 function UsedBy({ ids }: { ids: string[] }) {
@@ -109,11 +107,8 @@ function SecretItem({ secret, onEdit, onDelete }: { secret: Secret; onEdit: () =
 
 /** The vault: keys agents use through the server and never hold. */
 export function SecretsPage() {
-  const slug = useSlug();
   const base = useSettingsBase();
-  // Asked again when the stream comes back: a copy fetched afresh after a long gap starts without them.
-  const live = useStore((s) => s.stream === "live");
-  const loaded = useLoad(() => loadSecrets(slug), [slug, live]);
+  const loaded = useLoadSecrets();
   const secrets = useSecrets();
   const [form, setForm] = useState<{ secret?: Secret } | null>(null);
   const [removing, setRemoving] = useState<Secret | null>(null);

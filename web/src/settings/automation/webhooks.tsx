@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, ScrollText, Send, Trash2 } from "lucide-react";
 import { api, errorMessage, workspacePath } from "@/lib/api";
@@ -16,8 +17,9 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { RevealDialog } from "@/ui/reveal-dialog";
 import { Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { queryClient } from "@/lib/query";
 import {
+  automationKeys,
   change,
   lastSent,
   listWebhooks,
@@ -148,7 +150,7 @@ function WebhookItem({ hook, test, onTest, onToggle, onEdit, onLog, onRotate, on
 /** Webhooks: addresses the workspace calls when something happens. */
 export function WebhooksPage() {
   const slug = useSlug();
-  const hooks = useLoad(() => listWebhooks(slug), [slug]);
+  const key = automationKeys.webhooks(slug);
   const [form, setForm] = useState<{ hook?: Webhook } | null>(null);
   const [secret, setSecret] = useState<{ name: string; value: string } | null>(null);
   const [log, setLog] = useState<Webhook | null>(null);
@@ -156,43 +158,40 @@ export function WebhooksPage() {
   const [rotating, setRotating] = useState<Webhook | null>(null);
   const [tests, setTests] = useState<Record<string, Test>>({});
 
-  // A webhook made or removed somewhere else is heard through the feed.
-  // What it last sent is not an event, so the list is read again now and
-  // then while the page is in view and nothing is open over it.
-  const known = useRows("webhooks");
-  const reload = hooks.reload;
+  // What a webhook last sent is not an event, so the list is read again
+  // every ten seconds while the page is in view and nothing is open over it.
   const busy = !!(form || log || removing || rotating);
-  useEffect(() => {
-    void reload();
-  }, [known, reload]);
-  useEffect(() => {
-    if (busy) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void reload();
-    }, 10_000);
-    return () => clearInterval(timer);
-  }, [busy, reload]);
+  const hooks = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) => listWebhooks(slug, signal),
+    refetchInterval: busy ? false : 10_000,
+  });
+  const changed = () => queryClient.invalidateQueries({ queryKey: key });
 
-  async function test(hook: Webhook) {
-    setTests((s) => ({ ...s, [hook.id]: { busy: true } }));
-    try {
-      const result = await api.post<TestResult>(workspacePath(slug, `/webhooks/${hook.id}/test`));
-      setTests((s) => ({ ...s, [hook.id]: { busy: false, result } }));
-    } catch (err) {
-      setTests((s) => ({ ...s, [hook.id]: { busy: false, failed: errorMessage(err) } }));
-    }
+  // A webhook made or removed somewhere else is heard through the feed: read the list again (once, if a read is on its way).
+  const known = useRows("webhooks");
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: key }, { cancelRefetch: false });
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `key` is a new array each render; what it names is `slug`
+  }, [known, slug]);
+
+  const testing = useMutation({
+    mutationFn: (hook: Webhook) => api.post<TestResult>(workspacePath(slug, `/webhooks/${hook.id}/test`)),
+    onMutate: (hook) => setTests((s) => ({ ...s, [hook.id]: { busy: true } })),
+    onSuccess: (result, hook) => setTests((s) => ({ ...s, [hook.id]: { busy: false, result } })),
+    onError: (err, hook) => setTests((s) => ({ ...s, [hook.id]: { busy: false, failed: errorMessage(err) } })),
     // A test is logged as a delivery: the row's "last delivery" and its list now have it.
-    void hooks.reload();
-  }
+    onSettled: changed,
+  });
 
   async function toggle(hook: Webhook, active: boolean) {
-    hooks.set((list) => list?.map((h) => (h.id === hook.id ? { ...h, active } : h)));
+    queryClient.setQueryData<WebhookRow[]>(key, (list) => list?.map((h) => (h.id === hook.id ? { ...h, active } : h)));
     try {
       await change("webhook.update", { id: hook.id, active });
     } catch (err) {
       toast.error(errorMessage(err));
     }
-    await hooks.reload();
+    await changed();
   }
 
   async function rotate(hook: Webhook) {
@@ -224,7 +223,7 @@ export function WebhooksPage() {
                   key={hook.id}
                   hook={hook}
                   test={tests[hook.id]}
-                  onTest={() => void test(hook)}
+                  onTest={() => testing.mutate(hook)}
                   onToggle={(active) => void toggle(hook, active)}
                   onEdit={() => setForm({ hook })}
                   onLog={() => setLog(hook)}
@@ -244,7 +243,7 @@ export function WebhooksPage() {
           onSaved={(made) => {
             setForm(null);
             if (made) setSecret(made);
-            void hooks.reload();
+            void changed();
           }}
         />
       )}
@@ -253,7 +252,7 @@ export function WebhooksPage() {
           hook={log}
           onClose={() => {
             setLog(null);
-            void hooks.reload();
+            void changed();
           }}
         />
       )}
@@ -282,7 +281,7 @@ export function WebhooksPage() {
         confirm={t("s.delete")}
         onConfirm={async () => {
           if (removing) await change("webhook.delete", { id: removing.id });
-          await hooks.reload();
+          await changed();
         }}
       />
     </Page>

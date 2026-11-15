@@ -8,11 +8,11 @@ import { t } from "@/lib/i18n";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import type { Backup } from "@/admin/backups";
-import { fetchWorkspaces } from "@/admin/workspaces";
+import { useAdminWorkspaces } from "@/admin/workspaces";
 import { Segmented } from "@/settings/me/segmented";
 import { FormField, NativeSelect, Note, refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
-import { useLoad } from "@/lib/use-load";
+import { readError } from "@/lib/query";
 import { Input } from "@/ui/input";
 
 type Kind = "task" | "doc";
@@ -30,12 +30,13 @@ const taskKeyOf = (text: string): string =>
     ?.toUpperCase() ?? "";
 
 export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose: () => void }) {
-  const workspaces = useLoad(() => fetchWorkspaces().then((rows) => rows.filter((w) => !w.deleted_at)), []);
+  const workspaces = useAdminWorkspaces();
+  const open = workspaces.data?.filter((w) => !w.deleted_at);
   const [slug, setSlug] = useState("");
   const [kind, setKind] = useState<Kind>("task");
   const [ref, setRef] = useState("");
   const errors = useFieldErrors(["ref"]);
-  const workspace = slug || workspaces.data?.[0]?.slug || "";
+  const workspace = slug || open?.[0]?.slug || "";
 
   function pickKind(next: Kind) {
     setKind(next);
@@ -67,12 +68,16 @@ export function RestoreItemDialog({ backup, onClose }: { backup: Backup; onClose
       onSubmit={submit}
       onClose={onClose}
     >
-      <FormField label={t("admin.restoreItem.workspace")} htmlFor="ri-workspace" error={workspaces.error || undefined}>
+      <FormField
+        label={t("admin.restoreItem.workspace")}
+        htmlFor="ri-workspace"
+        error={readError(workspaces.error) || undefined}
+      >
         <NativeSelect
           id="ri-workspace"
           value={workspace}
           onChange={setSlug}
-          options={(workspaces.data ?? []).map((w) => ({ value: w.slug, label: `${w.name} (/${w.slug})` }))}
+          options={(open ?? []).map((w) => ({ value: w.slug, label: `${w.name} (/${w.slug})` }))}
         />
       </FormField>
       <Segmented

@@ -1,10 +1,13 @@
-// Install settings as the admin area reads and saves them. The frame loads
-// GET /api/v1/admin/settings once and shares it; a page asks for one
-// setting by name and gets its value, whether the environment locks it, and
-// a way to save it.
+// Install settings as the admin area reads and saves them. GET
+// /api/v1/admin/settings is read once into the query cache and shared (the
+// frame waits for it); a page asks for one setting by name and gets its
+// value, whether the environment locks it, and a way to save it.
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
+import { adminKeys } from "@/admin/data";
 import { api } from "@/lib/api";
+import { queryClient } from "@/lib/query";
 import { type FieldErrors, useFieldErrors } from "@/ui/form";
 
 interface SettingEntry {
@@ -20,23 +23,18 @@ export const MASK = "********";
 
 const PATH = "/api/v1/admin/settings";
 
-export const fetchSettings = () => api.get<{ settings: SettingsMap }>(PATH).then((r) => r.settings);
+/** Every install setting. `enabled` false asks nothing (the server answers install admins only). */
+export const useSettings = (enabled = true) =>
+  useQuery({
+    queryKey: adminKeys.settings,
+    queryFn: ({ signal }) => api.get<{ settings: SettingsMap }>(PATH, signal).then((r) => r.settings),
+    enabled,
+  });
+
+const NO_SETTINGS: SettingsMap = {};
 
 /** The environment variable that sets a setting: "auth.google" is QUADIT_SETTING_AUTH_GOOGLE. */
 const envName = (setting: string) => `QUADIT_SETTING_${setting.replace(/\./g, "_").toUpperCase()}`;
-
-interface Ctx {
-  settings: SettingsMap;
-  replace: (next: SettingsMap) => void;
-}
-
-export const SettingsContext = createContext<Ctx | null>(null);
-
-function useCtx(): Ctx {
-  const ctx = useContext(SettingsContext);
-  if (!ctx) throw new Error("admin settings are read inside the admin frame");
-  return ctx;
-}
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -46,13 +44,13 @@ export interface Setting<T> {
   locked: boolean;
   /** The variable to change when it is locked. */
   env: string;
-  /** Saves and refreshes every setting from the server's answer. Throws the server's refusal. */
+  /** Saves, and every setting is shown as the server's answer has it. Throws the server's refusal. */
   save: (value: T | null) => Promise<void>;
 }
 
-/** One install setting: useSetting("auth.registration", false). */
+/** One install setting: useSetting("auth.registration", false). Read inside the admin frame, which waits for the settings. */
 export function useSetting<T>(name: string, fallback: T): Setting<T> {
-  const { settings, replace } = useCtx();
+  const settings = useSettings().data ?? NO_SETTINGS;
   const entry = settings[name];
   const stored = entry?.value;
   // The fallback the caller first gave: a literal written in its render is new each time.
@@ -61,12 +59,15 @@ export function useSetting<T>(name: string, fallback: T): Setting<T> {
     if (stored === undefined || stored === null) return fb;
     return (isObject(fb) && isObject(stored) ? { ...fb, ...stored } : stored) as T;
   }, [stored, fb]);
+  const { mutateAsync } = useMutation({
+    mutationFn: (next: T | null) => api.put<{ settings: SettingsMap }>(`${PATH}/${encodeURIComponent(name)}`, next),
+    onSuccess: (out) => queryClient.setQueryData(adminKeys.settings, out.settings),
+  });
   const save = useCallback(
     async (next: T | null) => {
-      const out = await api.put<{ settings: SettingsMap }>(`${PATH}/${encodeURIComponent(name)}`, next);
-      replace(out.settings);
+      await mutateAsync(next);
     },
-    [name, replace],
+    [mutateAsync],
   );
   return { value, locked: entry?.from_env ?? false, env: envName(name), save };
 }

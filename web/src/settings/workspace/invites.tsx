@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link2, Mail, UserPlus } from "lucide-react";
 import { api, workspacePath } from "@/lib/api";
@@ -12,7 +13,7 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { RevealDialog } from "@/ui/reveal-dialog";
 import { FormAlert } from "@/ui/form";
 import { EmptyRow, Row, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { inWorkspace, queryClient, readError } from "@/lib/query";
 import { AddPeopleDialog } from "@/settings/workspace/add-people";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -38,10 +39,17 @@ export interface Created {
 export function InvitesSection() {
   const slug = useSlug();
   const members = useLookupEvenIfGone("members");
-  const invites = useLoad(
-    () => api.get<{ invites: Invite[] }>(workspacePath(slug, "/invites")).then((r) => r.invites),
-    [slug],
-  );
+  const key = [...inWorkspace(slug), "invites"];
+  const invites = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) =>
+      api.get<{ invites: Invite[] }>(workspacePath(slug, "/invites"), signal).then((r) => r.invites),
+  });
+  const changed = () => queryClient.invalidateQueries({ queryKey: key });
+  const revoking = useMutation({
+    mutationFn: (id: string) => api.del(workspacePath(slug, `/invites/${id}`)),
+    onSettled: changed,
+  });
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
   const [revoke, setRevoke] = useState<Invite | null>(null);
@@ -57,7 +65,7 @@ export function InvitesSection() {
         </Button>
       }
     >
-      {invites.error && <FormAlert>{invites.error}</FormAlert>}
+      {readError(invites.error) && <FormAlert>{readError(invites.error)}</FormAlert>}
       {invites.data?.length === 0 && <EmptyRow>{t("invites.none")}</EmptyRow>}
       {!!invites.data?.length && (
         <Rows>
@@ -107,7 +115,7 @@ export function InvitesSection() {
           onCreated={(out) => {
             setCreating(false);
             setCreated(out);
-            void invites.reload();
+            void changed();
           }}
         />
       )}
@@ -125,8 +133,7 @@ export function InvitesSection() {
         body={t("invites.revoke.body")}
         confirm={t("s.revoke")}
         onConfirm={async () => {
-          await api.del(workspacePath(slug, `/invites/${revoke?.id}`));
-          await invites.reload();
+          if (revoke) await revoking.mutateAsync(revoke.id);
         }}
       />
     </Section>

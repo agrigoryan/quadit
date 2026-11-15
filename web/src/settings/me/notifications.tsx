@@ -5,7 +5,16 @@ import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { useAuthConfig } from "@/auth/config";
 import { useSettingsBase } from "@/settings/base";
-import { type Account, type EmailChoice, type NotifyPrefs, saveAccount, useAccount } from "@/settings/me/account";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/query";
+import {
+  type Account,
+  accountKeys,
+  type EmailChoice,
+  type NotifyPrefs,
+  useAccount,
+  useSaveAccount,
+} from "@/settings/me/account";
 import { type PushState, pushState, sendTestPush, turnPushOff, turnPushOn } from "@/settings/me/push";
 import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, Note, SwitchRow } from "@/ui/form";
@@ -21,26 +30,24 @@ const prefsOf = (a: Account): Required<NotifyPrefs> => ({
   push: a.user.notify?.push ?? true,
 });
 
-function useSavePrefs(account: Account, onSaved: (a: Account) => void) {
-  const [error, setError] = useState("");
-  const save = async (change: NotifyPrefs) => {
-    setError("");
-    const before = account;
-    const notify = { ...prefsOf(account), ...change };
-    // Show the choice at once; put it back if the server refuses.
-    onSaved({ ...account, user: { ...account.user, notify } });
-    try {
-      onSaved(await saveAccount({ notify }));
-    } catch (err) {
-      onSaved(before);
-      setError(errorMessage(err));
-    }
+function useSavePrefs(account: Account) {
+  const saveAccount = useSaveAccount();
+  // Shows the choice at once; puts it back if the server refuses.
+  const save = useMutation({
+    mutationFn: (notify: Required<NotifyPrefs>) => saveAccount.mutateAsync({ notify }),
+    onMutate(notify) {
+      queryClient.setQueryData(accountKeys.account, { ...account, user: { ...account.user, notify } });
+    },
+    onError: () => queryClient.setQueryData(accountKeys.account, account),
+  });
+  return {
+    save: (change: NotifyPrefs) => save.mutate({ ...prefsOf(account), ...change }),
+    error: save.error ? errorMessage(save.error) : "",
   };
-  return { save, error };
 }
 
-function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
-  const { save, error } = useSavePrefs(account, onSaved);
+function EmailSection({ account }: { account: Account }) {
+  const { save, error } = useSavePrefs(account);
   const value = prefsOf(account).email;
   const noMail = useAuthConfig()?.mail === false;
   return (
@@ -59,7 +66,7 @@ function EmailSection({ account, onSaved }: { account: Account; onSaved: (a: Acc
                   name="notify-email"
                   className="size-3.5 shrink-0 accent-accent"
                   checked={value === choice}
-                  onChange={() => void save({ email: choice })}
+                  onChange={() => save({ email: choice })}
                 />
                 <span className="min-w-0">
                   <span className={cx("block text-sm text-ink", value === choice && "font-medium")}>
@@ -84,8 +91,8 @@ const stateTone: Record<PushState, "ok" | "neutral" | "danger" | "wait"> = {
   unsupported: "wait",
 };
 
-function PushSection({ account, onSaved }: { account: Account; onSaved: (a: Account) => void }) {
-  const { save, error: saveError } = useSavePrefs(account, onSaved);
+function PushSection({ account }: { account: Account }) {
+  const { save, error: saveError } = useSavePrefs(account);
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -132,7 +139,7 @@ function PushSection({ account, onSaved }: { account: Account; onSaved: (a: Acco
           title={t("me.notify.pushAll")}
           hint={t("me.notify.pushAllHint")}
           checked={wanted}
-          onChange={(push) => void save({ push })}
+          onChange={(push) => save({ push })}
         />
         <div className="border-t border-line pt-3.5">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
@@ -180,8 +187,8 @@ export function NotificationsPage() {
       <LoadGate of={account}>
         {(a) => (
           <>
-            <EmailSection account={a} onSaved={account.set} />
-            <PushSection account={a} onSaved={account.set} />
+            <EmailSection account={a} />
+            <PushSection account={a} />
           </>
         )}
       </LoadGate>

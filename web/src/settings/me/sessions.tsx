@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { MonitorSmartphone } from "lucide-react";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
@@ -8,7 +9,8 @@ import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Row, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { accountKeys } from "@/settings/me/account";
+import { queryClient } from "@/lib/query";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 
@@ -23,20 +25,17 @@ interface Session {
 
 const SESSIONS = "/api/v1/auth/sessions";
 
-interface Props {
-  /** Changes when something else ended sessions (a new password): fetch the list again. */
-  stamp: number;
-}
-
 /** Every browser signed in to the account, with a way to sign any of them out. */
-export function SessionsSection({ stamp }: Props) {
-  const list = useLoad(() => api.get<{ sessions: Session[] }>(SESSIONS).then((r) => r.sessions), []);
+export function SessionsSection() {
+  const list = useQuery({
+    queryKey: accountKeys.sessions,
+    queryFn: ({ signal }) => api.get<{ sessions: Session[] }>(SESSIONS, signal).then((r) => r.sessions),
+  });
+  const end = useMutation({
+    mutationFn: (id: string) => api.del(`${SESSIONS}/${id}`),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: accountKeys.sessions }),
+  });
   const [ending, setEnding] = useState<Session | null>(null);
-  const { reload } = list;
-
-  useEffect(() => {
-    if (stamp > 0) void reload();
-  }, [stamp, reload]);
 
   return (
     <Section title={t("me.sessions.title")} lead={t("me.sessions.lead")}>
@@ -85,8 +84,7 @@ export function SessionsSection({ stamp }: Props) {
         body={t("me.sessions.endBody", { what: summariseAgent(ending?.user_agent) || t("me.sessions.unknown") })}
         confirm={t("top.signOut")}
         onConfirm={async () => {
-          await api.del(`${SESSIONS}/${ending?.id}`);
-          await reload();
+          if (ending) await end.mutateAsync(ending.id);
         }}
       />
     </Section>

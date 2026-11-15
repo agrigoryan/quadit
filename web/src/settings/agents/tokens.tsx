@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
-import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { useNow } from "@/lib/live";
 import { dayAndMonth } from "@/lib/time";
-import { useProjects, useSlug } from "@/lib/selectors";
+import { useProjects } from "@/lib/selectors";
 import type { AgentMember, Token } from "@/settings/agents/data";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { Fact } from "@/ui/fact";
@@ -13,8 +12,8 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { RevealDialog } from "@/ui/reveal-dialog";
 import { FormAlert, FormField, NativeSelect, SwitchRow } from "@/ui/form";
 import { EmptyRow, Row, Rows, Section } from "@/ui/page-layout";
-import { CreateTokenDialog, ScopeBadges, type TokenFieldsProps } from "@/settings/ui/tokens";
-import { useLoad } from "@/lib/use-load";
+import { CreateTokenDialog, ScopeBadges, type TokenFieldsProps, useRevokeToken, useTokens } from "@/settings/ui/tokens";
+import { readError } from "@/lib/query";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -24,17 +23,9 @@ const EXPIRY = [0, 7, 30, 90, 365];
 
 /** The tokens issued to one agent: make one (shown once), see when each was used, revoke. */
 export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: boolean }) {
-  const slug = useSlug();
   // The server lists an agent's tokens for admins only; anyone else is told so rather than shown an empty list.
-  const tokens = useLoad(
-    () =>
-      canEdit
-        ? api
-            .get<{ tokens: Token[] }>(workspacePath(slug, "/tokens"))
-            .then((r) => r.tokens.filter((tk) => tk.user_id === agent.user_id))
-        : Promise.resolve(null),
-    [slug, agent.user_id, canEdit],
-  );
+  const tokens = useTokens(agent.user_id, canEdit);
+  const revoking = useRevokeToken();
   const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState("");
   const [revoke, setRevoke] = useState<Token | null>(null);
@@ -53,7 +44,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
         )
       }
     >
-      {tokens.error && <FormAlert>{tokens.error}</FormAlert>}
+      {readError(tokens.error) && <FormAlert>{readError(tokens.error)}</FormAlert>}
       {!canEdit && <EmptyRow>{t("tokens.adminsOnly")}</EmptyRow>}
       {tokens.data?.length === 0 && <EmptyRow>{t("tokens.none")}</EmptyRow>}
       {!!tokens.data?.length && (
@@ -109,7 +100,6 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
           onCreated={(created) => {
             setCreating(false);
             setSecret(created.token);
-            void tokens.reload();
           }}
         />
       )}
@@ -121,8 +111,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
         body={t("tokens.revoke.body")}
         confirm={t("s.revoke")}
         onConfirm={async () => {
-          await api.del(workspacePath(slug, `/tokens/${revoke?.id}`));
-          await tokens.reload();
+          if (revoke) await revoking.mutateAsync(revoke.id);
         }}
       />
     </Section>

@@ -1,15 +1,14 @@
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
 import { AuditLog } from "@/admin/audit-log";
-import { fetchUsers } from "@/admin/users";
-import { fetchWorkspaces } from "@/admin/workspaces";
-import { useLoad } from "@/lib/use-load";
+import { useAdminUsers } from "@/admin/users";
+import { useAdminWorkspaces } from "@/admin/workspaces";
 
 /** The whole install's audit log. */
 export function AdminAuditPage() {
   // The filters work without these lists; they only add names to pick from.
-  const users = useLoad(fetchUsers, []);
-  const workspaces = useLoad(fetchWorkspaces, []);
+  const users = useAdminUsers();
+  const workspaces = useAdminWorkspaces();
   const actors = useMemo(
     () =>
       (users.data ?? []).map((u) => ({

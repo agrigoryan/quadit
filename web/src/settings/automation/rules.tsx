@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { errorMessage } from "@/lib/api";
@@ -11,8 +12,8 @@ import { LoadGate } from "@/ui/load-gate";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Switch } from "@/ui/form";
 import { EmptyRow, Page, Rows } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
-import { change, listRows } from "@/settings/automation/data";
+import { queryClient } from "@/lib/query";
+import { automationKeys, change, listRows } from "@/settings/automation/data";
 import type { Rule, Webhook } from "@/lib/types-automation";
 import { RuleForm } from "@/settings/automation/rule-form";
 import { RuleSentence } from "@/settings/automation/rule-text";
@@ -21,21 +22,32 @@ import { RuleSentence } from "@/settings/automation/rule-text";
 export function RulesPage() {
   const slug = useSlug();
   const base = useSettingsBase();
-  const data = useLoad(async () => {
-    const [rules, hooks] = await Promise.all([listRows<Rule>(slug, "rules"), listRows<Webhook>(slug, "webhooks")]);
-    return { rules, hooks };
-  }, [slug]);
+  const key = automationKeys.rules(slug);
+  const data = useQuery({
+    queryKey: key,
+    queryFn: async ({ signal }) => {
+      const [rules, hooks] = await Promise.all([
+        listRows<Rule>(slug, "rules", "", signal),
+        listRows<Webhook>(slug, "webhooks", "", signal),
+      ]);
+      return { rules, hooks };
+    },
+  });
+  const changed = () => queryClient.invalidateQueries({ queryKey: key });
   const [form, setForm] = useState<{ rule?: Rule } | null>(null);
   const [removing, setRemoving] = useState<Rule | null>(null);
 
   async function toggle(rule: Rule, active: boolean) {
-    data.set((d) => d && { ...d, rules: d.rules.map((r) => (r.id === rule.id ? { ...r, active } : r)) });
+    queryClient.setQueryData<{ rules: Rule[]; hooks: Webhook[] }>(
+      key,
+      (d) => d && { ...d, rules: d.rules.map((r) => (r.id === rule.id ? { ...r, active } : r)) },
+    );
     try {
       await change("rule.update", { id: rule.id, active });
     } catch (err) {
       toast.error(errorMessage(err));
     }
-    await data.reload();
+    await changed();
   }
 
   return (
@@ -95,7 +107,7 @@ export function RulesPage() {
           onClose={() => setForm(null)}
           onSaved={() => {
             setForm(null);
-            void data.reload();
+            void changed();
           }}
         />
       )}
@@ -107,7 +119,7 @@ export function RulesPage() {
         confirm={t("s.delete")}
         onConfirm={async () => {
           if (removing) await change("rule.delete", { id: removing.id });
-          await data.reload();
+          await changed();
         }}
       />
     </Page>

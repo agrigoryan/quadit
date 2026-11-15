@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ArchiveRestore, CircleAlert, CircleCheck, Download, LoaderCircle } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
@@ -14,7 +15,8 @@ import { download } from "@/lib/download";
 import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, SwitchRow } from "@/ui/form";
 import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { adminKeys } from "@/admin/data";
+import { queryClient } from "@/lib/query";
 
 export interface Backup {
   id: string;
@@ -147,24 +149,16 @@ function BackupRow({ backup, onRestore }: { backup: Backup; onRestore: () => voi
 }
 
 export function BackupsPage() {
-  const list = useLoad(() => api.get<BackupList>("/api/v1/admin/backups"), []);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const list = useQuery({
+    queryKey: adminKeys.backups,
+    queryFn: ({ signal }) => api.get<BackupList>("/api/v1/admin/backups", signal),
+  });
+  const backUp = useMutation({
+    mutationFn: () => api.post<Backup>("/api/v1/admin/backups"),
+    onSuccess: () => toast.info(t("admin.backups.done")),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: adminKeys.backups }),
+  });
   const [restoring, setRestoring] = useState<Backup | null>(null);
-
-  async function backUpNow() {
-    setBusy(true);
-    setError("");
-    try {
-      await api.post<Backup>("/api/v1/admin/backups");
-      toast.info(t("admin.backups.done"));
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-      void list.reload();
-    }
-  }
 
   return (
     <Page title={t("admin.backups.title")} lead={t("admin.backups.lead")} back="/admin">
@@ -176,13 +170,13 @@ export function BackupsPage() {
         title={t("admin.backups.list")}
         lead={list.data ? t("admin.backups.directory", { dir: list.data.directory }) : undefined}
         actions={
-          <Button variant="primary" disabled={busy} onClick={() => void backUpNow()}>
-            {busy ? t("admin.backups.nowBusy") : t("admin.backups.now")}
+          <Button variant="primary" disabled={backUp.isPending} onClick={() => backUp.mutate()}>
+            {backUp.isPending ? t("admin.backups.nowBusy") : t("admin.backups.now")}
           </Button>
         }
       >
         <div className="flex flex-col gap-3">
-          <FormAlert>{error}</FormAlert>
+          <FormAlert>{backUp.error ? errorMessage(backUp.error) : ""}</FormAlert>
           <LoadGate of={list}>
             {(data) =>
               data.backups.length === 0 ? (

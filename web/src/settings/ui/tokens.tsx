@@ -1,13 +1,44 @@
 // What the two token pages share (a person's own tokens under Me, an agent's
-// on its page): the dialog that makes a token, and a token's scopes as badges.
-// Each page brings its own words and its own fields.
+// on its page): the list, the dialog that makes a token, revoking one, and a
+// token's scopes as badges. Each page brings its own words and its own fields.
 
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { type ComponentType, type Dispatch, type ReactNode, type SetStateAction, useState } from "react";
 import { api, workspacePath } from "@/lib/api";
+import { inWorkspace, queryClient } from "@/lib/query";
 import { useSlug } from "@/lib/selectors";
+import type { Token } from "@/settings/agents/data";
 import { type FieldErrors, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
 import { Badge } from "@/ui/badge";
+
+const tokensKey = (slug: string) => [...inWorkspace(slug), "tokens"] as const;
+
+const tokensChanged = (slug: string) => queryClient.invalidateQueries({ queryKey: tokensKey(slug) });
+
+/**
+ * The tokens issued to one member of this workspace. The server lists them
+ * all in one answer, which both pages share. `enabled` false asks nothing
+ * (the server lists an agent's tokens for admins only).
+ */
+export function useTokens(userId: string, enabled = true) {
+  const slug = useSlug();
+  return useQuery({
+    queryKey: tokensKey(slug),
+    queryFn: ({ signal }) => api.get<{ tokens: Token[] }>(workspacePath(slug, "/tokens"), signal),
+    select: (out) => out.tokens.filter((tk) => tk.user_id === userId),
+    enabled,
+  });
+}
+
+/** Revokes a token; the list is asked again either way. */
+export function useRevokeToken() {
+  const slug = useSlug();
+  return useMutation({
+    mutationFn: (id: string) => api.del(workspacePath(slug, `/tokens/${id}`)),
+    onSettled: () => tokensChanged(slug),
+  });
+}
 
 /** What the server answers when a token is made: the token itself, this once, and its row in the list. */
 export interface CreatedToken {
@@ -67,16 +98,20 @@ export function CreateTokenDialog({
   const [days, setDays] = useState(firstDays);
   const errors = useFieldErrors(["name", "projects"]);
 
-  async function submit() {
-    onCreated(
-      await api.post<CreatedToken>(workspacePath(slug, "/tokens"), {
+  const make = useMutation({
+    mutationFn: () =>
+      api.post<CreatedToken>(workspacePath(slug, "/tokens"), {
         user,
         name: name.trim(),
         read_only: readOnly,
         projects,
         expires_days: days,
       }),
-    );
+    onSuccess: () => tokensChanged(slug),
+  });
+
+  async function submit() {
+    onCreated(await make.mutateAsync());
   }
 
   return (

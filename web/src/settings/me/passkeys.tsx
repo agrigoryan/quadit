@@ -1,3 +1,4 @@
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { createPasskey, passkeyCanceled, passkeysSupported } from "@/auth/webauthn";
@@ -10,7 +11,7 @@ import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { FormAlert, FormField, Note } from "@/ui/form";
 import { EmptyRow, Row, Rows, Section } from "@/ui/page-layout";
-import { useLoad } from "@/lib/use-load";
+import { accountChanged, accountKeys } from "@/settings/me/account";
 import { Button, IconButton } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { Input } from "@/ui/input";
@@ -93,16 +94,16 @@ function NameDialog({
 }
 
 /** Passkeys: sign in with a fingerprint, a face or a security key instead of a password. */
-export function PasskeysSection({ onChanged }: { onChanged: () => void }) {
-  const list = useLoad(() => api.get<{ passkeys: Passkey[] }>(PASSKEYS).then((r) => r.passkeys), []);
+export function PasskeysSection() {
+  const list = useQuery({
+    queryKey: accountKeys.passkeys,
+    queryFn: ({ signal }) => api.get<{ passkeys: Passkey[] }>(PASSKEYS, signal).then((r) => r.passkeys),
+  });
+  // The account counts its passkeys: it is asked again too.
+  const remove = useMutation({ mutationFn: (id: string) => api.del(`${PASSKEYS}/${id}`), onSettled: accountChanged });
   const [naming, setNaming] = useState<Passkey | "new" | null>(null);
   const [removing, setRemoving] = useState<Passkey | null>(null);
   const supported = passkeysSupported();
-
-  const changed = () => {
-    void list.reload();
-    onChanged();
-  };
 
   return (
     <Section
@@ -162,7 +163,7 @@ export function PasskeysSection({ onChanged }: { onChanged: () => void }) {
           onClose={() => setNaming(null)}
           onDone={() => {
             setNaming(null);
-            changed();
+            accountChanged();
           }}
         />
       )}
@@ -173,8 +174,7 @@ export function PasskeysSection({ onChanged }: { onChanged: () => void }) {
         body={t("me.passkeys.removeBody")}
         confirm={t("s.remove")}
         onConfirm={async () => {
-          await api.del(`${PASSKEYS}/${removing?.id}`);
-          changed();
+          if (removing) await remove.mutateAsync(removing.id);
         }}
       />
     </Section>

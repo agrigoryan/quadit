@@ -3,10 +3,12 @@
 // changed in the form, and starts again from fresh values the server hands
 // back.
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { type SettingsMap, SettingsContext, useDraft } from "@/admin/settings";
+import { adminKeys } from "@/admin/data";
+import { type SettingsMap, useDraft } from "@/admin/settings";
+import { queryClient } from "@/lib/query";
+import { WithQuery } from "@/test/query";
 
 function Form() {
   const form = useDraft<string>("install.name", "Quadit");
@@ -19,36 +21,35 @@ function Form() {
 }
 
 /** The admin frame, with a button that stands for the server handing back fresh settings. */
-function Frame({ initial, fresh = {} }: { initial: SettingsMap; fresh?: SettingsMap }) {
-  const [settings, setSettings] = useState(initial);
+function Frame({ fresh = {} }: { fresh?: SettingsMap }) {
   return (
-    <SettingsContext value={{ settings, replace: setSettings }}>
+    <WithQuery>
       <Form />
-      <button type="button" onClick={() => setSettings(fresh)}>
+      <button type="button" onClick={() => queryClient.setQueryData(adminKeys.settings, fresh)}>
         fresh
       </button>
-    </SettingsContext>
+    </WithQuery>
   );
 }
 
+/** What the frame waits for: the settings in the query cache, read a moment ago. */
+const stored = (settings: SettingsMap) => queryClient.setQueryData(adminKeys.settings, settings);
+
 describe("useDraft", () => {
   it("starts from the stored value, or the fallback", () => {
-    render(<Frame initial={{}} />);
+    stored({});
+    render(<Frame />);
     expect(screen.getByLabelText("name")).toHaveValue("Quadit");
     expect(screen.getByLabelText("dirty")).toHaveTextContent("false");
   });
 
-  it("keeps what is typed until fresh values come back, then starts again from them", () => {
-    render(
-      <Frame
-        initial={{ "install.name": { value: "Acme", from_env: false } }}
-        fresh={{ "install.name": { value: "Acme Ltd", from_env: false } }}
-      />,
-    );
+  it("keeps what is typed until fresh values come back, then starts again from them", async () => {
+    stored({ "install.name": { value: "Acme", from_env: false } });
+    render(<Frame fresh={{ "install.name": { value: "Acme Ltd", from_env: false } }} />);
     fireEvent.change(screen.getByLabelText("name"), { target: { value: "Acme Inc" } });
     expect(screen.getByLabelText("dirty")).toHaveTextContent("true");
     fireEvent.click(screen.getByRole("button", { name: "fresh" }));
-    expect(screen.getByLabelText("name")).toHaveValue("Acme Ltd");
+    await waitFor(() => expect(screen.getByLabelText("name")).toHaveValue("Acme Ltd"));
     expect(screen.getByLabelText("dirty")).toHaveTextContent("false");
   });
 });
