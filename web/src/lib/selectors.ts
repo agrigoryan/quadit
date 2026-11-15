@@ -139,6 +139,14 @@ export function useLookupEvenIfGone<K extends keyof Collections>(name: K): Dict<
   return useStore((s) => tableOf(s, name));
 }
 
+/**
+ * useLookupEvenIfGone outside a component: for an action that must follow
+ * or find rows in the trash (restoring a page with those trashed with it).
+ */
+export function getLookupEvenIfGone<K extends keyof Collections>(name: K): Dict<Row<K>> {
+  return tableOf(getState(), name);
+}
+
 /** The rows of a collection in the trash, the most recently trashed first. */
 export function useTrashed<K extends keyof Collections>(name: K): Row<K>[] {
   return useStore((s) => trashedList(tableOf(s, name)) as Row<K>[]);
