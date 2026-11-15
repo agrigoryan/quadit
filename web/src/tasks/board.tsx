@@ -21,6 +21,7 @@ import { type CardMove, moveCard } from "@/tasks/actions";
 import { AddStatusColumn } from "@/tasks/add-status";
 import { CardOverlay } from "@/tasks/board-card";
 import { BoardColumn, type Card } from "@/tasks/board-column";
+import { useBoardKeys } from "@/tasks/board-keys";
 import { NONE, type TaskGroup } from "@/tasks/filters";
 
 interface Props {
@@ -64,13 +65,15 @@ function changeFor(task: Task, from: TaskGroup, to: TaskGroup): CardMove | null 
  * Tasks as cards in columns. Dragging a card within a column gives it a new
  * rank between its neighbours; dragging it to another column also gives it
  * what that column stands for. Both go out as one task.update. Each column
- * draws only the cards in view.
+ * draws only the cards in view. The keys that look at a task are in
+ * tasks/board-keys.ts.
  */
 export function Board({ groups, project }: Props) {
   const me = useMe();
   const [activeId, setActiveId] = useState<string | null>(null);
   // While a card is being dragged the columns follow the pointer, not the store.
   const [order, setOrder] = useState<Order | null>(null);
+  const pointer = useBoardKeys(groups);
 
   const { cards, byGroup } = useMemo(() => {
     const cards = new Map<string, Card & { group: TaskGroup }>();
@@ -158,7 +161,7 @@ export function Board({ groups, project }: Props) {
         setOrder(null);
       }}
     >
-      <div className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3">
+      <div {...pointer} className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3">
         {groups.map((group) => {
           const list = order ? ((order[group.id] ?? []).map((id) => cards.get(id)).filter(Boolean) as Card[]) : (byGroup.get(group.id) ?? []);
           return (
