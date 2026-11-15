@@ -3,7 +3,7 @@
 // with a stand-in for the panel (the panel is open while the address is a
 // task's), and its sub-tasks nested under their parents.
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useMemo, useState } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -279,6 +279,25 @@ describe("TaskList sub-tasks", () => {
 });
 
 describe("DisplayControls", () => {
+  it("groups a list by status, assignee, label, epic or priority, and a board's columns by status, assignee or label", () => {
+    const optionNames = () => screen.getAllByRole("option").map((o) => o.textContent);
+    const { unmount } = render(
+      <TooltipProvider>
+        <DisplayControls state={defaultViewState} onChange={() => {}} />
+      </TooltipProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Group\s*Status/ }));
+    expect(optionNames()).toEqual(["Status", "Assignee", "Label", "Epic", "Priority", "No grouping"]);
+    unmount();
+    render(
+      <TooltipProvider>
+        <DisplayControls state={{ ...defaultViewState, layout: "board" }} onChange={() => {}} />
+      </TooltipProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Columns\s*Status/ }));
+    expect(optionNames()).toEqual(["Status", "Assignee", "Label"]);
+  });
+
   it("offers sub-tasks nested or flat, nested to start with", () => {
     const onChange = vi.fn();
     render(
@@ -289,6 +308,65 @@ describe("DisplayControls", () => {
     fireEvent.click(screen.getByRole("button", { name: /Sub-tasks\s*Nested/ }));
     fireEvent.click(screen.getByRole("option", { name: "Flat" }));
     expect(onChange).toHaveBeenCalledWith({ subtasks: "flat" });
+  });
+});
+
+describe("TaskList adding to a group", () => {
+  /** What the create dialog is opened with from each group's + button, one group at a time. */
+  function drafts(groups: TaskGroup[]) {
+    return groups.map((g) => {
+      const onAdd = vi.fn();
+      step += 1;
+      const { unmount } = render(
+        <MemoryRouter initialEntries={[{ pathname: "/test/p/SVA/tasks", key: `step${step}` }]}>
+          <TooltipProvider>
+            <TaskList
+              groups={[g]}
+              nested={false}
+              sort="manual"
+              selected={new Set()}
+              onSelectedChange={() => {}}
+              onAdd={onAdd}
+            />
+          </TooltipProvider>
+        </MemoryRouter>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^New task in/ }));
+      unmount();
+      return onAdd.mock.calls[0]?.[0];
+    });
+  }
+  const of = (kind: TaskGroup["kind"], value: string, category?: TaskGroup["category"]): TaskGroup => ({
+    id: `${kind}-${value}`,
+    title: `${kind} ${value}`,
+    kind,
+    value,
+    category,
+    tasks: [task(1)],
+  });
+
+  it("leaves the assignee off rows grouped by assignee, which their heading says", () => {
+    renderList([{ ...group("Ann", [1]), kind: "assignee", value: "u1" }], false);
+    expect(screen.queryByRole("button", { name: /^Assignee:/ })).toBeNull();
+    cleanup();
+    renderList([group("Todo", [1])], false);
+    expect(screen.getByRole("button", { name: /^Assignee:/ })).toBeInTheDocument();
+  });
+
+  it("starts the task with the group's status, assignee, epic or label, and nothing for none", () => {
+    expect(
+      drafts([
+        { ...of("status", "s"), id: "s", category: "unstarted" },
+        of("status", "started", "started"),
+        of("assignee", "u1"),
+        of("assignee", "none"),
+        of("epic", "e1"),
+        of("epic", "none"),
+        of("label", "l1"),
+        of("label", "none"),
+        of("priority", "2"),
+      ]),
+    ).toEqual([{ statusId: "s" }, {}, { assigneeId: "u1" }, {}, { epicId: "e1" }, {}, { labelIds: ["l1"] }, {}, {}]);
   });
 });
 
@@ -311,6 +389,19 @@ describe("TaskList for who may change the tasks, and who may not", () => {
     press("s");
     expect(statusPicker()).not.toBeNull();
     expect(screen.getByRole("button", { name: "Status: Todo" })).toBeEnabled();
+  });
+
+  it.each([
+    ["s", "Change status…"],
+    ["a", "Assign to…"],
+    ["p", "Set priority…"],
+    ["l", "Add or remove labels…"],
+  ])("opens a picker for the current row with %s", (key, title) => {
+    seed();
+    renderList([group("Todo", [1])]);
+    press("j");
+    press(key);
+    expect(screen.getByRole("dialog", { name: title })).toBeInTheDocument();
   });
 
   it("opens nothing for a read-only member: S does nothing and the row's buttons are off", () => {

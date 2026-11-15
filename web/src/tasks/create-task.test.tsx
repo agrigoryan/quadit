@@ -3,10 +3,10 @@
 // task closes the dialog at once and is sent behind it; several are sent as
 // one batch with the button off, and a refusal keeps the dialog open.
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useEffect } from "react";
 import { type Location, MemoryRouter, useLocation } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "@/lib/api";
 import { clearOutbox } from "@/lib/mutate";
 import { clearStore, loadBootstrap } from "@/lib/store";
@@ -213,6 +213,107 @@ describe("CreateTaskDialog, several tasks", () => {
     fireEvent.change(titles(), { target: { value: "" } });
     fireEvent.keyDown(titles(), { key: "Enter", ctrlKey: true });
     expect(screen.getByRole("alert")).toHaveTextContent("Write at least one title");
+  });
+});
+
+describe("CreateTaskDialog, the properties under the description", () => {
+  beforeAll(() => {
+    // The pickers' lists scroll and measure; jsdom does neither.
+    Element.prototype.scrollIntoView = vi.fn();
+    globalThis.ResizeObserver ??= class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  });
+
+  beforeEach(() => {
+    loadBootstrap("acme", {
+      seq: 2,
+      me: { user_id: "u1", handle: "ann", name: "Ann", role: "owner" } as Member,
+      user: { id: "u1" } as User,
+      workspace: { id: "w", slug: "acme" } as Workspace,
+      projects: [{ id: "p1", key: "SVA", name: "Game" }],
+      statuses: [
+        { id: "s1", project_id: "p1", name: "Todo", category: "unstarted", is_default: true, rank: "a" },
+        { id: "s2", project_id: "p1", name: "Doing", category: "started", rank: "b" },
+      ],
+      members: [
+        { user_id: "u1", handle: "ann", name: "Ann", kind: "person" },
+        { user_id: "u2", handle: "coder", name: "Coder", kind: "agent" },
+      ],
+      labels: [{ id: "l1", project_id: "p1", name: "bug" }],
+      epics: [{ id: "e1", project_id: "p1", name: "Launch", rank: "a" }],
+      templates: [{ id: "tp1", project_id: "p1", name: "Bug report" }],
+      tasks: [
+        {
+          id: "t9",
+          project_id: "p1",
+          number: 9,
+          key: "SVA-9",
+          title: "Parent",
+          status_id: "s1",
+          priority: 0,
+          rank: "a",
+        },
+      ],
+    });
+  });
+
+  /** The row of property buttons, by what each shows. */
+  const pills = (dialog: HTMLElement) =>
+    [...dialog.querySelectorAll("form > div:last-child > *")].map((el) => el.textContent);
+  const choose = (button: RegExp, label: string) => {
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    const rows = within(screen.getByRole("listbox")).getAllByRole("option");
+    const row = rows.find((o) => o.querySelector("span.flex-1")?.textContent === label);
+    if (!row) throw new Error(`no row ${label}`);
+    fireEvent.click(row);
+  };
+
+  it("offers status, assignee, priority, labels, epic, parent, due date and template, in that order", () => {
+    open();
+    expect(pills(screen.getByRole("dialog"))).toEqual([
+      "Todo",
+      "Assignee",
+      "Priority",
+      "Labels",
+      "Epic",
+      "Parent",
+      "Due date",
+      "Template",
+    ]);
+  });
+
+  it("offers the same for several tasks but the parent and the template", () => {
+    open(true);
+    expect(pills(screen.getByRole("dialog"))).toEqual(["Todo", "Assignee", "Priority", "Labels", "Epic", "Due date"]);
+  });
+
+  it("creates the task with what was picked", async () => {
+    open();
+    fireEvent.change(screen.getByLabelText("Task title"), { target: { value: "Fix the menu" } });
+    choose(/^Status/, "Doing");
+    choose(/^Assignee$/, "Coder");
+    choose(/^Priority$/, "High");
+    choose(/^Labels/, "bug");
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+    choose(/^Epic$/, "Launch");
+    choose(/^Parent$/, "Parent");
+    fireEvent.change(screen.getByLabelText("Due date"), { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Create task/ }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.changes[0]?.args).toMatchObject({
+      project: "p1",
+      title: "Fix the menu",
+      status: "s2",
+      assignee: "u2",
+      priority: 2,
+      labels: ["l1"],
+      epic: "e1",
+      parent: "t9",
+      due_on: "2026-12-01",
+    });
   });
 });
 

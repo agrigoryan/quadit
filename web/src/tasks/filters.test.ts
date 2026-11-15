@@ -166,6 +166,56 @@ describe("groupTasks", () => {
   });
 });
 
+describe("groupTasks headings", () => {
+  const c = { statuses: live(statuses), members, epics, labels: live(labels) };
+  const heads = (by: Parameters<typeof groupTasks>[1], projectId: string | null = "p1") =>
+    groupTasks(
+      [
+        task({ id: "a", assignee_id: "u1", label_ids: ["l-bug"], epic_id: "e1", priority: 2, status_id: "s-doing" }),
+        task({ id: "b" }),
+      ],
+      by,
+      c,
+      projectId ?? undefined,
+      true,
+    ).map((g) => [g.kind, g.id, g.title, g.value, g.category ?? "-"].join(" "));
+
+  it("names each group after what it stands for, with a group for none where a task can have none", () => {
+    expect(heads("status")).toEqual([
+      "status s-todo To do s-todo unstarted",
+      "status s-doing Doing s-doing started",
+      "status s-done Done s-done done",
+    ]);
+    expect(heads("status", null)).toEqual([
+      "status backlog Backlog backlog backlog",
+      "status unstarted To do unstarted unstarted",
+      "status started In progress started started",
+      "status waiting Waiting waiting waiting",
+      "status done Done done done",
+      "status canceled Canceled canceled canceled",
+    ]);
+    expect(heads("assignee")).toEqual([
+      "assignee u1 Ann u1 -",
+      "assignee u2 Bot u2 -",
+      "assignee none Unassigned none -",
+    ]);
+    expect(heads("label")).toEqual([
+      "label l-art art l-art -",
+      "label l-bug bug l-bug -",
+      "label none No label none -",
+    ]);
+    expect(heads("epic")).toEqual(["epic e1 Launch e1 -", "epic none No epic none -"]);
+    expect(heads("priority")).toEqual([
+      "priority 1 Urgent 1 -",
+      "priority 2 High 2 -",
+      "priority 3 Medium 3 -",
+      "priority 4 Low 4 -",
+      "priority 0 No priority 0 -",
+    ]);
+    expect(heads("none")).toEqual(["none all   -"]);
+  });
+});
+
 describe("toQuery and fromQuery", () => {
   // As a page passes them (tasks/tasks-view.tsx): what is gone is not there to be found.
   const source = {
