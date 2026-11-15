@@ -3,6 +3,7 @@
 // to paste into the provider's console.
 
 import { t } from "@/lib/i18n";
+import { isWebAddress } from "@/lib/url";
 import { SecretField, SettingForm, TextField } from "@/admin/setting-form";
 import { useDraft, useSetting } from "@/admin/settings";
 import { CopyField } from "@/ui/settings-dialogs";
@@ -36,8 +37,7 @@ export function ProviderForm({ provider, name }: Props) {
       const wrong: Record<string, string> = {};
       if (v.enabled && !v.client_id.trim()) wrong.client_id = t("admin.provider.needId");
       if (v.enabled && !v.client_secret) wrong.client_secret = t("admin.provider.needSecret");
-      if (v.enabled && oidc && !/^https?:\/\/\S+$/.test((v.issuer ?? "").trim()))
-        wrong.issuer = t("admin.provider.needIssuer");
+      if (v.enabled && oidc && !isWebAddress(v.issuer ?? "")) wrong.issuer = t("admin.provider.needIssuer");
       return wrong;
     },
     toValue: (v) => ({ ...v, client_id: v.client_id.trim(), issuer: v.issuer?.trim(), name: v.name?.trim() }),

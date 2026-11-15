@@ -22,3 +22,6 @@ export function githubRepo(text: string): string | null {
     .replace(/\/+$/, "");
   return /^[\w.-]+\/[\w.-]+$/.test(repo) ? repo : null;
 }
+
+/** True for an http or https address with no spaces in it: the check a form makes before sending one. */
+export const isWebAddress = (text: string): boolean => /^https?:\/\/\S+$/i.test(text.trim());

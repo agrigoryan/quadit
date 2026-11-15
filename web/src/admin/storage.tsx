@@ -1,4 +1,5 @@
 import { t } from "@/lib/i18n";
+import { isWebAddress } from "@/lib/url";
 import { NumberField, SecretField, SettingForm, TextField } from "@/admin/setting-form";
 import { useDraft, useSetting } from "@/admin/settings";
 import { Checkbox, FormField, NativeSelect, Note } from "@/ui/form";
@@ -72,8 +73,7 @@ function validate(v: FilesSetting): Record<string, string> {
   if (v.kind === "s3") {
     if (!v.access_key.trim()) wrong.access_key = t("s.required");
     if (!v.secret_key) wrong.secret_key = t("s.required");
-    if (v.endpoint.trim() && !/^https?:\/\/\S+$/.test(v.endpoint.trim()))
-      wrong.endpoint = t("admin.storage.endpointBad");
+    if (v.endpoint.trim() && !isWebAddress(v.endpoint)) wrong.endpoint = t("admin.storage.endpointBad");
   }
   if (v.kind === "azure") {
     if (!v.account.trim()) wrong.account = t("s.required");

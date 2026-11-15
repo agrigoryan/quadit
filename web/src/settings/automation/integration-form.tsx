@@ -10,7 +10,7 @@ import { Input } from "@/ui/input";
 import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
 import { change } from "@/settings/automation/data";
 import type { GitHubConfig, Integration } from "@/lib/types-automation";
-import { githubRepo } from "@/lib/url";
+import { githubRepo, isWebAddress } from "@/lib/url";
 
 interface Props {
   /** The integration to edit; none to connect a repository. */
@@ -43,8 +43,7 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
     errors.clear();
     const cleanRepo = githubRepo(repo);
     if (!cleanRepo) return errors.set("repo", t("auto.gh.repoInvalid"));
-    if (apiUrl.trim() && !/^https?:\/\/\S+$/i.test(apiUrl.trim()))
-      return errors.set("config", t("auto.hook.urlInvalid"));
+    if (apiUrl.trim() && !isWebAddress(apiUrl)) return errors.set("config", t("auto.hook.urlInvalid"));
 
     const config: GitHubConfig = { repo: cleanRepo };
     if (apiUrl.trim()) config.api_url = apiUrl.trim();

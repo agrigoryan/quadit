@@ -11,6 +11,7 @@ import { Input } from "@/ui/input";
 import { FormAlert, FormField, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
 import { change, randomSecret } from "@/settings/automation/data";
 import type { Webhook } from "@/lib/types-automation";
+import { isWebAddress } from "@/lib/url";
 import { EventPicker } from "@/settings/automation/event-picker";
 
 type Scope = "all" | "project" | "member";
@@ -43,7 +44,7 @@ export function WebhookForm({ hook, onClose, onSaved }: Props) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     errors.clear();
-    if (!/^https?:\/\/\S+$/i.test(url.trim())) return errors.set("url", t("auto.hook.urlInvalid"));
+    if (!isWebAddress(url)) return errors.set("url", t("auto.hook.urlInvalid"));
     if (scope === "project" && !projectId) return errors.set("project", t("auto.hook.projectMissing"));
     if (scope === "member" && !memberId) return errors.set("for", t("auto.hook.memberMissing"));
     await run(async () => {
