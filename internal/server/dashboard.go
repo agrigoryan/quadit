@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"net/http"
 	"slices"
 	"sort"
 	"time"
@@ -14,13 +13,13 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init adds the dashboard's routes to the server's routes.
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/dashboard", s.workspaceMember(s.handleShowDashboard))
-		m.HandleFunc("GET /api/v1/w/{ws}/cycles/{id}/chart", s.workspaceMember(s.handleShowCycleChart)) // dashboard_cycle.go
-		m.HandleFunc("GET /api/v1/w/{ws}/agents", s.workspaceMember(s.handleListAgents))                // dashboard_agents.go
-	})
+// dashboardRoutes are the routes of the dashboard and its parts.
+func (s *Server) dashboardRoutes() []route {
+	return []route{
+		{"GET /api/v1/w/{ws}/dashboard", s.workspaceMember(s.handleShowDashboard), "Where everything stands: waiting on me, epics with progress, flow, agents, recent decisions, health.", "project: key", "oversight"},
+		{"GET /api/v1/w/{ws}/cycles/{id}/chart", s.workspaceMember(s.handleShowCycleChart), "A cycle's scope against done, day by day.", "", "oversight"},                 // dashboard_cycle.go
+		{"GET /api/v1/w/{ws}/agents", s.workspaceMember(s.handleListAgents), "What every agent is doing now, and whether anything is listening for it.", "", "oversight"}, // dashboard_agents.go
+	}
 }
 
 // handleShowDashboard is where everything stands, in one call: what waits on the

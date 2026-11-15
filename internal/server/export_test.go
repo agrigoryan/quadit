@@ -14,6 +14,16 @@ func (s *Server) LimitFactor() float64 {
 	return s.limits.factor
 }
 
+// RoutePatterns are the patterns of every route the server answers, as
+// the mux has them.
+func (s *Server) RoutePatterns() []string {
+	var patterns []string
+	for _, rt := range s.allRoutes() {
+		patterns = append(patterns, rt.pattern)
+	}
+	return patterns
+}
+
 // GitHubTimeout is how long one request to GitHub may take, for tests to shorten.
 var GitHubTimeout = &githubTimeout
 

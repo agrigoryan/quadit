@@ -11,7 +11,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// Background work: Run, the list of loops it starts, and two of them.
+// Background work: Run, the lists of loops it starts and of kinds of
+// job, and the loops and the job that belong to no other file.
 
 // Run does the server's background work until ctx ends. It first switches
 // file storage to what the "files" setting says and applies the rate-limit
@@ -62,27 +63,38 @@ func (s *Server) Run(ctx context.Context) {
 	}
 }
 
-// runners are background loops started with the server. Each runs until
-// ctx ends; Run waits for them to return.
-var runners []func(s *Server, ctx context.Context)
-
-func init() {
-	// files.move copies files left on local disk into the cloud store.
-	jobKinds["files.move"] = func(s *Server, ctx context.Context, _ core.Job) error {
-		l, ok := s.fileStore().(blob.Layered)
-		if !ok {
-			return nil
-		}
-		n, err := blob.Move(ctx, l.Old, l.Primary)
-		if n > 0 {
-			s.log.Info("moved files to the cloud store", "files", n)
-		}
-		return err
-	}
+// runners are the background loops Run starts, each in a goroutine of its
+// own. Each runs until ctx ends; Run waits for them to return.
+var runners = []func(s *Server, ctx context.Context){
+	(*Server).hearOtherServers, // below: writes made through another server
+	(*Server).shareRateCounts,  // below: rate limits across servers
+	(*Server).runDispatcher,    // dispatch.go: events into wake-ups
+	(*Server).runDeliveries,    // deliveries.go: webhook deliveries
+	(*Server).runJobs,          // jobs.go: the jobs below, when due
+	(*Server).runSchedule,      // backups.go: backups and emptying the trash, on schedule
+	(*Server).runGitHub,        // github.go: GitHub integrations, on their timer
+	func(s *Server, ctx context.Context) { s.repos.Run(ctx) }, // package reposync: repository sources, on their timer
 }
 
-func init() {
-	runners = append(runners, (*Server).hearOtherServers, (*Server).shareRateCounts)
+// jobKinds maps a kind of job to what runs it (jobs.go runs them).
+var jobKinds = map[string]func(s *Server, ctx context.Context, j core.Job) error{
+	"notify":      (*Server).jobNotify,
+	"backup":      (*Server).jobBackup,
+	"trash.purge": (*Server).jobPurgeTrash,
+	"files.move":  (*Server).jobMoveFiles,
+}
+
+// jobMoveFiles copies files left on local disk into the cloud store.
+func (s *Server) jobMoveFiles(ctx context.Context, _ core.Job) error {
+	l, ok := s.fileStore().(blob.Layered)
+	if !ok {
+		return nil
+	}
+	n, err := blob.Move(ctx, l.Old, l.Primary)
+	if n > 0 {
+		s.log.Info("moved files to the cloud store", "files", n)
+	}
+	return err
 }
 
 // hearOtherServers wakes this server's waiters when a write was made

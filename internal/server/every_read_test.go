@@ -746,34 +746,18 @@ func dayOffset(n int) string { return time.Now().UTC().AddDate(0, 0, n).Format("
 // recording neither asked nor excused.
 func (rw *richWorkspace) everyGetRouteWasCalled() {
 	rw.t.Helper()
-	files, _ := filepath.Glob("*.go")
-	plain := regexp.MustCompile(`HandleFunc\("GET (/[^"]*)"`)
-	inWorkspace := regexp.MustCompile(`HandleFunc\("GET "\+w\+"([^"]*)"`)
 	n := 0
-	for _, file := range files {
-		if strings.HasSuffix(file, "_test.go") {
+	for _, route := range rw.s.srv.RoutePatterns() {
+		if !strings.HasPrefix(route, "GET ") {
 			continue
 		}
-		src, err := os.ReadFile(file)
-		if err != nil {
-			rw.t.Fatal(err)
-		}
-		var routes []string
-		for _, m := range plain.FindAllStringSubmatch(string(src), -1) {
-			routes = append(routes, "GET "+m[1])
-		}
-		for _, m := range inWorkspace.FindAllStringSubmatch(string(src), -1) {
-			routes = append(routes, "GET /api/v1/w/{ws}"+m[1])
-		}
-		for _, route := range routes {
-			n++
-			if !rw.called[route] && notRecorded[route] == "" {
-				rw.t.Errorf("%s (%s) is a read the recording does not ask: add it to reads, or to notRecorded with the reason", route, file)
-			}
+		n++
+		if !rw.called[route] && notRecorded[route] == "" {
+			rw.t.Errorf("%s is a read the recording does not ask: add it to reads, or to notRecorded with the reason", route)
 		}
 	}
 	if n < 50 {
-		rw.t.Fatalf("found only %d GET routes in the source", n)
+		rw.t.Fatalf("found only %d GET routes", n)
 	}
 	// The lists: a wrong name is answered with the names there are.
 	var refusal struct {

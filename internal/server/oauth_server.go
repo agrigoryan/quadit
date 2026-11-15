@@ -27,16 +27,17 @@ import (
 // that acts as that person there. The token is an ordinary API token of
 // kind "oauth", so it shows in the token list and is revoked the same way.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /.well-known/oauth-protected-resource", s.handleDescribeProtectedResource)
-		m.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", s.handleDescribeProtectedResource)
-		m.HandleFunc("GET /.well-known/oauth-authorization-server", s.handleDescribeAuthorizationServer)
-		m.HandleFunc("POST /oauth/register", s.public(s.handleRegisterOAuthClient))
-		m.HandleFunc("GET /oauth/authorize", s.public(s.handleShowConsentPage))
-		m.HandleFunc("POST /oauth/authorize", s.public(s.handleAnswerConsentPage))
-		m.HandleFunc("POST /oauth/token", s.handleIssueOAuthToken)
-	})
+// oauthServerRoutes are the routes of the sign-in server MCP clients use.
+func (s *Server) oauthServerRoutes() []route {
+	return []route{
+		{"GET /.well-known/oauth-protected-resource", s.handleDescribeProtectedResource, "Where an MCP client signs its user in (RFC 9728).", "", "mcp"},
+		{"GET /.well-known/oauth-protected-resource/mcp", s.handleDescribeProtectedResource, "The same, at the address some clients ask.", "", "mcp"},
+		{"GET /.well-known/oauth-authorization-server", s.handleDescribeAuthorizationServer, "The sign-in server's own description (RFC 8414).", "", "mcp"},
+		{"POST /oauth/register", s.public(s.handleRegisterOAuthClient), "An MCP client registers itself (RFC 7591).", "", "mcp"},
+		{"GET /oauth/authorize", s.public(s.handleShowConsentPage), "The consent page a person sees: which client, and which agent it will work as.", "", "mcp"},
+		{"POST /oauth/authorize", s.public(s.handleAnswerConsentPage), "The person's answer on the consent page.", "", "mcp"},
+		{"POST /oauth/token", s.handleIssueOAuthToken, "Exchange a code, or a refresh token, for an access token (with PKCE).", "", "mcp"},
+	}
 }
 
 func (s *Server) handleDescribeProtectedResource(w http.ResponseWriter, _ *http.Request) {

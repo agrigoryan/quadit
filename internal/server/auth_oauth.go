@@ -20,13 +20,14 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/start", s.public(s.handleStartProviderSignIn))
-		m.HandleFunc("GET /api/v1/auth/oauth/{provider}/callback", s.public(s.handleFinishProviderSignIn))
-		m.HandleFunc("GET /api/v1/auth/identities", s.signedIn(s.handleListIdentities))
-		m.HandleFunc("DELETE /api/v1/auth/identities/{id}", s.signedIn(s.handleUnlinkIdentity))
-	})
+// providerSignInRoutes are the routes of signing in with Google, GitHub or OpenID Connect, and of the accounts linked that way.
+func (s *Server) providerSignInRoutes() []route {
+	return []route{
+		{"GET /api/v1/auth/oauth/{provider}/start", s.public(s.handleStartProviderSignIn), "Begin signing in with a provider: google, github or oidc.", "", "account"},
+		{"GET /api/v1/auth/oauth/{provider}/callback", s.public(s.handleFinishProviderSignIn), "Where a provider sends the browser back after sign-in.", "", "account"},
+		{"GET /api/v1/auth/identities", s.signedIn(s.handleListIdentities), "The provider accounts (Google, GitHub, OpenID Connect) linked to this one.", "", "account"},
+		{"DELETE /api/v1/auth/identities/{id}", s.signedIn(s.handleUnlinkIdentity), "Unlink a provider account.", "", "account"},
+	}
 }
 
 type oauthState struct {

@@ -37,11 +37,6 @@ const (
 	outcomePause = 200 * time.Millisecond // the wait before the second try; it doubles after
 )
 
-// jobKinds maps a job kind to what runs it.
-var jobKinds = map[string]func(s *Server, ctx context.Context, j core.Job) error{
-	"notify": (*Server).jobNotify,
-}
-
 // enqueue adds a job. With a dedupe name, a second job of the same name is
 // not added while the first still waits, and that is not an error.
 func (s *Server) enqueue(ctx context.Context, kind, workspaceID, dedupe string, payload any, runAt time.Time) error {

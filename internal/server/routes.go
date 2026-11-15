@@ -16,73 +16,122 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// The core routes of the API, and /list/{collection}: one kind of row as
-// stored (the kinds are in rowkinds.go). Other files add their own routes
-// through extraRoutes.
+// The server's routes: what each is, the one list of them all, the core
+// routes, and /list/{collection}: one kind of row as stored (the kinds are
+// in rowkinds.go).
 
-// routes makes the server's mux: the routes listed here, then those the
-// feature files add (addFeatureRoutes).
+// route is one address the server answers, with the words that describe
+// it in openapi.json. The mux and the description are both made from the
+// list of routes, so nothing is answered that is not described.
+type route struct {
+	// pattern is the method and the path, as http.ServeMux takes them.
+	// {ws} is the workspace, described as {workspace}; a last {name...}
+	// takes the rest of the path.
+	pattern string
+	// handler answers, wrapped in the check of who may call it: public,
+	// signedIn, firstStepPassed, workspaceMember, installAdmin; none for a
+	// route that checks its caller itself or takes anyone.
+	handler http.HandlerFunc
+	summary string // what it does, for whoever calls it
+	query   string // its query parameters: "name: what it does; name2: …"
+	tag     string // the group it is listed under
+}
+
+// allRoutes is every route the server answers: the core routes below,
+// then each feature's, declared beside its handlers.
+func (s *Server) allRoutes() []route {
+	return slices.Concat(
+		s.coreRoutes(),
+		s.authRoutes(),           // auth.go
+		s.passkeyRoutes(),        // auth_passkeys.go
+		s.providerSignInRoutes(), // auth_oauth.go
+		s.adminRoutes(),          // admin.go
+		s.backupRoutes(),         // backups.go
+		s.pageRoutes(),           // docs.go
+		s.sourceRoutes(),         // reposync.go
+		s.dashboardRoutes(),      // dashboard.go
+		s.pictureRoutes(),        // picture.go
+		s.exportRoutes(),         // export.go
+		s.importRoutes(),         // importing.go
+		s.webhookRoutes(),        // dispatch.go
+		s.githubRoutes(),         // github.go
+		s.secretRoutes(),         // secrets.go
+		s.pushRoutes(),           // push.go
+		s.eventTypeRoutes(),      // eventtypes.go
+		s.mcpRoutes(),            // mcp.go
+		s.oauthServerRoutes(),    // oauth_server.go
+		s.openAPIRoutes(),        // openapi.go
+	)
+}
+
+// routes makes the server's mux from allRoutes. Two routes with the same
+// pattern panic here, when the server is made.
 func (s *Server) routes() {
 	m := http.NewServeMux()
+	for _, rt := range s.allRoutes() {
+		m.HandleFunc(rt.pattern, rt.handler)
+	}
 	s.mux = m
-	// Monitoring: no sign-in.
-	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { fmt.Fprintln(w, "ok") })
-	m.HandleFunc("GET /readyz", s.handleCheckReadiness)
-	m.HandleFunc("GET /metrics", s.handleShowMetrics)
-
-	// Signing in and the account, outside any workspace.
-	m.HandleFunc("GET /api/v1/auth/config", s.public(s.handleShowSignInOptions))
-	m.HandleFunc("POST /api/v1/auth/setup", s.public(s.handleSetUpInstall))
-	m.HandleFunc("POST /api/v1/auth/login", s.public(s.handleSignIn))
-	m.HandleFunc("POST /api/v1/auth/logout", s.public(s.handleSignOut))
-	m.HandleFunc("GET /api/v1/auth/me", s.signedIn(s.handleShowAccount))
-	m.HandleFunc("PATCH /api/v1/auth/me", s.signedIn(s.handleUpdateProfile))
-	m.HandleFunc("POST /api/v1/auth/password", s.signedIn(s.handleChangePassword))
-	m.HandleFunc("GET /api/v1/auth/sessions", s.signedIn(s.handleListSessions))
-	m.HandleFunc("DELETE /api/v1/auth/sessions/{id}", s.signedIn(s.handleRevokeSession))
-	m.HandleFunc("POST /api/v1/workspaces", s.signedIn(s.handleCreateWorkspace))
-	m.HandleFunc("GET /api/v1/changes", s.public(s.handleDescribeChangeTypes))
-
-	// Inside a workspace: every write is a change; the rest are reads.
-	const w = "/api/v1/w/{ws}"
-	m.HandleFunc("POST "+w+"/changes", s.workspaceMember(s.handleApplyChanges))
-	m.HandleFunc("GET "+w+"/bootstrap", s.workspaceMember(s.handleBootstrapLocalCopy))
-	// Orientation and the feed.
-	m.HandleFunc("GET "+w+"/me", s.workspaceMember(s.handleShowWhoAmI))
-	m.HandleFunc("GET "+w+"/my-work", s.workspaceMember(s.handleShowMyWork))
-	m.HandleFunc("GET "+w+"/events", s.workspaceMember(s.handleReadFeed))
-	m.HandleFunc("GET "+w+"/events/stream", s.workspaceMember(s.handleStreamFeed))
-	m.HandleFunc("GET "+w+"/cursors/{name}", s.workspaceMember(s.handleShowFeedCursor))
-	m.HandleFunc("PUT "+w+"/cursors/{name}", s.workspaceMember(s.handleMoveFeedCursor))
-	// Finding tasks, decisions and rows.
-	m.HandleFunc("GET "+w+"/tasks", s.workspaceMember(s.handleListTasks))
-	m.HandleFunc("GET "+w+"/tasks/{ref}", s.workspaceMember(s.handleShowTask))
-	m.HandleFunc("GET "+w+"/tasks/{ref}/context", s.workspaceMember(s.handleShowTaskContext))
-	m.HandleFunc("GET "+w+"/inbox", s.workspaceMember(s.handleListInbox))
-	m.HandleFunc("GET "+w+"/search", s.workspaceMember(s.handleSearch))
-	m.HandleFunc("GET "+w+"/decisions", s.workspaceMember(s.handleListDecisions))
-	m.HandleFunc("GET "+w+"/projects/{key}/layout", s.workspaceMember(s.handleShowProjectLayout))
-	m.HandleFunc("GET "+w+"/list/{collection}", s.workspaceMember(s.handleListCollection))
-	// Tokens and files.
-	m.HandleFunc("GET "+w+"/tokens", s.workspaceMember(s.handleListTokens))
-	m.HandleFunc("POST "+w+"/tokens", s.workspaceMember(s.handleCreateToken))
-	m.HandleFunc("DELETE "+w+"/tokens/{id}", s.workspaceMember(s.handleRevokeToken))
-	m.HandleFunc("POST "+w+"/files", s.workspaceMember(s.handleUploadFile))
-	m.HandleFunc("PATCH "+w+"/files/{id}", s.workspaceMember(s.handleUploadFilePart))
-	m.HandleFunc("GET "+w+"/files/{id}", s.workspaceMember(s.handleShowFile))
-	m.HandleFunc("GET /f/{id}/{name...}", s.signedIn(s.handleServeFile))
-	s.addFeatureRoutes(m)
 }
 
-// addFeatureRoutes registers the routes added by other files of this package.
-func (s *Server) addFeatureRoutes(m *http.ServeMux) {
-	for _, add := range extraRoutes {
-		add(s, m)
+// taskFilters are the query parameters that narrow a list of tasks, and
+// the feed to the events of matching tasks.
+const taskFilters = "project: key; assignee: me, @handle or none; status: name or category; open: true; waiting_on: me or @handle; label: name; " +
+	"epic: name or none; cycle: current, next, number or none; priority: 1-4; has_open_decision: true; asked: member; changed_since: feed position; " +
+	"mentions: member; watching: true; q: text in the title; parent: task key; sort: created, -created, rank, priority, due, -activity, -updated, key; limit; offset"
+
+// coreRoutes are monitoring, signing in and the account, and the core of a
+// workspace: changes, the feed, finding tasks, tokens and files.
+func (s *Server) coreRoutes() []route {
+	const w = "/api/v1/w/{ws}"
+	return []route{
+		// Monitoring: no sign-in.
+		{"GET /healthz", func(w http.ResponseWriter, _ *http.Request) { fmt.Fprintln(w, "ok") }, "The process is up.", "", "monitoring"},
+		{"GET /readyz", s.handleCheckReadiness, "The database and the file store answer.", "", "monitoring"},
+		{"GET /metrics", s.handleShowMetrics, "Counters in the Prometheus text format.", "", "monitoring"},
+
+		// Signing in and the account, outside any workspace.
+		{"GET /api/v1/auth/config", s.public(s.handleShowSignInOptions), "What this install offers for signing in, and whether it has been set up.", "", "account"},
+		{"POST /api/v1/auth/setup", s.public(s.handleSetUpInstall), "First run: make the first person and workspace. Body: {name, email, password, workspace_name}.", "", "account"},
+		{"POST /api/v1/auth/login", s.public(s.handleSignIn), "Sign in with email and password. Body: {email, password}. Answers with a session cookie; with two-step on, the second step follows.", "", "account"},
+		{"POST /api/v1/auth/logout", s.public(s.handleSignOut), "Sign out of this session.", "", "account"},
+		{"GET /api/v1/auth/me", s.signedIn(s.handleShowAccount), "The signed-in account and the workspaces it is in.", "", "account"},
+		{"PATCH /api/v1/auth/me", s.signedIn(s.handleUpdateProfile), "Change the profile: {name, avatar, timezone, theme, locale}; {email, password} changes the sign-in address.", "", "account"},
+		{"POST /api/v1/auth/password", s.signedIn(s.handleChangePassword), "Change the password. Body: {current, new}. Signed in only.", "", "account"},
+		{"GET /api/v1/auth/sessions", s.signedIn(s.handleListSessions), "The devices signed in to this account.", "", "account"},
+		{"DELETE /api/v1/auth/sessions/{id}", s.signedIn(s.handleRevokeSession), "Sign one device out.", "", "account"},
+		{"POST /api/v1/workspaces", s.signedIn(s.handleCreateWorkspace), "Make a workspace. Body: {name, slug}.", "", "account"},
+		{"GET /api/v1/changes", s.public(s.handleDescribeChangeTypes), "Every change type with its arguments and the least role it needs, and the surface version.", "format: text", "describe"},
+
+		// Inside a workspace: every write is a change; the rest are reads.
+		{"POST " + w + "/changes", s.workspaceMember(s.handleApplyChanges), "Apply one change, or a batch that succeeds or fails together. Body: {id, type, args} or {changes: […], dry_run}. The id is made by the caller; sending the same id again applies nothing twice. Alone or in a batch, an admin may mark a change quiet: true (history being imported): it notifies nobody, and its events say quiet.", "events: true to get the events back; dry_run: true to check without writing", "write"},
+		{"GET " + w + "/bootstrap", s.workspaceMember(s.handleBootstrapLocalCopy), "The whole workspace as rows, for a client that keeps a local copy and then follows the feed.", "", "sync"},
+		// Orientation and the feed.
+		{"GET " + w + "/me", s.workspaceMember(s.handleShowWhoAmI), "Who am I: role, projects, what needs approval, budget left, unread count, feed position, cursors.", "", "orient"},
+		{"GET " + w + "/my-work", s.workspaceMember(s.handleShowMyWork), "What waits on me, questions asked of me, tasks assigned to me, my unread inbox.", "", "orient"},
+		{"GET " + w + "/events", s.workspaceMember(s.handleReadFeed), "The change feed after a position. wait holds the request until something matching arrives. Task filters narrow it to the events of matching tasks.", "after: feed position; cursor: name of a server-kept cursor; ack: move that cursor to this position first; wait: seconds, up to 55; mine: true; others: true; inbox: true; task: key; types: comma-separated; compact: true for one line per event; " + taskFilters, "follow"},
+		{"GET " + w + "/events/stream", s.workspaceMember(s.handleStreamFeed), "The live stream (server-sent events), one message per feed event.", "after: feed position", "follow"},
+		{"GET " + w + "/cursors/{name}", s.workspaceMember(s.handleShowFeedCursor), "Where a server-kept cursor stands.", "", "follow"},
+		{"PUT " + w + "/cursors/{name}", s.workspaceMember(s.handleMoveFeedCursor), "Mark the feed handled up to a position. Body: {seq}. A cursor never moves back.", "", "follow"},
+		// Finding tasks, decisions and rows.
+		{"GET " + w + "/tasks", s.workspaceMember(s.handleListTasks), "Find tasks. All filters combine.", taskFilters + "; view: a saved view's slug or name; cursor: next_cursor from the last answer, to read on; count: true for the number only; fields: comma-separated; raw: true for stored rows", "find"},
+		{"GET " + w + "/tasks/{ref}", s.workspaceMember(s.handleShowTask), "One task with decisions, comments, sub-tasks, relations, links and files.", "since: feed position, to get only what changed after it; full: true to not cut long text; max_chars; raw: true", "find"},
+		{"GET " + w + "/tasks/{ref}/context", s.workspaceMember(s.handleShowTaskContext), "The context pack: the task, its parents, epic, standing preferences, recent decisions, linked docs.", "full: true", "find"},
+		{"GET " + w + "/inbox", s.workspaceMember(s.handleListInbox), "The caller's inbox.", "all: true to include read items; limit", "find"},
+		{"GET " + w + "/search", s.workspaceMember(s.handleSearch), "Full-text search across tasks, decisions, comments and docs.", "q: text; kind: task, comment, decision, doc; limit", "find"},
+		{"GET " + w + "/decisions", s.workspaceMember(s.handleListDecisions), "The decision log.", "state: answered, open, picked, sent_back, all; project; q; asked; trash: true for deleted ones; limit; offset", "find"},
+		{"GET " + w + "/projects/{key}/layout", s.workspaceMember(s.handleShowProjectLayout), "A project's statuses, labels, members, epics, cycles and templates, by name.", "", "orient"},
+		{"GET " + w + "/list/{collection}", s.workspaceMember(s.handleListCollection), "Rows of one kind as stored: members, projects, statuses, labels, epics, milestones, cycles, views, templates, preferences, resources, secrets, claims, sessions, relations, attachments, links, webhooks, deliveries, rules, integrations.", "project; task; trash: true; limit; offset", "sync"},
+		// Tokens and files.
+		{"GET " + w + "/tokens", s.workspaceMember(s.handleListTokens), "API tokens (one's own; all of them for admins).", "", "admin"},
+		{"POST " + w + "/tokens", s.workspaceMember(s.handleCreateToken), "Issue a token: {user, name, read_only, projects, expires_days}. The token is in the answer once.", "", "admin"},
+		{"DELETE " + w + "/tokens/{id}", s.workspaceMember(s.handleRevokeToken), "Revoke a token at once.", "", "admin"},
+		{"POST " + w + "/files", s.workspaceMember(s.handleUploadFile), "Upload a file: the body is the file, or a multipart form with a file field. With size= a large file continues with PATCH.", "name: file name; size: full size in bytes, for an upload in parts", "files"},
+		{"PATCH " + w + "/files/{id}", s.workspaceMember(s.handleUploadFilePart), "Send the next part of an upload.", "offset: bytes already received", "files"},
+		{"GET " + w + "/files/{id}", s.workspaceMember(s.handleShowFile), "A file's details and addresses.", "", "files"},
+		{"GET /f/{id}/{name...}", s.signedIn(s.handleServeFile), "A file's bytes. The name is for the reader; the id decides. /f/{id}/preview is its small preview. Takes a session or a token, and byte ranges.", "", "files"},
 	}
 }
-
-// extraRoutes lets each feature file add its routes from an init function.
-var extraRoutes []func(s *Server, m *http.ServeMux)
 
 // handleCheckReadiness answers "ready" when the database answers within
 // three seconds.

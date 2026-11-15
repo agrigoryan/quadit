@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -22,12 +21,12 @@ import (
 // database, not from the request that made the change, so nothing is lost
 // if the server restarts between a change and its wake-up.
 
-func init() {
-	runners = append(runners, (*Server).runDispatcher, (*Server).runDeliveries, (*Server).runJobs)
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/deliveries/{id}/redeliver", s.workspaceMember(s.handleResendDelivery))
-		m.HandleFunc("POST /api/v1/w/{ws}/webhooks/{id}/test", s.workspaceMember(s.handleSendTestWebhook))
-	})
+// webhookRoutes are the routes that send a webhook delivery by hand.
+func (s *Server) webhookRoutes() []route {
+	return []route{
+		{"POST /api/v1/w/{ws}/deliveries/{id}/redeliver", s.workspaceMember(s.handleResendDelivery), "Send a webhook delivery again. Admins.", "", "admin"},
+		{"POST /api/v1/w/{ws}/webhooks/{id}/test", s.workspaceMember(s.handleSendTestWebhook), "Send a sample event to a webhook now and answer with what it said. Admins.", "", "admin"},
+	}
 }
 
 // Timing and size of the dispatcher's passes.

@@ -1,23 +1,19 @@
 package server
 
 import (
-	"context"
-	"net/http"
-
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// The routes and the timer of repository sources, whose syncing is
-// package reposync.
+// The routes of repository sources, whose syncing is package reposync.
 
-func init() {
-	runners = append(runners, func(s *Server, ctx context.Context) { s.repos.Run(ctx) })
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/sources/{id}/sync", s.workspaceMember(s.handleSyncSource))
-		m.HandleFunc("GET /api/v1/w/{ws}/sources", s.workspaceMember(s.handleListSources))
-	})
+// sourceRoutes are the routes of repository sources.
+func (s *Server) sourceRoutes() []route {
+	return []route{
+		{"POST /api/v1/w/{ws}/sources/{id}/sync", s.workspaceMember(s.handleSyncSource), "Sync one repository source now; answers with what moved each way.", "", "docs"},
+		{"GET /api/v1/w/{ws}/sources", s.workspaceMember(s.handleListSources), "The repository sources that pages sync with, with their last sync and error.", "", "docs"},
+	}
 }
 
 // handleListSources lists the workspace's repository sources.

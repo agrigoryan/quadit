@@ -36,13 +36,13 @@ import (
 //	github_issues.go  labeled issues, made into tasks
 //	github_client.go  asking GitHub's REST API; sign-in with GitHub uses it too
 
-func init() {
-	runners = append(runners, (*Server).runGitHub)
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /hooks/github/{id}", s.handleReceiveGitHubEvent)
-		m.HandleFunc("POST /api/v1/w/{ws}/integrations/{id}/sync", s.workspaceMember(s.handleSyncIntegration))
-		m.HandleFunc("GET /api/v1/w/{ws}/integrations/{id}/webhook", s.workspaceMember(s.handleShowIntegrationWebhook))
-	})
+// githubRoutes are the routes of GitHub integrations: GitHub's calls in, and syncing by hand.
+func (s *Server) githubRoutes() []route {
+	return []route{
+		{"POST /hooks/github/{id}", s.handleReceiveGitHubEvent, "Where GitHub sends events for an integration, signed with its secret.", "", "integrations"},
+		{"POST /api/v1/w/{ws}/integrations/{id}/sync", s.workspaceMember(s.handleSyncIntegration), "Sync one integration now. Admins.", "", "admin"},
+		{"GET /api/v1/w/{ws}/integrations/{id}/webhook", s.workspaceMember(s.handleShowIntegrationWebhook), "The address and secret to give the outside service so it can call in. Admins.", "", "admin"},
+	}
 }
 
 // githubConfig is what an admin sets on a GitHub integration.

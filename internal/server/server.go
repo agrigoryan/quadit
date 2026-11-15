@@ -9,11 +9,14 @@
 //	  server.go      the Server, the request context c, the route wrappers
 //	                 (public, signedIn, firstStepPassed, workspaceMember),
 //	                 sign-in by token or cookie, errors and the audit log
-//	  routes.go      the core routes, and /list/{collection}
+//	  routes.go      the route: one address with its words; allRoutes, the
+//	                 list of them all that the mux and openapi.json are both
+//	                 made from (each feature's routes are declared beside
+//	                 its handlers); the core routes, and /list/{collection}
 //	  params.go      checking number, yes/no and date parameters
 //	  gzip.go, limits.go, stats.go   compression, rate limits, metrics
 //	  inprocess.go   the server calling its own API (MCP tools, imports)
-//	  openapi.go     the description of every route (openapi.json)
+//	  openapi.go     openapi.json, made from allRoutes
 //	  settings.go, admin.go          install settings and administration
 //	Sign-in
 //	  auth.go, auth_totp.go, auth_reset.go, auth_invites.go,
@@ -35,7 +38,8 @@
 //	  changes.go     POST /changes: the engine applies, this audits
 //	  eventtypes.go  the event types the feed carries
 //	Background work
-//	  run.go         Run and the list of background loops
+//	  run.go         Run, the list of background loops it starts and the
+//	                 list of kinds of job
 //	  jobs.go, dispatch.go, deliveries.go, push.go, backups.go
 //	Integrations
 //	  github*.go, reposync.go (routes of package reposync: pages kept in a git repository), secrets.go

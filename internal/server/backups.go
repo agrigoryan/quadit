@@ -23,16 +23,14 @@ import (
 // Backups on a schedule and on request, restoring one item from a backup,
 // and the daily emptying of the trash.
 
-func init() {
-	runners = append(runners, (*Server).runSchedule)
-	jobKinds["backup"] = (*Server).jobBackup
-	jobKinds["trash.purge"] = (*Server).jobPurgeTrash
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleListBackups)))
-		m.HandleFunc("POST /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleCreateBackup)))
-		m.HandleFunc("POST /api/v1/admin/backups/{id}/restore-item", s.signedIn(s.installAdmin(s.handleRestoreItemFromBackup)))
-		m.HandleFunc("GET /api/v1/admin/backups/{id}/download", s.signedIn(s.installAdmin(s.handleDownloadBackup)))
-	})
+// backupRoutes are the routes of the install's backups.
+func (s *Server) backupRoutes() []route {
+	return []route{
+		{"GET /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleListBackups)), "The backups taken.", "", "install"},
+		{"POST /api/v1/admin/backups", s.signedIn(s.installAdmin(s.handleCreateBackup)), "Take a backup now.", "", "install"},
+		{"POST /api/v1/admin/backups/{id}/restore-item", s.signedIn(s.installAdmin(s.handleRestoreItemFromBackup)), "Bring one task or page back from a backup, as it was then. Body: {workspace, task} or {workspace, doc}.", "", "install"},
+		{"GET /api/v1/admin/backups/{id}/download", s.signedIn(s.installAdmin(s.handleDownloadBackup)), "Download a backup archive.", "", "install"},
+	}
 }
 
 // How long what is thrown away is kept.

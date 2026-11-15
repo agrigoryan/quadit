@@ -1,13 +1,12 @@
 package server
 
-import "net/http"
-
 // The event types the feed carries, and GET /api/v1/events/types.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/events/types", s.public(func(x *c) error { return x.ok(map[string]any{"types": eventTypes}) }))
-	})
+// eventTypeRoutes is the route that lists the event types.
+func (s *Server) eventTypeRoutes() []route {
+	return []route{
+		{"GET /api/v1/events/types", s.public(func(x *c) error { return x.ok(map[string]any{"types": eventTypes}) }), "Every event type the feed can carry.", "", "describe"},
+	}
 }
 
 // eventTypes lists the kinds of event the feed carries, for pickers in

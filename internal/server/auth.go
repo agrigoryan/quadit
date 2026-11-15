@@ -18,26 +18,26 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// The routes of the second step, password reset, registration and
-// invitations: auth_totp.go, auth_reset.go, auth_invites.go.
-
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/auth/second-step", s.firstStepPassed(s.handleFinishSecondStep))
-		m.HandleFunc("POST /api/v1/auth/totp/start", s.signedIn(s.handleStartTwoStepSetup))
-		m.HandleFunc("POST /api/v1/auth/totp/enable", s.signedIn(s.handleEnableTwoStep))
-		m.HandleFunc("POST /api/v1/auth/totp/disable", s.signedIn(s.handleDisableTwoStep))
-		m.HandleFunc("POST /api/v1/auth/recovery-codes", s.signedIn(s.handleRenewRecoveryCodes))
-		m.HandleFunc("POST /api/v1/auth/reset/request", s.public(s.handleRequestPasswordReset))
-		m.HandleFunc("POST /api/v1/auth/reset/confirm", s.public(s.handleConfirmPasswordReset))
-		m.HandleFunc("POST /api/v1/auth/register", s.public(s.handleRegisterAccount))
-		m.HandleFunc("GET /api/v1/auth/invite/{token}", s.public(s.handleShowInvite))
-		m.HandleFunc("POST /api/v1/auth/invite/{token}", s.public(s.handleAcceptInvite))
-		const w = "/api/v1/w/{ws}"
-		m.HandleFunc("GET "+w+"/invites", s.workspaceMember(s.handleListInvites))
-		m.HandleFunc("POST "+w+"/invites", s.workspaceMember(s.handleCreateInvite))
-		m.HandleFunc("DELETE "+w+"/invites/{id}", s.workspaceMember(s.handleRevokeInvite))
-	})
+// authRoutes are the routes of the second step, password reset,
+// registration and invitations, whose handlers are in auth_totp.go,
+// auth_reset.go and auth_invites.go.
+func (s *Server) authRoutes() []route {
+	const w = "/api/v1/w/{ws}"
+	return []route{
+		{"POST /api/v1/auth/second-step", s.firstStepPassed(s.handleFinishSecondStep), "Finish signing in with an authenticator code or a recovery code. Body: {code}.", "", "account"},
+		{"POST /api/v1/auth/totp/start", s.signedIn(s.handleStartTwoStepSetup), "Begin setting up two-step codes; answers with the secret to scan.", "", "account"},
+		{"POST /api/v1/auth/totp/enable", s.signedIn(s.handleEnableTwoStep), "Turn two-step on with a first code. Body: {code}. Answers with recovery codes.", "", "account"},
+		{"POST /api/v1/auth/totp/disable", s.signedIn(s.handleDisableTwoStep), "Turn two-step off. Body: {code} or {password}.", "", "account"},
+		{"POST /api/v1/auth/recovery-codes", s.signedIn(s.handleRenewRecoveryCodes), "Make a new set of recovery codes. Body: {code}, a current code.", "", "account"},
+		{"POST /api/v1/auth/reset/request", s.public(s.handleRequestPasswordReset), "Ask for a password reset by mail. Body: {email}.", "", "account"},
+		{"POST /api/v1/auth/reset/confirm", s.public(s.handleConfirmPasswordReset), "Set a new password with the mailed token. Body: {token, password}.", "", "account"},
+		{"POST /api/v1/auth/register", s.public(s.handleRegisterAccount), "Make an account, when open registration is on. Body: {name, email, password}.", "", "account"},
+		{"GET /api/v1/auth/invite/{token}", s.public(s.handleShowInvite), "What an invitation is for.", "", "account"},
+		{"POST /api/v1/auth/invite/{token}", s.public(s.handleAcceptInvite), "Accept an invitation, making an account if needed. Body: {name, email, password}.", "", "account"},
+		{"GET " + w + "/invites", s.workspaceMember(s.handleListInvites), "Open invitations.", "", "admin"},
+		{"POST " + w + "/invites", s.workspaceMember(s.handleCreateInvite), "Invite by link or email: {email, role, expires_days, max_uses}.", "", "admin"},
+		{"DELETE " + w + "/invites/{id}", s.workspaceMember(s.handleRevokeInvite), "Withdraw an invitation. Admins.", "", "admin"},
+	}
 }
 
 const sessionLife = 30 * 24 * time.Hour

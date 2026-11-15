@@ -8,192 +8,37 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 )
 
-// GET /api/v1/openapi.json: every route described in words, as OpenAPI.
+// GET /api/v1/openapi.json: every route described in words, as OpenAPI,
+// from the words each route carries.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/openapi.json", s.handleDescribeAPI)
-	})
+// openAPIRoutes is the route of the API's description.
+func (s *Server) openAPIRoutes() []route {
+	return []route{
+		{"GET /api/v1/openapi.json", s.handleDescribeAPI, "This document.", "", "describe"},
+	}
 }
 
-// apiOperation is one operation of the API, described for the OpenAPI document.
-type apiOperation struct {
-	Method, Path, Summary string
-	Query                 string // "name: what it does; name2: …"
-	Tag                   string
-}
-
-const taskFilters = "project: key; assignee: me, @handle or none; status: name or category; open: true; waiting_on: me or @handle; label: name; " +
-	"epic: name or none; cycle: current, next, number or none; priority: 1-4; has_open_decision: true; asked: member; changed_since: feed position; " +
-	"mentions: member; watching: true; q: text in the title; parent: task key; sort: created, -created, rank, priority, due, -activity, -updated, key; limit; offset"
-
-// apiOps is the read surface and the few write endpoints that are not
-// changes. Every other write is a change, described from the engine's catalog.
-var apiOps = []apiOperation{
-	{"POST", "/changes", "Apply one change, or a batch that succeeds or fails together. Body: {id, type, args} or {changes: […], dry_run}. " +
-		"The id is made by the caller; sending the same id again applies nothing twice. " +
-		"Alone or in a batch, an admin may mark a change quiet: true (history being imported): it notifies nobody, and its events say quiet.", "events: true to get the events back; dry_run: true to check without writing", "write"},
-	{"GET", "/me", "Who am I: role, projects, what needs approval, budget left, unread count, feed position, cursors.", "", "orient"},
-	{"GET", "/my-work", "What waits on me, questions asked of me, tasks assigned to me, my unread inbox.", "", "orient"},
-	{"GET", "/projects/{key}/layout", "A project's statuses, labels, members, epics, cycles and templates, by name.", "", "orient"},
-	{"GET", "/tasks", "Find tasks. All filters combine.", taskFilters + "; view: a saved view's slug or name; cursor: next_cursor from the last answer, to read on; count: true for the number only; fields: comma-separated; raw: true for stored rows", "find"},
-	{"GET", "/tasks/{ref}", "One task with decisions, comments, sub-tasks, relations, links and files.", "since: feed position, to get only what changed after it; full: true to not cut long text; max_chars; raw: true", "find"},
-	{"GET", "/tasks/{ref}/context", "The context pack: the task, its parents, epic, standing preferences, recent decisions, linked docs.", "full: true", "find"},
-	{"GET", "/search", "Full-text search across tasks, decisions, comments and docs.", "q: text; kind: task, comment, decision, doc; limit", "find"},
-	{"GET", "/decisions", "The decision log.", "state: answered, open, picked, sent_back, all; project; q; asked; trash: true for deleted ones; limit; offset", "find"},
-	{"DELETE", "/invites/{id}", "Withdraw an invitation. Admins.", "", "admin"},
-	{"GET", "/sources", "The repository sources that pages sync with, with their last sync and error.", "", "docs"},
-	{"POST", "/sources/{id}/sync", "Sync one repository source now; answers with what moved each way.", "", "docs"},
-	{"POST", "/integrations/{id}/sync", "Sync one integration now. Admins.", "", "admin"},
-	{"GET", "/integrations/{id}/webhook", "The address and secret to give the outside service so it can call in. Admins.", "", "admin"},
-	{"POST", "/webhooks/{id}/test", "Send a sample event to a webhook now and answer with what it said. Admins.", "", "admin"},
-	{"POST", "/deliveries/{id}/redeliver", "Send a webhook delivery again. Admins.", "", "admin"},
-	{"POST", "/import", "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace, session}, dry_run}. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
-	{"GET", "/audit", "This workspace's part of the audit log, newest first. Admins.", "action; actor; cursor: the last id seen; before; after; limit; format: csv", "admin"},
-	{"GET", "/secrets", "The secrets the caller may use: names, hosts and what they are for. Values are never returned.", "", "secrets"},
-	{"POST", "/secrets/{name}/request", "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; the value is blanked out of the answer.", "", "secrets"},
-	{"POST", "/secrets/env", "For a companion's token made for secrets: the values of secrets marked env. Body: {names}.", "", "secrets"},
-	{"GET", "/inbox", "The caller's inbox.", "all: true to include read items; limit", "find"},
-	{"GET", "/events", "The change feed after a position. wait holds the request until something matching arrives. Task filters narrow it to the events of matching tasks.",
-		"after: feed position; cursor: name of a server-kept cursor; ack: move that cursor to this position first; wait: seconds, up to 55; mine: true; others: true; " +
-			"inbox: true; task: key; types: comma-separated; compact: true for one line per event; " + taskFilters, "follow"},
-	{"GET", "/events/stream", "The live stream (server-sent events), one message per feed event.", "after: feed position", "follow"},
-	{"GET", "/cursors/{name}", "Where a server-kept cursor stands.", "", "follow"},
-	{"PUT", "/cursors/{name}", "Mark the feed handled up to a position. Body: {seq}. A cursor never moves back.", "", "follow"},
-	{"GET", "/bootstrap", "The whole workspace as rows, for a client that keeps a local copy and then follows the feed.", "", "sync"},
-	{"GET", "/list/{collection}", "Rows of one kind as stored: members, projects, statuses, labels, epics, milestones, cycles, views, templates, preferences, resources, secrets, claims, sessions, relations, attachments, links, webhooks, deliveries, rules, integrations.",
-		"project; task; trash: true; limit; offset", "sync"},
-	{"GET", "/dashboard", "Where everything stands: waiting on me, epics with progress, flow, agents, recent decisions, health.", "project: key", "oversight"},
-	{"GET", "/agents", "What every agent is doing now, and whether anything is listening for it.", "", "oversight"},
-	{"GET", "/cycles/{id}/chart", "A cycle's scope against done, day by day.", "", "oversight"},
-	{"GET", "/docs", "The page tree.", "", "docs"},
-	{"GET", "/docs/{id}", "One page: rows for the editor, or Markdown with format=md.", "format: md or text; full: true", "docs"},
-	{"GET", "/docs/{id}/versions", "A page's kept versions.", "", "docs"},
-	{"GET", "/docs/{id}/versions/{version}", "One version's content.", "format: md", "docs"},
-	{"GET", "/docs/{id}/rows", "A database's rows with formulas and rollups worked out.", "filter: Prop:op:value, comma-separated; sort: Prop or -Prop; view: name", "docs"},
-	{"POST", "/docs/{id}/presence", "Say which block I am in; returns who else is in the page. Body: {block}.", "", "docs"},
-	{"GET", "/memory", "An agent's notes from earlier sessions, as Markdown.", "agent: @handle (default: the caller)", "docs"},
-	{"POST", "/memory", "Save a note: {title, markdown, mode}.", "", "docs"},
-	{"POST", "/files", "Upload a file: the body is the file, or a multipart form with a file field. With size= a large file continues with PATCH.", "name: file name; size: full size in bytes, for an upload in parts", "files"},
-	{"PATCH", "/files/{id}", "Send the next part of an upload.", "offset: bytes already received", "files"},
-	{"GET", "/files/{id}", "A file's details and addresses.", "", "files"},
-	{"GET", "/render", "A PNG of a task or page as a person sees it.", "task: key; doc: id; width: 390 for a phone, 1280 for a desktop; height: of the picture, in place of the usual 900 (844 on a phone); full: true for the whole page however long (to 8000); theme: dark", "files"},
-	{"GET", "/tokens", "API tokens (one's own; all of them for admins).", "", "admin"},
-	{"POST", "/tokens", "Issue a token: {user, name, read_only, projects, expires_days}. The token is in the answer once.", "", "admin"},
-	{"DELETE", "/tokens/{id}", "Revoke a token at once.", "", "admin"},
-	{"GET", "/invites", "Open invitations.", "", "admin"},
-	{"POST", "/invites", "Invite by link or email: {email, role, expires_days, max_uses}.", "", "admin"},
-	{"GET", "/export", "The whole workspace as a zip of Markdown, JSON and the original files.", "", "admin"},
-}
-
-// installOps are the calls outside any workspace: accounts and sign-in, and
-// the install's own administration. An agent seldom needs them; a script
-// that sets an install up does.
-var installOps = []apiOperation{
-	{"GET", "/auth/config", "What this install offers for signing in, and whether it has been set up.", "", "account"},
-	{"POST", "/auth/setup", "First run: make the first person and workspace. Body: {name, email, password, workspace_name}.", "", "account"},
-	{"POST", "/auth/login", "Sign in with email and password. Body: {email, password}. Answers with a session cookie; with two-step on, the second step follows.", "", "account"},
-	{"POST", "/auth/second-step", "Finish signing in with an authenticator code or a recovery code. Body: {code}.", "", "account"},
-	{"POST", "/auth/logout", "Sign out of this session.", "", "account"},
-	{"GET", "/auth/me", "The signed-in account and the workspaces it is in.", "", "account"},
-	{"PATCH", "/auth/me", "Change the profile: {name, avatar, timezone, theme, locale}; {email, password} changes the sign-in address.", "", "account"},
-	{"POST", "/auth/password", "Change the password. Body: {current, new}. Signed in only.", "", "account"},
-	{"POST", "/auth/register", "Make an account, when open registration is on. Body: {name, email, password}.", "", "account"},
-	{"GET", "/auth/invite/{token}", "What an invitation is for.", "", "account"},
-	{"POST", "/auth/invite/{token}", "Accept an invitation, making an account if needed. Body: {name, email, password}.", "", "account"},
-	{"POST", "/auth/reset/request", "Ask for a password reset by mail. Body: {email}.", "", "account"},
-	{"POST", "/auth/reset/confirm", "Set a new password with the mailed token. Body: {token, password}.", "", "account"},
-	{"GET", "/auth/sessions", "The devices signed in to this account.", "", "account"},
-	{"DELETE", "/auth/sessions/{id}", "Sign one device out.", "", "account"},
-	{"POST", "/auth/totp/start", "Begin setting up two-step codes; answers with the secret to scan.", "", "account"},
-	{"POST", "/auth/totp/enable", "Turn two-step on with a first code. Body: {code}. Answers with recovery codes.", "", "account"},
-	{"POST", "/auth/totp/disable", "Turn two-step off. Body: {code} or {password}.", "", "account"},
-	{"POST", "/auth/recovery-codes", "Make a new set of recovery codes. Body: {code}, a current code.", "", "account"},
-	{"GET", "/auth/passkeys", "The account's passkeys.", "", "account"},
-	{"GET", "/auth/identities", "The provider accounts (Google, GitHub, OpenID Connect) linked to this one.", "", "account"},
-	{"GET", "/auth/oauth/{provider}/start", "Begin signing in with a provider: google, github or oidc.", "", "account"},
-	{"POST", "/workspaces", "Make a workspace. Body: {name, slug}.", "", "account"},
-	{"GET", "/push/key", "The key a browser needs to subscribe to push notifications.", "", "account"},
-	{"POST", "/push/subscriptions", "Register this browser for push. Body: the browser's subscription {endpoint, keys}.", "", "account"},
-	{"POST", "/push/test", "Send a test notification to this account's browsers.", "", "account"},
-	{"DELETE", "/auth/identities/{id}", "Unlink a provider account.", "", "account"},
-	{"POST", "/auth/passkeys/register/start", "Begin adding a passkey: answers with what the browser's WebAuthn call needs.", "", "account"},
-	{"POST", "/auth/passkeys/register/finish", "Finish adding a passkey with the browser's answer.", "", "account"},
-	{"POST", "/auth/passkeys/login/start", "Begin signing in with a passkey.", "", "account"},
-	{"POST", "/auth/passkeys/login/finish", "Finish signing in with a passkey.", "", "account"},
-	{"PATCH", "/auth/passkeys/{id}", "Rename a passkey. Body: {name}.", "", "account"},
-	{"DELETE", "/auth/passkeys/{id}", "Remove a passkey.", "", "account"},
-	{"GET", "/auth/oauth/{provider}/callback", "Where a provider sends the browser back after sign-in.", "", "account"},
-	{"GET", "/auth/render-session", "Used by the server's own browser when it takes a picture of a page.", "token", "account"},
-	{"DELETE", "/push/subscriptions", "Stop push to this browser. Body: {endpoint}.", "", "account"},
-	{"GET", "/changes", "Every change type with its arguments and the least role it needs, and the surface version.", "format: text", "describe"},
-	{"GET", "/events/types", "Every event type the feed can carry.", "", "describe"},
-	{"GET", "/openapi.json", "This document.", "", "describe"},
-	{"GET", "/admin/backups/{id}/download", "Download a backup archive.", "", "install"},
-	{"GET", "/admin/settings", "The install's settings; secrets are blanked.", "", "install"},
-	{"PUT", "/admin/settings/{name}", "Set one setting. Body: its JSON value.", "", "install"},
-	{"POST", "/admin/mail/test", "Send a test message through the mail server. Body: {to}.", "", "install"},
-	{"GET", "/admin/users", "Every account on the install.", "kind: person or agent", "install"},
-	{"PATCH", "/admin/users/{id}", "Disable or enable an account, or change who runs the install. Body: {disabled, is_admin}.", "", "install"},
-	{"GET", "/admin/workspaces", "Every workspace, deleted ones included for the 30 days they can be restored.", "", "install"},
-	{"POST", "/admin/workspaces/{id}/join", "Become an admin of a workspace, on the record.", "", "install"},
-	{"POST", "/admin/workspaces/{id}/restore", "Bring a deleted workspace back.", "", "install"},
-	{"GET", "/admin/audit", "The install's audit log, newest first.", "action: a name, * for any run of letters; actor; workspace; cursor: the last id seen; limit; format: csv", "install"},
-	{"GET", "/admin/health", "What is failing or waiting behind the scenes.", "", "install"},
-	{"GET", "/admin/backups", "The backups taken.", "", "install"},
-	{"POST", "/admin/backups", "Take a backup now.", "", "install"},
-	{"POST", "/admin/backups/{id}/restore-item", "Bring one task or page back from a backup, as it was then. Body: {workspace, task} or {workspace, doc}.", "", "install"},
-}
-
-// rootOps are the addresses outside /api/v1: files, the MCP endpoint and
-// its sign-in, incoming GitHub events, and what monitoring reads.
-var rootOps = []apiOperation{
-	{"GET", "/f/{id}/{name}", "A file's bytes. The name is for the reader; the id decides. /f/{id}/preview is its small preview. Takes a session or a token, and byte ranges.", "", "files"},
-	{"POST", "/mcp", "The MCP endpoint (streamable HTTP). Takes a personal token or an OAuth token as a Bearer credential.", "", "mcp"},
-	{"GET", "/mcp", "The MCP endpoint's event stream, for clients that open one.", "", "mcp"},
-	{"GET", "/.well-known/oauth-protected-resource", "Where an MCP client signs its user in (RFC 9728).", "", "mcp"},
-	{"GET", "/.well-known/oauth-protected-resource/mcp", "The same, at the address some clients ask.", "", "mcp"},
-	{"GET", "/.well-known/oauth-authorization-server", "The sign-in server's own description (RFC 8414).", "", "mcp"},
-	{"POST", "/oauth/register", "An MCP client registers itself (RFC 7591).", "", "mcp"},
-	{"GET", "/oauth/authorize", "The consent page a person sees: which client, and which agent it will work as.", "", "mcp"},
-	{"POST", "/oauth/authorize", "The person's answer on the consent page.", "", "mcp"},
-	{"POST", "/oauth/token", "Exchange a code, or a refresh token, for an access token (with PKCE).", "", "mcp"},
-	{"POST", "/hooks/github/{id}", "Where GitHub sends events for an integration, signed with its secret.", "", "integrations"},
-	{"GET", "/healthz", "The process is up.", "", "monitoring"},
-	{"GET", "/readyz", "The database and the file store answer.", "", "monitoring"},
-	{"GET", "/metrics", "Counters in the Prometheus text format.", "", "monitoring"},
-}
-
-// handleDescribeAPI describes the API as an OpenAPI 3.1 document, built from the
-// routes above and the engine's catalog of changes.
+// handleDescribeAPI describes the API as an OpenAPI 3.1 document, built from
+// the server's routes (allRoutes) and the engine's catalog of changes.
 func (s *Server) handleDescribeAPI(w http.ResponseWriter, _ *http.Request) {
 	paths := map[string]map[string]any{}
-	add := func(path, method string, item map[string]any) {
+	for _, rt := range s.allRoutes() {
+		method, path, _ := strings.Cut(rt.pattern, " ")
+		path = strings.ReplaceAll(path, "...}", "}")
+		okAnswer := "JSON."
+		if rest, ok := strings.CutPrefix(path, "/api/v1/w/{ws}"); ok {
+			path = "/api/v1/w/{workspace}" + rest
+			okAnswer = "JSON, or one line per item as text/plain when format=text or Accept: text/plain."
+		}
+		item := describeOperation(rt, append(pathParams(path), queryParams(rt.query)...), okAnswer)
+		if path == "/api/v1/w/{workspace}/changes" {
+			item["requestBody"] = map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{
+				"oneOf": []map[string]string{{"$ref": "#/components/schemas/Change"}, {"$ref": "#/components/schemas/Batch"}}}}}}
+		}
 		if paths[path] == nil {
 			paths[path] = map[string]any{}
 		}
 		paths[path][strings.ToLower(method)] = item
-	}
-	prefixed := make([]apiOperation, 0, len(installOps)+len(rootOps))
-	for _, o := range installOps {
-		o.Path = "/api/v1" + o.Path
-		prefixed = append(prefixed, o)
-	}
-	for _, o := range append(prefixed, rootOps...) {
-		params := append(pathParams(o.Path), queryParams(o.Query)...)
-		add(o.Path, o.Method, describeOperation(o, params, "JSON."))
-	}
-	for _, o := range apiOps {
-		params := []map[string]any{{"name": "workspace", "in": "path", "required": true, "schema": map[string]string{"type": "string"},
-			"description": "The workspace's slug, or - for the workspace of the token used."}}
-		params = append(params, pathParams(o.Path)...)
-		params = append(params, queryParams(o.Query)...)
-		item := describeOperation(o, params, "JSON, or one line per item as text/plain when format=text or Accept: text/plain.")
-		if o.Path == "/changes" {
-			item["requestBody"] = map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{
-				"oneOf": []map[string]string{{"$ref": "#/components/schemas/Change"}, {"$ref": "#/components/schemas/Batch"}}}}}}
-		}
-		add("/api/v1/w/{workspace}"+o.Path, o.Method, item)
 	}
 	doc := map[string]any{
 		"openapi": "3.1.0",
@@ -214,6 +59,7 @@ func (s *Server) handleDescribeAPI(w http.ResponseWriter, _ *http.Request) {
 
 // pathParamWords says what goes in each {name} part of a path, by its name.
 var pathParamWords = map[string]string{
+	"workspace":  "The workspace's slug, or - for the workspace of the token used.",
 	"id":         "The id of the thing the path names: the word before it says what that is (a page, a webhook, a backup…).",
 	"name":       "The name of the thing the path names: a cursor's or a secret's own name, a setting's key, or a file's name (for the reader; the id decides).",
 	"token":      "The invitation's token: the last part of the link it was sent as.",
@@ -251,8 +97,8 @@ func queryParams(query string) []map[string]any {
 
 // describeOperation is one operation of the document, answering okAnswer
 // when it succeeds and an Error when it does not.
-func describeOperation(o apiOperation, params []map[string]any, okAnswer string) map[string]any {
-	return map[string]any{"summary": o.Summary, "tags": []string{o.Tag}, "parameters": params,
+func describeOperation(rt route, params []map[string]any, okAnswer string) map[string]any {
+	return map[string]any{"summary": rt.summary, "tags": []string{rt.tag}, "parameters": params,
 		"responses": map[string]any{
 			"200":     map[string]any{"description": okAnswer},
 			"default": map[string]any{"description": "A refusal.", "content": map[string]any{"application/json": map[string]any{"schema": map[string]string{"$ref": "#/components/schemas/Error"}}}},

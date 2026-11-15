@@ -21,15 +21,16 @@ import (
 // The tools are listed in mcp_tools.go and run in mcp_calls.go; they reach
 // the API through the in-process call of inprocess.go.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /mcp", s.handleServeMCP)
-		m.HandleFunc("GET /mcp", func(w http.ResponseWriter, _ *http.Request) {
+// mcpRoutes are the routes of the MCP endpoint.
+func (s *Server) mcpRoutes() []route {
+	return []route{
+		{"POST /mcp", s.handleServeMCP, "The MCP endpoint (streamable HTTP). Takes a personal token or an OAuth token as a Bearer credential.", "", "mcp"},
+		{"GET /mcp", func(w http.ResponseWriter, _ *http.Request) {
 			// No server-to-client stream is offered; clients poll with tools.
 			w.Header().Set("Allow", "POST")
 			http.Error(w, "this server answers each request directly; use POST", http.StatusMethodNotAllowed)
-		})
-	})
+		}, "The MCP endpoint's event stream, for clients that open one.", "", "mcp"},
+	}
 }
 
 // rpcRequest is one JSON-RPC 2.0 request.

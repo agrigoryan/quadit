@@ -31,12 +31,13 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/secrets", s.workspaceMember(s.handleListSecrets))
-		m.HandleFunc("POST /api/v1/w/{ws}/secrets/{name}/request", s.workspaceMember(s.handleSendRequestWithSecret))
-		m.HandleFunc("POST /api/v1/w/{ws}/secrets/env", s.workspaceMember(s.handleListEnvSecrets))
-	})
+// secretRoutes are the routes of using secrets without reading them.
+func (s *Server) secretRoutes() []route {
+	return []route{
+		{"GET /api/v1/w/{ws}/secrets", s.workspaceMember(s.handleListSecrets), "The secrets the caller may use: names, hosts and what they are for. Values are never returned.", "", "secrets"},
+		{"POST /api/v1/w/{ws}/secrets/{name}/request", s.workspaceMember(s.handleSendRequestWithSecret), "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; the value is blanked out of the answer.", "", "secrets"},
+		{"POST /api/v1/w/{ws}/secrets/env", s.workspaceMember(s.handleListEnvSecrets), "For a companion's token made for secrets: the values of secrets marked env. Body: {names}.", "", "secrets"},
+	}
 }
 
 // secretRequestClient makes the vault's outbound requests. It never follows

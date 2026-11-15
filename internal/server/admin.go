@@ -16,20 +16,21 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/admin/settings", s.signedIn(s.installAdmin(s.handleListSettings)))
-		m.HandleFunc("PUT /api/v1/admin/settings/{name}", s.signedIn(s.installAdmin(s.handleUpdateSetting)))
-		m.HandleFunc("POST /api/v1/admin/mail/test", s.signedIn(s.installAdmin(s.handleSendTestMail)))
-		m.HandleFunc("GET /api/v1/admin/audit", s.signedIn(s.installAdmin(s.handleListInstallAuditLog)))
-		m.HandleFunc("GET /api/v1/admin/users", s.signedIn(s.installAdmin(s.handleListUsers)))
-		m.HandleFunc("PATCH /api/v1/admin/users/{id}", s.signedIn(s.installAdmin(s.handleUpdateUser)))
-		m.HandleFunc("GET /api/v1/admin/workspaces", s.signedIn(s.installAdmin(s.handleListWorkspaces)))
-		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/join", s.signedIn(s.installAdmin(s.handleJoinWorkspace)))
-		m.HandleFunc("POST /api/v1/admin/workspaces/{id}/restore", s.signedIn(s.installAdmin(s.handleRestoreWorkspace)))
-		m.HandleFunc("GET /api/v1/admin/health", s.signedIn(s.installAdmin(s.handleShowInstallHealth)))
-		m.HandleFunc("GET /api/v1/w/{ws}/audit", s.workspaceMember(s.handleListWorkspaceAuditLog))
-	})
+// adminRoutes are the install admin's routes, and the workspace's audit log.
+func (s *Server) adminRoutes() []route {
+	return []route{
+		{"GET /api/v1/admin/settings", s.signedIn(s.installAdmin(s.handleListSettings)), "The install's settings; secrets are blanked.", "", "install"},
+		{"PUT /api/v1/admin/settings/{name}", s.signedIn(s.installAdmin(s.handleUpdateSetting)), "Set one setting. Body: its JSON value.", "", "install"},
+		{"POST /api/v1/admin/mail/test", s.signedIn(s.installAdmin(s.handleSendTestMail)), "Send a test message through the mail server. Body: {to}.", "", "install"},
+		{"GET /api/v1/admin/audit", s.signedIn(s.installAdmin(s.handleListInstallAuditLog)), "The install's audit log, newest first.", "action: a name, * for any run of letters; actor; workspace; cursor: the last id seen; limit; format: csv", "install"},
+		{"GET /api/v1/admin/users", s.signedIn(s.installAdmin(s.handleListUsers)), "Every account on the install.", "kind: person or agent", "install"},
+		{"PATCH /api/v1/admin/users/{id}", s.signedIn(s.installAdmin(s.handleUpdateUser)), "Disable or enable an account, or change who runs the install. Body: {disabled, is_admin}.", "", "install"},
+		{"GET /api/v1/admin/workspaces", s.signedIn(s.installAdmin(s.handleListWorkspaces)), "Every workspace, deleted ones included for the 30 days they can be restored.", "", "install"},
+		{"POST /api/v1/admin/workspaces/{id}/join", s.signedIn(s.installAdmin(s.handleJoinWorkspace)), "Become an admin of a workspace, on the record.", "", "install"},
+		{"POST /api/v1/admin/workspaces/{id}/restore", s.signedIn(s.installAdmin(s.handleRestoreWorkspace)), "Bring a deleted workspace back.", "", "install"},
+		{"GET /api/v1/admin/health", s.signedIn(s.installAdmin(s.handleShowInstallHealth)), "What is failing or waiting behind the scenes.", "", "install"},
+		{"GET /api/v1/w/{ws}/audit", s.workspaceMember(s.handleListWorkspaceAuditLog), "This workspace's part of the audit log, newest first. Admins.", "action; actor; cursor: the last id seen; before; after; limit; format: csv", "admin"},
+	}
 }
 
 // installAdmin lets through only people who run the install.

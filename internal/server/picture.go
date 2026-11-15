@@ -21,11 +21,12 @@ import (
 // the server opens its own web app in a headless browser, as the caller,
 // and returns a picture. It needs Chrome or Chromium on the server.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/render", s.workspaceMember(s.handleTakePicture))
-		m.HandleFunc("GET /api/v1/auth/render-session", s.public(s.handleSignInPictureBrowser))
-	})
+// pictureRoutes are the routes of taking a picture of a page, and the sign-in of the browser that takes it.
+func (s *Server) pictureRoutes() []route {
+	return []route{
+		{"GET /api/v1/w/{ws}/render", s.workspaceMember(s.handleTakePicture), "A PNG of a task or page as a person sees it.", "task: key; doc: id; width: 390 for a phone, 1280 for a desktop; height: of the picture, in place of the usual 900 (844 on a phone); full: true for the whole page however long (to 8000); theme: dark", "files"},
+		{"GET /api/v1/auth/render-session", s.public(s.handleSignInPictureBrowser), "Used by the server's own browser when it takes a picture of a page.", "token", "account"},
+	}
 }
 
 // findChrome returns a Chrome or Chromium to run, or "".

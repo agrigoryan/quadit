@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -25,10 +24,11 @@ import (
 // Everything is written as the one who asks, through the same changes as
 // any other work, and running the same import twice adds nothing twice.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork))
-	})
+// importRoutes is the route of importing work.
+func (s *Server) importRoutes() []route {
+	return []route{
+		{"POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork), "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace, session}, dry_run}. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
+	}
 }
 
 // importLogSize is how many lines of an import's log are kept for the answer.

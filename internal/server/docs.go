@@ -21,19 +21,19 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// init adds the page routes to the server's routes.
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		const w = "/api/v1/w/{ws}"
-		m.HandleFunc("GET "+w+"/docs", s.workspaceMember(s.handleListPages))
-		m.HandleFunc("GET "+w+"/docs/{id}", s.workspaceMember(s.handleShowPage))
-		m.HandleFunc("GET "+w+"/docs/{id}/versions", s.workspaceMember(s.handleListPageVersions))
-		m.HandleFunc("GET "+w+"/docs/{id}/versions/{version}", s.workspaceMember(s.handleShowPageVersion))
-		m.HandleFunc("POST "+w+"/docs/{id}/presence", s.workspaceMember(s.handleReportPagePresence))
-		m.HandleFunc("GET "+w+"/docs/{id}/rows", s.workspaceMember(s.handleListDatabaseRows))
-		m.HandleFunc("GET "+w+"/memory", s.workspaceMember(s.handleShowAgentMemory))
-		m.HandleFunc("POST "+w+"/memory", s.workspaceMember(s.handleSaveAgentMemory))
-	})
+// pageRoutes are the routes of pages and agents' memory.
+func (s *Server) pageRoutes() []route {
+	const w = "/api/v1/w/{ws}"
+	return []route{
+		{"GET " + w + "/docs", s.workspaceMember(s.handleListPages), "The page tree.", "", "docs"},
+		{"GET " + w + "/docs/{id}", s.workspaceMember(s.handleShowPage), "One page: rows for the editor, or Markdown with format=md.", "format: md or text; full: true", "docs"},
+		{"GET " + w + "/docs/{id}/versions", s.workspaceMember(s.handleListPageVersions), "A page's kept versions.", "", "docs"},
+		{"GET " + w + "/docs/{id}/versions/{version}", s.workspaceMember(s.handleShowPageVersion), "One version's content.", "format: md", "docs"},
+		{"POST " + w + "/docs/{id}/presence", s.workspaceMember(s.handleReportPagePresence), "Say which block I am in; returns who else is in the page. Body: {block}.", "", "docs"},
+		{"GET " + w + "/docs/{id}/rows", s.workspaceMember(s.handleListDatabaseRows), "A database's rows with formulas and rollups worked out.", "filter: Prop:op:value, comma-separated; sort: Prop or -Prop; view: name", "docs"},
+		{"GET " + w + "/memory", s.workspaceMember(s.handleShowAgentMemory), "An agent's notes from earlier sessions, as Markdown.", "agent: @handle (default: the caller)", "docs"},
+		{"POST " + w + "/memory", s.workspaceMember(s.handleSaveAgentMemory), "Save a note: {title, markdown, mode}.", "", "docs"},
+	}
 }
 
 // docByID loads a page the caller may see. A page the caller may not see

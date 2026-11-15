@@ -72,3 +72,37 @@ func TestChangeCatalogSaysWhatIsRequired(t *testing.T) {
 		t.Fatal("no task.move in the OpenAPI document")
 	})
 }
+
+// TestEveryRouteIsDescribed checks the words of openapi.json, which is made
+// from the same list of routes as the mux: every operation says what it
+// does and is in a group, and every part of an address that is filled in
+// says what goes there. (Two routes with one pattern fail every test: the
+// mux panics when the server is made.)
+func TestEveryRouteIsDescribed(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	var spec struct {
+		Paths map[string]map[string]struct {
+			Summary    string
+			Tags       []string
+			Parameters []struct{ Name, In, Description string }
+		}
+	}
+	s.call(nil, "", "GET", "/api/v1/openapi.json", nil, 200, &spec)
+	n := 0
+	for path, methods := range spec.Paths {
+		for method, op := range methods {
+			n++
+			if op.Summary == "" || len(op.Tags) != 1 || op.Tags[0] == "" {
+				t.Errorf("%s %s: no summary, or no group (%q, %q)", strings.ToUpper(method), path, op.Summary, op.Tags)
+			}
+			for _, p := range op.Parameters {
+				if p.In == "path" && p.Description == "" {
+					t.Errorf("%s %s: the path parameter {%s} has no description", strings.ToUpper(method), path, p.Name)
+				}
+			}
+		}
+	}
+	if n < 100 {
+		t.Fatalf("openapi.json describes only %d operations", n)
+	}
+}

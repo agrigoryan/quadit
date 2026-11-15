@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
@@ -16,10 +15,11 @@ import (
 // The export of a workspace: a zip of Markdown, JSON and the uploaded
 // files, written by the parts in export_*.go.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/w/{ws}/export", s.workspaceMember(s.handleExportWorkspace))
-	})
+// exportRoutes is the route of the workspace export.
+func (s *Server) exportRoutes() []route {
+	return []route{
+		{"GET /api/v1/w/{ws}/export", s.workspaceMember(s.handleExportWorkspace), "The whole workspace as a zip of Markdown, JSON and the original files.", "", "admin"},
+	}
 }
 
 // exportReadme is the README.txt at the top of an export.

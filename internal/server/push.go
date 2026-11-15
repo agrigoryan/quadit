@@ -32,13 +32,14 @@ import (
 // token (VAPID, RFC 8292). No outside service is involved beyond the
 // browser maker's own push endpoint, and only for people who turned push on.
 
-func init() {
-	extraRoutes = append(extraRoutes, func(s *Server, m *http.ServeMux) {
-		m.HandleFunc("GET /api/v1/push/key", s.signedIn(s.handleShowPushKey))
-		m.HandleFunc("POST /api/v1/push/subscriptions", s.signedIn(s.handleSubscribeToPush))
-		m.HandleFunc("DELETE /api/v1/push/subscriptions", s.signedIn(s.handleUnsubscribeFromPush))
-		m.HandleFunc("POST /api/v1/push/test", s.signedIn(s.handleSendTestNotification))
-	})
+// pushRoutes are the routes of push notifications to a browser.
+func (s *Server) pushRoutes() []route {
+	return []route{
+		{"GET /api/v1/push/key", s.signedIn(s.handleShowPushKey), "The key a browser needs to subscribe to push notifications.", "", "account"},
+		{"POST /api/v1/push/subscriptions", s.signedIn(s.handleSubscribeToPush), "Register this browser for push. Body: the browser's subscription {endpoint, keys}.", "", "account"},
+		{"DELETE /api/v1/push/subscriptions", s.signedIn(s.handleUnsubscribeFromPush), "Stop push to this browser. Body: {endpoint}.", "", "account"},
+		{"POST /api/v1/push/test", s.signedIn(s.handleSendTestNotification), "Send a test notification to this account's browsers.", "", "account"},
+	}
 }
 
 // b64 is the base64 of Web Push: URL-safe, unpadded.
