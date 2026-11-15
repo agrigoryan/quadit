@@ -137,7 +137,7 @@ func (b *bootstrapRows) loadTasks() error {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "part", Message: "unknown part " + b.part, Allowed: []string{"open", "rest"}}
 	}
 	var err error
-	if b.tasks, err = b.x.everyTask(want); err != nil {
+	if b.tasks, err = b.x.everyTask(b.x.ctx(), want); err != nil {
 		return err
 	}
 	b.taskIDs = map[string]bool{}
@@ -219,9 +219,9 @@ func (b *bootstrapRows) keepToCaller() {
 	b.views = keep(b.views, func(v core.View) bool { return (v.Shared || v.OwnerID == x.member.UserID) && inScope(v.ProjectID) })
 	b.templates = keep(b.templates, func(v core.Template) bool { return inScope(v.ProjectID) })
 	b.prefs = keep(b.prefs, func(v core.Preference) bool { return inScope(v.ProjectID) })
-	b.claims = keepByTask(x, b.claims, func(v core.ResourceClaim) string { return v.TaskID })
+	b.claims = keepByTask(x.ctx(), &x.viewer, b.claims, func(v core.ResourceClaim) string { return v.TaskID })
 	b.docs = keep(b.docs, func(doc core.Doc) bool { return engine.CanSeeDoc(doc, x.member.UserID) && inScope(doc.ProjectID) })
-	b.sessions = keepByTask(x, b.sessions, func(v core.AgentSession) string { return v.TaskID })
+	b.sessions = keepByTask(x.ctx(), &x.viewer, b.sessions, func(v core.AgentSession) string { return v.TaskID })
 }
 
 // fill puts the lists into the answer, each under its name.

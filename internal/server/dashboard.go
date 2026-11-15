@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"sort"
@@ -26,22 +27,9 @@ func init() {
 // caller, epics, flow, agents, recent decisions and the health of the
 // machinery. project=KEY narrows it to one project.
 func (s *Server) handleShowDashboard(x *c) error {
-	d, err := x.newDashboard()
+	d, err := x.dashboard(x.ctx(), x.r.URL.Query().Get("project"))
 	if err != nil {
 		return err
-	}
-	parts := []func() error{
-		d.waitingOnMe,
-		d.epicProgress, // dashboard_epics.go
-		d.flow,         // dashboard_flow.go
-		d.agentStates,  // dashboard_agents.go
-		d.recentDecisions,
-		d.health, // dashboard_health.go
-	}
-	for _, part := range parts {
-		if err := part(); err != nil {
-			return err
-		}
 	}
 	if x.wantText() {
 		return x.text(d.dashboardText()) // dashboard_text.go
@@ -50,14 +38,19 @@ func (s *Server) handleShowDashboard(x *c) error {
 }
 
 // dashboard is one dashboard being built: who asked, what it covers, and
-// its parts as they are filled in.
+// its parts as they are filled in. It is one run of work, made and filled
+// inside viewer.dashboard, which is why it holds a ctx.
 type dashboard struct {
-	x        *c
-	names    *nameLookup
-	now      time.Time
-	projects []string        // the projects it covers; none means all the caller may read
-	tasks    []core.Task     // every task of those projects, archived ones too
-	covered  map[string]bool // the ids of those tasks
+	who *viewer
+	ctx context.Context
+	// oneProject says the dashboard was asked for one project, not for
+	// everything the viewer may read.
+	oneProject bool
+	names      *nameLookup
+	now        time.Time
+	projects   []string        // the projects it covers; none means all the caller may read
+	tasks      []core.Task     // every task of those projects, archived ones too
+	covered    map[string]bool // the ids of those tasks
 
 	waiting   []taskView     // tasks that wait on the caller, oldest first
 	asked     []decisionView // open questions asked of the caller
@@ -71,25 +64,25 @@ type dashboard struct {
 	machinery map[string]any // what is failing behind the scenes
 }
 
-// newDashboard works out which projects the dashboard covers and reads
-// their tasks.
-func (x *c) newDashboard() (*dashboard, error) {
-	names, err := x.names(x.ctx())
+// dashboard builds the dashboard of the projects the viewer may read, or of
+// the one project named (by key or id) when projectRef is not "".
+func (who *viewer) dashboard(ctx context.Context, projectRef string) (*dashboard, error) {
+	names, err := who.names(ctx)
 	if err != nil {
 		return nil, err
 	}
-	projects := x.projects
-	if ref := x.r.URL.Query().Get("project"); ref != "" {
-		project, err := x.resolver(x.ctx()).Project(ref)
+	projects := who.projects
+	if projectRef != "" {
+		project, err := who.resolver(ctx).Project(projectRef)
 		if err != nil {
 			return nil, err
 		}
-		if !x.canProject(project.ID) {
-			return nil, errNotFound("project " + ref)
+		if !who.canProject(project.ID) {
+			return nil, errNotFound("project " + projectRef)
 		}
 		projects = []string{project.ID}
 	}
-	tasks, err := x.everyTask(store.TaskFilter{ProjectIDs: projects, Archived: true})
+	tasks, err := who.everyTask(ctx, store.TaskFilter{ProjectIDs: projects, Archived: true})
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +90,21 @@ func (x *c) newDashboard() (*dashboard, error) {
 	for _, t := range tasks {
 		covered[t.ID] = true
 	}
-	return &dashboard{x: x, names: names, now: time.Now(), projects: projects, tasks: tasks, covered: covered}, nil
+	d := &dashboard{who: who, ctx: ctx, oneProject: projectRef != "", names: names, now: time.Now(), projects: projects, tasks: tasks, covered: covered}
+	parts := []func() error{
+		d.waitingOnMe,
+		d.epicProgress, // dashboard_epics.go
+		d.flow,         // dashboard_flow.go
+		d.agentStates,  // dashboard_agents.go
+		d.recentDecisions,
+		d.health, // dashboard_health.go
+	}
+	for _, part := range parts {
+		if err := part(); err != nil {
+			return nil, err
+		}
+	}
+	return d, nil
 }
 
 // answer is the dashboard as it is sent.
@@ -117,7 +124,7 @@ func (d *dashboard) answer() map[string]any {
 // waitingOnMe fills in what waits on the caller: tasks and the questions
 // asked of them, oldest first.
 func (d *dashboard) waitingOnMe() error {
-	x, me := d.x, d.x.member.UserID
+	who, ctx, me := d.who, d.ctx, d.who.member.UserID
 	var waiting []core.Task
 	for _, t := range d.tasks {
 		if t.WaitingOnID == me && core.OpenCategory(d.names.statuses[t.StatusID].Category) {
@@ -126,26 +133,26 @@ func (d *dashboard) waitingOnMe() error {
 	}
 	sort.Slice(waiting, func(i, j int) bool { return waiting[i].UpdatedAt < waiting[j].UpdatedAt })
 	var err error
-	if d.waiting, err = x.taskViews(x.ctx(), waiting); err != nil {
+	if d.waiting, err = who.taskViews(ctx, waiting); err != nil {
 		return err
 	}
 	var asked []core.Decision
-	if err := x.db.List(x.ctx(), &asked, store.Q{Where: []store.Cond{store.Eq("asked_id", me), store.Eq("state", core.StateOpen), store.Live}, Order: "created_seq"}); err != nil {
+	if err := who.db.List(ctx, &asked, store.Q{Where: []store.Cond{store.Eq("asked_id", me), store.Eq("state", core.StateOpen), store.Live}, Order: "created_seq"}); err != nil {
 		return err
 	}
 	// Only questions on the tasks the dashboard covers: one narrowed to a
 	// project leaves out what is asked on another's.
 	asked = keep(asked, func(question core.Decision) bool { return d.covered[question.TaskID] })
-	d.asked, err = x.decisionViews(x.ctx(), asked)
+	d.asked, err = who.decisionViews(ctx, asked)
 	return err
 }
 
 // recentDecisions fills in the recent decisions and the new standing
 // preferences.
 func (d *dashboard) recentDecisions() error {
-	x, ctx := d.x, d.x.ctx()
+	who, ctx := d.who, d.ctx
 	var picked []core.Decision
-	if err := x.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: 60}); err != nil {
+	if err := who.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: 60}); err != nil {
 		return err
 	}
 	picked = keep(picked, func(decision core.Decision) bool { return d.covered[decision.TaskID] })
@@ -153,11 +160,11 @@ func (d *dashboard) recentDecisions() error {
 		picked = picked[:dashboardDecisions]
 	}
 	var err error
-	if d.decided, err = x.decisionViews(x.ctx(), picked); err != nil {
+	if d.decided, err = who.decisionViews(ctx, picked); err != nil {
 		return err
 	}
 	var prefs []core.Preference
-	if err := x.db.List(ctx, &prefs, store.Q{Where: []store.Cond{store.Live, store.Null("retired_at")}, Order: "-created_at", Limit: 5}); err != nil {
+	if err := who.db.List(ctx, &prefs, store.Q{Where: []store.Cond{store.Live, store.Null("retired_at")}, Order: "-created_at", Limit: 5}); err != nil {
 		return err
 	}
 	d.prefs = keep(prefs, func(pref core.Preference) bool {
@@ -171,11 +178,11 @@ func (d *dashboard) recentDecisions() error {
 const dashboardDecisions = 8
 
 // everyTask reads all the tasks a filter matches, however many there are.
-func (x *c) everyTask(f store.TaskFilter) ([]core.Task, error) {
+func (who *viewer) everyTask(ctx context.Context, f store.TaskFilter) ([]core.Task, error) {
 	f.Sort, f.Limit = "created", maxTasksByID
 	var all []core.Task
 	for {
-		page, err := x.db.Tasks(x.ctx(), f)
+		page, err := who.db.Tasks(ctx, f)
 		if err != nil {
 			return nil, err
 		}

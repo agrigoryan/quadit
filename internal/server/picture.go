@@ -132,7 +132,7 @@ func picturePath(x *c) (string, error) {
 		}
 		return path + "/task/" + t.Key, nil
 	case q.Get("doc") != "":
-		d, err := x.docByID(q.Get("doc"))
+		d, err := x.docByID(x.ctx(), q.Get("doc"))
 		if err != nil {
 			return "", err
 		}

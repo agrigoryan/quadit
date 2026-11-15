@@ -59,7 +59,7 @@ func (e *exporter) load() (*exportRows, error) {
 		{"views", new([]core.View), live},
 	}
 	for _, t := range r.tables {
-		if err := e.x.db.List(e.x.ctx(), t.rows, t.q); err != nil {
+		if err := e.who.db.List(e.ctx, t.rows, t.q); err != nil {
 			return nil, err
 		}
 	}
@@ -102,10 +102,10 @@ func (e *exporter) dump(name string, rows any) error {
 // is why it does not read them with everyTask, which gives them in the
 // order they were made.
 func (e *exporter) everyTaskByKey() ([]core.Task, error) {
-	x, ctx := e.x, e.x.ctx()
-	tasks, err := x.db.Tasks(ctx, store.TaskFilter{Archived: true, Limit: 5000, Sort: "key"})
+	who, ctx := e.who, e.ctx
+	tasks, err := who.db.Tasks(ctx, store.TaskFilter{Archived: true, Limit: 5000, Sort: "key"})
 	for more := tasks; err == nil && len(more) == 5000; {
-		more, err = x.db.Tasks(ctx, store.TaskFilter{Archived: true, Limit: 5000, Offset: len(tasks), Sort: "key"})
+		more, err = who.db.Tasks(ctx, store.TaskFilter{Archived: true, Limit: 5000, Offset: len(tasks), Sort: "key"})
 		tasks = append(tasks, more...)
 	}
 	return tasks, err
@@ -113,10 +113,10 @@ func (e *exporter) everyTaskByKey() ([]core.Task, error) {
 
 // everyEvent reads the whole feed, oldest first.
 func (e *exporter) everyEvent() ([]core.Event, error) {
-	x, ctx := e.x, e.x.ctx()
-	evs, err := x.db.Events(ctx, store.EventFilter{Limit: 2000})
+	who, ctx := e.who, e.ctx
+	evs, err := who.db.Events(ctx, store.EventFilter{Limit: 2000})
 	for page := evs; err == nil && len(page) == 2000; {
-		page, err = x.db.Events(ctx, store.EventFilter{After: evs[len(evs)-1].Seq, Limit: 2000})
+		page, err = who.db.Events(ctx, store.EventFilter{After: evs[len(evs)-1].Seq, Limit: 2000})
 		evs = append(evs, page...)
 	}
 	return evs, err

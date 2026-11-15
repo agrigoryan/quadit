@@ -25,7 +25,7 @@ func (e *exporter) docs(rows *exportRows) error {
 	}
 	used := map[string]bool{}
 	for _, d := range rows.docs {
-		if !engine.CanSeeDoc(d, e.x.member.UserID) {
+		if !engine.CanSeeDoc(d, e.who.member.UserID) {
 			continue
 		}
 		path := "docs/" + docPath(byID, d, 0)
@@ -59,11 +59,11 @@ func docPath(byID map[string]core.Doc, d core.Doc, depth int) string {
 // databaseCSV writes a database as a table: a line per row, a column per
 // property, every cell as it is shown.
 func (e *exporter) databaseCSV(name string, d core.Doc) error {
-	t, err := e.x.loadTable(d)
+	t, err := e.who.loadTable(e.ctx, d)
 	if err != nil {
 		return err
 	}
-	cells, err := e.x.computed(t)
+	cells, err := e.who.computed(e.ctx, t)
 	if err != nil {
 		return err
 	}

@@ -2,12 +2,14 @@ package server
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
 )
 
@@ -64,7 +66,7 @@ func (s *Server) handleExportWorkspace(x *c) error {
 	s.audit(x.r, x.ws.ID, x.user, "workspace.exported", "workspace", x.ws.ID, nil)
 	x.w.Header().Set("Content-Type", "application/zip")
 	x.w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-%s.zip"`, x.ws.Slug, time.Now().UTC().Format("2006-01-02")))
-	e := &exporter{x: x, names: names, zw: zip.NewWriter(x.w)}
+	e := &exporter{who: &x.viewer, ctx: x.ctx(), uploads: s.fileStore(), names: names, zw: zip.NewWriter(x.w)}
 	err = e.write()
 	// The archive is closed even after a failed part, as far as it got.
 	if cerr := e.zw.Close(); cerr != nil && err == nil {
@@ -98,11 +100,15 @@ func (e *exporter) write() error {
 	return nil
 }
 
-// exporter is one export being written: the request and the archive.
+// exporter is one export being written: who it is for, where the uploaded
+// files are, and the archive. It is one run of work, which is why it holds
+// a ctx.
 type exporter struct {
-	x     *c
-	names *nameLookup
-	zw    *zip.Writer
+	who     *viewer
+	ctx     context.Context
+	uploads blob.Store // where the uploaded files are read from
+	names   *nameLookup
+	zw      *zip.Writer
 
 	// What tasks/ is written from, by indexTasks.
 	optionsOf   map[string][]core.Option   // a decision's options

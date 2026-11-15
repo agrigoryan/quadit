@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -86,7 +87,7 @@ func (s *Server) handleListDecisions(x *c) error {
 	if err := x.db.List(x.ctx(), &decisions, store.Q{Where: conds, Order: "-updated_seq", Limit: min(x.intParam("limit", defaultDecisionPage), maxDecisionPage), Offset: x.intParam("offset", 0)}); err != nil {
 		return err
 	}
-	if decisions, err = x.decisionsInProjects(decisions, splitList(v.Get("project"))); err != nil {
+	if decisions, err = x.decisionsInProjects(x.ctx(), decisions, splitList(v.Get("project"))); err != nil {
 		return err
 	}
 	views, err := x.decisionViewsWithFiles(x.ctx(), decisions)
@@ -147,29 +148,29 @@ func (x *c) decisionConds() ([]store.Cond, error) {
 
 // decisionsInProjects keeps to the projects asked for, and to those the
 // caller may read.
-func (x *c) decisionsInProjects(decisions []core.Decision, refs []string) ([]core.Decision, error) {
+func (who *viewer) decisionsInProjects(ctx context.Context, decisions []core.Decision, refs []string) ([]core.Decision, error) {
 	var projectIDs []string
 	for _, ref := range refs {
-		project, err := x.resolver(x.ctx()).Project(ref)
+		project, err := who.resolver(ctx).Project(ref)
 		if err != nil {
 			return nil, err
 		}
 		projectIDs = append(projectIDs, project.ID)
 	}
-	if len(projectIDs) == 0 && x.projects == nil {
+	if len(projectIDs) == 0 && who.projects == nil {
 		return decisions, nil
 	}
 	var taskIDs []string
 	for _, decision := range decisions {
 		taskIDs = append(taskIDs, decision.TaskID)
 	}
-	tasks, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: taskIDs, Archived: true, Limit: maxTasksByID})
+	tasks, err := who.db.Tasks(ctx, store.TaskFilter{IDs: taskIDs, Archived: true, Limit: maxTasksByID})
 	if err != nil {
 		return nil, err
 	}
 	okTask := map[string]bool{}
 	for _, t := range tasks {
-		okTask[t.ID] = x.canProject(t.ProjectID) && (len(projectIDs) == 0 || slices.Contains(projectIDs, t.ProjectID))
+		okTask[t.ID] = who.canProject(t.ProjectID) && (len(projectIDs) == 0 || slices.Contains(projectIDs, t.ProjectID))
 	}
 	return keep(decisions, func(decision core.Decision) bool { return okTask[decision.TaskID] }), nil
 }

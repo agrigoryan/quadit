@@ -3,6 +3,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -37,8 +38,8 @@ type agentState struct {
 // agentStates says what every agent is doing right now. With projects,
 // every agent is still listed, but what it is shown doing (working, on
 // what, its last action) is only what it does in those projects.
-func (x *c) agentStates(tasks []core.Task, names *nameLookup, projects []string) ([]agentState, error) {
-	w, err := x.agentWork(tasks, names, projects)
+func (who *viewer) agentStates(ctx context.Context, tasks []core.Task, names *nameLookup, projects []string) ([]agentState, error) {
+	w, err := who.agentWork(ctx, tasks, names, projects)
 	if err != nil {
 		return nil, err
 	}
@@ -59,9 +60,11 @@ func (x *c) agentStates(tasks []core.Task, names *nameLookup, projects []string)
 
 // agentWork is what agentStates reads once and then looks at for each
 // agent: the open tasks, the sessions that are running, who is heard by a
-// webhook, and the open questions.
+// webhook, and the open questions. It is one run of work, made and used up
+// inside viewer.agentStates, which is why it holds a ctx.
 type agentWork struct {
-	x        *c
+	who      *viewer
+	ctx      context.Context
 	names    *nameLookup
 	now      time.Time
 	tasks    []core.Task
@@ -76,26 +79,25 @@ type agentWork struct {
 
 // agentWork reads it, for the open tasks given, in the projects given (or
 // the whole workspace).
-func (x *c) agentWork(tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
-	ctx := x.ctx()
-	w := &agentWork{x: x, names: names, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
-	if err := x.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", core.AgentSessionRunning), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
+func (who *viewer) agentWork(ctx context.Context, tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
+	w := &agentWork{who: who, ctx: ctx, names: names, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
+	if err := who.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", core.AgentSessionRunning), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
 		Order: "-started_at"}); err != nil {
 		return nil, err
 	}
-	w.sessions = keepByTask(x, w.sessions, func(v core.AgentSession) string { return v.TaskID })
+	w.sessions = keepByTask(ctx, who, w.sessions, func(v core.AgentSession) string { return v.TaskID })
 	if len(projects) > 0 {
 		w.keys = map[string]bool{}
 		for _, projectID := range projects {
 			w.keys[names.projects[projectID].Key] = true
 		}
 		var err error
-		if w.sessions, err = x.sessionsIn(w.sessions, projects); err != nil {
+		if w.sessions, err = who.sessionsIn(ctx, w.sessions, projects); err != nil {
 			return nil, err
 		}
 	}
 	var hooks []core.Webhook
-	if err := x.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
+	if err := who.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
 		return nil, err
 	}
 	for _, hook := range hooks {
@@ -109,14 +111,14 @@ func (x *c) agentWork(tasks []core.Task, names *nameLookup, projects []string) (
 	}
 	// Open questions asked of someone wait on them too, even when the task
 	// itself names another.
-	if err := x.db.List(ctx, &w.asked, store.Where(store.Eq("state", core.StateOpen), store.NotNull("asked_id"), store.Live)); err != nil {
+	if err := who.db.List(ctx, &w.asked, store.Where(store.Eq("state", core.StateOpen), store.NotNull("asked_id"), store.Live)); err != nil {
 		return nil, err
 	}
 	return w, nil
 }
 
 // sessionsIn keeps the sessions on tasks of the projects.
-func (x *c) sessionsIn(sessions []core.AgentSession, projects []string) ([]core.AgentSession, error) {
+func (who *viewer) sessionsIn(ctx context.Context, sessions []core.AgentSession, projects []string) ([]core.AgentSession, error) {
 	var ids []string
 	for _, session := range sessions {
 		if session.TaskID != "" {
@@ -126,7 +128,7 @@ func (x *c) sessionsIn(sessions []core.AgentSession, projects []string) ([]core.
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	tasks, err := x.db.Tasks(x.ctx(), store.TaskFilter{IDs: ids, ProjectIDs: projects, Archived: true, Limit: maxTasksByID})
+	tasks, err := who.db.Tasks(ctx, store.TaskFilter{IDs: ids, ProjectIDs: projects, Archived: true, Limit: maxTasksByID})
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +213,7 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 	}
 
 	// What it has spent this week, and its budget.
-	cost, minutes, err := w.x.s.eng.Usage(w.x.ctx(), w.x.db, m.UserID, weekStart(w.now))
+	cost, minutes, err := w.who.agentUsage(w.ctx, w.who.db, m.UserID, weekStart(w.now))
 	if err != nil {
 		return a, err
 	}
@@ -229,7 +231,7 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 // when it was on a task of the projects the agents are seen in.
 func (w *agentWork) lastAction(m core.Member) string {
 	shown := []core.Member{m}
-	w.x.hideActions(w.x.ctx(), shown)
+	w.who.hideActions(w.ctx, shown)
 	if w.keys != nil && !actsIn(shown[0].LastAction, w.keys) {
 		return ""
 	}
@@ -243,11 +245,11 @@ func (s *Server) handleListAgents(x *c) error {
 	if err != nil {
 		return err
 	}
-	tasks, err := x.everyTask(store.TaskFilter{Open: true, ProjectIDs: x.projects})
+	tasks, err := x.everyTask(x.ctx(), store.TaskFilter{Open: true, ProjectIDs: x.projects})
 	if err != nil {
 		return err
 	}
-	agents, err := x.agentStates(tasks, names, nil)
+	agents, err := x.agentStates(x.ctx(), tasks, names, nil)
 	if err != nil {
 		return err
 	}
@@ -281,9 +283,9 @@ func (d *dashboard) agentStates() error {
 	}
 	var err error
 	var only []string
-	if d.x.r.URL.Query().Get("project") != "" {
+	if d.oneProject {
 		only = d.projects
 	}
-	d.agents, err = d.x.agentStates(open, d.names, only)
+	d.agents, err = d.who.agentStates(d.ctx, open, d.names, only)
 	return err
 }

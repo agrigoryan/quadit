@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"slices"
@@ -27,12 +28,12 @@ type loadedDatabase struct {
 
 // loadTable reads a database's properties and rows, and each row's stored
 // values.
-func (x *c) loadTable(database core.Doc) (*loadedDatabase, error) {
+func (who *viewer) loadTable(ctx context.Context, database core.Doc) (*loadedDatabase, error) {
 	t := &loadedDatabase{doc: database, values: map[string]map[string]any{}}
-	if err := x.db.List(x.ctx(), &t.props, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
+	if err := who.db.List(ctx, &t.props, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
-	if err := x.db.List(x.ctx(), &t.rows, store.Q{Where: []store.Cond{store.Eq("parent_id", database.ID), store.Eq("kind", core.DocRow), store.Live}, Order: "rank"}); err != nil {
+	if err := who.db.List(ctx, &t.rows, store.Q{Where: []store.Cond{store.Eq("parent_id", database.ID), store.Eq("kind", core.DocRow), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
 	for _, row := range t.rows {
@@ -61,8 +62,8 @@ type propConfig struct {
 // as the titles of the rows it points to, in a database loaded when first
 // needed. A database the caller may not see, or that is gone, reads as
 // empty; one that cannot be read fails the whole answer.
-func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
-	names, err := x.names(x.ctx())
+func (who *viewer) computed(ctx context.Context, t *loadedDatabase) (map[string]map[string]any, error) {
+	names, err := who.names(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -83,14 +84,14 @@ func (x *c) computed(t *loadedDatabase) (map[string]map[string]any, error) {
 		}
 		var database core.Doc
 		var loaded *loadedDatabase
-		there, err := store.Find(x.ctx(), x.db, &database, store.Eq("id", dbID), store.Live)
+		there, err := store.Find(ctx, who.db, &database, store.Eq("id", dbID), store.Live)
 		switch {
 		case err != nil:
 			if readErr == nil {
 				readErr = err
 			}
-		case there && engine.CanSeeDoc(database, x.member.UserID):
-			if loaded, err = x.loadTable(database); err != nil && readErr == nil {
+		case there && engine.CanSeeDoc(database, who.member.UserID):
+			if loaded, err = who.loadTable(ctx, database); err != nil && readErr == nil {
 				readErr = err
 			}
 		}
@@ -345,18 +346,18 @@ func matchRow(f rowFilter, v any) bool {
 // URL's, the rows kept and sorted (the first sort counts most), and the
 // answer as rows, as a Markdown table (text) or as raw cells (raw=1).
 func (s *Server) handleListDatabaseRows(x *c) error {
-	d, err := x.docByID(x.r.PathValue("id"))
+	d, err := x.docByID(x.ctx(), x.r.PathValue("id"))
 	if err != nil {
 		return err
 	}
 	if d.Kind != core.DocDatabase {
 		return errBad("%q is a page, not a database", d.Title)
 	}
-	t, err := x.loadTable(d)
+	t, err := x.loadTable(x.ctx(), d)
 	if err != nil {
 		return err
 	}
-	cells, err := x.computed(t)
+	cells, err := x.computed(x.ctx(), t)
 	if err != nil {
 		return err
 	}

@@ -49,11 +49,11 @@ var secretRequestClient = &http.Client{
 const secretMask = "•••"
 
 // mayUseSecret reports whether the caller is among those a secret is for.
-func (x *c) mayUseSecret(sec core.Secret) bool {
-	if len(sec.Agents) == 0 || x.member.Kind != core.KindAgent {
+func (who *viewer) mayUseSecret(sec core.Secret) bool {
+	if len(sec.Agents) == 0 || who.member.Kind != core.KindAgent {
 		return true
 	}
-	return slices.Contains(sec.Agents, x.member.UserID)
+	return slices.Contains(sec.Agents, who.member.UserID)
 }
 
 // handleListSecrets lists the secrets the caller may use: names and what they are

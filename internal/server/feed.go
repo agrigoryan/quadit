@@ -107,7 +107,7 @@ func (s *Server) handleReadFeed(x *c) error {
 		f.ScopeType, f.ScopeID = "task", t.ID
 	}
 	if ref := v.Get("doc"); ref != "" {
-		d, err := x.docByID(ref)
+		d, err := x.docByID(x.ctx(), ref)
 		if err != nil {
 			return err
 		}

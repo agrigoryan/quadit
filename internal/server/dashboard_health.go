@@ -13,20 +13,20 @@ import (
 // health fills in what is failing behind the scenes: webhooks, their
 // deliveries, the last backup, and pages synced from a repository.
 func (d *dashboard) health() error {
-	x, ctx := d.x, d.x.ctx()
+	who, ctx := d.who, d.ctx
 	health := map[string]any{}
 	var err error
-	if health["webhooks_failing"], err = x.db.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0)); err != nil {
+	if health["webhooks_failing"], err = who.db.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0)); err != nil {
 		return err
 	}
-	if health["deliveries_dead"], err = countLiveDeliveries(ctx, x.db, store.Eq("state", core.DeliveryDead)); err != nil {
+	if health["deliveries_dead"], err = countLiveDeliveries(ctx, who.db, store.Eq("state", core.DeliveryDead)); err != nil {
 		return err
 	}
-	if health["deliveries_pending"], err = countLiveDeliveries(ctx, x.db, store.Eq("state", core.DeliveryPending), store.Gt("attempts", 0)); err != nil {
+	if health["deliveries_pending"], err = countLiveDeliveries(ctx, who.db, store.Eq("state", core.DeliveryPending), store.Gt("attempts", 0)); err != nil {
 		return err
 	}
 	var backups []core.Backup
-	if err := x.s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err != nil {
+	if err := who.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err != nil {
 		return err
 	}
 	if len(backups) > 0 {
@@ -34,7 +34,7 @@ func (d *dashboard) health() error {
 		health["last_backup_ok"] = backups[0].Error == "" && backups[0].FinishedAt != 0
 	}
 	var sources []core.DocSource
-	if err := x.db.List(ctx, &sources, store.Where(store.Live)); err != nil {
+	if err := who.db.List(ctx, &sources, store.Where(store.Live)); err != nil {
 		return err
 	}
 	failing := 0

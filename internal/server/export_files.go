@@ -26,9 +26,9 @@ func (e *exporter) files(rows *exportRows) error {
 			continue
 		}
 		name := "files/" + f.ID + "/" + fileSafe(f.Name)
-		r, _, err := e.x.s.fileStore().Open(e.x.ctx(), f.StorageKey)
+		r, _, err := e.uploads.Open(e.ctx, f.StorageKey)
 		if err != nil {
-			e.x.s.log.Warn("export: a file was not included", "file", f.ID, "err", err)
+			e.who.log.Warn("export: a file was not included", "file", f.ID, "err", err)
 			missing = append(missing, name+": "+notIncludedWhy(err))
 			continue
 		}

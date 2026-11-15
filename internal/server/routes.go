@@ -186,7 +186,7 @@ func listOf[T any](order string, conds ...store.Cond) func(x *c) (any, error) {
 			return nil, err
 		}
 		if x.projects != nil {
-			rows = keepInProjects(x, rows)
+			rows = keepInProjects(x.ctx(), &x.viewer, rows)
 		}
 		if rows == nil {
 			rows = []T{}
@@ -213,7 +213,7 @@ func listConditions[T any](x *c, conds []store.Cond) ([]store.Cond, error) {
 			continue
 		}
 		col, _, _ := strings.Cut(f.Tag.Get("db"), ",")
-		id, err := x.narrowingID(param, val)
+		id, err := x.narrowingID(x.ctx(), param, val)
 		if err != nil {
 			return nil, err
 		}
@@ -227,16 +227,16 @@ func listConditions[T any](x *c, conds []store.Cond) ([]store.Cond, error) {
 
 // narrowingID is the id a narrowing parameter's value names: a project or
 // a task is found by its key or id, any other value is an id already.
-func (x *c) narrowingID(param, val string) (string, error) {
+func (who *viewer) narrowingID(ctx context.Context, param, val string) (string, error) {
 	switch param {
 	case "project":
-		p, err := x.resolver(x.ctx()).Project(val)
+		p, err := who.resolver(ctx).Project(val)
 		if err != nil {
 			return "", err
 		}
 		return p.ID, nil
 	case "task":
-		tk, err := x.resolver(x.ctx()).Task(val)
+		tk, err := who.resolver(ctx).Task(val)
 		if err != nil {
 			return "", err
 		}
@@ -248,26 +248,26 @@ func (x *c) narrowingID(param, val string) (string, error) {
 // keepInProjects keeps a narrowed caller inside its projects: by the row's
 // own project, by being a project, by the task it hangs on, or by its epic's
 // project. Rows of a type with none of these are all kept.
-func keepInProjects[T any](x *c, rows []T) []T {
+func keepInProjects[T any](ctx context.Context, who *viewer, rows []T) []T {
 	t := reflect.TypeFor[T]()
 	if f, ok := t.FieldByName("ProjectID"); ok {
-		return keep(rows, func(r T) bool { return x.canProject(reflect.ValueOf(r).FieldByIndex(f.Index).String()) })
+		return keep(rows, func(r T) bool { return who.canProject(reflect.ValueOf(r).FieldByIndex(f.Index).String()) })
 	}
 	if t == reflect.TypeFor[core.Project]() {
-		return keep(rows, func(r T) bool { return x.canProject(reflect.ValueOf(r).FieldByName("ID").String()) })
+		return keep(rows, func(r T) bool { return who.canProject(reflect.ValueOf(r).FieldByName("ID").String()) })
 	}
 	if f, ok := t.FieldByName("TaskID"); ok {
-		return keepByTask(x, rows, func(r T) string { return reflect.ValueOf(r).FieldByIndex(f.Index).String() })
+		return keepByTask(ctx, who, rows, func(r T) string { return reflect.ValueOf(r).FieldByIndex(f.Index).String() })
 	}
 	if f, ok := t.FieldByName("EpicID"); ok {
-		return keepByEpic(x, rows, func(r T) string { return reflect.ValueOf(r).FieldByIndex(f.Index).String() })
+		return keepByEpic(ctx, who, rows, func(r T) string { return reflect.ValueOf(r).FieldByIndex(f.Index).String() })
 	}
 	return rows
 }
 
 // keepByEpic keeps the rows whose epic is in a project the caller may read.
 // An epic that cannot be read counts as in no project.
-func keepByEpic[T any](x *c, rows []T, epicOf func(T) string) []T {
+func keepByEpic[T any](ctx context.Context, who *viewer, rows []T, epicOf func(T) string) []T {
 	projectOf := map[string]string{}
 	return keep(rows, func(r T) bool {
 		eid := epicOf(r)
@@ -275,19 +275,19 @@ func keepByEpic[T any](x *c, rows []T, epicOf func(T) string) []T {
 		if !seen {
 			var e core.Epic
 			pid = "none"
-			if x.db.Get(x.ctx(), &e, store.Eq("id", eid)) == nil {
+			if who.db.Get(ctx, &e, store.Eq("id", eid)) == nil {
 				pid = e.ProjectID
 			}
 			projectOf[eid] = pid
 		}
-		return x.canProject(pid)
+		return who.canProject(pid)
 	})
 }
 
 // keepByTask keeps, for a caller limited to some projects, the rows that
 // hang on a task of those projects, and the rows on no task.
-func keepByTask[T any](x *c, rows []T, taskOf func(T) string) []T {
-	if x.projects == nil {
+func keepByTask[T any](ctx context.Context, who *viewer, rows []T, taskOf func(T) string) []T {
+	if who.projects == nil {
 		return rows
 	}
 	projectOf := map[string]string{}
@@ -300,12 +300,12 @@ func keepByTask[T any](x *c, rows []T, taskOf func(T) string) []T {
 		if !seen {
 			var tk core.Task
 			pid = "none"
-			if x.db.Get(x.ctx(), &tk, store.Eq("id", tid)) == nil {
+			if who.db.Get(ctx, &tk, store.Eq("id", tid)) == nil {
 				pid = tk.ProjectID
 			}
 			projectOf[tid] = pid
 		}
-		return x.canProject(pid)
+		return who.canProject(pid)
 	})
 }
 
