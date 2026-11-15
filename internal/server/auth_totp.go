@@ -82,7 +82,7 @@ func (s *Server) handleStartTwoStepSetup(x *c) error {
 	if _, err := s.st.Update(x.ctx(), "users", map[string]any{"totp_secret": sealed}, store.Eq("id", x.user.ID)); err != nil {
 		return err
 	}
-	issuer := s.settingStr(x.ctx(), "install.name", "Quadit")
+	issuer := s.installName(x.ctx())
 	return x.ok(map[string]any{"secret": secret, "url": auth.TOTPURL(issuer, x.user.Email, secret)})
 }
 

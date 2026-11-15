@@ -172,7 +172,7 @@ func (s *Server) handleShowSignInOptions(x *c) error {
 		"require_2fa":                  s.settingBool(ctx, "auth.require_2fa", false),
 		"mail":                         s.mailReady(ctx),
 		"version":                      s.cfg.Version,
-		"name":                         s.settingStr(ctx, "install.name", "Quadit"),
+		"name":                         s.installName(ctx),
 	}
 	out["providers"] = s.providerList(ctx)
 	return x.ok(out)

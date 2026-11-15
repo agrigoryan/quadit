@@ -212,9 +212,12 @@ func (s *Server) settingBool(ctx context.Context, name string, def bool) bool {
 	return def
 }
 
-func (s *Server) settingStr(ctx context.Context, name, def string) string {
-	s.setting(ctx, name, &def)
-	return def
+// installName is what the install is called (the install.name setting),
+// Quadit when it is not named.
+func (s *Server) installName(ctx context.Context) string {
+	name := "Quadit"
+	s.setting(ctx, "install.name", &name)
+	return name
 }
 
 const masked = "********"
@@ -384,7 +387,7 @@ func (s *Server) maskedSettings(ctx context.Context) (map[string]any, error) {
 func (s *Server) sendMail(ctx context.Context, to, subject, text string) error {
 	var cfg mail.Config
 	s.setting(ctx, "mail", &cfg)
-	name := s.settingStr(ctx, "install.name", "Quadit")
+	name := s.installName(ctx)
 	html := "<div style=\"font:15px/1.5 -apple-system,Segoe UI,sans-serif;color:#111;max-width:560px\">" +
 		strings.ReplaceAll(linkify(htmlEscape(text)), "\n", "<br>") + "<p style=\"color:#888;font-size:12px\">" + htmlEscape(name) + "</p></div>"
 	return mail.Send(ctx, cfg, mail.Message{To: to, Subject: subject, Text: text, HTML: html})

@@ -67,7 +67,7 @@ func (s *Server) webauthn(r *http.Request) (*webauthn.WebAuthn, error) {
 		return nil, &engine.Error{Code: engine.CodeConflict, Message: "passkeys need the server to be reached by a name, not an IP address: " +
 			"start it with --url set to its name (http://localhost:4780 works for a local install)"}
 	}
-	return webauthn.New(&webauthn.Config{RPID: base.Hostname(), RPDisplayName: s.settingStr(r.Context(), "install.name", "Quadit"), RPOrigins: origins})
+	return webauthn.New(&webauthn.Config{RPID: base.Hostname(), RPDisplayName: s.installName(r.Context()), RPOrigins: origins})
 }
 
 func (s *Server) passkeyUser(ctx context.Context, u core.User) (webAuthnUser, error) {
