@@ -1,3 +1,5 @@
+// The Linear source: the CSV that Linear exports.
+
 package importer
 
 import (
@@ -8,12 +10,15 @@ import (
 // linear reads the CSV that Linear exports.
 type linear struct{}
 
+// Kind is "linear".
 func (linear) Kind() string { return "linear" }
 
+// Read reads the CSV file at path.
 func (linear) Read(path string, _ Options) (Plan, error) {
 	return readCSV(path, "linear", linearRow)
 }
 
+// linearRow makes a task of one row of Linear's CSV.
 func linearRow(get csvCells) Task {
 	t := Task{Ext: get("id"), Title: get("title"), Description: get("description"), Status: get("status"), Assignee: get("assignee"),
 		DueOn: get("due date"), Epic: get("project"), ParentExt: get("parent issue"), Priority: priorityNames[strings.ToLower(get("priority"))]}
@@ -26,7 +31,10 @@ func linearRow(get csvCells) Task {
 	case get("started") != "" && t.Category == "unstarted":
 		t.Category = "started"
 	}
-	t.Estimate, _ = strconv.Atoi(strings.SplitN(get("estimate"), ".", 2)[0])
+	whole, _, _ := strings.Cut(get("estimate"), ".")
+	if n, err := strconv.Atoi(whole); err == nil {
+		t.Estimate = n // no estimate, or not a number: none
+	}
 	if l := get("labels"); l != "" {
 		t.Labels = strings.Split(l, ",")
 	}

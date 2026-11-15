@@ -1,13 +1,19 @@
+// Making the plan's tasks: each with its place, comments, files and
+// watchers, and then the relations between them.
+
 package importer
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/id"
 )
 
+// makeTasks makes every task of the plan, each after the one it is under,
+// and notes the assignees who have no member here.
 func (a *applier) makeTasks() error {
 	a.tasks, a.taskDone, a.unmatched = map[string]Task{}, map[string]bool{}, map[string]bool{}
 	for _, t := range a.plan.Tasks {
@@ -114,15 +120,16 @@ func (a *applier) place(t Task, key string, args map[string]any) error {
 // createTask sends the task. It asks for the number the task had at the
 // source; if someone here has that number already, it gets the next one.
 func (a *applier) createTask(t Task, key string, args map[string]any, notes []string) error {
-	sameKey := t.Number > 0 && strings.EqualFold(t.WasKey, fmt.Sprintf("%s-%d", key, t.Number))
-	args["description"] = a.describe(t, notes, sameKey)
+	keyHere := ""
 	if t.Number > 0 {
+		keyHere = fmt.Sprintf("%s-%d", key, t.Number)
 		args["number"] = t.Number
 	}
+	args["description"] = a.describe(t, notes, keyHere)
 	err := a.change("task.create", args)
-	if err != nil && t.Number > 0 && strings.Contains(err.Error(), "is taken") {
+	if t.Number > 0 && refusedFor(err, refusalNumberTaken) {
 		delete(args, "number")
-		args["description"] = a.describe(t, notes, false)
+		args["description"] = a.describe(t, notes, "")
 		err = a.change("task.create", args)
 	}
 	return err
@@ -130,10 +137,11 @@ func (a *applier) createTask(t Task, key string, args map[string]any, notes []st
 
 // describe is the task's description here: its text, with files pointing
 // at their copies, and a line under it saying where it came from. What it
-// was called there is said only when it is called something else here.
-func (a *applier) describe(t Task, notes []string, sameKey bool) string {
-	notes = notes[:len(notes):len(notes)]
-	if t.WasKey != "" && !sameKey {
+// was called there is said only when it is called something else here:
+// keyHere is the key it asks for here, empty when it gets the next one.
+func (a *applier) describe(t Task, notes []string, keyHere string) string {
+	notes = slices.Clip(notes)
+	if t.WasKey != "" && !strings.EqualFold(t.WasKey, keyHere) {
 		notes = append(notes, "Was "+t.WasKey+" there.")
 	}
 	if t.URL != "" {
@@ -204,7 +212,7 @@ func (a *applier) member(who string) string {
 	if w == "" {
 		return ""
 	}
-	local := strings.SplitN(w, "@", 2)[0]
+	local, _, _ := strings.Cut(w, "@")
 	for _, m := range a.members {
 		name := strings.ToLower(m.Name)
 		if strings.ToLower(m.Email) == w || name == w || m.Handle == w || m.Handle == local || name == strings.ReplaceAll(local, ".", " ") {

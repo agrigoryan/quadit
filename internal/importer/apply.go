@@ -1,3 +1,6 @@
+// Apply, the run of it that the apply_*.go files add steps to, and the
+// refusals a run gets past.
+
 package importer
 
 import (
@@ -89,12 +92,35 @@ func (a *applier) change(typ string, args map[string]any) error {
 	}
 	// The same thing from an earlier run, but changed at the source since
 	// (an edited description, say): what is here stays as it is.
-	if err != nil && strings.Contains(err.Error(), "is already in use") {
+	if refusedFor(err, refusalAlreadyInUse) {
 		a.fresh = false
 		a.sum.Already++
 		return nil
 	}
 	return err
+}
+
+// The refusals an import gets past, each matched by what its message
+// says (see refusedFor).
+const (
+	// refusalAlreadyInUse: the thing's id is in use, by the same thing
+	// made by an earlier run of the import.
+	refusalAlreadyInUse = "is already in use"
+	// refusalNumberTaken: the task number asked for is someone else's here.
+	refusalNumberTaken = "is taken"
+)
+
+// refusedFor says whether err is the API refusing a change for reason.
+//
+// It matches the refusal's message, which the code style otherwise forbids,
+// because nothing else tells these refusals apart: the API answers both with
+// the code "conflict" and no field. The refusal reaches an import as
+// internal/cli's APIError over the network and as internal/engine's Error
+// from inside the server, and the importer depends on neither. Once the
+// engine gives each refusal a code of its own, this matches on the code
+// (with errors.As on an interface both error types satisfy) instead.
+func refusedFor(err error, reason string) bool {
+	return err != nil && strings.Contains(err.Error(), reason)
 }
 
 // list reads one of the workspace's lists: projects, statuses, members.

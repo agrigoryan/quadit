@@ -1,3 +1,6 @@
+// Making the plan's pages and databases, with their links and pictures
+// pointing here.
+
 package importer
 
 import (
@@ -76,9 +79,9 @@ func (a *applier) localImages(d Doc, text string) string {
 	}
 	return localImage.ReplaceAllStringFunc(text, func(m string) string {
 		sub := localImage.FindStringSubmatch(m)
-		ref, _ := url.PathUnescape(sub[2])
-		if strings.Contains(ref, "://") {
-			return m
+		ref, err := url.PathUnescape(sub[2])
+		if err != nil || strings.Contains(ref, "://") {
+			return m // not a path to a file beside the page
 		}
 		for _, p := range []string{filepath.Join(d.Dir, ref), filepath.Join(d.Dir, filepath.Base(ref))} {
 			if st, err := os.Stat(p); err == nil && !st.IsDir() {

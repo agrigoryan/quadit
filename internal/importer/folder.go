@@ -1,3 +1,6 @@
+// The folder sources (markdown, obsidian): a folder of Markdown, or a zip
+// of one, as a tree of pages.
+
 package importer
 
 import (
@@ -13,10 +16,12 @@ import (
 // such a folder; its [[links]] are followed when the plan is applied.
 type folder struct{ kind string }
 
+// Kind is "markdown" or "obsidian".
 func (f folder) Kind() string { return f.kind }
 
+// Read reads the folder, or the zip of it, at source.
 func (f folder) Read(source string, _ Options) (Plan, error) {
-	dir, tmp, err := unpacked(source, f.kind, false)
+	dir, tmp, err := unpacked(source, f.kind, zipByName)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -27,15 +32,23 @@ func (f folder) Read(source string, _ Options) (Plan, error) {
 	return (&tree{source: f.kind, root: dir, tmp: tmp}).read()
 }
 
+// zipRule says which files unpacked takes for a zip.
+type zipRule int
+
+const (
+	zipByName  zipRule = iota // only a file whose name ends in .zip
+	zipAnyFile                // any file, whatever its name
+)
+
 // unpacked gives the folder to read for source: source itself, or the
 // temporary folder its zip was unpacked into (tmp, to remove once the plan
-// is applied). With anyFile, a file is taken for a zip whatever its name.
-func unpacked(source, kind string, anyFile bool) (dir, tmp string, err error) {
+// is applied).
+func unpacked(source, kind string, rule zipRule) (dir, tmp string, err error) {
 	info, err := os.Stat(source)
 	if err != nil {
 		return "", "", err
 	}
-	if info.IsDir() || (!anyFile && !strings.HasSuffix(strings.ToLower(source), ".zip")) {
+	if info.IsDir() || (rule == zipByName && !strings.HasSuffix(strings.ToLower(source), ".zip")) {
 		return source, "", nil
 	}
 	tmp, err = unzipToTemp(source, kind)
@@ -60,6 +73,7 @@ type tree struct {
 	dirDoc map[string]bool
 }
 
+// read walks the tree into a plan of pages and databases.
 func (t *tree) read() (Plan, error) {
 	t.plan, t.dirDoc = Plan{Source: t.source, Tmp: t.tmp}, map[string]bool{}
 	info, err := os.Stat(t.root)
@@ -107,7 +121,10 @@ func (t *tree) files() ([]string, error) {
 
 // file adds what one file becomes: a page, a database, or nothing.
 func (t *tree) file(p string) error {
-	rel, _ := filepath.Rel(t.root, p)
+	rel, err := filepath.Rel(t.root, p)
+	if err != nil {
+		return err
+	}
 	ext := filepath.ToSlash(strings.TrimSuffix(rel, filepath.Ext(rel)))
 	switch strings.ToLower(filepath.Ext(p)) {
 	case ".md", ".markdown":
@@ -144,9 +161,9 @@ func (t *tree) name(path string) string {
 // parent returns the page a directory stands for, making a page for each
 // directory on the way unless a file of the same name is that page.
 func (t *tree) parent(dir string) string {
-	rel, _ := filepath.Rel(t.root, dir)
-	if rel == "." {
-		return ""
+	rel, err := filepath.Rel(t.root, dir)
+	if err != nil || rel == "." {
+		return "" // the root, or a folder outside it: no page
 	}
 	ext := filepath.ToSlash(rel)
 	if !t.dirDoc[ext] {

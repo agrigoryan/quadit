@@ -1,3 +1,5 @@
+// Bringing the plan's files over, and pointing text at the copies.
+
 package importer
 
 import (
@@ -40,7 +42,8 @@ func (a *applier) send(ext string) string {
 	if u, ok := a.files.sent[ext]; ok {
 		return u
 	}
-	f, u, isNew := a.files.byExt[ext], "", true
+	f, isNew := a.files.byExt[ext], true
+	var u string
 	var err error
 	if up, ok := a.sink.(FileUploader); ok {
 		u, isNew, err = up.UploadAs(a.uid("file", ext), f.Path)

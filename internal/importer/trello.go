@@ -1,15 +1,19 @@
+// The Trello source: the JSON a board exports.
+
 package importer
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 )
 
 // trello reads the JSON that a Trello board exports.
 type trello struct{}
 
+// Kind is "trello".
 func (trello) Kind() string { return "trello" }
 
 // trelloBoard is the part of a board export that is brought over.
@@ -35,6 +39,7 @@ type trelloBoard struct {
 	}
 }
 
+// Read reads the board's JSON export at path.
 func (trello) Read(path string, _ Options) (Plan, error) {
 	plan := Plan{Source: "trello"}
 	raw, err := os.ReadFile(path)
@@ -89,8 +94,7 @@ func (b trelloBoard) checklists() map[string]string {
 // comments gives each card's comments, oldest first, by the card's id.
 func (b trelloBoard) comments() map[string][]Comment {
 	out := map[string][]Comment{}
-	for i := len(b.Actions) - 1; i >= 0; i-- { // the export lists newest first
-		a := b.Actions[i]
+	for _, a := range slices.Backward(b.Actions) { // the export lists newest first
 		if a.Type == "commentCard" {
 			out[a.Data.Card.ID] = append(out[a.Data.Card.ID], Comment{Author: a.MemberCreator.FullName, At: a.Date, Body: a.Data.Text})
 		}
