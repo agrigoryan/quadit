@@ -73,6 +73,9 @@ func (s *Syncer) Run(ctx context.Context) {
 		}
 		var list []core.DocSource
 		if err := s.Store.List(ctx, &list, store.Where(store.Live)); err != nil {
+			if ctx.Err() == nil {
+				s.Log.Error("repository sync: the sources could not be listed; this round is skipped", "err", err)
+			}
 			continue
 		}
 		for _, src := range list {
