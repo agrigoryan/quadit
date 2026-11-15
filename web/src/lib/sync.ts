@@ -22,7 +22,7 @@
 // says so; the shell then shows the way out.
 
 import { create } from "zustand";
-import { api, ApiError, workspacePath } from "@/lib/api";
+import { api, ApiError, noteReachable, workspacePath } from "@/lib/api";
 import { type EventStream, openEventStream } from "@/lib/event-stream";
 import { restoreQueue } from "@/lib/mutate";
 import {
@@ -130,8 +130,15 @@ function post(s: Session, msg: Message) {
 
 /** Sets the stream's state here and, from the leader, in every other tab. */
 function setStream(s: Session, state: StreamState) {
-  if (getState().stream !== state) useStore.setState({ stream: state });
+  showStream(state);
   if (s.role === "leader") post(s, { t: "state", state, seq: getState().seq });
+}
+
+/** Puts the stream's state in the store. Live is the surest sign the server is back: what waits to try again does. */
+function showStream(state: StreamState) {
+  if (getState().stream === state) return;
+  useStore.setState({ stream: state });
+  if (state === "live") noteReachable();
 }
 
 // ---- the starting copy ----
@@ -460,7 +467,7 @@ function hear(s: Session, msg: Message) {
     case "state":
       s.asked = false;
       s.misses = 0;
-      if (getState().stream !== msg.state) useStore.setState({ stream: msg.state });
+      showStream(msg.state);
       if (msg.seq > getState().seq) void catchUp(s);
       return;
     case "reset":

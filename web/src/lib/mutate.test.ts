@@ -2,7 +2,7 @@
 // again unchanged when the server cannot be reached, undone when refused.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, NetworkError } from "@/lib/api";
+import { api, ApiError, NetworkError, noteReachable } from "@/lib/api";
 import { clearOutbox, mutate, restoreQueue } from "@/lib/mutate";
 import { outbox, type OutboxItem } from "@/lib/outbox";
 import { applyEvents, clearStore, getState, loadBootstrap } from "@/lib/store";
@@ -128,6 +128,41 @@ describe("mutate", () => {
     await done;
     expect(getState().offline).toBe(false);
     expect(getState().collections.tasks.t1?.priority).toBe(2);
+  });
+
+  it("waits about a second before the first new try, and tries at once when the server is heard from", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(1);
+    const done = mutate({ type: "task.update", args: { id: "t1", priority: 2 } });
+    await settle();
+    calls[0]?.fail(new NetworkError());
+    await vi.advanceTimersByTimeAsync(999);
+    expect(calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(calls).toHaveLength(2);
+
+    calls[1]?.fail(new NetworkError());
+    await settle();
+    noteReachable();
+    await settle();
+    expect(calls).toHaveLength(3);
+    calls[2]?.answer([]);
+    await done;
+  });
+
+  it("does not make a change wait behind a retry of one that was forgotten meanwhile", async () => {
+    const forgotten = mutate({ type: "task.update", args: { id: "t1", title: "x" } }).catch((err: unknown) => err);
+    await settle();
+    calls[0]?.fail(new NetworkError());
+    await settle();
+    await clearOutbox();
+    expect(await forgotten).toBeInstanceOf(Error);
+
+    const next = mutate({ type: "task.update", args: { id: "t1", title: "y" } });
+    await settle();
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.changes[0]?.args.title).toBe("y");
+    calls[1]?.answer([]);
+    await next;
   });
 
   it("forgets the whole queue on a 401 without undoing anything", async () => {

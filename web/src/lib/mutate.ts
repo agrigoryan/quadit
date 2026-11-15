@@ -14,7 +14,7 @@
 // taken over this way has nothing on screen to undo; if the server refuses
 // it, a note says what was not saved.
 
-import { api, ApiError, errorMessage, NetworkError, workspacePath } from "@/lib/api";
+import { api, ApiError, errorMessage, NetworkError, whenReachable, workspacePath } from "@/lib/api";
 import type { Changes } from "@/lib/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -123,28 +123,10 @@ interface Job {
 
 const queue: Job[] = [];
 let pumping = false;
-let wake: (() => void) | null = null;
-
-if (typeof window !== "undefined") window.addEventListener("online", () => wake?.());
-// The live stream coming back is the surest sign the server can be reached again.
-useStore.subscribe((s, prev) => {
-  if (s.stream === "live" && prev.stream !== "live") wake?.();
-});
+/** The wait before a retry, while there is one: pump() sets it, and forgetQueue() ends it when the queue is emptied. */
+let retryWait: AbortController | null = null;
 
 const countUnsent = () => useStore.setState({ unsent: queue.length });
-
-/** Waits before a retry; coming back online ends the wait early. */
-function pause(ms: number) {
-  return new Promise<void>((resolve) => {
-    const timer = setTimeout(done, ms);
-    function done() {
-      clearTimeout(timer);
-      wake = null;
-      resolve();
-    }
-    wake = done;
-  });
-}
 
 async function pump() {
   if (pumping) return;
@@ -171,8 +153,9 @@ async function pump() {
       if (err instanceof NetworkError) {
         // Not refused, just not delivered: keep it and try again.
         useStore.setState({ offline: true });
-        attempt++;
-        await pause(Math.min(1000 * 2 ** Math.min(attempt, 4), 15_000));
+        retryWait = new AbortController();
+        // Rejects only when the queue was emptied meanwhile, which the loop sees for itself.
+        await whenReachable(attempt++, retryWait.signal).catch(() => {});
         continue;
       }
       if (err instanceof ApiError && err.status === 401) {
@@ -203,7 +186,7 @@ function forgetQueue(reason: unknown) {
     clearDrafts(job.made);
     job.reject(reason);
   }
-  wake?.();
+  retryWait?.abort();
 }
 
 /**
