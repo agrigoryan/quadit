@@ -47,21 +47,6 @@ func (r *Resolver) Task(ref string) (core.Task, error) { return r.anyTask("task"
 // a refusal.
 func (r *Resolver) Member(field, ref string) (core.Member, error) { return r.memberRef(field, ref) }
 
-// Status finds a status of the project by id, name or category.
-func (r *Resolver) Status(project core.Project, ref string) (core.Status, error) {
-	return r.status(project, "status", ref)
-}
-
-// Label finds a label usable in the project by id or name.
-func (r *Resolver) Label(project core.Project, ref string) (core.Label, error) {
-	return r.label(project, "label", ref)
-}
-
-// Epic finds an epic of the project by id or name.
-func (r *Resolver) Epic(project core.Project, ref string) (core.Epic, error) {
-	return r.epic(project, "epic", ref)
-}
-
 // Cycle finds a cycle of the project by id, number, "current" or "next".
 func (r *Resolver) Cycle(project core.Project, ref string) (core.Cycle, error) {
 	return r.cycle(project, "cycle", ref)
