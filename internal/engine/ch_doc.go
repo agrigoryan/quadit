@@ -289,6 +289,8 @@ type pageEdit struct {
 	p           *patch
 	wasAudience string
 	unshared    []string // those who could see the page and no longer can
+	moved       bool     // its project changes
+	toProject   string   // to this one; none when empty
 }
 
 func (u *pageEdit) updateLook() error {
@@ -329,23 +331,6 @@ func (u *pageEdit) parent() error {
 
 func (u *pageEdit) rank() error {
 	return u.p.rank(u.a.Rank, &u.d.Rank)
-}
-
-func (u *pageEdit) project() error {
-	a := u.a
-	if !a.Project.Set {
-		return nil
-	}
-	pid := ""
-	if !a.Project.Null && a.Project.V != "" {
-		pr, err := u.c.project(a.Project.V)
-		if err != nil {
-			return err
-		}
-		pid = pr.ID
-	}
-	u.p.put("project_id", u.d.ProjectID, pid)
-	return nil
 }
 
 // private makes the page its owner's alone, or everyone's again.
@@ -474,14 +459,27 @@ func (u *pageEdit) save() error {
 			}
 		}
 	}
-	if _, ok := p.set["title"]; ok {
-		rows, err := LoadBlocks(cxLister{c}, d.ID)
-		if err != nil {
+	if u.moved {
+		// The pages under it that are in the project because it is go with it.
+		if err := c.moveSubPages(d, u.toProject); err != nil {
 			return err
 		}
-		return c.afterDocText(d, newEditor(c, d, rows))
+		d.ProjectID = u.toProject
+	}
+	// Search knows a page by its title, and keeps it to those who may see its project.
+	if _, ok := p.set["title"]; ok || u.moved {
+		return c.reindexDoc(d)
 	}
 	return nil
+}
+
+// reindexDoc puts a page as it is now back into search and the mention lists.
+func (c *cx) reindexDoc(d core.Doc) error {
+	rows, err := LoadBlocks(cxLister{c}, d.ID)
+	if err != nil {
+		return err
+	}
+	return c.afterDocText(d, newEditor(c, d, rows))
 }
 
 // subtree returns a page and every page under it.
