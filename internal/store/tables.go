@@ -10,8 +10,8 @@
 //     `db:"col"`, `db:"col,null"` or `db:"col,json"` (the rules are in
 //     internal/store/sqlstore/record.go). A table of a workspace has a
 //     workspace_id column.
-//  3. An entry in the list in init below: register[core.Thing]("things",
-//     "thing", ws), or global for a table outside workspaces.
+//  3. An entry in the list below: table[core.Thing]("things", "thing",
+//     inWorkspace), or global for a table outside workspaces.
 //  4. The entry's place in that list: it is the order a backup is loaded
 //     back in (and the reverse is the order a workspace is purged in), so
 //     a table goes after every table it refers to.
@@ -22,7 +22,7 @@ package store
 
 import (
 	"reflect"
-	"sort"
+	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 )
@@ -39,19 +39,86 @@ type Table struct {
 	Global bool
 }
 
-var (
-	byType    = map[reflect.Type]*Table{}
-	byName    = map[string]*Table{}
-	loadOrder = map[string]int{} // table name -> its place in the registry
-)
+// Where a table is: inside workspaces, or outside them (Table.Global).
+const inWorkspace, global = false, true
 
-// register adds the table of row type T. Tables are registered parents
-// first, which makes the order they are registered in the load order.
-func register[T any](name, noun string, global bool) {
-	t := &Table{Name: name, Type: reflect.TypeFor[T](), Noun: noun, Global: global}
-	byType[t.Type] = t
-	byName[name] = t
-	loadOrder[name] = len(loadOrder)
+// tables is every table, in the order a backup loads them back (the
+// reverse is the order a workspace is purged in): a table comes after
+// every table it refers to.
+var tables = []*Table{
+	table[core.Workspace]("workspaces", "workspace", global),
+	table[core.User]("users", "user", global),
+	table[core.Member]("members", "member", inWorkspace),
+	table[core.APIToken]("api_tokens", "token", inWorkspace),
+	table[core.Project]("projects", "project", inWorkspace),
+	table[core.Status]("statuses", "status", inWorkspace),
+	table[core.Label]("labels", "label", inWorkspace),
+	table[core.Epic]("epics", "epic", inWorkspace),
+	table[core.Milestone]("milestones", "milestone", inWorkspace),
+	table[core.Cycle]("cycles", "cycle", inWorkspace),
+	table[core.Task]("tasks", "task", inWorkspace),
+	table[core.TaskLabel]("task_labels", "task label", inWorkspace),
+	table[core.Relation]("task_relations", "relation", inWorkspace),
+	table[core.Decision]("decisions", "decision", inWorkspace),
+	table[core.Option]("decision_options", "option", inWorkspace),
+	table[core.Doc]("docs", "page", inWorkspace),
+	table[core.Block]("doc_blocks", "block", inWorkspace),
+	table[core.DocVersion]("doc_versions", "version", inWorkspace),
+	table[core.DBProperty]("db_properties", "property", inWorkspace),
+	table[core.DBView]("db_views", "database view", inWorkspace),
+	table[core.DocSource]("doc_sources", "source", inWorkspace),
+	table[core.Comment]("comments", "comment", inWorkspace),
+	table[core.Event]("events", "event", inWorkspace),
+	table[core.AppliedChange]("changes", "change", inWorkspace),
+	table[core.Cursor]("cursors", "cursor", inWorkspace),
+	table[core.View]("views", "view", inWorkspace),
+	table[core.Watcher]("watchers", "watcher", inWorkspace),
+	table[core.Notification]("notifications", "notification", inWorkspace),
+	table[core.TaskLink]("task_links", "link", inWorkspace),
+	table[core.Ref]("refs", "reference", inWorkspace),
+	table[core.Template]("templates", "template", inWorkspace),
+	table[core.Preference]("preferences", "preference", inWorkspace),
+	table[core.File]("files", "file", inWorkspace),
+	table[core.Attachment]("attachments", "attachment", inWorkspace),
+	table[core.Session]("sessions", "session", global),
+	table[core.Identity]("identities", "connected account", global),
+	table[core.Passkey]("passkeys", "passkey", global),
+	table[core.RecoveryCode]("recovery_codes", "recovery code", global),
+	table[core.Invite]("invites", "invitation", global),
+	table[core.OneTimeToken]("one_time_tokens", "one-time link", global),
+	table[core.Setting]("settings", "setting", global),
+	table[core.AuditEntry]("audit_log", "audit entry", global),
+	table[core.RateCounter]("rate_counters", "rate counter", global),
+	table[core.PushSubscription]("push_subscriptions", "push subscription", global),
+	table[core.OAuthClient]("oauth_clients", "OAuth client", global),
+	table[core.Backup]("backups", "backup", global),
+	table[core.Webhook]("webhooks", "webhook", inWorkspace),
+	table[core.WebhookDelivery]("webhook_deliveries", "delivery", inWorkspace),
+	table[core.Rule]("rules", "rule", inWorkspace),
+	table[core.Job]("jobs", "job", global),
+	table[core.AgentSession]("agent_sessions", "agent session", inWorkspace),
+	table[core.Resource]("resources", "resource", inWorkspace),
+	table[core.ResourceClaim]("resource_claims", "claim", inWorkspace),
+	table[core.Integration]("integrations", "integration", inWorkspace),
+	table[core.Secret]("secrets", "secret", inWorkspace),
+	table[core.Presence]("doc_presence", "presence", inWorkspace),
+	table[core.TaskKey]("task_keys", "task key", inWorkspace),
+}
+
+// table is the entry of row type T.
+func table[T any](name, noun string, isGlobal bool) *Table {
+	return &Table{Name: name, Type: reflect.TypeFor[T](), Noun: noun, Global: isGlobal}
+}
+
+var byType, byName = indexTables()
+
+// indexTables finds the tables by row type and by name.
+func indexTables() (map[reflect.Type]*Table, map[string]*Table) {
+	byType, byName := map[reflect.Type]*Table{}, map[string]*Table{}
+	for _, t := range tables {
+		byType[t.Type], byName[t.Name] = t, t
+	}
+	return byType, byName
 }
 
 // TableOf returns the table of a registered row type.
@@ -62,72 +129,4 @@ func TableNamed(name string) (*Table, bool) { tb, ok := byName[name]; return tb,
 
 // Tables lists every registered table, in an order that is safe to load (a
 // table comes after the tables it refers to).
-func Tables() []*Table {
-	out := make([]*Table, 0, len(byName))
-	for _, t := range byName {
-		out = append(out, t)
-	}
-	sort.Slice(out, func(i, j int) bool { return loadOrder[out[i].Name] < loadOrder[out[j].Name] })
-	return out
-}
-
-func init() {
-	const ws, global = false, true
-	register[core.Workspace]("workspaces", "workspace", global)
-	register[core.User]("users", "user", global)
-	register[core.Member]("members", "member", ws)
-	register[core.APIToken]("api_tokens", "token", ws)
-	register[core.Project]("projects", "project", ws)
-	register[core.Status]("statuses", "status", ws)
-	register[core.Label]("labels", "label", ws)
-	register[core.Epic]("epics", "epic", ws)
-	register[core.Milestone]("milestones", "milestone", ws)
-	register[core.Cycle]("cycles", "cycle", ws)
-	register[core.Task]("tasks", "task", ws)
-	register[core.TaskLabel]("task_labels", "task label", ws)
-	register[core.Relation]("task_relations", "relation", ws)
-	register[core.Decision]("decisions", "decision", ws)
-	register[core.Option]("decision_options", "option", ws)
-	register[core.Doc]("docs", "page", ws)
-	register[core.Block]("doc_blocks", "block", ws)
-	register[core.DocVersion]("doc_versions", "version", ws)
-	register[core.DBProperty]("db_properties", "property", ws)
-	register[core.DBView]("db_views", "database view", ws)
-	register[core.DocSource]("doc_sources", "source", ws)
-	register[core.Comment]("comments", "comment", ws)
-	register[core.Event]("events", "event", ws)
-	register[core.AppliedChange]("changes", "change", ws)
-	register[core.Cursor]("cursors", "cursor", ws)
-	register[core.View]("views", "view", ws)
-	register[core.Watcher]("watchers", "watcher", ws)
-	register[core.Notification]("notifications", "notification", ws)
-	register[core.TaskLink]("task_links", "link", ws)
-	register[core.Ref]("refs", "reference", ws)
-	register[core.Template]("templates", "template", ws)
-	register[core.Preference]("preferences", "preference", ws)
-	register[core.File]("files", "file", ws)
-	register[core.Attachment]("attachments", "attachment", ws)
-	register[core.Session]("sessions", "session", global)
-	register[core.Identity]("identities", "connected account", global)
-	register[core.Passkey]("passkeys", "passkey", global)
-	register[core.RecoveryCode]("recovery_codes", "recovery code", global)
-	register[core.Invite]("invites", "invitation", global)
-	register[core.OneTimeToken]("one_time_tokens", "one-time link", global)
-	register[core.Setting]("settings", "setting", global)
-	register[core.AuditEntry]("audit_log", "audit entry", global)
-	register[core.RateCounter]("rate_counters", "rate counter", global)
-	register[core.PushSubscription]("push_subscriptions", "push subscription", global)
-	register[core.OAuthClient]("oauth_clients", "OAuth client", global)
-	register[core.Backup]("backups", "backup", global)
-	register[core.Webhook]("webhooks", "webhook", ws)
-	register[core.WebhookDelivery]("webhook_deliveries", "delivery", ws)
-	register[core.Rule]("rules", "rule", ws)
-	register[core.Job]("jobs", "job", global)
-	register[core.AgentSession]("agent_sessions", "agent session", ws)
-	register[core.Resource]("resources", "resource", ws)
-	register[core.ResourceClaim]("resource_claims", "claim", ws)
-	register[core.Integration]("integrations", "integration", ws)
-	register[core.Secret]("secrets", "secret", ws)
-	register[core.Presence]("doc_presence", "presence", ws)
-	register[core.TaskKey]("task_keys", "task key", ws)
-}
+func Tables() []*Table { return slices.Clone(tables) }
