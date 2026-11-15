@@ -63,6 +63,7 @@ func taskTake(c *cx, a taskTakeArgs) error {
 	if t.AssigneeID != c.actor.UserID {
 		p.put("assignee_id", t.AssigneeID, c.actor.UserID)
 		t.AssigneeID = c.actor.UserID
+		newAssignee = c.actor.UserID
 		if c.actor.Kind != core.KindAgent {
 			p.put("asked_by", t.AskedBy, "") // a person holds it now
 			t.AskedBy = ""
