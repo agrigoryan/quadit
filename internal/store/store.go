@@ -241,7 +241,7 @@ type TaskFilter struct {
 	// Sort is one of: created (default), -created, rank, priority, due,
 	// -activity, -updated, key.
 	Sort string
-	// Limit is the most tasks to return: 0, or more than 5000, gives 100,
+	// Limit is the most tasks to return, itself at most 5000: 0 gives 100,
 	// unlike Q.Limit, where 0 is every row.
 	Limit  int
 	Offset int

@@ -14,8 +14,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// The number of rows a list returns when its filter asks for none, or for
-// more than the most it may have.
+// The number of rows a list returns when its filter asks for none, and the
+// most it returns whatever it asks for.
 const (
 	defaultTaskLimit  = 100
 	maxTaskLimit      = 5000
@@ -23,12 +23,12 @@ const (
 	maxEventLimit     = 2000
 )
 
-// limitOr is asked when it is in 1..most, else byDefault.
+// limitOr is asked, held to most; byDefault when nothing is asked.
 func limitOr(asked, byDefault, most int) int {
-	if asked <= 0 || asked > most {
+	if asked <= 0 {
 		return byDefault
 	}
-	return asked
+	return min(asked, most)
 }
 
 // taskWhere builds the WHERE of a task filter on the tasks table under the
