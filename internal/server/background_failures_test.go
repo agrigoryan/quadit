@@ -405,3 +405,43 @@ func TestAToolCallWhoseParamsDoNotReadIsToldSo(t *testing.T) {
 		t.Fatalf("the answer's error: %+v", answer.Error)
 	}
 }
+
+func TestADeliveryInFlightAtShutdownIsKeptForTheNextStart(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		// A receiver that takes the request and does not answer until the test ends.
+		arrived, ended := make(chan struct{}, 1), make(chan struct{})
+		slow := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			select {
+			case arrived <- struct{}{}:
+			default:
+			}
+			select {
+			case <-req.Context().Done():
+			case <-ended:
+			}
+		}))
+		t.Cleanup(slow.Close)
+		t.Cleanup(func() { close(ended) })
+		hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": slow.URL, "event_types": []string{"task.*"}})["ref"].(string)
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
+		select {
+		case <-arrived:
+		case <-time.After(12 * time.Second):
+			t.Fatal("the delivery never reached the receiver")
+		}
+
+		start := time.Now()
+		s.stopRun()
+		if took := time.Since(start); took > 3*time.Second {
+			t.Errorf("the background work took %s to stop; the send should end when the server stops", took)
+		}
+		// Run has returned, so what the delivery came to is recorded by now.
+		d := deliveryOf(t, st, hook)
+		if d.State != core.DeliveryPending || d.Attempts != 0 || d.NextAt > time.Now().UnixMilli() || !strings.Contains(d.Error, "stopped") {
+			t.Fatalf("after shutdown the delivery is %q, %d attempts, next at %d (now %d), error %q; want it pending, due now, its attempt not counted",
+				d.State, d.Attempts, d.NextAt, time.Now().UnixMilli(), d.Error)
+		}
+	})
+}

@@ -29,6 +29,8 @@ type site struct {
 	dir   string
 	owner *http.Client
 	srv   *server.Server
+	// stopRun ends the server's background work and returns when Run has.
+	stopRun func()
 }
 
 func newSite(t *testing.T, st store.Store) *site {
@@ -46,10 +48,15 @@ func newSite(t *testing.T, st store.Store) *site {
 	hs.Config.Handler = srv.Handler()
 	hs.Start()
 	ctx, stop := context.WithCancel(context.Background())
-	go srv.Run(ctx)
-	t.Cleanup(func() { stop(); hs.Close() })
+	ran := make(chan struct{})
+	go func() {
+		defer close(ran)
+		srv.Run(ctx)
+	}()
+	stopRun := func() { stop(); <-ran }
+	t.Cleanup(func() { stopRun(); hs.Close() })
 	jar, _ := cookiejar.New(nil)
-	s := &site{t: t, url: base, dir: dir, owner: &http.Client{Jar: jar}, srv: srv}
+	s := &site{t: t, url: base, dir: dir, owner: &http.Client{Jar: jar}, srv: srv, stopRun: stopRun}
 	s.call(s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
 		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
 	return s

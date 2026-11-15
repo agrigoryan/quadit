@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/blob"
@@ -18,13 +19,11 @@ import (
 // itself rolls cycles over every hour and expires quiet holds on shared
 // resources every minute.
 //
-// At shutdown, when ctx ends, Run returns at once and does not wait for the
-// loops it started: nothing can. Each loop sees ctx end at its next check
-// and returns; one in the middle of a piece of work (a job, a webhook
-// delivery, a repository sync) carries on until that work next looks at
-// ctx, and may still be running when the caller closes the store, or be cut
-// off when the process exits. A job cut off this way is claimed for five
-// minutes and then tried again; a delivery stays in its queue.
+// When ctx ends Run returns once every loop it started has returned, so
+// the caller may then close the store. A loop in the middle of a piece of
+// work (a job, a webhook delivery, a repository sync) ends it at its next
+// look at ctx, and records what became of it first; outbound requests see
+// ctx end and are cut off.
 func (s *Server) Run(ctx context.Context) {
 	var fc blob.Config
 	if s.setting(ctx, "files", &fc) {
@@ -33,8 +32,10 @@ func (s *Server) Run(ctx context.Context) {
 		}
 	}
 	s.applyLimits(ctx)
+	var loops sync.WaitGroup
+	defer loops.Wait()
 	for _, r := range runners {
-		go r(s, ctx)
+		loops.Go(func() { r(s, ctx) })
 	}
 	hourly := time.NewTicker(time.Hour)
 	defer hourly.Stop()
@@ -62,7 +63,7 @@ func (s *Server) Run(ctx context.Context) {
 }
 
 // runners are background loops started with the server. Each runs until
-// ctx ends; Run does not wait for them (see Run).
+// ctx ends; Run waits for them to return.
 var runners []func(s *Server, ctx context.Context)
 
 func init() {

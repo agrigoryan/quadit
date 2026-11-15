@@ -81,6 +81,10 @@ func Send(ctx context.Context, c Config, m Message) error {
 	if err != nil {
 		return fmt.Errorf("mail: connect to %s: %w", addr, err)
 	}
+	// The session ends with ctx too, not only the dial: a server that is
+	// stopping does not wait out a slow mail server.
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() }) // the send then fails, and says so
+	defer stop()
 	if err := conn.SetDeadline(time.Now().Add(sessionTimeout)); err != nil {
 		conn.Close()
 		return fmt.Errorf("mail: %w", err)

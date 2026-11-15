@@ -178,7 +178,13 @@ func Serve(args []string, version string) int {
 	if web := WebHandler(); web != nil {
 		srv.SetWeb(web)
 	}
-	go srv.Run(ctx)
+	// The background work ends with ctx; ran says it has, so the store is
+	// not closed under it.
+	ran := make(chan struct{})
+	go func() {
+		defer close(ran)
+		srv.Run(ctx)
+	}()
 
 	hs := &http.Server{Addr: o.Listen, Handler: srv.Handler(), ReadHeaderTimeout: readHeaderTimeout}
 	errc := make(chan error, 3)
@@ -198,13 +204,15 @@ func Serve(args []string, version string) int {
 		}()
 	}
 	log.Info("quadit is running", "version", version, "listen", o.Listen, "https", run.https(), "url", o.BaseURL, "database", st.Dialect(), "files", files.Kind())
+	code := 0
 	select {
 	case err := <-errc:
 		log.Error("server stopped", "err", err)
-		return 1
+		code = 1
 	case <-ctx.Done():
 	}
 	log.Info("shutting down")
+	stop() // ends the background work, if a listener failure brought us here
 	srv.Stop()
 	// ctx is done by now: the time to finish is counted on one that is not.
 	shut, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
@@ -212,7 +220,12 @@ func Serve(args []string, version string) int {
 	if err := hs.Shutdown(shut); err != nil {
 		log.Warn("requests were cut off", "err", err)
 	}
-	return 0
+	select {
+	case <-ran:
+	case <-shut.Done():
+		log.Warn("background work (deliveries, jobs, syncs) did not end in time; the database closes under it, and what it did not record is done again on the next start")
+	}
+	return code
 }
 
 // serveFlags are what quadit serve is told beside the Options: logging,
