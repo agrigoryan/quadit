@@ -334,7 +334,13 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 			return err
 		}
 	}
-	return c.index(store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "doc", ScopeID: doc.ID, ProjectID: doc.ProjectID, AudienceID: doc.OwnerID, Title: doc.Title, Body: cm.Body})
+	return c.index(docCommentEntry(doc, cm))
+}
+
+// docCommentEntry is how search knows a comment on a page: by the page's
+// title, and only to those who may see the page.
+func docCommentEntry(doc core.Doc, cm core.Comment) store.SearchDoc {
+	return store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "doc", ScopeID: doc.ID, ProjectID: doc.ProjectID, AudienceID: doc.OwnerID, Title: doc.Title, Body: cm.Body}
 }
 
 // commentPlace returns where a comment's events belong, and the key of its

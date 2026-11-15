@@ -32,34 +32,14 @@ func (u *pageEdit) project() error {
 	return nil
 }
 
-// sameProjectBelow returns the pages under a page that are in its project,
-// down to the first that is not. A page under it that was tied to another
-// project, or to none, was put there on purpose: it and what is under it
-// are left out. Pages in the trash count, so one restored later comes back
-// where its parent is.
-func (c *cx) sameProjectBelow(root core.Doc) ([]core.Doc, error) {
-	var out []core.Doc
-	for at := []core.Doc{root}; len(at) > 0 && len(out) < 20_000; at = at[1:] {
-		var kids []core.Doc
-		if err := c.tx.List(c.ctx, &kids, store.Q{Where: []store.Cond{store.Eq("parent_id", at[0].ID)}, Order: "rank"}); err != nil {
-			return nil, err
-		}
-		for _, k := range kids {
-			if k.ProjectID == root.ProjectID {
-				out = append(out, k)
-				at = append(at, k)
-			}
-		}
-	}
-	return out, nil
-}
-
 // moveSubPages takes the pages under a page along when its project
 // changes: a sub-page is in the project because its parent is, as it was
-// when it was made. Each says so in the feed, and search keeps each to
-// those who may see the project it is in now.
+// when it was made. A page under it that was tied to another project, or
+// to none, was put there on purpose: it and what is under it are left out.
+// Each says so in the feed, and search keeps each to those who may see the
+// project it is in now.
 func (c *cx) moveSubPages(root core.Doc, toProject string) error {
-	below, err := c.sameProjectBelow(root)
+	below, err := c.below(root, func(k core.Doc) bool { return k.ProjectID == root.ProjectID })
 	if err != nil {
 		return err
 	}

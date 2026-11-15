@@ -128,7 +128,7 @@ comment.deleted {"changes":{"deleted_at":{"from":null,"to":1768986107000}},"id":
 attachment.created {"row":{"id":"#74","file_id":"#75","subject_type":"doc","subject_id":"#66","rank":"00000000sg","created_by":"#3","created_at":1768986109000,"file":{"id":"#75","name":"d.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1768986108000,"url":"/f/#75/d.png"}}}
 doc.created {"row":{"id":"#76","kind":"page","title":"Mine","owner_id":"#3","rank":"r","created_by":"#3","created_at":1768986110000,"updated_by":"#3","updated_at":1768986110000,"created_seq":129,"updated_seq":129,"content_seq":129}}
 doc.updated {"changes":{"shared_with":{"from":null,"to":["#2"]}},"id":"#76","row":{"id":"#76","kind":"page","title":"Mine","owner_id":"#3","shared_with":["#2"],"rank":"r","created_by":"#3","created_at":1768986110000,"updated_by":"#3","updated_at":1768986111000,"created_seq":129,"updated_seq":130,"content_seq":129}}
-doc.updated {"changes":{"shared_with":{"from":["#2"],"to":null}},"id":"#76","row":{"id":"#76","kind":"page","title":"Mine","owner_id":"#3","rank":"r","created_by":"#3","created_at":1768986110000,"updated_by":"#3","updated_at":1768986112000,"created_seq":129,"updated_seq":131,"content_seq":129}}
+doc.updated {"changes":{"shared_with":{"from":["#2"],"to":null}},"id":"#76"}
 doc.unshared {"gone":true,"id":"#76"}
 doc.created {"row":{"id":"#77","parent_id":"#66","kind":"page","title":"Details","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986113000,"updated_by":"#3","updated_at":1768986113000,"created_seq":133,"updated_seq":133,"content_seq":133}}
 doc.updated {"changes":{"project_id":{"from":"#5","to":"#14"}},"id":"#66"}

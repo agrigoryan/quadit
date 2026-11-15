@@ -265,7 +265,7 @@ func docUpdate(c *cx, a docUpdateArgs) error {
 	if err != nil {
 		return err
 	}
-	u := &pageEdit{c: c, a: a, d: d, p: newPatch(), wasAudience: docAudience(d)}
+	u := &pageEdit{c: c, a: a, d: d, p: newPatch(), was: d}
 	steps := []func() error{
 		u.look,
 		u.parent,
@@ -289,16 +289,15 @@ func docUpdate(c *cx, a docUpdateArgs) error {
 }
 
 // pageEdit is one doc.update under way: the page as it is becoming, the
-// patch that takes it there, and who could see it before.
+// patch that takes it there, and the page as it was.
 type pageEdit struct {
-	c           *cx
-	a           docUpdateArgs
-	d           core.Doc
-	p           *patch
-	wasAudience string
-	unshared    []string // those who could see the page and no longer can
-	moved       bool     // its project changes
-	toProject   string   // to this one; none when empty
+	c         *cx
+	a         docUpdateArgs
+	d         core.Doc
+	p         *patch
+	was       core.Doc
+	moved     bool   // its project changes
+	toProject string // to this one; none when empty
 }
 
 // look sets what the page is called and how it looks: its title, icon and
@@ -311,6 +310,8 @@ func (u *pageEdit) look() error {
 }
 
 // parent moves the page under another, which may not be one of its own.
+// Under a private page it is private the same way, as a page made there
+// is, unless it is someone else's private page, which only they change.
 func (u *pageEdit) parent() error {
 	c, a, d := u.c, u.a, u.d
 	if !a.Parent.Set {
@@ -338,6 +339,11 @@ func (u *pageEdit) parent() error {
 			}
 		}
 		pid = parent.ID
+		if parent.OwnerID != "" && pid != d.ParentID && (d.OwnerID == "" || d.OwnerID == c.actor.UserID) {
+			u.p.put("owner_id", d.OwnerID, parent.OwnerID)
+			u.p.put("shared_with", d.SharedWith, parent.SharedWith)
+			u.d.OwnerID, u.d.SharedWith = parent.OwnerID, parent.SharedWith
+		}
 	}
 	u.p.put("parent_id", d.ParentID, pid)
 	return nil
@@ -365,8 +371,7 @@ func (u *pageEdit) private() error {
 	return nil
 }
 
-// sharedWith sets who a private page is shared with, and notes who it no
-// longer is.
+// sharedWith sets who a private page is shared with.
 func (u *pageEdit) sharedWith() error {
 	if !u.a.SharedWith.Set {
 		return nil
@@ -380,11 +385,7 @@ func (u *pageEdit) sharedWith() error {
 		ids = append(ids, m.UserID)
 	}
 	u.p.put("shared_with", u.d.SharedWith, ids)
-	for _, was := range u.d.SharedWith {
-		if !slices.Contains(ids, was) {
-			u.unshared = append(u.unshared, was)
-		}
-	}
+	u.d.SharedWith = ids
 	return nil
 }
 
@@ -434,7 +435,8 @@ func (u *pageEdit) props() error {
 }
 
 // save writes the patch and tells those who see the page, and those who no
-// longer do.
+// longer do. A change of who sees it, or of its project, reaches the pages
+// under it.
 func (u *pageEdit) save() error {
 	c, d, p := u.c, u.d, u.p
 	seq := c.tx.NextSeq()
@@ -442,30 +444,13 @@ func (u *pageEdit) save() error {
 	if _, err := c.tx.Update(c.ctx, "docs", p.set, store.Eq("id", d.ID)); err != nil {
 		return err
 	}
-	// Going private must still tell everyone, so their copy can drop it.
-	audience := docAudience(d)
-	if u.wasAudience == "" {
-		audience = ""
-	}
-	data := core.EventData{ID: d.ID, Changes: p.changes}
-	if _, sharing := p.set["shared_with"]; sharing || u.wasAudience != docAudience(d) {
-		// Someone may be seeing this page for the first time: send all of it.
-		var now core.Doc
-		if err := c.tx.Get(c.ctx, &now, store.Eq("id", d.ID)); err != nil {
-			return err
-		}
-		data.Row = now
-	}
-	if err := c.emit(event{seq: seq, typ: "doc.updated", entity: "doc", entityID: d.ID, place: inDoc(d), audience: audience, data: data}); err != nil {
+	if err := c.tellReaders(seq, u.was, d, p.changes); err != nil {
 		return err
 	}
-	if docAudience(d) != "" {
-		// Someone the page is no longer shared with stops getting its events:
-		// tell each of them, alone, to let go of their copy.
-		for _, uid := range u.unshared {
-			if err := c.emit(event{seq: c.tx.NextSeq(), typ: "doc.unshared", entity: "doc", entityID: d.ID, place: place{scopeType: "user", scopeID: uid, projectID: d.ProjectID}, audience: uid, data: core.EventData{ID: d.ID, Gone: true}}); err != nil {
-				return err
-			}
+	readers := !sameReaders(u.was, d)
+	if readers {
+		if err := c.passReadersDown(u.was, d); err != nil {
+			return err
 		}
 	}
 	if u.moved {
@@ -478,20 +463,34 @@ func (u *pageEdit) save() error {
 		}
 		d.ProjectID = u.toProject
 	}
-	// Search knows a page by its title, and keeps it to those who may see its project.
-	if _, ok := p.set["title"]; ok || u.moved {
+	// Search knows a page by its title, and keeps it to those who may see it.
+	if _, ok := p.set["title"]; ok || u.moved || readers {
 		return c.reindexDoc(d)
 	}
 	return nil
 }
 
-// reindexDoc puts a page as it is now back into search and the mention lists.
+// reindexDoc puts a page as it is now back into search and the mention
+// lists, with the comments on it, which search shows under the page's title
+// and keeps to those who may see the page.
 func (c *cx) reindexDoc(d core.Doc) error {
 	rows, err := LoadBlocks(cxLister{c}, d.ID)
 	if err != nil {
 		return err
 	}
-	return c.afterDocText(d, newEditor(c, d, rows))
+	if err := c.afterDocText(d, newEditor(c, d, rows)); err != nil {
+		return err
+	}
+	var comments []core.Comment
+	if err := c.tx.List(c.ctx, &comments, store.Where(store.Eq("doc_id", d.ID), store.Live)); err != nil {
+		return err
+	}
+	for _, cm := range comments {
+		if err := c.index(docCommentEntry(d, cm)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // subtree returns a page and every page under it.
@@ -509,6 +508,27 @@ func (c *cx) subtree(root core.Doc, deletedAt int64) ([]core.Doc, error) {
 			return nil, err
 		}
 		out = append(out, kids...)
+	}
+	return out, nil
+}
+
+// below returns the pages under a page that follow it, down to the first
+// that does not: one that does not follow is left out with what is under
+// it. Pages in the trash count, so one restored later comes back as its
+// parent is.
+func (c *cx) below(root core.Doc, follows func(core.Doc) bool) ([]core.Doc, error) {
+	var out []core.Doc
+	for at := []core.Doc{root}; len(at) > 0 && len(out) < 20_000; at = at[1:] {
+		var kids []core.Doc
+		if err := c.tx.List(c.ctx, &kids, store.Q{Where: []store.Cond{store.Eq("parent_id", at[0].ID)}, Order: "rank"}); err != nil {
+			return nil, err
+		}
+		for _, k := range kids {
+			if follows(k) {
+				out = append(out, k)
+				at = append(at, k)
+			}
+		}
 	}
 	return out, nil
 }
