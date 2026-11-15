@@ -98,6 +98,8 @@ The aim is few places that deal with errors (see "Define errors out of existence
 
 ## Web app conventions
 
+The web app follows common React and TypeScript practice first: the official React guidance (the Rules of React, "You Might Not Need an Effect"), an established library before a hand-written equivalent, generated types from the server before hand-kept copies, semantic HTML, and Testing Library's way of testing what a person sees. The principles above are the lens for how deep a module is and what it is called; where the two pull apart here, common practice wins.
+
 `pnpm check` checks the rules a tool can (types, lint, format, tests). The folders under `web/src` are layers: `lib`, `i18n` and `ui` at the bottom; the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`) above them; `shell`, `pages` and `palette` on top.
 
 ### Files and layers
@@ -107,7 +109,7 @@ The aim is few places that deal with errors (see "Define errors out of existence
 4. Imports go through `@/`. No relative imports, no barrel files. Default exports only for lazy routes.
 
 ### Data and views
-5. A view file (`.tsx`) calls neither `api.*` nor `mutate` with an inline payload. Reads live in the folder's `data.ts`, writes in `actions.ts`.
+5. A write that carries knowledge (an optimistic row, several changes that belong together, a mapping from what the view has to what the change takes) lives in the folder's `actions.ts`. A write that is one plain change is called where it happens: a wrapper that only passes its arguments on adds nothing. A read or a response shape used twice has a name in the folder's `data.ts`.
 6. Every write is a named change through `mutate` or `send`. Nothing else writes the store.
 7. Data that is not in the store is read with `useLoad` or `useLive`, never in a component's own effect.
 8. An effect synchronises with something outside React, has a complete dependency array and cleans up. State derived from props is computed in render or reset with `key`.
@@ -126,7 +128,7 @@ The aim is few places that deal with errors (see "Define errors out of existence
 ### Words, dates, controls
 16. Every word shown goes through `t()`. Strings live in `i18n/en/`.
 17. Dates are `YYYY-MM-DD` strings handled only by `lib/days.ts`; times are milliseconds formatted only by `lib/time.ts`.
-18. Clickable things are `<button>` or `<a>`, or `ui/` components. An icon-only button has a label. Dialogs use `ui/dialog`.
+18. Clickable things are `<button>` or `<a>`, or `ui/` components. An icon-only button has a label. Modal forms use `ui/dialog`; a side sheet, a lightbox, a drawer or a command bar is a different thing and is built on the primitive directly.
 
 ### Names and state
 19. Names are words. One letter is allowed for the parameter of a one-expression callback, plus `e` (event), `t` (translate), `s` (store state) and `i`.
