@@ -8,7 +8,7 @@ import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRe
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { formatDay } from "@/lib/time";
-import { dayOf } from "@/insights/lib/format";
+import { dayFromNumber } from "@/lib/days";
 import { type Scale, xOf } from "@/insights/timeline/scale";
 
 type Mode = "move" | "start" | "end";
@@ -43,7 +43,7 @@ interface Props {
   onChange: (next: { start?: number; end?: number }) => void;
 }
 
-const day = (n: number) => formatDay(dayOf(n));
+const day = (n: number) => formatDay(dayFromNumber(n));
 
 function apply(mode: Mode, from: Range, by: number): Range {
   if (mode === "start") return { s: Math.min(from.s + by, from.e), e: from.e };

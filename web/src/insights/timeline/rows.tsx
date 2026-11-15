@@ -10,7 +10,8 @@ import { t } from "@/lib/i18n";
 import { useSlug } from "@/lib/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
 import type { Category, Epic } from "@/lib/types";
-import { count, dayOf } from "@/insights/lib/format";
+import { count } from "@/insights/lib/amounts";
+import { dayFromNumber } from "@/lib/days";
 import { Bar } from "@/insights/timeline/bar";
 import { type EpicLine, setEpicDates, type TaskLine } from "@/insights/timeline/data";
 import { type Scale, widthOf, xOf } from "@/insights/timeline/scale";
@@ -45,7 +46,7 @@ const taskColor: Record<Category, string> = {
   canceled: "var(--viz-backlog)",
 };
 
-const lateBy = (day: number | undefined) => (day === undefined ? 0 : Math.max(0, -daysUntil(dayOf(day))));
+const lateBy = (day: number | undefined) => (day === undefined ? 0 : Math.max(0, -daysUntil(dayFromNumber(day))));
 
 /** A note that stays at the left edge of the track however far the scale is scrolled. */
 function TrackNote({ children }: { children: React.ReactNode }) {
@@ -128,7 +129,7 @@ export function EpicRow({ line, projectKey, scale, today, open, onToggle }: Epic
             describedBy={KEYS_HINT_ID}
             label={
               <>
-                {line.target !== undefined && formatDay(dayOf(line.target))}
+                {line.target !== undefined && formatDay(dayFromNumber(line.target))}
                 {/* On a phone the names column has no room for the state, so it is written here. */}
                 <span className="sm:hidden">
                   {line.target !== undefined && ", "}
@@ -155,7 +156,7 @@ export function EpicRow({ line, projectKey, scale, today, open, onToggle }: Epic
           <Diamond
             key={milestone.id}
             x={xOf(scale, day) + scale.dayW / 2}
-            label={t("timeline.milestone", { name: milestone.name, day: formatDay(dayOf(day)) })}
+            label={t("timeline.milestone", { name: milestone.name, day: formatDay(dayFromNumber(day)) })}
           />
         ))}
       </div>
@@ -223,11 +224,11 @@ export function TaskLineRow({ line, scale, today }: TaskProps) {
             describedBy={KEYS_HINT_ID}
             label={
               <>
-                {formatDay(dayOf(line.due))}
+                {formatDay(dayFromNumber(line.due))}
                 {late > 0 && <span className="sm:hidden">, {t("due.late", { n: late })}</span>}
               </>
             }
-            onChange={(next) => next.end !== undefined && setDue([task], dayOf(next.end))}
+            onChange={(next) => next.end !== undefined && setDue([task], dayFromNumber(next.end))}
           />
         ) : (
           <TrackNote>
@@ -239,7 +240,7 @@ export function TaskLineRow({ line, scale, today }: TaskProps) {
                   ghostButton,
                   "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100",
                 )}
-                onClick={() => setDue([task], dayOf(today + 7))}
+                onClick={() => setDue([task], dayFromNumber(today + 7))}
               >
                 <Plus className="size-3" aria-hidden />
                 {t("timeline.setDue")}

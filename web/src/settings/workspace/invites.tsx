@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link2, Mail, UserPlus } from "lucide-react";
 import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { dayAndMonth } from "@/lib/time";
 import { useSlug } from "@/lib/selectors";
 import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
@@ -81,7 +82,7 @@ export function InvitesSection() {
                     <span className="max-sm:hidden">{t("invites.used", { uses: inv.uses, max: inv.max_uses })}</span>
                   )}
                   <Fact label={t("invites.expiresIn")} className="max-sm:hidden">
-                    {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(inv.expires_at)}
+                    {dayAndMonth(inv.expires_at)}
                   </Fact>
                   <Badge>{t(`role.${inv.role}`)}</Badge>
                 </>

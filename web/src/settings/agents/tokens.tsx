@@ -2,6 +2,7 @@ import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { dayAndMonth } from "@/lib/time";
 import { useProjects, useSlug } from "@/lib/selectors";
 import type { AgentMember, Token } from "@/settings/agents/data";
 import { MultiPick } from "@/settings/ui/multi-pick";
@@ -73,7 +74,7 @@ export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: b
                       <Badge tone="danger">{t("tokens.expired")}</Badge>
                     ) : (
                       <Fact label={t("tokens.expiresOn")} className="max-sm:hidden">
-                        {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(tk.expires_at)}
+                        {dayAndMonth(tk.expires_at)}
                       </Fact>
                     )
                   ) : null}

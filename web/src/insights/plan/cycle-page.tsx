@@ -14,7 +14,7 @@ import { type Cycle, isOpenCategory, type Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { BurnUp, burnRows } from "@/insights/charts/burn-up";
-import { count } from "@/insights/lib/format";
+import { count } from "@/insights/lib/amounts";
 import { useLive } from "@/lib/live";
 import type { CycleChart } from "@/insights/lib/types";
 import { moveToCycle, updateCycle } from "@/insights/plan/actions";

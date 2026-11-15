@@ -7,8 +7,7 @@ import { CircleCheck, DatabaseBackup, TriangleAlert } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMinute } from "@/lib/tick";
-import { ago, exact } from "@/lib/time";
-import { parseWhen } from "@/insights/lib/format";
+import { ago, exact, parseWhen } from "@/lib/time";
 import type { Health } from "@/insights/lib/types";
 import { Panel } from "@/insights/ui/panel";
 

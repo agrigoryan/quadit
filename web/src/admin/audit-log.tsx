@@ -7,7 +7,7 @@ import { ChevronRight, Download } from "lucide-react";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { exact } from "@/lib/time";
+import { exact, toTheSecond } from "@/lib/time";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Loading, Spinner } from "@/ui/spinner";
@@ -43,14 +43,6 @@ interface Props {
   /** Given for the install's log: adds the workspace filter and column. */
   workspaces?: Named[];
 }
-
-const when = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  second: "2-digit",
-});
 
 function Target({ entry, names }: { entry: AuditEntry; names: Map<string, string> }) {
   if (!entry.target_type && !entry.target_id) return <span className="text-ink-3">–</span>;
@@ -124,7 +116,7 @@ function EntryRow({
           title={exact(entry.at)}
           className="shrink-0 text-xs text-ink-3 tnum max-md:order-3 max-md:w-full md:w-36"
         >
-          {when.format(entry.at)}
+          {toTheSecond(entry.at)}
         </time>
         <span className="min-w-0 truncate font-medium text-ink max-md:order-1 max-md:flex-1 md:w-36 md:shrink-0">
           {actor}

@@ -4,6 +4,7 @@
 import { ArrowUpRight, Check } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { useMember } from "@/lib/selectors";
+import { isDay } from "@/lib/days";
 import { formatDay } from "@/lib/time";
 import { docTitle, useDocs } from "@/docs/data";
 import type { Value } from "@/docs/db/formula";
@@ -11,8 +12,6 @@ import { formulaText } from "@/docs/db/formula-values";
 import { findOption, OptionChip } from "@/docs/db/options";
 import type { DBProperty } from "@/lib/types-docs";
 import { Avatar } from "@/ui/avatar";
-
-const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** A list of strings out of whatever is stored (a property that changed type may hold anything). */
 export function asList(v: unknown): string[] {

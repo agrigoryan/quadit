@@ -2,6 +2,7 @@ import { useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { api, workspacePath } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { fullDate } from "@/lib/time";
 import { useCollection, useMe, useProjects, useSlug } from "@/lib/selectors";
 import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
@@ -29,7 +30,6 @@ interface Token {
   last_used_at?: number;
 }
 
-const day = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const expiryChoices = ["0", "30", "90", "365"] as const;
 
 /** The fields of a token of one's own: its name beside when it expires, then what it may do and where. */
@@ -148,7 +148,7 @@ export function MyTokensPage() {
                           {" · "}
                           {tk.expires_at < Date.now()
                             ? t("me.tokens.expired")
-                            : t("me.tokens.expiresOn", { when: day.format(tk.expires_at) })}
+                            : t("me.tokens.expiresOn", { when: fullDate(tk.expires_at) })}
                         </>
                       ) : null}
                     </>

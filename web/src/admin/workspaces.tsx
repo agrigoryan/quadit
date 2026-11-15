@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router";
 import { loadSession, useSession } from "@/auth/session";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { exact } from "@/lib/time";
+import { exact, fullDate } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -46,7 +46,6 @@ export function WorkspacesPage() {
   const navigate = useNavigate();
   const [joining, setJoining] = useState<AdminWorkspace | null>(null);
   const [restoring, setRestoring] = useState<AdminWorkspace | null>(null);
-  const dated = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
   /** Makes the install admin an admin of the workspace; the server records it where its members can see. */
   async function join(w: AdminWorkspace) {
@@ -146,7 +145,7 @@ export function WorkspacesPage() {
                           <span className="tnum">{t("admin.workspaces.members", { n: w.members })}</span>
                           <span className="tnum">{t("admin.workspaces.tasks", { n: w.tasks })}</span>
                           <Fact label={t("admin.workspaces.created")} className="max-md:hidden">
-                            <span title={exact(w.created_at)}>{dated.format(w.created_at)}</span>
+                            <span title={exact(w.created_at)}>{fullDate(w.created_at)}</span>
                           </Fact>
                         </span>
                       }

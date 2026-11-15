@@ -2,6 +2,8 @@ import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { daysFrom } from "@/lib/days";
+import { weekdayName } from "@/lib/time";
 import { mutate, send } from "@/lib/mutate";
 import { toast } from "@/lib/toast";
 import type { Project } from "@/lib/types";
@@ -15,12 +17,8 @@ import { Input } from "@/ui/input";
 
 type Settings = { cycles?: boolean; cycle_days?: number; cycle_start?: number; estimates?: boolean };
 
-const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
-/** Weekday names in the person's language; 0 is Sunday, as the server counts. */
-const WEEKDAYS = Array.from({ length: 7 }, (_, i) => ({
-  value: String(i),
-  label: weekday.format(new Date(2024, 0, 7 + i)),
-}));
+/** Weekday names in the person's language; 0 is Sunday, as the server counts. 7 January 2024 was a Sunday. */
+const WEEKDAYS = daysFrom("2024-01-07", 7).map((day, i) => ({ value: String(i), label: weekdayName(day, "long") }));
 const WEEKS = [1, 2, 3, 4, 6];
 
 /** A project's name, key and colour, its switches, and archiving or deleting it. */

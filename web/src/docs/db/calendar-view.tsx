@@ -12,14 +12,27 @@ import {
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { today } from "@/lib/time";
+import {
+  addMonths,
+  dayOfMonth,
+  daysBetween,
+  daysFrom,
+  isDay,
+  monthStart,
+  sameMonth,
+  startOfWeek,
+  weekday,
+} from "@/lib/days";
+import { monthAndYear, today, weekdayName } from "@/lib/time";
 import { setRowProps } from "@/docs/actions";
 import { createProperty, setViewConfig } from "@/docs/db/actions";
-import { addDays, addMonths, isDay, monthName, monthStart, weekday, WEEKDAYS } from "@/docs/db/dates";
 import type { ViewProps } from "@/docs/db/use-table";
 import type { Doc } from "@/lib/types-docs";
 import { Button, IconButton } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
+
+/** "Mon" … "Sun" in the person's language. 1 January 2024 was a Monday. */
+const WEEKDAYS = daysFrom("2024-01-01", 7).map((day) => weekdayName(day));
 
 function Chip({ row, onOpen }: { row: Doc; onOpen: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({ id: row.id });
@@ -79,7 +92,7 @@ function DayCell({
             isToday ? "bg-accent font-semibold text-accent-ink" : dim ? "text-ink-3" : "text-ink-2",
           )}
         >
-          {Number(day.slice(8))}
+          {dayOfMonth(day)}
         </span>
       </div>
       {rows.map((row) => (
@@ -122,10 +135,10 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
     );
   }
 
-  const first = addDays(month, -weekday(month));
+  const first = startOfWeek(month);
   const next = addMonths(month, 1);
-  const weeks = Math.ceil((weekday(month) + Number(addDays(next, -1).slice(8))) / 7);
-  const days = Array.from({ length: weeks * 7 }, (_, i) => addDays(first, i));
+  const weeks = Math.ceil((weekday(month) + daysBetween(month, next)) / 7);
+  const days = daysFrom(first, weeks * 7);
   const now = today();
   const undated = rows.length - [...byDay.values()].reduce((n, list) => n + list.length, 0);
 
@@ -138,7 +151,7 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
   return (
     <div>
       <div className="flex h-9 items-center gap-1">
-        <h3 className="flex-1 text-sm font-semibold">{monthName(month)}</h3>
+        <h3 className="flex-1 text-sm font-semibold">{monthAndYear(month)}</h3>
         {undated > 0 && <span className="mr-2 text-xs text-ink-3">{t("db.calendar.undated", { n: undated })}</span>}
         <Button variant="ghost" size="sm" onClick={() => setMonth(monthStart(today()))}>
           {t("db.calendar.today")}
@@ -164,7 +177,7 @@ export function CalendarView({ db, view, rows, onOpen, onAdd }: ViewProps) {
             <DayCell
               key={day}
               day={day}
-              dim={day.slice(0, 7) !== month.slice(0, 7)}
+              dim={!sameMonth(day, month)}
               isToday={day === now}
               rows={byDay.get(day) ?? []}
               onOpen={onOpen}

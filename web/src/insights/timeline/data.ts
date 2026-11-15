@@ -5,7 +5,8 @@ import { useMemo } from "react";
 import { type ChangeSpec, send } from "@/lib/mutate";
 import { useCollection, useEpics, useLiveTasks } from "@/lib/selectors";
 import type { Category, Epic, Milestone, Task } from "@/lib/types";
-import { dayNumber, dayOf, dayOfMs } from "@/insights/lib/format";
+import { dayFromNumber, dayNumber } from "@/lib/days";
+import { localDay } from "@/lib/time";
 import type { Extent } from "@/insights/timeline/scale";
 
 export interface TaskLine {
@@ -64,7 +65,7 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
       const category = statuses[task.status_id]?.category ?? "backlog";
       if (category === "canceled" && !showCanceled) continue;
       const due = task.due_on ? dayNumber(task.due_on) : undefined;
-      const began = dayNumber(dayOfMs(task.started_at ?? task.created_at));
+      const began = dayNumber(localDay(task.started_at ?? task.created_at));
       const line: TaskLine = { task, category, start: due === undefined ? began : Math.min(began, due), due };
       if (task.epic_id) (byEpic[task.epic_id] ??= []).push(line);
       else if (due !== undefined) loose.push(line);
@@ -89,7 +90,7 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
         start: epic.start_on
           ? dayNumber(epic.start_on)
           : epic.target_on && epic.created_at
-            ? Math.min(dayNumber(dayOfMs(epic.created_at)), dayNumber(epic.target_on))
+            ? Math.min(dayNumber(localDay(epic.created_at)), dayNumber(epic.target_on))
             : undefined,
         target: epic.target_on ? dayNumber(epic.target_on) : undefined,
         tasks: own,
@@ -120,8 +121,9 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
 /** Changes an epic's dates: only the ones that differ are sent. */
 export function setEpicDates(epic: Epic, next: { start?: number; end?: number }) {
   const fields: Record<string, string> = {};
-  if (next.start !== undefined && dayOf(next.start) !== epic.start_on) fields.start_on = dayOf(next.start);
-  if (next.end !== undefined && dayOf(next.end) !== epic.target_on) fields.target_on = dayOf(next.end);
+  if (next.start !== undefined && dayFromNumber(next.start) !== epic.start_on)
+    fields.start_on = dayFromNumber(next.start);
+  if (next.end !== undefined && dayFromNumber(next.end) !== epic.target_on) fields.target_on = dayFromNumber(next.end);
   if (Object.keys(fields).length === 0) return;
   const change: ChangeSpec = { type: "epic.update", args: { id: epic.id, ...fields } };
   send(change, (tx) => tx.patch("epics", epic.id, fields));

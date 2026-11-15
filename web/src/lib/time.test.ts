@@ -1,7 +1,24 @@
 // Times and calendar days as people read them (lib/time.ts).
 
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { ago, daysUntil, dueLabel, exact, formatDay, timeOfDay } from "@/lib/time";
+import {
+  ago,
+  dayAndMonth,
+  daysUntil,
+  dueLabel,
+  exact,
+  formatDay,
+  fullDate,
+  localDay,
+  localMidnight,
+  monthAndYear,
+  shortMonthAndTwoDigitYear,
+  shortMonthAndYear,
+  timeOfDay,
+  today,
+  toTheSecond,
+  weekdayName,
+} from "@/lib/time";
 
 // A time zone with clock changes: in 2026 Berlin's clocks go forward on
 // 29 March (a 23-hour day) and back on 25 October (a 25-hour day). The
@@ -86,11 +103,41 @@ describe("formatters", () => {
 
   it("exact: the date and the time to the minute", () => expect(exact(instant)).toBe("Nov 15, 2026, 3:30 PM"));
   it("timeOfDay: the clock time", () => expect(timeOfDay(instant)).toBe("3:30 PM"));
+  it("dayAndMonth: the day of a moment", () => expect(dayAndMonth(instant)).toBe("Nov 15"));
+  it("fullDate: the day of a moment, with the year", () => expect(fullDate(instant)).toBe("Nov 15, 2026"));
+  it("toTheSecond: the day and the time to the second", () => expect(toTheSecond(instant)).toBe("Nov 15, 3:30:05 PM"));
+
+  it("dayAndMonth: the day in the person's zone, late at night UTC", () =>
+    expect(dayAndMonth(Date.UTC(2026, 10, 15, 23, 30))).toBe("Nov 16"));
+
+  it("monthAndYear", () => expect(monthAndYear("2026-11-01")).toBe("November 2026"));
+  it("shortMonthAndYear", () => expect(shortMonthAndYear("2026-11-30")).toBe("Nov 2026"));
+  it("shortMonthAndTwoDigitYear", () => expect(shortMonthAndTwoDigitYear("2026-11-01")).toBe("Nov 26"));
+
+  it("weekdayName: short and long", () => {
+    expect(weekdayName("2026-11-16")).toBe("Mon");
+    expect(weekdayName("2024-01-07", "long")).toBe("Sunday");
+  });
 
   it("formatDay: a calendar day, with the year only when it is not this year", () => {
     vi.useFakeTimers({ now: new Date(2026, 5, 15, 12) });
     expect(formatDay("2026-12-01")).toBe("Dec 1");
     expect(formatDay("2025-12-31")).toBe("Dec 31, 2025");
     expect(formatDay("2026-03-29")).toBe("Mar 29");
+  });
+});
+
+describe("the person's own day", () => {
+  it("is the local calendar day of a moment, at both ends of the day and when the clocks change", () => {
+    expect(localDay(new Date(2026, 2, 29, 0, 30).getTime())).toBe("2026-03-29");
+    expect(localDay(new Date(2026, 10, 15, 23, 59).getTime())).toBe("2026-11-15");
+    expect(localDay(Date.UTC(2026, 10, 15, 23, 30))).toBe("2026-11-16");
+    expect(today(new Date(2026, 10, 15, 23, 59))).toBe("2026-11-15");
+  });
+
+  it("begins at local midnight, an hour before UTC's in Berlin's winter and two in summer", () => {
+    expect(localMidnight("2026-11-15")).toBe(Date.UTC(2026, 10, 14, 23));
+    expect(localMidnight("2026-03-29")).toBe(Date.UTC(2026, 2, 28, 23));
+    expect(localMidnight("2026-03-30")).toBe(Date.UTC(2026, 2, 29, 22));
   });
 });

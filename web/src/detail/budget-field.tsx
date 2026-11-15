@@ -6,7 +6,7 @@ import { type FormEvent, useState } from "react";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/lib/types";
 import { PropButton } from "@/detail/property-fields";
-import { moneyMicros } from "@/insights/lib/format";
+import { moneyMicros } from "@/insights/lib/amounts";
 import { setBudget, type TaskBudget } from "@/tasks/actions";
 import { Button } from "@/ui/button";
 import { Field, Input } from "@/ui/input";

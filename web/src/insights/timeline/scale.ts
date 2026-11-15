@@ -1,9 +1,9 @@
 // The time scale of the timeline: which days it covers, how wide a day is
 // at each zoom, and where the months and weeks fall. Days are counted as
-// whole numbers (days since 1970, see insights/lib/format.ts) so positions
+// whole numbers (days since 1970, see dayNumber in lib/days.ts) so positions
 // are plain arithmetic.
 
-import { dayOf } from "@/insights/lib/format";
+import { addMonths, dayFromNumber, dayNumber, dayOfMonth, monthOf, startOfWeek, weekday } from "@/lib/days";
 
 export type Zoom = "weeks" | "months";
 
@@ -22,8 +22,8 @@ export interface Scale {
 export const xOf = (scale: Scale, day: number) => (day - scale.start) * scale.dayW;
 export const widthOf = (scale: Scale) => (scale.end - scale.start + 1) * scale.dayW;
 
-/** The Monday on or before a day. Day 0 (1 Jan 1970) was a Thursday. */
-const monday = (day: number) => day - ((((day + 3) % 7) + 7) % 7);
+/** The Monday on or before a day. */
+const monday = (day: number) => dayNumber(startOfWeek(dayFromNumber(day)));
 
 /** Room left before the first date and after the last, so bars can be dragged outwards. */
 const BEFORE = 21;
@@ -68,10 +68,9 @@ export function monthsOf(scale: Scale): MonthSpan[] {
   const out: MonthSpan[] = [];
   let from = scale.start;
   while (from <= scale.end) {
-    const [y, m] = dayOf(from).split("-").map(Number);
-    const next = Math.round(Date.UTC(y ?? 1970, m ?? 1, 1) / 86_400_000);
-    const to = Math.min(next - 1, scale.end);
-    out.push({ from, days: to - from + 1, month: dayOf(from).slice(0, 7) });
+    const day = dayFromNumber(from);
+    const to = Math.min(dayNumber(addMonths(day, 1)) - 1, scale.end);
+    out.push({ from, days: to - from + 1, month: monthOf(day) });
     from = to + 1;
   }
   return out;
@@ -85,7 +84,7 @@ export function weeksOf(scale: Scale): number[] {
 }
 
 /** The day of the month of a day, for the header. */
-export const dateOf = (day: number) => Number(dayOf(day).slice(8));
+export const dateOf = (day: number) => dayOfMonth(dayFromNumber(day));
 
 /** Saturday or Sunday. */
-export const isWeekend = (day: number) => (((day + 3) % 7) + 7) % 7 >= 5;
+export const isWeekend = (day: number) => weekday(dayFromNumber(day)) >= 5;

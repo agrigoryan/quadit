@@ -2,10 +2,10 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, use
 import { ChartGantt } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { today } from "@/lib/time";
+import { addDays, dayOfMonth, daysBetween, daysFrom, isDay, sameMonth, weekday } from "@/lib/days";
+import { shortMonthAndYear, today } from "@/lib/time";
 import { setRowProps } from "@/docs/actions";
 import { createProperty, setViewConfig } from "@/docs/db/actions";
-import { addDays, daysBetween, isDay, monthShortName, weekday } from "@/docs/db/dates";
 import type { ViewProps } from "@/docs/db/use-table";
 import type { Doc } from "@/lib/types-docs";
 import { Button } from "@/ui/button";
@@ -79,11 +79,11 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
     );
   }
 
-  const days = Array.from({ length: total }, (_, i) => addDays(from, i));
+  const days = daysFrom(from, total);
   const months: { day: string; days: number }[] = [];
   for (const day of days) {
     const last = months[months.length - 1];
-    if (last && last.day.slice(0, 7) === day.slice(0, 7)) last.days++;
+    if (last && sameMonth(last.day, day)) last.days++;
     else months.push({ day, days: 1 });
   }
   const todayAt = daysBetween(from, now);
@@ -130,7 +130,7 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
                 >
                   {/* The name follows the scroll until its month runs out. */}
                   <span className="sticky left-44 inline-block px-1.5 pt-1 text-xs font-medium whitespace-nowrap text-ink-2 max-sm:left-28">
-                    {monthShortName(m.day)}
+                    {shortMonthAndYear(m.day)}
                   </span>
                 </div>
               ))}
@@ -148,7 +148,7 @@ export function TimelineView({ db, view, rows, onOpen }: ViewProps) {
                       day === now ? "bg-accent font-semibold text-accent-ink" : "text-ink-3",
                     )}
                   >
-                    {Number(day.slice(8))}
+                    {dayOfMonth(day)}
                   </span>
                 </div>
               ))}

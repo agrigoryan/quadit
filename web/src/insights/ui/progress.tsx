@@ -4,7 +4,7 @@
 import "@/insights/viz.css";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { count } from "@/insights/lib/format";
+import { count } from "@/insights/lib/amounts";
 
 interface Props {
   done: number;

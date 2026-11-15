@@ -11,7 +11,7 @@ import { useRestLoaded } from "@/lib/store";
 import { daysUntil, formatDay, serverDay } from "@/lib/time";
 import type { Cycle, Project } from "@/lib/types";
 import { usePageTitle } from "@/lib/ui-state";
-import { addDays } from "@/insights/lib/format";
+import { addDays } from "@/lib/days";
 import { cycleName, cyclePhase } from "@/insights/plan/cycle-page";
 import { type Tally, useTallies } from "@/insights/plan/stats";
 import { PlanRow } from "@/insights/plan/plan-row";

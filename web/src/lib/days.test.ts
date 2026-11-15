@@ -1,10 +1,23 @@
-// PINNING (old copies): what each copy of day arithmetic returns today.
+// Calendar-day arithmetic (lib/days.ts). The tables were first run against the
+// three copies this file replaced (docs/db/dates.ts, insights/lib/format.ts and
+// the local-time arithmetic in lib/time.ts), which all agreed on them; they run
+// in two zones whose clocks change, because UTC arithmetic must not care.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import * as db from "@/docs/db/dates";
-import * as ins from "@/insights/lib/format";
-import { daysUntil, today } from "@/lib/time";
-import { isWeekend, monthsOf } from "@/insights/timeline/scale";
+import {
+  addDays,
+  addMonths,
+  dayFromNumber,
+  dayNumber,
+  dayOfMonth,
+  daysBetween,
+  daysFrom,
+  isDay,
+  monthStart,
+  sameMonth,
+  startOfWeek,
+  weekday,
+} from "@/lib/days";
 
 const HOUR = 3_600_000;
 
@@ -69,46 +82,55 @@ describe.each(["Europe/Berlin", "America/New_York"])("in %s", (tz) => {
     expect(new Date(2026, 2, march + 1).getTime() - new Date(2026, 2, march).getTime()).toBe(23 * HOUR);
   });
 
-  it.each(ADD)("addDays(%s, %i) is %s", (day, n, want) => {
-    expect(db.addDays(day, n)).toBe(want);
-    expect(ins.addDays(day, n)).toBe(want);
-  });
+  it.each(ADD)("addDays(%s, %i) is %s", (day, n, want) => expect(addDays(day, n)).toBe(want));
 
-  it.each(BETWEEN)("from %s to %s is %i days", (from, to, want) => {
-    expect(db.daysBetween(from, to)).toBe(want);
-    expect(ins.dayNumber(to) - ins.dayNumber(from)).toBe(want);
-    expect(daysUntil(to, from)).toBe(want);
-  });
+  it.each(BETWEEN)("from %s to %s is %i days", (from, to, want) => expect(daysBetween(from, to)).toBe(want));
 
   it.each(WEEKDAY)("%s is weekday %i", (day, want) => {
-    expect(db.weekday(day)).toBe(want);
-    expect(isWeekend(ins.dayNumber(day))).toBe(want >= 5);
+    expect(weekday(day)).toBe(want);
+    expect(startOfWeek(day)).toBe(addDays(day, -want));
+    expect(weekday(startOfWeek(day))).toBe(0);
   });
 
-  it.each(ADD_MONTHS)("addMonths(%s, %i) is %s", (day, n, want) => {
-    expect(db.addMonths(day, n)).toBe(want);
-  });
+  it.each(ADD_MONTHS)("addMonths(%s, %i) is %s", (day, n, want) => expect(addMonths(day, n)).toBe(want));
 
   it("counts days since 1970 both ways", () => {
-    expect(ins.dayNumber("1970-01-01")).toBe(0);
-    expect(ins.dayNumber("1969-12-31")).toBe(-1);
-    expect(ins.dayOf(-1)).toBe("1969-12-31");
-    expect(ins.dayOf(ins.dayNumber("2024-02-29"))).toBe("2024-02-29");
+    expect(dayNumber("1970-01-01")).toBe(0);
+    expect(dayNumber("1969-12-31")).toBe(-1);
+    expect(dayFromNumber(-1)).toBe("1969-12-31");
+    expect(dayFromNumber(dayNumber("2024-02-29"))).toBe("2024-02-29");
   });
 
-  it("cuts a scale into months at month ends, leap day included", () => {
-    const start = ins.dayNumber("2024-02-26");
-    const months = monthsOf({ start, end: start + 13, zoom: "weeks", dayW: 24 });
-    expect(months).toEqual([
-      { from: start, days: 4, month: "2024-02" },
-      { from: start + 4, days: 10, month: "2024-03" },
-    ]);
+  it("gives runs of days, months and days of the month", () => {
+    expect(daysFrom("2024-02-27", 4)).toEqual(["2024-02-27", "2024-02-28", "2024-02-29", "2024-03-01"]);
+    expect(daysFrom("2026-11-15", 0)).toEqual([]);
+    expect(monthStart("2026-11-15")).toBe("2026-11-01");
+    expect(sameMonth("2026-11-30", "2026-11-01")).toBe(true);
+    expect(sameMonth("2026-11-30", "2026-12-01")).toBe(false);
+    expect(sameMonth("2025-11-30", "2026-11-30")).toBe(false);
+    expect(dayOfMonth("2026-11-05")).toBe(5);
+    expect(dayOfMonth("2026-11-25")).toBe(25);
   });
+});
 
-  it("finds the day a moment falls on in the person's own zone", () => {
-    expect(ins.dayOfMs(new Date(2026, 2, 29, 0, 30).getTime())).toBe("2026-03-29");
-    expect(ins.dayOfMs(new Date(2026, 10, 15, 23, 59).getTime())).toBe("2026-11-15");
-    expect(today(new Date(2026, 10, 15, 23, 59))).toBe("2026-11-15");
-    expect(today(new Date(2026, 2, 8, 0, 0))).toBe("2026-03-08");
+describe("isDay", () => {
+  it("takes YYYY-MM-DD and nothing else", () => {
+    expect(isDay("2026-11-15")).toBe(true);
+    expect(isDay("2026-1-5")).toBe(false);
+    expect(isDay("2026-11-15T10:00")).toBe(false);
+    expect(isDay(20261115)).toBe(false);
+    expect(isDay(undefined)).toBe(false);
+  });
+});
+
+// Samoa moved across the date line at the end of 2011 and skipped 30 December.
+// lib/time.ts used to count days between local midnights, which there made
+// 29 to 31 December one day apart; a calendar counts two.
+describe("in Pacific/Apia", () => {
+  beforeAll(() => void (process.env.TZ = "Pacific/Apia"));
+
+  it("counts a skipped local day as a calendar day", () => {
+    expect(daysBetween("2011-12-29", "2011-12-31")).toBe(2);
+    expect(addDays("2011-12-29", 1)).toBe("2011-12-30");
   });
 });

@@ -3,7 +3,7 @@
 
 import type { ReactNode } from "react";
 import { cx } from "@/lib/cx";
-import { count } from "@/insights/lib/format";
+import { count } from "@/insights/lib/amounts";
 
 interface Props {
   title: string;

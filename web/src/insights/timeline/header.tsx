@@ -6,10 +6,8 @@ import "@/insights/viz.css";
 import { useMemo } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { monthAndYear, shortMonthAndTwoDigitYear } from "@/lib/time";
 import { dateOf, isWeekend, monthsOf, type Scale, weeksOf, widthOf, xOf } from "@/insights/timeline/scale";
-
-const monthName = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
-const monthShort = new Intl.DateTimeFormat(undefined, { month: "short", year: "2-digit", timeZone: "UTC" });
 
 /** Months on the first line; under them every day (weeks zoom) or every Monday (months zoom). */
 export function ScaleHeader({ scale, today }: { scale: Scale; today: number }) {
@@ -35,7 +33,7 @@ export function ScaleHeader({ scale, today }: { scale: Scale; today: number }) {
             >
               {m.days * scale.dayW >= 44 && (
                 <span className="sticky left-[calc(var(--tl-left)+0.5rem)] inline-block px-2 pt-1 text-xs font-medium whitespace-nowrap text-ink-2">
-                  {(narrow ? monthShort : monthName).format(new Date(`${m.month}-01T00:00:00Z`))}
+                  {(narrow ? shortMonthAndTwoDigitYear : monthAndYear)(`${m.month}-01`)}
                 </span>
               )}
             </div>

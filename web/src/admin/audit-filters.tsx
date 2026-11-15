@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { X } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { localMidnight } from "@/lib/time";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { FormField, NativeSelect } from "@/ui/form";
@@ -26,19 +27,14 @@ export const noFilters: AuditFilters = { action: "", actor: "", workspace: "", f
 
 export const anyFilter = (f: AuditFilters) => Object.values(f).some(Boolean);
 
-function dayStart(day: string): number {
-  const [y, m, d] = day.split("-").map(Number);
-  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1).getTime();
-}
-
 /** The query string for the filters. `extra` adds the page size, the `cursor` of the next page, or the format. */
 export function auditQuery(f: AuditFilters, extra: Record<string, string | number> = {}): string {
   const q = new URLSearchParams();
   if (f.action.trim()) q.set("action", f.action.trim());
   if (f.actor) q.set("actor", f.actor);
   if (f.workspace) q.set("workspace", f.workspace);
-  if (f.from) q.set("after", String(dayStart(f.from) - 1));
-  if (f.to) q.set("before", String(dayStart(f.to) + 24 * 3600_000));
+  if (f.from) q.set("after", String(localMidnight(f.from) - 1));
+  if (f.to) q.set("before", String(localMidnight(f.to) + 24 * 3600_000));
   for (const [key, value] of Object.entries(extra)) q.set(key, String(value));
   return q.toString();
 }

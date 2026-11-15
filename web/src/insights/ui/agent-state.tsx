@@ -7,7 +7,8 @@ import "@/insights/viz.css";
 import { CircleDashed, EarOff, Hourglass, Inbox, Loader } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { money, minutes } from "@/insights/lib/format";
+import { money } from "@/insights/lib/amounts";
+import { minutes } from "@/insights/lib/durations";
 import type { AgentState, AgentStateName } from "@/insights/lib/types";
 
 const looks: Record<AgentStateName, { icon: typeof Loader; tone: string }> = {

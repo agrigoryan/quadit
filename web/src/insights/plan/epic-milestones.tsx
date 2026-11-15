@@ -10,7 +10,7 @@ import { t } from "@/lib/i18n";
 import { findTaskByKey, sortByRank, useCollection } from "@/lib/selectors";
 import { getState } from "@/lib/store";
 import type { Epic, Milestone, Task } from "@/lib/types";
-import { count } from "@/insights/lib/format";
+import { count } from "@/insights/lib/amounts";
 import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from "@/insights/plan/actions";
 import { tallyOf } from "@/insights/plan/stats";
 import { ProgressCount } from "@/insights/ui/progress";

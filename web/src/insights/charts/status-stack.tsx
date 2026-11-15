@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { Category } from "@/lib/types";
 import { Legend, useWidth } from "@/insights/charts/base";
-import { count } from "@/insights/lib/format";
+import { count } from "@/insights/lib/amounts";
 import type { StatusCount } from "@/insights/lib/types";
 import { Tooltip } from "@/ui/tooltip";
 
