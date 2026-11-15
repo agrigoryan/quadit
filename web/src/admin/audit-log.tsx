@@ -13,7 +13,7 @@ import { EmptyState } from "@/ui/empty";
 import { Loading, Spinner } from "@/ui/spinner";
 import { AuditFilterBar, type AuditFilters, anyFilter, auditQuery, type Named, noFilters } from "@/admin/audit-filters";
 import { download } from "@/lib/download";
-import { EmptyRow, Page } from "@/ui/settings-layout";
+import { EmptyRow, Page } from "@/ui/page-layout";
 
 export interface AuditEntry {
   id: string;

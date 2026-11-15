@@ -10,7 +10,7 @@ import { Button } from "@/ui/button";
 import type { Backup } from "@/admin/backups";
 import { loadChangeCatalog } from "@/settings/agents/asks-before";
 import { LoadGate } from "@/ui/load-gate";
-import { Page, Rows, Section } from "@/ui/settings-layout";
+import { Page, Rows, Section } from "@/ui/page-layout";
 import { useLoad } from "@/lib/use-load";
 import { Ago } from "@/ui/ago";
 

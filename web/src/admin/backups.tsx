@@ -13,7 +13,7 @@ import { useDraft } from "@/admin/settings";
 import { download } from "@/lib/download";
 import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, SwitchRow } from "@/ui/form";
-import { EmptyRow, Page, Row, Rows, Section } from "@/ui/settings-layout";
+import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
 import { useLoad } from "@/lib/use-load";
 
 export interface Backup {

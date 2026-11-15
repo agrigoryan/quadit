@@ -11,7 +11,7 @@ import type { Workspace } from "@/lib/types";
 import { useSettingsBase } from "@/settings/base";
 import { download } from "@/lib/download";
 import { FormAlert, FormField, FormFoot, useFieldErrors, useSubmit } from "@/ui/form";
-import { Card, Page, Section } from "@/ui/settings-layout";
+import { Card, Page, Section } from "@/ui/page-layout";
 import { DeleteWorkspaceDialog } from "@/settings/workspace/delete-workspace";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";

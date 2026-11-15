@@ -11,7 +11,7 @@ import { Segmented } from "@/settings/me/segmented";
 import { AvatarInput } from "@/settings/ui/avatar-input";
 import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, FormField, FormFoot, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
-import { Card, Page, Section } from "@/ui/settings-layout";
+import { Card, Page, Section } from "@/ui/page-layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

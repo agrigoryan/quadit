@@ -12,7 +12,7 @@ import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/sett
 import { SWATCHES } from "@/lib/swatches";
 import { refuse, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
-import { Page, Rows, Section } from "@/ui/settings-layout";
+import { Page, Rows, Section } from "@/ui/page-layout";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";

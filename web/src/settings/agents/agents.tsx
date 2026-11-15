@@ -13,7 +13,7 @@ import { useIsAdmin, useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { When } from "@/ui/when";
 import { Checkbox } from "@/ui/form";
-import { EmptyRow, Page, Rows } from "@/ui/settings-layout";
+import { EmptyRow, Page, Rows } from "@/ui/page-layout";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";

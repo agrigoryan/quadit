@@ -3,7 +3,7 @@ import { isWebAddress } from "@/lib/url";
 import { NumberField, SecretField, SettingForm, TextField } from "@/admin/setting-form";
 import { useDraft, useSetting } from "@/admin/settings";
 import { Checkbox, FormField, NativeSelect, Note } from "@/ui/form";
-import { Page, Section } from "@/ui/settings-layout";
+import { Page, Section } from "@/ui/page-layout";
 
 type Kind = "disk" | "s3" | "gcs" | "azure";
 

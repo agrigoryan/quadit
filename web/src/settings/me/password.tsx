@@ -3,7 +3,7 @@ import { api, ApiError, errorMessage } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FormAlert, FormField, FormFoot, useFieldErrors } from "@/ui/form";
-import { Card, Section } from "@/ui/settings-layout";
+import { Card, Section } from "@/ui/page-layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

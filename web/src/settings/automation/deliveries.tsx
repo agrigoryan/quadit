@@ -9,7 +9,7 @@ import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
 import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
-import { EmptyRow, Rows } from "@/ui/settings-layout";
+import { EmptyRow, Rows } from "@/ui/page-layout";
 import { useLoad } from "@/lib/use-load";
 import { isTest, listRows } from "@/settings/automation/data";
 import type { Delivery, Webhook } from "@/lib/types-automation";

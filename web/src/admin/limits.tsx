@@ -1,7 +1,7 @@
 import { t } from "@/lib/i18n";
 import { NumberField, SettingForm } from "@/admin/setting-form";
 import { useDraft } from "@/admin/settings";
-import { Page, Section } from "@/ui/settings-layout";
+import { Page, Section } from "@/ui/page-layout";
 
 export function LimitsPage() {
   // Empty means "the default": the server then counts 1200 a minute.

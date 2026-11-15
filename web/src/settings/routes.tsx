@@ -21,7 +21,7 @@ import { ProjectPage } from "@/settings/projects/project";
 import { ProjectsPage } from "@/settings/projects/projects";
 import { SecretsPage } from "@/settings/secrets/secrets";
 import { settingsGroups } from "@/settings/pages";
-import { NavLayout } from "@/ui/settings-layout";
+import { NavLayout } from "@/ui/page-layout";
 import { GeneralPage } from "@/settings/workspace/general";
 import { MembersPage } from "@/settings/workspace/members";
 import { EmptyState } from "@/ui/empty";

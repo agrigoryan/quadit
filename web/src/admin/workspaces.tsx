@@ -10,8 +10,8 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";
-import { ConfirmDialog } from "@/ui/settings-dialogs";
-import { EmptyRow, Page, Row, Rows, Section } from "@/ui/settings-layout";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { EmptyRow, Page, Row, Rows, Section } from "@/ui/page-layout";
 import { useLoad } from "@/lib/use-load";
 
 export interface AdminWorkspace {

@@ -9,9 +9,9 @@ import { toast } from "@/lib/toast";
 import type { Project } from "@/lib/types";
 import { useSettingsBase } from "@/settings/base";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";
-import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { FormAlert, FormField, FormFoot, NativeSelect, SwitchRow, useFieldErrors, useSubmit } from "@/ui/form";
-import { Card, Section } from "@/ui/settings-layout";
+import { Card, Section } from "@/ui/page-layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 

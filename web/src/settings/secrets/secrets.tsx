@@ -15,8 +15,9 @@ import { SecretForm } from "@/settings/secrets/secret-form";
 import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
-import { ConfirmDialog, CopyField } from "@/ui/settings-dialogs";
-import { EmptyRow, Page, Rows, Section } from "@/ui/settings-layout";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { CopyField } from "@/ui/reveal-dialog";
+import { EmptyRow, Page, Rows, Section } from "@/ui/page-layout";
 import { useLoad } from "@/lib/use-load";
 
 /** Who may use a secret: everyone, or the few it names. */

@@ -6,7 +6,7 @@ import { t } from "@/lib/i18n";
 import { isWebAddress } from "@/lib/url";
 import { SecretField, SettingForm, TextField } from "@/admin/setting-form";
 import { useDraft, useSetting } from "@/admin/settings";
-import { CopyField } from "@/ui/settings-dialogs";
+import { CopyField } from "@/ui/reveal-dialog";
 import { SwitchRow } from "@/ui/form";
 
 interface ProviderSetting {

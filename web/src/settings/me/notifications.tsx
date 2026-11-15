@@ -9,7 +9,7 @@ import { type Account, type EmailChoice, type NotifyPrefs, saveAccount, useAccou
 import { type PushState, pushState, sendTestPush, turnPushOff, turnPushOn } from "@/settings/me/push";
 import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, Note, SwitchRow } from "@/ui/form";
-import { Card, Page, Rows, Section } from "@/ui/settings-layout";
+import { Card, Page, Rows, Section } from "@/ui/page-layout";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 

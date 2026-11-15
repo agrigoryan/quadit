@@ -12,9 +12,10 @@ import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { LoadGate } from "@/ui/load-gate";
 import { When } from "@/ui/when";
-import { ConfirmDialog, RevealDialog } from "@/ui/settings-dialogs";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { RevealDialog } from "@/ui/reveal-dialog";
 import { Switch } from "@/ui/form";
-import { EmptyRow, Page, Rows } from "@/ui/settings-layout";
+import { EmptyRow, Page, Rows } from "@/ui/page-layout";
 import { useLoad } from "@/lib/use-load";
 import {
   change,

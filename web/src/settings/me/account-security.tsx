@@ -6,7 +6,7 @@ import { PasskeysSection } from "@/settings/me/passkeys";
 import { TwoStepSection } from "@/settings/me/two-step";
 import { LoadGate } from "@/ui/load-gate";
 import { Note } from "@/ui/form";
-import { Page } from "@/ui/settings-layout";
+import { Page } from "@/ui/page-layout";
 
 /**
  * Two-step verification and passkeys on a page of their own, outside any

@@ -1,6 +1,7 @@
-// The frame shared by workspace settings and the admin area: a list of
-// pages on the left, the page on the right. On a phone the list is its own
-// screen and a page has a way back to it.
+// The layout of an area made of pages, shared by workspace settings and the
+// admin area: the list of pages on the left and the page on the right (on a
+// phone the list is its own screen and a page has a way back to it), and
+// what a page is made of: a title, sections, bordered rows.
 
 import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";

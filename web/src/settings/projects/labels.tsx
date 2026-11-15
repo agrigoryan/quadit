@@ -9,9 +9,9 @@ import type { Label, Project } from "@/lib/types";
 import { ColorButton } from "@/settings/projects/color-button";
 import { InlineName } from "@/settings/projects/inline-name";
 import { SWATCHES } from "@/lib/swatches";
-import { ConfirmDialog } from "@/ui/settings-dialogs";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { FormAlert, NativeSelect, useFieldErrors, useSubmit } from "@/ui/form";
-import { EmptyRow, Rows, Section } from "@/ui/settings-layout";
+import { EmptyRow, Rows, Section } from "@/ui/page-layout";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 

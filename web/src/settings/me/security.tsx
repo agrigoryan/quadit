@@ -8,7 +8,7 @@ import { PasswordSection } from "@/settings/me/password";
 import { SessionsSection } from "@/settings/me/sessions";
 import { TwoStepSection } from "@/settings/me/two-step";
 import { LoadGate } from "@/ui/load-gate";
-import { Page } from "@/ui/settings-layout";
+import { Page } from "@/ui/page-layout";
 
 /** Me → Sign-in and security: every way into the account, and every browser that is in. */
 export function SecurityPage() {
