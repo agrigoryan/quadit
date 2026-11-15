@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 var (
@@ -108,7 +110,7 @@ func (a *applier) makeTables() error {
 // table, and a row for each row. The first column is the row's title.
 func (a *applier) makeTable(tb Table) error {
 	dbID := a.uid("db", tb.Ext)
-	args := map[string]any{"id": dbID, "title": orStr(tb.Title, "Untitled"), "kind": "database"}
+	args := map[string]any{"id": dbID, "title": orStr(tb.Title, "Untitled"), "kind": core.DocDatabase}
 	if _, ok := a.docs[tb.ParentExt]; ok {
 		args["parent"] = a.uid("doc", tb.ParentExt)
 	}

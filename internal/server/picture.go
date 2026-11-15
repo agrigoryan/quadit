@@ -76,7 +76,7 @@ func (s *Server) handleTakePicture(x *c) error {
 		return err
 	}
 	// The browser signs in with a link that works once and can only read.
-	token, err := s.oneTime(x.ctx(), "render", x.user.ID, nil, time.Minute)
+	token, err := s.oneTime(x.ctx(), core.OneTimeRender, x.user.ID, nil, time.Minute)
 	if err != nil {
 		return err
 	}
@@ -164,13 +164,13 @@ func chromeSwitches() []string {
 // read-only, and sends it to the page.
 func (s *Server) handleSignInPictureBrowser(x *c) error {
 	q := x.r.URL.Query()
-	ot, err := s.useOneTime(x.ctx(), "render", q.Get("token"), false)
+	ot, err := s.useOneTime(x.ctx(), core.OneTimeRender, q.Get("token"), false)
 	if err != nil {
 		return err
 	}
 	token := auth.Random(32)
 	now := time.Now()
-	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: ot.UserID, Stage: "render", IP: clientIP(x.r), UserAgent: "render check",
+	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: ot.UserID, Stage: core.SessionRender, IP: clientIP(x.r), UserAgent: "render check",
 		CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(), ExpiresAt: now.Add(2 * time.Minute).UnixMilli()}
 	if err := s.st.Insert(x.ctx(), sess); err != nil {
 		return err

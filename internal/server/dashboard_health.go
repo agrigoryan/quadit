@@ -19,10 +19,10 @@ func (d *dashboard) health() error {
 	if health["webhooks_failing"], err = x.db.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0)); err != nil {
 		return err
 	}
-	if health["deliveries_dead"], err = countLiveDeliveries(ctx, x.db, store.Eq("state", "dead")); err != nil {
+	if health["deliveries_dead"], err = countLiveDeliveries(ctx, x.db, store.Eq("state", core.DeliveryDead)); err != nil {
 		return err
 	}
-	if health["deliveries_pending"], err = countLiveDeliveries(ctx, x.db, store.Eq("state", "pending"), store.Gt("attempts", 0)); err != nil {
+	if health["deliveries_pending"], err = countLiveDeliveries(ctx, x.db, store.Eq("state", core.DeliveryPending), store.Gt("attempts", 0)); err != nil {
 		return err
 	}
 	var backups []core.Backup

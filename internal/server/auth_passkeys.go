@@ -129,7 +129,7 @@ func (s *Server) handleStartPasskeyRegistration(x *c) error {
 	if err != nil {
 		return err
 	}
-	state, err := s.oneTime(x.ctx(), "passkey_register", x.user.ID, session, passkeyStateLife)
+	state, err := s.oneTime(x.ctx(), core.OneTimePasskeyRegister, x.user.ID, session, passkeyStateLife)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (s *Server) handleStartPasskeyRegistration(x *c) error {
 // the browser's credential; the state comes in the query.
 func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	ctx := x.ctx()
-	spent, err := s.useOneTime(ctx, "passkey_register", x.r.URL.Query().Get("state"), false)
+	spent, err := s.useOneTime(ctx, core.OneTimePasskeyRegister, x.r.URL.Query().Get("state"), false)
 	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 		return err
 	}
@@ -258,7 +258,7 @@ func (s *Server) handleStartPasskeySignIn(x *c) error {
 	if err != nil {
 		return err
 	}
-	state, err := s.oneTime(x.ctx(), "passkey_login", "", session, passkeyStateLife)
+	state, err := s.oneTime(x.ctx(), core.OneTimePasskeyLogin, "", session, passkeyStateLife)
 	if err != nil {
 		return err
 	}
@@ -272,7 +272,7 @@ func (s *Server) handleFinishPasskeySignIn(x *c) error {
 	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), signInsPerIP, signInWindow); err != nil {
 		return err
 	}
-	spent, err := s.useOneTime(ctx, "passkey_login", x.r.URL.Query().Get("state"), false)
+	spent, err := s.useOneTime(ctx, core.OneTimePasskeyLogin, x.r.URL.Query().Get("state"), false)
 	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 		return err
 	}

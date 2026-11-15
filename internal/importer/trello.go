@@ -8,6 +8,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // trello reads the JSON that a Trello board exports.
@@ -64,8 +66,8 @@ func (trello) Read(path string, _ Options) (Plan, error) {
 		for _, l := range c.Labels {
 			t.Labels = append(t.Labels, orStr(l.Name, l.Color))
 		}
-		if c.Closed && t.Category != "done" {
-			t.Status, t.Category = "", "canceled" // archived there
+		if c.Closed && t.Category != core.CatDone {
+			t.Status, t.Category = "", core.CatCanceled // archived there
 		}
 		plan.Tasks = append(plan.Tasks, t)
 	}

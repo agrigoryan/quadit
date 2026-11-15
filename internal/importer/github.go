@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // github reads a repository's issues (not its pull requests) with their
@@ -62,11 +64,11 @@ func (github) Read(repo string, opts Options) (Plan, error) {
 }
 
 func (is githubIssue) task(repo string) Task {
-	t := Task{Ext: repo + "#" + strconv.Itoa(is.Number), Title: is.Title, Description: is.Body, URL: is.HTMLURL, Category: "unstarted"}
+	t := Task{Ext: repo + "#" + strconv.Itoa(is.Number), Title: is.Title, Description: is.Body, URL: is.HTMLURL, Category: core.CatUnstarted}
 	if is.State == "closed" {
-		t.Category = "done"
+		t.Category = core.CatDone
 		if is.StateReason == "not_planned" {
-			t.Category = "canceled"
+			t.Category = core.CatCanceled
 		}
 	}
 	for _, l := range is.Labels {

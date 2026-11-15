@@ -72,7 +72,7 @@ func (e *exporter) taskMarkdown(t core.Task) string {
 			b.WriteString("\n\n## Comments\n")
 		}
 		fmt.Fprintf(&b, "\n**%s**, %s", names.handle(cm.AuthorID), formatTime(cm.CreatedAt))
-		if cm.Kind == "result" {
+		if cm.Kind == core.CommentResult {
 			b.WriteString(" (result)")
 		}
 		b.WriteString("\n\n" + cm.Body + "\n")

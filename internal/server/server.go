@@ -421,9 +421,9 @@ func (x *c) narrowedAlready() { x.narrowed = true }
 // do: a signed-in session, or a token with no narrowing on it.
 func (x *c) hasFullAccess() bool {
 	if x.sess != nil {
-		return x.sess.Stage == "full"
+		return x.sess.Stage == core.SessionFull
 	}
-	return x.token != nil && x.token.Kind == "token" && x.token.Scopes == ""
+	return x.token != nil && x.token.Kind == core.TokenAPI && x.token.Scopes == ""
 }
 
 // admin refuses a caller whose role in the workspace is below admin.
@@ -652,12 +652,12 @@ func (s *Server) identifyBySession(x *c, now int64) error {
 // site's page sent with the cookie is refused.
 func (x *c) sessionMayAct(sess core.Session) error {
 	switch {
-	case sess.Stage == "render":
+	case sess.Stage == core.SessionRender:
 		// A session made to take a picture of a page: it may only look.
 		if x.r.Method != http.MethodGet && x.r.Method != http.MethodHead {
 			return errForbidden("this session is read-only")
 		}
-	case sess.Stage != "full" && !x.firstStepEnough:
+	case sess.Stage != core.SessionFull && !x.firstStepEnough:
 		return &httpError{Status: 401, Code: "second_step", Message: "finish signing in with your second step"}
 	}
 	// A cookie rides along on requests other sites make; refuse those.

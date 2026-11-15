@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/blob"
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // files/ of an export: the uploaded files as they were uploaded.
@@ -21,7 +22,7 @@ const notIncludedName = "files/NOT-INCLUDED.txt"
 func (e *exporter) files() error {
 	var missing []string
 	for _, f := range e.rows.files {
-		if f.State != "ready" {
+		if f.State != core.FileReady {
 			continue
 		}
 		name := "files/" + f.ID + "/" + fileSafe(f.Name)

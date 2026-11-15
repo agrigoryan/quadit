@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/rank"
 )
 
@@ -100,7 +101,7 @@ func (a *applier) makeStatus(key, name, category, color string) error {
 	if a.has(a.statuses, key, name) {
 		return nil
 	}
-	args := map[string]any{"id": a.uid("status", key+"/"+strings.ToLower(name)), "project": a.projectID[key], "name": name, "category": orStr(category, "unstarted")}
+	args := map[string]any{"id": a.uid("status", key+"/"+strings.ToLower(name)), "project": a.projectID[key], "name": name, "category": orStr(category, core.CatUnstarted)}
 	if color != "" {
 		args["color"] = color
 	}
@@ -138,7 +139,7 @@ func (a *applier) settleWorkflow(key string) error {
 			continue
 		}
 		names = append(names, strings.ToLower(st.Name))
-		if st.Category == "unstarted" && firstOpen == "" {
+		if st.Category == core.CatUnstarted && firstOpen == "" {
 			firstOpen = strings.ToLower(st.Name)
 		}
 	}

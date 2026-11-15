@@ -215,7 +215,7 @@ func (s *Server) handleSetUpInstall(x *c) error {
 		return err
 	}
 	s.audit(x.r, ws.ID, owner, "install.setup", "workspace", ws.ID, nil)
-	if err := s.startSession(x, owner, "full"); err != nil {
+	if err := s.startSession(x, owner, core.SessionFull); err != nil {
 		return err
 	}
 	return x.json(201, map[string]any{"user": owner, "workspace": ws})
@@ -284,14 +284,14 @@ func (s *Server) handleSignIn(x *c) error {
 // finishSignIn starts the session after the first step, asking for the
 // second when the person has one.
 func (s *Server) finishSignIn(x *c, u core.User, method string) error {
-	stage := "full"
+	stage := core.SessionFull
 	if u.TOTPAt != 0 && method != "passkey" {
-		stage = "mfa"
+		stage = core.SessionMFA
 	}
 	if err := s.startSession(x, u, stage); err != nil {
 		return err
 	}
-	if stage == "mfa" {
+	if stage == core.SessionMFA {
 		return x.ok(map[string]any{"second_step": true})
 	}
 	s.audit(x.r, "", u, "signin", "user", u.ID, map[string]string{"method": method})

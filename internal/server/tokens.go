@@ -53,7 +53,7 @@ func (s *Server) handleCreateToken(x *c) error {
 	token, prefix := auth.NewAPIToken()
 	now := time.Now()
 	info := core.APIToken{ID: id.New(), WorkspaceID: x.ws.ID, UserID: m.UserID, Name: strings.TrimSpace(b.Name), TokenHash: auth.Hash(token), Prefix: prefix,
-		Scopes: strings.Join(scopes, " "), Kind: "token", CreatedBy: x.member.UserID, CreatedAt: now.UnixMilli()}
+		Scopes: strings.Join(scopes, " "), Kind: core.TokenAPI, CreatedBy: x.member.UserID, CreatedAt: now.UnixMilli()}
 	if info.Name == "" {
 		info.Name = "token " + now.UTC().Format(time.DateOnly)
 	}

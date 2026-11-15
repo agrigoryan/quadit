@@ -6,6 +6,8 @@ package importer
 import (
 	"regexp"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // category guesses a status category from a status's name.
@@ -21,17 +23,17 @@ func category(name string) string {
 	}
 	switch {
 	case has("cancel", "duplicate", "won't", "wont"):
-		return "canceled"
+		return core.CatCanceled
 	case has("done", "complete", "closed", "shipped", "merged"):
-		return "done"
+		return core.CatDone
 	case has("wait", "blocked", "hold"):
-		return "waiting"
+		return core.CatWaiting
 	case has("progress", "doing", "review", "started"):
-		return "started"
+		return core.CatStarted
 	case has("backlog", "icebox", "triage", "someday"):
-		return "backlog"
+		return core.CatBacklog
 	}
-	return "unstarted"
+	return core.CatUnstarted
 }
 
 // priorityNames gives our number for a priority's name elsewhere.

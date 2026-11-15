@@ -606,7 +606,7 @@ func (run *adminRun) token() error {
 		label = strings.Join(pos[2:], " ")
 	}
 	t := core.APIToken{ID: id.New(), WorkspaceID: ws.ID, UserID: m.UserID, Name: label, TokenHash: auth.Hash(token), Prefix: prefix,
-		Scopes: scopes, Kind: "token", CreatedBy: m.UserID, CreatedAt: time.Now().UnixMilli()}
+		Scopes: scopes, Kind: core.TokenAPI, CreatedBy: m.UserID, CreatedAt: time.Now().UnixMilli()}
 	if err := st.Insert(ctx, t); err != nil {
 		return err
 	}

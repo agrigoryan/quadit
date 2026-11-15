@@ -79,7 +79,7 @@ type agentWork struct {
 func (x *c) agentWork(tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
 	ctx := x.ctx()
 	w := &agentWork{x: x, names: names, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
-	if err := x.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", "running"), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
+	if err := x.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", core.AgentSessionRunning), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
 		Order: "-started_at"}); err != nil {
 		return nil, err
 	}

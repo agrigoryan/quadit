@@ -361,8 +361,8 @@ func (s *Server) handleShowInstallHealth(x *c) error {
 		}
 		out[count.key] = n
 	}
-	out["deliveries_dead"] = liveDeliveries(ctx, s.st, store.Eq("state", "dead"))
-	out["deliveries_pending"] = liveDeliveries(ctx, s.st, store.Eq("state", "pending"))
+	out["deliveries_dead"] = liveDeliveries(ctx, s.st, store.Eq("state", core.DeliveryDead))
+	out["deliveries_pending"] = liveDeliveries(ctx, s.st, store.Eq("state", core.DeliveryPending))
 	var backups []core.Backup
 	if err := s.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err == nil && len(backups) > 0 {
 		out["last_backup"] = backups[0]

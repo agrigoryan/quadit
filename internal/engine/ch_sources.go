@@ -36,8 +36,8 @@ type sourceArgs struct {
 }
 
 var (
-	authorities = []string{"repo", "pages"}
-	writeModes  = []string{"commit", "propose", "none"}
+	authorities = []string{core.AuthorityRepo, core.AuthorityPages}
+	writeModes  = []string{core.WriteCommit, core.WritePropose, core.WriteNone}
 )
 
 // sourceCreate adds a repository whose files are mirrored as pages.
@@ -53,7 +53,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 		return err
 	}
 	src := core.DocSource{ID: sid, WorkspaceID: c.ws, Repo: strings.TrimSpace(a.Repo.V), Branch: a.Branch.V, Subdir: strings.Trim(a.Subdir.V, "/"),
-		Authority: firstNonEmpty(a.Authority.V, "repo"), WriteMode: firstNonEmpty(a.WriteMode.V, "commit"), CreatedBy: c.actor.UserID, CreatedAt: c.at}
+		Authority: firstNonEmpty(a.Authority.V, core.AuthorityRepo), WriteMode: firstNonEmpty(a.WriteMode.V, core.WriteCommit), CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if !slices.Contains(authorities, src.Authority) {
 		return oneOf("authority", "authority", src.Authority, authorities)
 	}

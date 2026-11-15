@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
 )
 
@@ -237,7 +238,7 @@ func (a *applier) member(who string) string {
 // relateTasks says how the tasks hang together, once they are all there.
 func (a *applier) relateTasks() error {
 	for _, t := range a.plan.Tasks {
-		for typ, others := range map[string][]string{"blocks": t.Blocks, "relates": t.Relates} {
+		for typ, others := range map[string][]string{core.RelBlocks: t.Blocks, core.RelRelates: t.Relates} {
 			for _, o := range others {
 				if _, ok := a.tasks[o]; !ok {
 					continue

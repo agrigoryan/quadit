@@ -193,7 +193,7 @@ func (s *Server) handleUploadFile(x *c) error {
 			return x.ok(s.fileOut(x, had))
 		}
 	}
-	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, State: "uploading",
+	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, State: core.FileUploading,
 		UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
 	f.StorageKey = x.ws.ID + "/" + f.ID
 	if err := s.receiveFirstPart(ctx, &f, up.src, maxSize); err != nil {
@@ -287,7 +287,7 @@ func (s *Server) handleUploadFilePart(x *c) error {
 	if !there {
 		return errNotFound("file")
 	}
-	if f.State != "uploading" {
+	if f.State != core.FileUploading {
 		return x.ok(s.fileOut(x, f))
 	}
 	if f.UploadedBy != x.member.UserID {
@@ -332,7 +332,7 @@ func (s *Server) dropPart(ctx context.Context, f core.File, offset int64) {
 
 // fileOut is a file as the API shows it: with its addresses once it is ready.
 func (s *Server) fileOut(x *c, f core.File) core.File {
-	if f.State == "ready" {
+	if f.State == core.FileReady {
 		f.URL, f.PreviewURL = x.fileURL(f)
 	}
 	return f
@@ -364,7 +364,7 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 		return fmt.Errorf("file storage: %w", err)
 	}
 	f.SHA256, f.State = hex.EncodeToString(h.Sum(nil)), "ready"
-	set := map[string]any{"state": "ready", "sha256": f.SHA256, "content_type": f.ContentType, "size": f.Size, "received": f.Size}
+	set := map[string]any{"state": core.FileReady, "sha256": f.SHA256, "content_type": f.ContentType, "size": f.Size, "received": f.Size}
 	s.addPreview(ctx, f, path, set)
 	_, err = x.db.Update(ctx, "files", set, store.Eq("id", f.ID))
 	return err
@@ -567,7 +567,7 @@ func inlineType(ct string) bool {
 func (s *Server) handleServeFile(x *c) error {
 	ctx := x.ctx()
 	var f core.File
-	if err := s.st.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil || f.State != "ready" {
+	if err := s.st.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil || f.State != core.FileReady {
 		return errNotFound("file")
 	}
 	if n, err := s.st.Count(ctx, "members", store.Eq("workspace_id", f.WorkspaceID), store.Eq("user_id", x.user.ID), store.Null("removed_at"),

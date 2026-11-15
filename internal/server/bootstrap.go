@@ -112,7 +112,7 @@ func (b *bootstrapRows) loadLists() error {
 		{&b.notes, store.Q{Where: []store.Cond{mine, store.Null("archived_at")}, Order: "-seq", Limit: most}},
 		{&b.watchers, store.Where(mine)},
 		{&b.resources, live("")},
-		{&b.claims, store.Where(store.Ne("state", "released"))},
+		{&b.claims, store.Where(store.Ne("state", core.ClaimReleased))},
 		{&b.docs, live("rank")},
 		{&b.sessions, store.Q{Where: []store.Cond{store.Gte("started_at", weekAgo)}, Order: "-started_at", Limit: most}},
 	} {

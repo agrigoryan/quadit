@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // orbit reads a workspace from an Orbit server through its public API: its
@@ -69,8 +71,8 @@ type orbitList[T any] struct {
 }
 
 // orbitCategory gives our kind of status for Orbit's.
-var orbitCategory = map[string]string{"backlog": "backlog", "unstarted": "unstarted", "started": "started", "completed": "done",
-	"cancelled": "canceled", "canceled": "canceled", "duplicate": "canceled"} //nolint:misspell // "cancelled" is how Orbit may spell it
+var orbitCategory = map[string]string{"backlog": core.CatBacklog, "unstarted": core.CatUnstarted, "started": core.CatStarted, "completed": core.CatDone,
+	"cancelled": core.CatCanceled, "canceled": core.CatCanceled, "duplicate": core.CatCanceled} //nolint:misspell // "cancelled" is how Orbit may spell it
 
 // members learns people's names and addresses, when the token may read
 // them; without them people are known by their ids.
@@ -128,7 +130,7 @@ func (r *orbitReader) workflow(projectID, key string) error {
 		// started, its "Waiting on you" one that is. The name says which
 		// of ours it is.
 		switch guess := category(s.Name); {
-		case cat == "", cat == "unstarted" && guess == "backlog", cat == "started" && guess == "waiting":
+		case cat == "", cat == core.CatUnstarted && guess == core.CatBacklog, cat == core.CatStarted && guess == core.CatWaiting:
 			cat = guess
 		}
 		st := Status{Project: key, Name: s.Name, Category: cat, Color: s.Color}

@@ -49,7 +49,7 @@ func relationAdd(c *cx, a relationArgs) error {
 			t, o = o, t
 		}
 	default:
-		return oneOf("type", "relation type", a.Type, []string{"blocks", "blocked_by", "relates", "duplicates"})
+		return oneOf("type", "relation type", a.Type, []string{core.RelBlocks, "blocked_by", core.RelRelates, core.RelDuplicates})
 	}
 	n, err := c.tx.Count(c.ctx, "task_relations", store.Eq("task_id", t.ID), store.Eq("related_task_id", o.ID), store.Eq("type", typ))
 	if err != nil || n > 0 {

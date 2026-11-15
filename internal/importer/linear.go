@@ -5,6 +5,8 @@ package importer
 import (
 	"strconv"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // linear reads the CSV that Linear exports.
@@ -25,11 +27,11 @@ func linearRow(get csvCells) Task {
 	t.Category = category(t.Status)
 	switch {
 	case get("canceled") != "":
-		t.Category = "canceled"
+		t.Category = core.CatCanceled
 	case get("completed") != "":
-		t.Category = "done"
-	case get("started") != "" && t.Category == "unstarted":
-		t.Category = "started"
+		t.Category = core.CatDone
+	case get("started") != "" && t.Category == core.CatUnstarted:
+		t.Category = core.CatStarted
 	}
 	whole, _, _ := strings.Cut(get("estimate"), ".")
 	if n, err := strconv.Atoi(whole); err == nil {

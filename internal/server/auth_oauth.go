@@ -66,7 +66,7 @@ func (s *Server) handleStartProviderSignIn(x *c) error {
 	if s.identify(x) == nil && x.sess != nil && x.r.URL.Query().Has("link") {
 		state.LinkUser = x.user.ID
 	}
-	stateToken, err := s.oneTime(ctx, "oauth", "", state, approvalLife)
+	stateToken, err := s.oneTime(ctx, core.OneTimeOAuth, "", state, approvalLife)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 	if e := q.Get("error"); e != "" {
 		return back("The sign-in was cancelled.") //nolint:misspell // the words the person is shown, kept as they are
 	}
-	spent, err := s.useOneTime(ctx, "oauth", q.Get("state"), false)
+	spent, err := s.useOneTime(ctx, core.OneTimeOAuth, q.Get("state"), false)
 	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 		return err
 	}
@@ -119,14 +119,14 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 		return back("This account is disabled.")
 	}
 	if state.LinkUser == "" {
-		stage := "full"
+		stage := core.SessionFull
 		if u.TOTPAt != 0 {
-			stage = "mfa"
+			stage = core.SessionMFA
 		}
 		if err := s.startSession(x, u, stage); err != nil {
 			return err
 		}
-		if stage == "mfa" {
+		if stage == core.SessionMFA {
 			http.Redirect(x.w, x.r, "/login?second_step=1&next="+url.QueryEscape(state.Next), http.StatusFound)
 			return nil
 		}

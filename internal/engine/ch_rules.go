@@ -24,7 +24,7 @@ type ruleArgs struct {
 	Action *core.RuleAction `json:"action"`
 }
 
-var ruleActions = []string{"notify", "webhook", "assign", "wait_on"}
+var ruleActions = []string{core.RuleNotify, core.RuleWebhook, core.RuleAssign, core.RuleWaitOn}
 
 // checkRuleMatch resolves the names in what a rule matches to ids.
 func (c *cx) checkRuleMatch(m *core.RuleMatch) error {
@@ -66,7 +66,7 @@ func (c *cx) checkRule(m *core.RuleMatch, a *core.RuleAction) error {
 	if err := c.checkRuleMatch(m); err != nil {
 		return err
 	}
-	if a.Kind == "webhook" {
+	if a.Kind == core.RuleWebhook {
 		if _, err := loadLive[core.Webhook](c, "webhook", "action.webhook_id", a.WebhookID); err != nil {
 			return err
 		}

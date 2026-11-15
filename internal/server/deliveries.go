@@ -38,7 +38,7 @@ const (
 func (s *Server) queueDelivery(ctx context.Context, db store.DB, h core.Webhook, ev core.Event) error {
 	now := time.Now().UnixMilli()
 	return db.Upsert(ctx, core.WebhookDelivery{ID: id.New(), WorkspaceID: h.WorkspaceID, WebhookID: h.ID, Seq: ev.Seq, EventType: ev.Type,
-		State: "pending", CreatedAt: now, NextAt: now}, "webhook_id", "seq")
+		State: core.DeliveryPending, CreatedAt: now, NextAt: now}, "webhook_id", "seq")
 }
 
 // busyHooks is the set of webhooks being delivered to right now, shared by
@@ -114,7 +114,7 @@ func (s *Server) waitingDeliveries(ctx context.Context, busy *busyHooks) (map[st
 			continue
 		}
 		var list []core.WebhookDelivery
-		q := store.Q{Where: []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", "pending")}, Order: "seq", Limit: deliveryBatch}
+		q := store.Q{Where: []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", core.DeliveryPending)}, Order: "seq", Limit: deliveryBatch}
 		if err := s.st.List(ctx, &list, q); err == nil && len(list) > 0 {
 			byHook[h.ID] = list
 		}
@@ -129,7 +129,7 @@ func (s *Server) deliverInOrder(ctx context.Context, list []core.WebhookDelivery
 	for _, d := range list {
 		// Claim it by moving its time on; only one server wins.
 		n, err := s.st.Update(ctx, "webhook_deliveries", map[string]any{"next_at": time.Now().UnixMilli() + deliveryClaim.Milliseconds(), "attempts": d.Attempts + 1},
-			store.Eq("id", d.ID), store.Eq("state", "pending"), store.Eq("attempts", d.Attempts))
+			store.Eq("id", d.ID), store.Eq("state", core.DeliveryPending), store.Eq("attempts", d.Attempts))
 		if err != nil || n != 1 {
 			return
 		}
@@ -213,7 +213,7 @@ func (s *Server) deliver(ctx context.Context, d core.WebhookDelivery) bool {
 // its next try.
 func (s *Server) giveUpDelivery(ctx context.Context, db store.DB, d core.WebhookDelivery, reason string) bool {
 	s.recordOutcome(ctx, "webhook delivery", func(ctx context.Context) error {
-		_, err := db.Update(ctx, "webhook_deliveries", map[string]any{"state": "dead", "error": reason, "done_at": time.Now().UnixMilli()}, store.Eq("id", d.ID))
+		_, err := db.Update(ctx, "webhook_deliveries", map[string]any{"state": core.DeliveryDead, "error": reason, "done_at": time.Now().UnixMilli()}, store.Eq("id", d.ID))
 		return err
 	}, "delivery", d.ID)
 	return true
@@ -305,7 +305,7 @@ func (s *Server) handleResendDelivery(x *c) error {
 	if tests > 0 {
 		return errBad("this was a test; send a new test instead")
 	}
-	n, err := x.db.Update(x.ctx(), "webhook_deliveries", map[string]any{"state": "pending", "attempts": 0, "next_at": time.Now().UnixMilli(), "done_at": 0, "error": ""},
+	n, err := x.db.Update(x.ctx(), "webhook_deliveries", map[string]any{"state": core.DeliveryPending, "attempts": 0, "next_at": time.Now().UnixMilli(), "done_at": 0, "error": ""},
 		store.Eq("id", x.r.PathValue("id")))
 	if err != nil {
 		return err
@@ -338,10 +338,10 @@ func (s *Server) handleSendTestWebhook(x *c) error {
 	// A test shows in the delivery log like any other delivery. It has no
 	// place in the feed, so it gets a number of its own below zero.
 	now := time.Now().UnixMilli()
-	d := core.WebhookDelivery{ID: did, WorkspaceID: x.ws.ID, WebhookID: h.ID, Seq: -now, EventType: ev.Type, State: "ok", Attempts: 1,
+	d := core.WebhookDelivery{ID: did, WorkspaceID: x.ws.ID, WebhookID: h.ID, Seq: -now, EventType: ev.Type, State: core.DeliveryOK, Attempts: 1,
 		StatusCode: status, Error: errText, DurationMS: int(took.Milliseconds()), CreatedAt: now, DoneAt: now}
 	if status < 200 || status >= 300 {
-		d.State = "dead"
+		d.State = core.DeliveryDead
 	}
 	if err := x.db.Insert(x.ctx(), d); err != nil {
 		s.log.Error("webhook test: delivery log", "err", err)
@@ -349,7 +349,7 @@ func (s *Server) handleSendTestWebhook(x *c) error {
 	// The webhook's own record says when it last answered and how. A test
 	// does not count for or against it as a run of failures.
 	last := fmt.Sprint(status)
-	if d.State != "ok" {
+	if d.State != core.DeliveryOK {
 		last = firstNonEmpty(errText, last)
 	}
 	if _, err := x.db.Update(x.ctx(), "webhooks", map[string]any{"last_at": now, "last_status": last}, store.Eq("id", h.ID)); err != nil {

@@ -122,7 +122,7 @@ func (b *detailBuilder) comments() error {
 	for _, cm := range comments {
 		v := commentView{ID: cm.ID, Seq: cm.CreatedSeq, By: b.names.handle(cm.AuthorID), At: formatTime(cm.CreatedAt), On: where[cm.SubjectID],
 			ReplyTo: cm.ParentID, Evidence: cm.Evidence, Attachments: b.files[cm.ID], Edited: cm.EditedAt != 0}
-		if cm.Kind != "comment" {
+		if cm.Kind != core.CommentPlain {
 			v.Kind = cm.Kind
 		}
 		v.Body, v.Truncated = truncate(cm.Body, b.maxChars/2)

@@ -34,7 +34,7 @@ func (s *Server) handleRequestPasswordReset(x *c) error {
 	email := strings.ToLower(strings.TrimSpace(b.Email))
 	var u core.User
 	if err := s.st.Get(ctx, &u, store.Eq("email", email), store.Live); err == nil && u.Kind == core.KindPerson && u.DisabledAt == 0 {
-		token, err := s.oneTime(ctx, "reset", u.ID, nil, time.Hour)
+		token, err := s.oneTime(ctx, core.OneTimeReset, u.ID, nil, time.Hour)
 		if err != nil {
 			return err
 		}
@@ -67,7 +67,7 @@ func (s *Server) handleConfirmPasswordReset(x *c) error {
 	if err := auth.CheckPasswordRules(b.Password); err != nil {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: err.Error()}
 	}
-	spent, err := s.useOneTime(ctx, "reset", b.Token, false)
+	spent, err := s.useOneTime(ctx, core.OneTimeReset, b.Token, false)
 	if err != nil {
 		return err
 	}

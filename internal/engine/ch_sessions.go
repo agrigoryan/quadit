@@ -35,7 +35,7 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 	}
 	seq := c.tx.NextSeq()
 	s := core.AgentSession{ID: sid, WorkspaceID: c.ws, AgentID: c.actor.UserID, Title: a.Title, Instructions: a.Instructions,
-		State: "running", StartedAt: c.at, UpdatedSeq: seq}
+		State: core.AgentSessionRunning, StartedAt: c.at, UpdatedSeq: seq}
 	where, key := inWorkspace(c.ws), ""
 	if a.Task != "" {
 		t, err := c.task("task", a.Task)
@@ -101,12 +101,12 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	p.setText("title", a.Title, &s.Title)
 	p.setText("summary", a.Summary, &s.Summary)
 	if a.State.Set {
-		states := []string{"running", "done", "failed", "stopped"}
+		states := []string{core.AgentSessionRunning, core.AgentSessionDone, core.AgentSessionFailed, core.AgentSessionStopped}
 		if !slices.Contains(states, a.State.V) {
 			return oneOf("state", "session state", a.State.V, states)
 		}
 		p.setText("state", a.State, &s.State)
-		if s.State != "running" && s.EndedAt == 0 {
+		if s.State != core.AgentSessionRunning && s.EndedAt == 0 {
 			p.put("ended_at", int64(0), c.at)
 		}
 	}

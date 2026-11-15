@@ -90,7 +90,7 @@ func (s *apiSink) Upload(path string) (string, error) {
 // earlier run of the same import has.
 func (s *apiSink) UploadAs(fileID, path string) (string, bool, error) {
 	var had struct{ URL, State string }
-	if raw, err := s.api.Call("GET", "/files/"+fileID, nil, nil); err == nil && json.Unmarshal(raw, &had) == nil && had.State == "ready" {
+	if raw, err := s.api.Call("GET", "/files/"+fileID, nil, nil); err == nil && json.Unmarshal(raw, &had) == nil && had.State == core.FileReady {
 		return had.URL, false, nil
 	}
 	u, err := s.api.SendFile(fileID, path)

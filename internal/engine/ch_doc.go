@@ -251,7 +251,7 @@ func (c *cx) canEditDoc(d core.Doc) error {
 		if err != nil {
 			return err
 		}
-		if ok && src.Authority == "repo" && src.WriteMode == "none" {
+		if ok && src.Authority == core.AuthorityRepo && src.WriteMode == core.WriteNone {
 			return conflictErr("this page mirrors a file in a repository that is read-only here; change the file instead")
 		}
 	}

@@ -263,7 +263,7 @@ func (s *Server) runRule(ctx context.Context, l listeners, r core.Rule, ev core.
 	if ev.ScopeType == "task" {
 		taskID = ev.ScopeID
 	}
-	if r.Action.Kind == "webhook" {
+	if r.Action.Kind == core.RuleWebhook {
 		for _, h := range l.hooks {
 			if h.ID == r.Action.WebhookID {
 				return s.queueDelivery(ctx, l.db, h, ev)
@@ -342,18 +342,18 @@ func (s *Server) ruleAct(ctx context.Context, ws core.Workspace, r core.Rule, ta
 			msg = r.Name
 		}
 		switch a.Kind {
-		case "notify":
+		case core.RuleNotify:
 			args := map[string]any{"user": a.UserID, "message": msg}
 			if taskID != "" {
 				args["task"] = taskID
 			}
 			return sys.Do("notify", args)
-		case "assign":
+		case core.RuleAssign:
 			if taskID == "" {
 				return nil
 			}
 			return sys.Do("task.update", map[string]any{"id": taskID, "assignee": a.UserID})
-		case "wait_on":
+		case core.RuleWaitOn:
 			if taskID == "" {
 				return nil
 			}

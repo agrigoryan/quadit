@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 )
@@ -228,7 +229,7 @@ func (s *Server) uploadPart(who selfCaller, a map[string]any) (string, bool) {
 	if json.Unmarshal([]byte(out), &f) != nil {
 		return out, true // taken; the answer is passed on as it came
 	}
-	if f.State == "ready" {
+	if f.State == core.FileReady {
 		return fmt.Sprintf("file id=%s ready %s", f.ID, f.URL), true
 	}
 	return fmt.Sprintf("file id=%s received %d of %d; send the next part with id and offset=%d", f.ID, f.Received, f.Size, f.Received), true

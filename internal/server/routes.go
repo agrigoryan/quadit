@@ -137,7 +137,7 @@ func (s *Server) handleShowMetrics(w http.ResponseWriter, r *http.Request) {
 	if n, err := s.st.Count(ctx, "jobs", store.Null("done_at")); err == nil {
 		fmt.Fprintf(w, "# TYPE quadit_jobs_waiting gauge\nquadit_jobs_waiting %d\n", n)
 	}
-	fmt.Fprintf(w, "# TYPE quadit_webhook_deliveries_dead gauge\nquadit_webhook_deliveries_dead %d\n", liveDeliveries(ctx, s.st, store.Eq("state", "dead")))
+	fmt.Fprintf(w, "# TYPE quadit_webhook_deliveries_dead gauge\nquadit_webhook_deliveries_dead %d\n", liveDeliveries(ctx, s.st, store.Eq("state", core.DeliveryDead)))
 	fmt.Fprintf(w, "# TYPE quadit_info gauge\nquadit_info{version=%q,database=%q,files=%q} 1\n", s.cfg.Version, s.st.Dialect(), s.fileStore().Kind())
 }
 
@@ -345,7 +345,7 @@ var collections = map[string]collection{
 	"preferences": {load: listOf[core.Preference]("created_at")},
 	"resources":   {load: listOf[core.Resource]("name")},
 	"secrets":     {admin: true, load: listOf[core.Secret]("name")},
-	"claims":      {load: listOf[core.ResourceClaim]("requested_at", store.Ne("state", "released"))},
+	"claims":      {load: listOf[core.ResourceClaim]("requested_at", store.Ne("state", core.ClaimReleased))},
 	"sessions":    {load: listOf[core.AgentSession]("-started_at")},
 	"relations":   {load: listOf[core.Relation]("created_at")},
 	"attachments": {load: loadAttachments},

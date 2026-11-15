@@ -68,13 +68,13 @@ func commentCreate(c *cx, a commentCreateArgs) error {
 func commentKind(a commentCreateArgs) (string, error) {
 	kind := a.Kind
 	if kind == "" {
-		kind = "comment"
+		kind = core.CommentPlain
 		if a.Evidence != nil {
-			kind = "result"
+			kind = core.CommentResult
 		}
 	}
-	if kind != "comment" && kind != "result" {
-		return "", oneOf("kind", "kind", a.Kind, []string{"comment", "result"})
+	if kind != core.CommentPlain && kind != core.CommentResult {
+		return "", oneOf("kind", "kind", a.Kind, []string{core.CommentPlain, core.CommentResult})
 	}
 	return kind, nil
 }
@@ -140,7 +140,7 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 		return err
 	}
 	note := core.NoteComment
-	if cm.Kind == "result" {
+	if cm.Kind == core.CommentResult {
 		note = core.NoteResult
 	}
 	if err := c.handOn(cm, t, a, note); err != nil {
@@ -246,7 +246,7 @@ func (c *cx) handOn(cm core.Comment, t core.Task, a commentCreateArgs, note stri
 		if err := c.setWaitingOn(t, "", ""); err != nil {
 			return err
 		}
-	case cm.Kind == "result":
+	case cm.Kind == core.CommentResult:
 		var ds []core.Decision
 		if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.NotNull("decided_by"), store.Live},
 			Order: "-updated_seq", Limit: 1}); err != nil {

@@ -27,7 +27,7 @@ func (s *Server) checkSecond(ctx context.Context, u core.User, code string) bool
 	}
 	if step, ok := auth.CheckTOTP(secret, code, time.Now()); ok {
 		// A code works once: remember the step it was used in.
-		mark := core.OneTimeToken{ID: id.New(), Kind: "totp_used", TokenHash: auth.Hash(fmt.Sprintf("totp:%s:%d", u.ID, step)), UserID: u.ID,
+		mark := core.OneTimeToken{ID: id.New(), Kind: core.OneTimeTOTPUsed, TokenHash: auth.Hash(fmt.Sprintf("totp:%s:%d", u.ID, step)), UserID: u.ID,
 			CreatedAt: time.Now().UnixMilli(), ExpiresAt: time.Now().Add(5 * time.Minute).UnixMilli()}
 		return s.st.Insert(ctx, mark) == nil
 	}
@@ -47,7 +47,7 @@ func (s *Server) handleFinishSecondStep(x *c) error {
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	if x.sess == nil || x.sess.Stage == "full" {
+	if x.sess == nil || x.sess.Stage == core.SessionFull {
 		return x.ok(map[string]any{"user": x.user})
 	}
 	ctx := x.ctx()
@@ -58,7 +58,7 @@ func (s *Server) handleFinishSecondStep(x *c) error {
 		s.audit(x.r, "", x.user, "signin.second_step_failed", "user", x.user.ID, nil)
 		return errUnauthorized("that code is not right; codes change every 30 seconds")
 	}
-	if _, err := s.st.Update(ctx, "sessions", map[string]any{"stage": "full"}, store.Eq("id", x.sess.ID)); err != nil {
+	if _, err := s.st.Update(ctx, "sessions", map[string]any{"stage": core.SessionFull}, store.Eq("id", x.sess.ID)); err != nil {
 		return err
 	}
 	s.audit(x.r, "", x.user, "signin", "user", x.user.ID, map[string]string{"method": "password+code"})

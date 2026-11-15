@@ -41,7 +41,7 @@ func (c *cx) attach(a attachArgs, subjectType, subjectID string, t core.Task) (c
 	if err != nil {
 		return at, err
 	}
-	if f.State != "ready" {
+	if f.State != core.FileReady {
 		return at, conflictErr("file %s is still uploading", f.Name)
 	}
 	if !slices.Contains([]string{"", "before", "after"}, a.Role) {

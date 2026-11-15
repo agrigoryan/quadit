@@ -37,21 +37,21 @@ func linkSet(c *cx, a linkSetArgs) error {
 	if err != nil {
 		return err
 	}
-	kinds := []string{"branch", "commit", "pr", "issue", "url"}
+	kinds := []string{core.LinkBranch, core.LinkCommit, core.LinkPR, core.LinkIssue, core.LinkURL}
 	if !slices.Contains(kinds, a.Kind) {
 		return oneOf("kind", "link kind", a.Kind, kinds)
 	}
-	if a.Kind == "url" && a.URL == "" {
+	if a.Kind == core.LinkURL && a.URL == "" {
 		return invalid("url", "a url link needs a url")
 	}
-	if a.Kind != "url" && a.Ref == "" {
+	if a.Kind != core.LinkURL && a.Ref == "" {
 		return invalid("ref", "a %s link needs ref: the branch name, commit hash or pull request number", a.Kind)
 	}
 	var l core.TaskLink
 	conds := []store.Cond{store.Eq("task_id", t.ID), store.Eq("kind", a.Kind), store.Live}
 	if a.ID != "" {
 		conds = []store.Cond{store.Eq("id", a.ID), store.Live}
-	} else if a.Kind == "url" {
+	} else if a.Kind == core.LinkURL {
 		conds = append(conds, store.Eq("url", a.URL))
 	} else {
 		conds = append(conds, store.Eq("repo", a.Repo), store.Eq("ref", a.Ref))

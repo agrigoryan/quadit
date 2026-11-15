@@ -198,7 +198,7 @@ func (s *Server) handleShowConsentPage(x *c) error {
 		}
 	}
 	req := authRequest{ClientID: client.ID, RedirectURI: q.Get("redirect_uri"), State: q.Get("state"), Challenge: q.Get("code_challenge"), Scope: q.Get("scope"), UserID: x.user.ID}
-	token, err := s.oneTime(ctx, "oauth_consent", x.user.ID, req, approvalLife)
+	token, err := s.oneTime(ctx, core.OneTimeOAuthConsent, x.user.ID, req, approvalLife)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 	if err := s.identify(x); err != nil || x.sess == nil {
 		return errUnauthorized("sign in first")
 	}
-	spent, err := s.useOneTime(ctx, "oauth_consent", x.r.PostForm.Get("request"), false)
+	spent, err := s.useOneTime(ctx, core.OneTimeOAuthConsent, x.r.PostForm.Get("request"), false)
 	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 		return err
 	}
@@ -266,7 +266,7 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 		if !allowed {
 			return errBad("you cannot let a client work as that member there")
 		}
-		code, err := s.oneTime(ctx, "oauth_code", x.user.ID, req, 5*time.Minute)
+		code, err := s.oneTime(ctx, core.OneTimeOAuthCode, x.user.ID, req, 5*time.Minute)
 		if err != nil {
 			return err
 		}
@@ -318,7 +318,7 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 			s.log.Warn("oauth token: the client's name is not known; the token gets a plain one", "err", err)
 		}
 		issued := core.APIToken{ID: id.New(), WorkspaceID: workspaceID, UserID: userID, Name: firstNonEmpty(client.Name, "MCP client"), TokenHash: auth.Hash(access), Prefix: prefix,
-			Scopes: scopes, Kind: "oauth", ClientID: clientID, RefreshHash: auth.Hash(refresh), CreatedBy: userID, CreatedAt: now.UnixMilli(),
+			Scopes: scopes, Kind: core.TokenOAuth, ClientID: clientID, RefreshHash: auth.Hash(refresh), CreatedBy: userID, CreatedAt: now.UnixMilli(),
 			ExpiresAt: now.Add(accessLife).UnixMilli()}
 		if err := s.st.Insert(ctx, issued); err != nil {
 			fail("server_error", "the token could not be stored")
@@ -329,7 +329,7 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 	}
 	switch form.Get("grant_type") {
 	case "authorization_code":
-		spent, err := s.useOneTime(ctx, "oauth_code", form.Get("code"), false)
+		spent, err := s.useOneTime(ctx, core.OneTimeOAuthCode, form.Get("code"), false)
 		if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 			s.log.Error("oauth token: the code could not be spent", "err", err)
 			fail("server_error", "the code could not be spent; try again")

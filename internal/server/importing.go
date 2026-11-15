@@ -111,7 +111,7 @@ func (s *Server) importSource(x *c, b importBody) (source string, cleanup func()
 	if err != nil {
 		return "", cleanup, err
 	}
-	if !there || f.State != "ready" {
+	if !there || f.State != core.FileReady {
 		return "", cleanup, errNotFound("file")
 	}
 	dir, err := os.MkdirTemp("", "quadit-import-*")

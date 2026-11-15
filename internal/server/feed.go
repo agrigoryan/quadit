@@ -282,7 +282,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 	if !ok {
 		return errBad("this connection cannot stream")
 	}
-	if x.sess != nil && x.sess.Stage == "render" {
+	if x.sess != nil && x.sess.Stage == core.SessionRender {
 		// The browser taking a picture must see the page settle; an open
 		// stream would keep it waiting. "No content" tells it not to retry.
 		x.w.WriteHeader(http.StatusNoContent)

@@ -85,13 +85,13 @@ type resourceAcquireArgs struct {
 // releasing a hold whose lease ran out.
 func (c *cx) activeClaims(r core.Resource) ([]core.ResourceClaim, error) {
 	var claims []core.ResourceClaim
-	if err := c.tx.List(c.ctx, &claims, store.Q{Where: []store.Cond{store.Eq("resource_id", r.ID), store.Ne("state", "released")}, Order: "requested_at,id"}); err != nil {
+	if err := c.tx.List(c.ctx, &claims, store.Q{Where: []store.Cond{store.Eq("resource_id", r.ID), store.Ne("state", core.ClaimReleased)}, Order: "requested_at,id"}); err != nil {
 		return nil, err
 	}
 	var live []core.ResourceClaim
 	for _, cl := range claims {
-		if cl.State == "holding" && cl.LeaseUntil != 0 && cl.LeaseUntil < c.at {
-			if err := c.setClaim(cl, map[string]any{"state": "released", "released_at": c.at}, "expired"); err != nil {
+		if cl.State == core.ClaimHolding && cl.LeaseUntil != 0 && cl.LeaseUntil < c.at {
+			if err := c.setClaim(cl, map[string]any{"state": core.ClaimReleased, "released_at": c.at}, "expired"); err != nil {
 				return nil, err
 			}
 			continue
@@ -139,7 +139,7 @@ func (c *cx) claimProject(cl core.ResourceClaim) (string, error) {
 // promote gives a free resource to the first in its queue.
 func (c *cx) promote(r core.Resource, live []core.ResourceClaim) error {
 	for _, cl := range live {
-		if cl.State == "holding" {
+		if cl.State == core.ClaimHolding {
 			return nil
 		}
 	}
@@ -148,7 +148,7 @@ func (c *cx) promote(r core.Resource, live []core.ResourceClaim) error {
 	}
 	next := live[0]
 	// The one who was waiting gets half an hour to notice and renew.
-	if err := c.setClaim(next, map[string]any{"state": "holding", "acquired_at": c.at, "lease_until": c.at + defaultLeaseMinutes*msPerMinute}, "acquired"); err != nil {
+	if err := c.setClaim(next, map[string]any{"state": core.ClaimHolding, "acquired_at": c.at, "lease_until": c.at + defaultLeaseMinutes*msPerMinute}, "acquired"); err != nil {
 		return err
 	}
 	return c.notify(next.UserID, core.NoteWaitingOn, core.Notification{EntityType: "resource", EntityID: r.ID, TaskID: next.TaskID,
@@ -176,7 +176,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 	for _, cl := range live {
 		if cl.UserID == c.actor.UserID {
 			c.ref, c.key = cl.ID, cl.State
-			if cl.State == "holding" { // renew
+			if cl.State == core.ClaimHolding { // renew
 				return c.setClaim(cl, map[string]any{"lease_until": c.at + int64(a.Minutes)*msPerMinute}, "renewed")
 			}
 			return nil // already queued
@@ -186,7 +186,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 	if err != nil {
 		return err
 	}
-	cl := core.ResourceClaim{ID: cid, WorkspaceID: c.ws, ResourceID: r.ID, UserID: c.actor.UserID, Note: a.Note, State: "waiting", RequestedAt: c.at}
+	cl := core.ResourceClaim{ID: cid, WorkspaceID: c.ws, ResourceID: r.ID, UserID: c.actor.UserID, Note: a.Note, State: core.ClaimWaiting, RequestedAt: c.at}
 	if a.Task != "" {
 		t, err := c.task("task", a.Task)
 		if err != nil {
@@ -196,10 +196,10 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 	}
 	held := false
 	for _, o := range live {
-		held = held || o.State == "holding"
+		held = held || o.State == core.ClaimHolding
 	}
 	if !held && len(live) == 0 {
-		cl.State, cl.AcquiredAt, cl.LeaseUntil = "holding", c.at, c.at+int64(a.Minutes)*msPerMinute
+		cl.State, cl.AcquiredAt, cl.LeaseUntil = core.ClaimHolding, c.at, c.at+int64(a.Minutes)*msPerMinute
 	}
 	if err := c.tx.Insert(c.ctx, cl); err != nil {
 		return alreadyInUse(err, "id", cid)
@@ -212,7 +212,7 @@ func resourceAcquire(c *cx, a resourceAcquireArgs) error {
 	if err := c.emit(event{seq: c.tx.NextSeq(), typ: "claim.created", entity: "claim", entityID: cl.ID, place: place{scopeType: "workspace", scopeID: c.ws, projectID: projectID}, data: core.EventData{Row: cl, Resource: r.Name}}); err != nil {
 		return err
 	}
-	if cl.State == "waiting" {
+	if cl.State == core.ClaimWaiting {
 		return c.promote(r, append(live, cl))
 	}
 	return nil
@@ -248,7 +248,7 @@ func resourceRelease(c *cx, a resourceReleaseArgs) error {
 	var rest []core.ResourceClaim
 	for _, cl := range live {
 		if cl.UserID == userID {
-			if err := c.setClaim(cl, map[string]any{"state": "released", "released_at": c.at}, "released"); err != nil {
+			if err := c.setClaim(cl, map[string]any{"state": core.ClaimReleased, "released_at": c.at}, "released"); err != nil {
 				return err
 			}
 			continue
@@ -263,7 +263,7 @@ func resourceRelease(c *cx, a resourceReleaseArgs) error {
 func (e *Engine) ExpireHolds(ctx context.Context) error {
 	now := e.now().UnixMilli()
 	var stale []core.ResourceClaim
-	if err := e.st.List(ctx, &stale, store.Where(store.Eq("state", "holding"), store.Lt("lease_until", now))); err != nil {
+	if err := e.st.List(ctx, &stale, store.Where(store.Eq("state", core.ClaimHolding), store.Lt("lease_until", now))); err != nil {
 		return err
 	}
 	seen := map[string]bool{}

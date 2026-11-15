@@ -2,7 +2,11 @@
 
 package importer
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
+)
 
 // asana reads the CSV that Asana exports.
 type asana struct{}
@@ -20,8 +24,8 @@ func asanaRow(get csvCells) Task {
 		DueOn: get("due date"), Epic: get("projects"), ParentExt: get("parent task id")}
 	t.Category = category(t.Status)
 	if get("completed at") != "" {
-		t.Category = "done"
-		if t.Status == "" || category(t.Status) != "done" {
+		t.Category = core.CatDone
+		if t.Status == "" || category(t.Status) != core.CatDone {
 			t.Status = "" // done there, whatever column it sat in
 		}
 	}

@@ -336,7 +336,7 @@ type commentView struct {
 func (cm commentView) text() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "[#%d %s %s]", cm.Seq, cm.By, cm.At)
-	if cm.Kind == "result" {
+	if cm.Kind == core.CommentResult {
 		b.WriteString(" RESULT")
 	}
 	if cm.On != "" {
@@ -537,7 +537,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 		var cm core.Comment
 		data.ReadRow(&cm)
 		kind := "comment"
-		if cm.Kind == "result" {
+		if cm.Kind == core.CommentResult {
 			kind = "RESULT"
 		}
 		on := ""
@@ -601,7 +601,7 @@ func (x *c) eventLine(ev core.Event, names *nameLookup) string {
 			if data.TaskID != nil {
 				claim.TaskID = *data.TaskID
 			}
-		case claim.State == "holding":
+		case claim.State == core.ClaimHolding:
 			what = "claim: took " + data.Resource
 		default:
 			what = "claim: waits for " + data.Resource
