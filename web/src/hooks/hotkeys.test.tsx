@@ -40,6 +40,15 @@ describe("combo", () => {
     expect(named({ key: "к", code: "KeyR", metaKey: true })).toBe("mod+r");
   });
 
+  it("names a Latin letter as typed, where a layout puts it on another key", () => {
+    // German: Z and Y swap places; Cmd+Z is the key labelled Z, as the system has it.
+    expect(named({ key: "z", code: "KeyY", metaKey: true })).toBe("mod+z");
+    expect(named({ key: "y", code: "KeyZ", metaKey: true })).toBe("mod+y");
+    // French: A is where Q is on a US keyboard.
+    expect(named({ key: "a", code: "KeyQ" })).toBe("a");
+    expect(named({ key: "A", code: "KeyQ", shiftKey: true })).toBe("shift+a");
+  });
+
   it("names a digit by the key pressed", () => {
     expect(named({ key: "1", code: "Digit1" })).toBe("1");
     // French layout: the digit row types symbols unless Shift is held.

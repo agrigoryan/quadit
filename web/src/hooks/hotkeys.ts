@@ -57,10 +57,12 @@ const SIGN_KEYS: Record<string, string> = {
  * What a key press is called in a Hotkeys table: "j", "shift+s",
  * "mod+shift+z", "alt+u", "?", "mod+.", "Enter", "shift+ ".
  *
- * A letter is named by the key pressed (e.code), not by the character it
- * types, so the keys work under any keyboard layout (Russian, Armenian…),
- * and Option with a letter on a Mac is "alt+" that letter, not "¨" or "ø".
- * So is a digit, unless Option makes it type a sign (the German Mac's [ is
+ * A Latin letter is named as typed, so on a German or French keyboard Cmd+Z
+ * is the key labelled Z, as the system has it. Any other letter is named by
+ * the key pressed (e.code), so the keys work under a layout that types
+ * none (Russian, Armenian…), and Option with a letter on a Mac is "alt+"
+ * that letter, not "¨" or "ø". A digit is named by its key, unless Option
+ * makes it type a sign (the German Mac's [ is
  * Option+5). Shift is in the name, taken from the Shift key itself: Caps
  * Lock does not turn S into Shift+S, and a bare "s" does not run on Shift+S.
  * Cmd and Ctrl are both "mod". A sign typed as a character ("?", "[", "/")
@@ -71,15 +73,17 @@ const SIGN_KEYS: Record<string, string> = {
  */
 export function combo(e: KeyboardEvent): string {
   const mod = e.metaKey || e.ctrlKey;
-  const letter = /^Key[A-Z]$/.test(e.code)
-    ? e.code.slice(3).toLowerCase()
-    : /^Digit\d$/.test(e.code) && !(e.altKey && !mod)
-      ? e.code.slice(5)
-      : mod && SIGN_KEYS[e.code]
-        ? SIGN_KEYS[e.code]
-        : !e.code && /^[a-z0-9]$/i.test(e.key)
-          ? e.key.toLowerCase()
-          : undefined;
+  const letter = /^[a-z]$/i.test(e.key)
+    ? e.key.toLowerCase()
+    : /^Key[A-Z]$/.test(e.code)
+      ? e.code.slice(3).toLowerCase()
+      : /^Digit\d$/.test(e.code) && !(e.altKey && !mod)
+        ? e.code.slice(5)
+        : mod && SIGN_KEYS[e.code]
+          ? SIGN_KEYS[e.code]
+          : !e.code && /^\d$/.test(e.key)
+            ? e.key
+            : undefined;
   // A character typed, Shift and Option already in it.
   if (letter === undefined && e.key.length === 1 && e.key !== " " && !mod) return e.key;
   const key = letter ?? e.key;
