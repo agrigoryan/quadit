@@ -25,7 +25,9 @@ test("a trashed task's own page opens and says it is in the trash", async ({ pag
   await trash(quadit, key);
   await page.goto(`/e2e/task/${key}`);
   await expect(page.getByText("This task is in the trash.")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("Drop the beta banner");
+  // Its title is words to read, not a box to Tab into.
+  await expect(page.getByRole("heading", { level: 2, name: "Drop the beta banner" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveCount(0);
 });
 
 test("a trashed task leaves the list, the board, My work and the palette", async ({ page, project, quadit }) => {

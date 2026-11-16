@@ -25,9 +25,8 @@ test("a read-only member sees a task but no control that changes it, and cannot 
   const page = await context.newPage();
 
   await page.goto(`/e2e/task/${key}`);
-  const title = page.getByRole("textbox", { name: "Title" });
-  await expect(title).toHaveValue("Read the contract");
-  await expect(title).not.toBeEditable();
+  await expect(page.getByRole("heading", { level: 2, name: "Read the contract" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveCount(0);
   const properties = page.getByRole("region", { name: "Properties" });
   await expect(properties.getByRole("button", { name: "Status: Todo" })).toBeDisabled();
   await expect(properties.getByRole("button", { name: "Assignee: Unassigned" })).toBeDisabled();

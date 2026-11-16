@@ -15,12 +15,19 @@ import { Markdown } from "@/ui/markdown";
 import { MentionTextarea } from "@/ui/mention-textarea";
 
 /**
- * The title is always a text box that looks like a heading: click and type.
- * Enter saves, Escape puts the old title back, and it can never be left empty.
+ * The title is a text box that looks like a heading: click and type. Enter
+ * saves, Escape puts the old title back, and it can never be left empty.
+ * Someone who may not edit the task (it is in the trash, or they may only
+ * read) gets the heading itself: words to read and select, not a Tab stop.
  */
 export function EditableTitle({ task, large }: { task: Task; large?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const can = useCan();
+  const type = cx(
+    "text-lg font-semibold tracking-tight",
+    // On the task's own page the title is the page's heading.
+    large && "lg:text-2xl",
+  );
 
   // Leaving the box saves; Enter leaves it.
   function save() {
@@ -29,13 +36,15 @@ export function EditableTitle({ task, large }: { task: Task; large?: boolean }) 
     setDraft(null);
   }
 
+  // The bar above holds the page's h1; the task's sections below are h3.
+  if (!can.editTask(task)) return <h2 className={cx(type, "py-0.5 break-words")}>{task.title}</h2>;
+
   return (
     <Textarea
       bare
       autoGrow
       rows={1}
       aria-label={t("detail.title")}
-      readOnly={!can.editTask(task)}
       value={draft ?? task.title}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => draft !== null && save()}
@@ -51,9 +60,8 @@ export function EditableTitle({ task, large }: { task: Task; large?: boolean }) 
         }
       }}
       className={cx(
-        "-mx-1.5 block w-[calc(100%+0.75rem)] rounded-md px-1.5 py-0.5 text-lg font-semibold tracking-tight hover:bg-hover/60 focus:bg-transparent focus:ring-2 focus:ring-accent/25",
-        // On the task's own page the title is the page's heading.
-        large && "lg:text-2xl",
+        "-mx-1.5 block w-[calc(100%+0.75rem)] rounded-md px-1.5 py-0.5 hover:bg-hover/60 focus:bg-transparent focus:ring-2 focus:ring-accent/25",
+        type,
       )}
     />
   );
