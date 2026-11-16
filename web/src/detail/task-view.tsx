@@ -2,11 +2,12 @@
 // (still looking, the server did not answer, no access, nothing at this
 // address). The panel and the task's own page are both a frame around this.
 
-import { useHotkeys } from "@/hooks/hotkeys";
+import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { useTaskByKeyEvenIfGone } from "@/data/selectors";
 import { useTaskDetail } from "@/data/task-detail";
 import { usePageTitle } from "@/lib/ui-state";
+import { startComment } from "@/detail/comment-box";
 import { useFindTask } from "@/detail/data";
 import { useFileDrop } from "@/detail/file-drop";
 import { PanelHeader, TrashBanner } from "@/detail/panel-header";
@@ -73,6 +74,11 @@ export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
         if (!onExpand || onControl(e)) return;
         e.preventDefault();
         onExpand();
+      },
+      // Ctrl+M on every system: the command key with M is the Mac's own (it puts the window away).
+      "mod+m": (e) => {
+        if (!e.ctrlKey || e.metaKey || overlayOpen()) return;
+        if (startComment()) e.preventDefault();
       },
     },
     { layer: "panel" },

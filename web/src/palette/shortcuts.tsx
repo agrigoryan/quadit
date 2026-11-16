@@ -67,7 +67,9 @@ const sections: Section[] = [
       { what: "shortcuts.pageNext", keys: ["J", "K"], join: "or" },
       { what: "shortcuts.back", keys: ["Esc"] },
       ...propertyKeys,
+      { what: "shortcuts.comment", keys: ["Ctrl M"] },
       { what: "shortcuts.send", keys: [`${MOD} Enter`] },
+      { what: "shortcuts.leaveBox", keys: ["Esc"] },
     ],
   },
   {

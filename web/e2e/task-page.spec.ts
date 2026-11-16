@@ -39,3 +39,34 @@ test("a file is attached and listed", async ({ page, project }) => {
   const served = await page.request.get((await download.getAttribute("href")) ?? "");
   expect(await served.text()).toContain("a small text file to attach");
 });
+
+test("Ctrl+M starts a comment, Escape leaves the box with the draft kept, and Escape again closes the panel", async ({
+  page,
+  project,
+}) => {
+  const key = await project.newTask("Pick the launch day");
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  await page.getByRole("link", { name: `Open ${key}` }).hover();
+  await page.keyboard.press(" ");
+  const panel = page.getByRole("complementary", { name: key });
+  const box = panel.getByRole("textbox", { name: "New comment" });
+  await expect(box).toBeVisible();
+  await expect(box).not.toBeFocused();
+
+  await page.keyboard.press("Control+m");
+  await expect(box).toBeFocused();
+  await page.keyboard.type("Tuesday, after the");
+  await page.keyboard.press("Escape");
+  await expect(box).not.toBeFocused();
+  await expect(panel).toBeVisible();
+  await expect(box).toHaveValue("Tuesday, after the");
+
+  // Back in the box, the cursor is at the end of what was typed.
+  await page.keyboard.press("Control+m");
+  await page.keyboard.type(" freeze");
+  await expect(box).toHaveValue("Tuesday, after the freeze");
+
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+});

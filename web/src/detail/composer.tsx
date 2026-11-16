@@ -1,6 +1,8 @@
 // The comment box at the end of the timeline. Files can be attached by
 // button, paste or drop, and the task can be handed to someone in the same
-// send. The draft survives closing the panel until it is sent.
+// send. The draft survives closing the panel until it is sent. Escape
+// leaves the box with the draft kept, so the next key is the task's (Escape
+// again closes it); Ctrl+M comes back to it (detail/comment-box.ts).
 
 import { useRef, useState } from "react";
 import { CircleSlash, CornerDownRight, Paperclip, X } from "lucide-react";
@@ -75,6 +77,10 @@ export function Composer({ task }: { task: Task }) {
         onChange={(body) => editDraft(task.id, (d) => ({ ...d, body }))}
         onSubmit={submit}
         onFiles={(files) => addDraftFiles(task.id, files)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") e.currentTarget.blur();
+        }}
+        data-comment-box
         className="block min-h-16 px-3 pt-2.5 pb-1 text-sm leading-[1.375rem]"
       />
 

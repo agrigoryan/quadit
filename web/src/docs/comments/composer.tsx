@@ -35,10 +35,12 @@ export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFoc
         aria-label={placeholder}
         onFocus={() => setActive(true)}
         onKeyDown={(e) => {
-          if (e.key === "Escape" && onCancel) {
+          if (e.key !== "Escape") return;
+          // A box that can be put away is; one that stays is left, with what was typed kept.
+          if (onCancel) {
             e.stopPropagation();
             onCancel();
-          }
+          } else e.currentTarget.blur();
         }}
         className="text-sm"
       />
