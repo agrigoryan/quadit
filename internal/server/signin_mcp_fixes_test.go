@@ -185,7 +185,7 @@ func TestGitHubSignInGivesUp(t *testing.T) {
 // mcpPost sends one body to /mcp as the bearer of token.
 func mcpPost(t *testing.T, s *site, token, body string) (*http.Response, string) {
 	t.Helper()
-	req, _ := http.NewRequest("POST", s.url+"/mcp", strings.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPost, s.url+"/mcp", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)

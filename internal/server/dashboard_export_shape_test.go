@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"regexp"
 	"strings"
 	"testing"
@@ -126,7 +127,7 @@ func TestDashboardAndExportShape(t *testing.T) {
 	raw, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	head := resp.Header.Get("Content-Type") + "; " + regexp.MustCompile(`\d{4}-\d\d-\d\d`).ReplaceAllString(resp.Header.Get("Content-Disposition"), "DAY")
-	if resp.StatusCode != 200 || head != `application/zip; attachment; filename="games-DAY.zip"` {
+	if resp.StatusCode != http.StatusOK || head != `application/zip; attachment; filename="games-DAY.zip"` {
 		t.Fatalf("export: status %d, %s", resp.StatusCode, head)
 	}
 	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))

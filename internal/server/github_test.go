@@ -32,13 +32,13 @@ func TestGitHub(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			if r.Header.Get("Authorization") != "Bearer ghp_secret" {
-				w.WriteHeader(401)
+				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
 			switch {
-			case strings.HasSuffix(r.URL.Path, "/issues") && r.Method == "GET":
+			case strings.HasSuffix(r.URL.Path, "/issues") && r.Method == http.MethodGet:
 				if r.URL.Query().Get("labels") != "quadit" {
-					w.WriteHeader(422)
+					w.WriteHeader(http.StatusUnprocessableEntity)
 					return
 				}
 				json.NewEncoder(w).Encode(issues)
@@ -46,14 +46,14 @@ func TestGitHub(t *testing.T) {
 				json.NewEncoder(w).Encode([]M{pull})
 			case strings.HasSuffix(r.URL.Path, "/check-runs"):
 				json.NewEncoder(w).Encode(M{"check_runs": checks})
-			case strings.HasSuffix(r.URL.Path, "/comments") && r.Method == "POST":
+			case strings.HasSuffix(r.URL.Path, "/comments") && r.Method == http.MethodPost:
 				var b struct{ Body string }
 				json.NewDecoder(r.Body).Decode(&b)
 				comments = append(comments, b.Body)
-				w.WriteHeader(201)
+				w.WriteHeader(http.StatusCreated)
 				w.Write([]byte("{}"))
 			default:
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
 		t.Cleanup(gh.Close)
@@ -102,7 +102,7 @@ func TestGitHub(t *testing.T) {
 		s.call(s.owner, "", "GET", w+"/integrations/"+in+"/webhook", nil, 200, &hook)
 		body := `{"action":"closed"}`
 		post := func(sig string) int {
-			req, _ := http.NewRequest("POST", hook.URL, strings.NewReader(body))
+			req, _ := http.NewRequest(http.MethodPost, hook.URL, strings.NewReader(body))
 			req.Header.Set("X-Hub-Signature-256", sig)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {

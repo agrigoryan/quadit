@@ -32,7 +32,7 @@ func orbitAsItAnswers(t *testing.T, fetched *int) *httptest.Server {
 		auth := r.Header.Get("Authorization")
 		if inner, ok := strings.CutPrefix(r.URL.Path, "/api/v1/workspaces/"+ws); ok {
 			if auth != "Bearer orbit-session" { // an API token is refused here
-				rw.WriteHeader(401)
+				rw.WriteHeader(http.StatusUnauthorized)
 				return
 			}
 			switch inner {
@@ -48,12 +48,12 @@ func orbitAsItAnswers(t *testing.T, fetched *int) *httptest.Server {
 				rw.Header().Set("Content-Type", "image/gif")
 				rw.Write(append(append([]byte{}, gif...), inner...)) // each its own bytes
 			default:
-				rw.WriteHeader(404)
+				rw.WriteHeader(http.StatusNotFound)
 			}
 			return
 		}
 		if auth != "Bearer orbit-token" {
-			rw.WriteHeader(401)
+			rw.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		switch strings.TrimPrefix(r.URL.Path, "/api/public/v1/workspaces/"+ws) {
@@ -96,7 +96,7 @@ func orbitAsItAnswers(t *testing.T, fetched *int) *httptest.Server {
 			json.NewEncoder(rw).Encode(M{"id": "d2", "title": "Bosses", "content": []M{}, "markdown": "The final boss.\n"})
 		default: // milestones, relations: this release has neither
 			rw.Header().Set("Content-Type", "application/problem+json")
-			rw.WriteHeader(404)
+			rw.WriteHeader(http.StatusNotFound)
 			rw.Write([]byte(`{"title":"Route not found","status":404}`))
 		}
 	}))

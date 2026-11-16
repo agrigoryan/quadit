@@ -36,7 +36,7 @@ func newReceiver(t *testing.T, secret string) *receiver {
 		defer r.mu.Unlock()
 		if r.fail > 0 {
 			r.fail--
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		mac := hmac.New(sha256.New, []byte(secret))

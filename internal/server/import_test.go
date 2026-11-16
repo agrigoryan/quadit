@@ -203,7 +203,7 @@ func TestImports(t *testing.T) {
 		// Orbit, from a stand-in for its public API.
 		orbit := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			if r.Header.Get("Authorization") != "Bearer orbit-token" {
-				rw.WriteHeader(401)
+				rw.WriteHeader(http.StatusUnauthorized)
 				return
 			}
 			p := strings.TrimPrefix(r.URL.Path, "/api/public/v1/workspaces/ws1")

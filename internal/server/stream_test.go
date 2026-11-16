@@ -46,10 +46,10 @@ func (st *stream) ended() bool {
 func (s *site) stream(t *testing.T, token string) *stream {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	req, _ := http.NewRequestWithContext(ctx, "GET", s.url+"/api/v1/w/-/events/stream", nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, s.url+"/api/v1/w/-/events/stream", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil || resp.StatusCode != http.StatusOK {
 		t.Fatalf("open stream: %v %v", err, resp)
 	}
 	st := &stream{done: make(chan struct{}), close: cancel}
@@ -104,7 +104,7 @@ func TestStreamsEndWithAccess(t *testing.T) {
 		heldFrom := at.Seq
 		go func() {
 			// From where the feed stands now, so the request is really held.
-			req, _ := http.NewRequest("GET", s.url+"/api/v1/w/-/events?wait=20&types=comment.created&after="+fmt.Sprint(heldFrom), nil)
+			req, _ := http.NewRequest(http.MethodGet, s.url+"/api/v1/w/-/events?wait=20&types=comment.created&after="+fmt.Sprint(heldFrom), nil)
 			req.Header.Set("Authorization", "Bearer "+coder)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -169,7 +169,7 @@ func TestCompression(t *testing.T) {
 		var tok struct{ Token string }
 		s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
 		get := func(path string, gz bool, hdr ...string) (*http.Response, int) {
-			req, _ := http.NewRequest("GET", s.url+path, nil)
+			req, _ := http.NewRequest(http.MethodGet, s.url+path, nil)
 			req.Header.Set("Authorization", "Bearer "+tok.Token)
 			if gz {
 				req.Header.Set("Accept-Encoding", "gzip")
@@ -203,7 +203,7 @@ func TestCompression(t *testing.T) {
 		s.call(nil, tok.Token, "POST", "/api/v1/w/-/files?name=notes.txt", []byte(strings.Repeat("plain words ", 2000)), 201, &f)
 		file, _ := get(strings.TrimPrefix(f.URL, s.url), true)
 		part, n := get(strings.TrimPrefix(f.URL, s.url), true, "Range", "bytes=100-199")
-		if file.Header.Get("Content-Encoding") != "" || part.StatusCode != 206 || n != 100 {
+		if file.Header.Get("Content-Encoding") != "" || part.StatusCode != http.StatusPartialContent || n != 100 {
 			t.Fatalf("file: encoding %q; range: %d, %d bytes", file.Header.Get("Content-Encoding"), part.StatusCode, n)
 		}
 		// A short answer is not worth it; a compressed one still decodes for a normal client.

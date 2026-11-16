@@ -524,7 +524,7 @@ func TestSurfaceOnlyGrows(t *testing.T) {
 		// The list needs a token; ask with one.
 		var tok struct{ Token string }
 		s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
-		req, _ := http.NewRequest("POST", s.url+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+		req, _ := http.NewRequest(http.MethodPost, s.url+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
 		req.Header.Set("Authorization", "Bearer "+tok.Token)
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := http.DefaultClient.Do(req)
@@ -837,13 +837,13 @@ func TestSecondAuditFindings(t *testing.T) {
 		// Guessing tokens is slowed down.
 		limited := false
 		for i := 0; i < 140 && !limited; i++ {
-			req, _ := http.NewRequest("GET", s.url+"/api/v1/w/-/me", nil)
+			req, _ := http.NewRequest(http.MethodGet, s.url+"/api/v1/w/-/me", nil)
 			req.Header.Set("Authorization", "Bearer qd_not_a_token")
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatal(err)
 			}
-			limited = resp.StatusCode == 429
+			limited = resp.StatusCode == http.StatusTooManyRequests
 			resp.Body.Close()
 		}
 		if !limited {

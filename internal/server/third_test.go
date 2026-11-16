@@ -295,7 +295,7 @@ func TestThirdAuditFindings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			limited = resp.StatusCode == 429
+			limited = resp.StatusCode == http.StatusTooManyRequests
 			resp.Body.Close()
 		}
 		if !limited {

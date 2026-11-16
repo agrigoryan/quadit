@@ -195,7 +195,7 @@ func TestAPI(t *testing.T) {
 		if f.State != "ready" {
 			t.Fatalf("upload did not finish: %+v", f)
 		}
-		req, _ := http.NewRequest("GET", s.url+"/f/"+f.ID+"/notes.txt", nil)
+		req, _ := http.NewRequest(http.MethodGet, s.url+"/f/"+f.ID+"/notes.txt", nil)
 		req.Header.Set("Authorization", "Bearer "+agent)
 		req.Header.Set("Range", "bytes=7-12")
 		resp, err := http.DefaultClient.Do(req)
@@ -204,7 +204,7 @@ func TestAPI(t *testing.T) {
 		}
 		part, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if resp.StatusCode != 206 || string(part) != "quadit" {
+		if resp.StatusCode != http.StatusPartialContent || string(part) != "quadit" {
 			t.Fatalf("range read = %d %q", resp.StatusCode, part)
 		}
 		s.change(nil, agent, "attachment.add", M{"task": "SVA-1", "file": f.ID})
@@ -286,7 +286,7 @@ func TestLooseEnds(t *testing.T) {
 
 		// A webhook test is in the delivery log.
 		got := 0
-		rcv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { got++; rw.WriteHeader(204) }))
+		rcv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { got++; rw.WriteHeader(http.StatusNoContent) }))
 		defer rcv.Close()
 		hook := s.change(s.owner, "", "webhook.create", M{"name": "probe", "url": rcv.URL, "event_types": []string{"comment.created"}})["ref"].(string)
 		s.call(s.owner, "", "POST", w+"/webhooks/"+hook+"/test", nil, 200, nil)
@@ -298,7 +298,7 @@ func TestLooseEnds(t *testing.T) {
 			}
 		}
 		s.call(s.owner, "", "GET", w+"/list/deliveries", nil, 200, &log)
-		if got != 1 || len(log.Deliveries) != 1 || log.Deliveries[0].EventType != "webhook.test" || log.Deliveries[0].State != "ok" || log.Deliveries[0].StatusCode != 204 {
+		if got != 1 || len(log.Deliveries) != 1 || log.Deliveries[0].EventType != "webhook.test" || log.Deliveries[0].State != "ok" || log.Deliveries[0].StatusCode != http.StatusNoContent {
 			t.Fatalf("test delivery log: got=%d %+v", got, log.Deliveries)
 		}
 		s.call(s.owner, "", "POST", w+"/deliveries/"+log.Deliveries[0].ID+"/redeliver", nil, 400, nil)

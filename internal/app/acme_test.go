@@ -65,7 +65,7 @@ func TestAutomaticCertificate(t *testing.T) {
 	}
 
 	// Plain HTTP sends a visitor to HTTPS.
-	req, _ := http.NewRequest("GET", "http://"+plain+"/games", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://"+plain+"/games", nil)
 	req.Host = name
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	res, err := client.Do(req)

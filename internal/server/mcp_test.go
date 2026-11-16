@@ -28,7 +28,7 @@ func TestMCPWithOAuth(t *testing.T) {
 		// With no token the server says where to sign in.
 		resp, _ := http.Post(s.url+"/mcp", "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
 		resp.Body.Close()
-		if resp.StatusCode != 401 || !strings.Contains(resp.Header.Get("WWW-Authenticate"), "/.well-known/oauth-protected-resource") {
+		if resp.StatusCode != http.StatusUnauthorized || !strings.Contains(resp.Header.Get("WWW-Authenticate"), "/.well-known/oauth-protected-resource") {
 			t.Fatalf("unauthenticated MCP: %d %q", resp.StatusCode, resp.Header.Get("WWW-Authenticate"))
 		}
 		var meta struct {
@@ -79,7 +79,7 @@ func TestMCPWithOAuth(t *testing.T) {
 		form := url.Values{"grant_type": {"authorization_code"}, "code": {loc.Query().Get("code")}, "client_id": {cl.ID}, "redirect_uri": {redirect}, "code_verifier": {"wrong"}}
 		bad, _ := http.PostForm(meta.Token, form)
 		bad.Body.Close()
-		if bad.StatusCode != 400 {
+		if bad.StatusCode != http.StatusBadRequest {
 			t.Fatalf("a wrong verifier got %d", bad.StatusCode)
 		}
 		// The failed try used the code up, so go round again for a fresh one.
@@ -105,7 +105,7 @@ func TestMCPWithOAuth(t *testing.T) {
 		rpc := func(token, method string, params any) map[string]any {
 			t.Helper()
 			body, _ := json.Marshal(M{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-			req, _ := http.NewRequest("POST", s.url+"/mcp", strings.NewReader(string(body)))
+			req, _ := http.NewRequest(http.MethodPost, s.url+"/mcp", strings.NewReader(string(body)))
 			req.Header.Set("Authorization", "Bearer "+token)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -248,12 +248,12 @@ func TestMCPWithOAuth(t *testing.T) {
 			t.Fatal("refresh gave no new token")
 		}
 		resp, _ = http.DefaultClient.Do(func() *http.Request {
-			req, _ := http.NewRequest("POST", s.url+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+			req, _ := http.NewRequest(http.MethodPost, s.url+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
 			req.Header.Set("Authorization", "Bearer "+tok.Access)
 			return req
 		}())
 		resp.Body.Close()
-		if resp.StatusCode != 401 {
+		if resp.StatusCode != http.StatusUnauthorized {
 			t.Fatalf("the old token still works after a refresh: %d", resp.StatusCode)
 		}
 		rpc(next.Access, "ping", nil)

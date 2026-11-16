@@ -32,7 +32,7 @@ func fakeGitHub(t *testing.T, seen *[]string) *httptest.Server {
 	mux.HandleFunc("/login/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		if r.Form.Get("code") != "the-code" || r.Form.Get("client_id") == "" && r.Header.Get("Authorization") == "" {
-			http.Error(w, "bad_verification_code", 400)
+			http.Error(w, "bad_verification_code", http.StatusBadRequest)
 			return
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
@@ -41,7 +41,7 @@ func fakeGitHub(t *testing.T, seen *[]string) *httptest.Server {
 	api := func(path string, body any) {
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 			if !strings.HasSuffix(r.Header.Get("Authorization"), "gho_fake123") {
-				http.Error(w, `{"message":"Bad credentials"}`, 401)
+				http.Error(w, `{"message":"Bad credentials"}`, http.StatusUnauthorized)
 				return
 			}
 			*seen = append(*seen, path)

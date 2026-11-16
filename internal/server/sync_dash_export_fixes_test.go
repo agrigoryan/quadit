@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -177,7 +178,7 @@ func TestExportNamesWhatItLeftOut(t *testing.T) {
 	}
 	raw, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("export: status %d: %s", resp.StatusCode, raw)
 	}
 	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
