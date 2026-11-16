@@ -162,4 +162,14 @@ describe("the keys of a database", () => {
     expect(address()).toBe("/acme/docs/db1?peek=r2");
     expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("J");
   });
+
+  it("open the row beside as a page with Enter from a chosen cell, as a click on Open leaves the table", () => {
+    open("/acme/docs/db1?peek=r1");
+    const grid = screen.getByRole("grid", { name: "Table" });
+    act(() => grid.focus());
+    act(() => void fireEvent.keyDown(grid, { key: "j", code: "KeyJ" }));
+    act(() => void fireEvent.keyDown(grid, { key: "Enter", code: "Enter" }));
+    expect(address()).toBe("/acme/docs/r2");
+    expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+  });
 });

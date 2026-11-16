@@ -137,6 +137,9 @@ export function TableView({ db, view, rows, onOpen, onAdd, peek, readOnly }: Vie
     } else if (e.key === "Escape") {
       e.preventDefault(); // the cell is let go of; a second Escape leaves the page
       setActive(null);
+    } else if (peek && (e.key === "Enter" || (!e.shiftKey && /^[jk]$/i.test(e.key)))) {
+      // With a row open beside, J and K (Caps Lock or not) step it and Enter opens it as a page
+      // (docs/db/database-page.tsx); Shift+J types a J. A click on Open leaves a cell chosen.
     } else if (readOnly) {
       // Moving about and opening rows only.
     } else if (e.key === "Enter") {
@@ -150,8 +153,6 @@ export function TableView({ db, view, rows, onOpen, onAdd, peek, readOnly }: Vie
       trashDoc(active.row);
     } else if (e.key === "Backspace" || e.key === "Delete") {
       if (prop && !isComputed(prop)) setRowProps(active.row, { [prop.id]: null });
-    } else if (peek && !e.shiftKey && /^[jk]$/i.test(e.key)) {
-      // J and K step the row open beside the table (docs/db/database-page.tsx), Caps Lock or not; Shift+J types a J.
     } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && (!prop || takesTyping(prop))) {
       e.preventDefault();
       setEditing({ seed: e.key });
