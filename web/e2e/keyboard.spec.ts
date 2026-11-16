@@ -1,5 +1,7 @@
 import type { Locator } from "@playwright/test";
-import { expect, test } from "./quadit";
+import { writeFile } from "node:fs/promises";
+import { OWNER } from "./run";
+import { expect, invitedMember, test } from "./quadit";
 
 test("G then a letter goes to the place", async ({ page, project }) => {
   await page.goto(`/e2e/p/${project.key}/tasks`);
@@ -334,4 +336,304 @@ test("on the board the arrows and J/K move the focus from card to card, and S ac
   await page.keyboard.press("s");
   await page.getByRole("dialog", { name: "Change status…" }).getByRole("option", { name: "Done" }).click();
   await expect.poll(async () => (await quadit.task(top)).status).toBe("Done");
+});
+
+test("in the inbox Option+U reads everything, Shift+Backspace archives what is read, Backspace the item", async ({
+  browser,
+  page: ownerPage,
+  project,
+  quadit,
+}) => {
+  // An inbox of its own, which no other test reads or archives.
+  const { context } = await invitedMember(browser, ownerPage.request, `Inbox ${project.key}`);
+  const handle = `inbox-${project.key.toLowerCase()}`;
+  const first = await project.newTask("Read the brief");
+  const second = await project.newTask("Read the notes");
+  await quadit.agent("comment", first, `For you @${handle}`);
+  await quadit.agent("comment", second, `And this @${handle}`);
+  const page = await context.newPage();
+  await page.goto("/e2e/inbox");
+  const item = (key: string) => page.getByRole("link", { name: new RegExp(key) });
+  await expect(item(first)).toBeVisible();
+  await expect(item(second)).toBeVisible();
+  const unread = page.getByRole("img", { name: "Unread" });
+  await expect(unread).toHaveCount(2);
+
+  await page.keyboard.press("Alt+KeyU");
+  await expect(unread).toHaveCount(0);
+  await page.keyboard.press("Shift+Backspace");
+  await expect(item(first)).toHaveCount(0);
+  await expect(item(second)).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(item(first)).toBeVisible();
+  await expect(item(second)).toBeVisible();
+
+  // The newest first: J is on the second task's item.
+  await page.keyboard.press("j");
+  await expect(item(second)).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("Backspace");
+  await expect(item(second)).toHaveCount(0);
+  await expect(item(first)).toBeVisible();
+  await context.close();
+});
+
+test("on the timeline - zooms out, = zooms in, 0 scrolls back to today", async ({ page, project, quadit }) => {
+  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  await quadit.cli(
+    "do",
+    "epic.create",
+    JSON.stringify({ project: project.key, name: "Long haul", start_on: day(-120), target_on: day(120) }),
+  );
+  await page.goto(`/e2e/p/${project.key}/timeline`);
+  await expect(page.getByRole("slider", { name: "Long haul" })).toBeVisible();
+  const zoom = (name: string) => page.getByRole("radio", { name });
+
+  await page.keyboard.press("-");
+  await expect(zoom("Months")).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("=");
+  await expect(zoom("Weeks")).toHaveAttribute("aria-checked", "true");
+
+  // The calendar's scroller is the bar's nearest ancestor that scrolls sideways; this sets it, or only reads it.
+  const scroll = (to?: number) =>
+    page.getByRole("slider", { name: "Long haul" }).evaluate((bar, left) => {
+      let el = bar.parentElement;
+      while (el && getComputedStyle(el).overflowX !== "auto") el = el.parentElement;
+      if (!el) return -1;
+      if (left !== undefined) el.scrollLeft = left;
+      return el.scrollLeft;
+    }, to);
+  await expect.poll(() => scroll()).toBeGreaterThan(0);
+  await scroll(0);
+  await expect.poll(() => scroll()).toBe(0);
+  await page.keyboard.press("0");
+  await expect.poll(() => scroll()).toBeGreaterThan(0);
+});
+
+test("Cmd+Option+P copies the open task's context pack, to paste into an agent", async ({ page, project, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const key = await project.newTask("Tune the jump", "description=Too floaty at the top.");
+  await page.goto(`/e2e/task/${key}`);
+  await expect(page.getByRole("heading", { level: 1, name: `${key} Tune the jump` })).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+Alt+KeyP");
+  const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+  await expect.poll(clipboard).toContain(`${key}  Tune the jump`);
+  expect(await clipboard()).toContain("Too floaty at the top.");
+});
+
+test("N makes a page in a project's Docs, a page inside the open page, and a row on a database", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await page.goto(`/e2e/p/${project.key}/docs`);
+  await expect(page.getByRole("main").getByRole("button", { name: "New page" }).first()).toBeVisible();
+  await page.keyboard.press("n");
+  const title = page.getByRole("textbox", { name: "Page title" });
+  await expect(title).toBeFocused();
+  await title.fill("Roadmap");
+  const id = new URL(page.url()).pathname.split("/").pop() ?? "";
+  const doc = async (ref: string) =>
+    (JSON.parse(await quadit.cli("--json", "doc", ref)) as { doc: { title: string; parent_id?: string } }).doc;
+  await expect.poll(async () => (await doc(id)).title).toBe("Roadmap");
+  await expect(page).toHaveURL(new RegExp(`/e2e/p/${project.key}/docs/${id}$`));
+
+  // Off the title: N is a key again, and makes a page inside this one.
+  await title.blur();
+  await page.keyboard.press("n");
+  const where = page.getByRole("navigation", { name: "Where this page is" });
+  await expect(where.getByRole("link", { name: "Roadmap" })).toBeVisible();
+  const inside = new URL(page.url()).pathname.split("/").pop() ?? "";
+  expect(inside).not.toBe(id);
+  await expect.poll(async () => (await doc(inside)).parent_id).toBe(id);
+
+  const made = JSON.parse(
+    await quadit.cli(
+      "--json",
+      "do",
+      "doc.create",
+      JSON.stringify({ kind: "database", title: "Vendors", project: project.key }),
+    ),
+  ) as { ref: string };
+  await page.goto(`/e2e/docs/${made.ref}`);
+  await expect(page.getByRole("grid", { name: "Table" })).toBeVisible();
+  await page.keyboard.press("n");
+  await expect(page.getByRole("dialog", { name: "Untitled" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/e2e/docs/${made.ref}\\?.*peek=`));
+});
+
+test("T moves to the open page in the tree, where F2 renames it, N adds a page inside and Cmd+Backspace trashes it", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const create = async (args: object) =>
+    (
+      JSON.parse(await quadit.cli("--json", "do", "doc.create", JSON.stringify({ project: project.key, ...args }))) as {
+        ref: string;
+      }
+    ).ref;
+  const plan = await create({ title: `Plan ${project.key}` });
+  const week = await create({ title: `Week ${project.key}`, parent: plan });
+  await page.goto(`/e2e/p/${project.key}/docs/${week}`);
+  await expect(page.getByRole("textbox", { name: "Page title" })).toHaveValue(`Week ${project.key}`);
+  const tree = page.getByRole("navigation", { name: "Pages" });
+
+  await page.keyboard.press("t");
+  const name = tree.getByRole("link", { name: `Week ${project.key}` });
+  await expect(name).toBeFocused();
+
+  await page.keyboard.press("F2");
+  const box = tree.getByRole("textbox", { name: "Rename" });
+  await box.fill(`Week one ${project.key}`);
+  await page.keyboard.press("Enter");
+  await expect(tree.getByRole("link", { name: `Week one ${project.key}` })).toBeFocused();
+  await expect
+    .poll(async () => (JSON.parse(await quadit.cli("--json", "doc", week)) as { doc: { title: string } }).doc.title)
+    .toBe(`Week one ${project.key}`);
+
+  await page.keyboard.press("n");
+  const where = page.getByRole("navigation", { name: "Where this page is" });
+  await expect(where.getByRole("link", { name: `Week one ${project.key}` })).toBeVisible();
+
+  // The new page's title has the caret; off it, T finds the new page in the tree, and Up the one it is in.
+  await page.getByRole("textbox", { name: "Page title" }).blur();
+  await page.keyboard.press("t");
+  await expect(tree.getByRole("link", { name: "Untitled" })).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(tree.getByRole("link", { name: `Week one ${project.key}` })).toBeFocused();
+  await page.keyboard.press("ControlOrMeta+Backspace");
+  await expect(tree.getByRole("link", { name: `Week one ${project.key}` })).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(tree.getByRole("link", { name: `Week one ${project.key}` })).toBeVisible();
+});
+
+test("J and K step the row open beside a database, in the view's order, and Enter opens it as a page", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const made = JSON.parse(
+    await quadit.cli(
+      "--json",
+      "do",
+      "doc.create",
+      JSON.stringify({ kind: "database", title: "Vendors", project: project.key }),
+    ),
+  ) as { ref: string };
+  await quadit.cli("row", made.ref, "Acme paints");
+  await quadit.cli("row", made.ref, "Bolt brushes");
+  await page.goto(`/e2e/docs/${made.ref}`);
+  await page.getByRole("button", { name: "Open", exact: true }).first().click();
+  await expect(page.getByRole("dialog", { name: "Acme paints" })).toBeVisible();
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+  await page.keyboard.press("j");
+  await expect(page.getByRole("dialog", { name: "Bolt brushes" })).toBeVisible();
+  await page.keyboard.press("k");
+  await expect(page.getByRole("dialog", { name: "Acme paints" })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/e2e\/docs\/[^/?]+$/);
+  await expect(page.getByRole("main").getByRole("textbox", { name: "Page title" })).toHaveValue("Acme paints");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("D answers the open task's question asked of me: side by side when it has pictures, else on its options", async ({
+  page,
+  project,
+  quadit,
+}, testInfo) => {
+  const plain = await project.newTask("Pick a colour");
+  await quadit.agent("ask", plain, "Which colour?", "option=Blue", "option=Green", `ask=@${OWNER.handle}`);
+  // A one-pixel picture on each option.
+  const pixel = testInfo.outputPath("pixel.png");
+  await writeFile(
+    pixel,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  );
+  const pictured = await project.newTask("Pick a logo");
+  await quadit.agent(
+    "ask",
+    pictured,
+    "Which logo?",
+    "option=Round",
+    `file=${pixel}`,
+    "option=Square",
+    `file=${pixel}`,
+    `ask=@${OWNER.handle}`,
+  );
+  const none = await project.newTask("Nothing to answer");
+
+  await page.goto(`/e2e/task/${plain}`);
+  const question = page.getByRole("article", { name: "Which colour?" });
+  await expect(question).toBeVisible();
+  await page.keyboard.press("d");
+  await expect(
+    question.getByRole("article", { name: "Blue" }).getByRole("button", { name: "This one", exact: true }),
+  ).toBeFocused();
+
+  await page.goto(`/e2e/task/${pictured}`);
+  await expect(page.getByRole("article", { name: "Which logo?" })).toBeVisible();
+  await page.keyboard.press("d");
+  await expect(page.getByRole("dialog", { name: "Which logo?" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.goto(`/e2e/task/${none}`);
+  await expect(page.getByRole("heading", { level: 1, name: `${none} Nothing to answer` })).toBeVisible();
+  await page.keyboard.press("d");
+  await expect(page.getByText("No open question here waits on your answer")).toBeVisible();
+});
+
+test("in a task's description Cmd+B bolds what is chosen, the box's undo takes it back, and Enter goes on with a list", async ({
+  page,
+  project,
+}) => {
+  const key = await project.newTask("Write the notes");
+  await page.goto(`/e2e/task/${key}`);
+  await page.getByRole("button", { name: "Add a description" }).click();
+  const box = page.getByRole("textbox", { name: "Description" });
+  await box.pressSequentially("make it loud");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press("ControlOrMeta+b");
+  await expect(box).toHaveValue("make it **loud**");
+  await page.keyboard.press("ControlOrMeta+i");
+  await expect(box).toHaveValue("make it **_loud_**");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(box).toHaveValue("make it **loud**");
+
+  // The caret to the end (End only scrolls on a Mac).
+  await box.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(el.value.length, el.value.length));
+  await page.keyboard.press("Enter");
+  await box.pressSequentially("- [ ] milk");
+  await page.keyboard.press("Enter");
+  await box.pressSequentially("eggs");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect(box).toHaveValue("make it **loud**\n- [ ] milk\n- [ ] eggs\n");
+});
+
+test("a box of a task list in a description is ticked with a click, and Cmd+Z unticks it", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const key = await project.newTask("Shop", "description=- [ ] milk\n- [ ] eggs");
+  await page.goto(`/e2e/task/${key}`);
+  const boxes = page.getByRole("main").getByRole("checkbox");
+  await expect(boxes).toHaveCount(2);
+  await boxes.nth(1).click();
+  await expect(boxes.nth(1)).toBeChecked();
+  const description = async () =>
+    (JSON.parse(await quadit.cli("--json", "show", key)) as { task: { description?: string } }).task.description;
+  await expect.poll(description).toBe("- [ ] milk\n- [x] eggs");
+  await page.getByRole("main").focus();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(boxes.nth(1)).not.toBeChecked();
+  await expect.poll(description).toBe("- [ ] milk\n- [ ] eggs");
 });
