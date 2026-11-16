@@ -149,7 +149,7 @@ func (s *Server) handleCheckReadiness(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleShowMetrics(w http.ResponseWriter, r *http.Request) {
 	// The token decides access: when it cannot be read, nobody is let in.
 	var tok string
-	if err := s.checkedSetting(r.Context(), "metrics.token", &tok); err != nil {
+	if err := s.settings.Checked(r.Context(), "metrics.token", &tok); err != nil {
 		s.log.Error("metrics: the token cannot be read, so the page is not shown", "err", err)
 		http.Error(w, "the metrics token cannot be read", http.StatusInternalServerError)
 		return

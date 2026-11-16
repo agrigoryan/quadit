@@ -158,11 +158,11 @@ func (s *Server) handleShowSignInOptions(x *c) error {
 	}
 	out := map[string]any{
 		"setup_needed":                 people == 0,
-		"password":                     s.settingBool(ctx, "auth.password", true),
-		"passkeys":                     s.settingBool(ctx, "auth.passkeys", true),
-		"registration":                 s.settingBool(ctx, "auth.registration", false),
-		"anyone_can_create_workspaces": s.settingBool(ctx, "workspaces.anyone_can_create", true),
-		"require_2fa":                  s.settingBool(ctx, "auth.require_2fa", false),
+		"password":                     s.settings.Bool(ctx, "auth.password", true),
+		"passkeys":                     s.settings.Bool(ctx, "auth.passkeys", true),
+		"registration":                 s.settings.Bool(ctx, "auth.registration", false),
+		"anyone_can_create_workspaces": s.settings.Bool(ctx, "workspaces.anyone_can_create", true),
+		"require_2fa":                  s.settings.Bool(ctx, "auth.require_2fa", false),
 		"mail":                         s.mailReady(ctx),
 		"version":                      s.cfg.Version,
 		"name":                         s.installName(ctx),
@@ -247,7 +247,7 @@ func (s *Server) handleSignIn(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
-	if on, err := s.checkedSettingBool(ctx, "auth.password", true); err != nil {
+	if on, err := s.settings.CheckedBool(ctx, "auth.password", true); err != nil {
 		return err
 	} else if !on {
 		return errForbidden("signing in with a password is turned off on this install")
@@ -582,7 +582,7 @@ func (s *Server) handleCreateWorkspace(x *c) error {
 		return errForbidden("a workspace is created by a person: signed in, or with a personal token that is not narrowed")
 	}
 	if !x.user.IsAdmin {
-		if anyone, err := s.checkedSettingBool(x.ctx(), "workspaces.anyone_can_create", true); err != nil {
+		if anyone, err := s.settings.CheckedBool(x.ctx(), "workspaces.anyone_can_create", true); err != nil {
 			return err
 		} else if !anyone {
 			return errForbidden("only an install admin can create workspaces here")

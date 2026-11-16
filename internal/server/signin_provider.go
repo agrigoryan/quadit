@@ -25,8 +25,8 @@ import (
 
 // signInProvider is one outside service people can sign in with. Each kind
 // is in its own file; adding one means writing that file, naming it in
-// signInProviders below, and adding its setting to the tables of settings
-// (settingSecrets and settingShapes).
+// signInProviders below, and adding its setting to the table of settings
+// (settingKinds).
 type signInProvider interface {
 	// ID is the name the provider goes by: its setting is "auth.<id>", its
 	// routes are under /api/v1/auth/oauth/<id>/, and a connected account
@@ -101,7 +101,7 @@ func (s *Server) signInWith(ctx context.Context, provider string) (signInProvide
 	if p == nil {
 		return nil, cfg, false
 	}
-	s.setting(ctx, "auth."+provider, &cfg)
+	s.settings.Get(ctx, "auth."+provider, &cfg)
 	cfg.version = s.cfg.Version
 	if !cfg.Enabled || cfg.ClientID == "" {
 		return p, cfg, false

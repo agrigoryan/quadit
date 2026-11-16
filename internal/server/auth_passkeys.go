@@ -95,7 +95,7 @@ func (s *Server) handleListPasskeys(x *c) error {
 }
 
 func (s *Server) passkeysOn(x *c) error {
-	on, err := s.checkedSettingBool(x.ctx(), "auth.passkeys", true)
+	on, err := s.settings.CheckedBool(x.ctx(), "auth.passkeys", true)
 	if err != nil {
 		return err
 	}

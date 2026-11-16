@@ -236,7 +236,7 @@ func (s *Server) newProviderAccount(x *c, in providerSignIn) (u core.User, refus
 		return u, "", err
 	}
 	if !invited {
-		open, err := s.checkedSettingBool(ctx, "auth.registration", false)
+		open, err := s.settings.CheckedBool(ctx, "auth.registration", false)
 		if err != nil {
 			return u, "", err
 		}

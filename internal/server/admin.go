@@ -13,6 +13,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/settings"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -46,11 +47,11 @@ func (s *Server) installAdmin(h handler) handler {
 }
 
 func (s *Server) handleListSettings(x *c) error {
-	settings, err := s.maskedSettings(x.ctx())
+	all, err := s.settings.List(x.ctx())
 	if err != nil {
 		return err
 	}
-	return x.ok(map[string]any{"settings": settings})
+	return x.ok(map[string]any{"settings": all})
 }
 
 // handleUpdateSetting sets one install setting. The body is its JSON value.
@@ -60,19 +61,19 @@ func (s *Server) handleUpdateSetting(x *c) error {
 	if err := json.NewDecoder(http.MaxBytesReader(x.w, x.r.Body, 1<<20)).Decode(&value); err != nil {
 		return errBad("the body must be the setting's JSON value")
 	}
-	if _, fromEnv := s.rawSetting(x.ctx(), name); fromEnv {
-		return &engine.Error{Code: engine.CodeConflict, Message: fmt.Sprintf("%s is set by the environment variable %s, which wins; change it there", name, envName(name))}
+	if s.settings.FromEnv(x.ctx(), name) {
+		return &engine.Error{Code: engine.CodeConflict, Message: fmt.Sprintf("%s is set by the environment variable %s, which wins; change it there", name, settings.EnvName(name))}
 	}
 	if err := s.keepsADoor(x, name, value); err != nil {
 		return err
 	}
-	if err := s.saveSetting(x.ctx(), name, value, x.user.ID); err != nil {
+	if err := s.settings.Set(x.ctx(), name, value, x.user.ID); err != nil {
 		return err
 	}
 	// The record says what it was set to, with anything secret blanked;
 	// a setting that cannot be read back is recorded without its value.
-	settings, err := s.maskedSettings(x.ctx())
-	s.audit(x.r, "", x.user, "setting.changed", "setting", name, settings[name])
+	all, err := s.settings.List(x.ctx())
+	s.audit(x.r, "", x.user, "setting.changed", "setting", name, all[name])
 	if err != nil {
 		return err
 	}
@@ -432,7 +433,7 @@ func (s *Server) doorOn(ctx context.Context, change settingChange, setting strin
 		cfg, ok := s.oauthConfig(ctx, strings.TrimPrefix(setting, "auth."))
 		return ok && cfg.Enabled, nil
 	}
-	return s.checkedSettingBool(ctx, setting, def)
+	return s.settings.CheckedBool(ctx, setting, def)
 }
 
 // changedSettingOn reads whether a sign-in setting's new value turns it on:

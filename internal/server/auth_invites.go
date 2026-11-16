@@ -20,7 +20,7 @@ import (
 // the list cannot be read, the error says so and no address is allowed.
 func (s *Server) emailAllowed(ctx context.Context, email string) (bool, error) {
 	var domains []string
-	if err := s.checkedSetting(ctx, "auth.allowed_domains", &domains); err != nil {
+	if err := s.settings.Checked(ctx, "auth.allowed_domains", &domains); err != nil {
 		return false, err
 	}
 	if len(domains) == 0 {
@@ -81,7 +81,7 @@ func (s *Server) handleRegisterAccount(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
-	if open, err := s.checkedSettingBool(ctx, "auth.registration", false); err != nil {
+	if open, err := s.settings.CheckedBool(ctx, "auth.registration", false); err != nil {
 		return err
 	} else if !open {
 		return errForbidden("registration is closed on this install; ask for an invitation")

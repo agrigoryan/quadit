@@ -27,7 +27,7 @@ import (
 // ctx end and are cut off.
 func (s *Server) Run(ctx context.Context) {
 	var fc blob.Config
-	if s.setting(ctx, "files", &fc) {
+	if s.settings.Get(ctx, "files", &fc) {
 		if err := s.useFiles(ctx, fc); err != nil {
 			s.log.Error("file storage is not usable as set; files stay on local disk until it is fixed", "err", err)
 		}

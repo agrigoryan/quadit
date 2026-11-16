@@ -163,7 +163,7 @@ func (s *Server) handleDisableTwoStep(x *c) error {
 // secondStepNotRequired refuses turning codes off where the install requires
 // a second step and the person has no passkey to be it.
 func (s *Server) secondStepNotRequired(ctx context.Context, u core.User) error {
-	required, err := s.checkedSettingBool(ctx, "auth.require_2fa", false)
+	required, err := s.settings.CheckedBool(ctx, "auth.require_2fa", false)
 	if err != nil || !required {
 		return err
 	}

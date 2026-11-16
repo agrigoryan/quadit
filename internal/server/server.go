@@ -83,6 +83,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/mcp"
 	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/reposync"
+	"github.com/agrigoryan/quadit/internal/settings"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -113,11 +114,10 @@ type Server struct {
 	mux     *http.ServeMux // the API's routes, made by routes()
 	web     http.Handler   // the web app, when built in
 
-	seenMu        sync.Mutex               // guards seen
-	seen          map[string]int64         // user id + workspace id -> last time presence was written
-	settingsMu    sync.Mutex               // guards settingsCache
-	settingsCache map[string]cachedSetting // settings read in the last few seconds (settings.go)
-	limits        *limiter                 // requests per caller per minute (limits.go)
+	seenMu   sync.Mutex         // guards seen
+	seen     map[string]int64   // user id + workspace id -> last time presence was written
+	settings *settings.Settings // the install's settings (settings.go)
+	limits   *limiter           // requests per caller per minute (limits.go)
 	// quit is closed when the server is told to stop: held connections
 	// (live streams, waits for the next event) end then, at once.
 	quit     chan struct{}
@@ -160,6 +160,7 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 	s := &Server{cfg: cfg, st: st, eng: engine.New(st, sealer.Seal), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
 		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{})}
 	s.eng.OnCommit = s.hub.Notify
+	s.settings = settings.New(st, sealer, cfg.Log, s.settingKinds())
 	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}
 	s.mcp = mcp.New(s.callAsToken, cfg.Version)
 	s.github = &github.Syncer{Store: st, Engine: s.eng, Sealer: sealer, BaseURL: cfg.BaseURL, Version: cfg.Version}
@@ -708,7 +709,7 @@ func (s *Server) enterWorkspace(ctx context.Context, x *c, ref string) error {
 	if err := s.loadMembership(ctx, x, ref); err != nil {
 		return err
 	}
-	if x.sess != nil && s.settingBool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
+	if x.sess != nil && s.settings.Bool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
 		// Fails closed: when the passkeys cannot be counted, the answer is no.
 		if n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); err != nil || n == 0 {
 			return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}

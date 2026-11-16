@@ -32,7 +32,7 @@ func (s *Server) pushRoutes() []route {
 // it, making it on first use, and its private key.
 func (s *Server) pushKey(ctx context.Context) (webpush.Keys, *ecdsa.PrivateKey, error) {
 	var pk webpush.Keys
-	s.setting(ctx, "push", &pk)
+	s.settings.Get(ctx, "push", &pk)
 	if pk.PrivateKey == "" {
 		made, err := webpush.NewKeys()
 		if err != nil {
@@ -40,7 +40,7 @@ func (s *Server) pushKey(ctx context.Context) (webpush.Keys, *ecdsa.PrivateKey, 
 		}
 		pk = made
 		raw := plainjson.Marshal(pk)
-		if err := s.saveSetting(ctx, "push", raw, ""); err != nil {
+		if err := s.settings.Set(ctx, "push", raw, ""); err != nil {
 			return pk, nil, err
 		}
 	}

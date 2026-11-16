@@ -42,7 +42,7 @@ const sniffSize = 512
 
 // maxUpload is the largest file the install takes, from the "files.max_mb" setting.
 func (s *Server) maxUpload(ctx context.Context) int64 {
-	if n := s.settingInt(ctx, "files.max_mb", 0); n > 0 {
+	if n := 0; s.settings.Get(ctx, "files.max_mb", &n) && n > 0 {
 		return int64(n) << 20
 	}
 	return defaultMaxUpload

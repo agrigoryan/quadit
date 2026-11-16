@@ -115,7 +115,7 @@ func (s *Server) runSchedule(ctx context.Context) {
 			s.log.Error("the daily emptying of the trash; queued again on the next pass", "err", err)
 		}
 		var bs backupSetting
-		if s.setting(ctx, "backup", &bs) && bs.Enabled && now.Hour() >= bs.Hour {
+		if s.settings.Get(ctx, "backup", &bs) && bs.Enabled && now.Hour() >= bs.Hour {
 			var today []core.Backup
 			start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).UnixMilli()
 			if err := s.st.List(ctx, &today, store.Q{Where: []store.Cond{store.Gte("started_at", start)}, Limit: 1}); err == nil && len(today) == 0 {
@@ -139,7 +139,7 @@ func (s *Server) backupDir() string { return filepath.Join(s.cfg.DataDir, "backu
 // drops the oldest beyond the number to keep.
 func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 	var setting backupSetting
-	s.setting(ctx, "backup", &setting)
+	s.settings.Get(ctx, "backup", &setting)
 	b := core.Backup{ID: id.New(), StartedAt: time.Now().UnixMilli()}
 	if err := os.MkdirAll(s.backupDir(), 0o750); err != nil {
 		return b, err
@@ -264,7 +264,7 @@ func (s *Server) handleListBackups(x *c) error {
 		return err
 	}
 	var bs backupSetting
-	s.setting(x.ctx(), "backup", &bs)
+	s.settings.Get(x.ctx(), "backup", &bs)
 	return x.ok(map[string]any{"backups": list, "schedule": bs, "directory": s.backupDir()})
 }
 
