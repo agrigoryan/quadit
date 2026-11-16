@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"cmp"
 	"encoding/json"
 	"slices"
 	"strings"
@@ -185,7 +186,10 @@ func docWrite(c *cx, a docWriteArgs) error {
 	}
 	before := append([]core.Block(nil), rows...)
 	ed := newEditor(c, d, rows)
-	fresh := md.Parse(a.Markdown)
+	fresh, err := c.pageMarkdown(a.Markdown)
+	if err != nil {
+		return err
+	}
 	switch a.Mode {
 	case "append", "prepend":
 		for _, b := range fresh {
@@ -276,4 +280,19 @@ func lcs(a, b []md.Block) (keepA, keepB []bool) {
 		}
 	}
 	return keepA, keepB
+}
+
+// pageMarkdown is Markdown read into a page's blocks, with each @handle of
+// a member made a mention as the editor makes one (md.Mentions): it then
+// references and tells the member as a typed mention does, and the page
+// writes it back as @handle.
+func (c *cx) pageMarkdown(src string) ([]md.Block, error) {
+	var failed error
+	blocks := md.Mentions(md.Parse(src), func(handle string) bool {
+		var m core.Member
+		ok, err := store.Find(c.ctx, c.tx, &m, store.Eq("handle", handle), store.Null("removed_at"))
+		failed = cmp.Or(failed, err)
+		return ok
+	})
+	return blocks, failed
 }

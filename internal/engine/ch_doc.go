@@ -177,7 +177,10 @@ func (c *cx) insertDoc(d core.Doc, a docCreateArgs) error {
 	}
 	blocks := a.Blocks
 	if len(blocks) == 0 && a.Markdown != "" {
-		blocks = md.Parse(a.Markdown)
+		var err error
+		if blocks, err = c.pageMarkdown(a.Markdown); err != nil {
+			return err
+		}
 	}
 	ed := newEditor(c, d, nil)
 	for i, b := range blocks {
