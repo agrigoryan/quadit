@@ -1,5 +1,6 @@
-// A member limited to some projects sees that a task is related to one of
-// another project, and nothing of that task: not its key, not its title.
+// A member limited to some projects sees those projects and nothing of the
+// others: a task related to one of another project says so, without that
+// task's key or title.
 
 import { expect, invitedMember, test } from "./quadit";
 
