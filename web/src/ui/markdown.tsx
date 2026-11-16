@@ -1,15 +1,15 @@
 import { memo, useContext } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
-import { Link } from "react-router";
 import remarkGfm from "remark-gfm";
 import { cx } from "@/lib/cx";
 import { getProjectByKey, useRows } from "@/data/selectors";
 import { useStore } from "@/data/store";
-import { useTaskLink } from "@/nav/task-link";
 import { MemberMention } from "@/ui/member-mention";
+import { TaskMention } from "@/ui/task-mention";
 
-// Markdown as the server stores it, with two additions shown as links:
-// @handle of a real member, and a task key such as SVA-12.
+// Markdown as the server stores it, with two additions: @handle of a real
+// member, and a task key such as SVA-12, shown as the task it names
+// (ui/task-mention.tsx).
 
 interface Node {
   type: string;
@@ -53,15 +53,6 @@ const remarkRefs = () => (tree: Node) => walk(tree);
 const allowRefs = (url: string) =>
   url.startsWith("mention:") || url.startsWith("task:") ? url : defaultUrlTransform(url);
 
-/** A task's key in a text opens the task the way every link to a task does. */
-function TaskRef({ taskKey, children }: { taskKey: string; children?: React.ReactNode }) {
-  return (
-    <Link {...useTaskLink({ key: taskKey })} className="task-ref">
-      {children}
-    </Link>
-  );
-}
-
 function RefLink({ href, children }: { href?: string; children?: React.ReactNode }) {
   const handle = href?.startsWith("mention:") ? href.slice(8) : undefined;
   const members = useRows("members");
@@ -84,7 +75,7 @@ function RefLink({ href, children }: { href?: string; children?: React.ReactNode
       </button>,
     );
   }
-  if (href?.startsWith("task:")) return <TaskRef taskKey={href.slice(5)}>{children}</TaskRef>;
+  if (href?.startsWith("task:")) return <TaskMention taskKey={href.slice(5)} />;
   return (
     <a href={href} target="_blank" rel="noreferrer noopener">
       {children}

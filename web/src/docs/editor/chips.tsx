@@ -15,7 +15,8 @@ import { answerOf, DECISION_REF, decisionsOf } from "@/docs/editor/decision-refs
 import { openDecision, openDoc, openTask } from "@/docs/nav";
 import { PageIcon } from "@/docs/page-icon";
 import { MemberCard } from "@/tasks/member-card";
-import { DecisionMark, StatusIcon } from "@/ui/icons";
+import { DecisionMark } from "@/ui/icons";
+import { TaskMention } from "@/ui/task-mention";
 
 interface MentionProps {
   handle: string;
@@ -123,20 +124,11 @@ export const openChipAtCaret = createExtension({
 /** The inline content types that open what they name (a mention, the card about the member). */
 const CHIPS = new Set(["taskChip", "decisionChip", "pageLink", "mention"]);
 
+/** A task, drawn as the task's mention is wherever text names one (ui/task-mention.tsx). */
 export function TaskChip({ taskKey, editable }: { taskKey: string; editable: boolean }) {
-  // A trashed task is found, to be shown as gone.
+  // A trashed task opens too: its page says it is in the trash.
   const task = useTaskByKeyEvenIfGone(taskKey);
-  const category = useRowEvenIfGone("statuses", task?.status_id)?.category;
-  return (
-    <span
-      className={cx("qd-chip qd-task", (!task || !!task.deleted_at) && "is-missing")}
-      {...chipLink(task && (() => openTask(task.key)), editable)}
-    >
-      {category && <StatusIcon category={category} className="qd-chip-icon" />}
-      <span className="qd-task-key">{taskKey.toUpperCase()}</span>
-      {task && <span className="qd-task-title">{task.title}</span>}
-    </span>
-  );
+  return <TaskMention taskKey={taskKey} control={chipLink(task && (() => openTask(task.key)), editable)} />;
 }
 
 /** How a decision stands, in the fewest words: "Open", "Picked: B: burst", "Approved". */

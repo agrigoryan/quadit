@@ -1,14 +1,18 @@
 // @vitest-environment jsdom
 // The chips inside a page's text (docs/editor/chips.tsx) open what they name
 // from the keyboard: in a page that cannot be edited they are Tab stops that
-// Enter or Space opens; while editing, the caret moves over them.
+// Enter or Space opens; while editing, the caret moves over them. A task's
+// chip is the task's mention (ui/task-mention.tsx): its status, key and
+// title, and the card about it when the pointer rests on it.
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { PageChip, TaskChip } from "@/docs/editor/chips";
 import { openDoc, openTask } from "@/docs/nav";
+import { WithQuery } from "@/test/query";
 
 vi.mock("@/docs/nav", () => ({ openDoc: vi.fn(), openTask: vi.fn(), openDecision: vi.fn() }));
 
@@ -39,6 +43,18 @@ describe("a chip in a page that cannot be edited", () => {
     render(<PageChip docId="d1" editable={false} />);
     fireEvent.keyDown(screen.getByRole("link", { name: /Release plan/ }), { key: " " });
     expect(openDoc).toHaveBeenCalledWith("d1");
+  });
+});
+
+describe("a task's chip", () => {
+  it("shows the task's status, key and title, and its card when the pointer rests on it", async () => {
+    render(<TaskChip taskKey="SVA-1" editable />, { wrapper: WithQuery });
+    const chip = screen.getByRole("link", { name: "Todo SVA-1 Paint the fence" });
+    expect(within(chip).getByRole("img", { name: "Todo" })).toBeInTheDocument();
+    await userEvent.hover(chip);
+    const card = await screen.findByRole("tooltip", {}, { timeout: 2000 });
+    expect(within(card).getByText("Paint the fence")).toBeInTheDocument();
+    expect(within(card).getByText("No assignee")).toBeInTheDocument();
   });
 });
 

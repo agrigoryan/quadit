@@ -1,4 +1,5 @@
-/* Rendered Markdown: task descriptions, comments, decision details. */
+/* Rendered Markdown: task descriptions, comments, decision details; and the
+   mention of a task, which a page's chips draw too. */
 
 .md {
   font-size: 0.875rem;
@@ -164,8 +165,58 @@
   color: var(--move-text);
 }
 
-.md .task-ref {
-  font-variant-numeric: tabular-nums;
-  font-weight: 550;
+/* A task named in text (ui/task-mention.tsx): here, and as a chip in a page. */
+
+.task-mention {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.3em;
+  border-radius: 5px;
+  padding: 0 0.3em;
+  vertical-align: baseline;
+  line-height: 1.45;
   white-space: nowrap;
+  font-size: 0.93em;
+  cursor: pointer;
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.md a.task-mention {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.task-mention:hover {
+  background: var(--press);
+}
+
+.task-mention-icon {
+  width: 0.95em;
+  height: 0.95em;
+  flex: none;
+}
+
+.task-mention-key {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-2);
+  font-size: 0.9em;
+}
+
+.task-mention-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28em;
+}
+
+.task-mention.is-gone,
+.md a.task-mention.is-gone,
+.task-mention.is-gone .task-mention-key {
+  color: var(--ink-3);
+}
+
+.task-mention.is-gone .task-mention-key {
+  text-decoration: line-through;
 }

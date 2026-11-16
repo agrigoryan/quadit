@@ -193,7 +193,7 @@
   font-size: 0.75rem;
 }
 
-/* ---- inline chips: a person, a task, a decision, a page ---- */
+/* ---- inline chips: a person, a decision, a page (a task is drawn as its mention: styles/prose.css) ---- */
 
 .qd-chip {
   display: inline-flex;
@@ -221,14 +221,12 @@
   background: var(--move-soft);
   color: var(--move-text);
 }
-.qd-task,
 .qd-decision,
 .qd-page {
   cursor: pointer;
   background: var(--sunken);
   color: var(--ink);
 }
-.qd-task:hover,
 .qd-decision:hover,
 .qd-page:hover {
   background: var(--press);

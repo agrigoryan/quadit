@@ -235,4 +235,9 @@ export const tasks = {
   "memberCard.removed": "Removed from the workspace",
   "memberCard.suspended": "Suspended",
   "memberCard.tasks": "Tasks assigned",
+
+  "taskCard.noAssignee": "No assignee",
+  "taskCard.inTrash": "In the trash",
+  "taskCard.archived": "Archived",
+  "taskCard.notThere": "There is no such task, or it is not yours to see.",
 } as const;
