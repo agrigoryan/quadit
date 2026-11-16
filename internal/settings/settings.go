@@ -116,13 +116,20 @@ func (s *Settings) Bool(ctx context.Context, name string, def bool) bool {
 }
 
 // Checked is Get for a check that decides access: when the database cannot
-// be read it returns the error, and the caller refuses.
+// be read, or the value set is not of the setting's shape (an environment
+// variable written wrong), it returns the error, and the caller refuses.
 func (s *Settings) Checked(ctx context.Context, name string, dst any) error {
-	raw, _, err := s.load(ctx, name)
+	raw, fromEnv, err := s.load(ctx, name)
 	if err != nil {
 		return err
 	}
-	decode(raw, dst)
+	if len(raw) > 0 && !decode(raw, dst) {
+		where := "stored"
+		if fromEnv {
+			where = "in " + EnvName(name)
+		}
+		return fmt.Errorf("the setting %s %s does not read as what it holds", name, where)
+	}
 	return nil
 }
 
