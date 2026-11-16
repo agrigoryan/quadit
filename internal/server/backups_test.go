@@ -59,3 +59,55 @@ func TestABackupOfANewerQuaditIsRefusedInWords(t *testing.T) {
 		}
 	})
 }
+
+// TestBringingAnItemBackAnswersWhatWentWrong: bringing a task back from a
+// backup is answered not found only when the backup, the workspace or the
+// task is not there; a damaged archive is refused; and a database that
+// fails on the way is a failure, not a task that is not found.
+func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
+	st := newFaultyStore(testdb.SQLite(t))
+	s := newSite(t, st)
+	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	backupOf := func() (id, location string) {
+		t.Helper()
+		var made struct {
+			Backup struct{ ID string }
+			ID     string
+		}
+		s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
+		id = made.Backup.ID
+		if id == "" {
+			id = made.ID
+		}
+		var b core.Backup
+		if err := st.Get(context.Background(), &b, store.Eq("id", id)); err != nil {
+			t.Fatal(err)
+		}
+		return id, b.Location
+	}
+	restore := func(t *testing.T, id string, body M, want int) {
+		t.Helper()
+		s.in(t).call(s.owner, "", "POST", "/api/v1/admin/backups/"+id+"/restore-item", body, want, nil)
+	}
+	good, _ := backupOf()
+
+	t.Run("what is not there is not found", func(t *testing.T) {
+		restore(t, good, M{"workspace": "games", "task": "SVA-99"}, 404)
+		restore(t, good, M{"workspace": "nope", "task": "SVA-1"}, 404)
+		restore(t, "no-such-backup", M{"workspace": "games", "task": "SVA-1"}, 404)
+	})
+	t.Run("a database that fails is a failure", func(t *testing.T) {
+		st.faults.set("count tasks")
+		defer st.faults.clear()
+		restore(t, good, M{"workspace": "games", "task": "SVA-1"}, 500)
+	})
+	restore(t, good, M{"workspace": "games", "task": "SVA-1"}, 200)
+	t.Run("a damaged archive is refused", func(t *testing.T) {
+		damaged, location := backupOf()
+		if err := os.WriteFile(location, []byte("not an archive"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		restore(t, damaged, M{"workspace": "games", "task": "SVA-1"}, 409)
+	})
+}

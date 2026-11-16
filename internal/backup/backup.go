@@ -67,6 +67,14 @@ type Manifest struct {
 // and columns that are new. The error says which version made it.
 var ErrNewerArchive = errors.New("the archive is newer than this Quadit")
 
+// ErrDamaged is the refusal of a file that is not a whole, readable
+// archive. The error says what is wrong with it.
+var ErrDamaged = errors.New("the archive is damaged")
+
+// ErrNotInArchive is RestoreItem's answer when the archive has no such
+// workspace, or no such task or page in it.
+var ErrNotInArchive = errors.New("not in the archive")
+
 // skipPrefixes are stored objects that are not users' files.
 var skipPrefixes = []string{"backups/", "probe/"}
 
@@ -215,7 +223,7 @@ func read(r io.Reader, each func(name string, body io.Reader) error) (Manifest, 
 	var m Manifest
 	gz, err := gzip.NewReader(r)
 	if err != nil {
-		return m, fmt.Errorf("this is not a backup archive: %w", err)
+		return m, fmt.Errorf("%w: this is not a backup archive: %w", ErrDamaged, err)
 	}
 	tr := tar.NewReader(gz)
 	found := false
@@ -225,11 +233,11 @@ func read(r io.Reader, each func(name string, body io.Reader) error) (Manifest, 
 			break
 		}
 		if err != nil {
-			return m, fmt.Errorf("the archive is damaged: %w", err)
+			return m, fmt.Errorf("%w: %w", ErrDamaged, err)
 		}
 		if h.Name == "manifest.json" {
 			if err := json.NewDecoder(tr).Decode(&m); err != nil {
-				return m, fmt.Errorf("the manifest is damaged: %w", err)
+				return m, fmt.Errorf("%w: its manifest does not read: %w", ErrDamaged, err)
 			}
 			found = true
 			continue
@@ -239,7 +247,7 @@ func read(r io.Reader, each func(name string, body io.Reader) error) (Manifest, 
 		}
 	}
 	if !found {
-		return m, errors.New("the archive has no manifest: it is incomplete")
+		return m, fmt.Errorf("%w: it has no manifest, so it is incomplete", ErrDamaged)
 	}
 	return m, nil
 }
@@ -263,14 +271,14 @@ func Verify(r io.Reader) (Manifest, error) {
 	for _, e := range m.Entries {
 		got, ok := sums[e.Name]
 		if !ok {
-			return m, fmt.Errorf("the archive is missing %s", e.Name)
+			return m, fmt.Errorf("%w: it is missing %s", ErrDamaged, e.Name)
 		}
 		if got.SHA256 != e.SHA256 || got.Size != e.Size {
-			return m, fmt.Errorf("%s does not match its checksum: the archive is damaged", e.Name)
+			return m, fmt.Errorf("%w: %s does not match its checksum", ErrDamaged, e.Name)
 		}
 	}
 	if len(sums) != len(m.Entries) {
-		return m, errors.New("the archive holds members its manifest does not list")
+		return m, fmt.Errorf("%w: it holds members its manifest does not list", ErrDamaged)
 	}
 	return m, nil
 }
@@ -332,7 +340,7 @@ func lines(body io.Reader, batch int, flush func([]map[string]any) error) error 
 		var row map[string]any
 		dec := json.NewDecoder(strings.NewReader(sc.Text()))
 		if err := dec.Decode(&row); err != nil {
-			return err
+			return fmt.Errorf("%w: a row does not read: %w", ErrDamaged, err)
 		}
 		rows = append(rows, row)
 		if batch > 0 && len(rows) >= batch {
@@ -357,7 +365,7 @@ func readable(ctx context.Context, st store.Store, name string, body io.Reader) 
 	}
 	var made madeBy
 	if err := json.NewDecoder(body).Decode(&made); err != nil {
-		return fmt.Errorf("the archive is damaged: its %s does not read: %w", schemaMember, err)
+		return fmt.Errorf("%w: its %s does not read: %w", ErrDamaged, schemaMember, err)
 	}
 	ours, err := st.SchemaVersion(ctx)
 	if err != nil {
@@ -438,10 +446,10 @@ func RestoreItem(ctx context.Context, st store.Store, files blob.Store, r io.Rea
 		return "", err
 	}
 	if ir.wsID == "" {
-		return "", fmt.Errorf("the archive has no workspace %q", it.Workspace)
+		return "", fmt.Errorf("workspace %q is %w", it.Workspace, ErrNotInArchive)
 	}
 	if ir.rootID == "" {
-		return "", fmt.Errorf("the archive has no %s %q in %s", it.Kind, it.Ref, it.Workspace)
+		return "", fmt.Errorf("%s %q of %s is %w", it.Kind, it.Ref, it.Workspace, ErrNotInArchive)
 	}
 	if it.Kind == "doc" {
 		if err := ir.trashNewBlocks(); err != nil {

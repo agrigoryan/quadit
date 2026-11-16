@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -335,16 +336,21 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 		return errBad("say which workspace, and which task (its key) or page (its id)")
 	}
 	f, err := os.Open(bk.Location)
-	if err != nil {
+	if errors.Is(err, fs.ErrNotExist) {
 		return errNotFound("backup file")
+	}
+	if err != nil {
+		return err
 	}
 	defer f.Close()
 	rid, err := backup.RestoreItem(ctx, s.st, s.fileStore(), f, it)
-	if errors.Is(err, backup.ErrNewerArchive) {
-		return &engine.Error{Code: engine.CodeConflict, Message: err.Error()}
-	}
-	if err != nil {
+	switch {
+	case errors.Is(err, backup.ErrNotInArchive):
 		return &engine.Error{Code: engine.CodeNotFound, Message: err.Error()}
+	case errors.Is(err, backup.ErrNewerArchive), errors.Is(err, backup.ErrDamaged):
+		return &engine.Error{Code: engine.CodeConflict, Message: err.Error()}
+	case err != nil:
+		return err
 	}
 	var ws core.Workspace
 	there, err := store.Find(ctx, s.st, &ws, store.Eq("slug", it.Workspace), store.Live)
