@@ -16,6 +16,8 @@ import (
 // projects. For anyone else it is nil, since the numbers are the
 // workspace's, whatever the dashboard was asked for.
 func (who *viewer) health(ctx context.Context) (map[string]any, error) {
+	// The owner's decision: workspace admins whose credential is not limited
+	// to some projects, and nobody else.
 	if !who.member.Role.AtLeast(core.RoleAdmin) || who.limited() {
 		return nil, nil
 	}

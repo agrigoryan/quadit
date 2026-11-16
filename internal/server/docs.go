@@ -376,6 +376,8 @@ func (who *viewer) pageBlocks(ctx context.Context, page core.Doc) ([]core.Block,
 // one, and all of them to the projects the viewer may read. So the page of
 // the whole workspace reads differently to different members, and is never
 // stored: stored once, it would show everyone what its first reader may see.
+// Not stored, it is not in the search index either: what it says is found
+// by searching the tasks and decisions themselves (the owner's decision).
 func (who *viewer) generatedPage(ctx context.Context, page core.Doc) (string, error) {
 	names, err := who.names(ctx)
 	if err != nil {

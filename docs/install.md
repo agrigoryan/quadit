@@ -118,7 +118,7 @@ quadit admin token games @coordinator               # an API token for a member,
 | `/readyz` | The database answers |
 | `/metrics` | Prometheus counters: requests, rows per table, waiting jobs, dead webhook deliveries |
 
-The admin area's health panel shows failing webhooks, undelivered wake-ups, repository syncs with errors and the last backup.
+The admin area's health panel shows failing webhooks, undelivered wake-ups, repository syncs with errors and the last backup. The dashboard shows the same health part to workspace admins whose sign-in or token is not limited to some projects, since its numbers are the whole workspace's; anyone else's dashboard has none.
 
 ## Optional programs on the server
 
