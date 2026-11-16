@@ -12,7 +12,8 @@
 // on the device until sent), and selectors.ts and access.ts (how the app
 // reads it, and what the member may do). Beside it: api.ts, the one place
 // that talks HTTP; query.ts, live.ts, task-detail.ts, listening.ts and
-// change-catalog.ts, the reads the copy does not hold; and files.ts, uploads. Nothing here knows
+// change-catalog.ts, the reads the copy does not hold; find-task.ts, a task
+// the copy lacks fetched into it; and files.ts, uploads. Nothing here knows
 // the router or the interface.
 
 import { create } from "zustand";

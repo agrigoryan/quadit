@@ -1,0 +1,78 @@
+// Looking up a task the store does not hold. The starting copy leaves out
+// what is in the trash, and the finished work (done, canceled, archived)
+// arrives a while after the rest; a task's page, a relation's row or a
+// mention in a text that names one of those asks the server for it here, and
+// the answer goes into the store, where the feed keeps it current.
+
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { api, workspacePath } from "@/data/api";
+import { isNotFound, readError } from "@/data/query";
+import { useLookupEvenIfGone, useSlug } from "@/data/selectors";
+import { mergeRows } from "@/data/store";
+import { taskKeys } from "@/data/task-detail";
+import type { Task } from "@/types/core";
+
+/** Where the look for a task the store does not have stands. */
+export interface FindTask {
+  /** True while the answer is on its way. */
+  looking: boolean;
+  /** Why the server could not answer, or "". A task that is not there is not an error. */
+  error: string;
+  retry: () => void;
+}
+
+/**
+ * Fetches a task (by key or id) into the store. True when it was there; false
+ * when the server says there is no such task, or none for this person.
+ */
+async function fetchTaskRow(slug: string, keyOrId: string, signal: AbortSignal): Promise<boolean> {
+  try {
+    const raw = await api.get<{ task: Task }>(
+      workspacePath(slug, `/tasks/${encodeURIComponent(keyOrId)}?raw=1`),
+      signal,
+    );
+    mergeRows("tasks", [raw.task]);
+    return true;
+  } catch (err) {
+    if (isNotFound(err)) return false;
+    throw err;
+  }
+}
+
+/**
+ * Asks the server for the task with this key when the store does not have
+ * it (`have` false). A failed look is tried again when the live stream comes
+ * back.
+ */
+export function useFindTask(taskKey: string, have: boolean): FindTask {
+  const slug = useSlug();
+  const found = useQuery({
+    queryKey: taskKeys.row(slug, taskKey),
+    queryFn: ({ signal }) => fetchTaskRow(slug, taskKey, signal),
+    enabled: !have,
+  });
+  const error = have ? "" : readError(found.error);
+  // A 401 is no answer: the person is on the way to sign in.
+  const looking = !have && (found.isPending || (!!found.error && !error));
+  return { looking, error, retry: () => void found.refetch() };
+}
+
+/**
+ * Fetches tasks the store does not hold yet, by id, so a row that names one
+ * can be drawn. Each is asked for once; one that failed is asked again when
+ * the stream comes back, or when a row that names it is drawn again.
+ */
+export function useEnsureTasks(ids: string[]) {
+  const slug = useSlug();
+  const tasks = useLookupEvenIfGone("tasks");
+  useQueries({
+    queries: ids
+      .filter((id) => !tasks[id])
+      .map((id) => ({
+        queryKey: taskKeys.row(slug, id),
+        queryFn: ({ signal }: { signal: AbortSignal }) => fetchTaskRow(slug, id, signal),
+        // Once there, the task is in the store and the feed keeps it current.
+        staleTime: Infinity,
+      })),
+  });
+}

@@ -2,63 +2,14 @@
 // sub-tasks, relations, links and files, and how a person or agent is named
 // in a sentence.
 
-import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api, workspacePath } from "@/data/api";
 import { t } from "@/lib/i18n";
-import { isNotFound, readError } from "@/data/query";
-import { getRowEvenIfGone, sortByRank, useLookupEvenIfGone, useRows, useSlug } from "@/data/selectors";
-import { type Dict, mergeRows } from "@/data/store";
-import { taskKeys } from "@/data/task-detail";
+import { getRowEvenIfGone, sortByRank, useRows } from "@/data/selectors";
+import type { Dict } from "@/data/store";
 import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/types/core";
 
 /** An attachment whose file is known (every one the panel draws). */
 export type Attached = Attachment & { file: FileRow };
-
-/** Where the look for a task the store does not have stands. */
-export interface FindTask {
-  /** True while the answer is on its way. */
-  looking: boolean;
-  /** Why the server could not answer, or "". A task that is not there is not an error. */
-  error: string;
-  retry: () => void;
-}
-
-/**
- * Fetches a task (by key or id) into the store. True when it was there; false
- * when the server says there is no such task, or none for this person.
- */
-async function fetchTaskRow(slug: string, keyOrId: string, signal: AbortSignal): Promise<boolean> {
-  try {
-    const raw = await api.get<{ task: Task }>(
-      workspacePath(slug, `/tasks/${encodeURIComponent(keyOrId)}?raw=1`),
-      signal,
-    );
-    mergeRows("tasks", [raw.task]);
-    return true;
-  } catch (err) {
-    if (isNotFound(err)) return false;
-    throw err;
-  }
-}
-
-/**
- * Asks the server for a task the store does not have: one in the trash, which
- * the starting copy leaves out. A failed look is tried again when the live
- * stream comes back.
- */
-export function useFindTask(taskKey: string, have: boolean): FindTask {
-  const slug = useSlug();
-  const found = useQuery({
-    queryKey: taskKeys.row(slug, taskKey),
-    queryFn: ({ signal }) => fetchTaskRow(slug, taskKey, signal),
-    enabled: !have,
-  });
-  const error = have ? "" : readError(found.error);
-  // A 401 is no answer: the person is on the way to sign in.
-  const looking = !have && (found.isPending || (!!found.error && !error));
-  return { looking, error, retry: () => void found.refetch() };
-}
 
 export function useSubtasks(taskId: string): Task[] {
   const tasks = useRows("tasks");
@@ -133,25 +84,4 @@ export function linkName(link: Pick<TaskLink, "kind" | "title" | "ref" | "repo" 
   if (link.kind === "commit" && link.ref) return link.ref.slice(0, 8);
   if (link.ref) return link.ref;
   return (link.url ?? "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-}
-
-/**
- * Fetches tasks the store does not hold yet (closed ones arrive later than
- * the rest; one may be in the trash), so a row that names one can be drawn.
- * Each is asked for once; one that failed is asked again when the stream
- * comes back, or when a row that names it is drawn again.
- */
-export function useEnsureTasks(ids: string[]) {
-  const slug = useSlug();
-  const tasks = useLookupEvenIfGone("tasks");
-  useQueries({
-    queries: ids
-      .filter((id) => !tasks[id])
-      .map((id) => ({
-        queryKey: taskKeys.row(slug, id),
-        queryFn: ({ signal }: { signal: AbortSignal }) => fetchTaskRow(slug, id, signal),
-        // Once there, the task is in the store and the feed keeps it current.
-        staleTime: Infinity,
-      })),
-  });
 }

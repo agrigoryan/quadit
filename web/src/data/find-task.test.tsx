@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
-// Looking up a task the store does not have (detail/data.ts useFindTask,
+// Looking up a task the store does not have (data/find-task.ts useFindTask,
 // useEnsureTasks): a task that is not there is told apart from a server that
 // did not answer, and a failed look is tried again when the live stream
 // comes back.
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useEnsureTasks, useFindTask } from "@/detail/data";
 import { api, ApiError } from "@/data/api";
+import { useEnsureTasks, useFindTask } from "@/data/find-task";
 import { getRowEvenIfGone } from "@/data/selectors";
 import { clearStore, useStore } from "@/data/store";
 import { WithQuery } from "@/test/query";

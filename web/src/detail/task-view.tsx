@@ -5,10 +5,10 @@
 import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { useTaskByKeyEvenIfGone } from "@/data/selectors";
+import { useFindTask } from "@/data/find-task";
 import { useTaskDetail } from "@/data/task-detail";
 import { usePageTitle } from "@/lib/ui-state";
 import { startComment } from "@/detail/comment-box";
-import { useFindTask } from "@/detail/data";
 import { useFileDrop } from "@/detail/file-drop";
 import { PanelHeader, TrashBanner } from "@/detail/panel-header";
 import { useRevealFromHash } from "@/detail/reveal-hash";
