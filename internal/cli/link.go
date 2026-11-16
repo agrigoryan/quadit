@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -40,10 +41,12 @@ func gitAnswer(ctx context.Context, args ...string) string {
 func (r *runner) link(in input) error {
 	pos := in.pos
 	if page := in.f["page"]; len(page) > 0 {
-		if len(pos) != 1 {
-			return errors.New("name the task: quadit link KEY page=ID")
+		// The task is named first or as task=KEY: the page's side reads "link page=ID task=KEY".
+		task := append(slices.Clone(pos), in.f["task"]...)
+		if len(task) != 1 {
+			return errors.New("name the task: quadit link KEY page=ID, or quadit link page=ID task=KEY")
 		}
-		return r.change("link.set", map[string]any{"task": pos[0], "kind": "doc", "ref": page[0]}, in.approval)
+		return r.change("link.set", map[string]any{"task": task[0], "kind": "doc", "ref": page[0]}, in.approval)
 	}
 	if len(pos) == 2 && strings.Contains(pos[1], "://") {
 		return r.change("link.set", map[string]any{"task": pos[0], "kind": "url", "url": pos[1]}, in.approval)

@@ -8,10 +8,10 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
-import { applyEvents, clearStore, loadBootstrap, mergeRows } from "@/data/store";
+import { applyEvents, clearStore, loadBootstrap, mergeRows, useStore } from "@/data/store";
 import { TasksPanel } from "@/docs/page/tasks-panel";
 import { useDocsStore } from "@/docs/store";
 import { WithQuery } from "@/test/query";
@@ -33,6 +33,16 @@ const ref = (fromType: string, fromId: string, scopeId: string, toType = "doc", 
 type Sent = { type: string; args: Record<string, unknown> };
 let sent: Sent[] = [];
 
+beforeAll(() => {
+  // cmdk scrolls the active row into view and measures the list; jsdom does neither.
+  Element.prototype.scrollIntoView = vi.fn();
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
+
 beforeEach(() => {
   sent = [];
   vi.spyOn(api, "post").mockImplementation((_path: string, body?: unknown) => {
@@ -43,13 +53,31 @@ beforeEach(() => {
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
-    me: { user_id: "u1", handle: "ann", name: "Ann Owner", role: "member", kind: "person" } as Member,
+    // Ann is kept to SVA: a task of OPS is not one she may change, should the copy hold one.
+    me: {
+      user_id: "u1",
+      handle: "ann",
+      name: "Ann Owner",
+      role: "member",
+      kind: "person",
+      scope: { projects: ["p1"] },
+    } as Member,
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
-    projects: [{ id: "p1", key: "SVA", name: "Game" }],
+    projects: [
+      { id: "p1", key: "SVA", name: "Game" },
+      { id: "p2", key: "OPS", name: "Ops" },
+    ],
     statuses: [{ id: "s1", project_id: "p1", name: "Todo", category: "unstarted", rank: "a" }],
     members: [{ user_id: "u1", handle: "ann", name: "Ann Owner", kind: "person" }],
-    tasks: [task(1, { assignee_id: "u1" }), task(2), task(3), task(4), task(5, { deleted_at: 9 })],
+    tasks: [
+      task(1, { assignee_id: "u1" }),
+      task(2),
+      task(3),
+      task(4),
+      task(5, { deleted_at: 9 }),
+      task(6, { project_id: "p2", key: "OPS-6" }),
+    ],
     docs: [{ id: "page", title: "Handbook", kind: "page" }],
   });
   // What the page was read with: t1 linked, t2 mentioning it (and t9, a task this person cannot see), t3 named in it.
@@ -71,7 +99,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-function show() {
+function renderPanel() {
   render(
     <MemoryRouter initialEntries={["/acme/docs/page"]}>
       <WithQuery>
@@ -81,6 +109,10 @@ function show() {
       </WithQuery>
     </MemoryRouter>,
   );
+}
+
+function show() {
+  renderPanel();
   return screen.getByRole("region", { name: "Tasks" });
 }
 
@@ -145,5 +177,35 @@ describe("a page's Tasks", () => {
       ),
     );
     await waitFor(() => expect(titles()).toEqual(["Task 4", "Task 2", "Task 3"]));
+  });
+
+  it("links a task picked by key or title, offering only tasks not listed yet that this person may change", async () => {
+    const panel = show();
+    fireEvent.click(within(panel).getByRole("button", { name: "Add a task" }));
+    const list = await screen.findByRole("listbox", { name: "Add a task" });
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Task 4SVA-4"]);
+    fireEvent.change(screen.getByPlaceholderText("Add a task"), { target: { value: "sva-4" } });
+    fireEvent.click(within(list).getByRole("option", { name: /Task 4/ }));
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ type: "link.set", args: { task: "t4", kind: "doc", ref: "page" } });
+    await waitFor(() => expect(titles()).toEqual(["Task 4", "Task 1", "Task 2", "Task 3"]));
+  });
+
+  it("is there to add the first task", () => {
+    useDocsStore.setState({ meta: {} });
+    const panel = show();
+    expect(within(panel).queryAllByRole("listitem")).toHaveLength(0);
+    expect(within(panel).getByRole("button", { name: "Add a task" })).toBeInTheDocument();
+  });
+
+  it("draws nothing for someone who may change no task, when no task points at the page", () => {
+    useDocsStore.setState({ meta: {} });
+    useStore.setState((s) => ({ me: s.me && { ...s.me, scope: { read_only: true } } }));
+    renderPanel();
+    expect(screen.queryByRole("region", { name: "Tasks" })).not.toBeInTheDocument();
   });
 });

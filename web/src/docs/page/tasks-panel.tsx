@@ -1,18 +1,21 @@
 // "Tasks" under a page: the tasks linked to it (from the task, or with
 // `quadit link`), those whose text or comments mention it, and those it
-// mentions, each once and each a link to the task. A linked one can be taken
-// off here. The server sends only what the reader may see.
+// mentions, each once and each a link to the task. A task is linked here
+// too, and a linked one taken off. The server sends only what the reader may
+// see.
 
-import { useMemo } from "react";
-import { X } from "lucide-react";
+import { useCallback, useMemo } from "react";
+import { Plus, X } from "lucide-react";
 import { Link } from "react-router";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { useLookup, useLookupEvenIfGone, useMember, useRows } from "@/data/selectors";
+import { getRow, useLookup, useLookupEvenIfGone, useMember, useRows } from "@/data/selectors";
 import type { Task } from "@/types/core";
+import { TaskPicker } from "@/detail/task-picker";
 import { unlinkTask } from "@/docs/actions";
 import { useDocsStore } from "@/docs/store";
 import { useTaskLink } from "@/nav/task-link";
+import { linkPage } from "@/tasks/actions";
 import { MemberCard } from "@/tasks/member-card";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
@@ -99,20 +102,46 @@ function TaskRow({ row }: { row: PageTask }) {
   );
 }
 
-/** The page's "Tasks" panel. Draws nothing when no task points at the page or is named in it. */
+/**
+ * The page's "Tasks" panel, with the way to link a task. Draws nothing when
+ * no task points at the page or is named in it and none can be linked.
+ */
 export function TasksPanel({ docId }: { docId: string }) {
   const rows = usePageTasks(docId);
-  if (rows.length === 0) return null;
+  const can = useCan();
+  const listed = useMemo(() => new Set(rows.map((row) => row.task.id)), [rows]);
+  const offered = useCallback((task: Task) => can.editTask(task) && !listed.has(task.id), [can, listed]);
+  const tasks = useRows("tasks");
+  const mayAdd = tasks.some(offered);
+  if (rows.length === 0 && !mayAdd) return null;
   return (
     <section aria-label={t("docs.tasks")} className="mt-8 border-t border-line pt-3">
-      <h2 className="flex h-7 items-center gap-2 text-xs font-medium text-ink-2">
-        {t("docs.tasks")} <span className="font-normal text-ink-3 tnum">{rows.length}</span>
-      </h2>
-      <ul>
-        {rows.map((row) => (
-          <TaskRow key={row.task.id} row={row} />
-        ))}
-      </ul>
+      <div className="flex h-7 items-center gap-2">
+        <h2 className="text-xs font-medium text-ink-2">
+          {t("docs.tasks")} {rows.length > 0 && <span className="font-normal text-ink-3 tnum">{rows.length}</span>}
+        </h2>
+        <span className="flex-1" />
+        {mayAdd && (
+          <TaskPicker filter={offered} label={t("docs.tasks.add")} onPick={(taskId) => linkTask(taskId, docId)}>
+            <IconButton label={t("docs.tasks.add")} size="sm" className="max-md:size-9">
+              <Plus className="size-3.5" />
+            </IconButton>
+          </TaskPicker>
+        )}
+      </div>
+      {rows.length > 0 && (
+        <ul>
+          {rows.map((row) => (
+            <TaskRow key={row.task.id} row={row} />
+          ))}
+        </ul>
+      )}
     </section>
   );
+}
+
+/** Links a task to the page, the way the task's own "Add a page" does. */
+function linkTask(taskId: string, docId: string) {
+  const task = getRow("tasks", taskId);
+  if (task) linkPage(task, docId);
 }

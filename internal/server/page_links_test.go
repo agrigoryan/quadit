@@ -121,5 +121,13 @@ func TestAnAgentLinksAPageFromTheCommandLine(t *testing.T) {
 		if out, _ := s.quadit(narrow, "context", "SVA-1"); !strings.Contains(out, "Handbook") {
 			t.Fatalf("the context pack does not name the page linked to the task: %s", out)
 		}
+		// The same link written from the page's side is the same change.
+		runbook := s.change(s.owner, "", "doc.create", M{"title": "Runbook", "markdown": "rotate\n"})["ref"].(string)
+		if out, code := s.quadit(narrow, "link", "page="+runbook, "task=SVA-1"); code != 0 {
+			t.Fatalf("quadit link page=ID task=KEY failed (%d): %s", code, out)
+		}
+		if out, _ := s.quadit(narrow, "show", "SVA-1"); !strings.Contains(out, "page Runbook") {
+			t.Fatalf("the task does not show the page linked from the page's side: %s", out)
+		}
 	})
 }

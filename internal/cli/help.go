@@ -76,6 +76,7 @@ var helpTopics = map[string]string{
                                the key is read from the branch name when left out
   link KEY URL                 link a URL to a task
   link KEY page=ID             link a page to a task; the page lists the task
+  link page=ID task=KEY        the same, written from the page's side
   render KEY|doc=ID [width=390] [height=N | full=1] [theme=dark] [out=FILE]
                                a picture of how it looks to a person; full=1 takes the whole page
 `,

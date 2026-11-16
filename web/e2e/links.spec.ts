@@ -78,7 +78,7 @@ test("a page linked from a task lists the task, and taking the link off there ta
   await expect(tasks.getByRole("link", { name: "Arena lighting" })).toBeHidden();
 
   await tasks.getByRole("button", { name: `Remove the link to ${key}` }).click();
-  await expect(tasks).toBeHidden();
+  await expect(tasks.getByRole("link", { name: "Boss fight", exact: true })).toBeHidden();
   await expect.poll(() => quadit.cli("show", key)).not.toContain(`page ${title}`);
 
   await page.goto(`/e2e/task/${key}`);

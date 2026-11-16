@@ -138,6 +138,7 @@ export const docs = {
   "docs.tasks.mentionsPage": "mentions this page",
   "docs.tasks.mentionedHere": "mentioned here",
   "docs.tasks.remove": "Remove the link to {key}",
+  "docs.tasks.add": "Add a task",
   "docs.backlinks.none": "No task or page mentions this page yet.",
   "docs.backlinks.inComment": "in a comment",
   "docs.backlinks.inDecision": "in a decision",
