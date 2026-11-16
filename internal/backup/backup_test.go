@@ -336,3 +336,59 @@ func TestRestoreKeepsWhatTheUpgradesRepaired(t *testing.T) {
 		})
 	})
 }
+
+// TestAPageBroughtBackUnderAPrivatePageIsPrivateTheSameWay: one page
+// brought back from an archive made while its parent was everyone's, into
+// a workspace where the parent has since been made private, is private the
+// same way once the restore is settled (as the install and the admin
+// restore do it), and is not found by others.
+func TestAPageBroughtBackUnderAPrivatePageIsPrivateTheSameWay(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		ctx := context.Background()
+		files, _ := blob.NewDisk(t.TempDir())
+		e := engine.New(st, nil)
+		ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", OwnerHandle: "aram", WorkspaceSlug: "games", WorkspaceName: "Games"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		do := func(typ string, args M) string {
+			t.Helper()
+			raw, _ := json.Marshal(args)
+			res, err := e.Apply(ctx, ws.ID, engine.Actor{UserID: owner.ID}, engine.Change{ID: id.New(), Type: typ, Args: raw})
+			if err != nil {
+				t.Fatalf("%s: %v", typ, err)
+			}
+			return res.Ref
+		}
+		other := do("agent.create", M{"name": "Other", "handle": "other"})
+		root := do("doc.create", M{"title": "Plans"})
+		child := do("doc.create", M{"parent": root, "title": "Quarter one", "markdown": "quokka\n"})
+		var archive bytes.Buffer
+		if _, err := backup.Write(ctx, st, files, "test", &archive); err != nil {
+			t.Fatal(err)
+		}
+		do("doc.update", M{"id": root, "private": true})
+
+		rid, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "doc", Ref: child})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := e.AnnounceRestored(ctx, ws.ID, "doc", rid); err != nil {
+			t.Fatal(err)
+		}
+		if err := e.Reindex(ctx, ws.ID); err != nil {
+			t.Fatal(err)
+		}
+		db := st.In(ws.ID)
+		var page core.Doc
+		if err := db.Get(ctx, &page, store.Eq("id", child)); err != nil {
+			t.Fatal(err)
+		}
+		if page.OwnerID != owner.ID {
+			t.Errorf("the page brought back under a private page is owned by %q, want the private page's owner", page.OwnerID)
+		}
+		if hits, err := db.Search(ctx, store.SearchQuery{Text: "quokka", Viewer: other}); err != nil || len(hits) != 0 {
+			t.Errorf("another member finds the page brought back under a private page: %v, %v", hits, err)
+		}
+	})
+}

@@ -330,10 +330,34 @@ func (e *Engine) PurgeWorkspaces(ctx context.Context, keep time.Duration) (prefi
 	return prefixes, nil
 }
 
+// restoredUnderPrivate makes a page set back from a backup private the
+// same way as the page it is under, when that is private (underPrivate),
+// and passes its new readers down to the pages under it that had its old
+// ones. The page is told of afterwards, with its row as it then is.
+func (c *cx) restoredUnderPrivate(doc *core.Doc) error {
+	if doc.ParentID == "" {
+		return nil
+	}
+	var parent core.Doc
+	if there, err := store.Find(c.ctx, c.tx, &parent, store.Eq("id", doc.ParentID)); !there {
+		return err // nil when the parent is gone: the page is under nothing
+	}
+	was := *doc
+	if !underPrivate(doc, parent, "") || sameReaders(was, *doc) {
+		return nil
+	}
+	if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"owner_id": doc.OwnerID, "shared_with": doc.SharedWith}, store.Eq("id", doc.ID)); err != nil {
+		return err
+	}
+	return c.passReadersDown(was, *doc)
+}
+
 // AnnounceRestored tells the feed that a task or a page was set back from a
 // backup. The rows get new positions in the feed, so every copy that
 // compares positions takes them as the newest state, and an open editor
-// gets the page's text as it stands now.
+// gets the page's text as it stands now. A page set back under a page that
+// has been made private since is first made private the same way, as a
+// page moved there is, with the pages under it that shared its readers.
 func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id string) error {
 	var owner core.Member
 	if err := e.st.In(workspaceID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner)), store.Null("removed_at")); err != nil {
@@ -365,6 +389,9 @@ func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id str
 		}
 		var doc core.Doc
 		if err := tx.Get(ctx, &doc, store.Eq("id", id)); err != nil {
+			return err
+		}
+		if err := sys.c.restoredUnderPrivate(&doc); err != nil {
 			return err
 		}
 		if err := sys.c.emit(event{seq: tx.NextSeq(), typ: "doc.restored", entity: "doc", entityID: doc.ID, place: inDoc(doc), audience: docAudience(doc),

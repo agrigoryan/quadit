@@ -3,13 +3,13 @@
 // A private page is its owner's and those it is shared with (owner_id and
 // shared_with on its row); the pages under it are private the same way.
 // That is kept true when it is written, not looked up when it is read:
-// CanSeeDoc reads one row. A page made under a private page takes its
-// readers (placeDoc), unless it is made private itself and so given its
-// own (docReaders); changing who sees a page passes the change down to
-// the pages under it that had its readers (passReadersDown); a page moved
-// under a private page takes that page's readers (docUpdate). A page
-// moved out of one stays as private as it was: nobody is shown a page
-// because it moved.
+// CanSeeDoc reads one row. A page placed under a private page takes its
+// readers (underPrivate): one made there (placeDoc), unless it is made
+// private itself and so given its own (docReaders); one moved there
+// (docUpdate); one brought back there from a backup (AnnounceRestored).
+// Changing who sees a page passes the change down to the pages under it
+// that had its readers (passReadersDown). A page moved out of one stays as
+// private as it was: nobody is shown a page because it moved.
 
 package engine
 
@@ -19,6 +19,19 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 )
+
+// underPrivate gives a page placed under parent the parent's readers when
+// the parent is private: a page under a private page is private the same
+// way. A page that is someone's own private page keeps its readers, unless
+// it is the one placing it (by) who owns it; only its owner changes who sees
+// a private page. It reports whether the page's readers changed hands.
+func underPrivate(d *core.Doc, parent core.Doc, by string) bool {
+	if parent.OwnerID == "" || d.OwnerID != "" && d.OwnerID != by {
+		return false
+	}
+	d.OwnerID, d.SharedWith = parent.OwnerID, parent.SharedWith
+	return true
+}
 
 // readersOf is who may see a page: nil for everyone, else its owner and
 // those it is shared with.

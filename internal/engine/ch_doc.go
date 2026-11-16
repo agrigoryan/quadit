@@ -85,9 +85,8 @@ func (c *cx) placeDoc(d *core.Doc, a docCreateArgs) error {
 		if err != nil {
 			return err
 		}
-		d.ParentID, d.ProjectID = parent.ID, parent.ProjectID
-		// A page under a private page is private the same way.
-		d.OwnerID, d.SharedWith, d.MemoryOf = parent.OwnerID, parent.SharedWith, parent.MemoryOf
+		d.ParentID, d.ProjectID, d.MemoryOf = parent.ID, parent.ProjectID, parent.MemoryOf
+		underPrivate(d, parent, c.actor.UserID)
 		d.SourceID = parent.SourceID // a page made inside a mirrored folder becomes a file there
 		if parent.Kind == core.DocDatabase && d.Kind == core.DocPage {
 			d.Kind = core.DocRow
@@ -286,10 +285,9 @@ func docUpdate(c *cx, a docUpdateArgs) error {
 				return err
 			}
 			pid = parent.ID
-			if parent.OwnerID != "" && pid != d.ParentID && (d.OwnerID == "" || d.OwnerID == c.actor.UserID) {
-				p.put("owner_id", d.OwnerID, parent.OwnerID)
-				p.put("shared_with", d.SharedWith, parent.SharedWith)
-				d.OwnerID, d.SharedWith = parent.OwnerID, parent.SharedWith
+			if before := d; pid != d.ParentID && underPrivate(&d, parent, c.actor.UserID) {
+				p.put("owner_id", before.OwnerID, d.OwnerID)
+				p.put("shared_with", before.SharedWith, d.SharedWith)
 			}
 		}
 		p.put("parent_id", d.ParentID, pid)
