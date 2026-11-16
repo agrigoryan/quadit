@@ -78,7 +78,8 @@ export function combo(e: KeyboardEvent): string {
   const digit = /^Digit\d$/.test(e.code) && (mod || /^\d$/.test(e.key) || !(e.shiftKey || e.altKey));
   const letter = /^[a-z]$/i.test(e.key)
     ? e.key.toLowerCase()
-    : /^Key[A-Z]$/.test(e.code)
+    : // A letter key that types no plain character (Cyrillic, Option's ¨, a dead key); a French comma on it stays a comma.
+      /^Key[A-Z]$/.test(e.code) && !/^[ -~]$/.test(e.key)
       ? e.code.slice(3).toLowerCase()
       : digit
         ? e.code.slice(5)

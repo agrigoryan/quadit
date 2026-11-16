@@ -47,6 +47,9 @@ describe("combo", () => {
     // French: A is where Q is on a US keyboard.
     expect(named({ key: "a", code: "KeyQ" })).toBe("a");
     expect(named({ key: "A", code: "KeyQ", shiftKey: true })).toBe("shift+a");
+    // French: M is beside L, and the key of a US M types a comma.
+    expect(named({ key: "m", code: "Semicolon" })).toBe("m");
+    expect(named({ key: ",", code: "KeyM" })).toBe(",");
   });
 
   it("names a digit by the key pressed", () => {
