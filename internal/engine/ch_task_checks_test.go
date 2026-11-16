@@ -1,10 +1,13 @@
 package engine_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -78,5 +81,37 @@ func TestATaskIsNotMovedAwayFromWhoseWorkItIs(t *testing.T) {
 		w.refused(engine.CodeInvalid, w.owner.ID, "task.move", M{"id": "SVA-1", "project": "OPS"})
 		w.do(w.owner.ID, "decision.delete", M{"id": decision})
 		w.do(w.owner.ID, "task.move", M{"id": "SVA-1", "project": "OPS"})
+	})
+}
+
+// TestAnAgentsQuestionGoesToItsPersonOnlyWhereTheyMayRead: an agent that
+// asks nobody by name asks the person responsible for it, by the same rule
+// as naming them: a task of a project that person cannot read is refused,
+// saying so.
+func TestAnAgentsQuestionGoesToItsPersonOnlyWhereTheyMayRead(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(w.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"})
+		mia := core.User{ID: id.New(), Kind: core.KindPerson, Name: "Mia", Email: "mia-" + id.New() + "@example.com", CreatedAt: 1, UpdatedAt: 1}
+		if err := st.Insert(context.Background(), mia); err != nil {
+			t.Fatal(err)
+		}
+		w.do(w.owner.ID, "member.add", M{"user": mia.ID, "handle": "mia", "scope": M{"projects": []string{"SVA"}}})
+		helper := w.do(w.owner.ID, "agent.create", M{"name": "Helper", "handle": "helper", "responsible": "@mia"}).Ref
+		w.do(helper, "task.create", M{"project": "OPS", "title": "Rotate keys"})
+		w.do(helper, "task.create", M{"project": "SVA", "title": "Boss design"})
+		question := func(task string) M {
+			return M{"task": task, "question": "Which one?", "options": []M{{"label": "This"}, {"label": "That"}}}
+		}
+
+		e := w.refused(engine.CodeInvalid, helper, "decision.open", question("OPS-1"))
+		if e.Field != "ask" || !strings.Contains(e.Message, "@mia") {
+			t.Fatalf("the refusal does not say who cannot read the project: %v", e)
+		}
+		w.do(helper, "decision.open", question("SVA-1"))
+		if got := w.task("SVA-1").WaitingOnID; got != mia.ID {
+			t.Fatalf("SVA-1 waits on %q, want the responsible person", got)
+		}
 	})
 }

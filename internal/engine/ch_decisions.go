@@ -127,7 +127,9 @@ func decisionKind(a decisionOpenArgs) (string, error) {
 }
 
 // askedOf is who a new decision is put to: the member named, or for an
-// agent that names nobody, the person responsible for it.
+// agent that names nobody, the person responsible for it. Either is held
+// to personOnTask's rule: one who cannot read the task's project is not
+// asked.
 func (c *cx) askedOf(a decisionOpenArgs, kind string, t core.Task) (string, error) {
 	asked := ""
 	if a.Ask != "" {
@@ -144,6 +146,14 @@ func (c *cx) askedOf(a decisionOpenArgs, kind string, t core.Task) (string, erro
 			return "", err
 		}
 		asked = self.ResponsibleID
+		var responsible core.Member
+		there, err := store.Find(c.ctx, c.tx, &responsible, store.Eq("user_id", self.ResponsibleID), store.Null("removed_at"))
+		if err != nil {
+			return "", err
+		}
+		if there && !responsible.Scope.MayRead(t.ProjectID) {
+			return "", invalid("ask", "@%s, who answers for you, cannot read this task's project, so they cannot be asked about it: name someone who can with ask", responsible.Handle)
+		}
 	}
 	if kind == core.DecisionApproval && a.Action != "" && asked != "" {
 		m, err := c.memberRef("ask", asked)
