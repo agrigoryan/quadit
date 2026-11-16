@@ -257,9 +257,24 @@ func firstNonEmpty(a, b string) string {
 // sendDelivery sends the request. The body carries the event as stored plus one
 // line saying what happened, so a receiver can act without calling back.
 func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Webhook, deliveryID string, ev core.Event) (status int, errText string, took time.Duration) {
-	// The line says what happened as the feed's text form does, to nobody in
-	// particular: a webhook is the workspace's, not one member's.
+	// The event and the line that says what happened (as the feed's text
+	// form does) are as the webhook's reader may see them: a webhook made
+	// for a member reads as that member, one made for a project as a reader
+	// of that project alone, and one of the whole workspace sees everything.
+	// So a relation to a task of another project comes to a project's
+	// webhook with its far end blank.
 	who := s.viewerFor(ws, core.Member{})
+	if h.UserID != "" {
+		var m core.Member
+		if there, err := store.Find(ctx, who.db, &m, store.Eq("user_id", h.UserID)); err != nil || !there {
+			return 0, "its member could not be read", 0
+		}
+		who = s.viewerFor(ws, m)
+	}
+	if h.ProjectID != "" {
+		who.limitTo([]string{h.ProjectID})
+	}
+	ev = who.asSeen(ctx, []core.Event{ev})[0]
 	line := ""
 	if names, err := who.names(ctx); err == nil {
 		line = who.eventLine(ctx, ev, names)

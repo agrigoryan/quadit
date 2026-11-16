@@ -135,15 +135,23 @@ func (who *viewer) feed() store.EventFilter {
 	return store.EventFilter{Viewer: who.member.UserID, ProjectIDs: who.projects, AllowNoProject: true}
 }
 
-// readFeed reads the events a filter selects, each as the viewer may see it.
-// The filter says which events are the viewer's to read (feed, or one made
-// for a task or a page the viewer was let into); what an event says of a
-// task the viewer may not read is taken out here: the far end of a
-// relation, its id and its key.
+// readFeed reads the events a filter selects, each as the viewer may see it
+// (asSeen). The filter says which events are the viewer's to read (feed, or
+// one made for a task or a page the viewer was let into).
 func (who *viewer) readFeed(ctx context.Context, f store.EventFilter) ([]core.Event, error) {
 	evs, err := who.db.Events(ctx, f)
-	if err != nil || !who.limited() {
-		return evs, err
+	if err != nil {
+		return nil, err
+	}
+	return who.asSeen(ctx, evs), nil
+}
+
+// asSeen is events the viewer was let read, each without what it says of
+// a task the viewer may not read: the far end of a relation, its id and its
+// key. The events are changed in place.
+func (who *viewer) asSeen(ctx context.Context, evs []core.Event) []core.Event {
+	if !who.limited() {
+		return evs
 	}
 	mayRead := who.readableTasks(ctx)
 	for i, ev := range evs {
@@ -178,7 +186,7 @@ func (who *viewer) readFeed(ctx context.Context, f store.EventFilter) ([]core.Ev
 		}
 		evs[i].Data = plainjson.Marshal(data)
 	}
-	return evs, nil
+	return evs
 }
 
 // search finds what the viewer may read by its words: in its projects, and

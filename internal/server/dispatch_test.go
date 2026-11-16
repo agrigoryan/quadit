@@ -207,3 +207,41 @@ func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
 	s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the backlog"})
 	eventually(t, "the working webhook to hear the comment", func() bool { return strings.Contains(fine.types(), "comment.created") })
 }
+
+// TestAProjectsWebhookIsNotToldOfTasksOfOtherProjects: a webhook made for
+// one project is sent a relation of its tasks to another project's task
+// as a reader of that project alone reads it, with the far end blank; a
+// webhook for the whole workspace is sent both ends.
+func TestAProjectsWebhookIsNotToldOfTasksOfOtherProjects(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+		var sva struct{ Task struct{ ID string } }
+		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva)
+		ops, all := newReceiver(t, ""), newReceiver(t, "")
+		s.change(s.owner, "", "webhook.create", M{"name": "ops", "url": ops.srv.URL, "project": "OPS", "event_types": []string{"relation.*", "task.related"}})
+		s.change(s.owner, "", "webhook.create", M{"name": "all", "url": all.srv.URL, "event_types": []string{"relation.*", "task.related"}})
+		s.change(s.owner, "", "relation.add", M{"task": "OPS-1", "type": "blocks", "other": "SVA-1"})
+		s.change(s.owner, "", "relation.add", M{"task": "SVA-1", "type": "relates", "other": "OPS-1"})
+
+		eventually(t, "both webhooks to hear of both relations", func() bool {
+			return strings.Count(ops.types(), "relation.created")+strings.Count(ops.types(), "task.related") >= 2 &&
+				strings.Count(all.types(), "relation.created") == 2
+		})
+		said := func(r *receiver) string {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			raw, _ := json.Marshal(r.got)
+			return string(raw)
+		}
+		if got := said(ops); strings.Contains(got, sva.Task.ID) || strings.Contains(got, "SVA-1") {
+			t.Fatalf("the OPS webhook is told of SVA-1: %s", got)
+		}
+		if got := said(all); !strings.Contains(got, sva.Task.ID) || !strings.Contains(got, `"other_key":"SVA-1"`) {
+			t.Fatalf("the workspace's webhook is not told of SVA-1: %s", got)
+		}
+	})
+}
