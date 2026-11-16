@@ -171,19 +171,20 @@ func renderInlines(ins []Inline) string {
 			continue
 		}
 		t := in.Text
-		if in.Styles["code"] {
-			b.WriteString("`" + t + "`")
-			continue
-		}
-		// Markers go around the text, not around its outer spaces.
+		// Markers go around the text, not around its outer spaces; code
+		// keeps its spaces inside its backticks.
 		lead := t[:len(t)-len(strings.TrimLeft(t, " \n"))]
 		trail := t[len(strings.TrimRight(t, " \n")):]
 		core := strings.TrimSpace(t)
-		if core == "" {
+		switch {
+		case in.Styles["code"]:
+			lead, trail, core = "", "", "`"+t+"`"
+		case core == "":
 			b.WriteString(t)
 			continue
+		default:
+			core = escape(core)
 		}
-		core = escape(core)
 		if in.Styles["strike"] {
 			core = "~~" + core + "~~"
 		}

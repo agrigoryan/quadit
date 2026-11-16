@@ -81,8 +81,8 @@ func (p *inlineParser) toggle(name string) {
 	}
 }
 
-// code reads `code` up to its closing backtick; a backtick with none is
-// a plain character.
+// code reads `code` up to its closing backtick, with the marks open
+// around it; a backtick with none is a plain character.
 func (p *inlineParser) code() {
 	rest := p.s[p.i:]
 	end := strings.IndexByte(rest[1:], '`')
@@ -92,7 +92,11 @@ func (p *inlineParser) code() {
 		return
 	}
 	p.flush()
-	p.out = append(p.out, Inline{Type: "text", Text: rest[1 : 1+end], Styles: map[string]bool{"code": true}})
+	styles := map[string]bool{"code": true}
+	for k := range p.styles {
+		styles[k] = true
+	}
+	p.out = append(p.out, Inline{Type: "text", Text: rest[1 : 1+end], Styles: styles})
 	p.i += end + 2
 }
 
