@@ -19,6 +19,7 @@ import { pageUnder, projectInView } from "@/nav/project-in-view";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
+import { UndoKeys } from "@/shell/undo-keys";
 import { UploadsIndicator } from "@/shell/uploads";
 import { canGoBack, isTaskPath, type Peek, PeekContext, taskPath } from "@/nav/task-link";
 import { leaveForPage } from "@/nav/task-queue";
@@ -142,6 +143,7 @@ export function Shell() {
     <PeekContext value={peek}>
       <MemberMention value={memberCard}>
         <div className="flex h-dvh overflow-hidden">
+          <UndoKeys />
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <TopBar onNewTask={mayCreate ? openNewTask : undefined} />

@@ -5,7 +5,7 @@ import { useCan } from "@/data/access";
 import { getRowEvenIfGone, useMe, useRows } from "@/data/selectors";
 import type { Notification } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
-import { anchorOf, archive, markAllRead, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
+import { anchorOf, archive, markAllRead, markOpened, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { InboxRow } from "@/pages/inbox-row";
 import { type OpenAs, useListKeys } from "@/tasks/list-keys";
 import { useTaskNav } from "@/nav/task-link";
@@ -37,7 +37,7 @@ export function InboxPage() {
 
   const open = useCallback(
     (item: Notification, as: OpenAs = "peek") => {
-      if (write && !item.read_at) markRead([item.id]);
+      if (write && !item.read_at) markOpened(item.id);
       const key = taskKeyOf(item);
       if (key) tasks[as](key, anchorOf(item));
     },

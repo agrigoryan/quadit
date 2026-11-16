@@ -1,17 +1,14 @@
 // Where the work for this task lives outside Quadit: branches, commits,
 // pull requests and plain web addresses, each as a chip that opens it.
 
-import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useState } from "react";
 import { CircleDot, FileText, GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { newId } from "@/lib/ids";
-import { send } from "@/data/mutate";
 import type { Task, TaskLink } from "@/types/core";
 import { linkName } from "@/detail/data";
 import { Section } from "@/detail/section";
-import { removeLink } from "@/tasks/actions";
+import { linkUrl, removeLink } from "@/tasks/actions";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 
@@ -26,15 +23,6 @@ const icons = {
 
 /** Only web addresses are ever made into something to click. */
 const isWeb = (url: string) => /^https?:\/\//i.test(url);
-
-function addLink(task: Task, url: string, title: string) {
-  const id = newId();
-  const args: Changes["link.set"] = { id, task: task.id, kind: "url", url };
-  if (title) args.title = title;
-  send({ type: "link.set", args }, (tx) =>
-    tx.insert("links", { id, task_id: task.id, kind: "url", url, title: title || undefined }),
-  );
-}
 
 function LinkChip({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
   const Icon = icons[link.kind] ?? Link2;
@@ -86,7 +74,7 @@ function AddLink({ task, onDone }: { task: Task; onDone: () => void }) {
     e.preventDefault();
     const address = url.trim();
     if (!address) return;
-    addLink(task, isWeb(address) ? address : `https://${address}`, title.trim());
+    linkUrl(task, isWeb(address) ? address : `https://${address}`, title.trim() || undefined);
     onDone();
   }
 

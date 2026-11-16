@@ -18,12 +18,14 @@ import {
   Monitor,
   Moon,
   Plus,
+  Redo2,
   Shapes,
   SlidersHorizontal,
   Sun,
   SunMoon,
   Tag,
   Tags,
+  Undo2,
   Wrench,
 } from "lucide-react";
 import { matchPath, useLocation } from "react-router";
@@ -34,6 +36,8 @@ import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { useProjects, useViews } from "@/data/selectors";
 import { useStore } from "@/data/store";
+import { redo, undo, useUndo } from "@/data/undo";
+import { MOD } from "@/hooks/hotkeys";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
 import type { Project, Task } from "@/types/core";
@@ -104,6 +108,8 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   const can = useCan();
   const installAdmin = useStore((s) => !!s.user?.is_admin);
   const theme = useThemeChoice();
+  const lastDone = useUndo((s) => s.done.findLast((d) => d.slug === slug));
+  const lastUndone = useUndo((s) => s.undone.findLast((d) => d.slug === slug));
   const admin = can.administer;
   const at = (path: string) => () => go(`/${slug}/${path}`);
   // On a project's Docs a new page is that project's; anywhere else it is tied to none.
@@ -301,6 +307,31 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   // The theme in effect is on the page itself, whatever chose it.
   const dark = typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
   const general: Cmd[] = [
+    // Each is offered while there is something for it, and says what.
+    ...(lastDone
+      ? [
+          {
+            id: "undo",
+            label: t("palette.undo", { name: lastDone.name }),
+            words: "revert take back",
+            icon: <Undo2 />,
+            hint: `${MOD} Z`,
+            run: () => run(() => void undo(lastDone)),
+          },
+        ]
+      : []),
+    ...(lastUndone
+      ? [
+          {
+            id: "redo",
+            label: t("palette.redo", { name: lastUndone.name }),
+            words: "again",
+            icon: <Redo2 />,
+            hint: `Shift ${MOD} Z`,
+            run: () => run(() => void redo()),
+          },
+        ]
+      : []),
     {
       id: "shortcuts",
       label: t("top.shortcuts"),

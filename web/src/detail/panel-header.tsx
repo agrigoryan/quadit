@@ -20,7 +20,7 @@ import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
-import { send } from "@/data/mutate";
+import { type Batch, sendUndoable } from "@/data/undo";
 import { useMe, useRow, useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import type { Task } from "@/types/core";
@@ -41,11 +41,15 @@ interface Props {
 }
 
 function setWatching(task: Task, userId: string, watching: boolean) {
-  send({ type: "watch.set", args: { subject: task.id, watching } }, (tx) => {
-    if (watching)
-      tx.insert("watchers", { user_id: userId, subject_type: "task", subject_id: task.id, created_at: Date.now() });
-    else tx.remove("watchers", `${userId}:${task.id}`);
+  const set = (on: boolean): Batch => ({
+    changes: [{ type: "watch.set", args: { subject: task.id, watching: on } }],
+    show: (tx) => {
+      if (on)
+        tx.insert("watchers", { user_id: userId, subject_type: "task", subject_id: task.id, created_at: Date.now() });
+      else tx.remove("watchers", `${userId}:${task.id}`);
+    },
   });
+  sendUndoable(t(watching ? "undo.watch" : "undo.unwatch", { what: task.key }), set(watching), set(!watching));
 }
 
 export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }: Props) {

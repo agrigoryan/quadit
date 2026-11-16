@@ -93,6 +93,7 @@ Every test that touches data runs on both databases. Dependencies are permissive
 
 - The browser holds a copy of the workspace (`data/store.ts`): `data/sync.ts` fills it from `/bootstrap` and keeps it current from the event feed, shared by the tabs. Components read it through `data/selectors.ts`, and ask `useCan()` (`data/access.ts`) what the signed-in member may do.
 - Every write is a named change through `mutate` or `send` (`data/mutate.ts`): it shows at once, waits on the device (`data/outbox.ts`) until the server answers, and is undone if refused. Its name and arguments are typed from `types/changes.gen.ts` (`make generate`).
+- A person's own edit that can be taken back is sent with its opposite (`sendUndoable`, `data/undo.ts`): Cmd+Z sends that opposite as a new change, Shift+Cmd+Z the edit again. The history is the tab's, the last hundred edits.
 - What the copy does not hold (settings lists, a task's history, a page's blocks, the trash, the admin pages) is read with TanStack Query, through the one client in `data/query.ts`.
 - A task property (status, assignee, due date…) is described once under `tasks/properties/`; the pickers, the property panel, the bulk bar, the filters and the rest read that table. A form in a dialog is built on `ui/form-dialog`.
 - Unit and component tests (Vitest, Testing Library) sit beside the file they check and run in `pnpm check`.

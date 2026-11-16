@@ -5,6 +5,7 @@ import { registerServiceWorker } from "@/auth/pwa";
 import { getPasskey } from "@/auth/webauthn";
 import { api, ApiError, onUnauthorized } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
+import { clearUndo } from "@/data/undo";
 import { clearStore } from "@/data/store";
 import { stopSync } from "@/data/sync";
 import { adoptAccountTheme, applyTheme, type ThemeChoice } from "@/lib/theme";
@@ -150,6 +151,7 @@ export async function signOut() {
   } finally {
     // Changes not yet sent are dropped with the session: the next person here must not send them.
     void clearOutbox();
+    clearUndo();
     signedOut();
     useSession.setState({ half: false });
   }

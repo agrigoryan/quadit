@@ -2,6 +2,9 @@
 // `notification.read` change (internal/engine/ch_inbox.go).
 
 import { send } from "@/data/mutate";
+import { getState } from "@/data/store";
+import { t } from "@/lib/i18n";
+import { type Batch, sendUndoable } from "@/data/undo";
 import type { Notification } from "@/types/core";
 
 /** "SVA-5 Jump feels floaty" as its key and its title; a title with no key stays whole. */
@@ -14,20 +17,33 @@ export function splitTitle(title: string | undefined): { key: string; title: str
 export const anchorOf = (item: Notification): string | undefined =>
   item.entity_type === "decision" && item.entity_id ? `decision-${item.entity_id}` : undefined;
 
-export function markRead(ids: string[]) {
-  const now = Date.now();
-  send({ type: "notification.read", args: { ids } }, (tx) => {
-    for (const id of ids) tx.patch("notifications", id, { read_at: now });
-  });
+/** The batch that marks items read, or unread again. */
+const reading = (ids: string[], read: boolean): Batch => ({
+  changes: [{ type: "notification.read", args: read ? { ids } : { ids, unread: true } }],
+  show: (tx) => {
+    for (const id of ids) tx.patch("notifications", id, { read_at: read ? Date.now() : null });
+  },
+});
+
+/** Marks items read or unread; undone, the ones it changed go back. */
+function setRead(ids: string[], read: boolean) {
+  const { notifications } = getState().collections;
+  const changed = ids.filter((id) => notifications[id] && !!notifications[id].read_at !== read);
+  if (changed.length === 0) return;
+  const name = t(read ? "undo.read" : "undo.unread", { n: changed.length });
+  sendUndoable(name, reading(changed, read), reading(changed, !read));
 }
 
-export function markUnread(ids: string[]) {
-  send({ type: "notification.read", args: { ids, unread: true } }, (tx) => {
-    for (const id of ids) tx.patch("notifications", id, { read_at: null });
-  });
+/** An item opened is read: that follows from opening it, and is not a step of its own to undo. */
+export function markOpened(id: string) {
+  const batch = reading([id], true);
+  send(batch.changes, batch.show);
 }
 
-/** Takes items out of the inbox for good. */
+export const markRead = (ids: string[]) => setRead(ids, true);
+export const markUnread = (ids: string[]) => setRead(ids, false);
+
+/** Takes items out of the inbox for good: the one thing here Cmd+Z does not bring back. */
 export function archive(ids: string[]) {
   const now = Date.now();
   send({ type: "notification.read", args: { ids, archive: true } }, (tx) => {
@@ -41,7 +57,15 @@ export function markAllRead(shown: Notification[]) {
   if (unread.length === 0) return;
   const now = Date.now();
   const upTo = Math.max(...shown.map((n) => n.seq));
-  send({ type: "notification.read", args: { all: true, up_to: upTo } }, (tx) => {
-    for (const n of unread) tx.patch("notifications", n.id, { read_at: now });
-  });
+  const ids = unread.map((n) => n.id);
+  sendUndoable(
+    t("undo.read", { n: ids.length }),
+    {
+      changes: [{ type: "notification.read", args: { all: true, up_to: upTo } }],
+      show: (tx) => {
+        for (const id of ids) tx.patch("notifications", id, { read_at: now });
+      },
+    },
+    reading(ids, false),
+  );
 }

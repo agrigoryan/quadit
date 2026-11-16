@@ -21,7 +21,7 @@ import { t } from "@/lib/i18n";
 import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/types/core";
-import { anchorOf, archive, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
+import { anchorOf, archive, markOpened, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
@@ -115,7 +115,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen, readOnly
           <Link
             {...link}
             to={to}
-            onClick={() => unread && !readOnly && markRead([item.id])}
+            onClick={() => unread && !readOnly && markOpened(item.id)}
             aria-label={label}
             // J and K move a marker, not the page's focus: the row's link says it is the one they are on.
             aria-current={focused || undefined}

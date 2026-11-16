@@ -11,7 +11,8 @@ import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { send } from "@/data/mutate";
+import type { Tx } from "@/data/mutate";
+import { sendUndoable } from "@/data/undo";
 import { getRows, useLookupEvenIfGone, useRow } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
@@ -56,13 +57,33 @@ function addRelation(task: Task, type: AddType, otherId: string) {
     return;
   }
   const id = newId();
-  send({ type: "relation.add", args: { id, task: task.id, type, other: otherId } }, (tx) =>
-    tx.insert("relations", { id, ...row, created_by: me?.user_id, created_at: Date.now() }),
+  const other = getRows("tasks").find((o) => o.id === otherId)?.key ?? "";
+  sendUndoable(
+    t("undo.relate", { what: task.key, other }),
+    {
+      changes: [{ type: "relation.add", args: { id, task: task.id, type, other: otherId } }],
+      show: (tx) => tx.insert("relations", { id, ...row, created_by: me?.user_id, created_at: Date.now() }),
+    },
+    removal(id),
   );
 }
 
-function removeRelation(id: string) {
-  send({ type: "relation.remove", args: { id } }, (tx) => tx.remove("relations", id));
+const removal = (id: string) => ({
+  changes: [{ type: "relation.remove" as const, args: { id } }],
+  show: (tx: Tx) => tx.remove("relations", id),
+});
+
+/** Takes away the relation with `other`; undone, the same row is made again, read from the task it is stored under. */
+function removeRelation(relation: Relation, other: Task) {
+  sendUndoable(t("undo.unrelate", { what: other.key }), removal(relation.id), {
+    changes: [
+      {
+        type: "relation.add",
+        args: { id: relation.id, task: relation.task_id, type: relation.type, other: relation.related_task_id },
+      },
+    ],
+    show: (tx) => tx.insert("relations", { ...relation }),
+  });
 }
 
 function RelationRow({ relation, other, readOnly }: { relation: Relation; other: Task; readOnly: boolean }) {
@@ -85,7 +106,7 @@ function RelationRow({ relation, other, readOnly }: { relation: Relation; other:
           label={t("detail.relations.remove", { key: other.key })}
           size="sm"
           className={cx("relative z-[1]", rowAction)}
-          onClick={() => removeRelation(relation.id)}
+          onClick={() => removeRelation(relation, other)}
         >
           <X className="size-3.5" />
         </IconButton>

@@ -18,7 +18,6 @@ import {
   X,
 } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
-import { send } from "@/data/mutate";
 import { useCan } from "@/data/access";
 import { useRows } from "@/data/selectors";
 import type { AgentSession, Task, TaskLink } from "@/types/core";
@@ -28,6 +27,7 @@ import { Section } from "@/detail/section";
 import { moneyMicros } from "@/lib/amounts";
 import { useNow } from "@/data/live";
 import { SessionRow } from "@/insights/agents/session-row";
+import { removeLink } from "@/tasks/actions";
 import { Badge } from "@/ui/badge";
 import { IconButton } from "@/ui/button";
 
@@ -104,11 +104,7 @@ function CodeLink({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
             label={t("taskwork.remove", { name })}
             size="sm"
             className="-mr-1 text-ink-3 max-md:size-8"
-            onClick={() =>
-              send({ type: "link.remove", args: { id: link.id } }, (tx) =>
-                tx.patch("links", link.id, { deleted_at: Date.now() }),
-              )
-            }
+            onClick={() => removeLink(link.id)}
           >
             <X className="size-3" />
           </IconButton>
