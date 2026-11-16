@@ -117,7 +117,8 @@ export interface Dashboard {
   agents: AgentState[];
   recent_decisions: DecisionView[];
   preferences: Preference[];
-  health: Health;
+  /** Only for an admin of the whole workspace; no health is not "all well". */
+  health?: Health;
 }
 
 export interface ChartDay {

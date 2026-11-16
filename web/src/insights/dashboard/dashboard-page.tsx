@@ -78,9 +78,9 @@ export function DashboardPage() {
               <DecisionsPanel
                 decisions={data.recent_decisions}
                 preferences={data.preferences}
-                className="lg:col-span-7"
+                className={data.health ? "lg:col-span-7" : "lg:col-span-12"}
               />
-              <HealthPanel health={data.health} className="lg:col-span-5" />
+              {data.health && <HealthPanel health={data.health} className="lg:col-span-5" />}
             </>
           ) : (
             <div className="bg-surface lg:col-span-5" />
