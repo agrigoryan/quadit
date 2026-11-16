@@ -8,6 +8,12 @@
 // server cannot be reached the change waits and is sent again with the same
 // change id, which the server uses to apply it only once.
 //
+// An edit that is still waiting stays on screen whatever arrives meanwhile:
+// the answer to an earlier edit of the same field, or someone else's change
+// to it, is put in the copy and the waiting edits are shown over it again,
+// each standing on the one before. The person's edit is the later one; if
+// the server refuses it, the field goes back to what it stood on.
+//
 // Waiting changes are also kept on the device (data/outbox.ts), so a reload
 // or a closed tab does not lose them: the next page of the same workspace
 // takes them over and sends them, in order, before anything new. A change
@@ -19,6 +25,7 @@ import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { outbox, type OutboxChange } from "@/data/outbox";
+import { targetsOf } from "@/data/apply";
 import {
   applyOwnEvents,
   clearDrafts,
@@ -27,12 +34,13 @@ import {
   keyOf,
   markDrafts,
   mergeRows,
+  onEvents,
   patchRow,
   removeRow,
   useStore,
 } from "@/data/store";
 import { toast } from "@/lib/toast";
-import type { ChangeResult } from "@/types/core";
+import type { ChangeResult, FeedEvent } from "@/types/core";
 
 type Row = Record<string, unknown>;
 
@@ -62,27 +70,31 @@ export interface Tx {
 
 type Undo = () => void;
 
+/** Fields an edit shows on a row ahead of the server's answer, and what each stood on. */
+interface Shown {
+  collection: CollectionName;
+  id: string;
+  fields: Row;
+  /** What to put back should the server refuse the edit. Kept in step with what arrives meanwhile (showWaitingEdits). */
+  before: Row;
+}
+
+/** One thing an edit did to the copy, taken back in reverse order when the server refuses the edit. */
+type Step = Shown | Undo;
+
 const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-function optimisticTx(undos: Undo[], made: string[]): Tx {
-  const table = (name: CollectionName) => getState().collections[name] as Record<string, Row>;
+const tableOf = (name: CollectionName) => getState().collections[name] as Record<string, Row>;
+
+function optimisticTx(steps: Step[], made: string[]): Tx {
   return {
     patch(collection, id, fields) {
-      const cur = table(collection)[id];
+      const cur = tableOf(collection)[id];
       if (!cur) return;
       const before: Row = {};
       for (const field of Object.keys(fields)) before[field] = cur[field] ?? null;
       patchRow(collection, id, fields);
-      undos.push(() => {
-        // Put back only what is still as this edit left it: a newer event wins.
-        const now = table(collection)[id];
-        if (!now) return;
-        const restore: Row = {};
-        for (const field of Object.keys(fields)) {
-          if (same(now[field], fields[field])) restore[field] = before[field];
-        }
-        patchRow(collection, id, restore);
-      });
+      steps.push({ collection, id, fields, before });
     },
     insert(collection, row) {
       const id = keyOf(collection, row);
@@ -90,17 +102,78 @@ function optimisticTx(undos: Undo[], made: string[]): Tx {
       // Until the server answers the row is a draft (store.isDraft): a new task has no number yet.
       markDrafts(collection, [id]);
       made.push(id);
-      undos.push(() => removeRow(collection, id));
+      steps.push(() => removeRow(collection, id));
     },
     remove(collection, id) {
-      const cur = table(collection)[id];
+      const cur = tableOf(collection)[id];
       if (!cur) return;
       removeRow(collection, id);
-      undos.push(() => {
-        if (!table(collection)[id]) mergeRows(collection, [cur as never]);
+      steps.push(() => {
+        if (!tableOf(collection)[id]) mergeRows(collection, [cur as never]);
       });
     },
   };
+}
+
+/** The edits of one field of one row that are still waiting, oldest first. */
+function waitingEditsOf(collection: CollectionName, id: string, field: string): Shown[] {
+  const out: Shown[] = [];
+  for (const job of queue) {
+    for (const step of job.steps) {
+      if (typeof step !== "function" && step.collection === collection && step.id === id && field in step.fields)
+        out.push(step);
+    }
+  }
+  return out;
+}
+
+/** Takes a refused edit's fields back. The edit has left the queue by now. */
+function takeBack(edit: Shown) {
+  const now = tableOf(edit.collection)[edit.id];
+  if (!now) return;
+  const restore: Row = {};
+  for (const field of Object.keys(edit.fields)) {
+    const [next] = waitingEditsOf(edit.collection, edit.id, field);
+    if (next) {
+      // A later edit of the field is still waiting and stays on screen: it now stands on what this one stood on.
+      if (same(next.before[field], edit.fields[field])) next.before[field] = edit.before[field];
+    } else if (same(now[field], edit.fields[field])) {
+      // Put back only what is still as this edit left it: a newer event wins.
+      restore[field] = edit.before[field];
+    }
+  }
+  patchRow(edit.collection, edit.id, restore);
+}
+
+/**
+ * Events have just been put in the copy (store.onEvents): the edits still
+ * waiting are shown over them again. For each field an event wrote, the
+ * oldest waiting edit now stands on what the server said, each later one on
+ * the edit before it, and the row shows the last.
+ */
+function showWaitingEdits(events: FeedEvent[]) {
+  if (queue.length === 0) return;
+  for (const ev of events) {
+    const target = targetsOf(ev);
+    if (!target || target.gone) continue;
+    // A whole row (something made, or restored) writes every field; a change, the fields it names.
+    const wrote = ev.data?.changes ? Object.keys(ev.data.changes) : null;
+    for (const id of target.keys) {
+      const now = tableOf(target.collection)[id];
+      if (!now) continue;
+      const fields = wrote ?? Object.keys(now);
+      const again: Row = {};
+      for (const field of fields) {
+        let standsOn: unknown = now[field] ?? null;
+        for (const edit of waitingEditsOf(target.collection, id, field)) {
+          edit.before[field] = standsOn;
+          standsOn = edit.fields[field];
+          again[field] = standsOn;
+        }
+      }
+      if (Object.keys(again).length > 0) patchRow(target.collection, id, again);
+    }
+  }
 }
 
 interface Job {
@@ -109,7 +182,8 @@ interface Job {
   /** The workspace it was made in; it is sent there wherever the person is by then. */
   slug: string;
   body: { changes: OutboxChange[] };
-  undos: Undo[];
+  /** What the edit did to the copy, in order. */
+  steps: Step[];
   /** Rows the edit inserted: drafts until the server answers. */
   made: string[];
   quiet: boolean;
@@ -131,6 +205,18 @@ const countUnsent = () => useStore.setState({ unsent: queue.length });
 async function pump() {
   if (pumping) return;
   pumping = true;
+  // While anything waits, what arrives is shown under the waiting edits, not over them.
+  const stopShowing = onEvents(showWaitingEdits);
+  try {
+    await sendQueue();
+  } finally {
+    stopShowing();
+    pumping = false;
+  }
+}
+
+/** Sends the queue, one change at a time, until it is empty or forgotten. */
+async function sendQueue() {
   let attempt = 0;
   while (queue.length > 0) {
     const job = queue[0] as Job;
@@ -168,14 +254,16 @@ async function pump() {
       outbox.remove(job.key);
       attempt = 0;
       countUnsent();
-      for (const undo of job.undos.reverse()) undo();
+      for (const step of job.steps.toReversed()) {
+        if (typeof step === "function") step();
+        else takeBack(step);
+      }
       clearDrafts(job.made);
       if (job.restored) toast.error(t("sync.refused", { what: job.what, reason: errorMessage(err) }));
       else if (!job.quiet) toast.error(errorMessage(err));
       job.reject(err);
     }
   }
-  pumping = false;
 }
 
 /** Empties the queue in memory. What is kept on the device stays there. */
@@ -212,7 +300,7 @@ export async function restoreQueue(slug: string): Promise<void> {
     key: item.key,
     slug: item.slug,
     body: { changes: item.changes },
-    undos: [],
+    steps: [],
     made: [],
     quiet: false,
     what: item.what,
@@ -268,13 +356,13 @@ export function mutate(
   const body = { changes: list.map((c): OutboxChange => ({ ...c, id: c.id ?? newId() })) };
   // Named before the edit shows, while the rows still read as the person saw them.
   const what = describe(body.changes);
-  const undos: Undo[] = [];
+  const steps: Step[] = [];
   const made: string[] = [];
-  optimistic?.(optimisticTx(undos, made));
+  optimistic?.(optimisticTx(steps, made));
   const key = outbox.newKey();
   if (me) outbox.put({ key, slug, user: me.user_id, changes: body.changes, what, at: Date.now() });
   return new Promise((resolve, reject) => {
-    queue.push({ key, slug, body, undos, made, quiet: opts.quiet ?? false, what, restored: false, resolve, reject });
+    queue.push({ key, slug, body, steps, made, quiet: opts.quiet ?? false, what, restored: false, resolve, reject });
     countUnsent();
     void pump();
   });

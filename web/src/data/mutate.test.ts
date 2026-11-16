@@ -110,6 +110,77 @@ describe("mutate", () => {
     expect(getState().unsent).toBe(0);
   });
 
+  it("keeps showing a later edit of a field while the answer to an earlier one comes in", async () => {
+    const title = () => getState().collections.tasks.t1?.title;
+    const first = mutate({ type: "task.update", args: { id: "t1", title: "x" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "x" }),
+    );
+    const second = mutate({ type: "task.update", args: { id: "t1", title: "y" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "y" }),
+    );
+    await settle();
+    expect(title()).toBe("y");
+
+    // The server answers the first with its event: the title became "x". The second is still on its way.
+    calls[0]?.answer([{ change_id: "c11", type: "task.update", seq: 11, events: [retitle(11, "t1", "x")] }]);
+    await settle();
+    expect(title()).toBe("y");
+    // So does anyone else's change that arrives meanwhile: this person's edit is the later one.
+    applyEvents([retitle(12, "t1", "z")], true);
+    expect(title()).toBe("y");
+
+    calls[1]?.answer([{ change_id: "c13", type: "task.update", seq: 13, events: [retitle(13, "t1", "y")] }]);
+    await Promise.all([first, second]);
+    expect(title()).toBe("y");
+  });
+
+  it("when a later edit is refused, shows what the server has, not the edit before it that the server already replaced", async () => {
+    const title = () => getState().collections.tasks.t1?.title;
+    const first = mutate({ type: "task.update", args: { id: "t1", title: "x" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "x" }),
+    );
+    const second = mutate({ type: "task.update", args: { id: "t1", title: "y" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "y" }),
+    ).catch(() => {});
+    await settle();
+    calls[0]?.answer([{ change_id: "c11", type: "task.update", seq: 11, events: [retitle(11, "t1", "x")] }]);
+    await settle();
+    calls[1]?.fail(new ApiError(409, { message: "no" }));
+    await Promise.all([first, second]);
+    expect(title()).toBe("x");
+  });
+
+  it("when both of two waiting edits of a field are refused, puts back what the field held before either", async () => {
+    const title = () => getState().collections.tasks.t1?.title;
+    const first = mutate({ type: "task.update", args: { id: "t1", title: "x" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "x" }),
+    ).catch(() => {});
+    const second = mutate({ type: "task.update", args: { id: "t1", title: "y" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "y" }),
+    ).catch(() => {});
+    await settle();
+    calls[0]?.fail(new ApiError(400, { message: "no" }));
+    await settle();
+    // The later edit is still waiting, and still shows.
+    expect(title()).toBe("y");
+    calls[1]?.fail(new ApiError(400, { message: "no" }));
+    await Promise.all([first, second]);
+    expect(title()).toBe("a");
+  });
+
+  it("a waiting edit that is refused goes back to what someone else set meanwhile", async () => {
+    const title = () => getState().collections.tasks.t1?.title;
+    const edit = mutate({ type: "task.update", args: { id: "t1", title: "x" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "x" }),
+    ).catch(() => {});
+    await settle();
+    applyEvents([retitle(11, "t1", "theirs")], true);
+    expect(title()).toBe("x");
+    calls[0]?.fail(new ApiError(400, { message: "no" }));
+    await edit;
+    expect(title()).toBe("theirs");
+  });
+
   it("sends a change again with the same change id when the server could not be reached", async () => {
     const done = mutate({ type: "task.update", args: { id: "t1", priority: 2 } }, (tx) =>
       tx.patch("tasks", "t1", { priority: 2 }),
