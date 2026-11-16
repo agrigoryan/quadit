@@ -271,7 +271,7 @@ func (c *cx) handOn(cm core.Comment, t core.Task, a commentCreateArgs, note stri
 	return nil
 }
 
-// docComment adds a comment to a doc or one of its blocks.
+// docComment adds a comment to a doc or one of its blocks, with its files.
 func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	if a.Block != "" {
 		b, err := loadLive[core.Block](c, "block", "block", a.Block)
@@ -296,8 +296,19 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.tx.Insert(c.ctx, cm); err != nil {
 		return alreadyInUse(err, "id", cm.ID)
 	}
+	// Files given with the comment are on the comment, and are seen where
+	// the page is: their rows say no task, and the comment's event, which
+	// carries them, goes to those who may see the page.
+	var atts []core.Attachment
+	for _, aa := range a.Attachments {
+		at, err := c.attach(aa, "comment", cm.ID, core.Task{})
+		if err != nil {
+			return err
+		}
+		atts = append(atts, at)
+	}
 	c.ref = cm.ID
-	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(doc), audience: doc.OwnerID, data: core.EventData{Row: cm}}); err != nil {
+	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(doc), audience: doc.OwnerID, data: core.EventData{Row: cm, Attachments: atts}}); err != nil {
 		return err
 	}
 	if err := c.watch(c.actor.UserID, "doc", doc.ID); err != nil {

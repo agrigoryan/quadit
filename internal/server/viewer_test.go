@@ -542,6 +542,48 @@ func TestAFileIsServedWithinBothTheMembersAndTheTokensProjects(t *testing.T) {
 	})
 }
 
+// TestAFileGivenWithACommentOnAPageIsAttachedAndFollowsThePage: the files
+// comment.create is given with a comment on a page are attached to the
+// comment, as they are on a task, and are seen by those who may see the
+// page and by no one else.
+func TestAFileGivenWithACommentOnAPageIsAttachedAndFollowsThePage(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
+		var other struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
+		commentWithFile := func(name string, page M) {
+			doc := s.change(nil, other.Token, "doc.create", page)["ref"].(string)
+			var f struct{ ID string }
+			s.call(nil, other.Token, "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			s.change(nil, other.Token, "comment.create", M{"doc": doc, "body": "see the file", "attachments": []M{{"file": f.ID, "caption": "the " + name}}})
+		}
+		commentWithFile("handbook.txt", M{"title": "Handbook"})
+		commentWithFile("runbook.txt", M{"title": "Runbook", "project": "OPS"})
+		commentWithFile("diary.txt", M{"title": "Diary", "private": true})
+
+		sees := func(who string, hc *http.Client, token string, want map[string]bool) {
+			t.Helper()
+			listed := s.call(hc, token, "GET", w+"/list/attachments", nil, 200, nil)
+			feed := s.call(hc, token, "GET", w+"/events?after=0&limit=2000", nil, 200, nil)
+			for name, seen := range want {
+				if strings.Contains(listed, "the "+name) != seen {
+					t.Errorf("/list/attachments lists %s for %s: %v, want %v", name, who, !seen, seen)
+				}
+				if strings.Contains(feed, "the "+name) != seen {
+					t.Errorf("the feed tells %s of %s: %v, want %v", who, name, !seen, seen)
+				}
+			}
+		}
+		sees("the one who attached them", nil, other.Token, map[string]bool{"handbook.txt": true, "runbook.txt": true, "diary.txt": true})
+		sees("an owner, of a page someone keeps private", s.owner, "", map[string]bool{"handbook.txt": true, "runbook.txt": true, "diary.txt": false})
+		for who, token := range callers {
+			sees(who, nil, token, map[string]bool{"handbook.txt": true, "runbook.txt": false, "diary.txt": false})
+		}
+	})
+}
+
 // TestAnExportIsNotForATokenLimitedToSomeProjects: an export holds the
 // whole workspace, so an admin's token made for some projects is refused
 // one; the admin's token for every project, and the admin signed in, get it.
