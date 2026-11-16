@@ -96,11 +96,11 @@ func (r *reindex) indexComments() error {
 		return err
 	}
 	for _, cm := range comments {
-		sd := store.SearchDoc{Kind: "comment", EntityID: cm.ID, Body: cm.Body}
+		var sd store.SearchDoc
 		if t, ok := r.tasks[cm.TaskID]; ok {
-			sd.ScopeType, sd.ScopeID, sd.ProjectID, sd.Title = "task", t.ID, t.ProjectID, t.Key+" "+t.Title
+			sd = taskCommentEntry(t, cm)
 		} else if d, ok := r.docs[cm.DocID]; ok {
-			sd.ScopeType, sd.ScopeID, sd.ProjectID, sd.Title, sd.AudienceID = "doc", d.ID, d.ProjectID, d.Title, d.OwnerID
+			sd = docCommentEntry(d, cm)
 		} else {
 			continue
 		}

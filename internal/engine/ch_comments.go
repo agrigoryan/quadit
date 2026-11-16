@@ -148,7 +148,7 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.notifyWatchers(t, note, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
 		return err
 	}
-	return c.index(store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: cm.Body})
+	return c.index(taskCommentEntry(t, cm))
 }
 
 // commentSubject works out what a comment on a task is about: an option, a
@@ -337,6 +337,29 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	return c.index(docCommentEntry(doc, cm))
 }
 
+// indexComment puts a comment as it is now into search, under its task or
+// its page.
+func (c *cx) indexComment(cm core.Comment) error {
+	if cm.TaskID != "" {
+		var t core.Task
+		if err := c.tx.Get(c.ctx, &t, store.Eq("id", cm.TaskID)); err != nil {
+			return err
+		}
+		return c.index(taskCommentEntry(t, cm))
+	}
+	var d core.Doc
+	if err := c.tx.Get(c.ctx, &d, store.Eq("id", cm.DocID)); err != nil {
+		return err
+	}
+	return c.index(docCommentEntry(d, cm))
+}
+
+// taskCommentEntry is how search knows a comment on a task: by the task's
+// key and title.
+func taskCommentEntry(t core.Task, cm core.Comment) store.SearchDoc {
+	return store.SearchDoc{Kind: "comment", EntityID: cm.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: cm.Body}
+}
+
 // docCommentEntry is how search knows a comment on a page: by the page's
 // title, and only to those who may see the page.
 func docCommentEntry(doc core.Doc, cm core.Comment) store.SearchDoc {
@@ -404,6 +427,7 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 		if _, err := c.link("comment", cm.ID, row.place.scopeType, row.place.scopeID, cm.Body); err != nil {
 			return err
 		}
+		return c.indexComment(cm)
 	}
 	return nil
 }
