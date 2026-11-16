@@ -127,6 +127,7 @@ export const pages = {
 
   "goto.title": "Go to…",
   "goto.project": "Project pages: {project}",
+  "relate.title": "Relate to another task",
 
   "shortcuts.group.anywhere": "Anywhere",
   "shortcuts.group.goto": "Go to",
@@ -176,6 +177,10 @@ export const pages = {
   "shortcuts.trash": "Move to the trash",
   "shortcuts.subtask": "Add a sub-task",
   "shortcuts.openParent": "Open the parent task",
+  "shortcuts.blockedBy": "Mark as blocked by a task",
+  "shortcuts.blocking": "Mark as blocking a task",
+  "shortcuts.related": "Relate to a task",
+  "shortcuts.duplicate": "Mark as a duplicate of a task",
   "shortcuts.openSubtask": "Open the first sub-task",
   "shortcuts.fold": "Task list: fold or unfold sub-tasks",
   "shortcuts.status": "Change status",

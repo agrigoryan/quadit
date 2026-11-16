@@ -17,7 +17,8 @@ import { Links } from "@/detail/links";
 import { MentionedIn } from "@/detail/mentions";
 import { Pages, useTaskPages } from "@/detail/pages";
 import { Properties } from "@/detail/properties";
-import { Relations } from "@/detail/relations";
+import { useTakeRelationKeys } from "@/detail/relation-keys";
+import { type Adding, Relations } from "@/detail/relations";
 import { Subtasks } from "@/detail/subtasks";
 import { Timeline } from "@/detail/timeline";
 import { useFamilyKeys } from "@/detail/family-keys";
@@ -29,7 +30,7 @@ import { Button } from "@/ui/button";
 /** Where the task is shown: the panel over a list, or its own page. */
 export type TaskLayout = "panel" | "page";
 
-type Extra = "subtasks" | "relations" | "links" | "pages";
+type Extra = "subtasks" | "links" | "pages";
 const NO_UPLOADS: PendingUpload[] = [];
 
 interface Props {
@@ -53,6 +54,9 @@ export function TaskBody({ task, status, layout }: Props) {
   const [opened, setOpened] = useState<Partial<Record<Extra, boolean>>>({});
   const open = (name: Extra) => setOpened((o) => ({ ...o, [name]: true }));
   const close = (name: Extra) => setOpened((o) => ({ ...o, [name]: false }));
+  // The form that adds a relation, while it is open: from its button, or from M then a letter, which opens its list of tasks too.
+  const [relating, setRelating] = useState<Adding | null>(null);
+  const relate = (type: Adding["type"], pick: boolean) => setRelating((r) => ({ type, pick, n: (r?.n ?? 0) + 1 }));
 
   const loading = status === "loading";
   const failed = status !== "loading" && status !== "ready";
@@ -60,7 +64,7 @@ export function TaskBody({ task, status, layout }: Props) {
   const page = layout === "page";
   const show = {
     subtasks: subtasks.length > 0 || !!opened.subtasks,
-    relations: relations.length > 0 || !!opened.relations,
+    relations: relations.length > 0 || relating !== null,
     links: links.length > 0 || !!opened.links,
     pages: pages.length > 0 || !!opened.pages,
     files: files.length > 0 || pending.length > 0,
@@ -68,6 +72,7 @@ export function TaskBody({ task, status, layout }: Props) {
   const attach = () => chooser.current?.click();
 
   useFamilyKeys(task);
+  useTakeRelationKeys((type) => relate(type, true), !readOnly);
   // Cmd+Shift+O: the caret in the box that adds a sub-task, the section shown first if it is not yet.
   const body = useRef<HTMLDivElement>(null);
   useHotkeys(
@@ -85,7 +90,7 @@ export function TaskBody({ task, status, layout }: Props) {
   // oxlint-disable-next-line react/refs -- `attach` reads the ref when a button is pressed, not while drawing; the list only carries it to the button
   const adders = [
     { on: !show.subtasks, icon: ListTree, label: t("detail.add.subtask"), run: () => open("subtasks") },
-    { on: !show.relations, icon: GitFork, label: t("detail.add.relation"), run: () => open("relations") },
+    { on: !show.relations, icon: GitFork, label: t("detail.add.relation"), run: () => relate("blocks", false) },
     { on: !show.links, icon: Link2, label: t("detail.add.link"), run: () => open("links") },
     { on: !show.pages, icon: FileText, label: t("detail.add.page"), run: () => open("pages") },
     { on: !show.files, icon: Paperclip, label: t("detail.add.attach"), run: attach },
@@ -147,8 +152,9 @@ export function TaskBody({ task, status, layout }: Props) {
             <Relations
               task={task}
               relations={relations}
-              startAdding={!!opened.relations}
-              onEmptyClose={() => close("relations")}
+              adding={relating}
+              onAdd={() => relate("blocks", false)}
+              onAddDone={() => setRelating(null)}
             />
           )}
           {show.links && (

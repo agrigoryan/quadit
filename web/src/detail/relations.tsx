@@ -2,9 +2,10 @@
 // relates to or repeats. The server keeps one row per pair, so each row is
 // read from this task's side. A row whose other end is blank is a relation
 // to a task of a project this person may not read: it is drawn as a task
-// they can't see.
+// they can't see. A relation is added from a form the section opens, with
+// a button or with M then a letter (detail/relation-keys.ts).
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EyeOff, Plus, X } from "lucide-react";
 import { Link } from "react-router";
 import { useCan } from "@/data/access";
@@ -29,7 +30,8 @@ import { Select } from "@/ui/picker";
 
 const SIDES: Side[] = ["blocks", "blockedBy", "relates", "duplicates", "duplicatedBy"];
 
-type AddType = "blocks" | "blocked_by" | "relates" | "duplicates";
+/** A relation as it is added, from this task's side. */
+export type AddType = "blocks" | "blocked_by" | "relates" | "duplicates";
 const ADD_TYPES: { id: AddType; side: Side }[] = [
   { id: "blocks", side: "blocks" },
   { id: "blocked_by", side: "blockedBy" },
@@ -127,11 +129,28 @@ function HiddenRelationRow() {
   );
 }
 
-function AddRelation({ task, onDone }: { task: Task; onDone: () => void }) {
-  const [type, setType] = useState<AddType>("blocks");
+/**
+ * The form that adds a relation, while it is open: the kind it starts with,
+ * and whether its list of tasks opens at once, as when a key asked for that
+ * kind. `n` tells one asking from the next: asked again, the form starts over.
+ */
+export interface Adding {
+  type: AddType;
+  pick: boolean;
+  n: number;
+}
+
+function AddRelation({ task, start, onDone }: { task: Task; start: Adding; onDone: () => void }) {
+  const [type, setType] = useState(start.type);
+  const [picking, setPicking] = useState(start.pick);
   const filter = useCallback((tk: Task) => tk.id !== task.id, [task.id]);
+  // Opened by a key, the form may be below the fold of the panel, and its list opens beside it.
+  const form = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (start.pick) form.current?.scrollIntoView({ block: "nearest" });
+  }, [start.pick]);
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-2">
+    <div ref={form} className="mt-1 flex flex-wrap items-center gap-2">
       <Select
         label={t("detail.relations.type")}
         value={type}
@@ -142,6 +161,8 @@ function AddRelation({ task, onDone }: { task: Task; onDone: () => void }) {
       <TaskPicker
         filter={filter}
         label={t("detail.relations.pick")}
+        open={picking}
+        onOpenChange={setPicking}
         onPick={(otherId) => {
           addRelation(task, type, otherId);
           onDone();
@@ -159,16 +180,17 @@ function AddRelation({ task, onDone }: { task: Task; onDone: () => void }) {
 interface Props {
   task: Task;
   relations: Relation[];
-  /** Start with the add form open (the section was opened to add the first one). */
-  startAdding?: boolean;
-  /** Called when the add form closes with nothing in the section. */
-  onEmptyClose?: () => void;
+  /** The add form, while it is open. */
+  adding: Adding | null;
+  /** Asks for the add form, as its button does. */
+  onAdd: () => void;
+  /** The add form closed: a relation was added, or it was put away. */
+  onAddDone: () => void;
 }
 
-export function Relations({ task, relations, startAdding, onEmptyClose }: Props) {
+export function Relations({ task, relations, adding, onAdd, onAddDone }: Props) {
   // An archived task still stands in a relation; one in the trash does not.
   const tasks = useLookupEvenIfGone("tasks");
-  const [adding, setAdding] = useState(!!startAdding);
   const can = useCan();
   const readOnly = !can.editTask(task);
   // The task at the other end may not be in the local copy yet; the relation is shown once it is.
@@ -188,23 +210,13 @@ export function Relations({ task, relations, startAdding, onEmptyClose }: Props)
     }),
   })).filter((g) => g.rows.length > 0);
 
-  function closeForm() {
-    setAdding(false);
-    if (groups.length === 0) onEmptyClose?.();
-  }
-
   return (
     <Section
       title={t("detail.relations")}
       action={
         !readOnly &&
         !adding && (
-          <IconButton
-            label={t("detail.relations.add")}
-            size="sm"
-            className="max-md:size-9"
-            onClick={() => setAdding(true)}
-          >
+          <IconButton label={t("detail.relations.add")} size="sm" className="max-md:size-9" onClick={onAdd}>
             <Plus className="size-3.5" />
           </IconButton>
         )
@@ -226,7 +238,7 @@ export function Relations({ task, relations, startAdding, onEmptyClose }: Props)
           </ul>
         </div>
       ))}
-      {adding && <AddRelation task={task} onDone={closeForm} />}
+      {adding && <AddRelation key={adding.n} task={task} start={adding} onDone={onAddDone} />}
     </Section>
   );
 }

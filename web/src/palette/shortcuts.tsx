@@ -3,6 +3,7 @@ import { keyHint, MOD } from "@/hooks/hotkeys";
 import { useFocusReturn } from "@/palette/focus-return";
 import { type Key, t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
+import { RELATION_KEYS } from "@/detail/relation-keys";
 import { DESTINATIONS, goKeys, listedName } from "@/shell/destinations";
 import { KEYED } from "@/tasks/properties";
 import { Dialog } from "@/ui/dialog";
@@ -85,6 +86,8 @@ const sections: Section[] = [
       { what: "shortcuts.subtask", keys: [`Shift ${MOD} O`] },
       { what: "shortcuts.openParent", keys: [`Shift ${MOD} ↑`] },
       { what: "shortcuts.openSubtask", keys: [`Shift ${MOD} ↓`] },
+      // M then a letter, read where G's letters are (shell/sequences.tsx).
+      ...RELATION_KEYS.map(({ key, what }) => ({ what, keys: [`M ${key.toUpperCase()}`] })),
       { what: "shortcuts.comment", keys: ["Ctrl M"] },
       { what: "shortcuts.send", keys: [`${MOD} Enter`] },
       { what: "shortcuts.leaveBox", keys: ["Esc"] },

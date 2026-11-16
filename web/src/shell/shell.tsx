@@ -14,7 +14,7 @@ import { MyWorkPage } from "@/pages/my-work";
 import { TrashPage } from "@/pages/trash";
 import { insightPaths } from "@/insights/paths";
 import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
-import { GoHint, useGoKeys } from "@/shell/go-keys";
+import { SequenceHint, useSequences } from "@/shell/sequences";
 import { usePageFocus } from "@/shell/page-focus";
 import { NotFoundPage } from "@/ui/not-found";
 import { draftInView, pageUnder, projectInView } from "@/nav/project-in-view";
@@ -173,7 +173,7 @@ export function Shell() {
     },
     { layer: "global", guardChords: true },
   );
-  useGoKeys();
+  useSequences();
   usePageFocus(location.key);
 
   return (
@@ -268,7 +268,7 @@ export function Shell() {
           <Part on={paletteOpen}>{paletteOpen && <palette.Part />}</Part>
           <Part on={!!newTask}>{newTask && <createTask.Part draft={newTask} />}</Part>
           <ShortcutsSheet />
-          <GoHint />
+          <SequenceHint />
         </div>
       </MemberMention>
     </PeekContext>

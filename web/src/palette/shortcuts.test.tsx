@@ -40,6 +40,7 @@ describe("ShortcutsSheet", () => {
       "Move to the trash",
     ])
       expect(screen.getAllByText(what)).toHaveLength(2);
-    for (const what of ["Add a sub-task", "Rename"]) expect(screen.getAllByText(what)).toHaveLength(1);
+    for (const what of ["Add a sub-task", "Rename", "Open the parent task", "Mark as blocked by a task"])
+      expect(screen.getAllByText(what)).toHaveLength(1);
   });
 });
