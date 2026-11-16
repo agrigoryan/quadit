@@ -182,6 +182,73 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 	})
 }
 
+// TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee: a task
+// in full, and its context pack, list a relation to a task of a project the
+// caller may not read by its kind alone, marked hidden, and in text as "a
+// task you can't see": not the task's key, title, status or id.
+func TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music"})
+		for _, r := range []M{{"task": "SVA-1", "type": "blocks", "other": "SVA-2"}, {"task": "SVA-1", "type": "duplicates", "other": "OPS-1"},
+			{"task": "OPS-1", "type": "blocks", "other": "SVA-1"}, {"task": "SVA-1", "type": "relates", "other": "OPS-1"}} {
+			s.change(s.owner, "", "relation.add", r)
+		}
+		var ops1 struct{ Task struct{ ID string } }
+		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		type related struct {
+			ID, Type, Task, Title, Status string
+			Hidden                        bool
+		}
+		hidden := func(r related) bool { return r == related{Type: r.Type, Hidden: true} }
+
+		for _, path := range []string{"/tasks/SVA-1", "/tasks/SVA-1/context"} {
+			if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); strings.Contains(out, "hidden") || strings.Count(out, `"task":"OPS-1","title":"Rotate keys"`) != 3 {
+				t.Errorf("%s does not name the three related tasks of OPS to the owner: %s", path, out)
+			}
+			if out := s.call(s.owner, "", "GET", w+path+"?format=text", nil, 200, nil); strings.Contains(out, "can't see") || strings.Count(out, "OPS-1 [Todo] Rotate keys") != 3 {
+				t.Errorf("%s as text does not name the three related tasks of OPS to the owner: %s", path, out)
+			}
+			for who, token := range callers {
+				var detail, pack struct {
+					Relations []related
+					Task      struct{ Relations []related }
+				}
+				out := s.call(nil, token, "GET", w+path, nil, 200, &detail)
+				if strings.Contains(path, "context") {
+					s.call(nil, token, "GET", w+path, nil, 200, &pack)
+					detail.Relations = pack.Task.Relations
+				}
+				text := s.call(nil, token, "GET", w+path+"?format=text", nil, 200, nil)
+				for _, answer := range []string{out, text} {
+					for what, secret := range map[string]string{"key": "OPS-1", "title": "Rotate keys", "id": ops1.Task.ID} {
+						if strings.Contains(answer, secret) {
+							t.Errorf("%s gives %s the %s of a related task of OPS: %s", path, who, what, answer)
+						}
+					}
+				}
+				kinds := map[string]bool{}
+				for _, r := range detail.Relations {
+					if r.Task == "SVA-2" && r.Type == "blocks" && r.Title == "Boss music" && r.ID != "" && !r.Hidden {
+						kinds["SVA-2"] = true
+					} else if hidden(r) {
+						kinds[r.Type] = true
+					}
+				}
+				if len(detail.Relations) != 4 || !kinds["SVA-2"] || !kinds["duplicates"] || !kinds["blocked_by"] || !kinds["relates"] {
+					t.Errorf("%s gives %s the relations %+v, want SVA-2 whole and three marked hidden with their kind alone", path, who, detail.Relations)
+				}
+				for _, line := range []string{"blocks SVA-2 [Todo] Boss music\n", "duplicates a task you can't see\n", "blocked by a task you can't see\n", "relates to a task you can't see\n"} {
+					if !strings.Contains(text, line) {
+						t.Errorf("%s as text does not tell %s %q: %s", path, who, line, text)
+					}
+				}
+			}
+		}
+	})
+}
+
 // TestListedAttachmentsFollowTheirPage: /list/attachments gives a file on
 // a page only to those who may see the page. One on someone's private
 // page, or on a page of a project the caller may not read, is not listed.

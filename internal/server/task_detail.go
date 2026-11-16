@@ -102,7 +102,9 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 		d.Comments = append(d.Comments, v)
 	}
 
-	// The tasks it is related to, from either end.
+	// The tasks it is related to, from either end. One of a project the
+	// viewer may not read is listed as a task they cannot see: the kind of
+	// relation, and nothing of the task.
 	var outgoing, incoming []core.Relation
 	if err := who.db.List(ctx, &outgoing, store.Where(store.Eq("task_id", t.ID))); err != nil {
 		return d, err
@@ -127,7 +129,12 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 			byID[o.ID] = o
 		}
 		add := func(r core.Relation, otherID, typ string) {
-			if o, ok := byID[otherID]; ok {
+			o, ok := byID[otherID]
+			switch {
+			case !ok: // in the trash
+			case !who.canProject(o.ProjectID):
+				d.Relations = append(d.Relations, relationView{Type: typ, Hidden: true})
+			default:
 				d.Relations = append(d.Relations, relationView{ID: r.ID, Type: typ, Task: o.Key, Title: o.Title, State: names.statuses[o.StatusID].Name})
 			}
 		}

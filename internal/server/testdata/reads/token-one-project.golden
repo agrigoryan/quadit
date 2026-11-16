@@ -3160,10 +3160,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
  ],
  "relations": [
   {
-   "id": "<relation SVA-1 relates OPS-1>",
-   "status": "Todo",
-   "task": "OPS-1",
-   "title": "Rotate keys",
+   "hidden": true,
    "type": "relates"
   },
   {
@@ -3246,7 +3243,7 @@ The last one flies. See OPS-1.
 file: notes.txt http://quadit.test/f/<file notes.txt>/notes.txt
 --- sub-tasks
 SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
-relates OPS-1 [Todo] Rotate keys
+relates to a task you can't see
 blocks SVA-2 [Todo] Explosion effect
 pr 12 open passing https://git.example.com/games/sva/pull/12
 --- decision 1 (picked, asked @aram by @artist) id=<decision SVA-1 explosion>
@@ -4096,10 +4093,7 @@ seq: 264
  ],
  "relations": [
   {
-   "id": "<relation SVA-1 relates OPS-1>",
-   "status": "Todo",
-   "task": "OPS-1",
-   "title": "Rotate keys",
+   "hidden": true,
    "type": "relates"
   },
   {
@@ -4699,10 +4693,7 @@ seq: 261
  ],
  "relations": [
   {
-   "id": "<relation SVA-1 relates OPS-1>",
-   "status": "Todo",
-   "task": "OPS-1",
-   "title": "Rotate keys",
+   "hidden": true,
    "type": "relates"
   },
   {
@@ -4786,7 +4777,7 @@ The last one flies. See OPS-1.
 file: notes.txt http://quadit.test/f/<file notes.txt>/notes.txt
 --- sub-tasks
 SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
-relates OPS-1 [Todo] Rotate keys
+relates to a task you can't see
 blocks SVA-2 [Todo] Explosion effect
 pr 12 open passing https://git.example.com/games/sva/pull/12
 --- decision 1 (picked, asked @aram by @artist) id=<decision SVA-1 explosion>
@@ -4996,10 +4987,7 @@ How many phases?
   ],
   "relations": [
    {
-    "id": "<relation SVA-1 relates OPS-1>",
-    "status": "Todo",
-    "task": "OPS-1",
-    "title": "Rotate keys",
+    "hidden": true,
     "type": "relates"
    },
    {
@@ -5083,7 +5071,7 @@ The last one flies. See OPS-1.
 file: notes.txt http://quadit.test/f/<file notes.txt>/notes.txt
 --- sub-tasks
 SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
-relates OPS-1 [Todo] Rotate keys
+relates to a task you can't see
 blocks SVA-2 [Todo] Explosion effect
 pr 12 open passing https://git.example.com/games/sva/pull/12
 --- decision 1 (picked, asked @aram by @artist) id=<decision SVA-1 explosion>
@@ -5366,10 +5354,7 @@ For Bea  (doc <doc For Bea>)
  "task": {
   "relations": [
    {
-    "id": "<relation OPS-2 duplicates SVA-3>",
-    "status": "Todo",
-    "task": "OPS-2",
-    "title": "Back up nightly",
+    "hidden": true,
     "type": "duplicated_by"
    }
   ],

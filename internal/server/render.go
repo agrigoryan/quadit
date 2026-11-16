@@ -365,12 +365,15 @@ func (cm commentView) text() string {
 }
 
 // relationView is a task related to the one shown, from that one's side.
+// A task the reader may not read is Hidden: the view says how the two are
+// related and nothing else, not the relation's id either.
 type relationView struct {
-	ID    string `json:"id"`
-	Type  string `json:"type"` // blocks, blocked_by, relates, duplicates, duplicated_by
-	Task  string `json:"task"`
-	Title string `json:"title"`
-	State string `json:"status"`
+	ID     string `json:"id,omitempty"`
+	Type   string `json:"type"` // blocks, blocked_by, relates, duplicates, duplicated_by
+	Task   string `json:"task,omitempty"`
+	Title  string `json:"title,omitempty"`
+	State  string `json:"status,omitempty"`
+	Hidden bool   `json:"hidden,omitempty"`
 }
 
 // linkView is a link on a task: a branch, a pull request, a URL.
@@ -492,7 +495,15 @@ func (d taskDetail) text() string {
 		}
 	}
 	for _, r := range d.Relations {
-		fmt.Fprintf(&b, "%s %s [%s] %s\n", strings.ReplaceAll(r.Type, "_", " "), r.Task, r.State, r.Title)
+		how := strings.ReplaceAll(r.Type, "_", " ")
+		switch {
+		case !r.Hidden:
+			fmt.Fprintf(&b, "%s %s [%s] %s\n", how, r.Task, r.State, r.Title)
+		case r.Type == core.RelRelates:
+			b.WriteString("relates to a task you can't see\n")
+		default:
+			fmt.Fprintf(&b, "%s a task you can't see\n", how)
+		}
 	}
 	for _, l := range d.Links {
 		fmt.Fprintf(&b, "%s %s %s %s %s\n", l.Kind, l.Ref, l.State, l.Checks, l.URL)
