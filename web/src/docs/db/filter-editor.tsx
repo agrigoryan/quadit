@@ -2,7 +2,7 @@
 // toolbar. Both are kept in the view's config, where the server reads them
 // too (rows?view=).
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { getRowEvenIfGone, useMembers } from "@/data/selectors";
@@ -135,19 +135,45 @@ const propItems = (props: DBProperty[]) => [
   ...props.map((p) => ({ id: p.id, label: p.name, icon: <PropIcon type={p.type} /> })),
 ];
 
+/** A key for a filter's row, new each time. Written only here. */
+let lastRowKey = 0;
+const newRowKey = () => ++lastRowKey;
+
 export function FilterEditor({ view, props }: { view: DBView; props: DBProperty[] }) {
   const filters = view.config?.filters ?? [];
-  const save = (next: RowFilter[]) => setViewConfig(view, { filters: next.length ? next : undefined });
+  // A stored filter has no id. Each row gets a key while the editor is open,
+  // kept in step with the filters by adding and taking away below, so a
+  // row's text box and the value it waits to save stay with its filter when
+  // one above it goes. Filters added or taken away elsewhere meanwhile start
+  // the rows over.
+  const [keys, setKeys] = useState(() => filters.map(newRowKey));
+  let rowKeys = keys;
+  if (keys.length !== filters.length) {
+    rowKeys = filters.map(newRowKey);
+    setKeys(rowKeys);
+  }
+  // The keys as they are now, for a write that waits: it runs after a pause
+  // or as its row goes, when the render that made it may be out of date.
+  // Changed at once on taking a filter away, before its row goes and runs it.
+  const keysNow = useRef(rowKeys);
+  useEffect(() => {
+    keysNow.current = rowKeys;
+  });
+  const save = (next: RowFilter[], nextKeys: number[]) => {
+    keysNow.current = nextKeys;
+    setKeys(nextKeys);
+    setViewConfig(view, { filters: next.length ? next : undefined });
+  };
   /**
-   * Changes filter i as the view now is: a value typed is saved after a
-   * pause, or as its box goes (the filter taken away, the popover closed),
-   * when this render's filters may be out of date. It is dropped when filter
-   * i is no longer on the property it was on in this render.
+   * Changes the filter of row `key` as the view now is. It is dropped when
+   * that filter was taken away, or is no longer on property `prop`, the one
+   * it was on when the change was made.
    */
-  const patch = (i: number, fields: Partial<RowFilter>) => {
+  const patch = (key: number, prop: string, fields: Partial<RowFilter>) => {
+    const i = keysNow.current.indexOf(key);
     const now = getRowEvenIfGone("dbviews", view.id) ?? view;
     const current = now.config?.filters ?? [];
-    if (current[i]?.prop !== filters[i]?.prop) return;
+    if (i < 0 || current[i]?.prop !== prop) return;
     setViewConfig(now, { filters: current.map((f, j) => (j === i ? { ...f, ...fields } : f)) });
   };
   return (
@@ -156,15 +182,16 @@ export function FilterEditor({ view, props }: { view: DBView; props: DBProperty[
       {filters.map((f, i) => {
         const prop = props.find((p) => p.id === f.prop);
         const ops = opsFor(prop);
+        const key = rowKeys[i] ?? -1;
         return (
-          <div key={i} className="flex flex-wrap items-center gap-1.5">
+          <div key={key} className="flex flex-wrap items-center gap-1.5">
             <Select
               label={t("db.filter.prop")}
               items={propItems(props)}
               value={f.prop}
               onPick={(id) => {
                 const nextOps = opsFor(props.find((p) => p.id === id));
-                patch(i, { prop: id, op: nextOps.includes(f.op) ? f.op : nextOps[0], value: undefined });
+                patch(key, f.prop, { prop: id, op: nextOps.includes(f.op) ? f.op : nextOps[0], value: undefined });
               }}
               buttonProps={{ className: "w-32 [&>span]:flex-1" }}
             />
@@ -172,16 +199,21 @@ export function FilterEditor({ view, props }: { view: DBView; props: DBProperty[
               label={t("db.filter.op")}
               items={ops.map((op) => ({ id: op, label: opName(op, DATES.includes(prop?.type ?? "")) }))}
               value={f.op}
-              onPick={(op) => patch(i, { op: op as FilterOp })}
+              onPick={(op) => patch(key, f.prop, { op: op as FilterOp })}
               buttonProps={{ className: "w-32 [&>span]:flex-1" }}
             />
             {!NO_VALUE.includes(f.op) && (
-              <ValueInput prop={prop} filter={f} onChange={(value) => patch(i, { value })} />
+              <ValueInput prop={prop} filter={f} onChange={(value) => patch(key, f.prop, { value })} />
             )}
             <button
               type="button"
               aria-label={t("db.filter.remove")}
-              onClick={() => save(filters.filter((_, j) => j !== i))}
+              onClick={() =>
+                save(
+                  filters.filter((_, j) => j !== i),
+                  rowKeys.filter((k) => k !== key),
+                )
+              }
               className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 hover:bg-hover hover:text-ink"
             >
               <X className="size-4" aria-hidden />
@@ -193,7 +225,7 @@ export function FilterEditor({ view, props }: { view: DBView; props: DBProperty[
         variant="ghost"
         size="sm"
         className="self-start"
-        onClick={() => save([...filters, { prop: TITLE, op: "contains" }])}
+        onClick={() => save([...filters, { prop: TITLE, op: "contains" }], [...rowKeys, newRowKey()])}
       >
         <Plus className="size-3.5" aria-hidden />
         {t("db.filter.add")}
