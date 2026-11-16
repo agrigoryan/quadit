@@ -61,8 +61,9 @@ const SIGN_KEYS: Record<string, string> = {
  * is the key labelled Z, as the system has it. Any other letter is named by
  * the key pressed (e.code), so the keys work under a layout that types
  * none (Russian, Armenian…), and Option with a letter on a Mac is "alt+"
- * that letter, not "¨" or "ø". A digit is named by its key, unless Option
- * makes it type a sign (the German Mac's [ is
+ * that letter, not "¨" or "ø". A digit is named by its key (the French
+ * keyboard types "&" on the 1 unless Shift is held), unless Shift or Option
+ * makes it type a sign (the German "/" is Shift+7, its Mac's [ is
  * Option+5). Shift is in the name, taken from the Shift key itself: Caps
  * Lock does not turn S into Shift+S, and a bare "s" does not run on Shift+S.
  * Cmd and Ctrl are both "mod". A sign typed as a character ("?", "[", "/")
@@ -73,11 +74,13 @@ const SIGN_KEYS: Record<string, string> = {
  */
 export function combo(e: KeyboardEvent): string {
   const mod = e.metaKey || e.ctrlKey;
+  // A digit key that types a sign with Shift or Option ("/" on a German keyboard, "?" on a Russian one) types that sign.
+  const digit = /^Digit\d$/.test(e.code) && (mod || /^\d$/.test(e.key) || !(e.shiftKey || e.altKey));
   const letter = /^[a-z]$/i.test(e.key)
     ? e.key.toLowerCase()
     : /^Key[A-Z]$/.test(e.code)
       ? e.code.slice(3).toLowerCase()
-      : /^Digit\d$/.test(e.code) && !(e.altKey && !mod)
+      : digit
         ? e.code.slice(5)
         : mod && SIGN_KEYS[e.code]
           ? SIGN_KEYS[e.code]

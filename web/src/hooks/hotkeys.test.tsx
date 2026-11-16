@@ -77,6 +77,16 @@ describe("combo", () => {
     // German layout on a Mac: [ is Option+5.
     expect(named({ key: "[", code: "Digit5", altKey: true })).toBe("[");
     expect(named({ key: "=", code: "Equal" })).toBe("=");
+    // German, Spanish, Italian: / is Shift+7 and = is Shift+0.
+    expect(named({ key: "/", code: "Digit7", shiftKey: true })).toBe("/");
+    expect(named({ key: "=", code: "Digit0", shiftKey: true })).toBe("=");
+    // Russian: ? is Shift+7.
+    expect(named({ key: "?", code: "Digit7", shiftKey: true })).toBe("?");
+  });
+
+  it("names a digit typed with Shift by the digit, Shift and all", () => {
+    // French: the digit row types its digits with Shift.
+    expect(named({ key: "1", code: "Digit1", shiftKey: true })).toBe("shift+1");
   });
 
   it("names a sign held with Cmd or Ctrl by the key, with Shift", () => {
