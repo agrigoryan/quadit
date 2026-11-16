@@ -10,8 +10,8 @@
 //	client.go     the API client: requests, changes, uploads
 //	login.go      saving the server's address and a token
 //	cmd_*.go      what the commands do, by the groups the help gives them:
-//	              read (orient, find), follow, task, decision, files, do,
-//	              docs, secrets
+//	              read (orient, find), follow, task, comments, decision,
+//	              files, do, docs, secrets
 //	listen.go, link.go, render.go, import.go   the larger commands, one each
 //	masker.go     blanking secrets out of what a command prints
 package cli

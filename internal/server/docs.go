@@ -25,7 +25,9 @@ func (s *Server) pageRoutes() []route {
 	const w = "/api/v1/w/{ws}"
 	return []route{
 		{"GET " + w + "/docs", s.workspaceMember(s.handleListPages), "The page tree.", "", "docs"},
-		{"GET " + w + "/docs/{id}", s.workspaceMember(s.handleShowPage), "One page: rows for the editor, or Markdown with format=md.", "format: md or text; full: true", "docs"},
+		{"GET " + w + "/docs/{id}", s.workspaceMember(s.handleShowPage), "One page: rows for the editor, or Markdown with format=md. The text form ends with the page's open comment threads.",
+			"format: md or text; full: true; resolved: 1 for the resolved threads too; comments: 0 for none, 1 to add them to format=md", "docs"},
+		{"GET " + w + "/docs/{id}/comments", s.workspaceMember(s.handleListPageComments), "A page's comment threads: each with what it is on, its comments and replies.", "resolved: 1 for the resolved threads too (text)", "docs"},
 		{"GET " + w + "/docs/{id}/versions", s.workspaceMember(s.handleListPageVersions), "A page's kept versions.", "", "docs"},
 		{"GET " + w + "/docs/{id}/versions/{version}", s.workspaceMember(s.handleShowPageVersion), "One version's content.", "format: md", "docs"},
 		{"POST " + w + "/docs/{id}/presence", s.workspaceMember(s.handleReportPagePresence), "Say which block I am in; returns who else is in the page. Body: {block}.", "", "docs"},
@@ -184,7 +186,24 @@ func (s *Server) handleShowPage(x *c) error {
 		return err
 	}
 	if format := x.r.URL.Query().Get("format"); format == "md" || x.wantText() {
-		return x.text(pageText(page, blocks, format, x.maxChars()))
+		text := pageText(page, blocks, format, x.maxChars())
+		// The text form, which agents read, ends with the open threads.
+		// Markdown is the page alone, as it is written back, unless asked.
+		q := x.r.URL.Query()
+		withComments := format != "md"
+		if q.Has("comments") {
+			withComments = truthyParam(q, "comments")
+		}
+		if withComments {
+			threads, err := x.pageThreads(x.ctx(), page)
+			if err != nil {
+				return err
+			}
+			if more := threadsText(threads, truthyParam(q, "resolved")); more != "" {
+				text = strings.TrimRight(text, "\n") + "\n\n" + more
+			}
+		}
+		return x.text(text)
 	}
 	out, err := x.pageAnswer(x.ctx(), page, blocks)
 	if err != nil {

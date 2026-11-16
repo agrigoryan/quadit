@@ -37,6 +37,7 @@ api GET /api/v1/w/{workspace}/dashboard
 api GET /api/v1/w/{workspace}/decisions
 api GET /api/v1/w/{workspace}/docs
 api GET /api/v1/w/{workspace}/docs/{id}
+api GET /api/v1/w/{workspace}/docs/{id}/comments
 api GET /api/v1/w/{workspace}/docs/{id}/rows
 api GET /api/v1/w/{workspace}/docs/{id}/versions
 api GET /api/v1/w/{workspace}/docs/{id}/versions/{version}
@@ -670,6 +671,7 @@ cli assign
 cli attach
 cli changes
 cli comment
+cli comments
 cli context
 cli create
 cli dashboard
@@ -693,7 +695,10 @@ cli read
 cli release
 cli remember
 cli render
+cli reopen
+cli reply
 cli request
+cli resolve
 cli restore
 cli result
 cli row
@@ -747,8 +752,10 @@ mcp decisions arg project
 mcp decisions arg q
 mcp decisions arg state
 mcp doc
+mcp doc arg comments
 mcp doc arg full
 mcp doc arg id
+mcp doc arg resolved
 mcp docs
 mcp events
 mcp events arg after

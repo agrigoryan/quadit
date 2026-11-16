@@ -476,10 +476,12 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@artist",
+   "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
+   "thread": "<comment SVA-1 for the webhook>",
    "title": "SVA-1 Boss design",
    "type": "comment"
   },
@@ -496,10 +498,12 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@artist",
+   "comment": "<comment SVA-1 result>",
    "id": "<id #160>",
    "seq": 142,
    "snippet": "Drew the burst.",
    "task": "SVA-1",
+   "thread": "<comment SVA-1 result>",
    "title": "SVA-1 Boss design",
    "type": "result"
   },
@@ -564,9 +568,9 @@ SVA-1  How many phases?  (id=<decision SVA-1 phases>)
 == assigned to you (0)
 nothing
 == unread inbox (5)
-#259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
+#259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
 #253 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
-#142 <minute> @artist result: SVA-1 Boss design — Drew the burst.
+#142 <minute> @artist result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #120 <minute> @artist decision_asked: SVA-1 Boss design — How many phases?
 #114 <minute> @artist decision_asked: SVA-1 Boss design — Which explosion?
 seq: 261
@@ -578,10 +582,12 @@ seq: 261
   {
    "at": "<minute>",
    "by": "@artist",
+   "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
+   "thread": "<comment SVA-1 for the webhook>",
    "title": "SVA-1 Boss design",
    "type": "comment"
   },
@@ -598,10 +604,12 @@ seq: 261
   {
    "at": "<minute>",
    "by": "@artist",
+   "comment": "<comment SVA-1 result>",
    "id": "<id #160>",
    "seq": 142,
    "snippet": "Drew the burst.",
    "task": "SVA-1",
+   "thread": "<comment SVA-1 result>",
    "title": "SVA-1 Boss design",
    "type": "result"
   },
@@ -635,10 +643,12 @@ seq: 261
   {
    "at": "<minute>",
    "by": "@artist",
+   "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
+   "thread": "<comment SVA-1 for the webhook>",
    "title": "SVA-1 Boss design",
    "type": "comment"
   },
@@ -655,10 +665,12 @@ seq: 261
   {
    "at": "<minute>",
    "by": "@artist",
+   "comment": "<comment SVA-1 result>",
    "id": "<id #160>",
    "seq": 142,
    "snippet": "Drew the burst.",
    "task": "SVA-1",
+   "thread": "<comment SVA-1 result>",
    "title": "SVA-1 Boss design",
    "type": "result"
   },
@@ -687,9 +699,9 @@ seq: 261
 
 === GET /api/v1/w/games/inbox?format=text&all=1
 200
-#259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
+#259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
 #253 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
-#142 <minute> @artist result: SVA-1 Boss design — Drew the burst.
+#142 <minute> @artist result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #120 <minute> @artist decision_asked: SVA-1 Boss design — How many phases?
 #114 <minute> @artist decision_asked: SVA-1 Boss design — Which explosion?
 
@@ -700,10 +712,12 @@ seq: 261
   {
    "at": "<minute>",
    "by": "@artist",
+   "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
+   "thread": "<comment SVA-1 for the webhook>",
    "title": "SVA-1 Boss design",
    "type": "comment"
   },
@@ -3202,13 +3216,13 @@ How many phases?
   1) Three
   2) Four
 --- comments
-[#138 @aram <minute>]: @bea no rings please.
-[#141 @artist <minute>] RESULT: Drew the burst.
+[#138 @aram <minute> id=<comment SVA-1 owner>]: @bea no rings please.
+[#141 @artist <minute> id=<comment SVA-1 result>] RESULT: Drew the burst.
     checked: at 1x and 2x
     measured: 12 frames
     not verified: on a phone
     file: burst.txt http://quadit.test/f/<file burst.txt>/burst.txt
-[#258 @artist <minute>]: Phase three is drawn.
+[#258 @artist <minute> id=<comment SVA-1 for the webhook>]: Phase three is drawn.
 
 === GET /api/v1/w/games/tasks/SVA-1?raw=1
 200
@@ -4490,7 +4504,7 @@ seq: 261
 #135 <minute> @aram decision.deleted SVA-1 moved to trash
 #138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)
 #141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)
-#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.
+#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result
 #151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)
 #154 <minute> @aram comment.deleted SVA-1 moved to trash
@@ -4502,7 +4516,7 @@ seq: 261
 #232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
 #237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress
 #258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)
-#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
+#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
 seq: 258
 
 === GET /api/v1/w/games/tasks/SVA-1?max_chars=10
@@ -4741,13 +4755,13 @@ How many phases?
   1) Three
   2) Four
 --- comments
-[#138 @aram <minute>]: @bea no rings please.
-[#141 @artist <minute>] RESULT: Drew the burst.
+[#138 @aram <minute> id=<comment SVA-1 owner>]: @bea no rings please.
+[#141 @artist <minute> id=<comment SVA-1 result>] RESULT: Drew the burst.
     checked: at 1x and 2x
     measured: 12 frames
     not verified: on a phone
     file: burst.txt http://quadit.test/f/<file burst.txt>/burst.txt
-[#258 @artist <minute>]: Phase three is drawn.
+[#258 @artist <minute> id=<comment SVA-1 for the webhook>]: Phase three is drawn.
 
 === GET /api/v1/w/games/tasks/NOPE-1
 404
@@ -5030,13 +5044,13 @@ How many phases?
   1) Three
   2) Four
 --- comments
-[#138 @aram <minute>]: @bea no rings please.
-[#141 @artist <minute>] RESULT: Drew the burst.
+[#138 @aram <minute> id=<comment SVA-1 owner>]: @bea no rings please.
+[#141 @artist <minute> id=<comment SVA-1 result>] RESULT: Drew the burst.
     checked: at 1x and 2x
     measured: 12 frames
     not verified: on a phone
     file: burst.txt http://quadit.test/f/<file burst.txt>/burst.txt
-[#258 @artist <minute>]: Phase three is drawn.
+[#258 @artist <minute> id=<comment SVA-1 for the webhook>]: Phase three is drawn.
 === epic: Boss fight (planned, target <day+30>)
 The last level.
 === standing preferences
@@ -10730,7 +10744,7 @@ nothing found
 #135 <minute> @aram decision.deleted SVA-1 moved to trash
 #138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)
 #141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)
-#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.
+#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result
 #151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)
 #154 <minute> @aram comment.deleted SVA-1 moved to trash
@@ -10808,7 +10822,7 @@ nothing found
 #253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view "Art bugs"
 #257 <minute> @aram webhook.created "comments"
 #258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)
-#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
+#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
 #261 <minute> @aram label.created "last"
 seq: 261
 
@@ -10886,7 +10900,7 @@ seq: 261
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
-  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
+  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
@@ -10964,7 +10978,7 @@ seq: 261
   "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
   "#257 <minute> @aram webhook.created \"comments\"",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)",
   "#261 <minute> @aram label.created \"last\""
  ],
  "more": false,
@@ -11109,7 +11123,7 @@ seq: 261
   "#120 <minute> @artist inbox decision_asked: SVA-1 Boss design — How many phases?",
   "#121 <minute> @artist task.updated SVA-1 waiting_on: @artist -> @aram; waiting_on_note: answered: Burst: reads better small -> answer: How many phases?",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
-  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
+  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#201 <minute> @artist doc.created \"Artist: memory\"",
   "#202 <minute> @artist doc.created \"Palette\"",
@@ -11461,14 +11475,14 @@ seq: 261
 200
 #114 <minute> @artist inbox decision_asked: SVA-1 Boss design — Which explosion?
 #120 <minute> @artist inbox decision_asked: SVA-1 Boss design — How many phases?
-#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.
+#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #165 <minute> @aram doc.created "Salary notes"
 #166 <minute> @aram doc.created "For Bea"
 #198 <minute> @aram attachment.created
 #217 <minute> @aram view.created "Mine"
 #248 <minute> @aram watcher.created
 #253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view "Art bugs"
-#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
+#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
 seq: 261
 
 === GET /api/v1/w/games/events?after=0&types=comment.created,decision.opened&compact=1
@@ -11514,7 +11528,7 @@ seq: 261
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
-  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
+  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
@@ -11526,7 +11540,7 @@ seq: 261
   "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)"
  ],
  "more": false,
  "seq": 261
@@ -11856,7 +11870,7 @@ seq: 261
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
-  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
+  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
@@ -11870,7 +11884,7 @@ seq: 261
   "#252 <minute> @artist task.updated SVA-6 label: none -> art",
   "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)"
  ],
  "more": false,
  "seq": 261
@@ -11912,7 +11926,7 @@ seq: 261
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
-  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
+  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
@@ -11926,7 +11940,7 @@ seq: 261
   "#252 <minute> @artist task.updated SVA-6 label: none -> art",
   "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)"
  ],
  "more": false,
  "seq": 261
@@ -11972,7 +11986,7 @@ seq: 261
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
-  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
+  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
@@ -11986,7 +12000,7 @@ seq: 261
   "#252 <minute> @artist task.updated SVA-6 label: none -> art",
   "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)"
  ],
  "more": false,
  "seq": 261
@@ -12104,7 +12118,7 @@ seq: 261
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
-  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
+  "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
@@ -12182,7 +12196,7 @@ seq: 261
   "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
   "#257 <minute> @aram webhook.created \"comments\"",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)",
   "#261 <minute> @aram label.created \"last\""
  ],
  "more": false,
@@ -18696,6 +18710,10 @@ How we work now. See OPS-5.
 
 How we work now. See OPS-5.
 
+--- comments: 1 open thread
+thread <comment Handbook> on the page
+  @aram <minute>: Is this still how we work?
+
 === GET /api/v1/w/games/docs/<doc Handbook>/versions
 200
 {
@@ -20227,6 +20245,10 @@ Draw phase one, as the [[Handbook]] says.
 
 Draw phase one, as the [[Handbook]] says.
 
+--- comments: 1 open thread
+thread <comment Week one> on the page
+  @aram <minute>: Phase one first.
+
 === GET /api/v1/w/games/docs/<doc Plans sub-sub-page>/versions
 200
 {
@@ -20348,6 +20370,100 @@ Draw phase one, as the [[Handbook]] says.
  }
 }
 
+=== GET /api/v1/w/games/docs/<doc Handbook>/comments
+200
+{
+ "threads": [
+  {
+   "comments": [
+    {
+     "at": "<minute>",
+     "body": "Is this still how we work?",
+     "by": "@aram",
+     "id": "<comment Handbook>"
+    }
+   ],
+   "id": "<comment Handbook>"
+  }
+ ]
+}
+
+=== GET /api/v1/w/games/docs/<doc Handbook>/comments?format=text
+200
+--- comments: 1 open thread
+thread <comment Handbook> on the page
+  @aram <minute>: Is this still how we work?
+
+=== GET /api/v1/w/games/docs/<doc OPS runbook>/comments
+404
+{
+ "error": {
+  "code": "not_found",
+  "message": "doc <doc OPS runbook> not found"
+ }
+}
+
+=== GET /api/v1/w/games/docs/<doc OPS runbook>/comments?format=text
+404
+{
+ "error": {
+  "code": "not_found",
+  "message": "doc <doc OPS runbook> not found"
+ }
+}
+
+=== GET /api/v1/w/games/docs/<doc Plans sub-sub-page>/comments
+200
+{
+ "threads": [
+  {
+   "comments": [
+    {
+     "at": "<minute>",
+     "body": "Phase one first.",
+     "by": "@aram",
+     "id": "<comment Week one>"
+    }
+   ],
+   "id": "<comment Week one>"
+  }
+ ]
+}
+
+=== GET /api/v1/w/games/docs/<doc Plans sub-sub-page>/comments?format=text
+200
+--- comments: 1 open thread
+thread <comment Week one> on the page
+  @aram <minute>: Phase one first.
+
+=== GET /api/v1/w/games/docs/<doc Salary notes>/comments
+200
+{
+ "threads": []
+}
+
+=== GET /api/v1/w/games/docs/<doc Salary notes>/comments?format=text
+200
+no comments
+
+=== GET /api/v1/w/games/docs/<doc Bea's own>/comments
+404
+{
+ "error": {
+  "code": "not_found",
+  "message": "doc <doc Bea's own> not found"
+ }
+}
+
+=== GET /api/v1/w/games/docs/<doc Bea's own>/comments?format=text
+404
+{
+ "error": {
+  "code": "not_found",
+  "message": "doc <doc Bea's own> not found"
+ }
+}
+
 === GET /api/v1/w/games/docs/<project SVA>
 404
 {
@@ -20364,6 +20480,29 @@ Draw phase one, as the [[Handbook]] says.
 
 # Handbook
 … (cut; add full=1)
+
+--- comments: 1 open thread
+thread <comment Handbook> on the page
+  @aram <minute>: Is this still how we work?
+
+=== GET /api/v1/w/games/docs/<doc Handbook>?format=text&comments=0
+200
+# Handbook
+(doc <doc Handbook>, seq 195)
+
+# Handbook
+
+How we work now. See OPS-5.
+
+=== GET /api/v1/w/games/docs/<doc Handbook>?format=md&comments=1
+200
+# Handbook
+
+How we work now. See OPS-5.
+
+--- comments: 1 open thread
+thread <comment Handbook> on the page
+  @aram <minute>: Is this still how we work?
 
 === GET /api/v1/w/games/docs/<doc Handbook>/versions/<version Handbook>
 200

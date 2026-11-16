@@ -55,8 +55,13 @@ var commands = []command{
 	{names: []string{"release"}, args: 1, usage: "release KEY", run: (*runner).changeNamed},
 	{names: []string{"delete"}, args: 1, usage: "delete KEY", run: (*runner).changeNamed},
 	{names: []string{"restore"}, args: 1, usage: "restore KEY", run: (*runner).changeNamed},
-	{names: []string{"comment"}, args: 2, usage: "comment KEY TEXT", run: (*runner).comment},
+
+	// comment on tasks and pages (cmd_comments.go)
+	{names: []string{"comment"}, args: 1, usage: "comment KEY TEXT | comment page=PAGE_ID [block=BLOCK_ID] TEXT", run: (*runner).comment},
 	{names: []string{"result"}, args: 2, usage: "result KEY TEXT", run: (*runner).comment},
+	{names: []string{"reply"}, args: 2, usage: "reply COMMENT_ID TEXT", run: (*runner).reply},
+	{names: []string{"resolve"}, args: 1, usage: "resolve COMMENT_ID", run: (*runner).resolve},
+	{names: []string{"reopen"}, args: 1, usage: "reopen COMMENT_ID", run: (*runner).resolve},
 
 	// act on decisions (cmd_decision.go)
 	{names: []string{"ask"}, args: 2, usage: "ask KEY QUESTION ...", run: (*runner).ask},
@@ -80,6 +85,7 @@ var commands = []command{
 	// docs (cmd_docs.go)
 	{names: []string{"docs"}, run: readsWithFilters("/docs")},
 	{names: []string{"doc"}, args: 1, usage: "doc ID", run: readsWithFilters("/docs/%s")},
+	{names: []string{"comments"}, args: 1, usage: "comments PAGE_ID", run: readsWithFilters("/docs/%s/comments")},
 	{names: []string{"write"}, args: 1, usage: "write ID|new [TITLE] < markdown", run: (*runner).write},
 	{names: []string{"rows"}, args: 1, usage: "rows DATABASE", run: readsWithFilters("/docs/%s/rows")},
 	{names: []string{"row"}, args: 2, usage: "row DATABASE TITLE [Prop=value ...]", run: (*runner).row},

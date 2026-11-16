@@ -334,9 +334,10 @@ type commentView struct {
 }
 
 // text is the comment on one line, with its evidence and files below it.
+// Its id is what a reply names.
 func (cm commentView) text() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "[#%d %s %s]", cm.Seq, cm.By, cm.At)
+	fmt.Fprintf(&b, "[#%d %s %s id=%s]", cm.Seq, cm.By, cm.At, cm.ID)
 	if cm.Kind == core.CommentResult {
 		b.WriteString(" RESULT")
 	}
@@ -638,6 +639,7 @@ func (who *viewer) eventLine(ctx context.Context, ev core.Event, names *nameLook
 		if note.Snippet != "" {
 			what += " — " + oneLine(note.Snippet, 160)
 		}
+		what += who.refsOf(ctx, note).text()
 	default:
 		if ev.EntityType == "member" && ev.Type != "member.created" {
 			what += " " + names.handle(ev.EntityID) // whose membership it is

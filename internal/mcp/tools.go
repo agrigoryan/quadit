@@ -54,7 +54,10 @@ var tools = []tool{
 	{Name: "layout", Desc: "A project's statuses, labels, members, agents, epics, cycles and templates, by name.", Props: map[string]string{"!project": "project key"},
 		Run: readPathTool("/projects/{project}/layout", "project")},
 	{Name: "docs", Desc: "The page tree with ids.", Run: readPathTool("/docs")},
-	{Name: "doc", Desc: "One page as Markdown.", Props: map[string]string{"!id": "page id", "full": "true to not cut long text"}, Run: readPathTool("/docs/{id}", "id")},
+	{Name: "doc", Desc: "One page as Markdown, then its open comment threads: each with its id, the block it is on (id and text) or \"on the page\", and its comments and replies by whom and when. " +
+		"Reply with change comment.create {parent: thread id, body}; start a thread with comment.create {doc, block, body}; resolve one with comment.update {id, resolved: true}.",
+		Props: map[string]string{"!id": "page id", "full": "true to not cut long text", "resolved": "true to show the resolved threads too", "comments": "false to leave the threads out"},
+		Run:   readPathTool("/docs/{id}", "id")},
 	{Name: "rows", Desc: "A database's rows as a table, with formulas worked out.",
 		Props: map[string]string{"!id": "database id", "filter": "Prop:op:value, comma-separated; ops: is, is_not, contains, gt, lt, empty, not_empty, checked, unchecked", "sort": "Prop or -Prop", "view": "a view's name"},
 		Run:   readPathTool("/docs/{id}/rows", "id")},
@@ -65,6 +68,7 @@ var tools = []tool{
 	{Name: "changes", Desc: "Every change type with its arguments. Read once to learn what change can do.", Run: readPathTool("/api/v1/changes")},
 	{Name: "change", Desc: "Make one change. Common types: task.create {project, title, description, assignee, labels, parent}; task.update {id, status, assignee, waiting_on, priority, add_labels}; " +
 		"task.take {id}; comment.create {task, body, waiting_on} (add evidence {checked, measured, not_verified} to post a result); " +
+		"comment.create {doc, block, body} on a page or one of its blocks, {parent, body} to reply in a comment's thread; comment.update {id, resolved}; " +
 		"decision.open {task, question, options:[{label, description, attachments:[{file}]}], recommended, recommendation, ask} (the ask tool does this, with files, in one call); decision.pick {id, option, note}; " +
 		"doc.create {title, markdown, parent}; doc.write {doc, markdown, mode}. Names work wherever ids do (SVA-12, @handle, status and label names). " +
 		"Every change type with all of its arguments is listed by the changes tool (GET /api/v1/changes). " +

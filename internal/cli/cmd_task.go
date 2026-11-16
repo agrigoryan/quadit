@@ -1,5 +1,4 @@
-// The task commands: new, update, status, assign, take and the like, and
-// comments and results.
+// The task commands: new, update, status, assign, take and the like.
 
 package cli
 
@@ -46,38 +45,4 @@ func (r *runner) status(in input) error {
 // assign gives a task to a member, or to nobody.
 func (r *runner) assign(in input) error {
 	return r.change("task.update", map[string]any{"id": in.pos[0], "assignee": apiValue("assignee", in.pos[1])}, in.approval)
-}
-
-// comment writes a comment on a task, or, called as result, the report of
-// what was done: what was checked, measured and left unverified, and the
-// files that show it.
-func (r *runner) comment(in input) error {
-	a, err := argsFrom(in.f, "checked", "measured", "not_verified", "file")
-	if err != nil {
-		return err
-	}
-	a["task"], a["body"] = in.pos[0], strings.Join(in.pos[1:], " ")
-	if a["body"] == "-" {
-		if a["body"], err = readStdin(); err != nil {
-			return err
-		}
-	}
-	ev := map[string]string{}
-	for _, k := range []string{"checked", "measured", "not_verified"} {
-		if v := in.f[k]; len(v) > 0 {
-			ev[k] = v[0]
-		}
-	}
-	if in.name == "result" {
-		a["kind"] = "result"
-	}
-	if len(ev) > 0 {
-		a["evidence"] = ev
-	}
-	if atts, err := r.uploads(in.f["file"]); err != nil {
-		return err
-	} else if len(atts) > 0 {
-		a["attachments"] = atts
-	}
-	return r.change("comment.create", a, in.approval)
 }

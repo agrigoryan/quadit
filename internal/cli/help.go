@@ -22,6 +22,9 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
           status KEY NAME | assign KEY @WHO|none | take KEY | release KEY
           delete KEY | restore KEY   to the trash, and back from it
           comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID]
+          comment page=PAGE_ID [block=BLOCK_ID] TEXT   a thread on a page, or on one of its blocks
+          reply COMMENT_ID TEXT      answer in that comment's thread, on a task or a page
+          resolve COMMENT_ID | reopen COMMENT_ID       a thread, through any of its comments
           result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
           ask KEY QUESTION option=A [file=PATH ...] option=B [file=PATH ...] [recommended=2] [why=...] [ask=@WHO]
                                      a file= is shown on the option before it; before any option, on the question
@@ -64,7 +67,9 @@ var helpTopics = map[string]string{
 `,
 	"docs": `pages, databases and memory
   docs [project=KEY]           the page tree with ids; one project's pages with project=
-  doc ID                       one page as Markdown
+  doc ID [resolved=1] [comments=0]   one page as Markdown, then its open comment threads
+                               (each: thread id, the block it is on and its text, the replies)
+  comments PAGE_ID [resolved=1]       the page's comment threads alone
   write ID|new TITLE [parent=ID] [project=KEY] [mode=append] < markdown     write a page from stdin
   rows DATABASE [filter=Prop:is:Value] [sort=-Prop] [view=NAME]
   row DATABASE TITLE [Prop=value ...]                         add a row to a database

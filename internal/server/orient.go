@@ -188,15 +188,16 @@ type inboxItem struct {
 	Snippet string `json:"snippet,omitempty"`
 	At      string `json:"at"`
 	Read    bool   `json:"read,omitempty"`
+	noteRefs
 }
 
 // line is the item on one line of text.
 func (item inboxItem) line() string {
 	l := fmt.Sprintf("#%d %s %s %s: %s", item.Seq, item.At, item.By, item.Type, item.Title)
 	if item.Snippet != "" && item.Snippet != item.Title {
-		l += " — " + item.Snippet
+		l += " — " + oneLine(item.Snippet, 200)
 	}
-	return l
+	return l + item.noteRefs.text()
 }
 
 // inboxQuery is which of the caller's inbox items to read: up to limit,
@@ -222,7 +223,8 @@ func (who *viewer) inboxItems(ctx context.Context, query inboxQuery) ([]inboxIte
 	}
 	out := make([]inboxItem, len(notes))
 	for i, note := range notes {
-		item := inboxItem{ID: note.ID, Seq: note.Seq, Type: note.Type, By: names.handle(note.ActorID), Title: note.Title, Snippet: note.Snippet, At: formatTime(note.CreatedAt), Read: note.ReadAt != 0}
+		item := inboxItem{ID: note.ID, Seq: note.Seq, Type: note.Type, By: names.handle(note.ActorID), Title: note.Title, Snippet: note.Snippet, At: formatTime(note.CreatedAt), Read: note.ReadAt != 0,
+			noteRefs: who.refsOf(ctx, note)}
 		if note.TaskID != "" {
 			item.Task, _, _ = strings.Cut(note.Title, " ") // a task's notification is titled with its key first
 		}

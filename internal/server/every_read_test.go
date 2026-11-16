@@ -703,7 +703,11 @@ func (rw *richWorkspace) reads() []read {
 	for _, name := range []string{"doc Sprites", "doc Servers", "doc Handbook", "doc Bea's own", "doc removed"} {
 		add(inWS("/docs/{id}/rows", "/docs/"+id(name)+"/rows", "/docs/"+id(name)+"/rows?format=text")...)
 	}
-	add(inWS("/docs/{id}", "/docs/"+id("project SVA"), "/docs/"+id("doc Handbook")+"?max_chars=10&format=text")...)
+	for _, name := range []string{"doc Handbook", "doc OPS runbook", "doc Plans sub-sub-page", "doc Salary notes", "doc Bea's own"} {
+		add(inWS("/docs/{id}/comments", "/docs/"+id(name)+"/comments", "/docs/"+id(name)+"/comments?format=text")...)
+	}
+	add(inWS("/docs/{id}", "/docs/"+id("project SVA"), "/docs/"+id("doc Handbook")+"?max_chars=10&format=text", "/docs/"+id("doc Handbook")+"?format=text&comments=0",
+		"/docs/"+id("doc Handbook")+"?format=md&comments=1")...)
 	add(inWS("/docs/{id}/versions/{version}", "/docs/"+id("doc Handbook")+"/versions/"+id("version Handbook"), "/docs/"+id("doc Handbook")+"/versions/"+id("version Handbook")+"?format=md",
 		"/docs/"+id("doc OPS runbook")+"/versions/"+id("version Handbook"), "/docs/"+id("doc Handbook")+"/versions/"+id("project SVA"))...)
 	add(inWS("/docs/{id}/rows", "/docs/"+id("doc Sprites")+"/rows?raw=1", "/docs/"+id("doc Sprites")+"/rows?view=Drawn", "/docs/"+id("doc Sprites")+"/rows?filter=State:drawn",
