@@ -60,8 +60,11 @@ type propConfig struct {
 // (created_at, updated_at, created_by, member) from them. A formula reads
 // other cells through prop(), to a depth of formulaDepth; a relation is read
 // as the titles of the rows it points to, in a database loaded when first
-// needed. A database the caller may not see, or that is gone, reads as
-// empty; one that cannot be read fails the whole answer.
+// needed. A database the viewer may not see (someone's private one, or one
+// of a project they may not read), or that is gone, reads as empty: the
+// relation's own cell still holds the ids of the rows it links, which are
+// this row's values, and no formula or rollup gets a title or a value of
+// theirs. A database that cannot be read fails the whole answer.
 func (who *viewer) computed(ctx context.Context, t *loadedDatabase) (map[string]map[string]any, error) {
 	names, err := who.names(ctx)
 	if err != nil {
@@ -90,7 +93,7 @@ func (who *viewer) computed(ctx context.Context, t *loadedDatabase) (map[string]
 			if readErr == nil {
 				readErr = err
 			}
-		case there && engine.CanSeeDoc(database, who.member.UserID):
+		case there && who.canSeeDoc(database):
 			if loaded, err = who.loadTable(ctx, database); err != nil && readErr == nil {
 				readErr = err
 			}

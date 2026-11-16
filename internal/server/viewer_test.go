@@ -249,6 +249,45 @@ func TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee(t *testing.
 	})
 }
 
+// TestARelationColumnDoesNotShowRowsOfADatabaseTheCallerMayNotSee: a
+// database's relation column may point at a database of another project.
+// Someone who may not read that project sees that a row is linked (the
+// cell holds the linked row's id, which is the row's own value) and
+// nothing of the linked row: a formula does not get its title, a rollup
+// not its values. They read as they do for a database that is gone.
+func TestARelationColumnDoesNotShowRowsOfADatabaseTheCallerMayNotSee(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		do := func(typ string, args M) string { return s.change(s.owner, "", typ, args)["ref"].(string) }
+		servers := do("doc.create", M{"title": "Servers", "kind": "database", "project": "OPS"})
+		do("property.create", M{"database": servers, "name": "Rack", "type": "text"})
+		cellar := do("doc.create", M{"parent": servers, "title": "cellar-one", "props": M{"Rack": "rack-zebra"}})
+		sprites := do("doc.create", M{"title": "Sprites", "kind": "database", "project": "SVA"})
+		do("property.create", M{"database": sprites, "name": "Server", "type": "relation", "config": M{"database": servers}})
+		do("property.create", M{"database": sprites, "name": "Where", "type": "formula", "config": M{"formula": `prop("Server")`}})
+		do("property.create", M{"database": sprites, "name": "Racks", "type": "rollup", "config": M{"relation": "Server", "target": "Rack", "fn": "values"}})
+		do("property.create", M{"database": sprites, "name": "Named", "type": "rollup", "config": M{"relation": "Server", "fn": "values"}})
+		do("doc.create", M{"parent": sprites, "title": "Boss idle", "props": M{"Server": []string{cellar}}})
+
+		for _, form := range []string{"", "?format=text", "?raw=1"} {
+			path := "/docs/" + sprites + "/rows" + form
+			if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); strings.Count(out, "cellar-one") != 2 || !strings.Contains(out, "rack-zebra") {
+				t.Fatalf("%s does not give the owner the linked row's title, by the formula and by the rollup, and its value: %s", path, out)
+			}
+			for who, token := range callers {
+				out := s.call(nil, token, "GET", w+path, nil, 200, nil)
+				if strings.Contains(out, "cellar-one") || strings.Contains(out, "rack-zebra") {
+					t.Errorf("%s gives %s the title or a value of a row of a database of OPS: %s", path, who, out)
+				}
+				if !strings.Contains(out, "Boss idle") && form != "?raw=1" || !strings.Contains(out, cellar) {
+					t.Errorf("%s does not give %s the row with its link: %s", path, who, out)
+				}
+			}
+		}
+	})
+}
+
 // TestListedAttachmentsFollowTheirPage: /list/attachments gives a file on
 // a page only to those who may see the page. One on someone's private
 // page, or on a page of a project the caller may not read, is not listed.
