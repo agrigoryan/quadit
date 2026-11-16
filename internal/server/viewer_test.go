@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -484,6 +485,59 @@ func TestAFileOnACommentOnAPageFollowsThePage(t *testing.T) {
 		sees("an owner, of a page someone keeps private", s.owner, "", map[string]bool{"handbook.txt": true, "design.txt": true, "runbook.txt": true, "diary.txt": false})
 		for who, token := range callers {
 			sees(who, nil, token, map[string]bool{"handbook.txt": true, "design.txt": true, "runbook.txt": false, "diary.txt": false})
+		}
+	})
+}
+
+// TestAFileIsServedWithinBothTheMembersAndTheTokensProjects: a member
+// limited to some projects may make a token for fewer of them. A file is
+// served to that token when its task or page is of a project both the
+// membership and the token allow; a token made for a project outside the
+// membership is served none.
+func TestAFileIsServedWithinBothTheMembersAndTheTokensProjects(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		oneProjectOnly(t, s) // SVA and OPS, a task in each
+		s.change(s.owner, "", "project.create", M{"key": "ART", "name": "Art"})
+		s.change(s.owner, "", "task.create", M{"project": "ART", "title": "Draw"})
+		s.change(s.owner, "", "agent.create", M{"name": "Two", "handle": "two", "scope": M{"projects": []string{"SVA", "OPS"}}})
+		token := func(body M) string {
+			var tok struct{ Token string }
+			s.call(s.owner, "", "POST", w+"/tokens", body, 201, &tok)
+			return tok.Token
+		}
+		type file struct{ id, name, project string }
+		var files []file
+		attach := func(project, name string, to M) {
+			var f struct{ ID string }
+			s.call(s.owner, "", "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			to["file"] = f.ID
+			s.change(s.owner, "", "attachment.add", to)
+			files = append(files, file{f.ID, name, project})
+		}
+		for _, project := range []string{"SVA", "OPS", "ART"} {
+			attach(project, "task-"+project+".txt", M{"task": project + "-1"})
+			attach(project, "page-"+project+".txt", M{"doc": s.change(s.owner, "", "doc.create", M{"title": "Page of " + project, "project": project})["ref"]})
+		}
+		for _, caller := range []struct {
+			name, token string
+			projects    []string
+		}{
+			{"the member's own token", token(M{"user": "@two"}), []string{"SVA", "OPS"}},
+			{"the member's token for SVA", token(M{"user": "@two", "projects": []string{"SVA"}}), []string{"SVA"}},
+			{"the member's token for a project outside the membership", token(M{"user": "@two", "projects": []string{"ART"}}), nil},
+			{"the member's token for SVA and one outside", token(M{"user": "@two", "projects": []string{"SVA", "ART"}}), []string{"SVA"}},
+		} {
+			for _, f := range files {
+				status := 404
+				if slices.Contains(caller.projects, f.project) {
+					status = 200
+				}
+				s.call(nil, caller.token, "GET", w+"/files/"+f.id, nil, status, nil)
+				if body := s.call(nil, caller.token, "GET", "/f/"+f.id+"/"+f.name, nil, status, nil); status == 200 && body != "the bytes of "+f.name {
+					t.Errorf("%s is served to %s as %q", f.name, caller.name, body)
+				}
+			}
 		}
 	})
 }
