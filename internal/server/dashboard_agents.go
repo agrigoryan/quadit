@@ -283,7 +283,7 @@ func (who *viewer) dashboardAgents(ctx context.Context, scope dashboardScope) ([
 	}
 	var only []string
 	if scope.oneProject {
-		only = scope.projects
+		only = scope.covers.projects
 	}
 	return who.agentStates(ctx, open, scope.names, only)
 }

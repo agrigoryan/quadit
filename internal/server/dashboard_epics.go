@@ -3,7 +3,6 @@
 package server
 
 import (
-	"slices"
 	"sort"
 	"time"
 
@@ -37,7 +36,7 @@ func epicProgressOf(scope dashboardScope) []epicProgress {
 	names := scope.names
 	byEpic := map[string]*epicProgress{}
 	for _, epic := range names.epics {
-		if epic.DeletedAt != 0 || (len(scope.projects) > 0 && !slices.Contains(scope.projects, epic.ProjectID)) || epic.State == core.EpicCanceled {
+		if epic.DeletedAt != 0 || !scope.covers.canProject(epic.ProjectID) || epic.State == core.EpicCanceled {
 			continue
 		}
 		byEpic[epic.ID] = &epicProgress{ID: epic.ID, Name: epic.Name, Project: names.projects[epic.ProjectID].Key, State: epic.State, Lead: names.handle(epic.LeadID), TargetOn: epic.TargetOn}

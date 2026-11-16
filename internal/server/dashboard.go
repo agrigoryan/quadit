@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"slices"
 	"sort"
 	"time"
 
@@ -60,9 +59,11 @@ type dashboardScope struct {
 	oneProject bool
 	names      *nameLookup
 	now        time.Time
-	projects   []string        // the projects it covers; none means all the caller may read
-	tasks      []core.Task     // every task of those projects, archived ones too
-	covered    map[string]bool // the ids of those tasks
+	// covers is the viewer kept to the projects the dashboard covers: what
+	// it may see is what the dashboard shows.
+	covers  *viewer
+	tasks   []core.Task     // every task it covers, archived ones too
+	covered map[string]bool // the ids of those tasks
 }
 
 // dashboard builds the dashboard of the projects the viewer may read, or of
@@ -73,7 +74,7 @@ func (who *viewer) dashboard(ctx context.Context, projectRef string) (dashboard,
 	if err != nil {
 		return dashboard{}, err
 	}
-	projects := who.projects
+	covers := *who
 	if projectRef != "" {
 		project, err := who.resolver(ctx).Project(projectRef)
 		if err != nil {
@@ -82,9 +83,9 @@ func (who *viewer) dashboard(ctx context.Context, projectRef string) (dashboard,
 		if !who.canProject(project.ID) {
 			return dashboard{}, errNotFound("project " + projectRef)
 		}
-		projects = []string{project.ID}
+		covers.limitTo([]string{project.ID})
 	}
-	tasks, err := who.everyTask(ctx, store.TaskFilter{ProjectIDs: projects, Archived: true})
+	tasks, err := who.everyTask(ctx, covers.readable(store.TaskFilter{Archived: true}))
 	if err != nil {
 		return dashboard{}, err
 	}
@@ -92,7 +93,7 @@ func (who *viewer) dashboard(ctx context.Context, projectRef string) (dashboard,
 	for _, t := range tasks {
 		covered[t.ID] = true
 	}
-	scope := dashboardScope{oneProject: projectRef != "", names: names, now: time.Now(), projects: projects, tasks: tasks, covered: covered}
+	scope := dashboardScope{oneProject: projectRef != "", names: names, now: time.Now(), covers: &covers, tasks: tasks, covered: covered}
 
 	var d dashboard
 	if d.waiting, d.asked, err = who.waitingOnMe(ctx, scope); err != nil {
@@ -179,9 +180,7 @@ func (who *viewer) recentDecisions(ctx context.Context, scope dashboardScope) ([
 	if err := who.db.List(ctx, &prefs, store.Q{Where: []store.Cond{store.Live, store.Null("retired_at")}, Order: "-created_at", Limit: 5}); err != nil {
 		return nil, nil, err
 	}
-	prefs = keep(prefs, func(pref core.Preference) bool {
-		return len(scope.projects) == 0 || pref.ProjectID == "" || slices.Contains(scope.projects, pref.ProjectID)
-	})
+	prefs = keep(prefs, func(pref core.Preference) bool { return scope.covers.canProject(pref.ProjectID) })
 	return decided, prefs, nil
 }
 

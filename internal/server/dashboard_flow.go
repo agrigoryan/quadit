@@ -5,12 +5,10 @@ package server
 
 import (
 	"context"
-	"slices"
 	"sort"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
-	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // flowStatus is how many tasks one status of one project holds.
@@ -33,7 +31,7 @@ func (who *viewer) flowByStatus(scope dashboardScope) []flowStatus {
 	}
 	var statuses []core.Status
 	for _, status := range names.statuses {
-		if status.DeletedAt == 0 && (len(scope.projects) == 0 || slices.Contains(scope.projects, status.ProjectID)) && who.canProject(status.ProjectID) {
+		if status.DeletedAt == 0 && scope.covers.canProject(status.ProjectID) {
 			statuses = append(statuses, status)
 		}
 	}
@@ -127,7 +125,9 @@ type flowWait struct {
 func (who *viewer) flowWaiting(ctx context.Context, scope dashboardScope) ([]flowWait, error) {
 	names := scope.names
 	since := map[string]int64{}
-	evs, err := who.db.Events(ctx, store.EventFilter{Types: []string{"task.updated", "task.created"}, ProjectIDs: scope.projects, Desc: true, Limit: flowEvents})
+	tasksChanged := scope.covers.feed()
+	tasksChanged.Types, tasksChanged.Desc, tasksChanged.Limit = []string{"task.updated", "task.created"}, true, flowEvents
+	evs, err := who.db.Events(ctx, tasksChanged)
 	if err != nil {
 		return nil, err
 	}
