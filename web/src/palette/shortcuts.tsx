@@ -27,33 +27,47 @@ const propertyKeys: Shortcut[] = KEYED.flatMap(({ picker }) =>
   picker.hotkey ? [{ what: picker.hotkey.shortcut, keys: [picker.hotkey.key.toUpperCase()] }] : [],
 );
 
+/** The keys of tasks/task-keys.tsx: on a list's row or card, and on the open task alike. */
+const taskKeys: Shortcut[] = [
+  { what: "shortcuts.assignMe", keys: ["I"] },
+  { what: "shortcuts.copyKey", keys: [`${MOD} .`] },
+  { what: "shortcuts.copyBranch", keys: [`Shift ${MOD} .`] },
+  { what: "shortcuts.trash", keys: [`${MOD} Backspace`] },
+];
+
 const sections: Section[] = [
   {
     title: "shortcuts.group.anywhere",
     rows: [
-      { what: "shortcuts.palette", keys: [`${MOD} K`] },
+      { what: "shortcuts.palette", keys: [`${MOD} K`, "/"], join: "or" },
       { what: "shortcuts.newTask", keys: ["C"] },
       { what: "shortcuts.sheet", keys: ["?"] },
       { what: "shortcuts.undo", keys: [`${MOD} Z`] },
       { what: "shortcuts.redo", keys: [`Shift ${MOD} Z`] },
       { what: "shortcuts.goBack", keys: [`${MOD} [`] },
       { what: "shortcuts.goForward", keys: [`${MOD} ]`] },
+      { what: "shortcuts.sidebar", keys: ["["] },
+      { what: "shortcuts.copyLink", keys: [`Shift ${MOD} ,`] },
       { what: "shortcuts.close", keys: ["Esc"] },
+      { what: "shortcuts.leavePage", keys: ["Esc"] },
     ],
   },
   {
     title: "shortcuts.group.lists",
     hint: "shortcuts.group.listsHint",
     rows: [
-      { what: "shortcuts.down", keys: ["J"] },
-      { what: "shortcuts.up", keys: ["K"] },
+      { what: "shortcuts.down", keys: ["J", "↓"], join: "or" },
+      { what: "shortcuts.up", keys: ["K", "↑"], join: "or" },
       { what: "shortcuts.peek", keys: ["Space"] },
       { what: "shortcuts.open", keys: ["Enter"] },
       { what: "shortcuts.newTab", keys: [`${MOD} Click`] },
-      { what: "shortcuts.select", keys: ["X"] },
-      { what: "shortcuts.fold", keys: ["←", "→"], join: "or" },
       ...propertyKeys,
+      ...taskKeys,
+      { what: "shortcuts.select", keys: ["X"] },
+      { what: "shortcuts.selectAll", keys: [`${MOD} A`] },
       { what: "shortcuts.clear", keys: ["Esc"] },
+      { what: "shortcuts.fold", keys: ["←", "→"], join: "or" },
+      { what: "shortcuts.filter", keys: ["F"] },
       { what: "shortcuts.lift", keys: ["Shift Space"] },
     ],
   },
@@ -61,12 +75,14 @@ const sections: Section[] = [
     title: "shortcuts.group.panel",
     hint: "shortcuts.group.panelHint",
     rows: [
-      { what: "shortcuts.peekNext", keys: ["J", "K"], join: "or" },
+      { what: "shortcuts.peekNext", keys: ["J", "K", "↓", "↑"], join: "or" },
       { what: "shortcuts.openPage", keys: ["Enter"] },
       { what: "shortcuts.peekClose", keys: ["Space", "Esc"], join: "or" },
-      { what: "shortcuts.pageNext", keys: ["J", "K"], join: "or" },
+      { what: "shortcuts.pageNext", keys: ["J", "K", "↓", "↑"], join: "or" },
       { what: "shortcuts.back", keys: ["Esc"] },
       ...propertyKeys,
+      ...taskKeys,
+      { what: "shortcuts.subtask", keys: [`Shift ${MOD} O`] },
       { what: "shortcuts.comment", keys: ["Ctrl M"] },
       { what: "shortcuts.send", keys: [`${MOD} Enter`] },
       { what: "shortcuts.leaveBox", keys: ["Esc"] },
@@ -87,6 +103,38 @@ const sections: Section[] = [
     rows: [{ what: "shortcuts.openChip", keys: [`${MOD} Enter`] }],
   },
   {
+    title: "shortcuts.group.tree",
+    hint: "shortcuts.group.treeHint",
+    rows: [
+      { what: "shortcuts.treeWalk", keys: ["↓", "↑"], join: "or" },
+      { what: "shortcuts.treeFold", keys: ["→", "←"], join: "or" },
+    ],
+  },
+  {
+    title: "shortcuts.group.table",
+    hint: "shortcuts.group.tableHint",
+    rows: [
+      { what: "shortcuts.cellMove", keys: ["←", "→", "↑", "↓"], join: "or" },
+      { what: "shortcuts.cellNext", keys: ["Tab", "Shift Tab"], join: "or" },
+      { what: "shortcuts.cellEdit", keys: ["Enter"] },
+      { what: "shortcuts.rowOpen", keys: ["Space"] },
+      { what: "shortcuts.cellClear", keys: ["Backspace"] },
+      { what: "shortcuts.rowTrash", keys: [`${MOD} Backspace`] },
+      { what: "shortcuts.cellLeave", keys: ["Esc"] },
+    ],
+  },
+  {
+    title: "shortcuts.group.timeline",
+    hint: "shortcuts.group.timelineHint",
+    rows: [
+      { what: "shortcuts.barDay", keys: ["←", "→"], join: "or" },
+      { what: "shortcuts.barWeek", keys: ["PageUp", "PageDown"], join: "or" },
+      { what: "shortcuts.barEnd", keys: ["Shift ←", "Shift →"], join: "or" },
+      { what: "shortcuts.barStart", keys: ["Shift Alt ←", "Shift Alt →"], join: "or" },
+      { what: "shortcuts.barCancel", keys: ["Esc"] },
+    ],
+  },
+  {
     title: "shortcuts.group.inbox",
     rows: [
       { what: "shortcuts.archive", keys: ["E"] },
@@ -97,9 +145,12 @@ const sections: Section[] = [
     title: "shortcuts.group.compare",
     rows: [
       { what: "shortcuts.focusOption", keys: ["←", "→"], join: "or" },
+      { what: "shortcuts.stepFile", keys: ["↑", "↓"], join: "or" },
       { what: "shortcuts.pick", keys: ["1", "9"], join: "to" },
       { what: "shortcuts.zoom", keys: ["+", "−"], join: "or" },
       { what: "shortcuts.fit", keys: ["0"] },
+      { what: "shortcuts.pixels", keys: ["P"] },
+      { what: "shortcuts.play", keys: ["Space"] },
     ],
   },
 ];

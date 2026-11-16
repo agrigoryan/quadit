@@ -96,7 +96,7 @@ const rows = () =>
     .map((o) => {
       const label = o.querySelector("span.shrink")?.textContent ?? "";
       const detail = o.querySelector("span.flex-1")?.textContent;
-      const key = o.querySelector("kbd")?.textContent;
+      const key = Array.from(o.querySelectorAll("kbd"), (cap) => cap.textContent).join(" ");
       return (
         [label, detail, key && `[${key}]`].filter(Boolean).join(" ") + (o.querySelector("svg.lucide-check") ? " ✓" : "")
       );
@@ -107,13 +107,14 @@ describe("the palette on a task", () => {
   it("offers to change its status, assignee, priority and labels, each with its key", () => {
     seed();
     openPalette();
-    expect(rows().slice(0, 7)).toEqual([
+    expect(rows().slice(0, 8)).toEqual([
       "Change status… [S]",
       "Assign to… [A]",
       "Set priority… [P]",
       "Add or remove labels… [L]",
-      "Copy key",
-      "Copy link",
+      "Copy key [Ctrl .]",
+      "Copy link [Shift Ctrl ,]",
+      "Copy git branch name [Shift Ctrl .]",
       expect.stringMatching(/^New task/),
     ]);
   });

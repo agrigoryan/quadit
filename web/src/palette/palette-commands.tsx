@@ -10,6 +10,7 @@ import {
   FilePlus2,
   FileText,
   FolderPlus,
+  GitBranch,
   Keyboard,
   Link2,
   ListPlus,
@@ -17,6 +18,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  PanelLeft,
   Plus,
   Redo2,
   Shapes,
@@ -32,20 +34,21 @@ import { matchPath, useLocation } from "react-router";
 import { saveTheme, signOut } from "@/auth/session";
 import { projectDocs, workspaceDocs } from "@/docs/area";
 import { useCan } from "@/data/access";
-import { copyText } from "@/data/files";
+import { copyAndSay } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { useProjects, useViews } from "@/data/selectors";
 import { useStore } from "@/data/store";
 import { askToUndo, redo, useUndo } from "@/data/undo";
 import { MOD } from "@/hooks/hotkeys";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
-import { toast } from "@/lib/toast";
 import type { Project, Task } from "@/types/core";
 import { ui } from "@/lib/ui-state";
 import { settingsGroups } from "@/settings/pages";
 import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";
+import { showOrHideSidebar } from "@/shell/sidebar";
 import { openNewTask } from "@/tasks/draft";
 import { PALETTE, type PropertyName } from "@/tasks/properties";
+import { copyBranchName } from "@/tasks/task-keys";
 import { taskPath } from "@/nav/task-link";
 
 /** Pages where the box takes a name for something new. */
@@ -82,11 +85,6 @@ export interface CommandContext {
 
 const themeIcons: Record<ThemeChoice, ReactNode> = { system: <Monitor />, light: <Sun />, dark: <Moon /> };
 const themes: ThemeChoice[] = ["system", "light", "dark"];
-
-async function copy(text: string) {
-  if (await copyText(text)) toast.info(t("common.copied"));
-  else toast.error(t("common.copyFailed"));
-}
 
 const PROJECT_TABS: { tab: "general" | "templates" | "preferences"; icon: ReactNode }[] = [
   { tab: "general", icon: <SlidersHorizontal /> },
@@ -145,14 +143,24 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
           label: t("palette.copyKey"),
           words: task.key,
           icon: <Copy />,
-          run: () => run(() => void copy(task.key)),
+          hint: `${MOD} .`,
+          run: () => run(() => void copyAndSay(task.key)),
         },
         {
           id: "task:copy-link",
           label: t("palette.copyLink"),
           words: "url",
           icon: <Link2 />,
-          run: () => run(() => void copy(window.location.origin + taskPath(slug, task.key))),
+          hint: `Shift ${MOD} ,`,
+          run: () => run(() => void copyAndSay(window.location.origin + taskPath(slug, task.key))),
+        },
+        {
+          id: "task:copy-branch",
+          label: t("palette.copyBranch"),
+          words: "git branch name checkout",
+          icon: <GitBranch />,
+          hint: `Shift ${MOD} .`,
+          run: () => run(() => void copyBranchName(task)),
         },
       ]
     : [];
@@ -339,6 +347,14 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
       icon: <Keyboard />,
       hint: "?",
       run: () => run(() => ui.setShortcuts(true)),
+    },
+    {
+      id: "sidebar",
+      label: t("palette.sidebar"),
+      words: "toggle collapse expand navigation drawer menu",
+      icon: <PanelLeft />,
+      hint: "[",
+      run: () => run(showOrHideSidebar),
     },
     {
       id: "theme:toggle",

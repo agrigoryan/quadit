@@ -18,11 +18,11 @@ import {
 import { Link } from "react-router";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
-import { copyText } from "@/data/files";
+import { copyAndSay } from "@/data/files";
+import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { type Batch, sendUndoable } from "@/data/undo";
 import { useMe, useRow, useRowEvenIfGone, useSlug } from "@/data/selectors";
-import { toast } from "@/lib/toast";
 import type { Task } from "@/types/core";
 import type { TaskLayout } from "@/detail/task-body";
 import type { QueuePlace } from "@/detail/task-view";
@@ -60,12 +60,6 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }:
   const watching = !!useRow("watchers", task ? `${me.user_id}:${task.id}` : undefined);
   const can = useCan();
   const page = layout === "page";
-
-  async function copyLink() {
-    const ok = await copyText(location.origin + taskPath(slug, taskKey));
-    if (ok) toast.info(t("common.copied"));
-    else toast.error(t("common.copyFailed"));
-  }
 
   return (
     <header
@@ -108,7 +102,12 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }:
               {watching ? <Eye className="size-4 text-accent-text" /> : <EyeOff className="size-4" />}
             </IconButton>
           )}
-          <IconButton label={t("detail.copyLink")} className="max-md:size-10" onClick={copyLink}>
+          <IconButton
+            label={t("detail.copyLink")}
+            hint={`Shift ${MOD} ,`}
+            className="max-md:size-10"
+            onClick={() => void copyAndSay(location.origin + taskPath(slug, taskKey))}
+          >
             <Link2 className="size-4" />
           </IconButton>
           {can.editTask(task) && (

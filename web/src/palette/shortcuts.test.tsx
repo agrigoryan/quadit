@@ -24,4 +24,16 @@ describe("ShortcutsSheet", () => {
     const caps = within(row as HTMLElement).getAllByText((_, el) => el?.tagName === "KBD");
     expect(caps.map((cap) => cap.textContent)).toEqual([MOD, "Enter"]);
   });
+
+  it("lists the keys for a task under the lists and under a task alike", () => {
+    ui.setShortcuts(true);
+    render(
+      <TooltipProvider>
+        <ShortcutsSheet />
+      </TooltipProvider>,
+    );
+    for (const what of ["Assign to me, or take off me", "Copy the task's key", "Move to the trash"])
+      expect(screen.getAllByText(what)).toHaveLength(2);
+    expect(screen.getAllByText("Add a sub-task")).toHaveLength(1);
+  });
 });
