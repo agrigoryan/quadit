@@ -175,6 +175,10 @@ test("the page's keys work while a database row is peeked", async ({ page, proje
   await page.getByRole("button", { name: "Open", exact: true }).click();
   const peek = page.getByRole("dialog", { name: "Acme paints" });
   await expect(peek).toBeVisible();
+  // Off the table, whose chosen cell would take the letter as typing (docs/db/table-view.tsx).
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
   await page.keyboard.press("c");
   await expect(page.getByRole("dialog", { name: "New task" })).toBeVisible();
 });
