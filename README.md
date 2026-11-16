@@ -77,18 +77,29 @@ See [docs/agents.md](docs/agents.md). The same surface is an MCP server at `/mcp
 
 ```bash
 make test        # SQLite
-make test-all    # SQLite and Postgres, with the race detector (needs Postgres: see docs/install.md)
+make test-all    # SQLite and Postgres, with the race detector (needs Postgres: see docs/install.md), then the web app's types and tests
 make server      # the binary without the web app, for API work
 make lint        # the Go linter, then the web app's lint and format check
-cd web && pnpm check   # the web app: types, lint, format, tests
+make generate    # web/src/types/changes.gen.ts, the web app's types for every change, from the engine
+cd web && pnpm check   # the web app: types, lint, format, tests (Vitest)
 make e2e         # the end-to-end suite: Chromium against the binary (builds it first)
 ```
 
 Every test that touches data runs on both databases. Dependencies are permissively licensed only.
 
+### The web app
+
+`web/src` is in layers, bottom up: `types` (the wire types, the generated `changes.gen.ts` among them) and `i18n`; `lib`; `data` and `hooks`; `nav`; `ui`; the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`); `shell`, `pages` and `palette` on top. Lint keeps each layer to the ones below it; [docs/code-style.md](docs/code-style.md) has the rest of the rules.
+
+- The browser holds a copy of the workspace (`data/store.ts`): `data/sync.ts` fills it from `/bootstrap` and keeps it current from the event feed, shared by the tabs. Components read it through `data/selectors.ts`, and ask `useCan()` (`data/access.ts`) what the signed-in member may do.
+- Every write is a named change through `mutate` or `send` (`data/mutate.ts`): it shows at once, waits on the device (`data/outbox.ts`) until the server answers, and is undone if refused. Its name and arguments are typed from `types/changes.gen.ts` (`make generate`).
+- What the copy does not hold (settings lists, a task's history, a page's blocks, the trash, the admin pages) is read with TanStack Query, through the one client in `data/query.ts`.
+- A task property (status, assignee, due date…) is described once under `tasks/properties/`; the pickers, the property panel, the bulk bar, the filters and the rest read that table. A form in a dialog is built on `ui/form-dialog`.
+- Unit and component tests (Vitest, Testing Library) sit beside the file they check and run in `pnpm check`.
+
 ### End-to-end tests
 
-`web/e2e` is a [Playwright](https://playwright.dev) suite that drives the real binary in Chromium: one short spec per area of the app (sign-in, tasks, keyboard, board, task page, decisions, docs, palette, live updates, offline, settings, phone width). It is not part of `pnpm check`, because it needs the binary.
+`web/e2e` is a [Playwright](https://playwright.dev) suite that drives the real binary in Chromium: one short spec per area of the app (sign-in, tasks, keyboard, board, task page, decisions, docs, private pages, palette, live updates, offline, read-only access, project limits, trash, settings, phone width). It is not part of `pnpm check`, because it needs the binary.
 
 - First time: `cd web && pnpm exec playwright install chromium`.
 - `make e2e` builds and runs everything. After `make build`, `cd web && pnpm e2e` runs it again; `pnpm e2e tasks` runs the specs whose file name matches, `pnpm e2e --ui` opens Playwright's runner, `pnpm e2e --headed` shows the browser.
