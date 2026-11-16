@@ -116,3 +116,30 @@ test("bold around code and code in a link stay through an edit in the browser", 
   await expect(text.getByRole("link", { name: "code" })).toBeVisible();
   expect(await quadit.cli("doc", made.ref)).toContain(`Some ${bold} and ${link} here. Saved.`);
 });
+
+// The toolbar over a selection is the editor's own buttons and Comment. A
+// press on one makes the page draw again (the editor gives the focus up), and
+// the button must still be there for the click to land.
+test("the toolbar over a selection makes text bold and starts a comment on its block", async ({ page, project }) => {
+  await page.goto(`/e2e/p/${project.key}/docs`);
+  await page.getByRole("main").getByRole("button", { name: "New page" }).click();
+  await page.getByRole("textbox", { name: "Page title" }).fill("Launch notes");
+  const text = page.getByRole("textbox", { name: "Page text" });
+  await text.click();
+  await page.keyboard.type("Ship on Tuesday after the freeze.");
+  const toolbar = page.locator(".bn-formatting-toolbar");
+
+  await page.keyboard.press("Shift+Home");
+  await toolbar.getByRole("button", { name: "Bold" }).click();
+  await expect(text.locator("strong", { hasText: "Ship on Tuesday after the freeze." })).toBeVisible();
+
+  await page.keyboard.press("Shift+Home");
+  await toolbar.getByRole("button", { name: "Comment", exact: true }).click();
+  const comments = page.getByRole("complementary", { name: "Comments" });
+  await expect(comments.getByText("Ship on Tuesday after the freeze.")).toBeVisible();
+  const box = comments.getByRole("textbox", { name: "Comment on this block…" });
+  await expect(box).toBeFocused();
+  await box.fill("Which freeze, the code one?");
+  await comments.getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(comments.getByRole("article").filter({ hasText: "Which freeze, the code one?" })).toBeVisible();
+});

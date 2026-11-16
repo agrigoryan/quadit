@@ -8,11 +8,8 @@ import "@/docs/editor/theme.css";
 import { filterSuggestionItems } from "@blocknote/core/extensions";
 import { BlockNoteView } from "@blocknote/mantine";
 import {
-  FormattingToolbar,
   FormattingToolbarController,
   getDefaultReactSlashMenuItems,
-  getFormattingToolbarItems,
-  SideMenu,
   SideMenuController,
   SuggestionMenuController,
   useCreateBlockNote,
@@ -24,8 +21,7 @@ import { type BlockSchemaLike, type EdBlock, plainText, rowsToEditor } from "@/d
 import { Markers } from "@/docs/editor/markers";
 import {
   ActionsContext,
-  BlockMenu,
-  CommentButton,
+  BlockSideMenu,
   decisionItems,
   type EditorActions,
   extraSlashItems,
@@ -33,6 +29,7 @@ import {
   mentionItems,
   pageTitleItems,
   QuietMenu,
+  SelectionToolbar,
 } from "@/docs/editor/menus";
 import { openChipAtCaret } from "@/docs/editor/chips";
 import { type ChipKind, ChipPicker } from "@/docs/editor/pickers";
@@ -179,14 +176,15 @@ export default function Editor({
     [editor],
   );
 
+  const canComment = !!onComment;
   const actions = useMemo<EditorActions>(
     () => ({
-      comment: (blockId) => callbacks.current.onComment?.(blockId),
+      comment: canComment ? (blockId) => callbacks.current.onComment?.(blockId) : undefined,
       pickTask: () => setPicking("task"),
       pickDecision: () => setPicking("decision"),
       pickPage: () => setPicking("page"),
     }),
-    [],
+    [canComment],
   );
 
   function insertChip(kind: ChipKind, ref: string) {
@@ -244,14 +242,8 @@ export default function Editor({
             getItems={async (query) => pageTitleItems(editor, query, docId)}
             suggestionMenuComponent={QuietMenu}
           />
-          <FormattingToolbarController
-            formattingToolbar={() => (
-              <FormattingToolbar>
-                {[...getFormattingToolbarItems(), ...(onComment ? [<CommentButton key="qdComment" />] : [])]}
-              </FormattingToolbar>
-            )}
-          />
-          <SideMenuController sideMenu={(props) => <SideMenu {...props} dragHandleMenu={BlockMenu} />} />
+          <FormattingToolbarController formattingToolbar={SelectionToolbar} />
+          <SideMenuController sideMenu={BlockSideMenu} />
         </BlockNoteView>
       </ActionsContext.Provider>
       <Markers editor={editor} wrap={wrap} others={others ?? []} threads={threads ?? {}} onOpenThread={onOpenThread} />

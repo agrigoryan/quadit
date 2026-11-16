@@ -8,7 +8,11 @@ import {
   BlockColorsItem,
   type DefaultReactSuggestionItem,
   DragHandleMenu,
+  FormattingToolbar,
+  getFormattingToolbarItems,
   RemoveBlockItem,
+  SideMenu,
+  type SideMenuProps,
   type SuggestionMenuProps,
   TableColumnHeaderItem,
   TableRowHeaderItem,
@@ -32,7 +36,8 @@ import { DecisionMark } from "@/ui/icons";
 
 /** What the menus can ask the page to do. */
 export interface EditorActions {
-  comment: (blockId: string) => void;
+  /** Missing where comments cannot be added from the editor (a row's side peek, a reader). */
+  comment?: (blockId: string) => void;
   pickTask: () => void;
   pickDecision: () => void;
   pickPage: () => void;
@@ -238,18 +243,18 @@ export function extraSlashItems(actions: EditorActions): DefaultReactSuggestionI
 }
 
 /** "Comment" in the toolbar that floats over a selection: on the block the selection starts in. */
-export function CommentButton() {
+function CommentButton() {
   const Components = useComponentsContext();
   const editor = useBlockNoteEditor();
-  const actions = useContext(ActionsContext);
-  if (!Components || !actions) return null;
+  const comment = useContext(ActionsContext)?.comment;
+  if (!Components || !comment) return null;
   return (
     <Components.FormattingToolbar.Button
       className="bn-button"
       label={t("docs.comment.add")}
       mainTooltip={t("docs.comment.add")}
       icon={<MessageSquarePlus size={16} />}
-      onClick={() => actions.comment(editor.getTextCursorPosition().block.id)}
+      onClick={() => comment(editor.getTextCursorPosition().block.id)}
     />
   );
 }
@@ -257,14 +262,38 @@ export function CommentButton() {
 function CommentItem() {
   const Components = useComponentsContext();
   const editor = useBlockNoteEditor();
-  const actions = useContext(ActionsContext);
+  const comment = useContext(ActionsContext)?.comment;
   const block = useExtensionState(SideMenuExtension, { editor, selector: (state) => state?.block });
-  if (!Components || !actions || !block) return null;
+  if (!Components || !comment || !block) return null;
   return (
-    <Components.Generic.Menu.Item className="bn-menu-item" onClick={() => actions.comment(block.id)}>
+    <Components.Generic.Menu.Item className="bn-menu-item" onClick={() => comment(block.id)}>
       {t("docs.comment.add")}
     </Components.Generic.Menu.Item>
   );
+}
+
+/*
+ * The toolbar and the side menu are handed to the editor as components.
+ * They are declared here, once, not inline where the editor is drawn: an
+ * inline one is a new component on every draw of the page, so React
+ * replaces it, and a press on one of its buttons that draws the page again
+ * (the editor loses the focus to it) lands on a button that is gone, and
+ * nothing happens.
+ */
+
+/** The toolbar over a selection: the editor's own buttons, and "Comment". */
+export function SelectionToolbar() {
+  return (
+    <FormattingToolbar>
+      {getFormattingToolbarItems()}
+      <CommentButton />
+    </FormattingToolbar>
+  );
+}
+
+/** The handle beside a block, with this product's menu behind it. */
+export function BlockSideMenu(props: SideMenuProps) {
+  return <SideMenu {...props} dragHandleMenu={BlockMenu} />;
 }
 
 /** The menu behind a block's drag handle: the editor's own entries, and "Comment". */
