@@ -131,7 +131,7 @@ export function Board({ groups, project }: Props) {
   // While a card is being dragged the columns follow the pointer, not the store.
   const [order, setOrder] = useState<Order | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const pointer = useBoardKeys(groups, scroller);
+  const keys = useBoardKeys(groups, scroller);
 
   const { cards, byGroup } = useMemo(() => {
     const cards = new Map<string, Card & { group: TaskGroup }>();
@@ -255,7 +255,7 @@ export function Board({ groups, project }: Props) {
     >
       <div
         ref={scroller}
-        {...pointer}
+        {...keys.handlers}
         className="flex h-full gap-2.5 overflow-x-auto p-2.5 max-sm:snap-x max-sm:snap-mandatory md:p-3"
       >
         {groups.map((group) => {
@@ -277,6 +277,7 @@ export function Board({ groups, project }: Props) {
       <DragOverlay dropAnimation={{ duration: 160, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }}>
         {active && <CardOverlay task={active} />}
       </DragOverlay>
+      {keys.picker}
     </DndContext>
   );
 }

@@ -2,12 +2,13 @@ import { useCallback, useMemo, useRef } from "react";
 import { CheckCheck, Inbox } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { getRowEvenIfGone, useMe, useRows } from "@/data/selectors";
+import { getRow, getRowEvenIfGone, useMe, useRows } from "@/data/selectors";
 import type { Notification } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { anchorOf, archive, markAllRead, markOpened, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
 import { InboxRow } from "@/pages/inbox-row";
 import { type OpenAs, useListKeys } from "@/tasks/list-keys";
+import { useTaskKeys } from "@/tasks/task-keys";
 import { useTaskNav } from "@/nav/task-link";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
@@ -52,6 +53,15 @@ export function InboxPage() {
     scroller,
     keys: write ? { e: (item) => archive([item.id]), u: toggleRead } : {},
   });
+  // S/A/P/L, I, the copy keys and Cmd+Backspace act on the task the focused item is about.
+  const picker = useTaskKeys({
+    tasksFor: () => {
+      const item = items.find((n) => n.id === focusId);
+      const task = getRow("tasks", item?.task_id);
+      return task ? [task] : [];
+    },
+    anchorFor: () => scroller.current?.querySelector("[data-focused]") ?? scroller.current,
+  });
 
   if (items.length === 0) {
     return <EmptyState icon={<Inbox />} title={t("inbox.empty")} hint={t("inbox.emptyHint")} />;
@@ -76,6 +86,7 @@ export function InboxPage() {
       {items.map((item) => (
         <InboxRow key={item.id} item={item} focused={focusId === item.id} onOpen={open} readOnly={!write} />
       ))}
+      {picker}
     </div>
   );
 }

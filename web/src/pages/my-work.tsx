@@ -8,6 +8,7 @@ import { exact } from "@/lib/time";
 import { CATEGORIES, type Category, type Decision, isOpenCategory, type Task } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { useListKeys } from "@/tasks/list-keys";
+import { useTaskKeys } from "@/tasks/task-keys";
 import { useTaskLink, useTaskNav } from "@/nav/task-link";
 import { keyCell, keyColumn, TaskRow } from "@/tasks/task-row";
 import { Avatar } from "@/ui/avatar";
@@ -84,6 +85,11 @@ export function MyWorkPage() {
     taskKeyOf: (row) => row.task.key,
     scroller,
   });
+  // S/A/P/L, I, the copy keys and Cmd+Backspace act on the focused row's task (a question's, for a question).
+  const picker = useTaskKeys({
+    tasksFor: () => rows.filter((row) => row.id === focusId).map((row) => row.task),
+    anchorFor: () => scroller.current?.querySelector("[data-focused]") ?? scroller.current,
+  });
   const yours = waiting.length + questions.length;
   const keyStyle = useMemo(() => keyColumn(rows.map((row) => row.task.key)), [rows]);
 
@@ -135,6 +141,7 @@ export function MyWorkPage() {
           <TaskRow key={task.id} task={task} focused={focusId === `a:${task.id}`} />
         ))}
       </section>
+      {picker}
     </div>
   );
 }

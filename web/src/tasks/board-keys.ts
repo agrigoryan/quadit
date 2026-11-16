@@ -1,9 +1,10 @@
 // The board's keys for looking at tasks. A board has no row the keyboard
 // is "on", so the card the keys mean is the one that has the focus (clicked,
 // or reached with Tab), else the one under the pointer: Space shows it in
-// the panel and puts the panel away again, Enter opens its page. While the
-// panel is open, J and K (or the arrows) move it down and up the column,
-// and the left and right arrows to the column beside it. Space being the
+// the panel and puts the panel away again, Enter opens its page, and the
+// keys of tasks/task-keys.tsx (S/A/P/L, I, the copy keys, Cmd+Backspace)
+// act on it. While the panel is open, J and K (or the arrows) move it down
+// and up the column, and the left and right arrows to the column beside it. Space being the
 // quick look, a card is lifted for moving with Shift+Space (tasks/board.tsx).
 
 import { type MouseEvent, type RefObject, useEffect, useEffectEvent, useRef } from "react";
@@ -15,6 +16,7 @@ import type { TaskGroup } from "@/tasks/filters";
 import { usePeek, useTaskNav } from "@/nav/task-link";
 import { takeSeen, useTaskOrder } from "@/nav/task-queue";
 import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
+import { useTaskKeys } from "@/tasks/task-keys";
 
 /** The id of the task whose card has the focus. */
 const focusedCard = (e: KeyboardEvent) =>
@@ -42,7 +44,7 @@ function focusCard(id: string, keepScroll: boolean, tries = 20) {
 
 /**
  * Give the returned handlers to the element that holds the columns, whose
- * ref is `scroller`. Left for a task's page and come back to, the board is
+ * ref is `scroller`, and draw the returned picker (opened by S, A, P, L). Left for a task's page and come back to, the board is
  * scrolled where it was with the focus on the card that was opened
  * (nav/place.ts; each column keeps its own scroll in tasks/board-column.tsx).
  */
@@ -113,12 +115,24 @@ export function useBoardKeys(groups: TaskGroup[], scroller: RefObject<HTMLElemen
     },
   });
 
-  return {
-    onMouseOver: (e: MouseEvent) => {
-      hoveredId.current = (e.target as HTMLElement).closest<HTMLElement>("[data-task]")?.dataset.task ?? null;
+  // S/A/P/L, I, the copy keys and Cmd+Backspace act on the card the keys mean.
+  const picker = useTaskKeys({
+    tasksFor: (e) => {
+      const task = meant(e);
+      return task ? [task] : [];
     },
-    onMouseLeave: () => {
-      hoveredId.current = null;
+    anchorFor: ([first]) => (first ? cardOf(first.id) : null),
+  });
+
+  return {
+    picker,
+    handlers: {
+      onMouseOver: (e: MouseEvent) => {
+        hoveredId.current = (e.target as HTMLElement).closest<HTMLElement>("[data-task]")?.dataset.task ?? null;
+      },
+      onMouseLeave: () => {
+        hoveredId.current = null;
+      },
     },
   };
 }

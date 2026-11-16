@@ -10,7 +10,9 @@
 
 import { create } from "zustand";
 import { api, ApiError, calledOff, NetworkError, whenReachable, workspacePath } from "@/data/api";
+import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
+import { toast } from "@/lib/toast";
 import { getState } from "@/data/store";
 import type { FileRow } from "@/types/core";
 import { localPath } from "@/lib/url";
@@ -203,6 +205,12 @@ export async function copyText(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Copies text and says in a toast whether it worked. */
+export async function copyAndSay(text: string): Promise<void> {
+  if (await copyText(text)) toast.info(t("common.copied"));
+  else toast.error(t("common.copyFailed"));
 }
 
 // Uploads under way live in this module; reload instead of hot-swapping it in development.

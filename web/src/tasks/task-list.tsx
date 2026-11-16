@@ -7,7 +7,6 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { usePlace } from "@/nav/place";
-import { useCan } from "@/data/access";
 import { useLookup } from "@/data/selectors";
 import { isDraft } from "@/data/store";
 import { usePeek, useTaskNav } from "@/nav/task-link";
@@ -29,9 +28,8 @@ import {
   treeStep,
 } from "@/tasks/list-layout";
 import { giveKeysBackToList, isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
-import { GROUPINGS, KEYED } from "@/tasks/properties";
-import type { PickerProperty } from "@/tasks/properties/property";
-import { TaskPropertyPicker } from "@/tasks/property-picker";
+import { GROUPINGS } from "@/tasks/properties";
+import { useTaskKeys } from "@/tasks/task-keys";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { useViewport } from "@/tasks/use-viewport";
 
@@ -52,8 +50,10 @@ const groupingOf = (group: TaskGroup) => GROUPINGS.find((p) => p.name === group.
 /**
  * Tasks as dense rows under collapsible group headings, driven from the
  * keyboard: J/K move, Space shows the focused task in the panel, Enter
- * opens its page, X selects, S/A/P/L change the focused row or the whole
- * selection, Left and Right fold and unfold a parent's sub-tasks. A parent
+ * opens its page, X selects and Cmd+A selects them all, the keys of
+ * tasks/task-keys.tsx (S/A/P/L, I, the copy keys, Cmd+Backspace) act on
+ * the focused row or the whole selection, Left and Right fold and unfold a
+ * parent's sub-tasks. A parent
  * shown only for context (tasks/list-layout.ts) is walked and opened like
  * any row, but is never selected. While the panel is open J/K move it to the next task, and
  * Space or Escape closes it with the focus still on the row. Only the rows
@@ -73,12 +73,9 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
   useLayoutEffect(() => {
     place.current = { focus: focusKey, folded: [...collapsed] };
   });
-  const [picker, setPicker] = useState<PickerProperty | null>(null);
-  const anchor = useRef<Element | null>(null);
   const lastPicked = useRef<string | null>(null);
   const view = useViewport(scroller);
   const tasks = useLookup("tasks");
-  const can = useCan();
 
   // `collapsed` holds the groups folded, by id, and the parents folded, by row key.
   const { sections, rows, indexOf, total } = useMemo(
@@ -204,15 +201,6 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
   }
   const addTo = useCallback((group: TaskGroup) => onAdd?.(groupingOf(group)?.draft?.(group) ?? {}), [onAdd]);
 
-  function openPicker(property: PickerProperty) {
-    const first = targets[0];
-    // Like the row's own buttons: nothing to pick for a task the viewer may not change.
-    if (!first || !targets.every((task) => can.editTask(task))) return;
-    // The row may be scrolled out of the window; the list itself then holds the picker.
-    anchor.current = scroller.current?.querySelector(`[data-task="${first.id}"]`) ?? scroller.current;
-    setPicker(property);
-  }
-
   useHotkeys({
     j: () => move(1),
     k: () => move(-1),
@@ -244,15 +232,22 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     Escape: () => {
       if (selected.size > 0) onSelectedChange(new Set());
     },
-    ...Object.fromEntries(
-      KEYED.map((property) => [
-        property.picker.hotkey?.key,
-        (e: KeyboardEvent) => {
-          e.preventDefault(); // or the letter lands in the picker's search box
-          openPicker(property);
-        },
-      ]),
-    ),
+  });
+  useHotkeys(
+    {
+      // Every task on the list, and the bulk bar takes it from there; not the text of the page, as the browser would.
+      "mod+a": (e) => {
+        e.preventDefault();
+        onSelectedChange(new Set(rows.filter((row) => !row.branch?.context).map((row) => row.task.id)));
+      },
+    },
+    { guardChords: true },
+  );
+  // I, the copy keys, Cmd+Backspace, and S/A/P/L, on the selection or else the focused row.
+  const picker = useTaskKeys({
+    tasksFor: () => targets,
+    // The row may be scrolled out of the window; the list itself then holds the picker.
+    anchorFor: ([first]) => (first && scroller.current?.querySelector(`[data-task="${first.id}"]`)) || scroller.current,
   });
 
   // While the panel is open the same keys move it a row along. The focus leads and the panel follows, so keys pressed quickly are all counted.
@@ -317,15 +312,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
           );
         })}
       </div>
-      {picker && targets.length > 0 && (
-        <TaskPropertyPicker
-          property={picker}
-          tasks={targets}
-          open
-          onOpenChange={(open) => !open && setPicker(null)}
-          anchor={anchor}
-        />
-      )}
+      {picker}
     </div>
   );
 }

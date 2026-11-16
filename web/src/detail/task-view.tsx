@@ -15,6 +15,7 @@ import { useRevealFromHash } from "@/detail/reveal-hash";
 import { TaskBody, type TaskLayout } from "@/detail/task-body";
 import { LostProject, useLostProject } from "@/ui/not-found";
 import { isTaskPath } from "@/nav/task-link";
+import { useTaskKeys } from "@/tasks/task-keys";
 import { EmptyState } from "@/ui/empty";
 import { LoadFailed } from "@/ui/load-gate";
 import { Loading } from "@/ui/spinner";
@@ -83,6 +84,8 @@ export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
     },
     { layer: "panel" },
   );
+  // I, the copy keys and Cmd+Backspace act on the open task; S/A/P/L are its property rows' own (detail/properties.tsx).
+  useTaskKeys({ tasksFor: () => (task ? [task] : []), layer: "panel", onTrashed: onClose });
   const step = (by: number) => (e: KeyboardEvent) => {
     e.preventDefault();
     queue?.step(by);

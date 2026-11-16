@@ -190,6 +190,21 @@ describe("TaskList keys", () => {
     expect(screen.getByLabelText("selected").textContent).toBe("");
   });
 
+  it("selects every task with Cmd+A, but not from a field or under the panel", () => {
+    renderList();
+    const all = (target: Element = document.body) =>
+      act(() => void fireEvent.keyDown(target, { key: "a", code: "KeyA", metaKey: true }));
+    all(screen.getByLabelText("field"));
+    expect(screen.getByLabelText("selected").textContent).toBe("");
+    press("j");
+    press(" ");
+    all();
+    expect(screen.getByLabelText("selected").textContent).toBe("");
+    press(" ");
+    all();
+    expect(screen.getByLabelText("selected").textContent).toBe("t1,t2,t3,t4,t5");
+  });
+
   it("does nothing for keys typed in a field, or Space on a button", () => {
     renderList();
     const field = screen.getByLabelText("field");

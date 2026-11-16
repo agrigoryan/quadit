@@ -19,6 +19,7 @@ export const tasks = {
   "task.noParent": "No parent",
   "task.heldBy": "{name} is working on this",
   "task.subtasks": "{done} of {total} sub-tasks done",
+  "keys.notGivenWork": "Not given to you: you may not be given work in {project}",
 
   "prop.status": "Status",
   "prop.assignee": "Assignee",
