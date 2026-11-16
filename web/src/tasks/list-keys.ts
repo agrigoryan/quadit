@@ -9,7 +9,7 @@ import { type RefObject, useEffect, useEffectEvent, useLayoutEffect, useRef, use
 import { type Hotkeys, useHotkeys } from "@/hooks/hotkeys";
 import { usePlace } from "@/nav/place";
 import { takeSeen, useTaskOrder } from "@/nav/task-queue";
-import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
+import { giveKeysBackToList, isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 
 /** How a row is opened: in the panel over the list, or as the task's own page. */
 export type OpenAs = "peek" | "page";
@@ -59,10 +59,7 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
     const next = rows[Math.min(Math.max(index + by, 0), rows.length - 1)];
     if (!next) return;
     setFocusId(idOf(next));
-    // One marker at a time: a row left focused by the mouse or Tab gives way. The focus stays in the page, so Tab goes on from it.
-    const active = document.activeElement;
-    const main = active instanceof HTMLElement ? active.closest("main") : null;
-    if (main && active !== main) main.focus({ preventScroll: true });
+    giveKeysBackToList();
     return next;
   };
 

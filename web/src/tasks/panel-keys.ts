@@ -26,6 +26,19 @@ export function isOnControl(e: KeyboardEvent): boolean {
   return control !== null && !control.hasAttribute("data-task");
 }
 
+/**
+ * J and K move the list's marker, not the browser's focus. A control of the
+ * page left focused by the mouse or by Tab (a row's fold arrow, its status
+ * button) would go on answering Space and Enter for a row the marker has
+ * left, so the focus goes back to the page: the next key is the list's, and
+ * Tab goes on from the page.
+ */
+export function giveKeysBackToList() {
+  const active = document.activeElement;
+  const main = active instanceof HTMLElement ? active.closest("main") : null;
+  if (main && active !== main) main.focus({ preventScroll: true });
+}
+
 interface PanelStepKeys {
   /** Moves the panel along the list, `by` tasks down (or up, below zero). */
   onStep: (by: number) => void;

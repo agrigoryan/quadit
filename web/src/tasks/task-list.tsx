@@ -28,7 +28,7 @@ import {
   TAIL,
   treeStep,
 } from "@/tasks/list-layout";
-import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
+import { giveKeysBackToList, isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 import { GROUPINGS, KEYED } from "@/tasks/properties";
 import type { PickerProperty } from "@/tasks/properties/property";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
@@ -124,6 +124,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     const at = stepFrom(from, step, rows.length);
     const next = rows[at];
     if (next) focusRow(at);
+    giveKeysBackToList();
     return next;
   }
 
@@ -197,6 +198,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
     const to = treeStep(rows, focusAt, by);
     if (!to) return;
     e.preventDefault();
+    giveKeysBackToList();
     if ("toggle" in to) fold(to.toggle);
     else focusRow(to.focus);
   }

@@ -158,7 +158,7 @@ export const TaskRow = memo(function TaskRow({
       )}
 
       {draft ? (
-        <span aria-current={focused || undefined} className="min-w-0 flex-1 truncate py-2 text-ink-2">
+        <span aria-current={focused || undefined} className="min-w-0 truncate py-2 text-ink-2">
           {task.title}
         </span>
       ) : (
@@ -168,7 +168,7 @@ export const TaskRow = memo(function TaskRow({
           aria-current={focused || undefined}
           aria-label={context ? t("list.openContext", { key: task.key }) : t("task.open", { key: task.key })}
           className={cx(
-            "min-w-0 flex-1 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']",
+            "min-w-0 truncate py-2 outline-none after:absolute after:inset-0 after:content-['']",
             (closed || context) && "text-ink-2",
           )}
         >
@@ -176,9 +176,12 @@ export const TaskRow = memo(function TaskRow({
         </Link>
       )}
 
-      {/* Everything right of the title sits above the row-wide link. */}
+      {/* How far its sub-tasks have got reads with the title, not among the chips at the far end. Under the row-wide link: a click on it opens the task. */}
+      <SubtaskPill taskId={task.id} className="ml-0.5" />
+      <span className="flex-1" aria-hidden />
+
+      {/* Everything at the right end sits above the row-wide link. */}
       <div className="relative z-[1] flex shrink-0 items-center gap-2">
-        <SubtaskPill taskId={task.id} />
         {decision && (
           <DecisionMark
             mine={decision === "mine"}
@@ -233,6 +236,8 @@ function TreeGutter({ branch, label, onFold }: { branch: Branch; label: string; 
           type="button"
           aria-expanded={!folded}
           aria-label={folded ? t("list.unfold", { key: label }) : t("list.fold", { key: label })}
+          // A click folds and leaves the keyboard where it was: with the focus on the arrow, Space would go on folding instead of showing the row's task.
+          onMouseDown={(e) => e.preventDefault()}
           onClick={onFold}
           className="absolute top-1/2 z-[1] flex size-4 -translate-y-1/2 items-center justify-center rounded-sm text-ink-3 hover:bg-hover hover:text-ink"
           style={{ left: depth * STEP }}

@@ -126,3 +126,39 @@ test("a group folds and unfolds", async ({ page, project }) => {
   await todo.getByRole("button", { name: "Expand Todo" }).click();
   await expect(todo.getByRole("link", { name: `Open ${key}` })).toBeVisible();
 });
+
+test("a parent's arrow folds its sub-tasks and leaves Space to the list", async ({ page, project }) => {
+  const parent = await project.newTask("Launch the site");
+  const child = await project.newTask("Point the domain", `parent=${parent}`);
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  const sub = page.getByRole("link", { name: `Open ${child}` });
+  await expect(sub).toBeVisible();
+  // How far the sub-tasks have got is read with the title: before the chips at the row's far end.
+  const titleEnd = await page.getByRole("link", { name: `Open ${parent}` }).evaluate((el) => {
+    const words = document.createRange();
+    words.selectNodeContents(el);
+    return words.getBoundingClientRect().right;
+  });
+  const row = page.locator("[data-task]", { has: page.getByRole("link", { name: `Open ${parent}` }) });
+  const pillStart = await row.getByTitle("0 of 1 sub-tasks done").evaluate((el) => el.getBoundingClientRect().left);
+  expect(pillStart - titleEnd).toBeLessThan(16);
+
+  await page.getByRole("button", { name: `Hide the sub-tasks of ${parent}` }).click();
+  await expect(sub).toBeHidden();
+  // The mouse is on the parent's row, so that is the row Space shows; the arrow did not keep the keyboard.
+  await page.keyboard.press(" ");
+  const panel = page.getByRole("complementary", { name: parent });
+  await expect(panel.getByRole("textbox", { name: "Title" })).toHaveValue("Launch the site");
+  await page.keyboard.press(" ");
+  await expect(panel).toBeHidden();
+  await expect(sub).toBeHidden();
+
+  // Tabbed to, the arrow answers Space itself; J takes the keys back to the list.
+  await page.getByRole("button", { name: `Show the sub-tasks of ${parent}` }).focus();
+  await page.keyboard.press(" ");
+  await expect(sub).toBeVisible();
+  await page.keyboard.press("j");
+  await page.keyboard.press(" ");
+  await expect(page.getByRole("complementary", { name: child })).toBeVisible();
+  await expect(sub).toBeVisible();
+});
