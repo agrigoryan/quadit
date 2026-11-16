@@ -288,6 +288,70 @@ func TestARelationColumnDoesNotShowRowsOfADatabaseTheCallerMayNotSee(t *testing.
 	})
 }
 
+// TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead: a decision log, a
+// changelog or the open questions of the whole workspace lists, to each
+// reader, the decisions and tasks of the projects that reader may read.
+// The page is built when it is read and never stored: someone else's
+// reading leaves nothing for search or the feed to give, and moves nothing.
+func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		do := func(typ string, args M) string { return s.change(s.owner, "", typ, args)["ref"].(string) }
+		// Someone else asks, so that the owner may answer.
+		do("agent.create", M{"name": "Asker", "handle": "asker"})
+		var asker struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@asker"}, 201, &asker)
+		ask := func(args M) string { return s.change(nil, asker.Token, "decision.open", args)["ref"].(string) }
+		for _, key := range []string{"SVA-1", "OPS-1"} {
+			picked := ask(M{"task": key, "question": "Which zebra for " + key + "?", "options": []M{{"label": "Plains"}, {"label": "Mountain"}}})
+			do("decision.pick", M{"id": picked, "option": 1})
+			ask(M{"task": key, "question": "Which quokka for " + key + "?", "options": []M{{"label": "Small"}, {"label": "Large"}}})
+			do("task.create", M{"project": key[:3], "title": "Wombat work in " + key[:3]})
+			do("task.update", M{"id": key[:3] + "-2", "status": "done"})
+		}
+		pages := map[string]string{ // what each page says of a project, but for the project's key
+			do("doc.create", M{"title": "Decision log", "generated": "decision_log"}):     "Which zebra for ",
+			do("doc.create", M{"title": "Open questions", "generated": "open_questions"}): "Which quokka for ",
+			do("doc.create", M{"title": "Changelog", "generated": "changelog"}):           "Wombat work in ",
+		}
+		var before struct{ Seq int64 }
+		s.call(s.owner, "", "GET", w+"/events?after=0&limit=1", nil, 200, &before)
+
+		for page, says := range pages {
+			for _, form := range []string{"", "?format=md", "?format=text"} {
+				path := "/docs/" + page + form
+				if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); !strings.Contains(out, says+"SVA") || !strings.Contains(out, says+"OPS") {
+					t.Fatalf("%s does not show the owner both projects: %s", path, out)
+				}
+				for who, token := range callers {
+					if out := s.call(nil, token, "GET", w+path, nil, 200, nil); !strings.Contains(out, says+"SVA") || strings.Contains(out, "OPS") {
+						t.Errorf("%s shows %s something of OPS, or not what is of SVA: %s", path, who, out)
+					}
+				}
+			}
+		}
+		// What the owner was shown is nowhere for the others to find: not by
+		// search, not in the feed of the pages.
+		paths := []string{"/search?q=zebra", "/search?q=quokka&kind=doc", "/search?q=wombat"}
+		for page := range pages {
+			paths = append(paths, "/events?after=0&doc="+page, "/docs/"+page+"/versions")
+		}
+		for who, token := range callers {
+			for _, path := range paths {
+				if out := s.call(nil, token, "GET", w+path, nil, 200, nil); strings.Contains(out, "for OPS-1") || strings.Contains(out, "work in OPS") {
+					t.Errorf("%s gives %s what a page built from data said of OPS: %s", path, who, out)
+				}
+			}
+		}
+		var after struct{ Seq int64 }
+		s.call(s.owner, "", "GET", w+"/events?after=0&limit=1", nil, 200, &after)
+		if after.Seq != before.Seq {
+			t.Errorf("reading the pages moved the feed from %d to %d: a read wrote", before.Seq, after.Seq)
+		}
+	})
+}
+
 // TestListedAttachmentsFollowTheirPage: /list/attachments gives a file on
 // a page only to those who may see the page. One on someone's private
 // page, or on a page of a project the caller may not read, is not listed.

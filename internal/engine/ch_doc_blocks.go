@@ -5,9 +5,11 @@ package engine
 import (
 	"encoding/json"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/md"
 	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/rank"
@@ -42,6 +44,28 @@ func BlockTree(rows []core.Block) []md.Block {
 		return out
 	}
 	return build("")
+}
+
+// BlockRows is the reverse of BlockTree for a tree that is not stored: the
+// rows a page's content would be, for content made when it is read (a page
+// built from data). A row's id is made from the page's id and the block's
+// place in the tree, so the same content has the same ids each time.
+func BlockRows(page core.Doc, tree []md.Block) []core.Block {
+	var rows []core.Block
+	var add func(parent string, blocks []md.Block)
+	add = func(parent string, blocks []md.Block) {
+		for i, b := range blocks {
+			row := core.Block{ID: id.From(page.ID, "block", parent, strconv.Itoa(i)), WorkspaceID: page.WorkspaceID, DocID: page.ID, ParentID: parent,
+				Rank: rank.ForNumber(i + 1), Type: b.Type, Content: b.Content, Plain: md.Plain(b), CreatedBy: page.CreatedBy, UpdatedBy: page.CreatedBy}
+			if len(b.Props) > 0 {
+				row.Props = plainjson.Marshal(b.Props)
+			}
+			rows = append(rows, row)
+			add(row.ID, b.Children)
+		}
+	}
+	add("", tree)
+	return rows
 }
 
 // LoadBlocks returns a page's live blocks.

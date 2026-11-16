@@ -447,12 +447,6 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	do("attachment Week one", "attachment.add", M{"doc": rw.id("doc Plans sub-sub-page"), "file": file("week.txt", "the week's plan")})
 	change(owner, "", "doc.update", M{"id": rw.id("doc Plans"), "private": true})
 
-	// The pages built from data are built on their first read; that is done
-	// here, so that no read of the recording writes.
-	for _, name := range []string{"doc Decision log", "doc Open questions", "doc Changelog"} {
-		s.call(owner, "", "GET", w+"/docs/"+rw.id(name), nil, 200, nil)
-	}
-
 	// Pages kept in a git repository.
 	repo := newSyncedRepo(t, s, map[string]string{"docs/GUIDE.md": "# Style guide\n\nPixels, not vectors.\n"})
 	rw.n.replace(repo.origin, "<repository>")

@@ -413,7 +413,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
   "SVA"
  ],
  "role": "owner",
- "seq": 264,
+ "seq": 261,
  "server_time": "<time>",
  "standing_preferences": [
   "Write short."
@@ -431,7 +431,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
 200
 you are @aram (person, owner) in games
 projects: SVA
-unread: 7   seq: 264
+unread: 7   seq: 261
 rule: Write short.
 
 === GET /api/v1/w/games/my-work
@@ -469,7 +469,7 @@ rule: Write short.
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #157>",
-   "seq": 262,
+   "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
@@ -479,7 +479,7 @@ rule: Write short.
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #158>",
-   "seq": 256,
+   "seq": 253,
    "snippet": "in your view \"Art bugs\"",
    "task": "SVA-6",
    "title": "SVA-6 Review me",
@@ -536,7 +536,7 @@ rule: Write short.
    "type": "decision_asked"
   }
  ],
- "seq": 264,
+ "seq": 261,
  "waiting_on_me": [
   {
    "assignee": "@artist",
@@ -557,10 +557,10 @@ rule: Write short.
    ],
    "milestone": "Alpha",
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on": "@aram",
    "waiting_on_note": "review the result"
   }
@@ -576,14 +576,14 @@ SVA-1  How many phases?  (id=<decision SVA-1 phases>)
 == assigned to you (0)
 nothing
 == unread inbox (7)
-#262 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
-#256 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
+#259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
+#253 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
 #149 <minute> @ops comment: OPS-1 Rotate keys — Rotated the first ten.
 #142 <minute> @artist result: SVA-1 Boss design — Drew the burst.
 #126 <minute> @ops decision_asked: OPS-1 Rotate keys — Which vault?
 #120 <minute> @artist decision_asked: SVA-1 Boss design — How many phases?
 #114 <minute> @artist decision_asked: SVA-1 Boss design — Which explosion?
-seq: 264
+seq: 261
 
 === GET /api/v1/w/games/inbox
 200
@@ -593,7 +593,7 @@ seq: 264
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #157>",
-   "seq": 262,
+   "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
@@ -603,7 +603,7 @@ seq: 264
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #158>",
-   "seq": 256,
+   "seq": 253,
    "snippet": "in your view \"Art bugs\"",
    "task": "SVA-6",
    "title": "SVA-6 Review me",
@@ -670,7 +670,7 @@ seq: 264
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #157>",
-   "seq": 262,
+   "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
@@ -680,7 +680,7 @@ seq: 264
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #158>",
-   "seq": 256,
+   "seq": 253,
    "snippet": "in your view \"Art bugs\"",
    "task": "SVA-6",
    "title": "SVA-6 Review me",
@@ -741,8 +741,8 @@ seq: 264
 
 === GET /api/v1/w/games/inbox?format=text&all=1
 200
-#262 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
-#256 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
+#259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
+#253 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
 #149 <minute> @ops comment: OPS-1 Rotate keys — Rotated the first ten.
 #142 <minute> @artist result: SVA-1 Boss design — Drew the burst.
 #126 <minute> @ops decision_asked: OPS-1 Rotate keys — Which vault?
@@ -757,7 +757,7 @@ seq: 264
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #157>",
-   "seq": 262,
+   "seq": 259,
    "snippet": "Phase three is drawn.",
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
@@ -767,7 +767,7 @@ seq: 264
    "at": "<minute>",
    "by": "@artist",
    "id": "<id #158>",
-   "seq": 256,
+   "seq": 253,
    "snippet": "in your view \"Art bugs\"",
    "task": "SVA-6",
    "title": "SVA-6 Review me",
@@ -976,7 +976,7 @@ templates: Bug report, Sprite
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1004,7 +1004,7 @@ templates: Bug report, Sprite
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1025,7 +1025,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
  "more": false,
  "tasks": [
   {
-   "activity_seq": 261,
+   "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
    "budget": {
@@ -1057,7 +1057,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "status_id": "<id #164>",
    "title": "Boss design",
    "updated_at": 1700000000000,
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on_id": "<@aram>",
    "waiting_on_note": "review the result"
   },
@@ -1106,7 +1106,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "updated_seq": 89
   },
   {
-   "activity_seq": 255,
+   "activity_seq": 252,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 85,
@@ -1123,7 +1123,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "status_id": "<status Review>",
    "title": "Review me",
    "updated_at": 1700000000000,
-   "updated_seq": 255,
+   "updated_seq": 252,
    "waiting_on_id": "<@bea>",
    "waiting_on_note": "needs a look"
   }
@@ -1182,7 +1182,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1210,7 +1210,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1305,7 +1305,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1321,7 +1321,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1360,7 +1360,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1388,7 +1388,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1424,7 +1424,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1472,7 +1472,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1482,7 +1482,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1535,7 +1535,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1557,7 +1557,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1579,7 +1579,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1608,7 +1608,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1649,7 +1649,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1671,7 +1671,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1693,7 +1693,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1730,7 +1730,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1767,7 +1767,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1815,7 +1815,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1850,7 +1850,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1891,7 +1891,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -1913,7 +1913,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1944,7 +1944,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -1987,7 +1987,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2009,7 +2009,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2049,7 +2049,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2077,7 +2077,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2105,7 +2105,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2133,7 +2133,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2155,7 +2155,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2189,7 +2189,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2217,7 +2217,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2245,7 +2245,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2267,7 +2267,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2295,7 +2295,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2317,7 +2317,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2339,7 +2339,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2386,7 +2386,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2402,7 +2402,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2424,7 +2424,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2458,7 +2458,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2505,7 +2505,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2539,7 +2539,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2561,7 +2561,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2589,7 +2589,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2606,7 +2606,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2621,7 +2621,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2663,7 +2663,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2724,7 +2724,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2789,7 +2789,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2811,7 +2811,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2833,7 +2833,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2855,7 +2855,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -2877,7 +2877,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -2899,7 +2899,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -3075,7 +3075,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
    "body": "Phase three is drawn.",
    "by": "@artist",
    "id": "<comment SVA-1 for the webhook>",
-   "seq": 261
+   "seq": 258
   }
  ],
  "decisions": [
@@ -3171,7 +3171,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
    "type": "blocks"
   }
  ],
- "seq": 264,
+ "seq": 261,
  "subtasks": [
   {
    "assignee": "@bea",
@@ -3214,13 +3214,13 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
   "milestone": "Alpha",
   "priority": "high",
   "project": "SVA",
-  "seq": 261,
+  "seq": 258,
   "spent": {
    "cost_micros": 1250000
   },
   "status": "In Progress",
   "title": "Boss design",
-  "updated_seq": 240,
+  "updated_seq": 237,
   "waiting_on": "@aram",
   "waiting_on_note": "review the result"
  },
@@ -3235,7 +3235,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 264
+labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 261
 ---
 Four phases.
 
@@ -3264,7 +3264,7 @@ How many phases?
     measured: 12 frames
     not verified: on a phone
     file: burst.txt http://quadit.test/f/<file burst.txt>/burst.txt
-[#261 @artist <minute>]: Phase three is drawn.
+[#258 @artist <minute>]: Phase three is drawn.
 
 === GET /api/v1/w/games/tasks/SVA-1?raw=1
 200
@@ -3373,13 +3373,13 @@ How many phases?
    "author_id": "<@artist>",
    "body": "Phase three is drawn.",
    "created_at": 1700000000000,
-   "created_seq": 261,
+   "created_seq": 258,
    "id": "<comment SVA-1 for the webhook>",
    "kind": "comment",
    "subject_id": "<task SVA-1>",
    "subject_type": "task",
    "task_id": "<task SVA-1>",
-   "updated_seq": 261
+   "updated_seq": 258
   }
  ],
  "links": [
@@ -3400,15 +3400,6 @@ How many phases?
   }
  ],
  "mentioned_in": [
-  {
-   "from_id": "<doc Decision log>",
-   "from_scope_id": "<doc Decision log>",
-   "from_scope_type": "doc",
-   "from_type": "doc",
-   "title": "Decision log",
-   "to_id": "<task SVA-1>",
-   "to_type": "task"
-  },
   {
    "from_id": "<doc Plans sub-page>",
    "from_scope_id": "<doc Plans sub-page>",
@@ -3453,11 +3444,11 @@ How many phases?
    "summary": "two phases drawn",
    "task_id": "<task SVA-1>",
    "title": "Drawing the boss",
-   "updated_seq": 235
+   "updated_seq": 232
   }
  ],
  "task": {
-  "activity_seq": 261,
+  "activity_seq": 258,
   "asked_by": "<@aram>",
   "assignee_id": "<@artist>",
   "budget": {
@@ -3489,7 +3480,7 @@ How many phases?
   "status_id": "<id #164>",
   "title": "Boss design",
   "updated_at": 1700000000000,
-  "updated_seq": 240,
+  "updated_seq": 237,
   "waiting_on_id": "<@aram>",
   "waiting_on_note": "review the result"
  },
@@ -3580,7 +3571,7 @@ How many phases?
    "type": "blocked_by"
   }
  ],
- "seq": 264,
+ "seq": 261,
  "task": {
   "assignee": "@bea",
   "category": "unstarted",
@@ -3611,7 +3602,7 @@ How many phases?
 200
 SVA-2  Explosion effect
 status: Todo   assignee: @bea   waits on: @bea (answer: Which color?)
-labels: art   epic: Boss fight   parent: SVA-1   seq: 264
+labels: art   epic: Boss fight   parent: SVA-1   seq: 261
 blocked by SVA-1 [In Progress] Boss design
 --- decision 1 (open, asked @bea by @aram) id=<decision SVA-2 color>
 Which color?
@@ -3716,7 +3707,7 @@ Which color?
 === GET /api/v1/w/games/tasks/SVA-4
 200
 {
- "seq": 264,
+ "seq": 261,
  "task": {
   "category": "unstarted",
   "created_at": "<minute>",
@@ -3739,7 +3730,7 @@ Which color?
 200
 SVA-4  Old idea
 status: Todo (in the trash)
-seq: 264
+seq: 261
 
 === GET /api/v1/w/games/tasks/SVA-4?raw=1
 200
@@ -3807,7 +3798,7 @@ seq: 264
 === GET /api/v1/w/games/tasks/SVA-5
 200
 {
- "seq": 264,
+ "seq": 261,
  "task": {
   "archived": true,
   "category": "unstarted",
@@ -3830,7 +3821,7 @@ seq: 264
 200
 SVA-5  Shelved sketch
 status: Todo (archived)
-seq: 264
+seq: 261
 
 === GET /api/v1/w/games/tasks/SVA-5?raw=1
 200
@@ -4008,7 +3999,7 @@ seq: 264
    "body": "Phase three is drawn.",
    "by": "@artist",
    "id": "<comment SVA-1 for the webhook>",
-   "seq": 261
+   "seq": 258
   }
  ],
  "decisions": [
@@ -4104,7 +4095,7 @@ seq: 264
    "type": "blocks"
   }
  ],
- "seq": 264,
+ "seq": 261,
  "subtasks": [
   {
    "assignee": "@bea",
@@ -4147,13 +4138,13 @@ seq: 264
   "milestone": "Alpha",
   "priority": "high",
   "project": "SVA",
-  "seq": 261,
+  "seq": 258,
   "spent": {
    "cost_micros": 1250000
   },
   "status": "In Progress",
   "title": "Boss design",
-  "updated_seq": 240,
+  "updated_seq": 237,
   "waiting_on": "@aram",
   "waiting_on_note": "review the result"
  },
@@ -4373,7 +4364,7 @@ seq: 264
      "state": "running",
      "task_id": "<task SVA-1>",
      "title": "Drawing the boss",
-     "updated_seq": 234
+     "updated_seq": 231
     }
    },
    "entity_id": "<session artist>",
@@ -4381,7 +4372,7 @@ seq: 264
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 234,
+   "seq": 231,
    "type": "session.created"
   },
   {
@@ -4414,7 +4405,7 @@ seq: 264
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 235,
+   "seq": 232,
    "type": "session.updated"
   },
   {
@@ -4448,7 +4439,7 @@ seq: 264
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 240,
+   "seq": 237,
    "type": "task.updated"
   },
   {
@@ -4461,13 +4452,13 @@ seq: 264
      "author_id": "<@artist>",
      "body": "Phase three is drawn.",
      "created_at": 1700000000000,
-     "created_seq": 261,
+     "created_seq": 258,
      "id": "<comment SVA-1 for the webhook>",
      "kind": "comment",
      "subject_id": "<task SVA-1>",
      "subject_type": "task",
      "task_id": "<task SVA-1>",
-     "updated_seq": 261
+     "updated_seq": 258
     }
    },
    "entity_id": "<comment SVA-1 for the webhook>",
@@ -4475,7 +4466,7 @@ seq: 264
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 261,
+   "seq": 258,
    "type": "comment.created"
   },
   {
@@ -4490,7 +4481,7 @@ seq: 264
      "entity_id": "<comment SVA-1 for the webhook>",
      "entity_type": "comment",
      "id": "<id #157>",
-     "seq": 262,
+     "seq": 259,
      "snippet": "Phase three is drawn.",
      "task_id": "<task SVA-1>",
      "title": "SVA-1 Boss design",
@@ -4502,12 +4493,12 @@ seq: 264
    "entity_type": "notification",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 262,
+   "seq": 259,
    "type": "notification.created"
   }
  ],
  "more": false,
- "seq": 261
+ "seq": 258
 }
 
 === GET /api/v1/w/games/tasks/OPS-1?since=0&compact=1
@@ -4549,12 +4540,12 @@ seq: 264
 #157 <minute> @aram attachment.created SVA-1
 #159 <minute> @aram attachment.created SVA-1
 #160 <minute> @aram attachment.deleted moved to trash
-#234 <minute> @artist session.created SVA-1
-#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
-#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress
-#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)
-#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
-seq: 261
+#231 <minute> @artist session.created SVA-1
+#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
+#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress
+#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)
+#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
+seq: 258
 
 === GET /api/v1/w/games/tasks/SVA-1?max_chars=10
 200
@@ -4607,7 +4598,7 @@ seq: 261
    "body": "Phase",
    "by": "@artist",
    "id": "<comment SVA-1 for the webhook>",
-   "seq": 261,
+   "seq": 258,
    "truncated": true
   }
  ],
@@ -4704,7 +4695,7 @@ seq: 261
    "type": "blocks"
   }
  ],
- "seq": 264,
+ "seq": 261,
  "subtasks": [
   {
    "assignee": "@bea",
@@ -4748,13 +4739,13 @@ seq: 261
   "milestone": "Alpha",
   "priority": "high",
   "project": "SVA",
-  "seq": 261,
+  "seq": 258,
   "spent": {
    "cost_micros": 1250000
   },
   "status": "In Progress",
   "title": "Boss design",
-  "updated_seq": 240,
+  "updated_seq": 237,
   "waiting_on": "@aram",
   "waiting_on_note": "review the result"
  },
@@ -4769,7 +4760,7 @@ seq: 261
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 264
+labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 261
 ---
 Four phases.
 
@@ -4798,7 +4789,7 @@ How many phases?
     measured: 12 frames
     not verified: on a phone
     file: burst.txt http://quadit.test/f/<file burst.txt>/burst.txt
-[#261 @artist <minute>]: Phase three is drawn.
+[#258 @artist <minute>]: Phase three is drawn.
 
 === GET /api/v1/w/games/tasks/NOPE-1
 404
@@ -4834,11 +4825,6 @@ How many phases?
 200
 {
  "docs": [
-  {
-   "id": "<doc Decision log>",
-   "title": "Decision log",
-   "url": "http://quadit.test/games/docs/<doc Decision log>"
-  },
   {
    "id": "<doc Plans sub-page>",
    "title": "Quarter one",
@@ -4902,7 +4888,7 @@ How many phases?
     "body": "Phase three is drawn.",
     "by": "@artist",
     "id": "<comment SVA-1 for the webhook>",
-    "seq": 261
+    "seq": 258
    }
   ],
   "decisions": [
@@ -4998,7 +4984,7 @@ How many phases?
     "type": "blocks"
    }
   ],
-  "seq": 264,
+  "seq": 261,
   "subtasks": [
    {
     "assignee": "@bea",
@@ -5041,13 +5027,13 @@ How many phases?
    "milestone": "Alpha",
    "priority": "high",
    "project": "SVA",
-   "seq": 261,
+   "seq": 258,
    "spent": {
     "cost_micros": 1250000
    },
    "status": "In Progress",
    "title": "Boss design",
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on": "@aram",
    "waiting_on_note": "review the result"
   },
@@ -5063,7 +5049,7 @@ How many phases?
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 264
+labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 261
 ---
 Four phases.
 
@@ -5092,14 +5078,13 @@ How many phases?
     measured: 12 frames
     not verified: on a phone
     file: burst.txt http://quadit.test/f/<file burst.txt>/burst.txt
-[#261 @artist <minute>]: Phase three is drawn.
+[#258 @artist <minute>]: Phase three is drawn.
 === epic: Boss fight (planned, target <day+30>)
 The last level.
 === standing preferences
 - Write short.
 - Explosions are ring-shaped.
 === linked docs
-Decision log  (doc <doc Decision log>)
 Quarter one  (doc <doc Plans sub-page>)
 
 === GET /api/v1/w/games/tasks/SVA-2/context
@@ -5143,10 +5128,10 @@ Quarter one  (doc <doc Plans sub-page>)
    "milestone": "Alpha",
    "priority": "high",
    "project": "SVA",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on": "@aram",
    "waiting_on_note": "review the result"
   }
@@ -5226,7 +5211,7 @@ Quarter one  (doc <doc Plans sub-page>)
     "type": "blocked_by"
    }
   ],
-  "seq": 264,
+  "seq": 261,
   "task": {
    "assignee": "@bea",
    "category": "unstarted",
@@ -5258,7 +5243,7 @@ Quarter one  (doc <doc Plans sub-page>)
 200
 SVA-2  Explosion effect
 status: Todo   assignee: @bea   waits on: @bea (answer: Which color?)
-labels: art   epic: Boss fight   parent: SVA-1   seq: 264
+labels: art   epic: Boss fight   parent: SVA-1   seq: 261
 blocked by SVA-1 [In Progress] Boss design
 --- decision 1 (open, asked @bea by @aram) id=<decision SVA-2 color>
 Which color?
@@ -5300,13 +5285,6 @@ For Bea  (doc <doc For Bea>)
 === GET /api/v1/w/games/tasks/SVA-3/context
 200
 {
- "docs": [
-  {
-   "id": "<doc Changelog>",
-   "title": "Changelog",
-   "url": "http://quadit.test/games/docs/<doc Changelog>"
-  }
- ],
  "epic": {
   "description": "The last level.",
   "name": "Boss fight",
@@ -5358,7 +5336,7 @@ For Bea  (doc <doc For Bea>)
     "type": "duplicated_by"
    }
   ],
-  "seq": 264,
+  "seq": 261,
   "task": {
    "category": "done",
    "created_at": "<minute>",
@@ -5428,7 +5406,7 @@ For Bea  (doc <doc For Bea>)
   "Write short."
  ],
  "task": {
-  "seq": 264,
+  "seq": 261,
   "task": {
    "archived": true,
    "category": "unstarted",
@@ -5491,7 +5469,7 @@ For Bea  (doc <doc For Bea>)
   "Explosions are ring-shaped."
  ],
  "task": {
-  "seq": 264,
+  "seq": 261,
   "task": {
    "category": "started",
    "created_at": "<minute>",
@@ -5502,10 +5480,10 @@ For Bea  (doc <doc For Bea>)
     "art"
    ],
    "project": "SVA",
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
-   "updated_seq": 255,
+   "updated_seq": 252,
    "waiting_on": "@bea",
    "waiting_on_note": "needs a look"
   },
@@ -5519,7 +5497,7 @@ For Bea  (doc <doc For Bea>)
 200
 SVA-6  Review me
 status: Review   waits on: @bea (needs a look)
-labels: art   seq: 264
+labels: art   seq: 261
 === standing preferences
 - Write short.
 - Explosions are ring-shaped.
@@ -6161,16 +6139,6 @@ SVA-1 "Which explosion?" -> Burst: reads better small
    "url": "http://quadit.test/games/task/SVA-1"
   },
   {
-   "entity_id": "<doc Changelog>",
-   "kind": "doc",
-   "project_id": "<project SVA>",
-   "scope_id": "<doc Changelog>",
-   "scope_type": "doc",
-   "snippet": "<week>\nSVA-3 **Boss** music\n",
-   "title": "Changelog",
-   "url": "http://quadit.test/games/docs/<doc Changelog>"
-  },
-  {
    "entity_id": "<comment SVA-1 for the webhook>",
    "kind": "comment",
    "project_id": "<project SVA>",
@@ -6204,7 +6172,6 @@ doc  doc <row Boss attack>  Boss attack — Wind up, then strike.
 comment  SVA-1  Boss design — Drew the burst.
 doc  doc <doc SVA design>  SVA design — The **boss** has four phases.
 comment  SVA-1  Boss design — @bea no rings please.
-doc  doc <doc Changelog>  Changelog — <week> SVA-3 **Boss** music
 comment  SVA-1  Boss design — Phase three is drawn.
 task  SVA-1  Boss design — Four phases. The last one flies. See OPS-1.
 
@@ -6349,16 +6316,6 @@ nothing found
    "snippet": "The **boss** has four phases.\n",
    "title": "SVA design",
    "url": "http://quadit.test/games/docs/<doc SVA design>"
-  },
-  {
-   "entity_id": "<doc Changelog>",
-   "kind": "doc",
-   "project_id": "<project SVA>",
-   "scope_id": "<doc Changelog>",
-   "scope_type": "doc",
-   "snippet": "<week>\nSVA-3 **Boss** music\n",
-   "title": "Changelog",
-   "url": "http://quadit.test/games/docs/<doc Changelog>"
   }
  ]
 }
@@ -9918,286 +9875,33 @@ nothing found
    "at": 1700000000000,
    "change_id": "<id #377>",
    "data": {
-    "blocks": [
-     {
-      "content": [
-       {
-        "text": "2026-11",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 213,
-      "doc_id": "<doc Decision log>",
-      "id": "<id #378>",
-      "props": {
-       "level": 2
-      },
-      "rank": "00000000sg",
-      "type": "heading",
-      "updated_by": "<@aram>",
-      "updated_seq": 213
-     },
-     {
-      "content": [
-       {
-        "styles": {
-         "bold": true
-        },
-        "text": "OPS-1",
-        "type": "text"
-       },
-       {
-        "text": " Which vault? → ",
-        "type": "text"
-       },
-       {
-        "styles": {
-         "bold": true
-        },
-        "text": "Ours",
-        "type": "text"
-       },
-       {
-        "text": " — @aram, <minute>",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 213,
-      "doc_id": "<doc Decision log>",
-      "id": "<id #379>",
-      "rank": "i",
-      "type": "bulletListItem",
-      "updated_by": "<@aram>",
-      "updated_seq": 213
-     },
-     {
-      "content": [
-       {
-        "text": "Ours ✓",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 213,
-      "doc_id": "<doc Decision log>",
-      "id": "<id #380>",
-      "parent_id": "<id #379>",
-      "rank": "00000000sg",
-      "type": "bulletListItem",
-      "updated_by": "<@aram>",
-      "updated_seq": 213
-     },
-     {
-      "content": [
-       {
-        "text": "Theirs",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 213,
-      "doc_id": "<doc Decision log>",
-      "id": "<id #381>",
-      "parent_id": "<id #379>",
-      "rank": "00000001kw",
-      "type": "bulletListItem",
-      "updated_by": "<@aram>",
-      "updated_seq": 213
-     },
-     {
-      "content": [
-       {
-        "styles": {
-         "bold": true
-        },
-        "text": "SVA-1",
-        "type": "text"
-       },
-       {
-        "text": " Which explosion? → ",
-        "type": "text"
-       },
-       {
-        "styles": {
-         "bold": true
-        },
-        "text": "Burst",
-        "type": "text"
-       },
-       {
-        "text": " (with changes): reads better small — @aram, <minute>",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 213,
-      "doc_id": "<doc Decision log>",
-      "id": "<id #382>",
-      "rank": "r",
-      "type": "bulletListItem",
-      "updated_by": "<@aram>",
-      "updated_seq": 213
-     },
-     {
-      "content": [
-       {
-        "text": "Ring",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 213,
-      "doc_id": "<doc Decision log>",
-      "id": "<id #383>",
-      "parent_id": "<id #382>",
-      "rank": "00000000sg",
-      "type": "bulletListItem",
-      "updated_by": "<@aram>",
-      "updated_seq": 213
-     },
-     {
-      "content": [
-       {
-        "text": "Burst ✓",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 213,
-      "doc_id": "<doc Decision log>",
-      "id": "<id #384>",
-      "parent_id": "<id #382>",
-      "rank": "00000001kw",
-      "type": "bulletListItem",
-      "updated_by": "<@aram>",
-      "updated_seq": 213
-     }
-    ],
-    "changes": {
-     "content_seq": {
-      "from": null,
-      "to": 213
-     },
-     "updated_at": {
-      "from": null,
-      "to": 1700000000000
-     },
-     "updated_by": {
-      "from": null,
-      "to": "<@aram>"
-     }
-    },
-    "deleted": null,
-    "id": "<doc Decision log>"
-   },
-   "entity_id": "<doc Decision log>",
-   "entity_type": "doc",
-   "scope_id": "<doc Decision log>",
-   "scope_type": "doc",
-   "seq": 213,
-   "type": "doc.edited"
-  },
-  {
-   "actor_id": "<@aram>",
-   "at": 1700000000000,
-   "change_id": "<id #389>",
-   "data": {
-    "blocks": [
-     {
-      "content": [
-       {
-        "text": "<week>",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 215,
-      "doc_id": "<doc Changelog>",
-      "id": "<id #390>",
-      "props": {
-       "level": 2
-      },
-      "rank": "00000000sg",
-      "type": "heading",
-      "updated_by": "<@aram>",
-      "updated_seq": 215
-     },
-     {
-      "content": [
-       {
-        "text": "SVA-3 Boss music",
-        "type": "text"
-       }
-      ],
-      "created_by": "<@aram>",
-      "created_seq": 215,
-      "doc_id": "<doc Changelog>",
-      "id": "<id #391>",
-      "rank": "i",
-      "type": "bulletListItem",
-      "updated_by": "<@aram>",
-      "updated_seq": 215
-     }
-    ],
-    "changes": {
-     "content_seq": {
-      "from": null,
-      "to": 215
-     },
-     "updated_at": {
-      "from": null,
-      "to": 1700000000000
-     },
-     "updated_by": {
-      "from": null,
-      "to": "<@aram>"
-     }
-    },
-    "deleted": null,
-    "id": "<doc Changelog>"
-   },
-   "entity_id": "<doc Changelog>",
-   "entity_type": "doc",
-   "project_id": "<project SVA>",
-   "scope_id": "<doc Changelog>",
-   "scope_type": "doc",
-   "seq": 215,
-   "type": "doc.edited"
-  },
-  {
-   "actor_id": "<@aram>",
-   "at": 1700000000000,
-   "change_id": "<id #392>",
-   "data": {
     "row": {
-     "content_seq": 216,
+     "content_seq": 213,
      "created_at": 1700000000000,
      "created_by": "<@aram>",
-     "created_seq": 216,
+     "created_seq": 213,
      "icon": "git",
-     "id": "<id #393>",
+     "id": "<id #378>",
      "kind": "page",
      "props": null,
      "rank": "zzx",
      "title": "Game docs",
      "updated_at": 1700000000000,
      "updated_by": "<@aram>",
-     "updated_seq": 216
+     "updated_seq": 213
     }
    },
-   "entity_id": "<id #393>",
+   "entity_id": "<id #378>",
    "entity_type": "doc",
-   "scope_id": "<id #393>",
+   "scope_id": "<id #378>",
    "scope_type": "doc",
-   "seq": 216,
+   "seq": 213,
    "type": "doc.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #392>",
+   "change_id": "<id #377>",
    "data": {
     "row": {
      "authority": "repo",
@@ -10205,23 +9909,23 @@ nothing found
      "created_by": "<@aram>",
      "id": "<source Game docs>",
      "repo": "<repository>",
-     "root_doc_id": "<id #393>",
+     "root_doc_id": "<id #378>",
      "subdir": "docs",
-     "updated_seq": 217,
+     "updated_seq": 214,
      "write_mode": "commit"
     }
    },
    "entity_id": "<source Game docs>",
    "entity_type": "source",
-   "scope_id": "<id #393>",
+   "scope_id": "<id #378>",
    "scope_type": "doc",
-   "seq": 217,
+   "seq": 214,
    "type": "source.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #394>",
+   "change_id": "<id #379>",
    "data": {
     "blocks": [
      {
@@ -10232,42 +9936,42 @@ nothing found
        }
       ],
       "created_by": "<@aram>",
-      "created_seq": 218,
+      "created_seq": 215,
       "doc_id": "<doc mirrored>",
-      "id": "<id #395>",
+      "id": "<id #380>",
       "rank": "00000000sg",
       "type": "paragraph",
       "updated_by": "<@aram>",
-      "updated_seq": 218
+      "updated_seq": 215
      }
     ],
     "row": {
-     "content_seq": 218,
+     "content_seq": 215,
      "created_at": 1700000000000,
      "created_by": "<@aram>",
-     "created_seq": 218,
+     "created_seq": 215,
      "id": "<doc mirrored>",
      "kind": "page",
-     "parent_id": "<id #393>",
+     "parent_id": "<id #378>",
      "rank": "00000000sg",
      "source_id": "<source Game docs>",
      "title": "Style guide",
      "updated_at": 1700000000000,
      "updated_by": "<@aram>",
-     "updated_seq": 218
+     "updated_seq": 215
     }
    },
    "entity_id": "<doc mirrored>",
    "entity_type": "doc",
    "scope_id": "<doc mirrored>",
    "scope_type": "doc",
-   "seq": 218,
+   "seq": 215,
    "type": "doc.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #396>",
+   "change_id": "<id #381>",
    "data": {
     "row": {
      "created_at": 1700000000000,
@@ -10285,7 +9989,7 @@ nothing found
      "rank": "00000000sg",
      "shared": true,
      "slug": "art-bugs",
-     "updated_seq": 219
+     "updated_seq": 216
     }
    },
    "entity_id": "<view Art bugs>",
@@ -10293,14 +9997,14 @@ nothing found
    "project_id": "<project SVA>",
    "scope_id": "<project SVA>",
    "scope_type": "project",
-   "seq": 219,
+   "seq": 216,
    "type": "view.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
    "audience_id": "<@aram>",
-   "change_id": "<id #397>",
+   "change_id": "<id #382>",
    "data": {
     "row": {
      "created_at": 1700000000000,
@@ -10316,20 +10020,20 @@ nothing found
      "rank": "i",
      "shared": false,
      "slug": "mine",
-     "updated_seq": 220
+     "updated_seq": 217
     }
    },
    "entity_id": "<view Mine>",
    "entity_type": "view",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 220,
+   "seq": 217,
    "type": "view.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #399>",
+   "change_id": "<id #384>",
    "data": {
     "row": {
      "created_at": 1700000000000,
@@ -10348,20 +10052,20 @@ nothing found
      "rank": "x",
      "shared": true,
      "slug": "stale",
-     "updated_seq": 223
+     "updated_seq": 220
     }
    },
    "entity_id": "<view Stale>",
    "entity_type": "view",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 223,
+   "seq": 220,
    "type": "view.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #400>",
+   "change_id": "<id #385>",
    "data": {
     "changes": {
      "deleted_at": {
@@ -10375,13 +10079,13 @@ nothing found
    "entity_type": "label",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 224,
+   "seq": 221,
    "type": "label.deleted"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #401>",
+   "change_id": "<id #386>",
    "data": {
     "row": {
      "created_at": 1700000000000,
@@ -10395,20 +10099,20 @@ nothing found
      "rank": "y",
      "shared": true,
      "slug": "removed-view",
-     "updated_seq": 225
+     "updated_seq": 222
     }
    },
    "entity_id": "<view removed>",
    "entity_type": "view",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 225,
+   "seq": 222,
    "type": "view.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #402>",
+   "change_id": "<id #387>",
    "data": {
     "changes": {
      "deleted_at": {
@@ -10422,71 +10126,71 @@ nothing found
    "entity_type": "view",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 226,
+   "seq": 223,
    "type": "view.deleted"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #403>",
+   "change_id": "<id #388>",
    "data": {
     "row": {
      "created_at": 1700000000000,
      "description": "the one render machine",
      "id": "<resource gpu>",
      "name": "gpu",
-     "updated_seq": 227
+     "updated_seq": 224
     }
    },
    "entity_id": "<resource gpu>",
    "entity_type": "resource",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 227,
+   "seq": 224,
    "type": "resource.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #404>",
+   "change_id": "<id #389>",
    "data": {
     "row": {
      "created_at": 1700000000000,
      "id": "<resource staging>",
      "name": "staging",
-     "updated_seq": 228
+     "updated_seq": 225
     }
    },
    "entity_id": "<resource staging>",
    "entity_type": "resource",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 228,
+   "seq": 225,
    "type": "resource.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #405>",
+   "change_id": "<id #390>",
    "data": {
     "row": {
      "created_at": 1700000000000,
      "id": "<resource gone>",
      "name": "old-box",
-     "updated_seq": 229
+     "updated_seq": 226
     }
    },
    "entity_id": "<resource gone>",
    "entity_type": "resource",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 229,
+   "seq": 226,
    "type": "resource.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #406>",
+   "change_id": "<id #391>",
    "data": {
     "changes": {
      "deleted_at": {
@@ -10500,13 +10204,13 @@ nothing found
    "entity_type": "resource",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 230,
+   "seq": 227,
    "type": "resource.deleted"
   },
   {
    "actor_id": "<@artist>",
    "at": 1700000000000,
-   "change_id": "<id #407>",
+   "change_id": "<id #392>",
    "data": {
     "resource": "gpu",
     "row": {
@@ -10526,7 +10230,7 @@ nothing found
    "project_id": "<project SVA>",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 231,
+   "seq": 228,
    "type": "claim.created"
   },
   {
@@ -10543,7 +10247,7 @@ nothing found
      "state": "running",
      "task_id": "<task SVA-1>",
      "title": "Drawing the boss",
-     "updated_seq": 234
+     "updated_seq": 231
     }
    },
    "entity_id": "<session artist>",
@@ -10551,7 +10255,7 @@ nothing found
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 234,
+   "seq": 231,
    "type": "session.created"
   },
   {
@@ -10584,13 +10288,13 @@ nothing found
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 235,
+   "seq": 232,
    "type": "session.updated"
   },
   {
    "actor_id": "<@ops>",
    "at": 1700000000000,
-   "change_id": "<id #413>",
+   "change_id": "<id #398>",
    "data": {
     "key": "",
     "row": {
@@ -10599,14 +10303,14 @@ nothing found
      "started_at": 1700000000000,
      "state": "running",
      "title": "Looking around",
-     "updated_seq": 239
+     "updated_seq": 236
     }
    },
    "entity_id": "<session no task>",
    "entity_type": "session",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 239,
+   "seq": 236,
    "type": "session.created"
   },
   {
@@ -10640,13 +10344,13 @@ nothing found
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 240,
+   "seq": 237,
    "type": "task.updated"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #414>",
+   "change_id": "<id #399>",
    "data": {
     "row": {
      "action": {
@@ -10664,20 +10368,20 @@ nothing found
       "project_id": "<project OPS>"
      },
      "name": "tell the owner",
-     "updated_seq": 242
+     "updated_seq": 239
     }
    },
    "entity_id": "<rule notify>",
    "entity_type": "rule",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 242,
+   "seq": 239,
    "type": "rule.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #415>",
+   "change_id": "<id #400>",
    "data": {
     "row": {
      "action": {
@@ -10694,20 +10398,20 @@ nothing found
       ]
      },
      "name": "gone",
-     "updated_seq": 243
+     "updated_seq": 240
     }
    },
    "entity_id": "<rule gone>",
    "entity_type": "rule",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 243,
+   "seq": 240,
    "type": "rule.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #416>",
+   "change_id": "<id #401>",
    "data": {
     "changes": {
      "deleted_at": {
@@ -10721,13 +10425,13 @@ nothing found
    "entity_type": "rule",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 244,
+   "seq": 241,
    "type": "rule.deleted"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #417>",
+   "change_id": "<id #402>",
    "data": {
     "row": {
      "active": true,
@@ -10740,7 +10444,7 @@ nothing found
      "id": "<webhook OPS>",
      "name": "ops events",
      "project_id": "<project OPS>",
-     "updated_seq": 245,
+     "updated_seq": 242,
      "url": "http://receiver.test/ops"
     }
    },
@@ -10748,13 +10452,13 @@ nothing found
    "entity_type": "webhook",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 245,
+   "seq": 242,
    "type": "webhook.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #418>",
+   "change_id": "<id #403>",
    "data": {
     "row": {
      "active": true,
@@ -10766,7 +10470,7 @@ nothing found
      "failures": 0,
      "id": "<webhook gone>",
      "name": "gone",
-     "updated_seq": 246,
+     "updated_seq": 243,
      "url": "http://receiver.test/gone"
     }
    },
@@ -10774,13 +10478,13 @@ nothing found
    "entity_type": "webhook",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 246,
+   "seq": 243,
    "type": "webhook.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #419>",
+   "change_id": "<id #404>",
    "data": {
     "changes": {
      "deleted_at": {
@@ -10794,13 +10498,13 @@ nothing found
    "entity_type": "webhook",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 247,
+   "seq": 244,
    "type": "webhook.deleted"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #420>",
+   "change_id": "<id #405>",
    "data": {
     "row": {
      "active": false,
@@ -10811,20 +10515,20 @@ nothing found
      "kind": "github",
      "name": "sva on github",
      "project_id": "<project SVA>",
-     "updated_seq": 248
+     "updated_seq": 245
     }
    },
    "entity_id": "<integration github>",
    "entity_type": "integration",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 248,
+   "seq": 245,
    "type": "integration.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #421>",
+   "change_id": "<id #406>",
    "data": {
     "row": {
      "active": false,
@@ -10835,20 +10539,20 @@ nothing found
      "kind": "github",
      "name": "ops on github",
      "project_id": "<project OPS>",
-     "updated_seq": 249
+     "updated_seq": 246
     }
    },
    "entity_id": "<integration OPS>",
    "entity_type": "integration",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 249,
+   "seq": 246,
    "type": "integration.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #422>",
+   "change_id": "<id #407>",
    "data": {
     "row": {
      "agents": [
@@ -10861,21 +10565,21 @@ nothing found
      "id": "<secret DEPLOY_KEY>",
      "name": "DEPLOY_KEY",
      "updated_at": 1700000000000,
-     "updated_seq": 250
+     "updated_seq": 247
     }
    },
    "entity_id": "<secret DEPLOY_KEY>",
    "entity_type": "secret",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 250,
+   "seq": 247,
    "type": "secret.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
    "audience_id": "<@aram>",
-   "change_id": "<id #423>",
+   "change_id": "<id #408>",
    "data": {
     "row": {
      "created_at": 1700000000000,
@@ -10888,13 +10592,13 @@ nothing found
    "entity_type": "watcher",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 251,
+   "seq": 248,
    "type": "watcher.created"
   },
   {
    "actor_id": "<@artist>",
    "at": 1700000000000,
-   "change_id": "<id #424>",
+   "change_id": "<id #409>",
    "data": {
     "changes": {
      "label_ids": {
@@ -10912,14 +10616,14 @@ nothing found
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
-   "seq": 255,
+   "seq": 252,
    "type": "task.updated"
   },
   {
    "actor_id": "<@artist>",
    "at": 1700000000000,
    "audience_id": "<@aram>",
-   "change_id": "<id #425>",
+   "change_id": "<id #410>",
    "data": {
     "row": {
      "actor_id": "<@artist>",
@@ -10927,7 +10631,7 @@ nothing found
      "entity_id": "<task SVA-6>",
      "entity_type": "task",
      "id": "<id #158>",
-     "seq": 256,
+     "seq": 253,
      "snippet": "in your view \"Art bugs\"",
      "task_id": "<task SVA-6>",
      "title": "SVA-6 Review me",
@@ -10939,13 +10643,13 @@ nothing found
    "entity_type": "notification",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
-   "seq": 256,
+   "seq": 253,
    "type": "notification.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #427>",
+   "change_id": "<id #412>",
    "data": {
     "row": {
      "active": true,
@@ -10957,7 +10661,7 @@ nothing found
      "failures": 0,
      "id": "<webhook comments>",
      "name": "comments",
-     "updated_seq": 260,
+     "updated_seq": 257,
      "url": "http://receiver.test/comments"
     }
    },
@@ -10965,7 +10669,7 @@ nothing found
    "entity_type": "webhook",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 260,
+   "seq": 257,
    "type": "webhook.created"
   },
   {
@@ -10978,13 +10682,13 @@ nothing found
      "author_id": "<@artist>",
      "body": "Phase three is drawn.",
      "created_at": 1700000000000,
-     "created_seq": 261,
+     "created_seq": 258,
      "id": "<comment SVA-1 for the webhook>",
      "kind": "comment",
      "subject_id": "<task SVA-1>",
      "subject_type": "task",
      "task_id": "<task SVA-1>",
-     "updated_seq": 261
+     "updated_seq": 258
     }
    },
    "entity_id": "<comment SVA-1 for the webhook>",
@@ -10992,7 +10696,7 @@ nothing found
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 261,
+   "seq": 258,
    "type": "comment.created"
   },
   {
@@ -11007,7 +10711,7 @@ nothing found
      "entity_id": "<comment SVA-1 for the webhook>",
      "entity_type": "comment",
      "id": "<id #157>",
-     "seq": 262,
+     "seq": 259,
      "snippet": "Phase three is drawn.",
      "task_id": "<task SVA-1>",
      "title": "SVA-1 Boss design",
@@ -11019,30 +10723,30 @@ nothing found
    "entity_type": "notification",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 262,
+   "seq": 259,
    "type": "notification.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "change_id": "<id #428>",
+   "change_id": "<id #413>",
    "data": {
     "row": {
      "id": "<label last>",
      "name": "last",
-     "updated_seq": 264
+     "updated_seq": 261
     }
    },
    "entity_id": "<label last>",
    "entity_type": "label",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 264,
+   "seq": 261,
    "type": "label.created"
   }
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&limit=2000&format=text
@@ -11165,43 +10869,41 @@ nothing found
 #210 <minute> @aram doc.updated owner: none -> <@aram>
 #211 <minute> @aram doc.updated owner: none -> <@aram>
 #212 <minute> @aram doc.updated owner: none -> <@aram>
-#213 <minute> @aram doc.edited 
-#215 <minute> @aram doc.edited 
-#216 <minute> @aram doc.created "Game docs"
-#217 <minute> @aram source.created "/var/folders/97/nvhw0tv512d5rrl_zgfrl2nh0000gn/T/TestEveryReadAnswersEachCallerT…"
-#218 <minute> @aram doc.created "Style guide"
-#219 <minute> @aram view.created "Art bugs"
-#220 <minute> @aram view.created "Mine"
-#223 <minute> @aram view.created "Stale"
-#224 <minute> @aram label.deleted moved to trash
-#225 <minute> @aram view.created "Removed view"
-#226 <minute> @aram view.deleted moved to trash
-#227 <minute> @aram resource.created "gpu"
-#228 <minute> @aram resource.created "staging"
-#229 <minute> @aram resource.created "old-box"
-#230 <minute> @aram resource.deleted moved to trash
-#231 <minute> @artist claim: took gpu for SVA-1: rendering the boss
-#234 <minute> @artist session.created SVA-1
-#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
-#239 <minute> @ops session.created "Looking around"
-#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress
-#242 <minute> @aram rule.created "tell the owner"
-#243 <minute> @aram rule.created "gone"
-#244 <minute> @aram rule.deleted moved to trash
-#245 <minute> @aram webhook.created "ops events"
-#246 <minute> @aram webhook.created "gone"
-#247 <minute> @aram webhook.deleted moved to trash
-#248 <minute> @aram integration.created "sva on github"
-#249 <minute> @aram integration.created "ops on github"
-#250 <minute> @aram secret.created "DEPLOY_KEY"
-#251 <minute> @aram watcher.created
-#255 <minute> @artist task.updated SVA-6 label: none -> art
-#256 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view "Art bugs"
-#260 <minute> @aram webhook.created "comments"
-#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)
-#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
-#264 <minute> @aram label.created "last"
-seq: 264
+#213 <minute> @aram doc.created "Game docs"
+#214 <minute> @aram source.created "/var/folders/97/nvhw0tv512d5rrl_zgfrl2nh0000gn/T/TestEveryReadAnswersEachCallerT…"
+#215 <minute> @aram doc.created "Style guide"
+#216 <minute> @aram view.created "Art bugs"
+#217 <minute> @aram view.created "Mine"
+#220 <minute> @aram view.created "Stale"
+#221 <minute> @aram label.deleted moved to trash
+#222 <minute> @aram view.created "Removed view"
+#223 <minute> @aram view.deleted moved to trash
+#224 <minute> @aram resource.created "gpu"
+#225 <minute> @aram resource.created "staging"
+#226 <minute> @aram resource.created "old-box"
+#227 <minute> @aram resource.deleted moved to trash
+#228 <minute> @artist claim: took gpu for SVA-1: rendering the boss
+#231 <minute> @artist session.created SVA-1
+#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
+#236 <minute> @ops session.created "Looking around"
+#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress
+#239 <minute> @aram rule.created "tell the owner"
+#240 <minute> @aram rule.created "gone"
+#241 <minute> @aram rule.deleted moved to trash
+#242 <minute> @aram webhook.created "ops events"
+#243 <minute> @aram webhook.created "gone"
+#244 <minute> @aram webhook.deleted moved to trash
+#245 <minute> @aram integration.created "sva on github"
+#246 <minute> @aram integration.created "ops on github"
+#247 <minute> @aram secret.created "DEPLOY_KEY"
+#248 <minute> @aram watcher.created
+#252 <minute> @artist task.updated SVA-6 label: none -> art
+#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view "Art bugs"
+#257 <minute> @aram webhook.created "comments"
+#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)
+#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
+#261 <minute> @aram label.created "last"
+seq: 261
 
 === GET /api/v1/w/games/events?after=0&limit=2000&compact=1
 200
@@ -11325,45 +11027,43 @@ seq: 264
   "#210 <minute> @aram doc.updated owner: none -> <@aram>",
   "#211 <minute> @aram doc.updated owner: none -> <@aram>",
   "#212 <minute> @aram doc.updated owner: none -> <@aram>",
-  "#213 <minute> @aram doc.edited ",
-  "#215 <minute> @aram doc.edited ",
-  "#216 <minute> @aram doc.created \"Game docs\"",
-  "#217 <minute> @aram source.created \"/var/folders/97/nvhw0tv512d5rrl_zgfrl2nh0000gn/T/TestEveryReadAnswersEachCallerT…\"",
-  "#218 <minute> @aram doc.created \"Style guide\"",
-  "#219 <minute> @aram view.created \"Art bugs\"",
-  "#220 <minute> @aram view.created \"Mine\"",
-  "#223 <minute> @aram view.created \"Stale\"",
-  "#224 <minute> @aram label.deleted moved to trash",
-  "#225 <minute> @aram view.created \"Removed view\"",
-  "#226 <minute> @aram view.deleted moved to trash",
-  "#227 <minute> @aram resource.created \"gpu\"",
-  "#228 <minute> @aram resource.created \"staging\"",
-  "#229 <minute> @aram resource.created \"old-box\"",
-  "#230 <minute> @aram resource.deleted moved to trash",
-  "#231 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
-  "#234 <minute> @artist session.created SVA-1",
-  "#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
-  "#239 <minute> @ops session.created \"Looking around\"",
-  "#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
-  "#242 <minute> @aram rule.created \"tell the owner\"",
-  "#243 <minute> @aram rule.created \"gone\"",
-  "#244 <minute> @aram rule.deleted moved to trash",
-  "#245 <minute> @aram webhook.created \"ops events\"",
-  "#246 <minute> @aram webhook.created \"gone\"",
-  "#247 <minute> @aram webhook.deleted moved to trash",
-  "#248 <minute> @aram integration.created \"sva on github\"",
-  "#249 <minute> @aram integration.created \"ops on github\"",
-  "#250 <minute> @aram secret.created \"DEPLOY_KEY\"",
-  "#251 <minute> @aram watcher.created",
-  "#255 <minute> @artist task.updated SVA-6 label: none -> art",
-  "#256 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
-  "#260 <minute> @aram webhook.created \"comments\"",
-  "#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.",
-  "#264 <minute> @aram label.created \"last\""
+  "#213 <minute> @aram doc.created \"Game docs\"",
+  "#214 <minute> @aram source.created \"/var/folders/97/nvhw0tv512d5rrl_zgfrl2nh0000gn/T/TestEveryReadAnswersEachCallerT…\"",
+  "#215 <minute> @aram doc.created \"Style guide\"",
+  "#216 <minute> @aram view.created \"Art bugs\"",
+  "#217 <minute> @aram view.created \"Mine\"",
+  "#220 <minute> @aram view.created \"Stale\"",
+  "#221 <minute> @aram label.deleted moved to trash",
+  "#222 <minute> @aram view.created \"Removed view\"",
+  "#223 <minute> @aram view.deleted moved to trash",
+  "#224 <minute> @aram resource.created \"gpu\"",
+  "#225 <minute> @aram resource.created \"staging\"",
+  "#226 <minute> @aram resource.created \"old-box\"",
+  "#227 <minute> @aram resource.deleted moved to trash",
+  "#228 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
+  "#231 <minute> @artist session.created SVA-1",
+  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#236 <minute> @ops session.created \"Looking around\"",
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
+  "#239 <minute> @aram rule.created \"tell the owner\"",
+  "#240 <minute> @aram rule.created \"gone\"",
+  "#241 <minute> @aram rule.deleted moved to trash",
+  "#242 <minute> @aram webhook.created \"ops events\"",
+  "#243 <minute> @aram webhook.created \"gone\"",
+  "#244 <minute> @aram webhook.deleted moved to trash",
+  "#245 <minute> @aram integration.created \"sva on github\"",
+  "#246 <minute> @aram integration.created \"ops on github\"",
+  "#247 <minute> @aram secret.created \"DEPLOY_KEY\"",
+  "#248 <minute> @aram watcher.created",
+  "#252 <minute> @artist task.updated SVA-6 label: none -> art",
+  "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
+  "#257 <minute> @aram webhook.created \"comments\"",
+  "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.",
+  "#261 <minute> @aram label.created \"last\""
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&limit=5
@@ -11512,14 +11212,14 @@ seq: 264
   "#202 <minute> @artist doc.created \"Palette\"",
   "#203 <minute> @ops doc.created \"Ops bot: memory\"",
   "#204 <minute> @ops doc.created \"Vault\"",
-  "#231 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
-  "#234 <minute> @artist session.created SVA-1",
-  "#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
-  "#239 <minute> @ops session.created \"Looking around\"",
-  "#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress"
+  "#228 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
+  "#231 <minute> @artist session.created SVA-1",
+  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#236 <minute> @ops session.created \"Looking around\"",
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress"
  ],
  "more": true,
- "seq": 240
+ "seq": 237
 }
 
 === GET /api/v1/w/games/events?after=0&inbox=1
@@ -11795,7 +11495,7 @@ seq: 264
    "actor_id": "<@aram>",
    "at": 1700000000000,
    "audience_id": "<@aram>",
-   "change_id": "<id #397>",
+   "change_id": "<id #382>",
    "data": {
     "row": {
      "created_at": 1700000000000,
@@ -11811,21 +11511,21 @@ seq: 264
      "rank": "i",
      "shared": false,
      "slug": "mine",
-     "updated_seq": 220
+     "updated_seq": 217
     }
    },
    "entity_id": "<view Mine>",
    "entity_type": "view",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 220,
+   "seq": 217,
    "type": "view.created"
   },
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
    "audience_id": "<@aram>",
-   "change_id": "<id #423>",
+   "change_id": "<id #408>",
    "data": {
     "row": {
      "created_at": 1700000000000,
@@ -11838,14 +11538,14 @@ seq: 264
    "entity_type": "watcher",
    "scope_id": "<id #153>",
    "scope_type": "workspace",
-   "seq": 251,
+   "seq": 248,
    "type": "watcher.created"
   },
   {
    "actor_id": "<@artist>",
    "at": 1700000000000,
    "audience_id": "<@aram>",
-   "change_id": "<id #425>",
+   "change_id": "<id #410>",
    "data": {
     "row": {
      "actor_id": "<@artist>",
@@ -11853,7 +11553,7 @@ seq: 264
      "entity_id": "<task SVA-6>",
      "entity_type": "task",
      "id": "<id #158>",
-     "seq": 256,
+     "seq": 253,
      "snippet": "in your view \"Art bugs\"",
      "task_id": "<task SVA-6>",
      "title": "SVA-6 Review me",
@@ -11865,7 +11565,7 @@ seq: 264
    "entity_type": "notification",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
-   "seq": 256,
+   "seq": 253,
    "type": "notification.created"
   },
   {
@@ -11880,7 +11580,7 @@ seq: 264
      "entity_id": "<comment SVA-1 for the webhook>",
      "entity_type": "comment",
      "id": "<id #157>",
-     "seq": 262,
+     "seq": 259,
      "snippet": "Phase three is drawn.",
      "task_id": "<task SVA-1>",
      "title": "SVA-1 Boss design",
@@ -11892,12 +11592,12 @@ seq: 264
    "entity_type": "notification",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 262,
+   "seq": 259,
    "type": "notification.created"
   }
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&inbox=1&format=text
@@ -11910,11 +11610,11 @@ seq: 264
 #165 <minute> @aram doc.created "Salary notes"
 #166 <minute> @aram doc.created "For Bea"
 #198 <minute> @aram attachment.created
-#220 <minute> @aram view.created "Mine"
-#251 <minute> @aram watcher.created
-#256 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view "Art bugs"
-#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
-seq: 264
+#217 <minute> @aram view.created "Mine"
+#248 <minute> @aram watcher.created
+#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view "Art bugs"
+#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.
+seq: 261
 
 === GET /api/v1/w/games/events?after=0&types=comment.created,decision.opened&compact=1
 200
@@ -11929,10 +11629,10 @@ seq: 264
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#199 <minute> @aram comment : Is this still how we work?  (id=<comment Handbook>)",
   "#208 <minute> @aram comment : Phase one first.  (id=<comment Week one>)",
-  "#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)"
+  "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)"
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&task=SVA-1&compact=1
@@ -11967,14 +11667,14 @@ seq: 264
   "#157 <minute> @aram attachment.created SVA-1",
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
-  "#234 <minute> @artist session.created SVA-1",
-  "#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
-  "#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
-  "#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#231 <minute> @artist session.created SVA-1",
+  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
+  "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&task=OPS-1&compact=1
@@ -12163,7 +11863,7 @@ seq: 264
   }
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&doc=<doc OPS runbook>
@@ -12262,7 +11962,7 @@ seq: 264
   }
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&mine=1&compact=1
@@ -12309,16 +12009,16 @@ seq: 264
   "#157 <minute> @aram attachment.created SVA-1",
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
-  "#234 <minute> @artist session.created SVA-1",
-  "#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
-  "#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
-  "#255 <minute> @artist task.updated SVA-6 label: none -> art",
-  "#256 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
-  "#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#231 <minute> @artist session.created SVA-1",
+  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
+  "#252 <minute> @artist task.updated SVA-6 label: none -> art",
+  "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
+  "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&project=SVA&limit=2000&compact=1
@@ -12365,16 +12065,16 @@ seq: 264
   "#157 <minute> @aram attachment.created SVA-1",
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
-  "#234 <minute> @artist session.created SVA-1",
-  "#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
-  "#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
-  "#255 <minute> @artist task.updated SVA-6 label: none -> art",
-  "#256 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
-  "#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#231 <minute> @artist session.created SVA-1",
+  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
+  "#252 <minute> @artist task.updated SVA-6 label: none -> art",
+  "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
+  "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&project=OPS&limit=2000&compact=1
@@ -12425,16 +12125,16 @@ seq: 264
   "#157 <minute> @aram attachment.created SVA-1",
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
-  "#234 <minute> @artist session.created SVA-1",
-  "#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
-  "#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
-  "#255 <minute> @artist task.updated SVA-6 label: none -> art",
-  "#256 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
-  "#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
+  "#231 <minute> @artist session.created SVA-1",
+  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
+  "#252 <minute> @artist task.updated SVA-6 label: none -> art",
+  "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
+  "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn."
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&assignee=me&compact=1
@@ -12442,7 +12142,7 @@ seq: 264
 {
  "events": [],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=0&view=ops-infra&compact=1
@@ -12472,7 +12172,7 @@ seq: 264
   "#124 <minute> @aram task.updated SVA-2 waiting_on: none -> @bea; waiting_on_note: none -> answer: Which color?"
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?cursor=main&compact=1
@@ -12597,45 +12297,43 @@ seq: 264
   "#210 <minute> @aram doc.updated owner: none -> <@aram>",
   "#211 <minute> @aram doc.updated owner: none -> <@aram>",
   "#212 <minute> @aram doc.updated owner: none -> <@aram>",
-  "#213 <minute> @aram doc.edited ",
-  "#215 <minute> @aram doc.edited ",
-  "#216 <minute> @aram doc.created \"Game docs\"",
-  "#217 <minute> @aram source.created \"/var/folders/97/nvhw0tv512d5rrl_zgfrl2nh0000gn/T/TestEveryReadAnswersEachCallerT…\"",
-  "#218 <minute> @aram doc.created \"Style guide\"",
-  "#219 <minute> @aram view.created \"Art bugs\"",
-  "#220 <minute> @aram view.created \"Mine\"",
-  "#223 <minute> @aram view.created \"Stale\"",
-  "#224 <minute> @aram label.deleted moved to trash",
-  "#225 <minute> @aram view.created \"Removed view\"",
-  "#226 <minute> @aram view.deleted moved to trash",
-  "#227 <minute> @aram resource.created \"gpu\"",
-  "#228 <minute> @aram resource.created \"staging\"",
-  "#229 <minute> @aram resource.created \"old-box\"",
-  "#230 <minute> @aram resource.deleted moved to trash",
-  "#231 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
-  "#234 <minute> @artist session.created SVA-1",
-  "#235 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
-  "#239 <minute> @ops session.created \"Looking around\"",
-  "#240 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
-  "#242 <minute> @aram rule.created \"tell the owner\"",
-  "#243 <minute> @aram rule.created \"gone\"",
-  "#244 <minute> @aram rule.deleted moved to trash",
-  "#245 <minute> @aram webhook.created \"ops events\"",
-  "#246 <minute> @aram webhook.created \"gone\"",
-  "#247 <minute> @aram webhook.deleted moved to trash",
-  "#248 <minute> @aram integration.created \"sva on github\"",
-  "#249 <minute> @aram integration.created \"ops on github\"",
-  "#250 <minute> @aram secret.created \"DEPLOY_KEY\"",
-  "#251 <minute> @aram watcher.created",
-  "#255 <minute> @artist task.updated SVA-6 label: none -> art",
-  "#256 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
-  "#260 <minute> @aram webhook.created \"comments\"",
-  "#261 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
-  "#262 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.",
-  "#264 <minute> @aram label.created \"last\""
+  "#213 <minute> @aram doc.created \"Game docs\"",
+  "#214 <minute> @aram source.created \"/var/folders/97/nvhw0tv512d5rrl_zgfrl2nh0000gn/T/TestEveryReadAnswersEachCallerT…\"",
+  "#215 <minute> @aram doc.created \"Style guide\"",
+  "#216 <minute> @aram view.created \"Art bugs\"",
+  "#217 <minute> @aram view.created \"Mine\"",
+  "#220 <minute> @aram view.created \"Stale\"",
+  "#221 <minute> @aram label.deleted moved to trash",
+  "#222 <minute> @aram view.created \"Removed view\"",
+  "#223 <minute> @aram view.deleted moved to trash",
+  "#224 <minute> @aram resource.created \"gpu\"",
+  "#225 <minute> @aram resource.created \"staging\"",
+  "#226 <minute> @aram resource.created \"old-box\"",
+  "#227 <minute> @aram resource.deleted moved to trash",
+  "#228 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
+  "#231 <minute> @artist session.created SVA-1",
+  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#236 <minute> @ops session.created \"Looking around\"",
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
+  "#239 <minute> @aram rule.created \"tell the owner\"",
+  "#240 <minute> @aram rule.created \"gone\"",
+  "#241 <minute> @aram rule.deleted moved to trash",
+  "#242 <minute> @aram webhook.created \"ops events\"",
+  "#243 <minute> @aram webhook.created \"gone\"",
+  "#244 <minute> @aram webhook.deleted moved to trash",
+  "#245 <minute> @aram integration.created \"sva on github\"",
+  "#246 <minute> @aram integration.created \"ops on github\"",
+  "#247 <minute> @aram secret.created \"DEPLOY_KEY\"",
+  "#248 <minute> @aram watcher.created",
+  "#252 <minute> @artist task.updated SVA-6 label: none -> art",
+  "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
+  "#257 <minute> @aram webhook.created \"comments\"",
+  "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
+  "#259 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.",
+  "#261 <minute> @aram label.created \"last\""
  ],
  "more": false,
- "seq": 264
+ "seq": 261
 }
 
 === GET /api/v1/w/games/events?after=99999
@@ -12644,7 +12342,7 @@ seq: 264
  "error": {
   "code": "invalid",
   "field": "after",
-  "message": "after=99999 is past the end of the feed, which stands at 264; read from there, or from 0 for everything"
+  "message": "after=99999 is past the end of the feed, which stands at 261; read from there, or from 0 for everything"
  }
 }
 
@@ -12966,20 +12664,20 @@ seq: 264
    "updated_seq": 212
   },
   {
-   "content_seq": 218,
+   "content_seq": 215,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 218,
+   "created_seq": 215,
    "id": "<doc mirrored>",
    "kind": "page",
-   "parent_id": "<id #393>",
+   "parent_id": "<id #378>",
    "rank": "00000000sg",
    "source_id": "<source Game docs>",
    "source_path": "GUIDE.md",
    "title": "Style guide",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 218
+   "updated_seq": 215
   },
   {
    "content_seq": 165,
@@ -13060,16 +12758,13 @@ seq: 264
    "updated_seq": 173
   },
   {
-   "content_seq": 213,
+   "content_seq": 186,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 186,
    "generated": "decision_log",
    "id": "<doc Decision log>",
    "kind": "page",
-   "props": {
-    "built_seq": 264
-   },
    "rank": "zv",
    "title": "Decision log",
    "updated_at": 1700000000000,
@@ -13077,7 +12772,7 @@ seq: 264
    "updated_seq": 186
   },
   {
-   "content_seq": 215,
+   "content_seq": 188,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 188,
@@ -13085,9 +12780,6 @@ seq: 264
    "id": "<doc Changelog>",
    "kind": "page",
    "project_id": "<project SVA>",
-   "props": {
-    "built_seq": 264
-   },
    "rank": "zy",
    "title": "Changelog",
    "updated_at": 1700000000000,
@@ -13153,12 +12845,12 @@ seq: 264
    "updated_seq": 210
   },
   {
-   "content_seq": 216,
+   "content_seq": 213,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 216,
+   "created_seq": 213,
    "icon": "git",
-   "id": "<id #393>",
+   "id": "<id #378>",
    "kind": "page",
    "props": null,
    "rank": "zzx",
@@ -13166,7 +12858,7 @@ seq: 264
    "title": "Game docs",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 216
+   "updated_seq": 213
   }
  ],
  "epics": [
@@ -13200,7 +12892,7 @@ seq: 264
   {
    "id": "<label last>",
    "name": "last",
-   "updated_seq": 264
+   "updated_seq": 261
   }
  ],
  "me": {
@@ -13352,7 +13044,7 @@ seq: 264
    "entity_id": "<comment SVA-1 for the webhook>",
    "entity_type": "comment",
    "id": "<id #157>",
-   "seq": 262,
+   "seq": 259,
    "snippet": "Phase three is drawn.",
    "task_id": "<task SVA-1>",
    "title": "SVA-1 Boss design",
@@ -13365,7 +13057,7 @@ seq: 264
    "entity_id": "<task SVA-6>",
    "entity_type": "task",
    "id": "<id #158>",
-   "seq": 256,
+   "seq": 253,
    "snippet": "in your view \"Art bugs\"",
    "task_id": "<task SVA-6>",
    "title": "SVA-6 Review me",
@@ -13503,16 +13195,16 @@ seq: 264
    "description": "the one render machine",
    "id": "<resource gpu>",
    "name": "gpu",
-   "updated_seq": 227
+   "updated_seq": 224
   },
   {
    "created_at": 1700000000000,
    "id": "<resource staging>",
    "name": "staging",
-   "updated_seq": 228
+   "updated_seq": 225
   }
  ],
- "seq": 264,
+ "seq": 261,
  "server_time": 1700000000000,
  "sessions": [
   {
@@ -13521,7 +13213,7 @@ seq: 264
    "started_at": 1700000000000,
    "state": "running",
    "title": "Looking around",
-   "updated_seq": 239
+   "updated_seq": 236
   },
   {
    "agent_id": "<@artist>",
@@ -13538,7 +13230,7 @@ seq: 264
    "summary": "two phases drawn",
    "task_id": "<task SVA-1>",
    "title": "Drawing the boss",
-   "updated_seq": 235
+   "updated_seq": 232
   }
  ],
  "statuses": [
@@ -13608,7 +13300,7 @@ seq: 264
  ],
  "tasks": [
   {
-   "activity_seq": 261,
+   "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
    "budget": {
@@ -13639,7 +13331,7 @@ seq: 264
    "status_id": "<id #164>",
    "title": "Boss design",
    "updated_at": 1700000000000,
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on_id": "<@aram>",
    "waiting_on_note": "review the result"
   },
@@ -13705,7 +13397,7 @@ seq: 264
    "updated_seq": 93
   },
   {
-   "activity_seq": 255,
+   "activity_seq": 252,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 85,
@@ -13722,7 +13414,7 @@ seq: 264
    "status_id": "<status Review>",
    "title": "Review me",
    "updated_at": 1700000000000,
-   "updated_seq": 255,
+   "updated_seq": 252,
    "waiting_on_id": "<@bea>",
    "waiting_on_note": "needs a look"
   }
@@ -13771,7 +13463,7 @@ seq: 264
    "rank": "00000000sg",
    "shared": true,
    "slug": "art-bugs",
-   "updated_seq": 219
+   "updated_seq": 216
   },
   {
    "created_at": 1700000000000,
@@ -13787,7 +13479,7 @@ seq: 264
    "rank": "i",
    "shared": false,
    "slug": "mine",
-   "updated_seq": 220
+   "updated_seq": 217
   },
   {
    "created_at": 1700000000000,
@@ -13806,7 +13498,7 @@ seq: 264
    "rank": "x",
    "shared": true,
    "slug": "stale",
-   "updated_seq": 223
+   "updated_seq": 220
   }
  ],
  "watchers": [
@@ -14052,7 +13744,7 @@ seq: 264
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<id #393>",
+   "subject_id": "<id #378>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -14073,7 +13765,7 @@ seq: 264
   "created_at": 1700000000000,
   "id": "<id #153>",
   "name": "Games",
-  "seq": 264,
+  "seq": 261,
   "slug": "games"
  }
 }
@@ -14353,20 +14045,20 @@ seq: 264
    "updated_seq": 212
   },
   {
-   "content_seq": 218,
+   "content_seq": 215,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 218,
+   "created_seq": 215,
    "id": "<doc mirrored>",
    "kind": "page",
-   "parent_id": "<id #393>",
+   "parent_id": "<id #378>",
    "rank": "00000000sg",
    "source_id": "<source Game docs>",
    "source_path": "GUIDE.md",
    "title": "Style guide",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 218
+   "updated_seq": 215
   },
   {
    "content_seq": 165,
@@ -14447,16 +14139,13 @@ seq: 264
    "updated_seq": 173
   },
   {
-   "content_seq": 213,
+   "content_seq": 186,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 186,
    "generated": "decision_log",
    "id": "<doc Decision log>",
    "kind": "page",
-   "props": {
-    "built_seq": 264
-   },
    "rank": "zv",
    "title": "Decision log",
    "updated_at": 1700000000000,
@@ -14464,7 +14153,7 @@ seq: 264
    "updated_seq": 186
   },
   {
-   "content_seq": 215,
+   "content_seq": 188,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 188,
@@ -14472,9 +14161,6 @@ seq: 264
    "id": "<doc Changelog>",
    "kind": "page",
    "project_id": "<project SVA>",
-   "props": {
-    "built_seq": 264
-   },
    "rank": "zy",
    "title": "Changelog",
    "updated_at": 1700000000000,
@@ -14540,12 +14226,12 @@ seq: 264
    "updated_seq": 210
   },
   {
-   "content_seq": 216,
+   "content_seq": 213,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 216,
+   "created_seq": 213,
    "icon": "git",
-   "id": "<id #393>",
+   "id": "<id #378>",
    "kind": "page",
    "props": null,
    "rank": "zzx",
@@ -14553,7 +14239,7 @@ seq: 264
    "title": "Game docs",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 216
+   "updated_seq": 213
   }
  ],
  "epics": [
@@ -14587,7 +14273,7 @@ seq: 264
   {
    "id": "<label last>",
    "name": "last",
-   "updated_seq": 264
+   "updated_seq": 261
   }
  ],
  "me": {
@@ -14739,7 +14425,7 @@ seq: 264
    "entity_id": "<comment SVA-1 for the webhook>",
    "entity_type": "comment",
    "id": "<id #157>",
-   "seq": 262,
+   "seq": 259,
    "snippet": "Phase three is drawn.",
    "task_id": "<task SVA-1>",
    "title": "SVA-1 Boss design",
@@ -14752,7 +14438,7 @@ seq: 264
    "entity_id": "<task SVA-6>",
    "entity_type": "task",
    "id": "<id #158>",
-   "seq": 256,
+   "seq": 253,
    "snippet": "in your view \"Art bugs\"",
    "task_id": "<task SVA-6>",
    "title": "SVA-6 Review me",
@@ -14883,17 +14569,17 @@ seq: 264
    "description": "the one render machine",
    "id": "<resource gpu>",
    "name": "gpu",
-   "updated_seq": 227
+   "updated_seq": 224
   },
   {
    "created_at": 1700000000000,
    "id": "<resource staging>",
    "name": "staging",
-   "updated_seq": 228
+   "updated_seq": 225
   }
  ],
  "rest": 2,
- "seq": 264,
+ "seq": 261,
  "server_time": 1700000000000,
  "sessions": [
   {
@@ -14902,7 +14588,7 @@ seq: 264
    "started_at": 1700000000000,
    "state": "running",
    "title": "Looking around",
-   "updated_seq": 239
+   "updated_seq": 236
   },
   {
    "agent_id": "<@artist>",
@@ -14919,7 +14605,7 @@ seq: 264
    "summary": "two phases drawn",
    "task_id": "<task SVA-1>",
    "title": "Drawing the boss",
-   "updated_seq": 235
+   "updated_seq": 232
   }
  ],
  "statuses": [
@@ -14989,7 +14675,7 @@ seq: 264
  ],
  "tasks": [
   {
-   "activity_seq": 261,
+   "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
    "budget": {
@@ -15020,7 +14706,7 @@ seq: 264
    "status_id": "<id #164>",
    "title": "Boss design",
    "updated_at": 1700000000000,
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on_id": "<@aram>",
    "waiting_on_note": "review the result"
   },
@@ -15049,7 +14735,7 @@ seq: 264
    "waiting_on_note": "answer: Which color?"
   },
   {
-   "activity_seq": 255,
+   "activity_seq": 252,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 85,
@@ -15066,7 +14752,7 @@ seq: 264
    "status_id": "<status Review>",
    "title": "Review me",
    "updated_at": 1700000000000,
-   "updated_seq": 255,
+   "updated_seq": 252,
    "waiting_on_id": "<@bea>",
    "waiting_on_note": "needs a look"
   }
@@ -15115,7 +14801,7 @@ seq: 264
    "rank": "00000000sg",
    "shared": true,
    "slug": "art-bugs",
-   "updated_seq": 219
+   "updated_seq": 216
   },
   {
    "created_at": 1700000000000,
@@ -15131,7 +14817,7 @@ seq: 264
    "rank": "i",
    "shared": false,
    "slug": "mine",
-   "updated_seq": 220
+   "updated_seq": 217
   },
   {
    "created_at": 1700000000000,
@@ -15150,7 +14836,7 @@ seq: 264
    "rank": "x",
    "shared": true,
    "slug": "stale",
-   "updated_seq": 223
+   "updated_seq": 220
   }
  ],
  "watchers": [
@@ -15396,7 +15082,7 @@ seq: 264
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<id #393>",
+   "subject_id": "<id #378>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -15417,7 +15103,7 @@ seq: 264
   "created_at": 1700000000000,
   "id": "<id #153>",
   "name": "Games",
-  "seq": 264,
+  "seq": 261,
   "slug": "games"
  }
 }
@@ -15438,7 +15124,7 @@ seq: 264
    "type": "duplicates"
   }
  ],
- "seq": 264,
+ "seq": 261,
  "tasks": [
   {
    "activity_seq": 103,
@@ -15609,7 +15295,7 @@ seq: 264
    "title": "Plans"
   },
   {
-   "id": "<id #393>",
+   "id": "<id #378>",
    "title": "Game docs"
   }
  ],
@@ -15737,7 +15423,7 @@ seq: 264
    "name": "staging"
   }
  ],
- "seq": 264,
+ "seq": 261,
  "server_time": 1700000000000,
  "sessions": [
   {
@@ -15890,7 +15576,7 @@ seq: 264
   "created_at": 1700000000000,
   "id": "<id #153>",
   "name": "Games",
-  "seq": 264,
+  "seq": 261,
   "slug": "games"
  }
 }
@@ -15999,20 +15685,20 @@ seq: 264
    "updated_seq": 212
   },
   {
-   "content_seq": 218,
+   "content_seq": 215,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 218,
+   "created_seq": 215,
    "id": "<doc mirrored>",
    "kind": "page",
-   "parent_id": "<id #393>",
+   "parent_id": "<id #378>",
    "rank": "00000000sg",
    "source_id": "<source Game docs>",
    "source_path": "GUIDE.md",
    "title": "Style guide",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 218
+   "updated_seq": 215
   },
   {
    "content_seq": 201,
@@ -16059,12 +15745,12 @@ seq: 264
    "updated_seq": 210
   },
   {
-   "content_seq": 216,
+   "content_seq": 213,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 216,
+   "created_seq": 213,
    "icon": "git",
-   "id": "<id #393>",
+   "id": "<id #378>",
    "kind": "page",
    "props": null,
    "rank": "zzx",
@@ -16072,7 +15758,7 @@ seq: 264
    "title": "Game docs",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 216
+   "updated_seq": 213
   }
  ],
  "epics": [],
@@ -16080,7 +15766,7 @@ seq: 264
   {
    "id": "<label last>",
    "name": "last",
-   "updated_seq": 264
+   "updated_seq": 261
   }
  ],
  "me": {
@@ -16104,7 +15790,7 @@ seq: 264
    "entity_id": "<comment SVA-1 for the webhook>",
    "entity_type": "comment",
    "id": "<id #157>",
-   "seq": 262,
+   "seq": 259,
    "snippet": "Phase three is drawn.",
    "task_id": "<task SVA-1>",
    "title": "SVA-1 Boss design",
@@ -16117,7 +15803,7 @@ seq: 264
    "entity_id": "<task SVA-6>",
    "entity_type": "task",
    "id": "<id #158>",
-   "seq": 256,
+   "seq": 253,
    "snippet": "in your view \"Art bugs\"",
    "task_id": "<task SVA-6>",
    "title": "SVA-6 Review me",
@@ -16159,16 +15845,16 @@ seq: 264
    "description": "the one render machine",
    "id": "<resource gpu>",
    "name": "gpu",
-   "updated_seq": 227
+   "updated_seq": 224
   },
   {
    "created_at": 1700000000000,
    "id": "<resource staging>",
    "name": "staging",
-   "updated_seq": 228
+   "updated_seq": 225
   }
  ],
- "seq": 264,
+ "seq": 261,
  "server_time": 1700000000000,
  "sessions": [
   {
@@ -16177,7 +15863,7 @@ seq: 264
    "started_at": 1700000000000,
    "state": "running",
    "title": "Looking around",
-   "updated_seq": 239
+   "updated_seq": 236
   },
   {
    "agent_id": "<@artist>",
@@ -16194,13 +15880,13 @@ seq: 264
    "summary": "two phases drawn",
    "task_id": "<task SVA-1>",
    "title": "Drawing the boss",
-   "updated_seq": 235
+   "updated_seq": 232
   }
  ],
  "statuses": [],
  "tasks": [
   {
-   "activity_seq": 261,
+   "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
    "budget": {
@@ -16231,12 +15917,12 @@ seq: 264
    "status_id": "<id #164>",
    "title": "Boss design",
    "updated_at": 1700000000000,
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on_id": "<@aram>",
    "waiting_on_note": "review the result"
   },
   {
-   "activity_seq": 255,
+   "activity_seq": 252,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 85,
@@ -16253,7 +15939,7 @@ seq: 264
    "status_id": "<status Review>",
    "title": "Review me",
    "updated_at": 1700000000000,
-   "updated_seq": 255,
+   "updated_seq": 252,
    "waiting_on_id": "<@bea>",
    "waiting_on_note": "needs a look"
   }
@@ -16285,7 +15971,7 @@ seq: 264
    "rank": "00000000sg",
    "shared": true,
    "slug": "art-bugs",
-   "updated_seq": 219
+   "updated_seq": 216
   },
   {
    "created_at": 1700000000000,
@@ -16301,7 +15987,7 @@ seq: 264
    "rank": "i",
    "shared": false,
    "slug": "mine",
-   "updated_seq": 220
+   "updated_seq": 217
   },
   {
    "created_at": 1700000000000,
@@ -16320,7 +16006,7 @@ seq: 264
    "rank": "x",
    "shared": true,
    "slug": "stale",
-   "updated_seq": 223
+   "updated_seq": 220
   }
  ],
  "watchers": [
@@ -16566,7 +16252,7 @@ seq: 264
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<id #393>",
+   "subject_id": "<id #378>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -16587,7 +16273,7 @@ seq: 264
   "created_at": 1700000000000,
   "id": "<id #153>",
   "name": "Games",
-  "seq": 264,
+  "seq": 261,
   "slug": "games"
  }
 }
@@ -16989,7 +16675,7 @@ Canceled  canceled  id=<id #198>
   {
    "id": "<label last>",
    "name": "last",
-   "updated_seq": 264
+   "updated_seq": 261
   }
  ]
 }
@@ -17008,7 +16694,7 @@ last  id=<label last>
    "deleted_at": 1700000000000,
    "id": "<label temp>",
    "name": "temp",
-   "updated_seq": 224
+   "updated_seq": 221
   }
  ]
 }
@@ -17238,13 +16924,13 @@ Explosions are ring-shaped.  id=<preference rings>
    "description": "the one render machine",
    "id": "<resource gpu>",
    "name": "gpu",
-   "updated_seq": 227
+   "updated_seq": 224
   },
   {
    "created_at": 1700000000000,
    "id": "<resource staging>",
    "name": "staging",
-   "updated_seq": 228
+   "updated_seq": 225
   }
  ]
 }
@@ -17263,7 +16949,7 @@ staging  id=<resource staging>
    "deleted_at": 1700000000000,
    "id": "<resource gone>",
    "name": "old-box",
-   "updated_seq": 230
+   "updated_seq": 227
   }
  ]
 }
@@ -17283,7 +16969,7 @@ staging  id=<resource staging>
    "id": "<secret DEPLOY_KEY>",
    "name": "DEPLOY_KEY",
    "updated_at": 1700000000000,
-   "updated_seq": 250
+   "updated_seq": 247
   }
  ]
 }
@@ -17348,7 +17034,7 @@ holding  task=<task SVA-1>  resource=<resource gpu>  user=<@artist>  id=<claim g
    "started_at": 1700000000000,
    "state": "running",
    "title": "Looking around",
-   "updated_seq": 239
+   "updated_seq": 236
   },
   {
    "agent_id": "<@artist>",
@@ -17365,7 +17051,7 @@ holding  task=<task SVA-1>  resource=<resource gpu>  user=<@artist>  id=<claim g
    "summary": "two phases drawn",
    "task_id": "<task SVA-1>",
    "title": "Drawing the boss",
-   "updated_seq": 235
+   "updated_seq": 232
   }
  ]
 }
@@ -17385,7 +17071,7 @@ Drawing the boss  running  task=<task SVA-1>  id=<session artist>
    "started_at": 1700000000000,
    "state": "running",
    "title": "Looking around",
-   "updated_seq": 239
+   "updated_seq": 236
   },
   {
    "agent_id": "<@artist>",
@@ -17402,7 +17088,7 @@ Drawing the boss  running  task=<task SVA-1>  id=<session artist>
    "summary": "two phases drawn",
    "task_id": "<task SVA-1>",
    "title": "Drawing the boss",
-   "updated_seq": 235
+   "updated_seq": 232
   }
  ]
 }
@@ -17713,7 +17399,7 @@ Boss phases  pr  open  https://git.example.com/games/sva/pull/12  12  id=<link S
    "last_at": 1700000000000,
    "last_status": "200",
    "name": "comments",
-   "updated_seq": 260,
+   "updated_seq": 257,
    "url": "http://receiver.test/comments"
   }
  ]
@@ -17738,7 +17424,7 @@ comments  http://receiver.test/comments  id=<webhook comments>
    "failures": 0,
    "id": "<webhook gone>",
    "name": "gone",
-   "updated_seq": 247,
+   "updated_seq": 244,
    "url": "http://receiver.test/gone"
   }
  ]
@@ -17753,9 +17439,9 @@ comments  http://receiver.test/comments  id=<webhook comments>
    "created_at": 1700000000000,
    "done_at": 1700000000000,
    "event_type": "comment.created",
-   "id": "<id #429>",
+   "id": "<id #414>",
    "next_at": 1700000000000,
-   "seq": 261,
+   "seq": 258,
    "state": "ok",
    "status_code": 200,
    "webhook_id": "<webhook comments>"
@@ -17765,7 +17451,7 @@ comments  http://receiver.test/comments  id=<webhook comments>
 
 === GET /api/v1/w/games/list/deliveries?format=text
 200
-ok  id=<id #429>
+ok  id=<id #414>
 
 === GET /api/v1/w/games/list/deliveries?trash=1
 200
@@ -17776,9 +17462,9 @@ ok  id=<id #429>
    "created_at": 1700000000000,
    "done_at": 1700000000000,
    "event_type": "comment.created",
-   "id": "<id #429>",
+   "id": "<id #414>",
    "next_at": 1700000000000,
-   "seq": 261,
+   "seq": 258,
    "state": "ok",
    "status_code": 200,
    "webhook_id": "<webhook comments>"
@@ -17806,7 +17492,7 @@ ok  id=<id #429>
     "project_id": "<project OPS>"
    },
    "name": "tell the owner",
-   "updated_seq": 242
+   "updated_seq": 239
   }
  ]
 }
@@ -17835,7 +17521,7 @@ tell the owner  id=<rule notify>
     ]
    },
    "name": "gone",
-   "updated_seq": 244
+   "updated_seq": 241
   }
  ]
 }
@@ -17853,7 +17539,7 @@ tell the owner  id=<rule notify>
    "kind": "github",
    "name": "sva on github",
    "project_id": "<project SVA>",
-   "updated_seq": 248
+   "updated_seq": 245
   }
  ]
 }
@@ -17888,7 +17574,7 @@ sva on github  github  id=<integration github>
    "rank": "00000000sg",
    "shared": true,
    "slug": "art-bugs",
-   "updated_seq": 219
+   "updated_seq": 216
   },
   {
    "created_at": 1700000000000,
@@ -17904,7 +17590,7 @@ sva on github  github  id=<integration github>
    "rank": "i",
    "shared": false,
    "slug": "mine",
-   "updated_seq": 220
+   "updated_seq": 217
   },
   {
    "created_at": 1700000000000,
@@ -17923,7 +17609,7 @@ sva on github  github  id=<integration github>
    "rank": "x",
    "shared": true,
    "slug": "stale",
-   "updated_seq": 223
+   "updated_seq": 220
   }
  ]
 }
@@ -17951,7 +17637,7 @@ stale  Stale  id=<view Stale>
    "rank": "y",
    "shared": true,
    "slug": "removed-view",
-   "updated_seq": 226
+   "updated_seq": 223
   }
  ]
 }
@@ -18180,7 +17866,7 @@ stale  Stale  id=<view Stale>
    "kind": "github",
    "name": "sva on github",
    "project_id": "<project SVA>",
-   "updated_seq": 248
+   "updated_seq": 245
   }
  ]
 }
@@ -18211,7 +17897,7 @@ stale  Stale  id=<view Stale>
    "rank": "00000000sg",
    "shared": true,
    "slug": "art-bugs",
-   "updated_seq": 219
+   "updated_seq": 216
   }
  ]
 }
@@ -18521,7 +18207,7 @@ stale  Stale  id=<view Stale>
    "summary": "two phases drawn",
    "task_id": "<task SVA-1>",
    "title": "Drawing the boss",
-   "updated_seq": 235
+   "updated_seq": 232
   }
  ]
 }
@@ -18691,7 +18377,7 @@ stale  Stale  id=<view Stale>
   {
    "id": "<label last>",
    "name": "last",
-   "updated_seq": 264
+   "updated_seq": 261
   }
  ]
 }
@@ -18714,7 +18400,7 @@ stale  Stale  id=<view Stale>
   {
    "id": "<label last>",
    "name": "last",
-   "updated_seq": 264
+   "updated_seq": 261
   }
  ]
 }
@@ -18818,7 +18504,7 @@ stale  Stale  id=<view Stale>
   {
    "id": "<label last>",
    "name": "last",
-   "updated_seq": 264
+   "updated_seq": 261
   }
  ]
 }
@@ -18857,9 +18543,9 @@ last  id=<label last>
    "created_at": 1700000000000,
    "done_at": 1700000000000,
    "event_type": "comment.created",
-   "id": "<id #429>",
+   "id": "<id #414>",
    "next_at": 1700000000000,
-   "seq": 261,
+   "seq": 258,
    "state": "ok",
    "status_code": 200,
    "webhook_id": "<webhook comments>"
@@ -18877,7 +18563,7 @@ last  id=<label last>
    "started_at": 1700000000000,
    "state": "running",
    "title": "Looking around",
-   "updated_seq": 239
+   "updated_seq": 236
   }
  ]
 }
@@ -19017,20 +18703,20 @@ last  id=<label last>
    "updated_seq": 212
   },
   {
-   "content_seq": 218,
+   "content_seq": 215,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 218,
+   "created_seq": 215,
    "id": "<doc mirrored>",
    "kind": "page",
-   "parent_id": "<id #393>",
+   "parent_id": "<id #378>",
    "rank": "00000000sg",
    "source_id": "<source Game docs>",
    "source_path": "GUIDE.md",
    "title": "Style guide",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 218
+   "updated_seq": 215
   },
   {
    "content_seq": 165,
@@ -19092,16 +18778,13 @@ last  id=<label last>
    "updated_seq": 173
   },
   {
-   "content_seq": 213,
+   "content_seq": 186,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 186,
    "generated": "decision_log",
    "id": "<doc Decision log>",
    "kind": "page",
-   "props": {
-    "built_seq": 264
-   },
    "rank": "zv",
    "title": "Decision log",
    "updated_at": 1700000000000,
@@ -19109,7 +18792,7 @@ last  id=<label last>
    "updated_seq": 186
   },
   {
-   "content_seq": 215,
+   "content_seq": 188,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 188,
@@ -19117,9 +18800,6 @@ last  id=<label last>
    "id": "<doc Changelog>",
    "kind": "page",
    "project_id": "<project SVA>",
-   "props": {
-    "built_seq": 264
-   },
    "rank": "zy",
    "title": "Changelog",
    "updated_at": 1700000000000,
@@ -19185,12 +18865,12 @@ last  id=<label last>
    "updated_seq": 210
   },
   {
-   "content_seq": 216,
+   "content_seq": 213,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "created_seq": 216,
+   "created_seq": 213,
    "icon": "git",
-   "id": "<id #393>",
+   "id": "<id #378>",
    "kind": "page",
    "props": null,
    "rank": "zzx",
@@ -19198,7 +18878,7 @@ last  id=<label last>
    "title": "Game docs",
    "updated_at": 1700000000000,
    "updated_by": "<@aram>",
-   "updated_seq": 216
+   "updated_seq": 213
   }
  ]
 }
@@ -19222,7 +18902,7 @@ Ops bot: memory [memory]  (<id #365>)
 Plans [private]  (<doc Plans>)
   Quarter one [private]  (<doc Plans sub-page>)
     Week one [private]  (<doc Plans sub-sub-page>)
-Game docs  (<id #393>)
+Game docs  (<id #378>)
   Style guide  (<doc mirrored>)
 
 === GET /api/v1/w/games/docs?trash=1
@@ -19294,7 +18974,7 @@ Game docs  (<id #393>)
    "updated_seq": 173
   },
   {
-   "content_seq": 215,
+   "content_seq": 188,
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 188,
@@ -19302,9 +18982,6 @@ Game docs  (<id #393>)
    "id": "<doc Changelog>",
    "kind": "page",
    "project_id": "<project SVA>",
-   "props": {
-    "built_seq": 264
-   },
    "rank": "zy",
    "title": "Changelog",
    "updated_at": 1700000000000,
@@ -19357,7 +19034,7 @@ Game docs  (<id #393>)
 <id #194>  Vault  (changed at 204)
 <doc Plans sub-page>  Quarter one  (changed at 211)
 <doc Plans sub-sub-page>  Week one  (changed at 212)
-<doc mirrored>  Style guide  (changed at 218)
+<doc mirrored>  Style guide  (changed at 215)
 <doc Salary notes>  Salary notes  (changed at 165)
 <doc For Bea>  For Bea  (changed at 166)
 <doc SVA design>  SVA design  (changed at 168)
@@ -19368,7 +19045,7 @@ Game docs  (<id #393>)
 <id #360>  Artist: memory  (changed at 201)
 <id #365>  Ops bot: memory  (changed at 203)
 <doc Plans>  Plans  (changed at 210)
-<id #393>  Game docs  (changed at 216)
+<id #378>  Game docs  (changed at 213)
 
 === GET /api/v1/w/games/docs?since=99999&format=text
 200
@@ -20341,118 +20018,16 @@ Wind up, then strike.
     }
    ],
    "created_by": "<@aram>",
-   "created_seq": 213,
+   "created_seq": 0,
    "doc_id": "<doc Decision log>",
-   "id": "<id #378>",
+   "id": "<id #415>",
    "props": {
     "level": 2
    },
    "rank": "00000000sg",
    "type": "heading",
    "updated_by": "<@aram>",
-   "updated_seq": 213
-  },
-  {
-   "content": [
-    {
-     "text": "Ours ✓",
-     "type": "text"
-    }
-   ],
-   "created_by": "<@aram>",
-   "created_seq": 213,
-   "doc_id": "<doc Decision log>",
-   "id": "<id #380>",
-   "parent_id": "<id #379>",
-   "rank": "00000000sg",
-   "type": "bulletListItem",
-   "updated_by": "<@aram>",
-   "updated_seq": 213
-  },
-  {
-   "content": [
-    {
-     "text": "Ring",
-     "type": "text"
-    }
-   ],
-   "created_by": "<@aram>",
-   "created_seq": 213,
-   "doc_id": "<doc Decision log>",
-   "id": "<id #383>",
-   "parent_id": "<id #382>",
-   "rank": "00000000sg",
-   "type": "bulletListItem",
-   "updated_by": "<@aram>",
-   "updated_seq": 213
-  },
-  {
-   "content": [
-    {
-     "text": "Theirs",
-     "type": "text"
-    }
-   ],
-   "created_by": "<@aram>",
-   "created_seq": 213,
-   "doc_id": "<doc Decision log>",
-   "id": "<id #381>",
-   "parent_id": "<id #379>",
-   "rank": "00000001kw",
-   "type": "bulletListItem",
-   "updated_by": "<@aram>",
-   "updated_seq": 213
-  },
-  {
-   "content": [
-    {
-     "text": "Burst ✓",
-     "type": "text"
-    }
-   ],
-   "created_by": "<@aram>",
-   "created_seq": 213,
-   "doc_id": "<doc Decision log>",
-   "id": "<id #384>",
-   "parent_id": "<id #382>",
-   "rank": "00000001kw",
-   "type": "bulletListItem",
-   "updated_by": "<@aram>",
-   "updated_seq": 213
-  },
-  {
-   "content": [
-    {
-     "styles": {
-      "bold": true
-     },
-     "text": "OPS-1",
-     "type": "text"
-    },
-    {
-     "text": " Which vault? → ",
-     "type": "text"
-    },
-    {
-     "styles": {
-      "bold": true
-     },
-     "text": "Ours",
-     "type": "text"
-    },
-    {
-     "text": " — @aram, <minute>",
-     "type": "text"
-    }
-   ],
-   "created_by": "<@aram>",
-   "created_seq": 213,
-   "doc_id": "<doc Decision log>",
-   "id": "<id #379>",
-   "rank": "i",
-   "type": "bulletListItem",
-   "updated_by": "<@aram>",
-   "updated_seq": 213
+   "updated_seq": 0
   },
   {
    "content": [
@@ -20480,28 +20055,59 @@ Wind up, then strike.
     }
    ],
    "created_by": "<@aram>",
-   "created_seq": 213,
+   "created_seq": 0,
    "doc_id": "<doc Decision log>",
-   "id": "<id #382>",
-   "rank": "r",
+   "id": "<id #416>",
+   "rank": "00000001kw",
    "type": "bulletListItem",
    "updated_by": "<@aram>",
-   "updated_seq": 213
+   "updated_seq": 0
+  },
+  {
+   "content": [
+    {
+     "text": "Ring",
+     "type": "text"
+    }
+   ],
+   "created_by": "<@aram>",
+   "created_seq": 0,
+   "doc_id": "<doc Decision log>",
+   "id": "<id #417>",
+   "parent_id": "<id #416>",
+   "rank": "00000000sg",
+   "type": "bulletListItem",
+   "updated_by": "<@aram>",
+   "updated_seq": 0
+  },
+  {
+   "content": [
+    {
+     "text": "Burst ✓",
+     "type": "text"
+    }
+   ],
+   "created_by": "<@aram>",
+   "created_seq": 0,
+   "doc_id": "<doc Decision log>",
+   "id": "<id #418>",
+   "parent_id": "<id #416>",
+   "rank": "00000001kw",
+   "type": "bulletListItem",
+   "updated_by": "<@aram>",
+   "updated_seq": 0
   }
  ],
  "children": [],
  "comments": [],
  "doc": {
-  "content_seq": 213,
+  "content_seq": 186,
   "created_at": 1700000000000,
   "created_by": "<@aram>",
   "created_seq": 186,
   "generated": "decision_log",
   "id": "<doc Decision log>",
   "kind": "page",
-  "props": {
-   "built_seq": 264
-  },
   "rank": "zv",
   "title": "Decision log",
   "updated_at": 1700000000000,
@@ -20509,41 +20115,13 @@ Wind up, then strike.
   "updated_seq": 186
  },
  "mentioned_in": [],
- "mentions": [
-  {
-   "from_id": "<doc Decision log>",
-   "from_scope_id": "<doc Decision log>",
-   "from_scope_type": "doc",
-   "from_type": "doc",
-   "to_id": "<@aram>",
-   "to_type": "member"
-  },
-  {
-   "from_id": "<doc Decision log>",
-   "from_scope_id": "<doc Decision log>",
-   "from_scope_type": "doc",
-   "from_type": "doc",
-   "to_id": "<task OPS-1>",
-   "to_type": "task"
-  },
-  {
-   "from_id": "<doc Decision log>",
-   "from_scope_id": "<doc Decision log>",
-   "from_scope_type": "doc",
-   "from_type": "doc",
-   "to_id": "<task SVA-1>",
-   "to_type": "task"
-  }
- ]
+ "mentions": []
 }
 
 === GET /api/v1/w/games/docs/<doc Decision log>?format=md
 200
 ## 2026-11
 
-- **OPS-1** Which vault? → **Ours** — @aram, <minute>
-  - Ours ✓
-  - Theirs
 - **SVA-1** Which explosion? → **Burst** (with changes): reads better small — @aram, <minute>
   - Ring
   - Burst ✓
@@ -20551,13 +20129,10 @@ Wind up, then strike.
 === GET /api/v1/w/games/docs/<doc Decision log>?format=text
 200
 # Decision log
-(doc <doc Decision log>, seq 213)
+(doc <doc Decision log>, seq 186)
 
 ## 2026-11
 
-- **OPS-1** Which vault? → **Ours** — @aram, <minute>
-  - Ours ✓
-  - Theirs
 - **SVA-1** Which explosion? → **Burst** (with changes): reads better small — @aram, <minute>
   - Ring
   - Burst ✓
@@ -20617,16 +20192,16 @@ Wind up, then strike.
     }
    ],
    "created_by": "<@aram>",
-   "created_seq": 215,
+   "created_seq": 0,
    "doc_id": "<doc Changelog>",
-   "id": "<id #390>",
+   "id": "<id #425>",
    "props": {
     "level": 2
    },
    "rank": "00000000sg",
    "type": "heading",
    "updated_by": "<@aram>",
-   "updated_seq": 215
+   "updated_seq": 0
   },
   {
    "content": [
@@ -20636,19 +20211,19 @@ Wind up, then strike.
     }
    ],
    "created_by": "<@aram>",
-   "created_seq": 215,
+   "created_seq": 0,
    "doc_id": "<doc Changelog>",
-   "id": "<id #391>",
-   "rank": "i",
+   "id": "<id #426>",
+   "rank": "00000001kw",
    "type": "bulletListItem",
    "updated_by": "<@aram>",
-   "updated_seq": 215
+   "updated_seq": 0
   }
  ],
  "children": [],
  "comments": [],
  "doc": {
-  "content_seq": 215,
+  "content_seq": 188,
   "created_at": 1700000000000,
   "created_by": "<@aram>",
   "created_seq": 188,
@@ -20656,9 +20231,6 @@ Wind up, then strike.
   "id": "<doc Changelog>",
   "kind": "page",
   "project_id": "<project SVA>",
-  "props": {
-   "built_seq": 264
-  },
   "rank": "zy",
   "title": "Changelog",
   "updated_at": 1700000000000,
@@ -20666,16 +20238,7 @@ Wind up, then strike.
   "updated_seq": 188
  },
  "mentioned_in": [],
- "mentions": [
-  {
-   "from_id": "<doc Changelog>",
-   "from_scope_id": "<doc Changelog>",
-   "from_scope_type": "doc",
-   "from_type": "doc",
-   "to_id": "<task SVA-3>",
-   "to_type": "task"
-  }
- ]
+ "mentions": []
 }
 
 === GET /api/v1/w/games/docs/<doc Changelog>?format=md
@@ -20687,7 +20250,7 @@ Wind up, then strike.
 === GET /api/v1/w/games/docs/<doc Changelog>?format=text
 200
 # Changelog
-(doc <doc Changelog>, seq 215)
+(doc <doc Changelog>, seq 188)
 
 ## <week>
 
@@ -20843,32 +20406,32 @@ kept, out of the way
     }
    ],
    "created_by": "<@aram>",
-   "created_seq": 218,
+   "created_seq": 215,
    "doc_id": "<doc mirrored>",
-   "id": "<id #395>",
+   "id": "<id #380>",
    "rank": "00000000sg",
    "type": "paragraph",
    "updated_by": "<@aram>",
-   "updated_seq": 218
+   "updated_seq": 215
   }
  ],
  "children": [],
  "comments": [],
  "doc": {
-  "content_seq": 218,
+  "content_seq": 215,
   "created_at": 1700000000000,
   "created_by": "<@aram>",
-  "created_seq": 218,
+  "created_seq": 215,
   "id": "<doc mirrored>",
   "kind": "page",
-  "parent_id": "<id #393>",
+  "parent_id": "<id #378>",
   "rank": "00000000sg",
   "source_id": "<source Game docs>",
   "source_path": "GUIDE.md",
   "title": "Style guide",
   "updated_at": 1700000000000,
   "updated_by": "<@aram>",
-  "updated_seq": 218
+  "updated_seq": 215
  },
  "mentioned_in": [],
  "mentions": [],
@@ -20880,9 +20443,9 @@ kept, out of the way
   "last_commit": "<commit>",
   "last_sync_at": 1700000000000,
   "repo": "<repository>",
-  "root_doc_id": "<id #393>",
+  "root_doc_id": "<id #378>",
   "subdir": "docs",
-  "updated_seq": 217,
+  "updated_seq": 214,
   "write_mode": "commit"
  }
 }
@@ -20894,7 +20457,7 @@ Pixels, not vectors.
 === GET /api/v1/w/games/docs/<doc mirrored>?format=text
 200
 # Style guide
-(doc <doc mirrored>, seq 218)
+(doc <doc mirrored>, seq 215)
 
 Pixels, not vectors.
 
@@ -21631,9 +21194,9 @@ Reds and golds.
    "last_commit": "<commit>",
    "last_sync_at": 1700000000000,
    "repo": "<repository>",
-   "root_doc_id": "<id #393>",
+   "root_doc_id": "<id #378>",
    "subdir": "docs",
-   "updated_seq": 217,
+   "updated_seq": 214,
    "write_mode": "commit"
   }
  ]
@@ -21918,10 +21481,10 @@ Reds and golds.
    ],
    "milestone": "Alpha",
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on": "@aram",
    "waiting_on_note": "review the result"
   }
@@ -22225,10 +21788,10 @@ SVA Done: 1
    ],
    "milestone": "Alpha",
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
-   "updated_seq": 240,
+   "updated_seq": 237,
    "waiting_on": "@aram",
    "waiting_on_note": "review the result"
   }
@@ -22742,7 +22305,7 @@ the week's plan
   {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "id": "<id #430>",
+   "id": "<id #427>",
    "kind": "token",
    "last_used_at": 1700000000000,
    "name": "sva only",
@@ -22754,7 +22317,7 @@ the week's plan
   {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "id": "<id #431>",
+   "id": "<id #428>",
    "kind": "token",
    "last_used_at": 1700000000000,
    "name": "ops",
@@ -22765,7 +22328,7 @@ the week's plan
   {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
-   "id": "<id #432>",
+   "id": "<id #429>",
    "kind": "token",
    "last_used_at": 1700000000000,
    "name": "artist",
@@ -22791,7 +22354,7 @@ the week's plan
    "id": "<secret DEPLOY_KEY>",
    "name": "DEPLOY_KEY",
    "updated_at": 1700000000000,
-   "updated_seq": 250
+   "updated_seq": 247
   }
  ]
 }
@@ -22855,9 +22418,9 @@ DEPLOY_KEY  for the staging box
    "data": {
     "name": "sva only"
    },
-   "id": "<id #469>",
+   "id": "<id #466>",
    "ip": "<loopback>",
-   "target_id": "<id #430>",
+   "target_id": "<id #427>",
    "target_type": "token",
    "user_agent": "Go-http-client/1.1",
    "workspace_id": "<id #153>"
@@ -22867,7 +22430,7 @@ DEPLOY_KEY  for the staging box
    "actor_id": "<@aram>",
    "actor_name": "Aram",
    "at": 1700000000000,
-   "id": "<id #470>",
+   "id": "<id #467>",
    "ip": "<loopback>",
    "target_id": "<id #153>",
    "target_type": "workspace",
@@ -22886,7 +22449,7 @@ DEPLOY_KEY  for the staging box
     "name": "comments",
     "url": "http://receiver.test/comments"
    },
-   "id": "<id #433>",
+   "id": "<id #430>",
    "ip": "<loopback>",
    "target_id": "<webhook comments>",
    "target_type": "webhook",
@@ -22906,7 +22469,7 @@ DEPLOY_KEY  for the staging box
     "name": "DEPLOY_KEY",
     "value": "•••"
    },
-   "id": "<id #434>",
+   "id": "<id #431>",
    "ip": "<loopback>",
    "target_id": "<secret DEPLOY_KEY>",
    "target_type": "secret",
@@ -22925,7 +22488,7 @@ DEPLOY_KEY  for the staging box
     "project": "OPS",
     "secret": "<secret>"
    },
-   "id": "<id #435>",
+   "id": "<id #432>",
    "ip": "<loopback>",
    "target_id": "<integration OPS>",
    "target_type": "integration",
@@ -22933,7 +22496,7 @@ DEPLOY_KEY  for the staging box
    "workspace_id": "<id #153>"
   }
  ],
- "next": "<id #435>"
+ "next": "<id #432>"
 }
 
 === GET /api/v1/w/games/audit?action=workspace.exported
@@ -22945,7 +22508,7 @@ DEPLOY_KEY  for the staging box
    "actor_id": "<@aram>",
    "actor_name": "Aram",
    "at": 1700000000000,
-   "id": "<id #470>",
+   "id": "<id #467>",
    "ip": "<loopback>",
    "target_id": "<id #153>",
    "target_type": "workspace",
@@ -22969,7 +22532,7 @@ DEPLOY_KEY  for the staging box
     "bug"
    ],
    "priority": "high",
-   "seq": 261,
+   "seq": 258,
    "status": "In Progress",
    "title": "Boss design",
    "waiting_on": "@aram"
@@ -22997,7 +22560,7 @@ DEPLOY_KEY  for the staging box
    "labels": [
     "art"
    ],
-   "seq": 255,
+   "seq": 252,
    "status": "Review",
    "title": "Review me",
    "waiting_on": "@bea"
@@ -23364,112 +22927,106 @@ id: 212
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #376>","data":{"changes":{"owner_id":{"from":null,"to":"<@aram>"}},"id":"<doc Plans sub-sub-page>"},"entity_id":"<doc Plans sub-sub-page>","entity_type":"doc","scope_id":"<doc Plans sub-sub-page>","scope_type":"doc","seq":212,"type":"doc.updated"}
 
 id: 213
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #377>","data":{"blocks":[{"content":[{"text":"2026-11","type":"text"}],"created_by":"<@aram>","created_seq":213,"doc_id":"<doc Decision log>","id":"<id #378>","props":{"level":2},"rank":"00000000sg","type":"heading","updated_by":"<@aram>","updated_seq":213},{"content":[{"styles":{"bold":true},"text":"OPS-1","type":"text"},{"text":" Which vault? → ","type":"text"},{"styles":{"bold":true},"text":"Ours","type":"text"},{"text":" — @aram, <minute>","type":"text"}],"created_by":"<@aram>","created_seq":213,"doc_id":"<doc Decision log>","id":"<id #379>","rank":"i","type":"bulletListItem","updated_by":"<@aram>","updated_seq":213},{"content":[{"text":"Ours ✓","type":"text"}],"created_by":"<@aram>","created_seq":213,"doc_id":"<doc Decision log>","id":"<id #380>","parent_id":"<id #379>","rank":"00000000sg","type":"bulletListItem","updated_by":"<@aram>","updated_seq":213},{"content":[{"text":"Theirs","type":"text"}],"created_by":"<@aram>","created_seq":213,"doc_id":"<doc Decision log>","id":"<id #381>","parent_id":"<id #379>","rank":"00000001kw","type":"bulletListItem","updated_by":"<@aram>","updated_seq":213},{"content":[{"styles":{"bold":true},"text":"SVA-1","type":"text"},{"text":" Which explosion? → ","type":"text"},{"styles":{"bold":true},"text":"Burst","type":"text"},{"text":" (with changes): reads better small — @aram, <minute>","type":"text"}],"created_by":"<@aram>","created_seq":213,"doc_id":"<doc Decision log>","id":"<id #382>","rank":"r","type":"bulletListItem","updated_by":"<@aram>","updated_seq":213},{"content":[{"text":"Ring","type":"text"}],"created_by":"<@aram>","created_seq":213,"doc_id":"<doc Decision log>","id":"<id #383>","parent_id":"<id #382>","rank":"00000000sg","type":"bulletListItem","updated_by":"<@aram>","updated_seq":213},{"content":[{"text":"Burst ✓","type":"text"}],"created_by":"<@aram>","created_seq":213,"doc_id":"<doc Decision log>","id":"<id #384>","parent_id":"<id #382>","rank":"00000001kw","type":"bulletListItem","updated_by":"<@aram>","updated_seq":213}],"changes":{"content_seq":{"from":null,"to":213},"updated_at":{"from":null,"to":1700000000000},"updated_by":{"from":null,"to":"<@aram>"}},"deleted":null,"id":"<doc Decision log>"},"entity_id":"<doc Decision log>","entity_type":"doc","scope_id":"<doc Decision log>","scope_type":"doc","seq":213,"type":"doc.edited"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #377>","data":{"row":{"content_seq":213,"created_at":1700000000000,"created_by":"<@aram>","created_seq":213,"icon":"git","id":"<id #378>","kind":"page","props":null,"rank":"zzx","title":"Game docs","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":213}},"entity_id":"<id #378>","entity_type":"doc","scope_id":"<id #378>","scope_type":"doc","seq":213,"type":"doc.created"}
+
+id: 214
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #377>","data":{"row":{"authority":"repo","created_at":1700000000000,"created_by":"<@aram>","id":"<source Game docs>","repo":"<repository>","root_doc_id":"<id #378>","subdir":"docs","updated_seq":214,"write_mode":"commit"}},"entity_id":"<source Game docs>","entity_type":"source","scope_id":"<id #378>","scope_type":"doc","seq":214,"type":"source.created"}
 
 id: 215
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #389>","data":{"blocks":[{"content":[{"text":"<week>","type":"text"}],"created_by":"<@aram>","created_seq":215,"doc_id":"<doc Changelog>","id":"<id #390>","props":{"level":2},"rank":"00000000sg","type":"heading","updated_by":"<@aram>","updated_seq":215},{"content":[{"text":"SVA-3 Boss music","type":"text"}],"created_by":"<@aram>","created_seq":215,"doc_id":"<doc Changelog>","id":"<id #391>","rank":"i","type":"bulletListItem","updated_by":"<@aram>","updated_seq":215}],"changes":{"content_seq":{"from":null,"to":215},"updated_at":{"from":null,"to":1700000000000},"updated_by":{"from":null,"to":"<@aram>"}},"deleted":null,"id":"<doc Changelog>"},"entity_id":"<doc Changelog>","entity_type":"doc","project_id":"<project SVA>","scope_id":"<doc Changelog>","scope_type":"doc","seq":215,"type":"doc.edited"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #379>","data":{"blocks":[{"content":[{"text":"Pixels, not vectors.","type":"text"}],"created_by":"<@aram>","created_seq":215,"doc_id":"<doc mirrored>","id":"<id #380>","rank":"00000000sg","type":"paragraph","updated_by":"<@aram>","updated_seq":215}],"row":{"content_seq":215,"created_at":1700000000000,"created_by":"<@aram>","created_seq":215,"id":"<doc mirrored>","kind":"page","parent_id":"<id #378>","rank":"00000000sg","source_id":"<source Game docs>","title":"Style guide","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":215}},"entity_id":"<doc mirrored>","entity_type":"doc","scope_id":"<doc mirrored>","scope_type":"doc","seq":215,"type":"doc.created"}
 
 id: 216
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #392>","data":{"row":{"content_seq":216,"created_at":1700000000000,"created_by":"<@aram>","created_seq":216,"icon":"git","id":"<id #393>","kind":"page","props":null,"rank":"zzx","title":"Game docs","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":216}},"entity_id":"<id #393>","entity_type":"doc","scope_id":"<id #393>","scope_type":"doc","seq":216,"type":"doc.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #381>","data":{"row":{"created_at":1700000000000,"id":"<view Art bugs>","layout":"list","name":"Art bugs","owner_id":"<@aram>","project_id":"<project SVA>","query":{"label":["art"],"open":true},"rank":"00000000sg","shared":true,"slug":"art-bugs","updated_seq":216}},"entity_id":"<view Art bugs>","entity_type":"view","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":216,"type":"view.created"}
 
 id: 217
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #392>","data":{"row":{"authority":"repo","created_at":1700000000000,"created_by":"<@aram>","id":"<source Game docs>","repo":"<repository>","root_doc_id":"<id #393>","subdir":"docs","updated_seq":217,"write_mode":"commit"}},"entity_id":"<source Game docs>","entity_type":"source","scope_id":"<id #393>","scope_type":"doc","seq":217,"type":"source.created"}
-
-id: 218
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #394>","data":{"blocks":[{"content":[{"text":"Pixels, not vectors.","type":"text"}],"created_by":"<@aram>","created_seq":218,"doc_id":"<doc mirrored>","id":"<id #395>","rank":"00000000sg","type":"paragraph","updated_by":"<@aram>","updated_seq":218}],"row":{"content_seq":218,"created_at":1700000000000,"created_by":"<@aram>","created_seq":218,"id":"<doc mirrored>","kind":"page","parent_id":"<id #393>","rank":"00000000sg","source_id":"<source Game docs>","title":"Style guide","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":218}},"entity_id":"<doc mirrored>","entity_type":"doc","scope_id":"<doc mirrored>","scope_type":"doc","seq":218,"type":"doc.created"}
-
-id: 219
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #396>","data":{"row":{"created_at":1700000000000,"id":"<view Art bugs>","layout":"list","name":"Art bugs","owner_id":"<@aram>","project_id":"<project SVA>","query":{"label":["art"],"open":true},"rank":"00000000sg","shared":true,"slug":"art-bugs","updated_seq":219}},"entity_id":"<view Art bugs>","entity_type":"view","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":219,"type":"view.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #382>","data":{"row":{"created_at":1700000000000,"id":"<view Mine>","layout":"list","name":"Mine","owner_id":"<@aram>","query":{"assignee":["me"]},"rank":"i","shared":false,"slug":"mine","updated_seq":217}},"entity_id":"<view Mine>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":217,"type":"view.created"}
 
 id: 220
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #397>","data":{"row":{"created_at":1700000000000,"id":"<view Mine>","layout":"list","name":"Mine","owner_id":"<@aram>","query":{"assignee":["me"]},"rank":"i","shared":false,"slug":"mine","updated_seq":220}},"entity_id":"<view Mine>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":220,"type":"view.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #384>","data":{"row":{"created_at":1700000000000,"id":"<view Stale>","layout":"list","name":"Stale","owner_id":"<@aram>","query":{"label":["temp"],"status":["todo"]},"rank":"x","shared":true,"slug":"stale","updated_seq":220}},"entity_id":"<view Stale>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":220,"type":"view.created"}
+
+id: 221
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #385>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<label temp>"},"entity_id":"<label temp>","entity_type":"label","scope_id":"<id #153>","scope_type":"workspace","seq":221,"type":"label.deleted"}
+
+id: 222
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #386>","data":{"row":{"created_at":1700000000000,"id":"<view removed>","layout":"list","name":"Removed view","owner_id":"<@aram>","query":{"open":true},"rank":"y","shared":true,"slug":"removed-view","updated_seq":222}},"entity_id":"<view removed>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":222,"type":"view.created"}
 
 id: 223
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #399>","data":{"row":{"created_at":1700000000000,"id":"<view Stale>","layout":"list","name":"Stale","owner_id":"<@aram>","query":{"label":["temp"],"status":["todo"]},"rank":"x","shared":true,"slug":"stale","updated_seq":223}},"entity_id":"<view Stale>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":223,"type":"view.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #387>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<view removed>"},"entity_id":"<view removed>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":223,"type":"view.deleted"}
 
 id: 224
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #400>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<label temp>"},"entity_id":"<label temp>","entity_type":"label","scope_id":"<id #153>","scope_type":"workspace","seq":224,"type":"label.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #388>","data":{"row":{"created_at":1700000000000,"description":"the one render machine","id":"<resource gpu>","name":"gpu","updated_seq":224}},"entity_id":"<resource gpu>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":224,"type":"resource.created"}
 
 id: 225
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #401>","data":{"row":{"created_at":1700000000000,"id":"<view removed>","layout":"list","name":"Removed view","owner_id":"<@aram>","query":{"open":true},"rank":"y","shared":true,"slug":"removed-view","updated_seq":225}},"entity_id":"<view removed>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":225,"type":"view.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #389>","data":{"row":{"created_at":1700000000000,"id":"<resource staging>","name":"staging","updated_seq":225}},"entity_id":"<resource staging>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":225,"type":"resource.created"}
 
 id: 226
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #402>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<view removed>"},"entity_id":"<view removed>","entity_type":"view","scope_id":"<id #153>","scope_type":"workspace","seq":226,"type":"view.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #390>","data":{"row":{"created_at":1700000000000,"id":"<resource gone>","name":"old-box","updated_seq":226}},"entity_id":"<resource gone>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":226,"type":"resource.created"}
 
 id: 227
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #403>","data":{"row":{"created_at":1700000000000,"description":"the one render machine","id":"<resource gpu>","name":"gpu","updated_seq":227}},"entity_id":"<resource gpu>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":227,"type":"resource.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #391>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<resource gone>"},"entity_id":"<resource gone>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":227,"type":"resource.deleted"}
 
 id: 228
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #404>","data":{"row":{"created_at":1700000000000,"id":"<resource staging>","name":"staging","updated_seq":228}},"entity_id":"<resource staging>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":228,"type":"resource.created"}
-
-id: 229
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #405>","data":{"row":{"created_at":1700000000000,"id":"<resource gone>","name":"old-box","updated_seq":229}},"entity_id":"<resource gone>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":229,"type":"resource.created"}
-
-id: 230
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #406>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<resource gone>"},"entity_id":"<resource gone>","entity_type":"resource","scope_id":"<id #153>","scope_type":"workspace","seq":230,"type":"resource.deleted"}
+data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #392>","data":{"resource":"gpu","row":{"acquired_at":1700000000000,"id":"<claim gpu artist>","lease_until":1700000000000,"note":"rendering the boss","requested_at":1700000000000,"resource_id":"<resource gpu>","state":"holding","task_id":"<task SVA-1>","user_id":"<@artist>"}},"entity_id":"<claim gpu artist>","entity_type":"claim","project_id":"<project SVA>","scope_id":"<id #153>","scope_type":"workspace","seq":228,"type":"claim.created"}
 
 id: 231
-data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #407>","data":{"resource":"gpu","row":{"acquired_at":1700000000000,"id":"<claim gpu artist>","lease_until":1700000000000,"note":"rendering the boss","requested_at":1700000000000,"resource_id":"<resource gpu>","state":"holding","task_id":"<task SVA-1>","user_id":"<@artist>"}},"entity_id":"<claim gpu artist>","entity_type":"claim","project_id":"<project SVA>","scope_id":"<id #153>","scope_type":"workspace","seq":231,"type":"claim.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #186>","data":{"key":"SVA-1","row":{"agent_id":"<@artist>","id":"<session artist>","instructions":"four phases","started_at":1700000000000,"state":"running","task_id":"<task SVA-1>","title":"Drawing the boss","updated_seq":231}},"entity_id":"<session artist>","entity_type":"session","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":231,"type":"session.created"}
 
-id: 234
-data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #186>","data":{"key":"SVA-1","row":{"agent_id":"<@artist>","id":"<session artist>","instructions":"four phases","started_at":1700000000000,"state":"running","task_id":"<task SVA-1>","title":"Drawing the boss","updated_seq":234}},"entity_id":"<session artist>","entity_type":"session","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":234,"type":"session.created"}
+id: 232
+data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #187>","data":{"changes":{"cost_micros":{"from":0,"to":1250000},"steps":{"from":null,"to":[{"text":"sketched phase one"}]},"summary":{"from":null,"to":"two phases drawn"}},"id":"<session artist>"},"entity_id":"<session artist>","entity_type":"session","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":232,"type":"session.updated"}
 
-id: 235
-data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #187>","data":{"changes":{"cost_micros":{"from":0,"to":1250000},"steps":{"from":null,"to":[{"text":"sketched phase one"}]},"summary":{"from":null,"to":"two phases drawn"}},"id":"<session artist>"},"entity_id":"<session artist>","entity_type":"session","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":235,"type":"session.updated"}
+id: 236
+data: {"actor_id":"<@ops>","at":1700000000000,"change_id":"<id #398>","data":{"key":"","row":{"agent_id":"<@ops>","id":"<session no task>","started_at":1700000000000,"state":"running","title":"Looking around","updated_seq":236}},"entity_id":"<session no task>","entity_type":"session","scope_id":"<id #153>","scope_type":"workspace","seq":236,"type":"session.created"}
+
+id: 237
+data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #188>","data":{"changes":{"lease_holder_id":{"from":null,"to":"<@artist>"},"lease_until":{"from":0,"to":1700000000000},"started_at":{"from":0,"to":1700000000000},"status_id":{"from":"<id #166>","to":"<id #164>"}},"id":"<task SVA-1>","key":"SVA-1"},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":237,"type":"task.updated"}
 
 id: 239
-data: {"actor_id":"<@ops>","at":1700000000000,"change_id":"<id #413>","data":{"key":"","row":{"agent_id":"<@ops>","id":"<session no task>","started_at":1700000000000,"state":"running","title":"Looking around","updated_seq":239}},"entity_id":"<session no task>","entity_type":"session","scope_id":"<id #153>","scope_type":"workspace","seq":239,"type":"session.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #399>","data":{"row":{"action":{"kind":"notify","user_id":"<@aram>"},"active":false,"created_at":1700000000000,"created_by":"<@aram>","id":"<rule notify>","match":{"event_types":["task.created"],"project_id":"<project OPS>"},"name":"tell the owner","updated_seq":239}},"entity_id":"<rule notify>","entity_type":"rule","scope_id":"<id #153>","scope_type":"workspace","seq":239,"type":"rule.created"}
 
 id: 240
-data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #188>","data":{"changes":{"lease_holder_id":{"from":null,"to":"<@artist>"},"lease_until":{"from":0,"to":1700000000000},"started_at":{"from":0,"to":1700000000000},"status_id":{"from":"<id #166>","to":"<id #164>"}},"id":"<task SVA-1>","key":"SVA-1"},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":240,"type":"task.updated"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #400>","data":{"row":{"action":{"kind":"notify","user_id":"<@aram>"},"active":false,"created_at":1700000000000,"created_by":"<@aram>","id":"<rule gone>","match":{"event_types":["task.created"]},"name":"gone","updated_seq":240}},"entity_id":"<rule gone>","entity_type":"rule","scope_id":"<id #153>","scope_type":"workspace","seq":240,"type":"rule.created"}
+
+id: 241
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #401>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<rule gone>"},"entity_id":"<rule gone>","entity_type":"rule","scope_id":"<id #153>","scope_type":"workspace","seq":241,"type":"rule.deleted"}
 
 id: 242
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #414>","data":{"row":{"action":{"kind":"notify","user_id":"<@aram>"},"active":false,"created_at":1700000000000,"created_by":"<@aram>","id":"<rule notify>","match":{"event_types":["task.created"],"project_id":"<project OPS>"},"name":"tell the owner","updated_seq":242}},"entity_id":"<rule notify>","entity_type":"rule","scope_id":"<id #153>","scope_type":"workspace","seq":242,"type":"rule.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #402>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["never.matches"],"failures":0,"id":"<webhook OPS>","name":"ops events","project_id":"<project OPS>","updated_seq":242,"url":"http://receiver.test/ops"}},"entity_id":"<webhook OPS>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":242,"type":"webhook.created"}
 
 id: 243
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #415>","data":{"row":{"action":{"kind":"notify","user_id":"<@aram>"},"active":false,"created_at":1700000000000,"created_by":"<@aram>","id":"<rule gone>","match":{"event_types":["task.created"]},"name":"gone","updated_seq":243}},"entity_id":"<rule gone>","entity_type":"rule","scope_id":"<id #153>","scope_type":"workspace","seq":243,"type":"rule.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #403>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["never.matches"],"failures":0,"id":"<webhook gone>","name":"gone","updated_seq":243,"url":"http://receiver.test/gone"}},"entity_id":"<webhook gone>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":243,"type":"webhook.created"}
 
 id: 244
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #416>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<rule gone>"},"entity_id":"<rule gone>","entity_type":"rule","scope_id":"<id #153>","scope_type":"workspace","seq":244,"type":"rule.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #404>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<webhook gone>"},"entity_id":"<webhook gone>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":244,"type":"webhook.deleted"}
 
 id: 245
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #417>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["never.matches"],"failures":0,"id":"<webhook OPS>","name":"ops events","project_id":"<project OPS>","updated_seq":245,"url":"http://receiver.test/ops"}},"entity_id":"<webhook OPS>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":245,"type":"webhook.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #405>","data":{"row":{"active":false,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration github>","kind":"github","name":"sva on github","project_id":"<project SVA>","updated_seq":245}},"entity_id":"<integration github>","entity_type":"integration","scope_id":"<id #153>","scope_type":"workspace","seq":245,"type":"integration.created"}
 
 id: 246
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #418>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["never.matches"],"failures":0,"id":"<webhook gone>","name":"gone","updated_seq":246,"url":"http://receiver.test/gone"}},"entity_id":"<webhook gone>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":246,"type":"webhook.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #406>","data":{"row":{"active":false,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration OPS>","kind":"github","name":"ops on github","project_id":"<project OPS>","updated_seq":246}},"entity_id":"<integration OPS>","entity_type":"integration","scope_id":"<id #153>","scope_type":"workspace","seq":246,"type":"integration.created"}
 
 id: 247
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #419>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<webhook gone>"},"entity_id":"<webhook gone>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":247,"type":"webhook.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #407>","data":{"row":{"agents":["<@ops>"],"created_at":1700000000000,"created_by":"<@aram>","description":"for the staging box","env":false,"id":"<secret DEPLOY_KEY>","name":"DEPLOY_KEY","updated_at":1700000000000,"updated_seq":247}},"entity_id":"<secret DEPLOY_KEY>","entity_type":"secret","scope_id":"<id #153>","scope_type":"workspace","seq":247,"type":"secret.created"}
 
 id: 248
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #420>","data":{"row":{"active":false,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration github>","kind":"github","name":"sva on github","project_id":"<project SVA>","updated_seq":248}},"entity_id":"<integration github>","entity_type":"integration","scope_id":"<id #153>","scope_type":"workspace","seq":248,"type":"integration.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #408>","data":{"row":{"created_at":1700000000000,"subject_id":"<view Art bugs>","subject_type":"view","user_id":"<@aram>"}},"entity_id":"<view Art bugs>","entity_type":"watcher","scope_id":"<id #153>","scope_type":"workspace","seq":248,"type":"watcher.created"}
 
-id: 249
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #421>","data":{"row":{"active":false,"created_at":1700000000000,"created_by":"<@aram>","has_secret":true,"id":"<integration OPS>","kind":"github","name":"ops on github","project_id":"<project OPS>","updated_seq":249}},"entity_id":"<integration OPS>","entity_type":"integration","scope_id":"<id #153>","scope_type":"workspace","seq":249,"type":"integration.created"}
+id: 252
+data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #409>","data":{"changes":{"label_ids":{"from":null,"to":["<label art>"]}},"id":"<task SVA-6>","key":"SVA-6"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":252,"type":"task.updated"}
 
-id: 250
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #422>","data":{"row":{"agents":["<@ops>"],"created_at":1700000000000,"created_by":"<@aram>","description":"for the staging box","env":false,"id":"<secret DEPLOY_KEY>","name":"DEPLOY_KEY","updated_at":1700000000000,"updated_seq":250}},"entity_id":"<secret DEPLOY_KEY>","entity_type":"secret","scope_id":"<id #153>","scope_type":"workspace","seq":250,"type":"secret.created"}
+id: 253
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #410>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #158>","seq":253,"snippet":"in your view \"Art bugs\"","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@aram>"}},"entity_id":"<id #158>","entity_type":"notification","scope_id":"<task SVA-6>","scope_type":"task","seq":253,"type":"notification.created"}
 
-id: 251
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #423>","data":{"row":{"created_at":1700000000000,"subject_id":"<view Art bugs>","subject_type":"view","user_id":"<@aram>"}},"entity_id":"<view Art bugs>","entity_type":"watcher","scope_id":"<id #153>","scope_type":"workspace","seq":251,"type":"watcher.created"}
+id: 257
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #412>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["comment.created"],"failures":0,"id":"<webhook comments>","name":"comments","updated_seq":257,"url":"http://receiver.test/comments"}},"entity_id":"<webhook comments>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":257,"type":"webhook.created"}
 
-id: 255
-data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #424>","data":{"changes":{"label_ids":{"from":null,"to":["<label art>"]}},"id":"<task SVA-6>","key":"SVA-6"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":255,"type":"task.updated"}
+id: 258
+data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #189>","data":{"key":"SVA-1","row":{"author_id":"<@artist>","body":"Phase three is drawn.","created_at":1700000000000,"created_seq":258,"id":"<comment SVA-1 for the webhook>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":258}},"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":258,"type":"comment.created"}
 
-id: 256
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #425>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #158>","seq":256,"snippet":"in your view \"Art bugs\"","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@aram>"}},"entity_id":"<id #158>","entity_type":"notification","scope_id":"<task SVA-6>","scope_type":"task","seq":256,"type":"notification.created"}
-
-id: 260
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #427>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["comment.created"],"failures":0,"id":"<webhook comments>","name":"comments","updated_seq":260,"url":"http://receiver.test/comments"}},"entity_id":"<webhook comments>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":260,"type":"webhook.created"}
+id: 259
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #189>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","id":"<id #157>","seq":259,"snippet":"Phase three is drawn.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@aram>"}},"entity_id":"<id #157>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":259,"type":"notification.created"}
 
 id: 261
-data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #189>","data":{"key":"SVA-1","row":{"author_id":"<@artist>","body":"Phase three is drawn.","created_at":1700000000000,"created_seq":261,"id":"<comment SVA-1 for the webhook>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":261}},"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":261,"type":"comment.created"}
-
-id: 262
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #189>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","id":"<id #157>","seq":262,"snippet":"Phase three is drawn.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@aram>"}},"entity_id":"<id #157>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":262,"type":"notification.created"}
-
-id: 264
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #428>","data":{"row":{"id":"<label last>","name":"last","updated_seq":264}},"entity_id":"<label last>","entity_type":"label","scope_id":"<id #153>","scope_type":"workspace","seq":264,"type":"label.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #413>","data":{"row":{"id":"<label last>","name":"last","updated_seq":261}},"entity_id":"<label last>","entity_type":"label","scope_id":"<id #153>","scope_type":"workspace","seq":261,"type":"label.created"}
 
 
 

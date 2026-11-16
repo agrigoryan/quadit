@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
@@ -175,19 +174,13 @@ func pageOutline(docs []core.Doc, projects map[string]core.Project) string {
 }
 
 // handleShowPage returns one page: as rows for the editor, or as Markdown.
-// A page built from data is rebuilt first when its data changed.
 func (s *Server) handleShowPage(x *c) error {
 	page, err := x.docByID(x.ctx(), x.r.PathValue("id"))
 	if err != nil {
 		return err
 	}
-	if page.Generated != "" {
-		if err := s.regenerate(x.ctx(), &x.viewer, &page); err != nil {
-			s.log.Error("generated page", "doc", page.ID, "err", err)
-		}
-	}
-	var blocks []core.Block
-	if err := x.db.List(x.ctx(), &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", page.ID), store.Live}, Order: "rank"}); err != nil {
+	blocks, err := x.pageBlocks(x.ctx(), page)
+	if err != nil {
 		return err
 	}
 	if format := x.r.URL.Query().Get("format"); format == "md" || x.wantText() {
@@ -360,57 +353,37 @@ const presenceKept = 15 * time.Second
 
 // ---- generated pages ----
 
-// regenerate rebuilds a page that is made from data, when the data it shows
-// has changed since it was last built.
-func (s *Server) regenerate(ctx context.Context, who *viewer, page *core.Doc) error {
-	var meta struct {
-		BuiltSeq int64 `json:"built_seq"`
+// pageBlocks reads a page's content as the viewer reads it. A page people
+// write has the blocks stored for it. A page built from data has none
+// stored: its content is built here, each time, for this viewer
+// (generatedPage), as rows like the stored ones.
+func (who *viewer) pageBlocks(ctx context.Context, page core.Doc) ([]core.Block, error) {
+	if page.Generated == "" {
+		var blocks []core.Block
+		err := who.db.List(ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", page.ID), store.Live}, Order: "rank"})
+		return blocks, err
 	}
-	readStored(page.Props, &meta)
-	var projects []string
-	if page.ProjectID != "" {
-		projects = []string{page.ProjectID}
-	}
-	if meta.BuiltSeq > 0 {
-		news, err := who.db.Events(ctx, store.EventFilter{After: meta.BuiltSeq, ProjectIDs: projects, Limit: 1,
-			Types: []string{"decision.opened", "decision.picked", "decision.unclear", "decision.deleted", "task.updated", "task.created"}})
-		if err != nil || len(news) == 0 {
-			return err
-		}
-	}
-	body, err := who.generatedPage(ctx, *page)
+	body, err := who.generatedPage(ctx, page)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var ws core.Workspace
-	if err := s.st.Get(ctx, &ws, store.Eq("id", who.ws.ID)); err != nil {
-		return err
-	}
-	props := plainjson.Marshal(map[string]int64{"built_seq": ws.Seq})
-	err = s.eng.System(ctx, who.ws.ID, page.CreatedBy, func(sys *engine.Sys) error {
-		if err := sys.Do("doc.write", map[string]any{"doc": page.ID, "markdown": body}); err != nil {
-			return err
-		}
-		_, err := sys.Tx().Update(ctx, "docs", map[string]any{"props": json.RawMessage(props)}, store.Eq("id", page.ID))
-		return err
-	})
-	if err == nil {
-		page.Props = props
-	}
-	return err
+	return engine.BlockRows(page, md.Parse(body)), nil
 }
 
 // generatedPage writes the Markdown of a page built from data: a changelog
 // (the tasks done, by week), a decision log (the answered decisions, by
 // month) or the open questions, each kept to the page's project when it has
-// one. The page is the workspace's, and reads the same whoever opens it:
-// what it holds is not kept to the viewer's projects.
+// one, and all of them to the projects the viewer may read. So the page of
+// the whole workspace reads differently to different members, and is never
+// stored: stored once, it would show everyone what its first reader may see.
 func (who *viewer) generatedPage(ctx context.Context, page core.Doc) (string, error) {
 	names, err := who.names(ctx)
 	if err != nil {
 		return "", err
 	}
-	inProject := func(projectID string) bool { return page.ProjectID == "" || page.ProjectID == projectID }
+	inProject := func(projectID string) bool {
+		return (page.ProjectID == "" || page.ProjectID == projectID) && who.canProject(projectID)
+	}
 	var b strings.Builder
 	switch page.Generated {
 	case "changelog":

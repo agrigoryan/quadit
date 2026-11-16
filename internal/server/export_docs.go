@@ -39,7 +39,15 @@ func (e *exporter) docs(rows *exportRows) error {
 			}
 			continue
 		}
-		if err := e.addTextFile(path+".md", md.Render(engine.BlockTree(blocksOf[d.ID]))); err != nil {
+		blocks := blocksOf[d.ID]
+		if d.Generated != "" {
+			// Built from data, for the one who exports: nothing of it is stored.
+			var err error
+			if blocks, err = e.who.pageBlocks(e.ctx, d); err != nil {
+				return err
+			}
+		}
+		if err := e.addTextFile(path+".md", md.Render(engine.BlockTree(blocks))); err != nil {
 			return err
 		}
 	}

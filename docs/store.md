@@ -33,7 +33,9 @@ did not change when goose came in). A change to the schema is a new file with th
 number, recorded by running that test once with `QUADIT_UPDATE_MIGRATIONS=1`. So is a
 repair of rows already stored, which runs once, on the upgrade, after the copy is made:
 `0008_private_sub_pages` gives the pages under a private page its owner and sharing, which
-they lacked when the page was made private after them.
+they lacked when the page was made private after them; `0009_generated_pages` takes out
+what was stored of the pages built from data (a decision log, a changelog), which are now
+built for each reader from what that reader may see.
 
 A full restore loads an archive's rows into a database already at the newest schema, so
 no upgrade runs on them. An archive records the schema version it was made at (`schema`
