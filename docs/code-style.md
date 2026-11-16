@@ -100,7 +100,7 @@ The aim is few places that deal with errors (see "Define errors out of existence
 
 The web app follows common React and TypeScript practice first: the official React guidance (the Rules of React, "You Might Not Need an Effect"), an established library before a hand-written equivalent, generated types from the server before hand-kept copies, semantic HTML, and Testing Library's way of testing what a person sees. The principles above are the lens for how deep a module is and what it is called; where the two pull apart here, common practice wins.
 
-`pnpm check` checks the rules a tool can (types, lint, format, tests). The folders under `web/src` are layers, bottom up: `types` (the wire types, the generated `changes.gen.ts` among them) and `i18n` (the words); `lib` (small modules that know neither the server's data, the router nor any screen); `data` (the workspace copy and what keeps it current, the HTTP client, the reads the copy does not hold) and `hooks` (general React hooks); `nav` (what the app keeps in the browser's history, through the router); `ui` (shared components); the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`); `shell`, `pages` and `palette` on top. Each folder's first file says what the folder holds.
+`pnpm check` checks the rules a tool can (types, lint, format, tests). The folders under `web/src` are layers, bottom up: `types` (the wire types, the generated `changes.gen.ts` and `rows.gen.ts` among them) and `i18n` (the words); `lib` (small modules that know neither the server's data, the router nor any screen); `data` (the workspace copy and what keeps it current, the HTTP client, the reads the copy does not hold) and `hooks` (general React hooks); `nav` (what the app keeps in the browser's history, through the router); `ui` (shared components); the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`); `shell`, `pages` and `palette` on top. Each folder's first file says what the folder holds.
 
 ### Files and layers
 1. One topic per file, and the file's name is the topic. No `bits`, `parts`, `more`, `helpers` or `utils`. A file is split when it holds more than one topic, never because it is long.
@@ -124,7 +124,7 @@ The web app follows common React and TypeScript practice first: the official Rea
 
 ### Types
 13. No `any`, no `!`, no `@ts-ignore`. `as unknown as` only at a third-party boundary, with the reason on the line.
-14. Wire types are declared once in `types/*.ts`, named after the Go type they mirror. A response shape used twice has a name.
+14. Wire types are declared once in `types/*.ts`, named after the Go type they mirror. A response shape used twice has a name. Each row type is held to the server's by `types/rows.check.ts` against the generated `types/rows.gen.ts` (`make generate`); a difference made on purpose is listed there with its reason, and the app never imports `rows.gen.ts`.
 15. Promises are awaited, returned, or marked `void` with the reason it is safe to drop on the line above. `navigate()` is the exception that needs no reason: its type says promise, but under `BrowserRouter` it returns nothing. Event handlers contain no comma operator.
 
 ### Words, dates, controls
