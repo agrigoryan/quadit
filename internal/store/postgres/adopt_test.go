@@ -78,6 +78,9 @@ func (s *testServer) databases(name string) []string {
 		}
 		out = append(out, d)
 	}
+	if err := rows.Err(); err != nil {
+		s.t.Fatal(err)
+	}
 	return out
 }
 
@@ -107,6 +110,9 @@ func (s *testServer) column(database, q string) []string {
 			s.t.Fatal(err)
 		}
 		out = append(out, v.String)
+	}
+	if err := rows.Err(); err != nil {
+		s.t.Fatal(err)
 	}
 	return out
 }

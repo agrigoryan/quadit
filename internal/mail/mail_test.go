@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/x509"
+	"errors"
 	"net"
 	"os"
 	"strconv"
@@ -84,7 +85,7 @@ func TestSend(t *testing.T) {
 			t.Errorf("the message on the wire misses %q:\n%s", want, wire)
 		}
 	}
-	if err := Send(context.Background(), Config{}, Message{To: "a@b.c"}); err != ErrNotConfigured {
+	if err := Send(context.Background(), Config{}, Message{To: "a@b.c"}); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("no server set: %v", err)
 	}
 }

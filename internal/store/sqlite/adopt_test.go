@@ -63,6 +63,9 @@ func column(t *testing.T, path, q string) []string {
 		}
 		out = append(out, v.String)
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	return out
 }
 
