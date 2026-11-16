@@ -40,7 +40,7 @@ func TestAPageLinkedToATaskIsAReference(t *testing.T) {
 		w.do(me, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		w.do(me, "task.create", M{"project": "SVA", "title": "Boss design"})
 		task := w.task("SVA-1")
-		page := w.do(me, "doc.create", M{"title": "Art guide", "markdown": "colours\n"}).Ref
+		page := w.do(me, "doc.create", M{"title": "Art guide", "markdown": "palette\n"}).Ref
 		refsTo := func(docID string) []core.Ref {
 			var refs []core.Ref
 			if err := w.db().List(context.Background(), &refs, store.Where(store.Eq("to_id", docID))); err != nil {
