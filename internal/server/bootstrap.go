@@ -63,7 +63,7 @@ func (who *viewer) startingCopy(ctx context.Context, part string) (map[string]an
 		if kind.copyQuery == nil {
 			continue
 		}
-		list, err := kind.read(ctx, who, kind.copyQuery(who))
+		list, err := kind.readUpToLimit(ctx, who, kind.copyQuery(who))
 		if err != nil {
 			return nil, err
 		}

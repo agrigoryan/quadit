@@ -71,6 +71,36 @@ func (k rowKind) read(ctx context.Context, who *viewer, q store.Q) (any, error) 
 	return rows, nil
 }
 
+// readUpToLimit is read for a query with a limit, counted among the rows
+// the viewer may see: it reads page after page of q until the limit is
+// met or the rows run out, so that rows the viewer may not see do not
+// leave the list short while there are more it may. A query with no limit
+// is read as it is.
+func (k rowKind) readUpToLimit(ctx context.Context, who *viewer, q store.Q) (any, error) {
+	if q.Limit == 0 {
+		return k.read(ctx, who, q)
+	}
+	seen := reflect.MakeSlice(reflect.SliceOf(k.row), 0, q.Limit)
+	for page := q; seen.Len() < q.Limit; page.Offset += page.Limit {
+		rows, err := k.all(ctx, who.db, page)
+		if err != nil {
+			return nil, err
+		}
+		read := reflect.ValueOf(rows).Len()
+		seen = reflect.AppendSlice(seen, reflect.ValueOf(k.visible(ctx, who, rows)))
+		if read < page.Limit {
+			break
+		}
+	}
+	rows := seen.Slice(0, min(seen.Len(), q.Limit)).Interface()
+	if k.fill != nil {
+		if err := k.fill(ctx, who, rows); err != nil {
+			return nil, err
+		}
+	}
+	return rows, nil
+}
+
 // rule says which rows of a kind a viewer may see: it returns, of rows, the
 // ones to keep, each without what the viewer may not see of it (the far
 // end of a relation). A rule that must read to decide and cannot, keeps
@@ -211,7 +241,7 @@ func live(order string) store.Q { return store.Q{Where: []store.Cond{store.Live}
 func toEveryone(q store.Q) func(*viewer) store.Q { return func(*viewer) store.Q { return q } }
 
 // The starting copy brings the latest copyLatest notifications and agent
-// sessions, and the sessions of the last copySessionsFor.
+// sessions the viewer may see, and the sessions of the last copySessionsFor.
 const (
 	copyLatest      = 300
 	copySessionsFor = 7 * 24 * time.Hour

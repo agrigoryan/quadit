@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -731,4 +734,51 @@ func unzipped(t *testing.T, archive, prefix string) string {
 		all.WriteString("=== " + f.Name + "\n" + string(body) + "\n")
 	}
 	return all.String()
+}
+
+// TestTheStartingCopyFillsItsLatestWithWhatTheCallerMaySee: the starting
+// copy brings the latest inbox items and agent sessions up to a number,
+// counted among those the caller may see: newer ones of a project they may
+// not read do not crowd out older ones of a project they may.
+func TestTheStartingCopyFillsItsLatestWithWhatTheCallerMaySee(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		var sva1, ops1 struct{ Task core.Task }
+		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
+		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		var me struct {
+			Workspace core.Workspace
+			Me        core.Member
+		}
+		s.call(s.owner, "", "GET", w+"/bootstrap", nil, 200, &me)
+		ctx := context.Background()
+		db := st.In(me.Workspace.ID)
+		agent := s.change(s.owner, "", "agent.create", M{"name": "Busy", "handle": "busy"})["ref"].(string)
+		// One of SVA, then more of OPS than the copy brings, each newer.
+		for i, taskID := range append([]string{sva1.Task.ID}, slices.Repeat([]string{ops1.Task.ID}, 301)...) {
+			at := time.Now().UnixMilli() + int64(i)
+			for _, row := range []any{
+				core.Notification{ID: id.New(), UserID: me.Me.UserID, Seq: int64(1000 + i), Type: core.NoteComment, ActorID: agent, TaskID: taskID, CreatedAt: at},
+				core.AgentSession{ID: id.New(), AgentID: agent, TaskID: taskID, State: core.AgentSessionRunning, StartedAt: at},
+			} {
+				if err := db.Insert(ctx, row); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		for who, token := range callers {
+			var got struct {
+				Notifications []core.Notification
+				Sessions      []core.AgentSession
+			}
+			s.call(nil, token, "GET", w+"/bootstrap", nil, 200, &got)
+			if who == "an admin's token limited to SVA" && !slices.ContainsFunc(got.Notifications, func(n core.Notification) bool { return n.TaskID == sva1.Task.ID }) {
+				t.Errorf("%s is not given its inbox item of SVA among the latest it may see (%d given)", who, len(got.Notifications))
+			}
+			if !slices.ContainsFunc(got.Sessions, func(session core.AgentSession) bool { return session.TaskID == sva1.Task.ID }) {
+				t.Errorf("%s is not given the session on SVA-1 among the latest it may see (%d given)", who, len(got.Sessions))
+			}
+		}
+	})
 }
