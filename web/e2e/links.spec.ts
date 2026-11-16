@@ -19,8 +19,6 @@ test("a member's mention in a page opens the card about them by keyboard, and it
   await page.keyboard.type("Ask @cod");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: "About Coder" })).toBeVisible();
-  // The list of members to mention closes a moment after the pick, and keeps the keys while it is open.
-  await expect(page.getByRole("listbox")).toBeHidden();
 
   // The caret goes to the end, after the space that follows the chip: one step back, and it is beside it.
   await page.keyboard.press("End");
@@ -42,6 +40,25 @@ test("a member's mention in a page opens the card about them by keyboard, and it
   const list = page.getByRole("main");
   await expect(list.getByText(`Paint the boss ${project.key}`)).toBeVisible();
   await expect(list.getByText(`Write the music ${project.key}`)).toBeHidden();
+});
+
+// The list of members to mention plays its way out for a moment after a
+// pick; the keys pressed meanwhile are the text's: Enter starts a new line,
+// it does not pick again.
+test("the keys pressed right after picking a member to mention go to the text", async ({ page, project, quadit }) => {
+  const made = JSON.parse(
+    await quadit.cli("--json", "do", "doc.create", JSON.stringify({ title: "Notes", project: project.key })),
+  ) as { ref: string };
+  await page.goto(`/e2e/p/${project.key}/docs/${made.ref}`);
+  const text = page.getByRole("textbox", { name: "Page text" });
+  await text.click();
+  await page.keyboard.type("Ask @cod");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Next line");
+  await expect(text.getByText("Next line")).toBeVisible();
+  await expect(text.getByRole("button", { name: "About Coder" })).toHaveCount(1);
+  await expect.poll(() => quadit.cli("doc", made.ref)).toMatch(/Ask @coder\s*\n+\s*Next line/i);
 });
 
 // A task and a page point at each other: a page linked from the task with
