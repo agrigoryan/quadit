@@ -521,8 +521,9 @@ func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
 			do("doc.create", M{"title": "Open questions", "generated": "open_questions"}): "Which quokka for ",
 			do("doc.create", M{"title": "Changelog", "generated": "changelog"}):           "Wombat work in ",
 		}
+		// The feed's head: where it stands now, as /me reports it.
 		var before struct{ Seq int64 }
-		s.call(s.owner, "", "GET", w+"/events?after=0&limit=1", nil, 200, &before)
+		s.call(s.owner, "", "GET", w+"/me", nil, 200, &before)
 
 		for page, says := range pages {
 			for _, form := range []string{"", "?format=md", "?format=text"} {
@@ -551,7 +552,7 @@ func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
 			}
 		}
 		var after struct{ Seq int64 }
-		s.call(s.owner, "", "GET", w+"/events?after=0&limit=1", nil, 200, &after)
+		s.call(s.owner, "", "GET", w+"/me", nil, 200, &after)
 		if after.Seq != before.Seq {
 			t.Errorf("reading the pages moved the feed from %d to %d: a read wrote", before.Seq, after.Seq)
 		}
