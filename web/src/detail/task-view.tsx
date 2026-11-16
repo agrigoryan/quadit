@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
-import { useRowEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/data/selectors";
+import { useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { useFindTask } from "@/data/find-task";
 import { useTaskDetail } from "@/data/task-detail";
 import { usePageTitle } from "@/lib/ui-state";
@@ -67,7 +67,7 @@ function PageTitle({ title }: { title: string }) {
  * A task moved to another project takes that project's key: the panel or
  * page showing it follows it to its new address, as it was opened (over the
  * same list, with the same place in it), instead of finding nothing at the
- * old one.
+ * old one. A link kept from before the move goes the same way.
  */
 function useFollowNewKey(taskKey: string, task: Task | undefined) {
   const slug = useSlug();
@@ -76,8 +76,8 @@ function useFollowNewKey(taskKey: string, task: Task | undefined) {
   // The task last shown here, by id: what stays when its key changes.
   const [shownId, setShownId] = useState(task?.id);
   if (task && task.id !== shownId) setShownId(task.id);
-  const moved = useRowEvenIfGone("tasks", task ? undefined : shownId);
-  const movedTo = moved && moved.key !== taskKey ? moved.key : undefined;
+  const shown = useRowEvenIfGone("tasks", task?.id ?? shownId);
+  const movedTo = shown && shown.key !== taskKey ? shown.key : undefined;
   useEffect(() => {
     if (movedTo) void navigate(taskPath(slug, movedTo) + location.hash, { replace: true, state: location.state });
   }, [movedTo, slug, location.hash, location.state, navigate]);
@@ -85,9 +85,9 @@ function useFollowNewKey(taskKey: string, task: Task | undefined) {
 
 export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
   // The task's own page shows it in the trash or the archive too.
-  const task = useTaskByKeyEvenIfGone(taskKey);
+  const find = useFindTask(taskKey);
+  const { task } = find;
   useFollowNewKey(taskKey, task);
-  const find = useFindTask(taskKey, !!task);
   const lost = useLostProject(taskKey.split("-")[0]);
   const status = useTaskDetail(task?.id);
   useRevealFromHash(!!task);

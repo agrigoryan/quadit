@@ -9,6 +9,8 @@ import { useMemo, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useMe, useRowEvenIfGone, useRows, useTaskByKeyEvenIfGone } from "@/data/selectors";
+import { useFindTask } from "@/data/find-task";
+import { useRestLoaded } from "@/data/store";
 import type { Decision } from "@/types/core";
 import { docTitle } from "@/docs/data";
 import { answerOf, DECISION_REF, decisionsOf } from "@/docs/editor/decision-refs";
@@ -126,8 +128,8 @@ const CHIPS = new Set(["taskChip", "decisionChip", "pageLink", "mention"]);
 
 /** A task, drawn as the task's mention is wherever text names one (ui/task-mention.tsx). */
 export function TaskChip({ taskKey, editable }: { taskKey: string; editable: boolean }) {
-  // A trashed task opens too: its page says it is in the trash.
-  const task = useTaskByKeyEvenIfGone(taskKey);
+  // A trashed task opens too: its page says it is in the trash. A moved one opens under its new key.
+  const { task } = useFindTask(taskKey, useRestLoaded());
   return <TaskMention taskKey={taskKey} control={chipLink(task && (() => openTask(task.key)), editable)} />;
 }
 

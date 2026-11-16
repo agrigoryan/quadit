@@ -5,8 +5,10 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { api, ApiError } from "@/data/api";
 import { clearStore, loadBootstrap } from "@/data/store";
+import { WithQuery } from "@/test/query";
 import type { Member, User, Workspace } from "@/types/core";
 import { Markdown } from "@/ui/markdown";
 
@@ -20,13 +22,18 @@ beforeEach(() => {
     projects: [{ id: "p1", key: "SVA" }],
     members: [{ user_id: "u2", handle: "artist", name: "Art" }],
   });
+  // A key the copy lacks is asked of the server (ui/task-mention.tsx): here there is no such task.
+  vi.spyOn(api, "get").mockRejectedValue(new ApiError(404, { message: "not found" }));
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 const show = (text: string) =>
   render(
     <MemoryRouter initialEntries={["/acme/tasks"]}>
       <Markdown text={text} />
     </MemoryRouter>,
+    { wrapper: WithQuery },
   ).container;
 
 describe("Markdown", () => {

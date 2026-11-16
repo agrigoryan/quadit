@@ -32,7 +32,7 @@ beforeEach(() => {
 
 describe("a chip in a page that cannot be edited", () => {
   it("is a Tab stop that Enter opens", () => {
-    render(<TaskChip taskKey="SVA-1" editable={false} />);
+    render(<TaskChip taskKey="SVA-1" editable={false} />, { wrapper: WithQuery });
     const chip = screen.getByRole("link", { name: /SVA-1/ });
     expect(chip).toHaveAttribute("tabindex", "0");
     fireEvent.keyDown(chip, { key: "Enter" });
@@ -60,7 +60,7 @@ describe("a task's chip", () => {
 
 describe("a chip in a page being edited", () => {
   it("is not a Tab stop and leaves Enter to the editor", () => {
-    render(<TaskChip taskKey="SVA-1" editable />);
+    render(<TaskChip taskKey="SVA-1" editable />, { wrapper: WithQuery });
     const chip = screen.getByRole("link", { name: /SVA-1/ });
     expect(chip).toHaveAttribute("tabindex", "-1");
     fireEvent.keyDown(chip, { key: "Enter" });

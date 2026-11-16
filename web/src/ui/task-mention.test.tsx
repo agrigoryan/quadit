@@ -32,7 +32,10 @@ beforeEach(() => {
     me: ann,
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
-    projects: [{ id: "p1", key: "SVA", name: "Game", rank: "a" }],
+    projects: [
+      { id: "p1", key: "SVA", name: "Game", rank: "a" },
+      { id: "p2", key: "OPS", name: "Ops", rank: "b" },
+    ],
     statuses: [
       { id: "s1", project_id: "p1", name: "Todo", category: "unstarted", rank: "a" },
       { id: "s2", project_id: "p1", name: "Done", category: "done", rank: "b" },
@@ -174,5 +177,15 @@ describe("the card about a task named in text", () => {
     await userEvent.hover(screen.getByRole("link", { name: "SVA-9" }));
     const about = await card();
     expect(await within(about).findByText("There is no such task, or it is not yours to see.")).toBeInTheDocument();
+  });
+
+  it("shows a task named by the key it had before it moved under its new key, and opens it there", async () => {
+    const get = vi.spyOn(api, "get").mockResolvedValue({
+      task: { id: "t9", key: "SVA-9", project_id: "p1", status_id: "s1", title: "Moved here" },
+    });
+    show("See OPS-4.");
+    const mention = await screen.findByRole("link", { name: "Todo SVA-9 Moved here" });
+    expect(get).toHaveBeenCalledWith("/api/v1/w/acme/tasks/OPS-4?raw=1", expect.anything());
+    expect(mention).toHaveAttribute("href", "/acme/task/SVA-9");
   });
 });

@@ -11,7 +11,7 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { useFindTask } from "@/data/find-task";
-import { useMember, useRowEvenIfGone, useTaskByKeyEvenIfGone } from "@/data/selectors";
+import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import { useRestLoaded } from "@/data/store";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
@@ -45,13 +45,14 @@ interface Props {
   control?: HTMLAttributes<HTMLSpanElement>;
 }
 
-export function TaskMention({ taskKey, control }: Props) {
-  // A trashed task is found, to be shown as gone.
-  const task = useTaskByKeyEvenIfGone(taskKey);
-  const status = useRowEvenIfGone("statuses", task?.status_id);
-  // Until the finished work has come, a task that is not here may be a closed one on its way.
+export function TaskMention({ taskKey: written, control }: Props) {
+  // Until the finished work has come, a task that is not here may be a closed one on its way: asked of the server after.
   const restLoaded = useRestLoaded();
-  const gone = task ? !!task.deleted_at : restLoaded;
+  // A trashed task is found, to be shown as gone; a moved one, to be shown under its new key.
+  const { task, looking } = useFindTask(written, restLoaded);
+  const taskKey = task?.key ?? written;
+  const status = useRowEvenIfGone("statuses", task?.status_id);
+  const gone = task ? !!task.deleted_at : restLoaded && !looking;
   const [open, setOpen] = useState(false);
   const cardId = useId();
   // Whether the mention has the keyboard's focus, which opens the card whatever was typed before.
@@ -138,8 +139,8 @@ function TaskLink({ taskKey, ...rest }: { taskKey: string } & Omit<ComponentProp
 
 /** What the card says about the task. One the copy does not hold is asked of the server first. */
 function TaskCard({ taskKey }: { taskKey: string }) {
-  const task = useTaskByKeyEvenIfGone(taskKey);
-  const find = useFindTask(taskKey, !!task);
+  const find = useFindTask(taskKey);
+  const { task } = find;
   const status = useRowEvenIfGone("statuses", task?.status_id);
   const assignee = useMember(task?.assignee_id);
   return (
