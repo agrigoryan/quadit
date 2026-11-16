@@ -76,10 +76,19 @@ quadit layout SVA                  # the project's statuses, labels, members, ep
 
 ```bash
 quadit docs                              # the page tree with ids
-quadit doc PAGE_ID                       # a page as Markdown
+quadit doc PAGE_ID                       # a page as Markdown, then its open comment threads
 quadit write PAGE_ID < page.md           # rewrite a page; unchanged blocks keep their comments
 quadit write new "Release notes" < notes.md
 echo "- lesson learned" | quadit remember "Lessons" mode=append     # a note for your next session
+```
+
+Asked on a page (an inbox item `mentioned` or `replied` ending in `(page …, comment …, thread …, on "…")`), answer there, not in chat:
+
+```bash
+quadit comments PAGE_ID                  # the page's threads: id, the block it is on, who said what
+quadit reply THREAD_ID "…"               # answer in the thread (works on a task's comments too)
+quadit comment page=PAGE_ID block=BLOCK_ID "…"     # start a thread on a block; leave out block= for the page
+quadit resolve THREAD_ID                 # once it is settled; reopen THREAD_ID undoes it
 ```
 
 Write down what the next session will need: preferences you were told, where things are, what you were in the middle of.

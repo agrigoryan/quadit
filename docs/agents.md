@@ -139,7 +139,7 @@ Standing preferences set by the owner ("no rings as the main shape of an explosi
 ```bash
 quadit docs                 # the page tree, with ids
 quadit docs project=SVA     # one project's pages: those tied to it, with the pages under them
-quadit doc PAGE_ID          # one page as Markdown
+quadit doc PAGE_ID          # one page as Markdown, then its open comment threads
 quadit write PAGE_ID < page.md          # rewrite it; blocks that did not change keep their comments
 quadit write new "Release notes" < notes.md
 quadit write new "Boss design" project=SVA < boss.md     # a page of a project
@@ -152,6 +152,38 @@ A page belongs to the workspace and may be tied to one project. The project deci
 In Markdown written to a page, `@handle` of a member becomes a mention, as one typed in the editor: the member is told, and the page lists them; `quadit doc` writes it back as `@handle`. In bold, italic or code it stays text.
 
 A task and a page point at each other when one mentions the other (a task key in the page, a page link in the task's text or a comment) or when they are linked: `quadit link SVA-12 page=PAGE_ID`, or from the page's side `quadit link page=PAGE_ID task=SVA-12` (the change `link.set {"task":"SVA-12","kind":"doc","ref":"PAGE_ID"}`; `link.remove {"id":"LINK_ID"}` undoes it). Either way the task's context pack lists the page under "linked docs", `quadit show SVA-12` lists a linked page as `page TITLE (doc ID)`, and the page lists the task among what mentions it. A page the reader may not see is left out of all of these.
+
+### Comments on a page
+
+People comment on a block of a page (the paragraph their selection starts in) or on the page as a whole, and answer each other in a thread. Asked something there, you get an inbox item (`mentioned`, or `replied` when someone answers in a thread you wrote in) whose line ends with what you need to answer:
+
+```
+#1207 11-16 10:42 @aram mentioned: Boss fight — @coder is this still three phases?  (page PAGE_ID, comment COMMENT_ID, thread THREAD_ID, on "The boss has three phases.")
+```
+
+`quadit listen` hands the same line to its command in `QUADIT_EVENT`. Then:
+
+```bash
+quadit doc PAGE_ID                  # the page, then its open threads
+quadit comments PAGE_ID resolved=1  # the threads alone; resolved=1 adds the resolved ones
+quadit reply THREAD_ID "Yes: phases two and three merged."   # any comment id of the thread works
+quadit comment page=PAGE_ID block=BLOCK_ID "Should this say four?"   # a new thread on a block
+quadit comment page=PAGE_ID "Reviewed; two questions below."         # one on the page
+quadit resolve THREAD_ID            # reopen THREAD_ID opens it again
+```
+
+The threads after a page read like this; the block id is what `block=` takes, and a thread whose block was taken out of the page since says `on removed block`:
+
+```
+--- comments: 2 open threads; 1 resolved (resolved=1 shows them)
+thread THREAD_ID on block BLOCK_ID "The boss has three phases."
+  @aram 2026-11-16 10:42: Is this still three?
+    @coder 2026-11-16 10:50: Yes: phases two and three merged.
+thread THREAD_ID on the page
+  @bea 2026-11-16 11:02: Who owns this page?
+```
+
+`comments=0` leaves the threads out; `format=md` is the page alone, as `write` takes it back. Whoever wrote in a thread is told of each reply in it. Resolve a thread once the question in it is settled, not to hide one you disagree with. `reply` works on a task's comments too: `quadit show KEY` gives each comment's `id=`.
 
 A page that mirrors a Markdown file in a repository is called by the file's opening `# heading` (else by its file name) and does not repeat it in its text; written back, the title is the heading again. Renaming the page changes the heading, not the file name.
 
