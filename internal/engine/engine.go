@@ -20,6 +20,8 @@
 //	                what was wrong
 //	cx.go           cx, what a handler works with; events and where they go
 //	patch.go        an update's changed fields; save and trash
+//	ranks.go        a row's place in its list: a new row's rank, a rank
+//	                given
 //	resolve.go      finding rows by what people call them (SVA-12, @ann)
 //	notify.go       the inbox, watchers, mentions and the search index
 //	memo.go         a transaction that remembers small rows it read
@@ -37,7 +39,6 @@
 //	                pages under it (ch_doc_private.go)
 //	ch_budgets.go   what agents spend, and the warnings
 //	ch_bootstrap.go a new workspace and its owner
-//	ch_shared.go    what the handlers of several files use
 //
 // A handler is a func(c *cx, a Args) error. Its arguments arrive read, with
 // unknown fields refused, and the catalog describes the change by the

@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"cmp"
 	"encoding/json"
 	"slices"
 
@@ -76,10 +77,10 @@ func linkSet(c *cx, a linkSetArgs) error {
 		return c.emit(event{seq: seq, typ: "link.created", entity: "link", entityID: l.ID, place: inTask(t), data: core.EventData{Row: l, Key: &t.Key}})
 	}
 	p := newPatch()
-	p.put("url", l.URL, firstNonEmpty(a.URL, l.URL))
-	p.put("title", l.Title, firstNonEmpty(a.Title, l.Title))
-	p.put("state", l.State, firstNonEmpty(a.State, l.State))
-	p.put("checks", l.Checks, firstNonEmpty(a.Checks, l.Checks))
+	p.put("url", l.URL, cmp.Or(a.URL, l.URL))
+	p.put("title", l.Title, cmp.Or(a.Title, l.Title))
+	p.put("state", l.State, cmp.Or(a.State, l.State))
+	p.put("checks", l.Checks, cmp.Or(a.Checks, l.Checks))
 	if len(a.Data) > 0 && string(a.Data) != string(l.Data) {
 		p.set["data"] = a.Data
 		p.changes["data"] = core.FieldChange{To: a.Data}

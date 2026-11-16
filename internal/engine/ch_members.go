@@ -6,6 +6,7 @@ import (
 	"errors"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -153,9 +154,9 @@ func (c *cx) freeHandle(want string) (string, error) {
 		if n == 0 {
 			return h, nil
 		}
-		h = want + itoa(i)
+		h = want + strconv.Itoa(i)
 		if len(h) > 32 {
-			h = want[:32-len(itoa(i))] + itoa(i)
+			h = want[:32-len(strconv.Itoa(i))] + strconv.Itoa(i)
 		}
 	}
 	return "", conflictErr("no free handle like @%s", want)
@@ -398,4 +399,17 @@ func (c *cx) scopeArg(a *scopeArgs, base *core.Scope) (*core.Scope, error) {
 		return nil, nil
 	}
 	return s, nil
+}
+
+// checkHandle checks an @handle: what people type to mention someone.
+func checkHandle(h string) error {
+	if len(h) < 2 || len(h) > 32 {
+		return invalid("handle", "a handle is 2 to 32 characters")
+	}
+	for _, r := range h {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' && r != '_' {
+			return invalid("handle", "a handle uses lower-case letters, digits, - and _ only: %q", h)
+		}
+	}
+	return nil
 }

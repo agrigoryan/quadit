@@ -88,7 +88,7 @@ func viewCreate(c *cx, a viewCreateArgs) error {
 		if n == 0 {
 			break
 		}
-		v.Slug = base + "-" + itoa(i)
+		v.Slug = base + "-" + strconv.Itoa(i)
 	}
 	if v.Rank = a.Rank; v.Rank == "" {
 		if v.Rank, err = nextRank[core.View](c, store.Live); err != nil {

@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"cmp"
 	"encoding/json"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -37,7 +38,7 @@ func (c *cx) keepVersionIfDue(d core.Doc, rows []core.Block) error {
 func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string) error {
 	snap := plainjson.Marshal(BlockTree(rows))
 	return c.tx.Insert(c.ctx, core.DocVersion{ID: id.New(), WorkspaceID: c.ws, DocID: d.ID, Seq: c.tx.Seq(), Label: label, Title: d.Title,
-		Snapshot: snap, CreatedBy: firstNonEmpty(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at})
+		Snapshot: snap, CreatedBy: cmp.Or(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at})
 }
 
 type docSnapshotArgs struct {

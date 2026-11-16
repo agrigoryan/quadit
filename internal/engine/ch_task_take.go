@@ -14,6 +14,14 @@ func init() {
 	register("task.release", core.RoleMember, taskRelease)
 }
 
+// defaultLeaseMinutes is how long a hold on a task or a resource
+// (resource.acquire) lasts without renewing, unless the one taking it says;
+// maxLeaseMinutes the longest it may.
+const (
+	defaultLeaseMinutes = 30
+	maxLeaseMinutes     = 24 * 60
+)
+
 type taskTakeArgs struct {
 	ID string `json:"id" quadit:"required,handler"`
 	// Minutes is how long the lease lasts without being renewed. Taking a

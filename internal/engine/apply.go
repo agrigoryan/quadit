@@ -338,3 +338,17 @@ func argsHash(ch Change) string {
 	sum := sha256.Sum256(append([]byte(ch.Type+"\n"+ch.For+"\n"), buf.Bytes()...))
 	return hex.EncodeToString(sum[:])
 }
+
+// applyNested runs another change type inside this one, as the same actor.
+func (c *cx) applyNested(changeType string, args any) error {
+	raw, err := json.Marshal(args)
+	if err != nil {
+		return err
+	}
+	saved, ref, key := c.change, c.ref, c.key
+	c.change = Change{ID: saved.ID, Type: changeType, Args: raw}
+	err = handlers[changeType].fn(c)
+	c.subRef = c.ref
+	c.change, c.ref, c.key = saved, ref, key
+	return err
+}

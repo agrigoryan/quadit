@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -49,7 +50,7 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	p := newPatch()
 	p.put("project_id", t.ProjectID, to.ID)
 	p.put("number", t.Number, int(n))
-	p.put("key", t.Key, to.Key+"-"+itoa(int(n)))
+	p.put("key", t.Key, to.Key+"-"+strconv.Itoa(int(n)))
 	p.put("status_id", t.StatusID, st.ID)
 	p.put("epic_id", t.EpicID, "")
 	p.put("milestone_id", t.MilestoneID, "")
@@ -61,7 +62,7 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	if err := c.setLabels(p, &t, keep); err != nil {
 		return err
 	}
-	t.ProjectID, t.Number, t.Key = to.ID, int(n), to.Key+"-"+itoa(int(n))
+	t.ProjectID, t.Number, t.Key = to.ID, int(n), to.Key+"-"+strconv.Itoa(int(n))
 	if err := c.saveTask(t, p, core.EventData{MovedFrom: oldKey, FromProjectID: oldProject}); err != nil {
 		return err
 	}

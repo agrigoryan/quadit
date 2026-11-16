@@ -90,3 +90,17 @@ func ownerFor(ctx context.Context, db store.DB, a BootstrapArgs, at int64) (core
 	owner.IsAdmin = people == 0
 	return owner, db.Insert(ctx, owner)
 }
+
+// validSlug reports whether a workspace's slug, the name in its address,
+// is 2 to 40 lower-case letters, digits and dashes.
+func validSlug(s string) bool {
+	if len(s) < 2 || len(s) > 40 {
+		return false
+	}
+	for _, r := range s {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+			return false
+		}
+	}
+	return true
+}

@@ -5,6 +5,7 @@ package engine
 
 import (
 	"sort"
+	"strconv"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -30,8 +31,8 @@ func (c *cx) staleError(t core.Task, base int64) error {
 		changed = append(changed, f)
 	}
 	sort.Strings(changed)
-	return &Error{Code: CodeStale, Allowed: changed, Message: "task " + t.Key + " changed since seq " + itoa(int(base)) +
-		" (it is now at " + itoa(int(t.UpdatedSeq)) + "; changed fields are listed); read it again, or resend without base_seq to overwrite"}
+	return &Error{Code: CodeStale, Allowed: changed, Message: "task " + t.Key + " changed since seq " + strconv.Itoa(int(base)) +
+		" (it is now at " + strconv.Itoa(int(t.UpdatedSeq)) + "; changed fields are listed); read it again, or resend without base_seq to overwrite"}
 }
 
 // checkParent refuses a parent that would make a loop.
@@ -99,7 +100,7 @@ func (c *cx) checkHandoff(t core.Task) error {
 		return err
 	}
 	if chain >= maxHandoffs {
-		return &Error{Code: CodeConflict, Message: "this task has been handed from agent to agent " + itoa(chain) +
+		return &Error{Code: CodeConflict, Message: "this task has been handed from agent to agent " + strconv.Itoa(chain) +
 			" times in a row; hand it to a person (waiting_on or assignee) so they can decide where it goes"}
 	}
 	return nil
@@ -160,7 +161,7 @@ func (c *cx) checkWeeklyHandoffs() error {
 		}
 	}
 	if n >= b.Handoffs {
-		return &Error{Code: CodeBudget, Message: "this agent has passed work on " + itoa(int(n)) + " times this week, which is its limit; hand the task to a person"}
+		return &Error{Code: CodeBudget, Message: "this agent has passed work on " + strconv.Itoa(int(n)) + " times this week, which is its limit; hand the task to a person"}
 	}
 	return nil
 }
@@ -186,7 +187,7 @@ func (c *cx) checkTaskHandoffs(t core.Task, evs []core.Event) error {
 		}
 	}
 	if n >= b.Handoffs {
-		return &Error{Code: CodeBudget, Message: t.Key + " has been passed between agents " + itoa(int(n)) + " times, which is its limit; hand it to a person"}
+		return &Error{Code: CodeBudget, Message: t.Key + " has been passed between agents " + strconv.Itoa(int(n)) + " times, which is its limit; hand it to a person"}
 	}
 	return nil
 }

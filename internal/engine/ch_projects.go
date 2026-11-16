@@ -4,6 +4,7 @@ package engine
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -212,7 +213,7 @@ func (c *cx) rekeyTasks(pr core.Project) error {
 		return err
 	}
 	for _, t := range append(tasks, trashed...) {
-		if _, err := c.tx.Update(c.ctx, "tasks", map[string]any{"key": pr.Key + "-" + itoa(t.Number)}, store.Eq("id", t.ID)); err != nil {
+		if _, err := c.tx.Update(c.ctx, "tasks", map[string]any{"key": pr.Key + "-" + strconv.Itoa(t.Number)}, store.Eq("id", t.ID)); err != nil {
 			return err
 		}
 	}

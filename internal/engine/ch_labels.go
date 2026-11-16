@@ -94,3 +94,14 @@ func labelDelete(c *cx, a memberRefArgs) error {
 	}
 	return c.trash(target{table: "labels", entity: "label", id: l.ID, place: c.inProjectOrWorkspace(l.ProjectID)})
 }
+
+// without is a list of label ids without one of them.
+func without(list []string, v string) []string {
+	out := make([]string, 0, len(list))
+	for _, x := range list {
+		if x != v {
+			out = append(out, x)
+		}
+	}
+	return out
+}

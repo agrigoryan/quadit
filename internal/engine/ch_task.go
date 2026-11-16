@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -150,7 +151,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	if t.Number, err = c.newTaskNumber(project, a.Number); err != nil {
 		return err
 	}
-	t.Key = project.Key + "-" + itoa(t.Number)
+	t.Key = project.Key + "-" + strconv.Itoa(t.Number)
 	t.Rank = a.Rank
 	if t.Rank == "" {
 		t.Rank = rank.ForNumber(t.Number)
@@ -203,7 +204,7 @@ func (c *cx) newTaskNumber(project core.Project, asked int) (int, error) {
 		if !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
 			return 0, forbidden("choosing a task's number is for imports and needs the admin role; leave number out and the task gets the next one")
 		}
-		key := project.Key + "-" + itoa(asked)
+		key := project.Key + "-" + strconv.Itoa(asked)
 		taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", project.ID), store.Eq("number", asked))
 		if err != nil {
 			return 0, err

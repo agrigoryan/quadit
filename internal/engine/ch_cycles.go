@@ -18,6 +18,9 @@ func init() {
 	register("cycle.delete", core.RoleMember, cycleDelete)
 }
 
+// defaultCycleDays is how long a cycle is when a project does not say.
+const defaultCycleDays = 14
+
 type cycleCreateArgs struct {
 	ID       string `json:"id"`
 	Project  string `json:"project" quadit:"required,handler"`

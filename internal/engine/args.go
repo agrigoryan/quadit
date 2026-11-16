@@ -13,6 +13,11 @@ import (
 	"strings"
 )
 
+// idArgs are the arguments of a change that names one row by its id.
+type idArgs struct {
+	ID string `json:"id" quadit:"required,handler"`
+}
+
 // args decodes the change's arguments into v, a pointer to the change's
 // argument struct. Unknown fields are refused, so a misspelled field is an
 // error and not a silent no-op; so is a required argument left out (see

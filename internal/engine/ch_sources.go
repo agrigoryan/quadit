@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 
@@ -52,7 +53,7 @@ func sourceCreate(c *cx, a sourceArgs) error {
 		return err
 	}
 	src := core.DocSource{ID: sid, WorkspaceID: c.ws, Repo: strings.TrimSpace(a.Repo.V), Branch: a.Branch.V, Subdir: strings.Trim(a.Subdir.V, "/"),
-		Authority: firstNonEmpty(a.Authority.V, core.AuthorityRepo), WriteMode: firstNonEmpty(a.WriteMode.V, core.WriteCommit), CreatedBy: c.actor.UserID, CreatedAt: c.at}
+		Authority: cmp.Or(a.Authority.V, core.AuthorityRepo), WriteMode: cmp.Or(a.WriteMode.V, core.WriteCommit), CreatedBy: c.actor.UserID, CreatedAt: c.at}
 	if !slices.Contains(authorities, src.Authority) {
 		return oneOf("authority", "authority", src.Authority, authorities)
 	}

@@ -11,6 +11,14 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+const (
+	// scanLimit is the most rows of one kind a change reads in one go.
+	scanLimit = 5000
+	// msPerMinute turns minutes into the Unix milliseconds times are kept
+	// in (cx.at and every stored time).
+	msPerMinute = 60_000
+)
+
 // cx is what a handler works with: one change, one actor, one transaction.
 type cx struct {
 	*Resolver // ctx, actor, at, and finding things by name
