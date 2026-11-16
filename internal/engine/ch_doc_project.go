@@ -9,27 +9,21 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// project ties the page to a project, or to none. The project decides who
-// may see the page, so nobody moves one into a project they cannot see.
-func (u *pageEdit) project() error {
-	c, a := u.c, u.a
-	if !a.Project.Set {
-		return nil
+// docProject is the project a page is to be tied to, or none. The project
+// decides who may see the page, so nobody moves one into a project they
+// cannot see.
+func (c *cx) docProject(given Opt[string]) (string, error) {
+	if given.Null || given.V == "" {
+		return "", nil
 	}
-	pid := ""
-	if !a.Project.Null && a.Project.V != "" {
-		pr, err := c.project(a.Project.V)
-		if err != nil {
-			return err
-		}
-		pid = pr.ID
+	pr, err := c.project(given.V)
+	if err != nil {
+		return "", err
 	}
-	if pid != "" && !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, pid) {
-		return forbidden("your access does not include this project")
+	if !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, pr.ID) {
+		return "", forbidden("your access does not include this project")
 	}
-	u.moved, u.toProject = pid != u.d.ProjectID, pid
-	u.p.put("project_id", u.d.ProjectID, pid)
-	return nil
+	return pr.ID, nil
 }
 
 // moveSubPages takes the pages under a page along when its project

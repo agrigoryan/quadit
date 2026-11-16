@@ -7,7 +7,7 @@
 // readers (placeDoc), unless it is made private itself and so given its
 // own (docReaders); changing who sees a page passes the change down to
 // the pages under it that had its readers (passReadersDown); a page moved
-// under a private page takes that page's readers (pageEdit.parent). A page
+// under a private page takes that page's readers (docUpdate). A page
 // moved out of one stays as private as it was: nobody is shown a page
 // because it moved.
 

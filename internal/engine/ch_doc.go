@@ -261,151 +261,152 @@ func (c *cx) canEditDoc(d core.Doc) error {
 }
 
 // docUpdate changes what a page is called, where it sits, who sees it and
-// its properties. Its text is changed with doc.edit and doc.write.
+// its properties. Its text is changed with doc.edit and doc.write. A change
+// of who sees it, or of its project, reaches the pages under it.
 func docUpdate(c *cx, a docUpdateArgs) error {
 	d, err := c.loadDoc("id", a.ID)
 	if err != nil {
 		return err
 	}
-	u := &pageEdit{c: c, a: a, d: d, p: newPatch(), was: d}
-	steps := []func() error{
-		u.look,
-		u.parent,
-		u.rank,
-		u.project,
-		u.private,
-		u.sharedWith,
-		u.archived,
-		u.props,
-	}
-	for _, step := range steps {
-		if err := step(); err != nil {
-			return err
-		}
-	}
-	c.ref = d.ID
-	if u.p.empty() {
-		return nil
-	}
-	return u.save()
-}
+	was, p := d, newPatch()
 
-// pageEdit is one doc.update under way: the page as it is becoming, the
-// patch that takes it there, and the page as it was.
-type pageEdit struct {
-	c         *cx
-	a         docUpdateArgs
-	d         core.Doc
-	p         *patch
-	was       core.Doc
-	moved     bool   // its project changes
-	toProject string // to this one; none when empty
-}
+	// What it is called and how it looks.
+	p.setText("title", a.Title, &d.Title)
+	p.setText("icon", a.Icon, &d.Icon)
+	p.setText("cover", a.Cover, &d.Cover)
 
-// look sets what the page is called and how it looks: its title, icon and
-// cover.
-func (u *pageEdit) look() error {
-	u.p.setText("title", u.a.Title, &u.d.Title)
-	u.p.setText("icon", u.a.Icon, &u.d.Icon)
-	u.p.setText("cover", u.a.Cover, &u.d.Cover)
-	return nil
-}
-
-// parent moves the page under another, which may not be one of its own.
-// Under a private page it is private the same way, as a page made there
-// is, unless it is someone else's private page, which only they change.
-func (u *pageEdit) parent() error {
-	c, a, d := u.c, u.a, u.d
-	if !a.Parent.Set {
-		return nil
-	}
-	pid := ""
-	if !a.Parent.Null && a.Parent.V != "" {
-		parent, err := c.loadDoc("parent", a.Parent.V)
-		if err != nil {
-			return err
-		}
-		for cur, depth := parent, 0; ; depth++ {
-			if cur.ID == d.ID || depth > 60 {
-				return invalid("parent", "a page cannot be placed inside itself")
-			}
-			if cur.ParentID == "" {
-				break
-			}
-			ok, err := store.Find(c.ctx, c.tx, &cur, store.Eq("id", cur.ParentID))
+	// Where it sits. Under a private page it is private the same way, as a
+	// page made there is, unless it is someone else's private page, which
+	// only they change.
+	if a.Parent.Set {
+		pid := ""
+		if !a.Parent.Null && a.Parent.V != "" {
+			parent, err := c.newParent(d, a.Parent.V)
 			if err != nil {
 				return err
 			}
-			if !ok {
-				break
+			pid = parent.ID
+			if parent.OwnerID != "" && pid != d.ParentID && (d.OwnerID == "" || d.OwnerID == c.actor.UserID) {
+				p.put("owner_id", d.OwnerID, parent.OwnerID)
+				p.put("shared_with", d.SharedWith, parent.SharedWith)
+				d.OwnerID, d.SharedWith = parent.OwnerID, parent.SharedWith
 			}
 		}
-		pid = parent.ID
-		if parent.OwnerID != "" && pid != d.ParentID && (d.OwnerID == "" || d.OwnerID == c.actor.UserID) {
-			u.p.put("owner_id", d.OwnerID, parent.OwnerID)
-			u.p.put("shared_with", d.SharedWith, parent.SharedWith)
-			u.d.OwnerID, u.d.SharedWith = parent.OwnerID, parent.SharedWith
-		}
+		p.put("parent_id", d.ParentID, pid)
 	}
-	u.p.put("parent_id", d.ParentID, pid)
-	return nil
-}
-
-func (u *pageEdit) rank() error {
-	return u.p.rank(u.a.Rank, &u.d.Rank)
-}
-
-// private makes the page its owner's alone, or everyone's again.
-func (u *pageEdit) private() error {
-	c, d := u.c, &u.d
-	if !u.a.Private.Set {
-		return nil
+	if err := p.rank(a.Rank, &d.Rank); err != nil {
+		return err
 	}
-	if d.OwnerID != "" && d.OwnerID != c.actor.UserID {
-		return forbidden("only its owner can change who sees a private page")
-	}
-	owner := ""
-	if u.a.Private.V {
-		owner = c.actor.UserID
-	}
-	u.p.put("owner_id", d.OwnerID, owner)
-	d.OwnerID = owner
-	return nil
-}
-
-// sharedWith sets who a private page is shared with.
-func (u *pageEdit) sharedWith() error {
-	if !u.a.SharedWith.Set {
-		return nil
-	}
-	var ids []string
-	for _, ref := range u.a.SharedWith.V {
-		m, err := u.c.memberRef("shared_with", ref)
-		if err != nil {
+	moved, toProject := false, ""
+	if a.Project.Set {
+		if toProject, err = c.docProject(a.Project); err != nil {
 			return err
 		}
-		ids = append(ids, m.UserID)
+		moved = toProject != d.ProjectID
+		p.put("project_id", d.ProjectID, toProject)
 	}
-	u.p.put("shared_with", u.d.SharedWith, ids)
-	u.d.SharedWith = ids
+
+	// Who sees it: its owner alone, or everyone again, and who it is
+	// shared with.
+	if a.Private.Set {
+		if d.OwnerID != "" && d.OwnerID != c.actor.UserID {
+			return forbidden("only its owner can change who sees a private page")
+		}
+		owner := ""
+		if a.Private.V {
+			owner = c.actor.UserID
+		}
+		p.put("owner_id", d.OwnerID, owner)
+		d.OwnerID = owner
+	}
+	if a.SharedWith.Set {
+		var ids []string
+		for _, ref := range a.SharedWith.V {
+			m, err := c.memberRef("shared_with", ref)
+			if err != nil {
+				return err
+			}
+			ids = append(ids, m.UserID)
+		}
+		p.put("shared_with", d.SharedWith, ids)
+		d.SharedWith = ids
+	}
+
+	p.setStamp("archived_at", a.Archived, d.ArchivedAt, c.at)
+	if err := c.mergeDocProps(p, d, a.Props); err != nil {
+		return err
+	}
+	c.ref = d.ID
+	if p.empty() {
+		return nil
+	}
+
+	// Write it, and tell those who see the page and those who no longer do.
+	seq := c.tx.NextSeq()
+	p.set["updated_seq"], p.set["updated_at"], p.set["updated_by"] = seq, c.at, c.actor.UserID
+	if _, err := c.tx.Update(c.ctx, "docs", p.set, store.Eq("id", d.ID)); err != nil {
+		return err
+	}
+	if err := c.tellReaders(seq, was, d, p.changes); err != nil {
+		return err
+	}
+	readersChanged := !sameReaders(was, d)
+	if readersChanged {
+		if err := c.passReadersDown(was, d); err != nil {
+			return err
+		}
+	}
+	if moved {
+		if err := c.tellNewProject(d); err != nil {
+			return err
+		}
+		// The pages under it that are in the project because it is go with it.
+		if err := c.moveSubPages(d, toProject); err != nil {
+			return err
+		}
+		d.ProjectID = toProject
+	}
+	// Search knows a page by its title, and keeps it to those who may see it.
+	if _, ok := p.set["title"]; ok || moved || readersChanged {
+		return c.reindexDoc(d)
+	}
 	return nil
 }
 
-func (u *pageEdit) archived() error {
-	a, d := u.a, u.d
-	u.p.setStamp("archived_at", a.Archived, d.ArchivedAt, u.c.at)
-	return nil
+// newParent loads the page another is to be moved under, which may not be
+// the page itself or one under it.
+func (c *cx) newParent(d core.Doc, ref string) (core.Doc, error) {
+	parent, err := c.loadDoc("parent", ref)
+	if err != nil {
+		return core.Doc{}, err
+	}
+	for cur, depth := parent, 0; ; depth++ {
+		if cur.ID == d.ID || depth > 60 {
+			return core.Doc{}, invalid("parent", "a page cannot be placed inside itself")
+		}
+		if cur.ParentID == "" {
+			return parent, nil
+		}
+		ok, err := store.Find(c.ctx, c.tx, &cur, store.Eq("id", cur.ParentID))
+		if err != nil {
+			return core.Doc{}, err
+		}
+		if !ok {
+			return parent, nil
+		}
+	}
 }
 
-// props merges the properties given into the page's own.
-func (u *pageEdit) props() error {
-	d, p, props := u.d, u.p, u.a.Props
+// mergeDocProps merges the properties given into the page's own, in p. A
+// row's are checked and stored the way its database's columns say; a null
+// value removes a key.
+func (c *cx) mergeDocProps(p *patch, d core.Doc, props map[string]json.RawMessage) error {
 	if len(props) == 0 {
 		return nil
 	}
 	if d.Kind == core.DocRow {
 		var err error
-		if props, err = u.c.rowProps(d.ParentID, props); err != nil {
+		if props, err = c.rowProps(d.ParentID, props); err != nil {
 			return err
 		}
 	}
@@ -432,42 +433,6 @@ func (u *pageEdit) props() error {
 		p.set["props"] = json.RawMessage(raw)
 		// The event carries only the keys that changed, to merge.
 		p.changes["props"] = core.FieldChange{To: json.RawMessage(raw)}
-	}
-	return nil
-}
-
-// save writes the patch and tells those who see the page, and those who no
-// longer do. A change of who sees it, or of its project, reaches the pages
-// under it.
-func (u *pageEdit) save() error {
-	c, d, p := u.c, u.d, u.p
-	seq := c.tx.NextSeq()
-	p.set["updated_seq"], p.set["updated_at"], p.set["updated_by"] = seq, c.at, c.actor.UserID
-	if _, err := c.tx.Update(c.ctx, "docs", p.set, store.Eq("id", d.ID)); err != nil {
-		return err
-	}
-	if err := c.tellReaders(seq, u.was, d, p.changes); err != nil {
-		return err
-	}
-	readersChanged := !sameReaders(u.was, d)
-	if readersChanged {
-		if err := c.passReadersDown(u.was, d); err != nil {
-			return err
-		}
-	}
-	if u.moved {
-		if err := c.tellNewProject(d); err != nil {
-			return err
-		}
-		// The pages under it that are in the project because it is go with it.
-		if err := c.moveSubPages(d, u.toProject); err != nil {
-			return err
-		}
-		d.ProjectID = u.toProject
-	}
-	// Search knows a page by its title, and keeps it to those who may see it.
-	if _, ok := p.set["title"]; ok || u.moved || readersChanged {
-		return c.reindexDoc(d)
 	}
 	return nil
 }
