@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	gcblob "gocloud.dev/blob"
 	"gocloud.dev/blob/gcsblob"
@@ -58,12 +59,11 @@ func gcsClient(ctx context.Context, c Config) (*gcp.HTTPClient, error) {
 // gcsScope is the access the file store asks Google for.
 const gcsScope = "https://www.googleapis.com/auth/devstorage.read_write"
 
-// gcsCredentialTypes are the kinds of Google credentials a key in the
-// settings may be: every kind of credentials file Google's library reads,
-// as its deprecated CredentialsFromJSON took them. That includes an OAuth
-// client file, which has no type.
+// gcsCredentialTypes are the kinds of Google credentials file a key in
+// the settings may be: those Google's library signs in with by itself.
+// An OAuth client file (an "installed" or "web" app's id and secret) is
+// not one: it only starts a consent flow, in which a person signs in.
 var gcsCredentialTypes = []google.CredentialsType{
-	"", // an OAuth client file ("installed" or "web")
 	google.ServiceAccount,
 	google.AuthorizedUser,
 	google.ExternalAccount,
@@ -74,16 +74,31 @@ var gcsCredentialTypes = []google.CredentialsType{
 
 // gcsCredentials reads the key in the settings. The library reads a key
 // only as the type its caller names, so the type the key says it is must
-// be one of the kinds the store takes.
+// be one of the kinds the store takes; any other is refused in words that
+// say what was given and what is needed.
 func gcsCredentials(ctx context.Context, key []byte) (*google.Credentials, error) {
 	var head struct {
-		Type google.CredentialsType `json:"type"`
+		Type      google.CredentialsType `json:"type"`
+		Installed json.RawMessage        `json:"installed"`
+		Web       json.RawMessage        `json:"web"`
 	}
 	if err := json.Unmarshal(key, &head); err != nil {
 		return nil, err
 	}
-	if !slices.Contains(gcsCredentialTypes, head.Type) {
-		return nil, fmt.Errorf("unknown credential type %q; a service account key is usual", head.Type)
+	if slices.Contains(gcsCredentialTypes, head.Type) {
+		return google.CredentialsFromJSONWithType(ctx, key, head.Type, gcsScope)
 	}
-	return google.CredentialsFromJSONWithType(ctx, key, head.Type, gcsScope)
+	given := fmt.Sprintf("the key's type is %q", head.Type)
+	switch {
+	case head.Type == "" && (head.Installed != nil || head.Web != nil):
+		given = "this is an OAuth client file (an app's id and secret, for asking a person to sign in), which cannot sign the server in by itself"
+	case head.Type == "":
+		given = `the key has no "type"`
+	}
+	kinds := make([]string, len(gcsCredentialTypes))
+	for i, k := range gcsCredentialTypes {
+		kinds[i] = fmt.Sprintf("%q", k)
+	}
+	return nil, fmt.Errorf(`%s; use a service account's key (a JSON key with "type": "service_account", made under IAM, Service accounts, Keys), or another credentials file Google signs in with by itself (%s), or leave it empty to use the machine's own identity`,
+		given, strings.Join(kinds[1:], ", "))
 }
