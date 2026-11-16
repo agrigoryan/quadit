@@ -88,7 +88,11 @@ func weekOf(ms int64) string {
 // flowWeeks weeks.
 func (d *dashboard) flowWeekly() []flowWeek {
 	weeks := map[string][2]int{} // opened, closed
-	cutoff := d.now.AddDate(0, 0, -7*flowWeeks).UnixMilli()
+	// Weeks are counted in UTC, as weekOf names them: stepped in the
+	// server's own zone, a week on the far side of a clock change would
+	// land on the day before its Monday.
+	now := d.now.UTC()
+	cutoff := now.AddDate(0, 0, -7*flowWeeks).UnixMilli()
 	for _, t := range d.tasks {
 		if t.CreatedAt >= cutoff {
 			w := weeks[weekOf(t.CreatedAt)]
@@ -102,7 +106,7 @@ func (d *dashboard) flowWeekly() []flowWeek {
 		}
 	}
 	var out []flowWeek
-	for day := d.now.AddDate(0, 0, -7*(flowWeeks-1)); !day.After(d.now); day = day.AddDate(0, 0, 7) {
+	for day := now.AddDate(0, 0, -7*(flowWeeks-1)); !day.After(now); day = day.AddDate(0, 0, 7) {
 		k := weekOf(day.UnixMilli())
 		out = append(out, flowWeek{Week: k, Opened: weeks[k][0], Closed: weeks[k][1]})
 	}

@@ -91,7 +91,7 @@ func epicBefore(a, b epicProgress) bool {
 // one of its tasks last changed.
 func (d *dashboard) markAtRisk(progress *epicProgress, lastMove int64) {
 	today := d.now.UTC().Format(time.DateOnly)
-	soon := d.now.AddDate(0, 0, 7).UTC().Format(time.DateOnly)
+	soon := d.now.UTC().AddDate(0, 0, 7).Format(time.DateOnly)
 	left := progress.Total - progress.Done
 	switch {
 	case progress.State == core.EpicDone || left == 0:

@@ -1065,8 +1065,28 @@ func sameEveryRun(key string, v any) any {
 		if key == "secret" && val != "" {
 			return "<secret>"
 		}
+		if key == "week" {
+			return weeksAgo(val)
+		}
 	}
 	return v
+}
+
+// weeksAgo names the Monday a week starts on by how many weeks before this
+// week it is. As a day it would differ with the day of the week the test is
+// run on, and week by week.
+func weeksAgo(day string) string {
+	var offset int
+	at, err := time.Parse("2006-01-02", day)
+	if _, scanErr := fmt.Sscanf(day, "<day%d>", &offset); scanErr == nil {
+		at, err = time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, offset), nil
+	}
+	if err != nil {
+		return day
+	}
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	thisWeek := today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
+	return fmt.Sprintf("<week-%d>", int(thisWeek.Sub(at).Hours()/24/7))
 }
 
 // stream is the live stream's text with each event's data as body gives
