@@ -1,8 +1,14 @@
 // The editor's schema: BlockNote's own blocks, plus four inline things
 // the server knows by other names (see editor/convert.ts): a mention, a task
-// chip, a decision chip and a link to a page.
+// chip, a decision chip and a link to a page; and a code style that other
+// styles and a link may wrap.
 
-import { BlockNoteSchema, defaultInlineContentSpecs } from "@blocknote/core";
+import {
+  BlockNoteSchema,
+  createStyleSpecFromTipTapMark,
+  defaultInlineContentSpecs,
+  defaultStyleSpecs,
+} from "@blocknote/core";
 import { UniqueID } from "@blocknote/core/extensions";
 import { createReactInlineContentSpec } from "@blocknote/react";
 import { newId } from "@/lib/ids";
@@ -45,6 +51,16 @@ const pageLink = createReactInlineContentSpec(
   { render: (p) => <PageChip docId={p.inlineContent.props.doc} editable={p.editor.isEditable} /> },
 );
 
+// BlockNote's code mark excludes every other formatting mark, the link
+// among them, but Markdown keeps "**bold `code` bold**" and "[`code`](url)"
+// (internal/md). The same mark, with its look, backtick input rule and
+// shortcut, excluding nothing, holds them.
+const code = createStyleSpecFromTipTapMark(
+  defaultStyleSpecs.code.implementation.mark.extend({ excludes: "" }),
+  "boolean",
+);
+
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: { ...defaultInlineContentSpecs, mention, taskChip, decisionChip, pageLink },
+  styleSpecs: { ...defaultStyleSpecs, code },
 });

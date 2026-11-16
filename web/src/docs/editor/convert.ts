@@ -68,13 +68,8 @@ const scalarText = (v: unknown, fallback = ""): string =>
 /**
  * Inline content for the editor. `rich` text also gets chips for the things it names
  * (editor/refs.ts).
- *
- * The editor's code mark (Tiptap's) excludes every other mark, the link among them, and a run
- * holding code with another mark stops the page from opening. Markdown keeps "**bold `code`**"
- * and "[`code`](url)" (internal/md); here code with marks around it shows as code alone, and
- * code in a link as the link's text, and an edit of the block stores it so.
  */
-function inlineIn(content: unknown, rich = true, inLink = false): unknown {
+function inlineIn(content: unknown, rich = true): unknown {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return [];
   const out: unknown[] = [];
@@ -82,11 +77,11 @@ function inlineIn(content: unknown, rich = true, inLink = false): unknown {
     if (!isObj(raw)) continue;
     const type = scalarText(raw.type, "text");
     if (type === "text") {
-      const styles = textStyles(raw.styles, inLink);
+      const styles = isObj(raw.styles) ? raw.styles : {};
       if (rich) out.push(...chipify(scalarText(raw.text), styles));
       else out.push({ type: "text", text: scalarText(raw.text), styles });
     } else if (type === "link") {
-      out.push({ type: "link", href: scalarText(raw.href), content: inlineIn(raw.content, false, true) });
+      out.push({ type: "link", href: scalarText(raw.href), content: inlineIn(raw.content, false) });
     } else if (TO_EDITOR[type] && isObj(raw.props)) {
       const prop = CHIP_PROP[type] as string;
       out.push({ type: TO_EDITOR[type], props: { [prop]: scalarText(raw.props[prop]).replace(/^@/, "") } });
@@ -95,15 +90,6 @@ function inlineIn(content: unknown, rich = true, inLink = false): unknown {
     }
   }
   return out;
-}
-
-/** A text run's styles as the editor can hold them (see inlineIn). */
-function textStyles(raw: unknown, inLink: boolean): Obj {
-  if (!isObj(raw)) return {};
-  if (!raw.code) return raw;
-  if (!inLink) return { code: true };
-  const { code: _code, ...rest } = raw;
-  return rest;
 }
 
 function tableIn(content: unknown): unknown {

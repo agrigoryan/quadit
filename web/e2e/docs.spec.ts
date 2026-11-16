@@ -90,3 +90,29 @@ test("a database column is resized from the keyboard and keeps its width", async
   await page.reload();
   await expect(handle).toHaveAttribute("aria-valuenow", String(start + 50));
 });
+
+// Markdown keeps bold around code and code in a link; so does the page's
+// editor: a word typed in the same paragraph saves it, and the bold and the
+// link are still around the code when the page is read back as Markdown.
+test("bold around code and code in a link stay through an edit in the browser", async ({ page, project, quadit }) => {
+  const markdown = "Some **bold `code` bold** and [`code`](https://example.com) here.\n";
+  const made = JSON.parse(
+    await quadit.cli("--json", "do", "doc.create", JSON.stringify({ title: "Styles", project: project.key, markdown })),
+  ) as { ref: string };
+  const bold = "**bold** **`code`** **bold**";
+  const link = "[`code`](https://example.com)";
+  expect(await quadit.cli("doc", made.ref)).toContain(`Some ${bold} and ${link} here.`);
+
+  await page.goto(`/e2e/docs/${made.ref}`);
+  const text = page.getByRole("textbox", { name: "Page text" });
+  await expect(text.getByRole("link", { name: "code" })).toBeVisible();
+  await text.getByText("here.").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Saved.");
+  await expect.poll(() => quadit.cli("doc", made.ref)).toContain(`Some ${bold} and ${link} here. Saved.`);
+
+  await page.reload();
+  await expect(text.getByText("Saved.")).toBeVisible();
+  await expect(text.getByRole("link", { name: "code" })).toBeVisible();
+  expect(await quadit.cli("doc", made.ref)).toContain(`Some ${bold} and ${link} here. Saved.`);
+});
