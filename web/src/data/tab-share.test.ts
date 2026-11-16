@@ -187,6 +187,19 @@ describe("park", () => {
     expect(b.heard).toEqual(["back"]);
   });
 
+  it("a tab that has left stays gone: unparked afterwards it neither hears nor leads", async () => {
+    const [a, b] = [tab(), tab()];
+    await settle();
+    b.park();
+    b.leave();
+    b.unpark();
+    a.post("to nobody");
+    a.leave();
+    await later(30_000);
+    expect(b.heard).toEqual([]);
+    expect(b.leads).toBe(false);
+  });
+
   it("a parked tab says nothing, and once unparked is heard again", async () => {
     const [a, b] = [tab(), tab()];
     await settle();

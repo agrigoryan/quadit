@@ -163,7 +163,8 @@ export function join<M>(name: string, handlers: TabHandlers<M>): TabShare<M> {
       handlers.onFollow();
     },
     unpark() {
-      if (!parked) return;
+      // A tab that has left stays gone.
+      if (!parked || left) return;
       parked = false;
       channel = listen();
       ask();
@@ -201,7 +202,7 @@ function alone<M>(handlers: TabHandlers<M>): TabShare<M> {
       handlers.onFollow();
     },
     unpark() {
-      if (!parked) return;
+      if (!parked || left) return;
       parked = false;
       lead();
     },
