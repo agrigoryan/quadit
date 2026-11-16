@@ -103,3 +103,23 @@ func TestAPageLinkedToATaskIsSeenFromBothSides(t *testing.T) {
 		}
 	})
 }
+
+// TestAnAgentLinksAPageFromTheCommandLine: quadit link KEY page=ID links a
+// page to a task, and the agent then reads it on the task and in its
+// context pack, as a page it may see.
+func TestAnAgentLinksAPageFromTheCommandLine(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		narrow := oneProjectOnly(t, s)
+		handbook := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "how we work\n"})["ref"].(string)
+		if out, code := s.quadit(narrow, "link", "SVA-1", "page="+handbook); code != 0 {
+			t.Fatalf("quadit link SVA-1 page=ID failed (%d): %s", code, out)
+		}
+		if out, _ := s.quadit(narrow, "show", "SVA-1"); !strings.Contains(out, "page Handbook") {
+			t.Fatalf("the task does not show the page linked to it: %s", out)
+		}
+		if out, _ := s.quadit(narrow, "context", "SVA-1"); !strings.Contains(out, "Handbook") {
+			t.Fatalf("the context pack does not name the page linked to the task: %s", out)
+		}
+	})
+}

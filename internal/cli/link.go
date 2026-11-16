@@ -1,4 +1,4 @@
-// The link command: tying a git branch, or a URL, to a task.
+// The link command: tying a git branch, a URL or a page to a task.
 
 package cli
 
@@ -35,9 +35,16 @@ func gitAnswer(ctx context.Context, args ...string) string {
 
 // link ties the git branch in the current directory to a task: its name,
 // its commits ahead of the main branch, and whether it is merged. It needs
-// no hosting service, only a local repository.
+// no hosting service, only a local repository. Given a URL, or page=ID, it
+// links that instead.
 func (r *runner) link(in input) error {
 	pos := in.pos
+	if page := in.f["page"]; len(page) > 0 {
+		if len(pos) != 1 {
+			return errors.New("name the task: quadit link KEY page=ID")
+		}
+		return r.change("link.set", map[string]any{"task": pos[0], "kind": "doc", "ref": page[0]}, in.approval)
+	}
 	if len(pos) == 2 && strings.Contains(pos[1], "://") {
 		return r.change("link.set", map[string]any{"task": pos[0], "kind": "url", "url": pos[1]}, in.approval)
 	}
