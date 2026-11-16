@@ -19,5 +19,15 @@ export default defineConfig({
     // The app's service worker would answer from its cache; the tests want the server.
     serviceWorkers: "block",
   },
-  projects: [{ name: "chromium" }],
+  projects: [
+    { name: "chromium", testIgnore: /bfcache\.spec\.ts/ },
+    {
+      // Chromium with its back/forward cache, which Playwright turns off by
+      // default. The headless shell has none; Chromium's new headless mode
+      // (channel "chromium") has it, headed or not.
+      name: "chromium-bfcache",
+      testMatch: /bfcache\.spec\.ts/,
+      use: { channel: "chromium", launchOptions: { ignoreDefaultArgs: ["--disable-back-forward-cache"] } },
+    },
+  ],
 });
