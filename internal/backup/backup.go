@@ -34,11 +34,14 @@ type Entry struct {
 // Manifest is the last member of an archive. It lists the others with
 // their checksums, so an archive can be verified without restoring it.
 type Manifest struct {
-	Format    int     `json:"format"`
-	CreatedAt int64   `json:"created_at"`
-	Version   string  `json:"version"`
-	Database  string  `json:"database"`
-	Entries   []Entry `json:"entries"`
+	Format    int    `json:"format"`
+	CreatedAt int64  `json:"created_at"`
+	Version   string `json:"version"`
+	Database  string `json:"database"`
+	// Schema is the schema version of the database the archive was made
+	// from; 0 in an archive made before it was recorded.
+	Schema  int     `json:"schema,omitempty"`
+	Entries []Entry `json:"entries"`
 }
 
 // skipPrefixes are stored objects that are not users' files.
@@ -46,7 +49,11 @@ var skipPrefixes = []string{"backups/", "probe/"}
 
 // Write makes an archive of everything.
 func Write(ctx context.Context, st store.Store, files blob.Store, version string, w io.Writer) (Manifest, error) {
-	aw := &archiveWriter{m: Manifest{Format: 1, CreatedAt: time.Now().UnixMilli(), Version: version, Database: st.Dialect()}}
+	schema, err := st.SchemaVersion(ctx)
+	if err != nil {
+		return Manifest{}, err
+	}
+	aw := &archiveWriter{m: Manifest{Format: 1, CreatedAt: time.Now().UnixMilli(), Version: version, Database: st.Dialect(), Schema: schema}}
 	gz := gzip.NewWriter(w)
 	aw.tw = tar.NewWriter(gz)
 	// Tables first, in an order that can be loaded back.
@@ -314,14 +321,18 @@ func lines(body io.Reader, batch int, flush func([]map[string]any) error) error 
 	return flush(rows)
 }
 
-// Restore loads an archive into an empty database and file store.
+// Restore loads an archive into an empty database and file store. The rows
+// of an archive made at an older schema version are then changed as the
+// upgrades since would have changed them in a database of that version
+// (store.UpgradeLoaded): a repair an upgrade made is not undone by a
+// restore.
 func Restore(ctx context.Context, st store.Store, files blob.Store, r io.Reader) (Manifest, error) {
 	if n, err := st.Count(ctx, "users"); err != nil {
 		return Manifest{}, err
 	} else if n > 0 {
 		return Manifest{}, errors.New("this database already has data; a full restore goes into an empty one (to bring back one task or page, name it)")
 	}
-	return read(r, func(name string, body io.Reader) error {
+	m, err := read(r, func(name string, body io.Reader) error {
 		if key, ok := strings.CutPrefix(name, "files/"); ok {
 			return files.Put(ctx, key, body, "")
 		}
@@ -346,6 +357,13 @@ func Restore(ctx context.Context, st store.Store, files blob.Store, r io.Reader)
 			return st.Load(ctx, table, rows)
 		})
 	})
+	if err != nil {
+		return m, err
+	}
+	if err := st.UpgradeLoaded(ctx, m.Schema); err != nil {
+		return m, fmt.Errorf("bringing the archive's rows up to this version: %w", err)
+	}
+	return m, nil
 }
 
 // Item names one task or page to bring back from an archive.

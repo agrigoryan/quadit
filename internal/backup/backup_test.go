@@ -235,3 +235,104 @@ func TestRestoreOneTask(t *testing.T) {
 		}
 	})
 }
+
+// TestRestoreKeepsWhatTheUpgradesRepaired: a restore leaves the rows as an
+// upgrade would. An archive made at schema version 7 can hold a page that
+// stayed everyone's under a page made private after it, which version 8
+// repaired; restored now, that page is private the same way, and search
+// keeps it to its readers. An archive made at the newest version is not
+// repaired again: a page under a private page made everyone's on purpose
+// stays everyone's.
+func TestRestoreKeepsWhatTheUpgradesRepaired(t *testing.T) {
+	ctx := context.Background()
+	apply := func(t *testing.T, e *engine.Engine, ws core.Workspace, actor, typ string, args M) string {
+		t.Helper()
+		raw, _ := json.Marshal(args)
+		res, err := e.Apply(ctx, ws.ID, engine.Actor{UserID: actor}, engine.Change{ID: id.New(), Type: typ, Args: raw})
+		if err != nil {
+			t.Fatalf("%s: %v", typ, err)
+		}
+		return res.Ref
+	}
+	start := func(t *testing.T, st store.Store) (*engine.Engine, core.Workspace, core.User) {
+		t.Helper()
+		e := engine.New(st, nil)
+		ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", OwnerHandle: "aram", WorkspaceSlug: "games", WorkspaceName: "Games"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e, ws, owner
+	}
+	// restored restores an archive onto every kind of database and checks
+	// each with check.
+	restored := func(t *testing.T, archive []byte, ws core.Workspace, check func(t *testing.T, db store.DB)) {
+		t.Helper()
+		testdb.Each(t, func(t *testing.T, dst store.Store) {
+			files, _ := blob.NewDisk(t.TempDir())
+			if _, err := backup.Restore(ctx, dst, files, bytes.NewReader(archive)); err != nil {
+				t.Fatal(err)
+			}
+			if err := engine.New(dst, nil).Reindex(ctx, ws.ID); err != nil {
+				t.Fatal(err)
+			}
+			check(t, dst.In(ws.ID))
+		})
+	}
+	page := func(t *testing.T, db store.DB, id string) core.Doc {
+		t.Helper()
+		var doc core.Doc
+		if err := db.Get(ctx, &doc, store.Eq("id", id)); err != nil {
+			t.Fatal(err)
+		}
+		return doc
+	}
+
+	t.Run("an archive from version 7", func(t *testing.T) {
+		testdb.EachAt(t, 7, func(t *testing.T, src store.Store) {
+			e, ws, owner := start(t, src)
+			other := apply(t, e, ws, owner.ID, "agent.create", M{"name": "Other", "handle": "other"})
+			root := apply(t, e, ws, owner.ID, "doc.create", M{"title": "Plans"})
+			child := apply(t, e, ws, owner.ID, "doc.create", M{"parent": root, "title": "Quarter one", "markdown": "quokka\n"})
+			// What making a page private did before version 8: the page alone.
+			if _, err := src.Update(ctx, "docs", map[string]any{"owner_id": owner.ID}, store.Eq("id", root)); err != nil {
+				t.Fatal(err)
+			}
+			files, _ := blob.NewDisk(t.TempDir())
+			var archive bytes.Buffer
+			m, err := backup.Write(ctx, src, files, "test", &archive)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if m.Schema != 7 {
+				t.Fatalf("the archive records schema version %d, want 7", m.Schema)
+			}
+			restored(t, archive.Bytes(), ws, func(t *testing.T, db store.DB) {
+				if doc := page(t, db, child); doc.OwnerID != owner.ID {
+					t.Errorf("the page under the private page is restored as owned by %q, want the private page's owner", doc.OwnerID)
+				}
+				if hits, err := db.Search(ctx, store.SearchQuery{Text: "quokka", Viewer: other}); err != nil || len(hits) != 0 {
+					t.Errorf("another member finds the page under the private page: %v, %v", hits, err)
+				}
+			})
+		})
+	})
+
+	t.Run("an archive from the newest version", func(t *testing.T) {
+		testdb.Each(t, func(t *testing.T, src store.Store) {
+			e, ws, owner := start(t, src)
+			root := apply(t, e, ws, owner.ID, "doc.create", M{"title": "Plans", "private": true})
+			child := apply(t, e, ws, owner.ID, "doc.create", M{"parent": root, "title": "Quarter one"})
+			apply(t, e, ws, owner.ID, "doc.update", M{"id": child, "private": false})
+			files, _ := blob.NewDisk(t.TempDir())
+			var archive bytes.Buffer
+			if _, err := backup.Write(ctx, src, files, "test", &archive); err != nil {
+				t.Fatal(err)
+			}
+			restored(t, archive.Bytes(), ws, func(t *testing.T, db store.DB) {
+				if doc := page(t, db, child); doc.OwnerID != "" {
+					t.Errorf("a page made everyone's on purpose is restored as owned by %q", doc.OwnerID)
+				}
+			})
+		})
+	})
+}

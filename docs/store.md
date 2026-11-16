@@ -35,6 +35,15 @@ repair of rows already stored, which runs once, on the upgrade, after the copy i
 `0008_private_sub_pages` gives the pages under a private page its owner and sharing, which
 they lacked when the page was made private after them.
 
+A full restore loads an archive's rows into a database already at the newest schema, so
+no upgrade runs on them. An archive records the schema version it was made at (`schema`
+in its manifest), and after loading, `UpgradeLoaded` runs again every statement of the
+later versions that changes rows (`UPDATE`, `INSERT`, `DELETE`, or `WITH` ahead of one),
+leaving out those that change the schema: the restored rows read as an upgrade would have
+left them, from the same SQL. An archive made before the version was recorded gets every
+one of them, as a page kept from someone wrongly is better than one shown wrongly. A
+statement that changes rows must therefore still run on the newest schema.
+
 ### What goose is given
 
 goose reads plain SQL, one file per version. `migration_files.go` makes those files in

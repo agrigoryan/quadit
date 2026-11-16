@@ -10,7 +10,8 @@
 //	Tx     the DB of one write to one workspace, inside Store.Write: it
 //	       hands out the workspace's event numbers and stores events.
 //	Store  one database: a DB that sees every row, plus Write and Atomic
-//	       (transactions), Dump, Load and Overwrite (backups), and In.
+//	       (transactions), Dump, Load, Overwrite, SchemaVersion and
+//	       UpgradeLoaded (backups), and In.
 //
 // In(workspaceID) returns a DB bound to that workspace, and that is the
 // guarantee the rest of the code relies on: every statement it runs on a
@@ -223,6 +224,13 @@ type Store interface {
 	// Overwrite sets the matching rows to what an archive row says, leaving
 	// the columns named in keep as they are.
 	Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...Cond) error
+	// SchemaVersion is the schema version the database is at, which an
+	// archive records.
+	SchemaVersion(ctx context.Context) (int, error)
+	// UpgradeLoaded does to rows loaded from an archive made at schema
+	// version from what the upgrades since did to stored rows, so they read
+	// as an upgrade would have left them. From 0 does all of it.
+	UpgradeLoaded(ctx context.Context, from int) error
 }
 
 // TaskFilter selects tasks. Conditions combine with AND; inside a list, OR.

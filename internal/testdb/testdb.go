@@ -27,7 +27,14 @@ import (
 // Each runs fn once per database kind, as a subtest named after it.
 func Each(t *testing.T, fn func(t *testing.T, st store.Store)) {
 	t.Helper()
-	t.Run("sqlite", func(t *testing.T) { fn(t, SQLite(t)) })
+	EachAt(t, 0, fn)
+}
+
+// EachAt is Each with the schema at a version (0 = the newest), standing
+// in for an older binary's database.
+func EachAt(t *testing.T, version int, fn func(t *testing.T, st store.Store)) {
+	t.Helper()
+	t.Run("sqlite", func(t *testing.T) { fn(t, sqliteAt(t, version)) })
 	t.Run("postgres", func(t *testing.T) {
 		url := os.Getenv("QUADIT_TEST_POSTGRES")
 		if url == "" {
@@ -46,7 +53,7 @@ func Each(t *testing.T, fn func(t *testing.T, st store.Store)) {
 		if strings.Contains(url, "?") {
 			sep = "&"
 		}
-		st, err := postgres.Open(ctx, url+sep+"search_path="+schema)
+		st, err := postgres.OpenAt(ctx, url+sep+"search_path="+schema, version)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,7 +73,13 @@ func Each(t *testing.T, fn func(t *testing.T, st store.Store)) {
 // SQLite opens a fresh SQLite database in a temporary directory.
 func SQLite(t *testing.T) store.Store {
 	t.Helper()
-	st, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "quadit.sqlite"))
+	return sqliteAt(t, 0)
+}
+
+// sqliteAt is SQLite with the schema at a version (0 = the newest).
+func sqliteAt(t *testing.T, version int) store.Store {
+	t.Helper()
+	st, err := sqlite.OpenAt(context.Background(), filepath.Join(t.TempDir(), "quadit.sqlite"), version)
 	if err != nil {
 		t.Fatal(err)
 	}
