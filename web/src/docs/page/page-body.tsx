@@ -58,6 +58,8 @@ export function PageBody({ doc, compact }: Props) {
         // The task panel over the page has Ctrl+M for the task's own comment box.
         if (!e.ctrlKey || e.metaKey || overlayOpen() || document.querySelector("[data-task-panel]")) return;
         e.preventDefault();
+        // Already writing a comment: a new thread's draft would be thrown away.
+        if (e.target instanceof Element && e.target.closest("[data-comments]")) return;
         if (block && mayEdit && !isDatabase) pageUi.startThread(block);
         else pageUi.commentOnPage();
       },

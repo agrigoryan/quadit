@@ -109,6 +109,7 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
 
   return (
     <aside
+      data-comments
       aria-label={t("docs.comment.title")}
       className="absolute inset-y-0 right-0 z-20 flex w-[min(22rem,100%)] shrink-0 flex-col border-l border-line bg-surface shadow-panel animate-panel xl:static xl:z-auto xl:w-80 xl:animate-none xl:shadow-none"
     >

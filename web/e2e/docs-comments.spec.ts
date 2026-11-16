@@ -207,6 +207,20 @@ test("Ctrl+M starts a comment on the block at the caret, or with no caret on the
   await expect(sheet.getByText("Close the comments")).toBeVisible();
 });
 
+test("Ctrl+M in a comment box leaves what is being written alone", async ({ page, project, quadit }) => {
+  const doc = await newPage(quadit, project.key, "Drafts", "First line.\n\nSecond line.\n");
+  await page.goto(`/e2e/docs/${doc.id}`);
+
+  await caretIn(page, "Second line.");
+  await page.keyboard.press("Control+m");
+  const draft = column(page).getByRole("textbox", { name: "Comment on this block…" });
+  await expect(draft).toBeFocused();
+  await page.keyboard.type("Half a thought");
+  await page.keyboard.press("Control+m");
+  await expect(draft).toBeFocused();
+  await expect(draft).toHaveValue("Half a thought");
+});
+
 test("a read-only member reads a page's comments and has no way to add one", async ({
   browser,
   page: ownerPage,
