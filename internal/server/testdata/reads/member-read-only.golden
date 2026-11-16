@@ -27028,12 +27028,6 @@ Reds and golds.
    }
   ]
  },
- "health": {
-  "deliveries_dead": 0,
-  "deliveries_pending": 0,
-  "sources_failing": 0,
-  "webhooks_failing": 0
- },
  "preferences": [
   {
    "body": "Rotate keys monthly.",
@@ -27184,8 +27178,6 @@ DEL Todo: 1
 == agents
 @artist  working SVA-1
 @ops  working 
-== health
-{"deliveries_dead":0,"deliveries_pending":0,"sources_failing":0,"webhooks_failing":0}
 
 === GET /api/v1/w/games/dashboard?project=SVA
 200
@@ -27358,12 +27350,6 @@ DEL Todo: 1
    }
   ]
  },
- "health": {
-  "deliveries_dead": 0,
-  "deliveries_pending": 0,
-  "sources_failing": 0,
-  "webhooks_failing": 0
- },
  "preferences": [
   {
    "body": "Explosions are ring-shaped.",
@@ -27439,8 +27425,6 @@ SVA Done: 1
 == agents
 @artist  working SVA-1
 @ops  idle 
-== health
-{"deliveries_dead":0,"deliveries_pending":0,"sources_failing":0,"webhooks_failing":0}
 
 === GET /api/v1/w/games/dashboard?project=OPS
 200
@@ -27621,12 +27605,6 @@ SVA Done: 1
    }
   ]
  },
- "health": {
-  "deliveries_dead": 0,
-  "deliveries_pending": 0,
-  "sources_failing": 0,
-  "webhooks_failing": 0
- },
  "preferences": [
   {
    "body": "Rotate keys monthly.",
@@ -27724,8 +27702,6 @@ OPS Done: 1
 == agents
 @artist  idle 
 @ops  working OPS-1
-== health
-{"deliveries_dead":0,"deliveries_pending":0,"sources_failing":0,"webhooks_failing":0}
 
 === GET /api/v1/w/games/dashboard?project=ARC
 200
@@ -27858,12 +27834,6 @@ OPS Done: 1
     "week": "<week-0>"
    }
   ]
- },
- "health": {
-  "deliveries_dead": 0,
-  "deliveries_pending": 0,
-  "sources_failing": 0,
-  "webhooks_failing": 0
  },
  "preferences": [
   {

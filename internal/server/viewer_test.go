@@ -352,6 +352,48 @@ func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
 	})
 }
 
+// TestTheDashboardTellsOnlyAdminsOfTheWholeWorkspaceItsHealth: failing
+// webhooks, lost deliveries, the last backup and failing page sources are
+// for those who run the workspace. Anyone else's dashboard has no health
+// part at all, in neither form: an empty one would read as all well.
+func TestTheDashboardTellsOnlyAdminsOfTheWholeWorkspaceItsHealth(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		s.change(s.owner, "", "agent.create", M{"name": "Plain", "handle": "plain"})
+		var plain struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@plain"}, 201, &plain)
+		callers["a member who is no admin"] = plain.Token
+
+		for _, path := range []string{"/dashboard", "/dashboard?project=SVA"} {
+			var board map[string]json.RawMessage
+			s.call(s.owner, "", "GET", w+path, nil, 200, &board)
+			if text := s.call(s.owner, "", "GET", w+textForm(path), nil, 200, nil); !strings.Contains(string(board["health"]), "webhooks_failing") || !strings.Contains(text, "== health\n{") {
+				t.Fatalf("%s does not tell the owner the health: %s\n%s", path, board["health"], text)
+			}
+			for who, token := range callers {
+				board = nil
+				s.call(nil, token, "GET", w+path, nil, 200, &board)
+				text := s.call(nil, token, "GET", w+textForm(path), nil, 200, nil)
+				if _, there := board["health"]; there || strings.Contains(text, "health") || strings.Contains(text, "webhooks_failing") {
+					t.Errorf("%s tells %s the health: %s\n%s", path, who, board["health"], text)
+				}
+				if _, there := board["epics"]; !there || !strings.Contains(text, "== agents") {
+					t.Errorf("%s does not give %s the rest of the dashboard: %s", path, who, text)
+				}
+			}
+		}
+	})
+}
+
+// textForm is a path with format=text added to its query.
+func textForm(path string) string {
+	if strings.Contains(path, "?") {
+		return path + "&format=text"
+	}
+	return path + "?format=text"
+}
+
 // TestListedAttachmentsFollowTheirPage: /list/attachments gives a file on
 // a page only to those who may see the page. One on someone's private
 // page, or on a page of a project the caller may not read, is not listed.

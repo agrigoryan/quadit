@@ -85,7 +85,7 @@ var tools = []tool{
 			"ask": "@handle of whom to ask; by default the person responsible for me", "dry_run": "true",
 			"id": "a UUID you make for this question; sending the same id again does nothing twice"},
 		Run: toolAsk},
-	{Name: "dashboard", Desc: "Where everything stands: what waits on me, epics with progress, flow, agents, recent decisions, health.", Props: map[string]string{"project": "project key"}, Run: readPathTool("/dashboard")},
+	{Name: "dashboard", Desc: "Where everything stands: what waits on me, epics with progress, flow, agents, recent decisions, and for an admin of the whole workspace its health.", Props: map[string]string{"project": "project key"}, Run: readPathTool("/dashboard")},
 	{Name: "agents", Desc: "What every agent is doing now, what it holds, and whether anything is listening for it.", Run: readPathTool("/agents")},
 	{Name: "render", Desc: "A picture of a task or a page as a person sees it, to check how work looks. Give task or doc.",
 		Props: map[string]string{"task": "task key", "doc": "page id", "width": "390 for a phone, 1280 (default) for a desktop", "theme": "light or dark"},

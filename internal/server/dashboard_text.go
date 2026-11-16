@@ -10,9 +10,9 @@ import (
 )
 
 // dashboardText is the dashboard in the compact text form: what waits on
-// the caller, epics, tasks by status, the longest waits, agents and health.
+// the caller, epics, tasks by status, the longest waits, agents and, for a
+// viewer it is for, health.
 func (d *dashboard) dashboardText() string {
-	raw := plainjson.Marshal(d.machinery)
 	var b strings.Builder
 	fmt.Fprintf(&b, "== waiting on you (%d)\n%s", len(d.waiting), lines(d.waiting, taskView.line, "nothing"))
 	b.WriteString("== epics\n")
@@ -40,6 +40,8 @@ func (d *dashboard) dashboardText() string {
 	for _, a := range d.agents {
 		fmt.Fprintf(&b, "%s  %s %s\n", a.Handle, strings.ReplaceAll(a.State, "_", " "), a.Task)
 	}
-	fmt.Fprintf(&b, "== health\n%s\n", raw)
+	if d.machinery != nil {
+		fmt.Fprintf(&b, "== health\n%s\n", plainjson.Marshal(d.machinery))
+	}
 	return b.String()
 }

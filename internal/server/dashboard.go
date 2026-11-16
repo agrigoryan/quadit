@@ -16,15 +16,16 @@ import (
 // dashboardRoutes are the routes of the dashboard and its parts.
 func (s *Server) dashboardRoutes() []route {
 	return []route{
-		{"GET /api/v1/w/{ws}/dashboard", s.workspaceMember(s.handleShowDashboard), "Where everything stands: waiting on me, epics with progress, flow, agents, recent decisions, health.", "project: key", "oversight"},
+		{"GET /api/v1/w/{ws}/dashboard", s.workspaceMember(s.handleShowDashboard), "Where everything stands: waiting on me, epics with progress, flow, agents, recent decisions, and for an admin of the whole workspace its health.", "project: key", "oversight"},
 		{"GET /api/v1/w/{ws}/cycles/{id}/chart", s.workspaceMember(s.handleShowCycleChart), "A cycle's scope against done, day by day.", "", "oversight"},                 // dashboard_cycle.go
 		{"GET /api/v1/w/{ws}/agents", s.workspaceMember(s.handleListAgents), "What every agent is doing now, and whether anything is listening for it.", "", "oversight"}, // dashboard_agents.go
 	}
 }
 
 // handleShowDashboard is where everything stands, in one call: what waits on the
-// caller, epics, flow, agents, recent decisions and the health of the
-// machinery. project=KEY narrows it to one project.
+// caller, epics, flow, agents, recent decisions and, for an admin of the
+// whole workspace, the health of the machinery. project=KEY narrows it to
+// one project.
 func (s *Server) handleShowDashboard(x *c) error {
 	d, err := x.dashboard(x.ctx(), x.r.URL.Query().Get("project"))
 	if err != nil {
@@ -60,7 +61,7 @@ type dashboard struct {
 	agents    []agentState
 	decided   []decisionView // the latest answered decisions
 	prefs     []core.Preference
-	machinery map[string]any // what is failing behind the scenes
+	machinery map[string]any // what is failing behind the scenes; nil when that is not for the viewer
 }
 
 // dashboard builds the dashboard of the projects the viewer may read, or of
@@ -106,9 +107,10 @@ func (who *viewer) dashboard(ctx context.Context, projectRef string) (*dashboard
 	return d, nil
 }
 
-// answer is the dashboard as it is sent.
+// answer is the dashboard as it is sent. It has a "health" only for a
+// viewer the health is for: none is not the same as nothing failing.
 func (d *dashboard) answer() map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"waiting_on_me":    d.waiting,
 		"asked_of_me":      d.asked,
 		"epics":            d.epics,
@@ -116,8 +118,11 @@ func (d *dashboard) answer() map[string]any {
 		"agents":           d.agents,
 		"recent_decisions": d.decided,
 		"preferences":      d.prefs,
-		"health":           d.machinery,
 	}
+	if d.machinery != nil {
+		out["health"] = d.machinery
+	}
+	return out
 }
 
 // waitingOnMe fills in what waits on the caller: tasks and the questions

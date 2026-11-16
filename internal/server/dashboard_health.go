@@ -11,9 +11,15 @@ import (
 )
 
 // health fills in what is failing behind the scenes: webhooks, their
-// deliveries, the last backup, and pages synced from a repository.
+// deliveries, the last backup, and pages synced from a repository. It is
+// for those who run the whole workspace: an admin not limited to some
+// projects. For anyone else it is left out (machinery stays nil), since
+// the numbers are the workspace's, whatever the dashboard was asked for.
 func (d *dashboard) health() error {
 	who, ctx := d.who, d.ctx
+	if who.admin() != nil || who.limited() {
+		return nil
+	}
 	health := map[string]any{}
 	var err error
 	if health["webhooks_failing"], err = who.db.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0)); err != nil {
