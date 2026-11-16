@@ -13,7 +13,7 @@ const ROWS = ["a", "b", "c"];
 
 interface ListProps {
   onOpen: (row: string, as: OpenAs) => void;
-  onArchive: (row: string) => void;
+  onArchive: (row: string, e: KeyboardEvent) => void;
   /** Archiving takes the row off the list, as the inbox does. */
   removes?: boolean;
 }
@@ -32,8 +32,8 @@ function List({ onOpen, onArchive, removes }: ListProps) {
           onOpen(row, as);
           if (as === "peek") setPeeked(row);
         }}
-        onArchive={(row) => {
-          onArchive(row);
+        onArchive={(row, e) => {
+          onArchive(row, e);
           if (removes) setRows((all) => all.filter((r) => r !== row));
         }}
       />
@@ -51,7 +51,7 @@ function Rows({
   rows: string[];
   scroller: RefObject<HTMLDivElement | null>;
   onOpen: (row: string, as: OpenAs) => void;
-  onArchive: (row: string) => void;
+  onArchive: (row: string, e: KeyboardEvent) => void;
 }) {
   const focusId = useListKeys({
     rows,
@@ -76,7 +76,7 @@ function Rows({
 let step = 0;
 function renderList({ removes = false } = {}) {
   const onOpen = vi.fn<(row: string, as: OpenAs) => void>();
-  const onArchive = vi.fn<(row: string) => void>();
+  const onArchive = vi.fn<(row: string, e: KeyboardEvent) => void>();
   step += 1;
   render(
     <MemoryRouter initialEntries={[{ pathname: "/inbox", key: `list${step}` }]}>
@@ -104,11 +104,20 @@ describe("useListKeys", () => {
     press("j");
     expect(current()).toBe("c");
     press("e");
-    expect(onArchive).toHaveBeenCalledWith("c");
+    expect(onArchive).toHaveBeenCalledWith("c", expect.objectContaining({ key: "e" }));
     press("Enter");
     expect(onOpen).toHaveBeenLastCalledWith("c", "page");
     press(" ");
     expect(onOpen).toHaveBeenLastCalledWith("c", "peek");
+  });
+
+  it("moves with the arrows as with J and K", () => {
+    renderList();
+    press("ArrowDown");
+    press("ArrowDown");
+    expect(current()).toBe("b");
+    press("ArrowUp");
+    expect(current()).toBe("a");
   });
 
   it("stays in place when the current row leaves the list, on the row that takes its place", () => {

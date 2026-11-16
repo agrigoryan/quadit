@@ -1,5 +1,6 @@
-// Keyboard focus for a page that is one flat run of rows: J and K move it,
-// Space shows the row's task in the panel, Enter opens the task's page.
+// Keyboard focus for a page that is one flat run of rows: J and K (or the
+// arrows) move it, Space shows the row's task in the panel, Enter opens the
+// task's page.
 // While the panel is open J and K move it along the rows, and Space puts it
 // away. The focus follows a row by its id, so rows arriving or leaving
 // while the page is open do not move it; left and come back to, the page is
@@ -22,8 +23,8 @@ interface Options<Row> {
   taskKeyOf: (row: Row) => string | undefined;
   /** The element that scrolls the rows. */
   scroller: RefObject<HTMLElement | null>;
-  /** More keys that act on the focused row ("e" archives it). */
-  keys?: Record<string, (row: Row) => void>;
+  /** More keys that act on the focused row ("e" archives it), by their names in hooks/hotkeys.ts. */
+  keys?: Record<string, (row: Row, e: KeyboardEvent) => void>;
 }
 
 /** Returns the id of the focused row, or null before the keyboard is used. */
@@ -63,9 +64,19 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
     return next;
   };
 
+  const down = (e: KeyboardEvent) => {
+    e.preventDefault(); // or the page scrolls too
+    move(1);
+  };
+  const up = (e: KeyboardEvent) => {
+    e.preventDefault();
+    move(index < 0 ? 1 : -1);
+  };
   const hotkeys: Hotkeys = {
-    j: () => move(1),
-    k: () => move(index < 0 ? 1 : -1),
+    j: down,
+    k: up,
+    ArrowDown: down,
+    ArrowUp: up,
     Enter: (e) => {
       if (!current || isOnControl(e)) return;
       e.preventDefault();
@@ -78,8 +89,8 @@ export function useListKeys<Row>({ rows, idOf, onOpen, taskKeyOf, scroller, keys
     },
   };
   for (const [key, run] of Object.entries(keys)) {
-    hotkeys[key] = () => {
-      if (current) run(current);
+    hotkeys[key] = (e) => {
+      if (current) run(current, e);
     };
   }
   useHotkeys(hotkeys);
