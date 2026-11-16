@@ -56,3 +56,15 @@ func TestEveryWorkspaceTableIsARowKindOrSaysWhereItIsRead(t *testing.T) {
 		}
 	}
 }
+
+// TestOnlyAKindWithARuleIsListedOrCopied: a kind of row with no rule for
+// who may see a row (exportOnly) is read by the export alone, which is the
+// whole workspace's: it is never given to /list or the starting copy, which
+// limited callers read.
+func TestOnlyAKindWithARuleIsListedOrCopied(t *testing.T) {
+	for _, kind := range rowKinds {
+		if kind.visible == nil && (kind.list != nil || kind.copyQuery != nil) {
+			t.Errorf("row kind %s has no rule for who may see its rows, and is listed or copied", kind.name)
+		}
+	}
+}

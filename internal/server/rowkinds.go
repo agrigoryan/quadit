@@ -18,15 +18,18 @@ import (
 // kind is one line there: its name, the rule for who may see a row of it,
 // and which of the three reads have it.
 //
-// The rule is not optional. /list and the starting copy read through
-// rowKind.read, which applies it; a kind cannot be given to a caller
-// limited to some projects without saying what such a caller may see of it.
+// The rule is not optional for what a caller limited to some projects may
+// be given: /list and the starting copy read through rowKind.read, which
+// applies it. A kind only the export reads (exportOnly) has none, as the
+// export is the whole workspace's and is refused to such a caller; it is
+// never listed or copied (TestOnlyAKindWithARuleIsListedOrCopied).
 type rowKind struct {
 	name string
 	row  reflect.Type // the row's type, a struct of core
 	// all reads the rows a query selects, as stored: a list of the row's type.
 	all func(ctx context.Context, db store.DB, q store.Q) (any, error)
-	// visible keeps, of a list all read, the rows the viewer may see.
+	// visible keeps, of a list all read, the rows the viewer may see; nil
+	// for a kind only the export reads.
 	visible func(ctx context.Context, who *viewer, rows any) any
 	// fill, when the kind has one, fills in what a row is shown with and is
 	// not stored: who answers for an agent, a file's address.
@@ -82,11 +85,7 @@ func kindOf[T any](name string, visible rule[T]) rowKind {
 	return rowKind{
 		name: name,
 		row:  reflect.TypeFor[T](),
-		all: func(ctx context.Context, db store.DB, q store.Q) (any, error) {
-			var rows []T
-			err := db.List(ctx, &rows, q)
-			return rows, err
-		},
+		all:  allRows[T],
 		visible: func(ctx context.Context, who *viewer, rows any) any {
 			kept := visible(ctx, who, rows.([]T))
 			if kept == nil {
@@ -95,6 +94,20 @@ func kindOf[T any](name string, visible rule[T]) rowKind {
 			return kept
 		},
 	}
+}
+
+// exportOnly makes a kind of rows of type T that only data/ of an export
+// holds, the rows q selects, as stored. It has no rule for who may see a
+// row, so it is never listed or put in the starting copy.
+func exportOnly[T any](name string, q store.Q) rowKind {
+	return rowKind{name: name, row: reflect.TypeFor[T](), all: allRows[T], exportQuery: &q}
+}
+
+// allRows reads the rows a query selects, as stored: a list of T.
+func allRows[T any](ctx context.Context, db store.DB, q store.Q) (any, error) {
+	var rows []T
+	err := db.List(ctx, &rows, q)
+	return rows, err
 }
 
 // filled is a kind whose rows are filled in by fill after they are read.
@@ -191,18 +204,6 @@ func onEpic[T any](epicOf func(T) string) rule[T] {
 	}
 }
 
-// wholeOnly is the rule of a kind that is read only as part of the whole
-// workspace (an export): a viewer limited to some projects sees none of it.
-// A kind gets a rule of its own before it is listed or copied.
-func wholeOnly[T any]() rule[T] {
-	return func(_ context.Context, who *viewer, rows []T) []T {
-		if who.limited() {
-			return nil
-		}
-		return rows
-	}
-}
-
 // live selects the rows not in the trash, in an order.
 func live(order string) store.Q { return store.Q{Where: []store.Cond{store.Live}, Order: order} }
 
@@ -237,19 +238,19 @@ var rowKinds = []rowKind{
 		listed("starts_on").copied(toEveryone(live("starts_on"))).exported(live("")),
 	kindOf("decisions", onTask(func(d core.Decision) string { return d.TaskID })).
 		copied(toEveryone(live("created_seq"))).exported(live("created_seq")),
-	kindOf("decision_options", wholeOnly[core.Option]()).exported(live("rank")),
-	kindOf("comments", wholeOnly[core.Comment]()).exported(live("created_seq")),
+	exportOnly[core.Option]("decision_options", live("rank")),
+	exportOnly[core.Comment]("comments", live("created_seq")),
 	kindOf("relations", rule[core.Relation](visibleRelations)).
 		listedBy(relationsQuery).copied(toEveryone(store.Q{})).exported(store.Q{}),
 	kindOf("links", onTask(func(l core.TaskLink) string { return l.TaskID })).
 		listed("created_at,id").exported(live("")),
 	filled(kindOf("attachments", rule[core.Attachment](visibleAttachments)), fillAttachments).
 		listedBy(attachmentsQuery).exported(live("")),
-	kindOf("files", wholeOnly[core.File]()).exported(live("")),
+	exportOnly[core.File]("files", live("")),
 	kindOf("docs", ifViewer((*viewer).canSeeDoc)).
 		copied(toEveryone(live("rank"))).exported(live("rank")),
-	kindOf("blocks", wholeOnly[core.Block]()).exported(live("rank")),
-	kindOf("properties", wholeOnly[core.DBProperty]()).exported(live("rank")),
+	exportOnly[core.Block]("blocks", live("rank")),
+	exportOnly[core.DBProperty]("properties", live("rank")),
 	kindOf("preferences", ofProject(func(p core.Preference) string { return p.ProjectID })).
 		listed("created_at").copied(toEveryone(live(""))).exported(live("")),
 	kindOf("views", ifViewer((*viewer).canSeeView)).
