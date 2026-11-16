@@ -477,6 +477,9 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 	return nil
 }
 
+// commentDelete moves a comment to the trash. The thread a first comment
+// started goes on without it: its first reply heads it, resolved or not as
+// the thread was, and the other replies answer that one.
 func commentDelete(c *cx, a idArgs) error {
 	cm, err := loadLive[core.Comment](c, "comment", "id", a.ID)
 	if err != nil {
@@ -492,5 +495,30 @@ func commentDelete(c *cx, a idArgs) error {
 	if err := c.tx.Unindex(c.ctx, cm.ID); err != nil {
 		return err
 	}
-	return c.trash(row)
+	if err := c.trash(row); err != nil {
+		return err
+	}
+	if cm.ParentID != "" {
+		return nil
+	}
+	var replies []core.Comment
+	if err := c.tx.List(c.ctx, &replies, store.Q{Where: []store.Cond{store.Eq("parent_id", cm.ID), store.Live}, Order: "created_seq"}); err != nil {
+		return err
+	}
+	for i, reply := range replies {
+		p := newPatch()
+		if i == 0 {
+			p.put("parent_id", reply.ParentID, "")
+			p.put("resolved_at", reply.ResolvedAt, cm.ResolvedAt)
+		} else {
+			p.put("parent_id", reply.ParentID, replies[0].ID)
+		}
+		moved := row
+		moved.id = reply.ID
+		if err := c.save(p, moved); err != nil {
+			return err
+		}
+	}
+	c.ref = cm.ID
+	return nil
 }

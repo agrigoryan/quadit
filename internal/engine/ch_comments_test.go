@@ -119,3 +119,44 @@ func TestAThreadIsResolvedThroughAnyOfItsComments(t *testing.T) {
 		}
 	})
 }
+
+// TestAThreadOutlivesItsFirstComment: deleting the comment that started a
+// thread leaves the replies as the thread, on what it was on: the first
+// reply heads it, with the thread's resolved state, and the rest answer it.
+func TestAThreadOutlivesItsFirstComment(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		page := w.do(w.owner.ID, "doc.create", M{"title": "Art notes", "markdown": "The ring is thin.\n"}).Ref
+		var block core.Block
+		if err := w.db().Get(context.Background(), &block, store.Eq("doc_id", page)); err != nil {
+			t.Fatal(err)
+		}
+		helper := w.agent("helper")
+		root := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block.ID, "body": "Is the ring right?"}).Ref
+		first := w.do(helper, "comment.create", M{"parent": root, "body": "It is."}).Ref
+		second := w.do(w.owner.ID, "comment.create", M{"parent": root, "body": "Thanks."}).Ref
+		w.do(w.owner.ID, "comment.update", M{"id": root, "resolved": true})
+		w.do(w.owner.ID, "comment.delete", M{"id": root})
+
+		comment := func(ref string) core.Comment {
+			t.Helper()
+			var cm core.Comment
+			if err := w.db().Get(context.Background(), &cm, store.Eq("id", ref)); err != nil {
+				t.Fatal(err)
+			}
+			return cm
+		}
+		head, rest := comment(first), comment(second)
+		if head.ParentID != "" || head.SubjectID != block.ID || head.ResolvedAt == 0 {
+			t.Errorf("the first reply does not head the thread on its block, resolved: %+v", head)
+		}
+		if rest.ParentID != first {
+			t.Errorf("the next reply answers %q, want the new head %q", rest.ParentID, first)
+		}
+		// The thread goes on: a reply to it joins the new head.
+		third := w.do(helper, "comment.create", M{"parent": second, "body": "Anytime."}).Ref
+		if got := comment(third).ParentID; got != first {
+			t.Errorf("a new reply answers %q, want %q", got, first)
+		}
+	})
+}
