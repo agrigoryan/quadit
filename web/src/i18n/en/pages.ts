@@ -176,6 +176,7 @@ export const pages = {
   "shortcuts.selectAll": "Task list, epic, cycle: select every task",
   "shortcuts.filter": "Task list and board: add a filter",
   "shortcuts.layout": "Task list and board: switch between the two",
+  "shortcuts.newPage": "New page; on a page a page inside it, on a database a row",
   "shortcuts.dbLayout": "Database: switch between its table and its board",
   "shortcuts.assignMe": "Assign to me, or take off me",
   "shortcuts.copyKey": "Copy the task's key",

@@ -108,7 +108,10 @@ const sections: Section[] = [
   {
     title: "shortcuts.group.docs",
     hint: "shortcuts.group.docsHint",
-    rows: [{ what: "shortcuts.dbLayout", keys: [`${MOD} B`] }],
+    rows: [
+      { what: "shortcuts.newPage", keys: ["N"] },
+      { what: "shortcuts.dbLayout", keys: [`${MOD} B`] },
+    ],
   },
   {
     title: "shortcuts.group.page",

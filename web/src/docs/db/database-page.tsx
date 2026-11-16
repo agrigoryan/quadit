@@ -48,7 +48,8 @@ const unsavedTable = (databaseId: string): DBView => ({
  * which row are open is in the address (?v= and ?peek=), so a link lands
  * on the same thing.
  *
- * Cmd+B goes from the table to the board and back (the first view of each).
+ * Its keys: Cmd+B goes from the table to the board and back (the first view
+ * of each), and N makes a row and opens it beside.
  */
 export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
   const db = useDatabase(doc.id);
@@ -115,6 +116,12 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
         if (to) setParam("v", to.id);
         else toast.info(t("db.view.none", { name: viewTypeName(other) }));
       },
+      ...(adds && {
+        n: (e: KeyboardEvent) => {
+          e.preventDefault();
+          openRow(addRow());
+        },
+      }),
     },
     { guardChords: true },
   );

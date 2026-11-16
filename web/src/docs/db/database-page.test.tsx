@@ -2,7 +2,7 @@
 // A database page (docs/db/database-page.tsx): for a read-only member one
 // with no views yet shows its rows in a table nobody saved, rather than
 // waiting for a view that only someone who may change it would make; and
-// Cmd+B between its table and its board.
+// its keys: Cmd+B between its table and its board, N a new row.
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
@@ -18,11 +18,24 @@ import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const doc = (fields: Partial<Doc>) =>
-  ({ title: "", rank: "a", created_at: 0, updated_at: 0, updated_seq: 1, ...fields }) as Doc; // only the fields a table reads
+  ({
+    title: "",
+    rank: "a",
+    created_at: 0,
+    updated_at: 0,
+    updated_seq: 1,
+    ...fields,
+  }) as Doc; // only the fields a table reads
 
 const database = doc({ id: "db1", kind: "database", title: "Tools" });
 const rows = {
-  r1: doc({ id: "r1", parent_id: "db1", kind: "row", title: "Hammer", rank: "a" }),
+  r1: doc({
+    id: "r1",
+    parent_id: "db1",
+    kind: "row",
+    title: "Hammer",
+    rank: "a",
+  }),
   r2: doc({ id: "r2", parent_id: "db1", kind: "row", title: "Saw", rank: "b" }),
 };
 
@@ -89,7 +102,9 @@ const address = () => screen.getByLabelText("address").textContent;
 describe("the keys of a database", () => {
   beforeEach(() => {
     vi.spyOn(api, "post").mockImplementation((_path: string, body?: unknown) =>
-      Promise.resolve({ results: (body as { changes: unknown[] }).changes.map(() => ({})) }),
+      Promise.resolve({
+        results: (body as { changes: unknown[] }).changes.map(() => ({})),
+      }),
     );
     useStore.setState((s) => ({
       collections: {
@@ -113,5 +128,14 @@ describe("the keys of a database", () => {
     expect(screen.queryByRole("grid")).toBeNull();
     press("b", "KeyB", { metaKey: true });
     expect(address()).toBe("/acme/docs/db1?v=v1");
+  });
+
+  it("make a row with N and open it beside the table", () => {
+    open();
+    press("n", "KeyN");
+    const made = Object.values(useStore.getState().collections.docs).filter((d) => !(d.id in rows) && d.id !== "db1");
+    expect(made).toHaveLength(1);
+    expect(made[0]?.parent_id).toBe("db1");
+    expect(address()).toBe(`/acme/docs/db1?peek=${made[0]?.id}`);
   });
 });

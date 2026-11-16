@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "re
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { useLookupEvenIfGone, useProjectByKey, useSlug } from "@/data/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { DocsAreaProvider, projectDocs, useDocsArea, workspaceDocs } from "@/docs/area";
@@ -13,6 +14,7 @@ import { DocPage } from "@/docs/page/doc-page";
 import { ProjectDocsHome } from "@/docs/project-home";
 import { MovePagesHere } from "@/docs/project-move";
 import { DocsTree } from "@/docs/tree/docs-tree";
+import type { NewDoc } from "@/docs/actions";
 import { createAndOpen } from "@/docs/tree/new-page";
 import { NotFoundPage } from "@/ui/not-found";
 import { Button } from "@/ui/button";
@@ -60,6 +62,26 @@ function Area() {
     return own ? projectDocs(slug, own) : workspaceDocs(slug);
   }, [docs, projects, id, project, slug]);
   const can = useCan();
+
+  // N makes a page as the "new" buttons nearby do: at the top of the Docs
+  // one of the project whose Docs these are, on a page one inside it. Not
+  // on a page built from data or in the trash; a database makes its own
+  // rows with N (docs/db/database-page.tsx).
+  const at = id ? docs[id] : undefined;
+  let makes: NewDoc | undefined;
+  if (!id) makes = can.edit(project?.id) ? { projectId: project?.id } : undefined;
+  else if (at && at.kind !== "database" && !at.generated && !at.deleted_at && can.edit(at.project_id))
+    makes = { parentId: at.id };
+  useHotkeys(
+    {
+      n: (e) => {
+        if (!makes) return;
+        e.preventDefault();
+        createAndOpen(makes);
+      },
+    },
+    { enabled: !!makes },
+  );
 
   if (elsewhere) return <Navigate to={`${elsewhere}/${id}`} replace />;
   if (project && !id && treeIsEmpty(tree)) return <ProjectDocsHome project={project} empty />;
