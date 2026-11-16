@@ -1,24 +1,27 @@
 // One epic in full: what it is for, its state, lead and dates, how far
-// along it is, and its tasks by milestone.
+// along it is, and its tasks by milestone, driven from the keyboard as a
+// task list is (tasks/row-keys.ts).
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, Ellipsis, Eye, EyeOff, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
 import { useMe, useMembers, useProjectByKey, useRow, useSlug } from "@/data/selectors";
-import type { Epic, Project } from "@/types/core";
+import type { Epic, Project, Task } from "@/types/core";
 import { ui, usePageTitle } from "@/lib/ui-state";
 import { useEscapeBack } from "@/nav/escape-back";
 import { setWatchingEpic, updateEpic } from "@/insights/plan/actions";
 import { EpicDescription } from "@/insights/plan/epic-description";
 import { EpicDialog } from "@/insights/plan/epic-dialog";
-import { EpicMilestones } from "@/insights/plan/epic-milestones";
+import { EpicMilestones, useByMilestone } from "@/insights/plan/epic-milestones";
 import { EPIC_STATES, emptyTally, epicStateName, riskLabel, riskOf, useTallies } from "@/insights/plan/stats";
 import { PageBar } from "@/insights/ui/panel";
 import { Progress } from "@/insights/ui/progress";
 import { DeleteEpic } from "@/insights/plan/delete-epic";
 import { useTasksBy } from "@/insights/plan/tasks-by";
+import { BulkBar } from "@/tasks/bulk-bar";
+import { useTaskRowKeys } from "@/tasks/row-keys";
 import { NotFoundPage } from "@/ui/not-found";
 import { Avatar } from "@/ui/avatar";
 import { Button, IconButton } from "@/ui/button";
@@ -27,6 +30,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Select } from "@/ui/picker";
 
 const NOBODY = "none";
+const NO_TASKS: Task[] = [];
 
 export function EpicPage() {
   const { key, id } = useParams();
@@ -42,7 +46,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
   const me = useMe();
   const navigate = useNavigate();
   const members = useMembers();
-  const tasks = useTasksBy(project.id, "epic_id")[epic.id] ?? [];
+  const tasks = useTasksBy(project.id, "epic_id")[epic.id] ?? NO_TASKS;
   const tally = useTallies("epic_id")[epic.id] ?? emptyTally();
   const watching = !!useRow("watchers", `${me.user_id}:${epic.id}`);
   const can = useCan();
@@ -51,11 +55,18 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
   const [deleting, setDeleting] = useState(false);
   const risk = riskOf(epic, tally);
   const list = `/${slug}/p/${project.key}/epics`;
-  useEscapeBack(list);
+  const scroller = useRef<HTMLDivElement>(null);
+  const byMilestone = useByMilestone(epic, tasks);
+  const rows = useTaskRowKeys(
+    useMemo(() => byMilestone.groups.flatMap((g) => g.tasks), [byMilestone]),
+    scroller,
+  );
+  // Escape lets go of a selection first.
+  useEscapeBack(list, rows.selected.length === 0);
   const backwards = (start: string, target: string) => !!start && !!target && target < start;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <PageBar>
         <Link
           to={list}
@@ -96,7 +107,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
         )}
       </PageBar>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-10">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto pb-10">
         <div className="px-4 pt-4 pb-4 md:px-6">
           <h1 className="text-lg font-semibold">{epic.name}</h1>
           <EpicDescription epic={epic} readOnly={readOnly} />
@@ -178,9 +189,11 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
         </div>
 
         <div className="border-t border-line">
-          <EpicMilestones epic={epic} tasks={tasks} readOnly={readOnly} />
+          <EpicMilestones epic={epic} byMilestone={byMilestone} readOnly={readOnly} rowProps={rows.rowProps} />
         </div>
       </div>
+      {rows.picker}
+      <BulkBar tasks={rows.selected} onClear={rows.clear} />
 
       {editing && <EpicDialog projectId={project.id} epic={epic} onClose={() => setEditing(false)} />}
       {deleting && <DeleteEpic epic={epic} onClose={() => setDeleting(false)} onDeleted={() => navigate(list)} />}

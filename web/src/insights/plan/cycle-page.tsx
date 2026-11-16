@@ -1,8 +1,9 @@
 // One cycle in full: its dates, the burn-up of scope against done, its
-// tasks by status, and a way to carry what is not finished into the next
-// cycle.
+// tasks by status, driven from the keyboard as a task list is
+// (tasks/row-keys.ts), and a way to carry what is not finished into the
+// next cycle.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { cx } from "@/lib/cx";
@@ -23,6 +24,8 @@ import { emptyTally, useTallies } from "@/insights/plan/stats";
 import { PageBar, Panel } from "@/insights/ui/panel";
 import { Progress } from "@/insights/ui/progress";
 import { useTasksBy } from "@/insights/plan/tasks-by";
+import { BulkBar } from "@/tasks/bulk-bar";
+import { useTaskRowKeys } from "@/tasks/row-keys";
 import { NotFoundPage } from "@/ui/not-found";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Badge } from "@/ui/badge";
@@ -70,10 +73,16 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
   );
   const left = daysUntil(cycle.ends_on, serverDay()); // a cycle's days are the server's
   const list = `/${slug}/p/${project.key}/cycles`;
-  useEscapeBack(list);
+  const scroller = useRef<HTMLDivElement>(null);
+  const rows = useTaskRowKeys(
+    useMemo(() => groups.flatMap((g) => g.tasks), [groups]),
+    scroller,
+  );
+  // Escape lets go of a selection first.
+  useEscapeBack(list, rows.selected.length === 0);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <PageBar>
         <Link
           to={list}
@@ -97,7 +106,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
         )}
       </PageBar>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-10">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto pb-10">
         <div className="px-4 pt-4 pb-3 md:px-6">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold">{name}</h1>
@@ -165,12 +174,14 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
                 <span className="text-xs font-normal text-ink-3 tnum">{count(list.length)}</span>
               </h2>
               {list.map((task) => (
-                <TaskRow key={task.id} task={task} />
+                <TaskRow key={task.id} task={task} {...rows.rowProps(task)} />
               ))}
             </section>
           ))}
         </div>
       </div>
+      {rows.picker}
+      <BulkBar tasks={rows.selected} onClear={rows.clear} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 // An epic's tasks, grouped by milestone: each milestone with its date and
-// its own progress, its tasks as ordinary task rows, and a last group for
-// tasks in no milestone. Milestones can be added, renamed, dated, moved up
-// or down and deleted; a task changes milestone from the mark at its right.
+// its own progress, its tasks as ordinary task rows (driven from the keys
+// the epic's page binds, tasks/row-keys.ts), and a last group for tasks in
+// no milestone. Milestones can be added, renamed, dated, moved up or down
+// and deleted; a task changes milestone from the mark at its right.
 
 import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Diamond, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,6 +17,7 @@ import { ProgressCount } from "@/insights/ui/progress";
 import { createTask, setMilestone } from "@/tasks/actions";
 import { milestone as milestoneProperty } from "@/tasks/properties/milestone";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
+import type { useTaskRowKeys } from "@/tasks/row-keys";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -65,6 +67,9 @@ function QuickAdd({ epic, milestone, onDone }: { epic: Epic; milestone?: Milesto
   );
 }
 
+/** What each task row shows of the page's keys. */
+type RowProps = ReturnType<typeof useTaskRowKeys>["rowProps"];
+
 interface GroupProps {
   epic: Epic;
   milestone?: Milestone;
@@ -72,9 +77,10 @@ interface GroupProps {
   tasks: Task[];
   /** Shown, not changed: the member may not change this project. */
   readOnly: boolean;
+  rowProps: RowProps;
 }
 
-function Group({ epic, milestone, ordered, tasks, readOnly }: GroupProps) {
+function Group({ epic, milestone, ordered, tasks, readOnly, rowProps }: GroupProps) {
   const statuses = useLookup("statuses");
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -177,7 +183,7 @@ function Group({ epic, milestone, ordered, tasks, readOnly }: GroupProps) {
       {tasks.map((task) => (
         <div key={task.id} className="flex items-stretch">
           <div className="min-w-0 flex-1">
-            <TaskRow task={task} hide={{ epic: true }} />
+            <TaskRow task={task} hide={{ epic: true }} {...rowProps(task)} />
           </div>
           {ordered.length > 0 && !readOnly && (
             <div className="flex items-center border-b border-line/70 pr-2">
@@ -233,26 +239,48 @@ function NewMilestone({ epic, last }: { epic: Epic; last: Milestone | undefined 
   );
 }
 
-export function EpicMilestones({ epic, tasks, readOnly }: { epic: Epic; tasks: Task[]; readOnly: boolean }) {
+/** An epic's milestones in their order, and its tasks under them: those in none, or in one gone, last. */
+export interface ByMilestone {
+  ordered: Milestone[];
+  groups: { milestone?: Milestone; tasks: Task[] }[];
+}
+
+/** The epic's tasks by milestone, as the page lists them. The group of tasks in no milestone is there while it has any, or while there are no milestones. */
+export function useByMilestone(epic: Epic, tasks: Task[]): ByMilestone {
   const milestones = useRows("milestones");
-  const ordered = useMemo(() => sortByRank(milestones.filter((m) => m.epic_id === epic.id)), [milestones, epic.id]);
-  const known = new Set(ordered.map((m) => m.id));
-  const loose = tasks.filter((task) => !task.milestone_id || !known.has(task.milestone_id));
+  return useMemo(() => {
+    const ordered = sortByRank(milestones.filter((m) => m.epic_id === epic.id));
+    const known = new Set(ordered.map((m) => m.id));
+    const loose = tasks.filter((task) => !task.milestone_id || !known.has(task.milestone_id));
+    const groups = ordered.map((milestone) => ({
+      milestone,
+      tasks: tasks.filter((task) => task.milestone_id === milestone.id),
+    }));
+    return { ordered, groups: loose.length > 0 || ordered.length === 0 ? [...groups, { tasks: loose }] : groups };
+  }, [milestones, epic.id, tasks]);
+}
+
+interface Props {
+  epic: Epic;
+  byMilestone: ByMilestone;
+  readOnly: boolean;
+  rowProps: RowProps;
+}
+
+export function EpicMilestones({ epic, byMilestone: { ordered, groups }, readOnly, rowProps }: Props) {
   return (
     <div>
-      {ordered.map((m) => (
+      {groups.map(({ milestone, tasks }) => (
         <Group
-          key={m.id}
+          key={milestone?.id ?? "none"}
           epic={epic}
-          milestone={m}
+          milestone={milestone}
           ordered={ordered}
-          tasks={tasks.filter((task) => task.milestone_id === m.id)}
+          tasks={tasks}
           readOnly={readOnly}
+          rowProps={rowProps}
         />
       ))}
-      {(loose.length > 0 || ordered.length === 0) && (
-        <Group epic={epic} ordered={ordered} tasks={loose} readOnly={readOnly} />
-      )}
       {!readOnly && <NewMilestone epic={epic} last={ordered[ordered.length - 1]} />}
     </div>
   );
