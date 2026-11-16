@@ -2,11 +2,11 @@ import { Fragment, memo, useRef, useState } from "react";
 import { Ellipsis, Trash2, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { useRowEvenIfGone } from "@/data/selectors";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { trashTasks } from "@/tasks/actions";
 import { BULK } from "@/tasks/properties";
-import { hasPicker } from "@/tasks/properties/property";
+import { applies, hasPicker } from "@/tasks/properties/property";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { Button, IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
@@ -31,12 +31,13 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
   /** Set when a menu entry opens something of its own, so the closing menu does not take the focus back. */
   const handingOver = useRef(false);
   // The tasks may be in an archived project, whose page still lists them.
-  const project = useRowEvenIfGone("projects", tasks[0]?.project_id);
+  const projects = useLookupEvenIfGone("projects");
   const can = useCan();
   if (tasks.length === 0) return null;
   // Every action here changes the tasks: for a selection the viewer may not change, they are all disabled.
   const readOnly = !tasks.every((task) => can.editTask(task));
-  const offered = BULK.filter((p) => p.bulk.offered?.(project) ?? true);
+  // What every task of the selection has: no cycle where one of their projects has none.
+  const offered = BULK.filter((p) => tasks.every((task) => applies(p, task, projects[task.project_id])));
   const menu = offered.filter((p) => p.bulk.place !== "bar");
 
   const open = (what: Bulk) => () => {
@@ -48,7 +49,7 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
     setMore(null);
     moreButton.current?.focus();
   };
-  const Form = more?.bulk.Form;
+  const Form = more?.Form;
 
   return (
     <div

@@ -39,7 +39,7 @@ import { t } from "@/lib/i18n";
 import { useProjects, useViews } from "@/data/selectors";
 import { useStore } from "@/data/store";
 import { askToUndo, redo, useUndo } from "@/data/undo";
-import { MOD } from "@/hooks/hotkeys";
+import { keyHint, MOD } from "@/hooks/hotkeys";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import type { Project, Task } from "@/types/core";
 import { ui } from "@/lib/ui-state";
@@ -114,11 +114,11 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   const docsOf = matchPath("/:ws/p/:key/docs/*", useLocation().pathname) ? project : undefined;
   const docsAt = docsOf ? projectDocs(slug, docsOf) : workspaceDocs(slug);
 
-  const taskChanges: Cmd[] = PALETTE.map(({ name, picker, palette }) => ({
+  const taskChanges: Cmd[] = PALETTE.map(({ name, key, picker, palette }) => ({
     id: `task:${name}`,
     label: picker.title(),
     icon: palette.icon,
-    hint: picker.hotkey?.key.toUpperCase(),
+    hint: key && keyHint(key.key),
     run: () => openPage(name),
   }));
 

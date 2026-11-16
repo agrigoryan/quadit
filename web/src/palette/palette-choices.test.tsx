@@ -164,7 +164,7 @@ describe("the palette on a task", () => {
 });
 
 describe("the shortcuts sheet", () => {
-  it("lists S, A, P and L for lists and for the open task", () => {
+  it("lists S, A, P, L and the Shift keys of the task properties for lists and for the open task", () => {
     act(() => ui.setShortcuts(true));
     render(
       <TooltipProvider>
@@ -179,7 +179,17 @@ describe("the shortcuts sheet", () => {
         .map((dt) => `${dt.textContent} ${dt.nextElementSibling?.textContent}`)
         .filter((row) => /^Change/.test(row));
     };
-    expect(keysOf("Lists")).toEqual(["Change status S", "Change assignee A", "Change priority P", "Change labels L"]);
+    expect(keysOf("Lists")).toEqual([
+      "Change status S",
+      "Change assignee A",
+      "Change priority P",
+      "Change labels L",
+      "Change epic ShiftP",
+      "Change milestone, in an epic ShiftM",
+      "Change cycle, where the project has cycles ShiftC",
+      "Change estimate, where the project counts them ShiftE",
+      "Change due date ShiftD",
+    ]);
     expect(keysOf("A task")).toEqual(keysOf("Lists"));
     act(() => ui.setShortcuts(false));
   });

@@ -9,10 +9,8 @@ import { PickerRow } from "@/tasks/properties/panel-row";
 import { asText, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
 import { noneItem } from "@/tasks/property-picker";
 
-/** Shown for a task in an epic: milestones belong to epics. */
 function MilestoneRow(panel: PanelProps) {
   const m = useRowEvenIfGone("milestones", panel.task.milestone_id);
-  if (!panel.task.epic_id) return null;
   const name = m ? m.name : t("task.noMilestone");
   return (
     <PickerRow property={milestone} panel={panel} value={name} empty={!m}>
@@ -25,6 +23,9 @@ function MilestoneRow(panel: PanelProps) {
 export const milestone = {
   name: "milestone",
   title: () => t("prop.milestone"),
+  // Milestones belong to epics.
+  appliesTo: (task) => !!task.epic_id,
+  key: { key: "shift+m", shortcut: "shortcuts.milestone" },
   picker: {
     title: () => t("prop.set.milestone"),
     useItems: (tasks) => {

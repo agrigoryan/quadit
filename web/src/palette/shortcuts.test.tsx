@@ -32,8 +32,14 @@ describe("ShortcutsSheet", () => {
         <ShortcutsSheet />
       </TooltipProvider>,
     );
-    for (const what of ["Assign to me, or take off me", "Copy the task's key", "Move to the trash"])
+    for (const what of [
+      "Assign to me, or take off me",
+      "Watch, or stop watching",
+      "Change due date",
+      "Copy the task's key",
+      "Move to the trash",
+    ])
       expect(screen.getAllByText(what)).toHaveLength(2);
-    expect(screen.getAllByText("Add a sub-task")).toHaveLength(1);
+    for (const what of ["Add a sub-task", "Rename"]) expect(screen.getAllByText(what)).toHaveLength(1);
   });
 });

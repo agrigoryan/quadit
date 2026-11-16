@@ -5,7 +5,6 @@ import { Gauge } from "lucide-react";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useRowEvenIfGone } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { setEstimate } from "@/tasks/actions";
 import { inlineField, PropRow } from "@/tasks/properties/panel-row";
@@ -14,7 +13,7 @@ import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
 /** Typed in place; saved on Enter or on leaving the box. Nothing, zero or less is no estimate. */
-function EstimateField({ task }: { task: Task }) {
+function EstimateField({ task, ref }: { task: Task; ref: PanelProps["takeControl"] }) {
   const [draft, setDraft] = useState<string | null>(null);
   const can = useCan();
 
@@ -28,6 +27,7 @@ function EstimateField({ task }: { task: Task }) {
 
   return (
     <input
+      ref={ref}
       type="number"
       inputMode="numeric"
       min={0}
@@ -50,13 +50,10 @@ function EstimateField({ task }: { task: Task }) {
   );
 }
 
-/** Shown where the task's project counts estimates. */
-function EstimateRow({ task }: PanelProps) {
-  const project = useRowEvenIfGone("projects", task.project_id);
-  if (!project?.settings?.estimates) return null;
+function EstimateRow({ task, takeControl }: PanelProps) {
   return (
     <PropRow label={t("prop.estimate")}>
-      <EstimateField task={task} />
+      <EstimateField task={task} ref={takeControl} />
     </PropRow>
   );
 }
@@ -106,15 +103,12 @@ function EstimateForm({ tasks, onDone }: { tasks: Task[]; onDone: () => void }) 
 export const estimate = {
   name: "estimate",
   title: () => t("prop.estimate"),
+  // Where the project counts them. The server leaves out a switch that is off, so off is "not said".
+  appliesTo: (_task, project) => !!project?.settings?.estimates,
+  key: { key: "shift+e", shortcut: "shortcuts.estimate" },
+  Form: EstimateForm,
   Panel: EstimateRow,
-  bulk: {
-    place: "menu",
-    icon: <Gauge />,
-    label: () => t("bulk.estimate"),
-    // As the panel's row: where the project counts them. The server leaves a switch that is off out, so off is "not said".
-    offered: (project) => !!project?.settings?.estimates,
-    Form: EstimateForm,
-  },
+  bulk: { place: "menu", icon: <Gauge />, label: () => t("bulk.estimate") },
   timeline: [
     {
       field: "estimate",

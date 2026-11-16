@@ -18,6 +18,28 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 /** The modifier shown in hints: the command key on a Mac, Ctrl elsewhere. */
 export const MOD = isMac ? "⌘" : "Ctrl";
 
+/** Keys the hints show by a sign or a short word rather than their name. */
+const SHOWN_AS: Record<string, string> = {
+  ArrowUp: "↑",
+  ArrowDown: "↓",
+  ArrowLeft: "←",
+  ArrowRight: "→",
+  " ": "Space",
+  Escape: "Esc",
+};
+
+/**
+ * A key named as a Hotkeys table names it, written as the hints and the
+ * shortcuts sheet show it: "s" is "S", "shift+c" is "Shift C",
+ * "mod+shift+ArrowUp" is "Shift ⌘ ↑" on a Mac.
+ */
+export function keyHint(name: string): string {
+  const parts = name.split("+");
+  const key = parts.pop() ?? "";
+  const held = [parts.includes("shift") && "Shift", parts.includes("alt") && "Alt", parts.includes("mod") && MOD];
+  return [...held.filter(Boolean), SHOWN_AS[key] ?? (key.length === 1 ? key.toUpperCase() : key)].join(" ");
+}
+
 export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);

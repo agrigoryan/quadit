@@ -97,6 +97,16 @@ const rowNames = () =>
     .getAllByRole("term")
     .map((dt) => dt.textContent);
 const press = (key: string) => act(() => void fireEvent.keyDown(document.body, { key }));
+/** A letter with Shift, as the browser gives it: the capital, on the letter's key. */
+const pressShift = (letter: string) =>
+  act(
+    () =>
+      void fireEvent.keyDown(document.body, {
+        key: letter.toUpperCase(),
+        code: `Key${letter.toUpperCase()}`,
+        shiftKey: true,
+      }),
+  );
 
 describe("Properties", () => {
   it("shows the rows every task has, in order", () => {
@@ -160,6 +170,35 @@ describe("Properties", () => {
     expect(screen.getByRole("dialog", { name: title })).toBeInTheDocument();
   });
 
+  it.each([
+    ["p", "Set epic…"],
+    ["m", "Set milestone…"],
+    ["c", "Set cycle…"],
+  ])("opens a picker with Shift+%s", (letter, title) => {
+    seed({ settings: { cycles: true }, task: { epic_id: "e1" } });
+    renderPanel();
+    pressShift(letter);
+    expect(screen.getByRole("dialog", { name: title })).toBeInTheDocument();
+  });
+
+  it("puts the caret in the estimate with Shift+E, its value chosen, and in the due date with Shift+D", () => {
+    seed({ settings: { estimates: true }, task: { estimate: 3 } });
+    renderPanel();
+    pressShift("e");
+    const estimate = within(section()).getByLabelText<HTMLInputElement>("Estimate");
+    expect(estimate).toHaveFocus();
+    pressShift("d");
+    expect(within(section()).getByLabelText("Due date")).toHaveFocus();
+  });
+
+  it("opens nothing with Shift+M outside an epic, Shift+C without cycles, Shift+E without estimates", () => {
+    seed();
+    renderPanel();
+    for (const letter of ["m", "c", "e"]) pressShift(letter);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.body).toHaveFocus();
+  });
+
   it("changes the epic from its row", async () => {
     seed();
     renderPanel();
@@ -190,6 +229,9 @@ describe("Properties", () => {
       expect(within(section()).getByRole("button", { name })).toBeDisabled();
     expect(within(section()).getByLabelText("Due date")).toHaveAttribute("readonly");
     press("s");
+    pressShift("p");
+    pressShift("d");
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.body).toHaveFocus();
   });
 });

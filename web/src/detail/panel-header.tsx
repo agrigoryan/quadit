@@ -21,12 +21,11 @@ import { cx } from "@/lib/cx";
 import { copyAndSay } from "@/data/files";
 import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
-import { type Batch, sendUndoable } from "@/data/undo";
 import { useMe, useRow, useRowEvenIfGone, useSlug } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import type { TaskLayout } from "@/detail/task-body";
 import type { QueuePlace } from "@/detail/task-view";
-import { restoreTasks, trashTasks } from "@/tasks/actions";
+import { restoreTasks, setWatching, trashTasks } from "@/tasks/actions";
 import { taskPath } from "@/nav/task-link";
 import { Button, IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
@@ -38,18 +37,6 @@ interface Props {
   onClose: () => void;
   onExpand?: () => void;
   queue?: QueuePlace;
-}
-
-function setWatching(task: Task, userId: string, watching: boolean) {
-  const set = (on: boolean): Batch => ({
-    changes: [{ type: "watch.set", args: { subject: task.id, watching: on } }],
-    show: (tx) => {
-      if (on)
-        tx.insert("watchers", { user_id: userId, subject_type: "task", subject_id: task.id, created_at: Date.now() });
-      else tx.remove("watchers", `${userId}:${task.id}`);
-    },
-  });
-  sendUndoable(t(watching ? "undo.watch" : "undo.unwatch", { what: task.key }), set(watching), set(!watching));
 }
 
 export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }: Props) {
@@ -95,9 +82,10 @@ export function PanelHeader({ taskKey, task, layout, onClose, onExpand, queue }:
           {can.write && (
             <IconButton
               label={watching ? t("detail.unwatch") : t("detail.watch")}
+              hint="Shift S"
               aria-pressed={watching}
               className="max-md:size-10"
-              onClick={() => setWatching(task, me.user_id, !watching)}
+              onClick={() => setWatching([task], !watching)}
             >
               {watching ? <Eye className="size-4 text-accent-text" /> : <EyeOff className="size-4" />}
             </IconButton>

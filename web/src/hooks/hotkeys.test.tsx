@@ -4,7 +4,7 @@
 
 import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { combo, type Hotkeys, useHotkeys } from "@/hooks/hotkeys";
+import { combo, type Hotkeys, keyHint, MOD, useHotkeys } from "@/hooks/hotkeys";
 
 interface KeysProps {
   keys: Hotkeys;
@@ -30,6 +30,15 @@ function Keys({ keys, overlay, beside, guardChords }: KeysProps) {
 
 const press = (key: string, more: KeyboardEventInit = {}) => fireEvent.keyDown(document.body, { key, ...more });
 const named = (init: KeyboardEventInit) => combo(new KeyboardEvent("keydown", init));
+
+describe("keyHint", () => {
+  it("writes a key's name as the sheet shows it: Shift first, then the command key, the letter in capitals", () => {
+    expect(keyHint("s")).toBe("S");
+    expect(keyHint("shift+c")).toBe("Shift C");
+    expect(keyHint("mod+shift+ArrowUp")).toBe(`Shift ${MOD} ↑`);
+    expect(keyHint("Enter")).toBe("Enter");
+  });
+});
 
 describe("combo", () => {
   it("names a letter by the key pressed, whatever the layout types", () => {

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // A task's title (detail/title-description.tsx): a text box for someone who
 // may edit the task, plain words for someone who may not (a task in the
-// trash, a member who may only read).
+// trash, a member who may only read), and Shift+R that renames.
 
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { EditableTitle } from "@/detail/title-description";
 import { clearStore, loadBootstrap } from "@/data/store";
@@ -42,5 +42,23 @@ describe("EditableTitle", () => {
     render(<EditableTitle task={TASK} large />);
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Fix the login" })).toBeInTheDocument();
+  });
+
+  it("takes the caret with Shift+R, the whole title chosen, but not from a field", () => {
+    seed();
+    render(
+      <>
+        <input aria-label="field" />
+        <EditableTitle task={TASK} />
+      </>,
+    );
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Title" });
+    const field = screen.getByLabelText("field");
+    field.focus();
+    act(() => void fireEvent.keyDown(field, { key: "R", code: "KeyR", shiftKey: true }));
+    expect(field).toHaveFocus();
+    act(() => void fireEvent.keyDown(document.body, { key: "R", code: "KeyR", shiftKey: true }));
+    expect(box).toHaveFocus();
+    expect([box.selectionStart, box.selectionEnd]).toEqual([0, "Fix the login".length]);
   });
 });

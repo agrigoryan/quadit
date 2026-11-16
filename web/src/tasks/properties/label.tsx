@@ -91,9 +91,9 @@ export const label = {
   title: () => t("prop.labels"),
   make: { run: createLabel, label: createLabelText },
   manage: "labels",
+  key: { key: "l", shortcut: "shortcuts.labels" },
   picker: {
     title: () => t("prop.set.labels"),
-    hotkey: { key: "l", shortcut: "shortcuts.labels" },
     useItems: (tasks) => {
       const labels = useLabels(tasks[0]?.project_id);
       return {

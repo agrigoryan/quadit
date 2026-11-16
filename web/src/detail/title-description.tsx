@@ -1,9 +1,9 @@
 // The task's title and description, both edited in place.
 
-import { type MouseEvent, useState } from "react";
+import { type MouseEvent, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { MOD } from "@/hooks/hotkeys";
+import { MOD, useHotkeys } from "@/hooks/hotkeys";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/types/core";
@@ -15,14 +15,26 @@ import { Markdown } from "@/ui/markdown";
 import { MentionTextarea } from "@/ui/mention-textarea";
 
 /**
- * The title is a text box that looks like a heading: click and type. Enter
- * saves, Escape puts the old title back, and it can never be left empty.
- * Someone who may not edit the task (it is in the trash, or they may only
- * read) gets the heading itself: words to read and select, not a Tab stop.
+ * The title is a text box that looks like a heading: click and type, or
+ * press Shift+R, which chooses the whole title. Enter saves, Escape puts
+ * the old title back, and it can never be left empty. Someone who may not
+ * edit the task (it is in the trash, or they may only read) gets the
+ * heading itself: words to read and select, not a Tab stop.
  */
 export function EditableTitle({ task, large }: { task: Task; large?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   const can = useCan();
+  const box = useRef<HTMLTextAreaElement>(null);
+  useHotkeys(
+    {
+      "shift+r": (e) => {
+        e.preventDefault(); // or the R lands in the title
+        box.current?.focus();
+        box.current?.select();
+      },
+    },
+    { layer: "panel", enabled: can.editTask(task) },
+  );
   const type = cx(
     "text-lg font-semibold tracking-tight",
     // On the task's own page the title is the page's heading.
@@ -41,6 +53,7 @@ export function EditableTitle({ task, large }: { task: Task; large?: boolean }) 
 
   return (
     <Textarea
+      ref={box}
       bare
       autoGrow
       rows={1}

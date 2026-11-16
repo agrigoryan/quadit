@@ -52,9 +52,9 @@ export const status = {
   name: "status",
   title: () => t("prop.status"),
   manage: "statuses",
+  key: { key: "s", shortcut: "shortcuts.status" },
   picker: {
     title: () => t("prop.set.status"),
-    hotkey: { key: "s", shortcut: "shortcuts.status" },
     useItems: (tasks) => ({
       items: useStatuses(tasks[0]?.project_id).map((s) => ({
         id: s.id,

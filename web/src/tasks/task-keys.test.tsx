@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
 // The keys that act on the tasks the keyboard is on (tasks/task-keys.tsx):
-// I gives them to me and takes them back, the copy keys copy, Cmd+Backspace
-// moves them to the trash, and none of them acts for someone who may not.
-// S, A, P and L are tried on the task list (tasks/task-list.test.tsx).
+// I gives them to me and takes them back, Shift+S watches them, the copy
+// keys copy, Cmd+Backspace moves them to the trash, the Shift keys of the
+// task properties open a picker or a form, and none of them acts for
+// someone who may not. S, A, P and L are tried on the task list
+// (tasks/task-list.test.tsx).
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { clearStore, getState, loadBootstrap } from "@/data/store";
 import { clearUndo } from "@/data/undo";
 import { useToasts } from "@/lib/toast";
-import type { Member, Task, User, Workspace } from "@/types/core";
+import type { Member, Project, Task, User, Workspace } from "@/types/core";
 import { useTaskKeys } from "@/tasks/task-keys";
 
 const task = (n: number, fields: Partial<Task> = {}): Task => ({
@@ -32,7 +35,11 @@ const task = (n: number, fields: Partial<Task> = {}): Task => ({
   ...fields,
 });
 
-function seed(scope?: Member["scope"], tasks = [task(1), task(2, { project_id: "p2" })]) {
+function seed(
+  scope?: Member["scope"],
+  tasks = [task(1), task(2, { project_id: "p2" })],
+  settings?: Project["settings"],
+) {
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -40,9 +47,10 @@ function seed(scope?: Member["scope"], tasks = [task(1), task(2, { project_id: "
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
     projects: [
-      { id: "p1", key: "SVA", name: "Live", rank: "a" },
+      { id: "p1", key: "SVA", name: "Live", rank: "a", settings },
       { id: "p2", key: "OPS", name: "Ops", rank: "b" },
     ],
+    cycles: [{ id: "c1", project_id: "p1", number: 1, starts_on: "2026-11-01", ends_on: "2026-11-14" }],
     tasks,
   });
 }
@@ -67,6 +75,16 @@ const press = (key: string, code: string, more: KeyboardEventInit = {}, target: 
 const assignee = (id: string) => getState().collections.tasks[id]?.assignee_id ?? null;
 const toasts = () => useToasts.getState().items.map((item) => item.text);
 const copied = vi.fn<(text: string) => Promise<void>>();
+
+beforeAll(() => {
+  // jsdom has no layout: nothing is ever resized, nor scrolled, as the pickers' lists ask.
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  Element.prototype.scrollIntoView = () => {};
+});
 
 beforeEach(() => {
   vi.spyOn(api, "post").mockImplementation((_path: string, body?: unknown) =>
@@ -162,5 +180,78 @@ describe("Cmd+Backspace", () => {
     press("Backspace", "Backspace", { metaKey: true });
     expect(getState().collections.tasks.t1?.deleted_at).toBeFalsy();
     expect(trashed).not.toHaveBeenCalled();
+  });
+});
+
+describe("Shift+S", () => {
+  const watching = (id: string) => !!getState().collections.watchers[`u1:${id}`];
+
+  it("has me watch the tasks, and pressed again stop, as one step each", () => {
+    seed(undefined, [task(1), task(3)]);
+    render(<Keys ids={["t1", "t3"]} />);
+    press("S", "KeyS", { shiftKey: true });
+    expect([watching("t1"), watching("t3")]).toEqual([true, true]);
+    press("S", "KeyS", { shiftKey: true });
+    expect([watching("t1"), watching("t3")]).toEqual([false, false]);
+  });
+
+  it("does nothing for a member who may only read", () => {
+    seed({ read_only: true });
+    render(<Keys ids={["t1"]} />);
+    press("S", "KeyS", { shiftKey: true });
+    expect(watching("t1")).toBe(false);
+  });
+});
+
+describe("the Shift keys of the task properties", () => {
+  it("open the property's picker beside the task: Shift+C its cycle where the project has cycles", () => {
+    seed(undefined, [task(1)], { cycles: true });
+    // The picker's foot links to where the values are kept.
+    render(
+      <MemoryRouter>
+        <Keys ids={["t1"]} />
+      </MemoryRouter>,
+    );
+    press("C", "KeyC", { shiftKey: true });
+    expect(screen.getByRole("dialog", { name: "Set cycle…" })).toBeInTheDocument();
+  });
+
+  it("open nothing where a task has no such property: no cycles, no epic, no estimates", () => {
+    seed(undefined, [task(1)]);
+    render(<Keys ids={["t1"]} />);
+    for (const [key, code] of [
+      ["C", "KeyC"],
+      ["M", "KeyM"],
+      ["E", "KeyE"],
+    ] as const)
+      press(key, code, { shiftKey: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("open the form of a typed value, Shift+D the due date's, which sets it on every task", async () => {
+    seed(undefined, [task(1), task(3)]);
+    render(<Keys ids={["t1", "t3"]} />);
+    press("D", "KeyD", { shiftKey: true });
+    const form = screen.getByRole("dialog", { name: "Due date" });
+    fireEvent.change(screen.getByLabelText("Due date for 2 tasks"), { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set" }));
+    await waitFor(() => expect(form).not.toBeInTheDocument());
+    const due = (id: string) => getState().collections.tasks[id]?.due_on;
+    expect([due("t1"), due("t3")]).toEqual(["2026-12-01", "2026-12-01"]);
+  });
+
+  it("open the estimate's form where the project counts estimates", () => {
+    seed(undefined, [task(1)], { estimates: true });
+    render(<Keys ids={["t1"]} />);
+    press("E", "KeyE", { shiftKey: true });
+    expect(screen.getByLabelText("Estimate, in points, for 1 task")).toHaveFocus();
+  });
+
+  it("open nothing for a task I may not change", () => {
+    seed({ read_only: true }, [task(1)]);
+    render(<Keys ids={["t1"]} />);
+    press("P", "KeyP", { shiftKey: true });
+    press("D", "KeyD", { shiftKey: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

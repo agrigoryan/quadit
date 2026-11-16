@@ -55,6 +55,7 @@ function EpicPill({ project, value, onChange }: CreateProps) {
 export const epic = {
   name: "epic",
   title: () => t("prop.epic"),
+  key: { key: "shift+p", shortcut: "shortcuts.epic" },
   picker: {
     title: () => t("prop.set.epic"),
     useItems: (tasks) => ({

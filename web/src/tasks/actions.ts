@@ -352,6 +352,28 @@ export function trashTasks(tasks: Task[]) {
   toast.info(t("bulk.deleted", { n: tasks.length }), { label: t("common.undo"), run: () => void undo(done) });
 }
 
+/**
+ * Has me watch the tasks, or stop watching them, as one step: what happens
+ * to a task I watch comes to my inbox. A task already as asked is left out.
+ */
+export function setWatching(tasks: Task[], watching: boolean) {
+  const userId = getState().me?.user_id;
+  if (!userId) return;
+  const changing = tasks.filter((task) => !!getRow("watchers", `${userId}:${task.id}`) !== watching);
+  if (changing.length === 0) return;
+  const set = (on: boolean): Batch => ({
+    changes: changing.map((task) => ({ type: "watch.set", args: { subject: task.id, watching: on } })),
+    show: (tx) => {
+      for (const task of changing) {
+        if (on)
+          tx.insert("watchers", { user_id: userId, subject_type: "task", subject_id: task.id, created_at: Date.now() });
+        else tx.remove("watchers", `${userId}:${task.id}`);
+      }
+    },
+  });
+  sendUndoable(t(watching ? "undo.watch" : "undo.unwatch", { what: named(changing) }), set(watching), set(!watching));
+}
+
 /** What a link is besides its task: enough to make it again. */
 type LinkFields = Pick<TaskLink, "kind" | "url" | "title" | "repo" | "ref" | "state" | "checks" | "data">;
 

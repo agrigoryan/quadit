@@ -55,13 +55,13 @@ interface PickerRowProps {
 
 /** The row of a property picked from a list: its value is a button that opens the picker. */
 export function PickerRow({ property, panel, value, empty, wide, className, children, after }: PickerRowProps) {
-  const { task, readOnly, picker, takeButton } = panel;
+  const { task, readOnly, picker, takeControl } = panel;
   const title = property.title();
   return (
     <PropRow label={title} wide={wide}>
       <TaskPropertyPicker property={property} tasks={[task]} {...picker}>
         <PropButton
-          ref={takeButton}
+          ref={takeControl}
           disabled={readOnly}
           empty={empty}
           aria-label={`${title}: ${value}`}

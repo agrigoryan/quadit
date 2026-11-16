@@ -1,7 +1,8 @@
 // Everything a task is filed under, as one dense block of label and value
 // rows: two columns of rows on a wide panel, one on a phone and at the side
-// of the task's own page. Each property draws its own row (tasks/properties);
-// the keys of those that have one (S, A, P, L) open their pickers.
+// of the task's own page. Each property draws its own row (tasks/properties),
+// where the task has it; the keys of those that have one (S, A, P, L, Shift
+// with P, M, C, E or D) open their pickers or put the caret in their box.
 
 import { useRef, useState } from "react";
 import { useCan } from "@/data/access";
@@ -9,11 +10,23 @@ import { cx } from "@/lib/cx";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { useNow } from "@/data/live";
 import { t } from "@/lib/i18n";
-import { useMember } from "@/data/selectors";
+import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { nameOf } from "@/detail/data";
 import { KEYED, PROPERTIES, type PropertyName } from "@/tasks/properties";
+import { applies } from "@/tasks/properties/property";
 import { Avatar } from "@/ui/avatar";
+
+/**
+ * A typed value's box, given the caret by its key: what is in it is chosen,
+ * so what is typed replaces it, and a day's box opens its calendar too.
+ */
+function takeCaret(box: HTMLElement) {
+  box.focus();
+  if (!(box instanceof HTMLInputElement)) return;
+  if (box.type === "date") box.showPicker?.();
+  else box.select();
+}
 
 interface Props {
   task: Task;
@@ -27,20 +40,24 @@ export function Properties({ task, side }: Props) {
   const readOnly = !can.editTask(task);
   const now = useNow();
   const held = holder && (task.lease_until ?? 0) > now;
+  // An archived project is still where the task lives, and still says which properties it has.
+  const project = useRowEvenIfGone("projects", task.project_id);
 
-  // Which row's picker is open, and the buttons a key's picker opens next to.
+  // Which row's picker is open, and the controls a key opens a picker next to or puts the caret in.
   const [opened, setOpened] = useState<PropertyName | null>(null);
-  const buttons = useRef<Partial<Record<PropertyName, HTMLButtonElement | null>>>({});
+  const controls = useRef<Partial<Record<PropertyName, HTMLElement | null>>>({});
 
   useHotkeys(
     Object.fromEntries(
-      KEYED.map(({ name, picker }) => [
-        picker.hotkey?.key,
+      KEYED.map((property) => [
+        property.key.key,
         (e: KeyboardEvent) => {
-          if (readOnly) return;
-          e.preventDefault();
-          buttons.current[name]?.scrollIntoView({ block: "nearest" });
-          setOpened(name);
+          const control = controls.current[property.name];
+          if (readOnly || !applies(property, task, project) || !control) return;
+          e.preventDefault(); // or the letter lands in the box that takes the caret
+          control.scrollIntoView({ block: "nearest" });
+          if (property.picker) setOpened(property.name);
+          else takeCaret(control);
         },
       ]),
     ),
@@ -62,16 +79,20 @@ export function Properties({ task, side }: Props) {
         )}
       >
         {PROPERTIES.map(
-          ({ name, Panel }) =>
-            Panel && (
-              <Panel
-                key={name}
+          (property) =>
+            property.Panel &&
+            applies(property, task, project) && (
+              <property.Panel
+                key={property.name}
                 task={task}
                 side={side}
                 readOnly={readOnly}
-                picker={{ open: opened === name, onOpenChange: (open) => setOpened(open ? name : null) }}
-                takeButton={(el) => {
-                  buttons.current[name] = el;
+                picker={{
+                  open: opened === property.name,
+                  onOpenChange: (open) => setOpened(open ? property.name : null),
+                }}
+                takeControl={(el) => {
+                  controls.current[property.name] = el;
                 }}
               />
             ),

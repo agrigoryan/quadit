@@ -8,6 +8,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import type { Key } from "@/lib/i18n";
+import { getRowEvenIfGone } from "@/data/selectors";
 import type { Collections } from "@/data/store";
 import type { Category, FeedEvent, FieldChange, Project, Task, TaskQuery } from "@/types/core";
 import type { NewTaskDraft } from "@/tasks/draft";
@@ -25,8 +26,24 @@ export interface TaskProperty<Name extends string = string> {
   name: Name;
   /** What it is called: the label of its row in the panel, of its button in the bulk bar. */
   title: () => string;
+  /**
+   * Whether a task has it at all: a cycle where its project works in
+   * cycles, a milestone once the task is in an epic. Where it is false the
+   * panel has no row for it, and the bulk bar, the keys and the palette do
+   * not offer it. Left out, every task has it.
+   */
+  appliesTo?: (task: Task, project: Project | undefined) => boolean;
+  /**
+   * The key that changes it on a list's row or selection and on the open
+   * task, by its name in hooks/hotkeys.ts ("s", "shift+c"), and what the
+   * shortcuts sheet calls it. It opens the picker; for a typed value, the
+   * form on a list and the value's box in the panel.
+   */
+  key?: { key: string; shortcut: Key };
   /** Changing it by picking from a list. */
   picker?: PickerPart;
+  /** For a value typed rather than picked: the form that sets it on one task or on all of a selection, in a popover. */
+  Form?: ComponentType<{ tasks: Task[]; onDone: () => void }>;
   /** A value made from typed words, where it does not exist yet: a label. Answers the new value's id at once. */
   make?: { run: (projectId: string | undefined, name: string) => string; label: (name: string) => string };
   /** The settings page where its values are kept, linked from the foot of its lists. */
@@ -177,10 +194,6 @@ export interface BulkPart {
   place: "bar" | "menu" | "move";
   /** The menu entry's words. */
   label?: () => string;
-  /** Offered only where the project has such a thing (cycles, estimates). */
-  offered?: (project: Project | undefined) => boolean;
-  /** For a value typed rather than picked: the form that sets it on them all. */
-  Form?: ComponentType<{ tasks: Task[]; onDone: () => void }>;
 }
 
 /** What the create dialog collects besides the title and description. */
@@ -215,15 +228,13 @@ export interface PanelProps {
   readOnly: boolean;
   /** The row's picker, which the panel's keys open too. */
   picker: { open: boolean; onOpenChange: (open: boolean) => void };
-  /** Takes the value's button, so a key's picker opens next to it. */
-  takeButton: (el: HTMLButtonElement | null) => void;
+  /** Takes the value's control (the button of a picked value, the box of a typed one), so its key opens the picker next to it or puts the caret in it. */
+  takeControl: (el: HTMLElement | null) => void;
 }
 
 export interface PickerPart {
   /** The picker's title and the words in its search box: "Change status…". */
   title: () => string;
-  /** The key that opens the picker on a list's current row and on the open task, and what the shortcuts sheet calls it. */
-  hotkey?: { key: string; shortcut: Key };
   /**
    * The rows offered for these tasks, and what they all have now: one value,
    * or, for a kind that holds several (labels), a list, where a pick adds or
@@ -241,6 +252,17 @@ export interface PickerListProps {
   tasks: Task[];
   close: () => void;
 }
+
+/**
+ * Whether the task has the property (its appliesTo). A render passes the
+ * task's project as it has it; a key's handler leaves it out, and it is
+ * read from the store.
+ */
+export const applies = (
+  property: Pick<TaskProperty, "appliesTo">,
+  task: Task,
+  project = getRowEvenIfGone("projects", task.project_id),
+) => property.appliesTo?.(task, project) ?? true;
 
 /** The value every one of the tasks has, or undefined when they differ. */
 export function shared<T>(tasks: Task[], get: (task: Task) => T): T | undefined {

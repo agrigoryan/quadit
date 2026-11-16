@@ -48,9 +48,9 @@ function PriorityPill({ value, onChange }: CreateProps) {
 export const priority = {
   name: "priority",
   title: () => t("prop.priority"),
+  key: { key: "p", shortcut: "shortcuts.priority" },
   picker: {
     title: () => t("prop.set.priority"),
-    hotkey: { key: "p", shortcut: "shortcuts.priority" },
     useItems: (tasks) => ({
       items: PRIORITIES.map((p) => ({
         id: String(p),

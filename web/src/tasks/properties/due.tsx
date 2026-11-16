@@ -16,12 +16,13 @@ import { Input } from "@/ui/input";
 import { Tooltip } from "@/ui/tooltip";
 
 /** The browser's own date field, dressed to sit in the grid, with a way to clear it. */
-function DueField({ task }: { task: Task }) {
+function DueField({ task, ref }: { task: Task; ref: PanelProps["takeControl"] }) {
   const can = useCan();
   const readOnly = !can.editTask(task);
   return (
     <>
       <input
+        ref={ref}
         type="date"
         aria-label={t("prop.due")}
         readOnly={readOnly}
@@ -45,10 +46,10 @@ function DueField({ task }: { task: Task }) {
   );
 }
 
-function DueRow({ task }: PanelProps) {
+function DueRow({ task, takeControl }: PanelProps) {
   return (
     <PropRow label={t("prop.due")}>
-      <DueField task={task} />
+      <DueField task={task} ref={takeControl} />
     </PropRow>
   );
 }
@@ -106,9 +107,11 @@ function DuePill({ value, onChange }: CreateProps) {
 export const due = {
   name: "due",
   title: () => t("prop.due"),
+  key: { key: "shift+d", shortcut: "shortcuts.due" },
+  Form: DueForm,
   Panel: DueRow,
   Create: DuePill,
-  bulk: { place: "menu", icon: <CalendarDays />, label: () => t("bulk.due"), Form: DueForm },
+  bulk: { place: "menu", icon: <CalendarDays />, label: () => t("bulk.due") },
   timeline: [
     {
       field: "due_on",

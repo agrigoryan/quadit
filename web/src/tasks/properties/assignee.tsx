@@ -126,9 +126,9 @@ function AssigneeMark({ group }: { group: GroupHead }) {
 export const assignee = {
   name: "assignee",
   title: () => t("prop.assignee"),
+  key: { key: "a", shortcut: "shortcuts.assignee" },
   picker: {
     title: () => t("prop.set.assignee"),
-    hotkey: { key: "a", shortcut: "shortcuts.assignee" },
     useItems: (tasks) => {
       // Those who may read every task's project: the server gives no one
       // work they cannot see.

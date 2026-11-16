@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { MOD } from "@/hooks/hotkeys";
+import { keyHint, MOD } from "@/hooks/hotkeys";
 import { useFocusReturn } from "@/palette/focus-return";
 import { type Key, t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
@@ -22,14 +22,13 @@ interface Section {
   rows: Shortcut[];
 }
 
-/** The keys that open a task property's picker, on a list's row and on the open task alike (tasks/properties). */
-const propertyKeys: Shortcut[] = KEYED.flatMap(({ picker }) =>
-  picker.hotkey ? [{ what: picker.hotkey.shortcut, keys: [picker.hotkey.key.toUpperCase()] }] : [],
-);
+/** The keys that change a task property, on a list's row and on the open task alike (tasks/properties). */
+const propertyKeys: Shortcut[] = KEYED.map(({ key }) => ({ what: key.shortcut, keys: [keyHint(key.key)] }));
 
 /** The keys of tasks/task-keys.tsx: on a list's row or card, and on the open task alike. */
 const taskKeys: Shortcut[] = [
   { what: "shortcuts.assignMe", keys: ["I"] },
+  { what: "shortcuts.watch", keys: ["Shift S"] },
   { what: "shortcuts.copyKey", keys: [`${MOD} .`] },
   { what: "shortcuts.copyBranch", keys: [`Shift ${MOD} .`] },
   { what: "shortcuts.trash", keys: [`${MOD} Backspace`] },
@@ -82,6 +81,7 @@ const sections: Section[] = [
       { what: "shortcuts.back", keys: ["Esc"] },
       ...propertyKeys,
       ...taskKeys,
+      { what: "shortcuts.rename", keys: ["Shift R"] },
       { what: "shortcuts.subtask", keys: [`Shift ${MOD} O`] },
       { what: "shortcuts.comment", keys: ["Ctrl M"] },
       { what: "shortcuts.send", keys: [`${MOD} Enter`] },

@@ -21,11 +21,8 @@ import { noneItem } from "@/tasks/property-picker";
 /** "Cycle 4", where it has no name of its own. */
 export const cycleName = (c: Cycle) => c.name || t("prop.cycleName", { n: String(c.number) });
 
-/** Shown where the task's project works in cycles. */
 function CycleRow(panel: PanelProps) {
-  const project = useRowEvenIfGone("projects", panel.task.project_id);
   const c = useRowEvenIfGone("cycles", panel.task.cycle_id);
-  if (!project?.settings?.cycles) return null;
   const name = c ? cycleName(c) : t("task.noCycle");
   return (
     <PickerRow property={cycle} panel={panel} value={name} empty={!c}>
@@ -64,6 +61,8 @@ function cyclesNamed(ref: string, { c, inScope }: QueryContext): string[] {
 export const cycle = {
   name: "cycle",
   title: () => t("prop.cycle"),
+  appliesTo: (_task, project) => !!project?.settings?.cycles,
+  key: { key: "shift+c", shortcut: "shortcuts.cycle" },
   picker: {
     title: () => t("prop.set.cycle"),
     useItems: (tasks) => ({
@@ -81,12 +80,7 @@ export const cycle = {
     pick: (tasks, id) => setCycle(tasks, id === NONE ? null : id),
   },
   Panel: CycleRow,
-  bulk: {
-    place: "menu",
-    icon: <RefreshCw />,
-    label: () => t("prop.set.cycle"),
-    offered: (project) => !!project?.settings?.cycles,
-  },
+  bulk: { place: "menu", icon: <RefreshCw />, label: () => t("prop.set.cycle") },
   timeline: [
     {
       field: "cycle_id",
