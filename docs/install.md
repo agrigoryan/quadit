@@ -72,6 +72,12 @@ quadit restore FILE --workspace games --doc PAGE_ID     # or one page
 
 Scheduled backups are a switch in the admin area. Each one is read back and checked before it counts; the last one shows in the health panel. Deleted tasks, pages and files stay in the trash for 30 days first.
 
+## Export
+
+An admin can download a workspace as one zip of open formats, in Settings → General → Export workspace or with `GET /api/v1/w/SLUG/export`: tasks and pages as Markdown, every table as JSON, and the uploaded files. Its `README.txt` says what is where.
+
+An export is complete: it contains everything in the workspace, every project and every member's private pages included, which the admin who exports could not open in the app. Treat the file accordingly. A token limited to some projects is refused an export, and each export is written to the audit log.
+
 ## Upgrades
 
 Replace the binary and start it; or, to do the database step by itself first, run `quadit upgrade`. If the new version changes the schema, a copy of the database as it was is made before anything is changed:

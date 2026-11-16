@@ -12,8 +12,9 @@ import (
 
 // docs/ of an export: the page tree as folders of Markdown.
 
-// docs writes docs/: the page tree as folders of Markdown; private pages of
-// others stay out.
+// docs writes docs/: the page tree as folders of Markdown. Every page is
+// written, the pages members keep private too, as in data/: the export is
+// the whole workspace (handleExportWorkspace).
 func (e *exporter) docs(rows *exportRows) error {
 	blocksOf := map[string][]core.Block{}
 	for _, bl := range rows.blocks {
@@ -25,9 +26,6 @@ func (e *exporter) docs(rows *exportRows) error {
 	}
 	used := map[string]bool{}
 	for _, d := range rows.docs {
-		if !e.who.canSeeDoc(d) {
-			continue
-		}
 		path := "docs/" + docPath(byID, d, 0)
 		for n := 2; used[path]; n++ {
 			path = fmt.Sprintf("docs/%s (%d)", docPath(byID, d, 0), n)

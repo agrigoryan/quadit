@@ -32334,6 +32334,7 @@ docs/Game docs/Style guide.md
 docs/Salary notes.md
 docs/Sprites/Boss attack.md
 docs/For Bea.md
+docs/Bea's own.md
 docs/SVA design.md
 docs/OPS runbook.md
 docs/OPS secrets.md
@@ -32368,6 +32369,10 @@ docs/    one Markdown file per page, in folders that follow the page tree;
 data/    every row of the workspace as JSON, one file per kind, for programs
 files/   the uploaded files, as they were uploaded; any that could not be
          included are named, with the reason, in files/NOT-INCLUDED.txt
+
+It holds everything in the workspace: every project, and the private pages
+of every member, the ones of others included. Keep it as you would keep
+those pages.
 
 Nothing here needs this product to be read.
 
@@ -42289,6 +42294,10 @@ Wind up, then strike.
 === GET /api/v1/w/games/export: docs/For Bea.md
 200
 between us, about SVA-2
+
+=== GET /api/v1/w/games/export: docs/Bea's own.md
+200
+mine
 
 === GET /api/v1/w/games/export: docs/SVA design.md
 200

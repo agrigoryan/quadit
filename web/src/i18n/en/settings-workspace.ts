@@ -10,7 +10,7 @@ export const workspaceStrings = {
   "general.addressHint": "The address is set when the workspace is made and does not change.",
   "general.export.title": "Export",
   "general.export.lead":
-    "Download everything in this workspace as one zip file: tasks, decisions, comments and pages as Markdown, every table as JSON, and the uploaded files.",
+    "Download everything in this workspace as one zip file: tasks, decisions, comments and pages as Markdown, every table as JSON, and the uploaded files. The export contains everything in the workspace, members' private pages included.",
   "general.export.button": "Export workspace",
   "general.export.started": "The export is being prepared; your browser will save it when it is ready.",
   "general.danger": "Danger zone",

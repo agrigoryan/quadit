@@ -647,7 +647,7 @@ OPS Todo: 2
 // One line per entry of the archive, in the archive's order: name, how it
 // is kept, size and SHA-256 of what it holds.
 const shapeExport = `
-README.txt | deflated | 544 | 2b29ac480d703e8b09fc5cf23bf80d8d7a0fe14985ba15b4ee5ed816b9a05bca
+README.txt | deflated | 705 | d5b732b4d9a9139d7f738562f7ec1e6cf4e8effb96421f59172f5fc9e8842929
 data/members.json | deflated | 774 | 2b805133015a47587ef2c143641d297c3fc48d8f3cd109dca65f4fd81a97104b
 data/projects.json | deflated | 344 | 1a512062438cf547ca5c3ca4e586922b433dbae258976396509ef55816a7ad50
 data/statuses.json | deflated | 1893 | ecfd23fa6bd35d948c79a0b54cc139a81b5281dc6f0b0e4e39e72f6638807230

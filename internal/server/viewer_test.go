@@ -506,11 +506,46 @@ func TestAnExportIsNotForATokenLimitedToSomeProjects(t *testing.T) {
 	})
 }
 
+// TestAnAdminsExportHoldsEveryMembersPrivatePages: an export is the whole
+// workspace, for the admin who keeps it. A page another member keeps
+// private, and the page under it, are in it like any other: as rows in
+// data/, and written out in docs/. Its README says so.
+func TestAnAdminsExportHoldsEveryMembersPrivatePages(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other"})
+		var other struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
+		s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "for everyone\n"})
+		diary := s.change(nil, other.Token, "doc.create", M{"title": "Diary", "private": true, "markdown": "quokka\n"})["ref"].(string)
+		s.change(nil, other.Token, "doc.create", M{"parent": diary, "title": "Monday", "markdown": "wombat\n"})
+		// The owner, an admin, may not open the page.
+		s.call(s.owner, "", "GET", w+"/docs/"+diary, nil, 404, nil)
+
+		archive := s.call(s.owner, "", "GET", w+"/export", nil, 200, nil)
+		pages := unzipped(t, archive, "docs/")
+		for _, want := range []string{"=== docs/Handbook.md\nfor everyone", "=== docs/Diary.md\nquokka", "=== docs/Diary/Monday.md\nwombat"} {
+			if !strings.Contains(pages, want) {
+				t.Errorf("docs/ of an admin's export does not hold %q: %s", want, pages)
+			}
+		}
+		if rows := unzipped(t, archive, "data/docs.json"); !strings.Contains(rows, diary) || !strings.Contains(rows, `"title": "Monday"`) {
+			t.Errorf("data/ of an admin's export does not hold the private page and the page under it: %s", rows)
+		}
+		if blocks := unzipped(t, archive, "data/blocks.json"); !strings.Contains(blocks, "quokka") || !strings.Contains(blocks, "wombat") {
+			t.Errorf("data/ of an admin's export does not hold what is written on the private pages: %s", blocks)
+		}
+		if readme := unzipped(t, archive, "README.txt"); !strings.Contains(readme, "private pages") {
+			t.Errorf("the export's README does not say it holds members' private pages: %s", readme)
+		}
+	})
+}
+
 // TestAPrivatePagesSubPagesAreNotSeenByOthers: a page made private after
 // it had sub-pages takes them along. Another member, an admin even, does
 // not get the sub-page or the one under it in the page list, cannot open
 // them, does not find them or what is on them by search, in the starting
-// copy, the list of files or an export, is not told of what happens to
+// copy or the list of files, is not told of what happens to
 // them afterwards, and does not see them among what mentions a page or a
 // task, or among a page's sub-pages.
 func TestAPrivatePagesSubPagesAreNotSeenByOthers(t *testing.T) {
@@ -559,11 +594,6 @@ func TestAPrivatePagesSubPagesAreNotSeenByOthers(t *testing.T) {
 		}
 		leaks("what mentions a task", s.call(nil, other, "GET", w+"/tasks/SVA-1", nil, 200, nil))
 		leaks("what mentions a page", s.call(nil, other, "GET", w+"/docs/"+handbook, nil, 200, nil))
-		// An export's data/ is every row of the workspace, for the admin who
-		// keeps it; its docs/ is the pages as the admin may read them.
-		if pages := unzipped(t, s.call(nil, other, "GET", w+"/export", nil, 200, nil), "docs/"); strings.Contains(pages, "quokka") || !strings.Contains(pages, "docs/Handbook.md") {
-			t.Errorf("an export's pages hold the private sub-pages, or not the page that is everyone's: %s", pages)
-		}
 
 		// A sub-page someone keeps private under a page others see is not
 		// among that page's sub-pages for them.

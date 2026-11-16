@@ -14,6 +14,14 @@ import (
 
 // The export of a workspace: a zip of Markdown, JSON and the uploaded
 // files, written by the parts in export_*.go.
+//
+// An export is complete. It is the copy of the workspace its admins keep,
+// so it holds everything as stored, with no rule of who may see what:
+// every project, and every member's private pages, which the admin who
+// asks for it could not open in the product. That is the owner's decision,
+// and it is said where a person meets it: the archive's README, the
+// export's text in Settings, and docs/install.md. Only an admin who is not
+// limited to some projects may ask for one.
 
 // exportRoutes is the route of the workspace export.
 func (s *Server) exportRoutes() []route {
@@ -31,6 +39,10 @@ docs/    one Markdown file per page, in folders that follow the page tree;
 data/    every row of the workspace as JSON, one file per kind, for programs
 files/   the uploaded files, as they were uploaded; any that could not be
          included are named, with the reason, in files/NOT-INCLUDED.txt
+
+It holds everything in the workspace: every project, and the private pages
+of every member, the ones of others included. Keep it as you would keep
+those pages.
 
 Nothing here needs this product to be read.
 `
@@ -59,8 +71,9 @@ func (s *Server) handleExportWorkspace(x *c) error {
 	if err := x.admin(); err != nil {
 		return err
 	}
-	// The export is written as stored, with no rule of who may see what:
-	// it is for a caller who may see it all.
+	// The export is written as stored, with no rule of who may see what
+	// (members' private pages are in it): it is for an admin of the whole
+	// workspace.
 	if x.limited() {
 		return errForbidden("an export holds every project of the workspace, and this credential is limited to some of them; ask with one that is not")
 	}
