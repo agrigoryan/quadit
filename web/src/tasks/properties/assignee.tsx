@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { CircleSlash, UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { mayBeGivenWork } from "@/data/access";
 import { useListening } from "@/data/listening";
 import { useMe, useMember, useMembers } from "@/data/selectors";
 import type { Task } from "@/types/core";
@@ -56,8 +57,8 @@ function AssigneeRow(panel: PanelProps) {
   );
 }
 
-function AssigneePill({ value, onChange }: CreateProps) {
-  const members = useMembers();
+function AssigneePill({ project, value, onChange }: CreateProps) {
+  const members = useMembers().filter((m) => mayBeGivenWork(m, project.id));
   const me = useMe();
   const listening = useListening();
   const person = members.find((m) => m.user_id === value.assigneeId);
@@ -81,7 +82,11 @@ function AssigneePill({ value, onChange }: CreateProps) {
   );
 }
 
-/** Unassigned, then me, then everyone else with their handle; a suspended member only while it has the task. */
+/**
+ * Unassigned, then me, then everyone else with their handle; a suspended
+ * member, or one who may not read the task's project, only while it has
+ * the task.
+ */
 function useChoices(task: Task): Choice[] {
   const members = useMembers();
   const me = useMe();
@@ -95,7 +100,7 @@ function useChoices(task: Task): Choice[] {
       apply: () => setAssignee([task], null),
     },
     ...[...members]
-      .filter((m) => !m.suspended_at || m.user_id === task.assignee_id)
+      .filter((m) => m.user_id === task.assignee_id || (!m.suspended_at && mayBeGivenWork(m, task.project_id)))
       .sort((a, b) => Number(b.user_id === me.user_id) - Number(a.user_id === me.user_id))
       .map((m) => ({
         id: m.user_id,
@@ -125,7 +130,9 @@ export const assignee = {
     title: () => t("prop.set.assignee"),
     hotkey: { key: "a", shortcut: "shortcuts.assignee" },
     useItems: (tasks) => {
-      const members = useMembers();
+      // Those who may read every task's project: the server gives no one
+      // work they cannot see.
+      const members = useMembers().filter((m) => tasks.every((task) => mayBeGivenWork(m, task.project_id)));
       const me = useMe();
       // Asked of the server only while the list is open.
       const listening = useListening();

@@ -2,7 +2,7 @@
 // The property picker (tasks/property-picker.tsx), kind by kind: the rows it
 // offers for a task, the one it marks as picked, and the change a pick sends.
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { WithQuery } from "@/test/query";
@@ -71,6 +71,7 @@ beforeEach(() => {
     members: [
       { user_id: "u1", handle: "ann", name: "Ann", kind: "person", role: "owner" },
       { user_id: "u2", handle: "coder", name: "Coder", kind: "agent", role: "member" },
+      { user_id: "u3", handle: "opsbot", name: "Ops bot", kind: "agent", role: "member", scope: { projects: ["p2"] } },
     ],
     labels: [
       { id: "l1", project_id: "p1", name: "bug" },
@@ -135,6 +136,14 @@ describe("TaskPropertyPicker", () => {
     expect(rows()).toEqual(["Unassigned ✓", "Ann", "Coder · Agent"]);
     pick(/Coder/);
     expect(await lastSent()).toEqual({ type: "task.update", args: { id: "t1", assignee: "u2" } });
+  });
+
+  it("assignee and waiting: only those who may read the task's project", () => {
+    open("assignee", [task({ id: "t2", project_id: "p2", key: "OPS-1", status_id: "s9" })]);
+    expect(rows()).toEqual(["Unassigned ✓", "Ann", "Coder · Agent", "Ops bot · Agent"]);
+    cleanup();
+    open("waiting");
+    expect(rows()).toEqual(["Nobody ✓", "An outside event…", "Ann", "Coder · Agent"]);
   });
 
   it("waiting: nobody, an outside event, then the people; an outside event asks for a note", async () => {

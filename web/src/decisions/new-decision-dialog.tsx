@@ -8,6 +8,7 @@ import { cx } from "@/lib/cx";
 import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { sendOnModEnter } from "@/lib/mod-enter";
+import { mayBeGivenWork } from "@/data/access";
 import { useMe, useMembers, useRow } from "@/data/selectors";
 import { Button } from "@/ui/button";
 import { Dialog } from "@/ui/dialog";
@@ -90,8 +91,11 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
   const questionError = !draft.question.trim() ? problems.question : undefined;
   const optionsError = labelled(draft.options) < 2 ? problems.options : undefined;
   const uploading = draft.kind === "choice" && draft.options.some((o) => o.files.some((f) => !f.file && !f.failed));
-  // The people who can be asked: everyone but the asker and the suspended.
-  const askable = useMembers().filter((m) => m.user_id !== me.user_id && !m.suspended_at);
+  // The people who can be asked: everyone but the asker, the suspended and
+  // those who may not read the task's project.
+  const askable = useMembers().filter(
+    (m) => m.user_id !== me.user_id && !m.suspended_at && mayBeGivenWork(m, task?.project_id),
+  );
   const asked = askable.find((m) => m.user_id === draft.ask);
   /** The server's refusal: one line in the footer, whichever field it names. */
   const [refusal, setRefusal] = useState("");

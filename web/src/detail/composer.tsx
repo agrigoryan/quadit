@@ -7,6 +7,7 @@ import { CircleSlash, CornerDownRight, Paperclip, X } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
+import { mayBeGivenWork } from "@/data/access";
 import { useMe, useMember, useMembers } from "@/data/selectors";
 import type { FileRow, Task } from "@/types/core";
 import { addDraftFiles, createComment, editDraft, EMPTY_DRAFT, useDrafts } from "@/detail/comment-actions";
@@ -24,7 +25,8 @@ const NOBODY = "none";
 
 export function Composer({ task }: { task: Task }) {
   const me = useMe();
-  const members = useMembers();
+  // The task may be handed to those who may read its project.
+  const members = useMembers().filter((m) => mayBeGivenWork(m, task.project_id));
   const draft = useDrafts((s) => s.drafts[task.id]) ?? EMPTY_DRAFT;
   const handTo = useMember(draft.handTo ?? undefined);
   const chooser = useRef<HTMLInputElement>(null);

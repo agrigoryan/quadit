@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from "react";
 import { Globe } from "lucide-react";
-import { useCan } from "@/data/access";
+import { mayBeGivenWork, useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useListening } from "@/data/listening";
@@ -30,7 +30,9 @@ import { Input, Textarea } from "@/ui/input";
 import { PickerList } from "@/ui/picker";
 
 function useItems(tasks: Task[]) {
-  const members = useMembers();
+  // Those who may read every task's project: the server makes no task wait
+  // on someone who cannot see it.
+  const members = useMembers().filter((m) => tasks.every((task) => mayBeGivenWork(m, task.project_id)));
   const me = useMe();
   // Asked of the server only while the list is open.
   const listening = useListening();

@@ -41,6 +41,17 @@ const NOTHING: Access = {
   own: false,
 };
 
+/**
+ * Whether a member may be given work in a project (a task assigned to them,
+ * waiting on them, a question asked of them): only one who may read it. The
+ * server refuses the rest (personOnTask in internal/engine). No project:
+ * anyone.
+ */
+export function mayBeGivenWork(member: Member, projectId?: string): boolean {
+  const projects = member.scope?.projects ?? [];
+  return !projectId || projects.length === 0 || projects.includes(projectId);
+}
+
 /** What a member may do. Outside a component, pass getState().me. */
 export function can(me: Member | null | undefined): Access {
   if (!me) return NOTHING;
