@@ -28,7 +28,7 @@ API paths are under `/api/v1/w/-/`; the `-` means "the workspace of this token".
 - Names work wherever ids do: `SVA-12`, `@handle`, a status, label, epic, milestone or saved view by name, a priority as `high`, `me`. A decision is named by its task: `SVA-12` when the task has one open question, `SVA-12#2` for its second.
 - Every list takes `fields=key,title` (only those fields, and the id) and `since=1042` (only what changed after that feed position), so you never pay for what you already know.
 - A long list says how to read on: `cursor=…` from the last answer. Tasks added while you page are left for the next read, and tasks that close do not shift the rest. A task whose own place in the order changes while you read (its priority is raised in a list read by priority) comes at the end of the last page, so none is missed; it may be one you saw before, now with its new values (`changed_while_reading` says how many).
-- A task moved to another project gets a new key; the old key still finds it.
+- A task moved to another project gets a new key; the old key still finds it. Moved back to a project it was in, it gets its key there back (unless another task has that number now).
 - A saved view that names a label, status or epic deleted since is read without that part, and the answer says so (`note`).
 - `quadit tasks assignee=me status=todo label=art open=1 sort=priority`; `count=1` returns only the number; `view=SLUG` runs a saved view.
 - `quadit show SVA-12 since=1042` returns only what happened in the task after feed position 1042.

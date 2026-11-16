@@ -19,11 +19,12 @@ type taskMoveArgs struct {
 	Project string `json:"project" quadit:"required,handler"`
 }
 
-// taskMove moves a task to another project. It gets a new number there; its
-// status becomes the nearest one of the same category, and labels, epic and
-// cycle that belong to the old project are dropped. It is refused while
-// the task is given to, waits on or asks a member who cannot read the new
-// project (see personOnTask).
+// taskMove moves a task to another project. It gets a new number there, or
+// the one it had there before (see takeNumberIn), and its old key still
+// finds it; its status becomes the nearest one of the same category, and
+// labels, epic and cycle that belong to the old project are dropped. It is
+// refused while the task is given to, waits on or asks a member who cannot
+// read the new project (see personOnTask).
 func taskMove(c *cx, a taskMoveArgs) error {
 	t, err := c.task("id", a.ID)
 	if err != nil {
@@ -44,18 +45,18 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	if err != nil {
 		return err
 	}
-	n, err := c.tx.Incr(c.ctx, "projects", "task_counter", 1, store.Eq("id", to.ID))
-	if err != nil {
-		return err
-	}
 	oldKey, oldProject := t.Key, t.ProjectID
 	if err := c.tx.Upsert(c.ctx, core.TaskKey{WorkspaceID: c.ws, Key: oldKey, TaskID: t.ID, At: c.at}, "workspace_id", "key"); err != nil {
 		return err
 	}
+	n, err := c.takeNumberIn(to, t.ID)
+	if err != nil {
+		return err
+	}
 	p := newPatch()
 	p.put("project_id", t.ProjectID, to.ID)
-	p.put("number", t.Number, int(n))
-	p.put("key", t.Key, to.Key+"-"+strconv.Itoa(int(n)))
+	p.put("number", t.Number, n)
+	p.put("key", t.Key, to.Key+"-"+strconv.Itoa(n))
 	p.put("status_id", t.StatusID, st.ID)
 	p.put("epic_id", t.EpicID, "")
 	p.put("milestone_id", t.MilestoneID, "")
@@ -67,11 +68,49 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	if err := c.setLabels(p, &t, keep); err != nil {
 		return err
 	}
-	t.ProjectID, t.Number, t.Key = to.ID, int(n), to.Key+"-"+strconv.Itoa(int(n))
+	t.ProjectID, t.Number, t.Key = to.ID, n, to.Key+"-"+strconv.Itoa(n)
 	if err := c.saveTask(t, p, core.EventData{MovedFrom: oldKey, FromProjectID: oldProject}); err != nil {
 		return err
 	}
 	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})
+}
+
+// takeNumberIn is the number a task moving to project to takes there. A
+// task that was there before takes back its number there (that of its most
+// recent old key that starts with the project's key), so a move that is
+// undone leaves the task as it was; that key is its own again, no longer an
+// old one. A number another task holds now (the key went to another project
+// meanwhile) is not taken. Otherwise the task takes the project's next
+// number.
+func (c *cx) takeNumberIn(to core.Project, taskID string) (int, error) {
+	var old []core.TaskKey
+	if err := c.tx.List(c.ctx, &old, store.Q{Where: []store.Cond{store.Eq("task_id", taskID)}, Order: "-at"}); err != nil {
+		return 0, err
+	}
+	for _, k := range old {
+		prefix, number, _ := strings.Cut(k.Key, "-")
+		n, err := strconv.Atoi(number)
+		if prefix != to.Key || err != nil || n <= 0 {
+			continue
+		}
+		taken, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", to.ID), store.Eq("number", n))
+		if err != nil {
+			return 0, err
+		}
+		held, err := c.tx.Count(c.ctx, "tasks", store.Eq("key", k.Key))
+		if err != nil {
+			return 0, err
+		}
+		if taken+held > 0 {
+			continue
+		}
+		if _, err := c.tx.Delete(c.ctx, "task_keys", store.Eq("key", k.Key)); err != nil {
+			return 0, err
+		}
+		return n, nil
+	}
+	n, err := c.tx.Incr(c.ctx, "projects", "task_counter", 1, store.Eq("id", to.ID))
+	return int(n), err
 }
 
 // checkPeopleCanFollow refuses to move a task to a project that a member
