@@ -131,7 +131,7 @@ export function Board({ groups, project }: Props) {
   // While a card is being dragged the columns follow the pointer, not the store.
   const [order, setOrder] = useState<Order | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
-  const keys = useBoardKeys(groups, scroller);
+  const keys = useBoardKeys(groups, scroller, activeId !== null);
 
   const { cards, byGroup } = useMemo(() => {
     const cards = new Map<string, Card & { group: TaskGroup }>();
@@ -263,7 +263,7 @@ export function Board({ groups, project }: Props) {
             ? ((order[group.id] ?? []).map((id) => cards.get(id)).filter(Boolean) as Card[])
             : (byGroup.get(group.id) ?? []);
           return (
-            <div key={group.id} className="h-full max-sm:snap-center">
+            <div key={group.id} data-column={group.id} className="h-full max-sm:snap-center">
               <BoardColumn group={group} cards={list} project={project} activeId={activeId} editable={editable} />
             </div>
           );

@@ -134,7 +134,7 @@ export const pages = {
   "shortcuts.group.gotoHint": "G, then the letter. A project's pages open for the project in view.",
   "shortcuts.group.lists": "Lists",
   "shortcuts.group.listsHint":
-    "The task list, the board, My work, the inbox, and the tasks on an epic's or a cycle's page; a key that names one of them works there only. A board has no rows to move along: its keys mean the card that has the focus, else the one under the pointer. In the inbox a key for a task acts on the task the item is about.",
+    "The task list, the board, My work, the inbox, and the tasks on an epic's or a cycle's page; a key that names one of them works there only. On a board the keys move the focus from card to card, and a key for a task means the card that has the focus, else the one under the pointer. In the inbox a key for a task acts on the task the item is about.",
   "shortcuts.group.inbox": "Inbox",
   "shortcuts.group.panel": "A task",
   "shortcuts.group.panelHint": "In the panel over a list, and on the task's own page.",
@@ -183,6 +183,7 @@ export const pages = {
   "shortcuts.duplicate": "Mark as a duplicate of a task",
   "shortcuts.openSubtask": "Open the first sub-task",
   "shortcuts.fold": "Task list: fold or unfold sub-tasks",
+  "shortcuts.across": "Board: the card in the column beside",
   "shortcuts.status": "Change status",
   "shortcuts.assignee": "Change assignee",
   "shortcuts.priority": "Change priority",

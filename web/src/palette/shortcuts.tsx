@@ -67,6 +67,7 @@ const sections: Section[] = [
       { what: "shortcuts.selectAll", keys: [`${MOD} A`] },
       { what: "shortcuts.clear", keys: ["Esc"] },
       { what: "shortcuts.fold", keys: ["←", "→"], join: "or" },
+      { what: "shortcuts.across", keys: ["←", "→"], join: "or" },
       { what: "shortcuts.filter", keys: ["F"] },
       { what: "shortcuts.lift", keys: ["Shift Space"] },
     ],
