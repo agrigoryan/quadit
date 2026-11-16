@@ -43,6 +43,9 @@ type cx struct {
 	origin string
 	// quiet is set for a change that tells nobody (Change.Quiet).
 	quiet bool
+	// noNews is set for a change that puts nothing in an inbox: the undo of
+	// a change made a moment ago (takeBackNews).
+	noNews bool
 	// asker is the member named with "for": the one this change is made for.
 	asker string
 	// askerOK remembers the tasks whose asker was already checked.
@@ -103,7 +106,8 @@ func (c *cx) emit(e event) error {
 			return err
 		}
 	}
-	e.data.Rule, e.data.Quiet = c.origin, c.quiet // every event says which rule caused it, and whether it was only brought in
+	// Every event says which rule caused it, whether it was only brought in, and which change it takes back.
+	e.data.Rule, e.data.Quiet, e.data.Undoes = c.origin, c.quiet, c.change.Undoes
 	raw, err := json.Marshal(e.data)
 	if err != nil {
 		return err

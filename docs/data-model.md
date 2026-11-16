@@ -43,10 +43,11 @@ An event names the row that changed (`entity`) and the object whose timeline it 
 | `{"id", "gone": true}` | The row was removed for good | Drop it |
 | `{"id", "changes", "blocks": […] or null, "deleted": […] or null}` | `doc.edited`: a page's blocks were edited. `id` and `changes` are the page's own; `blocks` are the blocks written, whole; `deleted` the ids of the blocks taken out | Apply the changes to the page, put each block in its copy, drop the deleted ones |
 
-Two keys can be on the data of any event:
+Three keys can be on the data of any event:
 
 - `rule`: the id of the rule whose action made the change. A change a person or an agent made has none.
 - `quiet: true`: the change brought history in (an import) and was not done now. It notifies nobody and sets off no rule; a webhook still gets it, with `quiet` in its payload.
+- `undoes`: the id of the earlier change this one takes back (a change sent with `"undoes": "<change id>"`, as the web app's Cmd+Z does). The two together left things as they were. When the earlier change was the same member's and no more than five minutes old, the inbox items it made that nobody had read are removed (`notification.deleted`, to their owner alone) and the undo makes none; rules and webhooks see both changes.
 
 The keys an event's data can have are defined once, by `core.EventData`; `internal/engine/testdata/events.golden` has an example of every event.
 

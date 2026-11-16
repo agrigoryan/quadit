@@ -35,6 +35,12 @@ type Change struct {
 	// nobody, no inbox item and no wake-up, though its events are in the
 	// feed as usual, each marked "quiet". Only an admin may send it.
 	Quiet bool `json:"quiet,omitempty"`
+	// Undoes is the id of an earlier change that this one takes back (a
+	// person's Cmd+Z). Its events say so, and when the earlier change was
+	// the same member's of a moment ago, what it put in inboxes and nobody
+	// has read is taken out again, and this change puts nothing in them
+	// (see takeBackNews).
+	Undoes string `json:"undoes,omitempty"`
 }
 
 // Result says what a change produced.
@@ -205,6 +211,9 @@ func (b *batch) apply(ch Change) (*Result, error) {
 		if err := c.checkApproval(); err != nil {
 			return nil, err
 		}
+	}
+	if err := c.takeBackNews(); err != nil {
+		return nil, err
 	}
 	if err := h.fn(c); err != nil {
 		return nil, err

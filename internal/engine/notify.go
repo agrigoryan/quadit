@@ -5,6 +5,7 @@ package engine
 import (
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -18,7 +19,7 @@ import (
 // first. A quiet change (history being imported) notifies nobody, and a
 // member is not told of a task or a page of a project they may not read.
 func (c *cx) notify(userID, typ string, n core.Notification) error {
-	if userID == "" || (userID == c.actor.UserID && !c.selfNotify) || c.quiet {
+	if userID == "" || (userID == c.actor.UserID && !c.selfNotify) || c.quiet || c.noNews {
 		return nil
 	}
 	key := userID + "|" + n.TaskID + n.DocID
@@ -64,6 +65,57 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 	err := c.emit(event{seq: seq, typ: "notification.created", entity: "notification", entityID: n.ID, place: where, audience: userID, data: core.EventData{Row: n}})
 	c.system = was
 	return err
+}
+
+// undoWindow is how long after a change its undo still takes its news back.
+const undoWindow = 5 * time.Minute
+
+// takeBackNews is for a change that undoes an earlier one (Change.Undoes).
+// A mistake put right at once is news to nobody: when the earlier change
+// was this member's own and no older than undoWindow, the inbox items it
+// made that are still unread are removed (a push or a mail not yet sent
+// for them is then never sent), and this change makes none. An undo that
+// comes later, or of someone else's change, is a change like any other:
+// what the first one said has been read or acted on by then.
+func (c *cx) takeBackNews() error {
+	if c.change.Undoes == "" {
+		return nil
+	}
+	var undone core.AppliedChange
+	found, err := store.Find(c.ctx, c.tx, &undone, store.Eq("id", c.change.Undoes))
+	if err != nil || !found || undone.ActorID != c.actor.UserID || c.at-undone.CreatedAt > undoWindow.Milliseconds() {
+		return err
+	}
+	c.noNews = true
+	// The earlier change's events are the feed from its first position to its last.
+	told, err := c.tx.Events(c.ctx, store.EventFilter{After: undone.FirstSeq - 1, Types: []string{"notification.created"},
+		ActorID: c.actor.UserID, Limit: int(undone.LastSeq - undone.FirstSeq + 1)})
+	if err != nil {
+		return err
+	}
+	for _, ev := range told {
+		if ev.Seq > undone.LastSeq || ev.ChangeID != undone.ID {
+			continue
+		}
+		n, err := c.tx.Delete(c.ctx, "notifications", store.Eq("id", ev.EntityID), store.Null("read_at"), store.Null("archived_at"))
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			continue // read or put away already: it stays as it is
+		}
+		// Like the item itself, its going is told to its owner alone, whatever the actor's own limits.
+		was := c.system
+		c.system = true
+		err = c.emit(event{seq: c.tx.NextSeq(), typ: "notification.deleted", entity: "notification", entityID: ev.EntityID,
+			place: place{scopeType: ev.ScopeType, scopeID: ev.ScopeID, projectID: ev.ProjectID}, audience: ev.AudienceID,
+			data: core.EventData{ID: ev.EntityID, Gone: true}})
+		c.system = was
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // about is what in a task a notification is about: a comment, a decision,

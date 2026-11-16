@@ -366,6 +366,14 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 	do("milestone.restore", M{"id": milestone})
 	do("cycle.restore", M{"id": cycle})
 
+	// A mistake put right at once: the undo names the change it takes back,
+	// and the inbox item that change made goes with it.
+	wrong := do("task.create", M{"project": "SVA", "title": "Made by mistake", "assignee": "@artist"})
+	raw, _ = json.Marshal(M{"id": wrong.Ref})
+	if _, err := try(Change{Type: "task.delete", Args: raw, Undoes: wrong.ChangeID}, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+
 	do("workspace.delete", M{"confirm": "events"})
 
 	for _, typ := range ChangeTypes() {

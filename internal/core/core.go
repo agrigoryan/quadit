@@ -489,8 +489,12 @@ type EventData struct {
 	Slug         string  `json:"slug,omitempty"`
 	TaskID       *string `json:"task_id,omitempty"` // on claim.updated: the task the hold is for, or ""
 	RelationType string  `json:"type,omitempty"`
-	UserID       string  `json:"user_id,omitempty"`
-	Why          string  `json:"why,omitempty"` // what happened to a hold: acquired, renewed, released, expired
+	// Undoes is the id of the earlier change this one takes back (the web
+	// app's Cmd+Z): the pair left things as they were. The engine sets it
+	// on every event of a change that names one.
+	Undoes string `json:"undoes,omitempty"`
+	UserID string `json:"user_id,omitempty"`
+	Why    string `json:"why,omitempty"` // what happened to a hold: acquired, renewed, released, expired
 }
 
 // Answer is the answer a decision had.

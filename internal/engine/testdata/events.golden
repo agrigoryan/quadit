@@ -186,4 +186,8 @@ cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170156000}},"id":"#
 epic.restored {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170151000,"updated_at":1774170151000,"updated_seq":186}}
 milestone.restored {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170152000,"updated_seq":187}}
 cycle.restored {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170153000,"updated_seq":188}}
+task.created {"row":{"id":"#89","project_id":"#5","number":7,"key":"SVA-7","title":"Made by mistake","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"00000005j4","created_by":"#3","created_at":1774170160000,"updated_at":1774170160000,"created_seq":189,"updated_seq":189,"activity_seq":189}}
+notification.created {"row":{"id":"#90","user_id":"#2","seq":190,"type":"assigned","actor_id":"#3","task_id":"#89","entity_type":"task","entity_id":"#89","title":"SVA-7 Made by mistake","created_at":1774170160000}}
+notification.deleted {"gone":true,"id":"#90","undoes":"#91"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1774170161000}},"deleted":true,"id":"#89","key":"SVA-7","undoes":"#91"}
 workspace.deleted {"gone":true,"id":"#1","slug":"events"}
