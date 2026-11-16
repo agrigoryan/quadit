@@ -135,6 +135,7 @@ export function TableView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps
       e.preventDefault();
       onOpen(active.row);
     } else if (e.key === "Escape") {
+      e.preventDefault(); // the cell is let go of; a second Escape leaves the page
       setActive(null);
     } else if (readOnly) {
       // Moving about and opening rows only.

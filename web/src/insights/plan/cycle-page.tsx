@@ -12,6 +12,7 @@ import { statusesOf, useCycles, useLookup, useProjectByKey, useRow, useSlug } fr
 import { daysUntil, formatDay, serverDay } from "@/lib/time";
 import { type Cycle, isOpenCategory, type Project, type Task } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
+import { useEscapeBack } from "@/nav/escape-back";
 import { DataTable, TableSwitch } from "@/insights/charts/base";
 import { BurnUp, burnRows } from "@/insights/charts/burn-up";
 import { count } from "@/lib/amounts";
@@ -68,12 +69,14 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
     [statuses, project.id, tasks],
   );
   const left = daysUntil(cycle.ends_on, serverDay()); // a cycle's days are the server's
+  const list = `/${slug}/p/${project.key}/cycles`;
+  useEscapeBack(list);
 
   return (
     <div className="flex h-full flex-col">
       <PageBar>
         <Link
-          to={`/${slug}/p/${project.key}/cycles`}
+          to={list}
           className="flex h-7 items-center gap-1 rounded-md pr-2 pl-1 text-sm text-ink-2 hover:bg-hover hover:text-ink"
         >
           <ChevronLeft className="size-4" aria-hidden />

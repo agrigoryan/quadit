@@ -9,6 +9,7 @@ import { useCan } from "@/data/access";
 import { useMe, useMembers, useProjectByKey, useRow, useSlug } from "@/data/selectors";
 import type { Epic, Project } from "@/types/core";
 import { ui, usePageTitle } from "@/lib/ui-state";
+import { useEscapeBack } from "@/nav/escape-back";
 import { setWatchingEpic, updateEpic } from "@/insights/plan/actions";
 import { EpicDescription } from "@/insights/plan/epic-description";
 import { EpicDialog } from "@/insights/plan/epic-dialog";
@@ -50,6 +51,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
   const [deleting, setDeleting] = useState(false);
   const risk = riskOf(epic, tally);
   const list = `/${slug}/p/${project.key}/epics`;
+  useEscapeBack(list);
   const backwards = (start: string, target: string) => !!start && !!target && target < start;
 
   return (

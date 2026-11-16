@@ -6,11 +6,13 @@ import { t } from "@/lib/i18n";
 import { isNotFound, readError } from "@/data/query";
 import { useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { usePageTitle } from "@/lib/ui-state";
+import { useEscapeBack } from "@/nav/escape-back";
 import { restoreDoc } from "@/docs/actions";
+import { useDocsArea } from "@/docs/area";
 import { docTitle } from "@/docs/data";
 import { PageBody } from "@/docs/page/page-body";
 import { PageHeader } from "@/docs/page/page-header";
-import { pageUi } from "@/docs/page/state";
+import { pageUi, usePageUi } from "@/docs/page/state";
 import { pageQuery } from "@/docs/store";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
@@ -23,6 +25,8 @@ export function DocPage({ id }: { id: string }) {
   const doc = useRowEvenIfGone("docs", id);
   const can = useCan();
   usePageTitle(doc ? docTitle(doc) : t("docs.title"));
+  // Escape is the comments column's own while it is open.
+  useEscapeBack(useDocsArea().base, !usePageUi((s) => s.commentsOpen));
 
   // Comments of another page are not this page's.
   useEffect(() => pageUi.closeComments, [id]);
