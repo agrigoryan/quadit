@@ -84,4 +84,11 @@ describe("D", () => {
     pressD();
     expect(toasts()).toEqual(["No open question here waits on your answer"]);
   });
+
+  it("says so for a question I asked of myself, which I may not answer", () => {
+    seed([question("d1", { asked_id: "u1", created_by: "u1" })]);
+    show();
+    pressD();
+    expect(toasts()).toEqual(["No open question here waits on your answer"]);
+  });
 });

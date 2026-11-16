@@ -42,8 +42,10 @@ export function DecisionSection({ taskId }: { taskId: string }) {
   const canAsk = !!task && can.editTask(task);
   const open = decisions.filter((d) => d.state === "open").length;
   const me = useMe();
-  // Answering is a change to the task: none from one who may not change it.
-  const asked = canAsk ? decisions.find((d) => d.state === "open" && d.asked_id === me.user_id) : undefined;
+  // Answering is a change to the task: none from one who may not change it, nor of a question one asked (decisions/data.ts useViewer).
+  const asked = canAsk
+    ? decisions.find((d) => d.state === "open" && d.asked_id === me.user_id && d.created_by !== me.user_id)
+    : undefined;
   useHotkeys({ d: () => toast.info(t("decision.noneAsked")) }, { layer: "panel", enabled: !asked });
 
   const dialog = asking && (
