@@ -49,6 +49,16 @@ func (tx faultTx) Get(ctx context.Context, dst any, where ...store.Cond) error {
 	return tx.Tx.Get(ctx, dst, where...)
 }
 
+func (tx faultTx) List(ctx context.Context, dst any, q store.Q) error {
+	tx.s.mu.Lock()
+	fail := tx.s.fail
+	tx.s.mu.Unlock()
+	if fail != nil && fail(dst, q.Where) {
+		return errDiskGone
+	}
+	return tx.Tx.List(ctx, dst, q)
+}
+
 // byID reports whether a read looks a row up by this id alone.
 func byID(where []store.Cond, id string) bool {
 	return len(where) == 1 && where[0].Col == "id" && where[0].Val == id
@@ -105,10 +115,11 @@ func TestAFailedReadIsNotTakenForAMissingRow(t *testing.T) {
 		t.Run("a reply", func(t *testing.T) {
 			first := w.do(w.owner.ID, "comment.create", M{"task": "SVA-1", "body": "first"}).Ref
 			// Before: the parent was taken for deleted, and its author was
-			// not told of the reply.
-			failing(t, "comment.create", M{"parent": first, "body": "a reply"}, func(dst any, where []store.Cond) bool {
-				_, comment := dst.(*core.Comment)
-				return comment && byID(where, first)
+			// not told of the reply. Those the reply answers are read as a
+			// list of the thread's comments.
+			failing(t, "comment.create", M{"parent": first, "body": "a reply"}, func(dst any, _ []store.Cond) bool {
+				_, thread := dst.(*[]core.Comment)
+				return thread
 			})
 		})
 

@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -208,19 +209,37 @@ func (c *cx) commentReaches(cm core.Comment, t core.Task) error {
 			return err
 		}
 	}
-	if cm.ParentID != "" {
-		var parent core.Comment
-		ok, err := store.Find(c.ctx, c.tx, &parent, store.Eq("id", cm.ParentID))
-		if err != nil {
+	people, err := c.threadPeople(cm)
+	if err != nil {
+		return err
+	}
+	for _, p := range people {
+		if err := c.notifyTask(p, core.NoteReplied, t, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
 			return err
-		}
-		if ok {
-			if err := c.notifyTask(parent.AuthorID, core.NoteReplied, t, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
+}
+
+// threadPeople are those a reply answers: whoever wrote in its thread
+// before it, the first comment's author and each earlier reply's, once
+// each. A comment that starts a thread answers nobody.
+func (c *cx) threadPeople(cm core.Comment) ([]string, error) {
+	if cm.ParentID == "" {
+		return nil, nil
+	}
+	var earlier []core.Comment
+	if err := c.tx.List(c.ctx, &earlier, store.Q{Where: []store.Cond{store.Either(store.Eq("id", cm.ParentID), store.Eq("parent_id", cm.ParentID)),
+		store.Ne("id", cm.ID), store.Live}, Order: "created_seq"}); err != nil {
+		return nil, err
+	}
+	var people []string
+	for _, e := range earlier {
+		if !slices.Contains(people, e.AuthorID) {
+			people = append(people, e.AuthorID)
+		}
+	}
+	return people, nil
 }
 
 // handOn hands the task on with a comment: where the caller said, or for a
@@ -324,16 +343,13 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 			return err
 		}
 	}
-	if cm.ParentID != "" {
-		var parent core.Comment
-		ok, err := store.Find(c.ctx, c.tx, &parent, store.Eq("id", cm.ParentID))
-		if err != nil {
+	people, err := c.threadPeople(cm)
+	if err != nil {
+		return err
+	}
+	for _, p := range people {
+		if err := c.notify(p, core.NoteReplied, n); err != nil {
 			return err
-		}
-		if ok {
-			if err := c.notify(parent.AuthorID, core.NoteReplied, n); err != nil {
-				return err
-			}
 		}
 	}
 	var ws []core.Watcher

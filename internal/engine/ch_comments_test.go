@@ -5,6 +5,7 @@ import (
 	"maps"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -47,6 +48,45 @@ func TestEditedCommentIsFoundByItsNewText(t *testing.T) {
 				}
 				if found("ring")[cm] {
 					t.Error("search still finds the comment by its old text")
+				}
+			})
+		}
+	})
+}
+
+// TestAReplyReachesEveryoneInTheThread: whoever wrote in a thread before is
+// told of a reply in it as a reply, not only the one who started it, on a
+// page and on a task alike. The one who asked in a reply hears the answer.
+func TestAReplyReachesEveryoneInTheThread(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Explosion effect"})
+		page := w.do(w.owner.ID, "doc.create", M{"title": "Art notes", "markdown": "The ring is thin.\n"}).Ref
+		asker, answerer := w.agent("asker"), w.agent("answerer")
+		for _, on := range []struct {
+			name string
+			args M
+		}{
+			{"on a page", M{"doc": page}},
+			{"on a task", M{"task": "SVA-1"}},
+		} {
+			t.Run(on.name, func(t *testing.T) {
+				args := M{"body": "Is the ring right?"}
+				maps.Copy(args, on.args)
+				root := w.do(w.owner.ID, "comment.create", args).Ref
+				w.do(asker, "comment.create", M{"parent": root, "body": "@answerer what do you think?"})
+				reply := w.do(answerer, "comment.create", M{"parent": root, "body": "Thicker by two pixels."}).Ref
+				for who, id := range map[string]string{"the one who started it": w.owner.ID, "the one who asked in a reply": asker} {
+					var got *core.Notification
+					for _, n := range w.inbox(id) {
+						if n.EntityID == reply {
+							got = &n
+						}
+					}
+					if got == nil || got.Type != core.NoteReplied {
+						t.Errorf("%s was not told of the reply as a reply: %+v", who, got)
+					}
 				}
 			})
 		}
