@@ -10,7 +10,7 @@ func TestBetweenKeepsOrder(t *testing.T) {
 	cases := [][2]string{{"", ""}, {"", "i"}, {"i", ""}, {"a", "b"}, {"a", "a1"}, {"az", "b"}, {"", "1"}, {"", "01"}, {"zz", ""}, {"0000000sg", "0000001kw"}}
 	for _, c := range cases {
 		m := Between(c[0], c[1])
-		if !(m > c[0]) || (c[1] != "" && !(m < c[1])) {
+		if m <= c[0] || (c[1] != "" && m >= c[1]) {
 			t.Errorf("Between(%q, %q) = %q: out of order", c[0], c[1], m)
 		}
 		if !Valid(m) {
@@ -54,7 +54,7 @@ func TestForNumberSortsAndLeavesRoom(t *testing.T) {
 			t.Fatalf("ForNumber(%d) = %q after %q", n, s, prev)
 		}
 		if prev != "" {
-			if m := Between(prev, s); !(m > prev && m < s) {
+			if m := Between(prev, s); m <= prev || m >= s {
 				t.Fatalf("no room between %q and %q", prev, s)
 			}
 		}

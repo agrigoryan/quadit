@@ -207,29 +207,29 @@ func TestImports(t *testing.T) {
 				return
 			}
 			p := strings.TrimPrefix(r.URL.Path, "/api/public/v1/workspaces/ws1")
-			switch {
-			case p == "/projects":
+			switch p {
+			case "/projects":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "p1", "name": "Samurai vs Alien", "key": "SVA"}}})
-			case p == "/projects/p1/statuses":
+			case "/projects/p1/statuses":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "s1", "name": "In Review", "category": "started"}, {"id": "s2", "name": "Done", "category": "completed"}}})
-			case p == "/projects/p1/labels":
+			case "/projects/p1/labels":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "lb1", "name": "art"}}})
-			case p == "/tasks":
+			case "/tasks":
 				json.NewEncoder(rw).Encode(M{"items": []M{
 					{"id": "t2", "identifier": "SVA-2", "number": 2, "project_id": "p1", "status_id": "s2", "title": "Second", "priority": "none", "parent_task_id": "t9"},
 					{"id": "t9", "identifier": "SVA-9", "number": 9, "project_id": "p1", "status_id": "s1", "title": "First", "description": "From Orbit", "priority": "urgent", "label_ids": []string{"lb1"}, "url": "https://orbit.example/tasks/t1", "milestone_id": "m1"},
 				}, "next_cursor": nil})
-			case p == "/projects/p1/milestones":
+			case "/projects/p1/milestones":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "m1", "name": "Vertical slice"}}})
-			case p == "/tasks/SVA-9/relations":
+			case "/tasks/SVA-9/relations":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"type": "blocks", "direction": "outgoing", "task": M{"id": "t2"}}}})
-			case p == "/tasks/SVA-2/relations":
+			case "/tasks/SVA-2/relations":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"type": "blocks", "direction": "incoming", "task": M{"id": "t9"}}}})
-			case p == "/tasks/SVA-9/comments":
+			case "/tasks/SVA-9/comments":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"body": "Owner comment", "author_id": "u1", "created_at": "2026-11-01T00:00:00Z"}}})
-			case p == "/docs":
+			case "/docs":
 				json.NewEncoder(rw).Encode(M{"items": []M{{"id": "d1", "title": "Game design"}}})
-			case p == "/docs/d1":
+			case "/docs/d1":
 				json.NewEncoder(rw).Encode(M{"markdown": "Design notes from Orbit.\n"})
 			default:
 				json.NewEncoder(rw).Encode(M{"items": []M{}})
