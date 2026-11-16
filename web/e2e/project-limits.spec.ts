@@ -1,6 +1,6 @@
 // A member limited to some projects sees those projects and nothing of the
 // others: a task related to one of another project says so, without that
-// task's key or title.
+// task's key or title, also when the relation is made while they look.
 
 import { expect, invitedMember, test } from "./quadit";
 
@@ -28,6 +28,21 @@ test("a member limited to one project sees a related task of another project as 
   await expect(blockedBy.getByRole("link")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(hidden);
   await expect(page.locator("body")).not.toContainText("Rotate the vault keys");
+
+  // With the page open, a task of the other project is related to theirs, and then no longer:
+  // the page follows without a reload, still without the task's key or title.
+  const second = (JSON.parse(await quadit.cli("--json", "new", otherKey, "Renew the certificates")) as { key: string })
+    .key;
+  const relation = (
+    JSON.parse(
+      await quadit.cli("--json", "do", "relation.add", JSON.stringify({ task: second, type: "blocks", other: mine })),
+    ) as { ref: string }
+  ).ref;
+  await expect(blockedBy.getByText("A task you can't see")).toHaveCount(2);
+  await expect(page.locator("body")).not.toContainText(second);
+  await expect(page.locator("body")).not.toContainText("Renew the certificates");
+  await quadit.cli("do", "relation.remove", JSON.stringify({ id: relation }));
+  await expect(blockedBy.getByText("A task you can't see")).toHaveCount(1);
 
   // The owner, who may read both projects, is shown the task itself.
   await ownerPage.goto(`/e2e/task/${mine}`);

@@ -7487,6 +7487,7 @@ nothing found
    "data": {
     "id": "<task SVA-2>",
     "key": "SVA-2",
+    "other_id": "<task SVA-1>",
     "other_key": "SVA-1",
     "relation": "<relation SVA-1 blocks SVA-2>",
     "removed": false,
@@ -7573,6 +7574,7 @@ nothing found
    "data": {
     "id": "<task SVA-6>",
     "key": "SVA-6",
+    "other_id": "<task SVA-1>",
     "other_key": "SVA-1",
     "relation": "<relation removed>",
     "removed": false,
@@ -7609,6 +7611,7 @@ nothing found
    "data": {
     "id": "<task SVA-6>",
     "key": "SVA-6",
+    "other_id": "<task SVA-1>",
     "other_key": "SVA-1",
     "relation": "<relation removed>",
     "removed": true,
@@ -22191,7 +22194,7 @@ id: 97
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #278>","data":{"key":"SVA-1","other_key":"SVA-2","row":{"created_at":1700000000000,"created_by":"<@aram>","id":"<relation SVA-1 blocks SVA-2>","related_task_id":"<task SVA-2>","task_id":"<task SVA-1>","type":"blocks"}},"entity_id":"<relation SVA-1 blocks SVA-2>","entity_type":"relation","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":97,"type":"relation.created"}
 
 id: 98
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #278>","data":{"id":"<task SVA-2>","key":"SVA-2","other_key":"SVA-1","relation":"<relation SVA-1 blocks SVA-2>","removed":false,"type":"blocks"},"entity_id":"<task SVA-2>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":98,"type":"task.related"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #278>","data":{"id":"<task SVA-2>","key":"SVA-2","other_id":"<task SVA-1>","other_key":"SVA-1","relation":"<relation SVA-1 blocks SVA-2>","removed":false,"type":"blocks"},"entity_id":"<task SVA-2>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":98,"type":"task.related"}
 
 id: 99
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #279>","data":{"key":"SVA-1","row":{"created_at":1700000000000,"created_by":"<@aram>","id":"<relation SVA-1 relates OPS-1>","related_task_id":"","task_id":"<task SVA-1>","type":"relates"}},"entity_id":"<relation SVA-1 relates OPS-1>","entity_type":"relation","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":99,"type":"relation.created"}
@@ -22203,13 +22206,13 @@ id: 105
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #282>","data":{"key":"SVA-1","other_key":"SVA-6","row":{"created_at":1700000000000,"created_by":"<@aram>","id":"<relation removed>","related_task_id":"<task SVA-6>","task_id":"<task SVA-1>","type":"relates"}},"entity_id":"<relation removed>","entity_type":"relation","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":105,"type":"relation.created"}
 
 id: 106
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #282>","data":{"id":"<task SVA-6>","key":"SVA-6","other_key":"SVA-1","relation":"<relation removed>","removed":false,"type":"relates"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":106,"type":"task.related"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #282>","data":{"id":"<task SVA-6>","key":"SVA-6","other_id":"<task SVA-1>","other_key":"SVA-1","relation":"<relation removed>","removed":false,"type":"relates"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":106,"type":"task.related"}
 
 id: 107
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #283>","data":{"gone":true,"id":"<relation removed>"},"entity_id":"<relation removed>","entity_type":"relation","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":107,"type":"relation.deleted"}
 
 id: 108
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #283>","data":{"id":"<task SVA-6>","key":"SVA-6","other_key":"SVA-1","relation":"<relation removed>","removed":true,"type":"relates"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":108,"type":"task.related"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #283>","data":{"id":"<task SVA-6>","key":"SVA-6","other_id":"<task SVA-1>","other_key":"SVA-1","relation":"<relation removed>","removed":true,"type":"relates"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":108,"type":"task.related"}
 
 id: 109
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #284>","data":{"key":"SVA-1","row":{"checks":"passing","created_at":1700000000000,"created_by":"<@aram>","id":"<link SVA-1 pr>","kind":"pr","ref":"12","repo":"games/sva","state":"open","task_id":"<task SVA-1>","title":"Boss phases","updated_at":1700000000000,"updated_seq":109,"url":"https://git.example.com/games/sva/pull/12"}},"entity_id":"<link SVA-1 pr>","entity_type":"link","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":109,"type":"link.created"}

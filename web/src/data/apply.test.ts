@@ -132,3 +132,57 @@ describe("applyEvent", () => {
     expect(c.tasks.t1).toBeDefined();
   });
 });
+
+describe("applyEvent on task.related", () => {
+  // OPS-1 blocks SVA-1: the relation's own event is OPS-1's; task.related is SVA-1's (t1).
+  const related = (seq: number, data: Record<string, unknown>) =>
+    event(seq, {
+      type: "task.related",
+      entity_id: "t1",
+      data: { id: "t1", key: "SVA-1", relation: "r1", type: "blocks", ...data },
+    });
+  const own = event(10, {
+    type: "relation.created",
+    entity_type: "relation",
+    entity_id: "r1",
+    data: {
+      key: "OPS-1",
+      other_key: "SVA-1",
+      row: { id: "r1", task_id: "o1", related_task_id: "t1", type: "blocks", created_by: "u1", created_at: 1010 },
+    },
+  });
+
+  it("adds the relation for a reader of this end alone, the far end blank as /list/relations gives it", () => {
+    const next = apply(emptyCollections(), related(11, { removed: false }));
+    expect(next.relations.r1).toEqual({
+      id: "r1",
+      task_id: "",
+      related_task_id: "t1",
+      type: "blocks",
+      created_by: "u1",
+      created_at: 1011,
+    });
+  });
+
+  it("drops the relation when it was taken away", () => {
+    const c = withRows({ relations: [{ id: "r1", task_id: "", related_task_id: "t1", type: "blocks" }, { id: "r2" }] });
+    const next = apply(c, related(12, { removed: true }));
+    expect(Object.keys(next.relations)).toEqual(["r2"]);
+  });
+
+  it("keeps the whole row a full reader got from the relation's own event: not doubled, not blanked", () => {
+    const next = apply(emptyCollections(), own, related(11, { removed: false, other_id: "o1", other_key: "OPS-1" }));
+    expect(next.relations).toEqual({ r1: own.data.row });
+  });
+
+  it("names the far end when the event does, even without the relation's own event", () => {
+    const next = apply(emptyCollections(), related(11, { removed: false, other_id: "o1", other_key: "OPS-1" }));
+    expect(next.relations.r1).toMatchObject({ task_id: "o1", related_task_id: "t1" });
+  });
+
+  it("leaves the task itself as it was", () => {
+    const c = withRows({ tasks: [{ id: "t1", title: "a" }] });
+    const next = apply(c, related(11, { removed: false }));
+    expect(next.tasks).toBe(c.tasks);
+  });
+});

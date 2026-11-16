@@ -77,12 +77,16 @@ func relationAdd(c *cx, a relationArgs) error {
 }
 
 // related tells those who follow the other end of a relation. The relation's
-// own event belongs to one task; this one belongs to the other, so a feed
-// narrowed to either task has it. An event belongs to one project, so a
-// member who may read only this end is not given the relation's own event:
-// their copy of the relation row catches up when it is next loaded.
+// own event belongs to one task (r.TaskID); this one belongs to the other
+// (t, at r.RelatedTaskID), so a feed narrowed to either task has it. An
+// event belongs to one project, so a member who may read only t is not
+// given the relation's own event: this one names the relation, its type
+// and the far end (other_id, other_key), which is all a copy needs to add
+// or drop the relation's row; the feed blanks the far end for a reader who
+// may not read it, as /list/relations does.
 func (c *cx) related(t, other core.Task, r core.Relation, removed bool) error {
-	return c.emit(event{seq: c.tx.NextSeq(), typ: "task.related", entity: "task", entityID: t.ID, place: inTask(t), data: core.EventData{ID: t.ID, Key: &t.Key, OtherKey: other.Key, Relation: r.ID, RelationType: r.Type, Removed: &removed}})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: "task.related", entity: "task", entityID: t.ID, place: inTask(t),
+		data: core.EventData{ID: t.ID, Key: &t.Key, OtherID: other.ID, OtherKey: other.Key, Relation: r.ID, RelationType: r.Type, Removed: &removed}})
 }
 
 // relationRemove takes a relation between two tasks away.

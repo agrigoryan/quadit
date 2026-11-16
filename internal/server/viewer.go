@@ -187,7 +187,8 @@ func (who *viewer) asSeen(ctx context.Context, evs []core.Event) []core.Event {
 			}
 		} else if other, err := who.resolver(ctx).Task(payload.OtherKey); err != nil || !who.canProject(other.ProjectID) {
 			// What the task at one end is told of the relation names the
-			// task at the other end by other_key alone.
+			// task at the other end by other_id and other_key alone.
+			delete(data, "other_id")
 			delete(data, "other_key")
 		}
 		evs[i].Data = plainjson.Marshal(data)

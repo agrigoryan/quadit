@@ -66,6 +66,11 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
   if (!name) return;
   const wanted = (collection: CollectionName, key: string) => !only || only(collection, key);
 
+  if (ev.type === "task.related") {
+    applyRelated(d, ev, wanted);
+    return;
+  }
+
   for (const att of data.attachments ?? []) {
     const row: AnyRow = att;
     if (wanted("attachments", keyOf("attachments", row))) d.put("attachments", row);
@@ -95,6 +100,32 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
       if (wanted(name, target)) d.patch(name, target, fields);
     }
   }
+}
+
+/**
+ * `task.related` is a relation as told to the task at its `related_task_id` end. It reaches a
+ * reader of that task who may not read the relation's own event (its `task_id` end is in a
+ * project they cannot read), so it adds the row, or drops it when `removed`, as /list/relations
+ * gives it to that reader: the far end (`other_id`) blank when the event leaves it out. A reader
+ * of both ends got the whole row from the relation's own event just before, and it is kept.
+ */
+function applyRelated(d: CopyOnWrite, ev: FeedEvent, wanted: (collection: CollectionName, key: string) => boolean) {
+  const data = ev.data;
+  const id = typeof data.relation === "string" ? data.relation : "";
+  if (!id || !wanted("relations", id)) return;
+  if (data.removed === true) {
+    d.drop("relations", id);
+    return;
+  }
+  if (id in d.peek("relations")) return;
+  d.put("relations", {
+    id,
+    task_id: typeof data.other_id === "string" ? data.other_id : "",
+    related_task_id: ev.entity_id,
+    type: data.type,
+    created_by: ev.actor_id,
+    created_at: ev.at,
+  });
 }
 
 /** The rows an event names: the keys it would write in its own collection. */

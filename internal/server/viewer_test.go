@@ -187,6 +187,64 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 	})
 }
 
+// TestAReaderOfOneEndIsToldOfTheRelationWithTheFarEndBlank: a relation
+// made and taken away from a task the caller may not read reaches them as
+// the event about the task they do read (task.related), with the
+// relation's id and type, and nothing of the far end: not its id, not its
+// key. Someone who may read both ends is told the far end.
+func TestAReaderOfOneEndIsToldOfTheRelationWithTheFarEndBlank(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		var sva1, ops1 struct{ Task struct{ ID string } }
+		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
+		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		rid := s.change(s.owner, "", "relation.add", M{"task": "OPS-1", "type": "blocks", "other": "SVA-1"})["ref"].(string)
+		s.change(s.owner, "", "relation.remove", M{"id": rid})
+
+		type related struct {
+			ID       string  `json:"id"`
+			Relation string  `json:"relation"`
+			Type     string  `json:"type"`
+			Removed  bool    `json:"removed"`
+			OtherID  *string `json:"other_id"`
+			OtherKey *string `json:"other_key"`
+		}
+		told := func(as *http.Client, token string) []related {
+			t.Helper()
+			var feed struct {
+				Events []struct {
+					Type string
+					Data related
+				}
+			}
+			s.call(as, token, "GET", w+"/events?after=0&limit=2000", nil, 200, &feed)
+			var out []related
+			for _, ev := range feed.Events {
+				if ev.Type == "task.related" && ev.Data.Relation == rid {
+					out = append(out, ev.Data)
+				}
+			}
+			if len(out) != 2 || out[0].Removed || !out[1].Removed {
+				t.Fatalf("the feed tells of the relation added and taken away as %+v, want two events, added then removed", out)
+			}
+			return out
+		}
+		for who, token := range callers {
+			for _, ev := range told(nil, token) {
+				if ev.ID != sva1.Task.ID || ev.Type != "blocks" || ev.OtherID != nil || ev.OtherKey != nil {
+					t.Errorf("%s is told %+v, want the relation's id and type on SVA-1 and no far end", who, ev)
+				}
+			}
+		}
+		for _, ev := range told(s.owner, "") {
+			if ev.OtherID == nil || *ev.OtherID != ops1.Task.ID || ev.OtherKey == nil || *ev.OtherKey != "OPS-1" {
+				t.Errorf("the owner is told %+v, want the far end, OPS-1, by id and key", ev)
+			}
+		}
+	})
+}
+
 // TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee: a task
 // in full, and its context pack, list a relation to a task of a project the
 // caller may not read by its kind alone, marked hidden, and in text as "a

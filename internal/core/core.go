@@ -464,6 +464,7 @@ type EventData struct {
 	LinkKind  string  `json:"kind,omitempty"`
 	MovedFrom string  `json:"moved_from,omitempty"` // a moved task's key before
 	Name      string  `json:"name,omitempty"`       // a deleted secret's name
+	OtherID   string  `json:"other_id,omitempty"`   // on task.related: the id of the task at the other end, the relation's task_id
 	OtherKey  string  `json:"other_key,omitempty"`  // the key of the task at the other end of a relation
 	Previous  *Answer `json:"previous,omitempty"`   // a decision's answer before it was marked unclear
 	// Quiet marks history brought in (an import), not done now: it notifies

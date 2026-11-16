@@ -50,9 +50,9 @@ task.updated {"changes":{"lease_holder_id":{"from":"#2","to":null},"lease_until"
 watcher.deleted {"gone":true,"id":"#32","user_id":"#3"}
 watcher.created {"row":{"user_id":"#3","subject_type":"task","subject_id":"#32","created_at":1767603637000}}
 relation.created {"key":"SVA-1","other_key":"SVA-2","row":{"id":"#35","task_id":"#30","related_task_id":"#32","type":"blocks","created_by":"#3","created_at":1767603638000}}
-task.related {"id":"#32","key":"SVA-2","other_key":"SVA-1","relation":"#35","removed":false,"type":"blocks"}
+task.related {"id":"#32","key":"SVA-2","other_id":"#30","other_key":"SVA-1","relation":"#35","removed":false,"type":"blocks"}
 relation.deleted {"gone":true,"id":"#35"}
-task.related {"id":"#32","key":"SVA-2","other_key":"SVA-1","relation":"#35","removed":true,"type":"blocks"}
+task.related {"id":"#32","key":"SVA-2","other_id":"#30","other_key":"SVA-1","relation":"#35","removed":true,"type":"blocks"}
 link.created {"key":"SVA-1","row":{"id":"#36","task_id":"#30","kind":"pr","url":"https://example.com/pr/1","title":"Explosions","repo":"a/b","ref":"1","created_by":"#3","created_at":1767603640000,"updated_at":1767603640000,"updated_seq":56}}
 link.updated {"changes":{"state":{"from":null,"to":"merged"}},"id":"#36","key":"SVA-1","kind":"pr","ref":"1"}
 link.created {"key":"SVA-1","row":{"id":"#37","task_id":"#30","kind":"url","url":"https://example.com/notes","created_by":"#3","created_at":1767603642000,"updated_at":1767603642000,"updated_seq":58}}
