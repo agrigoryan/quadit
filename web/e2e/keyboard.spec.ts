@@ -525,9 +525,8 @@ test("J and K step the row open beside a database, in the view's order, and Ente
   await page.goto(`/e2e/docs/${made.ref}`);
   await page.getByRole("button", { name: "Open", exact: true }).first().click();
   await expect(page.getByRole("dialog", { name: "Acme paints" })).toBeVisible();
-  await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  });
+  // The click leaves the row's title cell chosen and the table with the keys: J, K and Enter still serve the row beside.
+  await expect(page.getByRole("grid", { name: "Table" })).toBeFocused();
   await page.keyboard.press("j");
   await expect(page.getByRole("dialog", { name: "Bolt brushes" })).toBeVisible();
   await page.keyboard.press("k");
@@ -584,7 +583,8 @@ test("D answers the open task's question asked of me: side by side when it has p
   await page.goto(`/e2e/task/${none}`);
   await expect(page.getByRole("heading", { level: 1, name: `${none} Nothing to answer` })).toBeVisible();
   await page.keyboard.press("d");
-  await expect(page.getByText("No open question here waits on your answer")).toBeVisible();
+  // Exact: the screen reader's live region repeats the note after the word "Notifications".
+  await expect(page.getByText("No open question here waits on your answer", { exact: true })).toBeVisible();
 });
 
 test("in a task's description Cmd+B bolds what is chosen, the box's undo takes it back, and Enter goes on with a list", async ({
