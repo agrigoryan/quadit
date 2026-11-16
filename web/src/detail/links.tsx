@@ -3,7 +3,7 @@
 
 import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useState } from "react";
-import { FileText, GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
+import { CircleDot, FileText, GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -15,7 +15,14 @@ import { removeLink } from "@/tasks/actions";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 
-const icons = { branch: GitBranch, commit: GitCommitHorizontal, pr: GitPullRequest, url: Link2, doc: FileText };
+const icons = {
+  branch: GitBranch,
+  commit: GitCommitHorizontal,
+  pr: GitPullRequest,
+  issue: CircleDot,
+  url: Link2,
+  doc: FileText,
+};
 
 /** Only web addresses are ever made into something to click. */
 const isWeb = (url: string) => /^https?:\/\//i.test(url);

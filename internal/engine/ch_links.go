@@ -37,9 +37,8 @@ func linkSet(c *cx, a linkSetArgs) error {
 	if err != nil {
 		return err
 	}
-	kinds := []string{core.LinkBranch, core.LinkCommit, core.LinkPR, core.LinkIssue, core.LinkURL, core.LinkDoc}
-	if !slices.Contains(kinds, a.Kind) {
-		return oneOf("kind", "link kind", a.Kind, kinds)
+	if !slices.Contains(core.LinkKinds, a.Kind) {
+		return oneOf("kind", "link kind", a.Kind, core.LinkKinds)
 	}
 	if a.Kind == core.LinkURL && a.URL == "" {
 		return invalid("url", "a url link needs a url")

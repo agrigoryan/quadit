@@ -97,3 +97,17 @@ export type RowsAgree = [
   Check<Agrees<Drift<"DocSource", Docs.DocSource, Server.DocSource>>>,
   Check<Agrees<Drift<"Presence", Docs.PresenceEntry, Server.Presence>>>,
 ];
+
+/**
+ * A union of words is held to the server's list of the words, both ways: a
+ * word the server sends that the web type leaves out is no drift a field's
+ * check sees (the narrower union is still a string). The generator writes
+ * each such list from the engine (cmd/webtypes, valueLists).
+ */
+type SameWords<Name extends string, W extends string, S extends string> = [Exclude<W, S> | Exclude<S, W>] extends [
+  never,
+]
+  ? true
+  : { words: Name; missing_in_web: Exclude<S, W>; not_on_server: Exclude<W, S> };
+
+export type WordsAgree = [Check<SameWords<"LinkKind", Web.TaskLink["kind"], Server.LinkKind>>];

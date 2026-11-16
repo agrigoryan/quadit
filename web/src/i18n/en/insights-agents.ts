@@ -94,6 +94,7 @@ export const agentsStrings = {
   "taskwork.kind.branch": "Branch",
   "taskwork.kind.commit": "Commit",
   "taskwork.kind.pr": "Pull request",
+  "taskwork.kind.issue": "Issue",
   "taskwork.state.open": "Open",
   "taskwork.state.draft": "Draft",
   "taskwork.state.merged": "Merged",

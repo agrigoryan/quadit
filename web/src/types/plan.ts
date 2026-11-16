@@ -129,7 +129,7 @@ export type Notification = {
 export type TaskLink = {
   id: string;
   task_id: string;
-  kind: "branch" | "commit" | "pr" | "url" | "doc";
+  kind: "branch" | "commit" | "pr" | "issue" | "url" | "doc";
   url?: string;
   title?: string;
   repo?: string;

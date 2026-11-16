@@ -62,6 +62,7 @@ export const detail = {
   "detail.links.branch": "Branch",
   "detail.links.commit": "Commit",
   "detail.links.pr": "Pull request",
+  "detail.links.issue": "Issue",
   "detail.links.doc": "Page",
 
   "detail.commits.ahead": "{n} commit ahead of {base} | {n} commits ahead of {base}",
@@ -163,6 +164,7 @@ export const detail = {
   "timeline.linked.branch": "linked the branch {name}",
   "timeline.linked.commit": "linked the commit {name}",
   "timeline.linked.pr": "linked the pull request {name}",
+  "timeline.linked.issue": "linked the issue {name}",
   "timeline.linked.url": "added the link {name}",
   "timeline.linked.doc": "linked the page {name}",
 

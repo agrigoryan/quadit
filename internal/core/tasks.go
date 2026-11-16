@@ -142,6 +142,10 @@ const (
 	LinkDoc = "doc"
 )
 
+// LinkKinds are every kind a task link may be, in the order the engine
+// names them when it refuses another.
+var LinkKinds = []string{LinkBranch, LinkCommit, LinkPR, LinkIssue, LinkURL, LinkDoc}
+
 // TaskLink ties a task to something outside: a branch, a commit, a pull
 // request, an issue or any URL; or to a page of the workspace.
 type TaskLink struct {

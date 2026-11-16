@@ -834,3 +834,6 @@ export interface Workspace {
   settings?: unknown;
   created_at: number;
 }
+
+/** What a task link may point at: TaskLink.kind (core.LinkKinds). */
+export type LinkKind = "branch" | "commit" | "pr" | "issue" | "url" | "doc";

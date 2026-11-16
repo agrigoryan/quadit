@@ -3,9 +3,12 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -43,5 +46,24 @@ func rowsSource() string {
 // the server fails the type check until the web type follows.
 `)
 	w.writeNamed(&b)
+	for _, list := range valueLists {
+		words := make([]string, len(list.values))
+		for i, v := range list.values {
+			words[i] = strconv.Quote(v)
+		}
+		fmt.Fprintf(&b, "\n/** %s */\nexport type %s = %s;\n", list.doc, list.name, strings.Join(words, " | "))
+	}
 	return b.String()
+}
+
+// valueLists are the fields whose value is one of a list the server knows,
+// written as a union of the words: rows.check.ts holds the web's narrowed
+// union for the field to it both ways, which a field's own check cannot (a
+// union that leaves a word out is still a string). A list joins here when
+// the server keeps it in one place.
+var valueLists = []struct {
+	name, doc string
+	values    []string
+}{
+	{"LinkKind", "What a task link may point at: TaskLink.kind (core.LinkKinds).", core.LinkKinds},
 }

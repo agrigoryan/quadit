@@ -128,7 +128,8 @@ export function sideOf(
 /** What a link is called: its title, else what it points at. */
 export function linkName(link: Pick<TaskLink, "kind" | "title" | "ref" | "repo" | "url">): string {
   if (link.title) return link.title;
-  if (link.kind === "pr" && link.ref) return `${link.repo ? `${link.repo} ` : ""}#${link.ref}`;
+  if ((link.kind === "pr" || link.kind === "issue") && link.ref)
+    return `${link.repo ? `${link.repo} ` : ""}#${link.ref}`;
   if (link.kind === "commit" && link.ref) return link.ref.slice(0, 8);
   if (link.ref) return link.ref;
   return (link.url ?? "").replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");

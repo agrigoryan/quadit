@@ -5,6 +5,7 @@
 
 import { useMemo } from "react";
 import {
+  CircleDot,
   CircleCheck,
   CircleX,
   Clock,
@@ -32,7 +33,7 @@ import { IconButton } from "@/ui/button";
 
 type Tone = "neutral" | "accent" | "ok" | "danger" | "wait";
 
-const kinds = { branch: GitBranch, commit: GitCommitHorizontal, pr: GitPullRequest } as const;
+const kinds = { branch: GitBranch, commit: GitCommitHorizontal, pr: GitPullRequest, issue: CircleDot } as const;
 const states: Record<string, { icon: typeof GitMerge; tone: Tone }> = {
   open: { icon: GitPullRequest, tone: "accent" },
   draft: { icon: GitPullRequestDraft, tone: "neutral" },

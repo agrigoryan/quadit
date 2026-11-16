@@ -76,7 +76,7 @@ const nameOf = (link: TaskLink) =>
   link.kind === "doc" ? docTitle(getRowEvenIfGone("docs", link.ref)) : linkName(link);
 
 export function linkPhrase(link: TaskLink): string {
-  const kind = (["branch", "commit", "pr", "doc"] as const).find((k) => k === link.kind) ?? "url";
+  const kind = (["branch", "commit", "pr", "issue", "doc"] as const).find((k) => k === link.kind) ?? "url";
   return t(`timeline.linked.${kind}`, { name: nameOf(link) });
 }
 
