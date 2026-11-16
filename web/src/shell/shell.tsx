@@ -133,6 +133,15 @@ export function Shell() {
         openNewTask();
       },
       "?": () => ui.setShortcuts(true),
+      // The browser's own Back and Forward, under the keys other apps of this kind give them (a Mac browser has them already).
+      "mod+[": (e) => {
+        e.preventDefault();
+        void navigate(-1);
+      },
+      "mod+]": (e) => {
+        e.preventDefault();
+        void navigate(1);
+      },
     },
     { layer: "global" },
   );

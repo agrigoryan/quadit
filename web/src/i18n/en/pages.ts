@@ -142,6 +142,8 @@ export const pages = {
   "shortcuts.sheet": "Show this sheet",
   "shortcuts.undo": "Undo what you last did",
   "shortcuts.redo": "Do it again",
+  "shortcuts.goBack": "Back to the screen before",
+  "shortcuts.goForward": "Forward again",
   "shortcuts.close": "Close the panel or dialog",
   "shortcuts.down": "Move down",
   "shortcuts.up": "Move up",

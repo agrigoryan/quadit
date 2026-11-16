@@ -36,7 +36,7 @@ import { copyText } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { useProjects, useViews } from "@/data/selectors";
 import { useStore } from "@/data/store";
-import { redo, undo, useUndo } from "@/data/undo";
+import { askToUndo, redo, useUndo } from "@/data/undo";
 import { MOD } from "@/hooks/hotkeys";
 import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import { toast } from "@/lib/toast";
@@ -316,7 +316,7 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
             words: "revert take back",
             icon: <Undo2 />,
             hint: `${MOD} Z`,
-            run: () => run(() => void undo(lastDone)),
+            run: () => run(() => void askToUndo()),
           },
         ]
       : []),

@@ -5,7 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { clearStore, getState, loadBootstrap, patchRow } from "@/data/store";
-import { clearUndo, nextRedo, nextUndo, redo, remember, sendUndoable, undo, useUndo } from "@/data/undo";
+import {
+  askToUndo,
+  clearUndo,
+  nextRedo,
+  nextUndo,
+  redo,
+  remember,
+  sendUndoable,
+  stopAsking,
+  undo,
+  useUndo,
+} from "@/data/undo";
 import { useToasts } from "@/lib/toast";
 import type { Member, User, Workspace } from "@/types/core";
 
@@ -122,6 +133,80 @@ describe("the memory", () => {
     expect(nextUndo()).toBeUndefined();
     expect(undo()).toBe(false);
     expect(names("done")).toEqual([]);
+  });
+});
+
+describe("askToUndo", () => {
+  it("undoes a recent edit at once", () => {
+    step("one");
+    expect(askToUndo()).toBe(true);
+    expect(useUndo.getState().asking).toBeNull();
+    expect(names("undone")).toEqual(["one"]);
+    expect(askToUndo()).toBe(false);
+  });
+
+  it("asks before undoing what was done more than five minutes ago, and undoes it on a yes", async () => {
+    const old = step("one");
+    await vi.advanceTimersByTimeAsync(5 * 60_000 + 1);
+    askToUndo();
+    expect(useUndo.getState().asking).toBe(old);
+    expect(names("done")).toEqual(["one"]);
+    stopAsking();
+    expect(names("done")).toEqual(["one"]);
+    askToUndo();
+    undo(old);
+    expect(useUndo.getState().asking).toBeNull();
+    expect(names("undone")).toEqual(["one"]);
+  });
+
+  it("asks before an undo that loses more than the edit made", () => {
+    const made = remember(
+      "create",
+      () => Promise.resolve(),
+      () => Promise.resolve(),
+      { warning: "It goes to the trash." },
+    );
+    askToUndo();
+    expect(useUndo.getState().asking).toBe(made);
+  });
+});
+
+describe("edits that go on from one another", () => {
+  const typing = (from: string, to: string) =>
+    sendUndoable(
+      "retitle",
+      {
+        changes: [{ type: "task.update", args: { id: "t1", title: to } }],
+        show: (tx) => tx.patch("tasks", "t1", { title: to }),
+      },
+      {
+        changes: [{ type: "task.update", args: { id: "t1", title: from } }],
+        show: (tx) => tx.patch("tasks", "t1", { title: from }),
+      },
+      { sameAs: "t1:title" },
+    );
+
+  it("are one step, back to before the first and forward to the last", async () => {
+    typing("a", "ab");
+    await vi.advanceTimersByTimeAsync(500);
+    typing("ab", "abc");
+    await settle();
+    expect(names("done")).toEqual(["retitle"]);
+    undo();
+    await settle();
+    expect(title()).toBe("a");
+    redo();
+    await settle();
+    expect(title()).toBe("abc");
+  });
+
+  it("are steps of their own once ten seconds lie between them, or another edit does", async () => {
+    typing("a", "ab");
+    await vi.advanceTimersByTimeAsync(10_001);
+    typing("ab", "abc");
+    step("something else");
+    typing("abc", "abcd");
+    expect(names("done")).toEqual(["retitle", "retitle", "something else", "retitle"]);
   });
 });
 

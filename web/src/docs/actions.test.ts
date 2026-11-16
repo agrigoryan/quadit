@@ -1,56 +1,116 @@
-// @vitest-environment jsdom
-// Restoring a page the workspace copy never had (docs/actions.ts restoreDoc):
-// it is fetched whole after the restore, and a fetch that failed is said
-// rather than dropped. A page the server then says is not there is no
-// failure to report.
+// What a page's edits send to be undone (docs/actions.ts).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { restoreDoc } from "@/docs/actions";
-import { api, ApiError } from "@/data/api";
-import { getRowEvenIfGone } from "@/data/selectors";
-import { clearStore, loadBootstrap, useStore } from "@/data/store";
+import { api } from "@/data/api";
+import { clearOutbox } from "@/data/mutate";
+import { clearStore, getState, loadBootstrap } from "@/data/store";
+import { askToUndo, clearUndo, nextUndo, redo, undo, useUndo } from "@/data/undo";
 import { useToasts } from "@/lib/toast";
 import type { Member, User, Workspace } from "@/types/core";
-import "@/test/query";
+import { createDoc, moveDoc, setRowProps, setSharing, trashDoc, updateDoc } from "@/docs/actions";
+
+type Sent = { type: string; args: Record<string, unknown> };
+let requests: Sent[][] = [];
+
+const settle = () => vi.advanceTimersByTimeAsync(0);
+const last = () => (requests.at(-1) ?? []).map(({ type, args }) => ({ type, args }));
+const doc = (id: string) => getState().collections.docs[id];
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  requests = [];
+  vi.spyOn(api, "post").mockImplementation((_path: string, body?: unknown) => {
+    const { changes } = body as { changes: Sent[] };
+    requests.push(changes);
+    return Promise.resolve({ results: changes.map(() => ({})) });
+  });
   clearStore();
+  clearUndo();
+  useToasts.setState({ items: [] });
   loadBootstrap("acme", {
-    seq: 1,
-    me: { user_id: "u1", role: "member", name: "Ann", kind: "person", handle: "ann" } as Member,
+    seq: 10,
+    me: { user_id: "u1" } as Member,
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
+    docs: [
+      { id: "d1", kind: "page", title: "Handbook", rank: "b", icon: "📘" },
+      { id: "d2", kind: "page", title: "Onboarding", rank: "d", parent_id: "d1" },
+      { id: "d3", kind: "page", title: "Hers", rank: "f", owner_id: "u2", shared_with: ["u1"] },
+      { id: "r1", kind: "row", title: "Row", rank: "h", props: { size: "L" } },
+    ],
   });
-  useStore.setState({ stream: "live" });
-  useToasts.setState({ items: [] });
-  vi.spyOn(api, "post").mockResolvedValue({ results: [{}] });
 });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(async () => {
+  await clearOutbox();
+  await settle();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
-describe("restoreDoc", () => {
-  it("fetches a page the copy never had into it", async () => {
-    vi.spyOn(api, "get").mockResolvedValue({ doc: { id: "d9", title: "Back again", kind: "page" }, blocks: [] });
-    restoreDoc("d9");
-    await vi.waitFor(() => expect(getRowEvenIfGone("docs", "d9")?.title).toBe("Back again"));
-    expect(useToasts.getState().items).toEqual([]);
+describe("undoing a change to a page", () => {
+  it("gives it back its title and its icon", async () => {
+    updateDoc("d1", { title: "Guide", icon: "" });
+    await settle();
+    expect(nextUndo()?.name).toBe("change the page “Handbook”");
+    undo();
+    await settle();
+    expect(last()).toEqual([{ type: "doc.update", args: { id: "d1", title: "Handbook", icon: "📘" } }]);
+    expect(doc("d1")).toMatchObject({ title: "Handbook", icon: "📘" });
   });
 
-  it("says so when the restored page could not be fetched", async () => {
-    vi.spyOn(api, "get").mockRejectedValue(new ApiError(500, { message: "database is down" }));
-    restoreDoc("d9");
-    await vi.waitFor(() =>
-      expect(useToasts.getState().items.map((i) => i.text)).toEqual([
-        "The page is restored, but it could not be loaded: database is down",
-      ]),
-    );
+  it("moves it back under the page it was under, at its place", async () => {
+    moveDoc("d2", null, "z");
+    await settle();
+    undo();
+    await settle();
+    expect(last()).toEqual([{ type: "doc.update", args: { id: "d2", rank: "d", parent: "d1" } }]);
+    expect(doc("d2")).toMatchObject({ parent_id: "d1", rank: "d" });
   });
 
-  it("is quiet when the server says the page is not there", async () => {
-    const get = vi.spyOn(api, "get").mockRejectedValue(new ApiError(404, { message: "not found" }));
-    restoreDoc("d9");
-    await vi.waitFor(() => expect(get).toHaveBeenCalledTimes(1));
-    await new Promise((r) => setTimeout(r, 10));
-    expect(useToasts.getState().items.filter((i) => i.kind === "error")).toEqual([]);
+  it("brings a trashed page back with the pages under it", async () => {
+    trashDoc("d1");
+    await settle();
+    expect(doc("d2")?.deleted_at).toBeTruthy();
+    undo();
+    await settle();
+    expect(last()).toEqual([{ type: "doc.restore", args: { id: "d1" } }]);
+    expect(doc("d2")?.deleted_at ?? null).toBeNull();
+    redo();
+    await settle();
+    expect(last()).toEqual([{ type: "doc.delete", args: { id: "d1" } }]);
+  });
+
+  it("asks before undoing a page just made, which goes to the trash", async () => {
+    const id = createDoc({ title: "Notes" });
+    await settle();
+    askToUndo();
+    const asking = useUndo.getState().asking;
+    expect(asking?.warning).toBeTruthy();
+    undo(asking ?? undefined);
+    await settle();
+    expect(last()).toEqual([{ type: "doc.delete", args: { id } }]);
+  });
+
+  it("makes a page shared again as it was, but remembers nothing of a change to someone else's page", async () => {
+    setSharing("d1", { private: true });
+    await settle();
+    undo();
+    await settle();
+    expect(last()).toEqual([{ type: "doc.update", args: { id: "d1", private: false } }]);
+
+    clearUndo();
+    setSharing("d3", { sharedWith: [] });
+    await settle();
+    expect(nextUndo()).toBeUndefined();
+  });
+
+  it("gives a row back the values it had", async () => {
+    setRowProps("r1", { size: "XL", color: "red" });
+    await settle();
+    undo();
+    await settle();
+    expect(last()).toEqual([{ type: "doc.update", args: { id: "r1", props: { size: "L", color: null } } }]);
+    expect(doc("r1")?.props).toEqual({ size: "L" });
   });
 });

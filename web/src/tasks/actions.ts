@@ -420,6 +420,7 @@ function rememberMade(name: string, made: { id: string }[]) {
     name,
     () => trashMade(made, true),
     () => trashMade(made, false),
+    { warning: t("undo.warn.created") },
   );
 }
 

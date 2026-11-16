@@ -1,10 +1,12 @@
 // Every way these pages change an epic, a milestone or a cycle. Each shows
-// the change at once and sends it as a named change (data/mutate.ts).
+// the change at once and sends it as a named change (data/mutate.ts), and
+// is remembered with its opposite, so Cmd+Z takes it back (data/undo.ts).
 
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, send } from "@/data/mutate";
+import { type Batch, sendUndoable, undo } from "@/data/undo";
 import { rankBetween } from "@/lib/rank";
 import { getRows } from "@/data/selectors";
 import { toast } from "@/lib/toast";
@@ -62,7 +64,35 @@ export function updateEpic(
   const local: Fields = {};
   for (const [arg, value] of Object.entries(args)) local[epicField[arg] ?? arg] = value === "" ? null : value;
   if (Object.keys(local).length === 0) return;
-  send({ type: "epic.update", args: { id: epic.id, ...args } }, (tx) => tx.patch("epics", epic.id, local));
+  const { back, before } = putBack(epic, args, epicField);
+  sendUndoable(
+    t("undo.plan.change", { what: epic.name }),
+    {
+      changes: [{ type: "epic.update", args: { id: epic.id, ...args } }],
+      show: (tx) => tx.patch("epics", epic.id, local),
+    },
+    {
+      changes: [{ type: "epic.update", args: { id: epic.id, ...back } }],
+      show: (tx) => tx.patch("epics", epic.id, before),
+    },
+  );
+}
+
+/**
+ * What puts a row's fields back after an update with `args`: the arguments
+ * (null clears a field) and the row's fields as they stand now. `fieldOf`
+ * names the row field of an argument that is not called the same.
+ */
+function putBack(row: object, args: Fields, fieldOf: Record<string, string> = {}) {
+  const back: Record<string, string | null> = {};
+  const before: Fields = {};
+  for (const arg of Object.keys(args)) {
+    const field = fieldOf[arg] ?? arg;
+    const held = ((row as Fields)[field] as string | undefined) ?? null;
+    back[arg] = held;
+    before[field] = held;
+  }
+  return { back, before };
 }
 
 /** Deletes an epic; its tasks stay, without an epic. */
@@ -76,11 +106,15 @@ export function deleteEpic(epic: Epic) {
 }
 
 export function setWatchingEpic(epic: Epic, userId: string, watching: boolean) {
-  send({ type: "watch.set", args: { type: "epic", subject: epic.id, watching } }, (tx) => {
-    if (watching)
-      tx.insert("watchers", { user_id: userId, subject_type: "epic", subject_id: epic.id, created_at: Date.now() });
-    else tx.remove("watchers", `${userId}:${epic.id}`);
+  const set = (on: boolean): Batch => ({
+    changes: [{ type: "watch.set", args: { type: "epic", subject: epic.id, watching: on } }],
+    show: (tx) => {
+      if (on)
+        tx.insert("watchers", { user_id: userId, subject_type: "epic", subject_id: epic.id, created_at: Date.now() });
+      else tx.remove("watchers", `${userId}:${epic.id}`);
+    },
   });
+  sendUndoable(t(watching ? "undo.watch" : "undo.unwatch", { what: epic.name }), set(watching), set(!watching));
 }
 
 export function createMilestone(epic: Epic, name: string, targetOn: string, after: Milestone | undefined) {
@@ -99,8 +133,17 @@ export function updateMilestone(
 ) {
   const local: Fields = {};
   for (const [arg, value] of Object.entries(args)) local[arg] = value === "" ? null : value;
-  send({ type: "milestone.update", args: { id: milestone.id, ...args } }, (tx) =>
-    tx.patch("milestones", milestone.id, local),
+  const { back, before } = putBack(milestone, args);
+  sendUndoable(
+    t("undo.plan.change", { what: milestone.name }),
+    {
+      changes: [{ type: "milestone.update", args: { id: milestone.id, ...args } }],
+      show: (tx) => tx.patch("milestones", milestone.id, local),
+    },
+    {
+      changes: [{ type: "milestone.update", args: { id: milestone.id, ...back } }],
+      show: (tx) => tx.patch("milestones", milestone.id, before),
+    },
   );
 }
 
@@ -127,24 +170,39 @@ export function deleteMilestone(milestone: Milestone) {
 }
 
 export function updateCycle(cycle: Cycle, args: Partial<Record<"name" | "starts_on" | "ends_on", string>>) {
-  send({ type: "cycle.update", args: { id: cycle.id, ...args } }, (tx) =>
-    tx.patch("cycles", cycle.id, { ...args, name: args.name === "" ? null : args.name }),
+  const { before } = putBack(cycle, args);
+  // A cycle's name is cleared with "", and its dates are never empty.
+  const back: typeof args = {};
+  for (const arg of Object.keys(args) as (keyof typeof args)[]) back[arg] = cycle[arg] ?? "";
+  sendUndoable(
+    t("undo.plan.change", { what: cycle.name || t("undo.plan.cycle", { n: cycle.number }) }),
+    {
+      changes: [{ type: "cycle.update", args: { id: cycle.id, ...args } }],
+      show: (tx) => tx.patch("cycles", cycle.id, { ...args, name: args.name === "" ? null : args.name }),
+    },
+    {
+      changes: [{ type: "cycle.update", args: { id: cycle.id, ...back } }],
+      show: (tx) => tx.patch("cycles", cycle.id, before),
+    },
   );
 }
 
 /** Moves tasks to another cycle as one all-or-nothing batch, with a way back. */
 export function moveToCycle(tasks: Task[], to: Cycle, toName: string) {
   if (tasks.length === 0) return;
-  const move = (cycleOf: (task: Task) => string | null) =>
-    send(
-      tasks.map((task): ChangeSpec => ({ type: "task.update", args: { id: task.id, cycle: cycleOf(task) } })),
-      (tx) => {
-        for (const task of tasks) tx.patch("tasks", task.id, { cycle_id: cycleOf(task) });
-      },
-    );
-  move(() => to.id);
+  const move = (cycleOf: (task: Task) => string | null): Batch => ({
+    changes: tasks.map((task): ChangeSpec => ({ type: "task.update", args: { id: task.id, cycle: cycleOf(task) } })),
+    show: (tx) => {
+      for (const task of tasks) tx.patch("tasks", task.id, { cycle_id: cycleOf(task) });
+    },
+  });
+  const done = sendUndoable(
+    t("undo.plan.toCycle", { n: tasks.length, name: toName }),
+    move(() => to.id),
+    move((task) => task.cycle_id ?? null),
+  );
   toast.info(t("cycle.moved", { n: tasks.length, name: toName }), {
     label: t("common.undo"),
-    run: () => move((task) => task.cycle_id ?? null),
+    run: () => void undo(done),
   });
 }

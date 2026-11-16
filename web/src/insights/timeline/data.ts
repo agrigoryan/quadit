@@ -1,13 +1,12 @@
 // What the timeline draws, read from the store: a project's epics with
 // their tasks, progress and milestones, and the dated tasks with no epic.
 
-import type { Changes } from "@/types/changes.gen";
 import { useMemo } from "react";
-import { type ChangeSpec, send } from "@/data/mutate";
 import { useEpics, useLiveTasks, useLookup, useRows } from "@/data/selectors";
 import { type Category, type Epic, isCanceledCategory, isDoneCategory, type Milestone, type Task } from "@/types/core";
 import { dayFromNumber, dayNumber } from "@/lib/days";
 import { localDay } from "@/lib/time";
+import { updateEpic } from "@/insights/plan/actions";
 import type { Extent } from "@/insights/timeline/scale";
 
 export interface TaskLine {
@@ -121,11 +120,10 @@ export function useTimeline(projectId: string, showCanceled: boolean): TimelineD
 
 /** Changes an epic's dates: only the ones that differ are sent. */
 export function setEpicDates(epic: Epic, next: { start?: number; end?: number }) {
-  const fields: Omit<Changes["epic.update"], "id"> = {};
+  const fields: { start_on?: string; target_on?: string } = {};
   if (next.start !== undefined && dayFromNumber(next.start) !== epic.start_on)
     fields.start_on = dayFromNumber(next.start);
   if (next.end !== undefined && dayFromNumber(next.end) !== epic.target_on) fields.target_on = dayFromNumber(next.end);
   if (Object.keys(fields).length === 0) return;
-  const change: ChangeSpec = { type: "epic.update", args: { id: epic.id, ...fields } };
-  send(change, (tx) => tx.patch("epics", epic.id, fields));
+  updateEpic(epic, fields);
 }

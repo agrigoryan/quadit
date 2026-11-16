@@ -57,10 +57,58 @@ test("a task just made is undone into the trash, and done again out of it", asyn
   const row = page.getByRole("link", { name: `Open ${project.key}-1` });
   await expect(row).toBeVisible();
 
+  // Undoing it loses whatever was added to the task since: that is asked about first.
   await undo(page);
+  const ask = page.getByRole("dialog", { name: "Undo “create “Write the release notes””?" });
+  await expect(ask.getByText("It goes to the trash, with whatever was added to it since.")).toBeVisible();
+  await expect(page.locator("[data-task]")).toHaveCount(1);
+  await ask.getByRole("button", { name: "Undo" }).click();
   await expect(row).toBeHidden();
   await redo(page);
   await expect(row).toBeVisible();
+});
+
+test("a page moved to the trash comes back with Cmd+Z, and a rename typed in one go is one step", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const title = `Handbook ${project.key}`;
+  await quadit.cli("do", "doc.create", JSON.stringify({ title }));
+  await page.goto("/e2e/docs");
+  const tree = page.getByRole("navigation", { name: "Pages" });
+  await tree.getByRole("link", { name: title }).click();
+  const box = page.getByRole("textbox", { name: "Page title" });
+  await expect(box).toHaveValue(title);
+  await box.press("End");
+  await box.pressSequentially(" for everyone", { delay: 60 });
+  await expect(tree.getByRole("link", { name: `${title} for everyone` })).toBeVisible();
+  // Out of the field, Cmd+Z is the page's: the whole of the typing goes back.
+  await page.getByRole("main").focus();
+  await undo(page);
+  await expect(tree.getByRole("link", { name: title, exact: true })).toBeVisible();
+
+  await tree.getByRole("link", { name: title, exact: true }).hover();
+  await tree.getByRole("button", { name: `Actions for ${title}` }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await expect(tree.getByRole("link", { name: title, exact: true })).toHaveCount(0);
+  await page.getByRole("main").focus();
+  await undo(page);
+  await expect(tree.getByRole("link", { name: title, exact: true })).toBeVisible();
+});
+
+test("Cmd+[ goes back to the screen before, and Cmd+] forward again", async ({ page, project }) => {
+  const key = await project.newTask("Fix the login page");
+  const list = `/e2e/p/${project.key}/tasks`;
+  await page.goto(list);
+  await expect(page.getByRole("link", { name: `Open ${key}` })).toBeVisible();
+  await page.keyboard.press("j");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(new RegExp(`/e2e/task/${key}$`));
+  await page.keyboard.press("ControlOrMeta+[");
+  await expect(page).toHaveURL(new RegExp(`${list}$`));
+  await page.keyboard.press("ControlOrMeta+]");
+  await expect(page).toHaveURL(new RegExp(`/e2e/task/${key}$`));
 });
 
 test("in a field Cmd+Z is the text's own undo, not the list's", async ({ page, project, quadit }) => {

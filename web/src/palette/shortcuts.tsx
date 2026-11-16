@@ -36,6 +36,8 @@ const sections: Section[] = [
       { what: "shortcuts.sheet", keys: ["?"] },
       { what: "shortcuts.undo", keys: [`${MOD} Z`] },
       { what: "shortcuts.redo", keys: [`Shift ${MOD} Z`] },
+      { what: "shortcuts.goBack", keys: [`${MOD} [`] },
+      { what: "shortcuts.goForward", keys: [`${MOD} ]`] },
       { what: "shortcuts.close", keys: ["Esc"] },
     ],
   },

@@ -1,10 +1,14 @@
 // Every way the app changes a page, in one place. Each function shows the
-// change at once and sends it as a named change (see data/mutate.ts).
+// change at once and sends it as a named change (see data/mutate.ts), and
+// is remembered with its opposite, so Cmd+Z takes it back (data/undo.ts).
+// What a page says is the editor's own to undo; comments and kept versions
+// are not undone from here.
 
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { mutate, send } from "@/data/mutate";
+import { mutate, send, type Tx } from "@/data/mutate";
+import { type Batch, forget, remember, sendUndoable, undo } from "@/data/undo";
 import { rankBetween } from "@/lib/rank";
 import { getLookupEvenIfGone, getRow, getRowEvenIfGone, getRows } from "@/data/selectors";
 import { isNotFound, readError } from "@/data/query";
@@ -34,6 +38,19 @@ export interface NewDoc {
   rank?: string;
 }
 
+/** What a page is called when a step on it is undone: its title, in quotes. */
+const named = (doc: Pick<Doc, "title">) => t("undo.titled", { title: doc.title || t("docs.untitled") });
+
+/** The batch that puts a page and those under it in the trash, or takes them out. */
+function trashing(id: string, ids: string[], put: boolean): Batch {
+  return {
+    changes: [{ type: put ? "doc.delete" : "doc.restore", args: { id } }],
+    show: (tx) => {
+      for (const each of ids) tx.patch("docs", each, { deleted_at: put ? Date.now() : null });
+    },
+  };
+}
+
 /** The rank that puts a new page last among the pages under a parent. */
 export function lastRank(parentId: string | undefined): string {
   let last = "";
@@ -60,7 +77,13 @@ export function createDoc(input: NewDoc = {}): string {
   if (input.markdown) args.markdown = input.markdown;
   if (input.props && Object.keys(input.props).length) args.props = input.props;
   const now = Date.now();
-  send({ type: "doc.create", args }, (tx) =>
+  const made = remember(
+    t(kind === "row" ? "undo.row.create" : "undo.doc.create"),
+    () => sendBatch(trashing(id, [id], true)),
+    () => sendBatch(trashing(id, [id], false)),
+    { warning: t("undo.warn.created") },
+  );
+  mutate({ type: "doc.create", args }, (tx) =>
     tx.insert("docs", {
       id,
       parent_id: input.parentId,
@@ -79,9 +102,11 @@ export function createDoc(input: NewDoc = {}): string {
       created_at: now,
       updated_at: now,
     }),
-  );
+  ).catch(() => forget(made));
   return id;
 }
+
+const sendBatch = (batch: Batch) => mutate(batch.changes, batch.show);
 
 /** Sets simple fields of a page: title, icon, cover. */
 export function updateDoc(id: string, fields: Partial<Pick<Doc, "title" | "icon" | "cover">>) {
@@ -92,10 +117,28 @@ export function updateDoc(id: string, fields: Partial<Pick<Doc, "title" | "icon"
     if ((doc as Fields)[key] !== value && !(value === "" && (doc as Fields)[key] === undefined)) changed[key] = value;
   }
   if (Object.keys(changed).length === 0) return;
+  // What the row holds for a field, as doc.update takes it ("" clears an icon or a cover) and as the row keeps it.
+  const shown = (key: string, value: unknown) => (value === "" && key !== "title" ? null : value);
   const local: Fields = {};
-  for (const [key, value] of Object.entries(changed)) local[key] = value === "" && key !== "title" ? null : value;
-  send({ type: "doc.update", args: { id, ...changed } }, (tx) =>
-    tx.patch("docs", id, { ...local, updated_at: Date.now() }),
+  const back: Fields = {};
+  const before: Fields = {};
+  for (const [key, value] of Object.entries(changed)) {
+    local[key] = shown(key, value);
+    back[key] = (doc as Fields)[key] ?? "";
+    before[key] = shown(key, back[key]);
+  }
+  sendUndoable(
+    t("undo.doc.change", { what: named(doc) }),
+    {
+      changes: [{ type: "doc.update", args: { id, ...changed } }],
+      show: (tx) => tx.patch("docs", id, { ...local, updated_at: Date.now() }),
+    },
+    {
+      changes: [{ type: "doc.update", args: { id, ...back } }],
+      show: (tx) => tx.patch("docs", id, { ...before, updated_at: Date.now() }),
+    },
+    // A title is saved as it is typed: the whole of the typing is one step.
+    { sameAs: `doc:${id}:${Object.keys(changed).join()}` },
   );
 }
 
@@ -104,8 +147,19 @@ export function moveDoc(id: string, parentId: string | null, rank: string) {
   const doc = getRow("docs", id);
   if (!doc) return;
   const args: Changes["doc.update"] = { id, rank };
-  if ((doc.parent_id ?? null) !== parentId) args.parent = parentId;
-  send({ type: "doc.update", args }, (tx) => tx.patch("docs", id, { parent_id: parentId, rank }));
+  const back: Changes["doc.update"] = { id, rank: doc.rank };
+  if ((doc.parent_id ?? null) !== parentId) {
+    args.parent = parentId;
+    back.parent = doc.parent_id ?? null;
+  }
+  sendUndoable(
+    t("undo.doc.move", { what: named(doc) }),
+    { changes: [{ type: "doc.update", args }], show: (tx) => tx.patch("docs", id, { parent_id: parentId, rank }) },
+    {
+      changes: [{ type: "doc.update", args: back }],
+      show: (tx) => tx.patch("docs", id, { parent_id: doc.parent_id ?? null, rank: doc.rank }),
+    },
+  );
 }
 
 /** Makes a page private to its owner (and those it is shared with) or visible to the team. */
@@ -125,7 +179,27 @@ export function setSharing(id: string, sharing: { private?: boolean; sharedWith?
     args.shared_with = sharing.sharedWith;
     local.shared_with = sharing.sharedWith.length ? sharing.sharedWith : null;
   }
-  send({ type: "doc.update", args }, (tx) => tx.patch("docs", id, local));
+  const forward: Batch = { changes: [{ type: "doc.update", args }], show: (tx) => tx.patch("docs", id, local) };
+  const doc = getRow("docs", id);
+  // Making a page private makes the one who does it its owner: only the owner's own change can be put back as it was.
+  if (!doc || (doc.owner_id && doc.owner_id !== me?.user_id)) {
+    send(forward.changes, forward.show);
+    return;
+  }
+  const back: Changes["doc.update"] = { id };
+  const before: Fields = {};
+  if ("private" in args) {
+    back.private = !!doc.owner_id;
+    before.owner_id = doc.owner_id ?? null;
+  }
+  if ("shared_with" in args) {
+    back.shared_with = doc.shared_with ?? [];
+    before.shared_with = doc.shared_with ?? null;
+  }
+  sendUndoable(t("undo.doc.share", { what: named(doc) }), forward, {
+    changes: [{ type: "doc.update", args: back }],
+    show: (tx) => tx.patch("docs", id, before),
+  });
 }
 
 /**
@@ -138,9 +212,13 @@ export function setProject(id: string, projectId: string | null): Doc[] {
   if (!doc || (doc.project_id ?? null) === projectId) return [];
   // The server takes the trashed pages under it along too, so one restored later comes back where its parent is.
   const along = sameProjectBelow(getLookupEvenIfGone("docs"), doc);
-  send({ type: "doc.update", args: { id, project: projectId } }, (tx) => {
-    for (const each of [doc, ...along]) tx.patch("docs", each.id, { project_id: projectId });
+  const to = (project: string | null): Batch => ({
+    changes: [{ type: "doc.update", args: { id, project } }],
+    show: (tx) => {
+      for (const each of [doc, ...along]) tx.patch("docs", each.id, { project_id: project });
+    },
   });
+  sendUndoable(t("undo.doc.project", { what: named(doc) }), to(projectId), to(doc.project_id ?? null));
   return along;
 }
 
@@ -169,10 +247,8 @@ export function restoreDoc(id: string) {
   const ids = Object.values(getLookupEvenIfGone("docs"))
     .filter((d) => d.id === id || (at && d.deleted_at === at))
     .map((d) => d.id);
-  mutate({ type: "doc.restore", args: { id } }, (tx) => {
-    for (const each of ids) tx.patch("docs", each, { deleted_at: null });
-  })
-    .then(() => {
+  const restore = () =>
+    sendBatch(trashing(id, ids, false)).then(() => {
       // A page the workspace copy never had (deleted before this visit) is fetched whole.
       if (known) return;
       loadPage(id).catch((err: unknown) => {
@@ -180,23 +256,22 @@ export function restoreDoc(id: string) {
         const why = readError(err);
         if (why && !isNotFound(err)) toast.error(t("docs.trash.restoredNotLoaded", { why }));
       });
-    })
-    // Refused: mutate has said why and put the page back in the trash.
-    .catch(() => {});
+    });
+  const what = known ? named(known) : t("undo.doc.aPage");
+  const done = remember(t("undo.restore", { what }), () => sendBatch(trashing(id, ids, true)), restore);
+  // Refused: mutate has said why and put the page back in the trash.
+  restore().catch(() => forget(done));
 }
 
 /** Moves a page and the pages under it to the trash, with a way back. */
 export function trashDoc(id: string) {
   const doc = getRow("docs", id);
   if (!doc) return;
-  const all = subtree(id);
-  const at = Date.now();
-  send({ type: "doc.delete", args: { id } }, (tx) => {
-    for (const d of all) tx.patch("docs", d.id, { deleted_at: at });
-  });
+  const ids = subtree(id).map((d) => d.id);
+  const done = sendUndoable(t("undo.delete", { what: named(doc) }), trashing(id, ids, true), trashing(id, ids, false));
   toast.info(t(doc.kind === "row" ? "docs.rowDeleted" : "docs.deleted"), {
     label: t("common.undo"),
-    run: () => restoreDoc(id),
+    run: () => void undo(done),
   });
 }
 
@@ -213,7 +288,23 @@ export function setRowProps(rowId: string, values: Fields) {
     if (value === null || value === undefined) delete next[key];
     else next[key] = value;
   }
-  send({ type: "doc.update", args: { id: rowId, props: values } }, (tx) => {
+  const before: Fields = {};
+  for (const key of Object.keys(values)) before[key] = row.props?.[key] ?? null;
+  const forward: Batch = {
+    changes: [{ type: "doc.update", args: { id: rowId, props: values } }],
+    show: addingOptions,
+  };
+  const back: Batch = {
+    changes: [{ type: "doc.update", args: { id: rowId, props: before } }],
+    show: (tx) => tx.patch("docs", rowId, { props: row.props ?? null, updated_at: Date.now() }),
+  };
+  // A cell typed in is saved as it goes: the typing is one step.
+  sendUndoable(t("undo.row.change", { what: named(row) }), forward, back, {
+    sameAs: `row:${rowId}:${Object.keys(values).join()}`,
+  });
+
+  /** Shows the row's new values, and the options they add to their properties (which stay when the edit is undone). */
+  function addingOptions(tx: Tx) {
     tx.patch("docs", rowId, { props: next, updated_at: Date.now() });
     for (const [key, value] of Object.entries(values)) {
       const prop = getRow("properties", key);
@@ -226,7 +317,7 @@ export function setRowProps(rowId: string, values: Fields) {
       if (options.length > (prop.config?.options?.length ?? 0))
         tx.patch("properties", prop.id, { config: { ...prop.config, options } });
     }
-  });
+  }
 }
 
 export const keepVersion = (docId: string, label: string) =>
@@ -268,9 +359,11 @@ export function addComment({ docId, blockId, parentId, body }: NewDocComment) {
 }
 
 export function resolveComment(comment: DocComment, resolved: boolean) {
-  send({ type: "comment.update", args: { id: comment.id, resolved } }, (tx) =>
-    tx.patch("comments", comment.id, { resolved_at: resolved ? Date.now() : null }),
-  );
+  const set = (on: boolean): Batch => ({
+    changes: [{ type: "comment.update", args: { id: comment.id, resolved: on } }],
+    show: (tx) => tx.patch("comments", comment.id, { resolved_at: on ? Date.now() : null }),
+  });
+  sendUndoable(t(resolved ? "undo.comment.resolve" : "undo.comment.reopen"), set(resolved), set(!resolved));
 }
 
 export function deleteComment(comment: DocComment) {
