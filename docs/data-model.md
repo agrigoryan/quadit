@@ -95,7 +95,7 @@ The feed is the task history, the record of who did what, what agents read from 
 - `doc.write` takes Markdown and keeps the blocks that did not change, so their comments stay attached.
 - A version of the page as it was is kept at most every 15 minutes while it is edited, and whenever asked.
 - A private page has an `owner_id`; its events carry that as their audience.
-- A page built from data (a decision log, a changelog, the open questions) is built for each reader when it is opened, from what that reader may see, so two members can read it differently. It is not stored: it has no blocks, no versions and no text in the search index. What it says is found by searching the tasks and decisions themselves, not the page.
+- A page built from data (a decision log, a changelog, the open questions) is built for each reader when it is opened, from what that reader may see, so two members can read it differently. It is not stored: it has no blocks and no versions, and search finds it by its title alone. What it says is found by searching the tasks and decisions themselves, not the page.
 
 ## Conventions
 
