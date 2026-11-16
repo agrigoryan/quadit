@@ -19,7 +19,15 @@ idConfig.addOptions = function addOptions() {
 
 const mention = createReactInlineContentSpec(
   { type: "mention", propSchema: { handle: { default: "" } }, content: "none" },
-  { render: (p) => <MentionChip handle={p.inlineContent.props.handle} editable={p.editor.isEditable} /> },
+  {
+    render: (p) => (
+      <MentionChip
+        handle={p.inlineContent.props.handle}
+        editable={p.editor.isEditable}
+        focusEditor={() => p.editor.prosemirrorView.focus()}
+      />
+    ),
+  },
 );
 
 const taskChip = createReactInlineContentSpec(

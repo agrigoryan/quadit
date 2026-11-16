@@ -5,7 +5,7 @@
 
 import { createExtension } from "@blocknote/core";
 import { FileText } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useMe, useRowEvenIfGone, useRows, useTaskByKeyEvenIfGone } from "@/data/selectors";
@@ -17,18 +17,23 @@ import { PageIcon } from "@/docs/page-icon";
 import { MemberCard } from "@/tasks/member-card";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 
+interface MentionProps {
+  handle: string;
+  editable: boolean;
+  /** Gives the editor the focus back, at its caret, when the card closes while the page is edited. */
+  focusEditor?: () => void;
+}
+
 /** A person or an agent: it opens the card about them (tasks/member-card.tsx), the way the other chips open what they name. */
-export function MentionChip({ handle, editable }: { handle: string; editable: boolean }) {
+export function MentionChip({ handle, editable, focusEditor }: MentionProps) {
   // A removed member's mention still shows their name, and their card.
   const members = useLookupEvenIfGone("members");
   const member = useMemo(() => Object.values(members).find((m) => m.handle === handle), [members, handle]);
   const meId = useMe()?.user_id;
   const [open, setOpen] = useState(false);
-  const self = useRef<HTMLSpanElement>(null);
   const isMe = !!member && meId === member.user_id;
   const chip = (
     <span
-      ref={self}
       className={cx("qd-chip qd-mention", isMe && "is-me")}
       data-handle={handle}
       {...(member && chipControl("button", () => setOpen(true), editable))}
@@ -43,10 +48,10 @@ export function MentionChip({ handle, editable }: { handle: string; editable: bo
       open={open}
       onOpenChange={setOpen}
       onCloseAutoFocus={(e) => {
-        if (!editable) return;
-        // While the page is edited the focus goes back to the text, where the caret was beside the chip.
+        if (!editable || !focusEditor) return;
+        // While the page is edited the focus goes back to the text, and not to the chip.
         e.preventDefault();
-        self.current?.closest<HTMLElement>("[contenteditable=true]")?.focus();
+        focusEditor();
       }}
     >
       {chip}
@@ -91,9 +96,15 @@ export const openChipAtCaret = createExtension({
   key: "qdOpenChip",
   keyboardShortcuts: {
     "Mod-Enter": ({ editor }) => {
-      const { selection } = editor.prosemirrorState;
-      if (!selection.empty) return false;
-      const $at = selection.$from;
+      const view = editor.prosemirrorView;
+      if (!view.state.selection.empty) return false;
+      // The caret where the browser shows it: beside an inline chip the editor's own idea of it can be a step off.
+      const shown = window.getSelection();
+      const caret =
+        shown?.isCollapsed && shown.anchorNode && view.dom.contains(shown.anchorNode)
+          ? view.posAtDOM(shown.anchorNode, shown.anchorOffset)
+          : view.state.selection.from;
+      const $at = view.state.doc.resolve(caret);
       const isChip = (node: typeof $at.nodeBefore) => !!node && CHIPS.has(node.type.name);
       const at = isChip($at.nodeBefore)
         ? $at.pos - ($at.nodeBefore?.nodeSize ?? 0)
@@ -101,7 +112,7 @@ export const openChipAtCaret = createExtension({
           ? $at.pos
           : -1;
       if (at < 0) return false;
-      const dom = editor.prosemirrorView.nodeDOM(at);
+      const dom = view.nodeDOM(at);
       const link = dom instanceof HTMLElement ? dom.querySelector<HTMLElement>('[role="link"], [role="button"]') : null;
       link?.click();
       return !!link;
