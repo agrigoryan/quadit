@@ -148,8 +148,14 @@ func (who *viewer) readFeed(ctx context.Context, f store.EventFilter) ([]core.Ev
 
 // asSeen is events the viewer was let read, each without what it says of
 // a task the viewer may not read: the far end of a relation, its id and its
-// key. The events are changed in place.
+// key; and without what a link to a page the viewer may not see says. The
+// events are changed in place.
 func (who *viewer) asSeen(ctx context.Context, evs []core.Event) []core.Event {
+	for i, ev := range evs {
+		if ev.EntityType == "link" && !who.seesLink(ctx, ev.EntityID) {
+			evs[i].Data = json.RawMessage(`{}`)
+		}
+	}
 	if !who.limited() {
 		return evs
 	}

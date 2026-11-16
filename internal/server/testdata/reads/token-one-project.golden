@@ -3347,6 +3347,16 @@ How many phases?
    "to_type": "task"
   }
  ],
+ "mentions": [
+  {
+   "from_id": "<comment SVA-1 owner>",
+   "from_scope_id": "<task SVA-1>",
+   "from_scope_type": "task",
+   "from_type": "comment",
+   "to_id": "<@bea>",
+   "to_type": "member"
+  }
+ ],
  "relations": [
   {
    "created_at": 1700000000000,
@@ -3563,6 +3573,7 @@ Which color?
    "to_type": "task"
   }
  ],
+ "mentions": [],
  "relations": [
   {
    "created_at": 1700000000000,
@@ -3676,6 +3687,7 @@ seq: 261
  "comments": [],
  "links": [],
  "mentioned_in": [],
+ "mentions": [],
  "relations": [],
  "sessions": [],
  "task": {
@@ -3777,6 +3789,7 @@ seq: 261
    "to_type": "task"
   }
  ],
+ "mentions": [],
  "relations": [],
  "sessions": [],
  "task": {

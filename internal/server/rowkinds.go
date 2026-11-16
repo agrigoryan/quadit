@@ -272,7 +272,7 @@ var rowKinds = []rowKind{
 	exportOnly[core.Comment]("comments", live("created_seq")),
 	kindOf("relations", rule[core.Relation](visibleRelations)).
 		listedBy(relationsQuery).copied(toEveryone(store.Q{})).exported(store.Q{}),
-	kindOf("links", onTask(func(l core.TaskLink) string { return l.TaskID })).
+	kindOf("links", rule[core.TaskLink](visibleLinks)).
 		listed("created_at,id").exported(live("")),
 	filled(kindOf("attachments", rule[core.Attachment](visibleAttachments)), fillAttachments).
 		listedBy(attachmentsQuery).exported(live("")),
@@ -492,6 +492,34 @@ func relationsQuery(x *c) (store.Q, error) {
 		q.Where = []store.Cond{store.Either(store.Eq("task_id", t.ID), store.Eq("related_task_id", t.ID))}
 	}
 	return q, nil
+}
+
+// Links.
+
+// visibleLinks is the rule of a task's links. One is seen by whoever may
+// read the task's project; a link to a page, only by whoever may also see
+// the page.
+func visibleLinks(ctx context.Context, who *viewer, links []core.TaskLink) []core.TaskLink {
+	links = onTask(func(l core.TaskLink) string { return l.TaskID })(ctx, who, links)
+	return keep(links, func(l core.TaskLink) bool {
+		if l.Kind != core.LinkDoc {
+			return true
+		}
+		var page core.Doc
+		return who.db.Get(ctx, &page, store.Eq("id", l.Ref)) == nil && who.canSeeDoc(page)
+	})
+}
+
+// seesLink reports whether the viewer may see a link, one removed since
+// included, by the rule of visibleLinks. A link no longer stored says
+// nothing.
+func (who *viewer) seesLink(ctx context.Context, linkID string) bool {
+	var l core.TaskLink
+	there, err := store.Find(ctx, who.db, &l, store.Eq("id", linkID))
+	if err != nil {
+		return false
+	}
+	return !there || len(visibleLinks(ctx, who, []core.TaskLink{l})) == 1
 }
 
 // Attachments.

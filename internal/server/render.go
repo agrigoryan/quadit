@@ -506,6 +506,10 @@ func (d taskDetail) text() string {
 		}
 	}
 	for _, l := range d.Links {
+		if l.Kind == core.LinkDoc {
+			fmt.Fprintf(&b, "page %s  (doc %s)\n", l.Title, l.Ref)
+			continue
+		}
 		fmt.Fprintf(&b, "%s %s %s %s %s\n", l.Kind, l.Ref, l.State, l.Checks, l.URL)
 	}
 	for _, dv := range d.Decisions {

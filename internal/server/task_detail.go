@@ -152,8 +152,17 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 	if err := who.db.List(ctx, &links, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.Live}, Order: "created_at,id"}); err != nil {
 		return d, err
 	}
-	for _, l := range links {
-		d.Links = append(d.Links, linkView{ID: l.ID, Kind: l.Kind, Ref: l.Ref, Repo: l.Repo, Title: l.Title, URL: l.URL, State: l.State, Checks: l.Checks, Data: l.Data})
+	for _, l := range visibleLinks(ctx, who, links) {
+		view := linkView{ID: l.ID, Kind: l.Kind, Ref: l.Ref, Repo: l.Repo, Title: l.Title, URL: l.URL, State: l.State, Checks: l.Checks, Data: l.Data}
+		if l.Kind == core.LinkDoc {
+			// A page is shown as it is called now, at its address.
+			var page core.Doc
+			if err := who.db.Get(ctx, &page, store.Eq("id", l.Ref)); err != nil {
+				return d, err
+			}
+			view.Title, view.URL = page.Title, who.baseURL+"/"+who.ws.Slug+"/docs/"+page.ID
+		}
+		d.Links = append(d.Links, view)
 	}
 
 	// Who watches it, by handle.
@@ -266,6 +275,11 @@ func (who *viewer) taskRows(ctx context.Context, t core.Task) (map[string]any, e
 	if err != nil {
 		return nil, err
 	}
+	// What the task mentions, or is linked to, of what the viewer may see.
+	var mentions []core.Ref
+	if err := who.db.List(ctx, &mentions, store.Q{Where: []store.Cond{store.Eq("from_scope_id", t.ID)}, Order: "from_id,to_id"}); err != nil {
+		return nil, err
+	}
 	var outgoing, incoming []core.Relation
 	if err := who.db.List(ctx, &outgoing, store.Where(store.Eq("task_id", t.ID))); err != nil {
 		return nil, err
@@ -273,6 +287,6 @@ func (who *viewer) taskRows(ctx context.Context, t core.Task) (map[string]any, e
 	if err := who.db.List(ctx, &incoming, store.Where(store.Eq("related_task_id", t.ID))); err != nil {
 		return nil, err
 	}
-	return map[string]any{"task": t, "comments": comments, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions,
-		"mentioned_in": mentioned, "relations": visibleRelations(ctx, who, append(outgoing, incoming...))}, nil
+	return map[string]any{"task": t, "comments": comments, "links": visibleLinks(ctx, who, links), "watchers": watchers, "attachments": atts, "sessions": sessions,
+		"mentioned_in": mentioned, "mentions": who.seenMentioned(ctx, mentions), "relations": visibleRelations(ctx, who, append(outgoing, incoming...))}, nil
 }
