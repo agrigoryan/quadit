@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
 // The comments beside a page (docs/comments/panel.tsx): each thread on a
 // block quotes the block's text as the editor has it, says when the block is
-// gone, and threads follow the order of their blocks.
+// gone, and threads follow the order of their blocks; Esc and the ask for
+// the page's own box (Ctrl+M away from the text) reach it.
 
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
 import { CommentsPanel } from "@/docs/comments/panel";
 import type { EditorHandle } from "@/docs/editor/editor";
+import { pageUi, usePageUi } from "@/docs/page/state";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const me = { user_id: "u1", role: "owner", name: "Me", kind: "person", handle: "me" } as Member;
@@ -35,6 +38,7 @@ const editor: { current: EditorHandle } = {
 };
 
 beforeEach(() => {
+  pageUi.closeComments();
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -50,13 +54,16 @@ beforeEach(() => {
   });
 });
 
+const panel = () =>
+  render(
+    <TooltipProvider>
+      <CommentsPanel docId="d1" projectId={undefined} editor={editor} />
+    </TooltipProvider>,
+  );
+
 describe("CommentsPanel", () => {
   it("quotes each thread's block, says when it is gone, and follows the blocks' order", async () => {
-    render(
-      <TooltipProvider>
-        <CommentsPanel docId="d1" projectId={undefined} editor={editor} />
-      </TooltipProvider>,
-    );
+    panel();
     expect(await screen.findByText("Ship by Friday")).toBeInTheDocument();
     expect(screen.getByText("Goals")).toBeInTheDocument();
     expect(screen.getByText("The block this was on is gone")).toBeInTheDocument();
@@ -65,14 +72,36 @@ describe("CommentsPanel", () => {
   });
 
   it("offers to show a thread's block in the page only while the block is there", async () => {
-    render(
-      <TooltipProvider>
-        <CommentsPanel docId="d1" projectId={undefined} editor={editor} />
-      </TooltipProvider>,
-    );
+    panel();
     const onGone = (await screen.findByText("About a removed line")).closest("article") as HTMLElement;
     const onThere = screen.getByText("Too soon?").closest("article") as HTMLElement;
     expect(within(onThere).getByRole("button", { name: "Show in the page" })).toBeInTheDocument();
     expect(within(onGone).queryByRole("button", { name: "Show in the page" })).toBeNull();
+  });
+
+  it("Esc in a comment box leaves it with what was typed; away from one, it closes the column", async () => {
+    const user = userEvent.setup();
+    act(() => pageUi.commentOnPage());
+    panel();
+    const box = screen.getByRole("textbox", { name: "Comment on the page…" });
+    await user.click(box);
+    await user.keyboard("Not yet{Escape}");
+    expect(box).not.toHaveFocus();
+    expect(box).toHaveValue("Not yet");
+    expect(usePageUi.getState().commentsOpen).toBe(true);
+    await user.keyboard("{Escape}");
+    expect(usePageUi.getState().commentsOpen).toBe(false);
+  });
+
+  it("puts the cursor in the page's own box when asked, and on each ask", async () => {
+    const user = userEvent.setup();
+    panel();
+    const box = screen.getByRole("textbox", { name: "Comment on the page…" });
+    expect(box).not.toHaveFocus();
+    act(() => pageUi.commentOnPage());
+    expect(box).toHaveFocus();
+    await user.click(screen.getAllByRole("button", { name: /Show in the page|Resolve/ })[0] as HTMLElement);
+    act(() => pageUi.commentOnPage());
+    expect(box).toHaveFocus();
   });
 });

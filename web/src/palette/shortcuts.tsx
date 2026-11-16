@@ -129,7 +129,13 @@ const sections: Section[] = [
   {
     title: "shortcuts.group.page",
     hint: "shortcuts.group.pageHint",
-    rows: [{ what: "shortcuts.openChip", keys: [`${MOD} Enter`] }],
+    rows: [
+      { what: "shortcuts.openChip", keys: [`${MOD} Enter`] },
+      { what: "shortcuts.commentOnPage", keys: ["Ctrl M"] },
+      { what: "shortcuts.send", keys: [`${MOD} Enter`] },
+      { what: "shortcuts.leaveBox", keys: ["Esc"] },
+      { what: "shortcuts.closeComments", keys: ["Esc"] },
+    ],
   },
   {
     title: "shortcuts.group.tree",

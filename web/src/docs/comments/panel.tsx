@@ -3,8 +3,9 @@
 // order of the blocks they are on.
 
 import { MessageSquare, X } from "lucide-react";
-import { type RefObject, useEffect, useMemo, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useCan } from "@/data/access";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { addComment } from "@/docs/actions";
@@ -67,6 +68,10 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
   const draftBlock = usePageUi((s) => s.draftBlock);
   const focusBlock = usePageUi((s) => s.focusBlock);
   const showResolved = usePageUi((s) => s.showResolved);
+  const pageBoxAsked = usePageUi((s) => s.pageBoxAsked);
+  const pageBox = useRef<HTMLTextAreaElement>(null);
+  // Esc in a comment box leaves the box (composer.tsx); away from one, it closes the column.
+  useHotkeys({ Escape: pageUi.closeComments });
   /**
    * What the editor shows: the blocks' order, to list threads the way the
    * page reads, and the text of each block a thread is on (undefined: the
@@ -85,6 +90,10 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
     setPage({ order: handle?.order() ?? [], texts });
   }, [editor, comments, draftBlock, focusBlock]);
   const { order } = page;
+
+  useEffect(() => {
+    if (pageBoxAsked) pageBox.current?.focus();
+  }, [pageBoxAsked]);
 
   const { open, resolved } = useMemo(() => {
     const place = new Map(order.map((id, i) => [id, i]));
@@ -173,6 +182,7 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
       {!showResolved && !readOnly && (
         <footer className="shrink-0 border-t border-line p-2">
           <Composer
+            ref={pageBox}
             placeholder={t("docs.comment.onPage")}
             submitLabel={t("docs.comment.send")}
             onSubmit={(body) => addComment({ docId, body })}

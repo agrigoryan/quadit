@@ -11,6 +11,12 @@ interface PageUi {
   /** The block whose threads should be shown first. */
   focusBlock: string | null;
   showResolved: boolean;
+  /**
+   * Asks for the page's own comment box to take the cursor (Ctrl+M away
+   * from the text). Counted up, so that each ask is seen; 0 when none is
+   * waiting.
+   */
+  pageBoxAsked: number;
   /** By page id. */
   saving: Record<string, SaveState>;
 }
@@ -20,12 +26,22 @@ export const usePageUi = create<PageUi>(() => ({
   draftBlock: null,
   focusBlock: null,
   showResolved: false,
+  pageBoxAsked: 0,
   saving: {},
 }));
 
 export const pageUi = {
-  toggleComments: () => usePageUi.setState((s) => ({ commentsOpen: !s.commentsOpen, draftBlock: null })),
-  closeComments: () => usePageUi.setState({ commentsOpen: false, draftBlock: null, focusBlock: null }),
+  toggleComments: () =>
+    usePageUi.setState((s) => ({ commentsOpen: !s.commentsOpen, draftBlock: null, pageBoxAsked: 0 })),
+  closeComments: () => usePageUi.setState({ commentsOpen: false, draftBlock: null, focusBlock: null, pageBoxAsked: 0 }),
+  /** Opens the comments with the cursor in the box for a comment on the page as a whole. */
+  commentOnPage: () =>
+    usePageUi.setState((s) => ({
+      commentsOpen: true,
+      draftBlock: null,
+      showResolved: false,
+      pageBoxAsked: s.pageBoxAsked + 1,
+    })),
   startThread: (blockId: string) =>
     usePageUi.setState({ commentsOpen: true, draftBlock: blockId, focusBlock: blockId, showResolved: false }),
   endDraft: () => usePageUi.setState({ draftBlock: null }),

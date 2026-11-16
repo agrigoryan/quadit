@@ -6,6 +6,7 @@
 import { GitBranch, Sparkles } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
 import { useCan } from "@/data/access";
+import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { CommentsPanel, useOpenThreads } from "@/docs/comments/panel";
@@ -50,6 +51,19 @@ export function PageBody({ doc, compact }: Props) {
   const headReadOnly = !!doc.generated || !!doc.deleted_at || !mayEdit;
 
   usePresence(doc.id, block, page.status === "ready" && !isDatabase);
+  useHotkeys(
+    {
+      // Ctrl+M on every system, as on a task: the command key with M is the Mac's own (it puts the window away).
+      "mod+m": (e) => {
+        // The task panel over the page has Ctrl+M for the task's own comment box.
+        if (!e.ctrlKey || e.metaKey || overlayOpen() || document.querySelector("[data-task-panel]")) return;
+        e.preventDefault();
+        if (block && mayEdit && !isDatabase) pageUi.startThread(block);
+        else pageUi.commentOnPage();
+      },
+    },
+    { enabled: !compact },
+  );
 
   const focusText = () => document.querySelector<HTMLElement>(`[data-page="${doc.id}"] .bn-editor`)?.focus();
 

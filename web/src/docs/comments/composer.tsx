@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type Ref, useState } from "react";
 import { t } from "@/lib/i18n";
 import { MOD } from "@/hooks/hotkeys";
 import { Button } from "@/ui/button";
@@ -10,10 +10,12 @@ interface Props {
   onSubmit: (body: string) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
+  /** The text box, for whoever puts the cursor in it from outside. */
+  ref?: Ref<HTMLTextAreaElement>;
 }
 
 /** A small box for a comment or a reply: Markdown, @ to mention, Cmd/Ctrl-Enter to send. */
-export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFocus }: Props) {
+export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFocus, ref }: Props) {
   const [body, setBody] = useState("");
   const [active, setActive] = useState(!!autoFocus);
   const send = () => {
@@ -26,6 +28,7 @@ export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFoc
   return (
     <div>
       <MentionTextarea
+        ref={ref}
         value={body}
         onChange={setBody}
         onSubmit={send}
