@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
@@ -426,6 +427,63 @@ func TestListedAttachmentsFollowTheirPage(t *testing.T) {
 			if strings.Contains(out, name) != listed {
 				t.Errorf("%s listed for a caller limited to SVA: %v, want %v", name, !listed, listed)
 			}
+		}
+	})
+}
+
+// TestAFileOnACommentOnAPageFollowsThePage: a file attached to a comment
+// on a page is seen by those who may see the page, like a file on the page
+// itself: in /list/attachments, as a file and its bytes, and in the feed.
+// Someone who may not read the page's project, or whose page it is not,
+// gets none of it.
+func TestAFileOnACommentOnAPageFollowsThePage(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		// Another admin writes the comments and uploads the files, so that
+		// nobody asked below sees a file because it is their own.
+		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
+		var other struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
+		files := map[string]string{}
+		commentWithFile := func(name string, page M) {
+			doc := s.change(nil, other.Token, "doc.create", page)["ref"].(string)
+			comment := s.change(nil, other.Token, "comment.create", M{"doc": doc, "body": "see the file"})["ref"].(string)
+			var f struct{ ID string }
+			s.call(nil, other.Token, "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			s.change(nil, other.Token, "attachment.add", M{"comment": comment, "file": f.ID})
+			files[name] = f.ID
+		}
+		commentWithFile("handbook.txt", M{"title": "Handbook"})
+		commentWithFile("design.txt", M{"title": "Design", "project": "SVA"})
+		commentWithFile("runbook.txt", M{"title": "Runbook", "project": "OPS"})
+		commentWithFile("diary.txt", M{"title": "Diary", "private": true})
+
+		sees := func(who string, hc *http.Client, token string, want map[string]bool) {
+			t.Helper()
+			listed := s.call(hc, token, "GET", w+"/list/attachments", nil, 200, nil)
+			feed := s.call(hc, token, "GET", w+"/events?after=0&limit=2000", nil, 200, nil)
+			for name, seen := range want {
+				status := 404
+				if seen {
+					status = 200
+				}
+				if strings.Contains(listed, name) != seen {
+					t.Errorf("/list/attachments lists %s for %s: %v, want %v", name, who, !seen, seen)
+				}
+				if strings.Contains(feed, name) != seen {
+					t.Errorf("the feed tells %s of %s: %v, want %v", who, name, !seen, seen)
+				}
+				s.call(hc, token, "GET", w+"/files/"+files[name], nil, status, nil)
+				if body := s.call(hc, token, "GET", "/f/"+files[name]+"/"+name, nil, status, nil); seen && body != "the bytes of "+name {
+					t.Errorf("%s is served to %s as %q", name, who, body)
+				}
+			}
+		}
+		sees("the one who attached them", nil, other.Token, map[string]bool{"handbook.txt": true, "design.txt": true, "runbook.txt": true, "diary.txt": true})
+		sees("an owner, of a page someone keeps private", s.owner, "", map[string]bool{"handbook.txt": true, "design.txt": true, "runbook.txt": true, "diary.txt": false})
+		for who, token := range callers {
+			sees(who, nil, token, map[string]bool{"handbook.txt": true, "design.txt": true, "runbook.txt": false, "diary.txt": false})
 		}
 	})
 }

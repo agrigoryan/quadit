@@ -403,19 +403,17 @@ func withoutHiddenEnds(r core.Relation, mayRead func(taskID string) bool) core.R
 
 // visibleAttachments is the rule of attachments. One on a task (on the
 // task itself, or on a comment, a decision or an option of it) is seen by
-// whoever may read the task's project; one on a page by whoever may see
-// the page. A task or a page that cannot be read hides what is on it.
+// whoever may read the task's project; one on a page, or on a comment on a
+// page, by whoever may see the page. A task or a page that cannot be read
+// hides what is on it, and so does being on neither.
 func visibleAttachments(ctx context.Context, who *viewer, atts []core.Attachment) []core.Attachment {
 	return keep(atts, func(a core.Attachment) bool {
 		if a.TaskID != "" {
 			var t core.Task
 			return who.db.Get(ctx, &t, store.Eq("id", a.TaskID)) == nil && who.canProject(t.ProjectID)
 		}
-		if a.SubjectType != "doc" {
-			return true
-		}
-		var page core.Doc
-		return who.db.Get(ctx, &page, store.Eq("id", a.SubjectID)) == nil && who.canSeeDoc(page)
+		page, there, err := attachmentPage(ctx, who.db, a)
+		return err == nil && there && who.canSeeDoc(page)
 	})
 }
 

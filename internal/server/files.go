@@ -635,8 +635,9 @@ func (s *Server) handleServeFile(x *c) error {
 // files are private, whoever asks, unless the viewer uploaded them. Beyond
 // that a viewer with no limit sees every file of the workspace, and one
 // limited to some projects sees a file that is its own, or attached to a
-// task of a project it may read, or to a page it may see. When what decides
-// it cannot be read, the answer is no.
+// task of a project it may read, or to a page it may see. A file on a
+// comment on a page is the page's (attachmentPage). When what decides it
+// cannot be read, the answer is no.
 func (who *viewer) canSeeFile(ctx context.Context, f core.File) bool {
 	var atts []core.Attachment
 	if err := who.db.List(ctx, &atts, store.Where(store.Eq("file_id", f.ID))); err != nil {
@@ -658,12 +659,30 @@ func (who *viewer) canSeeFile(ctx context.Context, f core.File) bool {
 			}
 			continue
 		}
-		var d core.Doc
-		if who.db.Get(ctx, &d, store.Eq("id", a.SubjectID)) == nil && who.canProject(d.ProjectID) {
+		if d, there, err := attachmentPage(ctx, who.db, a); err == nil && there && who.canProject(d.ProjectID) {
 			return true
 		}
 	}
 	return false
+}
+
+// attachmentPage finds the page an attachment on no task is shown on: the
+// page itself, or the page of the comment it is on. there is false when it
+// is on neither, or the page is gone for good.
+func attachmentPage(ctx context.Context, db store.DB, a core.Attachment) (page core.Doc, there bool, err error) {
+	pageID := a.SubjectID
+	if a.SubjectType == "comment" {
+		var comment core.Comment
+		if there, err := store.Find(ctx, db, &comment, store.Eq("id", a.SubjectID)); err != nil || !there {
+			return page, false, err
+		}
+		pageID = comment.DocID
+	}
+	if pageID == "" {
+		return page, false, nil
+	}
+	there, err = store.Find(ctx, db, &page, store.Eq("id", pageID))
+	return page, there, err
 }
 
 // onHiddenPage reports whether a file is attached to a page the user
@@ -671,8 +690,7 @@ func (who *viewer) canSeeFile(ctx context.Context, f core.File) bool {
 func onHiddenPage(ctx context.Context, db store.DB, atts []core.Attachment, userID string) bool {
 	for _, a := range atts {
 		if a.TaskID == "" && a.SubjectID != "" {
-			var d core.Doc
-			there, err := store.Find(ctx, db, &d, store.Eq("id", a.SubjectID))
+			d, there, err := attachmentPage(ctx, db, a)
 			if err != nil || (there && !engine.CanSeeDoc(d, userID)) {
 				return true // a page that cannot be read is taken to be one the user cannot see
 			}
