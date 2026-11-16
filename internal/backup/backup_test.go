@@ -1,9 +1,12 @@
 package backup_test
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -389,6 +392,103 @@ func TestAPageBroughtBackUnderAPrivatePageIsPrivateTheSameWay(t *testing.T) {
 		}
 		if hits, err := db.Search(ctx, store.SearchQuery{Text: "quokka", Viewer: other}); err != nil || len(hits) != 0 {
 			t.Errorf("another member finds the page brought back under a private page: %v, %v", hits, err)
+		}
+	})
+}
+
+// withSchema is an archive whose first member, which says the schema
+// version, says schema and version instead: as a newer Quadit would have
+// made it. A schema below 0 takes the member out, as in an archive made
+// before there was one.
+func withSchema(t *testing.T, archive []byte, schema int, version string) []byte {
+	t.Helper()
+	gz, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(gz)
+	var out bytes.Buffer
+	gw := gzip.NewWriter(&out)
+	tw := tar.NewWriter(gw)
+	for {
+		h, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Name == "schema.json" && schema < 0 {
+			continue
+		}
+		if h.Name == "schema.json" {
+			body, _ = json.Marshal(M{"schema": schema, "version": version})
+			h.Size = int64(len(body))
+		}
+		if err := tw.WriteHeader(h); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return out.Bytes()
+}
+
+// TestAnArchiveOfANewerQuaditIsRefusedBeforeAnythingIsWritten: an archive
+// whose first member says a schema version newer than this database's is
+// refused, whole or one item of it, before a row or a file is written,
+// with words that say which Quadit can read it. One that says this version
+// is restored, and so is one made before the first member said it.
+func TestAnArchiveOfANewerQuaditIsRefusedBeforeAnythingIsWritten(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		ctx := context.Background()
+		src := testdb.SQLite(t)
+		srcFiles, _ := blob.NewDisk(t.TempDir())
+		fill(t, src, srcFiles)
+		var archive bytes.Buffer
+		if _, err := backup.Write(ctx, src, srcFiles, "test", &archive); err != nil {
+			t.Fatal(err)
+		}
+		now, err := st.SchemaVersion(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		newer := withSchema(t, archive.Bytes(), now+1, "9.9.9")
+
+		files, _ := blob.NewDisk(t.TempDir())
+		_, err = backup.Restore(ctx, st, files, bytes.NewReader(newer))
+		if !errors.Is(err, backup.ErrNewerArchive) || !strings.Contains(err.Error(), "Quadit 9.9.9") {
+			t.Fatalf("a full restore of a newer archive: %v", err)
+		}
+		if n, err := st.Count(ctx, "users"); err != nil || n != 0 {
+			t.Fatalf("the refused restore wrote %d users (%v)", n, err)
+		}
+		stored := 0
+		if err := files.List(ctx, "", func(string, int64) error { stored++; return nil }); err != nil || stored != 0 {
+			t.Fatalf("the refused restore stored %d files (%v)", stored, err)
+		}
+
+		if _, err := backup.Restore(ctx, st, files, bytes.NewReader(withSchema(t, archive.Bytes(), now, "test"))); err != nil {
+			t.Fatalf("an archive of this version: %v", err)
+		}
+		before := withSchema(t, archive.Bytes(), -1, "")
+		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(before), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
+			t.Fatalf("an archive made before the first member said the schema: %v", err)
+		}
+		_, err = backup.RestoreItem(ctx, st, files, bytes.NewReader(newer), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"})
+		if !errors.Is(err, backup.ErrNewerArchive) {
+			t.Fatalf("bringing one task back from a newer archive: %v", err)
 		}
 	})
 }

@@ -2,11 +2,18 @@
 // JSON lines plus every stored file, in one .tar.gz. The same archive is
 // made on SQLite and on Postgres, on disk and on cloud storage, and can be
 // restored onto any of them.
+//
+// The archive's first member (schema.json) says the schema version it was
+// made at and the Quadit that made it, so a restore can refuse an archive
+// it cannot read whole before it writes anything; its last (manifest.json)
+// lists every member with its checksum. An archive made before the first
+// member existed has only the last.
 package backup
 
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -31,6 +38,17 @@ type Entry struct {
 	Rows   int    `json:"rows,omitempty"`
 }
 
+// schemaMember is the archive's first member: what a restore must know
+// before it reads a row.
+const schemaMember = "schema.json"
+
+// madeBy is what the first member says: the schema version the archive
+// was made at, and the version of Quadit that made it.
+type madeBy struct {
+	Schema  int    `json:"schema"`
+	Version string `json:"version"`
+}
+
 // Manifest is the last member of an archive. It lists the others with
 // their checksums, so an archive can be verified without restoring it.
 type Manifest struct {
@@ -44,6 +62,11 @@ type Manifest struct {
 	Entries []Entry `json:"entries"`
 }
 
+// ErrNewerArchive is the refusal of an archive made by a newer Quadit, whose
+// schema this one does not know: restored, its rows would lose the tables
+// and columns that are new. The error says which version made it.
+var ErrNewerArchive = errors.New("the archive is newer than this Quadit")
+
 // skipPrefixes are stored objects that are not users' files.
 var skipPrefixes = []string{"backups/", "probe/"}
 
@@ -56,7 +79,11 @@ func Write(ctx context.Context, st store.Store, files blob.Store, version string
 	aw := &archiveWriter{m: Manifest{Format: 1, CreatedAt: time.Now().UnixMilli(), Version: version, Database: st.Dialect(), Schema: schema}}
 	gz := gzip.NewWriter(w)
 	aw.tw = tar.NewWriter(gz)
-	// Tables first, in an order that can be loaded back.
+	head, _ := json.Marshal(madeBy{Schema: schema, Version: version})
+	if err := aw.add(schemaMember, int64(len(head)), bytes.NewReader(head), 0); err != nil {
+		return aw.m, err
+	}
+	// Tables next, in an order that can be loaded back.
 	for _, t := range store.Tables() {
 		if err := aw.addTable(ctx, st, t.Name); err != nil {
 			return aw.m, fmt.Errorf("table %s: %w", t.Name, err)
@@ -321,6 +348,28 @@ func lines(body io.Reader, batch int, flush func([]map[string]any) error) error 
 	return flush(rows)
 }
 
+// readable refuses, from its first member, an archive made at a schema
+// version newer than the database's: this Quadit would drop what it does
+// not know. Every other member is not this one's to judge.
+func readable(ctx context.Context, st store.Store, name string, body io.Reader) error {
+	if name != schemaMember {
+		return nil
+	}
+	var made madeBy
+	if err := json.NewDecoder(body).Decode(&made); err != nil {
+		return fmt.Errorf("the archive is damaged: its %s does not read: %w", schemaMember, err)
+	}
+	ours, err := st.SchemaVersion(ctx)
+	if err != nil {
+		return err
+	}
+	if made.Schema > ours {
+		return fmt.Errorf("%w: it was made by Quadit %s (schema version %d), and this Quadit knows schema version %d; restore it with Quadit %s or a later version",
+			ErrNewerArchive, made.Version, made.Schema, ours, made.Version)
+	}
+	return nil
+}
+
 // Restore loads an archive into an empty database and file store. The rows
 // of an archive made at an older schema version are then changed as the
 // upgrades since would have changed them in a database of that version
@@ -333,6 +382,9 @@ func Restore(ctx context.Context, st store.Store, files blob.Store, r io.Reader)
 		return Manifest{}, errors.New("this database already has data; a full restore goes into an empty one (to bring back one task or page, name it)")
 	}
 	m, err := read(r, func(name string, body io.Reader) error {
+		if err := readable(ctx, st, name, body); err != nil {
+			return err
+		}
 		if key, ok := strings.CutPrefix(name, "files/"); ok {
 			return files.Put(ctx, key, body, "")
 		}
@@ -441,6 +493,9 @@ func str(row map[string]any, k string) string { s, _ := row[k].(string); return 
 // member reads one member of the archive: a stored file, brought back if
 // it is one of the item's, or a table's rows.
 func (ir *itemRestore) member(name string, body io.Reader) error {
+	if err := readable(ir.ctx, ir.st, name, body); err != nil {
+		return err
+	}
 	if key, ok := strings.CutPrefix(name, "files/"); ok {
 		if ir.keys[key] {
 			return ir.files.Put(ir.ctx, key, body, "")

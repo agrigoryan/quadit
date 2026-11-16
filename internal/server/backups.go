@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -339,6 +340,9 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 	}
 	defer f.Close()
 	rid, err := backup.RestoreItem(ctx, s.st, s.fileStore(), f, it)
+	if errors.Is(err, backup.ErrNewerArchive) {
+		return &engine.Error{Code: engine.CodeConflict, Message: err.Error()}
+	}
 	if err != nil {
 		return &engine.Error{Code: engine.CodeNotFound, Message: err.Error()}
 	}
