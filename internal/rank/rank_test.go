@@ -22,7 +22,7 @@ func TestBetweenKeepsOrder(t *testing.T) {
 func TestRandomInsertsStaySorted(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	ranks := []string{Between("", "")}
-	for i := 0; i < 3000; i++ {
+	for range 3000 {
 		at := r.Intn(len(ranks) + 1) // insert before index at
 		lo, hi := "", ""
 		if at > 0 {

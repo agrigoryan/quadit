@@ -242,7 +242,7 @@ func TestBudgets(t *testing.T) {
 
 		// Hand-offs count against an agent's budget.
 		w.do(w.owner.ID, "agent.update", M{"id": "@alpha", "budget": M{"handoffs": 2}})
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Pass along", "assignee": "@alpha"})
 			w.do(a, "task.update", M{"id": fmt.Sprintf("SVA-%d", i+2), "assignee": "@beta"})
 		}

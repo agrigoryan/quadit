@@ -1,6 +1,7 @@
 package server
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -22,9 +23,9 @@ func TestFlowWeeksAreTheLastTwelveMondays(t *testing.T) {
 		t.Fatalf("%d weeks, want %d", len(weeks), flowWeeks)
 	}
 	monday := time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
-	for i := len(weeks) - 1; i >= 0; i-- {
-		if want := monday.Format(time.DateOnly); weeks[i].Week != want {
-			t.Errorf("week %d of the series is %s, want %s", i, weeks[i].Week, want)
+	for i, week := range slices.Backward(weeks) {
+		if want := monday.Format(time.DateOnly); week.Week != want {
+			t.Errorf("week %d of the series is %s, want %s", i, week.Week, want)
 		}
 		monday = monday.AddDate(0, 0, -7)
 	}

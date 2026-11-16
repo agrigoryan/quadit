@@ -304,11 +304,11 @@ func TestLooseEnds(t *testing.T) {
 		s.call(s.owner, "", "POST", w+"/deliveries/"+log.Deliveries[0].ID+"/redeliver", nil, 400, nil)
 
 		// The audit log pages by entry, never skipping or repeating one.
-		for i := 0; i < 7; i++ {
+		for i := range 7 {
 			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", i%2 == 0, 200, nil)
 		}
 		seen, cursor := map[string]bool{}, ""
-		for page := 0; page < 20; page++ {
+		for range 20 {
 			var out struct {
 				Audit []struct{ ID string }
 				Next  string

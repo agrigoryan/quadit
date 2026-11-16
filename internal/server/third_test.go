@@ -133,7 +133,7 @@ func TestThirdAuditFindings(t *testing.T) {
 		}
 
 		// A list read page by page while a task's place in it changes: none is missed.
-		for i := 0; i < 6; i++ {
+		for i := range 6 {
 			s.change(s.owner, "", "task.create", M{"project": "OPS", "title": fmt.Sprintf("Ordered %d", i), "priority": 3})
 		}
 		type page struct {

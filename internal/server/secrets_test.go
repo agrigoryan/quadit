@@ -561,7 +561,7 @@ func TestSurfaceOnlyGrows(t *testing.T) {
 	raw, _ := os.ReadFile(file)
 	var kept, missing []string
 	known := map[string]bool{}
-	for _, l := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(string(raw)), "\n") {
 		if l == "" || strings.HasPrefix(l, "#") {
 			continue
 		}
@@ -688,7 +688,7 @@ func TestPagesDoNotShift(t *testing.T) {
 			got := map[string]int{}
 			var p page
 			s.call(s.owner, "", "GET", w+"/tasks?"+query, nil, 200, &p)
-			for round := 0; round < 20; round++ {
+			for round := range 20 {
 				for _, tk := range p.Tasks {
 					got[tk.Key]++
 				}
@@ -800,7 +800,7 @@ func TestSecondAuditFindings(t *testing.T) {
 			t.Fatalf("a limited agent is shown the other project: %s", out)
 		}
 		// Helpers: at most three at work on a task, and gone with a deleted task.
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			do(asker, "agent.create", M{"name": fmt.Sprintf("Helper %d", i), "handle": fmt.Sprintf("helper%d", i), "task": "OPS-1"}, 200)
 		}
 		do(asker, "agent.create", M{"name": "One more", "handle": "helper9", "task": "OPS-1"}, 409)

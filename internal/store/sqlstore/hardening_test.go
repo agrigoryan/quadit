@@ -86,14 +86,14 @@ func fillTasks(t *testing.T, s *Store, n int) string {
 	must(s.Insert(ctx, core.Workspace{ID: ws, Slug: "w" + ws[:8], Name: "W", CreatedAt: 1, UpdatedAt: 1}))
 	must(s.Insert(ctx, core.User{ID: me, Kind: "person", Name: "Me", Email: me + "@example.com", CreatedAt: 1, UpdatedAt: 1}))
 	var projects, statuses []string
-	for p := 0; p < 2; p++ {
+	for p := range 2 {
 		pid, sid := id.New(), id.New()
 		must(s.Insert(ctx, core.Project{ID: pid, WorkspaceID: ws, Key: fmt.Sprintf("P%d", p), Name: "P", CreatedBy: me, CreatedAt: 1, UpdatedAt: 1, CreatedSeq: 1, UpdatedSeq: 1}))
 		must(s.Insert(ctx, core.Status{ID: sid, WorkspaceID: ws, ProjectID: pid, Name: "Todo", Category: "unstarted", Rank: "a", IsDefault: true, CreatedAt: 1}))
 		projects, statuses = append(projects, pid), append(statuses, sid)
 	}
 	db := s.In(ws)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		p := i % 2
 		due := ""
 		if i%3 == 0 {
@@ -216,7 +216,7 @@ func TestTaskPagesSearchTheIndex(t *testing.T) {
 // column, past the columns it is equal on: "INDEX tasks_activity
 // (workspace_id=? AND activity_seq<?)", whatever the words around it.
 func searchesRange(plan, index, col string) bool {
-	for _, step := range strings.Split(plan, "\n") {
+	for step := range strings.SplitSeq(plan, "\n") {
 		_, cond, ok := strings.Cut(step, index)
 		if ok && strings.Contains(cond, col) {
 			return true

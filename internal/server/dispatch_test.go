@@ -197,7 +197,7 @@ func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
 	fine := newReceiver(t, "")
 	s.change(s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x", "event_types": []string{"task.*"}})
 	s.change(s.owner, "", "webhook.create", M{"name": "fine", "url": fine.srv.URL, "event_types": []string{"comment.created"}})
-	for b := 0; b < 7; b++ {
+	for b := range 7 {
 		batch := make([]M, 300)
 		for i := range batch {
 			batch[i] = M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": fmt.Sprintf("Backlog %d-%d", b, i)}}

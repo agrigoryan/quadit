@@ -315,9 +315,7 @@ func TestServersStartingTogether(t *testing.T) {
 			start := make(chan struct{})
 			var wg sync.WaitGroup
 			for i := range servers {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					<-start
 					st, err := Open(context.Background(), s.url(name))
 					if err == nil {
@@ -325,7 +323,7 @@ func TestServersStartingTogether(t *testing.T) {
 						st.Close()
 					}
 					errs[i] = err
-				}()
+				})
 			}
 			close(start)
 			wg.Wait()

@@ -285,7 +285,7 @@ func (r *syncedRepo) idle(when string) {
 // pageID finds a page by its title in the page tree.
 func (s *site) pageID(title string) string {
 	s.t.Helper()
-	for _, line := range strings.Split(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil), "\n") {
+	for line := range strings.SplitSeq(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil), "\n") {
 		if strings.HasPrefix(strings.TrimSpace(line), title+"  (") {
 			return line[strings.LastIndex(line, "(")+1 : len(line)-1]
 		}

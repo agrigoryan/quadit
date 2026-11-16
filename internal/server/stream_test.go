@@ -163,7 +163,7 @@ func TestCompression(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		for i := 0; i < 40; i++ {
+		for i := range 40 {
 			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "A task about the boss fight, number " + strings.Repeat("x", i)})
 		}
 		var tok struct{ Token string }
@@ -282,7 +282,7 @@ func TestBootstrapInParts(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		for i := 0; i < 6; i++ {
+		for i := range 6 {
 			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i+1)})
 		}
 		s.change(s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"})

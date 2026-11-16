@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"testing"
 
@@ -49,9 +50,7 @@ func TestPageProjectTakesItsSubPages(t *testing.T) {
 			if parent != "" {
 				args["parent"] = parent
 			}
-			for k, v := range more {
-				args[k] = v
-			}
+			maps.Copy(args, more)
 			return w.do(me, "doc.create", args).Ref
 		}
 		root := page("Handbook", "", nil)

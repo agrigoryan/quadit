@@ -75,7 +75,7 @@ func TestRepositorySync(t *testing.T) {
 			t.Fatalf("page tree:\n%s", tree)
 		}
 		idOf := func(title string) string {
-			for _, line := range strings.Split(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil), "\n") {
+			for line := range strings.SplitSeq(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil), "\n") {
 				if strings.HasPrefix(strings.TrimSpace(line), title+"  (") {
 					return line[strings.LastIndex(line, "(")+1 : len(line)-1]
 				}

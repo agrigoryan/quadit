@@ -27,9 +27,9 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 		s.change(s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
 		statuses := []string{"Backlog", "Todo", "In Progress", "Waiting", "Done"}
 		start := time.Now()
-		for batch := 0; batch < 20; batch++ {
+		for batch := range 20 {
 			var changes []M
-			for i := 0; i < 500; i++ {
+			for i := range 500 {
 				n := batch*500 + i
 				args := M{"project": "SVA", "title": fmt.Sprintf("Task number %d about sprites and explosions", n), "status": statuses[n%5],
 					"description": "Some words to search for: alien samurai boss fight.", "priority": n % 5}
@@ -49,7 +49,7 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 			t.Helper()
 			fn() // once to warm up
 			best := time.Hour
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				at := time.Now()
 				fn()
 				if d := time.Since(at); d < best {

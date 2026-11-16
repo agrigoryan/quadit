@@ -135,7 +135,7 @@ func TestDashboardSameEveryTime(t *testing.T) {
 		return string(out.Epics) + "\n" + string(out.Flow.ByStatus)
 	}
 	first := order()
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		if got := order(); got != first {
 			t.Fatalf("call %d answered in another order:\n%s\nthan the first:\n%s", i+2, got, first)
 		}

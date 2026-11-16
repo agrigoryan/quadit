@@ -9,7 +9,7 @@ func TestNewIsValidSortedAndUnique(t *testing.T) {
 	const n = 20000 // more than the 4096 ids one millisecond can hold
 	seen := make(map[string]bool, n)
 	prev := ""
-	for i := 0; i < n; i++ {
+	for range n {
 		s := New()
 		if !Valid(s) {
 			t.Fatalf("invalid id %q", s)

@@ -176,7 +176,7 @@ func statementsBeforeGoose(d Dialect) ([][]string, error) {
 func splitStatementsBeforeGoose(sqlText string) []string {
 	var out []string
 	var cur strings.Builder
-	for _, line := range strings.Split(sqlText, "\n") {
+	for line := range strings.SplitSeq(sqlText, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
 			continue

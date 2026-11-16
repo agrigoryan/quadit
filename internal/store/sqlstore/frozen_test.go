@@ -33,7 +33,7 @@ func TestMigrationsAreFrozen(t *testing.T) {
 	raw, _ := os.ReadFile(file)
 	known := map[string]string{}
 	var lines []string
-	for _, l := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(string(raw)), "\n") {
 		if name, sum, ok := strings.Cut(l, " "); ok && !strings.HasPrefix(l, "#") {
 			known[name] = sum
 			lines = append(lines, l)

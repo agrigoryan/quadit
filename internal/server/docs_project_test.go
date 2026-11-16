@@ -35,7 +35,7 @@ func TestProjectPages(t *testing.T) {
 			return s.call(nil, narrow, "GET", "/api/v1/w/-/docs?format=text"+query, nil, 200, nil)
 		}
 		lineOf := func(text, title string) string {
-			for _, line := range strings.Split(text, "\n") {
+			for line := range strings.SplitSeq(text, "\n") {
 				if strings.HasPrefix(strings.TrimLeft(line, " "), title) {
 					return line
 				}

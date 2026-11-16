@@ -158,7 +158,7 @@ func TestImports(t *testing.T) {
 			t.Fatalf("vault tree:\n%s", tree)
 		}
 		var home string
-		for _, line := range strings.Split(tree, "\n") {
+		for line := range strings.SplitSeq(tree, "\n") {
 			if strings.HasPrefix(line, "Home  (") {
 				home = line[strings.Index(line, "(")+1 : len(line)-1]
 			}
@@ -190,7 +190,7 @@ func TestImports(t *testing.T) {
 			t.Fatalf("notion tree:\n%s", tree)
 		}
 		var bugs string
-		for _, line := range strings.Split(tree, "\n") {
+		for line := range strings.SplitSeq(tree, "\n") {
 			if strings.Contains(line, "Bugs [database]") {
 				bugs = line[strings.Index(line, "(")+1 : len(line)-1]
 			}

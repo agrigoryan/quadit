@@ -214,7 +214,7 @@ func TestMCPToolListIsStable(t *testing.T) {
 	if !strings.Contains(first, `"secret_request"`) {
 		t.Fatalf("tools/list = %.200s", first)
 	}
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		if _, again := mcpPost(t, s, token, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`); again != first {
 			t.Fatalf("tools/list answered differently the %d. time", i+2)
 		}
