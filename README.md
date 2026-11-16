@@ -50,6 +50,8 @@ See [docs/agents.md](docs/agents.md). The same surface is an MCP server at `/mcp
 | [docs/install.md](docs/install.md) | Running it: settings, storage, sign-in, backups, upgrades, monitoring |
 | [docs/agents.md](docs/agents.md) | Connecting agents: tokens, the feed, wake-ups, the CLI, MCP |
 | [docs/data-model.md](docs/data-model.md) | How data is stored and why |
+| [docs/store.md](docs/store.md) | The data layer: migrations on goose, restores, and the queries |
+| [docs/code-style.md](docs/code-style.md) | How the code is designed and written |
 
 ## Layout
 
@@ -59,10 +61,16 @@ See [docs/agents.md](docs/agents.md). The same surface is an MCP server at `/mcp
 | `internal/core` | The product's row types |
 | `internal/store` | The data layer's interface; `sqlstore` implements it for SQLite and Postgres |
 | `internal/engine` | Every change type, applied in one transaction with its events |
-| `internal/server` | The HTTP API, feed, files, sign-in, background work, MCP |
+| `internal/server` | The HTTP API: routes, sign-in, reads (through the viewer), feed, files, background work |
+| `internal/settings` | The install's settings: the environment over the stored value, sealed secrets, a short cache, safe values when unreadable |
+| `internal/app` | Wiring the server together, and the commands that run on its machine (`serve`, `admin`, `backup`, `restore`, `upgrade`) |
+| `internal/mcp` | The MCP server: the API's surface as MCP tools |
+| `internal/github`, `internal/reposync` | The GitHub integration; pages kept in step with Markdown files in a git repository |
+| `internal/hub`, `internal/webpush`, `internal/picture` | Waking held requests, browser push, pictures of pages through a headless browser |
 | `internal/cli`, `internal/importer` | The command-line client and the importers |
-| `internal/md`, `internal/formula`, `internal/rank`, `internal/id` | Markdown ↔ blocks, database formulas, manual ordering, ids |
+| `internal/md`, `internal/formula`, `internal/rank`, `internal/id`, `internal/plainjson` | Markdown ↔ blocks, database formulas, manual ordering, ids, JSON of plain values |
 | `internal/backup`, `internal/blob`, `internal/mail`, `internal/auth` | Archives, file storage, mail, credentials |
+| `internal/testdb` | Every kind of database, for tests |
 | `web` | The web app (React), built into the binary |
 
 ## Development

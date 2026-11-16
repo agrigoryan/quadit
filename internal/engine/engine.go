@@ -2,7 +2,10 @@
 // in the browser or an agent on the API, is a named change with an id made by
 // the caller. The engine checks it, writes the rows and the events in one
 // transaction, and remembers the id so the same change sent twice is applied
-// once.
+// once. Callers name a change and its arguments (Apply, Batch); the engine
+// hides the transaction, the rules each change keeps, the events, inbox,
+// watchers and search entries a change brings, and the record of ids
+// already applied.
 //
 // How the package is laid out:
 //
@@ -23,12 +26,15 @@
 //	sys.go          writes the engine makes itself (rules, roll-overs)
 //	maintain.go     reindexing and purging, run in the background
 //	catalog.go      the list of change types and their arguments, for callers
+//	task_query.go   a task query made into the store's filter, every name
+//	                resolved
 //	ch_<what>.go    the changes to one kind of thing (ch_labels.go: label.*),
 //	                registered in the file's init, with what only they use
 //	ch_task*.go     task.*: create, update, move, take; saving a task, the
 //	                checks on it, and its fields
 //	ch_doc*.go      doc.*: create and update, edit and write, versions; a
-//	                page's blocks, and its project
+//	                page's blocks, its project, and who may see it and the
+//	                pages under it (ch_doc_private.go)
 //	ch_budgets.go   what agents spend, and the warnings
 //	ch_bootstrap.go a new workspace and its owner
 //	ch_shared.go    what the handlers of several files use

@@ -238,9 +238,11 @@ app 13, backup 5), 32 more in tests. Counted with a type-checking script, not by
 
 Design **C** (goose only) leaves all nine as they are. Design **B** changes only 6 and 8.
 Design **A** changes all but 7. The SQL shown was compiled by sqlc for both databases, and
-the signatures are what it generated.
+the signatures are what it generated. The "now" code is as it read when the designs were
+compared; the places named are where it lives today, where some names have changed since
+(`get` is `loadLive`; a read in a handler is a method of the viewer, `who.db`).
 
-**1. One row by id** — `internal/server/deliveries.go:112`
+**1. One row by id** — `internal/server/deliveries.go:176`
 
 ```go
 var h core.Webhook                                                             // now, B, C
@@ -265,7 +267,7 @@ func (w webhooks) Get(ctx context.Context, id string) (core.Webhook, error) {  /
 }
 ```
 
-**2. Rows under a parent, in order** — `internal/server/task_detail.go:113`
+**2. Rows under a parent, in order** — `internal/server/task_detail.go:91`
 
 ```go
 var cms []core.Comment                                                         // now, B, C
@@ -283,7 +285,7 @@ ORDER BY created_seq;
 func (q *Queries) ListTaskComments(ctx context.Context, workspaceID string, taskID sql.NullString) ([]Comment, error)
 ```
 
-**3. Insert** — `internal/engine/ch_labels.go:45`
+**3. Insert** — `internal/engine/ch_labels.go:48`
 
 ```go
 if err := c.tx.Insert(c.ctx, l); err != nil {                                  // now, B, C
@@ -299,7 +301,7 @@ func (q *Queries) InsertLabel(ctx context.Context, arg InsertLabelParams) error
 // InsertLabelParams: 9 fields, ProjectID sql.NullString, DeletedAt sql.NullInt64; filled by hand from core.Label
 ```
 
-**4. Set a few named columns** — `internal/server/deliveries.go:114`
+**4. Set a few named columns** — `internal/server/deliveries.go:244`
 
 ```go
 db.Update(ctx, "webhook_deliveries", map[string]any{"state": "dead", "error": "the webhook was deleted", "done_at": time.Now().UnixMilli()}, store.Eq("id", d.ID))   // now, B, C
@@ -316,7 +318,7 @@ func (q *Queries) EndDelivery(ctx context.Context, arg EndDeliveryParams) (int64
 ```
 This table is updated in 7 places with 5 different sets of columns: 5 queries.
 
-**5. Delete** — `internal/engine/ch_task_save.go:100`
+**5. Delete** — `internal/engine/ch_task_save.go:107`
 
 ```go
 if _, err := c.tx.Delete(c.ctx, "task_labels", store.Eq("task_id", t.ID), store.Eq("label_id", l)); err != nil {   // now, B, C
@@ -330,7 +332,7 @@ DELETE FROM task_labels WHERE workspace_id = @workspace_id AND task_id = @task_i
 func (q *Queries) DeleteTaskLabel(ctx context.Context, workspaceID string, taskID string, labelID string) (int64, error)
 ```
 
-**6. A count per group** — `internal/server/views_shared.go:106`
+**6. A count per group** — `internal/server/views_shared.go:134`
 
 ```go
 rows, err := x.db.Tally(x.ctx(), "comments", []string{"subject_id"}, store.In("task_id", tids), store.Eq("subject_type", "decision_option"), store.Live)   // now, C
@@ -351,7 +353,7 @@ func (q *Queries) CountOptionComments(ctx context.Context, workspaceID string, t
 func (q *Queries) CountOptionComments(ctx context.Context, workspaceID string, taskIds string) ([]CountOptionCommentsRow, error)          // postgres
 ```
 
-**7. The task filter, page by page** — `internal/server/tasks_list.go:147`
+**7. The task filter, page by page** — `internal/server/tasks_list.go:165`
 
 ```go
 tasks, err := x.db.Tasks(x.ctx(), f)                                           // every design
@@ -398,7 +400,7 @@ func (q *Queries) CountTasksNumbered(ctx context.Context, workspaceID string, pr
 These two signatures are the same in both generated packages (with Postgres `integer`
 overridden to `int64`), so one Go interface covers both and the adapter is written once.
 
-**9. An update whose columns are decided at run time** — `internal/engine/ch_labels.go:66`, `patch.go:109`
+**9. An update whose columns are decided at run time** — `internal/engine/ch_labels.go:62`, `patch.go:136`
 
 ```go
 l, err := get[core.Label](c, "label", "id", a.ID)                              // now, B, C

@@ -1,7 +1,10 @@
 // Package server is the HTTP API. The web app, the command-line tool, the
 // MCP server and agents all use it; nothing reaches the data another way.
 // Every write is a change applied by internal/engine; this package parses
-// requests, checks who is asking, reads, and writes answers.
+// requests, checks who is asking, reads, and writes answers. Package app
+// builds it (New), serves its Handler and runs its background work (Run,
+// Stop); routing, sign-in, who may read what (the viewer), the install
+// settings and the background loops stay inside.
 //
 // How the package is laid out:
 //
@@ -17,7 +20,9 @@
 //	  gzip.go, limits.go, stats.go   compression, rate limits, metrics
 //	  inprocess.go   the server calling its own API (MCP tools, imports)
 //	  openapi.go     openapi.json, made from allRoutes
-//	  settings.go, admin.go          install settings and administration
+//	  settings.go    the table of install settings (package settings keeps
+//	                 them: cache, environment, sealing) and sending mail
+//	  admin.go       administration
 //	Sign-in
 //	  auth.go, auth_totp.go, auth_reset.go, auth_invites.go,
 //	  auth_passkeys.go, auth_oauth.go, signin_provider.go,
@@ -42,6 +47,7 @@
 //	Background work
 //	  run.go         Run, the list of background loops it starts and the
 //	                 list of kinds of job
+//	  detached.go    work a request starts and does not wait for
 //	  jobs.go, dispatch.go, deliveries.go, backups.go
 //	  push.go        browser push: the key and the browsers (package webpush
 //	                 sends)
