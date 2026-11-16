@@ -295,7 +295,8 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
   "source.updated",
   "source.deleted",
   "notification.created",
-  "notification.updated"
+  "notification.updated",
+  "notification.deleted"
  ]
 }
 

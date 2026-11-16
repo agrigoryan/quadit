@@ -29,5 +29,5 @@ var eventTypes = []string{
 	"session.created", "session.updated", "resource.created", "resource.deleted", "claim.created", "claim.updated",
 	"webhook.created", "webhook.updated", "webhook.deleted", "rule.created", "rule.updated", "rule.deleted",
 	"integration.created", "integration.updated", "integration.deleted", "secret.created", "secret.updated", "secret.deleted", "source.created", "source.updated", "source.deleted",
-	"notification.created", "notification.updated",
+	"notification.created", "notification.updated", "notification.deleted",
 }
