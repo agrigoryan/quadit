@@ -104,10 +104,12 @@ func (c *cx) placeDoc(d *core.Doc, a docCreateArgs) error {
 }
 
 // docReaders says who sees a new page that is private, and whose memory it
-// is when it is an agent's.
+// is when it is an agent's. A page made private is given its readers on
+// purpose: its maker and those named, in place of those of a private page
+// above it.
 func (c *cx) docReaders(d *core.Doc, a docCreateArgs) error {
 	if a.Private {
-		d.OwnerID = c.actor.UserID
+		d.OwnerID, d.SharedWith = c.actor.UserID, nil
 		for _, ref := range a.SharedWith {
 			m, err := c.memberRef("shared_with", ref)
 			if err != nil {

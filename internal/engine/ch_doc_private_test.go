@@ -240,3 +240,29 @@ func TestWhatHappensOnAPrivatePageIsToldToItsReaders(t *testing.T) {
 		w.refused(engine.CodeNotFound, other, "attachment.add", M{"comment": mine, "file": file()})
 	})
 }
+
+// TestAPageMadePrivateUnderASharedPageHasTheReadersGiven: a page made
+// under a private page takes its readers, unless it is made private itself:
+// then it has the readers it was given, its maker and those named, and not
+// those of the page above as well.
+func TestAPageMadePrivateUnderASharedPageHasTheReadersGiven(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		me := w.owner.ID
+		other, bea := w.agent("other"), w.agent("bea")
+		root := w.do(me, "doc.create", M{"title": "Plans", "private": true, "shared_with": []string{"@other"}}).Ref
+
+		taken := w.doc(w.do(me, "doc.create", M{"parent": root, "title": "Q1"}).Ref)
+		if taken.OwnerID != me || !slices.Equal(taken.SharedWith, []string{other}) {
+			t.Errorf("a page made under the shared page has owner %q, shared with %v; want the page above's", taken.OwnerID, taken.SharedWith)
+		}
+		given := w.doc(w.do(me, "doc.create", M{"parent": root, "title": "For Bea", "private": true, "shared_with": []string{"@bea"}}).Ref)
+		if given.OwnerID != me || !slices.Equal(given.SharedWith, []string{bea}) {
+			t.Errorf("a page made private for Bea under the shared page has owner %q, shared with %v; want shared with Bea alone", given.OwnerID, given.SharedWith)
+		}
+		alone := w.doc(w.do(me, "doc.create", M{"parent": root, "title": "Mine", "private": true}).Ref)
+		if alone.OwnerID != me || len(alone.SharedWith) != 0 {
+			t.Errorf("a page made private alone under the shared page has owner %q, shared with %v; want its maker's alone", alone.OwnerID, alone.SharedWith)
+		}
+	})
+}

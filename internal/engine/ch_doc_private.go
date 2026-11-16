@@ -4,7 +4,8 @@
 // shared_with on its row); the pages under it are private the same way.
 // That is kept true when it is written, not looked up when it is read:
 // CanSeeDoc reads one row. A page made under a private page takes its
-// readers (placeDoc); changing who sees a page passes the change down to
+// readers (placeDoc), unless it is made private itself and so given its
+// own (docReaders); changing who sees a page passes the change down to
 // the pages under it that had its readers (passReadersDown); a page moved
 // under a private page takes that page's readers (pageEdit.parent). A page
 // moved out of one stays as private as it was: nobody is shown a page
