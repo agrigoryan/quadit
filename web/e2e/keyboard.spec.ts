@@ -56,3 +56,20 @@ test("J and K move, Space peeks, Enter opens, Escape and Back return to the same
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(new RegExp(`/e2e/task/${keys[1]}$`));
 });
+
+test("Enter on a row's own control is the control's, not the list's", async ({ page, project }) => {
+  const key = await project.newTask("Has a priority button");
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  const open = page.getByRole("link", { name: `Open ${key}` });
+  await expect(open).toBeVisible();
+  // The row is the one the keys are on, and Tab has gone on to its priority button.
+  await page.keyboard.press("j");
+  await expect(open).toHaveAttribute("aria-current", "true");
+  await page
+    .locator("[data-task]", { has: open })
+    .getByRole("button", { name: /^Priority:/ })
+    .focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/e2e/p/${project.key}/tasks$`));
+});

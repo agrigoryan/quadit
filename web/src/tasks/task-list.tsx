@@ -224,9 +224,11 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
       e.preventDefault();
       move(-1);
     },
-    Enter: () => {
-      // A draft has no address yet.
-      if (focused && !isDraft(focused.id)) open.page(focused.key);
+    Enter: (e) => {
+      // A draft has no address yet; a control of the row (its priority, its status) answers Enter itself.
+      if (!focused || isDraft(focused.id) || isOnControl(e)) return;
+      e.preventDefault();
+      open.page(focused.key);
     },
     " ": (e) => {
       if (!focused || isOnControl(e)) return;
