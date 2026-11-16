@@ -40,7 +40,7 @@ function seed(decisions: Decision[]) {
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
     projects: [{ id: "p1", key: "SVA", name: "Live", rank: "a" }],
-    members: [{ user_id: "agent", handle: "coder", name: "Coder", kind: "agent" } as Member],
+    members: [{ user_id: "agent", handle: "coder", name: "Coder", kind: "agent" }],
     tasks: [task],
     decisions,
   });
