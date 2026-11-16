@@ -11,7 +11,7 @@ import { isNotFound, readError } from "@/data/query";
 import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import { sameProjectBelow } from "@/docs/data";
-import { loadPage } from "@/docs/store";
+import { forgetLink, loadPage } from "@/docs/store";
 import { type Doc, type DocComment, type DocKind, OPTION_COLORS } from "@/types/docs";
 
 type Fields = Record<string, unknown>;
@@ -277,4 +277,20 @@ export function deleteComment(comment: DocComment) {
   send({ type: "comment.delete", args: { id: comment.id } }, (tx) =>
     tx.patch("comments", comment.id, { deleted_at: Date.now() }),
   );
+}
+
+/**
+ * Takes a task's link to a page off, from the page. The task's copy of the
+ * link goes at once; the page forgets it once the server has taken it off
+ * (its list was read with the page, and the link need not be in the copy).
+ */
+export async function unlinkTask(docId: string, linkId: string): Promise<void> {
+  try {
+    await mutate({ type: "link.remove", args: { id: linkId } }, (tx) =>
+      tx.patch("links", linkId, { deleted_at: Date.now() }),
+    );
+  } catch {
+    return; // refused: mutate has said so and put the link back
+  }
+  forgetLink(docId, linkId);
 }

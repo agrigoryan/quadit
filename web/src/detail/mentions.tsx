@@ -1,8 +1,9 @@
 // "Mentioned in": the tasks and pages whose text names this task, or one of
 // its questions, so a reader can follow the thread back. The server keeps
 // these references and says what each source is called; they come with the
-// task's detail. The task's own are listed in the panel, a question's under
-// that question.
+// task's detail. The tasks that name the task are listed in the panel (the
+// pages, in its Pages section: detail/pages.tsx), and what names a question
+// under that question.
 
 import { useMemo } from "react";
 import { FileText } from "lucide-react";
@@ -97,10 +98,10 @@ function Rows({ mentions }: { mentions: Mention[] }) {
   );
 }
 
-/** The panel's section: what mentions the task itself. Draws nothing when nothing does. */
+/** The panel's section: the tasks that mention the task itself (pages are in detail/pages.tsx). Draws nothing when none does. */
 export function MentionedIn({ task }: { task: Task }) {
   const all = useMentions(task.id);
-  const mentions = all.filter((m) => !m.decisionId);
+  const mentions = all.filter((m) => !m.decisionId && m.kind === "task");
   if (mentions.length === 0) return null;
   return (
     <Section title={t("detail.mentions")} meta={<span className="text-xs text-ink-3 tnum">{mentions.length}</span>}>

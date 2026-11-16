@@ -151,7 +151,7 @@ export function TaskWork({ task }: { task: Task }) {
     [all, task.id],
   );
   const links = useTaskLinks(task.id);
-  const code = useMemo(() => links.filter((l) => l.kind !== "url"), [links]);
+  const code = useMemo(() => links.filter((l) => l.kind !== "url" && l.kind !== "doc"), [links]);
 
   return (
     <>

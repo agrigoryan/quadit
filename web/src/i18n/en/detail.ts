@@ -30,6 +30,7 @@ export const detail = {
   "detail.add.subtask": "Sub-task",
   "detail.add.relation": "Relation",
   "detail.add.link": "Link",
+  "detail.add.page": "Page",
   "detail.add.attach": "Attach",
 
   "detail.subtasks": "Sub-tasks",
@@ -61,6 +62,7 @@ export const detail = {
   "detail.links.branch": "Branch",
   "detail.links.commit": "Commit",
   "detail.links.pr": "Pull request",
+  "detail.links.doc": "Page",
 
   "detail.commits.ahead": "{n} commit ahead of {base} | {n} commits ahead of {base}",
   "detail.commits.count": "{n} commit | {n} commits",
@@ -69,6 +71,13 @@ export const detail = {
   "detail.commits.all": "Show all {n}",
   "detail.commits.fewer": "Show fewer",
 
+  "detail.pages": "Pages",
+  "detail.pages.add": "Add a page",
+  "detail.pages.search": "Search pages by title",
+  "detail.pages.none": "No page to add",
+  "detail.pages.remove": "Remove the link to {title}",
+  "detail.pages.mentionsTask": "mentions this task",
+  "detail.pages.mentionedHere": "mentioned here",
   "detail.mentions": "Mentioned in",
   "detail.mentions.decision": "This question is mentioned in",
   "detail.mentions.page": "Page",
@@ -155,6 +164,7 @@ export const detail = {
   "timeline.linked.commit": "linked the commit {name}",
   "timeline.linked.pr": "linked the pull request {name}",
   "timeline.linked.url": "added the link {name}",
+  "timeline.linked.doc": "linked the page {name}",
 
   "comment.edited": "edited",
   "comment.editedShow": "Edited: show the earlier text",

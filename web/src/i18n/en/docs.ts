@@ -134,6 +134,10 @@ export const docs = {
   "docs.import.subpageHint": "Make a page under this one from the file.",
 
   "docs.backlinks.title": "Mentioned in",
+  "docs.tasks": "Tasks",
+  "docs.tasks.mentionsPage": "mentions this page",
+  "docs.tasks.mentionedHere": "mentioned here",
+  "docs.tasks.remove": "Remove the link to {key}",
   "docs.backlinks.none": "No task or page mentions this page yet.",
   "docs.backlinks.inComment": "in a comment",
   "docs.backlinks.inDecision": "in a decision",

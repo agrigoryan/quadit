@@ -73,6 +73,19 @@ export function setAssignee(tasks: Task[], userId: string | null) {
   );
 }
 
+/** Links a page to a task: the task lists the page, and the page the task (a link of kind doc, whose ref is the page). */
+export function linkPage(task: Task, docId: string) {
+  const id = newId();
+  send({ type: "link.set", args: { id, task: task.id, kind: "doc", ref: docId } }, (tx) =>
+    tx.insert("links", { id, task_id: task.id, kind: "doc", ref: docId }),
+  );
+}
+
+/** Takes a link off its task: a web address, a branch, a page. */
+export function removeLink(id: string) {
+  send({ type: "link.remove", args: { id } }, (tx) => tx.patch("links", id, { deleted_at: Date.now() }));
+}
+
 export type TaskBudget = NonNullable<Task["budget"]>;
 
 /** True when the task's next move is nobody's here: it waits on something outside (a build, a reply, a date). */

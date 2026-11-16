@@ -6,6 +6,7 @@ import { joinPhrases, t } from "@/lib/i18n";
 import { getRowEvenIfGone } from "@/data/selectors";
 import type { Attachment, Comment, Decision, FeedEvent, Relation, TaskLink } from "@/types/core";
 import { linkName, type Side, sideOf, who } from "@/detail/data";
+import { docTitle } from "@/docs/data";
 import { TIMELINE } from "@/tasks/properties";
 import { asText, type Changes, type Phrase } from "@/tasks/properties/property";
 
@@ -70,13 +71,17 @@ export function relationRemovedPhrase(r: Relation | undefined, taskId: string): 
   return key ? t("timeline.relationRemoved", { key }) : t("timeline.relationRemovedAny");
 }
 
+/** A link's name in the history: a page by its title, anything else as its chip names it. */
+const nameOf = (link: TaskLink) =>
+  link.kind === "doc" ? docTitle(getRowEvenIfGone("docs", link.ref)) : linkName(link);
+
 export function linkPhrase(link: TaskLink): string {
-  const kind = (["branch", "commit", "pr"] as const).find((k) => k === link.kind) ?? "url";
-  return t(`timeline.linked.${kind}`, { name: linkName(link) });
+  const kind = (["branch", "commit", "pr", "doc"] as const).find((k) => k === link.kind) ?? "url";
+  return t(`timeline.linked.${kind}`, { name: nameOf(link) });
 }
 
 export function linkRemovedPhrase(link: TaskLink | undefined): string {
-  return link ? t("timeline.linkRemoved", { name: linkName(link) }) : t("timeline.linkRemovedAny");
+  return link ? t("timeline.linkRemoved", { name: nameOf(link) }) : t("timeline.linkRemovedAny");
 }
 
 /**

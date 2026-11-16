@@ -89,6 +89,16 @@ async function fetchPage(slug: string, id: string, signal: AbortSignal): Promise
   return { blocks: data.blocks ?? [], seq: data.doc.content_seq ?? 0 };
 }
 
+/** A task's link to a page is gone: the page no longer lists the reference the link made. */
+export function forgetLink(docId: string, linkId: string) {
+  useDocsStore.setState((s) => {
+    const meta = s.meta[docId];
+    if (!meta) return s;
+    const mentioned_in = meta.mentioned_in.filter((ref) => ref.from_id !== linkId);
+    return { meta: { ...s.meta, [docId]: { ...meta, mentioned_in } } };
+  });
+}
+
 /** One page, read through the query cache (see fetchPage). */
 export const pageQuery = (slug: string, id: string) =>
   queryOptions({ queryKey: docsKeys.page(slug, id), queryFn: ({ signal }) => fetchPage(slug, id, signal) });

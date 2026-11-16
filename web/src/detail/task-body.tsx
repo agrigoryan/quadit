@@ -4,7 +4,7 @@
 // and the description and timeline take the rest.
 
 import { useRef, useState } from "react";
-import { GitFork, Link2, ListTree, Paperclip } from "lucide-react";
+import { FileText, GitFork, Link2, ListTree, Paperclip } from "lucide-react";
 import { DecisionSection } from "@/decisions/decision-section";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
@@ -14,6 +14,7 @@ import { Attachments } from "@/detail/attachments";
 import { useSubtasks, useTaskAttachments, useTaskLinks, useTaskRelations } from "@/detail/data";
 import { Links } from "@/detail/links";
 import { MentionedIn } from "@/detail/mentions";
+import { Pages, useTaskPages } from "@/detail/pages";
 import { Properties } from "@/detail/properties";
 import { Relations } from "@/detail/relations";
 import { Subtasks } from "@/detail/subtasks";
@@ -26,7 +27,7 @@ import { Button } from "@/ui/button";
 /** Where the task is shown: the panel over a list, or its own page. */
 export type TaskLayout = "panel" | "page";
 
-type Extra = "subtasks" | "relations" | "links";
+type Extra = "subtasks" | "relations" | "links" | "pages";
 const NO_UPLOADS: PendingUpload[] = [];
 
 interface Props {
@@ -41,6 +42,7 @@ export function TaskBody({ task, status, layout }: Props) {
   const relations = useTaskRelations(task.id);
   // Branches, commits and pull requests are drawn by TaskWork; Links keeps the plain addresses.
   const links = plainLinks(useTaskLinks(task.id));
+  const pages = useTaskPages(task.id);
   const files = useTaskAttachments(task.id);
   const pending = useUploads((s) => s.pending[task.id]) ?? NO_UPLOADS;
   const chooser = useRef<HTMLInputElement>(null);
@@ -58,6 +60,7 @@ export function TaskBody({ task, status, layout }: Props) {
     subtasks: subtasks.length > 0 || !!opened.subtasks,
     relations: relations.length > 0 || !!opened.relations,
     links: links.length > 0 || !!opened.links,
+    pages: pages.length > 0 || !!opened.pages,
     files: files.length > 0 || pending.length > 0,
   };
   const attach = () => chooser.current?.click();
@@ -66,6 +69,7 @@ export function TaskBody({ task, status, layout }: Props) {
     { on: !show.subtasks, icon: ListTree, label: t("detail.add.subtask"), run: () => open("subtasks") },
     { on: !show.relations, icon: GitFork, label: t("detail.add.relation"), run: () => open("relations") },
     { on: !show.links, icon: Link2, label: t("detail.add.link"), run: () => open("links") },
+    { on: !show.pages, icon: FileText, label: t("detail.add.page"), run: () => open("pages") },
     { on: !show.files, icon: Paperclip, label: t("detail.add.attach"), run: attach },
   ].filter((a) => a.on && !readOnly);
 
@@ -131,6 +135,9 @@ export function TaskBody({ task, status, layout }: Props) {
           )}
           {show.links && (
             <Links task={task} links={links} startAdding={!!opened.links} onEmptyClose={() => close("links")} />
+          )}
+          {show.pages && (
+            <Pages task={task} pages={pages} startAdding={!!opened.pages} onEmptyClose={() => close("pages")} />
           )}
           <TaskWork task={task} />
           {show.files && <Attachments task={task} files={files} pending={pending} onAttach={attach} />}

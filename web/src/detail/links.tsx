@@ -3,7 +3,7 @@
 
 import type { Changes } from "@/types/changes.gen";
 import { type FormEvent, useState } from "react";
-import { GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
+import { FileText, GitBranch, GitCommitHorizontal, GitPullRequest, Link2, Plus, X } from "lucide-react";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
@@ -11,10 +11,11 @@ import { send } from "@/data/mutate";
 import type { Task, TaskLink } from "@/types/core";
 import { linkName } from "@/detail/data";
 import { Section } from "@/detail/section";
+import { removeLink } from "@/tasks/actions";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
 
-const icons = { branch: GitBranch, commit: GitCommitHorizontal, pr: GitPullRequest, url: Link2 };
+const icons = { branch: GitBranch, commit: GitCommitHorizontal, pr: GitPullRequest, url: Link2, doc: FileText };
 
 /** Only web addresses are ever made into something to click. */
 const isWeb = (url: string) => /^https?:\/\//i.test(url);
@@ -26,10 +27,6 @@ function addLink(task: Task, url: string, title: string) {
   send({ type: "link.set", args }, (tx) =>
     tx.insert("links", { id, task_id: task.id, kind: "url", url, title: title || undefined }),
   );
-}
-
-function removeLink(id: string) {
-  send({ type: "link.remove", args: { id } }, (tx) => tx.patch("links", id, { deleted_at: Date.now() }));
 }
 
 function LinkChip({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {

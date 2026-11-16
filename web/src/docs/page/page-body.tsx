@@ -1,6 +1,7 @@
 // A page from its title down: icon and title, a row's properties, the note
-// on pages that cannot be edited here, then the editor (or, for a database,
-// its views), with the comments column beside it.
+// on pages that cannot be edited here, then the editor and the tasks the
+// page points at and that point at it (or, for a database, its views), with
+// the comments column beside it.
 
 import { GitBranch, Sparkles } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
@@ -13,6 +14,7 @@ import { PageCover } from "@/docs/page/cover";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { PageTitle } from "@/docs/page/title";
 import { usePage } from "@/docs/page/use-page";
+import { TasksPanel } from "@/docs/page/tasks-panel";
 import { usePresence } from "@/docs/page/use-presence";
 import { useDocsStore } from "@/docs/store";
 import type { Doc } from "@/types/docs";
@@ -98,6 +100,11 @@ export function PageBody({ doc, compact }: Props) {
                     onComment={compact || !mayEdit ? undefined : pageUi.startThread}
                     onOpenThread={pageUi.showThread}
                   />
+                  {!compact && (
+                    <div className="px-4 sm:px-12">
+                      <TasksPanel docId={doc.id} />
+                    </div>
+                  )}
                 </div>
               )}
             </Suspense>
