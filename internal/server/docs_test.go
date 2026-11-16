@@ -386,3 +386,63 @@ func TestDecisionsAndTitlesAsLinks(t *testing.T) {
 		}
 	})
 }
+
+// TestAPageTellsOfMentionsOnlyWhatTheReaderMaySee: a page lists what it
+// mentions and what mentions it, and a reader limited to some projects is
+// told of neither a task of another project, a page of another project, nor
+// someone else's private page, in either direction.
+func TestAPageTellsOfMentionsOnlyWhatTheReaderMaySee(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		narrow := oneProjectOnly(t, s)
+		taskID := func(key string) string {
+			var shown struct{ Task struct{ ID string } }
+			s.call(s.owner, "", "GET", w+"/tasks/"+key+"?raw=1", nil, 200, &shown)
+			return shown.Task.ID
+		}
+		sva, ops := taskID("SVA-1"), taskID("OPS-1")
+		salaries := s.change(s.owner, "", "doc.create", M{"title": "Salaries", "private": true, "markdown": "who earns what"})["ref"].(string)
+		runbook := s.change(s.owner, "", "doc.create", M{"title": "Runbook", "project": "OPS", "markdown": "rotate"})["ref"].(string)
+		handbook := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "See SVA-1 and OPS-1, the [[Runbook]] and [[Salaries]].\n"})["ref"].(string)
+		s.change(s.owner, "", "doc.write", M{"doc": runbook, "markdown": "As the [[Handbook]] says.\n"})
+		s.change(s.owner, "", "doc.write", M{"doc": salaries, "markdown": "As the [[Handbook]] says.\n"})
+
+		type mention struct {
+			FromScopeID string `json:"from_scope_id"`
+			ToID        string `json:"to_id"`
+		}
+		var page struct {
+			Mentions    []mention `json:"mentions"`
+			MentionedIn []mention `json:"mentioned_in"`
+		}
+		ids := func(ms []mention, of func(mention) string) string {
+			var out []string
+			for _, m := range ms {
+				out = append(out, of(m))
+			}
+			return strings.Join(out, " ")
+		}
+		to := func(m mention) string { return m.ToID }
+		from := func(m mention) string { return m.FromScopeID }
+
+		s.call(s.owner, "", "GET", w+"/docs/"+handbook, nil, 200, &page)
+		if got := ids(page.Mentions, to); !strings.Contains(got, ops) || !strings.Contains(got, salaries) || !strings.Contains(got, runbook) {
+			t.Fatalf("the owner is not told of all the page mentions: %s", got)
+		}
+		if got := ids(page.MentionedIn, from); !strings.Contains(got, runbook) || !strings.Contains(got, salaries) {
+			t.Fatalf("the owner is not told of all that mentions the page: %s", got)
+		}
+
+		page.Mentions, page.MentionedIn = nil, nil
+		s.call(nil, narrow, "GET", w+"/docs/"+handbook, nil, 200, &page)
+		got := ids(page.Mentions, to)
+		if !strings.Contains(got, sva) {
+			t.Fatalf("a reader of SVA is not told the page mentions SVA-1: %s", got)
+		}
+		for name, id := range map[string]string{"OPS-1": ops, "the OPS runbook": runbook, "a private page": salaries} {
+			if strings.Contains(got, id) || strings.Contains(ids(page.MentionedIn, from), id) {
+				t.Errorf("a reader of SVA is told of %s by the page's mentions: %+v", name, page)
+			}
+		}
+	})
+}

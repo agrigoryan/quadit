@@ -253,7 +253,7 @@ func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.
 	if err := who.db.List(ctx, &fwd, store.Q{Where: []store.Cond{store.Eq("from_scope_id", page.ID)}, Order: "from_id,to_id"}); err != nil {
 		return nil, err
 	}
-	out["mentioned_in"], out["mentions"] = back, fwd
+	out["mentioned_in"], out["mentions"] = back, who.seenMentioned(ctx, fwd)
 	_, atts, err := who.attachments(ctx, store.Eq("subject_id", page.ID))
 	if err != nil {
 		return nil, err

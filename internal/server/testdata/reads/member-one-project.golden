@@ -18045,16 +18045,7 @@ no page changed since 99999
   "updated_seq": 163
  },
  "mentioned_in": [],
- "mentions": [
-  {
-   "from_id": "<doc Handbook>",
-   "from_scope_id": "<doc Handbook>",
-   "from_scope_type": "doc",
-   "from_type": "doc",
-   "to_id": "<task OPS-5>",
-   "to_type": "task"
-  }
- ]
+ "mentions": []
 }
 
 === GET /api/v1/w/games/docs/<doc Handbook>?format=md

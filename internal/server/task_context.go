@@ -246,6 +246,30 @@ type namedRef struct {
 	Key   string `json:"key,omitempty"`
 }
 
+// seenMentioned keeps, of mentions, those whose mentioned end the viewer
+// may see: a task of a project it may read, a decision on one, a page it
+// may see. A member is seen by everyone; what cannot be read, or is of a
+// kind this does not know, is not seen. (Where a mention was made is
+// namedRefs' to decide.)
+func (who *viewer) seenMentioned(ctx context.Context, refs []core.Ref) []core.Ref {
+	mayRead := who.readableTasks(ctx)
+	return keep(refs, func(ref core.Ref) bool {
+		switch ref.ToType {
+		case "member":
+			return true
+		case "task":
+			return !who.limited() || mayRead(ref.ToID)
+		case "decision":
+			var decision core.Decision
+			return !who.limited() || who.db.Get(ctx, &decision, store.Eq("id", ref.ToID)) == nil && mayRead(decision.TaskID)
+		case "doc":
+			var page core.Doc
+			return who.db.Get(ctx, &page, store.Eq("id", ref.ToID)) == nil && who.canSeeDoc(page)
+		}
+		return false
+	})
+}
+
 // namedRefs gives each mention the name of where it was made, leaving out
 // those the caller may not see and those made in something since deleted.
 func (who *viewer) namedRefs(ctx context.Context, refs []core.Ref) ([]namedRef, error) {
