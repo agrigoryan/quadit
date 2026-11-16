@@ -85,7 +85,7 @@ session.created {"key":"","row":{"id":"#54","agent_id":"#3","title":"Thinking","
 session.updated {"changes":{"ended_at":{"from":0,"to":1767603665000},"state":{"from":"running","to":"done"},"summary":{"from":null,"to":"thought"}},"id":"#54"}
 task.updated {"changes":{"key":{"from":"SVA-3","to":"OPS-1"},"number":{"from":3,"to":1},"project_id":{"from":"#5","to":"#14"},"status_id":{"from":"#7","to":"#16"}},"from_project_id":"#5","id":"#34","key":"OPS-1","moved_from":"SVA-3"}
 task.updated {"changes":{"deleted_at":{"from":0,"to":1767603667000}},"deleted":true,"id":"#32","key":"SVA-2"}
-task.updated {"changes":{"deleted_at":{"from":1767603667000,"to":0}},"id":"#32","key":"SVA-2","restored":true}
+task.updated {"changes":{"deleted_at":{"from":1767603667000,"to":0}},"id":"#32","key":"SVA-2","restored":true,"row":{"id":"#32","project_id":"#5","number":2,"key":"SVA-2","title":"Sword sound","status_id":"#7","priority":0,"waiting_on_note":"pick one","rank":"00000001kw","created_by":"#3","created_at":1767603630000,"updated_at":1767603668000,"created_seq":43,"updated_seq":88,"activity_seq":88}}
 member.created {"row":{"workspace_id":"#1","user_id":"#55","role":"member","handle":"helper","kind":"agent","name":"Helper","scope":{"projects":["#5"],"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete"]},"created_at":1767603669000,"updated_seq":89,"delegated_by":"#3","delegated_task":"#32","responsible_id":"#3"}}
 task.updated {"changes":{"completed_at":{"from":0,"to":1767603670000},"started_at":{"from":0,"to":1767603670000},"status_id":{"from":"#7","to":"#10"},"waiting_on_note":{"from":"pick one","to":null}},"id":"#32","key":"SVA-2"}
 member.updated {"changes":{"suspended_at":{"from":null,"to":1767603670000}},"id":"#55","reason":"its task SVA-2 is closed","user_id":"#55"}
@@ -153,7 +153,7 @@ source.updated {"changes":{"branch":{"from":null,"to":"main"}},"id":"#83"}
 source.deleted {"changes":{"deleted_at":{"from":null,"to":1768986127000}},"id":"#83"}
 doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986128000}},"ids":["#76"]}
 doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986129000}},"ids":["#80"]}
-doc.restored {"changes":{"deleted_at":{"from":null,"to":null}},"ids":["#80"]}
+doc.restored {"changes":{"deleted_at":{"from":null,"to":null}},"row":{"id":"#80","parent_id":"#78","kind":"row","title":"Sword","props":{"#79":"edge"},"rank":"00000000sg","created_by":"#3","created_at":1768986118000,"updated_by":"#3","updated_at":1768986119000,"created_seq":141,"updated_seq":156,"content_seq":141}}
 task.updated {"changes":{"label_ids":{"from":["#22","#23"],"to":["#22"]}},"id":"#30","key":"SVA-1"}
 label.deleted {"changes":{"deleted_at":{"from":null,"to":1768986131000}},"id":"#23"}
 task.updated {"changes":{"milestone_id":{"from":"#25","to":null}},"id":"#30","key":"SVA-1"}

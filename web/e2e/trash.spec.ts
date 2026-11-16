@@ -1,5 +1,6 @@
-// A task in the trash or the archive: the trash lists it and brings it back,
-// its own page says where it is, and no list, board or search shows it. The
+// A task in the trash or the archive: the trash lists it and brings it back
+// (and a list or the page tree open elsewhere shows what came back), its
+// own page says where it is, and no list, board or search shows it. The
 // lists are open when the task goes, so the row the live feed changes is the
 // one that must disappear.
 
@@ -18,6 +19,39 @@ test("the trash lists a trashed task and restores it", async ({ page, project, q
   await expect(page.getByRole("button", { name: `Restore ${key}` })).toBeHidden();
   await page.goto(`/e2e/p/${project.key}/tasks`);
   await expect(page.getByRole("link", { name: `Open ${key}` })).toBeVisible();
+});
+
+test("a task brought back from the trash elsewhere appears in the open list without a reload", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const stays = await project.newTask("Keep the new logo");
+  const key = await project.newTask("Bring back the old logo");
+  await trash(quadit, key);
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  await expect(page.getByRole("link", { name: `Open ${stays}` })).toBeVisible();
+  await expect(page.getByRole("link", { name: `Open ${key}` })).toBeHidden();
+  await quadit.cli("do", "task.restore", JSON.stringify({ id: key }));
+  await expect(page.getByRole("link", { name: `Open ${key}` })).toBeVisible();
+});
+
+test("a page brought back from the trash elsewhere appears in the open page tree without a reload", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const title = `Old handbook ${project.key}`;
+  const id = (JSON.parse(await quadit.cli("--json", "do", "doc.create", JSON.stringify({ title }))) as { ref: string })
+    .ref;
+  await quadit.cli("do", "doc.create", JSON.stringify({ title: `New handbook ${project.key}` }));
+  await quadit.cli("do", "doc.delete", JSON.stringify({ id }));
+  await page.goto("/e2e/docs");
+  const tree = page.getByRole("navigation", { name: "Pages" });
+  await expect(tree.getByRole("link", { name: `New handbook ${project.key}` })).toBeVisible();
+  await expect(tree.getByRole("link", { name: title })).toHaveCount(0);
+  await quadit.cli("do", "doc.restore", JSON.stringify({ id }));
+  await expect(tree.getByRole("link", { name: title })).toBeVisible();
 });
 
 test("a trashed task's own page opens and says it is in the trash", async ({ page, project, quadit }) => {

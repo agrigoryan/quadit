@@ -542,15 +542,6 @@ func docRestore(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	seq := c.tx.NextSeq()
-	ids := make([]string, len(all))
-	for i, x := range all {
-		ids[i] = x.ID
-	}
-	// A page that came from a repository forgets what it last agreed on
-	// with its file: brought back, it is written there again, not taken
-	// for a page whose file was deleted and sent back to the trash.
-	set := map[string]any{"deleted_at": int64(0), "updated_seq": seq, "source_hash": ""}
 	// A page whose parent is still in the trash comes back at the top.
 	if d.ParentID != "" {
 		var parent core.Doc
@@ -564,18 +555,33 @@ func docRestore(c *cx, a idArgs) error {
 			}
 		}
 	}
-	if _, err := c.tx.Update(c.ctx, "docs", set, store.In("id", ids)); err != nil {
-		return err
-	}
-	if err := c.emit(event{seq: seq, typ: "doc.restored", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: core.EventData{IDs: ids, Changes: map[string]core.FieldChange{"deleted_at": {To: nil}}}}); err != nil {
-		return err
+	// Each page is told of whole, in an event of its own: a copy does not
+	// hold the trash, so it needs the row, and an event is given to those
+	// who may see its page, so a page under this one that a reader may not
+	// see (another project's, someone's private one) does not ride along.
+	for i, x := range all {
+		seq := c.tx.NextSeq()
+		// A page that came from a repository forgets what it last agreed on
+		// with its file: brought back, it is written there again, not taken
+		// for a page whose file was deleted and sent back to the trash.
+		set := map[string]any{"deleted_at": int64(0), "updated_seq": seq, "source_hash": ""}
+		if _, err := c.tx.Update(c.ctx, "docs", set, store.Eq("id", x.ID)); err != nil {
+			return err
+		}
+		if err := c.tx.Get(c.ctx, &all[i], store.Eq("id", x.ID)); err != nil {
+			return err
+		}
+		x = all[i]
+		if err := c.emit(event{seq: seq, typ: "doc.restored", entity: "doc", entityID: x.ID, place: inDoc(x), audience: docAudience(x),
+			data: core.EventData{Row: x, Changes: map[string]core.FieldChange{"deleted_at": {To: nil}}}}); err != nil {
+			return err
+		}
 	}
 	for _, x := range all {
 		rows, err := LoadBlocks(cxLister{c}, x.ID)
 		if err != nil {
 			return err
 		}
-		x.DeletedAt = 0
 		if err := c.afterDocText(x, newEditor(c, x, rows)); err != nil {
 			return err
 		}

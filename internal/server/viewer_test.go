@@ -245,6 +245,76 @@ func TestAReaderOfOneEndIsToldOfTheRelationWithTheFarEndBlank(t *testing.T) {
 	})
 }
 
+// TestARestoreFromTheTrashCarriesTheRowsEachReaderMaySee: a task or a page
+// brought back from the trash reaches a copy that never held it (the trash
+// is not copied) as its whole row. A page comes back with the pages under
+// it, each told of on its own, so a reader is given the rows they may see
+// and nothing of a sub-page of another project or someone else's private
+// one.
+func TestARestoreFromTheTrashCarriesTheRowsEachReaderMaySee(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		page := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "project": "SVA"})["ref"].(string)
+		other := s.change(s.owner, "", "doc.create", M{"title": "Vault runbook", "parent": page, "project": "OPS"})["ref"].(string)
+		mine := s.change(s.owner, "", "doc.create", M{"title": "My notes", "parent": page, "private": true})["ref"].(string)
+		s.change(s.owner, "", "task.delete", M{"id": "SVA-1"})
+		s.change(s.owner, "", "doc.delete", M{"id": page})
+		var before struct{ Seq int64 }
+		s.call(s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, &before)
+		s.change(s.owner, "", "task.restore", M{"id": "SVA-1"})
+		s.change(s.owner, "", "doc.restore", M{"id": page})
+
+		type event struct {
+			Type string
+			Data struct {
+				Row map[string]any
+			}
+		}
+		restored := func(as *http.Client, token string) (task map[string]any, pages []string, raw string) {
+			t.Helper()
+			var feed struct{ Events []event }
+			raw = s.call(as, token, "GET", w+"/events?after="+strconv.FormatInt(before.Seq, 10)+"&limit=2000", nil, 200, &feed)
+			for _, ev := range feed.Events {
+				switch ev.Type {
+				case "task.updated":
+					task = ev.Data.Row
+				case "doc.restored":
+					if ev.Data.Row != nil {
+						pages = append(pages, ev.Data.Row["id"].(string))
+					}
+				}
+			}
+			slices.Sort(pages)
+			return task, pages, raw
+		}
+		for who, token := range callers {
+			task, pages, raw := restored(nil, token)
+			if task == nil || task["key"] != "SVA-1" || task["title"] != "Boss design" {
+				t.Errorf("%s is told of the restored task as %v, want its whole row", who, task)
+			}
+			// The admin's token is the owner's: the private page is theirs.
+			want := []string{page}
+			if strings.Contains(who, "token") {
+				want = append(want, mine)
+				slices.Sort(want)
+			}
+			if !slices.Equal(pages, want) || strings.Contains(raw, other) {
+				t.Errorf("%s is told of the restored pages %v, want %v and nothing of the page of OPS: %s", who, pages, want, raw)
+			}
+			if !strings.Contains(who, "token") && strings.Contains(raw, mine) {
+				t.Errorf("%s is told of someone's private page: %s", who, raw)
+			}
+		}
+		_, pages, _ := restored(s.owner, "")
+		want := []string{page, other, mine}
+		slices.Sort(want)
+		if !slices.Equal(pages, want) {
+			t.Errorf("the owner is told of the restored pages %v, want all three", pages)
+		}
+	})
+}
+
 // TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee: a task
 // in full, and its context pack, list a relation to a task of a project the
 // caller may not read by its kind alone, marked hidden, and in text as "a

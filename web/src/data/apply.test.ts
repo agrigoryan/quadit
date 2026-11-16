@@ -186,3 +186,33 @@ describe("applyEvent on task.related", () => {
     expect(next.tasks).toBe(c.tasks);
   });
 });
+
+describe("applyEvent on a restore from the trash", () => {
+  const restore = (row: AnyRow, over: Partial<FeedEvent> = {}) =>
+    event(20, {
+      entity_id: String(row.id),
+      data: { id: row.id, changes: { deleted_at: { from: 5, to: 0 } }, restored: true, row },
+      ...over,
+    });
+
+  it("adds a task the copy did not hold, as the trash is not in it", () => {
+    const next = apply(emptyCollections(), restore({ id: "t1", title: "Back", updated_seq: 20 }));
+    expect(next.tasks.t1).toEqual({ id: "t1", title: "Back", updated_seq: 20 });
+  });
+
+  it("replaces a task the copy held with the row as restored", () => {
+    const c = withRows({ tasks: [{ id: "t1", title: "old", deleted_at: 5 }] });
+    const next = apply(c, restore({ id: "t1", title: "Back" }));
+    expect(next.tasks.t1).toEqual({ id: "t1", title: "Back" });
+  });
+
+  it("adds each page of a page restored with the pages under it", () => {
+    const page = (id: string, parent?: string) =>
+      restore(
+        { id, title: id, ...(parent ? { parent_id: parent } : {}) },
+        { type: "doc.restored", entity_type: "doc" },
+      );
+    const next = apply(emptyCollections(), page("d1"), page("d2", "d1"));
+    expect(Object.keys(next.docs).sort()).toEqual(["d1", "d2"]);
+  });
+});

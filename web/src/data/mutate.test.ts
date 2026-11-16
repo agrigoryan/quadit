@@ -187,6 +187,34 @@ describe("mutate", () => {
     expect(title()).toBe("theirs");
   });
 
+  it("keeps showing a waiting edit when an event brings the whole row, whatever fields its changes name", async () => {
+    const title = () => getState().collections.tasks.t1?.title;
+    const edit = mutate({ type: "task.update", args: { id: "t1", title: "x" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "x" }),
+    ).catch(() => {});
+    await settle();
+    // Someone brings the task back from the trash: the event names deleted_at, and its row writes every field.
+    applyEvents(
+      [
+        {
+          ...retitle(11, "t1", ""),
+          data: {
+            changes: { deleted_at: { from: 5, to: 0 } },
+            restored: true,
+            row: { id: "t1", title: "a", priority: 1 },
+          },
+        },
+      ],
+      true,
+    );
+    expect(title()).toBe("x");
+    calls[0]?.answer([
+      { change_id: "c12", type: "task.update", seq: 12, first_seq: 12, events: [retitle(12, "t1", "x")] },
+    ]);
+    await edit;
+    expect(title()).toBe("x");
+  });
+
   it("sends a change again with the same change id when the server could not be reached", async () => {
     const done = mutate({ type: "task.update", args: { id: "t1", priority: 2 } }, (tx) =>
       tx.patch("tasks", "t1", { priority: 2 }),

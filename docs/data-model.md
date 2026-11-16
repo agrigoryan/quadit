@@ -52,7 +52,7 @@ The keys an event's data can have are defined once, by `core.EventData`; `intern
 
 A relation is told twice: `relation.created` (or `relation.deleted`) belongs to the task at its `task_id` end, and `task.related` to the task at its `related_task_id` end, with the relation's id (`relation`), its `type`, `removed`, and the far end (`other_id`, `other_key`). An event belongs to one project, so a member who may read only the `related_task_id` end gets `task.related` alone, and gets it without `other_id` and `other_key`, as `/list/relations` gives them the row with that end blank. A client adds the relation's row from it (or drops it, when `removed`), unless it already has the whole row from the relation's own event.
 
-A soft delete is a change to `deleted_at`. An event with `audience_id` is for one member only: inbox items, and everything about a private page.
+A soft delete is a change to `deleted_at`. A browser's copy does not hold the trash, so what comes back from it comes whole: `task.updated` with `restored: true` carries the task's `row` as well as its `changes`, and a page brought back with the pages under it is one `doc.restored` for each page, with its `row`, so each goes only to those who may see that page. `decision.restored` and `attachment.restored` carry their `row` too. An event with `audience_id` is for one member only: inbox items, and everything about a private page.
 
 The feed is the task history, the record of who did what, what agents read from a cursor, what webhooks deliver, and what a browser replays to keep its copy current.
 

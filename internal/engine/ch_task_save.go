@@ -149,6 +149,15 @@ func (c *cx) saveTask(t core.Task, p *patch, extra core.EventData) error {
 	}
 	data := extra
 	data.ID, data.Key, data.Changes = t.ID, &t.Key, p.changes
+	if data.Restored {
+		// A task brought back from the trash is not in the copies of those
+		// who did not hold it (the trash is not copied): it comes whole.
+		var now core.Task
+		if err := c.tx.Get(c.ctx, &now, store.Eq("id", t.ID)); err != nil {
+			return err
+		}
+		data.Row = now
+	}
 	if err := c.emit(event{seq: seq, typ: "task.updated", entity: "task", entityID: t.ID, place: inTask(t), data: data}); err != nil {
 		return err
 	}

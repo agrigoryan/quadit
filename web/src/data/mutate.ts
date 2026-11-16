@@ -156,8 +156,9 @@ function showWaitingEdits(events: FeedEvent[]) {
   for (const ev of events) {
     const target = targetsOf(ev);
     if (!target || target.gone) continue;
-    // A whole row (something made, or restored) writes every field; a change, the fields it names.
-    const wrote = ev.data?.changes ? Object.keys(ev.data.changes) : null;
+    // A whole row (something made, or restored) writes every field, even when the event also names
+    // the changes that brought it; a change alone, the fields it names.
+    const wrote = !ev.data?.row && ev.data?.changes ? Object.keys(ev.data.changes) : null;
     for (const id of target.keys) {
       const now = tableOf(target.collection)[id];
       if (!now) continue;
