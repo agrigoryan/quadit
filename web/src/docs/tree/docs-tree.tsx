@@ -1,7 +1,8 @@
 // The page tree of the Docs area: the team's pages, the person's private
 // ones, each agent's memory, and the pages built from data. Pages are
 // dragged to reorder them or to put one inside another. In a project's
-// Docs it is the same tree, of that project's pages.
+// Docs it is the same tree, of that project's pages. T, anywhere in the
+// Docs, moves the focus into it, onto the open page.
 
 import {
   DndContext,
@@ -14,7 +15,9 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
+import { useParams } from "react-router";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { rankBetween } from "@/lib/rank";
@@ -78,6 +81,27 @@ export function DocsTree({ tree, className }: Props) {
   const [dragging, setDragging] = useState<Doc | null>(null);
   const [target, setTarget] = useState<DropTarget | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const nav = useRef<HTMLElement>(null);
+  const openId = useParams().id;
+
+  // T: the focus on the open page's name, its parents opened to show it;
+  // on the nearest of them that is in the tree (a database's row is not), else on the first page.
+  useHotkeys({
+    t: (e) => {
+      e.preventDefault();
+      const docs = getLookupEvenIfGone("docs");
+      const chain: string[] = [];
+      for (let at = openId ? docs[openId] : undefined; at; at = at.parent_id ? docs[at.parent_id] : undefined)
+        chain.push(at.id);
+      for (const above of chain.slice(1)) setOpen(above, true);
+      // Once the pages opened are drawn.
+      requestAnimationFrame(() => {
+        const rowOf = (id: string) => nav.current?.querySelector<HTMLElement>(`[data-tree-row="${id}"]`);
+        const row = chain.map(rowOf).find(Boolean) ?? nav.current?.querySelector<HTMLElement>("[data-tree-row]");
+        row?.focus();
+      });
+    },
+  });
 
   const end = (event: DragEndEvent) => {
     const to = targetOf(event);
@@ -105,7 +129,7 @@ export function DocsTree({ tree, className }: Props) {
     byAgent.set(doc.memory_of as string, [...(byAgent.get(doc.memory_of as string) ?? []), doc]);
 
   return (
-    <nav aria-label={t("docs.tree.label")} className={cx("flex min-h-0 flex-col", className)}>
+    <nav ref={nav} aria-label={t("docs.tree.label")} className={cx("flex min-h-0 flex-col", className)}>
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}

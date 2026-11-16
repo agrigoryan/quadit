@@ -110,6 +110,7 @@ const sections: Section[] = [
     hint: "shortcuts.group.docsHint",
     rows: [
       { what: "shortcuts.newPage", keys: ["N"] },
+      { what: "shortcuts.toTree", keys: ["T"] },
       { what: "shortcuts.dbLayout", keys: [`${MOD} B`] },
     ],
   },
@@ -124,6 +125,9 @@ const sections: Section[] = [
     rows: [
       { what: "shortcuts.treeWalk", keys: ["↓", "↑"], join: "or" },
       { what: "shortcuts.treeFold", keys: ["→", "←"], join: "or" },
+      { what: "shortcuts.treeRename", keys: ["F2"] },
+      { what: "shortcuts.treeNew", keys: ["N"] },
+      { what: "shortcuts.treeTrash", keys: [`${MOD} Backspace`] },
     ],
   },
   {

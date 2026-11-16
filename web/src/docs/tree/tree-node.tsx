@@ -1,10 +1,12 @@
 // One page in the tree: a link with a way to open what is under it, add a
 // page inside, and a menu. It can be dragged, and things can be dropped on,
-// before or after it.
+// before or after it. On its link the arrows walk the tree, F2 renames the
+// page, N adds a page inside and Cmd+Backspace moves it to the trash.
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronRight, Link2, MoreHorizontal, PenLine, Plus, Smile, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
+import { combo } from "@/hooks/hotkeys";
 import { NavLink } from "react-router";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
@@ -117,7 +119,7 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
             data-tree-row={doc.id}
             draggable={false}
             onClick={() => ui.setDrawer(false)}
-            onKeyDown={onRowKey}
+            onKeyDown={(e) => onRowKey(e, canChange ? doc : undefined)}
             className="ml-1 flex min-w-0 flex-1 items-center gap-1.5 py-1 outline-none focus-visible:underline aria-[current]:font-medium"
           >
             <span className="truncate">{title}</span>
@@ -198,19 +200,40 @@ export function TreeNode({ doc, tree, depth, editable: inEditablePart, drop, par
   );
 }
 
-/** On a page's link, the arrows walk the tree's pages; right and left open and close a page. */
-function onRowKey(e: KeyboardEvent<HTMLAnchorElement>) {
+/**
+ * On a page's link, the arrows walk the tree's pages; right and left open
+ * and close a page. On a page the person may change (`changes`), F2
+ * renames it, N adds a page inside, and Cmd+Backspace (or Delete) moves it
+ * to the trash, the focus going on to the next page's name.
+ */
+function onRowKey(e: KeyboardEvent<HTMLAnchorElement>, changes: Doc | undefined) {
   const tree = e.currentTarget.closest("nav");
   if (!tree) return;
   const rows = [...tree.querySelectorAll<HTMLElement>("[data-tree-row]")];
   const at = rows.indexOf(e.currentTarget);
   const id = e.currentTarget.dataset.treeRow;
   if (at < 0 || !id) return;
-  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+  const key = combo(e.nativeEvent);
+  if (key === "ArrowDown" || key === "ArrowUp") {
     e.preventDefault();
-    rows[at + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
-  } else if (e.key === "ArrowRight") setOpen(id, true);
-  else if (e.key === "ArrowLeft") setOpen(id, false);
+    rows[at + (key === "ArrowDown" ? 1 : -1)]?.focus();
+  } else if (key === "ArrowRight") setOpen(id, true);
+  else if (key === "ArrowLeft") setOpen(id, false);
+  else if (key === "F2" && changes) {
+    e.preventDefault();
+    startRename(changes.id);
+  } else if (key === "n") {
+    // The page's own N even where it cannot take one: the page open beside the tree is not this one.
+    e.preventDefault();
+    if (changes && changes.kind !== "database") createAndOpen({ parentId: changes.id });
+  } else if ((key === "mod+Backspace" || key === "mod+Delete") && changes) {
+    e.preventDefault();
+    // The next page outside this one (its own go with it), else the one before.
+    const branch = e.currentTarget.closest("li");
+    const after = rows.slice(at + 1).find((row) => !branch?.contains(row));
+    (after ?? rows[at - 1])?.focus();
+    trashDoc(changes.id);
+  }
 }
 
 function RenameBox({ doc }: { doc: Doc }) {
@@ -231,8 +254,10 @@ function RenameBox({ doc }: { doc: Doc }) {
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === "Enter") done(true);
-        if (e.key === "Escape") done(false);
+        if (e.key !== "Enter" && e.key !== "Escape") return;
+        done(e.key === "Enter");
+        // Ended from the keyboard, the keys go on from the page's name, drawn again in the box's place.
+        requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-tree-row="${doc.id}"]`)?.focus());
       }}
       className="ml-1 h-6 min-w-0 flex-1 rounded-sm border border-accent bg-surface px-1 text-sm text-ink outline-none"
     />
