@@ -158,7 +158,7 @@ func (s *Server) handleReadFeed(x *c) error {
 		if round == 0 && v.Has("after") && f.After > ws.Seq {
 			return &engine.Error{Code: engine.CodeInvalid, Field: "after", Message: fmt.Sprintf("after=%d is past the end of the feed, which stands at %d; read from there, or from 0 for everything", f.After, ws.Seq)}
 		}
-		evs, err := x.db.Events(ctx, f)
+		evs, err := x.readFeed(ctx, f)
 		if err != nil {
 			return err
 		}
@@ -326,7 +326,7 @@ func (s *Server) handleStreamFeed(x *c) error {
 		// after this moment has a higher number, and wakes the wait below.
 		mark := s.hub.Seq(x.ws.ID)
 		f.After = after
-		evs, err := x.db.Events(ctx, f)
+		evs, err := x.readFeed(ctx, f)
 		if err != nil {
 			// The headers are sent: the error cannot be the answer. The
 			// client reconnects and reads on from its last event.

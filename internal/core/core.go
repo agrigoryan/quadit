@@ -303,6 +303,8 @@ const (
 )
 
 // Relation ties two tasks: one blocks, relates to or duplicates the other.
+// Given to someone who may read only one of the two, it has the other's id
+// empty: the task is related to one they cannot see.
 type Relation struct {
 	ID            string `json:"id" db:"id"`
 	WorkspaceID   string `json:"-" db:"workspace_id"`

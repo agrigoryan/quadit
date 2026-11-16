@@ -2,10 +2,12 @@ package server_test
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"io"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
@@ -23,6 +25,17 @@ func oneProjectOnly(t *testing.T, s *site) (narrow string) {
 	var tok struct{ Token string }
 	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@narrow"}, 201, &tok)
 	return tok.Token
+}
+
+// limitedToSVA makes the workspace of oneProjectOnly and returns the two
+// kinds of caller that may read SVA alone, by name: a member whose
+// membership is limited to it, and an admin's token made for it.
+func limitedToSVA(t *testing.T, s *site) map[string]string {
+	t.Helper()
+	member := oneProjectOnly(t, s)
+	var tok struct{ Token string }
+	s.call(s.owner, "", "POST", w+"/tokens", M{"name": "SVA only", "projects": []string{"SVA"}}, 201, &tok)
+	return map[string]string{"a member limited to SVA": member, "an admin's token limited to SVA": tok.Token}
 }
 
 // TestContextPackLeavesOutPagesOfOtherProjects: a task's context pack
@@ -66,26 +79,105 @@ func TestAViewOfAnotherProjectIsNotThere(t *testing.T) {
 	})
 }
 
-// TestTheStartingCopyKeepsRelationsToReadableTasks: a relation is seen by
-// whoever may read the task it is on, in the starting copy as in
-// /list/relations. One made on a task of another project is not brought,
-// though it points at a task the caller may read.
-func TestTheStartingCopyKeepsRelationsToReadableTasks(t *testing.T) {
+// TestARelationRowDoesNotNameATaskTheCallerMayNotRead: a relation is seen
+// by whoever may read the task at either end of it, and the end they may
+// not read is blank: its id is not in the rows of /list/relations, the
+// starting copy or a task, nor in the feed, which leaves out its key too.
+// A relation between two tasks the caller may not read is not theirs.
+func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		narrow := oneProjectOnly(t, s)
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music"})
-		hidden := s.change(s.owner, "", "relation.add", M{"task": "OPS-1", "type": "duplicates", "other": "SVA-1"})["ref"].(string)
-		shown := s.change(s.owner, "", "relation.add", M{"task": "SVA-1", "type": "blocks", "other": "SVA-2"})["ref"].(string)
-		for _, path := range []string{"/bootstrap", "/bootstrap?part=open", "/list/relations"} {
-			if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); !strings.Contains(out, hidden) || !strings.Contains(out, shown) {
-				t.Fatalf("%s does not give every relation to someone who may read both projects: %s", path, out)
+		callers := limitedToSVA(t, s)
+		task := func(project, title string) string {
+			return s.change(s.owner, "", "task.create", M{"project": project, "title": title})["ref"].(string)
+		}
+		relate := func(task, typ, other string) string {
+			return s.change(s.owner, "", "relation.add", M{"task": task, "type": typ, "other": other})["ref"].(string)
+		}
+		var sva1, ops1 struct{ Task struct{ ID string } }
+		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
+		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		task("SVA", "Boss music")
+		ops2 := task("OPS", "Back up nightly")
+		inside := relate("SVA-1", "blocks", "SVA-2")
+		across := []string{relate("SVA-1", "duplicates", "OPS-1"), relate("OPS-1", "blocks", "SVA-1"), relate("SVA-1", "relates", "OPS-1")}
+		outside := relate("OPS-1", "blocks", "OPS-2")
+		removed := relate("OPS-2", "relates", "SVA-1")
+		s.change(s.owner, "", "relation.remove", M{"id": removed})
+		s.change(s.owner, "", "label.create", M{"name": "last"})
+
+		type relation struct {
+			ID      string `json:"id"`
+			Task    string `json:"task_id"`
+			Related string `json:"related_task_id"`
+		}
+		lists := []string{"/list/relations", "/bootstrap", "/bootstrap?part=open", "/tasks/SVA-1?raw=1"}
+		for _, path := range lists {
+			var got struct{ Relations []relation }
+			s.call(s.owner, "", "GET", w+path, nil, 200, &got)
+			want := 5
+			if strings.Contains(path, "SVA-1") {
+				want = 4 // not the one between two tasks of OPS
 			}
-			var got struct{ Relations []struct{ ID string } }
-			s.call(nil, narrow, "GET", w+path, nil, 200, &got)
-			if len(got.Relations) != 1 || got.Relations[0].ID != shown {
-				t.Fatalf("%s gives a caller limited to SVA the relations %+v, want only the one made on SVA-1", path, got.Relations)
+			if len(got.Relations) != want {
+				t.Fatalf("%s gives the owner %d relations, want %d: %+v", path, len(got.Relations), want, got.Relations)
 			}
+			for _, r := range got.Relations {
+				if r.Task == "" || r.Related == "" {
+					t.Fatalf("%s gives the owner a relation with a blank end: %+v", path, r)
+				}
+			}
+		}
+		for who, token := range callers {
+			for _, path := range lists {
+				var got struct{ Relations json.RawMessage }
+				s.call(nil, token, "GET", w+path, nil, 200, &got)
+				if out := string(got.Relations); strings.Contains(out, ops1.Task.ID) || strings.Contains(out, ops2) || strings.Contains(out, outside) {
+					t.Errorf("%s gives %s the id of a task of OPS, or a relation between two of them: %s", path, who, out)
+				}
+				var relations []relation
+				if err := json.Unmarshal(got.Relations, &relations); err != nil {
+					t.Fatal(err)
+				}
+				ends := map[string]string{}
+				for _, r := range relations {
+					ends[r.ID] = r.Task + "|" + r.Related
+				}
+				if len(ends) != 4 || !strings.Contains(ends[inside], sva1.Task.ID+"|") || strings.HasSuffix(ends[inside], "|") {
+					t.Errorf("%s gives %s the relations %v, want four, the one inside SVA whole", path, who, ends)
+				}
+				for _, id := range across {
+					if ends[id] != sva1.Task.ID+"|" && ends[id] != "|"+sva1.Task.ID {
+						t.Errorf("%s gives %s the relation across projects as %q, want SVA-1 at one end and nothing at the other", path, who, ends[id])
+					}
+				}
+			}
+			feeds := []string{"/events?after=0&limit=2000", "/events?after=0&limit=2000&compact=1", "/events?after=0&limit=2000&format=text", "/tasks/SVA-1?since=0",
+				"/list/relations?format=text", "/list/relations?task=SVA-1"}
+			for _, path := range feeds {
+				out := s.call(nil, token, "GET", w+path, nil, 200, nil)
+				for what, hidden := range map[string]string{"id": ops1.Task.ID, "key": "OPS-", "other id": ops2} {
+					if strings.Contains(out, hidden) {
+						t.Errorf("%s gives %s the %s of a task of OPS: %s", path, who, what, out)
+					}
+				}
+				if !strings.Contains(out, across[0]) && !strings.Contains(out, "relation.created SVA-1") {
+					t.Errorf("%s does not tell %s of a relation of SVA-1 at all: %s", path, who, out)
+				}
+			}
+			live := s.stream(t, token)
+			for deadline := time.Now().Add(10 * time.Second); !strings.Contains(live.all(), `"type":"label.created"`); time.Sleep(10 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatalf("the live stream of %s did not reach the last event: %s", who, live.all())
+				}
+			}
+			if out := live.all(); strings.Contains(out, ops1.Task.ID) || strings.Contains(out, ops2) || strings.Contains(out, "OPS-") || !strings.Contains(out, across[0]) {
+				t.Errorf("the live stream gives %s the id or the key of a task of OPS, or no relation of SVA-1: %s", who, out)
+			}
+		}
+		// Someone who may read both projects is still told both ends.
+		if out := s.call(s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, nil); !strings.Contains(out, `"other_key":"OPS-1"`) || !strings.Contains(out, ops1.Task.ID) {
+			t.Errorf("the feed does not tell the owner the other end of a relation: %s", out)
 		}
 	})
 }

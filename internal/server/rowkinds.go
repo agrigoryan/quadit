@@ -69,8 +69,9 @@ func (k rowKind) read(ctx context.Context, who *viewer, q store.Q) (any, error) 
 }
 
 // rule says which rows of a kind a viewer may see: it returns, of rows, the
-// ones to keep. A rule that must read to decide and cannot, keeps nothing
-// it is unsure of.
+// ones to keep, each without what the viewer may not see of it (the far
+// end of a relation). A rule that must read to decide and cannot, keeps
+// nothing it is unsure of.
 type rule[T any] func(ctx context.Context, who *viewer, rows []T) []T
 
 // kindOf makes a kind of rows of type T with the rule for who may see them.
@@ -162,22 +163,10 @@ func onTask[T any](taskOf func(T) string) rule[T] {
 		if !who.limited() {
 			return rows
 		}
-		projectOf := map[string]string{}
+		mayRead := who.readableTasks(ctx)
 		return keep(rows, func(row T) bool {
 			taskID := taskOf(row)
-			if taskID == "" {
-				return true
-			}
-			projectID, seen := projectOf[taskID]
-			if !seen {
-				var t core.Task
-				projectID = "none"
-				if who.db.Get(ctx, &t, store.Eq("id", taskID)) == nil {
-					projectID = t.ProjectID
-				}
-				projectOf[taskID] = projectID
-			}
-			return who.canProject(projectID)
+			return taskID == "" || mayRead(taskID)
 		})
 	}
 }
@@ -255,7 +244,7 @@ var rowKinds = []rowKind{
 		copied(toEveryone(live("created_seq"))).exported(live("created_seq")),
 	kindOf("decision_options", wholeOnly[core.Option]()).exported(live("rank")),
 	kindOf("comments", wholeOnly[core.Comment]()).exported(live("created_seq")),
-	kindOf("relations", onTask(func(r core.Relation) string { return r.TaskID })).
+	kindOf("relations", rule[core.Relation](visibleRelations)).
 		listed("created_at,id").copied(toEveryone(store.Q{})).exported(store.Q{}),
 	kindOf("links", onTask(func(l core.TaskLink) string { return l.TaskID })).
 		listed("created_at,id").exported(live("")),
@@ -376,6 +365,38 @@ func (who *viewer) hideActions(ctx context.Context, members []core.Member) {
 			}
 		}
 	}
+}
+
+// Relations.
+
+// visibleRelations is the rule of relations. One is seen by whoever may
+// read the task at either end of it. Of an end the viewer may not read
+// they are told nothing: its id is blank in the row they get, so the row
+// says only that the task they do read is related to one they cannot see.
+func visibleRelations(ctx context.Context, who *viewer, relations []core.Relation) []core.Relation {
+	if !who.limited() {
+		return relations
+	}
+	mayRead := who.readableTasks(ctx)
+	seen := make([]core.Relation, 0, len(relations))
+	for _, r := range relations {
+		if r = withoutHiddenEnds(r, mayRead); r.TaskID != "" || r.RelatedTaskID != "" {
+			seen = append(seen, r)
+		}
+	}
+	return seen
+}
+
+// withoutHiddenEnds is a relation with the id of each end blank that is a
+// task the viewer may not read (mayRead).
+func withoutHiddenEnds(r core.Relation, mayRead func(taskID string) bool) core.Relation {
+	if !mayRead(r.TaskID) {
+		r.TaskID = ""
+	}
+	if !mayRead(r.RelatedTaskID) {
+		r.RelatedTaskID = ""
+	}
+	return r
 }
 
 // Attachments.

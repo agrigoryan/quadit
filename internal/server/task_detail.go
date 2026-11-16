@@ -195,7 +195,7 @@ func (s *Server) handleShowTask(x *c) error {
 	v := x.r.URL.Query()
 	x.narrowedAlready()
 	if since := x.intParam("since", -1); since >= 0 {
-		evs, err := x.db.Events(x.ctx(), store.EventFilter{After: int64(since), ScopeType: "task", ScopeID: t.ID, Viewer: x.member.UserID, Limit: 500})
+		evs, err := x.readFeed(x.ctx(), store.EventFilter{After: int64(since), ScopeType: "task", ScopeID: t.ID, Viewer: x.member.UserID, Limit: 500})
 		if err != nil {
 			return err
 		}
@@ -267,5 +267,5 @@ func (who *viewer) taskRows(ctx context.Context, t core.Task) (map[string]any, e
 		return nil, err
 	}
 	return map[string]any{"task": t, "comments": comments, "links": links, "watchers": watchers, "attachments": atts, "sessions": sessions,
-		"mentioned_in": mentioned, "relations": append(outgoing, incoming...)}, nil
+		"mentioned_in": mentioned, "relations": visibleRelations(ctx, who, append(outgoing, incoming...))}, nil
 }

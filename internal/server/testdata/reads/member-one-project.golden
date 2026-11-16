@@ -3505,7 +3505,7 @@ How many phases?
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "id": "<relation SVA-1 relates OPS-1>",
-   "related_task_id": "<task OPS-1>",
+   "related_task_id": "",
    "task_id": "<task SVA-1>",
    "type": "relates"
   },
@@ -7731,12 +7731,11 @@ nothing found
    "change_id": "<id #279>",
    "data": {
     "key": "SVA-1",
-    "other_key": "OPS-1",
     "row": {
      "created_at": 1700000000000,
      "created_by": "<@aram>",
      "id": "<relation SVA-1 relates OPS-1>",
-     "related_task_id": "<task OPS-1>",
+     "related_task_id": "",
      "task_id": "<task SVA-1>",
      "type": "relates"
     }
@@ -7756,7 +7755,6 @@ nothing found
    "data": {
     "id": "<task SVA-3>",
     "key": "SVA-3",
-    "other_key": "OPS-2",
     "relation": "<relation OPS-2 duplicates SVA-3>",
     "removed": false,
     "type": "duplicates"
@@ -13479,9 +13477,17 @@ seq: 264
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "id": "<relation SVA-1 relates OPS-1>",
-   "related_task_id": "<task OPS-1>",
+   "related_task_id": "",
    "task_id": "<task SVA-1>",
    "type": "relates"
+  },
+  {
+   "created_at": 1700000000000,
+   "created_by": "<@aram>",
+   "id": "<relation OPS-2 duplicates SVA-3>",
+   "related_task_id": "<task SVA-3>",
+   "task_id": "",
+   "type": "duplicates"
   }
  ],
  "resources": [
@@ -14613,7 +14619,7 @@ seq: 264
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "id": "<relation SVA-1 relates OPS-1>",
-   "related_task_id": "<task OPS-1>",
+   "related_task_id": "",
    "task_id": "<task SVA-1>",
    "type": "relates"
   }
@@ -14938,7 +14944,16 @@ seq: 264
  "attachments": [],
  "decisions": [],
  "part": "rest",
- "relations": [],
+ "relations": [
+  {
+   "created_at": 1700000000000,
+   "created_by": "<@aram>",
+   "id": "<relation OPS-2 duplicates SVA-3>",
+   "related_task_id": "<task SVA-3>",
+   "task_id": "",
+   "type": "duplicates"
+  }
+ ],
  "seq": 264,
  "tasks": [
   {
@@ -15224,6 +15239,9 @@ seq: 264
   },
   {
    "id": "<relation SVA-1 relates OPS-1>"
+  },
+  {
+   "id": "<relation OPS-2 duplicates SVA-3>"
   }
  ],
  "resources": [
@@ -15561,9 +15579,17 @@ seq: 264
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "id": "<relation SVA-1 relates OPS-1>",
-   "related_task_id": "<task OPS-1>",
+   "related_task_id": "",
    "task_id": "<task SVA-1>",
    "type": "relates"
+  },
+  {
+   "created_at": 1700000000000,
+   "created_by": "<@aram>",
+   "id": "<relation OPS-2 duplicates SVA-3>",
+   "related_task_id": "<task SVA-3>",
+   "task_id": "",
+   "type": "duplicates"
   }
  ],
  "resources": [
@@ -16594,9 +16620,17 @@ Drawing the boss  running  task=<task SVA-1>  id=<session artist>
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "id": "<relation SVA-1 relates OPS-1>",
-   "related_task_id": "<task OPS-1>",
+   "related_task_id": "",
    "task_id": "<task SVA-1>",
    "type": "relates"
+  },
+  {
+   "created_at": 1700000000000,
+   "created_by": "<@aram>",
+   "id": "<relation OPS-2 duplicates SVA-3>",
+   "related_task_id": "<task SVA-3>",
+   "task_id": "",
+   "type": "duplicates"
   }
  ]
 }
@@ -16604,7 +16638,8 @@ Drawing the boss  running  task=<task SVA-1>  id=<session artist>
 === GET /api/v1/w/games/list/relations?format=text
 200
 blocks  task=<task SVA-1>  related_task=<task SVA-2>  id=<relation SVA-1 blocks SVA-2>
-relates  task=<task SVA-1>  related_task=<task OPS-1>  id=<relation SVA-1 relates OPS-1>
+relates  task=<task SVA-1>  id=<relation SVA-1 relates OPS-1>
+duplicates  related_task=<task SVA-3>  id=<relation OPS-2 duplicates SVA-3>
 
 === GET /api/v1/w/games/list/relations?trash=1
 200
@@ -16622,9 +16657,17 @@ relates  task=<task SVA-1>  related_task=<task OPS-1>  id=<relation SVA-1 relate
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "id": "<relation SVA-1 relates OPS-1>",
-   "related_task_id": "<task OPS-1>",
+   "related_task_id": "",
    "task_id": "<task SVA-1>",
    "type": "relates"
+  },
+  {
+   "created_at": 1700000000000,
+   "created_by": "<@aram>",
+   "id": "<relation OPS-2 duplicates SVA-3>",
+   "related_task_id": "<task SVA-3>",
+   "task_id": "",
+   "type": "duplicates"
   }
  ]
 }
@@ -17585,7 +17628,7 @@ stale  Stale  id=<view Stale>
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "id": "<relation SVA-1 relates OPS-1>",
-   "related_task_id": "<task OPS-1>",
+   "related_task_id": "",
    "task_id": "<task SVA-1>",
    "type": "relates"
   }
@@ -21807,10 +21850,10 @@ id: 98
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #278>","data":{"id":"<task SVA-2>","key":"SVA-2","other_key":"SVA-1","relation":"<relation SVA-1 blocks SVA-2>","removed":false,"type":"blocks"},"entity_id":"<task SVA-2>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":98,"type":"task.related"}
 
 id: 99
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #279>","data":{"key":"SVA-1","other_key":"OPS-1","row":{"created_at":1700000000000,"created_by":"<@aram>","id":"<relation SVA-1 relates OPS-1>","related_task_id":"<task OPS-1>","task_id":"<task SVA-1>","type":"relates"}},"entity_id":"<relation SVA-1 relates OPS-1>","entity_type":"relation","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":99,"type":"relation.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #279>","data":{"key":"SVA-1","row":{"created_at":1700000000000,"created_by":"<@aram>","id":"<relation SVA-1 relates OPS-1>","related_task_id":"","task_id":"<task SVA-1>","type":"relates"}},"entity_id":"<relation SVA-1 relates OPS-1>","entity_type":"relation","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":99,"type":"relation.created"}
 
 id: 104
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #281>","data":{"id":"<task SVA-3>","key":"SVA-3","other_key":"OPS-2","relation":"<relation OPS-2 duplicates SVA-3>","removed":false,"type":"duplicates"},"entity_id":"<task SVA-3>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-3>","scope_type":"task","seq":104,"type":"task.related"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #281>","data":{"id":"<task SVA-3>","key":"SVA-3","relation":"<relation OPS-2 duplicates SVA-3>","removed":false,"type":"duplicates"},"entity_id":"<task SVA-3>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-3>","scope_type":"task","seq":104,"type":"task.related"}
 
 id: 105
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #282>","data":{"key":"SVA-1","other_key":"SVA-6","row":{"created_at":1700000000000,"created_by":"<@aram>","id":"<relation removed>","related_task_id":"<task SVA-6>","task_id":"<task SVA-1>","type":"relates"}},"entity_id":"<relation removed>","entity_type":"relation","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":105,"type":"relation.created"}

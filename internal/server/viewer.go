@@ -4,11 +4,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -63,6 +65,22 @@ func (who *viewer) canProject(projectID string) bool {
 	return who.projects == nil || projectID == "" || slices.Contains(who.projects, projectID)
 }
 
+// readableTasks answers, for one run of rows, whether the viewer may read
+// a task by its id: whether it is of a project the viewer may read. Each
+// task is read once. A task that cannot be read is one the viewer may not.
+func (who *viewer) readableTasks(ctx context.Context) func(taskID string) bool {
+	may := map[string]bool{}
+	return func(taskID string) bool {
+		readable, asked := may[taskID]
+		if !asked {
+			var t core.Task
+			readable = who.db.Get(ctx, &t, store.Eq("id", taskID)) == nil && who.canProject(t.ProjectID)
+			may[taskID] = readable
+		}
+		return readable
+	}
+}
+
 // limited reports whether the viewer is kept to some of the projects.
 func (who *viewer) limited() bool { return who.projects != nil }
 
@@ -115,6 +133,52 @@ func (who *viewer) readable(f store.TaskFilter) store.TaskFilter {
 // projects and of no project, and none that is addressed to someone else.
 func (who *viewer) feed() store.EventFilter {
 	return store.EventFilter{Viewer: who.member.UserID, ProjectIDs: who.projects, AllowNoProject: true}
+}
+
+// readFeed reads the events a filter selects, each as the viewer may see it.
+// The filter says which events are the viewer's to read (feed, or one made
+// for a task or a page the viewer was let into); what an event says of a
+// task the viewer may not read is taken out here: the far end of a
+// relation, its id and its key.
+func (who *viewer) readFeed(ctx context.Context, f store.EventFilter) ([]core.Event, error) {
+	evs, err := who.db.Events(ctx, f)
+	if err != nil || !who.limited() {
+		return evs, err
+	}
+	mayRead := who.readableTasks(ctx)
+	for i, ev := range evs {
+		if ev.Type != "relation.created" && ev.Type != "task.related" {
+			continue
+		}
+		// The data is changed key by key, so that what is not taken out
+		// goes on as it was written. Data that does not read is not given.
+		payload, err := ev.Payload()
+		var data map[string]json.RawMessage
+		if err != nil || json.Unmarshal(ev.Data, &data) != nil {
+			evs[i].Data = json.RawMessage(`{}`)
+			continue
+		}
+		if ev.Type == "relation.created" {
+			// The relation's own event carries its row; key and other_key
+			// are the keys of the tasks at its two ends.
+			var r core.Relation
+			payload.ReadRow(&r)
+			r = withoutHiddenEnds(r, mayRead)
+			data["row"] = plainjson.Marshal(r)
+			if r.TaskID == "" {
+				delete(data, "key")
+			}
+			if r.RelatedTaskID == "" {
+				delete(data, "other_key")
+			}
+		} else if other, err := who.resolver(ctx).Task(payload.OtherKey); err != nil || !who.canProject(other.ProjectID) {
+			// What the task at one end is told of the relation names the
+			// task at the other end by other_key alone.
+			delete(data, "other_key")
+		}
+		evs[i].Data = plainjson.Marshal(data)
+	}
+	return evs, nil
 }
 
 // search finds what the viewer may read by its words: in its projects, and
