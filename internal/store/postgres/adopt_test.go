@@ -155,7 +155,7 @@ func (s *testServer) latest() int {
 }
 
 const (
-	gooseVersions = `SELECT version_id::text FROM goose_db_version WHERE is_applied ORDER BY version_id`
+	gooseVersions = `SELECT version_id::text FROM goose_db_version WHERE is_applied ORDER BY goose_db_version.version_id` // by number, not by the text
 	oldVersions   = `SELECT version || ' ' || name || ' ' || applied_at FROM schema_migrations ORDER BY version`
 	hasGooseTable = `SELECT COUNT(*)::text FROM pg_tables WHERE tablename = 'goose_db_version'`
 )
@@ -335,7 +335,7 @@ func TestServersStartingTogether(t *testing.T) {
 			if got := s.column(name, gooseVersions); !slices.Equal(got, upTo(latest)) {
 				t.Errorf("goose's table has versions %v, want each of %v once", got, upTo(latest))
 			}
-			if got := s.column(name, `SELECT version::text FROM schema_migrations ORDER BY version`); !slices.Equal(got, upTo(latest)[1:]) {
+			if got := s.column(name, `SELECT version::text FROM schema_migrations ORDER BY schema_migrations.version`); !slices.Equal(got, upTo(latest)[1:]) {
 				t.Errorf("schema_migrations has versions %v, want each of %v once", got, upTo(latest)[1:])
 			}
 		})
