@@ -18,10 +18,12 @@ server:
 web:
 	cd web && pnpm install --frozen-lockfile && pnpm build
 
-# The web app's types for every change and its arguments, from the engine.
-# A test (cmd/webchanges) fails until this is run after an argument changes.
+# The web app's types generated from the server: every change and its
+# arguments, and every row (the guard rows.check.ts holds the web's own row
+# types to). A test (cmd/webtypes) fails until this is run after an argument
+# or a row changes.
 generate:
-	go run ./cmd/webchanges
+	go run ./cmd/webtypes
 
 test:
 	go test ./...
