@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -508,7 +509,10 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	// comes into it is news for whoever watches it and may see it.
 	change(owner, "", "watch.set", M{"type": "view", "subject": rw.id("view Art bugs")})
 	change(bea, "", "watch.set", M{"type": "view", "subject": rw.id("view Art bugs")})
-	change(bea, "", "watch.set", M{"type": "view", "subject": rw.id("view Ops infra")})
+	// A view of a project Bea may not read is not hers to follow; a page
+	// of hers is.
+	s.call(bea, "", "POST", w+"/changes", M{"id": id.New(), "type": "watch.set", "args": M{"type": "view", "subject": rw.id("view Ops infra")}}, 403, nil)
+	change(bea, "", "watch.set", M{"type": "doc", "subject": rw.id("doc SVA design")})
 	change(owner, "", "watch.set", M{"type": "view", "subject": rw.id("view Ops infra"), "user": "@cy"})
 	rw.settle()
 	change(nil, rw.artist, "task.update", M{"id": "SVA-6", "add_labels": []string{"art"}})

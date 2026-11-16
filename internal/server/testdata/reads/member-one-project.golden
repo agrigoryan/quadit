@@ -10594,8 +10594,9 @@ nothing found
    },
    "entity_id": "<view Art bugs>",
    "entity_type": "watcher",
-   "scope_id": "<id #153>",
-   "scope_type": "workspace",
+   "project_id": "<project SVA>",
+   "scope_id": "<project SVA>",
+   "scope_type": "project",
    "seq": 249,
    "type": "watcher.created"
   },
@@ -10607,15 +10608,16 @@ nothing found
    "data": {
     "row": {
      "created_at": 1700000000000,
-     "subject_id": "<view Ops infra>",
-     "subject_type": "view",
+     "subject_id": "<doc SVA design>",
+     "subject_type": "doc",
      "user_id": "<@bea>"
     }
    },
-   "entity_id": "<view Ops infra>",
+   "entity_id": "<doc SVA design>",
    "entity_type": "watcher",
-   "scope_id": "<id #153>",
-   "scope_type": "workspace",
+   "project_id": "<project SVA>",
+   "scope_id": "<doc SVA design>",
+   "scope_type": "doc",
    "seq": 250,
    "type": "watcher.created"
   },
@@ -11510,8 +11512,9 @@ seq: 261
    },
    "entity_id": "<view Art bugs>",
    "entity_type": "watcher",
-   "scope_id": "<id #153>",
-   "scope_type": "workspace",
+   "project_id": "<project SVA>",
+   "scope_id": "<project SVA>",
+   "scope_type": "project",
    "seq": 249,
    "type": "watcher.created"
   },
@@ -11523,15 +11526,16 @@ seq: 261
    "data": {
     "row": {
      "created_at": 1700000000000,
-     "subject_id": "<view Ops infra>",
-     "subject_type": "view",
+     "subject_id": "<doc SVA design>",
+     "subject_type": "doc",
      "user_id": "<@bea>"
     }
    },
-   "entity_id": "<view Ops infra>",
+   "entity_id": "<doc SVA design>",
    "entity_type": "watcher",
-   "scope_id": "<id #153>",
-   "scope_type": "workspace",
+   "project_id": "<project SVA>",
+   "scope_id": "<doc SVA design>",
+   "scope_type": "doc",
    "seq": 250,
    "type": "watcher.created"
   },
@@ -13418,6 +13422,12 @@ seq: 261
    "subject_id": "<view Art bugs>",
    "subject_type": "view",
    "user_id": "<@bea>"
+  },
+  {
+   "created_at": 1700000000000,
+   "subject_id": "<doc SVA design>",
+   "subject_type": "doc",
+   "user_id": "<@bea>"
   }
  ],
  "workspace": {
@@ -14492,6 +14502,12 @@ seq: 261
    "subject_id": "<view Art bugs>",
    "subject_type": "view",
    "user_id": "<@bea>"
+  },
+  {
+   "created_at": 1700000000000,
+   "subject_id": "<doc SVA design>",
+   "subject_type": "doc",
+   "user_id": "<@bea>"
   }
  ],
  "workspace": {
@@ -14922,6 +14938,7 @@ seq: 261
   {},
   {},
   {},
+  {},
   {}
  ],
  "workspace": {
@@ -15342,6 +15359,12 @@ seq: 261
    "created_at": 1700000000000,
    "subject_id": "<view Art bugs>",
    "subject_type": "view",
+   "user_id": "<@bea>"
+  },
+  {
+   "created_at": 1700000000000,
+   "subject_id": "<doc SVA design>",
+   "subject_type": "doc",
    "user_id": "<@bea>"
   }
  ],
@@ -21544,10 +21567,10 @@ id: 247
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #407>","data":{"row":{"agents":["<@ops>"],"created_at":1700000000000,"created_by":"<@aram>","description":"for the staging box","env":false,"id":"<secret DEPLOY_KEY>","name":"DEPLOY_KEY","updated_at":1700000000000,"updated_seq":247}},"entity_id":"<secret DEPLOY_KEY>","entity_type":"secret","scope_id":"<id #153>","scope_type":"workspace","seq":247,"type":"secret.created"}
 
 id: 249
-data: {"actor_id":"<@bea>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #457>","data":{"row":{"created_at":1700000000000,"subject_id":"<view Art bugs>","subject_type":"view","user_id":"<@bea>"}},"entity_id":"<view Art bugs>","entity_type":"watcher","scope_id":"<id #153>","scope_type":"workspace","seq":249,"type":"watcher.created"}
+data: {"actor_id":"<@bea>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #457>","data":{"row":{"created_at":1700000000000,"subject_id":"<view Art bugs>","subject_type":"view","user_id":"<@bea>"}},"entity_id":"<view Art bugs>","entity_type":"watcher","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":249,"type":"watcher.created"}
 
 id: 250
-data: {"actor_id":"<@bea>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #458>","data":{"row":{"created_at":1700000000000,"subject_id":"<view Ops infra>","subject_type":"view","user_id":"<@bea>"}},"entity_id":"<view Ops infra>","entity_type":"watcher","scope_id":"<id #153>","scope_type":"workspace","seq":250,"type":"watcher.created"}
+data: {"actor_id":"<@bea>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #458>","data":{"row":{"created_at":1700000000000,"subject_id":"<doc SVA design>","subject_type":"doc","user_id":"<@bea>"}},"entity_id":"<doc SVA design>","entity_type":"watcher","project_id":"<project SVA>","scope_id":"<doc SVA design>","scope_type":"doc","seq":250,"type":"watcher.created"}
 
 id: 252
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #409>","data":{"changes":{"label_ids":{"from":null,"to":["<label art>"]}},"id":"<task SVA-6>","key":"SVA-6"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":252,"type":"task.updated"}
