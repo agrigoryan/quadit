@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Plus } from "lucide-react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { createDoc } from "@/docs/actions";
+import { useDocsArea } from "@/docs/area";
 import { useViews } from "@/docs/data";
 import { createView } from "@/docs/db/actions";
 import { viewTypeName } from "@/docs/db/prop-meta";
@@ -49,7 +50,9 @@ const unsavedTable = (databaseId: string): DBView => ({
  * on the same thing.
  *
  * Its keys: Cmd+B goes from the table to the board and back (the first view
- * of each), and N makes a row and opens it beside.
+ * of each), N makes a row and opens it beside, and while a row is open
+ * beside, J and K (and the arrows) step to the next or previous row of the
+ * view and Enter opens it as a page.
  */
 export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
   const db = useDatabase(doc.id);
@@ -61,6 +64,8 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
     [saved, loaded, readOnly, doc.id],
   );
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { base } = useDocsArea();
   const view = views.find((v) => v.id === params.get("v")) ?? views[0];
   const peek = params.get("peek");
 
@@ -125,6 +130,26 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
     },
     { guardChords: true },
   );
+  const step = (by: number) => (e: KeyboardEvent) => {
+    e.preventDefault();
+    const next = rows[rows.findIndex((row) => row.id === peek) + by];
+    if (next) openRow(next.id);
+  };
+  useHotkeys(
+    {
+      j: step(1),
+      k: step(-1),
+      ArrowDown: step(1),
+      ArrowUp: step(-1),
+      Enter: (e) => {
+        // A button or a link that has the focus answers Enter itself.
+        if (e.target instanceof Element && e.target.closest("a, button, [role=button], [role=tab]")) return;
+        e.preventDefault();
+        void navigate(`${base}/${peek}`);
+      },
+    },
+    { enabled: !!peek },
+  );
 
   if (!db || !loaded || !view) return <Loading />;
   const Body = VIEWS[view.type] ?? TableView;
@@ -148,7 +173,7 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
         )}
       </div>
       <div className="min-w-0 pt-2">
-        <Body db={db} view={view} rows={rows} onOpen={openRow} onAdd={addRow} readOnly={readOnly} />
+        <Body db={db} view={view} rows={rows} onOpen={openRow} onAdd={addRow} peek={peek} readOnly={readOnly} />
       </div>
       {peek && <RowPeek rowId={peek} onClose={closeRow} readOnly={readOnly} />}
     </section>

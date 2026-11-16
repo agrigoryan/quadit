@@ -112,6 +112,8 @@ const sections: Section[] = [
       { what: "shortcuts.newPage", keys: ["N"] },
       { what: "shortcuts.toTree", keys: ["T"] },
       { what: "shortcuts.dbLayout", keys: [`${MOD} B`] },
+      { what: "shortcuts.rowNext", keys: ["J", "K", "↓", "↑"], join: "or" },
+      { what: "shortcuts.rowPage", keys: ["Enter"] },
     ],
   },
   {

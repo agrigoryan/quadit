@@ -114,6 +114,8 @@ export interface ViewProps {
   onOpen: (rowId: string) => void;
   /** Adds a row with these values (on top of what the view's filters imply) and answers its id. */
   onAdd: (values?: Record<string, unknown>, title?: string) => string;
+  /** The row open beside the view, if one is: J and K step it, so a view does not take them as typing. */
+  peek: string | null;
   /** Shown, not changed: no new rows, no edits, no moves, and the view's own settings stay as they are. */
   readOnly: boolean;
 }

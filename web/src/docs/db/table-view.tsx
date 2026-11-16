@@ -31,7 +31,7 @@ interface Active {
  * keyboard, arrows move, Enter opens the cell, typing starts writing,
  * Backspace clears, Space opens the row, Tab goes on to the next cell.
  */
-export function TableView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps) {
+export function TableView({ db, view, rows, onOpen, onAdd, peek, readOnly }: ViewProps) {
   const props = useMemo(() => shownProps(db.table.props, view), [db.table.props, view]);
   const [active, setActive] = useState<Active | null>(null);
   const [editing, setEditing] = useState<{ seed?: string } | null>(null);
@@ -150,6 +150,8 @@ export function TableView({ db, view, rows, onOpen, onAdd, readOnly }: ViewProps
       trashDoc(active.row);
     } else if (e.key === "Backspace" || e.key === "Delete") {
       if (prop && !isComputed(prop)) setRowProps(active.row, { [prop.id]: null });
+    } else if (peek && /^[jk]$/i.test(e.key)) {
+      // J and K step the row open beside the table (docs/db/database-page.tsx).
     } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && (!prop || takesTyping(prop))) {
       e.preventDefault();
       setEditing({ seed: e.key });

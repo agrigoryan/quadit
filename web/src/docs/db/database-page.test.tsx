@@ -2,7 +2,8 @@
 // A database page (docs/db/database-page.tsx): for a read-only member one
 // with no views yet shows its rows in a table nobody saved, rather than
 // waiting for a view that only someone who may change it would make; and
-// its keys: Cmd+B between its table and its board, N a new row.
+// its keys: Cmd+B between its table and its board, N a new row, and J/K
+// and Enter on the row open beside it.
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
@@ -137,5 +138,17 @@ describe("the keys of a database", () => {
     expect(made).toHaveLength(1);
     expect(made[0]?.parent_id).toBe("db1");
     expect(address()).toBe(`/acme/docs/db1?peek=${made[0]?.id}`);
+  });
+
+  it("step the row open beside it with J and K, in the view's order, and open it as a page with Enter", () => {
+    open("/acme/docs/db1?peek=r1");
+    press("j", "KeyJ");
+    expect(address()).toBe("/acme/docs/db1?peek=r2");
+    press("j", "KeyJ");
+    expect(address()).toBe("/acme/docs/db1?peek=r2");
+    press("ArrowUp", "ArrowUp");
+    expect(address()).toBe("/acme/docs/db1?peek=r1");
+    press("Enter", "Enter");
+    expect(address()).toBe("/acme/docs/r1");
   });
 });

@@ -178,6 +178,8 @@ export const pages = {
   "shortcuts.layout": "Task list and board: switch between the two",
   "shortcuts.newPage": "New page; on a page a page inside it, on a database a row",
   "shortcuts.toTree": "Move to the open page in the tree",
+  "shortcuts.rowNext": "Row beside a database: the next or previous row",
+  "shortcuts.rowPage": "Row beside a database: open it as a page",
   "shortcuts.dbLayout": "Database: switch between its table and its board",
   "shortcuts.assignMe": "Assign to me, or take off me",
   "shortcuts.copyKey": "Copy the task's key",
