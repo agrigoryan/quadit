@@ -138,6 +138,7 @@ export type Task = {
   deleted_at?: number;
 };
 
+/** One end's id is "" when it is a task of a project the reader may not read. */
 export type Relation = {
   id: string;
   task_id: string;

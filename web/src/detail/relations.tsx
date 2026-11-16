@@ -1,9 +1,11 @@
 // How this task stands to others: what it blocks, what blocks it, what it
 // relates to or repeats. The server keeps one row per pair, so each row is
-// read from this task's side.
+// read from this task's side. A row whose other end is blank is a relation
+// to a task of a project this person may not read: it is drawn as a task
+// they can't see.
 
 import { useCallback, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { EyeOff, Plus, X } from "lucide-react";
 import { Link } from "react-router";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
@@ -92,6 +94,17 @@ function RelationRow({ relation, other, readOnly }: { relation: Relation; other:
   );
 }
 
+function HiddenRelationRow() {
+  return (
+    <li className="-mx-1.5 flex h-8 items-center gap-1.5 px-1.5 text-sm text-ink-3 max-md:h-10">
+      <span className="flex size-6 shrink-0 items-center justify-center">
+        <EyeOff className="size-3.5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{t("detail.relations.hidden")}</span>
+    </li>
+  );
+}
+
 function AddRelation({ task, onDone }: { task: Task; onDone: () => void }) {
   const [type, setType] = useState<AddType>("blocks");
   const filter = useCallback((tk: Task) => tk.id !== task.id, [task.id]);
@@ -137,14 +150,19 @@ export function Relations({ task, relations, startAdding, onEmptyClose }: Props)
   const can = useCan();
   const readOnly = !can.editTask(task);
   // The task at the other end may not be in the local copy yet; the relation is shown once it is.
-  useEnsureTasks(useMemo(() => relations.map((r) => sideOf(r, task.id).otherId), [relations, task.id]));
+  useEnsureTasks(
+    useMemo(() => relations.map((r) => sideOf(r, task.id).otherId).filter((id) => id !== ""), [relations, task.id]),
+  );
 
   const groups = SIDES.map((side) => ({
     side,
-    rows: relations.flatMap((relation) => {
+    rows: relations.flatMap((relation): { relation: Relation; other?: Task }[] => {
       const seen = sideOf(relation, task.id);
+      if (seen.side !== side) return [];
+      // No other end: a task this person may not see.
+      if (!seen.otherId) return [{ relation }];
       const other = tasks[seen.otherId];
-      return seen.side === side && other && !other.deleted_at ? [{ relation, other }] : [];
+      return other && !other.deleted_at ? [{ relation, other }] : [];
     }),
   })).filter((g) => g.rows.length > 0);
 
@@ -175,10 +193,14 @@ export function Relations({ task, relations, startAdding, onEmptyClose }: Props)
           <p className="w-[5.5rem] shrink-0 py-1.5 text-xs text-ink-3 max-sm:pt-1 max-sm:pb-0">
             {t(`detail.relations.${group.side}`)}
           </p>
-          <ul className="min-w-0 flex-1">
-            {group.rows.map(({ relation, other }) => (
-              <RelationRow key={relation.id} relation={relation} other={other} readOnly={readOnly} />
-            ))}
+          <ul aria-label={t(`detail.relations.${group.side}`)} className="min-w-0 flex-1">
+            {group.rows.map(({ relation, other }) =>
+              other ? (
+                <RelationRow key={relation.id} relation={relation} other={other} readOnly={readOnly} />
+              ) : (
+                <HiddenRelationRow key={relation.id} />
+              ),
+            )}
           </ul>
         </div>
       ))}

@@ -48,6 +48,7 @@ export const detail = {
   "detail.relations.type": "Kind of relation",
   "detail.relations.pick": "Pick a task…",
   "detail.relations.remove": "Remove the relation to {key}",
+  "detail.relations.hidden": "A task you can't see",
   "detail.relations.exists": "These tasks are already related that way",
 
   "detail.links": "Links",
