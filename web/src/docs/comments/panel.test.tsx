@@ -3,7 +3,7 @@
 // block quotes the block's text as the editor has it, says when the block is
 // gone, and threads follow the order of their blocks.
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
@@ -62,5 +62,17 @@ describe("CommentsPanel", () => {
     expect(screen.getByText("The block this was on is gone")).toBeInTheDocument();
     const bodies = screen.getAllByText(/Too soon\?|Which goals\?|About a removed line/).map((el) => el.textContent);
     expect(bodies).toEqual(["Which goals?", "Too soon?", "About a removed line"]);
+  });
+
+  it("offers to show a thread's block in the page only while the block is there", async () => {
+    render(
+      <TooltipProvider>
+        <CommentsPanel docId="d1" projectId={undefined} editor={editor} />
+      </TooltipProvider>,
+    );
+    const onGone = (await screen.findByText("About a removed line")).closest("article") as HTMLElement;
+    const onThere = screen.getByText("Too soon?").closest("article") as HTMLElement;
+    expect(within(onThere).getByRole("button", { name: "Show in the page" })).toBeInTheDocument();
+    expect(within(onGone).queryByRole("button", { name: "Show in the page" })).toBeNull();
   });
 });

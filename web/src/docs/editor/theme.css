@@ -62,6 +62,7 @@
 
 .qd-editor .bn-block-content {
   padding-block: 2px;
+  border-radius: 4px; /* for the flash of "show in the page" */
 }
 
 /* Headings on the app's scale, not a poster's. */
@@ -312,19 +313,6 @@
 }
 .qd-thread-mark:hover {
   filter: brightness(0.96);
-}
-
-@keyframes qd-flash {
-  from {
-    background: var(--move-soft);
-  }
-  to {
-    background: transparent;
-  }
-}
-.qd-flash > .bn-block > .bn-block-content {
-  border-radius: 4px;
-  animation: qd-flash 1.6s ease-out;
 }
 
 @media (max-width: 640px) {

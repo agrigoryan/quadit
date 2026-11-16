@@ -156,9 +156,12 @@ export default function Editor({
         const el = wrap.current?.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(id)}"]`);
         if (!el) return;
         el.scrollIntoView({ block: "center", behavior: "smooth" });
-        el.classList.remove("qd-flash");
-        void el.offsetWidth;
-        el.classList.add("qd-flash");
+        // The flash is an animation, not a class: the editor puts back any
+        // attribute changed on its blocks from outside, at once.
+        el.querySelector(":scope > .bn-block > .bn-block-content")?.animate(
+          [{ background: "var(--move-soft)" }, { background: "transparent" }],
+          { duration: 1600, easing: "ease-out" },
+        );
       },
       blockText(id) {
         const block = editor.getBlock(id) as unknown as EdBlock | undefined;

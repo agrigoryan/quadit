@@ -156,7 +156,9 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
             projectId={projectId}
             quote={<Quote text={quote(th.blockId)} gone={gone(th.blockId)} page={!th.blockId} />}
             active={!!th.blockId && th.blockId === focusBlock}
-            onLocate={th.blockId ? () => editor.current?.scrollToBlock(th.blockId as string) : undefined}
+            onLocate={
+              th.blockId && !gone(th.blockId) ? () => editor.current?.scrollToBlock(th.blockId as string) : undefined
+            }
           />
         ))}
         {shown.length === 0 && !draftBlock && (
