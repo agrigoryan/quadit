@@ -315,6 +315,79 @@ func TestARestoreFromTheTrashCarriesTheRowsEachReaderMaySee(t *testing.T) {
 	})
 }
 
+// TestTrashingAPageTellsEachReaderOfThePagesTheyMaySee: a page goes to the
+// trash with the pages under it, each told of on its own, so neither the
+// feed nor the live stream gives a reader the id of a sub-page of another
+// project or of someone else's private one.
+func TestTrashingAPageTellsEachReaderOfThePagesTheyMaySee(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		callers := limitedToSVA(t, s)
+		page := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "project": "SVA"})["ref"].(string)
+		other := s.change(s.owner, "", "doc.create", M{"title": "Vault runbook", "parent": page, "project": "OPS"})["ref"].(string)
+		mine := s.change(s.owner, "", "doc.create", M{"title": "My notes", "parent": page, "private": true})["ref"].(string)
+		var before struct{ Seq int64 }
+		s.call(s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, &before)
+		streams := map[string]*stream{}
+		for who, token := range callers {
+			streams[who] = s.stream(t, token)
+		}
+		s.change(s.owner, "", "doc.delete", M{"id": page})
+		// Something every caller is told of after, so a stream that has it
+		// has had all the trashing.
+		s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the trashing"})
+
+		type event struct {
+			Type     string
+			EntityID string `json:"entity_id"`
+			Data     struct{ IDs []string }
+		}
+		trashed := func(as *http.Client, token string) (pages []string, raw string) {
+			t.Helper()
+			var feed struct{ Events []event }
+			raw = s.call(as, token, "GET", w+"/events?after="+strconv.FormatInt(before.Seq, 10)+"&limit=2000", nil, 200, &feed)
+			for _, ev := range feed.Events {
+				if ev.Type == "doc.deleted" {
+					pages = append(pages, ev.EntityID)
+					pages = append(pages, ev.Data.IDs...)
+				}
+			}
+			slices.Sort(pages)
+			return pages, raw
+		}
+		for who, token := range callers {
+			pages, raw := trashed(nil, token)
+			// The admin's token is the owner's: the private page is theirs.
+			want := []string{page}
+			if strings.Contains(who, "token") {
+				want = append(want, mine)
+				slices.Sort(want)
+			}
+			if !slices.Equal(pages, want) || strings.Contains(raw, other) {
+				t.Errorf("%s is told of the trashed pages %v, want %v and nothing of the page of OPS: %s", who, pages, want, raw)
+			}
+			if !strings.Contains(who, "token") && strings.Contains(raw, mine) {
+				t.Errorf("%s is told of someone's private page: %s", who, raw)
+			}
+			sm := streams[who]
+			eventually(t, who+"'s stream to reach what came after", func() bool { return strings.Contains(sm.all(), "after the trashing") })
+			live := sm.all()
+			if !strings.Contains(live, page) || strings.Contains(live, other) {
+				t.Errorf("%s's live stream does not tell of the trashed page alone, without the page of OPS: %s", who, live)
+			}
+			if !strings.Contains(who, "token") && strings.Contains(live, mine) {
+				t.Errorf("%s's live stream tells of someone's private page: %s", who, live)
+			}
+		}
+		pages, _ := trashed(s.owner, "")
+		want := []string{page, other, mine}
+		slices.Sort(want)
+		if !slices.Equal(pages, want) {
+			t.Errorf("the owner is told of the trashed pages %v, want all three", pages)
+		}
+	})
+}
+
 // TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee: a task
 // in full, and its context pack, list a relation to a task of a project the
 // caller may not read by its kind alone, marked hidden, and in text as "a

@@ -9185,9 +9185,7 @@ nothing found
       "to": 1700000000000
      }
     },
-    "ids": [
-     "<row removed>"
-    ]
+    "id": "<row removed>"
    },
    "entity_id": "<row removed>",
    "entity_type": "doc",
@@ -9372,9 +9370,7 @@ nothing found
       "to": 1700000000000
      }
     },
-    "ids": [
-     "<doc removed>"
-    ]
+    "id": "<doc removed>"
    },
    "entity_id": "<doc removed>",
    "entity_type": "doc",
@@ -21436,7 +21432,7 @@ id: 181
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #335>","data":{"row":{"content_seq":181,"created_at":1700000000000,"created_by":"<@aram>","created_seq":181,"id":"<row removed>","kind":"row","parent_id":"<doc Sprites>","project_id":"<project SVA>","props":{"<property State>":"todo"},"rank":"r","title":"Boss removed","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":181}},"entity_id":"<row removed>","entity_type":"doc","project_id":"<project SVA>","scope_id":"<row removed>","scope_type":"doc","seq":181,"type":"doc.created"}
 
 id: 182
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #336>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"ids":["<row removed>"]},"entity_id":"<row removed>","entity_type":"doc","project_id":"<project SVA>","scope_id":"<row removed>","scope_type":"doc","seq":182,"type":"doc.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #336>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<row removed>"},"entity_id":"<row removed>","entity_type":"doc","project_id":"<project SVA>","scope_id":"<row removed>","scope_type":"doc","seq":182,"type":"doc.deleted"}
 
 id: 186
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #340>","data":{"row":{"content_seq":186,"created_at":1700000000000,"created_by":"<@aram>","created_seq":186,"generated":"decision_log","id":"<doc Decision log>","kind":"page","rank":"zv","title":"Decision log","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":186}},"entity_id":"<doc Decision log>","entity_type":"doc","scope_id":"<doc Decision log>","scope_type":"doc","seq":186,"type":"doc.created"}
@@ -21454,7 +21450,7 @@ id: 191
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #346>","data":{"blocks":[{"content":[{"text":"in the trash","type":"text"}],"created_by":"<@aram>","created_seq":191,"doc_id":"<doc removed>","id":"<id #347>","rank":"00000000sg","type":"paragraph","updated_by":"<@aram>","updated_seq":191}],"row":{"content_seq":191,"created_at":1700000000000,"created_by":"<@aram>","created_seq":191,"id":"<doc removed>","kind":"page","rank":"zzi","title":"Removed page","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":191}},"entity_id":"<doc removed>","entity_type":"doc","scope_id":"<doc removed>","scope_type":"doc","seq":191,"type":"doc.created"}
 
 id: 192
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #348>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"ids":["<doc removed>"]},"entity_id":"<doc removed>","entity_type":"doc","scope_id":"<doc removed>","scope_type":"doc","seq":192,"type":"doc.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #348>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<doc removed>"},"entity_id":"<doc removed>","entity_type":"doc","scope_id":"<doc removed>","scope_type":"doc","seq":192,"type":"doc.deleted"}
 
 id: 195
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #352>","data":{"blocks":[{"content":[{"text":"How we work now. See OPS-5.","type":"text"}],"created_by":"<@aram>","created_seq":195,"doc_id":"<doc Handbook>","id":"<id #353>","rank":"i","type":"paragraph","updated_by":"<@aram>","updated_seq":195}],"changes":{"content_seq":{"from":null,"to":195},"updated_at":{"from":null,"to":1700000000000},"updated_by":{"from":null,"to":"<@aram>"}},"deleted":["<id #309>"],"id":"<doc Handbook>"},"entity_id":"<doc Handbook>","entity_type":"doc","scope_id":"<doc Handbook>","scope_type":"doc","seq":195,"type":"doc.edited"}

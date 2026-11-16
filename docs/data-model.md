@@ -39,7 +39,7 @@ An event names the row that changed (`entity`) and the object whose timeline it 
 | --- | --- | --- |
 | `{"row": {…}}` | A row was made, or changed in a way that is clearer whole (a pick) | Put the row in its copy |
 | `{"id", "changes": {field: {from, to}}}` | Fields changed | Set each field to `to` |
-| `{"ids": […], "changes": …}` | The same change to several rows | The same, for each |
+| `{"ids": […], "changes": …}` | The same change to several rows of the reader's own (`notification.updated`: inbox items marked read or archived together) | The same, for each |
 | `{"id", "gone": true}` | The row was removed for good | Drop it |
 | `{"id", "changes", "blocks": […] or null, "deleted": […] or null}` | `doc.edited`: a page's blocks were edited. `id` and `changes` are the page's own; `blocks` are the blocks written, whole; `deleted` the ids of the blocks taken out | Apply the changes to the page, put each block in its copy, drop the deleted ones |
 
@@ -52,7 +52,7 @@ The keys an event's data can have are defined once, by `core.EventData`; `intern
 
 A relation is told twice: `relation.created` (or `relation.deleted`) belongs to the task at its `task_id` end, and `task.related` to the task at its `related_task_id` end, with the relation's id (`relation`), its `type`, `removed`, and the far end (`other_id`, `other_key`). An event belongs to one project, so a member who may read only the `related_task_id` end gets `task.related` alone, and gets it without `other_id` and `other_key`, as `/list/relations` gives them the row with that end blank. A client adds the relation's row from it (or drops it, when `removed`), unless it already has the whole row from the relation's own event.
 
-A soft delete is a change to `deleted_at`. A browser's copy does not hold the trash, so what comes back from it comes whole: `task.updated` with `restored: true` carries the task's `row` as well as its `changes`, and a page brought back with the pages under it is one `doc.restored` for each page, with its `row`, so each goes only to those who may see that page. `decision.restored` and `attachment.restored` carry their `row` too. An event with `audience_id` is for one member only: inbox items, and everything about a private page.
+A soft delete is a change to `deleted_at`. A page sent to the trash with the pages under it is one `doc.deleted` for each page, placed in that page's project and given to that page's audience, so no reader learns the id of a page they may not see. A browser's copy does not hold the trash, so what comes back from it comes whole: `task.updated` with `restored: true` carries the task's `row` as well as its `changes`, and a page brought back with the pages under it is one `doc.restored` for each page, with its `row`, so each goes only to those who may see that page. `decision.restored` and `attachment.restored` carry their `row` too. An event with `audience_id` is for one member only: inbox items, and everything about a private page.
 
 The feed is the task history, the record of who did what, what agents read from a cursor, what webhooks deliver, and what a browser replays to keep its copy current.
 

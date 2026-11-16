@@ -511,19 +511,24 @@ func docDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	seq := c.tx.NextSeq()
-	ids := make([]string, len(all))
-	for i, x := range all {
-		ids[i] = x.ID
+	c.ref = d.ID
+	// Each page is told of in an event of its own, given to those who may
+	// see it, so a page under this one that a reader may not see (another
+	// project's, someone's private one) does not ride along.
+	for _, x := range all {
+		seq := c.tx.NextSeq()
 		if err := c.tx.Unindex(c.ctx, x.ID); err != nil {
 			return err
 		}
+		if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"deleted_at": c.at, "updated_seq": seq}, store.Eq("id", x.ID)); err != nil {
+			return err
+		}
+		if err := c.emit(event{seq: seq, typ: "doc.deleted", entity: "doc", entityID: x.ID, place: inDoc(x), audience: docAudience(x),
+			data: core.EventData{ID: x.ID, Changes: map[string]core.FieldChange{"deleted_at": {To: c.at}}}}); err != nil {
+			return err
+		}
 	}
-	if _, err := c.tx.Update(c.ctx, "docs", map[string]any{"deleted_at": c.at, "updated_seq": seq}, store.In("id", ids)); err != nil {
-		return err
-	}
-	c.ref = d.ID
-	return c.emit(event{seq: seq, typ: "doc.deleted", entity: "doc", entityID: d.ID, place: inDoc(d), audience: docAudience(d), data: core.EventData{IDs: ids, Changes: map[string]core.FieldChange{"deleted_at": {To: c.at}}}})
+	return nil
 }
 
 // docRestore takes a page out of the trash, with the pages that went there

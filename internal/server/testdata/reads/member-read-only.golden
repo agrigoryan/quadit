@@ -13123,9 +13123,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
       "to": 1700000000000
      }
     },
-    "ids": [
-     "<row removed>"
-    ]
+    "id": "<row removed>"
    },
    "entity_id": "<row removed>",
    "entity_type": "doc",
@@ -13421,9 +13419,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
       "to": 1700000000000
      }
     },
-    "ids": [
-     "<doc removed>"
-    ]
+    "id": "<doc removed>"
    },
    "entity_id": "<doc removed>",
    "entity_type": "doc",
@@ -13489,9 +13485,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
       "to": 1700000000000
      }
     },
-    "ids": [
-     "<doc OPS removed>"
-    ]
+    "id": "<doc OPS removed>"
    },
    "entity_id": "<doc OPS removed>",
    "entity_type": "doc",
@@ -29200,7 +29194,7 @@ id: 181
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #335>","data":{"row":{"content_seq":181,"created_at":1700000000000,"created_by":"<@aram>","created_seq":181,"id":"<row removed>","kind":"row","parent_id":"<doc Sprites>","project_id":"<project SVA>","props":{"<property State>":"todo"},"rank":"r","title":"Boss removed","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":181}},"entity_id":"<row removed>","entity_type":"doc","project_id":"<project SVA>","scope_id":"<row removed>","scope_type":"doc","seq":181,"type":"doc.created"}
 
 id: 182
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #336>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"ids":["<row removed>"]},"entity_id":"<row removed>","entity_type":"doc","project_id":"<project SVA>","scope_id":"<row removed>","scope_type":"doc","seq":182,"type":"doc.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #336>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<row removed>"},"entity_id":"<row removed>","entity_type":"doc","project_id":"<project SVA>","scope_id":"<row removed>","scope_type":"doc","seq":182,"type":"doc.deleted"}
 
 id: 183
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #337>","data":{"row":{"content_seq":183,"created_at":1700000000000,"created_by":"<@aram>","created_seq":183,"id":"<doc Servers>","kind":"database","project_id":"<project OPS>","rank":"zr","title":"Servers","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":183}},"entity_id":"<doc Servers>","entity_type":"doc","project_id":"<project OPS>","scope_id":"<doc Servers>","scope_type":"doc","seq":183,"type":"doc.created"}
@@ -29230,13 +29224,13 @@ id: 191
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #346>","data":{"blocks":[{"content":[{"text":"in the trash","type":"text"}],"created_by":"<@aram>","created_seq":191,"doc_id":"<doc removed>","id":"<id #347>","rank":"00000000sg","type":"paragraph","updated_by":"<@aram>","updated_seq":191}],"row":{"content_seq":191,"created_at":1700000000000,"created_by":"<@aram>","created_seq":191,"id":"<doc removed>","kind":"page","rank":"zzi","title":"Removed page","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":191}},"entity_id":"<doc removed>","entity_type":"doc","scope_id":"<doc removed>","scope_type":"doc","seq":191,"type":"doc.created"}
 
 id: 192
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #348>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"ids":["<doc removed>"]},"entity_id":"<doc removed>","entity_type":"doc","scope_id":"<doc removed>","scope_type":"doc","seq":192,"type":"doc.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #348>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<doc removed>"},"entity_id":"<doc removed>","entity_type":"doc","scope_id":"<doc removed>","scope_type":"doc","seq":192,"type":"doc.deleted"}
 
 id: 193
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #349>","data":{"blocks":[{"content":[{"text":"in the trash too","type":"text"}],"created_by":"<@aram>","created_seq":193,"doc_id":"<doc OPS removed>","id":"<id #350>","rank":"00000000sg","type":"paragraph","updated_by":"<@aram>","updated_seq":193}],"row":{"content_seq":193,"created_at":1700000000000,"created_by":"<@aram>","created_seq":193,"id":"<doc OPS removed>","kind":"page","project_id":"<project OPS>","rank":"zzi","title":"Removed OPS page","updated_at":1700000000000,"updated_by":"<@aram>","updated_seq":193}},"entity_id":"<doc OPS removed>","entity_type":"doc","project_id":"<project OPS>","scope_id":"<doc OPS removed>","scope_type":"doc","seq":193,"type":"doc.created"}
 
 id: 194
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #351>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"ids":["<doc OPS removed>"]},"entity_id":"<doc OPS removed>","entity_type":"doc","project_id":"<project OPS>","scope_id":"<doc OPS removed>","scope_type":"doc","seq":194,"type":"doc.deleted"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #351>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<doc OPS removed>"},"entity_id":"<doc OPS removed>","entity_type":"doc","project_id":"<project OPS>","scope_id":"<doc OPS removed>","scope_type":"doc","seq":194,"type":"doc.deleted"}
 
 id: 195
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #352>","data":{"blocks":[{"content":[{"text":"How we work now. See OPS-5.","type":"text"}],"created_by":"<@aram>","created_seq":195,"doc_id":"<doc Handbook>","id":"<id #353>","rank":"i","type":"paragraph","updated_by":"<@aram>","updated_seq":195}],"changes":{"content_seq":{"from":null,"to":195},"updated_at":{"from":null,"to":1700000000000},"updated_by":{"from":null,"to":"<@aram>"}},"deleted":["<id #309>"],"id":"<doc Handbook>"},"entity_id":"<doc Handbook>","entity_type":"doc","scope_id":"<doc Handbook>","scope_type":"doc","seq":195,"type":"doc.edited"}
