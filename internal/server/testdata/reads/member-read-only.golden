@@ -23643,6 +23643,14 @@ stale  Stale  id=<view Stale>
   {
    "created_at": 1700000000000,
    "created_by": "<@aram>",
+   "id": "<relation SVA-1 relates OPS-1>",
+   "related_task_id": "<task OPS-1>",
+   "task_id": "<task SVA-1>",
+   "type": "relates"
+  },
+  {
+   "created_at": 1700000000000,
+   "created_by": "<@aram>",
    "id": "<relation OPS-1 blocks OPS-2>",
    "related_task_id": "<task OPS-2>",
    "task_id": "<task OPS-1>",

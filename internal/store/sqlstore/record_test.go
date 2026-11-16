@@ -151,3 +151,34 @@ func TestIncrStartsACounterThatIsNotThere(t *testing.T) {
 		})
 	})
 }
+
+// TestEitherSelectsTheRowsAnyOfItsConditionsDoes: Either is an OR of whole
+// conditions, combined with the others by AND; with no condition it
+// selects nothing.
+func TestEitherSelectsTheRowsAnyOfItsConditionsDoes(t *testing.T) {
+	eachDB(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		db := s.In(fillTasks(t, s, 6))
+		var all []core.Task
+		if err := db.List(ctx, &all, store.Q{Order: "created_seq"}); err != nil || len(all) != 6 {
+			t.Fatalf("%d tasks (%v)", len(all), err)
+		}
+		count := func(conds ...store.Cond) int {
+			t.Helper()
+			var got []core.Task
+			if err := db.List(ctx, &got, store.Where(conds...)); err != nil {
+				t.Fatal(err)
+			}
+			return len(got)
+		}
+		if n := count(store.Either(store.Eq("id", all[0].ID), store.Eq("id", all[1].ID))); n != 2 {
+			t.Errorf("either of two ids selects %d tasks, want 2", n)
+		}
+		if n := count(store.Either(store.Eq("id", all[0].ID), store.In("id", []string{all[1].ID, all[2].ID})), store.Eq("project_id", all[0].ProjectID)); n != 2 {
+			t.Errorf("either of three ids, in one of the two projects, selects %d tasks, want 2", n)
+		}
+		if n := count(store.Either()); n != 0 {
+			t.Errorf("a choice of nothing selects %d tasks, want none", n)
+		}
+	})
+}

@@ -17189,9 +17189,12 @@ stale  Stale  id=<view Stale>
 }
 
 === GET /api/v1/w/games/list/relations?task=OPS-1
-200
+404
 {
- "relations": []
+ "error": {
+  "code": "not_found",
+  "message": "task OPS-1 not found"
+ }
 }
 
 === GET /api/v1/w/games/list/attachments?task=SVA-1

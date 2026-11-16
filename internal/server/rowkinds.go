@@ -240,7 +240,7 @@ var rowKinds = []rowKind{
 	kindOf("decision_options", wholeOnly[core.Option]()).exported(live("rank")),
 	kindOf("comments", wholeOnly[core.Comment]()).exported(live("created_seq")),
 	kindOf("relations", rule[core.Relation](visibleRelations)).
-		listed("created_at,id").copied(toEveryone(store.Q{})).exported(store.Q{}),
+		listedBy(relationsQuery).copied(toEveryone(store.Q{})).exported(store.Q{}),
 	kindOf("links", onTask(func(l core.TaskLink) string { return l.TaskID })).
 		listed("created_at,id").exported(live("")),
 	filled(kindOf("attachments", rule[core.Attachment](visibleAttachments)), fillAttachments).
@@ -444,6 +444,23 @@ func visibleWatchers(ctx context.Context, who *viewer, watchers []core.Watcher) 
 		}
 		return false
 	})
+}
+
+// relationsQuery reads which relations /list/relations is asked for, in
+// the order they were made: task= narrows to those the task is at either
+// end of, and limit= and offset= page it as every list is paged. The task
+// must be one the caller may read: asked by a task they may not, the list
+// would say which task the blank end of a relation is.
+func relationsQuery(x *c) (store.Q, error) {
+	q := store.Q{Order: "created_at,id", Limit: min(x.intParam("limit", 1000), 5000), Offset: x.intParam("offset", 0)}
+	if ref := x.r.URL.Query().Get("task"); ref != "" {
+		t, err := x.taskByRef(x.ctx(), ref)
+		if err != nil {
+			return store.Q{}, err
+		}
+		q.Where = []store.Cond{store.Either(store.Eq("task_id", t.ID), store.Eq("related_task_id", t.ID))}
+	}
+	return q, nil
 }
 
 // Attachments.

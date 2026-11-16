@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
 
@@ -123,4 +124,38 @@ func TestAListsTrashIsTheDeletedRowsAlone(t *testing.T) {
 	if !slices.Equal(names, []string{"gone"}) {
 		t.Fatalf("the labels' trash lists %v, want only the deleted one", names)
 	}
+}
+
+// TestRelationsOfATaskAreListedFromEitherEnd: /list/relations?task= lists
+// every relation the task is at an end of, whether it was made from the
+// task or from the other one. Asked by a task the caller may not read, it
+// is not found: the list would say which task the blank end is.
+func TestRelationsOfATaskAreListedFromEitherEnd(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		for _, title := range []string{"Boss design", "Boss music", "Boss art"} {
+			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": title})
+		}
+		blocks := s.change(s.owner, "", "relation.add", M{"task": "SVA-1", "type": "blocks", "other": "SVA-2"})["ref"].(string)
+		relates := s.change(s.owner, "", "relation.add", M{"task": "SVA-2", "type": "relates", "other": "SVA-3"})["ref"].(string)
+		for task, want := range map[string][]string{"SVA-1": {blocks}, "SVA-2": {blocks, relates}, "SVA-3": {relates}} {
+			var out struct{ Relations []struct{ ID string } }
+			s.call(s.owner, "", "GET", w+"/list/relations?task="+task, nil, 200, &out)
+			var got []string
+			for _, r := range out.Relations {
+				got = append(got, r.ID)
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("the relations of %s are %v, want %v", task, got, want)
+			}
+		}
+
+		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+		s.change(s.owner, "", "relation.add", M{"task": "OPS-1", "type": "blocks", "other": "SVA-1"})
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"name": "SVA only", "projects": []string{"SVA"}}, 201, &tok)
+		s.call(nil, tok.Token, "GET", w+"/list/relations?task=OPS-1", nil, 404, nil)
+	})
 }

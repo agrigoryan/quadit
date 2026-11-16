@@ -77,10 +77,11 @@ type Listener interface {
 	Listen(ctx context.Context, each func(workspaceID string, seq int64)) error
 }
 
-// Cond is one condition on a column. Conditions combine with AND.
+// Cond is one condition on a column, or (Either) a choice of conditions.
+// Conditions combine with AND.
 type Cond struct {
 	Col string
-	Op  string // = != > >= < <= in notin null notnull like
+	Op  string // = != > >= < <= in notin null notnull like, or either
 	Val any
 }
 
@@ -113,6 +114,10 @@ func Null(col string) Cond { return Cond{col, "null", nil} }
 
 // NotNull is col IS NOT NULL.
 func NotNull(col string) Cond { return Cond{col, "notnull", nil} }
+
+// Either holds when any of conds does: a row at either end of a relation.
+// With no conds it selects nothing.
+func Either(conds ...Cond) Cond { return Cond{"", "either", conds} }
 
 // Like is a LIKE in any case: the column and the pattern are compared in
 // lowercase. % and _ in the pattern are LIKE's wildcards.

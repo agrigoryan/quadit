@@ -350,8 +350,25 @@ func (c conn) where(m *meta, conds []store.Cond) (string, []any, error) {
 	return where.sql(), where.args, nil
 }
 
-// addCond adds one condition on a column of m's table.
+// addCond adds one condition on a column of m's table, or a choice of them.
 func (w *clause) addCond(m *meta, cond store.Cond) error {
+	if cond.Op == "either" {
+		conds, _ := cond.Val.([]store.Cond) // anything else is no choice, which selects nothing
+		choices := make([]string, 0, len(conds))
+		for _, one := range conds {
+			alone := &clause{}
+			if err := alone.addCond(m, one); err != nil {
+				return err
+			}
+			choices = append(choices, "("+alone.sql()+")")
+			w.args = append(w.args, alone.args...)
+		}
+		if len(choices) == 0 {
+			choices = append(choices, "1 = 0")
+		}
+		w.parts = append(w.parts, "("+strings.Join(choices, " OR ")+")")
+		return nil
+	}
 	f, ok := m.byCol[cond.Col]
 	if !ok {
 		return fmt.Errorf("store: table %s has no column %q", m.table.Name, cond.Col)
