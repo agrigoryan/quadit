@@ -27,11 +27,13 @@ export function isTyping(target: EventTarget | null): boolean {
  * True while a dialog, menu or picker is open above the page. One that has
  * closed but is still on the page, playing its way out (Radix marks it
  * data-state="closed"), does not count: a key pressed just after Escape works.
+ * Nor does a panel beside the page that leaves the page in use (a database
+ * row's peek, a dialog that is not modal): it carries data-beside.
  */
 export function overlayOpen(): boolean {
   return (
     document.querySelector(
-      ':is([role="dialog"], [role="menu"], [role="listbox"], [data-overlay]):not([data-state="closed"])',
+      ':is([role="dialog"], [role="menu"], [role="listbox"], [data-overlay]):not([data-state="closed"], [data-beside])',
     ) !== null
   );
 }

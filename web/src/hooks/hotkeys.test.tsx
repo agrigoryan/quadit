@@ -6,7 +6,15 @@ import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { combo, type Hotkeys, useHotkeys } from "@/hooks/hotkeys";
 
-function Keys({ keys, overlay, guardChords }: { keys: Hotkeys; overlay?: "open" | "closed"; guardChords?: boolean }) {
+interface KeysProps {
+  keys: Hotkeys;
+  overlay?: "open" | "closed";
+  /** The overlay is a panel beside the page, which leaves the page's keys working. */
+  beside?: boolean;
+  guardChords?: boolean;
+}
+
+function Keys({ keys, overlay, beside, guardChords }: KeysProps) {
   useHotkeys(keys, { guardChords });
   // Radix keeps an overlay on the page, marked closed, while it plays its way out.
   return (
@@ -14,7 +22,7 @@ function Keys({ keys, overlay, guardChords }: { keys: Hotkeys; overlay?: "open" 
       <input aria-label="field" />
       {overlay && (
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- stands in for Radix's overlay, which is a div with the role
-        <div role="dialog" aria-label="overlay" data-state={overlay} />
+        <div role="dialog" aria-label="overlay" data-state={overlay} data-beside={beside || undefined} />
       )}
     </>
   );
@@ -115,6 +123,13 @@ describe("useHotkeys", () => {
     render(<Keys keys={{ s: status }} overlay="closed" />);
     press("s");
     expect(status).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a bare key while a panel beside the page is open", () => {
+    const create = vi.fn();
+    render(<Keys keys={{ c: create }} overlay="open" beside />);
+    press("c");
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it("runs a chord in a field, unless chords are held to the rules of bare keys", () => {

@@ -34,6 +34,8 @@ export function RowPeek({ rowId, onClose, readOnly }: { rowId: string; onClose: 
         <RDialog.Content
           aria-describedby={undefined}
           data-row-peek
+          // Not modal: the page's keys (C, ?, G then a letter) go on working beside it.
+          data-beside
           onOpenAutoFocus={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => {
