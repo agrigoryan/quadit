@@ -133,6 +133,9 @@ const sections: Section[] = [
     title: "shortcuts.group.timeline",
     hint: "shortcuts.group.timelineHint",
     rows: [
+      { what: "shortcuts.zoomOut", keys: ["-"] },
+      { what: "shortcuts.zoomIn", keys: ["="] },
+      { what: "shortcuts.today", keys: ["0"] },
       { what: "shortcuts.barDay", keys: ["←", "→"], join: "or" },
       { what: "shortcuts.barWeek", keys: ["PageUp", "PageDown"], join: "or" },
       { what: "shortcuts.barEnd", keys: ["Shift ←", "Shift →"], join: "or" },

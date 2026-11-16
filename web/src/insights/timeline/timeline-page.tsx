@@ -9,6 +9,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { keep, readKept } from "@/lib/kept";
 import { useCan } from "@/data/access";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { useProjectByKey, useSlug } from "@/data/selectors";
 import { today } from "@/lib/time";
 import type { Project } from "@/types/core";
@@ -80,6 +81,13 @@ function Timeline({ project }: { project: Project }) {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el?.scrollTo({ left: todayLeft(el), behavior: calm ? "auto" : "smooth" });
   }
+
+  // As in Linear: - shows more of the calendar, = less of it in more detail; 0 brings today back into view.
+  useHotkeys({
+    "-": () => pickZoom("months"),
+    "=": () => pickZoom("weeks"),
+    "0": goToday,
+  });
 
   const toggle = (id: string) =>
     setOpen((cur) => {
