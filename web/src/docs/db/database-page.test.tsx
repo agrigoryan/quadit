@@ -151,4 +151,15 @@ describe("the keys of a database", () => {
     press("Enter", "Enter");
     expect(address()).toBe("/acme/docs/r1");
   });
+
+  it("step the row from a chosen cell with J under Caps Lock, and leave Shift+J to typing into the cell", () => {
+    open("/acme/docs/db1?peek=r1");
+    const grid = screen.getByRole("grid", { name: "Table" });
+    act(() => grid.focus());
+    act(() => void fireEvent.keyDown(grid, { key: "J", code: "KeyJ" }));
+    expect(address()).toBe("/acme/docs/db1?peek=r2");
+    act(() => void fireEvent.keyDown(grid, { key: "J", code: "KeyJ", shiftKey: true }));
+    expect(address()).toBe("/acme/docs/db1?peek=r2");
+    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("J");
+  });
 });

@@ -150,8 +150,8 @@ export function TableView({ db, view, rows, onOpen, onAdd, peek, readOnly }: Vie
       trashDoc(active.row);
     } else if (e.key === "Backspace" || e.key === "Delete") {
       if (prop && !isComputed(prop)) setRowProps(active.row, { [prop.id]: null });
-    } else if (peek && /^[jk]$/i.test(e.key)) {
-      // J and K step the row open beside the table (docs/db/database-page.tsx).
+    } else if (peek && !e.shiftKey && /^[jk]$/i.test(e.key)) {
+      // J and K step the row open beside the table (docs/db/database-page.tsx), Caps Lock or not; Shift+J types a J.
     } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && (!prop || takesTyping(prop))) {
       e.preventDefault();
       setEditing({ seed: e.key });
