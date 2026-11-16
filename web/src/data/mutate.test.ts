@@ -122,14 +122,18 @@ describe("mutate", () => {
     expect(title()).toBe("y");
 
     // The server answers the first with its event: the title became "x". The second is still on its way.
-    calls[0]?.answer([{ change_id: "c11", type: "task.update", seq: 11, events: [retitle(11, "t1", "x")] }]);
+    calls[0]?.answer([
+      { change_id: "c11", type: "task.update", seq: 11, first_seq: 11, events: [retitle(11, "t1", "x")] },
+    ]);
     await settle();
     expect(title()).toBe("y");
     // So does anyone else's change that arrives meanwhile: this person's edit is the later one.
     applyEvents([retitle(12, "t1", "z")], true);
     expect(title()).toBe("y");
 
-    calls[1]?.answer([{ change_id: "c13", type: "task.update", seq: 13, events: [retitle(13, "t1", "y")] }]);
+    calls[1]?.answer([
+      { change_id: "c13", type: "task.update", seq: 13, first_seq: 13, events: [retitle(13, "t1", "y")] },
+    ]);
     await Promise.all([first, second]);
     expect(title()).toBe("y");
   });
@@ -143,7 +147,9 @@ describe("mutate", () => {
       tx.patch("tasks", "t1", { title: "y" }),
     ).catch(() => {});
     await settle();
-    calls[0]?.answer([{ change_id: "c11", type: "task.update", seq: 11, events: [retitle(11, "t1", "x")] }]);
+    calls[0]?.answer([
+      { change_id: "c11", type: "task.update", seq: 11, first_seq: 11, events: [retitle(11, "t1", "x")] },
+    ]);
     await settle();
     calls[1]?.fail(new ApiError(409, { message: "no" }));
     await Promise.all([first, second]);
