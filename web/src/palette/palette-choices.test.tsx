@@ -111,7 +111,7 @@ describe("the palette on a task", () => {
   it("offers to change what it is filed under, each with its key, and to watch it", () => {
     seed();
     openPalette();
-    expect(rows().slice(0, 12)).toEqual([
+    expect(rows().slice(0, 13)).toEqual([
       "Change status… [S]",
       "Assign to… [A]",
       "Set priority… [P]",
@@ -123,6 +123,7 @@ describe("the palette on a task", () => {
       "Copy key [Ctrl .]",
       "Copy link [Shift Ctrl ,]",
       "Copy git branch name [Shift Ctrl .]",
+      "Copy as a prompt for an agent [Alt Ctrl P]",
       expect.stringMatching(/^New task/),
     ]);
   });

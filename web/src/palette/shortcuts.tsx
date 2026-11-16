@@ -32,6 +32,7 @@ const taskKeys: Shortcut[] = [
   { what: "shortcuts.watch", keys: ["Shift S"] },
   { what: "shortcuts.copyKey", keys: [`${MOD} .`] },
   { what: "shortcuts.copyBranch", keys: [`Shift ${MOD} .`] },
+  { what: "shortcuts.copyPrompt", keys: [keyHint("mod+alt+p")] },
   { what: "shortcuts.trash", keys: [`${MOD} Backspace`] },
 ];
 

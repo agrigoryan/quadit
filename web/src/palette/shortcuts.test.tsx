@@ -37,6 +37,7 @@ describe("ShortcutsSheet", () => {
       "Watch, or stop watching",
       "Change due date",
       "Copy the task's key",
+      "Copy the task as a prompt for an agent",
       "Move to the trash",
     ])
       expect(screen.getAllByText(what)).toHaveLength(2);

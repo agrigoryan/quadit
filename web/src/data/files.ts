@@ -197,18 +197,29 @@ export function fileSize(bytes: number): string {
   return `${(bytes / 1024 ** 2).toFixed(bytes < 10 * 1024 ** 2 ? 1 : 0)} MB`;
 }
 
-/** Copies text, answering whether the browser allowed it. */
-export async function copyText(text: string): Promise<boolean> {
+/**
+ * Copies text, answering whether the browser allowed it. The text may still
+ * be on its way (read from the server): Safari copies only inside the key
+ * press or click that asked, so the copy is asked for at once, holding a
+ * promise of the text, and called before anything is awaited. A browser
+ * that cannot copy a promise gets the text once it is here.
+ */
+export async function copyText(text: string | Promise<string>): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text);
+    if (typeof text === "string") await navigator.clipboard.writeText(text);
+    else if (typeof ClipboardItem === "function" && navigator.clipboard.write)
+      await navigator.clipboard.write([
+        new ClipboardItem({ "text/plain": text.then((plain) => new Blob([plain], { type: "text/plain" })) }),
+      ]);
+    else await navigator.clipboard.writeText(await text);
     return true;
   } catch {
     return false;
   }
 }
 
-/** Copies text and says in a toast whether it worked. */
-export async function copyAndSay(text: string): Promise<void> {
+/** Copies text, or text on its way (see copyText), and says in a toast whether it worked. */
+export async function copyAndSay(text: string | Promise<string>): Promise<void> {
   if (await copyText(text)) toast.info(t("common.copied"));
   else toast.error(t("common.copyFailed"));
 }

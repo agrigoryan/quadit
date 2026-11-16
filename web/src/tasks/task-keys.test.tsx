@@ -162,6 +162,40 @@ describe("the copy keys", () => {
     await vi.waitFor(() => expect(copied).toHaveBeenLastCalledWith("sva-1-fix-the-login-1"));
     await vi.waitFor(() => expect(toasts()).toEqual(["Copied", "Copied"]));
   });
+
+  it("copy the first task's context pack with Cmd+Option+P, the copy asked for inside the key press", async () => {
+    seed();
+    const asked = vi.spyOn(api, "getText").mockResolvedValue("# SVA-1 Fix the login 1\n");
+    // The clipboard is written as the key is pressed, with the text still on its way (Safari allows a copy only then).
+    const items: Record<string, Promise<Blob>>[] = [];
+    vi.stubGlobal(
+      "ClipboardItem",
+      class {
+        constructor(readonly parts: Record<string, Promise<Blob>>) {
+          items.push(parts);
+        }
+      },
+    );
+    const write = vi.fn<(items: unknown[]) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: copied, write }, configurable: true });
+    render(<Keys ids={["t1", "t2"]} />);
+    // Option with P types π on a Mac: the key is named by where it is.
+    press("π", "KeyP", { metaKey: true, altKey: true });
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(asked).toHaveBeenCalledWith("/api/v1/w/acme/tasks/SVA-1/context?format=text");
+    const blob = await items[0]?.["text/plain"];
+    expect(await blob?.text()).toBe("# SVA-1 Fix the login 1\n");
+    await vi.waitFor(() => expect(toasts()).toEqual(["Copied"]));
+    vi.unstubAllGlobals();
+  });
+
+  it("copy the context pack once it is here where the browser cannot copy what is still on its way", async () => {
+    seed();
+    vi.spyOn(api, "getText").mockResolvedValue("the pack");
+    render(<Keys ids={["t1"]} />);
+    press("p", "KeyP", { ctrlKey: true, altKey: true });
+    await vi.waitFor(() => expect(copied).toHaveBeenLastCalledWith("the pack"));
+  });
 });
 
 describe("Cmd+Backspace", () => {

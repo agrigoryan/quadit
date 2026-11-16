@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import {
   ArrowUpRight,
   Bookmark,
+  Bot,
   Copy,
   Eye,
   EyeOff,
@@ -53,7 +54,7 @@ import { openNewTask } from "@/tasks/draft";
 import { setWatching } from "@/tasks/actions";
 import { PALETTE, type PropertyName } from "@/tasks/properties";
 import { applies } from "@/tasks/properties/property";
-import { copyBranchName } from "@/tasks/task-keys";
+import { copyBranchName, copyContextPack } from "@/tasks/task-keys";
 import { taskPath } from "@/nav/task-link";
 
 /** Pages where the box takes a name for something new. */
@@ -201,6 +202,14 @@ export function useCommands({ slug, task, expand, project, run, go, openTask, op
           icon: <GitBranch />,
           hint: `Shift ${MOD} .`,
           run: () => run(() => void copyBranchName(task)),
+        },
+        {
+          id: "task:copy-prompt",
+          label: t("palette.copyPrompt"),
+          words: "context pack agent prompt ai",
+          icon: <Bot />,
+          hint: keyHint("mod+alt+p"),
+          run: () => run(() => void copyContextPack(task)),
         },
       ]
     : [];

@@ -50,13 +50,15 @@ interface RequestOptions {
   signal?: AbortSignal;
   /** Sign-in calls answer 401 for a wrong password; that is not a lost session. */
   quiet401?: boolean;
+  /** The answer is plain text (a read asked for with ?format=text), handed over as it is. A refusal is JSON still. */
+  plain?: boolean;
 }
 
 const request = <T>(method: string, path: string, opts: RequestOptions = {}) =>
   noted(fetchAnswer<T>(method, path, opts));
 
 async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: opts.plain ? "text/plain" : "application/json" };
   let body: BodyInit | undefined;
   if (opts.raw) {
     body = opts.raw;
@@ -85,7 +87,7 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
     if (calledOff(err, opts.signal)) throw err;
     throw new NetworkError(err);
   }
-  return answer<T>(res.status, text, opts.quiet401);
+  return answer<T>(res.status, text, opts);
 }
 
 /**
@@ -97,10 +99,10 @@ export const calledOff = (err: unknown, signal?: AbortSignal) =>
   !!signal?.aborted || (err instanceof Object && "name" in err && err.name === "AbortError");
 
 /** Turns a status and a body into the result, or throws the error they mean. */
-function answer<T>(status: number, text: string, quiet401?: boolean): T {
+function answer<T>(status: number, text: string, { quiet401, plain }: RequestOptions = {}): T {
   let data: unknown;
   try {
-    data = text ? JSON.parse(text) : undefined;
+    data = plain && status >= 200 && status < 300 ? text : text ? JSON.parse(text) : undefined;
   } catch {
     data = undefined;
   }
@@ -252,6 +254,8 @@ export function whenReachable(attempt: number, signal?: AbortSignal): Promise<vo
 
 export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>("GET", path, { signal }),
+  /** A read in its plain-text form, as an agent or the CLI reads it. */
+  getText: (path: string, signal?: AbortSignal) => request<string>("GET", path, { signal, plain: true }),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>("POST", path, { ...opts, body }),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body }),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body }),
