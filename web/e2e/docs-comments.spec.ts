@@ -221,6 +221,22 @@ test("Ctrl+M in a comment box leaves what is being written alone", async ({ page
   await expect(draft).toHaveValue("Half a thought");
 });
 
+test("Esc on a database's cell lets go of the cell and leaves the comments open", async ({ page, project, quadit }) => {
+  const database = await newPage(quadit, project.key, "Vendors", "", "database");
+  await quadit.cli("row", database.id, "Acme paints");
+  await page.goto(`/e2e/docs/${database.id}`);
+  await page.getByRole("button", { name: "Comments" }).click();
+  const grid = page.getByRole("grid");
+  await grid.focus();
+  await expect(grid).toHaveAttribute("aria-activedescendant", /.+/);
+
+  await page.keyboard.press("Escape");
+  await expect(grid).not.toHaveAttribute("aria-activedescendant", /.+/);
+  await expect(column(page)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(column(page)).toBeHidden();
+});
+
 test("a read-only member reads a page's comments and has no way to add one", async ({
   browser,
   page: ownerPage,

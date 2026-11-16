@@ -135,7 +135,7 @@ export function TableView({ db, view, rows, onOpen, onAdd, peek, readOnly }: Vie
       e.preventDefault();
       onOpen(active.row);
     } else if (e.key === "Escape") {
-      e.preventDefault(); // the cell is let go of; a second Escape leaves the page
+      e.preventDefault(); // used up here: a second Escape leaves the page, and the comments beside it stay open
       setActive(null);
     } else if (peek && (e.key === "Enter" || (!e.shiftKey && /^[jk]$/i.test(e.key)))) {
       // With a row open beside, J and K (Caps Lock or not) step it and Enter opens it as a page
