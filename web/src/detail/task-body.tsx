@@ -20,6 +20,7 @@ import { Properties } from "@/detail/properties";
 import { Relations } from "@/detail/relations";
 import { Subtasks } from "@/detail/subtasks";
 import { Timeline } from "@/detail/timeline";
+import { useFamilyKeys } from "@/detail/family-keys";
 import { Description, EditableTitle } from "@/detail/title-description";
 import { attachToTask, type PendingUpload, useUploads } from "@/detail/uploads";
 import { plainLinks, TaskWork } from "@/insights/task-work";
@@ -66,6 +67,7 @@ export function TaskBody({ task, status, layout }: Props) {
   };
   const attach = () => chooser.current?.click();
 
+  useFamilyKeys(task);
   // Cmd+Shift+O: the caret in the box that adds a sub-task, the section shown first if it is not yet.
   const body = useRef<HTMLDivElement>(null);
   useHotkeys(

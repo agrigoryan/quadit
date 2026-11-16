@@ -5,6 +5,7 @@
 
 import type { ReactNode } from "react";
 import {
+  ArrowUpRight,
   Bookmark,
   Copy,
   Eye,
@@ -84,6 +85,8 @@ export interface CommandContext {
   /** Runs a command and closes the palette. */
   run: (action: () => void) => void;
   go: (path: string) => void;
+  /** Opens a task as a link to it would, and closes the palette. */
+  openTask: (key: string) => void;
   openPage: (page: PalettePage) => void;
 }
 
@@ -104,7 +107,7 @@ export interface Commands {
   general: Cmd[];
 }
 
-export function useCommands({ slug, task, expand, project, run, go, openPage }: CommandContext): Commands {
+export function useCommands({ slug, task, expand, project, run, go, openTask, openPage }: CommandContext): Commands {
   const projects = useProjects();
   const views = useViews();
   const can = useCan();
@@ -117,6 +120,8 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   const watching = !!useRow("watchers", task ? `${me.user_id}:${task.id}` : undefined);
   // What the task's project has (cycles, estimates) decides what it can be given; an archived project still has a say.
   const taskProject = useRowEvenIfGone("projects", task?.project_id);
+  // Named even in the trash or the archive, as the link to it in the panel is.
+  const parent = useRowEvenIfGone("tasks", task?.parent_id);
   const at = (path: string) => () => go(`/${slug}/${path}`);
   // On a project's Docs a new page is that project's; anywhere else it is tied to none.
   const docsOf = matchPath("/:ws/p/:key/docs/*", useLocation().pathname) ? project : undefined;
@@ -143,6 +148,18 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
                 icon: <Maximize2 />,
                 hint: "Enter",
                 run: () => run(expand),
+              },
+            ]
+          : []),
+        ...(parent
+          ? [
+              {
+                id: "task:parent",
+                label: t("palette.openParent", { key: parent.key }),
+                words: `${parent.title} up`,
+                icon: <ArrowUpRight />,
+                hint: `Shift ${MOD} ↑`,
+                run: () => openTask(parent.key),
               },
             ]
           : []),

@@ -14,7 +14,6 @@ interface Props extends CommandContext {
   query: string;
   hits: SearchHit[];
   searching: boolean;
-  openTask: (key: string) => void;
 }
 
 /**
@@ -23,8 +22,8 @@ interface Props extends CommandContext {
  * comes under them: tasks by key and title, then words inside comments,
  * questions and pages.
  */
-export function RootPage({ query, hits, searching, openTask, ...context }: Props) {
-  const { slug, task, go } = context;
+export function RootPage({ query, hits, searching, ...context }: Props) {
+  const { slug, task, go, openTask } = context;
   const commands = useCommands(context);
   const tasks = useLiveTasks();
   // Every task by id, gone ones included: to tell a hit on a task now in the archive or the trash.

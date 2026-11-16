@@ -83,6 +83,8 @@ const sections: Section[] = [
       ...taskKeys,
       { what: "shortcuts.rename", keys: ["Shift R"] },
       { what: "shortcuts.subtask", keys: [`Shift ${MOD} O`] },
+      { what: "shortcuts.openParent", keys: [`Shift ${MOD} ↑`] },
+      { what: "shortcuts.openSubtask", keys: [`Shift ${MOD} ↓`] },
       { what: "shortcuts.comment", keys: ["Ctrl M"] },
       { what: "shortcuts.send", keys: [`${MOD} Enter`] },
       { what: "shortcuts.leaveBox", keys: ["Esc"] },

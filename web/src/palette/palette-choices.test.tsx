@@ -127,6 +127,14 @@ describe("the palette on a task", () => {
     ]);
   });
 
+  it("offers first to open its parent, with the key that does", () => {
+    seed(undefined, { parent_id: "t2" });
+    openPalette();
+    expect(rows()[0]).toBe("Open parent SVA-2 [Shift Ctrl ↑]");
+    choose(/Open parent/);
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
   it("offers the milestone in an epic, and the cycle where the project has cycles", () => {
     seed(undefined, { epic_id: "e1" }, { cycles: true });
     openPalette();
