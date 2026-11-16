@@ -17,7 +17,7 @@ import (
 // the numbers are the workspace's, whatever the dashboard was asked for.
 func (d *dashboard) health() error {
 	who, ctx := d.who, d.ctx
-	if who.admin() != nil || who.limited() {
+	if !who.member.Role.AtLeast(core.RoleAdmin) || who.limited() {
 		return nil
 	}
 	health := map[string]any{}
