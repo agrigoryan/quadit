@@ -184,7 +184,7 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
             setNodeRef(el);
           }}
           className={cx(
-            "min-h-16 flex-1 overflow-y-auto px-2 pb-2 transition-colors",
+            "min-h-16 flex-1 overflow-y-auto px-2 pt-1.5 pb-2 transition-colors", // room above the first card for its focus ring
             isOver && cards.length === 0 && "bg-hover",
           )}
         >
