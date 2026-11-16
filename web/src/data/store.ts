@@ -129,9 +129,19 @@ export function onEvents(listener: EventListener): () => void {
 }
 
 /**
+ * The positions of events applied early, until the stream delivers each in
+ * its place. Written by applyEvents; emptied with the copy (loadBootstrap,
+ * clearStore).
+ */
+const appliedEarly = new Set<number>();
+
+/**
  * Applies feed events. Events from the live stream arrive in order and move
  * `seq`; events returned by a write are applied early and do not, because
- * the stream will deliver them again in their place.
+ * the stream will deliver them again in their place. When it does, the
+ * event is not put in the rows a second time: by then newer ones may have
+ * been applied over it, and the row would go back to it until they arrive
+ * again too. Listeners still hear it (see onEvents).
  */
 export function applyEvents(events: FeedEvent[], fromStream: boolean) {
   const { seq, collections: c, drafts } = getState();
@@ -140,8 +150,10 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
   const d = new CopyOnWrite(c);
   let last = seq;
   let confirmed: Dict<CollectionName> | null = null;
-  for (const ev of fresh) {
-    last = Math.max(last, ev.seq);
+  const toApply = fromStream ? fresh.filter((ev) => !appliedEarly.delete(ev.seq)) : fresh;
+  if (!fromStream) for (const ev of fresh) appliedEarly.add(ev.seq);
+  for (const ev of fresh) last = Math.max(last, ev.seq);
+  for (const ev of toApply) {
     if (ev.entity_type === "workspace" && ev.data?.changes) continue;
     applyEvent(d, ev);
     // The server's own row for something made here: it is no longer a draft.
@@ -151,7 +163,7 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
       delete confirmed[id];
     }
   }
-  const workspacePatch = workspaceChanges(fresh);
+  const workspacePatch = workspaceChanges(toApply);
   const next = d.done();
   useStore.setState((s) => ({
     collections: next,
@@ -236,6 +248,7 @@ export interface LoadOptions {
 /** Replaces the whole copy with a fresh one from the server. */
 export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptions = {}) {
   const prev = getState();
+  appliedEarly.clear();
   const keep = prev.slug === slug && !opts.fresh ? prev : null;
   const c = emptyCollections();
   for (const name of Object.keys(c) as CollectionName[]) {
@@ -398,6 +411,7 @@ export function markOpened(taskId: string) {
 
 /** Empties the copy: at sign-out, and when the person may no longer see this workspace. */
 export function clearStore() {
+  appliedEarly.clear();
   useStore.setState({
     slug: "",
     ready: false,

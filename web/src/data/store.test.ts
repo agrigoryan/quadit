@@ -53,6 +53,22 @@ describe("applyEvents", () => {
     expect(getState().seq).toBe(13);
   });
 
+  it("does not apply again, in its place in the stream, an event a write was already answered with", () => {
+    loadBootstrap("acme", boot({ tasks: [{ id: "t1", title: "a" }] }));
+    const title = () => getState().collections.tasks.t1?.title;
+    // Two of this tab's writes are answered, each with its event, ahead of the stream.
+    applyEvents([retitle(11, "t1", "first")], false);
+    applyEvents([retitle(13, "t1", "second")], false);
+    expect(title()).toBe("second");
+    // The stream now delivers the first in its place: the row must not go back to it, even for a moment.
+    applyEvents([retitle(11, "t1", "first")], true);
+    expect(title()).toBe("second");
+    expect(getState().seq).toBe(11);
+    applyEvents([retitle(13, "t1", "second")], true);
+    expect(title()).toBe("second");
+    expect(getState().seq).toBe(13);
+  });
+
   it("drops events at or below the position already applied", () => {
     loadBootstrap("acme", boot({ tasks: [{ id: "t1", title: "a" }] }));
     applyEvents([event(10, { data: { gone: true } }), retitle(9, "t1", "old"), retitle(11, "t1", "b")], true);
@@ -251,6 +267,27 @@ describe("mergeRows", () => {
       description: "whole",
       updated_seq: 12,
     });
+  });
+});
+
+describe("mergeRows on a row of any kind", () => {
+  it("does not undo a feed change to a database view fetched before it", () => {
+    loadBootstrap("acme", boot());
+    mergeRows("dbviews", [{ id: "v1", name: "Table", config: {}, updated_seq: 5 } as never]);
+    applyEvents(
+      [
+        event(12, {
+          type: "dbview.updated",
+          entity_type: "dbview",
+          entity_id: "v1",
+          data: { changes: { config: { from: {}, to: { widths: { p1: 250 } } } } },
+        }),
+      ],
+      true,
+    );
+    // The page's fetch, read before that change, answers after it.
+    mergeRows("dbviews", [{ id: "v1", name: "Table", config: {}, updated_seq: 5 } as never]);
+    expect(getState().collections.dbviews.v1).toMatchObject({ config: { widths: { p1: 250 } }, updated_seq: 12 });
   });
 });
 

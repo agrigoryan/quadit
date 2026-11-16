@@ -55,9 +55,6 @@ export class CopyOnWrite {
   }
 }
 
-/** Collections whose rows carry `updated_seq`, the position of their last change, and come in the starting copy's second part. */
-const TRACKED: ReadonlySet<CollectionName> = new Set<CollectionName>(["tasks", "decisions"]);
-
 /**
  * Applies one feed event to the draft. Applying an event twice is harmless.
  * With `only`, the event touches just the rows it names (used to replay
@@ -90,9 +87,10 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
     const fields: AnyRow = {};
     for (const [field, change] of Object.entries(data.changes)) fields[field] = change.to;
     if (name === "tasks") fields.updated_at = ev.at;
-    // The server stamps the row with the event's position; keep the copy's stamp in step,
-    // so an older copy of the row arriving later is recognised as older.
-    if (TRACKED.has(name)) fields.updated_seq = ev.seq;
+    // The server stamps every row it changes with the event's position; keep the copy's stamp
+    // in step, so an older copy of the row arriving later (a fetch answered after the change)
+    // is recognised as older, whatever kind of row it is.
+    fields.updated_seq = ev.seq;
     for (const target of data.ids ?? [id]) {
       if (wanted(name, target)) d.patch(name, target, fields);
     }
