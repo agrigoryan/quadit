@@ -26,7 +26,9 @@ const task = (n: number): Task => ({
   created_by: "u",
   created_at: 0,
   updated_at: 0,
+  created_seq: 0,
   updated_seq: 0,
+  activity_seq: 0,
 });
 
 const relation = (id: string, taskId: string, type: Relation["type"], relatedId: string): Relation => ({

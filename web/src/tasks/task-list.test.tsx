@@ -43,7 +43,9 @@ const task = (n: number, parent?: number, status = "s"): Task => ({
   created_by: "u",
   created_at: 0,
   updated_at: 0,
+  created_seq: 0,
   updated_seq: 0,
+  activity_seq: 0,
 });
 
 const group = (id: string, tasks: (number | Task)[]): TaskGroup => ({

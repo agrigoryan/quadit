@@ -7,14 +7,8 @@ import { useAuthConfig } from "@/auth/config";
 import { useSettingsBase } from "@/settings/base";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/data/query";
-import {
-  type Account,
-  accountKeys,
-  type EmailChoice,
-  type NotifyPrefs,
-  useAccount,
-  useSaveAccount,
-} from "@/settings/me/account";
+import { type Account, accountKeys, useAccount, useSaveAccount } from "@/settings/me/account";
+import type { EmailChoice, NotifyPrefs } from "@/types/core";
 import { type PushState, pushState, sendTestPush, turnPushOff, turnPushOn } from "@/settings/me/push";
 import { LoadGate } from "@/ui/load-gate";
 import { FormAlert, Note, SwitchRow } from "@/ui/form";

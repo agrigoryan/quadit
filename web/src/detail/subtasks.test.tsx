@@ -25,7 +25,9 @@ const task = (n: number, statusId: string, parent?: string): Task => ({
   created_by: "u",
   created_at: 0,
   updated_at: 0,
+  created_seq: 0,
   updated_seq: 0,
+  activity_seq: 0,
 });
 
 const parent = task(1, "todo");

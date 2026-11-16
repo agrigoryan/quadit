@@ -7,8 +7,10 @@
 // meets (workspace, members, projects, statuses, tasks, comments,
 // decisions, files); feed.ts, plan.ts, docs.ts, agents.ts and automation.ts
 // hold the rest by topic, and changes.gen.ts, generated from the server,
-// holds the arguments of every change. Nothing here imports from outside
-// this folder.
+// holds the arguments of every change. rows.gen.ts, also generated, is the
+// server's rows, which rows.check.ts holds these types to: a field the
+// server adds or changes fails the type check until it is written here.
+// Nothing here imports from outside this folder.
 
 export type Category = "backlog" | "unstarted" | "started" | "waiting" | "done" | "canceled";
 export const CATEGORIES: Category[] = ["backlog", "unstarted", "started", "waiting", "done", "canceled"];
@@ -28,6 +30,19 @@ export interface Workspace {
   name: string;
   icon?: string;
   seq: number;
+  /** The workspace's own settings, as an admin set them. */
+  settings?: Record<string, unknown>;
+  created_at: number;
+}
+
+export type EmailChoice = "all" | "important" | "none";
+
+/** Which notices a person wants (core.User's `notify`). */
+export interface NotifyPrefs {
+  /** Missing means "important". */
+  email?: EmailChoice;
+  /** Missing means on. */
+  push?: boolean;
 }
 
 export interface User {
@@ -36,9 +51,21 @@ export interface User {
   name: string;
   email?: string;
   avatar?: string;
+  description?: string;
+  timezone?: string;
   theme?: string;
   locale?: string;
+  /** When two-step sign-in was turned on; missing when it is off. */
+  totp_at?: number;
   is_admin?: boolean;
+  notify?: NotifyPrefs;
+  /** An agent's: the workspace it belongs to, the person who answers for it, and who made it. */
+  workspace_id?: string;
+  responsible_id?: string;
+  created_by?: string;
+  created_at: number;
+  last_seen_at?: number;
+  disabled_at?: number;
 }
 
 export type Member = {
@@ -48,6 +75,8 @@ export type Member = {
   handle: string;
   kind: "person" | "agent";
   name: string;
+  /** Given to admins only. */
+  email?: string;
   avatar?: string;
   title?: string;
   /** For an agent: the person who answers for it. */
@@ -62,12 +91,15 @@ export type Member = {
   last_action?: string;
   last_seen_at?: number;
   listening_until?: number;
+  created_at: number;
+  updated_seq: number;
   suspended_at?: number;
   removed_at?: number;
 };
 
 export type Project = {
   id: string;
+  workspace_id: string;
   key: string;
   name: string;
   description?: string;
@@ -76,6 +108,9 @@ export type Project = {
   lead_id?: string;
   rank?: string;
   settings?: { cycles?: boolean; cycle_days?: number; estimates?: boolean };
+  created_by: string;
+  created_at: number;
+  updated_seq: number;
   archived_at?: number;
   deleted_at?: number;
 };
@@ -88,6 +123,7 @@ export type Status = {
   category: Category;
   rank: string;
   is_default?: boolean;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -95,7 +131,9 @@ export type Label = {
   id: string;
   project_id?: string;
   name: string;
+  description?: string;
   color?: string;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -133,7 +171,10 @@ export type Task = {
   started_at?: number;
   completed_at?: number;
   canceled_at?: number;
+  created_seq: number;
   updated_seq: number;
+  /** The last change to it or to anything on it (a comment, a decision, a file). */
+  activity_seq: number;
   archived_at?: number;
   deleted_at?: number;
 };
@@ -217,10 +258,16 @@ export interface FileRow {
   name: string;
   content_type: string;
   size: number;
+  /** Bytes received so far, while it is being uploaded. */
+  received?: number;
+  sha256?: string;
   state: string;
   width?: number;
   height?: number;
   duration_ms?: number;
+  uploaded_by: string;
+  created_at: number;
+  deleted_at?: number;
   url: string;
   preview_url?: string;
 }
@@ -256,6 +303,7 @@ export type AgentSession = {
   tokens_out?: number;
   started_at: number;
   ended_at?: number;
+  updated_seq: number;
 };
 
 /** A key or password agents can use but never read. Its value is never sent to the browser. */
@@ -273,6 +321,7 @@ export type Secret = {
   created_at: number;
   updated_at: number;
   last_used_at?: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 

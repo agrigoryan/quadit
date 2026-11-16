@@ -39,7 +39,9 @@ const TASK: Task = {
   created_by: "u1",
   created_at: 0,
   updated_at: 0,
+  created_seq: 0,
   updated_seq: 0,
+  activity_seq: 0,
 };
 
 function seed({

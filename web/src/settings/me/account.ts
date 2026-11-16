@@ -11,24 +11,8 @@ import { queryClient } from "@/data/query";
 import { useStore } from "@/data/store";
 import type { User } from "@/types/core";
 
-export type EmailChoice = "all" | "important" | "none";
-
-export interface NotifyPrefs {
-  /** Missing means "important". */
-  email?: EmailChoice;
-  /** Missing means on. */
-  push?: boolean;
-}
-
-export interface AccountUser extends User {
-  timezone?: string;
-  /** When two-step verification was turned on; missing when it is off. */
-  totp_at?: number;
-  notify?: NotifyPrefs;
-}
-
 export interface Account {
-  user: AccountUser;
+  user: User;
   has_password: boolean;
   /** How many passkeys the account has. */
   passkeys: number;
@@ -49,7 +33,7 @@ export const accountChanged = () => void queryClient.invalidateQueries({ queryKe
 export const useAccount = () =>
   useQuery({ queryKey: accountKeys.account, queryFn: ({ signal }) => api.get<Account>(ME, signal) });
 
-type AccountFields = Partial<Pick<AccountUser, "name" | "avatar" | "timezone" | "notify" | "email">> & {
+type AccountFields = Partial<Pick<User, "name" | "avatar" | "timezone" | "notify" | "email">> & {
   /** The current password, which a change of the sign-in address asks for. */
   password?: string;
 };

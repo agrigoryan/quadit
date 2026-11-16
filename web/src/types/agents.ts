@@ -9,6 +9,8 @@ export type Resource = {
   created_at: number;
   updated_seq: number;
   deleted_at?: number;
+  /** Its queue, where an answer brings it along with the resource. */
+  claims?: Claim[];
 };
 
 /** One place in a resource's queue, or the hold on it (core.ResourceClaim). A released claim stays in the store; skip it. */

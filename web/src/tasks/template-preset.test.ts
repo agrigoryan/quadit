@@ -30,7 +30,8 @@ beforeEach(() => {
   loadBootstrap("acme", fixture);
 });
 
-const preset = (p: Template["preset"]) => presetOf({ id: "tp", name: "T", preset: p }, project);
+const preset = (p: Template["preset"]) =>
+  presetOf({ id: "tp", name: "T", preset: p, created_at: 0, updated_seq: 0 }, project);
 
 describe("presetOf", () => {
   it("fills in what the template names", () => {

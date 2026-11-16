@@ -38,6 +38,8 @@ export interface ChangeResult {
   change_id: string;
   type: string;
   seq: number;
+  /** The feed position of the change's first event. */
+  first_seq: number;
   ref?: string;
   key?: string;
   duplicate?: boolean;

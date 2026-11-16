@@ -9,10 +9,15 @@ export type Epic = {
   state: "planned" | "active" | "paused" | "done" | "canceled";
   lead_id?: string;
   color?: string;
+  icon?: string;
   start_on?: string;
   target_on?: string;
   rank: string;
-  created_at?: number;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  completed_at?: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -23,6 +28,8 @@ export type Milestone = {
   description?: string;
   target_on?: string;
   rank: string;
+  created_at: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -34,6 +41,8 @@ export type Cycle = {
   starts_on: string;
   ends_on: string;
   closed_at?: number;
+  created_at: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -42,12 +51,16 @@ export type View = {
   project_id?: string;
   name: string;
   slug: string;
+  description?: string;
+  icon?: string;
   owner_id: string;
   shared: boolean;
   query?: TaskQuery;
   layout: "list" | "board" | "timeline";
   display?: ViewDisplay;
   rank: string;
+  created_at: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -102,6 +115,8 @@ export type Notification = {
   type: NotificationType;
   actor_id: string;
   task_id?: string;
+  /** Set on an item about a page. */
+  doc_id?: string;
   entity_type?: string;
   entity_id?: string;
   title?: string;
@@ -121,6 +136,12 @@ export type TaskLink = {
   ref?: string;
   state?: string;
   checks?: string;
+  /** What the service said of it besides, as it said it. */
+  data?: unknown;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 
@@ -131,6 +152,8 @@ export type Template = {
   title?: string;
   description?: string;
   preset?: { status?: string; priority?: number; labels?: string[]; assignee?: string; estimate?: number };
+  created_at: number;
+  updated_seq: number;
   deleted_at?: number;
 };
 
