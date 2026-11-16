@@ -38,11 +38,12 @@ e2e: build
 	cd web && pnpm e2e
 
 # The rules of docs/code-style.md that a tool can check: .golangci.yml for
-# Go, web/.oxlintrc.json and Prettier for the web app.
+# Go, web/.oxlintrc.json and Prettier for the web app. CI runs this, so the
+# version here is the one that gates.
 GOLANGCI ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 lint:
 	$(GOLANGCI) run ./...
-	cd web && pnpm lint && pnpm format:check
+	cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm format:check
 
 # A local server on :4780 with data in ./data.
 dev: server

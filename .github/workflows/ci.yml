@@ -26,10 +26,6 @@ jobs:
         run: |
           test -z "$(gofmt -l cmd internal)"
           go vet ./...
-      # Not blocking yet: the rules are being brought in package by package.
-      - name: Lint
-        continue-on-error: true
-        run: make lint
       - name: Test on SQLite and Postgres
         env:
           QUADIT_TEST_POSTGRES: postgres://postgres:quadit@127.0.0.1:5432/quadit
@@ -42,13 +38,14 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
+      # golangci-lint at the version the Makefile names, then the web app's.
+      - name: Lint
+        run: make lint
       - name: Web app
         working-directory: web
         run: |
           pnpm install --frozen-lockfile
           pnpm typecheck
-          pnpm lint
-          pnpm format:check
           pnpm test
           pnpm build
       - name: The whole binary
