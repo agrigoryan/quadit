@@ -17,8 +17,7 @@ func TestFlowWeeksAreTheLastTwelveMondays(t *testing.T) {
 		t.Skip("no time zone data here:", err)
 	}
 	// Sunday evening in New York, already Monday in UTC; clocks went back on 1 November.
-	d := &dashboard{now: time.Date(2026, 11, 15, 19, 2, 0, 0, zone)}
-	weeks := d.flowWeekly()
+	weeks := flowWeekly(dashboardScope{now: time.Date(2026, 11, 15, 19, 2, 0, 0, zone)})
 	if len(weeks) != flowWeeks {
 		t.Fatalf("%d weeks, want %d", len(weeks), flowWeeks)
 	}

@@ -30,19 +30,20 @@ type epicProgress struct {
 	AtRiskCode string `json:"at_risk_code,omitempty"`
 }
 
-// epicProgress fills in the epics with their progress: the tasks and points
-// done and started, leaving out canceled tasks and canceled epics.
-func (d *dashboard) epicProgress() error {
-	names := d.names
+// epicProgressOf is the epics a dashboard covers with their progress: the
+// tasks and points done and started, leaving out canceled tasks and
+// canceled epics.
+func epicProgressOf(scope dashboardScope) []epicProgress {
+	names := scope.names
 	byEpic := map[string]*epicProgress{}
 	for _, epic := range names.epics {
-		if epic.DeletedAt != 0 || (len(d.projects) > 0 && !slices.Contains(d.projects, epic.ProjectID)) || epic.State == core.EpicCanceled {
+		if epic.DeletedAt != 0 || (len(scope.projects) > 0 && !slices.Contains(scope.projects, epic.ProjectID)) || epic.State == core.EpicCanceled {
 			continue
 		}
 		byEpic[epic.ID] = &epicProgress{ID: epic.ID, Name: epic.Name, Project: names.projects[epic.ProjectID].Key, State: epic.State, Lead: names.handle(epic.LeadID), TargetOn: epic.TargetOn}
 	}
 	lastMove := map[string]int64{}
-	for _, t := range d.tasks {
+	for _, t := range scope.tasks {
 		category := names.statuses[t.StatusID].Category
 		progress, ok := byEpic[t.EpicID]
 		if !ok || category == core.CatCanceled {
@@ -63,12 +64,11 @@ func (d *dashboard) epicProgress() error {
 	}
 	var epics []epicProgress
 	for epicID, progress := range byEpic {
-		d.markAtRisk(progress, lastMove[epicID])
+		markAtRisk(progress, lastMove[epicID], scope.now)
 		epics = append(epics, *progress)
 	}
 	sort.Slice(epics, func(i, j int) bool { return epicBefore(epics[i], epics[j]) })
-	d.epics = epics
-	return nil
+	return epics
 }
 
 // epicBefore orders epics: those with a target date first, the nearest
@@ -87,11 +87,11 @@ func epicBefore(a, b epicProgress) bool {
 	return a.ID < b.ID
 }
 
-// markAtRisk says on an epic why it is at risk, if it is. lastMove is when
-// one of its tasks last changed.
-func (d *dashboard) markAtRisk(progress *epicProgress, lastMove int64) {
-	today := d.now.UTC().Format(time.DateOnly)
-	soon := d.now.UTC().AddDate(0, 0, 7).Format(time.DateOnly)
+// markAtRisk says on an epic why it is at risk, if it is, as of now.
+// lastMove is when one of its tasks last changed.
+func markAtRisk(progress *epicProgress, lastMove int64, now time.Time) {
+	today := now.UTC().Format(time.DateOnly)
+	soon := now.UTC().AddDate(0, 0, 7).Format(time.DateOnly)
 	left := progress.Total - progress.Done
 	switch {
 	case progress.State == core.EpicDone || left == 0:
@@ -99,7 +99,7 @@ func (d *dashboard) markAtRisk(progress *epicProgress, lastMove int64) {
 		progress.AtRisk, progress.AtRiskCode = "past its target date", "past_target"
 	case progress.TargetOn != "" && progress.TargetOn <= soon && progress.Done*2 < progress.Total:
 		progress.AtRisk, progress.AtRiskCode = "due within a week and less than half done", "due_soon"
-	case progress.State == core.EpicActive && lastMove != 0 && d.now.UnixMilli()-lastMove > (14*24*time.Hour).Milliseconds():
+	case progress.State == core.EpicActive && lastMove != 0 && now.UnixMilli()-lastMove > (14*24*time.Hour).Milliseconds():
 		progress.AtRisk, progress.AtRiskCode = "nothing has moved in two weeks", "stalled"
 	}
 }

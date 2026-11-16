@@ -12,7 +12,7 @@ import (
 // dashboardText is the dashboard in the compact text form: what waits on
 // the caller, epics, tasks by status, the longest waits, agents and, for a
 // viewer it is for, health.
-func (d *dashboard) dashboardText() string {
+func (d dashboard) dashboardText() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "== waiting on you (%d)\n%s", len(d.waiting), lines(d.waiting, taskView.line, "nothing"))
 	b.WriteString("== epics\n")

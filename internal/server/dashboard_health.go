@@ -10,30 +10,29 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// health fills in what is failing behind the scenes: webhooks, their
+// health is what is failing behind the scenes: webhooks, their
 // deliveries, the last backup, and pages synced from a repository. It is
 // for those who run the whole workspace: an admin not limited to some
-// projects. For anyone else it is left out (machinery stays nil), since
-// the numbers are the workspace's, whatever the dashboard was asked for.
-func (d *dashboard) health() error {
-	who, ctx := d.who, d.ctx
+// projects. For anyone else it is nil, since the numbers are the
+// workspace's, whatever the dashboard was asked for.
+func (who *viewer) health(ctx context.Context) (map[string]any, error) {
 	if !who.member.Role.AtLeast(core.RoleAdmin) || who.limited() {
-		return nil
+		return nil, nil
 	}
 	health := map[string]any{}
 	var err error
 	if health["webhooks_failing"], err = who.db.Count(ctx, "webhooks", store.Live, store.Gt("failures", 0)); err != nil {
-		return err
+		return nil, err
 	}
 	if health["deliveries_dead"], err = countLiveDeliveries(ctx, who.db, store.Eq("state", core.DeliveryDead)); err != nil {
-		return err
+		return nil, err
 	}
 	if health["deliveries_pending"], err = countLiveDeliveries(ctx, who.db, store.Eq("state", core.DeliveryPending), store.Gt("attempts", 0)); err != nil {
-		return err
+		return nil, err
 	}
 	var backups []core.Backup
 	if err := who.st.List(ctx, &backups, store.Q{Order: "-started_at", Limit: 1}); err != nil {
-		return err
+		return nil, err
 	}
 	if len(backups) > 0 {
 		health["last_backup"] = formatTime(backups[0].FinishedAt)
@@ -41,7 +40,7 @@ func (d *dashboard) health() error {
 	}
 	var sources []core.DocSource
 	if err := who.db.List(ctx, &sources, store.Where(store.Live)); err != nil {
-		return err
+		return nil, err
 	}
 	failing := 0
 	for _, source := range sources {
@@ -50,8 +49,7 @@ func (d *dashboard) health() error {
 		}
 	}
 	health["sources_failing"] = failing
-	d.machinery = health
-	return nil
+	return health, nil
 }
 
 // liveDeliveries is countLiveDeliveries for a caller that shows a number

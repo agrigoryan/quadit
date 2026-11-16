@@ -271,21 +271,19 @@ func (s *Server) handleListAgents(x *c) error {
 	return x.ok(map[string]any{"agents": agents})
 }
 
-// agentStates fills in what every agent is doing, from the open tasks the
+// dashboardAgents is what every agent is doing, from the open tasks the
 // dashboard covers. Narrowed to one project, that is what each agent does
 // there.
-func (d *dashboard) agentStates() error {
+func (who *viewer) dashboardAgents(ctx context.Context, scope dashboardScope) ([]agentState, error) {
 	var open []core.Task
-	for _, t := range d.tasks {
-		if core.OpenCategory(d.names.statuses[t.StatusID].Category) {
+	for _, t := range scope.tasks {
+		if core.OpenCategory(scope.names.statuses[t.StatusID].Category) {
 			open = append(open, t)
 		}
 	}
-	var err error
 	var only []string
-	if d.oneProject {
-		only = d.projects
+	if scope.oneProject {
+		only = scope.projects
 	}
-	d.agents, err = d.who.agentStates(d.ctx, open, d.names, only)
-	return err
+	return who.agentStates(ctx, open, scope.names, only)
 }

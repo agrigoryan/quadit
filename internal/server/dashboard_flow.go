@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"slices"
 	"sort"
 	"time"
@@ -11,16 +12,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 )
-
-// flow fills in how work moves: tasks by status, opened and closed per
-// week, waits per member.
-func (d *dashboard) flow() error {
-	d.byStatus = d.flowByStatus()
-	d.weekly = d.flowWeekly()
-	var err error
-	d.waits, err = d.flowWaiting()
-	return err
-}
 
 // flowStatus is how many tasks one status of one project holds.
 type flowStatus struct {
@@ -32,17 +23,17 @@ type flowStatus struct {
 
 // flowByStatus counts the tasks, archived ones left out, in each status of
 // the projects the dashboard covers.
-func (d *dashboard) flowByStatus() []flowStatus {
-	names := d.names
+func (who *viewer) flowByStatus(scope dashboardScope) []flowStatus {
+	names := scope.names
 	count := map[string]int{}
-	for _, t := range d.tasks {
+	for _, t := range scope.tasks {
 		if t.ArchivedAt == 0 {
 			count[t.StatusID]++
 		}
 	}
 	var statuses []core.Status
 	for _, status := range names.statuses {
-		if status.DeletedAt == 0 && (len(d.projects) == 0 || slices.Contains(d.projects, status.ProjectID)) && d.who.canProject(status.ProjectID) {
+		if status.DeletedAt == 0 && (len(scope.projects) == 0 || slices.Contains(scope.projects, status.ProjectID)) && who.canProject(status.ProjectID) {
 			statuses = append(statuses, status)
 		}
 	}
@@ -86,14 +77,14 @@ func weekOf(ms int64) string {
 
 // flowWeekly counts the tasks opened and closed in each of the last
 // flowWeeks weeks.
-func (d *dashboard) flowWeekly() []flowWeek {
+func flowWeekly(scope dashboardScope) []flowWeek {
 	weeks := map[string][2]int{} // opened, closed
 	// Weeks are counted in UTC, as weekOf names them: stepped in the
 	// server's own zone, a week on the far side of a clock change would
 	// land on the day before its Monday.
-	now := d.now.UTC()
+	now := scope.now.UTC()
 	cutoff := now.AddDate(0, 0, -7*flowWeeks).UnixMilli()
-	for _, t := range d.tasks {
+	for _, t := range scope.tasks {
 		if t.CreatedAt >= cutoff {
 			w := weeks[weekOf(t.CreatedAt)]
 			w[0]++
@@ -133,10 +124,10 @@ type flowWait struct {
 // the last change that handed it to them, as the latest flowEvents task
 // events tell, or else since the task last changed. Hours are given to a
 // tenth, the members longest waited on first.
-func (d *dashboard) flowWaiting() ([]flowWait, error) {
-	names := d.names
+func (who *viewer) flowWaiting(ctx context.Context, scope dashboardScope) ([]flowWait, error) {
+	names := scope.names
 	since := map[string]int64{}
-	evs, err := d.who.db.Events(d.ctx, store.EventFilter{Types: []string{"task.updated", "task.created"}, ProjectIDs: d.projects, Desc: true, Limit: flowEvents})
+	evs, err := who.db.Events(ctx, store.EventFilter{Types: []string{"task.updated", "task.created"}, ProjectIDs: scope.projects, Desc: true, Limit: flowEvents})
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +139,7 @@ func (d *dashboard) flowWaiting() ([]flowWait, error) {
 		since[ev.ScopeID] = ev.At
 	}
 	waits := map[string]*flowWait{}
-	for _, t := range d.tasks {
+	for _, t := range scope.tasks {
 		if t.WaitingOnID == "" || !core.OpenCategory(names.statuses[t.StatusID].Category) {
 			continue
 		}
@@ -156,7 +147,7 @@ func (d *dashboard) flowWaiting() ([]flowWait, error) {
 		if at == 0 {
 			at = t.UpdatedAt
 		}
-		hours := float64(d.now.UnixMilli()-at) / float64(time.Hour.Milliseconds())
+		hours := float64(scope.now.UnixMilli()-at) / float64(time.Hour.Milliseconds())
 		wait := waits[t.WaitingOnID]
 		if wait == nil {
 			wait = &flowWait{Member: names.handle(t.WaitingOnID), Kind: names.members[t.WaitingOnID].Kind}
