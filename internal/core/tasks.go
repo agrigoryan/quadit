@@ -138,10 +138,12 @@ const (
 	LinkPR     = "pr"
 	LinkIssue  = "issue"
 	LinkURL    = "url"
+	// LinkDoc ties a task to a page of the workspace; Ref is the page's id.
+	LinkDoc = "doc"
 )
 
 // TaskLink ties a task to something outside: a branch, a commit, a pull
-// request, an issue or any URL.
+// request, an issue or any URL; or to a page of the workspace.
 type TaskLink struct {
 	ID          string          `json:"id" db:"id"`
 	WorkspaceID string          `json:"-" db:"workspace_id"`

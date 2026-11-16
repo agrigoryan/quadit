@@ -1,4 +1,4 @@
-// link.set and link.remove: links from a task to elsewhere.
+// link.set and link.remove: links from a task to elsewhere, or to a page.
 
 package engine
 
@@ -17,34 +17,45 @@ func init() {
 }
 
 type linkSetArgs struct {
-	ID     string          `json:"id"`
-	Task   string          `json:"task" quadit:"required,handler"`
-	Kind   string          `json:"kind" quadit:"required,handler"` // branch, commit, pr, url
-	URL    string          `json:"url"`
-	Title  string          `json:"title"`
-	Repo   string          `json:"repo"`
-	Ref    string          `json:"ref"` // branch name, commit hash or pull request number
+	ID    string `json:"id"`
+	Task  string `json:"task" quadit:"required,handler"`
+	Kind  string `json:"kind" quadit:"required,handler"` // branch, commit, pr, issue, url, doc
+	URL   string `json:"url"`
+	Title string `json:"title"`
+	Repo  string `json:"repo"`
+	Ref   string `json:"ref"` // branch name, commit hash, pull request number, or the page's id
+
 	State  string          `json:"state"`
 	Checks string          `json:"checks"`
 	Data   json.RawMessage `json:"data"`
 }
 
-// linkSet adds a link from a task to a branch, commit, pull request or URL,
-// or updates the one already there for the same thing.
+// linkSet adds a link from a task to a branch, commit, pull request, URL
+// or page, or updates the one already there for the same thing.
 func linkSet(c *cx, a linkSetArgs) error {
 	t, err := c.task("task", a.Task)
 	if err != nil {
 		return err
 	}
-	kinds := []string{core.LinkBranch, core.LinkCommit, core.LinkPR, core.LinkIssue, core.LinkURL}
+	kinds := []string{core.LinkBranch, core.LinkCommit, core.LinkPR, core.LinkIssue, core.LinkURL, core.LinkDoc}
 	if !slices.Contains(kinds, a.Kind) {
 		return oneOf("kind", "link kind", a.Kind, kinds)
 	}
 	if a.Kind == core.LinkURL && a.URL == "" {
 		return invalid("url", "a url link needs a url")
 	}
+	if a.Kind == core.LinkDoc && a.Ref == "" {
+		return invalid("ref", "a doc link needs ref: the page's id")
+	}
 	if a.Kind != core.LinkURL && a.Ref == "" {
 		return invalid("ref", "a %s link needs ref: the branch name, commit hash or pull request number", a.Kind)
+	}
+	if a.Kind == core.LinkDoc {
+		page, err := c.linkedPage(a.Ref)
+		if err != nil {
+			return err
+		}
+		a.Ref, a.Repo = page.ID, ""
 	}
 	var l core.TaskLink
 	conds := []store.Cond{store.Eq("task_id", t.ID), store.Eq("kind", a.Kind), store.Live}
@@ -71,6 +82,14 @@ func linkSet(c *cx, a linkSetArgs) error {
 			return err
 		}
 		c.ref = l.ID
+		if l.Kind == core.LinkDoc {
+			// The page is referenced by the task as a mention in its text
+			// would make it: the page lists the task, and the task the page.
+			ref := core.Ref{WorkspaceID: c.ws, FromType: "link", FromID: l.ID, FromScopeType: "task", FromScopeID: t.ID, ToType: "doc", ToID: l.Ref}
+			if err := c.tx.Insert(c.ctx, ref); err != nil {
+				return err
+			}
+		}
 		if err := c.touchTask(t.ID, seq); err != nil {
 			return err
 		}
@@ -105,5 +124,23 @@ func linkRemove(c *cx, a idArgs) error {
 	if err := c.tx.Get(c.ctx, &t, store.Eq("id", l.TaskID)); err != nil {
 		return err
 	}
+	if _, err := c.tx.Delete(c.ctx, "refs", store.Eq("from_id", l.ID)); err != nil {
+		return err
+	}
 	return c.trash(target{table: "task_links", entity: "link", id: l.ID, place: inTask(t)})
+}
+
+// linkedPage is the page a doc link names: one the actor may see, and of a
+// project its access includes. A page it may not see is not there for it.
+func (c *cx) linkedPage(ref string) (core.Doc, error) {
+	page, err := c.loadDoc("ref", ref)
+	if err != nil {
+		return page, err
+	}
+	if page.ProjectID != "" && !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, page.ProjectID) {
+		e := notFound("doc", ref)
+		e.Field = "ref"
+		return page, e
+	}
+	return page, nil
 }
