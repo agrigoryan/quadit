@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { FileText, GitFork, Link2, ListTree, Paperclip } from "lucide-react";
 import { DecisionSection } from "@/decisions/decision-section";
 import { useCan } from "@/data/access";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/types/core";
@@ -64,6 +65,21 @@ export function TaskBody({ task, status, layout }: Props) {
     files: files.length > 0 || pending.length > 0,
   };
   const attach = () => chooser.current?.click();
+
+  // Cmd+Shift+O: the caret in the box that adds a sub-task, the section shown first if it is not yet.
+  const body = useRef<HTMLDivElement>(null);
+  useHotkeys(
+    {
+      "mod+shift+o": (e) => {
+        if (readOnly) return;
+        e.preventDefault();
+        const box = body.current?.querySelector<HTMLInputElement>("input[data-subtask-add]");
+        if (box) box.focus();
+        else open("subtasks"); // it takes the caret as it appears
+      },
+    },
+    { layer: "panel", guardChords: true },
+  );
   // oxlint-disable-next-line react/refs -- `attach` reads the ref when a button is pressed, not while drawing; the list only carries it to the button
   const adders = [
     { on: !show.subtasks, icon: ListTree, label: t("detail.add.subtask"), run: () => open("subtasks") },
@@ -74,7 +90,7 @@ export function TaskBody({ task, status, layout }: Props) {
   ].filter((a) => a.on && !readOnly);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <div ref={body} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <input
         ref={chooser}
         type="file"

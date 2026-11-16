@@ -86,6 +86,8 @@ function QuickAdd({ parent, autoFocus }: { parent: Task; autoFocus?: boolean }) 
       </span>
       <input
         ref={input}
+        // Cmd+Shift+O puts the caret here (detail/task-body.tsx).
+        data-subtask-add
         autoFocus={autoFocus}
         value={title}
         aria-label={t("detail.subtasks.add")}
