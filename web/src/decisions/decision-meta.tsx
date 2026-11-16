@@ -198,6 +198,7 @@ export function ApprovalControls({ decision, viewer }: { decision: Decision; vie
         variant={viewer.mine ? "move" : "secondary"}
         className="max-sm:h-10 max-sm:flex-1"
         onClick={() => pick(decision, { outcome: "approved", note })}
+        data-answer
       >
         {t("decision.approve")}
       </Button>

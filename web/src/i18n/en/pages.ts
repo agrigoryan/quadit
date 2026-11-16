@@ -212,6 +212,7 @@ export const pages = {
   "shortcuts.toggleRead": "Mark read or unread",
   "shortcuts.archiveRead": "Archive everything read",
   "shortcuts.allRead": "Mark everything read",
+  "shortcuts.answer": "Answer the question asked of you: side by side, or its options",
   "shortcuts.comment": "Write a comment",
   "shortcuts.send": "Send the comment or save",
   "shortcuts.leaveBox": "Leave the comment box, keeping what you typed",

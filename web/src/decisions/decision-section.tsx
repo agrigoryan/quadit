@@ -1,12 +1,16 @@
 // The decisions of a task, inside the task panel: each question as a block,
 // the open ones first, and the button that asks a new one. A task with no
-// decisions shows only that button.
+// decisions shows only that button. D answers: the first open question
+// asked of me takes it (decisions/decision-block.tsx); with none, a short
+// note says so.
 
 import { type DragEvent, useState } from "react";
 import { MessageCircleQuestion } from "lucide-react";
 import { useCan } from "@/data/access";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
-import { useRowEvenIfGone } from "@/data/selectors";
+import { toast } from "@/lib/toast";
+import { useMe, useRowEvenIfGone } from "@/data/selectors";
 import { Section } from "@/detail/section";
 import { Button } from "@/ui/button";
 import { useTaskDecisions } from "@/decisions/data";
@@ -37,6 +41,10 @@ export function DecisionSection({ taskId }: { taskId: string }) {
   const [asking, setAsking] = useState(false);
   const canAsk = !!task && can.editTask(task);
   const open = decisions.filter((d) => d.state === "open").length;
+  const me = useMe();
+  // Answering is a change to the task: none from one who may not change it.
+  const asked = canAsk ? decisions.find((d) => d.state === "open" && d.asked_id === me.user_id) : undefined;
+  useHotkeys({ d: () => toast.info(t("decision.noneAsked")) }, { layer: "panel", enabled: !asked });
 
   const dialog = asking && (
     <div className="contents" {...keepDrags}>
@@ -68,7 +76,7 @@ export function DecisionSection({ taskId }: { taskId: string }) {
     >
       <div className="mt-2 mb-2 flex flex-col gap-7">
         {decisions.map((decision) => (
-          <DecisionBlock key={decision.id} decision={decision} />
+          <DecisionBlock key={decision.id} decision={decision} answerKey={decision === asked} />
         ))}
       </div>
       {dialog}

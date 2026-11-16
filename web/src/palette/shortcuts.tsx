@@ -91,6 +91,7 @@ const sections: Section[] = [
       { what: "shortcuts.openSubtask", keys: [`Shift ${MOD} ↓`] },
       // M then a letter, read where G's letters are (shell/sequences.tsx).
       ...RELATION_KEYS.map(({ key, what }) => ({ what, keys: [`M ${key.toUpperCase()}`] })),
+      { what: "shortcuts.answer", keys: ["D"] },
       { what: "shortcuts.comment", keys: ["Ctrl M"] },
       { what: "shortcuts.send", keys: [`${MOD} Enter`] },
       { what: "shortcuts.leaveBox", keys: ["Esc"] },

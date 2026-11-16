@@ -4,6 +4,7 @@ export const decisions = {
   "decision.section": "Decisions",
   "decision.openCount": "{n} open | {n} open",
   "decision.ask": "Ask a question",
+  "decision.noneAsked": "No open question here waits on your answer",
 
   "decision.state.open": "Open",
   "decision.state.yours": "Your answer is needed",

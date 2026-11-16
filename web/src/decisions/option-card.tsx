@@ -80,7 +80,12 @@ export function OptionCard({
 
         {viewer.canAnswer && (
           <div className="mt-auto flex flex-col gap-1.5 pt-3">
-            <Button variant={viewer.mine ? "move" : "secondary"} className="w-full max-sm:h-10" onClick={onPick}>
+            <Button
+              variant={viewer.mine ? "move" : "secondary"}
+              className="w-full max-sm:h-10"
+              onClick={onPick}
+              data-answer
+            >
               {t("decision.pick")}
             </Button>
             <Button variant="ghost" className="w-full max-sm:h-10" onClick={onPickWithChanges}>

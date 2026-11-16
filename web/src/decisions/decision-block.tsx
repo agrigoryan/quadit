@@ -2,10 +2,11 @@
 // options side by side with their pick buttons, and the answer once it is in.
 // When the question is asked of the viewer, this is where the highlighter goes.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Columns3, X } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { isMedia } from "@/data/files";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import type { Decision, DecisionOption } from "@/types/core";
 import { DecisionMentions } from "@/detail/mentions";
@@ -47,7 +48,13 @@ function splitFiles(files: OptionFiles): { media: OptionFiles; docs: OptionFiles
   return { media, docs };
 }
 
-export function DecisionBlock({ decision }: { decision: Decision }) {
+interface Props {
+  decision: Decision;
+  /** D answers this one: it opens side by side when its options have pictures, else the focus goes to its first answer. */
+  answerKey?: boolean;
+}
+
+export function DecisionBlock({ decision, answerKey = false }: Props) {
   const viewer = useViewer(decision);
   const options = optionsOf(decision);
   const files = useOptionFiles(decision);
@@ -68,6 +75,18 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
   const open = decision.state === "open";
   const choice = decision.kind === "choice";
   const thread = options.find((o) => o.id === threadOf);
+  const article = useRef<HTMLElement>(null);
+
+  useHotkeys(
+    {
+      d: (e) => {
+        e.preventDefault();
+        if (allMedia.length > 0) setCompare({ option: 0, file: 0 });
+        else article.current?.querySelector<HTMLElement>("[data-answer]")?.focus();
+      },
+    },
+    { layer: "panel", enabled: answerKey },
+  );
 
   function answer(optionId: string) {
     pick(decision, { option: optionId });
@@ -124,6 +143,7 @@ export function DecisionBlock({ decision }: { decision: Decision }) {
 
   return (
     <article
+      ref={article}
       id={`decision-${decision.id}`}
       aria-label={decision.question}
       className="@container relative pl-4 max-sm:pl-3.5"
