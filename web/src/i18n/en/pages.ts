@@ -221,6 +221,7 @@ export const pages = {
   "shortcuts.comment": "Write a comment",
   "shortcuts.send": "Send the comment or save",
   "shortcuts.leaveBox": "Leave the comment box, keeping what you typed",
+  "shortcuts.leavePageBox": "Leave the comment box, keeping what you typed; a new thread's box is put away",
   "shortcuts.openChip": "Open the task, decision, page or person beside the cursor",
   "shortcuts.commentOnPage": "Comment on the block at the cursor, or on the page",
   "shortcuts.closeComments": "Close the comments, away from a comment box",

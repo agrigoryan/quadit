@@ -44,4 +44,16 @@ describe("ShortcutsSheet", () => {
     for (const what of ["Add a sub-task", "Rename", "Open the parent task", "Mark as blocked by a task"])
       expect(screen.getAllByText(what)).toHaveLength(1);
   });
+
+  it("says that Esc in a page's comment box puts a new thread's draft away", () => {
+    ui.setShortcuts(true);
+    render(
+      <TooltipProvider>
+        <ShortcutsSheet />
+      </TooltipProvider>,
+    );
+    expect(
+      screen.getByText("Leave the comment box, keeping what you typed; a new thread's box is put away"),
+    ).toBeInTheDocument();
+  });
 });
