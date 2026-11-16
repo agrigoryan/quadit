@@ -48,11 +48,11 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 			out["budget"] = budget
 		}
 	}
-	unread, err := x.db.Count(ctx, "notifications", store.Eq("user_id", x.member.UserID), store.Null("read_at"))
+	unread, err := x.ownNotes(ctx, []store.Cond{store.Null("read_at")}, 0)
 	if err != nil {
 		return err
 	}
-	out["unread"] = unread
+	out["unread"] = len(unread)
 	cursors, err := x.cursorSeqs(x.ctx())
 	if err != nil {
 		return err
@@ -212,12 +212,12 @@ func (who *viewer) inboxItems(ctx context.Context, query inboxQuery) ([]inboxIte
 	if err != nil {
 		return nil, err
 	}
-	conds := []store.Cond{store.Eq("user_id", who.member.UserID), store.Null("archived_at")}
+	conds := []store.Cond{store.Null("archived_at")}
 	if query.unreadOnly {
 		conds = append(conds, store.Null("read_at"))
 	}
-	var notes []core.Notification
-	if err := who.db.List(ctx, &notes, store.Q{Where: conds, Order: "-seq", Limit: query.limit}); err != nil {
+	notes, err := who.ownNotes(ctx, conds, query.limit)
+	if err != nil {
 		return nil, err
 	}
 	out := make([]inboxItem, len(notes))
@@ -230,6 +230,38 @@ func (who *viewer) inboxItems(ctx context.Context, query inboxQuery) ([]inboxIte
 	}
 	return out, nil
 }
+
+// ownNotes reads the viewer's own notifications that conds select, newest
+// first, up to limit (0 for all), as visibleNotifications lets the viewer
+// see them. A viewer that rule may keep from some is read page by page
+// until the limit is met, so leaving some out does not shorten the list.
+func (who *viewer) ownNotes(ctx context.Context, conds []store.Cond, limit int) ([]core.Notification, error) {
+	q := store.Q{Where: append([]store.Cond{store.Eq("user_id", who.member.UserID)}, conds...), Order: "-seq", Limit: limit}
+	if !who.limited() {
+		var notes []core.Notification
+		err := who.db.List(ctx, &notes, q)
+		return notes, err
+	}
+	q.Limit = max(limit, notesPage)
+	var seen []core.Notification
+	for ; ; q.Offset += q.Limit {
+		var page []core.Notification
+		if err := who.db.List(ctx, &page, q); err != nil {
+			return nil, err
+		}
+		seen = append(seen, visibleNotifications(ctx, who, page)...)
+		if len(page) < q.Limit || limit > 0 && len(seen) >= limit {
+			break
+		}
+	}
+	if limit > 0 && len(seen) > limit {
+		seen = seen[:limit]
+	}
+	return seen, nil
+}
+
+// notesPage is how many notifications ownNotes reads at a time.
+const notesPage = 200
 
 // The inbox lists defaultInboxPage items unless limit= says otherwise, and
 // never more than maxInboxPage.
@@ -282,6 +314,7 @@ func (s *Server) handleShowMyWork(x *c) error {
 	if err := x.db.List(ctx, &asked, store.Q{Where: []store.Cond{store.Eq("asked_id", me), store.Eq("state", core.StateOpen), store.Live}, Order: "created_seq"}); err != nil {
 		return err
 	}
+	asked = onTask(func(d core.Decision) string { return d.TaskID })(ctx, &x.viewer, asked)
 	askedViews, err := x.decisionViews(x.ctx(), asked)
 	if err != nil {
 		return err

@@ -150,11 +150,6 @@ func ofProject[T any](projectOf func(T) string) rule[T] {
 	return ifViewer(func(who *viewer, row T) bool { return who.canProject(projectOf(row)) })
 }
 
-// ownOnly is the rule of a kind whose rows are each one member's own.
-func ownOnly[T any](userOf func(T) string) rule[T] {
-	return ifViewer(func(who *viewer, row T) bool { return userOf(row) == who.member.UserID })
-}
-
 // onTask is the rule of a kind whose rows hang on a task: a row is seen by
 // whoever may read the task's project, and a row on no task by everyone. A
 // task that cannot be read counts as in no project the viewer may read.
@@ -270,11 +265,11 @@ var rowKinds = []rowKind{
 		listed("-started_at,id").copied(func(*viewer) store.Q {
 		return store.Q{Where: []store.Cond{store.Gte("started_at", time.Now().Add(-copySessionsFor).UnixMilli())}, Order: "-started_at,id", Limit: copyLatest}
 	}),
-	kindOf("notifications", ownOnly(func(n core.Notification) string { return n.UserID })).
+	kindOf("notifications", rule[core.Notification](visibleNotifications)).
 		copied(func(who *viewer) store.Q {
 			return store.Q{Where: []store.Cond{store.Eq("user_id", who.member.UserID), store.Null("archived_at")}, Order: "-seq", Limit: copyLatest}
 		}),
-	kindOf("watchers", ownOnly(func(w core.Watcher) string { return w.UserID })).
+	kindOf("watchers", rule[core.Watcher](visibleWatchers)).
 		copied(func(who *viewer) store.Q { return store.Where(store.Eq("user_id", who.member.UserID)) }),
 	kindOf("secrets", everyMember[core.Secret]()).listed("name").adminsOnly(),
 	kindOf("webhooks", ofProject(func(h core.Webhook) string { return h.ProjectID })).listed("name").adminsOnly(),
@@ -397,6 +392,58 @@ func withoutHiddenEnds(r core.Relation, mayRead func(taskID string) bool) core.R
 		r.RelatedTaskID = ""
 	}
 	return r
+}
+
+// A member's own rows.
+
+// visibleNotifications is the rule of inbox items. One is seen by the
+// member it is for, and only while they may read what it is about: a task
+// of a project they may read, a page they may see. So a token made for some
+// projects shows its member's inbox of those projects alone, and an item
+// about a task of a project the member was since kept out of is not shown.
+func visibleNotifications(ctx context.Context, who *viewer, notes []core.Notification) []core.Notification {
+	notes = keep(notes, func(n core.Notification) bool { return n.UserID == who.member.UserID })
+	if !who.limited() {
+		return notes
+	}
+	mayRead := who.readableTasks(ctx)
+	return keep(notes, func(n core.Notification) bool {
+		if n.TaskID != "" && !mayRead(n.TaskID) {
+			return false
+		}
+		var page core.Doc
+		return n.DocID == "" || who.db.Get(ctx, &page, store.Eq("id", n.DocID)) == nil && who.canSeeDoc(page)
+	})
+}
+
+// visibleWatchers is the rule of what members watch. A row is seen by the
+// member who watches, and only while they may see what is watched: so a
+// token made for some projects does not say that its member follows a task,
+// an epic, a project, a view or a page of another. A row of a kind of thing
+// this does not know is not shown.
+func visibleWatchers(ctx context.Context, who *viewer, watchers []core.Watcher) []core.Watcher {
+	mayRead := who.readableTasks(ctx)
+	return keep(watchers, func(watching core.Watcher) bool {
+		if watching.UserID != who.member.UserID {
+			return false
+		}
+		switch watching.SubjectType {
+		case "task":
+			return !who.limited() || mayRead(watching.SubjectID)
+		case "project":
+			return who.canProject(watching.SubjectID)
+		case "epic":
+			var epic core.Epic
+			return who.db.Get(ctx, &epic, store.Eq("id", watching.SubjectID)) == nil && who.canProject(epic.ProjectID)
+		case "view":
+			var view core.View
+			return who.db.Get(ctx, &view, store.Eq("id", watching.SubjectID)) == nil && who.canSeeView(view)
+		case "doc":
+			var page core.Doc
+			return who.db.Get(ctx, &page, store.Eq("id", watching.SubjectID)) == nil && who.canSeeDoc(page)
+		}
+		return false
+	})
 }
 
 // Attachments.

@@ -10410,6 +10410,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
    },
    "entity_id": "<id #438>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-2>",
    "scope_type": "task",
    "seq": 76,
@@ -11729,6 +11730,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
    },
    "entity_id": "<id #445>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 132,
@@ -12041,6 +12043,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
    },
    "entity_id": "<id #449>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 146,
@@ -12095,6 +12098,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
    },
    "entity_id": "<id #451>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 150,
@@ -14917,6 +14921,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
    },
    "entity_id": "<id #463>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 256,
@@ -15648,6 +15653,7 @@ seq: 261
    },
    "entity_id": "<id #438>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-2>",
    "scope_type": "task",
    "seq": 76,
@@ -15675,6 +15681,7 @@ seq: 261
    },
    "entity_id": "<id #445>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 132,
@@ -15702,6 +15709,7 @@ seq: 261
    },
    "entity_id": "<id #449>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 146,
@@ -15729,6 +15737,7 @@ seq: 261
    },
    "entity_id": "<id #451>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 150,
@@ -15797,6 +15806,7 @@ seq: 261
    },
    "entity_id": "<id #463>",
    "entity_type": "notification",
+   "project_id": "<project OPS>",
    "scope_id": "<task OPS-1>",
    "scope_type": "task",
    "seq": 256,
@@ -28772,7 +28782,7 @@ id: 75
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #260>","data":{"row":{"activity_seq":75,"asked_by":"<@aram>","assignee_id":"<@ops>","created_at":1700000000000,"created_by":"<@aram>","created_seq":75,"epic_id":"<epic Hardening>","id":"<task OPS-2>","key":"OPS-2","number":2,"parent_id":"<task OPS-1>","priority":0,"project_id":"<project OPS>","rank":"00000001kw","status_id":"<id #165>","title":"Back up nightly","updated_at":1700000000000,"updated_seq":75,"waiting_on_id":"<@cy>"}},"entity_id":"<task OPS-2>","entity_type":"task","project_id":"<project OPS>","scope_id":"<task OPS-2>","scope_type":"task","seq":75,"type":"task.created"}
 
 id: 76
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #260>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task OPS-2>","entity_type":"task","id":"<id #438>","seq":76,"task_id":"<task OPS-2>","title":"OPS-2 Back up nightly","type":"waiting_on","user_id":"<@cy>"}},"entity_id":"<id #438>","entity_type":"notification","scope_id":"<task OPS-2>","scope_type":"task","seq":76,"type":"notification.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #260>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task OPS-2>","entity_type":"task","id":"<id #438>","seq":76,"task_id":"<task OPS-2>","title":"OPS-2 Back up nightly","type":"waiting_on","user_id":"<@cy>"}},"entity_id":"<id #438>","entity_type":"notification","project_id":"<project OPS>","scope_id":"<task OPS-2>","scope_type":"task","seq":76,"type":"notification.created"}
 
 id: 78
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #261>","data":{"row":{"activity_seq":78,"created_at":1700000000000,"created_by":"<@aram>","created_seq":78,"epic_id":"<epic Boss fight>","estimate":2,"id":"<task SVA-3>","key":"SVA-3","number":3,"priority":0,"project_id":"<project SVA>","rank":"00000002dc","status_id":"<id #166>","title":"Boss music","updated_at":1700000000000,"updated_seq":78}},"entity_id":"<task SVA-3>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-3>","scope_type":"task","seq":78,"type":"task.created"}
@@ -28913,7 +28923,7 @@ id: 131
 data: {"actor_id":"<@ops>","at":1700000000000,"change_id":"<id #294>","data":{"key":"OPS-1","row":{"asked_id":"<@cy>","created_at":1700000000000,"created_by":"<@ops>","id":"<decision OPS-1 window>","kind":"choice","options":[{"decision_id":"<decision OPS-1 window>","id":"<id #176>","label":"Monday","rank":"00000000sg"},{"decision_id":"<decision OPS-1 window>","id":"<id #177>","label":"Friday","rank":"00000001kw"}],"question":"Which night?","rank":"00000001kw","state":"open","task_id":"<task OPS-1>","updated_at":1700000000000,"updated_seq":131}},"entity_id":"<decision OPS-1 window>","entity_type":"decision","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":131,"type":"decision.opened"}
 
 id: 132
-data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #294>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<decision OPS-1 window>","entity_type":"decision","id":"<id #445>","seq":132,"snippet":"Which night?","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"decision_asked","user_id":"<@cy>"}},"entity_id":"<id #445>","entity_type":"notification","scope_id":"<task OPS-1>","scope_type":"task","seq":132,"type":"notification.created"}
+data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #294>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<decision OPS-1 window>","entity_type":"decision","id":"<id #445>","seq":132,"snippet":"Which night?","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"decision_asked","user_id":"<@cy>"}},"entity_id":"<id #445>","entity_type":"notification","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":132,"type":"notification.created"}
 
 id: 133
 data: {"actor_id":"<@ops>","at":1700000000000,"change_id":"<id #294>","data":{"changes":{"waiting_on_id":{"from":"<@ops>","to":"<@cy>"},"waiting_on_note":{"from":"answered: Ours","to":"answer: Which night?"}},"id":"<task OPS-1>","key":"OPS-1"},"entity_id":"<task OPS-1>","entity_type":"task","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":133,"type":"task.updated"}
@@ -28943,13 +28953,13 @@ id: 145
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #301>","data":{"key":"OPS-1","row":{"author_id":"<@aram>","body":"@cy check the vault first.","created_at":1700000000000,"created_seq":145,"id":"<comment OPS-1 owner>","kind":"comment","subject_id":"<task OPS-1>","subject_type":"task","task_id":"<task OPS-1>","updated_seq":145}},"entity_id":"<comment OPS-1 owner>","entity_type":"comment","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":145,"type":"comment.created"}
 
 id: 146
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #301>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment OPS-1 owner>","entity_type":"comment","id":"<id #449>","seq":146,"snippet":"@cy check the vault first.","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"mentioned","user_id":"<@cy>"}},"entity_id":"<id #449>","entity_type":"notification","scope_id":"<task OPS-1>","scope_type":"task","seq":146,"type":"notification.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #301>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment OPS-1 owner>","entity_type":"comment","id":"<id #449>","seq":146,"snippet":"@cy check the vault first.","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"mentioned","user_id":"<@cy>"}},"entity_id":"<id #449>","entity_type":"notification","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":146,"type":"notification.created"}
 
 id: 148
 data: {"actor_id":"<@ops>","at":1700000000000,"change_id":"<id #302>","data":{"key":"OPS-1","row":{"author_id":"<@ops>","body":"Rotated the first ten.","created_at":1700000000000,"created_seq":148,"id":"<comment OPS-1 ops>","kind":"comment","subject_id":"<id #174>","subject_type":"decision_option","task_id":"<task OPS-1>","updated_seq":148}},"entity_id":"<comment OPS-1 ops>","entity_type":"comment","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":148,"type":"comment.created"}
 
 id: 150
-data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #302>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<comment OPS-1 ops>","entity_type":"comment","id":"<id #451>","seq":150,"snippet":"Rotated the first ten.","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"comment","user_id":"<@cy>"}},"entity_id":"<id #451>","entity_type":"notification","scope_id":"<task OPS-1>","scope_type":"task","seq":150,"type":"notification.created"}
+data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #302>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<comment OPS-1 ops>","entity_type":"comment","id":"<id #451>","seq":150,"snippet":"Rotated the first ten.","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"comment","user_id":"<@cy>"}},"entity_id":"<id #451>","entity_type":"notification","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":150,"type":"notification.created"}
 
 id: 151
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #180>","data":{"key":"SVA-1","row":{"author_id":"<@aram>","body":"Said by mistake.","created_at":1700000000000,"created_seq":151,"id":"<comment removed>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":151}},"entity_id":"<comment removed>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":151,"type":"comment.created"}
@@ -29225,7 +29235,7 @@ id: 255
 data: {"actor_id":"<@ops>","at":1700000000000,"change_id":"<id #411>","data":{"changes":{"priority":{"from":1,"to":2}},"id":"<task OPS-1>","key":"OPS-1"},"entity_id":"<task OPS-1>","entity_type":"task","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":255,"type":"task.updated"}
 
 id: 256
-data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #462>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<task OPS-1>","entity_type":"task","id":"<id #463>","seq":256,"snippet":"in your view \"Ops infra\"","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"waiting_on","user_id":"<@cy>"}},"entity_id":"<id #463>","entity_type":"notification","scope_id":"<task OPS-1>","scope_type":"task","seq":256,"type":"notification.created"}
+data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #462>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<task OPS-1>","entity_type":"task","id":"<id #463>","seq":256,"snippet":"in your view \"Ops infra\"","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"waiting_on","user_id":"<@cy>"}},"entity_id":"<id #463>","entity_type":"notification","project_id":"<project OPS>","scope_id":"<task OPS-1>","scope_type":"task","seq":256,"type":"notification.created"}
 
 id: 257
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #412>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["comment.created"],"failures":0,"id":"<webhook comments>","name":"comments","updated_seq":257,"url":"http://receiver.test/comments"}},"entity_id":"<webhook comments>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":257,"type":"webhook.created"}

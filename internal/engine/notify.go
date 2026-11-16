@@ -28,6 +28,23 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 	if ok, err := store.Find(c.ctx, c.tx, &m, store.Eq("user_id", userID), store.Null("removed_at")); !ok {
 		return err // nil when they are not a member any more: nobody to tell
 	}
+	// The item's event belongs to the project of the task or the page it is
+	// about, so that a feed kept to other projects (a token made for them)
+	// leaves it out.
+	where := inWorkspace(c.ws)
+	if n.TaskID != "" {
+		var t core.Task
+		if err := c.tx.Get(c.ctx, &t, store.Eq("id", n.TaskID)); err != nil {
+			return err
+		}
+		where = inTask(t)
+	} else if n.DocID != "" {
+		var d core.Doc
+		if err := c.tx.Get(c.ctx, &d, store.Eq("id", n.DocID)); err != nil {
+			return err
+		}
+		where = inDoc(d)
+	}
 	c.notified[key] = true
 	seq := c.tx.NextSeq()
 	n.ID, n.WorkspaceID, n.UserID, n.Seq, n.Type, n.ActorID, n.CreatedAt = id.New(), c.ws, userID, seq, typ, c.actor.UserID, c.at
@@ -35,13 +52,14 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 	if err := c.tx.Insert(c.ctx, n); err != nil {
 		return err
 	}
-	where := inWorkspace(c.ws)
-	if n.TaskID != "" {
-		where = place{scopeType: "task", scopeID: n.TaskID}
-	} else if n.DocID != "" {
-		where = place{scopeType: "doc", scopeID: n.DocID}
-	}
-	return c.emit(event{seq: seq, typ: "notification.created", entity: "notification", entityID: n.ID, place: where, audience: userID, data: core.EventData{Row: n}})
+	// Telling someone is not a write to the task or the page: the actor's
+	// own limits are not asked of it (resource.release tells the next in
+	// line, whose task may be of a project the actor does not have).
+	was := c.system
+	c.system = true
+	err := c.emit(event{seq: seq, typ: "notification.created", entity: "notification", entityID: n.ID, place: where, audience: userID, data: core.EventData{Row: n}})
+	c.system = was
+	return err
 }
 
 // about is what in a task a notification is about: a comment, a decision,

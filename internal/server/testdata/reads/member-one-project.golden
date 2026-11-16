@@ -417,7 +417,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
  "standing_preferences": [
   "Write short."
  ],
- "unread": 9,
+ "unread": 8,
  "user_id": "<@bea>",
  "version": "test",
  "workspace": {
@@ -430,7 +430,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
 200
 you are @bea (person, member) in games
 projects: SVA
-unread: 9   seq: 261
+unread: 8   seq: 261
 rule: Write short.
 
 === GET /api/v1/w/games/my-work
@@ -554,15 +554,6 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@aram",
-   "id": "<id #440>",
-   "seq": 84,
-   "task": "OPS-5",
-   "title": "OPS-5 Patch the kernel",
-   "type": "waiting_on"
-  },
-  {
-   "at": "<minute>",
-   "by": "@aram",
    "id": "<id #437>",
    "seq": 74,
    "task": "SVA-2",
@@ -613,7 +604,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 SVA-2  Which color?  (id=<decision SVA-2 color>)
 == assigned to you (1)
 SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
-== unread inbox (9)
+== unread inbox (8)
 #260 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
 #254 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
 #152 <minute> @aram comment: SVA-1 Boss design — Said by mistake.
@@ -621,7 +612,6 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 #139 <minute> @aram mentioned: SVA-1 Boss design — @bea no rings please.
 #123 <minute> @aram decision_asked: SVA-2 Explosion effect — Which color?
 #86 <minute> @aram waiting_on: SVA-6 Review me — needs a look
-#84 <minute> @aram waiting_on: OPS-5 Patch the kernel
 #74 <minute> @aram assigned: SVA-2 Explosion effect
 seq: 261
 
@@ -697,15 +687,6 @@ seq: 261
    "snippet": "needs a look",
    "task": "SVA-6",
    "title": "SVA-6 Review me",
-   "type": "waiting_on"
-  },
-  {
-   "at": "<minute>",
-   "by": "@aram",
-   "id": "<id #440>",
-   "seq": 84,
-   "task": "OPS-5",
-   "title": "OPS-5 Patch the kernel",
    "type": "waiting_on"
   },
   {
@@ -797,15 +778,6 @@ seq: 261
   {
    "at": "<minute>",
    "by": "@aram",
-   "id": "<id #440>",
-   "seq": 84,
-   "task": "OPS-5",
-   "title": "OPS-5 Patch the kernel",
-   "type": "waiting_on"
-  },
-  {
-   "at": "<minute>",
-   "by": "@aram",
    "id": "<id #437>",
    "seq": 74,
    "task": "SVA-2",
@@ -824,7 +796,6 @@ seq: 261
 #139 <minute> @aram mentioned: SVA-1 Boss design — @bea no rings please.
 #123 <minute> @aram decision_asked: SVA-2 Explosion effect — Which color?
 #86 <minute> @aram waiting_on: SVA-6 Review me — needs a look
-#84 <minute> @aram waiting_on: OPS-5 Patch the kernel
 #74 <minute> @aram assigned: SVA-2 Explosion effect
 
 === GET /api/v1/w/games/inbox?since=0&limit=2
@@ -4284,6 +4255,7 @@ seq: 261
    },
    "entity_id": "<id #452>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 152,
@@ -4585,6 +4557,7 @@ seq: 261
    },
    "entity_id": "<id #464>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 260,
@@ -7361,6 +7334,7 @@ nothing found
    },
    "entity_id": "<id #437>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-2>",
    "scope_type": "task",
    "seq": 74,
@@ -7461,32 +7435,6 @@ nothing found
   {
    "actor_id": "<@aram>",
    "at": 1700000000000,
-   "audience_id": "<@bea>",
-   "change_id": "<id #266>",
-   "data": {
-    "row": {
-     "actor_id": "<@aram>",
-     "created_at": 1700000000000,
-     "entity_id": "<task OPS-5>",
-     "entity_type": "task",
-     "id": "<id #440>",
-     "seq": 84,
-     "task_id": "<task OPS-5>",
-     "title": "OPS-5 Patch the kernel",
-     "type": "waiting_on",
-     "user_id": "<@bea>"
-    }
-   },
-   "entity_id": "<id #440>",
-   "entity_type": "notification",
-   "scope_id": "<task OPS-5>",
-   "scope_type": "task",
-   "seq": 84,
-   "type": "notification.created"
-  },
-  {
-   "actor_id": "<@aram>",
-   "at": 1700000000000,
    "change_id": "<id #267>",
    "data": {
     "row": {
@@ -7539,6 +7487,7 @@ nothing found
    },
    "entity_id": "<id #441>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
    "seq": 86,
@@ -8136,6 +8085,7 @@ nothing found
    },
    "entity_id": "<id #443>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-2>",
    "scope_type": "task",
    "seq": 123,
@@ -8279,6 +8229,7 @@ nothing found
    },
    "entity_id": "<id #446>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 139,
@@ -8385,6 +8336,7 @@ nothing found
    },
    "entity_id": "<id #448>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 144,
@@ -8439,6 +8391,7 @@ nothing found
    },
    "entity_id": "<id #452>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 152,
@@ -10711,6 +10664,7 @@ nothing found
    },
    "entity_id": "<id #461>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
    "seq": 254,
@@ -10791,6 +10745,7 @@ nothing found
    },
    "entity_id": "<id #464>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 260,
@@ -10863,7 +10818,6 @@ nothing found
 #78 <minute> @aram task.created SVA-3 "Boss music" [Todo]
 #80 <minute> @aram task.created SVA-4 "Old idea" [Todo]
 #82 <minute> @aram task.created SVA-5 "Shelved sketch" [Todo]
-#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel
 #85 <minute> @aram task.created SVA-6 "Review me" [Review]
 #86 <minute> @aram inbox waiting_on: SVA-6 Review me — needs a look
 #89 <minute> @aram task.updated SVA-3 status: Todo -> Done
@@ -11023,7 +10977,6 @@ seq: 261
   "#78 <minute> @aram task.created SVA-3 \"Boss music\" [Todo]",
   "#80 <minute> @aram task.created SVA-4 \"Old idea\" [Todo]",
   "#82 <minute> @aram task.created SVA-5 \"Shelved sketch\" [Todo]",
-  "#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel",
   "#85 <minute> @aram task.created SVA-6 \"Review me\" [Review]",
   "#86 <minute> @aram inbox waiting_on: SVA-6 Review me — needs a look",
   "#89 <minute> @aram task.updated SVA-3 status: Todo -> Done",
@@ -11321,35 +11274,10 @@ seq: 261
    },
    "entity_id": "<id #437>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-2>",
    "scope_type": "task",
    "seq": 74,
-   "type": "notification.created"
-  },
-  {
-   "actor_id": "<@aram>",
-   "at": 1700000000000,
-   "audience_id": "<@bea>",
-   "change_id": "<id #266>",
-   "data": {
-    "row": {
-     "actor_id": "<@aram>",
-     "created_at": 1700000000000,
-     "entity_id": "<task OPS-5>",
-     "entity_type": "task",
-     "id": "<id #440>",
-     "seq": 84,
-     "task_id": "<task OPS-5>",
-     "title": "OPS-5 Patch the kernel",
-     "type": "waiting_on",
-     "user_id": "<@bea>"
-    }
-   },
-   "entity_id": "<id #440>",
-   "entity_type": "notification",
-   "scope_id": "<task OPS-5>",
-   "scope_type": "task",
-   "seq": 84,
    "type": "notification.created"
   },
   {
@@ -11374,6 +11302,7 @@ seq: 261
    },
    "entity_id": "<id #441>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
    "seq": 86,
@@ -11401,6 +11330,7 @@ seq: 261
    },
    "entity_id": "<id #443>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-2>",
    "scope_type": "task",
    "seq": 123,
@@ -11428,6 +11358,7 @@ seq: 261
    },
    "entity_id": "<id #446>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 139,
@@ -11455,6 +11386,7 @@ seq: 261
    },
    "entity_id": "<id #448>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 144,
@@ -11482,6 +11414,7 @@ seq: 261
    },
    "entity_id": "<id #452>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 152,
@@ -11623,6 +11556,7 @@ seq: 261
    },
    "entity_id": "<id #461>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
    "seq": 254,
@@ -11650,6 +11584,7 @@ seq: 261
    },
    "entity_id": "<id #464>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 260,
@@ -11663,7 +11598,6 @@ seq: 261
 === GET /api/v1/w/games/events?after=0&inbox=1&format=text
 200
 #74 <minute> @aram inbox assigned: SVA-2 Explosion effect
-#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel
 #86 <minute> @aram inbox waiting_on: SVA-6 Review me — needs a look
 #123 <minute> @aram inbox decision_asked: SVA-2 Explosion effect — Which color?
 #139 <minute> @aram inbox mentioned: SVA-1 Boss design — @bea no rings please.
@@ -12208,7 +12142,6 @@ seq: 261
   "#78 <minute> @aram task.created SVA-3 \"Boss music\" [Todo]",
   "#80 <minute> @aram task.created SVA-4 \"Old idea\" [Todo]",
   "#82 <minute> @aram task.created SVA-5 \"Shelved sketch\" [Todo]",
-  "#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel",
   "#85 <minute> @aram task.created SVA-6 \"Review me\" [Review]",
   "#86 <minute> @aram inbox waiting_on: SVA-6 Review me — needs a look",
   "#89 <minute> @aram task.updated SVA-3 status: Todo -> Done",
@@ -13082,18 +13015,6 @@ seq: 261
   {
    "actor_id": "<@aram>",
    "created_at": 1700000000000,
-   "entity_id": "<task OPS-5>",
-   "entity_type": "task",
-   "id": "<id #440>",
-   "seq": 84,
-   "task_id": "<task OPS-5>",
-   "title": "OPS-5 Patch the kernel",
-   "type": "waiting_on",
-   "user_id": "<@bea>"
-  },
-  {
-   "actor_id": "<@aram>",
-   "created_at": 1700000000000,
    "entity_id": "<task SVA-2>",
    "entity_type": "task",
    "id": "<id #437>",
@@ -13494,12 +13415,6 @@ seq: 261
   {
    "created_at": 1700000000000,
    "subject_id": "<view Art bugs>",
-   "subject_type": "view",
-   "user_id": "<@bea>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<view Ops infra>",
    "subject_type": "view",
    "user_id": "<@bea>"
   }
@@ -14217,18 +14132,6 @@ seq: 261
   {
    "actor_id": "<@aram>",
    "created_at": 1700000000000,
-   "entity_id": "<task OPS-5>",
-   "entity_type": "task",
-   "id": "<id #440>",
-   "seq": 84,
-   "task_id": "<task OPS-5>",
-   "title": "OPS-5 Patch the kernel",
-   "type": "waiting_on",
-   "user_id": "<@bea>"
-  },
-  {
-   "actor_id": "<@aram>",
-   "created_at": 1700000000000,
    "entity_id": "<task SVA-2>",
    "entity_type": "task",
    "id": "<id #437>",
@@ -14588,12 +14491,6 @@ seq: 261
    "subject_id": "<view Art bugs>",
    "subject_type": "view",
    "user_id": "<@bea>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<view Ops infra>",
-   "subject_type": "view",
-   "user_id": "<@bea>"
   }
  ],
  "workspace": {
@@ -14877,10 +14774,6 @@ seq: 261
    "title": "SVA-6 Review me"
   },
   {
-   "id": "<id #440>",
-   "title": "OPS-5 Patch the kernel"
-  },
-  {
    "id": "<id #437>",
    "title": "SVA-2 Explosion effect"
   }
@@ -15025,7 +14918,6 @@ seq: 261
   }
  ],
  "watchers": [
-  {},
   {},
   {},
   {},
@@ -15448,12 +15340,6 @@ seq: 261
   {
    "created_at": 1700000000000,
    "subject_id": "<view Art bugs>",
-   "subject_type": "view",
-   "user_id": "<@bea>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<view Ops infra>",
    "subject_type": "view",
    "user_id": "<@bea>"
   }
@@ -21342,7 +21228,7 @@ id: 73
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #259>","data":{"row":{"activity_seq":73,"assignee_id":"<@bea>","created_at":1700000000000,"created_by":"<@aram>","created_seq":73,"epic_id":"<epic Boss fight>","id":"<task SVA-2>","key":"SVA-2","label_ids":["<label art>"],"number":2,"parent_id":"<task SVA-1>","priority":0,"project_id":"<project SVA>","rank":"00000001kw","status_id":"<id #166>","title":"Explosion effect","updated_at":1700000000000,"updated_seq":73}},"entity_id":"<task SVA-2>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":73,"type":"task.created"}
 
 id: 74
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #259>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task SVA-2>","entity_type":"task","id":"<id #437>","seq":74,"task_id":"<task SVA-2>","title":"SVA-2 Explosion effect","type":"assigned","user_id":"<@bea>"}},"entity_id":"<id #437>","entity_type":"notification","scope_id":"<task SVA-2>","scope_type":"task","seq":74,"type":"notification.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #259>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task SVA-2>","entity_type":"task","id":"<id #437>","seq":74,"task_id":"<task SVA-2>","title":"SVA-2 Explosion effect","type":"assigned","user_id":"<@bea>"}},"entity_id":"<id #437>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":74,"type":"notification.created"}
 
 id: 78
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #261>","data":{"row":{"activity_seq":78,"created_at":1700000000000,"created_by":"<@aram>","created_seq":78,"epic_id":"<epic Boss fight>","estimate":2,"id":"<task SVA-3>","key":"SVA-3","number":3,"priority":0,"project_id":"<project SVA>","rank":"00000002dc","status_id":"<id #166>","title":"Boss music","updated_at":1700000000000,"updated_seq":78}},"entity_id":"<task SVA-3>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-3>","scope_type":"task","seq":78,"type":"task.created"}
@@ -21353,14 +21239,11 @@ data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #263>","data":{"
 id: 82
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #265>","data":{"row":{"activity_seq":82,"created_at":1700000000000,"created_by":"<@aram>","created_seq":82,"id":"<task SVA-5>","key":"SVA-5","number":5,"priority":0,"project_id":"<project SVA>","rank":"00000003y8","status_id":"<id #166>","title":"Shelved sketch","updated_at":1700000000000,"updated_seq":82}},"entity_id":"<task SVA-5>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-5>","scope_type":"task","seq":82,"type":"task.created"}
 
-id: 84
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #266>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task OPS-5>","entity_type":"task","id":"<id #440>","seq":84,"task_id":"<task OPS-5>","title":"OPS-5 Patch the kernel","type":"waiting_on","user_id":"<@bea>"}},"entity_id":"<id #440>","entity_type":"notification","scope_id":"<task OPS-5>","scope_type":"task","seq":84,"type":"notification.created"}
-
 id: 85
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #267>","data":{"row":{"activity_seq":85,"created_at":1700000000000,"created_by":"<@aram>","created_seq":85,"id":"<task SVA-6>","key":"SVA-6","number":6,"priority":0,"project_id":"<project SVA>","rank":"00000004qo","started_at":1700000000000,"status_id":"<status Review>","title":"Review me","updated_at":1700000000000,"updated_seq":85,"waiting_on_id":"<@bea>","waiting_on_note":"needs a look"}},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":85,"type":"task.created"}
 
 id: 86
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #267>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #441>","seq":86,"snippet":"needs a look","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@bea>"}},"entity_id":"<id #441>","entity_type":"notification","scope_id":"<task SVA-6>","scope_type":"task","seq":86,"type":"notification.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #267>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #441>","seq":86,"snippet":"needs a look","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@bea>"}},"entity_id":"<id #441>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":86,"type":"notification.created"}
 
 id: 89
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #270>","data":{"changes":{"completed_at":{"from":0,"to":1700000000000},"started_at":{"from":0,"to":1700000000000},"status_id":{"from":"<id #166>","to":"<id #167>"}},"id":"<task SVA-3>","key":"SVA-3"},"entity_id":"<task SVA-3>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-3>","scope_type":"task","seq":89,"type":"task.updated"}
@@ -21426,7 +21309,7 @@ id: 122
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #291>","data":{"key":"SVA-2","row":{"asked_id":"<@bea>","created_at":1700000000000,"created_by":"<@aram>","id":"<decision SVA-2 color>","kind":"choice","options":[{"decision_id":"<decision SVA-2 color>","id":"<id #178>","label":"Red","rank":"00000000sg"},{"decision_id":"<decision SVA-2 color>","id":"<id #179>","label":"Blue","rank":"00000001kw"}],"question":"Which color?","rank":"00000000sg","state":"open","task_id":"<task SVA-2>","updated_at":1700000000000,"updated_seq":122}},"entity_id":"<decision SVA-2 color>","entity_type":"decision","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":122,"type":"decision.opened"}
 
 id: 123
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #291>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<decision SVA-2 color>","entity_type":"decision","id":"<id #443>","seq":123,"snippet":"Which color?","task_id":"<task SVA-2>","title":"SVA-2 Explosion effect","type":"decision_asked","user_id":"<@bea>"}},"entity_id":"<id #443>","entity_type":"notification","scope_id":"<task SVA-2>","scope_type":"task","seq":123,"type":"notification.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #291>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<decision SVA-2 color>","entity_type":"decision","id":"<id #443>","seq":123,"snippet":"Which color?","task_id":"<task SVA-2>","title":"SVA-2 Explosion effect","type":"decision_asked","user_id":"<@bea>"}},"entity_id":"<id #443>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":123,"type":"notification.created"}
 
 id: 124
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #291>","data":{"changes":{"waiting_on_id":{"from":null,"to":"<@bea>"},"waiting_on_note":{"from":null,"to":"answer: Which color?"}},"id":"<task SVA-2>","key":"SVA-2"},"entity_id":"<task SVA-2>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":124,"type":"task.updated"}
@@ -21441,7 +21324,7 @@ id: 138
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #299>","data":{"key":"SVA-1","row":{"author_id":"<@aram>","body":"@bea no rings please.","created_at":1700000000000,"created_seq":138,"id":"<comment SVA-1 owner>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":138}},"entity_id":"<comment SVA-1 owner>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":138,"type":"comment.created"}
 
 id: 139
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #299>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment SVA-1 owner>","entity_type":"comment","id":"<id #446>","seq":139,"snippet":"@bea no rings please.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"mentioned","user_id":"<@bea>"}},"entity_id":"<id #446>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":139,"type":"notification.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #299>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment SVA-1 owner>","entity_type":"comment","id":"<id #446>","seq":139,"snippet":"@bea no rings please.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"mentioned","user_id":"<@bea>"}},"entity_id":"<id #446>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":139,"type":"notification.created"}
 
 id: 141
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #300>","data":{"attachments":[{"created_at":1700000000000,"created_by":"<@artist>","file":{"content_type":"text/plain; charset=utf-8","created_at":1700000000000,"id":"<file burst.txt>","name":"burst.txt","received":7,"sha256":"a46aedb8774401126bfb41d83796be3fca39150bf2aa3db46bacfed57b017eb3","size":7,"state":"ready","uploaded_by":"<@aram>","url":"/f/<file burst.txt>/burst.txt"},"file_id":"<file burst.txt>","id":"<id #173>","rank":"00000000sg","role":"after","subject_id":"<comment SVA-1 result>","subject_type":"comment","task_id":"<task SVA-1>"}],"key":"SVA-1","row":{"author_id":"<@artist>","body":"Drew the burst.","created_at":1700000000000,"created_seq":141,"evidence":{"checked":"at 1x and 2x","measured":"12 frames","not_verified":"on a phone"},"id":"<comment SVA-1 result>","kind":"result","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":141}},"entity_id":"<comment SVA-1 result>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":141,"type":"comment.created"}
@@ -21450,13 +21333,13 @@ id: 143
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #300>","data":{"changes":{"waiting_on_note":{"from":"answer: How many phases?","to":"review the result"}},"id":"<task SVA-1>","key":"SVA-1"},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":143,"type":"task.updated"}
 
 id: 144
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #300>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 result>","entity_type":"comment","id":"<id #448>","seq":144,"snippet":"Drew the burst.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"result","user_id":"<@bea>"}},"entity_id":"<id #448>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":144,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #300>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 result>","entity_type":"comment","id":"<id #448>","seq":144,"snippet":"Drew the burst.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"result","user_id":"<@bea>"}},"entity_id":"<id #448>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":144,"type":"notification.created"}
 
 id: 151
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #180>","data":{"key":"SVA-1","row":{"author_id":"<@aram>","body":"Said by mistake.","created_at":1700000000000,"created_seq":151,"id":"<comment removed>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":151}},"entity_id":"<comment removed>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":151,"type":"comment.created"}
 
 id: 152
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #180>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment removed>","entity_type":"comment","id":"<id #452>","seq":152,"snippet":"Said by mistake.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@bea>"}},"entity_id":"<id #452>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":152,"type":"notification.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #180>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment removed>","entity_type":"comment","id":"<id #452>","seq":152,"snippet":"Said by mistake.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@bea>"}},"entity_id":"<id #452>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":152,"type":"notification.created"}
 
 id: 154
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #181>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<comment removed>","key":"SVA-1"},"entity_id":"<comment removed>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":154,"type":"comment.deleted"}
@@ -21675,7 +21558,7 @@ id: 252
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #409>","data":{"changes":{"label_ids":{"from":null,"to":["<label art>"]}},"id":"<task SVA-6>","key":"SVA-6"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":252,"type":"task.updated"}
 
 id: 254
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #460>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #461>","seq":254,"snippet":"in your view \"Art bugs\"","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@bea>"}},"entity_id":"<id #461>","entity_type":"notification","scope_id":"<task SVA-6>","scope_type":"task","seq":254,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #460>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #461>","seq":254,"snippet":"in your view \"Art bugs\"","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@bea>"}},"entity_id":"<id #461>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":254,"type":"notification.created"}
 
 id: 257
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #412>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["comment.created"],"failures":0,"id":"<webhook comments>","name":"comments","updated_seq":257,"url":"http://receiver.test/comments"}},"entity_id":"<webhook comments>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":257,"type":"webhook.created"}
@@ -21684,7 +21567,7 @@ id: 258
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #189>","data":{"key":"SVA-1","row":{"author_id":"<@artist>","body":"Phase three is drawn.","created_at":1700000000000,"created_seq":258,"id":"<comment SVA-1 for the webhook>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":258}},"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":258,"type":"comment.created"}
 
 id: 260
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #189>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","id":"<id #464>","seq":260,"snippet":"Phase three is drawn.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@bea>"}},"entity_id":"<id #464>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":260,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #189>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","id":"<id #464>","seq":260,"snippet":"Phase three is drawn.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@bea>"}},"entity_id":"<id #464>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":260,"type":"notification.created"}
 
 id: 261
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #413>","data":{"row":{"id":"<label last>","name":"last","updated_seq":261}},"entity_id":"<label last>","entity_type":"label","scope_id":"<id #153>","scope_type":"workspace","seq":261,"type":"label.created"}

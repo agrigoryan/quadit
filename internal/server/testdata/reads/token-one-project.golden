@@ -418,7 +418,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
  "standing_preferences": [
   "Write short."
  ],
- "unread": 7,
+ "unread": 5,
  "user_id": "<@aram>",
  "version": "test",
  "workspace": {
@@ -431,7 +431,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
 200
 you are @aram (person, owner) in games
 projects: SVA
-unread: 7   seq: 261
+unread: 5   seq: 261
 rule: Write short.
 
 === GET /api/v1/w/games/my-work
@@ -487,16 +487,6 @@ rule: Write short.
   },
   {
    "at": "<minute>",
-   "by": "@ops",
-   "id": "<id #159>",
-   "seq": 149,
-   "snippet": "Rotated the first ten.",
-   "task": "OPS-1",
-   "title": "OPS-1 Rotate keys",
-   "type": "comment"
-  },
-  {
-   "at": "<minute>",
    "by": "@artist",
    "id": "<id #160>",
    "seq": 142,
@@ -504,16 +494,6 @@ rule: Write short.
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
    "type": "result"
-  },
-  {
-   "at": "<minute>",
-   "by": "@ops",
-   "id": "<id #161>",
-   "seq": 126,
-   "snippet": "Which vault?",
-   "task": "OPS-1",
-   "title": "OPS-1 Rotate keys",
-   "type": "decision_asked"
   },
   {
    "at": "<minute>",
@@ -575,12 +555,10 @@ SVA-1  [In Progress]  !high  @artist  waits on @aram  Boss design  #art  #bug  d
 SVA-1  How many phases?  (id=<decision SVA-1 phases>)
 == assigned to you (0)
 nothing
-== unread inbox (7)
+== unread inbox (5)
 #259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
 #253 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
-#149 <minute> @ops comment: OPS-1 Rotate keys — Rotated the first ten.
 #142 <minute> @artist result: SVA-1 Boss design — Drew the burst.
-#126 <minute> @ops decision_asked: OPS-1 Rotate keys — Which vault?
 #120 <minute> @artist decision_asked: SVA-1 Boss design — How many phases?
 #114 <minute> @artist decision_asked: SVA-1 Boss design — Which explosion?
 seq: 261
@@ -611,16 +589,6 @@ seq: 261
   },
   {
    "at": "<minute>",
-   "by": "@ops",
-   "id": "<id #159>",
-   "seq": 149,
-   "snippet": "Rotated the first ten.",
-   "task": "OPS-1",
-   "title": "OPS-1 Rotate keys",
-   "type": "comment"
-  },
-  {
-   "at": "<minute>",
    "by": "@artist",
    "id": "<id #160>",
    "seq": 142,
@@ -628,16 +596,6 @@ seq: 261
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
    "type": "result"
-  },
-  {
-   "at": "<minute>",
-   "by": "@ops",
-   "id": "<id #161>",
-   "seq": 126,
-   "snippet": "Which vault?",
-   "task": "OPS-1",
-   "title": "OPS-1 Rotate keys",
-   "type": "decision_asked"
   },
   {
    "at": "<minute>",
@@ -688,16 +646,6 @@ seq: 261
   },
   {
    "at": "<minute>",
-   "by": "@ops",
-   "id": "<id #159>",
-   "seq": 149,
-   "snippet": "Rotated the first ten.",
-   "task": "OPS-1",
-   "title": "OPS-1 Rotate keys",
-   "type": "comment"
-  },
-  {
-   "at": "<minute>",
    "by": "@artist",
    "id": "<id #160>",
    "seq": 142,
@@ -705,16 +653,6 @@ seq: 261
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
    "type": "result"
-  },
-  {
-   "at": "<minute>",
-   "by": "@ops",
-   "id": "<id #161>",
-   "seq": 126,
-   "snippet": "Which vault?",
-   "task": "OPS-1",
-   "title": "OPS-1 Rotate keys",
-   "type": "decision_asked"
   },
   {
    "at": "<minute>",
@@ -743,9 +681,7 @@ seq: 261
 200
 #259 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.
 #253 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
-#149 <minute> @ops comment: OPS-1 Rotate keys — Rotated the first ten.
 #142 <minute> @artist result: SVA-1 Boss design — Drew the burst.
-#126 <minute> @ops decision_asked: OPS-1 Rotate keys — Which vault?
 #120 <minute> @artist decision_asked: SVA-1 Boss design — How many phases?
 #114 <minute> @artist decision_asked: SVA-1 Boss design — Which explosion?
 
@@ -4491,6 +4427,7 @@ seq: 261
    },
    "entity_id": "<id #157>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 259,
@@ -7814,6 +7751,7 @@ nothing found
    },
    "entity_id": "<id #163>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 114,
@@ -7981,6 +7919,7 @@ nothing found
    },
    "entity_id": "<id #162>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 120,
@@ -8079,33 +8018,6 @@ nothing found
    "scope_type": "task",
    "seq": 124,
    "type": "task.updated"
-  },
-  {
-   "actor_id": "<@ops>",
-   "at": 1700000000000,
-   "audience_id": "<@aram>",
-   "change_id": "<id #292>",
-   "data": {
-    "row": {
-     "actor_id": "<@ops>",
-     "created_at": 1700000000000,
-     "entity_id": "<decision OPS-1 vault>",
-     "entity_type": "decision",
-     "id": "<id #161>",
-     "seq": 126,
-     "snippet": "Which vault?",
-     "task_id": "<task OPS-1>",
-     "title": "OPS-1 Rotate keys",
-     "type": "decision_asked",
-     "user_id": "<@aram>"
-    }
-   },
-   "entity_id": "<id #161>",
-   "entity_type": "notification",
-   "scope_id": "<task OPS-1>",
-   "scope_type": "task",
-   "seq": 126,
-   "type": "notification.created"
   },
   {
    "actor_id": "<@aram>",
@@ -8276,6 +8188,7 @@ nothing found
    },
    "entity_id": "<id #160>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 142,
@@ -8302,33 +8215,6 @@ nothing found
    "scope_type": "task",
    "seq": 143,
    "type": "task.updated"
-  },
-  {
-   "actor_id": "<@ops>",
-   "at": 1700000000000,
-   "audience_id": "<@aram>",
-   "change_id": "<id #302>",
-   "data": {
-    "row": {
-     "actor_id": "<@ops>",
-     "created_at": 1700000000000,
-     "entity_id": "<comment OPS-1 ops>",
-     "entity_type": "comment",
-     "id": "<id #159>",
-     "seq": 149,
-     "snippet": "Rotated the first ten.",
-     "task_id": "<task OPS-1>",
-     "title": "OPS-1 Rotate keys",
-     "type": "comment",
-     "user_id": "<@aram>"
-    }
-   },
-   "entity_id": "<id #159>",
-   "entity_type": "notification",
-   "scope_id": "<task OPS-1>",
-   "scope_type": "task",
-   "seq": 149,
-   "type": "notification.created"
   },
   {
    "actor_id": "<@aram>",
@@ -10641,6 +10527,7 @@ nothing found
    },
    "entity_id": "<id #158>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
    "seq": 253,
@@ -10721,6 +10608,7 @@ nothing found
    },
    "entity_id": "<id #157>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 259,
@@ -10817,14 +10705,12 @@ nothing found
 #121 <minute> @artist task.updated SVA-1 waiting_on: @artist -> @aram; waiting_on_note: answered: Burst: reads better small -> answer: How many phases?
 #122 <minute> @aram decision.opened SVA-2 "Which color?" [1) Red  2) Blue] asked @bea  (id=<decision SVA-2 color>)
 #124 <minute> @aram task.updated SVA-2 waiting_on: none -> @bea; waiting_on_note: none -> answer: Which color?
-#126 <minute> @ops inbox decision_asked: OPS-1 Rotate keys — Which vault?
 #134 <minute> @aram decision.opened SVA-1 "Asked by mistake?" [1) Yes  2) No]  (id=<decision removed>)
 #135 <minute> @aram decision.deleted SVA-1 moved to trash
 #138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)
 #141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)
 #142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.
 #143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result
-#149 <minute> @ops inbox comment: OPS-1 Rotate keys — Rotated the first ten.
 #151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)
 #154 <minute> @aram comment.deleted SVA-1 moved to trash
 #155 <minute> @aram attachment.created SVA-1
@@ -10975,14 +10861,12 @@ seq: 261
   "#121 <minute> @artist task.updated SVA-1 waiting_on: @artist -> @aram; waiting_on_note: answered: Burst: reads better small -> answer: How many phases?",
   "#122 <minute> @aram decision.opened SVA-2 \"Which color?\" [1) Red  2) Blue] asked @bea  (id=<decision SVA-2 color>)",
   "#124 <minute> @aram task.updated SVA-2 waiting_on: none -> @bea; waiting_on_note: none -> answer: Which color?",
-  "#126 <minute> @ops inbox decision_asked: OPS-1 Rotate keys — Which vault?",
   "#134 <minute> @aram decision.opened SVA-1 \"Asked by mistake?\" [1) Yes  2) No]  (id=<decision removed>)",
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
   "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
-  "#149 <minute> @ops inbox comment: OPS-1 Rotate keys — Rotated the first ten.",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#155 <minute> @aram attachment.created SVA-1",
@@ -11203,11 +11087,9 @@ seq: 261
   "#119 <minute> @artist decision.opened SVA-1 \"How many phases?\" [1) Three  2) Four] asked @aram  (id=<decision SVA-1 phases>)",
   "#120 <minute> @artist inbox decision_asked: SVA-1 Boss design — How many phases?",
   "#121 <minute> @artist task.updated SVA-1 waiting_on: @artist -> @aram; waiting_on_note: answered: Burst: reads better small -> answer: How many phases?",
-  "#126 <minute> @ops inbox decision_asked: OPS-1 Rotate keys — Which vault?",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
   "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
-  "#149 <minute> @ops inbox comment: OPS-1 Rotate keys — Rotated the first ten.",
   "#201 <minute> @artist doc.created \"Artist: memory\"",
   "#202 <minute> @artist doc.created \"Palette\"",
   "#203 <minute> @ops doc.created \"Ops bot: memory\"",
@@ -11216,10 +11098,12 @@ seq: 261
   "#231 <minute> @artist session.created SVA-1",
   "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#236 <minute> @ops session.created \"Looking around\"",
-  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress"
+  "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
+  "#252 <minute> @artist task.updated SVA-6 label: none -> art",
+  "#253 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\""
  ],
  "more": true,
- "seq": 237
+ "seq": 253
 }
 
 === GET /api/v1/w/games/events?after=0&inbox=1
@@ -11248,6 +11132,7 @@ seq: 261
    },
    "entity_id": "<id #163>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 114,
@@ -11275,36 +11160,10 @@ seq: 261
    },
    "entity_id": "<id #162>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 120,
-   "type": "notification.created"
-  },
-  {
-   "actor_id": "<@ops>",
-   "at": 1700000000000,
-   "audience_id": "<@aram>",
-   "change_id": "<id #292>",
-   "data": {
-    "row": {
-     "actor_id": "<@ops>",
-     "created_at": 1700000000000,
-     "entity_id": "<decision OPS-1 vault>",
-     "entity_type": "decision",
-     "id": "<id #161>",
-     "seq": 126,
-     "snippet": "Which vault?",
-     "task_id": "<task OPS-1>",
-     "title": "OPS-1 Rotate keys",
-     "type": "decision_asked",
-     "user_id": "<@aram>"
-    }
-   },
-   "entity_id": "<id #161>",
-   "entity_type": "notification",
-   "scope_id": "<task OPS-1>",
-   "scope_type": "task",
-   "seq": 126,
    "type": "notification.created"
   },
   {
@@ -11329,36 +11188,10 @@ seq: 261
    },
    "entity_id": "<id #160>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 142,
-   "type": "notification.created"
-  },
-  {
-   "actor_id": "<@ops>",
-   "at": 1700000000000,
-   "audience_id": "<@aram>",
-   "change_id": "<id #302>",
-   "data": {
-    "row": {
-     "actor_id": "<@ops>",
-     "created_at": 1700000000000,
-     "entity_id": "<comment OPS-1 ops>",
-     "entity_type": "comment",
-     "id": "<id #159>",
-     "seq": 149,
-     "snippet": "Rotated the first ten.",
-     "task_id": "<task OPS-1>",
-     "title": "OPS-1 Rotate keys",
-     "type": "comment",
-     "user_id": "<@aram>"
-    }
-   },
-   "entity_id": "<id #159>",
-   "entity_type": "notification",
-   "scope_id": "<task OPS-1>",
-   "scope_type": "task",
-   "seq": 149,
    "type": "notification.created"
   },
   {
@@ -11563,6 +11396,7 @@ seq: 261
    },
    "entity_id": "<id #158>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-6>",
    "scope_type": "task",
    "seq": 253,
@@ -11590,6 +11424,7 @@ seq: 261
    },
    "entity_id": "<id #157>",
    "entity_type": "notification",
+   "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
    "seq": 259,
@@ -11604,9 +11439,7 @@ seq: 261
 200
 #114 <minute> @artist inbox decision_asked: SVA-1 Boss design — Which explosion?
 #120 <minute> @artist inbox decision_asked: SVA-1 Boss design — How many phases?
-#126 <minute> @ops inbox decision_asked: OPS-1 Rotate keys — Which vault?
 #142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.
-#149 <minute> @ops inbox comment: OPS-1 Rotate keys — Rotated the first ten.
 #165 <minute> @aram doc.created "Salary notes"
 #166 <minute> @aram doc.created "For Bea"
 #198 <minute> @aram attachment.created
@@ -12245,14 +12078,12 @@ seq: 261
   "#121 <minute> @artist task.updated SVA-1 waiting_on: @artist -> @aram; waiting_on_note: answered: Burst: reads better small -> answer: How many phases?",
   "#122 <minute> @aram decision.opened SVA-2 \"Which color?\" [1) Red  2) Blue] asked @bea  (id=<decision SVA-2 color>)",
   "#124 <minute> @aram task.updated SVA-2 waiting_on: none -> @bea; waiting_on_note: none -> answer: Which color?",
-  "#126 <minute> @ops inbox decision_asked: OPS-1 Rotate keys — Which vault?",
   "#134 <minute> @aram decision.opened SVA-1 \"Asked by mistake?\" [1) Yes  2) No]  (id=<decision removed>)",
   "#135 <minute> @aram decision.deleted SVA-1 moved to trash",
   "#138 <minute> @aram comment SVA-1: @bea no rings please.  (id=<comment SVA-1 owner>)",
   "#141 <minute> @artist RESULT SVA-1: Drew the burst.  (id=<comment SVA-1 result>)",
   "#142 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.",
   "#143 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
-  "#149 <minute> @ops inbox comment: OPS-1 Rotate keys — Rotated the first ten.",
   "#151 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
   "#154 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#155 <minute> @aram attachment.created SVA-1",
@@ -13065,19 +12896,6 @@ seq: 261
    "user_id": "<@aram>"
   },
   {
-   "actor_id": "<@ops>",
-   "created_at": 1700000000000,
-   "entity_id": "<comment OPS-1 ops>",
-   "entity_type": "comment",
-   "id": "<id #159>",
-   "seq": 149,
-   "snippet": "Rotated the first ten.",
-   "task_id": "<task OPS-1>",
-   "title": "OPS-1 Rotate keys",
-   "type": "comment",
-   "user_id": "<@aram>"
-  },
-  {
    "actor_id": "<@artist>",
    "created_at": 1700000000000,
    "entity_id": "<comment SVA-1 result>",
@@ -13088,19 +12906,6 @@ seq: 261
    "task_id": "<task SVA-1>",
    "title": "SVA-1 Boss design",
    "type": "result",
-   "user_id": "<@aram>"
-  },
-  {
-   "actor_id": "<@ops>",
-   "created_at": 1700000000000,
-   "entity_id": "<decision OPS-1 vault>",
-   "entity_type": "decision",
-   "id": "<id #161>",
-   "seq": 126,
-   "snippet": "Which vault?",
-   "task_id": "<task OPS-1>",
-   "title": "OPS-1 Rotate keys",
-   "type": "decision_asked",
    "user_id": "<@aram>"
   },
   {
@@ -13510,12 +13315,6 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<epic Hardening>",
-   "subject_type": "epic",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<epic Scrapped>",
    "subject_type": "epic",
    "user_id": "<@aram>"
@@ -13528,19 +13327,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-1>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-2>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task OPS-2>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -13552,19 +13339,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-3>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-4>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task OPS-4>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -13576,25 +13351,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-5>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-6>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task ARC-1>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task DEL-1>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -13636,24 +13393,6 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<doc OPS runbook>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS sub-page>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS private>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<doc Sprites>",
    "subject_type": "doc",
    "user_id": "<@aram>"
@@ -13678,25 +13417,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<doc Servers>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<row cellar>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<doc Decision log>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc Open questions>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -13715,12 +13436,6 @@ seq: 261
   {
    "created_at": 1700000000000,
    "subject_id": "<doc removed>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS removed>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -14446,19 +14161,6 @@ seq: 261
    "user_id": "<@aram>"
   },
   {
-   "actor_id": "<@ops>",
-   "created_at": 1700000000000,
-   "entity_id": "<comment OPS-1 ops>",
-   "entity_type": "comment",
-   "id": "<id #159>",
-   "seq": 149,
-   "snippet": "Rotated the first ten.",
-   "task_id": "<task OPS-1>",
-   "title": "OPS-1 Rotate keys",
-   "type": "comment",
-   "user_id": "<@aram>"
-  },
-  {
    "actor_id": "<@artist>",
    "created_at": 1700000000000,
    "entity_id": "<comment SVA-1 result>",
@@ -14469,19 +14171,6 @@ seq: 261
    "task_id": "<task SVA-1>",
    "title": "SVA-1 Boss design",
    "type": "result",
-   "user_id": "<@aram>"
-  },
-  {
-   "actor_id": "<@ops>",
-   "created_at": 1700000000000,
-   "entity_id": "<decision OPS-1 vault>",
-   "entity_type": "decision",
-   "id": "<id #161>",
-   "seq": 126,
-   "snippet": "Which vault?",
-   "task_id": "<task OPS-1>",
-   "title": "OPS-1 Rotate keys",
-   "type": "decision_asked",
    "user_id": "<@aram>"
   },
   {
@@ -14848,12 +14537,6 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<epic Hardening>",
-   "subject_type": "epic",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<epic Scrapped>",
    "subject_type": "epic",
    "user_id": "<@aram>"
@@ -14866,19 +14549,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-1>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-2>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task OPS-2>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -14890,19 +14561,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-3>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-4>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task OPS-4>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -14914,25 +14573,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-5>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-6>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task ARC-1>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task DEL-1>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -14974,24 +14615,6 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<doc OPS runbook>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS sub-page>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS private>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<doc Sprites>",
    "subject_type": "doc",
    "user_id": "<@aram>"
@@ -15016,25 +14639,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<doc Servers>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<row cellar>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<doc Decision log>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc Open questions>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -15053,12 +14658,6 @@ seq: 261
   {
    "created_at": 1700000000000,
    "subject_id": "<doc removed>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS removed>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -15367,16 +14966,8 @@ seq: 261
    "title": "SVA-6 Review me"
   },
   {
-   "id": "<id #159>",
-   "title": "OPS-1 Rotate keys"
-  },
-  {
    "id": "<id #160>",
    "title": "SVA-1 Boss design"
-  },
-  {
-   "id": "<id #161>",
-   "title": "OPS-1 Rotate keys"
   },
   {
    "id": "<id #162>",
@@ -15528,21 +15119,6 @@ seq: 261
   }
  ],
  "watchers": [
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
-  {},
   {},
   {},
   {},
@@ -16018,12 +15594,6 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<epic Hardening>",
-   "subject_type": "epic",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<epic Scrapped>",
    "subject_type": "epic",
    "user_id": "<@aram>"
@@ -16036,19 +15606,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-1>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-2>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task OPS-2>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -16060,19 +15618,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-3>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-4>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task OPS-4>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -16084,25 +15630,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<task OPS-5>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<task SVA-6>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task ARC-1>",
-   "subject_type": "task",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<task DEL-1>",
    "subject_type": "task",
    "user_id": "<@aram>"
   },
@@ -16144,24 +15672,6 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<doc OPS runbook>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS sub-page>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS private>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<doc Sprites>",
    "subject_type": "doc",
    "user_id": "<@aram>"
@@ -16186,25 +15696,7 @@ seq: 261
   },
   {
    "created_at": 1700000000000,
-   "subject_id": "<doc Servers>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<row cellar>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
    "subject_id": "<doc Decision log>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc Open questions>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -16223,12 +15715,6 @@ seq: 261
   {
    "created_at": 1700000000000,
    "subject_id": "<doc removed>",
-   "subject_type": "doc",
-   "user_id": "<@aram>"
-  },
-  {
-   "created_at": 1700000000000,
-   "subject_id": "<doc OPS removed>",
    "subject_type": "doc",
    "user_id": "<@aram>"
   },
@@ -22728,7 +22214,7 @@ id: 113
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #288>","data":{"key":"SVA-1","row":{"asked_id":"<@aram>","created_at":1700000000000,"created_by":"<@artist>","details":"It is seen from far away.","id":"<decision SVA-1 explosion>","kind":"choice","options":[{"decision_id":"<decision SVA-1 explosion>","description":"one clean ring","id":"<id #171>","label":"Ring","rank":"00000000sg"},{"decision_id":"<decision SVA-1 explosion>","id":"<id #172>","label":"Burst","rank":"00000001kw"}],"question":"Which explosion?","rank":"00000000sg","recommended_option_id":"<id #171>","state":"open","task_id":"<task SVA-1>","updated_at":1700000000000,"updated_seq":113}},"entity_id":"<decision SVA-1 explosion>","entity_type":"decision","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":113,"type":"decision.opened"}
 
 id: 114
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #288>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<decision SVA-1 explosion>","entity_type":"decision","id":"<id #163>","seq":114,"snippet":"Which explosion?","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"decision_asked","user_id":"<@aram>"}},"entity_id":"<id #163>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":114,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #288>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<decision SVA-1 explosion>","entity_type":"decision","id":"<id #163>","seq":114,"snippet":"Which explosion?","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"decision_asked","user_id":"<@aram>"}},"entity_id":"<id #163>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":114,"type":"notification.created"}
 
 id: 115
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #288>","data":{"changes":{"waiting_on_note":{"from":null,"to":"answer: Which explosion?"}},"id":"<task SVA-1>","key":"SVA-1"},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":115,"type":"task.updated"}
@@ -22743,7 +22229,7 @@ id: 119
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #290>","data":{"key":"SVA-1","row":{"asked_id":"<@aram>","created_at":1700000000000,"created_by":"<@artist>","id":"<decision SVA-1 phases>","kind":"choice","options":[{"decision_id":"<decision SVA-1 phases>","id":"<id #155>","label":"Three","rank":"00000000sg"},{"decision_id":"<decision SVA-1 phases>","id":"<id #156>","label":"Four","rank":"00000001kw"}],"question":"How many phases?","rank":"00000001kw","state":"open","task_id":"<task SVA-1>","updated_at":1700000000000,"updated_seq":119}},"entity_id":"<decision SVA-1 phases>","entity_type":"decision","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":119,"type":"decision.opened"}
 
 id: 120
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #290>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<decision SVA-1 phases>","entity_type":"decision","id":"<id #162>","seq":120,"snippet":"How many phases?","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"decision_asked","user_id":"<@aram>"}},"entity_id":"<id #162>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":120,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #290>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<decision SVA-1 phases>","entity_type":"decision","id":"<id #162>","seq":120,"snippet":"How many phases?","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"decision_asked","user_id":"<@aram>"}},"entity_id":"<id #162>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":120,"type":"notification.created"}
 
 id: 121
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #290>","data":{"changes":{"waiting_on_id":{"from":"<@artist>","to":"<@aram>"},"waiting_on_note":{"from":"answered: Burst: reads better small","to":"answer: How many phases?"}},"id":"<task SVA-1>","key":"SVA-1"},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":121,"type":"task.updated"}
@@ -22753,9 +22239,6 @@ data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #291>","data":{"
 
 id: 124
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #291>","data":{"changes":{"waiting_on_id":{"from":null,"to":"<@bea>"},"waiting_on_note":{"from":null,"to":"answer: Which color?"}},"id":"<task SVA-2>","key":"SVA-2"},"entity_id":"<task SVA-2>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":124,"type":"task.updated"}
-
-id: 126
-data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #292>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<decision OPS-1 vault>","entity_type":"decision","id":"<id #161>","seq":126,"snippet":"Which vault?","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"decision_asked","user_id":"<@aram>"}},"entity_id":"<id #161>","entity_type":"notification","scope_id":"<task OPS-1>","scope_type":"task","seq":126,"type":"notification.created"}
 
 id: 134
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #295>","data":{"key":"SVA-1","row":{"created_at":1700000000000,"created_by":"<@aram>","id":"<decision removed>","kind":"choice","options":[{"decision_id":"<decision removed>","id":"<id #192>","label":"Yes","rank":"00000000sg"},{"decision_id":"<decision removed>","id":"<id #193>","label":"No","rank":"00000001kw"}],"question":"Asked by mistake?","rank":"00000002dc","state":"open","task_id":"<task SVA-1>","updated_at":1700000000000,"updated_seq":134}},"entity_id":"<decision removed>","entity_type":"decision","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":134,"type":"decision.opened"}
@@ -22770,13 +22253,10 @@ id: 141
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #300>","data":{"attachments":[{"created_at":1700000000000,"created_by":"<@artist>","file":{"content_type":"text/plain; charset=utf-8","created_at":1700000000000,"id":"<file burst.txt>","name":"burst.txt","received":7,"sha256":"a46aedb8774401126bfb41d83796be3fca39150bf2aa3db46bacfed57b017eb3","size":7,"state":"ready","uploaded_by":"<@aram>","url":"/f/<file burst.txt>/burst.txt"},"file_id":"<file burst.txt>","id":"<id #173>","rank":"00000000sg","role":"after","subject_id":"<comment SVA-1 result>","subject_type":"comment","task_id":"<task SVA-1>"}],"key":"SVA-1","row":{"author_id":"<@artist>","body":"Drew the burst.","created_at":1700000000000,"created_seq":141,"evidence":{"checked":"at 1x and 2x","measured":"12 frames","not_verified":"on a phone"},"id":"<comment SVA-1 result>","kind":"result","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":141}},"entity_id":"<comment SVA-1 result>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":141,"type":"comment.created"}
 
 id: 142
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #300>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 result>","entity_type":"comment","id":"<id #160>","seq":142,"snippet":"Drew the burst.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"result","user_id":"<@aram>"}},"entity_id":"<id #160>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":142,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #300>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 result>","entity_type":"comment","id":"<id #160>","seq":142,"snippet":"Drew the burst.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"result","user_id":"<@aram>"}},"entity_id":"<id #160>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":142,"type":"notification.created"}
 
 id: 143
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #300>","data":{"changes":{"waiting_on_note":{"from":"answer: How many phases?","to":"review the result"}},"id":"<task SVA-1>","key":"SVA-1"},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":143,"type":"task.updated"}
-
-id: 149
-data: {"actor_id":"<@ops>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #302>","data":{"row":{"actor_id":"<@ops>","created_at":1700000000000,"entity_id":"<comment OPS-1 ops>","entity_type":"comment","id":"<id #159>","seq":149,"snippet":"Rotated the first ten.","task_id":"<task OPS-1>","title":"OPS-1 Rotate keys","type":"comment","user_id":"<@aram>"}},"entity_id":"<id #159>","entity_type":"notification","scope_id":"<task OPS-1>","scope_type":"task","seq":149,"type":"notification.created"}
 
 id: 151
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #180>","data":{"key":"SVA-1","row":{"author_id":"<@aram>","body":"Said by mistake.","created_at":1700000000000,"created_seq":151,"id":"<comment removed>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":151}},"entity_id":"<comment removed>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":151,"type":"comment.created"}
@@ -22998,7 +22478,7 @@ id: 252
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #409>","data":{"changes":{"label_ids":{"from":null,"to":["<label art>"]}},"id":"<task SVA-6>","key":"SVA-6"},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":252,"type":"task.updated"}
 
 id: 253
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #410>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #158>","seq":253,"snippet":"in your view \"Art bugs\"","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@aram>"}},"entity_id":"<id #158>","entity_type":"notification","scope_id":"<task SVA-6>","scope_type":"task","seq":253,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #410>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<task SVA-6>","entity_type":"task","id":"<id #158>","seq":253,"snippet":"in your view \"Art bugs\"","task_id":"<task SVA-6>","title":"SVA-6 Review me","type":"waiting_on","user_id":"<@aram>"}},"entity_id":"<id #158>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":253,"type":"notification.created"}
 
 id: 257
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #412>","data":{"row":{"active":true,"created_at":1700000000000,"created_by":"<@aram>","event_types":["comment.created"],"failures":0,"id":"<webhook comments>","name":"comments","updated_seq":257,"url":"http://receiver.test/comments"}},"entity_id":"<webhook comments>","entity_type":"webhook","scope_id":"<id #153>","scope_type":"workspace","seq":257,"type":"webhook.created"}
@@ -23007,7 +22487,7 @@ id: 258
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #189>","data":{"key":"SVA-1","row":{"author_id":"<@artist>","body":"Phase three is drawn.","created_at":1700000000000,"created_seq":258,"id":"<comment SVA-1 for the webhook>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":258}},"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":258,"type":"comment.created"}
 
 id: 259
-data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #189>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","id":"<id #157>","seq":259,"snippet":"Phase three is drawn.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@aram>"}},"entity_id":"<id #157>","entity_type":"notification","scope_id":"<task SVA-1>","scope_type":"task","seq":259,"type":"notification.created"}
+data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@aram>","change_id":"<id #189>","data":{"row":{"actor_id":"<@artist>","created_at":1700000000000,"entity_id":"<comment SVA-1 for the webhook>","entity_type":"comment","id":"<id #157>","seq":259,"snippet":"Phase three is drawn.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@aram>"}},"entity_id":"<id #157>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":259,"type":"notification.created"}
 
 id: 261
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #413>","data":{"row":{"id":"<label last>","name":"last","updated_seq":261}},"entity_id":"<label last>","entity_type":"label","scope_id":"<id #153>","scope_type":"workspace","seq":261,"type":"label.created"}
