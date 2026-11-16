@@ -3,9 +3,7 @@
 // all-or-nothing batch. Always pass ids from the store.
 //
 // Each is also remembered with its opposite (data/undo.ts), so Cmd+Z takes
-// it back: a selection changed at once is one step. Moving tasks to
-// another project is the exception: they are numbered anew there, and
-// moving them back would number them a third time.
+// it back: a selection changed at once is one step.
 
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
@@ -283,14 +281,37 @@ export function moveCard(task: Task, rank: string | undefined, move: CardMove = 
  * and the status of the same name (or kind); what belongs to the old
  * project (its labels, epic, cycle) is left behind. The server's answer
  * redraws them; nothing is guessed ahead of it.
+ *
+ * Undone, each task is moved back, where the server gives it its old key
+ * again, and is given back what the move left behind.
  */
 export function moveToProject(tasks: Task[], projectId: string) {
   const project = getRow("projects", projectId);
   const moving = tasks.filter((task) => task.project_id !== projectId);
   if (!project || moving.length === 0) return;
-  mutate(moving.map((task) => ({ type: "task.move", args: { id: task.id, project: projectId } })))
+  const there: ChangeSpec[] = moving.map((task) => ({ type: "task.move", args: { id: task.id, project: projectId } }));
+  const back: ChangeSpec[] = moving.flatMap((task): ChangeSpec[] => [
+    { type: "task.move", args: { id: task.id, project: task.project_id } },
+    {
+      type: "task.update",
+      args: {
+        id: task.id,
+        status: task.status_id,
+        epic: task.epic_id ?? null,
+        milestone: task.milestone_id ?? null,
+        cycle: task.cycle_id ?? null,
+        labels: task.label_ids ?? [],
+      },
+    },
+  ]);
+  const done = remember(
+    t("undo.moveProject", { what: named(moving), project: project.name }),
+    () => mutate(back),
+    () => mutate(there),
+  );
+  mutate(there)
     .then(() => toast.info(t("bulk.moved", { n: moving.length, project: project.name })))
-    .catch(() => {});
+    .catch(() => forget(done));
 }
 
 const sendBatch = (batch: Batch) => mutate(batch.changes, batch.show);

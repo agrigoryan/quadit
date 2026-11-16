@@ -13,6 +13,7 @@ import {
   createTasks,
   linkUrl,
   moveCard,
+  moveToProject,
   removeLink,
   setAssignee,
   setDue,
@@ -48,7 +49,10 @@ beforeEach(() => {
     me: { user_id: "u1" } as Member,
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
-    projects: [{ id: "p", key: "SVA", name: "Samurai" }],
+    projects: [
+      { id: "p", key: "SVA", name: "Samurai" },
+      { id: "q", key: "WEB", name: "Website" },
+    ],
     statuses: [
       { id: "todo", project_id: "p", name: "Todo", category: "unstarted", is_default: true },
       { id: "done", project_id: "p", name: "Done", category: "done" },
@@ -191,6 +195,27 @@ describe("undoing the trash and the making of tasks", () => {
     await settle();
     expect(last().map((c) => c.type)).toEqual(["task.delete", "task.delete", "task.delete"]);
     expect(useUndo.getState().done).toEqual([]);
+  });
+});
+
+describe("undoing a move to another project", () => {
+  it("moves each task back and gives it what the move left behind", async () => {
+    moveToProject([task("t2")], "q");
+    await settle();
+    expect(nextUndo()?.name).toBe("move SVA-2 to Website");
+    undo();
+    await settle();
+    // Back in its project first, where the server gives it its key again; its status and labels are of that project.
+    expect(last()).toEqual([
+      { type: "task.move", args: { id: "t2", project: "p" } },
+      {
+        type: "task.update",
+        args: { id: "t2", status: "todo", epic: null, milestone: null, cycle: null, labels: ["bug"] },
+      },
+    ]);
+    redo();
+    await settle();
+    expect(last()).toEqual([{ type: "task.move", args: { id: "t2", project: "q" } }]);
   });
 });
 

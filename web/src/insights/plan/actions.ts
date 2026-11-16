@@ -5,8 +5,8 @@
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
-import { type ChangeSpec, mutate, send } from "@/data/mutate";
-import { type Batch, sendUndoable, undo } from "@/data/undo";
+import { type ChangeSpec, mutate } from "@/data/mutate";
+import { type Batch, forget, remember, sendUndoable, undo } from "@/data/undo";
 import { rankBetween } from "@/lib/rank";
 import { getRows } from "@/data/selectors";
 import { toast } from "@/lib/toast";
@@ -32,26 +32,70 @@ export async function createEpic(projectId: string, f: EpicFields): Promise<stri
   if (f.startOn) args.start_on = f.startOn;
   if (f.targetOn) args.target_on = f.targetOn;
   const lastRank = getRows("epics").reduce((max, e) => (e.project_id === projectId && e.rank > max ? e.rank : max), "");
-  await mutate(
-    { type: "epic.create", args },
-    (tx) =>
-      tx.insert("epics", {
-        id,
-        project_id: projectId,
-        name: args.name,
-        description: args.description,
-        state: f.state,
-        lead_id: f.leadId || undefined,
-        start_on: f.startOn || undefined,
-        target_on: f.targetOn || undefined,
-        rank: `${lastRank}z`,
-        created_at: Date.now(),
-      }),
-    // The dialog shows the refusal.
-    { quiet: true },
+  const made = remember(
+    t("undo.plan.create", { what: args.name }),
+    () => sendBatch(inTrash("epic", "epics", id, true)),
+    () => sendBatch(inTrash("epic", "epics", id, false)),
   );
+  try {
+    await mutate(
+      { type: "epic.create", args },
+      (tx) =>
+        tx.insert("epics", {
+          id,
+          project_id: projectId,
+          name: args.name,
+          description: args.description,
+          state: f.state,
+          lead_id: f.leadId || undefined,
+          start_on: f.startOn || undefined,
+          target_on: f.targetOn || undefined,
+          rank: `${lastRank}z`,
+          created_at: Date.now(),
+        }),
+      // The dialog shows the refusal.
+      { quiet: true },
+    );
+  } catch (err) {
+    forget(made);
+    throw err;
+  }
   return id;
 }
+
+const sendBatch = (batch: Batch) => mutate(batch.changes, batch.show);
+
+/** The batch that puts an epic, a milestone or a cycle in the trash, or takes it out. */
+function inTrash(
+  kind: "epic" | "milestone" | "cycle",
+  collection: "epics" | "milestones" | "cycles",
+  id: string,
+  put: boolean,
+): Batch {
+  return {
+    changes: [{ type: `${kind}.${put ? "delete" : "restore"}`, args: { id } }],
+    show: (tx) => tx.patch(collection, id, { deleted_at: put ? Date.now() : null }),
+  };
+}
+
+/** The batch that gives tasks back what a delete took off them: each task's own fields, as task.update takes them. */
+function givenBack(tasks: Task[], args: (task: Task) => Changes["task.update"], fields: (task: Task) => Fields): Batch {
+  return {
+    changes: tasks.map((task): ChangeSpec => ({ type: "task.update", args: args(task) })),
+    show: (tx) => {
+      for (const task of tasks) tx.patch("tasks", task.id, fields(task));
+    },
+  };
+}
+
+/** One batch after another, as one: the first's changes are sent first. */
+const both = (first: Batch, then: Batch): Batch => ({
+  changes: [...first.changes, ...then.changes],
+  show: (tx) => {
+    first.show?.(tx);
+    then.show?.(tx);
+  },
+});
 
 /** Row fields an epic.update argument lands in. */
 const epicField: Record<string, string> = { lead: "lead_id" };
@@ -95,14 +139,27 @@ function putBack(row: object, args: Fields, fieldOf: Record<string, string> = {}
   return { back, before };
 }
 
-/** Deletes an epic; its tasks stay, without an epic. */
+/** Deletes an epic; its tasks stay, without an epic. Undone, the epic is back and so are its tasks, each in its milestone. */
 export function deleteEpic(epic: Epic) {
-  send({ type: "epic.delete", args: { id: epic.id } }, (tx) => {
-    for (const task of getRows("tasks")) {
-      if (task.epic_id === epic.id) tx.patch("tasks", task.id, { epic_id: null, milestone_id: null });
-    }
-    tx.remove("epics", epic.id);
-  });
+  const tasks = getRows("tasks").filter((task) => task.epic_id === epic.id);
+  sendUndoable(
+    t("undo.plan.delete", { what: epic.name }),
+    {
+      changes: [{ type: "epic.delete", args: { id: epic.id } }],
+      show: (tx) => {
+        for (const task of tasks) tx.patch("tasks", task.id, { epic_id: null, milestone_id: null });
+        tx.patch("epics", epic.id, { deleted_at: Date.now() });
+      },
+    },
+    both(
+      inTrash("epic", "epics", epic.id, false),
+      givenBack(
+        tasks,
+        (task) => ({ id: task.id, epic: epic.id, milestone: task.milestone_id ?? null }),
+        (task) => ({ epic_id: epic.id, milestone_id: task.milestone_id ?? null }),
+      ),
+    ),
+  );
 }
 
 export function setWatchingEpic(epic: Epic, userId: string, watching: boolean) {
@@ -122,9 +179,14 @@ export function createMilestone(epic: Epic, name: string, targetOn: string, afte
   const rank = rankBetween(after?.rank, undefined);
   const args: Changes["milestone.create"] = { id, epic: epic.id, name: name.trim(), rank };
   if (targetOn) args.target_on = targetOn;
-  send({ type: "milestone.create", args }, (tx) =>
-    tx.insert("milestones", { id, epic_id: epic.id, name: args.name, target_on: targetOn || undefined, rank }),
+  const made = remember(
+    t("undo.plan.create", { what: args.name }),
+    () => sendBatch(inTrash("milestone", "milestones", id, true)),
+    () => sendBatch(inTrash("milestone", "milestones", id, false)),
   );
+  mutate({ type: "milestone.create", args }, (tx) =>
+    tx.insert("milestones", { id, epic_id: epic.id, name: args.name, target_on: targetOn || undefined, rank }),
+  ).catch(() => forget(made));
 }
 
 export function updateMilestone(
@@ -159,13 +221,43 @@ export function moveMilestone(ordered: Milestone[], milestone: Milestone, step: 
   updateMilestone(milestone, { rank });
 }
 
-/** Deletes a milestone; its tasks stay in the epic. */
+/** Deletes a milestone; its tasks stay in the epic. Undone, it is back with its tasks. */
 export function deleteMilestone(milestone: Milestone) {
-  send({ type: "milestone.delete", args: { id: milestone.id } }, (tx) => {
-    for (const task of getRows("tasks")) {
-      if (task.milestone_id === milestone.id) tx.patch("tasks", task.id, { milestone_id: null });
-    }
-    tx.remove("milestones", milestone.id);
+  const tasks = getRows("tasks").filter((task) => task.milestone_id === milestone.id);
+  sendUndoable(
+    t("undo.plan.delete", { what: milestone.name }),
+    {
+      changes: [{ type: "milestone.delete", args: { id: milestone.id } }],
+      show: (tx) => {
+        for (const task of tasks) tx.patch("tasks", task.id, { milestone_id: null });
+        tx.patch("milestones", milestone.id, { deleted_at: Date.now() });
+      },
+    },
+    both(
+      inTrash("milestone", "milestones", milestone.id, false),
+      givenBack(
+        tasks,
+        (task) => ({ id: task.id, milestone: milestone.id }),
+        () => ({ milestone_id: milestone.id }),
+      ),
+    ),
+  );
+}
+
+/** Makes a cycle of a project; rejects (after a note) where the server refuses, as for dates another cycle has. */
+export function createCycle(projectId: string, number: number, startsOn: string, endsOn: string): Promise<unknown> {
+  const id = newId();
+  const made = remember(
+    t("undo.plan.create", { what: t("undo.plan.cycle", { n: number }) }),
+    () => sendBatch(inTrash("cycle", "cycles", id, true)),
+    () => sendBatch(inTrash("cycle", "cycles", id, false)),
+  );
+  return mutate(
+    { type: "cycle.create", args: { id, project: projectId, starts_on: startsOn, ends_on: endsOn } },
+    (tx) => tx.insert("cycles", { id, project_id: projectId, number, starts_on: startsOn, ends_on: endsOn }),
+  ).catch((err: unknown) => {
+    forget(made);
+    throw err;
   });
 }
 

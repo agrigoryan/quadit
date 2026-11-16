@@ -43,12 +43,30 @@ export function markOpened(id: string) {
 export const markRead = (ids: string[]) => setRead(ids, true);
 export const markUnread = (ids: string[]) => setRead(ids, false);
 
-/** Takes items out of the inbox for good: the one thing here Cmd+Z does not bring back. */
+/** Takes items out of the inbox. Undone, they are back in it, unread if they were. */
 export function archive(ids: string[]) {
-  const now = Date.now();
-  send({ type: "notification.read", args: { ids, archive: true } }, (tx) => {
-    for (const id of ids) tx.patch("notifications", id, { archived_at: now, read_at: now });
-  });
+  const { notifications } = getState().collections;
+  const unread = ids.filter((id) => notifications[id] && !notifications[id].read_at);
+  const back: Batch = {
+    changes: [{ type: "notification.read", args: { ids, unarchive: true } }],
+    show: (tx) => {
+      for (const id of ids) tx.patch("notifications", id, { archived_at: null });
+      for (const id of unread) tx.patch("notifications", id, { read_at: null });
+    },
+  };
+  // Taking an item out marks it read: one that was unread is made so again.
+  if (unread.length > 0) back.changes.push({ type: "notification.read", args: { ids: unread, unread: true } });
+  sendUndoable(
+    t("undo.archive", { n: ids.length }),
+    {
+      changes: [{ type: "notification.read", args: { ids, archive: true } }],
+      show: (tx) => {
+        const now = Date.now();
+        for (const id of ids) tx.patch("notifications", id, { archived_at: now, read_at: now });
+      },
+    },
+    back,
+  );
 }
 
 /** Marks everything shown as read; items that arrive after the newest one shown stay unread. */

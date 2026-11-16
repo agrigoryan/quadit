@@ -32,7 +32,7 @@ test("Cmd+Z takes a change back and Shift+Cmd+Z makes it again, on the server to
 
   await undo(page);
   await expect(page.getByRole("button", { name: "Priority: Low" })).toBeVisible();
-  await expect(page.getByText(`Undone: change the priority of ${key}`)).toBeVisible();
+  await expect(page.getByText(`Undone: change the priority of ${key}`, { exact: true })).toBeVisible();
   await expect.poll(() => quadit.task(key)).toMatchObject({ priority: "low" });
 
   await redo(page);
@@ -125,4 +125,39 @@ test("in a field Cmd+Z is the text's own undo, not the list's", async ({ page, p
   await undo(page);
   await expect(page.getByRole("button", { name: "Priority: Urgent" })).toBeVisible();
   await expect.poll(() => quadit.task(key)).toMatchObject({ priority: "urgent" });
+});
+
+test("a task moved to another project comes back under its old key", async ({ page, project, quadit }) => {
+  const key = await project.newTask("Port the importer");
+  const other = `${project.key}X`;
+  await quadit.cli("do", "project.create", JSON.stringify({ key: other, name: `Elsewhere ${other}` }));
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  await expect(page.getByRole("link", { name: `Open ${key}` })).toBeVisible();
+  await page.keyboard.press("j");
+  await page.keyboard.press("x");
+  await page.getByRole("button", { name: "More changes" }).click();
+  await page.getByRole("menuitem", { name: "Move to project…" }).click();
+  await page.getByRole("option", { name: new RegExp(`Elsewhere ${other}`) }).click();
+  await expect(page.getByText(`1 task moved to Elsewhere ${other}`, { exact: true })).toBeVisible();
+  await expect.poll(async () => (await quadit.task(key)).key).toBe(`${other}-1`);
+
+  // The same page still: what was done is this tab's to undo, and a reload would forget it.
+  await expect(page.getByRole("link", { name: `Open ${key}` })).toHaveCount(0);
+  await page.getByRole("main").focus();
+  await undo(page);
+  await expect(page.getByRole("link", { name: `Open ${key}` })).toBeVisible();
+  await expect.poll(async () => (await quadit.task(`${other}-1`)).key).toBe(key);
+});
+
+test("an inbox item archived with E comes back with Cmd+Z, unread as it was", async ({ page, project, quadit }) => {
+  const key = await project.newTask("Review the copy");
+  await quadit.agent("comment", key, "Ready for you @ann-owner");
+  await page.goto("/e2e/inbox");
+  const item = page.getByRole("link", { name: new RegExp(`${key}`) }).first();
+  await expect(item).toBeVisible();
+  await page.keyboard.press("j");
+  await page.keyboard.press("e");
+  await expect(page.getByRole("link", { name: new RegExp(`${key}`) })).toHaveCount(0);
+  await undo(page);
+  await expect(page.getByRole("link", { name: new RegExp(`${key}`) }).first()).toBeVisible();
 });

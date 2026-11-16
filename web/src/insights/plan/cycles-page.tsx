@@ -4,8 +4,6 @@ import { type FormEvent, useMemo, useState } from "react";
 import { Plus, RefreshCw } from "lucide-react";
 import { useParams } from "react-router";
 import { t } from "@/lib/i18n";
-import { newId } from "@/lib/ids";
-import { mutate } from "@/data/mutate";
 import { useCan } from "@/data/access";
 import { useCycles, useProjectByKey, useSlug } from "@/data/selectors";
 import { useRestLoaded } from "@/data/store";
@@ -13,6 +11,7 @@ import { daysUntil, formatDay, serverDay } from "@/lib/time";
 import type { Cycle, Project } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { addDays } from "@/lib/days";
+import { createCycle } from "@/insights/plan/actions";
 import { cycleName, cyclePhase } from "@/insights/plan/cycle-page";
 import { type Tally, useTallies } from "@/insights/plan/stats";
 import { PlanRow } from "@/insights/plan/plan-row";
@@ -136,12 +135,9 @@ function NewCycle({ project, cycles }: { project: Project; cycles: Cycle[] }) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!start || !end) return;
-    const id = newId();
     const number = cycles.reduce((max, c) => Math.max(max, c.number), 0) + 1;
     // Overlapping dates are refused by the server: its message shows as a toast and the dates stay to be fixed.
-    mutate({ type: "cycle.create", args: { id, project: project.id, starts_on: start, ends_on: end } }, (tx) =>
-      tx.insert("cycles", { id, project_id: project.id, number, starts_on: start, ends_on: end }),
-    ).then(
+    createCycle(project.id, number, start, end).then(
       () => setEdited(null),
       () => {},
     );
