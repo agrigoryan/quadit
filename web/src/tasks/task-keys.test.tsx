@@ -11,7 +11,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
-import { clearStore, getState, loadBootstrap } from "@/data/store";
+import { type BootstrapData, clearStore, getState, loadBootstrap } from "@/data/store";
 import { clearUndo } from "@/data/undo";
 import { useToasts } from "@/lib/toast";
 import type { Member, Project, Task, User, Workspace } from "@/types/core";
@@ -39,6 +39,7 @@ function seed(
   scope?: Member["scope"],
   tasks = [task(1), task(2, { project_id: "p2" })],
   settings?: Project["settings"],
+  more: Pick<BootstrapData, "epics" | "milestones"> = {},
 ) {
   clearStore();
   loadBootstrap("acme", {
@@ -52,6 +53,7 @@ function seed(
     ],
     cycles: [{ id: "c1", project_id: "p1", number: 1, starts_on: "2026-11-01", ends_on: "2026-11-14" }],
     tasks,
+    ...more,
   });
 }
 
@@ -226,6 +228,37 @@ describe("the Shift keys of the task properties", () => {
     ] as const)
       press(key, code, { shiftKey: true });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("offer with Shift+M only the milestones every task can take: those of their one epic", () => {
+    seed(undefined, [task(1, { epic_id: "e1" }), task(3, { epic_id: "e1" }), task(4, { epic_id: "e2" })], undefined, {
+      epics: [
+        { id: "e1", project_id: "p1", name: "Launch", rank: "a" },
+        { id: "e2", project_id: "p1", name: "Billing", rank: "b" },
+      ],
+      milestones: [
+        { id: "m1", epic_id: "e1", name: "Beta", rank: "a" },
+        { id: "m2", epic_id: "e2", name: "Invoices", rank: "a" },
+      ],
+    });
+    const { unmount } = render(
+      <MemoryRouter>
+        <Keys ids={["t1", "t3"]} />
+      </MemoryRouter>,
+    );
+    press("M", "KeyM", { shiftKey: true });
+    const options = () => screen.getAllByRole("option").map((o) => o.textContent);
+    expect(options()).toEqual([expect.stringContaining("No milestone"), expect.stringContaining("Beta")]);
+    unmount();
+
+    // In two epics, no milestone suits both: the server would refuse it for one.
+    render(
+      <MemoryRouter>
+        <Keys ids={["t1", "t4"]} />
+      </MemoryRouter>,
+    );
+    press("M", "KeyM", { shiftKey: true });
+    expect(options()).toEqual([expect.stringContaining("No milestone")]);
   });
 
   it("open the form of a typed value, Shift+D the due date's, which sets it on every task", async () => {

@@ -29,14 +29,15 @@ export const milestone = {
   picker: {
     title: () => t("prop.set.milestone"),
     useItems: (tasks) => {
-      const first = tasks[0];
-      const epics = useEpics(first?.project_id);
+      const epics = useEpics(tasks[0]?.project_id);
       const milestones = useRows("milestones");
+      // The epic the tasks are all in ("" for none, where any of the project's will do); tasks in two epics share no milestone.
+      const epicId = shared(tasks, (task) => task.epic_id ?? "");
       return {
         items: [
           noneItem(t("task.noMilestone")),
           ...milestones
-            .filter((m) => (!first?.epic_id || m.epic_id === first.epic_id) && epics.some((e) => e.id === m.epic_id))
+            .filter((m) => (epicId === "" || m.epic_id === epicId) && epics.some((e) => e.id === m.epic_id))
             .map((m) => ({
               id: m.id,
               label: m.name,
