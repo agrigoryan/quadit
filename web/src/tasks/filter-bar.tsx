@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { ListFilter, Search, X } from "lucide-react";
 import { t } from "@/lib/i18n";
 import type { Project } from "@/types/core";
@@ -135,10 +136,16 @@ function StageList({ property, filters, onChange, project, close }: ChipProps & 
   );
 }
 
-/** Text search, the active filters as chips, and a button to add another. */
+/** Text search, the active filters as chips, and a button to add another, which F presses. */
 export function FilterBar({ filters, onChange, project }: Props) {
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Filter | null>(null);
+  useHotkeys({
+    f: (e) => {
+      e.preventDefault(); // or the letter lands in the menu's search box
+      setOpen(true);
+    },
+  });
 
   const offered = FILTERS.filter((p) => p.filter.offered?.(project) ?? true);
   const active = FILTERS.filter((p) => filters[p.name].length > 0);
