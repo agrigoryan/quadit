@@ -157,7 +157,7 @@ describe("park", () => {
     expect(a).toMatchObject({ leads: true, led: 2 });
   });
 
-  it("a parked follower is not given the lead, does not take it, and still hears", async () => {
+  it("a parked follower is not given the lead, does not take it, and hears nothing until unparked", async () => {
     const leader = silentLeader();
     const b = tab();
     const c = tab();
@@ -174,12 +174,30 @@ describe("park", () => {
     expect(tabs.locks.isHeld(NAME)).toBe(false);
     expect(b.followed).toBe(0);
 
-    c.post("still here");
+    // A browser throws a kept page out of its cache when a message comes for it: the channel is closed meanwhile.
+    const other = tabs.channel(NAME);
+    other.postMessage({ is: "say", msg: "while away" });
     await settle();
-    expect(b.heard).toEqual(["still here"]);
+    expect(b.heard).toEqual([]);
     b.unpark();
     await settle();
     expect(b.leads).toBe(true);
+    other.postMessage({ is: "say", msg: "back" });
+    await settle();
+    expect(b.heard).toEqual(["back"]);
+  });
+
+  it("a parked tab says nothing, and once unparked is heard again", async () => {
+    const [a, b] = [tab(), tab()];
+    await settle();
+    b.park();
+    b.post("while away");
+    await settle();
+    expect(a.heard).toEqual([]);
+    b.unpark();
+    b.post("back");
+    await settle();
+    expect(a.heard).toEqual(["back"]);
   });
 
   it("a tab parked just as the lead falls to it does not take it", async () => {

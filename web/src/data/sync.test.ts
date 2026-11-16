@@ -764,6 +764,33 @@ describe("the connection", () => {
       expect(a.stream.url).toBe(`${W}/events/stream?after=11`);
     });
 
+    // In the order Chromium gives them: pagehide, hidden, (frozen in the cache), visible, pageshow.
+    it("hears nothing the other tabs say while it is away, and when shown again fetches it from the server", async () => {
+      const a = await openLeader();
+      const leader = lead();
+      putAway();
+      setVisibility("hidden");
+      await settle();
+      expect(a.stream.closed).toBe(true);
+
+      // A message for a page in the cache gets it thrown out of the cache.
+      leader.passOn(10, retitle(11, "t1", "b"));
+      leader.say({ t: "state", state: "live", seq: 11 });
+      await settle();
+      expect(a.title("t1")).toBe("a");
+
+      server.get(`${W}/events?after=10&limit=2000`, { events: [retitle(11, "t1", "b")], seq: 11, more: false });
+      setVisibility("visible");
+      shownAgain();
+      await settle();
+      expect(a.title("t1")).toBe("b");
+      expect(leader.asks()).toBeGreaterThan(0);
+      leader.passOn(11, retitle(12, "t1", "c"));
+      await settle();
+      expect(a.title("t1")).toBe("c");
+      expect(a.streams).toHaveLength(1);
+    });
+
     it("opens nothing if it was put away before its copy arrived; shown again, it takes its place among the tabs", async () => {
       const first = server.hold(OPEN_PART);
       server.get(MISSED, { events: [], seq: 10, more: false });

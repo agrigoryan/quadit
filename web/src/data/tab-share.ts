@@ -36,7 +36,9 @@ export interface TabShare<M> {
    * Takes the tab out of the running while its page is put away (kept by the
    * browser for Back and Forward): it gives the lead up if it has it, and is
    * not given it, so that a page nobody sees never holds what the others
-   * rely on. It still hears what is said.
+   * rely on. Nor does it hear or say anything until unparked: a browser
+   * throws a kept page out of its cache when a message comes for it, so
+   * whatever was said meanwhile is missed.
    */
   park(): void;
   /** Undoes park(): the tab stands for the lead again. */
@@ -59,7 +61,7 @@ const canShare = () =>
 export function join<M>(name: string, handlers: TabHandlers<M>): TabShare<M> {
   if (!canShare()) return alone(handlers);
 
-  const channel = new BroadcastChannel(name);
+  let channel = listen();
   let leads = false;
   let parked = false;
   let left = false;
@@ -117,15 +119,19 @@ export function join<M>(name: string, handlers: TabHandlers<M>): TabShare<M> {
     });
   }
 
-  channel.onmessage = (e) => {
-    const wire = e.data as Wire<M>;
-    if (wire.is === "say") handlers.onMessage(wire.msg);
-    else if (wire.is === "ping" && leads) send({ is: "pong" });
-    else if (wire.is === "pong") {
-      asked = false;
-      misses = 0;
-    }
-  };
+  function listen() {
+    const opened = new BroadcastChannel(name);
+    opened.onmessage = (e) => {
+      const wire = e.data as Wire<M>;
+      if (wire.is === "say") handlers.onMessage(wire.msg);
+      else if (wire.is === "ping" && leads) send({ is: "pong" });
+      else if (wire.is === "pong") {
+        asked = false;
+        misses = 0;
+      }
+    };
+    return opened;
+  }
 
   const pinging = setInterval(() => {
     if (leads || parked) return;
@@ -147,6 +153,7 @@ export function join<M>(name: string, handlers: TabHandlers<M>): TabShare<M> {
     post: (msg) => send({ is: "say", msg }),
     park() {
       parked = true;
+      channel.close();
       lockWait?.abort();
       lockWait = null;
       release?.();
@@ -158,6 +165,7 @@ export function join<M>(name: string, handlers: TabHandlers<M>): TabShare<M> {
     unpark() {
       if (!parked) return;
       parked = false;
+      channel = listen();
       ask();
       standForLead(false);
     },
