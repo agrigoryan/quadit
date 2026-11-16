@@ -335,6 +335,25 @@ func loadLive[T any](c *cx, what, field, ref string) (T, error) {
 	return row, nil
 }
 
+// loadAny loads a row by id, in the trash or not, naming what is missing
+// when it is not there at all.
+func loadAny[T any](c *cx, what, field, ref string) (T, error) {
+	var row T
+	if ref == "" {
+		return row, invalid(field, "%s is required", field)
+	}
+	there, err := store.Find(c.ctx, c.tx, &row, store.Eq("id", ref))
+	if err != nil {
+		return row, err
+	}
+	if !there {
+		e := notFound(what, ref)
+		e.Field = field
+		return row, e
+	}
+	return row, nil
+}
+
 // looksLikeID reports whether a reference has the shape of an id.
 func looksLikeID(ref string) bool {
 	return len(ref) == 36 && ref[8] == '-' && ref[13] == '-' && ref[18] == '-' && ref[23] == '-'

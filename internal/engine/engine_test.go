@@ -56,6 +56,23 @@ func (w *world) try(userID, typ string, args any) (*engine.Result, error) {
 	return w.e.Apply(context.Background(), w.ws.ID, engine.Actor{UserID: userID}, engine.Change{ID: id.New(), Type: typ, Args: raw})
 }
 
+// change is one change of a batch.
+func change(typ string, args any) engine.Change {
+	raw, _ := json.Marshal(args)
+	return engine.Change{ID: id.New(), Type: typ, Args: raw}
+}
+
+// batch applies changes as one batch as userID, and fails the test if it is
+// refused.
+func (w *world) batch(userID string, changes ...engine.Change) []*engine.Result {
+	w.t.Helper()
+	res, err := w.e.Batch(context.Background(), w.ws.ID, engine.Actor{UserID: userID}, changes, false)
+	if err != nil {
+		w.t.Fatalf("batch: %v", err)
+	}
+	return res
+}
+
 // refused checks that a change is refused with the given code.
 func (w *world) refused(code, userID, typ string, args any) *engine.Error {
 	w.t.Helper()

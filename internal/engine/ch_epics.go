@@ -1,4 +1,4 @@
-// epic.create, epic.update and epic.delete.
+// epic.create, epic.update, epic.delete and epic.restore.
 
 package engine
 
@@ -14,6 +14,7 @@ func init() {
 	register("epic.create", core.RoleMember, epicCreate)
 	register("epic.update", core.RoleMember, epicUpdate)
 	register("epic.delete", core.RoleMember, epicDelete)
+	register("epic.restore", core.RoleMember, epicRestore)
 }
 
 type epicCreateArgs struct {
@@ -173,4 +174,21 @@ func epicDelete(c *cx, a idArgs) error {
 		return err
 	}
 	return c.trash(target{table: "epics", entity: "epic", id: e.ID, place: inProject(e.ProjectID)})
+}
+
+// epicRestore takes an epic back out of the trash and back into search. Its
+// tasks are not put back in it: the caller sends task.update for those.
+func epicRestore(c *cx, a idArgs) error {
+	e, err := loadAny[core.Epic](c, "epic", "id", a.ID)
+	if err != nil {
+		return err
+	}
+	c.ref = e.ID
+	if e.DeletedAt == 0 {
+		return nil // not in the trash: nothing to do
+	}
+	if err := c.untrash(target{table: "epics", entity: "epic", id: e.ID, place: inProject(e.ProjectID)}); err != nil {
+		return err
+	}
+	return c.index(store.SearchDoc{Kind: "epic", EntityID: e.ID, ScopeType: "epic", ScopeID: e.ID, ProjectID: e.ProjectID, Title: e.Name, Body: e.Description})
 }

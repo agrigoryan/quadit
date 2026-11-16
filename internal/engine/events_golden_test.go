@@ -352,9 +352,19 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 		t.Fatal(err)
 	}
 
-	// What is put back as it was: an inbox taken out and back in.
+	// What is put back as it was: an inbox taken out and back in, and an
+	// epic, a milestone and a cycle taken out of the trash.
 	as(artist, "notification.read", M{"all": true, "archive": true})
 	as(artist, "notification.read", M{"all": true, "unarchive": true})
+	epic = do("epic.create", M{"project": "SVA", "name": "Stealth"}).Ref
+	milestone = do("milestone.create", M{"epic": epic, "name": "Beta"}).Ref
+	cycle = do("cycle.create", M{"project": "SVA", "starts_on": "2027-01-04", "ends_on": "2027-01-10"}).Ref
+	do("epic.delete", M{"id": epic})
+	do("milestone.delete", M{"id": milestone})
+	do("cycle.delete", M{"id": cycle})
+	do("epic.restore", M{"id": epic})
+	do("milestone.restore", M{"id": milestone})
+	do("cycle.restore", M{"id": cycle})
 
 	do("workspace.delete", M{"confirm": "events"})
 

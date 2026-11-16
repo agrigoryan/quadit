@@ -177,4 +177,13 @@ task.deleted {"gone":true,"id":"#85"}
 doc.deleted {"gone":true,"id":"#76"}
 notification.updated {"changes":{"archived_at":{"from":null,"to":1774170149000},"read_at":{"from":null,"to":1774170149000}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
 notification.updated {"changes":{"archived_at":{"from":null,"to":0}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
+epic.created {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170151000,"updated_at":1774170151000,"updated_seq":180}}
+milestone.created {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170152000,"updated_seq":181}}
+cycle.created {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170153000,"updated_seq":182}}
+epic.deleted {"changes":{"deleted_at":{"from":null,"to":1774170154000}},"id":"#86"}
+milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1774170155000}},"id":"#87"}
+cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170156000}},"id":"#88"}
+epic.restored {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170151000,"updated_at":1774170151000,"updated_seq":186}}
+milestone.restored {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170152000,"updated_seq":187}}
+cycle.restored {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170153000,"updated_seq":188}}
 workspace.deleted {"gone":true,"id":"#1","slug":"events"}

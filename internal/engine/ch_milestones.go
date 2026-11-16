@@ -1,4 +1,4 @@
-// milestone.create, milestone.update and milestone.delete.
+// milestone.create, milestone.update, milestone.delete and milestone.restore.
 
 package engine
 
@@ -13,6 +13,7 @@ func init() {
 	register("milestone.create", core.RoleMember, milestoneCreate)
 	register("milestone.update", core.RoleMember, milestoneUpdate)
 	register("milestone.delete", core.RoleMember, milestoneDelete)
+	register("milestone.restore", core.RoleMember, milestoneRestore)
 }
 
 type milestoneCreateArgs struct {
@@ -108,4 +109,26 @@ func milestoneDelete(c *cx, a idArgs) error {
 		}
 	}
 	return c.trash(target{table: "milestones", entity: "milestone", id: m.ID, place: inProject(e.ProjectID)})
+}
+
+// milestoneRestore takes a milestone back out of the trash, once its epic
+// is out of it. Its tasks are not put back in it: the caller sends
+// task.update for those.
+func milestoneRestore(c *cx, a idArgs) error {
+	m, err := loadAny[core.Milestone](c, "milestone", "id", a.ID)
+	if err != nil {
+		return err
+	}
+	c.ref = m.ID
+	if m.DeletedAt == 0 {
+		return nil // not in the trash: nothing to do
+	}
+	var e core.Epic
+	if err := c.tx.Get(c.ctx, &e, store.Eq("id", m.EpicID)); err != nil {
+		return err
+	}
+	if e.DeletedAt != 0 {
+		return conflictErr("its epic %s is in the trash; restore the epic first", e.Name)
+	}
+	return c.untrash(target{table: "milestones", entity: "milestone", id: m.ID, place: inProject(e.ProjectID)})
 }

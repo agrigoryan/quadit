@@ -112,6 +112,7 @@ comment.delete (member): id (required)
 comment.update (member): id (required), body, resolved
 cycle.create (member): id, project (required), name, starts_on (required), ends_on (required)
 cycle.delete (member): id (required)
+cycle.restore (member): id (required)
 cycle.update (member): id (required), name, starts_on, ends_on
 dbview.create (member): id, database, name, type, config, rank
 dbview.delete (member): id (required)
@@ -132,6 +133,7 @@ doc.update (member): id (required), title, icon, cover, parent, rank, project, p
 doc.write (member): doc (required), markdown, mode
 epic.create (member): id, project (required), name (required), description, state, lead, color, icon, start_on, target_on, rank
 epic.delete (member): id (required)
+epic.restore (member): id (required)
 epic.update (member): id (required), name, description, state, lead, color, icon, start_on, target_on, rank
 integration.create (admin): id, kind, name, project, config, secret, active
 integration.delete (admin): id (required)
@@ -146,6 +148,7 @@ member.remove (admin): id (required)
 member.update (admin): id (required), role, handle, title, suspended, scope
 milestone.create (member): id, epic (required), name (required), description, target_on, rank
 milestone.delete (member): id (required)
+milestone.restore (member): id (required)
 milestone.update (member): id (required), name, description, target_on, rank
 notification.read (member): ids, task, all, up_to, unread, archive, unarchive
 notify (member): user (required), task, message (required)
@@ -236,12 +239,15 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
   "epic.created",
   "epic.updated",
   "epic.deleted",
+  "epic.restored",
   "milestone.created",
   "milestone.updated",
   "milestone.deleted",
+  "milestone.restored",
   "cycle.created",
   "cycle.updated",
   "cycle.deleted",
+  "cycle.restored",
   "view.created",
   "view.updated",
   "view.deleted",

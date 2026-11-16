@@ -1,8 +1,10 @@
-// An update's changed fields, and saving or trashing one row with its event.
+// An update's changed fields, and saving, trashing or restoring one row with
+// its event.
 
 package engine
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -166,6 +168,38 @@ func (c *cx) trash(row target) error {
 	data := row.extra
 	data.ID, data.Changes = row.id, map[string]core.FieldChange{"deleted_at": {From: nil, To: c.at}}
 	return c.emit(event{seq: seq, typ: row.entity + ".deleted", entity: row.entity, entityID: row.id, place: row.place, audience: row.audience, data: data})
+}
+
+// untrash takes a row out of the trash and emits "<entity>.restored"
+// carrying the whole row as it now is: a copy that dropped the row when it
+// went to the trash gets it back from the event. It makes the row the
+// change's answer (c.ref). The row must be in the trash; what pointed at it
+// before (a task's epic) is not put back.
+func (c *cx) untrash(row target) error {
+	c.ref = row.id
+	tb, ok := store.TableNamed(row.table)
+	if !ok {
+		return fmt.Errorf("engine: no table %q", row.table)
+	}
+	seq := c.tx.NextSeq()
+	set := map[string]any{"deleted_at": int64(0)}
+	if _, has := tb.Type.FieldByName("UpdatedSeq"); has {
+		set["updated_seq"] = seq
+	}
+	n, err := c.tx.Update(c.ctx, row.table, set, store.Eq("id", row.id), store.NotNull("deleted_at"))
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return notFound(row.entity, row.id)
+	}
+	whole := reflect.New(tb.Type).Interface()
+	if err := c.tx.Get(c.ctx, whole, store.Eq("id", row.id)); err != nil {
+		return err
+	}
+	data := row.extra
+	data.Row = whole
+	return c.emit(event{seq: seq, typ: row.entity + ".restored", entity: row.entity, entityID: row.id, place: row.place, audience: row.audience, data: data})
 }
 
 // emitDeleted emits "<entity>.deleted" for a row that was removed outright.

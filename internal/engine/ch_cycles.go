@@ -1,4 +1,5 @@
-// cycle.create, cycle.update and cycle.delete, and rolling cycles over.
+// cycle.create, cycle.update, cycle.delete and cycle.restore, and rolling
+// cycles over.
 
 package engine
 
@@ -16,6 +17,7 @@ func init() {
 	register("cycle.create", core.RoleMember, cycleCreate)
 	register("cycle.update", core.RoleMember, cycleUpdate)
 	register("cycle.delete", core.RoleMember, cycleDelete)
+	register("cycle.restore", core.RoleMember, cycleRestore)
 }
 
 // defaultCycleDays is how long a cycle is when a project does not say.
@@ -128,6 +130,24 @@ func cycleDelete(c *cx, a idArgs) error {
 		}
 	}
 	return c.trash(target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(cy.ProjectID)})
+}
+
+// cycleRestore takes a cycle back out of the trash, unless another cycle of
+// the project has taken its dates meanwhile. Its tasks are not put back in
+// it: the caller sends task.update for those.
+func cycleRestore(c *cx, a idArgs) error {
+	cy, err := loadAny[core.Cycle](c, "cycle", "id", a.ID)
+	if err != nil {
+		return err
+	}
+	c.ref = cy.ID
+	if cy.DeletedAt == 0 {
+		return nil // not in the trash: nothing to do
+	}
+	if err := c.cycleOverlap(cy.ProjectID, cy.ID, cy.StartsOn, cy.EndsOn); err != nil {
+		return err
+	}
+	return c.untrash(target{table: "cycles", entity: "cycle", id: cy.ID, place: inProject(cy.ProjectID)})
 }
 
 // startCycles makes a project's first cycles as soon as cycles are on, so

@@ -358,6 +358,15 @@ status.delete -move_to: ok
 cycle.delete {}: invalid [id] id is required
 cycle.delete -id: invalid [id] id is required
 cycle.delete -id others wrong: invalid [id] id is required
+epic.restore {}: invalid [id] id is required
+epic.restore -id: invalid [id] id is required
+epic.restore -id others wrong: invalid [id] id is required
+milestone.restore {}: invalid [id] id is required
+milestone.restore -id: invalid [id] id is required
+milestone.restore -id others wrong: invalid [id] id is required
+cycle.restore {}: invalid [id] id is required
+cycle.restore -id: invalid [id] id is required
+cycle.restore -id others wrong: invalid [id] id is required
 template.delete {}: invalid [id] id is required
 template.delete -id: invalid [id] id is required
 template.delete -id others wrong: invalid [id] id is required

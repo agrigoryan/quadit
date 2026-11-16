@@ -82,6 +82,9 @@ export interface Changes {
   "cycle.delete": {
     id: string;
   };
+  "cycle.restore": {
+    id: string;
+  };
   "cycle.update": {
     id: string;
     name?: string | null;
@@ -211,6 +214,9 @@ export interface Changes {
   "epic.delete": {
     id: string;
   };
+  "epic.restore": {
+    id: string;
+  };
   "epic.update": {
     id: string;
     name?: string | null;
@@ -302,6 +308,9 @@ export interface Changes {
     rank?: string;
   };
   "milestone.delete": {
+    id: string;
+  };
+  "milestone.restore": {
     id: string;
   };
   "milestone.update": {

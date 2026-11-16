@@ -176,6 +176,8 @@ change cycle.create arg project
 change cycle.create arg starts_on
 change cycle.delete
 change cycle.delete arg id
+change cycle.restore
+change cycle.restore arg id
 change cycle.update
 change cycle.update arg ends_on
 change cycle.update arg id
@@ -285,6 +287,8 @@ change epic.create arg state
 change epic.create arg target_on
 change epic.delete
 change epic.delete arg id
+change epic.restore
+change epic.restore arg id
 change epic.update
 change epic.update arg color
 change epic.update arg description
@@ -364,6 +368,8 @@ change milestone.create arg rank
 change milestone.create arg target_on
 change milestone.delete
 change milestone.delete arg id
+change milestone.restore
+change milestone.restore arg id
 change milestone.update
 change milestone.update arg description
 change milestone.update arg id
