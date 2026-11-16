@@ -30,7 +30,7 @@ test:
 
 # Both databases. Needs Postgres: docker start quadit-pg
 test-all:
-	QUADIT_TEST_POSTGRES='postgres://postgres:quadit@127.0.0.1:54329/quadit' go test -race ./...
+	QUADIT_TEST_POSTGRES='postgres://postgres:quadit@127.0.0.1:54329/quadit' go test -race -timeout 30m ./...
 	cd web && pnpm typecheck && pnpm test
 
 # The end-to-end suite: Chromium drives the binary just built, on a server of

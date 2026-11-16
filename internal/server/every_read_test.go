@@ -450,7 +450,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 
 	// Pages kept in a git repository.
 	repo := newSyncedRepo(t, s, map[string]string{"docs/GUIDE.md": "# Style guide\n\nPixels, not vectors.\n"})
-	rw.n.replace(repo.origin, "<repository>")
+	rw.n.replacePath(repo.origin, "<repository>")
 	repo.src = do("source Game docs", "source.create", M{"title": "Game docs", "repo": repo.origin, "subdir": "docs"})
 	if res := repo.sync(); res.PagesCreated != 1 {
 		t.Fatalf("the first sync: %+v", res)
@@ -950,11 +950,14 @@ func (rec *recording) outside() {
 type normaliser struct {
 	names    map[string]string
 	replaces []string
-	days     map[string]string
+	// paths are this machine's paths that a line of text may show cut
+	// short, each with what it becomes (replacePath).
+	paths map[string]string
+	days  map[string]string
 }
 
 func newNormaliser(baseURL string) *normaliser {
-	n := &normaliser{names: map[string]string{}, days: map[string]string{}}
+	n := &normaliser{names: map[string]string{}, paths: map[string]string{}, days: map[string]string{}}
 	n.replace(baseURL, "http://quadit.test")
 	n.replace(strings.TrimPrefix(baseURL, "http://"), "quadit.test")
 	for offset := -40; offset <= 400; offset++ {
@@ -966,6 +969,18 @@ func newNormaliser(baseURL string) *normaliser {
 func (n *normaliser) name(id, name string) { n.names[id] = "<" + name + ">" }
 
 func (n *normaliser) replace(from, to string) { n.replaces = append(n.replaces, from, to) }
+
+// replacePath is replace for a path of this machine. A line of text cuts a
+// long one short ("/var/folders/…/T/TestEvery…"), and how much of it is
+// left depends on where the machine keeps its temporary files, so the cut
+// form becomes the same word: the answer is then the same on every machine.
+func (n *normaliser) replacePath(path, to string) {
+	n.replace(path, to)
+	n.paths[path] = to
+}
+
+// cutShortRE finds what may be a path cut short: from a slash to the mark of the cut.
+var cutShortRE = regexp.MustCompile(`/[^"\\\s…]*…`)
 
 var (
 	uuidRE    = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
@@ -986,6 +1001,14 @@ var (
 // text makes one piece of text the same on every run.
 func (n *normaliser) text(s string) string {
 	s = strings.NewReplacer(n.replaces...).Replace(s)
+	s = cutShortRE.ReplaceAllStringFunc(s, func(cut string) string {
+		for path, to := range n.paths {
+			if strings.HasPrefix(path, strings.TrimSuffix(cut, "…")) {
+				return to
+			}
+		}
+		return cut
+	})
 	s = uuidRE.ReplaceAllStringFunc(s, func(id string) string {
 		if _, ok := n.names[id]; !ok {
 			n.names[id] = fmt.Sprintf("<id #%d>", len(n.names)+1)
