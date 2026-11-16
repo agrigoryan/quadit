@@ -4,7 +4,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCan } from "@/data/access";
-import { useMedia } from "@/hooks/use-media";
 import { isImage } from "@/data/files";
 import { useMe, useMember, useRowEvenIfGone, useRows } from "@/data/selectors";
 import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } from "@/types/core";
@@ -174,8 +173,6 @@ export function nameOf(member: Member | undefined, fallback: string): string {
 export function useMemberName(userId: string | undefined, fallback: string): string {
   return nameOf(useMember(userId), fallback);
 }
-
-export const usePhone = () => useMedia("(max-width: 639px)");
 
 /**
  * Gives the focus back to whatever had it when an overlay opened, once the

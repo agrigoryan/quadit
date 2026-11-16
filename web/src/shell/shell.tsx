@@ -1,6 +1,6 @@
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from "react";
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
-import { useMedia } from "@/hooks/use-media";
+import { useOnePane } from "@/hooks/breakpoints";
 import { ShortcutsSheet } from "@/palette/shortcuts";
 import { ahead } from "@/shell/ahead";
 import { useCan } from "@/data/access";
@@ -85,7 +85,7 @@ export function Shell() {
 
   const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key?.toUpperCase();
   const background = pageUnder(location);
-  const phone = useMedia("(max-width: 767px)");
+  const phone = useOnePane();
   const inPanel = !!taskKey && (!!background || phone);
   const projectKey = taskKey?.split("-")[0];
   const fallback = `/${slug}/${projectKey ? `p/${projectKey}/tasks` : "my-work"}`;

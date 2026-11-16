@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
+import { useOnePane } from "@/hooks/breakpoints";
 import { t } from "@/lib/i18n";
 import { EmptyState } from "@/ui/empty";
 import { AdminAuditPage } from "@/admin/audit";
@@ -14,17 +14,9 @@ import { StoragePage } from "@/admin/storage";
 import { UsersPage } from "@/admin/users";
 import { WorkspacesPage } from "@/admin/workspaces";
 
-const wide = typeof matchMedia === "function" ? matchMedia("(min-width: 768px)") : null;
-
 /** At /admin a phone shows the list of pages; a wider screen opens the first page beside it. */
 function Root() {
-  const [isWide, setWide] = useState(wide?.matches ?? true);
-  useEffect(() => {
-    const on = () => setWide(wide?.matches ?? true);
-    wide?.addEventListener("change", on);
-    return () => wide?.removeEventListener("change", on);
-  }, []);
-  return isWide ? <Navigate to="general" replace /> : null;
+  return useOnePane() ? null : <Navigate to="general" replace />;
 }
 
 /** The install's admin area, at /admin. For the people who run the install. Loaded on demand. */

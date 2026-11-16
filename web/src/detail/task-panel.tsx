@@ -4,7 +4,7 @@
 // detail/task-page.tsx.
 
 import { type RefObject, useEffect, useRef } from "react";
-import { useMedia } from "@/hooks/use-media";
+import { useOnePane } from "@/hooks/breakpoints";
 import { TaskView } from "@/detail/task-view";
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
  * menus are drawn outside the frame and stay usable.
  */
 function useCoverPage(panel: RefObject<HTMLElement | null>) {
-  const covers = useMedia("(max-width: 767px)");
+  const covers = useOnePane();
   useEffect(() => {
     const el = panel.current;
     const frame = el?.parentElement;

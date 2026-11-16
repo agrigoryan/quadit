@@ -13,7 +13,8 @@ import { CompareStage } from "@/decisions/compare-panes";
 import { ComparePhone } from "@/decisions/compare-phone";
 import { type Compare, type CompareProps, useCompare } from "@/decisions/compare-state";
 import { Transport } from "@/decisions/compare-transport";
-import { usePhone, useReturnFocus } from "@/decisions/data";
+import { useReturnFocus } from "@/decisions/data";
+import { usePhone } from "@/hooks/breakpoints";
 import { useMedia } from "@/hooks/use-media";
 import { PixelToggle, StageButton, ZoomControls } from "@/decisions/stage-ui";
 

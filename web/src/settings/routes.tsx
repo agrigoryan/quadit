@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router";
 import { useCan } from "@/data/access";
+import { useOnePane } from "@/hooks/breakpoints";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
 import { NotFoundPage } from "@/ui/not-found";
@@ -27,17 +27,9 @@ import { GeneralPage } from "@/settings/workspace/general";
 import { MembersPage } from "@/settings/workspace/members";
 import { EmptyState } from "@/ui/empty";
 
-const wide = typeof matchMedia === "function" ? matchMedia("(min-width: 768px)") : null;
-
 /** At the root a phone shows the list of pages; a wider screen opens the first page beside it. */
 function Root({ first }: { first: string }) {
-  const [isWide, setWide] = useState(wide?.matches ?? true);
-  useEffect(() => {
-    const on = () => setWide(wide?.matches ?? true);
-    wide?.addEventListener("change", on);
-    return () => wide?.removeEventListener("change", on);
-  }, []);
-  return isWide ? <Navigate to={first} replace /> : null;
+  return useOnePane() ? null : <Navigate to={first} replace />;
 }
 
 /** What a member sees at the address of a page only admins may use: why, and where their own settings are. */
