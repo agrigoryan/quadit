@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Plus } from "lucide-react";
 import { useSearchParams } from "react-router";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
+import { toast } from "@/lib/toast";
 import { createDoc } from "@/docs/actions";
 import { useViews } from "@/docs/data";
 import { createView } from "@/docs/db/actions";
+import { viewTypeName } from "@/docs/db/prop-meta";
 import { BoardView } from "@/docs/db/board-view";
 import { CalendarView } from "@/docs/db/calendar-view";
 import { applyView } from "@/docs/db/compute";
@@ -44,6 +47,8 @@ const unsavedTable = (databaseId: string): DBView => ({
  * filters and sorts applied, and a row opened beside it. Which view and
  * which row are open is in the address (?v= and ?peek=), so a link lands
  * on the same thing.
+ *
+ * Cmd+B goes from the table to the board and back (the first view of each).
  */
 export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: boolean }) {
   const db = useDatabase(doc.id);
@@ -100,6 +105,20 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
     [doc.id, view, props],
   );
 
+  const adds = !readOnly && view?.type !== "form";
+  const other: ViewType = view?.type === "board" ? "table" : "board";
+  useHotkeys(
+    {
+      "mod+b": (e) => {
+        e.preventDefault();
+        const to = views.find((v) => v.type === other);
+        if (to) setParam("v", to.id);
+        else toast.info(t("db.view.none", { name: viewTypeName(other) }));
+      },
+    },
+    { guardChords: true },
+  );
+
   if (!db || !loaded || !view) return <Loading />;
   const Body = VIEWS[view.type] ?? TableView;
 
@@ -114,7 +133,7 @@ export default function DatabaseView({ doc, readOnly }: { doc: Doc; readOnly: bo
           readOnly={readOnly}
         />
         <ViewToolbar view={view} props={db.table.props} readOnly={readOnly} />
-        {view.type !== "form" && !readOnly && (
+        {adds && (
           <Button variant="primary" size="sm" className="ml-1 shrink-0" onClick={() => openRow(addRow())}>
             <Plus className="size-3.5" aria-hidden />
             <span className="max-sm:sr-only">{t("db.new")}</span>

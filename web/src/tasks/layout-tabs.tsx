@@ -1,8 +1,10 @@
 // The tabs at the start of a task page's toolbar that switch between the
-// list and the board, and on a project's page lead to its timeline.
+// list and the board, and on a project's page lead to its timeline. Cmd+B
+// switches too, as in Linear; in a field it is the field's (bold).
 
 import { ChartGantt, ListTodo, SquareKanban } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useSlug } from "@/data/selectors";
@@ -30,6 +32,15 @@ export function LayoutTabs({ layout, routeProject, onChange }: Props) {
       void navigate(`/${slug}/p/${routeProject.key}/${next === "board" ? "board" : "tasks"}${location.search}`);
     else onChange(next);
   }
+  useHotkeys(
+    {
+      "mod+b": (e) => {
+        e.preventDefault();
+        choose(layout === "list" ? "board" : "list");
+      },
+    },
+    { guardChords: true },
+  );
 
   return (
     <div role="tablist" aria-label={t("list.layout")} className="flex shrink-0 items-center rounded-md bg-sunken p-0.5">

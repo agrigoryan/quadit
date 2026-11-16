@@ -231,6 +231,7 @@ export const docs = {
   "db.view.timeline": "Timeline",
   "db.view.form": "Form",
   "db.view.add": "Add a view",
+  "db.view.none": "This database has no {name} view yet: add one with the + beside its views",
   "db.view.rename": "Rename view",
   "db.view.showAs": "Show as",
   "db.view.moveLeft": "Move left",

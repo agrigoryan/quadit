@@ -70,6 +70,7 @@ const sections: Section[] = [
       { what: "shortcuts.fold", keys: ["←", "→"], join: "or" },
       { what: "shortcuts.across", keys: ["←", "→"], join: "or" },
       { what: "shortcuts.filter", keys: ["F"] },
+      { what: "shortcuts.layout", keys: [`${MOD} B`] },
       { what: "shortcuts.lift", keys: ["Shift Space"] },
     ],
   },
@@ -103,6 +104,11 @@ const sections: Section[] = [
       const keys = goKeys(place);
       return keys ? [{ what: listedName(place), keys: [keys] }] : [];
     }),
+  },
+  {
+    title: "shortcuts.group.docs",
+    hint: "shortcuts.group.docsHint",
+    rows: [{ what: "shortcuts.dbLayout", keys: [`${MOD} B`] }],
   },
   {
     title: "shortcuts.group.page",
