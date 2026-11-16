@@ -10,6 +10,7 @@ import { updateEpic } from "@/insights/plan/actions";
 import { Button, IconButton } from "@/ui/button";
 import { Textarea } from "@/ui/input";
 import { Markdown } from "@/ui/markdown";
+import { markdownKey } from "@/ui/markdown-keys";
 
 /** readOnly: shown, not edited (the member may not change this project). */
 export function EpicDescription({ epic, readOnly }: { epic: Epic; readOnly: boolean }) {
@@ -36,7 +37,7 @@ export function EpicDescription({ epic, readOnly }: { epic: Epic; readOnly: bool
             if (e.key === "Escape") {
               e.stopPropagation();
               setDraft(null);
-            } else sendOnModEnter(e, save);
+            } else if (!sendOnModEnter(e, save)) markdownKey(e);
           }}
         />
         <div className="mt-2 flex items-center gap-2">

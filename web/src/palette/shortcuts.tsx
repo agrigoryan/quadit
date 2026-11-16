@@ -107,6 +107,15 @@ const sections: Section[] = [
     }),
   },
   {
+    title: "shortcuts.group.markdown",
+    hint: "shortcuts.group.markdownHint",
+    rows: [
+      { what: "shortcuts.bold", keys: [`${MOD} B`] },
+      { what: "shortcuts.italic", keys: [`${MOD} I`] },
+      { what: "shortcuts.listNext", keys: ["Enter"] },
+    ],
+  },
+  {
     title: "shortcuts.group.docs",
     hint: "shortcuts.group.docsHint",
     rows: [

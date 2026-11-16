@@ -7,6 +7,7 @@ import { sendOnModEnter } from "@/lib/mod-enter";
 import { Avatar } from "@/ui/avatar";
 import { Textarea } from "@/ui/input";
 import { ListeningDot } from "@/ui/listening-dot";
+import { markdownKey } from "@/ui/markdown-keys";
 
 interface Props extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
   value: string;
@@ -27,7 +28,8 @@ function mentionAt(text: string, caret: number): { start: number; query: string 
 
 /**
  * A growing text box for Markdown. Typing @ offers the people and agents of
- * the workspace; arrows move, Enter or Tab picks.
+ * the workspace; arrows move, Enter or Tab picks. Cmd+B, Cmd+I and Enter on
+ * a list item help write Markdown (ui/markdown-keys.ts).
  */
 export function MentionTextarea({
   value,
@@ -92,6 +94,7 @@ export function MentionTextarea({
       }
     }
     if (onSubmit && sendOnModEnter(e, onSubmit)) return;
+    if (markdownKey(e)) return;
     onKeyDown?.(e);
   }
 
