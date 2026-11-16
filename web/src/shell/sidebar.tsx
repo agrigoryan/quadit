@@ -2,6 +2,7 @@ import { useId } from "react";
 import { Bookmark, PanelLeft } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { SidebarDocs } from "@/docs/tree/sidebar-docs";
+import { isOnePane } from "@/hooks/breakpoints";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useProjects, useSlug, useUnreadCount, useViews } from "@/data/selectors";
@@ -14,6 +15,12 @@ import { IconButton } from "@/ui/button";
 import { ProjectGlyph } from "@/ui/project-glyph";
 
 // What the sidebar lists is the table in shell/destinations.tsx; this file only lays it out.
+
+/** "[" and the palette's command: shows or hides the sidebar; on a phone, where it is a drawer, opens or shuts that. */
+export function showOrHideSidebar() {
+  if (isOnePane()) ui.setDrawer(!useUi.getState().drawerOpen);
+  else ui.toggleSidebar();
+}
 
 /** A project's pages: the places every project has, for this one. Folded, the project is one mark that opens its first page. */
 function ProjectNav({ project, slug, collapsed }: { project: Project; slug: string; collapsed: boolean }) {
@@ -84,6 +91,7 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
         {!collapsed && <WorkspaceSwitcher />}
         <IconButton
           label={collapsed ? t("nav.expand") : t("nav.collapse")}
+          hint="["
           onClick={ui.toggleSidebar}
           className="max-md:hidden"
         >

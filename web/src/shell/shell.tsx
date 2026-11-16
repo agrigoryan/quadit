@@ -5,6 +5,8 @@ import { ShortcutsSheet } from "@/palette/shortcuts";
 import { ahead } from "@/shell/ahead";
 import { useCan } from "@/data/access";
 import { useHotkeys } from "@/hooks/hotkeys";
+import { copyAndSay } from "@/data/files";
+import { docPath } from "@/docs/area";
 import { useStore } from "@/data/store";
 import { ui, useUi } from "@/lib/ui-state";
 import { InboxPage } from "@/pages/inbox";
@@ -17,7 +19,7 @@ import { usePageFocus } from "@/shell/page-focus";
 import { NotFoundPage } from "@/ui/not-found";
 import { draftInView, pageUnder, projectInView } from "@/nav/project-in-view";
 import { Loading } from "@/ui/spinner";
-import { Sidebar } from "@/shell/sidebar";
+import { showOrHideSidebar, Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
 import { UndoKeys } from "@/shell/undo-keys";
 import { UploadsIndicator } from "@/shell/uploads";
@@ -57,6 +59,15 @@ if (typeof window !== "undefined" && isTaskPath(window.location.pathname)) taskP
 
 function Later({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading />}>{children}</Suspense>;
+}
+
+/** The address of what is open, to copy: the task (in the panel or on its page), else a page of the docs, else an epic. */
+function linkInView(slug: string, location: Location, pagePath: string): string | undefined {
+  const taskKey = matchPath("/:ws/task/:key", location.pathname)?.params.key;
+  if (taskKey) return taskPath(slug, taskKey.toUpperCase());
+  const docId = (matchPath("/:ws/docs/:id", pagePath) ?? matchPath("/:ws/p/:key/docs/:id", pagePath))?.params.id;
+  if (docId) return docPath(slug, docId);
+  return matchPath("/:ws/p/:key/epics/:id", pagePath)?.pathnameBase;
 }
 
 /** One part drawn over the page. Each waits and fails by itself, so opening one never hides another. */
@@ -132,7 +143,12 @@ export function Shell() {
         e.preventDefault();
         openNewTask();
       },
+      "/": (e) => {
+        e.preventDefault(); // or a page that takes typing gets the slash
+        ui.setPalette(true);
+      },
       "?": () => ui.setShortcuts(true),
+      "[": showOrHideSidebar,
       // The browser's own Back and Forward, under the keys other apps of this kind give them (a Mac browser has them already).
       "mod+[": (e) => {
         e.preventDefault();
@@ -144,6 +160,18 @@ export function Shell() {
       },
     },
     { layer: "global" },
+  );
+  useHotkeys(
+    {
+      // The link of what is open: the task, else the page of the docs, else the epic.
+      "mod+shift+,": (e) => {
+        const link = linkInView(slug, location, pagePath);
+        if (!link) return;
+        e.preventDefault();
+        void copyAndSay(window.location.origin + link);
+      },
+    },
+    { layer: "global", guardChords: true },
   );
   useGoKeys();
   usePageFocus(location.key);

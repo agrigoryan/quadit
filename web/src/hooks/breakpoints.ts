@@ -11,6 +11,8 @@ import { useMedia } from "@/hooks/use-media";
  */
 export const usePhone = () => useMedia("(max-width: 639px)");
 
+const ONE_PANE = "(max-width: 767px)";
+
 /**
  * Narrower than Tailwind's `md` (768px): one pane at a time. The sidebar
  * becomes a drawer and the task panel covers the page (the `md:` and
@@ -18,4 +20,7 @@ export const usePhone = () => useMedia("(max-width: 639px)");
  * detail/task-panel.tsx), and settings and admin show their list of pages
  * or one page (ui/page-layout.tsx).
  */
-export const useOnePane = () => useMedia("(max-width: 767px)");
+export const useOnePane = () => useMedia(ONE_PANE);
+
+/** The same, asked once: for a key or a command, which looks when it is pressed. */
+export const isOnePane = () => window.matchMedia(ONE_PANE).matches;
