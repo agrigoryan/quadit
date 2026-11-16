@@ -4,7 +4,8 @@
 // Nothing is held back to make undo possible: an edit is sent when it is
 // made (data/mutate.ts), and undoing it sends a second, opposite change the
 // same way, so it is saved, shown to everyone and kept in the history like
-// any other. The opposite is worked out when the edit is made, from the
+// any other. That change names the one it takes back, so the server can
+// spare people the news of a mistake put right at once. The opposite is worked out when the edit is made, from the
 // rows as they stood then: undo puts back what the person saw, whatever
 // anyone changed since.
 //
@@ -21,6 +22,7 @@
 
 import { create } from "zustand";
 import { t } from "@/lib/i18n";
+import { newId } from "@/lib/ids";
 import { type ChangeSpec, mutate, type Tx } from "@/data/mutate";
 import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
@@ -128,14 +130,23 @@ export function forget(entry: Done) {
  * back. A refusal is shown by mutate() and the edit is forgotten.
  */
 export function sendUndoable(name: string, forward: Batch, back: Batch, about?: Remembered): Done {
-  const run = (batch: Batch) => mutate(batch.changes, batch.show);
-  const entry = remember(
-    name,
-    () => run(back),
-    () => run(forward),
-    about,
-  );
-  run(forward).catch(() => forget(entry));
+  /** The ids the edit's changes were last sent under. */
+  let sentAs: string[] = [];
+  const there = () => {
+    sentAs = forward.changes.map(() => newId());
+    return mutate(
+      forward.changes.map((change, i) => ({ ...change, id: sentAs[i] })),
+      forward.show,
+    );
+  };
+  // Each change on the way back takes back the one in its place; where the way back is longer, the rest take back the last.
+  const andBack = () =>
+    mutate(
+      back.changes.map((change, i) => ({ ...change, undoes: sentAs[Math.min(i, sentAs.length - 1)] })),
+      back.show,
+    );
+  const entry = remember(name, andBack, there, about);
+  there().catch(() => forget(entry));
   return entry;
 }
 

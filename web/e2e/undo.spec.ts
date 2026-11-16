@@ -161,3 +161,21 @@ test("an inbox item archived with E comes back with Cmd+Z, unread as it was", as
   await undo(page);
   await expect(page.getByRole("link", { name: new RegExp(`${key}`) }).first()).toBeVisible();
 });
+
+test("a mistake undone at once leaves nothing in the other one's inbox", async ({ page, project, quadit }) => {
+  const key = await project.newTask("Draw the boss");
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  await expect(page.getByRole("link", { name: `Open ${key}` })).toBeVisible();
+  await page.keyboard.press("j");
+  await page.keyboard.press("a");
+  const search = page.getByRole("combobox", { name: "Assign to…" });
+  await search.pressSequentially("coder");
+  await page.keyboard.press("Enter");
+  await expect(search).toBeHidden();
+  const told = async () => (await quadit.agent("inbox")).includes(key);
+  await expect.poll(told).toBe(true);
+
+  await undo(page);
+  await expect.poll(told).toBe(false);
+  expect((await quadit.task(key)).assignee ?? "").toBe("");
+});

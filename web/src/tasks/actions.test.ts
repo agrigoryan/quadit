@@ -22,7 +22,7 @@ import {
   trashTasks,
 } from "@/tasks/actions";
 
-type Sent = { type: string; args: Record<string, unknown> };
+type Sent = { id: string; type: string; args: Record<string, unknown>; undoes?: string };
 
 /** Each request the server was sent, as its changes. */
 let requests: Sent[][] = [];
@@ -183,6 +183,8 @@ describe("undoing the trash and the making of tasks", () => {
     undo();
     await settle();
     expect(last()).toEqual([{ type: "task.delete", args: { id: made } }]);
+    // The delete says which change it takes back, so nobody is told of a task made by mistake.
+    expect(requests.at(-1)?.[0]?.undoes).toBe(requests[0]?.[0]?.id);
     redo();
     await settle();
     expect(last()).toEqual([{ type: "task.restore", args: { id: made } }]);

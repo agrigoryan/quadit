@@ -57,6 +57,12 @@ export type ChangeSpec<K extends ChangeType = ChangeType> = {
     args: Changes[P];
     /** The change id, when the caller needs to recognise its own events in the feed. Made here when left out. */
     id?: string;
+    /**
+     * The id of the earlier change this one takes back (data/undo.ts). The
+     * server then takes out again what that change put in inboxes a moment
+     * ago and nobody has read, and its events say what they undo.
+     */
+    undoes?: string;
   };
 }[K];
 

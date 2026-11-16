@@ -15,9 +15,9 @@
 import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
 
-/** A change as it is sent: its id, its name and its arguments. */
+/** A change as it is sent: its id, its name and its arguments, and the id of the change it takes back when it is an undo. */
 export type OutboxChange = {
-  [K in keyof Changes]: { id: string; type: K; args: Changes[K] };
+  [K in keyof Changes]: { id: string; type: K; args: Changes[K]; undoes?: string };
 }[keyof Changes];
 
 export interface OutboxItem {

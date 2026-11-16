@@ -319,11 +319,14 @@ const sendBatch = (batch: Batch) => mutate(batch.changes, batch.show);
 /** The most changes the server takes in one request. */
 const BATCH = 500;
 
-/** Puts tasks just made in the trash, or takes them out again: creating them undone, and done again. */
-function trashMade(tasks: { id: string }[], put: boolean) {
+/** Puts tasks just made in the trash, naming the changes that made them as undone, or takes them out again. */
+function trashMade(made: Creation[], put: boolean) {
   const requests = [];
-  for (let from = 0; from < tasks.length; from += BATCH)
-    requests.push(sendBatch(trashing(tasks.slice(from, from + BATCH), put)));
+  for (let from = 0; from < made.length; from += BATCH) {
+    const batch = trashing(made.slice(from, from + BATCH), put);
+    if (put) batch.changes = batch.changes.map((change, i) => ({ ...change, undoes: made[from + i]?.change.id }));
+    requests.push(sendBatch(batch));
+  }
   return Promise.all(requests);
 }
 
@@ -436,7 +439,7 @@ interface Creation {
 }
 
 /** Remembers tasks being made, so that undo puts them in the trash and redo takes them out. `made` may still be filling. */
-function rememberMade(name: string, made: { id: string }[]) {
+function rememberMade(name: string, made: Creation[]) {
   return remember(
     name,
     () => trashMade(made, true),
@@ -488,7 +491,7 @@ function creation(input: NewTask, number: number, rank: string): Creation | null
     updated_at: now,
     updated_seq: 0,
   };
-  return { id, change: { type: "task.create", args }, row };
+  return { id, change: { id: newId(), type: "task.create", args }, row };
 }
 
 /**

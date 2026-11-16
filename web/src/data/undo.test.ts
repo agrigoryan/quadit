@@ -20,7 +20,7 @@ import {
 import { useToasts } from "@/lib/toast";
 import type { Member, User, Workspace } from "@/types/core";
 
-type Sent = { type: string; args: Record<string, unknown> };
+type Sent = { id: string; type: string; args: Record<string, unknown>; undoes?: string };
 
 /** Every change the server was sent, in order; `refuse` names a change type it says no to. */
 let sent: Sent[] = [];
@@ -222,6 +222,23 @@ describe("sendUndoable", () => {
     expect(title()).toBe("b");
     await settle();
     expect(sent.map((c) => c.args.title)).toEqual(["b", "a", "b"]);
+  });
+
+  it("the undo names the change it takes back: the edit as it was last sent", async () => {
+    retitle("a", "b");
+    await settle();
+    undo();
+    await settle();
+    redo();
+    await settle();
+    undo();
+    await settle();
+    const [edit, back, again, backAgain] = sent;
+    expect(edit?.undoes).toBeUndefined();
+    expect(back?.undoes).toBe(edit?.id);
+    // Done again it is a new change, and it is that one the second undo takes back.
+    expect(again?.id).not.toBe(edit?.id);
+    expect(backAgain?.undoes).toBe(again?.id);
   });
 
   it("undo puts back what the person saw, whatever the field holds by then", async () => {
