@@ -1,9 +1,11 @@
 // The project the screen is about: where a new task goes, and which
 // project's list "G then T" opens. A page open in the workspace's Docs
-// brings its project into view as an open task does.
+// brings its project into view as an open task does. An epic's or a
+// cycle's page also says the epic or cycle a new task belongs to.
 
 import { type Location, matchPath } from "react-router";
-import { getRowEvenIfGone, getRows, getTaskByKeyEvenIfGone, sortByRank } from "@/data/selectors";
+import { getRow, getRowEvenIfGone, getRows, getTaskByKeyEvenIfGone, sortByRank } from "@/data/selectors";
+import type { TaskDraft } from "@/lib/ui-state";
 import type { Project } from "@/types/core";
 
 /** The project last seen on screen: on a page of no project (the inbox, My work) it is still the one in view. */
@@ -32,4 +34,21 @@ export function projectInView(location: Location): Project | undefined {
     projects.find((p) => p.id === doc?.project_id);
   if (named) lastId = named.id;
   return named ?? projects.find((p) => p.id === lastId) ?? sortByRank(projects)[0];
+}
+
+/**
+ * What a task made here starts with (C, the top bar's New task): the
+ * project in view, and on an epic's or a cycle's page that epic or cycle,
+ * as the page's own Add task button has it.
+ */
+export function draftInView(location: Location): TaskDraft {
+  const project = projectInView(location);
+  if (!project) return {};
+  const epicId = matchPath("/:ws/p/:key/epics/:id", location.pathname)?.params.id;
+  const cycleId = matchPath("/:ws/p/:key/cycles/:id", location.pathname)?.params.id;
+  const epic = getRow("epics", epicId);
+  const cycle = getRow("cycles", cycleId);
+  if (epic?.project_id === project.id) return { projectId: project.id, epicId: epic.id };
+  if (cycle?.project_id === project.id) return { projectId: project.id, cycleId: cycle.id };
+  return { projectId: project.id };
 }

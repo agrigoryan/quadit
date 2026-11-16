@@ -15,7 +15,7 @@ import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
 import { GoHint, useGoKeys } from "@/shell/go-keys";
 import { usePageFocus } from "@/shell/page-focus";
 import { NotFoundPage } from "@/ui/not-found";
-import { pageUnder, projectInView } from "@/nav/project-in-view";
+import { draftInView, pageUnder, projectInView } from "@/nav/project-in-view";
 import { Loading } from "@/ui/spinner";
 import { Sidebar } from "@/shell/sidebar";
 import { TopBar } from "@/shell/topbar";
@@ -99,11 +99,11 @@ export function Shell() {
   const page: Location | string = inPanel ? (background ?? fallback) : location;
   const pagePath = typeof page === "string" ? page : page.pathname;
 
-  // A new task goes in the project in view: offered only to someone who may make one there.
+  // A new task goes in the project in view (and the epic or cycle of the page): offered only to someone who may make one there.
   const projectId = projectInView(location)?.id;
   const mayCreate = useCan().edit(projectId);
   const openNewTask = () => {
-    if (mayCreate) ui.newTask({ projectId });
+    if (mayCreate) ui.newTask(draftInView(location));
   };
   // The panel is one step above its page in the history: closing it is going back that step.
   const closePanel = useCallback(
