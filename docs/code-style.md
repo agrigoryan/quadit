@@ -55,7 +55,7 @@ Signs, when reading or reviewing, that a design needs another look:
 ### Packages and files
 1. Every package has one doc comment saying what it is for, what it hides from the rest of the program, and how its files are laid out.
 2. One topic per file; the file's name is the topic. A file is split when it holds more than one topic, never because it is long. A file opens with a comment when its name does not say enough.
-3. Packages below `server` never import it. `server` holds routing, the request context, sign-in and thin handlers; a feature with logic of its own is a package.
+3. Packages below `server` never import it. `server` holds routing, the request context, sign-in, the reads (the viewer) and what shares the viewer's knowledge (the dashboard, export, the dispatcher). A part that hides one thing behind a small interface is a package of its own (`reposync`, `github`, `mcp`, `picture`, `webpush`, `settings`); a package is never made for size, nor by cutting through knowledge two sides share.
 
 ### Functions
 4. A function does one thing and does it completely. A long function that reads top to bottom as one story, with a blank line and a short comment between its parts, is good code. Take a part out only when it is a thing of its own: it has a clear name, a simple interface, and can be understood without reading its caller. A group of functions or methods that hand state to each other through parameters or struct fields, and that only make sense read together, is one function in disguise: write it as one.
