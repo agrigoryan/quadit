@@ -56,7 +56,7 @@ export function usePageTasks(docId: string): PageTask[] {
   }, [links, everyLink, mentionedIn, mentions, tasks, docId]);
 }
 
-function TaskRow({ docId, row }: { docId: string; row: PageTask }) {
+function TaskRow({ row }: { row: PageTask }) {
   const { task, linkId, how } = row;
   const status = useLookup("statuses")[task.status_id];
   const link = useTaskLink(task);
@@ -90,7 +90,7 @@ function TaskRow({ docId, row }: { docId: string; row: PageTask }) {
           size="sm"
           className="relative z-[1] shrink-0 text-ink-3 max-md:size-8"
           // Safe to drop: it never rejects, and a refusal is shown, and undone, by mutate.
-          onClick={() => void unlinkTask(docId, linkId)}
+          onClick={() => void unlinkTask(linkId)}
         >
           <X className="size-3" />
         </IconButton>
@@ -110,7 +110,7 @@ export function TasksPanel({ docId }: { docId: string }) {
       </h2>
       <ul>
         {rows.map((row) => (
-          <TaskRow key={row.task.id} docId={docId} row={row} />
+          <TaskRow key={row.task.id} row={row} />
         ))}
       </ul>
     </section>

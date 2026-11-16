@@ -6,16 +6,16 @@
 // once. A task the copy does not hold (one this person may not see) is not
 // listed.
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
-import { clearStore, loadBootstrap, mergeRows } from "@/data/store";
+import { applyEvents, clearStore, loadBootstrap, mergeRows } from "@/data/store";
 import { TasksPanel } from "@/docs/page/tasks-panel";
 import { useDocsStore } from "@/docs/store";
 import { WithQuery } from "@/test/query";
-import type { Member, Task, TaskLink, User, Workspace } from "@/types/core";
+import type { FeedEvent, Member, Task, TaskLink, User, Workspace } from "@/types/core";
 import type { DocRef } from "@/types/docs";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -117,5 +117,33 @@ describe("a page's Tasks", () => {
     const gone = { id: "l1", task_id: "t1", kind: "doc", ref: "page", deleted_at: 5 } as TaskLink;
     mergeRows("links", [made, gone]);
     return waitFor(() => expect(titles()).toEqual(["Task 4", "Task 2", "Task 3"]));
+  });
+
+  it("follows the feed: a link someone else takes off goes, though its task was never opened here, and one made comes", async () => {
+    show();
+    const linkEvent = (seq: number, type: string, data: FeedEvent["data"]): FeedEvent =>
+      ({
+        seq,
+        at: 1,
+        type,
+        entity_type: "link",
+        entity_id: `l${seq}`,
+        scope_type: "task",
+        scope_id: "t1",
+        data,
+      }) as FeedEvent;
+    act(() =>
+      applyEvents(
+        [
+          {
+            ...linkEvent(2, "link.deleted", { id: "l1", changes: { deleted_at: { from: null, to: 5 } } }),
+            entity_id: "l1",
+          },
+          linkEvent(3, "link.created", { row: { id: "l3", task_id: "t4", kind: "doc", ref: "page" } }),
+        ],
+        true,
+      ),
+    );
+    await waitFor(() => expect(titles()).toEqual(["Task 4", "Task 2", "Task 3"]));
   });
 });

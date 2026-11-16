@@ -53,8 +53,11 @@ test("a page linked from a task lists the task, and taking the link off there ta
   quadit,
 }) => {
   const key = await project.newTask("Boss fight");
+  const other = await project.newTask("Arena lighting");
   const title = `Boss fight spec ${project.key}`;
-  await quadit.cli("do", "doc.create", JSON.stringify({ title, project: project.key }));
+  const made = JSON.parse(
+    await quadit.cli("--json", "do", "doc.create", JSON.stringify({ title, project: project.key })),
+  ) as { ref: string };
 
   await page.goto(`/e2e/task/${key}`);
   await page.getByRole("button", { name: "Page", exact: true }).click();
@@ -67,6 +70,13 @@ test("a page linked from a task lists the task, and taking the link off there ta
   await pages.getByRole("link", { name: title }).click();
   const tasks = page.getByRole("region", { name: "Tasks" });
   await expect(tasks.getByRole("link", { name: "Boss fight", exact: true })).toBeVisible();
+
+  // Someone else links a task the page has not seen, and takes it off again: the open page follows.
+  const linked = JSON.parse(await quadit.agent("--json", "link", other, `page=${made.ref}`)) as { ref: string };
+  await expect(tasks.getByRole("link", { name: "Arena lighting" })).toBeVisible();
+  await quadit.agent("do", "link.remove", JSON.stringify({ id: linked.ref }));
+  await expect(tasks.getByRole("link", { name: "Arena lighting" })).toBeHidden();
+
   await tasks.getByRole("button", { name: `Remove the link to ${key}` }).click();
   await expect(tasks).toBeHidden();
   await expect.poll(() => quadit.cli("show", key)).not.toContain(`page ${title}`);

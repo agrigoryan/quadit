@@ -281,10 +281,10 @@ export function deleteComment(comment: DocComment) {
 
 /**
  * Takes a task's link to a page off, from the page. The task's copy of the
- * link goes at once; the page forgets it once the server has taken it off
+ * link goes at once; the pages forget it once the server has taken it off
  * (its list was read with the page, and the link need not be in the copy).
  */
-export async function unlinkTask(docId: string, linkId: string): Promise<void> {
+export async function unlinkTask(linkId: string): Promise<void> {
   try {
     await mutate({ type: "link.remove", args: { id: linkId } }, (tx) =>
       tx.patch("links", linkId, { deleted_at: Date.now() }),
@@ -292,5 +292,5 @@ export async function unlinkTask(docId: string, linkId: string): Promise<void> {
   } catch {
     return; // refused: mutate has said so and put the link back
   }
-  forgetLink(docId, linkId);
+  forgetLink(linkId);
 }

@@ -11,7 +11,7 @@ import { create } from "zustand";
 import { api, workspacePath } from "@/data/api";
 import { inWorkspace, isNotFound, queryClient } from "@/data/query";
 import { getRowEvenIfGone } from "@/data/selectors";
-import { type Dict, getState, mergeRows, removeRow, useStore } from "@/data/store";
+import { type Dict, getState, mergeRows, onEvents, removeRow, useStore } from "@/data/store";
 import type { BlockRow, DocRef, DocSource, PageData, PresenceEntry } from "@/types/docs";
 
 interface PageMeta {
@@ -89,15 +89,29 @@ async function fetchPage(slug: string, id: string, signal: AbortSignal): Promise
   return { blocks: data.blocks ?? [], seq: data.doc.content_seq ?? 0 };
 }
 
-/** A task's link to a page is gone: the page no longer lists the reference the link made. */
-export function forgetLink(docId: string, linkId: string) {
+/** A task's link to a page is gone: no page lists the reference the link made any more. */
+export function forgetLink(linkId: string) {
   useDocsStore.setState((s) => {
-    const meta = s.meta[docId];
-    if (!meta) return s;
-    const mentioned_in = meta.mentioned_in.filter((ref) => ref.from_id !== linkId);
-    return { meta: { ...s.meta, [docId]: { ...meta, mentioned_in } } };
+    const meta: Dict<PageMeta> = {};
+    let changed = false;
+    for (const [docId, page] of Object.entries(s.meta)) {
+      const mentioned_in = page.mentioned_in.filter((ref) => ref.from_id !== linkId);
+      changed ||= mentioned_in.length !== page.mentioned_in.length;
+      meta[docId] = mentioned_in.length === page.mentioned_in.length ? page : { ...page, mentioned_in };
+    }
+    return changed ? { meta } : s;
   });
 }
+
+// A link taken off a task, by anyone: the feed says so even when the link's
+// row is not in the copy (its task was never opened here), and a page read
+// earlier still holds the reference it made. A link made comes with its row,
+// which the copy keeps (docs/page/tasks-panel.tsx reads both).
+onEvents((events) => {
+  for (const ev of events) {
+    if (ev.entity_type === "link" && ev.data?.changes?.deleted_at?.to) forgetLink(ev.entity_id);
+  }
+});
 
 /** One page, read through the query cache (see fetchPage). */
 export const pageQuery = (slug: string, id: string) =>
