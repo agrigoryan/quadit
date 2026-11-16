@@ -141,6 +141,8 @@ test("a thread whose block was taken out of the page says so, and still opens", 
   await gone.getByRole("textbox", { name: "Reply…" }).fill("It was moved to the plan.");
   await gone.getByRole("button", { name: "Reply", exact: true }).click();
   await expect(gone.getByText("It was moved to the plan.")).toBeVisible();
+  // Taken by the server, not only shown ahead of its answer.
+  await expect.poll(() => quadit.cli("comments", doc.id)).toContain("It was moved to the plan.");
 });
 
 test("an agent's reply from the command line shows in the thread", async ({ page, project, quadit }) => {

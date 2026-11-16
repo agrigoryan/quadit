@@ -100,7 +100,9 @@ func (c *cx) replyTo(cm *core.Comment, a *commentCreateArgs) error {
 		case "decision_option":
 			a.Option = parent.SubjectID
 		case "doc_block":
-			a.Block = parent.SubjectID
+			// The thread's block, even one taken out of the page since: a
+			// thread outlives its block, and only a new one needs it there.
+			cm.SubjectType, cm.SubjectID = parent.SubjectType, parent.SubjectID
 		}
 	}
 	return nil

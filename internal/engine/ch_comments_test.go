@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -158,5 +159,31 @@ func TestAThreadOutlivesItsFirstComment(t *testing.T) {
 		if got := comment(third).ParentID; got != first {
 			t.Errorf("a new reply answers %q, want %q", got, first)
 		}
+	})
+}
+
+// TestAThreadGoesOnAfterItsBlockIsGone: a block taken out of the page keeps
+// its threads, and they can still be answered; only a new thread needs the
+// block to be there.
+func TestAThreadGoesOnAfterItsBlockIsGone(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		page := w.do(w.owner.ID, "doc.create", M{"title": "Draft", "markdown": "Cut this.\n"}).Ref
+		var block core.Block
+		if err := w.db().Get(context.Background(), &block, store.Eq("doc_id", page)); err != nil {
+			t.Fatal(err)
+		}
+		root := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block.ID, "body": "Why is this here?"}).Ref
+		w.do(w.owner.ID, "doc.edit", M{"doc": page, "ops": []M{{"op": "delete", "id": block.ID}}})
+
+		reply := w.do(w.agent("helper"), "comment.create", M{"parent": root, "body": "It was moved to the plan."}).Ref
+		var cm core.Comment
+		if err := w.db().Get(context.Background(), &cm, store.Eq("id", reply)); err != nil {
+			t.Fatal(err)
+		}
+		if cm.ParentID != root || cm.SubjectType != "doc_block" || cm.SubjectID != block.ID || cm.DocID != page {
+			t.Errorf("the reply is not in the thread on the gone block: %+v", cm)
+		}
+		w.refused(engine.CodeNotFound, w.owner.ID, "comment.create", M{"doc": page, "block": block.ID, "body": "A new one"})
 	})
 }
