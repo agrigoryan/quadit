@@ -111,8 +111,8 @@ export const estimate = {
     place: "menu",
     icon: <Gauge />,
     label: () => t("bulk.estimate"),
-    // Unlike the panel's row, which wants estimates turned on, the bar offers them unless they are turned off.
-    offered: (project) => project?.settings?.estimates !== false,
+    // As the panel's row: where the project counts them. The server leaves a switch that is off out, so off is "not said".
+    offered: (project) => !!project?.settings?.estimates,
     Form: EstimateForm,
   },
   timeline: [

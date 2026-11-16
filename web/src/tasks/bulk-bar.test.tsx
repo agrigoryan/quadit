@@ -127,11 +127,11 @@ describe("BulkBar", () => {
     expect(menu()).toEqual(["Set epic…", "Set due date…", "Move to project…"]);
   });
 
-  it("offers estimates where the project says nothing of them", () => {
+  it("leaves out estimates where the project says nothing of them: the server never says false, so that is off", () => {
     seed(undefined);
     renderBar();
     openMore();
-    expect(menu()).toEqual(["Set epic…", "Set due date…", "Set estimate…", "Move to project…"]);
+    expect(menu()).toEqual(["Set epic…", "Set due date…", "Move to project…"]);
   });
 
   it("opens the status picker for the selection from its button", () => {
