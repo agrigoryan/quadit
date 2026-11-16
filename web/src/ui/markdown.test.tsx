@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 // Task keys and mentions in Markdown become links (ui/markdown.tsx), but only
-// for a project and a member there are.
+// for a project and a member there are; and a task list's boxes can be ticked
+// where the text may be changed.
 
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import { Markdown } from "@/ui/markdown";
@@ -46,5 +47,46 @@ describe("Markdown", () => {
     const page = show("ask @artist or @nobody");
     expect([...page.querySelectorAll(".mention")].map((m) => m.textContent)).toEqual(["@artist"]);
     expect(page.textContent).toBe("ask @artist or @nobody");
+  });
+});
+
+describe("a task list's boxes", () => {
+  const text = [
+    "Steps:",
+    "",
+    "- [x] buy paint",
+    "  - [ ] the blue",
+    "",
+    "```",
+    "- [ ] not a box, code",
+    "```",
+    "",
+    "1. [ ] paint the wall",
+  ].join("\n");
+
+  it("hand the text with the box ticked, or not, to be saved", () => {
+    const tick = vi.fn<(next: string) => void>();
+    render(
+      <MemoryRouter>
+        <Markdown text={text} onTick={tick} />
+      </MemoryRouter>,
+    );
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes.map((box) => (box as HTMLInputElement).checked)).toEqual([true, false, false]);
+    fireEvent.click(boxes[2] as HTMLElement);
+    expect(tick).toHaveBeenLastCalledWith(text.replace("1. [ ] paint", "1. [x] paint"));
+    fireEvent.click(boxes[0] as HTMLElement);
+    expect(tick).toHaveBeenLastCalledWith(text.replace("- [x] buy", "- [ ] buy"));
+    fireEvent.click(boxes[1] as HTMLElement);
+    expect(tick).toHaveBeenLastCalledWith(text.replace("  - [ ] the blue", "  - [x] the blue"));
+  });
+
+  it("are shown, not ticked, where the text may not be changed", () => {
+    render(
+      <MemoryRouter>
+        <Markdown text={text} />
+      </MemoryRouter>,
+    );
+    for (const box of screen.getAllByRole("checkbox")) expect(box).toBeDisabled();
   });
 });

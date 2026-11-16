@@ -92,7 +92,8 @@ function DescriptionSkeleton() {
 
 /**
  * The description as rendered Markdown. A click (not on a link, not while
- * selecting text) or the pencil turns it into a text box.
+ * selecting text) or the pencil turns it into a text box. The boxes of a
+ * task list in it are ticked with a click.
  */
 export function Description({ task, loading }: { task: Task; loading: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -175,7 +176,8 @@ export function Description({ task, loading }: { task: Task; loading: boolean })
       {/* The pencil is the keyboard's way in; the click is a shortcut for the mouse. */}
       {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- see above */}
       <div onClick={clickToEdit} className={readOnly ? undefined : "cursor-text"}>
-        <Markdown text={text} />
+        {/* A task list's boxes are ticked in place, saved as any edit of the description is. */}
+        <Markdown text={text} onTick={readOnly ? undefined : (next) => setDescription([task], next)} />
       </div>
       {!readOnly && (
         <IconButton

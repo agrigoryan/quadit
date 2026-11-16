@@ -1,5 +1,5 @@
-import { memo, useContext } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import { type ComponentProps, createContext, memo, useContext } from "react";
+import ReactMarkdown, { defaultUrlTransform, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cx } from "@/lib/cx";
 import { getProjectByKey, useRows } from "@/data/selectors";
@@ -9,7 +9,8 @@ import { TaskMention } from "@/ui/task-mention";
 
 // Markdown as the server stores it, with two additions: @handle of a real
 // member, and a task key such as SVA-12, shown as the task it names
-// (ui/task-mention.tsx).
+// (ui/task-mention.tsx). Where the text may be changed, the boxes of a task
+// list ("- [ ] milk") can be ticked.
 
 interface Node {
   type: string;
@@ -83,19 +84,56 @@ function RefLink({ href, children }: { href?: string; children?: React.ReactNode
   );
 }
 
+/** A task list item's start, up to the mark in its box: "- [x", "12. [ ". */
+const BOXED_ITEM = /^(?:[-*+]|\d+[.)])\s+\[([ xX])/;
+
+/** The text with the box of the task list item that starts at `offset` ticked, or no longer ticked. */
+function flipBox(text: string, offset: number): string {
+  const found = BOXED_ITEM.exec(text.slice(offset));
+  if (!found) return text;
+  const at = offset + found[0].length - 1;
+  return text.slice(0, at) + (found[1] === " " ? "x" : " ") + text.slice(at + 1);
+}
+
+/** Given, the boxes can be ticked: it flips the box of the item that starts at this offset of the text. */
+const Tick = createContext<((offset: number) => void) | null>(null);
+/** Where in the text the list item around a box starts. */
+const ItemStart = createContext<number | undefined>(undefined);
+
+function ListItem({ node, children, ...rest }: ComponentProps<"li"> & ExtraProps) {
+  return (
+    <li {...rest}>
+      <ItemStart value={node?.position?.start.offset}>{children}</ItemStart>
+    </li>
+  );
+}
+
+function TaskBox({ node: _node, ...rest }: ComponentProps<"input"> & ExtraProps) {
+  const tick = useContext(Tick);
+  const at = useContext(ItemStart);
+  if (rest.type !== "checkbox" || !tick || at === undefined) return <input {...rest} />;
+  return <input type="checkbox" checked={!!rest.checked} onChange={() => tick(at)} className="cursor-pointer" />;
+}
+
+const components = { a: RefLink, li: ListItem, input: TaskBox };
+
 interface Props {
   text: string;
   /** Smaller type, for comments and cards. */
   tight?: boolean;
   className?: string;
+  /** Given, a task list's boxes can be ticked: it is handed the text with the box changed, to save. */
+  onTick?: (next: string) => void;
 }
 
-export const Markdown = memo(function Markdown({ text, tight, className }: Props) {
+export const Markdown = memo(function Markdown({ text, tight, className, onTick }: Props) {
   return (
     <div className={cx("md", tight && "md-tight", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkRefs]} urlTransform={allowRefs} components={{ a: RefLink }}>
-        {text}
-      </ReactMarkdown>
+      <Tick value={onTick ? (offset) => onTick(flipBox(text, offset)) : null}>
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkRefs]} urlTransform={allowRefs} components={components}>
+          {text}
+        </ReactMarkdown>
+      </Tick>
     </div>
   );
 });
