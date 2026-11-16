@@ -175,4 +175,6 @@ doc.restored {"from_backup":true,"row":{"id":"#66","kind":"page","title":"The pl
 doc.edited {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":175},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":175}],"changes":{"content_seq":{"from":null,"to":175}},"deleted":["#69","#70"],"from_backup":true,"id":"#66"}
 task.deleted {"gone":true,"id":"#85"}
 doc.deleted {"gone":true,"id":"#76"}
+notification.updated {"changes":{"archived_at":{"from":null,"to":1774170149000},"read_at":{"from":null,"to":1774170149000}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
+notification.updated {"changes":{"archived_at":{"from":null,"to":0}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
 workspace.deleted {"gone":true,"id":"#1","slug":"events"}

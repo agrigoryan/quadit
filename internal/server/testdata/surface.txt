@@ -375,6 +375,7 @@ change notification.read arg all
 change notification.read arg archive
 change notification.read arg ids
 change notification.read arg task
+change notification.read arg unarchive
 change notification.read arg unread
 change notification.read arg up_to
 change notify

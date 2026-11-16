@@ -351,6 +351,11 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 	if _, _, err := e.PurgeTrash(ctx, 30*24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
+
+	// What is put back as it was: an inbox taken out and back in.
+	as(artist, "notification.read", M{"all": true, "archive": true})
+	as(artist, "notification.read", M{"all": true, "unarchive": true})
+
 	do("workspace.delete", M{"confirm": "events"})
 
 	for _, typ := range ChangeTypes() {

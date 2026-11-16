@@ -318,6 +318,7 @@ export interface Changes {
     up_to?: number;
     unread?: boolean;
     archive?: boolean;
+    unarchive?: boolean;
   };
   notify: {
     user: string;

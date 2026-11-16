@@ -22,13 +22,18 @@ type notificationReadArgs struct {
 	// UpTo limits "all" to items at or before this feed position, so items
 	// that arrived while the caller was reading stay unread.
 	UpTo int64 `json:"up_to"`
-	// Unread puts the items back as unread. Archive takes them out of the inbox.
-	Unread  bool `json:"unread"`
-	Archive bool `json:"archive"`
+	// Unread puts the items back as unread. Archive takes them out of the
+	// inbox, and Unarchive puts archived ones back in, read or not as they were.
+	Unread    bool `json:"unread"`
+	Archive   bool `json:"archive"`
+	Unarchive bool `json:"unarchive"`
 }
 
 // notificationRead marks the caller's inbox items as handled.
 func notificationRead(c *cx, a notificationReadArgs) error {
+	if a.Archive && a.Unarchive {
+		return invalid("unarchive", "say archive or unarchive, not both")
+	}
 	conds := []store.Cond{store.Eq("user_id", c.actor.UserID)}
 	switch {
 	case len(a.IDs) > 0:
@@ -51,6 +56,9 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 	case a.Archive:
 		conds = append(conds, store.Null("archived_at"))
 		set = map[string]any{"archived_at": c.at, "read_at": c.at}
+	case a.Unarchive:
+		conds = append(conds, store.NotNull("archived_at"))
+		set = map[string]any{"archived_at": int64(0)}
 	case a.Unread:
 		conds = append(conds, store.NotNull("read_at"))
 		set = map[string]any{"read_at": int64(0)}
