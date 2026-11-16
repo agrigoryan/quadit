@@ -160,7 +160,7 @@ export const pages = {
   "shortcuts.archive": "Archive",
   "shortcuts.toggleRead": "Mark read or unread",
   "shortcuts.send": "Send the comment or save",
-  "shortcuts.openChip": "Open the task, decision or page beside the cursor",
+  "shortcuts.openChip": "Open the task, decision, page or person beside the cursor",
   "shortcuts.focusOption": "Move between options",
   "shortcuts.pick": "Pick an option",
   "shortcuts.zoom": "Zoom in or out",

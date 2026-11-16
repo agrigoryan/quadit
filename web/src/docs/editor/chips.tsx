@@ -1,9 +1,11 @@
 // The inline things of a page that are not text: a person or agent, a task,
-// a decision, another page. Each shows live from the workspace copy.
+// a decision, another page. Each shows live from the workspace copy, and
+// opens what it names: the task, the decision, the page, the card about the
+// member.
 
 import { createExtension } from "@blocknote/core";
 import { FileText } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone, useMe, useRowEvenIfGone, useRows, useTaskByKeyEvenIfGone } from "@/data/selectors";
@@ -12,18 +14,43 @@ import { docTitle } from "@/docs/data";
 import { answerOf, DECISION_REF, decisionsOf } from "@/docs/editor/decision-refs";
 import { openDecision, openDoc, openTask } from "@/docs/nav";
 import { PageIcon } from "@/docs/page-icon";
+import { MemberCard } from "@/tasks/member-card";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 
-export function MentionChip({ handle }: { handle: string }) {
-  // A removed member's mention still shows their name.
+/** A person or an agent: it opens the card about them (tasks/member-card.tsx), the way the other chips open what they name. */
+export function MentionChip({ handle, editable }: { handle: string; editable: boolean }) {
+  // A removed member's mention still shows their name, and their card.
   const members = useLookupEvenIfGone("members");
   const member = useMemo(() => Object.values(members).find((m) => m.handle === handle), [members, handle]);
   const meId = useMe()?.user_id;
+  const [open, setOpen] = useState(false);
+  const self = useRef<HTMLSpanElement>(null);
   const isMe = !!member && meId === member.user_id;
-  return (
-    <span className={cx("qd-chip qd-mention", isMe && "is-me")} data-handle={handle}>
+  const chip = (
+    <span
+      ref={self}
+      className={cx("qd-chip qd-mention", isMe && "is-me")}
+      data-handle={handle}
+      {...(member && chipControl("button", () => setOpen(true), editable))}
+    >
       @{member?.name ?? handle}
     </span>
+  );
+  if (!member) return chip;
+  return (
+    <MemberCard
+      member={member}
+      open={open}
+      onOpenChange={setOpen}
+      onCloseAutoFocus={(e) => {
+        if (!editable) return;
+        // While the page is edited the focus goes back to the text, where the caret was beside the chip.
+        e.preventDefault();
+        self.current?.closest<HTMLElement>("[contenteditable=true]")?.focus();
+      }}
+    >
+      {chip}
+    </MemberCard>
   );
 }
 
@@ -34,12 +61,20 @@ export function MentionChip({ handle }: { handle: string }) {
  * Enter or Space opens.
  */
 function chipLink(open: (() => void) | undefined, editable: boolean) {
+  return { ...chipControl("link", open, editable), onClick: () => open?.() };
+}
+
+/**
+ * The keyboard and focus of a chip that is a control. A mention's card
+ * opens on a click by itself (it is the card's trigger), so only the keys
+ * are given `open` here.
+ */
+function chipControl(role: "link" | "button", open: (() => void) | undefined, editable: boolean) {
   return {
-    // An <a> inside the editor's text would be edited as a link of the text.
-    role: "link",
+    // An <a> or a <button> inside the editor's text would be edited as part of the text.
+    role,
     tabIndex: editable ? -1 : 0,
     onMouseDown: (e: React.MouseEvent) => e.preventDefault(),
-    onClick: () => open?.(),
     onKeyDown: (e: React.KeyboardEvent) => {
       if (editable || (e.key !== "Enter" && e.key !== " ")) return;
       e.preventDefault();
@@ -67,15 +102,15 @@ export const openChipAtCaret = createExtension({
           : -1;
       if (at < 0) return false;
       const dom = editor.prosemirrorView.nodeDOM(at);
-      const link = dom instanceof HTMLElement ? dom.querySelector<HTMLElement>('[role="link"]') : null;
+      const link = dom instanceof HTMLElement ? dom.querySelector<HTMLElement>('[role="link"], [role="button"]') : null;
       link?.click();
       return !!link;
     },
   },
 });
 
-/** The inline content types that open what they name (a mention names a person, and opens nothing). */
-const CHIPS = new Set(["taskChip", "decisionChip", "pageLink"]);
+/** The inline content types that open what they name (a mention, the card about the member). */
+const CHIPS = new Set(["taskChip", "decisionChip", "pageLink", "mention"]);
 
 export function TaskChip({ taskKey, editable }: { taskKey: string; editable: boolean }) {
   // A trashed task is found, to be shown as gone.

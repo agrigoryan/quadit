@@ -9,6 +9,7 @@ import { useIsDraft } from "@/data/store";
 import { isClosedCategory, type Task } from "@/types/core";
 import { useTaskLink } from "@/nav/task-link";
 import type { Branch } from "@/tasks/list-layout";
+import { MemberCard } from "@/tasks/member-card";
 import { assignee as assigneeProperty } from "@/tasks/properties/assignee";
 import { priority } from "@/tasks/properties/priority";
 import { status as statusProperty } from "@/tasks/properties/status";
@@ -196,18 +197,26 @@ export const TaskRow = memo(function TaskRow({
         </span>
         {!hide?.epic && epic && <EpicChip name={epic.name} className="max-xl:hidden" />}
         {task.due_on && <DueChip day={task.due_on} done={closed} className="max-sm:hidden" />}
-        {!hide?.assignee && (
-          <TaskPropertyPicker property={assigneeProperty} tasks={[task]} align="end">
-            <button
-              type="button"
-              className={iconButton}
-              disabled={readOnly}
-              aria-label={`${t("prop.assignee")}: ${assignee ? assignee.name : t("task.unassigned")}`}
-            >
-              <Avatar member={assignee} size="sm" />
-            </button>
-          </TaskPropertyPicker>
-        )}
+        {!hide?.assignee &&
+          (readOnly && assignee ? (
+            // Who cannot change the assignee learns about them instead.
+            <MemberCard member={assignee}>
+              <button type="button" className={iconButton}>
+                <Avatar member={assignee} size="sm" />
+              </button>
+            </MemberCard>
+          ) : (
+            <TaskPropertyPicker property={assigneeProperty} tasks={[task]} align="end">
+              <button
+                type="button"
+                className={iconButton}
+                disabled={readOnly}
+                aria-label={`${t("prop.assignee")}: ${assignee ? assignee.name : t("task.unassigned")}`}
+              >
+                <Avatar member={assignee} size="sm" />
+              </button>
+            </TaskPropertyPicker>
+          ))}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo } from "react";
+import { lazy, type ReactElement, type ReactNode, Suspense, useCallback, useEffect, useMemo } from "react";
 import { type Location, matchPath, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { useOnePane } from "@/hooks/breakpoints";
 import { ShortcutsSheet } from "@/palette/shortcuts";
@@ -22,9 +22,15 @@ import { TopBar } from "@/shell/topbar";
 import { UploadsIndicator } from "@/shell/uploads";
 import { canGoBack, isTaskPath, type Peek, PeekContext, taskPath } from "@/nav/task-link";
 import { leaveForPage } from "@/nav/task-queue";
+import type { Member } from "@/types/core";
+import { MemberCard } from "@/tasks/member-card";
 import { ProjectTasksPage, ViewPage } from "@/tasks/tasks-page";
+import { MemberMention } from "@/ui/member-mention";
 
 // The larger parts of the app are fetched when first opened.
+/** A member's mention in Markdown opens the card about them. */
+const memberCard = (member: Member, control: ReactElement) => <MemberCard member={member}>{control}</MemberCard>;
+
 const DocsRoutes = lazy(() => import("@/docs/routes"));
 const SettingsRoutes = lazy(() => import("@/settings/routes"));
 const InsightRoutes = lazy(() => import("@/insights/routes"));
@@ -134,96 +140,98 @@ export function Shell() {
 
   return (
     <PeekContext value={peek}>
-      <div className="flex h-dvh overflow-hidden">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar onNewTask={mayCreate ? openNewTask : undefined} />
-          {/* It takes the focus after each move (shell/page-focus.ts); what looks focused is then the page's own current row. */}
-          <main data-page tabIndex={-1} className="relative min-h-0 flex-1 overflow-hidden bg-surface outline-none">
-            <PageBoundary resetKey={pagePath}>
-              <Routes location={page}>
-                <Route index element={<Navigate to="my-work" replace />} />
-                <Route path="my-work" element={<MyWorkPage />} />
-                <Route path="inbox" element={<InboxPage />} />
-                <Route path="p/:key/tasks" element={<ProjectTasksPage layout="list" />} />
-                <Route path="p/:key/board" element={<ProjectTasksPage layout="board" />} />
-                <Route
-                  path="p/:key/epics"
-                  element={
-                    <Later>
-                      <EpicsPage />
-                    </Later>
-                  }
-                />
-                <Route
-                  path="p/:key/cycles"
-                  element={
-                    <Later>
-                      <CyclesPage />
-                    </Later>
-                  }
-                />
-                <Route path="view/:slug" element={<ViewPage />} />
-                <Route
-                  path="p/:key/docs/*"
-                  element={
-                    <Later>
-                      <DocsRoutes />
-                    </Later>
-                  }
-                />
-                <Route
-                  path="docs/*"
-                  element={
-                    <Later>
-                      <DocsRoutes />
-                    </Later>
-                  }
-                />
-                <Route
-                  path="settings/*"
-                  element={
-                    <Later>
-                      <SettingsRoutes />
-                    </Later>
-                  }
-                />
-                {insightPaths.map((path) => (
+      <MemberMention value={memberCard}>
+        <div className="flex h-dvh overflow-hidden">
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar onNewTask={mayCreate ? openNewTask : undefined} />
+            {/* It takes the focus after each move (shell/page-focus.ts); what looks focused is then the page's own current row. */}
+            <main data-page tabIndex={-1} className="relative min-h-0 flex-1 overflow-hidden bg-surface outline-none">
+              <PageBoundary resetKey={pagePath}>
+                <Routes location={page}>
+                  <Route index element={<Navigate to="my-work" replace />} />
+                  <Route path="my-work" element={<MyWorkPage />} />
+                  <Route path="inbox" element={<InboxPage />} />
+                  <Route path="p/:key/tasks" element={<ProjectTasksPage layout="list" />} />
+                  <Route path="p/:key/board" element={<ProjectTasksPage layout="board" />} />
                   <Route
-                    key={path}
-                    path={path}
+                    path="p/:key/epics"
                     element={
                       <Later>
-                        <InsightRoutes />
+                        <EpicsPage />
                       </Later>
                     }
                   />
-                ))}
-                <Route path="trash" element={<TrashPage />} />
-                <Route
-                  path="task/:key"
-                  element={
-                    <Later>
-                      <taskPage.Part onBack={leavePage} />
-                    </Later>
-                  }
-                />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </PageBoundary>
-            <UploadsIndicator />
-          </main>
+                  <Route
+                    path="p/:key/cycles"
+                    element={
+                      <Later>
+                        <CyclesPage />
+                      </Later>
+                    }
+                  />
+                  <Route path="view/:slug" element={<ViewPage />} />
+                  <Route
+                    path="p/:key/docs/*"
+                    element={
+                      <Later>
+                        <DocsRoutes />
+                      </Later>
+                    }
+                  />
+                  <Route
+                    path="docs/*"
+                    element={
+                      <Later>
+                        <DocsRoutes />
+                      </Later>
+                    }
+                  />
+                  <Route
+                    path="settings/*"
+                    element={
+                      <Later>
+                        <SettingsRoutes />
+                      </Later>
+                    }
+                  />
+                  {insightPaths.map((path) => (
+                    <Route
+                      key={path}
+                      path={path}
+                      element={
+                        <Later>
+                          <InsightRoutes />
+                        </Later>
+                      }
+                    />
+                  ))}
+                  <Route path="trash" element={<TrashPage />} />
+                  <Route
+                    path="task/:key"
+                    element={
+                      <Later>
+                        <taskPage.Part onBack={leavePage} />
+                      </Later>
+                    }
+                  />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </PageBoundary>
+              <UploadsIndicator />
+            </main>
+          </div>
+          <Part on={inPanel}>
+            {inPanel && (
+              <taskPanel.Part taskKey={taskKey} onClose={closePanel} onExpand={phone ? undefined : expandPanel} />
+            )}
+          </Part>
+          <Part on={paletteOpen}>{paletteOpen && <palette.Part />}</Part>
+          <Part on={!!newTask}>{newTask && <createTask.Part draft={newTask} />}</Part>
+          <ShortcutsSheet />
+          <GoHint />
         </div>
-        <Part on={inPanel}>
-          {inPanel && (
-            <taskPanel.Part taskKey={taskKey} onClose={closePanel} onExpand={phone ? undefined : expandPanel} />
-          )}
-        </Part>
-        <Part on={paletteOpen}>{paletteOpen && <palette.Part />}</Part>
-        <Part on={!!newTask}>{newTask && <createTask.Part draft={newTask} />}</Part>
-        <ShortcutsSheet />
-        <GoHint />
-      </div>
+      </MemberMention>
     </PeekContext>
   );
 }

@@ -18,7 +18,7 @@ describe("ShortcutsSheet", () => {
         <ShortcutsSheet />
       </TooltipProvider>,
     );
-    const row = screen.getByText("Open the task, decision or page beside the cursor").closest("div");
+    const row = screen.getByText("Open the task, decision, page or person beside the cursor").closest("div");
     expect(row).not.toBeNull();
     // A key cap for each key pressed together.
     const caps = within(row as HTMLElement).getAllByText((_, el) => el?.tagName === "KBD");

@@ -8,12 +8,13 @@ import { X } from "lucide-react";
 import { Link } from "react-router";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import { useLookup, useLookupEvenIfGone, useRows } from "@/data/selectors";
+import { useLookup, useLookupEvenIfGone, useMember, useRows } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { unlinkTask } from "@/docs/actions";
 import { useDocsStore } from "@/docs/store";
 import { useTaskLink } from "@/nav/task-link";
-import { AssigneeAvatar } from "@/tasks/task-chips";
+import { MemberCard } from "@/tasks/member-card";
+import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
 
@@ -60,6 +61,7 @@ function TaskRow({ docId, row }: { docId: string; row: PageTask }) {
   const status = useLookup("statuses")[task.status_id];
   const link = useTaskLink(task);
   const mayUnlink = useCan().editTask(task);
+  const assignee = useMember(task.assignee_id);
   return (
     <li className="group relative -mx-1.5 flex h-8 items-center gap-2 rounded-md px-1.5 text-sm hover:bg-hover max-md:h-10">
       <span className="flex size-5 shrink-0 items-center justify-center">
@@ -73,7 +75,15 @@ function TaskRow({ docId, row }: { docId: string; row: PageTask }) {
         {task.title}
       </Link>
       {how && <span className="shrink-0 text-xs text-ink-3 max-sm:hidden">{t(`docs.tasks.${how}`)}</span>}
-      <AssigneeAvatar userId={task.assignee_id} />
+      {assignee ? (
+        <MemberCard member={assignee}>
+          <button type="button" className="relative z-[1] flex size-6 shrink-0 items-center justify-center rounded-sm">
+            <Avatar member={assignee} size="sm" />
+          </button>
+        </MemberCard>
+      ) : (
+        <Avatar member={undefined} size="sm" />
+      )}
       {linkId && mayUnlink && (
         <IconButton
           label={t("docs.tasks.remove", { key: task.key })}

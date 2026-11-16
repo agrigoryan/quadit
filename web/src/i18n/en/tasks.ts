@@ -223,4 +223,16 @@ export const tasks = {
   "multi.submit": "Create {n} task | Create {n} tasks",
   "multi.needTitles": "Write at least one title",
   "multi.created": "{n} task created in {project} | {n} tasks created in {project}",
+
+  "memberCard.about": "About {name}",
+  "memberCard.person": "Person",
+  "memberCard.agent": "Agent",
+  "memberCard.role": "Role",
+  "memberCard.responsible": "Answers for it",
+  "memberCard.listening": "Listening",
+  "memberCard.listeningNow": "Listening now",
+  "memberCard.notListening": "Nothing is listening",
+  "memberCard.removed": "Removed from the workspace",
+  "memberCard.suspended": "Suspended",
+  "memberCard.tasks": "Tasks assigned",
 } as const;

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useContext } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { Link } from "react-router";
 import remarkGfm from "remark-gfm";
@@ -6,6 +6,7 @@ import { cx } from "@/lib/cx";
 import { getProjectByKey, useRows } from "@/data/selectors";
 import { useStore } from "@/data/store";
 import { useTaskLink } from "@/nav/task-link";
+import { MemberMention } from "@/ui/member-mention";
 
 // Markdown as the server stores it, with two additions shown as links:
 // @handle of a real member, and a task key such as SVA-12.
@@ -66,12 +67,21 @@ function RefLink({ href, children }: { href?: string; children?: React.ReactNode
   const members = useRows("members");
   const member = handle ? members.find((m) => m.handle === handle) : undefined;
   const meId = useStore((s) => s.me?.user_id);
+  const card = useContext(MemberMention);
   if (handle) {
     if (!member) return <>{children}</>;
-    return (
-      <span className={cx("mention", member.user_id === meId && "is-me")} title={member.name}>
+    const className = cx("mention", member.user_id === meId && "is-me");
+    if (!card)
+      return (
+        <span className={className} title={member.name}>
+          {children}
+        </span>
+      );
+    return card(
+      member,
+      <button type="button" className={cx(className, "cursor-pointer")}>
         {children}
-      </span>
+      </button>,
     );
   }
   if (href?.startsWith("task:")) return <TaskRef taskKey={href.slice(5)}>{children}</TaskRef>;
