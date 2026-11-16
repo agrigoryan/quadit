@@ -14,7 +14,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -374,7 +373,7 @@ func OpenFiles(ctx context.Context, st store.Store, sealer *auth.Sealer, dataDir
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := filesConfig(ctx, st, sealer)
+	cfg, err := server.FilesConfig(ctx, st, sealer, slog.Default())
 	if err != nil {
 		return nil, err
 	}
@@ -386,33 +385,6 @@ func OpenFiles(ctx context.Context, st store.Store, sealer *auth.Sealer, dataDir
 		return nil, err
 	}
 	return blob.Layered{Primary: cloud, Old: disk}, nil
-}
-
-// filesConfig is the "files" setting: from QUADIT_SETTING_FILES, or from
-// the database with its secrets unsealed. No setting is the zero Config,
-// which is the local disk.
-func filesConfig(ctx context.Context, st store.Store, sealer *auth.Sealer) (blob.Config, error) {
-	var cfg blob.Config
-	if v := os.Getenv("QUADIT_SETTING_FILES"); v != "" {
-		if err := json.Unmarshal([]byte(v), &cfg); err != nil {
-			return cfg, fmt.Errorf("QUADIT_SETTING_FILES: %w", err)
-		}
-		return cfg, nil
-	}
-	var set core.Setting
-	there, err := store.Find(ctx, st, &set, store.Eq("name", "files"))
-	if err != nil || !there {
-		return cfg, err
-	}
-	if err := json.Unmarshal(set.Value, &cfg); err != nil {
-		return cfg, fmt.Errorf("the files setting: %w", err)
-	}
-	for _, f := range []*string{&cfg.SecretKey, &cfg.Credentials, &cfg.AccountKey} {
-		if plain, err := sealer.Open(*f); err == nil {
-			*f = plain // a value that does not open was stored plain
-		}
-	}
-	return cfg, nil
 }
 
 // adminHelp is the help of quadit admin.

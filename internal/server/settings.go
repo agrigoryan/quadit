@@ -6,12 +6,15 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"strings"
 
+	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/mail"
 	"github.com/agrigoryan/quadit/internal/settings"
+	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/webpush"
 )
 
@@ -33,13 +36,31 @@ func (s *Server) settingKinds() settings.Table {
 		"auth.github":                  {Shape: func() any { return new(oauthSetting) }, Secrets: []string{"client_secret"}},
 		"auth.oidc":                    {Shape: func() any { return new(oauthSetting) }, Secrets: []string{"client_secret"}},
 		"mail":                         {Shape: func() any { return new(mail.Config) }, Secrets: []string{"password"}},
-		"files":                        {Shape: func() any { return new(blob.Config) }, Secrets: []string{"secret_key", "credentials", "account_key"}, Check: s.tryFiles},
+		"files":                        filesKind(s.tryFiles),
 		"files.max_mb":                 {Shape: func() any { return new(int) }},
 		"limits.api_per_minute":        {Shape: func() any { return new(int) }, Check: checkAPIPerMinute, Changed: s.applyLimits},
 		"metrics.token":                {Shape: func() any { return new(string) }},
 		"backup":                       {Shape: func() any { return new(backupSetting) }},
 		"push":                         {Shape: func() any { return new(webpush.Keys) }, Secrets: []string{"private_key"}},
 	}
+}
+
+// filesKind is the "files" setting: where uploaded files are kept, with
+// the keys to a cloud store sealed. check, when set, tries a new value
+// before it is kept.
+func filesKind(check func(ctx context.Context, value json.RawMessage) error) settings.Kind {
+	return settings.Kind{Shape: func() any { return new(blob.Config) }, Secrets: []string{"secret_key", "credentials", "account_key"}, Check: check}
+}
+
+// FilesConfig reads the "files" setting as a running server reads it (the
+// environment's value wins; the stored one has its keys unsealed), for a
+// command run on the server's machine without one: backup and restore. Not
+// set, it is the zero Config, the local disk. A database that cannot be
+// read is the error.
+func FilesConfig(ctx context.Context, st store.Store, sealer *auth.Sealer, log *slog.Logger) (blob.Config, error) {
+	var cfg blob.Config
+	err := settings.New(st, sealer, log, settings.Table{"files": filesKind(nil)}).Checked(ctx, "files", &cfg)
+	return cfg, err
 }
 
 // installName is what the install is called (the install.name setting),
