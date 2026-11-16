@@ -6,7 +6,9 @@
 // Nested, a group's rows are a tree: each sub-task under its parent. A task
 // stays in the group its own value puts it in; a parent that is not in that
 // group is shown above its sub-tasks there as a context row, which the
-// group does not count and which cannot be selected.
+// group does not count and which cannot be selected. Every row keeps the
+// column a fold control takes, parent or not: the first sub-task made
+// moves nothing sideways.
 
 import type { Dict } from "@/data/store";
 import type { Task } from "@/types/core";
@@ -109,8 +111,6 @@ export function layOut(groups: TaskGroup[], folded: ReadonlySet<string>, nesting
     sections.push({ group, top, head, rows: shown, height, first });
     top += height;
   }
-  // With no parent anywhere, the list looks as it does flat: no room kept for a fold control.
-  if (!rows.some((row) => row.branch && row.branch.children > 0)) for (const row of rows) row.branch = undefined;
   const indexOf = new Map(rows.map((row, i) => [row.key, i]));
   return { sections, rows, indexOf, total: top };
 }

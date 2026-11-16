@@ -224,8 +224,12 @@ describe("layOut, nested", () => {
     ]);
   });
 
-  it("gives no row a branch when nothing in the list is nested, so no room is kept for a fold control", () => {
-    expect(nest([sub(1), sub(2)], { todo: [1, 2] }).rows.map((row) => row.branch)).toEqual([undefined, undefined]);
+  it("keeps the fold control's room while nesting with no parent in the list, so the first parent shifts nothing", () => {
+    const { rows } = nest([sub(1), sub(2)], { todo: [1, 2] });
+    expect(rows.map((row) => [row.branch?.depth, row.branch?.children])).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
   });
 
   it("lays out flat, as grouped, when not asked to nest", () => {
