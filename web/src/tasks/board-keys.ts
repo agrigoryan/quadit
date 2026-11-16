@@ -20,7 +20,7 @@ import { isOnControl, usePanelStepKeys } from "@/tasks/panel-keys";
 const focusedCard = (e: KeyboardEvent) =>
   e.target instanceof HTMLElement ? e.target.closest<HTMLElement>("[data-task]")?.dataset.task : undefined;
 
-/** The card of a task, where it is drawn. */
+/** The link of a task's card, where it is drawn: on the board it is what has the focus. */
 const cardOf = (id: string) => document.querySelector<HTMLElement>(`main a[data-task="${CSS.escape(id)}"]`);
 const focusedId = () =>
   document.activeElement instanceof HTMLElement

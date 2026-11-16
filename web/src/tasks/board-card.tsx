@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "react-router";
@@ -9,13 +9,26 @@ import { useDecisionFlag, useLookup, useSubtaskProgress } from "@/data/selectors
 import { useIsDraft } from "@/data/store";
 import type { Task } from "@/types/core";
 import { waitsOutside } from "@/tasks/actions";
+import { AssigneeControl } from "@/tasks/assignee-control";
 import { AssigneeAvatar, DueChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
 import { useTaskLink } from "@/nav/task-link";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon } from "@/ui/icons";
 
-/** What a card shows; shared by the card in its column and the copy that follows the pointer. */
-const CardBody = memo(function CardBody({ task }: { task: Task }) {
+/**
+ * What a card shows; shared by the card in its column and the copy that follows the pointer.
+ * The card in its column puts its controls in: `title` the link that opens the task, `avatar`
+ * the assignee's button. Without them the title and avatar are only shown.
+ */
+const CardBody = memo(function CardBody({
+  task,
+  title,
+  avatar,
+}: {
+  task: Task;
+  title?: ReactNode;
+  avatar?: ReactNode;
+}) {
   const labels = useLookup("labels");
   const decision = useDecisionFlag(task.id);
   const progress = useSubtaskProgress(task.id);
@@ -31,9 +44,9 @@ const CardBody = memo(function CardBody({ task }: { task: Task }) {
             title={decision === "mine" ? t("task.decisionYours") : t("task.decisionOpen")}
           />
         )}
-        <AssigneeAvatar userId={task.assignee_id} />
+        {avatar ?? <AssigneeAvatar userId={task.assignee_id} />}
       </div>
-      <p className="mt-1.5 line-clamp-3 text-sm leading-[1.35]">{task.title}</p>
+      <p className="mt-1.5 line-clamp-3 text-sm leading-[1.35]">{title ?? task.title}</p>
       {(task.waiting_on_id || waitsOutside(task) || tags.length > 0 || task.due_on || progress) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <WaitsOnChip task={task} />
@@ -50,16 +63,22 @@ const CardBody = memo(function CardBody({ task }: { task: Task }) {
 
 const shell = "block rounded-md border border-line bg-surface p-2.5 shadow-card";
 
-/** A task on the board. Drag it to reorder or to move it to another column; click to open. */
+/**
+ * A task on the board. Drag it from anywhere to reorder it or to move it to another column;
+ * click anywhere to open it. The card is built as a list's row is (tasks/task-row.tsx): its
+ * title is the link, stretched over the card, and the assignee's avatar a button above it.
+ * The link is what has the focus: keys on it are the board's (it carries data-task, as the card
+ * does), and Shift+Space on it lifts the card.
+ */
 export const BoardCard = memo(function BoardCard({ id, task }: { id: string; task: Task }) {
   const draft = useIsDraft(task.id);
   // A card just made waits for its number: it cannot be opened or moved until the server has it.
   // Nor is it moved by someone who may not change the task (read-only, another project).
   const fixed = !useCan().editTask(task);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id,
     disabled: draft || fixed,
-    // A card is a link that can also be lifted: dnd-kit would call it a button.
+    // The link that can also be lifted: dnd-kit would call it a button.
     attributes: { role: "link" },
   });
   const link = useTaskLink(task);
@@ -72,20 +91,37 @@ export const BoardCard = memo(function BoardCard({ id, task }: { id: string; tas
     );
   }
   return (
-    <Link
-      {...link}
+    <article
       ref={setNodeRef}
       style={style}
-      draggable={false}
       data-task={task.id}
-      className={cx(shell, "touch-manipulation outline-offset-2 hover:border-line-strong", isDragging && "opacity-35")}
-      {...attributes}
+      className={cx(shell, "relative touch-manipulation hover:border-line-strong", isDragging && "opacity-35")}
       {...listeners}
     >
-      <CardBody task={task} />
-    </Link>
+      <CardBody
+        task={task}
+        title={
+          <Link
+            {...link}
+            ref={setActivatorNodeRef}
+            draggable={false}
+            data-task={task.id}
+            aria-label={`${task.key} ${task.title}`}
+            className="outline-none after:absolute after:-inset-px after:rounded-md after:content-[''] focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-accent"
+            {...attributes}
+          >
+            {task.title}
+          </Link>
+        }
+        avatar={<AssigneeControl task={task} readOnly={fixed} className={avatarButton} />}
+      />
+    </article>
   );
 });
+
+/** The avatar's button: a little bigger than the avatar, as much over its edges as it is wider, so the card keeps its size. */
+const avatarButton =
+  "relative z-[1] -m-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-hover data-[state=open]:bg-hover";
 
 /** The copy of a card that follows the pointer while dragging. */
 export function CardOverlay({ task }: { task: Task }) {

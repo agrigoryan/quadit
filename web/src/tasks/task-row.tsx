@@ -4,18 +4,16 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { useDecisionFlag, useLookup, useMember, useRow } from "@/data/selectors";
+import { useDecisionFlag, useLookup, useRow } from "@/data/selectors";
 import { useIsDraft } from "@/data/store";
 import { isClosedCategory, type Task } from "@/types/core";
 import { useTaskLink } from "@/nav/task-link";
 import type { Branch } from "@/tasks/list-layout";
-import { MemberCard } from "@/tasks/member-card";
-import { assignee as assigneeProperty } from "@/tasks/properties/assignee";
+import { AssigneeControl } from "@/tasks/assignee-control";
 import { priority } from "@/tasks/properties/priority";
 import { status as statusProperty } from "@/tasks/properties/status";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { DueChip, EpicChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
-import { Avatar } from "@/ui/avatar";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon, StatusIcon } from "@/ui/icons";
 
@@ -80,7 +78,6 @@ export const TaskRow = memo(function TaskRow({
   const status = useRow("statuses", task.status_id);
   const epic = useRow("epics", task.epic_id);
   const labels = useLookup("labels");
-  const assignee = useMember(task.assignee_id);
   const decision = useDecisionFlag(task.id);
   const link = useTaskLink(task);
   // Just made here and not yet numbered by the server: there is no address to open it at.
@@ -197,26 +194,7 @@ export const TaskRow = memo(function TaskRow({
         </span>
         {!hide?.epic && epic && <EpicChip name={epic.name} className="max-xl:hidden" />}
         {task.due_on && <DueChip day={task.due_on} done={closed} className="max-sm:hidden" />}
-        {!hide?.assignee &&
-          (readOnly && assignee ? (
-            // Who cannot change the assignee learns about them instead.
-            <MemberCard member={assignee}>
-              <button type="button" className={iconButton}>
-                <Avatar member={assignee} size="sm" />
-              </button>
-            </MemberCard>
-          ) : (
-            <TaskPropertyPicker property={assigneeProperty} tasks={[task]} align="end">
-              <button
-                type="button"
-                className={iconButton}
-                disabled={readOnly}
-                aria-label={`${t("prop.assignee")}: ${assignee ? assignee.name : t("task.unassigned")}`}
-              >
-                <Avatar member={assignee} size="sm" />
-              </button>
-            </TaskPropertyPicker>
-          ))}
+        {!hide?.assignee && <AssigneeControl task={task} readOnly={readOnly} className={iconButton} />}
       </div>
     </div>
   );
