@@ -223,6 +223,8 @@ test("the Shift keys change the list's row, and on the open task watch and renam
 
   await page.keyboard.press(" ");
   const panel = page.getByRole("complementary", { name: key });
+  // The task's details in first: their watchers, read before a change, would bring back a watch just stopped.
+  await expect(panel.getByRole("region", { name: "Activity" }).getByText("created this task")).toBeVisible();
   // Who made the task watches it: Shift+S stops that, and starts it again.
   const stop = panel.getByRole("button", { name: "Stop watching" });
   await expect(stop).toHaveAttribute("aria-pressed", "true");
