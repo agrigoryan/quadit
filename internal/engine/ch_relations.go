@@ -78,7 +78,9 @@ func relationAdd(c *cx, a relationArgs) error {
 
 // related tells those who follow the other end of a relation. The relation's
 // own event belongs to one task; this one belongs to the other, so a feed
-// narrowed to either task has it.
+// narrowed to either task has it. An event belongs to one project, so a
+// member who may read only this end is not given the relation's own event:
+// their copy of the relation row catches up when it is next loaded.
 func (c *cx) related(t, other core.Task, r core.Relation, removed bool) error {
 	return c.emit(event{seq: c.tx.NextSeq(), typ: "task.related", entity: "task", entityID: t.ID, place: inTask(t), data: core.EventData{ID: t.ID, Key: &t.Key, OtherKey: other.Key, Relation: r.ID, RelationType: r.Type, Removed: &removed}})
 }
