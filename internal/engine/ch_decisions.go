@@ -71,7 +71,7 @@ func decisionOpen(c *cx, a decisionOpenArgs) error {
 	if err != nil {
 		return err
 	}
-	asked, err := c.askedOf(a, kind)
+	asked, err := c.askedOf(a, kind, t)
 	if err != nil {
 		return err
 	}
@@ -128,11 +128,11 @@ func decisionKind(a decisionOpenArgs) (string, error) {
 
 // askedOf is who a new decision is put to: the member named, or for an
 // agent that names nobody, the person responsible for it.
-func (c *cx) askedOf(a decisionOpenArgs, kind string) (string, error) {
+func (c *cx) askedOf(a decisionOpenArgs, kind string, t core.Task) (string, error) {
 	asked := ""
 	if a.Ask != "" {
 		var err error
-		if asked, err = c.optMember("ask", a.Ask); err != nil {
+		if asked, err = c.personOnTask("ask", a.Ask, t); err != nil {
 			return "", err
 		}
 		if asked == c.actor.UserID {

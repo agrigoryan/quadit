@@ -125,6 +125,13 @@ type Scope struct {
 	NeedsApproval []string `json:"needs_approval,omitempty"`
 }
 
+// MayRead reports whether a member with this scope may read a project. No
+// scope, or one that names no projects, lets in every project; what belongs
+// to no project ("") is the workspace's, open to every member.
+func (s *Scope) MayRead(projectID string) bool {
+	return s == nil || len(s.Projects) == 0 || projectID == "" || slices.Contains(s.Projects, projectID)
+}
+
 // Budget limits an agent or a task. Zero means no limit.
 type Budget struct {
 	CostMicros int64 `json:"cost_micros,omitempty"` // per week for an agent, in total for a task

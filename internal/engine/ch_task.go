@@ -102,7 +102,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 		Budget: a.Budget, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 
 	// Who it is given to, who it is worked for, and whose move it is.
-	if t.AssigneeID, err = c.optMember("assignee", a.Assignee); err != nil {
+	if t.AssigneeID, err = c.personOnTask("assignee", a.Assignee, t); err != nil {
 		return err
 	}
 	if t.AskedBy, err = c.askedBy(t); err != nil {
@@ -115,7 +115,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 			return err
 		}
 		t.WaitingOutside = true
-	} else if t.WaitingOnID, err = c.optMember("waiting_on", a.WaitingOn); err != nil {
+	} else if t.WaitingOnID, err = c.personOnTask("waiting_on", a.WaitingOn, t); err != nil {
 		return err
 	}
 

@@ -1,4 +1,5 @@
-// The checks on a task change: a stale base, a parent loop, hand-offs.
+// The checks on a task change: a stale base, a parent loop, who may be
+// given its work, hand-offs.
 
 package engine
 
@@ -50,6 +51,25 @@ func (c *cx) checkParent(t core.Task, parentID string) error {
 		cur = p.ParentID
 	}
 	return nil
+}
+
+// personOnTask finds the member a task names for its work: its assignee,
+// the one it waits on, the one its decision asks; "" names nobody. A member
+// whose access does not include the task's project is refused, whoever
+// names them: they could not open the task, so they could not do the work,
+// and they would be told of a task they may not read.
+func (c *cx) personOnTask(field, ref string, t core.Task) (string, error) {
+	if ref == "" {
+		return "", nil
+	}
+	m, err := c.memberRef(field, ref)
+	if err != nil {
+		return "", err
+	}
+	if !m.Scope.MayRead(t.ProjectID) {
+		return "", invalid(field, "@%s's access does not include this task's project, so the task cannot be given to them, wait on them or ask them", m.Handle)
+	}
+	return m.UserID, nil
 }
 
 const maxHandoffs = 5

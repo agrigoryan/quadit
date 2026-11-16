@@ -419,7 +419,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
  "standing_preferences": [
   "Write short."
  ],
- "unread": 5,
+ "unread": 6,
  "user_id": "<@cy>",
  "version": "test",
  "workspace": {
@@ -433,7 +433,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
 you are @cy (person, member) in games
 projects: OPS, SVA
 read-only
-unread: 5   seq: 261
+unread: 6   seq: 261
 rule: Write short.
 
 === GET /api/v1/w/games/my-work
@@ -510,6 +510,15 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@aram",
+   "id": "<id #440>",
+   "seq": 84,
+   "task": "OPS-5",
+   "title": "OPS-5 Patch the kernel",
+   "type": "waiting_on"
+  },
+  {
+   "at": "<minute>",
+   "by": "@aram",
    "id": "<id #438>",
    "seq": 76,
    "task": "OPS-2",
@@ -561,11 +570,12 @@ OPS-2  [Todo]  @ops  waits on @cy  Back up nightly  in OPS-1
 OPS-1  Which night?  (id=<decision OPS-1 window>)
 == assigned to you (0)
 nothing
-== unread inbox (5)
+== unread inbox (6)
 #256 <minute> @ops waiting_on: OPS-1 Rotate keys — in your view "Ops infra"
 #150 <minute> @ops comment: OPS-1 Rotate keys — Rotated the first ten.
 #146 <minute> @aram mentioned: OPS-1 Rotate keys — @cy check the vault first.
 #132 <minute> @ops decision_asked: OPS-1 Rotate keys — Which night?
+#84 <minute> @aram waiting_on: OPS-5 Patch the kernel
 #76 <minute> @aram waiting_on: OPS-2 Back up nightly
 seq: 261
 
@@ -612,6 +622,15 @@ seq: 261
    "task": "OPS-1",
    "title": "OPS-1 Rotate keys",
    "type": "decision_asked"
+  },
+  {
+   "at": "<minute>",
+   "by": "@aram",
+   "id": "<id #440>",
+   "seq": 84,
+   "task": "OPS-5",
+   "title": "OPS-5 Patch the kernel",
+   "type": "waiting_on"
   },
   {
    "at": "<minute>",
@@ -672,6 +691,15 @@ seq: 261
   {
    "at": "<minute>",
    "by": "@aram",
+   "id": "<id #440>",
+   "seq": 84,
+   "task": "OPS-5",
+   "title": "OPS-5 Patch the kernel",
+   "type": "waiting_on"
+  },
+  {
+   "at": "<minute>",
+   "by": "@aram",
    "id": "<id #438>",
    "seq": 76,
    "task": "OPS-2",
@@ -687,6 +715,7 @@ seq: 261
 #150 <minute> @ops comment: OPS-1 Rotate keys — Rotated the first ten.
 #146 <minute> @aram mentioned: OPS-1 Rotate keys — @cy check the vault first.
 #132 <minute> @ops decision_asked: OPS-1 Rotate keys — Which night?
+#84 <minute> @aram waiting_on: OPS-5 Patch the kernel
 #76 <minute> @aram waiting_on: OPS-2 Back up nightly
 
 === GET /api/v1/w/games/inbox?since=0&limit=2
@@ -10588,7 +10617,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
      "title": "Patch the kernel",
      "updated_at": 1700000000000,
      "updated_seq": 83,
-     "waiting_on_id": "<@bea>"
+     "waiting_on_id": "<@cy>"
     }
    },
    "entity_id": "<task OPS-5>",
@@ -10598,6 +10627,33 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
    "scope_type": "task",
    "seq": 83,
    "type": "task.created"
+  },
+  {
+   "actor_id": "<@aram>",
+   "at": 1700000000000,
+   "audience_id": "<@cy>",
+   "change_id": "<id #266>",
+   "data": {
+    "row": {
+     "actor_id": "<@aram>",
+     "created_at": 1700000000000,
+     "entity_id": "<task OPS-5>",
+     "entity_type": "task",
+     "id": "<id #440>",
+     "seq": 84,
+     "task_id": "<task OPS-5>",
+     "title": "OPS-5 Patch the kernel",
+     "type": "waiting_on",
+     "user_id": "<@cy>"
+    }
+   },
+   "entity_id": "<id #440>",
+   "entity_type": "notification",
+   "project_id": "<project OPS>",
+   "scope_id": "<task OPS-5>",
+   "scope_type": "task",
+   "seq": 84,
+   "type": "notification.created"
   },
   {
    "actor_id": "<@aram>",
@@ -10741,7 +10797,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
       "to": "<id #168>"
      },
      "waiting_on_id": {
-      "from": "<@bea>",
+      "from": "<@cy>",
       "to": null
      }
     },
@@ -15085,11 +15141,12 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
 #81 <minute> @aram task.created OPS-4 "Shelved audit" [Todo]
 #82 <minute> @aram task.created SVA-5 "Shelved sketch" [Todo]
 #83 <minute> @aram task.created OPS-5 "Patch the kernel" [Todo]
+#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel
 #85 <minute> @aram task.created SVA-6 "Review me" [Review]
 #87 <minute> @aram task.created ARC-1 "In an archived project" [Todo]
 #88 <minute> @aram task.created DEL-1 "In a deleted project" [Todo]
 #89 <minute> @aram task.updated SVA-3 status: Todo -> Done
-#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @bea -> none
+#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @cy -> none
 #91 <minute> @aram task.updated SVA-4 moved to trash
 #92 <minute> @aram task.updated OPS-3 moved to trash
 #93 <minute> @aram task.updated SVA-5 archived
@@ -15319,11 +15376,12 @@ seq: 261
   "#81 <minute> @aram task.created OPS-4 \"Shelved audit\" [Todo]",
   "#82 <minute> @aram task.created SVA-5 \"Shelved sketch\" [Todo]",
   "#83 <minute> @aram task.created OPS-5 \"Patch the kernel\" [Todo]",
+  "#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel",
   "#85 <minute> @aram task.created SVA-6 \"Review me\" [Review]",
   "#87 <minute> @aram task.created ARC-1 \"In an archived project\" [Todo]",
   "#88 <minute> @aram task.created DEL-1 \"In a deleted project\" [Todo]",
   "#89 <minute> @aram task.updated SVA-3 status: Todo -> Done",
-  "#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @bea -> none",
+  "#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @cy -> none",
   "#91 <minute> @aram task.updated SVA-4 moved to trash",
   "#92 <minute> @aram task.updated OPS-3 moved to trash",
   "#93 <minute> @aram task.updated SVA-5 archived",
@@ -15660,6 +15718,33 @@ seq: 261
    "type": "notification.created"
   },
   {
+   "actor_id": "<@aram>",
+   "at": 1700000000000,
+   "audience_id": "<@cy>",
+   "change_id": "<id #266>",
+   "data": {
+    "row": {
+     "actor_id": "<@aram>",
+     "created_at": 1700000000000,
+     "entity_id": "<task OPS-5>",
+     "entity_type": "task",
+     "id": "<id #440>",
+     "seq": 84,
+     "task_id": "<task OPS-5>",
+     "title": "OPS-5 Patch the kernel",
+     "type": "waiting_on",
+     "user_id": "<@cy>"
+    }
+   },
+   "entity_id": "<id #440>",
+   "entity_type": "notification",
+   "project_id": "<project OPS>",
+   "scope_id": "<task OPS-5>",
+   "scope_type": "task",
+   "seq": 84,
+   "type": "notification.created"
+  },
+  {
    "actor_id": "<@ops>",
    "at": 1700000000000,
    "audience_id": "<@cy>",
@@ -15820,6 +15905,7 @@ seq: 261
 === GET /api/v1/w/games/events?after=0&inbox=1&format=text
 200
 #76 <minute> @aram inbox waiting_on: OPS-2 Back up nightly
+#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel
 #132 <minute> @ops inbox decision_asked: OPS-1 Rotate keys — Which night?
 #146 <minute> @aram inbox mentioned: OPS-1 Rotate keys — @cy check the vault first.
 #150 <minute> @ops inbox comment: OPS-1 Rotate keys — Rotated the first ten.
@@ -16327,7 +16413,8 @@ seq: 261
   "#76 <minute> @aram inbox waiting_on: OPS-2 Back up nightly",
   "#81 <minute> @aram task.created OPS-4 \"Shelved audit\" [Todo]",
   "#83 <minute> @aram task.created OPS-5 \"Patch the kernel\" [Todo]",
-  "#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @bea -> none",
+  "#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel",
+  "#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @cy -> none",
   "#94 <minute> @aram task.updated OPS-4 archived",
   "#100 <minute> @aram task.related OPS-1",
   "#101 <minute> @aram relation.created OPS-1",
@@ -16580,11 +16667,12 @@ seq: 261
   "#81 <minute> @aram task.created OPS-4 \"Shelved audit\" [Todo]",
   "#82 <minute> @aram task.created SVA-5 \"Shelved sketch\" [Todo]",
   "#83 <minute> @aram task.created OPS-5 \"Patch the kernel\" [Todo]",
+  "#84 <minute> @aram inbox waiting_on: OPS-5 Patch the kernel",
   "#85 <minute> @aram task.created SVA-6 \"Review me\" [Review]",
   "#87 <minute> @aram task.created ARC-1 \"In an archived project\" [Todo]",
   "#88 <minute> @aram task.created DEL-1 \"In a deleted project\" [Todo]",
   "#89 <minute> @aram task.updated SVA-3 status: Todo -> Done",
-  "#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @bea -> none",
+  "#90 <minute> @aram task.updated OPS-5 status: Todo -> Done; waiting_on: @cy -> none",
   "#91 <minute> @aram task.updated SVA-4 moved to trash",
   "#92 <minute> @aram task.updated OPS-3 moved to trash",
   "#93 <minute> @aram task.updated SVA-5 archived",
@@ -16698,11 +16786,10 @@ seq: 261
   "#222 <minute> @aram view.created \"Removed view\"",
   "#223 <minute> @aram view.deleted moved to trash",
   "#224 <minute> @aram resource.created \"gpu\"",
-  "#225 <minute> @aram resource.created \"staging\"",
-  "#226 <minute> @aram resource.created \"old-box\""
+  "#225 <minute> @aram resource.created \"staging\""
  ],
  "more": true,
- "seq": 226
+ "seq": 225
 }
 
 === GET /api/v1/w/games/events?after=99999
@@ -17596,6 +17683,18 @@ seq: 261
    "task_id": "<task OPS-1>",
    "title": "OPS-1 Rotate keys",
    "type": "decision_asked",
+   "user_id": "<@cy>"
+  },
+  {
+   "actor_id": "<@aram>",
+   "created_at": 1700000000000,
+   "entity_id": "<task OPS-5>",
+   "entity_type": "task",
+   "id": "<id #440>",
+   "seq": 84,
+   "task_id": "<task OPS-5>",
+   "title": "OPS-5 Patch the kernel",
+   "type": "waiting_on",
    "user_id": "<@cy>"
   },
   {
@@ -19206,6 +19305,18 @@ seq: 261
   {
    "actor_id": "<@aram>",
    "created_at": 1700000000000,
+   "entity_id": "<task OPS-5>",
+   "entity_type": "task",
+   "id": "<id #440>",
+   "seq": 84,
+   "task_id": "<task OPS-5>",
+   "title": "OPS-5 Patch the kernel",
+   "type": "waiting_on",
+   "user_id": "<@cy>"
+  },
+  {
+   "actor_id": "<@aram>",
+   "created_at": 1700000000000,
    "entity_id": "<task OPS-2>",
    "entity_type": "task",
    "id": "<id #438>",
@@ -20230,6 +20341,10 @@ seq: 261
   {
    "id": "<id #445>",
    "title": "OPS-1 Rotate keys"
+  },
+  {
+   "id": "<id #440>",
+   "title": "OPS-5 Patch the kernel"
   },
   {
    "id": "<id #438>",
@@ -28800,7 +28915,10 @@ id: 82
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #265>","data":{"row":{"activity_seq":82,"created_at":1700000000000,"created_by":"<@aram>","created_seq":82,"id":"<task SVA-5>","key":"SVA-5","number":5,"priority":0,"project_id":"<project SVA>","rank":"00000003y8","status_id":"<id #166>","title":"Shelved sketch","updated_at":1700000000000,"updated_seq":82}},"entity_id":"<task SVA-5>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-5>","scope_type":"task","seq":82,"type":"task.created"}
 
 id: 83
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #266>","data":{"row":{"activity_seq":83,"created_at":1700000000000,"created_by":"<@aram>","created_seq":83,"id":"<task OPS-5>","key":"OPS-5","number":5,"priority":0,"project_id":"<project OPS>","rank":"00000003y8","status_id":"<id #165>","title":"Patch the kernel","updated_at":1700000000000,"updated_seq":83,"waiting_on_id":"<@bea>"}},"entity_id":"<task OPS-5>","entity_type":"task","project_id":"<project OPS>","scope_id":"<task OPS-5>","scope_type":"task","seq":83,"type":"task.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #266>","data":{"row":{"activity_seq":83,"created_at":1700000000000,"created_by":"<@aram>","created_seq":83,"id":"<task OPS-5>","key":"OPS-5","number":5,"priority":0,"project_id":"<project OPS>","rank":"00000003y8","status_id":"<id #165>","title":"Patch the kernel","updated_at":1700000000000,"updated_seq":83,"waiting_on_id":"<@cy>"}},"entity_id":"<task OPS-5>","entity_type":"task","project_id":"<project OPS>","scope_id":"<task OPS-5>","scope_type":"task","seq":83,"type":"task.created"}
+
+id: 84
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@cy>","change_id":"<id #266>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<task OPS-5>","entity_type":"task","id":"<id #440>","seq":84,"task_id":"<task OPS-5>","title":"OPS-5 Patch the kernel","type":"waiting_on","user_id":"<@cy>"}},"entity_id":"<id #440>","entity_type":"notification","project_id":"<project OPS>","scope_id":"<task OPS-5>","scope_type":"task","seq":84,"type":"notification.created"}
 
 id: 85
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #267>","data":{"row":{"activity_seq":85,"created_at":1700000000000,"created_by":"<@aram>","created_seq":85,"id":"<task SVA-6>","key":"SVA-6","number":6,"priority":0,"project_id":"<project SVA>","rank":"00000004qo","started_at":1700000000000,"status_id":"<status Review>","title":"Review me","updated_at":1700000000000,"updated_seq":85,"waiting_on_id":"<@bea>","waiting_on_note":"needs a look"}},"entity_id":"<task SVA-6>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-6>","scope_type":"task","seq":85,"type":"task.created"}
@@ -28815,7 +28933,7 @@ id: 89
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #270>","data":{"changes":{"completed_at":{"from":0,"to":1700000000000},"started_at":{"from":0,"to":1700000000000},"status_id":{"from":"<id #166>","to":"<id #167>"}},"id":"<task SVA-3>","key":"SVA-3"},"entity_id":"<task SVA-3>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-3>","scope_type":"task","seq":89,"type":"task.updated"}
 
 id: 90
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #271>","data":{"changes":{"completed_at":{"from":0,"to":1700000000000},"started_at":{"from":0,"to":1700000000000},"status_id":{"from":"<id #165>","to":"<id #168>"},"waiting_on_id":{"from":"<@bea>","to":null}},"id":"<task OPS-5>","key":"OPS-5"},"entity_id":"<task OPS-5>","entity_type":"task","project_id":"<project OPS>","scope_id":"<task OPS-5>","scope_type":"task","seq":90,"type":"task.updated"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #271>","data":{"changes":{"completed_at":{"from":0,"to":1700000000000},"started_at":{"from":0,"to":1700000000000},"status_id":{"from":"<id #165>","to":"<id #168>"},"waiting_on_id":{"from":"<@cy>","to":null}},"id":"<task OPS-5>","key":"OPS-5"},"entity_id":"<task OPS-5>","entity_type":"task","project_id":"<project OPS>","scope_id":"<task OPS-5>","scope_type":"task","seq":90,"type":"task.updated"}
 
 id: 91
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #272>","data":{"changes":{"deleted_at":{"from":0,"to":1700000000000}},"deleted":true,"id":"<task SVA-4>","key":"SVA-4"},"entity_id":"<task SVA-4>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-4>","scope_type":"task","seq":91,"type":"task.updated"}

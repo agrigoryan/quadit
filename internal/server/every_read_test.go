@@ -306,7 +306,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	task(M{"project": "SVA", "title": "Old idea"})
 	task(M{"project": "OPS", "title": "Shelved audit"})
 	task(M{"project": "SVA", "title": "Shelved sketch"})
-	task(M{"project": "OPS", "title": "Patch the kernel", "waiting_on": "@bea"})
+	task(M{"project": "OPS", "title": "Patch the kernel", "waiting_on": "@cy"})
 	task(M{"project": "SVA", "title": "Review me", "status": "Review", "waiting_on": "@bea", "waiting_on_note": "needs a look"})
 	task(M{"project": "ARC", "title": "In an archived project"})
 	task(M{"project": "DEL", "title": "In a deleted project"})

@@ -15,7 +15,8 @@ import (
 // notify puts an item in a member's inbox and tells only them, in the feed.
 // The actor is never notified of their own change, and a member gets at most
 // one item per change and subject: callers notify the most specific reason
-// first. A quiet change (history being imported) notifies nobody.
+// first. A quiet change (history being imported) notifies nobody, and a
+// member is not told of a task or a page of a project they may not read.
 func (c *cx) notify(userID, typ string, n core.Notification) error {
 	if userID == "" || (userID == c.actor.UserID && !c.selfNotify) || c.quiet {
 		return nil
@@ -44,6 +45,9 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 			return err
 		}
 		where = inDoc(d)
+	}
+	if !m.Scope.MayRead(where.projectID) {
+		return nil
 	}
 	c.notified[key] = true
 	seq := c.tx.NextSeq()

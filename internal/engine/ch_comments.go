@@ -238,7 +238,7 @@ func (c *cx) handOn(cm core.Comment, t core.Task, a commentCreateArgs, note stri
 			return err
 		}
 	case a.WaitingOn.Set && !a.WaitingOn.Null && a.WaitingOn.V != "":
-		if handTo, err = c.optMember("waiting_on", a.WaitingOn.V); err != nil {
+		if handTo, err = c.personOnTask("waiting_on", a.WaitingOn.V, t); err != nil {
 			return err
 		}
 	case a.WaitingOn.Set:

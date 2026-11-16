@@ -134,12 +134,13 @@ func (u *taskEdit) numbers() error {
 	return nil
 }
 
-// member applies an optional member reference to a column.
+// member applies an optional reference to the member the task names for
+// its work (personOnTask) to a column.
 func (u *taskEdit) member(col, field string, o Opt[string], cur *string) error {
 	if !o.Set {
 		return nil
 	}
-	v, err := u.c.optMember(field, refOf(o))
+	v, err := u.c.personOnTask(field, refOf(o), u.t)
 	if err != nil {
 		return err
 	}

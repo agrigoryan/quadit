@@ -80,3 +80,30 @@ func TestATokenForSomeProjectsReadsItsMembersOwnListsOfThoseOnly(t *testing.T) {
 		}
 	})
 }
+
+// TestAnInboxItemOfAProjectAMemberWasKeptOutOfIsNotShown: a member waited
+// on in a project they were since kept out of is not told of that task by
+// their inbox, My work or the unread count.
+func TestAnInboxItemOfAProjectAMemberWasKeptOutOfIsNotShown(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(s.owner, "", "agent.create", M{"name": "Ops bot", "handle": "ops"})
+		var tok struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@ops"}, 201, &tok)
+		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Patch the kernel", "waiting_on": "@ops", "assignee": "@ops"})
+		s.change(s.owner, "", "agent.update", M{"id": "@ops", "scope": M{"projects": []string{"SVA"}}})
+
+		for _, path := range []string{"/inbox?all=1", "/my-work", "/my-work?format=text"} {
+			if out := s.call(nil, tok.Token, "GET", w+path, nil, 200, nil); strings.Contains(out, "OPS-1") || strings.Contains(out, "kernel") {
+				t.Fatalf("%s tells the member of a task of a project they were kept out of: %s", path, out)
+			}
+		}
+		var me struct{ Unread int }
+		s.call(nil, tok.Token, "GET", w+"/me", nil, 200, &me)
+		if me.Unread != 0 {
+			t.Fatalf("the member is told of %d unread items, want none", me.Unread)
+		}
+	})
+}
