@@ -24,7 +24,6 @@ import type {
   FilterPart,
   GroupPart,
   PalettePart,
-  PickerProperty,
   TaskProperty,
 } from "@/tasks/properties/property";
 import { status } from "@/tasks/properties/status";
@@ -121,7 +120,7 @@ export const GROUPINGS: readonly (TaskProperty<Exclude<Grouping, "none">> & { gr
 
 /** The ones the command palette changes on the open task, in the table's order. */
 export const PALETTE = PROPERTIES.filter(
-  (p): p is TaskProperty<PropertyName> & PickerProperty & { palette: PalettePart } => !!p.picker && !!p.palette,
+  (p): p is TaskProperty<PropertyName> & { palette: PalettePart } => !!p.palette,
 );
 
 /** A property with a key, and a picker or a form for the key to open. */

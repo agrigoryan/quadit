@@ -7,7 +7,7 @@ import { formatDay } from "@/lib/time";
 import { setMilestone } from "@/tasks/actions";
 import { PickerRow } from "@/tasks/properties/panel-row";
 import { asText, NONE, type PanelProps, shared, type TaskProperty } from "@/tasks/properties/property";
-import { noneItem } from "@/tasks/property-picker";
+import { noneChoice, noneItem } from "@/tasks/property-picker";
 
 function MilestoneRow(panel: PanelProps) {
   const m = useRowEvenIfGone("milestones", panel.task.milestone_id);
@@ -50,6 +50,23 @@ export const milestone = {
     pick: (tasks, id) => setMilestone(tasks, id === NONE ? null : id),
   },
   Panel: MilestoneRow,
+  palette: {
+    title: () => t("prop.set.milestone"),
+    icon: <Target />,
+    useChoices: (task) => [
+      noneChoice(t("task.noMilestone"), !task.milestone_id, () => setMilestone([task], null)),
+      ...useRows("milestones")
+        .filter((m) => m.epic_id === task.epic_id)
+        .map((m) => ({
+          id: m.id,
+          label: m.name,
+          detail: m.target_on ? formatDay(m.target_on) : undefined,
+          icon: <Target />,
+          checked: m.id === task.milestone_id,
+          apply: () => setMilestone([task], m.id),
+        })),
+    ],
+  },
   timeline: [
     {
       field: "milestone_id",

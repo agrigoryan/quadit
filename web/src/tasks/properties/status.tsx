@@ -69,6 +69,7 @@ export const status = {
   Panel: StatusRow,
   Create: StatusPill,
   palette: {
+    title: () => t("prop.set.status"),
     icon: <CircleDot />,
     useChoices: (task) =>
       useStatuses(task.project_id).map((s) => ({

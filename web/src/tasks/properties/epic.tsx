@@ -16,7 +16,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { nameWord, rowsNamed } from "@/tasks/properties/query-words";
-import { noneItem } from "@/tasks/property-picker";
+import { noneChoice, noneItem } from "@/tasks/property-picker";
 import { Picker } from "@/ui/picker";
 
 function EpicRow(panel: PanelProps) {
@@ -73,6 +73,20 @@ export const epic = {
   },
   Panel: EpicRow,
   Create: EpicPill,
+  palette: {
+    title: () => t("prop.set.epic"),
+    icon: <Layers />,
+    useChoices: (task) => [
+      noneChoice(t("task.noEpic"), !task.epic_id, () => setEpic([task], null)),
+      ...useEpics(task.project_id).map((e) => ({
+        id: e.id,
+        label: e.name,
+        icon: <Layers />,
+        checked: e.id === task.epic_id,
+        apply: () => setEpic([task], e.id),
+      })),
+    ],
+  },
   bulk: { place: "menu", icon: <Layers />, label: () => t("prop.set.epic") },
   timeline: [
     {

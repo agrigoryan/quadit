@@ -110,6 +110,7 @@ export const label = {
   Panel: LabelRow,
   Create: LabelPill,
   palette: {
+    title: () => t("prop.set.labels"),
     icon: <Tag />,
     useChoices: (task) =>
       useLabels(task.project_id).map((l) => ({

@@ -6,6 +6,7 @@ import { useProjects } from "@/data/selectors";
 import { moveToProject } from "@/tasks/actions";
 import { asText, shared, type TaskProperty } from "@/tasks/properties/property";
 import { projectItems } from "@/tasks/property-picker";
+import { ProjectGlyph } from "@/ui/project-glyph";
 
 export const project = {
   name: "project",
@@ -17,6 +18,19 @@ export const project = {
       value: shared(tasks, (task) => task.project_id),
     }),
     pick: moveToProject,
+  },
+  palette: {
+    title: () => t("prop.set.project"),
+    icon: <FolderInput />,
+    useChoices: (task) =>
+      useProjects().map((p) => ({
+        id: p.id,
+        label: p.name,
+        detail: p.key,
+        icon: <ProjectGlyph project={p} />,
+        checked: p.id === task.project_id,
+        apply: () => moveToProject([task], p.id),
+      })),
   },
   bulk: { place: "move", icon: <FolderInput />, label: () => t("bulk.move") },
   timeline: [

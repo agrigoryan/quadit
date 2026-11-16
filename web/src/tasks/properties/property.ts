@@ -167,6 +167,8 @@ export const asIds = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
 export interface PalettePart {
+  /** The command's words, and the box's placeholder on the page of its values: "Change status…". */
+  title: () => string;
   icon: ReactNode;
   /** The values the open task can take, the one it has checked. A hook. */
   useChoices: (task: Task) => Choice[];

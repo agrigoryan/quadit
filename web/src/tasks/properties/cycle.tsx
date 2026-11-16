@@ -16,7 +16,7 @@ import {
   shared,
   type TaskProperty,
 } from "@/tasks/properties/property";
-import { noneItem } from "@/tasks/property-picker";
+import { noneChoice, noneItem } from "@/tasks/property-picker";
 
 /** "Cycle 4", where it has no name of its own. */
 export const cycleName = (c: Cycle) => c.name || t("prop.cycleName", { n: String(c.number) });
@@ -80,6 +80,21 @@ export const cycle = {
     pick: (tasks, id) => setCycle(tasks, id === NONE ? null : id),
   },
   Panel: CycleRow,
+  palette: {
+    title: () => t("prop.set.cycle"),
+    icon: <RefreshCw />,
+    useChoices: (task) => [
+      noneChoice(t("task.noCycle"), !task.cycle_id, () => setCycle([task], null)),
+      ...useCycles(task.project_id).map((c) => ({
+        id: c.id,
+        label: cycleName(c),
+        detail: `${formatDay(c.starts_on)} – ${formatDay(c.ends_on)}`,
+        icon: <RefreshCw />,
+        checked: c.id === task.cycle_id,
+        apply: () => setCycle([task], c.id),
+      })),
+    ],
+  },
   bulk: { place: "menu", icon: <RefreshCw />, label: () => t("prop.set.cycle") },
   timeline: [
     {

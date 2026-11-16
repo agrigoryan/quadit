@@ -7,6 +7,8 @@ import type { ReactNode } from "react";
 import {
   Bookmark,
   Copy,
+  Eye,
+  EyeOff,
   FilePlus2,
   FileText,
   FolderPlus,
@@ -36,7 +38,7 @@ import { projectDocs, workspaceDocs } from "@/docs/area";
 import { useCan } from "@/data/access";
 import { copyAndSay } from "@/data/files";
 import { t } from "@/lib/i18n";
-import { useProjects, useViews } from "@/data/selectors";
+import { useMe, useProjects, useRow, useRowEvenIfGone, useViews } from "@/data/selectors";
 import { useStore } from "@/data/store";
 import { askToUndo, redo, useUndo } from "@/data/undo";
 import { keyHint, MOD } from "@/hooks/hotkeys";
@@ -47,7 +49,9 @@ import { settingsGroups } from "@/settings/pages";
 import { type Destination, DESTINATIONS, destinationPath, goKeys } from "@/shell/destinations";
 import { showOrHideSidebar } from "@/shell/sidebar";
 import { openNewTask } from "@/tasks/draft";
+import { setWatching } from "@/tasks/actions";
 import { PALETTE, type PropertyName } from "@/tasks/properties";
+import { applies } from "@/tasks/properties/property";
 import { copyBranchName } from "@/tasks/task-keys";
 import { taskPath } from "@/nav/task-link";
 
@@ -109,18 +113,24 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
   const lastDone = useUndo((s) => s.done.findLast((d) => d.slug === slug));
   const lastUndone = useUndo((s) => s.undone.findLast((d) => d.slug === slug));
   const admin = can.administer;
+  const me = useMe();
+  const watching = !!useRow("watchers", task ? `${me.user_id}:${task.id}` : undefined);
+  // What the task's project has (cycles, estimates) decides what it can be given; an archived project still has a say.
+  const taskProject = useRowEvenIfGone("projects", task?.project_id);
   const at = (path: string) => () => go(`/${slug}/${path}`);
   // On a project's Docs a new page is that project's; anywhere else it is tied to none.
   const docsOf = matchPath("/:ws/p/:key/docs/*", useLocation().pathname) ? project : undefined;
   const docsAt = docsOf ? projectDocs(slug, docsOf) : workspaceDocs(slug);
 
-  const taskChanges: Cmd[] = PALETTE.map(({ name, key, picker, palette }) => ({
-    id: `task:${name}`,
-    label: picker.title(),
-    icon: palette.icon,
-    hint: key && keyHint(key.key),
-    run: () => openPage(name),
-  }));
+  const taskChanges: Cmd[] = PALETTE.filter((p) => task && applies(p, task, taskProject)).map(
+    ({ name, key, palette }) => ({
+      id: `task:${name}`,
+      label: palette.title(),
+      icon: palette.icon,
+      hint: key && keyHint(key.key),
+      run: () => openPage(name),
+    }),
+  );
 
   const forTask: Cmd[] = task
     ? [
@@ -138,6 +148,19 @@ export function useCommands({ slug, task, expand, project, run, go, openPage }: 
           : []),
         // What changes the task: not for a task in the trash, nor for someone who may not edit it.
         ...(can.editTask(task) ? taskChanges : []),
+        // Watching is a change too: a read-only member may not make it.
+        ...(can.write
+          ? [
+              {
+                id: "task:watch",
+                label: watching ? t("detail.unwatch") : t("detail.watch"),
+                words: "follow subscribe notify inbox",
+                icon: watching ? <EyeOff /> : <Eye />,
+                hint: "Shift S",
+                run: () => run(() => setWatching([task], !watching)),
+              },
+            ]
+          : []),
         {
           id: "task:copy-key",
           label: t("palette.copyKey"),

@@ -4,7 +4,7 @@ import { t } from "@/lib/i18n";
 import type { Member, Project, Task } from "@/types/core";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { useManageLinks } from "@/tasks/manage";
-import { NONE, type PickerListProps, type PickerProperty } from "@/tasks/properties/property";
+import { type Choice, NONE, type PickerListProps, type PickerProperty } from "@/tasks/properties/property";
 import { Avatar } from "@/ui/avatar";
 import { ListeningDot } from "@/ui/listening-dot";
 import { type PickerItem, PickerList } from "@/ui/picker";
@@ -15,6 +15,15 @@ export const noneItem = (label: string): PickerItem => ({
   id: NONE,
   label,
   icon: <CircleSlash className="size-3.5 text-ink-3" aria-hidden />,
+});
+
+/** The choice of "nothing set" at the top of a page of the palette. */
+export const noneChoice = (label: string, checked: boolean, apply: () => void): Choice => ({
+  id: NONE,
+  label,
+  icon: <CircleSlash className="text-ink-3" />,
+  checked,
+  apply,
 });
 
 /** Says whether something is listening for an agent; nothing for a person. From useListening (data/listening.ts). */

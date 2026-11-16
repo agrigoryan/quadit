@@ -113,7 +113,7 @@ function Palette() {
                 value={query}
                 onValueChange={setQuery}
                 placeholder={
-                  making ? makeTitle[making]() : choosing ? choosing.picker.title() : t("palette.placeholder")
+                  making ? makeTitle[making]() : choosing ? choosing.palette.title() : t("palette.placeholder")
                 }
                 className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-3 max-sm:text-[16px]"
               />

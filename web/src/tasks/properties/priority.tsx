@@ -65,6 +65,7 @@ export const priority = {
   Panel: PriorityRow,
   Create: PriorityPill,
   palette: {
+    title: () => t("prop.set.priority"),
     icon: <SignalHigh />,
     // Urgent first and "no priority" last, unlike the picker's list.
     useChoices: (task) =>

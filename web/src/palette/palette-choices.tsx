@@ -21,7 +21,7 @@ export function ChoicesPage({ property, task, query, run }: Props) {
   const shown = q ? choices.filter((c) => matches(q, `${c.label} ${c.detail ?? ""} ${c.words ?? ""}`)) : choices;
 
   // A value that does not exist yet (a label) can be made here and put on the task in one go.
-  const canCreate = !!make && q !== "" && !choices.some((c) => c.label.toLowerCase() === q.toLowerCase());
+  const canCreate = !!make && !!picker && q !== "" && !choices.some((c) => c.label.toLowerCase() === q.toLowerCase());
 
   if (choices.length === 0 && palette.empty && !canCreate) return <Note>{palette.empty()}</Note>;
   if (shown.length === 0 && !canCreate) return <Note>{t("common.noMatches")}</Note>;
@@ -49,7 +49,7 @@ export function ChoicesPage({ property, task, query, run }: Props) {
           {c.label}
         </Item>
       ))}
-      {canCreate && (
+      {canCreate && make && picker && (
         <Item
           value={`${name}:create`}
           icon={<Plus />}

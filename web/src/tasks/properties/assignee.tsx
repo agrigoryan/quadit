@@ -145,7 +145,7 @@ export const assignee = {
   },
   Panel: AssigneeRow,
   Create: AssigneePill,
-  palette: { icon: <UserRound />, useChoices },
+  palette: { title: () => t("prop.set.assignee"), icon: <UserRound />, useChoices },
   bulk: { place: "bar", icon: <UserRound className="size-3.5" aria-hidden /> },
   timeline: [
     {
