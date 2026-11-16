@@ -2,19 +2,22 @@
 // (still looking, the server did not answer, no access, nothing at this
 // address). The panel and the task's own page are both a frame around this.
 
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
-import { useTaskByKeyEvenIfGone } from "@/data/selectors";
+import { useRowEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/data/selectors";
 import { useFindTask } from "@/data/find-task";
 import { useTaskDetail } from "@/data/task-detail";
 import { usePageTitle } from "@/lib/ui-state";
+import type { Task } from "@/types/core";
 import { startComment } from "@/detail/comment-box";
 import { useFileDrop } from "@/detail/file-drop";
 import { PanelHeader, TrashBanner } from "@/detail/panel-header";
 import { useRevealFromHash } from "@/detail/reveal-hash";
 import { TaskBody, type TaskLayout } from "@/detail/task-body";
 import { LostProject, useLostProject } from "@/ui/not-found";
-import { isTaskPath } from "@/nav/task-link";
+import { isTaskPath, taskPath } from "@/nav/task-link";
 import { useTaskKeys } from "@/tasks/task-keys";
 import { EmptyState } from "@/ui/empty";
 import { LoadFailed } from "@/ui/load-gate";
@@ -60,9 +63,30 @@ function PageTitle({ title }: { title: string }) {
   return null;
 }
 
+/**
+ * A task moved to another project takes that project's key: the panel or
+ * page showing it follows it to its new address, as it was opened (over the
+ * same list, with the same place in it), instead of finding nothing at the
+ * old one.
+ */
+function useFollowNewKey(taskKey: string, task: Task | undefined) {
+  const slug = useSlug();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // The task last shown here, by id: what stays when its key changes.
+  const [shownId, setShownId] = useState(task?.id);
+  if (task && task.id !== shownId) setShownId(task.id);
+  const moved = useRowEvenIfGone("tasks", task ? undefined : shownId);
+  const movedTo = moved && moved.key !== taskKey ? moved.key : undefined;
+  useEffect(() => {
+    if (movedTo) void navigate(taskPath(slug, movedTo) + location.hash, { replace: true, state: location.state });
+  }, [movedTo, slug, location.hash, location.state, navigate]);
+}
+
 export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
   // The task's own page shows it in the trash or the archive too.
   const task = useTaskByKeyEvenIfGone(taskKey);
+  useFollowNewKey(taskKey, task);
   const find = useFindTask(taskKey, !!task);
   const lost = useLostProject(taskKey.split("-")[0]);
   const status = useTaskDetail(task?.id);
