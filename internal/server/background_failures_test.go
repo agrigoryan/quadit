@@ -461,8 +461,11 @@ func TestAQueueThatCannotBeReadIsLogged(t *testing.T) {
 			s := newSite(t, st)
 			s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})
 			op, table, _ := strings.Cut(c.fails, " ")
-			fired := st.faults.arm(fault{op: op, table: table, times: 1})
-			eventually(t, "the failed read to be logged", func() bool { return fired() == 1 && logs.has(c.logged) })
+			// The read fails for as long as the test runs, not once: the
+			// dispatcher reads the same tables, and a single failure could
+			// be its read and never the queue's.
+			fired := st.faults.arm(fault{op: op, table: table})
+			eventually(t, "the failed read to be logged", func() bool { return fired() >= 1 && logs.has(c.logged) })
 		})
 	}
 }
