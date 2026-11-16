@@ -194,3 +194,142 @@ test("S on My work opens the status picker for the row", async ({ page, project,
   await page.keyboard.press("s");
   await expect(page.getByRole("dialog", { name: "Change status…" })).toBeVisible();
 });
+
+test("the Shift keys change the list's row, and on the open task watch and rename it", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const key = await project.newTask("Paint the shed");
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  const open = page.getByRole("link", { name: `Open ${key}` });
+  await expect(open).toBeVisible();
+  await page.keyboard.press("j");
+  await expect(open).toHaveAttribute("aria-current", "true");
+
+  // Shift+D: the due date's form beside the row.
+  await page.keyboard.press("Shift+D");
+  await page.getByLabel("Due date for 1 task").fill("2026-12-24");
+  await page.getByRole("button", { name: "Set", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Due date" })).toBeHidden();
+  await expect.poll(async () => JSON.stringify(await quadit.task(key))).toContain("2026-12-24");
+
+  // Shift+P: the epic's picker, its letter not typed into the search.
+  await page.keyboard.press("Shift+P");
+  const epics = page.getByRole("dialog", { name: "Set epic…" });
+  await expect(epics.getByRole("combobox")).toHaveValue("");
+  await page.keyboard.press("Escape");
+  await expect(epics).toBeHidden();
+
+  await page.keyboard.press(" ");
+  const panel = page.getByRole("complementary", { name: key });
+  // Who made the task watches it: Shift+S stops that, and starts it again.
+  const stop = panel.getByRole("button", { name: "Stop watching" });
+  await expect(stop).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Shift+S");
+  await expect(panel.getByRole("button", { name: "Watch this task" })).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("Shift+S");
+  await expect(stop).toHaveAttribute("aria-pressed", "true");
+
+  await page.keyboard.press("Shift+R");
+  const title = panel.getByRole("textbox", { name: "Title" });
+  await expect(title).toBeFocused();
+  await page.keyboard.type("Paint the barn");
+  await page.keyboard.press("Enter");
+  await expect.poll(async () => (await quadit.task(key)).title).toBe("Paint the barn");
+});
+
+test("M then B marks the open task as blocked by another, picked in the list that opens", async ({ page, project }) => {
+  const key = await project.newTask("Hang the door");
+  const other = await project.newTask("Build the frame");
+  await page.goto(`/e2e/task/${key}`);
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("Hang the door");
+
+  await page.keyboard.press("m");
+  await expect(page.getByRole("status", { name: "Relate to another task" })).toBeVisible();
+  await page.keyboard.press("b");
+  const pick = page.getByRole("dialog", { name: "Pick a task…" });
+  await expect(pick).toBeVisible();
+  await page.keyboard.type(other);
+  await page.keyboard.press("Enter");
+  await expect(pick).toBeHidden();
+  await expect(page.getByRole("list", { name: "Blocked by" }).getByText("Build the frame")).toBeVisible();
+});
+
+test("Cmd+Shift+Up opens the parent and Cmd+Shift+Down the first sub-task", async ({ page, project }) => {
+  const parent = await project.newTask("Paint the house");
+  const child = await project.newTask("Paint the door", `parent=${parent}`);
+  await page.goto(`/e2e/task/${child}`);
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("Paint the door");
+  await page.keyboard.press("ControlOrMeta+Shift+ArrowUp");
+  await expect(page).toHaveURL(new RegExp(`/e2e/task/${parent}$`));
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("Paint the house");
+  await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
+  await expect(page).toHaveURL(new RegExp(`/e2e/task/${child}$`));
+});
+
+test("an epic's tasks move with J, peek with Space, are selected with X and changed with S", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await quadit.cli("do", "epic.create", JSON.stringify({ project: project.key, name: "Spring cleaning" }));
+  const first = await project.newTask("Sweep the porch", "epic=Spring cleaning");
+  const second = await project.newTask("Wash the windows", "epic=Spring cleaning");
+  await page.goto(`/e2e/p/${project.key}/epics`);
+  await page.getByRole("link", { name: "Spring cleaning" }).click();
+  const row = (key: string) => page.getByRole("main").getByRole("link", { name: `Open ${key}` });
+  await expect(row(second)).toBeVisible();
+
+  await page.keyboard.press("j");
+  await expect(row(first)).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press(" ");
+  await expect(page.getByRole("complementary", { name: first })).toBeVisible();
+  await page.keyboard.press(" ");
+  await expect(page.getByRole("complementary", { name: first })).toBeHidden();
+
+  await page.keyboard.press("x");
+  await page.keyboard.press("j");
+  await page.keyboard.press("x");
+  await expect(page.getByText("2 selected")).toBeVisible();
+  await page.keyboard.press("s");
+  await page.getByRole("dialog", { name: "Change status…" }).getByRole("option", { name: "In Progress" }).click();
+  await expect.poll(async () => (await quadit.task(first)).status).toBe("In Progress");
+  await expect.poll(async () => (await quadit.task(second)).status).toBe("In Progress");
+
+  // Escape lets go of the selection first, then leaves the page.
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("2 selected")).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(new RegExp(`/e2e/p/${project.key}/epics$`));
+});
+
+test("on the board the arrows and J/K move the focus from card to card, and S acts on the focused one", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const top = await project.newTask("Buy the paint");
+  const next = await project.newTask("Mix the paint");
+  const across = await project.newTask("Paint the wall", "status=In Progress");
+  await page.goto(`/e2e/p/${project.key}/board`);
+  const card = (column: string, key: string) =>
+    page.getByRole("region", { name: column, exact: true }).getByRole("link", { name: new RegExp(`${key} `) });
+  await expect(card("In Progress", across)).toBeVisible();
+
+  // No card has the focus: the first key goes to the first card.
+  await page.keyboard.press("j");
+  await expect(card("Todo", top)).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(card("Todo", next)).toBeFocused();
+  await page.keyboard.press("k");
+  await expect(card("Todo", top)).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(card("In Progress", across)).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(card("Todo", top)).toBeFocused();
+
+  await page.keyboard.press("s");
+  await page.getByRole("dialog", { name: "Change status…" }).getByRole("option", { name: "Done" }).click();
+  await expect.poll(async () => (await quadit.task(top)).status).toBe("Done");
+});
