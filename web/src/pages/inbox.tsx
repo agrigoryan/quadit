@@ -1,15 +1,25 @@
 import { useCallback, useMemo, useRef } from "react";
-import { CheckCheck, Inbox } from "lucide-react";
+import { Archive, CheckCheck, Inbox } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
 import { getRow, getRowEvenIfGone, useMe, useRows } from "@/data/selectors";
 import type { Notification } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
-import { anchorOf, archive, markAllRead, markOpened, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
+import {
+  anchorOf,
+  archive,
+  archiveRead,
+  markAllRead,
+  markOpened,
+  markRead,
+  markUnread,
+  splitTitle,
+} from "@/pages/inbox-actions";
 import { InboxRow } from "@/pages/inbox-row";
 import { type OpenAs, useListKeys } from "@/tasks/list-keys";
 import { useTaskKeys } from "@/tasks/task-keys";
 import { useTaskNav } from "@/nav/task-link";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 
@@ -35,6 +45,7 @@ export function InboxPage() {
     [notifications, me.user_id],
   );
   const unread = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
+  const read = items.length - unread;
 
   const open = useCallback(
     (item: Notification, as: OpenAs = "peek") => {
@@ -51,8 +62,22 @@ export function InboxPage() {
     onOpen: open,
     taskKeyOf,
     scroller,
-    keys: write ? { e: (item) => archive([item.id]), u: toggleRead } : {},
+    keys: write ? { e: (item) => archive([item.id]), Backspace: (item) => archive([item.id]), u: toggleRead } : {},
   });
+  // What acts on the whole inbox: Shift+Backspace takes every read item out, Option+U marks everything read (as in Linear).
+  useHotkeys(
+    {
+      "shift+Backspace": (e) => {
+        e.preventDefault();
+        archiveRead(items);
+      },
+      "alt+u": (e) => {
+        e.preventDefault();
+        markAllRead(items);
+      },
+    },
+    { enabled: write },
+  );
   // S/A/P/L, I, the copy keys and Cmd+Backspace act on the task the focused item is about.
   const picker = useTaskKeys({
     tasksFor: () => {
@@ -81,6 +106,15 @@ export function InboxPage() {
         >
           <CheckCheck className="size-4" aria-hidden />
           {t("inbox.markAllRead")}
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={!write || read === 0}
+          onClick={() => archiveRead(items)}
+          className="max-sm:h-9"
+        >
+          <Archive className="size-4" aria-hidden />
+          {t("inbox.archiveRead")}
         </Button>
       </header>
       {items.map((item) => (

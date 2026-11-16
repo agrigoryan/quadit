@@ -69,6 +69,12 @@ export function archive(ids: string[]) {
   );
 }
 
+/** Takes the read items of those shown out of the inbox, in one step to undo; the unread stay. */
+export function archiveRead(shown: Notification[]) {
+  const ids = shown.filter((n) => n.read_at).map((n) => n.id);
+  if (ids.length > 0) archive(ids);
+}
+
 /** Marks everything shown as read; items that arrive after the newest one shown stay unread. */
 export function markAllRead(shown: Notification[]) {
   const unread = shown.filter((n) => !n.read_at);

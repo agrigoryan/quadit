@@ -7,7 +7,7 @@ import { clearStore, getState, loadBootstrap } from "@/data/store";
 import { clearUndo, nextUndo, undo } from "@/data/undo";
 import { useToasts } from "@/lib/toast";
 import type { Member, User, Workspace } from "@/types/core";
-import { archive, markOpened, markRead } from "@/pages/inbox-actions";
+import { archive, archiveRead, markOpened, markRead } from "@/pages/inbox-actions";
 
 type Sent = { type: string; args: Record<string, unknown> };
 let requests: Sent[][] = [];
@@ -70,6 +70,27 @@ describe("undoing what was done in the inbox", () => {
     undo();
     await settle();
     expect(last()).toEqual([{ type: "notification.read", args: { ids: ["n1"], unread: true } }]);
+  });
+
+  it("archives the read items alone, and undone puts them back read", async () => {
+    archiveRead(Object.values(getState().collections.notifications));
+    expect(item("n2")?.archived_at).toBeTruthy();
+    expect(item("n1")?.archived_at ?? null).toBeNull();
+    await settle();
+    expect(last()).toEqual([{ type: "notification.read", args: { ids: ["n2"], archive: true } }]);
+    expect(nextUndo()?.name).toBe("archive 1 notification");
+    undo();
+    await settle();
+    expect(last()).toEqual([{ type: "notification.read", args: { ids: ["n2"], unarchive: true } }]);
+    expect(item("n2")?.archived_at ?? null).toBeNull();
+    expect(item("n2")?.read_at).toBeTruthy();
+  });
+
+  it("sends nothing when no item is read", async () => {
+    archiveRead([]);
+    await settle();
+    expect(requests).toEqual([]);
+    expect(nextUndo()).toBeUndefined();
   });
 
   it("does not remember an item read by being opened", async () => {

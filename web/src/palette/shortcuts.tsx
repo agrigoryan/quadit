@@ -143,8 +143,10 @@ const sections: Section[] = [
   {
     title: "shortcuts.group.inbox",
     rows: [
-      { what: "shortcuts.archive", keys: ["E"] },
+      { what: "shortcuts.archive", keys: ["E", "Backspace"], join: "or" },
       { what: "shortcuts.toggleRead", keys: ["U"] },
+      { what: "shortcuts.archiveRead", keys: ["Shift Backspace"] },
+      { what: "shortcuts.allRead", keys: ["Alt U"] },
     ],
   },
   {
