@@ -207,6 +207,7 @@ surface: 1.0 (within 1.x nothing is removed or renamed)
   "task.updated",
   "task.restored",
   "task.related",
+  "task.deleted",
   "comment.created",
   "comment.updated",
   "comment.deleted",

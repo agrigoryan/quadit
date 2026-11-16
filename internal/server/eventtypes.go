@@ -14,7 +14,7 @@ func (s *Server) eventTypeRoutes() []route {
 // holds the list to the types the engine writes
 // (TestEventTypesAreTheOnesTheEngineWrites).
 var eventTypes = []string{
-	"task.created", "task.updated", "task.restored", "task.related",
+	"task.created", "task.updated", "task.restored", "task.related", "task.deleted",
 	"comment.created", "comment.updated", "comment.deleted",
 	"decision.opened", "decision.picked", "decision.unclear", "decision.updated", "decision.deleted", "decision.restored",
 	"attachment.created", "attachment.deleted", "attachment.restored", "relation.created", "relation.deleted", "link.created", "link.updated", "link.deleted",

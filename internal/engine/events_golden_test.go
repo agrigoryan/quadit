@@ -336,8 +336,11 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 	do("rule.delete", M{"id": rule})
 	do("project.delete", M{"id": "OPS"})
 
-	// Upkeep: what a restore announces, and the trash emptied.
+	// Upkeep: what a restore announces, and the trash emptied, with a task
+	// in it.
 	t1 := do("task.create", M{"project": "SVA", "title": "Restored"}).Ref
+	thrown := do("task.create", M{"project": "SVA", "title": "Thrown away"}).Ref
+	do("task.delete", M{"id": thrown})
 	if err := e.AnnounceRestored(ctx, ws.ID, "task", t1); err != nil {
 		t.Fatal(err)
 	}
