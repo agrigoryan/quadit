@@ -237,7 +237,7 @@ func TestTaskUpdate(t *testing.T) {
 		}
 		e = w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": "SVA-1", "titel": "x"})
 		if e.Nearest != "title" {
-			t.Fatalf("misspelt field should suggest title: %+v", e)
+			t.Fatalf("misspelled field should suggest title: %+v", e)
 		}
 		// An update on an old version is refused and says what changed.
 		e = w.refused(engine.CodeStale, w.owner.ID, "task.update", M{"id": "SVA-1", "base_seq": base, "title": "Double jump"})

@@ -171,7 +171,7 @@ func (s *Server) jobNotify(ctx context.Context, j core.Job) error {
 	}
 	var prefs notifyPrefs
 	if len(u.Notify) > 0 {
-		_ = json.Unmarshal(u.Notify, &prefs) //nolint:errcheck // choices that do not read are the defaults
+		_ = json.Unmarshal(u.Notify, &prefs) // choices that do not read are the defaults
 	}
 	var ws core.Workspace
 	var actor core.Member

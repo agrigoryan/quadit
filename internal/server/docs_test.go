@@ -133,7 +133,7 @@ func TestDocs(t *testing.T) {
 		}
 		if e := s.call(nil, agent, "POST", "/api/v1/w/-/changes", M{"id": "0192f0c0-0000-7000-8000-000000000001", "type": "doc.create",
 			"args": M{"parent": db, "title": "x", "props": M{"Framez": 1}}}, 400, nil); !strings.Contains(e, `"nearest":"Frames"`) {
-			t.Fatalf("misspelt property: %s", e)
+			t.Fatalf("misspelled property: %s", e)
 		}
 
 		// The decision log is a page built from the data.

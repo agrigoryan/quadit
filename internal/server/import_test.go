@@ -118,7 +118,7 @@ func TestImports(t *testing.T) {
 			}
 		}
 		if !strings.Contains(tasks("project=ART"), "ART-2  [Canceled]  Old idea") {
-			t.Fatalf("an archived card should be cancelled:\n%s", tasks("project=ART"))
+			t.Fatalf("an archived card should be canceled:\n%s", tasks("project=ART"))
 		}
 
 		// Asana.

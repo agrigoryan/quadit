@@ -371,7 +371,7 @@ func TestNamesNotIDs(t *testing.T) {
 		}
 		out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "task.update", "args": M{"id": "SVA-1", "priority": "hihg"}}, 400, nil)
 		if !strings.Contains(out, `"nearest":"high"`) || !strings.Contains(out, "urgent") {
-			t.Fatalf("a misspelt priority: %s", out)
+			t.Fatalf("a misspelled priority: %s", out)
 		}
 		s.call(s.owner, "", "GET", w+"/tasks?priority=hihg", nil, 400, nil)
 		// A decision by its task; with two, by its number. An agent asks, the owner answers.
@@ -380,7 +380,7 @@ func TestNamesNotIDs(t *testing.T) {
 		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &art)
 		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "options": []M{{"label": "Ring"}, {"label": "Burst"}}})
 		s.change(s.owner, "", "decision.pick", M{"id": "SVA-1", "option": "2"})
-		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which colour?", "options": []M{{"label": "Red"}, {"label": "Blue"}}})
+		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which color?", "options": []M{{"label": "Red"}, {"label": "Blue"}}})
 		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which sound?", "options": []M{{"label": "Boom"}, {"label": "Zap"}}})
 		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "decision.pick", "args": M{"id": "SVA-1", "option": "1"}}, 400, nil); !strings.Contains(out, "SVA-1#") {
 			t.Fatalf("two open decisions and no number: %s", out)
@@ -395,7 +395,7 @@ func TestNamesNotIDs(t *testing.T) {
 		s.change(s.owner, "", "watch.set", M{"type": "view", "subject": "Urgent things"})
 		// A name nothing has says which names there are.
 		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "watch.set", "args": M{"type": "epic", "subject": "Bos fight"}}, 404, nil); !strings.Contains(out, `"nearest":"Boss fight"`) {
-			t.Fatalf("a misspelt epic: %s", out)
+			t.Fatalf("a misspelled epic: %s", out)
 		}
 	})
 }

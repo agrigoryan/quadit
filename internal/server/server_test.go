@@ -138,7 +138,7 @@ func TestAPI(t *testing.T) {
 		s.call(nil, agent, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
 		s.call(nil, agent, "GET", "/api/v1/w/-/tasks?project=OPS", nil, 403, nil)
 		if out := s.call(nil, agent, "GET", "/api/v1/w/-/tasks?asignee=me", nil, 400, nil); !strings.Contains(out, `"nearest":"assignee"`) {
-			t.Fatalf("misspelt parameter should be corrected: %s", out)
+			t.Fatalf("misspelled parameter should be corrected: %s", out)
 		}
 		// The compact text form.
 		if out := s.call(nil, agent, "GET", "/api/v1/w/-/my-work?format=text", nil, 200, nil); !strings.Contains(out, "SVA-1  [Todo]  @artist  Explosion effect") {

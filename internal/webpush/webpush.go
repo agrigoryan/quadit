@@ -119,7 +119,7 @@ func Send(ctx context.Context, key *ecdsa.PrivateKey, subject string, sub core.P
 	if err != nil {
 		return 0, err
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)) //nolint:errcheck // drained only so the connection is reused; the status is the answer
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)) // drained only so the connection is reused; the status is the answer
 	resp.Body.Close()
 	return resp.StatusCode, nil
 }

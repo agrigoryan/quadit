@@ -214,7 +214,7 @@ func TestThirdAuditFindings(t *testing.T) {
 			t.Fatalf("a claim on an SVA task reached an agent limited to OPS: %s", out)
 		}
 		s.change(s.owner, "", "agent.update", M{"id": "@narrow", "scope": nil})
-		// A misspelt part of the limits is refused, not dropped.
+		// A misspelled part of the limits is refused, not dropped.
 		s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "agent.update", "args": M{"id": "@narrow", "scope": M{"projcts": []string{"OPS"}}}}, 400, nil)
 		// More values a saved view cannot name.
 		for _, q := range []M{{"assignee": []string{"@nobody"}}, {"epic": []string{"Nope epic"}}, {"priority": []int{9}}} {

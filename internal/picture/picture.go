@@ -235,7 +235,7 @@ func Take(ctx context.Context, p Request) (png []byte, whole int, err error) {
 	if err != nil || len(png) == 0 {
 		return nil, 0, errors.New("the browser made no picture")
 	}
-	_, _ = devtools.call(ctx, "", "Browser.close", map[string]any{}) //nolint:errcheck // the browser is stopped below in any case
+	_, _ = devtools.call(ctx, "", "Browser.close", map[string]any{}) // the browser is stopped below in any case
 	return png, whole, nil
 }
 
@@ -303,8 +303,8 @@ func (b *browser) readAnswers(ctx context.Context) {
 // stop ends the browser and closes the pipe.
 func (b *browser) stop() {
 	b.out.Close()
-	_ = b.cmd.Process.Kill() //nolint:errcheck // it may have exited already; either way it is gone
-	_ = b.cmd.Wait()         //nolint:errcheck // it was killed: its exit says nothing
+	_ = b.cmd.Process.Kill() // it may have exited already; either way it is gone
+	_ = b.cmd.Wait()         // it was killed: its exit says nothing
 	b.in.Close()
 }
 
@@ -339,13 +339,13 @@ func openPage(ctx context.Context, devtools *cdp, p Request) (string, error) {
 		return "", err
 	}
 	if phone {
-		_, _ = devtools.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true}) //nolint:errcheck // without touch the page is still a phone's
+		_, _ = devtools.call(ctx, s, "Emulation.setTouchEmulationEnabled", map[string]any{"enabled": true}) // without touch the page is still a phone's
 	}
 	scheme := "light"
 	if p.Dark {
 		scheme = "dark"
 	}
-	_, _ = devtools.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{ //nolint:errcheck // without it the page shows in its default scheme
+	_, _ = devtools.call(ctx, s, "Emulation.setEmulatedMedia", map[string]any{ // without it the page shows in its default scheme
 		"features": []map[string]string{{"name": "prefers-color-scheme", "value": scheme}}})
 	if _, err := devtools.call(ctx, s, "Page.enable", map[string]any{}); err != nil {
 		return "", err

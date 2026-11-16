@@ -70,7 +70,7 @@ func orbitAsItAnswers(t *testing.T, fetched *int) *httptest.Server {
 				M{"id": "s3", "name": "Todo", "category": "unstarted", "position": 2},
 				M{"id": "s4", "name": "In Progress", "category": "started", "position": 3},
 				M{"id": "s6", "name": "Done", "category": "completed", "position": 5},
-				M{"id": "s7", "name": "Cancelled", "category": "cancelled", "position": 6},
+				M{"id": "s7", "name": "Cancelled", "category": "cancelled", "position": 6}, //nolint:misspell // Orbit's own words
 				M{"id": "s8", "name": "Duplicate", "category": "duplicate", "position": 7})
 		case "/projects/p1/labels":
 			items(rw, M{"id": "l1", "name": "visual", "color": "#3b82f6"}, M{"id": "l2", "name": "tooling", "color": "#64748b"})
@@ -141,7 +141,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		}
 
 		// The whole workflow came, used by a task or not, in Orbit's order
-		// within each kind, with its colours.
+		// within each kind, with its colors.
 		// The project is new here, so its workflow is exactly Orbit's: every
 		// status, used by a task or not, in Orbit's order, each of the right
 		// kind; the statuses a new project starts with that Orbit does not
@@ -168,7 +168,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 				starts += st.Name
 			}
 		}
-		const want = "Backlog (backlog), Parked (unstarted), Todo (unstarted), In Progress (started), Waiting on you (waiting), Done (done), Cancelled (canceled), Duplicate (canceled), "
+		const want = "Backlog (backlog), Parked (unstarted), Todo (unstarted), In Progress (started), Waiting on you (waiting), Done (done), Cancelled (canceled), Duplicate (canceled), " //nolint:misspell // the name Orbit gave the status, kept
 		if all != want || starts != "Todo" {
 			t.Fatalf("the workflow:\n got %s\nwant %s\nnew tasks start in %q", all, want, starts)
 		}

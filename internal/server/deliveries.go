@@ -292,7 +292,7 @@ func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Web
 		return 0, plainNetError(err), took
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10)) //nolint:errcheck // drained only so the connection is reused; the status is the answer
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10)) // drained only so the connection is reused; the status is the answer
 	if resp.StatusCode >= 300 {
 		return resp.StatusCode, "answered " + resp.Status, took
 	}
