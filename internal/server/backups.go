@@ -146,10 +146,15 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 	if err := os.MkdirAll(s.backupDir(), 0o750); err != nil {
 		return b, err
 	}
-	name := "quadit-" + time.Now().UTC().Format("20060102-150405") + ".tar.gz"
-	path := filepath.Join(s.backupDir(), name)
+	out, err := backup.NewFile(s.backupDir(), time.Now())
+	if err != nil {
+		return b, err
+	}
+	path := out.Name()
 	b.Location = path
 	if err := s.st.Insert(ctx, b); err != nil {
+		_ = out.Close()     // nothing was written to it
+		_ = os.Remove(path) // a backup with no record is not kept
 		return b, err
 	}
 
@@ -172,10 +177,6 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 	}
 
 	// Write the archive, noting its size and checksum.
-	out, err := os.Create(path)
-	if err != nil {
-		return finish(err)
-	}
 	h := sha256.New()
 	_, err = backup.Write(ctx, s.st, s.fileStore(), s.cfg.Version, io.MultiWriter(out, h))
 	if cerr := out.Close(); err == nil {
@@ -209,7 +210,7 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 		if err != nil {
 			return finish(err)
 		}
-		err = s.fileStore().Put(ctx, "backups/"+name, in, "application/gzip")
+		err = s.fileStore().Put(ctx, "backups/"+filepath.Base(path), in, "application/gzip")
 		in.Close()
 		if err != nil {
 			return finish(fmt.Errorf("copying the archive to file storage: %w", err))

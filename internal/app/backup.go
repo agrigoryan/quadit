@@ -55,7 +55,14 @@ func Backup(args []string, version string) int {
 	}
 	path := *out
 	if path == "" {
-		path = "quadit-" + time.Now().UTC().Format("20060102-150405") + ".tar.gz"
+		// Named for now, in this folder, and never over a backup already there.
+		made, err := backup.NewFile(".", time.Now())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "backup failed:", err)
+			return 1
+		}
+		path = made.Name()
+		_ = made.Close() // writeVerified opens it again to write
 	}
 	size, err := writeVerified(path, func(w io.Writer) error {
 		_, err := backup.Write(ctx, st, files, version, w)

@@ -111,3 +111,21 @@ func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 		restore(t, damaged, M{"workspace": "games", "task": "SVA-1"}, 409)
 	})
 }
+
+// TestTwoBackupsInOneSecondAreTwoFiles: a backup is named for the second it
+// is taken in; a second one in that same second gets its own file instead of
+// writing over the first.
+func TestTwoBackupsInOneSecondAreTwoFiles(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	var first, second struct{ Location string }
+	s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &first)
+	s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &second)
+	if first.Location == "" || first.Location == second.Location {
+		t.Fatalf("the two backups are at %q and %q; want two files", first.Location, second.Location)
+	}
+	for _, path := range []string{first.Location, second.Location} {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("a backup's file is not there: %v", err)
+		}
+	}
+}
