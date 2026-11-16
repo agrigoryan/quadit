@@ -21,7 +21,9 @@ type taskMoveArgs struct {
 
 // taskMove moves a task to another project. It gets a new number there; its
 // status becomes the nearest one of the same category, and labels, epic and
-// cycle that belong to the old project are dropped.
+// cycle that belong to the old project are dropped. It is refused while
+// the task is given to, waits on or asks a member who cannot read the new
+// project (see personOnTask).
 func taskMove(c *cx, a taskMoveArgs) error {
 	t, err := c.task("id", a.ID)
 	if err != nil {
@@ -34,6 +36,9 @@ func taskMove(c *cx, a taskMoveArgs) error {
 	if to.ID == t.ProjectID {
 		c.ref, c.key = t.ID, t.Key
 		return nil
+	}
+	if err := c.checkPeopleCanFollow(t, to); err != nil {
+		return err
 	}
 	st, err := c.nearestStatus(to, t.StatusID)
 	if err != nil {
@@ -67,6 +72,50 @@ func taskMove(c *cx, a taskMoveArgs) error {
 		return err
 	}
 	return c.index(store.SearchDoc{Kind: "task", EntityID: t.ID, ScopeType: "task", ScopeID: t.ID, ProjectID: t.ProjectID, Title: t.Key + " " + t.Title, Body: t.Description})
+}
+
+// checkPeopleCanFollow refuses to move a task to a project that a member
+// whose work it is cannot read: its assignee, the one it waits on, the one
+// an open decision of it asks. The rule is personOnTask's: they could not
+// open the task where it goes. task.move does not change who is on the
+// task, so the refusal says what to do first.
+func (c *cx) checkPeopleCanFollow(t core.Task, to core.Project) error {
+	on := map[string][]string{} // user id: what they are on the task as
+	var order []string
+	add := func(userID, as string) {
+		if userID == "" {
+			return
+		}
+		if on[userID] == nil {
+			order = append(order, userID)
+		}
+		on[userID] = append(on[userID], as)
+	}
+	add(t.AssigneeID, "assignee")
+	add(t.WaitingOnID, "waiting_on")
+	var open []core.Decision
+	if err := c.tx.List(c.ctx, &open, store.Where(store.Eq("task_id", t.ID), store.Eq("state", core.StateOpen), store.Live)); err != nil {
+		return err
+	}
+	for _, d := range open {
+		add(d.AskedID, "asked")
+	}
+	var kept []string
+	for _, userID := range order {
+		var m core.Member
+		there, err := store.Find(c.ctx, c.tx, &m, store.Eq("user_id", userID), store.Null("removed_at"))
+		if err != nil {
+			return err
+		}
+		if there && !m.Scope.MayRead(to.ID) {
+			kept = append(kept, "@"+m.Handle+" ("+strings.Join(on[userID], ", ")+")")
+		}
+	}
+	if kept == nil {
+		return nil
+	}
+	return invalid("project", "%s cannot read %s, so %s cannot go there while it is theirs: give it to someone else or clear them (task.update; a decision with decision.delete) first, then move it",
+		strings.Join(kept, ", "), to.Key, t.Key)
 }
 
 // nearestStatus is the status a task moved to project to takes: the one of

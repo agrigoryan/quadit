@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/engine"
@@ -49,5 +50,33 @@ func TestAMemberWhoCannotReadAProjectIsGivenNoWorkInIt(t *testing.T) {
 		if inbox := w.inbox(narrow); len(inbox) == 0 {
 			t.Fatal("a member is not told of work in a project they may read")
 		}
+	})
+}
+
+// TestATaskIsNotMovedAwayFromWhoseWorkItIs: a task cannot be moved to a
+// project that the member it is given to, waits on or asks cannot read;
+// the refusal names them. Once they are taken off it, it moves.
+func TestATaskIsNotMovedAwayFromWhoseWorkItIs(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(w.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"})
+		w.do(w.owner.ID, "agent.create", M{"name": "Narrow", "handle": "narrow", "scope": M{"projects": []string{"SVA"}}})
+		w.do(w.owner.ID, "agent.create", M{"name": "Asked", "handle": "asked", "scope": M{"projects": []string{"SVA"}}})
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss design", "assignee": "@narrow", "waiting_on": "@narrow"})
+		decision := w.do(w.owner.ID, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "options": []M{{"label": "Ring"}, {"label": "Burst"}}, "ask": "@asked"}).Ref
+
+		e := w.refused(engine.CodeInvalid, w.owner.ID, "task.move", M{"id": "SVA-1", "project": "OPS"})
+		if e.Field != "project" || !strings.Contains(e.Message, "@narrow") || !strings.Contains(e.Message, "@asked") {
+			t.Fatalf("the refusal does not name who cannot read the project: %v", e)
+		}
+		if got := w.task("SVA-1"); got.Key != "SVA-1" {
+			t.Fatalf("the task moved after all: %s", got.Key)
+		}
+
+		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "assignee": nil, "waiting_on": nil})
+		w.refused(engine.CodeInvalid, w.owner.ID, "task.move", M{"id": "SVA-1", "project": "OPS"})
+		w.do(w.owner.ID, "decision.delete", M{"id": decision})
+		w.do(w.owner.ID, "task.move", M{"id": "SVA-1", "project": "OPS"})
 	})
 }
