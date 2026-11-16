@@ -92,3 +92,30 @@ func TestAReplyReachesEveryoneInTheThread(t *testing.T) {
 		}
 	})
 }
+
+// TestAThreadIsResolvedThroughAnyOfItsComments: resolving or opening again
+// asked of a reply is done to its thread, which its first comment carries.
+func TestAThreadIsResolvedThroughAnyOfItsComments(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		page := w.do(w.owner.ID, "doc.create", M{"title": "Art notes"}).Ref
+		root := w.do(w.owner.ID, "comment.create", M{"doc": page, "body": "Is the ring right?"}).Ref
+		reply := w.do(w.owner.ID, "comment.create", M{"parent": root, "body": "It is."}).Ref
+		resolvedAt := func(ref string) int64 {
+			t.Helper()
+			var cm core.Comment
+			if err := w.db().Get(context.Background(), &cm, store.Eq("id", ref)); err != nil {
+				t.Fatal(err)
+			}
+			return cm.ResolvedAt
+		}
+		w.do(w.owner.ID, "comment.update", M{"id": reply, "resolved": true})
+		if resolvedAt(root) == 0 || resolvedAt(reply) != 0 {
+			t.Fatalf("resolved through a reply: thread %d, reply %d; want the thread resolved and the reply untouched", resolvedAt(root), resolvedAt(reply))
+		}
+		w.do(w.owner.ID, "comment.update", M{"id": reply, "resolved": false})
+		if resolvedAt(root) != 0 {
+			t.Fatal("opening again through a reply left the thread resolved")
+		}
+	})
+}

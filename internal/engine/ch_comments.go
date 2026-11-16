@@ -421,14 +421,14 @@ type commentUpdateArgs struct {
 	Resolved Opt[bool]   `json:"resolved"`
 }
 
-// commentUpdate edits a comment's text, by its author, or resolves it or
-// opens it again.
+// commentUpdate edits a comment's text, by its author, or resolves its
+// thread or opens it again. A thread is resolved as a whole, and its first
+// comment carries that: asked through a reply, it is done to the first.
 func commentUpdate(c *cx, a commentUpdateArgs) error {
 	cm, err := loadLive[core.Comment](c, "comment", "id", a.ID)
 	if err != nil {
 		return err
 	}
-	p := newPatch()
 	if a.Body.Set {
 		if cm.AuthorID != c.actor.UserID {
 			return forbidden("only its author can edit a comment")
@@ -436,26 +436,44 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 		if strings.TrimSpace(a.Body.V) == "" {
 			return invalid("body", "a comment needs text; delete it instead")
 		}
-		p.setText("body", a.Body, &cm.Body)
-		if !p.empty() {
-			p.set["edited_at"] = c.at
-			p.changes["edited_at"] = core.FieldChange{From: nullIfEmpty(cm.EditedAt), To: c.at}
-		}
 	}
-	p.setStamp("resolved_at", a.Resolved, cm.ResolvedAt, c.at)
 	row, err := c.commentTarget(cm)
 	if err != nil {
 		return err
 	}
-	if err := c.save(p, row); err != nil {
-		return err
-	}
-	if _, ok := p.set["body"]; ok {
-		if _, err := c.link("comment", cm.ID, row.place.scopeType, row.place.scopeID, cm.Body); err != nil {
+	if a.Resolved.Set {
+		first := cm
+		if cm.ParentID != "" {
+			if first, err = loadLive[core.Comment](c, "comment", "id", cm.ParentID); err != nil {
+				return err
+			}
+		}
+		p := newPatch()
+		p.setStamp("resolved_at", a.Resolved, first.ResolvedAt, c.at)
+		thread := row
+		thread.id = first.ID
+		if err := c.save(p, thread); err != nil {
 			return err
 		}
-		return c.indexComment(cm)
 	}
+	if a.Body.Set {
+		p := newPatch()
+		p.setText("body", a.Body, &cm.Body)
+		if !p.empty() {
+			p.set["edited_at"] = c.at
+			p.changes["edited_at"] = core.FieldChange{From: nullIfEmpty(cm.EditedAt), To: c.at}
+			if err := c.save(p, row); err != nil {
+				return err
+			}
+			if _, err := c.link("comment", cm.ID, row.place.scopeType, row.place.scopeID, cm.Body); err != nil {
+				return err
+			}
+			if err := c.indexComment(cm); err != nil {
+				return err
+			}
+		}
+	}
+	c.ref = cm.ID
 	return nil
 }
 
