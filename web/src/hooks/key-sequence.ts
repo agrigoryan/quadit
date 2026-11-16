@@ -6,7 +6,7 @@
 
 import { useEffect, useEffectEvent } from "react";
 import { create } from "zustand";
-import { isTyping, overlayOpen } from "@/hooks/hotkeys";
+import { combo, isTyping, overlayOpen } from "@/hooks/hotkeys";
 
 /** How long the first key waits for the second. */
 export const SEQUENCE_MS = 1500;
@@ -33,7 +33,6 @@ function arm(prefix: string) {
   timer = setTimeout(disarm, SEQUENCE_MS);
 }
 
-const keyOf = (e: KeyboardEvent) => (e.key.length === 1 ? e.key.toLowerCase() : e.key);
 const withModifier = (e: KeyboardEvent) => e.metaKey || e.ctrlKey || e.altKey;
 const elsewhere = (e: KeyboardEvent) => isTyping(e.target) || overlayOpen();
 
@@ -47,7 +46,8 @@ export function useKeySequences(sequences: Sequences, enabled = true) {
     function onKey(e: KeyboardEvent) {
       if (e.isComposing || MODIFIERS.includes(e.key)) return;
       const pending = usePendingKey.getState().prefix;
-      const key = keyOf(e);
+      // Named as single keys are: by the key pressed, so G I works under any keyboard layout.
+      const key = combo(e);
       if (pending === null) {
         const starts = key in latest() && !e.repeat && !e.shiftKey && !withModifier(e) && !e.defaultPrevented;
         if (starts && !elsewhere(e)) arm(key);

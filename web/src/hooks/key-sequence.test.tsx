@@ -60,3 +60,14 @@ describe("useKeySequences", () => {
     expect(inbox).not.toHaveBeenCalled();
   });
 });
+
+describe("useKeySequences under another keyboard layout", () => {
+  it("runs by the keys pressed, not the letters a Russian layout types on them", () => {
+    const inbox = vi.fn();
+    render(<Keys sequences={{ g: { i: inbox } }} />);
+    fireEvent.keyDown(document.body, { key: "п", code: "KeyG" });
+    expect(usePendingKey.getState().prefix).toBe("g");
+    fireEvent.keyDown(document.body, { key: "ш", code: "KeyI" });
+    expect(inbox).toHaveBeenCalledTimes(1);
+  });
+});

@@ -5,7 +5,7 @@
 
 import { t } from "@/lib/i18n";
 import { askToUndo, redo, stopAsking, undo, useUndo } from "@/data/undo";
-import { isTyping, overlayOpen, useHotkeys } from "@/hooks/hotkeys";
+import { useHotkeys } from "@/hooks/hotkeys";
 import { exact } from "@/lib/time";
 import { toast } from "@/lib/toast";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -13,18 +13,19 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 export function UndoKeys() {
   const asking = useUndo((s) => s.asking);
 
+  // The key belongs to a text being typed, or to something open over the page.
   useHotkeys(
     {
       "mod+z": (e) => {
-        // The key belongs to a text being typed, or to something open over the page.
-        if (isTyping(e.target) || overlayOpen()) return;
         e.preventDefault();
-        if (e.shiftKey) {
-          if (!redo()) toast.info(t("undo.nothingRedo"));
-        } else if (!askToUndo()) toast.info(t("undo.nothing"));
+        if (!askToUndo()) toast.info(t("undo.nothing"));
+      },
+      "mod+shift+z": (e) => {
+        e.preventDefault();
+        if (!redo()) toast.info(t("undo.nothingRedo"));
       },
     },
-    { layer: "global" },
+    { layer: "global", guardChords: true },
   );
 
   return (
