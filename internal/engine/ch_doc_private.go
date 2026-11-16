@@ -6,7 +6,7 @@
 // CanSeeDoc reads one row. A page placed under a private page takes its
 // readers (underPrivate): one made there (placeDoc), unless it is made
 // private itself and so given its own (docReaders); one moved there
-// (docUpdate); one brought back there from a backup (AnnounceRestored).
+// (docUpdate); one brought back there from a backup (RestoreFromBackup).
 // Changing who sees a page passes the change down to the pages under it
 // that had its readers (passReadersDown). A page moved out of one stays as
 // private as it was: nobody is shown a page because it moved.

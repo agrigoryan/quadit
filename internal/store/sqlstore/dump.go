@@ -89,28 +89,45 @@ func jsonArg(val any) any {
 // Load inserts rows produced by Dump (after a trip through JSON), all in one
 // transaction.
 func (s *Store) Load(ctx context.Context, table string, rows []map[string]any) error {
+	return s.inTx(ctx, func(r runner) error { return conn{runner: r}.Load(ctx, table, rows) })
+}
+
+// Load inserts rows produced by Dump. In a conn bound to a workspace, a
+// row of a workspace table is put in that workspace whatever it says.
+func (c conn) Load(ctx context.Context, table string, rows []map[string]any) error {
 	m, err := metaNamed(table)
 	if err != nil {
 		return err
 	}
-	return s.inTx(ctx, func(r runner) error {
-		for _, row := range rows {
-			args, err := loadArgs(m, table, row)
-			if err != nil {
-				return err
-			}
-			if _, err := r.exec(ctx, "INSERT INTO "+m.name+" ("+m.cols+") VALUES ("+placeholders(len(args))+")", args...); err != nil {
-				return fmt.Errorf("%s: %w", table, err)
+	for _, row := range rows {
+		args, err := loadArgs(m, table, row)
+		if err != nil {
+			return err
+		}
+		if c.workspaceID != "" && !m.table.Global {
+			for i := range m.fields {
+				if m.fields[i].col == "workspace_id" {
+					args[i] = c.workspaceID
+				}
 			}
 		}
-		return nil
-	})
+		if _, err := c.exec(ctx, "INSERT INTO "+m.name+" ("+m.cols+") VALUES ("+placeholders(len(args))+")", args...); err != nil {
+			return fmt.Errorf("%s: %w", table, err)
+		}
+	}
+	return nil
 }
 
 // Overwrite sets the matching rows to what an archive row says, column by
 // column. The columns named in keep are left as they are now: a row's place
 // in the feed belongs to this database, not to the archive.
 func (s *Store) Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...store.Cond) error {
+	return s.inTx(ctx, func(r runner) error { return conn{runner: r}.Overwrite(ctx, table, row, keep, where...) })
+}
+
+// Overwrite is Store.Overwrite on this conn: in a conn bound to a
+// workspace, only that workspace's rows match.
+func (c conn) Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...store.Cond) error {
 	m, err := metaNamed(table)
 	if err != nil {
 		return err
@@ -129,12 +146,10 @@ func (s *Store) Overwrite(ctx context.Context, table string, row map[string]any,
 		sets = append(sets, ident(col)+" = ?")
 		vals = append(vals, args[i])
 	}
-	return s.inTx(ctx, func(r runner) error {
-		whereSQL, whereArgs, err := (conn{runner: r}).where(m, where)
-		if err != nil {
-			return err
-		}
-		_, err = r.exec(ctx, "UPDATE "+m.name+" SET "+strings.Join(sets, ", ")+" WHERE "+whereSQL, append(vals, whereArgs...)...)
+	whereSQL, whereArgs, err := c.where(m, where)
+	if err != nil {
 		return err
-	})
+	}
+	_, err = c.exec(ctx, "UPDATE "+m.name+" SET "+strings.Join(sets, ", ")+" WHERE "+whereSQL, append(vals, whereArgs...)...)
+	return err
 }

@@ -352,19 +352,25 @@ func (c *cx) restoredUnderPrivate(doc *core.Doc) error {
 	return c.passReadersDown(was, *doc)
 }
 
-// AnnounceRestored tells the feed that a task or a page was set back from a
-// backup. The rows get new positions in the feed, so every copy that
-// compares positions takes them as the newest state, and an open editor
-// gets the page's text as it stands now. A page set back under a page that
-// has been made private since is first made private the same way, as a
-// page moved there is, with the pages under it that shared its readers.
-func (e *Engine) AnnounceRestored(ctx context.Context, workspaceID, kind, id string) error {
+// RestoreFromBackup sets a task or a page (kind "task" or "doc", with that
+// id) back as a backup has it, and tells the feed, in one write: setBack
+// writes the item's rows from the archive, and when it or anything after
+// it fails, nothing of the restore is kept. The rows get new positions in
+// the feed, so every copy that compares positions takes them as the newest
+// state, and an open editor gets the page's text as it stands now. A page
+// set back under a page that has been made private since is made private
+// the same way, as a page moved there is, with the pages under it that
+// shared its readers.
+func (e *Engine) RestoreFromBackup(ctx context.Context, workspaceID, kind, id string, setBack func(store.Tx) error) error {
 	var owner core.Member
 	if err := e.st.In(workspaceID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner)), store.Null("removed_at")); err != nil {
 		return err
 	}
 	return e.System(ctx, workspaceID, owner.UserID, func(sys *Sys) error {
 		tx := sys.Tx()
+		if err := setBack(tx); err != nil {
+			return err
+		}
 		next := tx.Seq() + 1 // the position the next event takes
 		if kind == "task" {
 			if _, err := tx.Update(ctx, "tasks", map[string]any{"updated_seq": next, "activity_seq": next}, store.Eq("id", id)); err != nil {

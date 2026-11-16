@@ -8,7 +8,8 @@
 //	DB     reads and writes rows: by conditions (Cond, Q), and the task list,
 //	       the feed and full-text search, which conditions cannot express.
 //	Tx     the DB of one write to one workspace, inside Store.Write: it
-//	       hands out the workspace's event numbers and stores events.
+//	       hands out the workspace's event numbers and stores events, and
+//	       can set rows back from an archive (Load, Overwrite).
 //	Store  one database: a DB that sees every row, plus Write and Atomic
 //	       (transactions), Dump, Load, Overwrite, SchemaVersion and
 //	       UpgradeLoaded (backups), and In.
@@ -200,6 +201,11 @@ type Tx interface {
 	NextSeq() int64
 	// Emit stores an event. Its Seq must come from NextSeq in this Tx.
 	Emit(ctx context.Context, ev core.Event) error
+	// Load and Overwrite are Store's, inside this write, for setting rows
+	// back from an archive together with the events that tell of it. Like
+	// every statement of a Tx, they reach only the workspace's rows.
+	Load(ctx context.Context, table string, rows []map[string]any) error
+	Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...Cond) error
 }
 
 // Store is one database.

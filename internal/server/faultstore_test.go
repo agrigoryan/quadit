@@ -260,6 +260,32 @@ func (s *faultyStore) Atomic(ctx context.Context, fn func(store.DB) error) error
 	return s.Store.Atomic(ctx, func(db store.DB) error { return fn(&faultyDB{DB: db, faults: s.faults}) })
 }
 
+func (s *faultyStore) Write(ctx context.Context, workspaceID string, fn func(store.Tx) error) error {
+	return s.Store.Write(ctx, workspaceID, func(tx store.Tx) error {
+		return fn(faultyTx{faultyDB: &faultyDB{DB: tx, faults: s.faults}, tx: tx})
+	})
+}
+
+// faultyTx is a faulty store's write: its reads and writes fail as the
+// store's do; the event numbers and the events themselves never fail.
+type faultyTx struct {
+	*faultyDB
+	tx store.Tx
+}
+
+func (t faultyTx) WorkspaceID() string { return t.tx.WorkspaceID() }
+func (t faultyTx) Seq() int64          { return t.tx.Seq() }
+func (t faultyTx) NextSeq() int64      { return t.tx.NextSeq() }
+func (t faultyTx) Emit(ctx context.Context, ev core.Event) error {
+	return t.tx.Emit(ctx, ev)
+}
+func (t faultyTx) Load(ctx context.Context, table string, rows []map[string]any) error {
+	return t.tx.Load(ctx, table, rows)
+}
+func (t faultyTx) Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...store.Cond) error {
+	return t.tx.Overwrite(ctx, table, row, keep, where...)
+}
+
 // failGet makes every Get of that kind of row fail until the test ends.
 func failGet(t *testing.T, fs *faultyStore, row any) {
 	t.Helper()

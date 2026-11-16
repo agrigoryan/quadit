@@ -203,7 +203,7 @@ func Restore(args []string, _ string) int {
 }
 
 // restoreItem brings one task or page back from the archive into a running
-// install, and tells open browsers and the search index.
+// install, telling open browsers, and then the search index.
 func restoreItem(ctx context.Context, st store.Store, files blob.Store, archive io.Reader, ra restoreArgs) int {
 	it := backup.Item{Workspace: ra.workspace, Kind: "task", Ref: ra.task}
 	if ra.doc != "" {
@@ -213,21 +213,19 @@ func restoreItem(ctx context.Context, st store.Store, files blob.Store, archive 
 		fmt.Fprintln(os.Stderr, "say which workspace: --workspace SLUG")
 		return 2
 	}
-	rid, err := backup.RestoreItem(ctx, st, files, archive, it)
+	eng := engine.New(st, nil) // it only restores, announces and reindexes: no secret to seal
+	rid, err := backup.RestoreItem(ctx, eng, files, archive, it)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "restore failed:", err)
 		return 1
 	}
-	// Tell open browsers, and put the text back in the search index.
+	// Open browsers were told in the same write; put the text back in the
+	// search index.
 	var ws core.Workspace
 	switch there, err := store.Find(ctx, st, &ws, store.Eq("slug", it.Workspace)); {
 	case err != nil:
-		fmt.Fprintln(os.Stderr, "restored, but open browsers and search were not told:", err)
+		fmt.Fprintln(os.Stderr, "restored, but search was not told:", err)
 	case there:
-		eng := engine.New(st, nil) // it only announces and reindexes: no secret to seal
-		if err := eng.AnnounceRestored(ctx, ws.ID, it.Kind, rid); err != nil {
-			fmt.Fprintln(os.Stderr, "restored, but open browsers were not told:", err)
-		}
 		if err := eng.Reindex(ctx, ws.ID); err != nil {
 			fmt.Fprintln(os.Stderr, "rebuilding search:", err)
 		}

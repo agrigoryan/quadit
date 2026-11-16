@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/blob"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -438,9 +439,12 @@ type Item struct {
 // gone are put back, a row in the trash is taken out of it, and rows that
 // changed since are set back. What was added since stays, except in a page:
 // blocks the archive does not know are moved to the page's trash, so the
-// page reads as it did. It returns the id of the task or page.
-func RestoreItem(ctx context.Context, st store.Store, files blob.Store, r io.Reader, it Item) (string, error) {
-	ir := &itemRestore{ctx: ctx, st: st, files: files, it: it,
+// page reads as it did. The rows are set back, and the feed told, in one
+// write to eng's database (engine.RestoreFromBackup): a restore that fails
+// leaves the database as it was. Only the item's stored files, which are
+// put back first, may stay. It returns the id of the task or page.
+func RestoreItem(ctx context.Context, eng *engine.Engine, files blob.Store, r io.Reader, it Item) (string, error) {
+	ir := &itemRestore{ctx: ctx, st: eng.Store(), files: files, it: it,
 		decisions: map[string]bool{}, keys: map[string]bool{}, pending: map[string]map[string]any{}}
 	if _, err := read(r, ir.member); err != nil {
 		return "", err
@@ -451,10 +455,8 @@ func RestoreItem(ctx context.Context, st store.Store, files blob.Store, r io.Rea
 	if ir.rootID == "" {
 		return "", fmt.Errorf("%s %q of %s is %w", it.Kind, it.Ref, it.Workspace, ErrNotInArchive)
 	}
-	if it.Kind == "doc" {
-		if err := ir.trashNewBlocks(); err != nil {
-			return "", err
-		}
+	if err := eng.RestoreFromBackup(ctx, ir.wsID, it.Kind, ir.rootID, ir.setBack); err != nil {
+		return "", err
 	}
 	return ir.rootID, nil
 }
@@ -471,10 +473,20 @@ type itemRestore struct {
 	wsID   string // the workspace's id, once its row is read
 	rootID string // the task's or page's id, once its row is read
 
+	item      archived                  // the task's or page's own row
+	parts     []archived                // the rows that are parts of it, in archive order
 	decisions map[string]bool           // the task's decisions, by id
 	keys      map[string]bool           // the stored files to bring back
 	blocks    []string                  // the page's blocks in the archive
 	pending   map[string]map[string]any // file rows seen, until we know which are wanted
+}
+
+// archived is a row of the archive to set back, and the conditions that
+// find it in the database if it is still there.
+type archived struct {
+	table string
+	row   map[string]any
+	where []store.Cond
 }
 
 // partOf names, for each table whose rows are parts of a task or a page,
@@ -519,9 +531,7 @@ func (ir *itemRestore) member(name string, body io.Reader) error {
 			rows = parentsFirst(rows, cols)
 		}
 		for _, row := range rows {
-			if err := ir.row(table, row); err != nil {
-				return fmt.Errorf("%s: %w", table, err)
-			}
+			ir.row(table, row)
 		}
 		return nil
 	})
@@ -529,19 +539,22 @@ func (ir *itemRestore) member(name string, body io.Reader) error {
 
 // row decides what one row of the archive is to the item: its workspace,
 // the item itself, a part of it, or nothing.
-func (ir *itemRestore) row(table string, row map[string]any) error {
+func (ir *itemRestore) row(table string, row map[string]any) {
 	switch {
 	case table == "workspaces" && str(row, "slug") == ir.it.Workspace:
 		ir.wsID = str(row, "id")
-		return nil
 	case ir.wsID == "" || (str(row, "workspace_id") != ir.wsID && table != "files"):
-		return nil // another workspace's
+		// another workspace's
 	case ir.isItem(table, row):
-		return ir.restoreItem(table, row)
-	case ir.rootID == "":
-		return nil // nothing can be a part before the item is found
+		ir.rootID = str(row, "id")
+		row["deleted_at"] = nil // out of the trash
+		if table == "tasks" {
+			row["deleted_by"] = nil
+		}
+		ir.item = archived{table, row, []store.Cond{store.Eq("id", ir.rootID)}}
+	case ir.rootID != "": // nothing can be a part before the item is found
+		ir.part(table, row)
 	}
-	return ir.restorePart(table, row)
 }
 
 // isItem says whether a row is the task or page being brought back.
@@ -556,58 +569,44 @@ func (ir *itemRestore) isItem(table string, row map[string]any) bool {
 	return false
 }
 
-// restoreItem puts the task or page back, out of the trash, under its
-// parent if that is still there.
-func (ir *itemRestore) restoreItem(table string, row map[string]any) error {
-	id := str(row, "id")
-	ir.rootID = id
-	row["deleted_at"] = nil
-	if table == "tasks" {
-		row["deleted_by"] = nil
-	}
-	if parent := str(row, "parent_id"); parent != "" {
-		n, err := ir.st.Count(ir.ctx, table, store.Eq("id", parent))
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			row["parent_id"] = nil // its parent is gone for good
-		}
-	}
-	return ir.put(table, row, store.Eq("id", id))
-}
-
-// restorePart puts back a row that is part of the item: a label, decision,
+// part takes in a row that is part of the item: a label, decision,
 // option, comment, link, block, version, property, view or attachment. A
 // file row is kept in mind until an attachment asks for it, as files come
-// before attachments in the archive.
-func (ir *itemRestore) restorePart(table string, row map[string]any) error {
+// before attachments in the archive; the file is then taken out of the
+// trash, and its stored objects are marked to be brought back.
+func (ir *itemRestore) part(table string, row map[string]any) {
 	id := str(row, "id")
+	byID := []store.Cond{store.Eq("id", id)}
 	switch {
 	case table == "files":
 		ir.pending[id] = row
-		return nil
+		return
 	case table == "decision_options":
 		if ir.decisions[str(row, "decision_id")] {
-			return ir.put(table, row, store.Eq("id", id))
+			ir.parts = append(ir.parts, archived{table, row, byID})
 		}
-		return nil
+		return
 	case !ir.isPart(table, row):
-		return nil
+		return
 	}
 	switch table {
 	case "task_labels":
-		return ir.put(table, row, store.Eq("task_id", ir.rootID), store.Eq("label_id", str(row, "label_id")))
+		byID = []store.Cond{store.Eq("task_id", ir.rootID), store.Eq("label_id", str(row, "label_id"))}
 	case "decisions":
 		ir.decisions[id] = true
 	case "doc_blocks":
 		ir.blocks = append(ir.blocks, id)
 	case "attachments":
-		if err := ir.restoreFile(str(row, "file_id")); err != nil {
-			return err
+		if f, ok := ir.pending[str(row, "file_id")]; ok {
+			f["deleted_at"] = nil
+			ir.parts = append(ir.parts, archived{"files", f, []store.Cond{store.Eq("id", str(f, "id"))}})
+			ir.keys[str(f, "storage_key")] = true
+			if pk := str(f, "preview_key"); pk != "" {
+				ir.keys[pk] = true
+			}
 		}
 	}
-	return ir.put(table, row, store.Eq("id", id))
+	ir.parts = append(ir.parts, archived{table, row, byID})
 }
 
 // isPart says whether a row of one of the partOf tables belongs to the
@@ -621,44 +620,41 @@ func (ir *itemRestore) isPart(table string, row map[string]any) bool {
 	return false
 }
 
-// restoreFile puts back the file row an attachment points at, if the
-// archive has it, and marks its stored objects to be brought back.
-func (ir *itemRestore) restoreFile(fileID string) error {
-	f, ok := ir.pending[fileID]
-	if !ok {
+// setBack writes what was read, in tx: the item under its parent if that
+// is still there, then its parts, each over its row if it is still here or
+// in again if it is gone. In a page, the blocks written after the archive
+// was made are then moved to the page's trash.
+func (ir *itemRestore) setBack(tx store.Tx) error {
+	if parent := str(ir.item.row, "parent_id"); parent != "" {
+		n, err := tx.Count(ir.ctx, ir.item.table, store.Eq("id", parent))
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			ir.item.row["parent_id"] = nil // its parent is gone for good
+		}
+	}
+	for _, a := range append([]archived{ir.item}, ir.parts...) {
+		n, err := tx.Count(ir.ctx, a.table, a.where...)
+		if err != nil {
+			return fmt.Errorf("%s: %w", a.table, err)
+		}
+		if n > 0 {
+			err = tx.Overwrite(ir.ctx, a.table, a.row, kept, a.where...)
+		} else {
+			err = tx.Load(ir.ctx, a.table, []map[string]any{a.row})
+		}
+		if err != nil {
+			return fmt.Errorf("%s: %w", a.table, err)
+		}
+	}
+	if ir.it.Kind != "doc" {
 		return nil
 	}
-	f["deleted_at"] = nil
-	if err := ir.put("files", f, store.Eq("id", fileID)); err != nil {
-		return err
-	}
-	ir.keys[str(f, "storage_key")] = true
-	if pk := str(f, "preview_key"); pk != "" {
-		ir.keys[pk] = true
-	}
-	return nil
-}
-
-// put sets a row back as the archive has it: over the row if it is still
-// here, or in again if it is gone.
-func (ir *itemRestore) put(table string, row map[string]any, cond ...store.Cond) error {
-	n, err := ir.st.Count(ir.ctx, table, cond...)
-	if err != nil {
-		return err
-	}
-	if n > 0 {
-		return ir.st.Overwrite(ir.ctx, table, row, kept, cond...)
-	}
-	return ir.st.Load(ir.ctx, table, []map[string]any{row})
-}
-
-// trashNewBlocks moves the blocks written into the page after the archive
-// was made to the page's trash.
-func (ir *itemRestore) trashNewBlocks() error {
 	conds := []store.Cond{store.Eq("doc_id", ir.rootID), store.Null("deleted_at")}
 	if len(ir.blocks) > 0 {
 		conds = append(conds, store.NotIn("id", ir.blocks))
 	}
-	_, err := ir.st.Update(ir.ctx, "doc_blocks", map[string]any{"deleted_at": time.Now().UnixMilli()}, conds...)
+	_, err := tx.Update(ir.ctx, "doc_blocks", map[string]any{"deleted_at": time.Now().UnixMilli()}, conds...)
 	return err
 }

@@ -63,7 +63,8 @@ func TestABackupOfANewerQuaditIsRefusedInWords(t *testing.T) {
 // TestBringingAnItemBackAnswersWhatWentWrong: bringing a task back from a
 // backup is answered not found only when the backup, the workspace or the
 // task is not there; a damaged archive is refused; and a database that
-// fails on the way is a failure, not a task that is not found.
+// fails on the way is a failure, not a task that is not found, that leaves
+// the task as it was.
 func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
@@ -101,6 +102,28 @@ func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 		st.faults.set("count tasks")
 		defer st.faults.clear()
 		restore(t, good, M{"workspace": "games", "task": "SVA-1"}, 500)
+	})
+	t.Run("a failure part way leaves the task as it was", func(t *testing.T) {
+		s.in(t).change(s.owner, "", "task.update", M{"id": "SVA-1", "title": "Renamed after the backup"})
+		ctx := context.Background()
+		var ws core.Workspace
+		if err := st.Get(ctx, &ws, store.Eq("slug", "games")); err != nil {
+			t.Fatal(err)
+		}
+		// The rows are set back first; telling the feed fails after.
+		fired := st.faults.arm(fault{op: "update", table: "tasks", times: 1})
+		restore(t, good, M{"workspace": "games", "task": "SVA-1"}, 500)
+		if fired() != 1 {
+			t.Fatalf("the fault fired %d times", fired())
+		}
+		var task core.Task
+		if err := st.In(ws.ID).Get(ctx, &task, store.Eq("key", "SVA-1")); err != nil || task.Title != "Renamed after the backup" {
+			t.Fatalf("after a failed restore the task is %q (%v), want it as it was before the attempt", task.Title, err)
+		}
+		var now core.Workspace
+		if err := st.Get(ctx, &now, store.Eq("id", ws.ID)); err != nil || now.Seq != ws.Seq {
+			t.Fatalf("a failed restore moved the feed from %d to %d (%v)", ws.Seq, now.Seq, err)
+		}
 	})
 	restore(t, good, M{"workspace": "games", "task": "SVA-1"}, 200)
 	t.Run("a damaged archive is refused", func(t *testing.T) {

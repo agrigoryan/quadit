@@ -162,7 +162,7 @@ func TestRestoreOneTask(t *testing.T) {
 			t.Fatalf("sub-task after its parent was purged: %+v, %v", sub, err)
 		}
 		// One command brings it back, with its decision, comment and file.
-		rid, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "sva-1"})
+		rid, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "sva-1"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestRestoreOneTask(t *testing.T) {
 			}
 		}
 		// Bringing it back twice changes nothing.
-		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
+		if _, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
 			t.Fatal(err)
 		}
 		if n, _ := db.Count(ctx, "comments"); n != 1 {
@@ -194,7 +194,7 @@ func TestRestoreOneTask(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
+		if _, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
 			t.Fatal(err)
 		}
 		var back core.Task
@@ -219,7 +219,7 @@ func TestRestoreOneTask(t *testing.T) {
 		if _, err := e.Apply(ctx, ws.ID, engine.Actor{UserID: owner.ID}, engine.Change{ID: id.New(), Type: "doc.write", Args: raw}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive2.Bytes()), backup.Item{Workspace: "games", Kind: "doc", Ref: res.Ref}); err != nil {
+		if _, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(archive2.Bytes()), backup.Item{Workspace: "games", Kind: "doc", Ref: res.Ref}); err != nil {
 			t.Fatal(err)
 		}
 		var live []core.Block
@@ -233,7 +233,7 @@ func TestRestoreOneTask(t *testing.T) {
 		if len(live) != 2 || strings.Contains(text, "rewritten") || strings.Contains(text, "third") || !strings.Contains(text, "first line") {
 			t.Fatalf("a page after restore reads: %s", text)
 		}
-		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-99"}); err == nil {
+		if _, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-99"}); err == nil {
 			t.Fatal("a task that is not in the archive was 'restored'")
 		}
 	})
@@ -372,11 +372,7 @@ func TestAPageBroughtBackUnderAPrivatePageIsPrivateTheSameWay(t *testing.T) {
 		}
 		do("doc.update", M{"id": root, "private": true})
 
-		rid, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "doc", Ref: child})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := e.AnnounceRestored(ctx, ws.ID, "doc", rid); err != nil {
+		if _, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "doc", Ref: child}); err != nil {
 			t.Fatal(err)
 		}
 		if err := e.Reindex(ctx, ws.ID); err != nil {
@@ -483,10 +479,11 @@ func TestAnArchiveOfANewerQuaditIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 			t.Fatalf("an archive of this version: %v", err)
 		}
 		before := withSchema(t, archive.Bytes(), -1, "")
-		if _, err := backup.RestoreItem(ctx, st, files, bytes.NewReader(before), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
+		e := engine.New(st, nil)
+		if _, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(before), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"}); err != nil {
 			t.Fatalf("an archive made before the first member said the schema: %v", err)
 		}
-		_, err = backup.RestoreItem(ctx, st, files, bytes.NewReader(newer), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"})
+		_, err = backup.RestoreItem(ctx, e, files, bytes.NewReader(newer), backup.Item{Workspace: "games", Kind: "task", Ref: "SVA-1"})
 		if !errors.Is(err, backup.ErrNewerArchive) {
 			t.Fatalf("bringing one task back from a newer archive: %v", err)
 		}

@@ -336,23 +336,6 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 	if it.Workspace == "" || it.Ref == "" {
 		return errBad("say which workspace, and which task (its key) or page (its id)")
 	}
-	f, err := os.Open(bk.Location)
-	if errors.Is(err, fs.ErrNotExist) {
-		return errNotFound("backup file")
-	}
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	rid, err := backup.RestoreItem(ctx, s.st, s.fileStore(), f, it)
-	switch {
-	case errors.Is(err, backup.ErrNotInArchive):
-		return &engine.Error{Code: engine.CodeNotFound, Message: err.Error()}
-	case errors.Is(err, backup.ErrNewerArchive), errors.Is(err, backup.ErrDamaged):
-		return &engine.Error{Code: engine.CodeConflict, Message: err.Error()}
-	case err != nil:
-		return err
-	}
 	var ws core.Workspace
 	there, err := store.Find(ctx, s.st, &ws, store.Eq("slug", it.Workspace), store.Live)
 	if err != nil {
@@ -361,8 +344,22 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 	if !there {
 		return errNotFound("workspace " + it.Workspace)
 	}
-	// Tell open browsers, and put the text back in the search index.
-	if err := s.eng.AnnounceRestored(ctx, ws.ID, it.Kind, rid); err != nil {
+	f, err := os.Open(bk.Location)
+	if errors.Is(err, fs.ErrNotExist) {
+		return errNotFound("backup file")
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// Open browsers are told in the same write; the search index after.
+	rid, err := backup.RestoreItem(ctx, s.eng, s.fileStore(), f, it)
+	switch {
+	case errors.Is(err, backup.ErrNotInArchive):
+		return &engine.Error{Code: engine.CodeNotFound, Message: err.Error()}
+	case errors.Is(err, backup.ErrNewerArchive), errors.Is(err, backup.ErrDamaged):
+		return &engine.Error{Code: engine.CodeConflict, Message: err.Error()}
+	case err != nil:
 		return err
 	}
 	if err := s.eng.Reindex(ctx, ws.ID); err != nil {
