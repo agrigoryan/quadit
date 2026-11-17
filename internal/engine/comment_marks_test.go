@@ -408,3 +408,37 @@ func TestThreadsThroughSplitsAndMerges(t *testing.T) {
 		})
 	})
 }
+
+// TestASpanPlacesOnlyThisPagesThreads: Markdown written with a span moves
+// one of the page's threads to the words it is around, a resolved one too,
+// which stays resolved; a span naming a thread of another page is dropped,
+// and that thread stays where it is.
+func TestASpanPlacesOnlyThisPagesThreads(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		page := w.do(w.owner.ID, "doc.create", M{"title": "Boss", "markdown": "The boss has three phases.\n"}).Ref
+		block := w.blocksOf(page)[0].ID
+		thread := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block, "quote": "three phases", "body": "Four?"}).Ref
+		w.do(w.owner.ID, "comment.update", M{"id": thread, "resolved": true})
+		other := w.do(w.owner.ID, "doc.create", M{"title": "Other", "markdown": "Lights low.\n"}).Ref
+		otherBlock := w.blocksOf(other)[0].ID
+		foreign := w.do(w.owner.ID, "comment.create", M{"doc": other, "block": otherBlock, "quote": "Lights", "body": "Why?"}).Ref
+
+		w.do(w.owner.ID, "doc.write", M{"doc": page, "markdown": `The <span data-comment="` + thread + `">boss</span> has <span data-comment="` + foreign + `">three phases</span>.` + "\n"})
+		if got := w.markedOn(page, thread); !slices.Equal(got, []string{block + ": boss"}) {
+			t.Errorf("the page's thread is on %v", got)
+		}
+		if cm := w.comment(thread); cm.ResolvedAt == 0 || cm.DetachedAt != 0 {
+			t.Errorf("the page's thread %+v, want it resolved, on its words", cm)
+		}
+		if got := w.markedOn(page, foreign); len(got) != 0 {
+			t.Errorf("another page's thread is on %v here", got)
+		}
+		if got := w.markedOn(other, foreign); !slices.Equal(got, []string{otherBlock + ": Lights"}) {
+			t.Errorf("another page's thread is on %v there", got)
+		}
+		if cm := w.comment(foreign); cm.DocID != other || cm.SubjectID != otherBlock || cm.DetachedAt != 0 {
+			t.Errorf("another page's thread %+v, want it as it was", cm)
+		}
+	})
+}
