@@ -299,20 +299,35 @@ func (s *Server) handleSignIn(x *c) error {
 	return s.finishSignIn(x, u, "password")
 }
 
-// finishSignIn starts the session after the first step, asking for the
-// second when the person owes one.
+// finishSignIn starts the session after the first step and answers with
+// the person, or with second_step when the session waits for it.
 func (s *Server) finishSignIn(x *c, u core.User, method string) error {
-	if err := s.startSession(x, u, method); err != nil {
+	secondStep, err := s.signIn(x, u, method)
+	if err != nil {
 		return err
 	}
-	if x.sess.Stage == core.SessionMFA {
+	if secondStep {
 		return x.ok(map[string]any{"second_step": true})
+	}
+	return x.ok(map[string]any{"user": u})
+}
+
+// signIn signs a person in on this browser once they have passed the first
+// step by method (password, passkey or a provider's id), and records the
+// sign-in. It reports whether the session still waits for the second step,
+// which startSession decides.
+func (s *Server) signIn(x *c, u core.User, method string) (secondStep bool, err error) {
+	if err := s.startSession(x, u, method); err != nil {
+		return false, err
+	}
+	if x.sess.Stage == core.SessionMFA {
+		return true, nil
 	}
 	s.audit(x.r, "", u, "signin", "user", u.ID, map[string]string{"method": method})
 	if _, err := s.st.Update(x.ctx(), "users", map[string]any{"last_seen_at": time.Now().UnixMilli()}, store.Eq("id", u.ID)); err != nil {
 		s.log.Warn("last seen not recorded at sign-in", "err", err) // the next request records it
 	}
-	return x.ok(map[string]any{"user": u})
+	return false, nil
 }
 
 // handleSignOut ends the browser's session. When the session cannot be

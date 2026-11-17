@@ -120,14 +120,14 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 		return back("This account is disabled.")
 	}
 	if state.LinkUser == "" {
-		if err := s.startSession(x, u, provider); err != nil {
+		secondStep, err := s.signIn(x, u, provider)
+		if err != nil {
 			return err
 		}
-		if x.sess.Stage == core.SessionMFA {
+		if secondStep {
 			http.Redirect(x.w, x.r, "/login?second_step=1&next="+url.QueryEscape(state.Next), http.StatusFound)
 			return nil
 		}
-		s.audit(x.r, "", u, "signin", "user", u.ID, map[string]string{"method": provider})
 	}
 	next := state.Next
 	if state.Invite != "" {
