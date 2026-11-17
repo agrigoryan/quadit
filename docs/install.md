@@ -1,6 +1,6 @@
 # Running Quadit
 
-One binary serves the web app, the API and the background work. By default it keeps one SQLite file and the uploaded files in a data directory.
+One binary serves the web app, the API and the background work. By default it keeps one SQLite file and the uploaded files in a data directory. The [README](../README.md#install) lists the ways to install it: the install script, Homebrew, Docker, a release archive, or a build from source.
 
 ## Start
 
@@ -20,6 +20,25 @@ quadit serve --data /var/lib/quadit --url https://quadit.example.com
 Put it behind a reverse proxy for HTTPS. The proxy must not buffer responses (the live stream and held requests need that): for nginx, `proxy_buffering off`.
 
 The first person to open the address creates the first account and workspace, and runs the install. Without a browser: `quadit admin setup --name … --email … --password … --workspace …`.
+
+## Docker
+
+The image `ghcr.io/agrigoryan/quadit` runs `quadit serve` on port 4780 with its data in the volume `/data`, as an ordinary user (uid 10001). It carries `git`, `ffmpeg` and Chromium, the optional programs below.
+
+```bash
+docker run -d --name quadit -p 4780:4780 -v quadit-data:/data \
+  -e QUADIT_BASE_URL=http://localhost:4780 ghcr.io/agrigoryan/quadit:latest
+```
+
+Every setting below can be given as an environment variable (`-e`). The `deploy/` folder has three Compose files to start from:
+
+| File | What |
+| --- | --- |
+| [`docker-compose.yml`](../deploy/docker-compose.yml) | One container, SQLite, files on disk |
+| [`docker-compose.https.yml`](../deploy/docker-compose.https.yml) | The same over HTTPS, with a certificate from Let's Encrypt |
+| [`docker-compose.postgres.yml`](../deploy/docker-compose.postgres.yml) | Postgres for the database and S3-compatible storage (MinIO) for files |
+
+The command-line client is in the image too: `docker exec quadit quadit admin …`, `docker exec quadit quadit backup --out /data/backup.tar.gz`.
 
 ## Settings
 
@@ -80,7 +99,7 @@ An export is complete: it contains everything in the workspace, every project an
 
 ## Upgrades
 
-Replace the binary and start it; or, to do the database step by itself first, run `quadit upgrade`. If the new version changes the schema, a copy of the database as it was is made before anything is changed:
+Replace the binary and start it (run the install script again, `brew upgrade quadit`, or `docker pull` the new image and recreate the container); or, to do the database step by itself first, run `quadit upgrade`. Take a backup first. If the new version changes the schema, a copy of the database as it was is made before anything is changed:
 
 - on SQLite, a file beside it (`quadit.sqlite.before-vN`);
 - on Postgres, a database beside it on the same server (`<name>_before_vN`). This needs the database to itself for a moment and a role allowed to create databases; if the copy cannot be made, nothing is changed and the server says why. With several servers on one database, stop them all first.
@@ -94,7 +113,7 @@ Agents are not broken by an upgrade: the API stays at `/api/v1`, and the list of
 Passkeys and phone notifications need HTTPS. Three ways:
 
 - `quadit serve --tls-domain quadit.example.com` gets a certificate from Let's Encrypt and renews it by itself. Ports 443 and 80 must reach the server.
-  Another authority that speaks the same protocol (a company's own, for one) is named with `--acme-directory <url>`, with `--acme-ca <pem file>` when its own certificate is not publicly trusted; `--acme-http-listen` moves the plain-HTTP side off port 80. This mode is tested against Pebble, Let's Encrypt's own test authority: see `TestAutomaticCertificate` in `internal/app`.
+  Another authority that speaks the same protocol (a company's own, for one) is named with `--acme-directory <url>`, with `--acme-ca <pem file>` when its own certificate is not publicly trusted; `--acme-http-listen` moves the plain-HTTP side off port 80.
 - `quadit serve --tls-cert cert.pem --tls-key key.pem` uses a certificate of your own.
 - or keep plain HTTP on `:4780` behind a proxy that terminates HTTPS (Caddy, nginx, a tunnel), and set `--url https://…`.
 
@@ -127,34 +146,3 @@ The admin area's health panel shows failing webhooks, undelivered wake-ups, repo
 | `git` | Syncing a folder of Markdown files in a repository with pages. The server keeps only the last commit, and for a source with a folder only that folder (git 2.25 or later; an older git, or a remote that refuses a shallow clone, gets a whole copy) |
 | `ffmpeg`, `ffprobe` | A sheet of stills for each uploaded clip, so agents can look at video cheaply |
 | Chrome or Chromium | The render check: a picture of a task or page as a person sees it. Set `QUADIT_CHROME` if it is not on the path |
-
-## Development database
-
-Tests run on SQLite always, and on Postgres when `QUADIT_TEST_POSTGRES` holds a URL:
-
-```bash
-docker run -d --name quadit-pg -e POSTGRES_PASSWORD=quadit -e POSTGRES_DB=quadit -p 127.0.0.1:54329:5432 postgres:17-alpine
-make test-all
-```
-
-## Checking against real services
-
-The test suite runs without a network. Some of its checks also run against real services when told where they are:
-
-```
-# S3 (AWS, R2, MinIO), Azure Blob and Google Cloud Storage: the store's settings as JSON, as the admin area saves them
-QUADIT_TEST_FILES_S3='{"kind":"s3","bucket":"quadit","endpoint":"http://127.0.0.1:9000","region":"us-east-1","access_key":"…","secret_key":"…"}' \
-QUADIT_TEST_FILES_AZURE='{"kind":"azure","bucket":"quadit","account":"…","account_key":"…"}' \
-QUADIT_TEST_FILES_GCS='{"kind":"gcs","bucket":"quadit","credentials":"{…service account key…}"}' \
-  go test -run TestRealBuckets ./internal/blob
-
-# Google and GitHub, as far as that goes without signing in: Google's sign-in addresses are found
-# the way sign-in finds them, and GitHub's own answer about who a token belongs to is read
-QUADIT_TEST_GOOGLE=1 QUADIT_TEST_GITHUB_TOKEN=$(gh auth token) go test -run TestRealProviders ./internal/server
-
-# Automatic certificates, against an authority that can reach this machine (Pebble, for one)
-QUADIT_TEST_ACME=https://localhost:14000/dir,pebble.minica.pem,quadit.test,127.0.0.1:5001,127.0.0.1:5002 \
-  go test -run TestAutomaticCertificate ./internal/app
-```
-
-What has been run this way, and by hand against a live server: file storage on MinIO (uploads, ranges, and moving an install's files from disk to the bucket), Azurite and a Google Cloud Storage emulator; mail through an SMTP server (test message, invitation, password reset, following the links); OpenID Connect sign-in with Dex in a browser; GitHub pull request and check linking against github.com; browser push through Google's push service to Chrome on a desktop and on an Android phone (emulated); the web app in Chrome on Android and in Safari on an iPhone (both emulated); the Docker image, built and run; automatic certificates from Pebble. Sign-in with Google and with GitHub themselves need your own OAuth app. The whole GitHub flow is tested against a stand-in that answers as GitHub does (`TestSignInWithGitHub`), Google's is the OpenID Connect code tested with Dex, and the two checks above touch the real services: try each once after you set it up.

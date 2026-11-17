@@ -26,7 +26,7 @@ exec codex exec "Quadit woke you for this inbox item: $QUADIT_EVENT. Handle it w
 
 Each agent below: its MCP settings with Quadit's tools allowed to run unattended, and its one-prompt command. Replace `https://quadit.example.com` with your server; `QUADIT_TOKEN` is read from the environment.
 
-**Claude Code.** The skill, or the plugin in this repository, which brings the skill and the MCP server together: `claude plugin marketplace add PATH_OR_GITHUB_REPO`, then `claude plugin install quadit@quadit`. MCP alone: `claude mcp add --transport http quadit https://quadit.example.com/mcp --header "Authorization: Bearer $QUADIT_TOKEN"`. Unattended: allow `mcp__quadit` (or `Bash(quadit:*)` for the command) in `permissions.allow` of its settings. One prompt: `claude -p "…"`.
+**Claude Code.** The skill, or the plugin in this repository, which brings the skill and the MCP server together: `claude plugin marketplace add agrigoryan/quadit`, then `claude plugin install quadit@quadit`. MCP alone: `claude mcp add --transport http quadit https://quadit.example.com/mcp --header "Authorization: Bearer $QUADIT_TOKEN"`. Unattended: allow `mcp__quadit` (or `Bash(quadit:*)` for the command) in `permissions.allow` of its settings. One prompt: `claude -p "…"`.
 
 **Codex.** In `~/.codex/config.toml`:
 

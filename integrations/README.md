@@ -5,7 +5,7 @@ One skill for every agent: `skills/quadit/SKILL.md`, in the [Agent Skills](https
 This folder is also a Claude Code plugin (the skill plus the MCP server, from `QUADIT_URL` and `QUADIT_TOKEN`):
 
 ```bash
-claude plugin marketplace add .     # from a checkout of this repository
+claude plugin marketplace add agrigoryan/quadit   # or a path to a checkout of this repository
 claude plugin install quadit@quadit
 ```
 
