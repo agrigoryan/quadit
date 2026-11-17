@@ -100,6 +100,9 @@ func (c *cx) replyTo(cm *core.Comment, a *commentCreateArgs) error {
 	if parent.ParentID != "" {
 		cm.ParentID = parent.ParentID // threads are one level deep
 	}
+	// The reply is where its thread is; the task or the page the caller
+	// names is checked against this once it is found (inThread).
+	cm.TaskID, cm.DocID = parent.TaskID, parent.DocID
 	if a.Task == "" && a.Doc == "" {
 		a.Task, a.Doc = parent.TaskID, parent.DocID
 	}
@@ -118,11 +121,28 @@ func (c *cx) replyTo(cm *core.Comment, a *commentCreateArgs) error {
 	return nil
 }
 
+// inThread refuses a reply put on another task or page (taskID, docID)
+// than its thread is on, as a thread that is not there: the thread's page
+// may be one the author cannot see. A comment that starts a thread is
+// anywhere.
+func inThread(cm core.Comment, taskID, docID string) error {
+	if cm.ParentID == "" || (cm.TaskID == taskID && cm.DocID == docID) {
+		return nil
+	}
+	e := notFound("comment", cm.ParentID)
+	e.Field = "parent"
+	return e
+}
+
 // taskComment adds a comment to a task, or to a decision or an option on
 // it, tells the people it concerns and hands the task on.
 func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
+	thread := cm
 	t, err := c.commentSubject(&cm, a)
 	if err != nil {
+		return err
+	}
+	if err := inThread(thread, t.ID, ""); err != nil {
 		return err
 	}
 	seq := c.tx.NextSeq()
@@ -313,9 +333,10 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	if onWords && a.Block == "" {
 		return invalid("block", "give the block the words are in")
 	}
+	var b core.Block
 	if a.Block != "" {
-		b, err := loadLive[core.Block](c, "block", "block", a.Block)
-		if err != nil {
+		var err error
+		if b, err = loadLive[core.Block](c, "block", "block", a.Block); err != nil {
 			return err
 		}
 		cm.SubjectType, cm.SubjectID = "doc_block", b.ID
@@ -325,6 +346,16 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	}
 	doc, err := c.loadDoc("doc", a.Doc)
 	if err != nil {
+		return err
+	}
+	// A block of another page is answered as one that is not there: that
+	// page may be one the author cannot see.
+	if a.Block != "" && b.DocID != doc.ID {
+		e := notFound("block", a.Block)
+		e.Field = "block"
+		return e
+	}
+	if err := inThread(cm, "", doc.ID); err != nil {
 		return err
 	}
 	if cm.SubjectType == "" {

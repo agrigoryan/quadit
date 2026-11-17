@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"testing"
 
@@ -185,5 +186,47 @@ func TestAThreadGoesOnAfterItsBlockIsGone(t *testing.T) {
 			t.Errorf("the reply is not in the thread on the gone block: %+v", cm)
 		}
 		w.refused(engine.CodeNotFound, w.owner.ID, "comment.create", M{"doc": page, "block": block.ID, "body": "A new one"})
+	})
+}
+
+// TestACommentIsOnlyOnThePageItNames: a comment is on the page it names and
+// on nothing of another: a block, words or a thread of a page it does not
+// name is refused as not found, whether the commenter may see that page or
+// not, so that a page one cannot see is never quoted, answered or told of
+// through one they can.
+func TestACommentIsOnlyOnThePageItNames(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Explosion effect"})
+		secret := w.do(w.owner.ID, "doc.create", M{"title": "Salaries", "markdown": "Bea earns a lot.\n", "private": true}).Ref
+		var hidden core.Block
+		if err := w.db().Get(context.Background(), &hidden, store.Eq("doc_id", secret)); err != nil {
+			t.Fatal(err)
+		}
+		hiddenThread := w.do(w.owner.ID, "comment.create", M{"doc": secret, "block": hidden.ID, "body": "Too much?"}).Ref
+		open := w.do(w.owner.ID, "doc.create", M{"title": "Plans", "markdown": "We ship in May.\n"}).Ref
+		openThread := w.do(w.owner.ID, "comment.create", M{"doc": open, "body": "Really?"}).Ref
+		bea := w.agent("bea")
+
+		for _, c := range []struct {
+			name string
+			args M
+		}{
+			{"a block of another page", M{"doc": open, "block": hidden.ID}},
+			{"words of another page", M{"doc": open, "block": hidden.ID, "quote": "Bea"}},
+			{"a reply to a thread of another page", M{"doc": open, "parent": hiddenThread}},
+			{"a reply on a block of another page", M{"parent": openThread, "block": hidden.ID}},
+			{"a reply to a page's thread said to be on a task", M{"task": "SVA-1", "parent": openThread}},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				args := M{"body": "@aram what does it say?"}
+				maps.Copy(args, c.args)
+				_, err := w.try(bea, "comment.create", args)
+				if ee := (*engine.Error)(nil); !errors.As(err, &ee) || ee.Code != engine.CodeNotFound {
+					t.Errorf("got %v, want it refused as not found", err)
+				}
+			})
+		}
 	})
 }
