@@ -16,6 +16,7 @@ import { getState } from "@/data/store";
 import { toast } from "@/lib/toast";
 import { sameProjectBelow } from "@/docs/data";
 import { forgetLink, loadPage } from "@/docs/store";
+import type { Words } from "@/docs/editor/words";
 import { type Doc, type DocComment, type DocKind, OPTION_COLORS } from "@/types/docs";
 
 type Fields = Record<string, unknown>;
@@ -333,26 +334,36 @@ export const writeMarkdown = (docId: string, markdown: string, mode: "replace" |
 export interface NewDocComment {
   docId: string;
   blockId?: string;
+  /** The words of the page it is on; the server puts the thread's marker on them. */
+  words?: Words;
   parentId?: string;
   body: string;
 }
 
-export function addComment({ docId, blockId, parentId, body }: NewDocComment) {
+export function addComment({ docId, blockId, words, parentId, body }: NewDocComment) {
   const { me } = getState();
   const id = newId();
   const args: Changes["comment.create"] = { id, doc: docId, body };
-  if (blockId) args.block = blockId;
+  const block = words?.block ?? blockId;
+  if (block) args.block = block;
+  if (words) {
+    args.quote = words.quote;
+    args.start = words.start;
+    args.end = words.end;
+    if (words.endBlock) args.end_block = words.endBlock;
+  }
   if (parentId) args.parent = parentId;
   send({ type: "comment.create", args }, (tx) =>
     tx.insert("comments", {
       id,
       doc_id: docId,
-      subject_type: blockId ? "doc_block" : "doc",
-      subject_id: blockId ?? docId,
+      subject_type: block ? "doc_block" : "doc",
+      subject_id: block ?? docId,
       kind: "comment",
       parent_id: parentId,
       author_id: me?.user_id,
       body,
+      quote: words?.quote,
       created_at: Date.now(),
     }),
   );

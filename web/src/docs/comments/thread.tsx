@@ -1,5 +1,5 @@
 import { Check, LocateFixed, RotateCcw, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
@@ -8,6 +8,7 @@ import { exact } from "@/lib/time";
 import { addComment, deleteComment, resolveComment } from "@/docs/actions";
 import { Composer } from "@/docs/comments/composer";
 import type { ThreadData } from "@/docs/comments/panel";
+import { pageUi } from "@/docs/page/state";
 import type { DocComment } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
@@ -19,30 +20,45 @@ interface Props {
   docId: string;
   /** The page's project, to know whether the person may answer, resolve or delete. */
   projectId: string | undefined;
-  /** What the thread is about: the block's text. */
+  /** What the thread is about: its words, the block's text, the page. */
   quote: ReactNode;
+  /** The thread asked for: its words were clicked, or its block's mark. */
   active: boolean;
-  /** Shows the block in the page. */
+  /** The pointer is on its words in the page. */
+  lit?: boolean;
+  /** Shows its words or its block in the page. */
   onLocate?: () => void;
 }
 
-/** One comment thread: the first comment, its replies, a box to reply, and "resolve". */
-export function Thread({ thread, docId, projectId, quote, active, onLocate }: Props) {
+/**
+ * One comment thread: the first comment, its replies, a box to reply, and
+ * "resolve". The pointer on it lights its words in the page; asked for, it
+ * comes into view.
+ */
+export function Thread({ thread, docId, projectId, quote, active, lit, onLocate }: Props) {
   const { root, replies } = thread;
   const done = !!root.resolved_at;
   const readOnly = !useCan().edit(projectId);
+  const card = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (active) card.current?.scrollIntoView?.({ block: "nearest" });
+  }, [active]);
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a click on the thread is the mouse's way to its block; the keyboard has the thread's own button
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a click on the thread is the mouse's way to its words or block; the keyboard has the thread's own button
     <article
+      ref={card}
       aria-current={active || undefined}
+      data-thread={root.id}
       className={cx(
         "rounded-lg border bg-surface p-2 transition-colors",
-        active ? "border-move" : "border-line",
+        active ? "border-move" : lit ? "border-line-strong" : "border-line",
         onLocate && "cursor-pointer hover:border-line-strong",
       )}
       onClick={(e) => {
         if (!(e.target as HTMLElement).closest("button, a, textarea")) onLocate?.();
       }}
+      onMouseEnter={() => pageUi.lightThread(root.id)}
+      onMouseLeave={() => pageUi.lightThread(null)}
     >
       <div className="flex items-start gap-1">
         <div className="min-w-0 flex-1">{quote}</div>

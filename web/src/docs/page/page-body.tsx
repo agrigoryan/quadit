@@ -40,6 +40,7 @@ export function PageBody({ doc, compact }: Props) {
   const source = useDocsStore((s) => s.meta[doc.id]?.source);
   const others = useDocsStore((s) => s.presence[doc.id]) ?? NO_OTHERS;
   const commentsOpen = usePageUi((s) => s.commentsOpen) && !compact;
+  const litThread = usePageUi((s) => s.litThread);
   const threads = useOpenThreads(doc.id);
   const editor = useRef<EditorHandle | null>(null);
   const [block, setBlock] = useState<string | null>(null);
@@ -61,9 +62,11 @@ export function PageBody({ doc, compact }: Props) {
         // Already writing a comment: a new thread's draft would be thrown away.
         if (e.target instanceof Element && e.target.closest("[data-comments]")) return;
         // Asked of the editor, not of `block`: that is the caret as of the last render, and a key pressed
-        // right after the caret moved would comment on the block it left.
-        const at = editor.current?.caretBlock() ?? null;
-        if (at && mayEdit && !isDatabase) pageUi.startThread(at);
+        // right after the caret moved would comment on the block it left. Words selected are what a
+        // thread is on, as with the toolbar's Comment, in a page that cannot be edited too.
+        const words = editor.current?.selectedWords();
+        const at = words?.block ?? editor.current?.caretBlock() ?? null;
+        if (at && mayEdit && !isDatabase) pageUi.startThread(at, words);
         else pageUi.commentOnPage();
       },
     },
@@ -118,6 +121,10 @@ export function PageBody({ doc, compact }: Props) {
                     onSaveState={(state) => pageUi.setSaving(doc.id, state)}
                     onComment={compact || !mayEdit ? undefined : pageUi.startThread}
                     onOpenThread={pageUi.showThread}
+                    wordThreads={compact ? undefined : threads.onWords}
+                    litThread={litThread}
+                    onShowThread={pageUi.showWordsThread}
+                    onLightThread={pageUi.lightThread}
                   />
                   {!compact && (
                     <div className="px-4 sm:px-12">

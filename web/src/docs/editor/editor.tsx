@@ -18,6 +18,7 @@ import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } f
 import { uploadFile } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { type BlockSchemaLike, type EdBlock, plainText, rowsToEditor } from "@/docs/editor/convert";
+import { Highlights } from "@/docs/editor/highlights";
 import { Markers } from "@/docs/editor/markers";
 import {
   ActionsContext,
@@ -37,12 +38,21 @@ import { schema } from "@/docs/editor/schema";
 import { DocSync, type SaveState } from "@/docs/editor/sync";
 import { chipTyped } from "@/docs/editor/task-keys";
 import { useThemeName } from "@/docs/editor/use-theme";
+import { selectedWords, threadText, type Words } from "@/docs/editor/words";
 import type { BlockRow, PresenceEntry } from "@/types/docs";
 
 export interface EditorHandle {
   scrollToBlock: (id: string) => void;
+  /** Scrolls to the words a comment thread is on, and flashes them. */
+  scrollToThread: (threadId: string) => void;
   /** A block's text, for the quote above a comment thread; undefined when the block is gone. */
   blockText: (id: string) => string | undefined;
+  /** The words a comment thread is on as they read now; undefined when they are not in the page. */
+  threadText: (threadId: string) => string | undefined;
+  /** The words selected in the text this moment, for a thread on them; undefined for none, or a selection elsewhere. */
+  selectedWords: () => Words | undefined;
+  /** Calls `listener` after each change of the page's text; gives what stops it. */
+  onChange: (listener: () => void) => () => void;
   /** Block ids in reading order. */
   order: () => string[];
   /**
@@ -67,10 +77,18 @@ interface Props {
   handle?: Ref<EditorHandle>;
   onSaveState?: (state: SaveState) => void;
   onFocusBlock?: (id: string | null) => void;
-  onComment?: (blockId: string) => void;
+  /** Starts a thread on a block, or on words of it. */
+  onComment?: (blockId: string, words?: Words) => void;
   /** Open comment threads per block. */
   threads?: Record<string, number>;
   onOpenThread?: (blockId: string) => void;
+  /** The open threads on words, whose words are highlighted, and the one the pointer is on. */
+  wordThreads?: string[];
+  litThread?: string | null;
+  /** Shows the thread whose words were clicked. */
+  onShowThread?: (threadId: string) => void;
+  /** The pointer came onto the words of a thread, or left them (null). */
+  onLightThread?: (threadId: string | null) => void;
   others?: PresenceEntry[];
 }
 
@@ -92,6 +110,10 @@ export default function Editor({
   onComment,
   threads,
   onOpenThread,
+  wordThreads,
+  litThread,
+  onShowThread,
+  onLightThread,
   others,
 }: Props) {
   const theme = useThemeName();
@@ -170,9 +192,35 @@ export default function Editor({
           { duration: 1600, easing: "ease-out" },
         );
       },
+      scrollToThread(threadId) {
+        const marked = wrap.current?.querySelectorAll<HTMLElement>(
+          `[data-style-type="comment"][data-value~="${CSS.escape(threadId)}"]`,
+        );
+        const first = marked?.[0];
+        if (!first) return;
+        first.scrollIntoView({ block: "center", behavior: "smooth" });
+        for (const el of marked)
+          el.animate([{ background: "var(--move)" }, { background: "transparent" }], {
+            duration: 1600,
+            easing: "ease-out",
+          });
+      },
       blockText(id) {
         const block = editor.getBlock(id) as unknown as EdBlock | undefined;
         return block ? plainText(block.content) : undefined;
+      },
+      threadText(threadId) {
+        return threadText(editor.document as unknown as EdBlock[], threadId); // BlockNote types blocks by schema generics
+      },
+      onChange(listener) {
+        return editor.onChange(listener);
+      },
+      selectedWords() {
+        // The editor keeps its last selection when the person selects or clicks elsewhere: only one
+        // the browser shows in the text now counts.
+        const shown = document.getSelection();
+        if (!shown || shown.isCollapsed || !editor.domElement?.contains(shown.anchorNode)) return undefined;
+        return selectedWords(editor);
       },
       order() {
         const out: string[] = [];
@@ -195,7 +243,7 @@ export default function Editor({
   const canComment = !!onComment;
   const actions = useMemo<EditorActions>(
     () => ({
-      comment: canComment ? (blockId) => callbacks.current.onComment?.(blockId) : undefined,
+      comment: canComment ? (blockId, words) => callbacks.current.onComment?.(blockId, words) : undefined,
       pickTask: () => setPicking("task"),
       pickDecision: () => setPicking("decision"),
       pickPage: () => setPicking("page"),
@@ -263,6 +311,13 @@ export default function Editor({
         </BlockNoteView>
       </ActionsContext.Provider>
       <Markers editor={editor} wrap={wrap} others={others ?? []} threads={threads ?? {}} onOpenThread={onOpenThread} />
+      <Highlights
+        editor={editor}
+        open={wordThreads ?? []}
+        lit={litThread}
+        onShow={onShowThread}
+        onLight={onLightThread}
+      />
       <ChipPicker kind={picking} onClose={() => setPicking(null)} onPick={insertChip} />
     </div>
   );

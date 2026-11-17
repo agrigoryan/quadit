@@ -30,14 +30,19 @@ import { decisionStateText } from "@/docs/editor/chips";
 import { canSee, docTitle, pathTo } from "@/docs/data";
 import { mentionable } from "@/docs/editor/decision-refs";
 import type { AnyEditor } from "@/docs/editor/sync";
+import { selectedWords, type Words } from "@/docs/editor/words";
 import { PageIcon } from "@/docs/page-icon";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
 
 /** What the menus can ask the page to do. */
 export interface EditorActions {
-  /** Missing where comments cannot be added from the editor (a row's side peek, a reader). */
-  comment?: (blockId: string) => void;
+  /**
+   * Starts a thread on a block, or on words of it when they are given.
+   * Missing where comments cannot be added from the editor (a row's side
+   * peek, a reader).
+   */
+  comment?: (blockId: string, words?: Words) => void;
   pickTask: () => void;
   pickDecision: () => void;
   pickPage: () => void;
@@ -242,7 +247,11 @@ export function extraSlashItems(actions: EditorActions): DefaultReactSuggestionI
   ];
 }
 
-/** "Comment" in the toolbar that floats over a selection: on the block the selection starts in. */
+/**
+ * "Comment" in the toolbar that floats over a selection: on the words
+ * selected, or, where they cannot carry a thread (a table), on the block
+ * the selection starts in.
+ */
 function CommentButton() {
   const Components = useComponentsContext();
   const editor = useBlockNoteEditor();
@@ -254,7 +263,10 @@ function CommentButton() {
       label={t("docs.comment.add")}
       mainTooltip={t("docs.comment.add")}
       icon={<MessageSquarePlus size={16} />}
-      onClick={() => comment(editor.getTextCursorPosition().block.id)}
+      onClick={() => {
+        const words = selectedWords(editor);
+        comment(words?.block ?? editor.getTextCursorPosition().block.id, words);
+      }}
     />
   );
 }
