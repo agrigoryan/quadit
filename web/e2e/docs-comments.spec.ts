@@ -28,7 +28,7 @@ async function caretIn(page: Page, text: string) {
   await page.keyboard.press("End");
 }
 
-test("a thread on a block is started over a selection, answered, resolved, reopened and its reply deleted", async ({
+test("a thread started over a selection is answered, resolved, reopened and its reply deleted", async ({
   page,
   project,
   quadit,
@@ -44,7 +44,7 @@ test("a thread on a block is started over a selection, answered, resolved, reope
   await caretIn(page, "Ship on Tuesday");
   await page.keyboard.press("Shift+Home");
   await page.locator(".bn-formatting-toolbar").getByRole("button", { name: "Comment", exact: true }).click();
-  const box = column(page).getByRole("textbox", { name: "Comment on this block…" });
+  const box = column(page).getByRole("textbox", { name: "Comment on these words…" });
   await expect(box).toBeFocused();
   await box.fill("Which freeze, the code one?");
   await column(page).getByRole("button", { name: "Comment", exact: true }).click();
@@ -205,7 +205,7 @@ test("Ctrl+M starts a comment on the block at the caret, or with no caret on the
 
   await page.keyboard.press("Shift+?");
   const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
-  await expect(sheet.getByText("Comment on the block at the cursor, or on the page")).toBeVisible();
+  await expect(sheet.getByText("Comment on the words selected, the block at the cursor, or the page")).toBeVisible();
   await expect(sheet.getByText("Close the comments")).toBeVisible();
 });
 
