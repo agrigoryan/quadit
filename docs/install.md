@@ -40,6 +40,19 @@ Every setting below can be given as an environment variable (`-e`). The `deploy/
 
 The command-line client is in the image too: `docker exec quadit quadit admin …`, `docker exec quadit quadit backup --out /data/backup.tar.gz`.
 
+## Linux packages
+
+Each release has `.deb` and `.rpm` packages for x86-64 and ARM64. They install `/usr/bin/quadit` and a systemd service, which they do not start:
+
+```bash
+sudo apt install ./quadit_0.1.0_amd64.deb            # Debian, Ubuntu
+sudo dnf install ./quadit-0.1.0-1.x86_64.rpm         # Fedora, RHEL
+sudoedit /etc/quadit/quadit.env                      # QUADIT_BASE_URL and any other setting
+sudo systemctl enable --now quadit
+```
+
+The service runs `quadit serve` as the system user `quadit`, made by the package, with its data in `/var/lib/quadit`. It reads its settings from `/etc/quadit/quadit.env`, which an upgrade keeps as you edited it. Logs: `journalctl -u quadit`. Removing the package stops and disables the service and leaves the data and the user. Commands that work on the data run as that user: `sudo -u quadit QUADIT_DATA=/var/lib/quadit quadit backup --out /var/lib/quadit/backup.tar.gz`.
+
 ## Settings
 
 Everything else is set in the admin area of the web app. Each setting can also come from an environment variable, which then wins and shows as locked in the admin area: the setting `auth.google` is read from `QUADIT_SETTING_AUTH_GOOGLE` as JSON.
@@ -99,14 +112,29 @@ An export is complete: it contains everything in the workspace, every project an
 
 ## Upgrades
 
-Replace the binary and start it (run the install script again, `brew upgrade quadit`, or `docker pull` the new image and recreate the container); or, to do the database step by itself first, run `quadit upgrade`. Take a backup first. If the new version changes the schema, a copy of the database as it was is made before anything is changed:
+Quadit follows [Semantic Versioning](https://semver.org): releases are tagged `vX.Y.Z`, and `quadit version` prints the version a binary is. Within a major version an upgrade breaks nothing that people or agents rely on. What changed is in [CHANGELOG.md](../CHANGELOG.md) and in the notes of each [release](https://github.com/agrigoryan/quadit/releases). Quadit does not update itself: you upgrade it the way you installed it.
 
-- on SQLite, a file beside it (`quadit.sqlite.before-vN`);
-- on Postgres, a database beside it on the same server (`<name>_before_vN`). This needs the database to itself for a moment and a role allowed to create databases; if the copy cannot be made, nothing is changed and the server says why. With several servers on one database, stop them all first.
+| Installed with | Upgrade |
+| --- | --- |
+| Homebrew | `brew upgrade quadit` |
+| The install script | Run it again: it replaces the binary in place and says which version it replaced. `QUADIT_VERSION=v0.1.0` installs that version instead of the newest |
+| Docker | `docker pull ghcr.io/agrigoryan/quadit:latest` and recreate the container; with Compose, `docker compose pull && docker compose up -d`. Tags: `X.Y.Z`, `X.Y` (newest patch), `X` (newest minor) and `latest`; pin one of the first three to upgrade only that far |
+| `.deb` / `.rpm` | Install the newer package: `sudo apt install ./quadit_X.Y.Z_amd64.deb` or `sudo dnf install ./quadit-X.Y.Z-1.x86_64.rpm`. A running `quadit` service is restarted on the new version |
+| An archive from Releases | Download the new one, replace the binary, restart the server |
+| From source | `git pull && make build`, then restart the server |
 
-To go back: stop the server, run `quadit upgrade --undo` (it puts the copy in place and keeps the upgraded database beside it), and start the older binary.
+Then restart the server, if the upgrade did not. Take a backup first (`quadit backup --out …`, see [Backups](#backups)): it is the only copy of the files as well as the database.
 
-Agents are not broken by an upgrade: the API stays at `/api/v1`, and the list of changes, their arguments, the MCP tools and the command-line tool's commands only ever gain things within a major version. `GET /api/v1/changes` says which surface version a server speaks.
+**What an upgrade does to your data.** The server brings the database's schema up to its own version when it starts. Run `quadit upgrade` (with the same `--data` / `--db` as the server) to do that step by itself before starting it. When the new version changes the schema, a copy of the database as it was is made first, and if the copy cannot be made, nothing is changed and the server says why:
+
+- on SQLite, a file beside it: `quadit.sqlite.before-vN`, where N is the schema version being upgraded to;
+- on Postgres, a database beside it on the same server: `<name>_before_vN`. This needs the database to itself for a moment and a role allowed to create databases; with several servers on one database, stop them all first. Where that is not possible, take a backup yourself and set `QUADIT_UPGRADE_WITHOUT_COPY=1` to upgrade without the copy.
+
+A release that does not change the schema makes no copy. Copies are not removed by Quadit: delete old ones once the new version has proved itself. Uploaded files are not copied; an upgrade does not change them.
+
+**Going back.** A binary refuses a database that a newer version has upgraded ("database is at version 9, this binary knows 8: use a newer binary"), so an older version cannot simply be started again. To go back: stop the server, run `quadit upgrade --undo` with the newer binary (it puts the copy in its place and keeps the upgraded database beside it as `….after-vN` or `<name>_after_vN`), then install and start the older version. Anything written after the upgrade is in the upgraded database only, not in the copy. A release that did not change the schema can be undone by installing the older version again.
+
+Agents are not broken by an upgrade: the API stays at `/api/v1`, and the list of changes, their arguments, the MCP tools and the command-line tool's commands only ever gain things within a major version. `GET /api/v1/changes` says which surface version a server speaks. Run `quadit skill install` again on each agent's machine after upgrading the `quadit` command there.
 
 ## HTTPS
 
