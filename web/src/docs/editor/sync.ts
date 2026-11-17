@@ -195,15 +195,15 @@ export class DocSync {
 
   /**
    * Of the blocks the server wrote for an edit of ours, takes those it wrote
-   * otherwise than they were sent, unless they were typed in since or are
-   * on their way again.
+   * otherwise than they were sent, unless they were typed in since, are on
+   * their way again, or someone's later edit of them is on screen already.
    */
   private takeOwn(rows: BlockRow[]) {
     this.quietly(() => {
       for (const row of rows) {
         const k = this.known.get(row.id);
         const cur = this.editor.getBlock(row.id) as unknown as EdBlock | undefined; // BlockNote types blocks by schema generics
-        if (!k || !cur || row.deleted_at || this.inflight.has(row.id)) continue;
+        if (!k || !cur || row.deleted_at || this.inflight.has(row.id) || k.seq > row.updated_seq) continue;
         const { id: _id, ...server } = toEditor(row, this.schema);
         const sig = signature(toWire(server, this.schema));
         if (sig === k.sig || this.sigOf(cur) !== k.sig) continue;

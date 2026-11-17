@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
-// Keeping an open page in step with the server (docs/editor/sync.ts) when the
-// page stops being editable while it is open (its project's access changed,
-// it became a mirror of a read-only file): what was typed before still goes
-// out, once, and nothing is sent again.
+// Keeping an open page in step with the server (docs/editor/sync.ts): when
+// the page stops being editable while it is open (its project's access
+// changed, it became a mirror of a read-only file), what was typed before
+// still goes out, once, and nothing is sent again; when the server writes a
+// block otherwise than it was sent (a comment thread's marker put back), the
+// editor takes it without losing what was typed since or moving the caret.
 
-import { BlockNoteEditor } from "@blocknote/core";
+import { BlockNoteEditor, getNodeById } from "@blocknote/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mutate } from "@/data/mutate";
+import { applyEvents } from "@/data/store";
 import { schema } from "@/docs/editor/schema";
 import { DocSync } from "@/docs/editor/sync";
 import type { BlockRow } from "@/types/docs";
@@ -121,6 +124,135 @@ describe("a block the server writes otherwise than it was sent", () => {
     ]);
     sync.flush();
     expect(sent()).toHaveLength(1); // taking the server's block sends nothing back
+    sync.destroy();
+  });
+});
+
+/** The answer to a doc.edit that wrote one block as `content`, at `seq`. */
+const answer = (id: string, seq: number, content: unknown[]) => [
+  {
+    change_id: "c",
+    type: "doc.edit",
+    seq,
+    first_seq: seq,
+    events: [{ seq, type: "doc.edited", entity_id: "d1", data: { blocks: [{ ...row(id, "a", "", seq), content }] } }],
+  },
+];
+
+/** Holds the next doc.edit's answer until `answer` is called with it. */
+function holdNextAnswer() {
+  let give: (results: unknown) => void = () => {};
+  vi.mocked(mutate).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        give = resolve;
+      }) as never,
+  );
+  return (results: unknown) => give(results);
+}
+
+/** Where the caret is in a block's text, in characters; undefined when it is elsewhere. */
+function caretIn(editor: ReturnType<typeof make>, id: string): number | undefined {
+  const { selection, doc } = editor.prosemirrorState;
+  const at = getNodeById(id, doc);
+  if (!at) return undefined;
+  const start = at.posBeforeNode + 2;
+  return selection.empty ? selection.from - start : undefined;
+}
+
+/** Puts the caret in a block's text, `offset` characters in. */
+function putCaret(editor: ReturnType<typeof make>, id: string, offset: number) {
+  editor.transact((tr) => {
+    const at = getNodeById(id, tr.doc);
+    if (!at) throw new Error(`no block ${id}`);
+    const Sel = tr.selection.constructor as unknown as { create(doc: unknown, pos: number): never }; // ProseMirror's TextSelection, which BlockNote does not export
+    tr.setSelection(Sel.create(tr.doc, at.posBeforeNode + 2 + offset));
+  });
+}
+
+const textOf = (editor: ReturnType<typeof make>, id: string) =>
+  ((editor.getBlock(id)?.content ?? []) as { text?: string }[]).map((c) => c.text ?? "").join("");
+
+describe("a block the server writes otherwise than it was sent, while the person types", () => {
+  const marked = (rest: string) => [
+    { type: "text", text: "The boss has " },
+    { type: "text", text: "three phases", styles: { comment: "t1" } },
+    { type: "text", text: rest },
+  ];
+
+  it("keeps the caret where it was when nothing was typed since", async () => {
+    const rows = [row("b1", "a", "The boss has three phases.", 1)];
+    const editor = make(rows);
+    const sync = new DocSync(editor, "d1", rows, 1);
+    const give = holdNextAnswer();
+    typeInto(editor, "b1", "The boss has three phases now.");
+    await vi.advanceTimersByTimeAsync(1000);
+    putCaret(editor, "b1", 15); // inside the marked words
+    give(answer("b1", 10, marked(" now.")));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(editor.getBlock("b1")?.content).toContainEqual({
+      type: "text",
+      text: "three phases",
+      styles: { comment: "t1" },
+    });
+    expect(caretIn(editor, "b1")).toBe(15);
+    sync.destroy();
+  });
+
+  it("never takes back what was typed while the edit was on its way, and takes the marker with the next answer", async () => {
+    const rows = [row("b1", "a", "The boss has three phases.", 1)];
+    const editor = make(rows);
+    const sync = new DocSync(editor, "d1", rows, 1);
+    const give = holdNextAnswer();
+    typeInto(editor, "b1", "The boss has three phases now.");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sent()).toHaveLength(1);
+    // Typing goes on before the answer comes.
+    typeInto(editor, "b1", "The boss has three phases now and then.");
+    putCaret(editor, "b1", 38);
+    give(answer("b1", 10, marked(" now.")));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(textOf(editor, "b1")).toBe("The boss has three phases now and then.");
+    expect(caretIn(editor, "b1")).toBe(38);
+    // The newer text goes out; its answer, with the marker, is taken as nothing was typed since.
+    vi.mocked(mutate).mockImplementationOnce(
+      () => Promise.resolve(answer("b1", 11, marked(" now and then."))) as never,
+    );
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sent()).toHaveLength(2);
+    expect(textOf(editor, "b1")).toBe("The boss has three phases now and then.");
+    expect(editor.getBlock("b1")?.content).toContainEqual({
+      type: "text",
+      text: "three phases",
+      styles: { comment: "t1" },
+    });
+    expect(caretIn(editor, "b1")).toBe(38);
+    sync.destroy();
+  });
+
+  it("does not take it over someone else's later edit of the block that came while it was on its way", async () => {
+    const rows = [row("b1", "a", "The boss has three phases.", 1)];
+    const editor = make(rows);
+    const sync = new DocSync(editor, "d1", rows, 1);
+    const give = holdNextAnswer();
+    typeInto(editor, "b1", "The boss has three phases now.");
+    await vi.advanceTimersByTimeAsync(1000);
+    applyEvents(
+      [
+        {
+          seq: 11,
+          change_id: "theirs",
+          type: "doc.edited",
+          entity_type: "doc",
+          entity_id: "d1",
+          data: { blocks: [row("b1", "a", "Their words.", 11)] },
+        } as never,
+      ],
+      true,
+    );
+    give(answer("b1", 10, marked(" now.")));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(textOf(editor, "b1")).toBe("Their words.");
     sync.destroy();
   });
 });
