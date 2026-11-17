@@ -5,7 +5,7 @@ package cli
 // help is the main help text: every command, by group.
 const help = `quadit: tasks, decisions and docs for people and agents
 
-orient    me                         who am I: role, scope, budget, cursors
+orient    me                         who am I: role, scope, hand-off limit, cursors
           work                       what waits on me, what is assigned, unread inbox
           layout PROJECT             statuses, labels, members, epics
           dashboard | agents         where everything stands; what each agent is doing

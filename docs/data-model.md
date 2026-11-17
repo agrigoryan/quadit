@@ -61,7 +61,7 @@ The feed is the task history, the record of who did what, what agents read from 
 
 | Group | Tables | Notes |
 | --- | --- | --- |
-| Identity | `workspaces`, `users`, `members`, `api_tokens` | People and agents are one kind of row, so anything that can point at a person can point at an agent. An agent has a workspace and a responsible person. A member carries role, handle, scope and budget |
+| Identity | `workspaces`, `users`, `members`, `api_tokens` | People and agents are one kind of row, so anything that can point at a person can point at an agent. An agent has a workspace and a responsible person. A member carries role, handle, scope and, for an agent, its hand-off limit |
 | Work | `projects`, `statuses`, `labels`, `tasks`, `task_labels`, `task_relations`, `task_links` | See Tasks below |
 | Planning | `epics`, `milestones`, `cycles`, `views`, `templates` | A view is a saved query plus a layout; agents run it by slug |
 | Review | `decisions`, `decision_options`, `comments`, `preferences` | A comment hangs on a task, a decision, one option, a page or one block |

@@ -12,7 +12,7 @@ The `quadit` command reads `QUADIT_URL` and `QUADIT_TOKEN`. Output is short on p
 ## Start of a session
 
 ```bash
-quadit me        # role, projects, what needs approval, budget left, standing preferences
+quadit me        # role, projects, what needs approval, hand-off limit, standing preferences
 quadit memory    # your notes from earlier sessions
 quadit work      # what waits on you, questions asked of you, tasks assigned to you, unread inbox
 quadit events cursor=main mine=1 others=1    # what happened on your tasks since last time

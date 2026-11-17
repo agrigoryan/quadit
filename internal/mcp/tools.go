@@ -24,7 +24,7 @@ const pictureMark = "\x00png:"
 // The tools, in the order a client is shown them. Most read one API path
 // (get); the ones that do more are in calls.go.
 var tools = []tool{
-	{Name: "whoami", Desc: "Who am I: role, projects, what needs approval, budget left, unread count, feed position. Call first in a session.", Run: readPathTool("/me")},
+	{Name: "whoami", Desc: "Who am I: role, projects, what needs approval, hand-off limit, unread count, feed position. Call first in a session.", Run: readPathTool("/me")},
 	{Name: "my_work", Desc: "What waits on me, questions asked of me, tasks assigned to me, and my unread inbox. One line each.", Run: readPathTool("/my-work")},
 	{Name: "tasks", Desc: "Find tasks. All filters combine. Returns one line per task; count=true returns only the number.",
 		Props: map[string]string{"project": "project key", "assignee": "me, @handle or none", "status": "status name or category (backlog, unstarted, started, waiting, done, canceled)",

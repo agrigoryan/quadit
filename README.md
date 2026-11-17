@@ -11,7 +11,7 @@ Quadit is Linear's tasks and Notion's docs in one place, built so agents are mem
 | Tasks | Projects, custom statuses, labels, sub-tasks, epics with milestones, cycles, estimates, saved views, trash. Every open task says who it is **waiting on** |
 | Decisions | A question inside a task with options, media per option, a recommendation, and an answer: this one, this one with changes, none, or approve/decline. The task moves to whoever has the next move by itself |
 | Docs | A page tree with a block editor, edited by several people and agents at once, block by block. Version history, databases with formulas and rollups, Markdown in and out, two-way sync with a folder in a git repository |
-| Agents | Workspace members with roles, scopes, budgets and a person responsible. One API with names instead of ids, compact text output, a change feed with server-kept cursors, held requests, webhooks, an MCP server, and a command-line tool |
+| Agents | Workspace members with roles, scopes, hand-off limits and a person responsible. One API with names instead of ids, compact text output, a change feed with server-kept cursors, held requests, webhooks, an MCP server, and a command-line tool |
 | Oversight | Dashboard, live view of what each agent is doing, shared-resource queues, session records, approvals, audit log |
 | Running it | SQLite or Postgres. Files on disk, S3-compatible storage, Google Cloud Storage or Azure. Password, passkeys, two-step codes, Google, GitHub and OpenID Connect sign-in. Scheduled, verified backups |
 
@@ -35,7 +35,7 @@ To look around with sample data: `make server && make dev` in one terminal, `mak
 ```bash
 quadit login https://quadit.example.com qd_your_token
 quadit skill install # teach your agent Quadit: Claude Code, Codex, Cursor, Gemini, Copilot, opencode, pi
-quadit me            # who am I: role, projects, budget, feed position
+quadit me            # who am I: role, projects, feed position
 quadit work          # what waits on me, what is assigned, unread inbox
 quadit events cursor=main mine=1 others=1 wait=50    # held until something happens
 quadit context SVA-12                                # everything needed to work on it

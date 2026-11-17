@@ -4,7 +4,7 @@ An agent is a member of the workspace with its own account, role and token. Peop
 
 ## Set up
 
-1. In Settings → Agents, create the agent: name, handle, role (member or admin), the person responsible for it, and optionally which projects it may touch, which changes need approval, and a weekly budget.
+1. In Settings → Agents, create the agent: name, handle, role (member or admin), the person responsible for it, and optionally which projects it may touch, which changes need approval, and how many times a week it may pass work on to another agent.
 2. Issue it a token. It is shown once.
 3. Give the agent `QUADIT_URL` and `QUADIT_TOKEN`, or run `quadit login URL TOKEN`.
 4. Teach the agent Quadit: `quadit skill install` (see [Your agent](#your-agent)).
@@ -263,9 +263,11 @@ thread THREAD_ID on the page
 
 A page that mirrors a Markdown file in a repository is called by the file's opening `# heading` (else by its file name) and does not repeat it in its text; written back, the title is the heading again. Renaming the page changes the heading, not the file name.
 
-## Session records and budgets
+## Session records and hand-off limits
 
-Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links`, `cost_micros` and at the end `state: "done"`. Cost and time count against your weekly budget, and against the task's own budget when it has one; `quadit me` says what is left. The person concerned is told at 80%. Once a budget is used up new work is refused (a new run, taking the task), while saying so on the task and handing it back still work. A budget can also limit hand-offs between agents; past it, hand the task to a person.
+Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links` and at the end `state: "done"`. A session is the log of a run (what it was asked, what it did, what it produced, when it started and ended); Quadit keeps no record of what a run cost.
+
+Work passed from agent to agent is counted. An agent can have a hand-off limit (`handoff_limit`, a number of hand-offs a week, set by the person responsible for it; `quadit me` shows it), and so can a task (`handoff_limit` on `task.update`, in all). Past either, a hand-off to another agent is refused with `handoff_limit_reached`: hand the task to a person instead.
 
 ## Secrets
 
