@@ -142,9 +142,6 @@ export function lengthOfMinutes(total: number): string {
 /** A length of time in hours, as the server counts waits (3.4): "3h 24m", "2d 4h". */
 export const lengthOfHours = (h: number) => lengthOfMinutes(h * 60);
 
-/** A length of time in milliseconds. */
-export const lengthOf = (ms: number) => lengthOfMinutes(ms / MIN);
-
 /** Video time as m:ss. */
 export function clockTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));

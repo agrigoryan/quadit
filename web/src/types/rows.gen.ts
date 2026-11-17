@@ -33,9 +33,6 @@ export interface AgentSession {
   instructions?: string;
   steps?: unknown;
   links?: unknown;
-  cost_micros?: number;
-  tokens_in?: number;
-  tokens_out?: number;
   started_at: number;
   ended_at?: number;
   updated_seq: number;
@@ -107,12 +104,6 @@ export interface Block {
   created_seq: number;
   updated_seq: number;
   deleted_at?: number;
-}
-
-export interface Budget {
-  cost_micros?: number;
-  minutes?: number;
-  handoffs?: number;
 }
 
 export interface Comment {
@@ -391,7 +382,7 @@ export interface Member {
   avatar?: string;
   title?: string;
   scope?: Scope;
-  budget?: Budget;
+  handoff_limit?: number;
   last_seen_at?: number;
   last_action?: string;
   listening_until?: number;
@@ -689,7 +680,7 @@ export interface Task {
   label_ids?: string[];
   lease_holder_id?: string;
   lease_until?: number;
-  budget?: Budget;
+  handoff_limit?: number;
   rank: string;
   due_on?: string;
   created_by: string;

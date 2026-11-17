@@ -16,13 +16,13 @@ import (
 // Error codes. Every refusal has one, so a caller can branch without reading
 // the message.
 const (
-	CodeInvalid       = "invalid"        // the change itself is wrong; fix it and resend
-	CodeForbidden     = "forbidden"      // the actor may not do this
-	CodeNotFound      = "not_found"      // something the change refers to does not exist
-	CodeConflict      = "conflict"       // it collides with what is there (a taken key, an answered decision)
-	CodeStale         = "stale"          // it was based on an older version than the current one
-	CodeNeedsApproval = "needs_approval" // allowed only with an approved decision
-	CodeBudget        = "budget_exceeded"
+	CodeInvalid       = "invalid"               // the change itself is wrong; fix it and resend
+	CodeForbidden     = "forbidden"             // the actor may not do this
+	CodeNotFound      = "not_found"             // something the change refers to does not exist
+	CodeConflict      = "conflict"              // it collides with what is there (a taken key, an answered decision)
+	CodeStale         = "stale"                 // it was based on an older version than the current one
+	CodeNeedsApproval = "needs_approval"        // allowed only with an approved decision
+	CodeHandoffLimit  = "handoff_limit_reached" // work has been passed between agents as often as a limit allows; a person takes it from here
 )
 
 // Reasons. A few refusals that share a code say which they are, for a

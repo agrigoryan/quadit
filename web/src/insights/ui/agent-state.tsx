@@ -1,14 +1,10 @@
 // How an agent's state is shown, on the dashboard and on the agents page:
-// what it is doing, whether anything would wake it, and what it has spent
-// this week against its budget. A state is always an icon and words, never
-// colour alone.
+// what it is doing, and whether anything would wake it. A state is always an
+// icon and words, never colour alone.
 
-import "@/insights/viz.css";
 import { CircleDashed, EarOff, Hourglass, Inbox, Loader } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { money } from "@/lib/amounts";
-import { lengthOfMinutes } from "@/lib/time";
 import type { AgentState, AgentStateName } from "@/types/dashboard";
 
 const looks: Record<AgentStateName, { icon: typeof Loader; tone: string }> = {
@@ -59,58 +55,3 @@ export function NotListening({ urgent, className }: { urgent?: boolean; classNam
 /** An agent that has work queued but would not hear about it. */
 export const isStranded = (a: AgentState) =>
   !a.listening && a.state !== "working" && (a.waiting_on_it > 0 || a.state === "has_work");
-
-interface BudgetProps {
-  agent: Pick<AgentState, "cost_week" | "minutes_week" | "budget">;
-  className?: string;
-}
-
-/**
- * This week's cost as a meter against the weekly budget, with the amounts
- * written out. Without a budget there is no meter, only what was spent.
- */
-export function BudgetBar({ agent, className }: BudgetProps) {
-  const cost = Number(agent.cost_week ?? 0) || 0;
-  const budget = Number(agent.budget ?? 0) || 0;
-  const time = agent.minutes_week ? lengthOfMinutes(agent.minutes_week) : "";
-  if (budget <= 0) {
-    return (
-      <p className={cx("text-xs text-ink-3 tnum", className)}>
-        {cost > 0 || time
-          ? t("ins.agent.spentNoBudget", { cost: money(cost), time: time || lengthOfMinutes(0) })
-          : t("ins.agent.nothingSpent")}
-      </p>
-    );
-  }
-  const share = cost / budget;
-  const level = share >= 1 ? "over" : share >= 0.8 ? "near" : "ok";
-  const fill = level === "over" ? "var(--viz-over)" : level === "near" ? "var(--viz-warn)" : "var(--viz-started)";
-  const label = t("ins.agent.budget", { cost: money(cost), budget: money(budget) });
-  return (
-    <div className={className}>
-      <div className="flex items-baseline justify-between gap-2 text-xs tnum">
-        <span className="text-ink-2">
-          {label}
-          {level !== "ok" && (
-            <span className={cx("ml-1.5 font-medium", level === "over" ? "text-danger" : "text-wait")}>
-              {t(`ins.agent.budget.${level}`)}
-            </span>
-          )}
-        </span>
-        {time && <span className="text-ink-3">{time}</span>}
-      </div>
-      <div
-        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- the bar is a child element drawn to match the app; <meter> is drawn by the browser
-        role="meter"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={budget}
-        aria-valuenow={Math.min(cost, budget)}
-        aria-valuetext={`${Math.round(share * 100)}%`}
-        className="mt-1 h-1.5 overflow-hidden rounded-full bg-sunken dark:bg-press"
-      >
-        <div className="h-full rounded-full" style={{ width: `${Math.min(1, share) * 100}%`, background: fill }} />
-      </div>
-    </div>
-  );
-}

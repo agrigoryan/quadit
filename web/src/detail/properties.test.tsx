@@ -124,7 +124,7 @@ describe("Properties", () => {
     ]);
   });
 
-  it("adds the milestone for a task in an epic, the cycle and estimate where the project has them, and the budget for an admin", () => {
+  it("adds the milestone for a task in an epic, the cycle and estimate where the project has them, and the hand-off limit for an admin", () => {
     seed({ settings: { cycles: true, estimates: true }, task: { epic_id: "e1" } });
     renderPanel();
     expect(rowNames()).toEqual([
@@ -139,7 +139,7 @@ describe("Properties", () => {
       "Estimate",
       "Due date",
       "Parent",
-      "Budget",
+      "Hand-off limit",
     ]);
   });
 
@@ -212,6 +212,27 @@ describe("Properties", () => {
     renderPanel();
     fireEvent.change(within(section()).getByLabelText("Due date"), { target: { value: "2026-12-01" } });
     await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", due_on: "2026-12-01" } }]));
+  });
+
+  it("sets the hand-off limit from its field", async () => {
+    seed();
+    renderPanel();
+    const field = within(section()).getByLabelText("Hand-off limit");
+    expect(field).toHaveAttribute("placeholder", "No limit");
+    fireEvent.change(field, { target: { value: "3" } });
+    fireEvent.blur(field);
+    await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", handoff_limit: 3 } }]));
+  });
+
+  it("clears the hand-off limit when its field is emptied", async () => {
+    seed({ task: { handoff_limit: 2 } });
+    renderPanel();
+    const field = within(section()).getByLabelText("Hand-off limit");
+    expect(field).toHaveValue(2);
+    act(() => field.focus());
+    fireEvent.change(field, { target: { value: "" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", handoff_limit: null } }]));
   });
 
   it("turns the rows off for a read-only member, and the keys open nothing", () => {

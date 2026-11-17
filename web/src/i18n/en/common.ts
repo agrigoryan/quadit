@@ -33,7 +33,7 @@ export const common = {
   "undo.what.waitingOn": "who it waits on",
   "undo.what.priority": "the priority",
   "undo.what.labels": "the labels",
-  "undo.what.budget": "the budget",
+  "undo.what.handoff_limit": "the hand-off limit",
   "undo.what.epic": "the epic",
   "undo.what.milestone": "the milestone",
   "undo.what.cycle": "the cycle",

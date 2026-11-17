@@ -3,7 +3,7 @@
 import { t } from "@/lib/i18n";
 import { useMembers, useProjects, useRowEvenIfGone } from "@/data/selectors";
 import { ASKS_FIRST, AsksBefore } from "@/settings/agents/asks-before";
-import { type AgentMember, dollars, toMicros, toMinutes } from "@/settings/agents/data";
+import { type AgentMember, toLimit } from "@/settings/agents/data";
 import { AvatarInput } from "@/settings/ui/avatar-input";
 import { MultiPick } from "@/settings/ui/multi-pick";
 import { type FieldErrors, FormField, NativeSelect, SwitchRow } from "@/ui/form";
@@ -22,9 +22,8 @@ export interface AgentDraft {
   projects: string[];
   readOnly: boolean;
   approval: string[];
-  money: string;
-  minutes: string;
-  handoffs: string;
+  /** How many times a week it may pass work on to another agent, as typed; "" for no limit. */
+  handoffLimit: string;
 }
 
 export const AGENT_FIELDS = [
@@ -36,9 +35,7 @@ export const AGENT_FIELDS = [
   "responsible",
   "projects",
   "needs_approval",
-  "cost_micros",
-  "minutes",
-  "handoffs",
+  "handoff_limit",
 ];
 
 export function draftOf(agent: AgentMember | undefined, responsible: string): AgentDraft {
@@ -53,32 +50,27 @@ export function draftOf(agent: AgentMember | undefined, responsible: string): Ag
     readOnly: agent?.scope?.read_only ?? false,
     // A new agent asks before what cannot be taken back or reaches outside, unless its maker unticks it.
     approval: agent ? (agent.scope?.needs_approval ?? []) : ASKS_FIRST,
-    money: dollars(agent?.budget?.cost_micros),
-    minutes: agent?.budget?.minutes ? String(agent.budget.minutes) : "",
-    handoffs: agent?.budget?.handoffs ? String(agent.budget.handoffs) : "",
+    handoffLimit: agent?.handoff_limit ? String(agent.handoff_limit) : "",
   };
 }
 
 /**
- * The scope and budget arguments for agent.create / agent.update, or the
- * field that is wrong. For a new agent the scope is always given, so that
- * the list of what it asks before is exactly the one shown (the server
- * fills in its own list when none is sent).
+ * The scope and hand-off limit arguments for agent.create / agent.update,
+ * or the field that is wrong. For a new agent the scope is always given, so
+ * that the list of what it asks before is exactly the one shown (the server
+ * fills in its own list when none is sent). A hand-off limit of null is
+ * none.
  */
 export function limitsOf(
   d: AgentDraft,
   creating = false,
-): { scope: object | null; budget: object | null } | { bad: "cost_micros" | "minutes" | "handoffs" } {
-  const cost = toMicros(d.money);
-  const minutes = toMinutes(d.minutes);
-  const handoffs = toMinutes(d.handoffs);
-  if (cost === null) return { bad: "cost_micros" };
-  if (minutes === null) return { bad: "minutes" };
-  if (handoffs === null) return { bad: "handoffs" };
+): { scope: object | null; handoffLimit: number | null } | { bad: "handoff_limit" } {
+  const handoffs = toLimit(d.handoffLimit);
+  if (handoffs === null) return { bad: "handoff_limit" };
   const scoped = creating || d.projects.length > 0 || d.readOnly || d.approval.length > 0;
   return {
     scope: scoped ? { projects: d.projects, read_only: d.readOnly, needs_approval: d.approval } : null,
-    budget: cost > 0 || minutes > 0 || handoffs > 0 ? { cost_micros: cost, minutes, handoffs } : null,
+    handoffLimit: handoffs > 0 ? handoffs : null,
   };
 }
 
@@ -220,50 +212,22 @@ export function AgentLimitFields({ draft, set, errors, disabled }: Props) {
       <FormField label={t("agent.approval")} hint={t("agent.approvalHint")} error={errors.fields.needs_approval}>
         <AsksBefore value={draft.approval} onChange={(v) => set({ approval: v })} disabled={disabled} />
       </FormField>
-      <div>
-        <p className="text-xs font-medium text-ink-2">{t("agent.budget")}</p>
-        <p className="mb-2 text-xs text-ink-3">{t("agent.budgetLead")}</p>
-        <div className="grid max-w-xl grid-cols-2 gap-3.5 sm:grid-cols-3">
-          <FormField label={t("agent.budgetMoney")} htmlFor="agent-money" error={errors.fields.cost_micros}>
-            <span className="relative">
-              <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-ink-3">
-                $
-              </span>
-              <Input
-                id="agent-money"
-                inputMode="decimal"
-                className="pl-6 tnum"
-                value={draft.money}
-                onChange={(e) => set({ money: e.target.value })}
-                disabled={disabled}
-                placeholder="—"
-              />
-            </span>
-          </FormField>
-          <FormField label={t("agent.budgetMinutes")} htmlFor="agent-minutes" error={errors.fields.minutes}>
-            <Input
-              id="agent-minutes"
-              inputMode="numeric"
-              className="tnum"
-              value={draft.minutes}
-              onChange={(e) => set({ minutes: e.target.value })}
-              disabled={disabled}
-              placeholder="—"
-            />
-          </FormField>
-          <FormField label={t("agent.budgetHandoffs")} htmlFor="agent-handoffs" error={errors.fields.handoffs}>
-            <Input
-              id="agent-handoffs"
-              inputMode="numeric"
-              className="tnum"
-              value={draft.handoffs}
-              onChange={(e) => set({ handoffs: e.target.value })}
-              disabled={disabled}
-              placeholder="—"
-            />
-          </FormField>
-        </div>
-      </div>
+      <FormField
+        label={t("agent.handoffLimit")}
+        hint={t("agent.handoffLimitHint")}
+        htmlFor="agent-handoffs"
+        error={errors.fields.handoff_limit}
+      >
+        <Input
+          id="agent-handoffs"
+          inputMode="numeric"
+          className="max-w-32 tnum"
+          value={draft.handoffLimit}
+          onChange={(e) => set({ handoffLimit: e.target.value })}
+          disabled={disabled}
+          placeholder={t("agent.handoffLimitNone")}
+        />
+      </FormField>
     </div>
   );
 }

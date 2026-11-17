@@ -24,6 +24,32 @@ test("an API token is shown once and works", async ({ page }) => {
   await expect(page.getByText(token)).toBeHidden();
 });
 
+test("an agent's weekly hand-off limit is set when it is made, and taken off on its page", async ({ page }) => {
+  const name = unique("Courier");
+  await page.goto("/e2e/settings/agents");
+  await page.getByRole("button", { name: "New agent" }).click();
+  const form = page.getByRole("dialog", { name: "New agent" });
+  await form.getByRole("textbox", { name: "Name", exact: true }).fill(name);
+  await form.getByRole("textbox", { name: "Hand-offs per week" }).fill("3");
+  await form.getByRole("button", { name: "Create agent" }).click();
+
+  await expect(page.getByRole("heading", { name, level: 2 })).toBeVisible();
+  const limit = page.getByRole("textbox", { name: "Hand-offs per week" });
+  await expect(limit).toHaveValue("3");
+  await page.reload();
+  await expect(limit).toHaveValue("3");
+
+  await limit.fill("");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  await expect
+    .poll(async () => {
+      await page.reload();
+      return limit.inputValue();
+    })
+    .toBe("");
+});
+
 test("the workspace is renamed", async ({ page }) => {
   const newName = unique("E2E");
   await page.goto("/e2e/settings/general");

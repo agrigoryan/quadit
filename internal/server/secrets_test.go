@@ -160,7 +160,7 @@ func TestAgentsCannotWidenThemselves(t *testing.T) {
 		// It cannot lift its own limits, by either door.
 		try("agent.update", M{"id": "@lead", "scope": nil}, 403)
 		try("agent.update", M{"id": "@lead", "scope": M{"projects": []string{"SVA", "OPS"}}}, 403)
-		try("agent.update", M{"id": "@lead", "budget": M{"cost_micros": 999_000_000}}, 403)
+		try("agent.update", M{"id": "@lead", "handoff_limit": 0}, 403)
 		try("member.update", M{"id": "@lead", "role": "owner"}, 403)
 		s.call(nil, lead.Token, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
 		// What it gives another agent is held to its own: asking for every

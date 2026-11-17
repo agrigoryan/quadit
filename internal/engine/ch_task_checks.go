@@ -6,6 +6,7 @@ package engine
 import (
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -91,8 +92,8 @@ func (c *cx) checkHandoff(t core.Task) error {
 	if err != nil {
 		return err
 	}
-	// A hand-off counts against a budget: the agent's for the week, and the
-	// task's own.
+	// A hand-off counts against two limits: the agent's for the week, and
+	// the task's own.
 	if err := c.checkWeeklyHandoffs(); err != nil {
 		return err
 	}
@@ -140,18 +141,26 @@ func (c *cx) agentChain(evs []core.Event) (int, error) {
 	return chain, nil
 }
 
+// checkHandoffLimit refuses a hand-off limit below zero; 0 is no limit.
+func checkHandoffLimit(n int) error {
+	if n < 0 {
+		return invalid("handoff_limit", "a hand-off limit is a number of hand-offs, 0 (no limit) or more")
+	}
+	return nil
+}
+
 // checkWeeklyHandoffs refuses a hand-off beyond the acting agent's weekly
-// budget of them.
+// limit of them.
 func (c *cx) checkWeeklyHandoffs() error {
-	b := c.actor.Budget
-	if b == nil || b.Handoffs <= 0 {
+	limit := c.actor.HandoffLimit
+	if limit <= 0 {
 		return nil
 	}
 	mine, err := c.tx.Events(c.ctx, store.EventFilter{ActorID: c.actor.UserID, Types: []string{"task.updated"}, Desc: true, Limit: 2000})
 	if err != nil {
 		return err
 	}
-	var n int64
+	n := 0
 	for _, ev := range mine {
 		if ev.At < weekStart(c.at) {
 			break
@@ -160,20 +169,19 @@ func (c *cx) checkWeeklyHandoffs() error {
 			n++
 		}
 	}
-	if n >= b.Handoffs {
-		return &Error{Code: CodeBudget, Message: "this agent has passed work on " + strconv.Itoa(int(n)) + " times this week, which is its limit; hand the task to a person"}
+	if n >= limit {
+		return &Error{Code: CodeHandoffLimit, Message: "this agent has passed work on " + strconv.Itoa(n) + " times this week, which is its limit; hand the task to a person"}
 	}
 	return nil
 }
 
-// checkTaskHandoffs refuses a hand-off beyond the task's own budget of
+// checkTaskHandoffs refuses a hand-off beyond the task's own limit of
 // hand-offs between agents.
 func (c *cx) checkTaskHandoffs(t core.Task, evs []core.Event) error {
-	b := t.Budget
-	if b == nil || b.Handoffs <= 0 {
+	if t.HandoffLimit <= 0 {
 		return nil
 	}
-	var n int64
+	n := 0
 	for _, ev := range evs {
 		if !isHandoff(ev) {
 			continue
@@ -186,8 +194,15 @@ func (c *cx) checkTaskHandoffs(t core.Task, evs []core.Event) error {
 			n++
 		}
 	}
-	if n >= b.Handoffs {
-		return &Error{Code: CodeBudget, Message: t.Key + " has been passed between agents " + strconv.Itoa(int(n)) + " times, which is its limit; hand it to a person"}
+	if n >= t.HandoffLimit {
+		return &Error{Code: CodeHandoffLimit, Message: t.Key + " has been passed between agents " + strconv.Itoa(n) + " times, which is its limit; hand it to a person"}
 	}
 	return nil
+}
+
+// weekStart returns the start of the week (Monday, UTC) containing at.
+func weekStart(at int64) int64 {
+	t := time.UnixMilli(at).UTC()
+	wd := (int(t.Weekday()) + 6) % 7
+	return time.Date(t.Year(), t.Month(), t.Day()-wd, 0, 0, 0, 0, time.UTC).UnixMilli()
 }

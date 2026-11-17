@@ -43,8 +43,7 @@ export const agentStrings = {
   "agent.role": "Role",
   "agent.roleHint": "An admin agent can manage projects, members and automation. Most agents are members.",
   "agent.responsibleField": "Responsible person",
-  "agent.responsibleHint":
-    "Who answers for this agent. Its questions go to them when it names nobody, and they hear when its budget runs low.",
+  "agent.responsibleHint": "Who answers for this agent. Its questions go to them when it names nobody.",
   "agent.responsibleNone": "No one",
   "agent.limits": "Limits",
   "agent.limitsLead": "Narrow what this agent may do below its role.",
@@ -72,13 +71,11 @@ export const agentStrings = {
   "agent.asks.item.source": "Adding or changing a repository source",
   "agent.asks.else": "Anything else",
   "agent.asks.elseNone": "Nothing else",
-  "agent.budget": "Weekly budget",
-  "agent.budgetLead":
-    "When a limit is reached the agent can only finish or hand over what is open. Empty means no limit.",
-  "agent.budgetMoney": "Money per week",
-  "agent.budgetMinutes": "Minutes per week",
-  "agent.budgetHandoffs": "Hand-offs per week",
-  "agent.budgetBad": "Use a number, or leave it empty for no limit",
+  "agent.handoffLimit": "Hand-offs per week",
+  "agent.handoffLimitHint":
+    "How many times a week this agent may pass work on to another agent. At the limit it hands the task to a person instead.",
+  "agent.handoffLimitNone": "No limit",
+  "agent.handoffLimitBad": "Use a whole number, or leave it empty for no limit",
   "agent.create": "Create agent",
   "agent.created": "{name} is ready. Issue it a token next.",
   "agent.save": "Save changes",

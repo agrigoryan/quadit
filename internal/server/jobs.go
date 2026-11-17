@@ -140,12 +140,11 @@ type notifyPrefs struct {
 }
 
 var importantNotes = map[string]bool{core.NoteAsked: true, core.NoteMentioned: true, core.NoteAssigned: true, core.NotePicked: true,
-	core.NoteUnclear: true, core.NoteWaitingOn: true, core.NoteResult: true, core.NoteBudget: true}
+	core.NoteUnclear: true, core.NoteWaitingOn: true, core.NoteResult: true}
 
 var noteVerbs = map[string]string{core.NoteAssigned: "assigned you", core.NoteMentioned: "mentioned you in", core.NoteWaitingOn: "is waiting on you in",
 	core.NoteAsked: "asked you a question in", core.NotePicked: "answered your question in", core.NoteUnclear: "found your answer unclear in",
-	core.NoteReplied: "replied to you in", core.NoteComment: "commented on", core.NoteResult: "posted a result in", core.NoteStatus: "changed the status of",
-	core.NoteBudget: "budget warning:"}
+	core.NoteReplied: "replied to you in", core.NoteComment: "commented on", core.NoteResult: "posted a result in", core.NoteStatus: "changed the status of"}
 
 // jobNotify tells a person about an inbox item by push and mail, unless
 // they have already read it. An item or a person that is gone is nothing

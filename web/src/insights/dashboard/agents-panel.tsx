@@ -1,5 +1,5 @@
-// Agents at a glance: who is working on what, who waits on whom, who has
-// work queued with nothing listening for it, and this week's spend.
+// Agents at a glance: who is working on what, who waits on whom, and who has
+// work queued with nothing listening for it.
 
 import { CornerDownRight } from "lucide-react";
 import { Link } from "react-router";
@@ -9,7 +9,7 @@ import { useLookupEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/data/sel
 import type { Member } from "@/types/core";
 import { useMembersByHandle } from "@/insights/members-by-handle";
 import type { AgentState } from "@/types/dashboard";
-import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-state";
+import { AgentStateChip, isStranded, NotListening } from "@/insights/ui/agent-state";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
 import { useTaskLink } from "@/nav/task-link";
@@ -75,7 +75,6 @@ function Row({
           <NotListening urgent={stranded} />
         </p>
       )}
-      <BudgetBar agent={agent} className="mt-1.5 pl-8" />
     </li>
   );
 }

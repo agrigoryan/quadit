@@ -30,9 +30,6 @@ type agentState struct {
 	LastDid   string `json:"last_action,omitempty"`
 	Open      int    `json:"open_tasks"`
 	Queue     int    `json:"waiting_on_it"`
-	CostWeek  string `json:"cost_week,omitempty"`
-	MinWeek   int64  `json:"minutes_week,omitempty"`
-	Budget    string `json:"budget,omitempty"`
 }
 
 // agentStates says what every agent is doing right now. With projects,
@@ -48,11 +45,7 @@ func (who *viewer) agentStates(ctx context.Context, tasks []core.Task, names *na
 		if m.Kind != core.KindAgent || m.RemovedAt != 0 || m.SuspendedAt != 0 {
 			continue // a suspended agent is not idle: it is not there
 		}
-		a, err := w.stateOf(m)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, a)
+		out = append(out, w.stateOf(m))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Handle < out[j].Handle })
 	return out, nil
@@ -153,8 +146,8 @@ func actsIn(action string, keys map[string]bool) bool {
 
 // stateOf says what one agent is doing: working (it holds a task, or runs a
 // session), has_work (something waits on it), waiting (all its open work
-// waits on others), or idle; and what it has spent this week.
-func (w *agentWork) stateOf(m core.Member) (agentState, error) {
+// waits on others), or idle.
+func (w *agentWork) stateOf(m core.Member) agentState {
 	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: w.lastAction(m),
 		Listening: m.ListeningUntil > w.now.UnixMilli() || w.pushed[m.UserID]}
 
@@ -211,20 +204,7 @@ func (w *agentWork) stateOf(m core.Member) (agentState, error) {
 	if a.State != "waiting" {
 		a.WaitsOn = ""
 	}
-
-	// What it has spent this week, and its budget.
-	cost, minutes, err := w.who.agentUsage(w.ctx, w.who.db, m.UserID, weekStart(w.now))
-	if err != nil {
-		return a, err
-	}
-	if cost > 0 {
-		a.CostWeek = formatMoney(cost)
-	}
-	a.MinWeek = minutes
-	if budget := m.Budget; budget != nil && budget.CostMicros > 0 {
-		a.Budget = formatMoney(budget.CostMicros)
-	}
-	return a, nil
+	return a
 }
 
 // lastAction is the agent's last action as the caller may see it: only

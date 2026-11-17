@@ -38,9 +38,6 @@ type viewer struct {
 	st      store.Store
 	baseURL string       // where people reach the server, for addresses in answers
 	log     *slog.Logger // for a read that shows less instead of failing
-	// agentUsage sums what an agent's sessions cost since a time
-	// (engine.Usage).
-	agentUsage func(ctx context.Context, db store.DB, agentID string, since int64) (costMicros, minutes int64, err error)
 	// nameCache is the workspace's names, read once (names).
 	nameCache *nameLookup
 }
@@ -52,7 +49,7 @@ type viewer struct {
 // of text a webhook is sent), and not to be asked for what is one member's
 // own, since the feed's filter takes no member to mean every member.
 func (s *Server) viewerFor(ws core.Workspace, member core.Member) *viewer {
-	who := &viewer{ws: ws, member: member, db: s.st.In(ws.ID), st: s.st, baseURL: s.cfg.BaseURL, log: s.log, agentUsage: s.eng.Usage}
+	who := &viewer{ws: ws, member: member, db: s.st.In(ws.ID), st: s.st, baseURL: s.cfg.BaseURL, log: s.log}
 	if member.Scope != nil {
 		who.projects = member.Scope.Projects
 	}

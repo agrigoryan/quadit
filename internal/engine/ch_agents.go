@@ -1,4 +1,4 @@
-// agent.create and agent.update: agents, their helpers, limits and budgets.
+// agent.create and agent.update: agents, their helpers and their limits.
 
 package engine
 
@@ -17,15 +17,17 @@ func init() {
 }
 
 type agentCreateArgs struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name" quadit:"required,handler"`
-	Handle      string       `json:"handle"`
-	Description string       `json:"description"`
-	Avatar      string       `json:"avatar"`
-	Role        string       `json:"role"`        // member (default) or admin
-	Responsible string       `json:"responsible"` // the person who answers for it; default: the caller
-	Scope       *scopeArgs   `json:"scope"`
-	Budget      *core.Budget `json:"budget"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name" quadit:"required,handler"`
+	Handle      string     `json:"handle"`
+	Description string     `json:"description"`
+	Avatar      string     `json:"avatar"`
+	Role        string     `json:"role"`        // member (default) or admin
+	Responsible string     `json:"responsible"` // the person who answers for it; default: the caller
+	Scope       *scopeArgs `json:"scope"`
+	// HandoffLimit is how many times a week the agent may pass work on to
+	// another agent; 0 is no limit.
+	HandoffLimit int `json:"handoff_limit"`
 	// Task makes a sub-agent for one task: any agent or member may make one.
 	// It is a member limited to that task's project and to its maker's own
 	// limits, and it is suspended when the task is done or dropped.
@@ -77,13 +79,16 @@ func agentCreate(c *cx, a agentCreateArgs) error {
 	if err != nil {
 		return err
 	}
+	if err := checkHandoffLimit(a.HandoffLimit); err != nil {
+		return err
+	}
 	u := core.User{ID: uid, Kind: core.KindAgent, Name: name, Description: a.Description, Avatar: a.Avatar, WorkspaceID: c.ws,
 		ResponsibleID: rm.UserID, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 	if err := c.tx.Insert(c.ctx, u); err != nil {
 		return alreadyInUse(err, "id", uid)
 	}
 	return c.addMember(core.Member{WorkspaceID: c.ws, UserID: uid, Role: role, Handle: handle, Kind: u.Kind, Name: u.Name,
-		Avatar: u.Avatar, Title: a.Description, Scope: scope, Budget: a.Budget, CreatedAt: c.at, ResponsibleID: rm.UserID,
+		Avatar: u.Avatar, Title: a.Description, Scope: scope, HandoffLimit: a.HandoffLimit, CreatedAt: c.at, ResponsibleID: rm.UserID,
 		DelegatedBy: delegatedBy(c, forTask), DelegatedTask: forTask.ID})
 }
 
@@ -259,17 +264,19 @@ func ifEmpty(list, instead []string) []string {
 }
 
 type agentUpdateArgs struct {
-	ID          string           `json:"id" quadit:"required,handler"`
-	Name        Opt[string]      `json:"name"`
-	Description Opt[string]      `json:"description"`
-	Avatar      Opt[string]      `json:"avatar"`
-	Responsible Opt[string]      `json:"responsible"`
-	Scope       Opt[scopeArgs]   `json:"scope"`
-	Budget      Opt[core.Budget] `json:"budget"`
+	ID          string         `json:"id" quadit:"required,handler"`
+	Name        Opt[string]    `json:"name"`
+	Description Opt[string]    `json:"description"`
+	Avatar      Opt[string]    `json:"avatar"`
+	Responsible Opt[string]    `json:"responsible"`
+	Scope       Opt[scopeArgs] `json:"scope"`
+	// HandoffLimit is how many times a week the agent may pass work on to
+	// another agent; 0 or null is no limit.
+	HandoffLimit Opt[int] `json:"handoff_limit"`
 }
 
-// agentUpdate changes an agent: what is shown of it, and what it may reach
-// and spend.
+// agentUpdate changes an agent: what is shown of it, what it may reach, and
+// how often it may pass work on.
 func agentUpdate(c *cx, a agentUpdateArgs) error {
 	m, err := c.memberRef("id", a.ID)
 	if err != nil {
@@ -283,8 +290,8 @@ func agentUpdate(c *cx, a agentUpdateArgs) error {
 	if err != nil {
 		return err
 	}
-	if !c.system && c.actor.Kind == core.KindAgent && m.UserID == c.actor.UserID && (a.Scope.Set || a.Budget.Set) {
-		return forbidden("an agent cannot change its own role, limits or budget; the person responsible for it can")
+	if !c.system && c.actor.Kind == core.KindAgent && m.UserID == c.actor.UserID && (a.Scope.Set || a.HandoffLimit.Set) {
+		return forbidden("an agent cannot change its own role or limits; the person responsible for it can")
 	}
 	if err := c.agentLimits(p, a, m); err != nil {
 		return err
@@ -331,7 +338,8 @@ func (c *cx) agentProfile(p *patch, a agentUpdateArgs, m *core.Member) (map[stri
 	return userSet, nil
 }
 
-// agentLimits applies what an agent may reach and spend.
+// agentLimits applies what an agent may reach, and how often it may pass
+// work on.
 func (c *cx) agentLimits(p *patch, a agentUpdateArgs, m core.Member) error {
 	if a.Scope.Set {
 		var sc *core.Scope
@@ -345,13 +353,9 @@ func (c *cx) agentLimits(p *patch, a agentUpdateArgs, m core.Member) error {
 		p.set["scope"] = sc
 		p.changes["scope"] = core.FieldChange{From: m.Scope, To: sc}
 	}
-	if a.Budget.Set {
-		var b *core.Budget
-		if !a.Budget.Null && (a.Budget.V.CostMicros > 0 || a.Budget.V.Minutes > 0 || a.Budget.V.Handoffs > 0) {
-			b = &a.Budget.V
-		}
-		p.set["budget"] = b
-		p.changes["budget"] = core.FieldChange{From: m.Budget, To: b}
+	if err := checkHandoffLimit(a.HandoffLimit.V); err != nil {
+		return err
 	}
+	p.setNumber("handoff_limit", a.HandoffLimit, &m.HandoffLimit)
 	return nil
 }

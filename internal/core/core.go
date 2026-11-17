@@ -132,33 +132,26 @@ func (s *Scope) MayRead(projectID string) bool {
 	return s == nil || len(s.Projects) == 0 || projectID == "" || slices.Contains(s.Projects, projectID)
 }
 
-// Budget limits an agent or a task. Zero means no limit.
-type Budget struct {
-	CostMicros int64 `json:"cost_micros,omitempty"` // per week for an agent, in total for a task
-	Minutes    int64 `json:"minutes,omitempty"`
-	// Handoffs is how many times work may be passed from agent to agent:
-	// per week for an agent, in total for a task.
-	Handoffs int64 `json:"handoffs,omitempty"`
-}
-
 // Member is a user's place in one workspace.
 type Member struct {
-	WorkspaceID    string  `json:"workspace_id" db:"workspace_id"`
-	UserID         string  `json:"user_id" db:"user_id"`
-	Role           Role    `json:"role" db:"role"`
-	Handle         string  `json:"handle" db:"handle"`
-	Kind           string  `json:"kind" db:"kind"`
-	Name           string  `json:"name" db:"name"`
-	Avatar         string  `json:"avatar,omitempty" db:"avatar"`
-	Title          string  `json:"title,omitempty" db:"title"`
-	Scope          *Scope  `json:"scope,omitempty" db:"scope,json"`
-	Budget         *Budget `json:"budget,omitempty" db:"budget,json"`
-	LastSeenAt     int64   `json:"last_seen_at,omitempty" db:"last_seen_at,null"`
-	LastAction     string  `json:"last_action,omitempty" db:"last_action"`
-	ListeningUntil int64   `json:"listening_until,omitempty" db:"listening_until,null"` // an agent's companion is waiting for its inbox until then
-	CreatedAt      int64   `json:"created_at" db:"created_at"`
-	UpdatedSeq     int64   `json:"updated_seq" db:"updated_seq"`
-	SuspendedAt    int64   `json:"suspended_at,omitempty" db:"suspended_at,null"`
+	WorkspaceID string `json:"workspace_id" db:"workspace_id"`
+	UserID      string `json:"user_id" db:"user_id"`
+	Role        Role   `json:"role" db:"role"`
+	Handle      string `json:"handle" db:"handle"`
+	Kind        string `json:"kind" db:"kind"`
+	Name        string `json:"name" db:"name"`
+	Avatar      string `json:"avatar,omitempty" db:"avatar"`
+	Title       string `json:"title,omitempty" db:"title"`
+	Scope       *Scope `json:"scope,omitempty" db:"scope,json"`
+	// HandoffLimit is how many times an agent may pass work on to another
+	// agent in a week (Monday to Monday, UTC); 0 is no limit.
+	HandoffLimit   int    `json:"handoff_limit,omitempty" db:"handoff_limit,null"`
+	LastSeenAt     int64  `json:"last_seen_at,omitempty" db:"last_seen_at,null"`
+	LastAction     string `json:"last_action,omitempty" db:"last_action"`
+	ListeningUntil int64  `json:"listening_until,omitempty" db:"listening_until,null"` // an agent's companion is waiting for its inbox until then
+	CreatedAt      int64  `json:"created_at" db:"created_at"`
+	UpdatedSeq     int64  `json:"updated_seq" db:"updated_seq"`
+	SuspendedAt    int64  `json:"suspended_at,omitempty" db:"suspended_at,null"`
 	// DelegatedBy and DelegatedTask mark a sub-agent: the agent that made
 	// it and the task it was made for. It ends when that task does.
 	DelegatedBy   string `json:"delegated_by,omitempty" db:"delegated_by,null"`
@@ -285,21 +278,23 @@ type Task struct {
 	LabelIDs      []string `json:"label_ids,omitempty" db:"label_ids,json"`
 	LeaseHolderID string   `json:"lease_holder_id,omitempty" db:"lease_holder_id,null"` // who has taken it
 	LeaseUntil    int64    `json:"lease_until,omitempty" db:"lease_until,null"`         // until when they hold it
-	Budget        *Budget  `json:"budget,omitempty" db:"budget,json"`
-	Rank          string   `json:"rank" db:"rank"`
-	DueOn         string   `json:"due_on,omitempty" db:"due_on,null"`
-	CreatedBy     string   `json:"created_by" db:"created_by"`
-	CreatedAt     int64    `json:"created_at" db:"created_at"`
-	UpdatedAt     int64    `json:"updated_at" db:"updated_at"`
-	StartedAt     int64    `json:"started_at,omitempty" db:"started_at,null"`
-	CompletedAt   int64    `json:"completed_at,omitempty" db:"completed_at,null"`
-	CanceledAt    int64    `json:"canceled_at,omitempty" db:"canceled_at,null"`
-	CreatedSeq    int64    `json:"created_seq" db:"created_seq"`
-	UpdatedSeq    int64    `json:"updated_seq" db:"updated_seq"`
-	ActivitySeq   int64    `json:"activity_seq" db:"activity_seq"` // the last event on it or on what is in it
-	ArchivedAt    int64    `json:"archived_at,omitempty" db:"archived_at,null"`
-	DeletedAt     int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`
-	DeletedBy     string   `json:"-" db:"deleted_by,null"`
+	// HandoffLimit is how many times the task may be passed from agent to
+	// agent in all; 0 is no limit.
+	HandoffLimit int    `json:"handoff_limit,omitempty" db:"handoff_limit,null"`
+	Rank         string `json:"rank" db:"rank"`
+	DueOn        string `json:"due_on,omitempty" db:"due_on,null"`
+	CreatedBy    string `json:"created_by" db:"created_by"`
+	CreatedAt    int64  `json:"created_at" db:"created_at"`
+	UpdatedAt    int64  `json:"updated_at" db:"updated_at"`
+	StartedAt    int64  `json:"started_at,omitempty" db:"started_at,null"`
+	CompletedAt  int64  `json:"completed_at,omitempty" db:"completed_at,null"`
+	CanceledAt   int64  `json:"canceled_at,omitempty" db:"canceled_at,null"`
+	CreatedSeq   int64  `json:"created_seq" db:"created_seq"`
+	UpdatedSeq   int64  `json:"updated_seq" db:"updated_seq"`
+	ActivitySeq  int64  `json:"activity_seq" db:"activity_seq"` // the last event on it or on what is in it
+	ArchivedAt   int64  `json:"archived_at,omitempty" db:"archived_at,null"`
+	DeletedAt    int64  `json:"deleted_at,omitempty" db:"deleted_at,null"`
+	DeletedBy    string `json:"-" db:"deleted_by,null"`
 }
 
 // Relation types. One row per pair; the reverse name is derived when read.

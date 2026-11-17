@@ -37,9 +37,6 @@ func taskTake(c *cx, a taskTakeArgs) error {
 	if err != nil {
 		return err
 	}
-	if err := c.checkTaskBudget(t); err != nil {
-		return err
-	}
 	if a.Minutes <= 0 {
 		a.Minutes = defaultLeaseMinutes
 	}
@@ -47,9 +44,6 @@ func taskTake(c *cx, a taskTakeArgs) error {
 		return invalid("minutes", "a lease lasts at most 1440 minutes; renew it by taking the task again")
 	}
 	if err := c.refuseHeld(t); err != nil {
-		return err
-	}
-	if err := c.checkBudget(); err != nil {
 		return err
 	}
 	var pr core.Project

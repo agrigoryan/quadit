@@ -233,7 +233,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	change(owner, "", "member.update", M{"id": "@bea", "scope": M{"projects": []string{"SVA"}}})
 	change(owner, "", "member.update", M{"id": "@cy", "scope": M{"read_only": true}})
 	change(owner, "", "member.remove", M{"id": "@dee"})
-	do("@artist", "agent.create", M{"name": "Artist", "handle": "artist", "scope": M{"projects": []string{"SVA"}}, "budget": M{"cost_micros": 5_000_000, "minutes": 600}})
+	do("@artist", "agent.create", M{"name": "Artist", "handle": "artist", "scope": M{"projects": []string{"SVA"}}, "handoff_limit": 5})
 	do("@ops", "agent.create", M{"name": "Ops bot", "handle": "ops"})
 	token := func(body M) string {
 		t.Helper()
@@ -297,7 +297,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	}
 	task(M{"project": "SVA", "title": "Boss design", "description": "Four phases.\n\nThe last one flies. See OPS-1.", "epic": "Boss fight", "milestone": "Alpha",
 		"cycle": "current", "assignee": "@artist", "waiting_on": "@aram", "priority": 2, "labels": []string{"art", "bug"}, "estimate": 3, "due_on": day(5),
-		"budget": M{"cost_micros": 2_000_000, "minutes": 120}})
+		"handoff_limit": 2})
 	task(M{"project": "OPS", "title": "Rotate keys", "description": "Every key in the vault.", "epic": "Hardening", "milestone": "Audit", "cycle": "current",
 		"assignee": "@aram", "labels": []string{"infra"}, "priority": 1})
 	task(M{"project": "SVA", "title": "Explosion effect", "parent": "SVA-1", "assignee": "@bea", "labels": []string{"art"}})
@@ -478,7 +478,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	as(rw.ops, "claim staging ops", "resource.acquire", M{"resource": "staging", "task": "OPS-1"})
 	as(rw.ops, "claim gpu ops", "resource.acquire", M{"resource": "gpu", "task": "OPS-2", "note": "after the artist"})
 	as(rw.artist, "session artist", "session.start", M{"task": "SVA-1", "title": "Drawing the boss", "instructions": "four phases"})
-	change(nil, rw.artist, "session.update", M{"id": rw.id("session artist"), "summary": "two phases drawn", "cost_micros": 1_250_000,
+	change(nil, rw.artist, "session.update", M{"id": rw.id("session artist"), "summary": "two phases drawn",
 		"add_steps": []M{{"text": "sketched phase one"}}})
 	as(rw.ops, "session ops", "session.start", M{"task": "OPS-1", "title": "Rotating keys"})
 	as(rw.ops, "session ops ended", "session.start", M{"task": "OPS-2", "title": "Checking backups"})

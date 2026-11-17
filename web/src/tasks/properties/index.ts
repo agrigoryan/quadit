@@ -7,12 +7,12 @@
 
 import type { ComponentType } from "react";
 import { assignee } from "@/tasks/properties/assignee";
-import { budget } from "@/tasks/properties/budget";
 import { category } from "@/tasks/properties/category";
 import { cycle } from "@/tasks/properties/cycle";
 import { due } from "@/tasks/properties/due";
 import { epic } from "@/tasks/properties/epic";
 import { estimate } from "@/tasks/properties/estimate";
+import { handoffLimit } from "@/tasks/properties/handoff-limit";
 import { label } from "@/tasks/properties/label";
 import { milestone } from "@/tasks/properties/milestone";
 import { parent } from "@/tasks/properties/parent";
@@ -42,7 +42,7 @@ const TABLE = [
   estimate,
   due,
   parent,
-  budget,
+  handoffLimit,
   project,
 ] as const;
 
@@ -80,13 +80,14 @@ export const CREATE: (TaskProperty<PropertyName> & { Create: ComponentType<Creat
 
 /**
  * The order the timeline says what changed in, when one change carries
- * several: the budget straight after the wait, where the panel shows it last.
+ * several: the hand-off limit straight after the wait, where the panel shows
+ * it last.
  */
 export const TIMELINE: TaskProperty<PropertyName>[] = [
   status,
   assignee,
   waiting,
-  budget,
+  handoffLimit,
   priority,
   label,
   epic,

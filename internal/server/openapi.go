@@ -135,7 +135,7 @@ func apiComponents() map[string]any {
 			"Batch": map[string]any{"type": "object", "properties": map[string]any{"changes": map[string]any{"type": "array", "items": map[string]string{"$ref": "#/components/schemas/Change"}},
 				"dry_run": map[string]string{"type": "boolean"}}},
 			"Error": map[string]any{"type": "object", "properties": map[string]any{"error": map[string]any{"type": "object", "properties": map[string]any{
-				"code":    map[string]any{"enum": []string{"invalid", "forbidden", "not_found", "conflict", "stale", "needs_approval", "budget_exceeded", "unauthorized", "rate_limited"}},
+				"code":    map[string]any{"enum": []string{"invalid", "forbidden", "not_found", "conflict", "stale", "needs_approval", "handoff_limit_reached", "unauthorized", "rate_limited"}},
 				"message": map[string]string{"type": "string"}, "field": map[string]string{"type": "string"},
 				"allowed": map[string]any{"type": "array", "items": map[string]string{"type": "string"}}, "nearest": map[string]string{"type": "string"},
 				"index": map[string]string{"type": "integer", "description": "Which change of a batch was refused."},

@@ -18,25 +18,27 @@ func init() {
 }
 
 type taskCreateArgs struct {
-	ID            string       `json:"id"`
-	Project       string       `json:"project"`
-	Title         string       `json:"title"`
-	Description   string       `json:"description"`
-	Status        string       `json:"status"`
-	Priority      int          `json:"priority"`
-	Assignee      string       `json:"assignee"`
-	WaitingOn     string       `json:"waiting_on"`
-	WaitingOnNote string       `json:"waiting_on_note"`
-	Parent        string       `json:"parent"`
-	Epic          string       `json:"epic"`
-	Milestone     string       `json:"milestone"`
-	Cycle         string       `json:"cycle"`
-	Estimate      int          `json:"estimate"`
-	Labels        []string     `json:"labels"`
-	DueOn         string       `json:"due_on"`
-	Rank          string       `json:"rank"`
-	Template      string       `json:"template"`
-	Budget        *core.Budget `json:"budget"`
+	ID            string   `json:"id"`
+	Project       string   `json:"project"`
+	Title         string   `json:"title"`
+	Description   string   `json:"description"`
+	Status        string   `json:"status"`
+	Priority      int      `json:"priority"`
+	Assignee      string   `json:"assignee"`
+	WaitingOn     string   `json:"waiting_on"`
+	WaitingOnNote string   `json:"waiting_on_note"`
+	Parent        string   `json:"parent"`
+	Epic          string   `json:"epic"`
+	Milestone     string   `json:"milestone"`
+	Cycle         string   `json:"cycle"`
+	Estimate      int      `json:"estimate"`
+	Labels        []string `json:"labels"`
+	DueOn         string   `json:"due_on"`
+	Rank          string   `json:"rank"`
+	Template      string   `json:"template"`
+	// HandoffLimit is how many times the task may be passed from agent to
+	// agent in all; 0 is no limit.
+	HandoffLimit int `json:"handoff_limit"`
 	// Number gives the task this number instead of the next one, so an
 	// import keeps SVA-12 as SVA-12. For admins; the number must be free.
 	Number int `json:"number"`
@@ -89,6 +91,9 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	if err := checkEstimate(a.Estimate); err != nil {
 		return err
 	}
+	if err := checkHandoffLimit(a.HandoffLimit); err != nil {
+		return err
+	}
 	var st core.Status
 	if a.Status != "" {
 		st, err = c.status(project, "status", a.Status)
@@ -100,7 +105,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	}
 	t := core.Task{ID: tid, WorkspaceID: c.ws, ProjectID: project.ID, Title: title, Description: a.Description, StatusID: st.ID,
 		Priority: a.Priority, WaitingOnNote: a.WaitingOnNote, ParentID: parent.ID, Estimate: a.Estimate, DueOn: a.DueOn,
-		Budget: a.Budget, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
+		HandoffLimit: a.HandoffLimit, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 
 	// Who it is given to, who it is worked for, and whose move it is.
 	if t.AssigneeID, err = c.personOnTask("assignee", a.Assignee, t); err != nil {

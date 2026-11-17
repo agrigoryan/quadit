@@ -1,4 +1,4 @@
-# What agents are built against, surface 1.x. Lines are only ever added here.
+# What agents are built against, surface 2.x. Lines are only ever added here.
 api DELETE /api/v1/auth/identities/{id}
 api DELETE /api/v1/auth/passkeys/{id}
 api DELETE /api/v1/auth/sessions/{id}
@@ -118,9 +118,9 @@ api PUT /api/v1/admin/settings/{name}
 api PUT /api/v1/w/{workspace}/cursors/{name}
 change agent.create
 change agent.create arg avatar
-change agent.create arg budget
 change agent.create arg description
 change agent.create arg handle
+change agent.create arg handoff_limit
 change agent.create arg id
 change agent.create arg name
 change agent.create arg responsible
@@ -129,8 +129,8 @@ change agent.create arg scope
 change agent.create arg task
 change agent.update
 change agent.update arg avatar
-change agent.update arg budget
 change agent.update arg description
+change agent.update arg handoff_limit
 change agent.update arg id
 change agent.update arg name
 change agent.update arg responsible
@@ -495,13 +495,10 @@ change session.start arg title
 change session.update
 change session.update arg add_links
 change session.update arg add_steps
-change session.update arg cost_micros
 change session.update arg id
 change session.update arg state
 change session.update arg summary
 change session.update arg title
-change session.update arg tokens_in
-change session.update arg tokens_out
 change source.create
 change source.create arg authority
 change source.create arg branch
@@ -541,12 +538,12 @@ change status.update arg name
 change status.update arg rank
 change task.create
 change task.create arg assignee
-change task.create arg budget
 change task.create arg cycle
 change task.create arg description
 change task.create arg due_on
 change task.create arg epic
 change task.create arg estimate
+change task.create arg handoff_limit
 change task.create arg id
 change task.create arg labels
 change task.create arg milestone
@@ -577,12 +574,12 @@ change task.update arg add_labels
 change task.update arg archived
 change task.update arg assignee
 change task.update arg base_seq
-change task.update arg budget
 change task.update arg cycle
 change task.update arg description
 change task.update arg due_on
 change task.update arg epic
 change task.update arg estimate
+change task.update arg handoff_limit
 change task.update arg id
 change task.update arg labels
 change task.update arg milestone

@@ -72,10 +72,6 @@ export interface AgentState {
   last_action?: string;
   open_tasks: number;
   waiting_on_it: number;
-  /** Dollars this week as a decimal string; absent when nothing was spent. */
-  cost_week?: string;
-  minutes_week?: number;
-  budget?: string;
 }
 
 export interface StatusCount {

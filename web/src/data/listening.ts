@@ -16,8 +16,6 @@ export interface AgentState {
   listening: boolean;
   open_tasks: number;
   waiting_on_it: number;
-  cost_week?: string;
-  minutes_week?: number;
 }
 
 /**

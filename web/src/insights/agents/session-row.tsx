@@ -1,6 +1,6 @@
 // One recorded agent run as a line that opens in place: what it was asked,
-// what it did step by step, what it produced and what it cost. Used on the
-// agents page and in the task panel.
+// what it did step by step, what it produced, and when it started and
+// ended. Used on the agents page and in the task panel.
 
 import { useState } from "react";
 import { Check, ChevronRight, Loader, Square, X } from "lucide-react";
@@ -8,9 +8,8 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember, useRowEvenIfGone } from "@/data/selectors";
-import { ago, exact, lengthOf } from "@/lib/time";
+import { ago, exact } from "@/lib/time";
 import type { AgentSession } from "@/types/core";
-import { moneyMicros, short } from "@/lib/amounts";
 import { sessionLink, stepText } from "@/insights/agents/session-data";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
@@ -24,12 +23,6 @@ const marks = {
 
 type StateName = keyof typeof marks;
 const stateOf = (s: AgentSession): StateName => (s.state in marks ? (s.state as StateName) : "stopped");
-
-/** How long a run took, or has taken so far. */
-export function sessionLength(s: AgentSession, now: number): string {
-  const ms = Math.max(0, (s.ended_at ?? now) - s.started_at);
-  return ms < 60_000 ? t("agents.session.underMinute") : lengthOf(ms);
-}
 
 function StateMark({ session }: { session: AgentSession }) {
   const state = stateOf(session);
@@ -72,7 +65,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-function SessionBody({ session, now }: { session: AgentSession; now: number }) {
+function SessionBody({ session }: { session: AgentSession }) {
   const steps = session.steps ?? [];
   const links = session.links ?? [];
   const heading = "mb-0.5 text-xs font-medium text-ink-2";
@@ -138,13 +131,8 @@ function SessionBody({ session, now }: { session: AgentSession; now: number }) {
         </div>
       )}
       <dl className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
-        <Fact label={t("agents.session.cost")}>{moneyMicros(session.cost_micros)}</Fact>
-        <Fact label={t("agents.session.tokensIn")}>{short(session.tokens_in)}</Fact>
-        <Fact label={t("agents.session.tokensOut")}>{short(session.tokens_out)}</Fact>
         <Fact label={t("agents.session.started")}>{exact(session.started_at)}</Fact>
-        <Fact label={t(session.ended_at ? "agents.session.took" : "agents.session.runningFor")}>
-          {sessionLength(session, now)}
-        </Fact>
+        {!!session.ended_at && <Fact label={t("agents.session.ended")}>{exact(session.ended_at)}</Fact>}
       </dl>
     </div>
   );
@@ -180,14 +168,13 @@ export function SessionRow({ session, now, showAgent, showTask }: Props) {
           <span className="min-w-0 truncate">{title}</span>
         </button>
         {showTask && session.task_id && <TaskKey taskId={session.task_id} />}
-        {!!session.cost_micros && (
-          <span className="shrink-0 text-xs text-ink-2 tnum">{moneyMicros(session.cost_micros)}</span>
-        )}
         <span className="shrink-0 text-xs text-ink-3 tnum" title={exact(session.started_at)}>
-          {running ? t("agents.session.elapsed", { time: sessionLength(session, now) }) : ago(session.started_at, now)}
+          {running
+            ? t("agents.session.startedAgo", { time: ago(session.started_at, now) })
+            : ago(session.started_at, now)}
         </span>
       </div>
-      {open && <SessionBody session={session} now={now} />}
+      {open && <SessionBody session={session} />}
     </li>
   );
 }

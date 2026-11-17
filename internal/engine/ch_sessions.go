@@ -29,9 +29,6 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 	if err != nil {
 		return err
 	}
-	if err := c.checkBudget(); err != nil {
-		return err
-	}
 	seq := c.tx.NextSeq()
 	s := core.AgentSession{ID: sid, WorkspaceID: c.ws, AgentID: c.actor.UserID, Title: a.Title, Instructions: a.Instructions,
 		State: core.AgentSessionRunning, StartedAt: c.at, UpdatedSeq: seq}
@@ -44,10 +41,6 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 		s.TaskID, where, key = t.ID, inTask(t), t.Key
 		if s.Title == "" {
 			s.Title = t.Title
-		}
-		// A task can carry its own limit on what may be spent on it.
-		if err := c.checkTaskBudget(t); err != nil {
-			return err
 		}
 	}
 	if err := c.tx.Insert(c.ctx, s); err != nil {
@@ -68,10 +61,6 @@ type sessionUpdateArgs struct {
 	AddSteps []json.RawMessage `json:"add_steps"`
 	// AddLinks appends commits, files or URLs the run produced.
 	AddLinks []json.RawMessage `json:"add_links"`
-	// Totals so far, not increments.
-	CostMicros Opt[int] `json:"cost_micros"`
-	TokensIn   Opt[int] `json:"tokens_in"`
-	TokensOut  Opt[int] `json:"tokens_out"`
 }
 
 // appendJSON adds items to a JSON list kept in a row.
@@ -86,8 +75,8 @@ func appendJSON(cur json.RawMessage, add []json.RawMessage) (json.RawMessage, er
 	return json.Marshal(list)
 }
 
-// sessionUpdate records how an agent's run goes: its state, steps, links and
-// what it cost.
+// sessionUpdate records how an agent's run goes: its state, steps and
+// links.
 func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 	s, err := loadLive[core.AgentSession](c, "session", "id", a.ID)
 	if err != nil {
@@ -127,16 +116,6 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 		p.set["links"] = all
 		p.changes["links"] = core.FieldChange{To: all}
 	}
-	before := s.CostMicros
-	total := func(col string, o Opt[int], cur *int64) {
-		if o.Set && int64(o.V) != *cur {
-			p.put(col, *cur, int64(o.V))
-			*cur = int64(o.V)
-		}
-	}
-	total("cost_micros", a.CostMicros, &s.CostMicros)
-	total("tokens_in", a.TokensIn, &s.TokensIn)
-	total("tokens_out", a.TokensOut, &s.TokensOut)
 	where := inWorkspace(c.ws)
 	if s.TaskID != "" {
 		var t core.Task
@@ -148,9 +127,5 @@ func sessionUpdate(c *cx, a sessionUpdateArgs) error {
 			where = inTask(t)
 		}
 	}
-	if err := c.save(p, target{table: "agent_sessions", entity: "session", id: s.ID, place: where}); err != nil {
-		return err
-	}
-	_ = before
-	return c.budgetWarnings(s)
+	return c.save(p, target{table: "agent_sessions", entity: "session", id: s.ID, place: where})
 }

@@ -1,6 +1,5 @@
 // One agent, as a card: what it is doing right now, what waits on it,
-// whether anything would wake it, what it spent this week, and its recent
-// runs.
+// whether anything would wake it, and its recent runs.
 
 import { useState } from "react";
 import { CornerDownRight, Ear } from "lucide-react";
@@ -12,9 +11,9 @@ import { useLookup, useRowEvenIfGone } from "@/data/selectors";
 import { count } from "@/lib/amounts";
 import type { AgentState } from "@/types/dashboard";
 import type { Claim } from "@/types/agents";
-import { AgentStateChip, BudgetBar, isStranded, NotListening } from "@/insights/ui/agent-state";
+import { AgentStateChip, isStranded, NotListening } from "@/insights/ui/agent-state";
 import type { AgentWork } from "@/insights/agents/agent-data";
-import { SessionRow, sessionLength } from "@/insights/agents/session-row";
+import { SessionRow } from "@/insights/agents/session-row";
 import { isFinishedHelper } from "@/settings/agents/helper-agents";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
@@ -56,7 +55,7 @@ function Doing({
       <p key="run" className="flex min-w-0 items-baseline gap-1.5">
         <span className="min-w-0 truncate font-medium">{running.title || t("agents.session.untitled")}</span>
         <span className="shrink-0 text-xs text-ink-3 tnum" title={exact(running.started_at)}>
-          {t("agents.session.elapsed", { time: sessionLength(running, now) })}
+          {t("agents.session.startedAgo", { time: ago(running.started_at, now) })}
         </span>
       </p>,
     );
@@ -275,7 +274,6 @@ export function AgentCard({ member, state, helpers, helperNote, work, sessions, 
       </section>
 
       {state && <Reach state={state} now={now} />}
-      {state && <BudgetBar agent={state} />}
 
       <section>
         <h4 className={label}>{t("agents.sessions")}</h4>

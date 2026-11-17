@@ -24,7 +24,7 @@ func TestUpgradeTakesOutWhatWasStoredOfPagesBuiltFromData(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
 		t.Run(d.Name, func(t *testing.T) {
 			ctx := context.Background()
-			st := openAtVersion(t, d, 8)
+			st := openAtVersion(t, d, 0) // the rows as version 8 left them: see upgradeRows
 			e := engine.New(st, nil)
 			ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", OwnerHandle: "aram", WorkspaceSlug: "games", WorkspaceName: "Games"})
 			if err != nil {
@@ -107,9 +107,7 @@ func TestUpgradeTakesOutWhatWasStoredOfPagesBuiltFromData(t *testing.T) {
 					blocks, versions, mentions, len(finds("wombat")), feed)
 			}
 
-			if err := st.MigrateTo(ctx, 0); err != nil {
-				t.Fatal(err)
-			}
+			upgradeRows(t, st, 8)
 			blocks, versions, mentions, feed, props := stored(log)
 			if blocks != 0 || versions != 0 || mentions != 0 || strings.Contains(feed, "wombat") || strings.Contains(props, "built_seq") {
 				t.Errorf("after the upgrade the page built from data still holds %d blocks, %d versions, %d mentions, props %s, and its feed is: %s", blocks, versions, mentions, props, feed)

@@ -136,9 +136,6 @@ type AgentSession struct {
 	Instructions string          `json:"instructions,omitempty" db:"instructions"`
 	Steps        json.RawMessage `json:"steps,omitempty" db:"steps,json"`
 	Links        json.RawMessage `json:"links,omitempty" db:"links,json"`
-	CostMicros   int64           `json:"cost_micros,omitempty" db:"cost_micros"`
-	TokensIn     int64           `json:"tokens_in,omitempty" db:"tokens_in"`
-	TokensOut    int64           `json:"tokens_out,omitempty" db:"tokens_out"`
 	StartedAt    int64           `json:"started_at" db:"started_at"`
 	EndedAt      int64           `json:"ended_at,omitempty" db:"ended_at,null"`
 	UpdatedSeq   int64           `json:"updated_seq" db:"updated_seq"`

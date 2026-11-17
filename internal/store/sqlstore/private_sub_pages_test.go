@@ -32,7 +32,7 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
 		t.Run(d.Name, func(t *testing.T) {
 			ctx := context.Background()
-			st := openAtVersion(t, d, 7)
+			st := openAtVersion(t, d, 0) // the rows as version 7 left them: see upgradeRows
 			e := engine.New(st, nil)
 			ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", OwnerHandle: "aram", WorkspaceSlug: "games", WorkspaceName: "Games"})
 			if err != nil {
@@ -62,9 +62,7 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := st.MigrateTo(ctx, 0); err != nil {
-				t.Fatal(err)
-			}
+			upgradeRows(t, st, 7)
 			db := st.In(ws.ID)
 			for _, page := range []string{root, child, grand, gone} {
 				var doc core.Doc
@@ -108,6 +106,21 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 				t.Errorf("the owner finds %v, want %v", got, want)
 			}
 		})
+	}
+}
+
+// upgradeRows does to the rows of st, a database at the newest schema
+// holding rows as an older version left them, what the upgrades since that
+// version do to rows: it runs each later version's statements that change
+// rows, as a restore of an older archive does (UpgradeLoaded). For an
+// upgrade that only repairs rows that is the whole of it. A test of such an
+// upgrade writes its rows with today's engine, which cannot write into an
+// older schema (its rows have today's columns), and changes by hand what
+// the older version did differently.
+func upgradeRows(t *testing.T, st *sqlstore.Store, from int) {
+	t.Helper()
+	if err := st.UpgradeLoaded(context.Background(), from); err != nil {
+		t.Fatal(err)
 	}
 }
 

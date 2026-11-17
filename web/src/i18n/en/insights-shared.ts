@@ -21,9 +21,4 @@ export const coreStrings = {
   "ins.agent.notListeningUrgent": "Work is waiting, nothing is listening",
   "ins.agent.notListeningHint":
     "Nothing would wake this agent: no companion is holding a wait for it and no webhook pushes to it.",
-  "ins.agent.budget": "{cost} of {budget} this week",
-  "ins.agent.budget.near": "Close to the limit",
-  "ins.agent.budget.over": "Used up",
-  "ins.agent.spentNoBudget": "{cost} and {time} this week, no budget set",
-  "ins.agent.nothingSpent": "Nothing spent this week",
 } as const;

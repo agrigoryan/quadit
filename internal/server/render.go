@@ -40,23 +40,22 @@ type taskView struct {
 	Labels        []string `json:"labels,omitempty"`
 	Epic          string   `json:"epic,omitempty"`
 	Milestone     string   `json:"milestone,omitempty"`
-	// Budget is the task's own limit; Spent what agents have used of it.
-	Budget      *core.Budget `json:"budget,omitempty"`
-	Spent       *core.Budget `json:"spent,omitempty"`
-	Cycle       int          `json:"cycle,omitempty"`
-	Parent      string       `json:"parent,omitempty"`
-	DueOn       string       `json:"due_on,omitempty"`
-	Estimate    int          `json:"estimate,omitempty"`
-	Project     string       `json:"project,omitempty"`
-	Description string       `json:"description,omitempty"`
-	Truncated   bool         `json:"description_truncated,omitempty"`
-	ID          string       `json:"id,omitempty"`
-	CreatedBy   string       `json:"created_by,omitempty"`
-	CreatedAt   string       `json:"created_at,omitempty"`
-	Seq         int64        `json:"seq"`         // moves on anything in the task
-	UpdatedSeq  int64        `json:"updated_seq"` // moves when its own fields change
-	Trashed     bool         `json:"trashed,omitempty"`
-	Archived    bool         `json:"archived,omitempty"`
+	// HandoffLimit is how many times the task may pass from agent to agent.
+	HandoffLimit int    `json:"handoff_limit,omitempty"`
+	Cycle        int    `json:"cycle,omitempty"`
+	Parent       string `json:"parent,omitempty"`
+	DueOn        string `json:"due_on,omitempty"`
+	Estimate     int    `json:"estimate,omitempty"`
+	Project      string `json:"project,omitempty"`
+	Description  string `json:"description,omitempty"`
+	Truncated    bool   `json:"description_truncated,omitempty"`
+	ID           string `json:"id,omitempty"`
+	CreatedBy    string `json:"created_by,omitempty"`
+	CreatedAt    string `json:"created_at,omitempty"`
+	Seq          int64  `json:"seq"`         // moves on anything in the task
+	UpdatedSeq   int64  `json:"updated_seq"` // moves when its own fields change
+	Trashed      bool   `json:"trashed,omitempty"`
+	Archived     bool   `json:"archived,omitempty"`
 }
 
 // formatTime is a moment as the compact forms show it, in UTC to the
@@ -119,7 +118,7 @@ func (who *viewer) taskViews(ctx context.Context, tasks []core.Task) ([]taskView
 		status := names.statuses[t.StatusID]
 		v := taskView{Key: t.Key, Title: t.Title, Status: status.Name, Category: status.Category, Assignee: names.handle(t.AssigneeID),
 			WaitingOn: waitsOn(names, t), WaitingOnNote: t.WaitingOnNote, Labels: names.labelNames(t.LabelIDs),
-			Epic: names.epics[t.EpicID].Name, Milestone: names.milestones[t.MilestoneID], Budget: t.Budget, Cycle: names.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
+			Epic: names.epics[t.EpicID].Name, Milestone: names.milestones[t.MilestoneID], HandoffLimit: t.HandoffLimit, Cycle: names.cycles[t.CycleID].Number, Parent: parentKey[t.ParentID], DueOn: t.DueOn,
 			Estimate: t.Estimate, Seq: t.ActivitySeq, UpdatedSeq: t.UpdatedSeq, Trashed: t.DeletedAt != 0, Archived: t.ArchivedAt != 0}
 		if t.Priority > 0 && t.Priority < len(priorityNames) {
 			v.Priority = priorityNames[t.Priority]
@@ -409,7 +408,7 @@ type taskDetail struct {
 
 // text is the task in full as text, in this order: the title, a line of
 // status and people, a line of everything else it has (labels, epic,
-// budget, dates, the feed position), the description, files, sub-tasks,
+// hand-off limit, dates, the feed position), the description, files, sub-tasks,
 // relations, links, decisions and comments.
 func (d taskDetail) text() string {
 	var b strings.Builder
@@ -448,22 +447,8 @@ func (d taskDetail) text() string {
 	if t.Milestone != "" {
 		meta = append(meta, "milestone: "+t.Milestone)
 	}
-	if budget := t.Budget; budget != nil {
-		var parts []string
-		spent := core.Budget{}
-		if t.Spent != nil {
-			spent = *t.Spent
-		}
-		if budget.CostMicros > 0 {
-			parts = append(parts, fmt.Sprintf("$%.2f of $%.2f", float64(spent.CostMicros)/1e6, float64(budget.CostMicros)/1e6))
-		}
-		if budget.Minutes > 0 {
-			parts = append(parts, fmt.Sprintf("%d of %d min", spent.Minutes, budget.Minutes))
-		}
-		if budget.Handoffs > 0 {
-			parts = append(parts, fmt.Sprintf("%d hand-offs at most", budget.Handoffs))
-		}
-		meta = append(meta, "budget: "+strings.Join(parts, ", "))
+	if t.HandoffLimit > 0 {
+		meta = append(meta, fmt.Sprintf("hand-offs between agents: %d at most", t.HandoffLimit))
 	}
 	if t.Cycle != 0 {
 		meta = append(meta, fmt.Sprintf("cycle: %d", t.Cycle))
@@ -728,18 +713,13 @@ func (n *nameLookup) changeText(changes map[string]core.FieldChange) string {
 		}
 		switch t := v.(type) {
 		case map[string]any:
-			// A budget or a set of limits: its parts in words, not as Go prints a map.
+			// A set of limits: its parts in words, not as Go prints a map.
 			if len(t) == 0 {
 				return ""
 			}
 			var parts []string
 			for k, val := range t {
 				switch k {
-				case "cost_micros":
-					if n, ok := val.(float64); ok {
-						parts = append(parts, "cost "+formatMoney(int64(n)))
-						continue
-					}
 				case "projects":
 					if ids, ok := val.([]any); ok {
 						var keys []string

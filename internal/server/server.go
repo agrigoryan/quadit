@@ -253,7 +253,7 @@ func errNotFound(what string) error {
 // for a code not listed.
 var statusOf = map[string]int{
 	engine.CodeInvalid: 400, engine.CodeForbidden: 403, engine.CodeNotFound: 404, engine.CodeConflict: 409,
-	engine.CodeStale: 409, engine.CodeNeedsApproval: 403, engine.CodeBudget: 403,
+	engine.CodeStale: 409, engine.CodeNeedsApproval: 403, engine.CodeHandoffLimit: 403,
 }
 
 // c is one request with who is asking: the request context every handler

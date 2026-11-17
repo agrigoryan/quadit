@@ -19,7 +19,6 @@ export const pages = {
   "inbox.type.comment": "{who} commented",
   "inbox.type.result": "{who} posted a result",
   "inbox.type.status": "{who} changed the status",
-  "inbox.type.budget": "{who} is close to its weekly budget",
   "inbox.unread": "Unread",
   "inbox.allRead": "Everything is read",
   "inbox.markAllRead": "Mark all read",

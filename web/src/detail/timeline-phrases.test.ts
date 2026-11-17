@@ -69,9 +69,10 @@ describe("changePhrases", () => {
     expect(say({ waiting_on_note: { from: "x", to: "" } })).toEqual(["cleared the waiting note"]);
   });
 
-  it("budget", () => {
-    expect(say({ budget: { from: null, to: { minutes: 5 } } })).toEqual(["set the task's budget"]);
-    expect(say({ budget: { from: { minutes: 5 }, to: null } })).toEqual(["removed the task's budget"]);
+  it("hand-off limit", () => {
+    expect(say({ handoff_limit: { from: 0, to: 3 } })).toEqual(["limited the hand-offs between agents to 3"]);
+    expect(say({ handoff_limit: { from: 3, to: 1 } })).toEqual(["limited the hand-offs between agents to 1"]);
+    expect(say({ handoff_limit: { from: 3, to: 0 } })).toEqual(["removed the limit on hand-offs between agents"]);
   });
 
   it("priority", () => {
@@ -124,7 +125,7 @@ describe("changePhrases", () => {
         epic_id: { from: null, to: "e1" },
         label_ids: { from: null, to: ["l1"] },
         priority: { from: null, to: 1 },
-        budget: { from: null, to: { minutes: 5 } },
+        handoff_limit: { from: 0, to: 2 },
         waiting_on_id: { from: null, to: "u2" },
         assignee_id: { from: null, to: "u2" },
         status_id: { from: "s1", to: "s2" },
@@ -137,7 +138,7 @@ describe("changePhrases", () => {
       "moved this from Todo to Doing",
       "assigned this to @coder",
       "asked @coder to act",
-      "set the task's budget",
+      "limited the hand-offs between agents to 2",
       "set the priority to Urgent",
       "added the label bug",
       "added this to the epic Launch",

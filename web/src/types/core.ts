@@ -81,8 +81,8 @@ export type Member = {
   title?: string;
   /** For an agent: the person who answers for it. */
   responsible_id?: string;
-  /** Limits per week: money, minutes of agent time, and hand-offs of work to another agent. */
-  budget?: { cost_micros?: number; minutes?: number; handoffs?: number };
+  /** For an agent: how many times a week it may pass work on to another agent; absent is no limit. */
+  handoff_limit?: number;
   /** `projects`: the member sees only these (ids). `read_only`: it may look but change nothing. */
   scope?: { projects?: string[]; read_only?: boolean };
   /** A helper agent made for one task: the user id of its maker, and the task. It is suspended when the task closes. */
@@ -161,8 +161,8 @@ export type Task = {
   lease_until?: number;
   /** The person who gave the task to an agent; the agent works with no more access than they have. */
   asked_by?: string;
-  /** What work on this task may take in total: money, minutes of agent time, hand-offs between agents. */
-  budget?: { cost_micros?: number; minutes?: number; handoffs?: number };
+  /** How many times the task may pass from agent to agent in all; absent is no limit. */
+  handoff_limit?: number;
   rank: string;
   due_on?: string;
   created_by: string;
@@ -298,9 +298,6 @@ export type AgentSession = {
   /** What the run did, in order; each step is whatever the agent recorded. */
   steps?: unknown[];
   links?: unknown[];
-  cost_micros?: number;
-  tokens_in?: number;
-  tokens_out?: number;
   started_at: number;
   ended_at?: number;
   updated_seq: number;

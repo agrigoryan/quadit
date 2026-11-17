@@ -24,7 +24,6 @@ const (
 	NoteComment   = "comment"
 	NoteResult    = "result"
 	NoteStatus    = "status"
-	NoteBudget    = "budget"
 )
 
 // Notification is one inbox item.

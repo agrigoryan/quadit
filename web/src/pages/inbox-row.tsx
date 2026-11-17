@@ -5,7 +5,6 @@ import {
   CircleCheck,
   CircleDot,
   ClipboardCheck,
-  Gauge,
   Hourglass,
   type LucideIcon,
   Mail,
@@ -39,7 +38,6 @@ const icons: Record<NotificationType, LucideIcon | null> = {
   comment: MessageSquare,
   result: ClipboardCheck,
   status: CircleDot,
-  budget: Gauge,
 };
 
 /** A snippet is the start of a Markdown text; shown on one line, its bold and code marks are only noise. */

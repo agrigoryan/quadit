@@ -37,7 +37,6 @@
 //	ch_doc*.go      doc.*: create and update, edit and write, versions; a
 //	                page's blocks, its project, and who may see it and the
 //	                pages under it (ch_doc_private.go)
-//	ch_budgets.go   what agents spend, and the warnings
 //	ch_bootstrap.go a new workspace and its owner
 //
 // A handler is a func(c *cx, a Args) error. Its arguments arrive read, with

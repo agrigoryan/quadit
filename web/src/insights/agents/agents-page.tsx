@@ -1,7 +1,7 @@
 // The live view of agents: one card per agent, then the shared resources
-// they take turns on. States, cost and reach come from the server (it alone
-// knows what is listening and what was spent); everything else is read from
-// the store, so the page moves as the feed does.
+// they take turns on. States and reach come from the server (it alone knows
+// what is listening); everything else is read from the store, so the page
+// moves as the feed does.
 
 import { useMemo, useState } from "react";
 import { Bot } from "lucide-react";

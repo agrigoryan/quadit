@@ -13,8 +13,8 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// handleShowWhoAmI answers "who am I": identity, role, scope, what needs approval, the
-// budget left, and where the caller's cursors stand.
+// handleShowWhoAmI answers "who am I": identity, role, scope, what needs
+// approval, an agent's hand-off limit, and where the caller's cursors stand.
 func (s *Server) handleShowWhoAmI(x *c) error {
 	ctx := x.ctx()
 	names, err := x.names(x.ctx())
@@ -40,12 +40,8 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 	}
 	if x.member.Kind == core.KindAgent {
 		out["responsible"] = names.handle(x.user.ResponsibleID)
-		if limits := x.member.Budget; limits != nil {
-			budget, err := x.weekBudget(ctx, limits)
-			if err != nil {
-				return err
-			}
-			out["budget"] = budget
+		if x.member.HandoffLimit > 0 {
+			out["handoff_limit"] = x.member.HandoffLimit
 		}
 	}
 	unread, err := x.ownNotes(ctx, []store.Cond{store.Null("read_at")}, 0)
@@ -83,24 +79,6 @@ func (who *viewer) projectKeys(names *nameLookup) []string {
 	return keys
 }
 
-// weekBudget says what an agent has used of its budget this week, what is
-// left, and when the week starts over.
-func (who *viewer) weekBudget(ctx context.Context, limits *core.Budget) (map[string]any, error) {
-	cost, minutes, err := who.agentUsage(ctx, who.db, who.member.UserID, weekStart(time.Now()))
-	if err != nil {
-		return nil, err
-	}
-	budget := map[string]any{}
-	if limits.CostMicros > 0 {
-		budget["cost_limit"], budget["cost_used"], budget["cost_left"] = formatMoney(limits.CostMicros), formatMoney(cost), formatMoney(max(0, limits.CostMicros-cost))
-	}
-	if limits.Minutes > 0 {
-		budget["minutes_limit"], budget["minutes_used"], budget["minutes_left"] = limits.Minutes, minutes, max(0, limits.Minutes-minutes)
-	}
-	budget["resets"] = time.UnixMilli(weekStart(time.Now())).AddDate(0, 0, 7).UTC().Format("2006-01-02")
-	return budget, nil
-}
-
 // cursorSeqs is where each of the caller's cursors stands, by name.
 func (who *viewer) cursorSeqs(ctx context.Context) (map[string]int64, error) {
 	var cursors []core.Cursor
@@ -128,7 +106,8 @@ func (who *viewer) workspaceRules(ctx context.Context) ([]string, error) {
 }
 
 // whoAmIText is handleShowWhoAmI's answer as lines of text: who, where,
-// what may be done, the budget, what is unread, the cursors and the rules.
+// what may be done, the hand-off limit, what is unread, the cursors and the
+// rules.
 func whoAmIText(out map[string]any, ws core.Workspace, keys []string, cursors map[string]int64, rules []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "you are %s (%s, %s) in %s\n", out["handle"], out["kind"], out["role"], ws.Slug)
@@ -142,15 +121,8 @@ func whoAmIText(out map[string]any, ws core.Workspace, keys []string, cursors ma
 	if out["read_only"] == true {
 		b.WriteString("read-only\n")
 	}
-	if budget, ok := out["budget"].(map[string]any); ok {
-		var parts []string
-		if _, ok := budget["cost_limit"]; ok {
-			parts = append(parts, fmt.Sprintf("cost %v of %v used (%v left)", budget["cost_used"], budget["cost_limit"], budget["cost_left"]))
-		}
-		if _, ok := budget["minutes_limit"]; ok {
-			parts = append(parts, fmt.Sprintf("%v of %v minutes used (%v left)", budget["minutes_used"], budget["minutes_limit"], budget["minutes_left"]))
-		}
-		fmt.Fprintf(&b, "budget this week: %s; resets %v\n", strings.Join(parts, ", "), budget["resets"])
+	if v, ok := out["handoff_limit"]; ok {
+		fmt.Fprintf(&b, "hand-offs to other agents: %v a week at most\n", v)
 	}
 	fmt.Fprintf(&b, "unread: %d   seq: %d\n", out["unread"], ws.Seq)
 	if len(cursors) > 0 {
@@ -166,16 +138,6 @@ func whoAmIText(out map[string]any, ws core.Workspace, keys []string, cursors ma
 	}
 	return b.String()
 }
-
-// weekStart is the start of the week (Monday, UTC) a moment falls in.
-func weekStart(t time.Time) int64 {
-	t = t.UTC()
-	wd := (int(t.Weekday()) + 6) % 7
-	return time.Date(t.Year(), t.Month(), t.Day()-wd, 0, 0, 0, 0, time.UTC).UnixMilli()
-}
-
-// formatMoney is an amount in millionths of a dollar, in dollars and cents.
-func formatMoney(micros int64) string { return fmt.Sprintf("%.2f", float64(micros)/1e6) }
 
 // inboxItem is one notification as the inbox lists it.
 type inboxItem struct {

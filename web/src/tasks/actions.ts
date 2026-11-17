@@ -36,11 +36,11 @@ const FIELD_OF: Partial<Record<keyof Update, keyof Task>> = {
   estimate: "estimate",
   due_on: "due_on",
   rank: "rank",
-  budget: "budget",
+  handoff_limit: "handoff_limit",
 };
 
 /** What a change is called when it is undone: "change {the status} of SVA-12". */
-type Changed = "status" | "assignee" | "waitingOn" | "priority" | "labels" | "budget" | keyof typeof SIMPLE;
+type Changed = "status" | "assignee" | "waitingOn" | "priority" | "labels" | keyof typeof SIMPLE;
 const SIMPLE = {
   epic: "epic_id",
   milestone: "milestone_id",
@@ -48,6 +48,7 @@ const SIMPLE = {
   parent: "parent_id",
   due_on: "due_on",
   estimate: "estimate",
+  handoff_limit: "handoff_limit",
   title: "title",
   description: "description",
 } as const satisfies Partial<Record<keyof Update, keyof Task>>;
@@ -151,8 +152,6 @@ export function setAssignee(tasks: Task[], userId: string | null) {
   );
 }
 
-export type TaskBudget = NonNullable<Task["budget"]>;
-
 /** True when the task's next move is nobody's here: it waits on something outside (a build, a reply, a date). */
 export const waitsOutside = (task: Task) => task.waiting_outside === true;
 
@@ -172,16 +171,6 @@ export function setWaitingOutside(tasks: Task[], note: string) {
     tasks,
     () => ({ waiting_on: OUTSIDE, waiting_on_note: note }),
     () => ({ waiting_on_id: null, waiting_outside: true, waiting_on_note: note || null }),
-  );
-}
-
-/** Gives one task a budget of its own (money, minutes of agent time, hand-offs between agents); null takes it away. */
-export function setBudget(task: Task, budget: TaskBudget | null) {
-  updateAll(
-    "budget",
-    [task],
-    () => ({ budget }),
-    () => ({ budget }),
   );
 }
 
@@ -234,6 +223,8 @@ export const setCycle = setter("cycle");
 export const setParent = setter("parent");
 export const setDue = setter("due_on");
 export const setEstimate = setter("estimate");
+/** How many times the tasks may pass from agent to agent in all; null is no limit. */
+export const setHandoffLimit = setter("handoff_limit");
 export const setTitle = setter("title");
 export const setDescription = setter("description");
 

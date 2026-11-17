@@ -16,26 +16,28 @@ type taskUpdateArgs struct {
 	// BaseSeq, when given, is the task's updated_seq the caller last saw. If
 	// the task has changed since, the update is refused instead of applied
 	// over the newer values.
-	BaseSeq       int64            `json:"base_seq"`
-	Title         Opt[string]      `json:"title"`
-	Description   Opt[string]      `json:"description"`
-	Status        Opt[string]      `json:"status"`
-	Priority      Opt[int]         `json:"priority"`
-	Assignee      Opt[string]      `json:"assignee"`
-	WaitingOn     Opt[string]      `json:"waiting_on"`
-	WaitingOnNote Opt[string]      `json:"waiting_on_note"`
-	Parent        Opt[string]      `json:"parent"`
-	Epic          Opt[string]      `json:"epic"`
-	Milestone     Opt[string]      `json:"milestone"`
-	Cycle         Opt[string]      `json:"cycle"`
-	Estimate      Opt[int]         `json:"estimate"`
-	DueOn         Opt[string]      `json:"due_on"`
-	Rank          Opt[string]      `json:"rank"`
-	Labels        Opt[[]string]    `json:"labels"`
-	AddLabels     []string         `json:"add_labels"`
-	RemoveLabels  []string         `json:"remove_labels"`
-	Archived      Opt[bool]        `json:"archived"`
-	Budget        Opt[core.Budget] `json:"budget"`
+	BaseSeq       int64         `json:"base_seq"`
+	Title         Opt[string]   `json:"title"`
+	Description   Opt[string]   `json:"description"`
+	Status        Opt[string]   `json:"status"`
+	Priority      Opt[int]      `json:"priority"`
+	Assignee      Opt[string]   `json:"assignee"`
+	WaitingOn     Opt[string]   `json:"waiting_on"`
+	WaitingOnNote Opt[string]   `json:"waiting_on_note"`
+	Parent        Opt[string]   `json:"parent"`
+	Epic          Opt[string]   `json:"epic"`
+	Milestone     Opt[string]   `json:"milestone"`
+	Cycle         Opt[string]   `json:"cycle"`
+	Estimate      Opt[int]      `json:"estimate"`
+	DueOn         Opt[string]   `json:"due_on"`
+	Rank          Opt[string]   `json:"rank"`
+	Labels        Opt[[]string] `json:"labels"`
+	AddLabels     []string      `json:"add_labels"`
+	RemoveLabels  []string      `json:"remove_labels"`
+	Archived      Opt[bool]     `json:"archived"`
+	// HandoffLimit is how many times the task may be passed from agent to
+	// agent in all; 0 or null is no limit.
+	HandoffLimit Opt[int] `json:"handoff_limit"`
 }
 
 // taskUpdate changes a task's fields: each one given, in the order of the
@@ -64,7 +66,7 @@ func taskUpdate(c *cx, a taskUpdateArgs) error {
 		u.cycle,
 		u.dueAndRank,
 		u.archived,
-		u.budget,
+		u.handoffLimit,
 		u.labels,
 	}
 	for _, step := range steps {
@@ -284,16 +286,11 @@ func (u *taskEdit) archived() error {
 	return nil
 }
 
-func (u *taskEdit) budget() error {
-	a := &u.a
-	if a.Budget.Set {
-		var b *core.Budget
-		if !a.Budget.Null && (a.Budget.V.CostMicros > 0 || a.Budget.V.Minutes > 0 || a.Budget.V.Handoffs > 0) {
-			b = &a.Budget.V
-		}
-		u.p.set["budget"] = b
-		u.p.changes["budget"] = core.FieldChange{From: u.t.Budget, To: b}
+func (u *taskEdit) handoffLimit() error {
+	if err := checkHandoffLimit(u.a.HandoffLimit.V); err != nil {
+		return err
 	}
+	u.p.setNumber("handoff_limit", u.a.HandoffLimit, &u.t.HandoffLimit)
 	return nil
 }
 

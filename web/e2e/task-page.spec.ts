@@ -70,3 +70,25 @@ test("Ctrl+M starts a comment, Escape leaves the box with the draft kept, and Es
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
 });
+
+test("an admin limits how often the task may pass between agents, and takes the limit off", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const key = await project.newTask("Paint the castle");
+  await page.goto(`/e2e/task/${key}`);
+  const limit = page.getByRole("region", { name: "Properties" }).getByRole("spinbutton", { name: "Hand-off limit" });
+  await limit.fill("2");
+  await limit.press("Enter");
+  await expect.poll(async () => (await quadit.task(key)).handoff_limit).toBe(2);
+  expect(await quadit.cli("show", key)).toContain("hand-offs between agents: 2 at most");
+  await page.reload();
+  await expect(limit).toHaveValue("2");
+
+  await limit.fill("");
+  await limit.press("Enter");
+  await expect.poll(async () => (await quadit.task(key)).handoff_limit).toBeUndefined();
+  await page.reload();
+  await expect(limit).toHaveValue("");
+});

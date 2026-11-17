@@ -290,8 +290,11 @@ func TestRestoreKeepsWhatTheUpgradesRepaired(t *testing.T) {
 		return doc
 	}
 
+	// The archive from version 7 is one made now, of rows as version 7 left
+	// them, that says it is from version 7: today's engine cannot write
+	// into version 7's schema, whose columns are not today's.
 	t.Run("an archive from version 7", func(t *testing.T) {
-		testdb.EachAt(t, 7, func(t *testing.T, src store.Store) {
+		testdb.Each(t, func(t *testing.T, src store.Store) {
 			e, ws, owner := start(t, src)
 			other := apply(t, e, ws, owner.ID, "agent.create", M{"name": "Other", "handle": "other"})
 			root := apply(t, e, ws, owner.ID, "doc.create", M{"title": "Plans"})
@@ -302,14 +305,10 @@ func TestRestoreKeepsWhatTheUpgradesRepaired(t *testing.T) {
 			}
 			files, _ := blob.NewDisk(t.TempDir())
 			var archive bytes.Buffer
-			m, err := backup.Write(ctx, src, files, "test", &archive)
-			if err != nil {
+			if _, err := backup.Write(ctx, src, files, "test", &archive); err != nil {
 				t.Fatal(err)
 			}
-			if m.Schema != 7 {
-				t.Fatalf("the archive records schema version %d, want 7", m.Schema)
-			}
-			restored(t, archive.Bytes(), ws, func(t *testing.T, db store.DB) {
+			restored(t, withSchema(t, archive.Bytes(), 7, "test"), ws, func(t *testing.T, db store.DB) {
 				if doc := page(t, db, child); doc.OwnerID != owner.ID {
 					t.Errorf("the page under the private page is restored as owned by %q, want the private page's owner", doc.OwnerID)
 				}
@@ -393,9 +392,10 @@ func TestAPageBroughtBackUnderAPrivatePageIsPrivateTheSameWay(t *testing.T) {
 }
 
 // withSchema is an archive whose first member, which says the schema
-// version, says schema and version instead: as a newer Quadit would have
-// made it. A schema below 0 takes the member out, as in an archive made
-// before there was one.
+// version, says schema and version instead, and whose manifest says the
+// same schema: as another Quadit would have made it. A schema below 0
+// takes the member out, and the schema out of the manifest, as in an
+// archive made before either said it.
 func withSchema(t *testing.T, archive []byte, schema int, version string) []byte {
 	t.Helper()
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
@@ -423,6 +423,18 @@ func withSchema(t *testing.T, archive []byte, schema int, version string) []byte
 		}
 		if h.Name == "schema.json" {
 			body, _ = json.Marshal(M{"schema": schema, "version": version})
+			h.Size = int64(len(body))
+		}
+		if h.Name == "manifest.json" {
+			var m M
+			if err := json.Unmarshal(body, &m); err != nil {
+				t.Fatal(err)
+			}
+			m["schema"] = schema
+			if schema < 0 {
+				delete(m, "schema")
+			}
+			body, _ = json.Marshal(m)
 			h.Size = int64(len(body))
 		}
 		if err := tw.WriteHeader(h); err != nil {

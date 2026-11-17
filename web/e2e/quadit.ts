@@ -21,6 +21,8 @@ export interface Task {
   priority?: string;
   assignee?: string;
   parent?: string;
+  /** How many times it may pass from agent to agent; absent is no limit. */
+  handoff_limit?: number;
 }
 
 export interface Quadit {

@@ -1,5 +1,5 @@
 // What agents did on a task, shown in the task panel: their recorded
-// sessions (who, when, what they did step by step, what it cost), and the
+// sessions (who, when, what they did step by step), and the
 // branches, commits and pull requests the work lives in, each with its state
 // and whether its checks pass.
 
@@ -24,7 +24,6 @@ import type { AgentSession, Task, TaskLink } from "@/types/core";
 import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
-import { moneyMicros } from "@/lib/amounts";
 import { useNow } from "@/data/live";
 import { SessionRow } from "@/insights/agents/session-row";
 import { removeLink } from "@/tasks/actions";
@@ -119,17 +118,8 @@ function Sessions({ sessions }: { sessions: AgentSession[] }) {
   // The clock only has to run while something is running.
   const running = sessions.some((s) => s.state === "running");
   const now = useNow(running ? 15_000 : 600_000);
-  const cost = sessions.reduce((sum, s) => sum + (s.cost_micros ?? 0), 0);
   return (
-    <Section
-      title={t("taskwork.sessions")}
-      meta={
-        <span className="text-xs text-ink-3 tnum">
-          {sessions.length}
-          {cost > 0 && ` · ${t("taskwork.sessions.cost", { cost: moneyMicros(cost) })}`}
-        </span>
-      }
-    >
+    <Section title={t("taskwork.sessions")} meta={<span className="text-xs text-ink-3 tnum">{sessions.length}</span>}>
       <ul>
         {sessions.map((s) => (
           <SessionRow key={s.id} session={s} now={now} showAgent />

@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -33,24 +32,6 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 		return d, err
 	}
 	d.Task = tv[0]
-	if t.Budget != nil {
-		// What agents have spent of the task's own budget so far.
-		var runs []core.AgentSession
-		if err := who.db.List(ctx, &runs, store.Where(store.Eq("task_id", t.ID))); err != nil {
-			return d, err
-		}
-		spent := core.Budget{}
-		now := time.Now().UnixMilli()
-		for _, r := range runs {
-			spent.CostMicros += r.CostMicros
-			end := r.EndedAt
-			if end == 0 {
-				end = now
-			}
-			spent.Minutes += (end - r.StartedAt) / 60_000
-		}
-		d.Task.Spent = &spent
-	}
 	d.Task.Description, d.Task.Truncated = truncate(d.Task.Description, maxChars)
 
 	// Its sub-tasks, in their order.

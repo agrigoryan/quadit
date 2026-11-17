@@ -34,7 +34,7 @@ export function CreateAgentDialog({
   async function submit() {
     if (!draft.name.trim()) refuse("name", t("s.required"));
     const limits = limitsOf(draft, true);
-    if ("bad" in limits) refuse(limits.bad, t("agent.budgetBad"));
+    if ("bad" in limits) refuse(limits.bad, t("agent.handoffLimitBad"));
     const args: Changes["agent.create"] = {
       id,
       name: draft.name.trim(),
@@ -45,7 +45,7 @@ export function CreateAgentDialog({
     if (draft.avatar) args.avatar = draft.avatar;
     if (draft.responsible) args.responsible = draft.responsible;
     if (limits.scope) args.scope = limits.scope;
-    if (limits.budget) args.budget = limits.budget;
+    if (limits.handoffLimit) args.handoff_limit = limits.handoffLimit;
     await mutate({ type: "agent.create", args }, undefined, { quiet: true });
     toast.info(t("agent.created", { name: draft.name.trim() }));
     onCreated(getRow("members", id)?.handle ?? draft.handle.trim());

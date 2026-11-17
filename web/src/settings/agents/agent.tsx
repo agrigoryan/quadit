@@ -76,14 +76,14 @@ function AgentBody({ agent }: { agent: AgentMember }) {
     errors.clear();
     if (!draft.name.trim()) return errors.set("name", t("s.required"));
     const limits = limitsOf(draft);
-    if ("bad" in limits) return errors.set(limits.bad, t("agent.budgetBad"));
+    if ("bad" in limits) return errors.set(limits.bad, t("agent.handoffLimitBad"));
     const args: Changes["agent.update"] = {
       id: agent.user_id,
       name: draft.name.trim(),
       description: draft.description.trim(),
       avatar: draft.avatar,
       scope: limits.scope,
-      budget: limits.budget,
+      handoff_limit: limits.handoffLimit,
     };
     if (draft.responsible && draft.responsible !== knownResponsible) args.responsible = draft.responsible;
     const changes: ChangeSpec[] = [{ type: "agent.update", args }];
@@ -127,8 +127,6 @@ function AgentBody({ agent }: { agent: AgentMember }) {
           </Fact>
           {agent.last_action && <Fact label={t("agents.lastAction")}>{agent.last_action}</Fact>}
           {state?.doing && <Fact label={state.task ?? ""}>{state.doing}</Fact>}
-          {state?.cost_week && <Fact label={t("agent.budgetMoney")}>{state.cost_week}</Fact>}
-          {!!state?.minutes_week && <Fact label={t("agent.budgetMinutes")}>{state.minutes_week}</Fact>}
         </Card>
       </Section>
 

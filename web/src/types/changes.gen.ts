@@ -20,7 +20,7 @@ export interface Changes {
     role?: string;
     responsible?: string;
     scope?: ScopeArgs | null;
-    budget?: Budget | null;
+    handoff_limit?: number;
     task?: string;
   };
   "agent.update": {
@@ -30,7 +30,7 @@ export interface Changes {
     avatar?: string | null;
     responsible?: string | null;
     scope?: ScopeArgs | null;
-    budget?: Budget | null;
+    handoff_limit?: number | null;
   };
   "attachment.add": {
     id?: string;
@@ -465,9 +465,6 @@ export interface Changes {
     state?: string | null;
     add_steps?: unknown[];
     add_links?: unknown[];
-    cost_micros?: number | null;
-    tokens_in?: number | null;
-    tokens_out?: number | null;
   };
   "source.create": {
     id?: string;
@@ -531,7 +528,7 @@ export interface Changes {
     due_on?: string;
     rank?: string;
     template?: string;
-    budget?: Budget | null;
+    handoff_limit?: number;
     number?: number;
   };
   "task.delete": {
@@ -572,7 +569,7 @@ export interface Changes {
     add_labels?: string[];
     remove_labels?: string[];
     archived?: boolean | null;
-    budget?: Budget | null;
+    handoff_limit?: number | null;
   };
   "template.create": {
     id?: string;
@@ -688,12 +685,6 @@ export interface BlockOp {
   after?: string;
   before?: string;
   rank?: string;
-}
-
-export interface Budget {
-  cost_micros?: number;
-  minutes?: number;
-  handoffs?: number;
 }
 
 export interface DecisionOpenArgs {

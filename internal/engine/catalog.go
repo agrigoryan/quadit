@@ -29,7 +29,7 @@ type ChangeInfo struct {
 // command-line tool's commands. Within a major version things are only
 // added; anything removed or renamed raises the major version. A test holds
 // the code to this (see testdata/surface.txt).
-const Surface = "1.0"
+const Surface = "2.0"
 
 // Catalog lists every change the engine accepts with its arguments. The
 // OpenAPI document, the MCP tool list and the command help are made from it.

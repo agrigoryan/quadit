@@ -102,8 +102,8 @@ ready
 
 === GET /api/v1/changes?format=text
 200
-agent.create (member): id, name (required), handle, description, avatar, role, responsible, scope, budget, task
-agent.update (admin): id (required), name, description, avatar, responsible, scope, budget
+agent.create (member): id, name (required), handle, description, avatar, role, responsible, scope, handoff_limit, task
+agent.update (admin): id (required), name, description, avatar, responsible, scope, handoff_limit
 attachment.add (member): id, file (required), role, caption, task, comment, decision, option, doc
 attachment.remove (member): id (required)
 attachment.restore (member): id (required)
@@ -173,20 +173,20 @@ rule.update (admin): id, name, active, match, action
 secret.delete (admin): id (required)
 secret.set (admin): id, name (required), description, value, hosts, agents, env
 session.start (member): id, task, title, instructions
-session.update (member): id (required), title, summary, state, add_steps, add_links, cost_micros, tokens_in, tokens_out
+session.update (member): id (required), title, summary, state, add_steps, add_links
 source.create (admin): id, root, title, repo, branch, subdir, authority, write_mode
 source.delete (admin): id (required)
 source.update (admin): id, root, title, repo, branch, subdir, authority, write_mode
 status.create (admin): id, project (required), name (required), category (required), color, rank
 status.delete (admin): id (required), move_to
 status.update (admin): id (required), name, category, color, rank, is_default
-task.create (member): id, project, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, labels, due_on, rank, template, budget, number
+task.create (member): id, project, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, labels, due_on, rank, template, handoff_limit, number
 task.delete (member): id (required)
 task.move (member): id (required), project (required)
 task.release (member): id (required)
 task.restore (member): id (required)
 task.take (member): id (required), minutes
-task.update (member): id (required), base_seq, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, due_on, rank, labels, add_labels, remove_labels, archived, budget
+task.update (member): id (required), base_seq, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, due_on, rank, labels, add_labels, remove_labels, archived, handoff_limit
 template.create (member): id, project, name (required), title, description, preset
 template.delete (member): id (required)
 template.update (member): id (required), name, title, description, preset
@@ -199,7 +199,7 @@ webhook.delete (admin): id (required)
 webhook.update (admin): id (required), name, url, secret, event_types, project, for, active
 workspace.delete (owner): confirm (required)
 workspace.update (admin): name, icon, settings
-surface: 1.0 (within 1.x nothing is removed or renamed)
+surface: 2.0 (within 2.x nothing is removed or renamed)
 
 === GET /api/v1/events/types
 200
@@ -1105,10 +1105,6 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
-   "budget": {
-    "cost_micros": 2000000,
-    "minutes": 120
-   },
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 70,
@@ -1117,6 +1113,7 @@ SVA-6  [Review]  waits on @bea  Review me  #art
    "due_on": "<day+5>",
    "epic_id": "<epic Boss fight>",
    "estimate": 3,
+   "handoff_limit": 2,
    "id": "<task SVA-1>",
    "key": "SVA-1",
    "label_ids": [
@@ -3278,10 +3275,6 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
  ],
  "task": {
   "assignee": "@artist",
-  "budget": {
-   "cost_micros": 2000000,
-   "minutes": 120
-  },
   "category": "started",
   "created_at": "<minute>",
   "created_by": "@aram",
@@ -3290,6 +3283,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
   "due_on": "<day+5>",
   "epic": "Boss fight",
   "estimate": 3,
+  "handoff_limit": 2,
   "held_by": "@artist",
   "id": "<task SVA-1>",
   "key": "SVA-1",
@@ -3301,9 +3295,6 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
   "priority": "high",
   "project": "SVA",
   "seq": 258,
-  "spent": {
-   "cost_micros": 1250000
-  },
   "status": "In Progress",
   "title": "Boss design",
   "updated_seq": 237,
@@ -3321,7 +3312,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 261
+labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3   seq: 261
 ---
 Four phases.
 
@@ -3517,7 +3508,6 @@ How many phases?
  "sessions": [
   {
    "agent_id": "<@artist>",
-   "cost_micros": 1250000,
    "id": "<session artist>",
    "instructions": "four phases",
    "started_at": 1700000000000,
@@ -3537,10 +3527,6 @@ How many phases?
   "activity_seq": 258,
   "asked_by": "<@aram>",
   "assignee_id": "<@artist>",
-  "budget": {
-   "cost_micros": 2000000,
-   "minutes": 120
-  },
   "created_at": 1700000000000,
   "created_by": "<@aram>",
   "created_seq": 70,
@@ -3549,6 +3535,7 @@ How many phases?
   "due_on": "<day+5>",
   "epic_id": "<epic Boss fight>",
   "estimate": 3,
+  "handoff_limit": 2,
   "id": "<task SVA-1>",
   "key": "SVA-1",
   "label_ids": [
@@ -4195,10 +4182,6 @@ seq: 261
  ],
  "task": {
   "assignee": "@artist",
-  "budget": {
-   "cost_micros": 2000000,
-   "minutes": 120
-  },
   "category": "started",
   "created_at": "<minute>",
   "created_by": "@aram",
@@ -4207,6 +4190,7 @@ seq: 261
   "due_on": "<day+5>",
   "epic": "Boss fight",
   "estimate": 3,
+  "handoff_limit": 2,
   "held_by": "@artist",
   "id": "<task SVA-1>",
   "key": "SVA-1",
@@ -4218,9 +4202,6 @@ seq: 261
   "priority": "high",
   "project": "SVA",
   "seq": 258,
-  "spent": {
-   "cost_micros": 1250000
-  },
   "status": "In Progress",
   "title": "Boss design",
   "updated_seq": 237,
@@ -4488,10 +4469,6 @@ seq: 261
    "change_id": "<id #187>",
    "data": {
     "changes": {
-     "cost_micros": {
-      "from": 0,
-      "to": 1250000
-     },
      "steps": {
       "from": null,
       "to": [
@@ -4649,7 +4626,7 @@ seq: 261
 #159 <minute> @aram attachment.created SVA-1
 #160 <minute> @aram attachment.deleted moved to trash
 #231 <minute> @artist session.created SVA-1
-#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
+#232 <minute> @artist session.updated steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
 #237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress
 #258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)
 #260 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
@@ -4824,10 +4801,6 @@ seq: 258
  ],
  "task": {
   "assignee": "@artist",
-  "budget": {
-   "cost_micros": 2000000,
-   "minutes": 120
-  },
   "category": "started",
   "created_at": "<minute>",
   "created_by": "@aram",
@@ -4837,6 +4810,7 @@ seq: 258
   "due_on": "<day+5>",
   "epic": "Boss fight",
   "estimate": 3,
+  "handoff_limit": 2,
   "held_by": "@artist",
   "id": "<task SVA-1>",
   "key": "SVA-1",
@@ -4848,9 +4822,6 @@ seq: 258
   "priority": "high",
   "project": "SVA",
   "seq": 258,
-  "spent": {
-   "cost_micros": 1250000
-  },
   "status": "In Progress",
   "title": "Boss design",
   "updated_seq": 237,
@@ -4868,7 +4839,7 @@ seq: 258
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 261
+labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3   seq: 261
 ---
 Four phases.
 
@@ -5106,10 +5077,6 @@ How many phases?
   ],
   "task": {
    "assignee": "@artist",
-   "budget": {
-    "cost_micros": 2000000,
-    "minutes": 120
-   },
    "category": "started",
    "created_at": "<minute>",
    "created_by": "@aram",
@@ -5118,6 +5085,7 @@ How many phases?
    "due_on": "<day+5>",
    "epic": "Boss fight",
    "estimate": 3,
+   "handoff_limit": 2,
    "held_by": "@artist",
    "id": "<task SVA-1>",
    "key": "SVA-1",
@@ -5129,9 +5097,6 @@ How many phases?
    "priority": "high",
    "project": "SVA",
    "seq": 258,
-   "spent": {
-    "cost_micros": 1250000
-   },
    "status": "In Progress",
    "title": "Boss design",
    "updated_seq": 237,
@@ -5150,7 +5115,7 @@ How many phases?
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   budget: $1.25 of $2.00, 0 of 120 min   cycle: 1   due: <day+5>   estimate: 3   seq: 261
+labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3   seq: 261
 ---
 Four phases.
 
@@ -5205,10 +5170,6 @@ The last level.
  "parents": [
   {
    "assignee": "@artist",
-   "budget": {
-    "cost_micros": 2000000,
-    "minutes": 120
-   },
    "category": "started",
    "created_at": "<minute>",
    "created_by": "@aram",
@@ -5217,6 +5178,7 @@ The last level.
    "due_on": "<day+5>",
    "epic": "Boss fight",
    "estimate": 3,
+   "handoff_limit": 2,
    "held_by": "@artist",
    "id": "<task SVA-1>",
    "key": "SVA-1",
@@ -6731,12 +6693,9 @@ nothing found
    "change_id": "<id #222>",
    "data": {
     "row": {
-     "budget": {
-      "cost_micros": 5000000,
-      "minutes": 600
-     },
      "created_at": 1700000000000,
      "handle": "artist",
+     "handoff_limit": 5,
      "kind": "agent",
      "name": "Artist",
      "responsible_id": "<@aram>",
@@ -7280,10 +7239,6 @@ nothing found
      "activity_seq": 70,
      "asked_by": "<@aram>",
      "assignee_id": "<@artist>",
-     "budget": {
-      "cost_micros": 2000000,
-      "minutes": 120
-     },
      "created_at": 1700000000000,
      "created_by": "<@aram>",
      "created_seq": 70,
@@ -7292,6 +7247,7 @@ nothing found
      "due_on": "<day+5>",
      "epic_id": "<epic Boss fight>",
      "estimate": 3,
+     "handoff_limit": 2,
      "id": "<task SVA-1>",
      "key": "SVA-1",
      "label_ids": [
@@ -10307,10 +10263,6 @@ nothing found
    "change_id": "<id #187>",
    "data": {
     "changes": {
-     "cost_micros": {
-      "from": 0,
-      "to": 1250000
-     },
      "steps": {
       "from": null,
       "to": [
@@ -10951,7 +10903,7 @@ nothing found
 #227 <minute> @aram resource.deleted moved to trash
 #228 <minute> @artist claim: took gpu for SVA-1: rendering the boss
 #231 <minute> @artist session.created SVA-1
-#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
+#232 <minute> @artist session.updated steps: none -> [{"text":"sketched phase one"}]; summary: none -> two phases drawn
 #236 <minute> @ops session.created "Looking around"
 #237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress
 #239 <minute> @aram rule.created "tell the owner"
@@ -11110,7 +11062,7 @@ seq: 261
   "#227 <minute> @aram resource.deleted moved to trash",
   "#228 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
   "#231 <minute> @artist session.created SVA-1",
-  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#232 <minute> @artist session.updated steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#236 <minute> @ops session.created \"Looking around\"",
   "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
   "#239 <minute> @aram rule.created \"tell the owner\"",
@@ -11707,7 +11659,7 @@ seq: 261
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
   "#231 <minute> @artist session.created SVA-1",
-  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#232 <minute> @artist session.updated steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
   "#260 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)"
@@ -11962,7 +11914,7 @@ seq: 261
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
   "#231 <minute> @artist session.created SVA-1",
-  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#232 <minute> @artist session.updated steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
   "#258 <minute> @artist comment SVA-1: Phase three is drawn.  (id=<comment SVA-1 for the webhook>)",
   "#260 <minute> @artist inbox comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)"
@@ -12019,7 +11971,7 @@ seq: 261
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
   "#231 <minute> @artist session.created SVA-1",
-  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#232 <minute> @artist session.updated steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
   "#252 <minute> @artist task.updated SVA-6 label: none -> art",
   "#254 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
@@ -12082,7 +12034,7 @@ seq: 261
   "#159 <minute> @aram attachment.created SVA-1",
   "#160 <minute> @aram attachment.deleted moved to trash",
   "#231 <minute> @artist session.created SVA-1",
-  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#232 <minute> @artist session.updated steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
   "#252 <minute> @artist task.updated SVA-6 label: none -> art",
   "#254 <minute> @artist inbox waiting_on: SVA-6 Review me — in your view \"Art bugs\"",
@@ -12277,7 +12229,7 @@ seq: 261
   "#227 <minute> @aram resource.deleted moved to trash",
   "#228 <minute> @artist claim: took gpu for SVA-1: rendering the boss",
   "#231 <minute> @artist session.created SVA-1",
-  "#232 <minute> @artist session.updated cost_micros: 0 -> 1250000; steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
+  "#232 <minute> @artist session.updated steps: none -> [{\"text\":\"sketched phase one\"}]; summary: none -> two phases drawn",
   "#236 <minute> @ops session.created \"Looking around\"",
   "#237 <minute> @artist task.updated SVA-1 lease_holder: none -> @artist; status: Todo -> In Progress",
   "#239 <minute> @aram rule.created \"tell the owner\"",
@@ -12848,12 +12800,9 @@ seq: 261
    "workspace_id": "<id #153>"
   },
   {
-   "budget": {
-    "cost_micros": 5000000,
-    "minutes": 600
-   },
    "created_at": 1700000000000,
    "handle": "artist",
+   "handoff_limit": 5,
    "kind": "agent",
    "last_action": "comment.create SVA-1",
    "last_seen_at": 1700000000000,
@@ -13156,7 +13105,6 @@ seq: 261
   },
   {
    "agent_id": "<@artist>",
-   "cost_micros": 1250000,
    "id": "<session artist>",
    "instructions": "four phases",
    "started_at": 1700000000000,
@@ -13242,10 +13190,6 @@ seq: 261
    "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
-   "budget": {
-    "cost_micros": 2000000,
-    "minutes": 120
-   },
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 70,
@@ -13253,6 +13197,7 @@ seq: 261
    "due_on": "<day+5>",
    "epic_id": "<epic Boss fight>",
    "estimate": 3,
+   "handoff_limit": 2,
    "id": "<task SVA-1>",
    "key": "SVA-1",
    "label_ids": [
@@ -13971,12 +13916,9 @@ seq: 261
    "workspace_id": "<id #153>"
   },
   {
-   "budget": {
-    "cost_micros": 5000000,
-    "minutes": 600
-   },
    "created_at": 1700000000000,
    "handle": "artist",
+   "handoff_limit": 5,
    "kind": "agent",
    "last_action": "comment.create SVA-1",
    "last_seen_at": 1700000000000,
@@ -14273,7 +14215,6 @@ seq: 261
   },
   {
    "agent_id": "<@artist>",
-   "cost_micros": 1250000,
    "id": "<session artist>",
    "instructions": "four phases",
    "started_at": 1700000000000,
@@ -14359,10 +14300,6 @@ seq: 261
    "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
-   "budget": {
-    "cost_micros": 2000000,
-    "minutes": 120
-   },
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 70,
@@ -14370,6 +14307,7 @@ seq: 261
    "due_on": "<day+5>",
    "epic_id": "<epic Boss fight>",
    "estimate": 3,
+   "handoff_limit": 2,
    "id": "<task SVA-1>",
    "key": "SVA-1",
    "label_ids": [
@@ -15236,7 +15174,6 @@ seq: 261
   },
   {
    "agent_id": "<@artist>",
-   "cost_micros": 1250000,
    "id": "<session artist>",
    "instructions": "four phases",
    "started_at": 1700000000000,
@@ -15258,10 +15195,6 @@ seq: 261
    "activity_seq": 258,
    "asked_by": "<@aram>",
    "assignee_id": "<@artist>",
-   "budget": {
-    "cost_micros": 2000000,
-    "minutes": 120
-   },
    "created_at": 1700000000000,
    "created_by": "<@aram>",
    "created_seq": 70,
@@ -15269,6 +15202,7 @@ seq: 261
    "due_on": "<day+5>",
    "epic_id": "<epic Boss fight>",
    "estimate": 3,
+   "handoff_limit": 2,
    "id": "<task SVA-1>",
    "key": "SVA-1",
    "label_ids": [
@@ -15433,12 +15367,9 @@ seq: 261
    "workspace_id": "<id #153>"
   },
   {
-   "budget": {
-    "cost_micros": 5000000,
-    "minutes": 600
-   },
    "created_at": 1700000000000,
    "handle": "artist",
+   "handoff_limit": 5,
    "kind": "agent",
    "last_action": "comment.create SVA-1",
    "last_seen_at": 1700000000000,
@@ -15566,12 +15497,9 @@ seq: 261
    "workspace_id": "<id #153>"
   },
   {
-   "budget": {
-    "cost_micros": 5000000,
-    "minutes": 600
-   },
    "created_at": 1700000000000,
    "handle": "artist",
+   "handoff_limit": 5,
    "kind": "agent",
    "last_action": "comment.create SVA-1",
    "last_seen_at": 1700000000000,
@@ -16165,7 +16093,6 @@ holding  task=<task SVA-1>  resource=<resource gpu>  user=<@artist>  id=<claim g
   },
   {
    "agent_id": "<@artist>",
-   "cost_micros": 1250000,
    "id": "<session artist>",
    "instructions": "four phases",
    "started_at": 1700000000000,
@@ -16202,7 +16129,6 @@ Drawing the boss  running  task=<task SVA-1>  id=<session artist>
   },
   {
    "agent_id": "<@artist>",
-   "cost_micros": 1250000,
    "id": "<session artist>",
    "instructions": "four phases",
    "started_at": 1700000000000,
@@ -16943,12 +16869,9 @@ stale  Stale  id=<view Stale>
    "workspace_id": "<id #153>"
   },
   {
-   "budget": {
-    "cost_micros": 5000000,
-    "minutes": 600
-   },
    "created_at": 1700000000000,
    "handle": "artist",
+   "handoff_limit": 5,
    "kind": "agent",
    "last_action": "comment.create SVA-1",
    "last_seen_at": 1700000000000,
@@ -17067,12 +16990,9 @@ stale  Stale  id=<view Stale>
    "workspace_id": "<id #153>"
   },
   {
-   "budget": {
-    "cost_micros": 5000000,
-    "minutes": 600
-   },
    "created_at": 1700000000000,
    "handle": "artist",
+   "handoff_limit": 5,
    "kind": "agent",
    "last_action": "comment.create SVA-1",
    "last_seen_at": 1700000000000,
@@ -17204,7 +17124,6 @@ stale  Stale  id=<view Stale>
  "sessions": [
   {
    "agent_id": "<@artist>",
-   "cost_micros": 1250000,
    "id": "<session artist>",
    "instructions": "four phases",
    "started_at": 1700000000000,
@@ -20070,8 +19989,6 @@ Reds and golds.
 {
  "agents": [
   {
-   "budget": "5.00",
-   "cost_week": "1.25",
    "doing": "Drawing the boss",
    "handle": "@artist",
    "last_action": "comment.create SVA-1",
@@ -20375,8 +20292,6 @@ SVA Done: 1
 {
  "agents": [
   {
-   "budget": "5.00",
-   "cost_week": "1.25",
    "doing": "Drawing the boss",
    "handle": "@artist",
    "last_action": "comment.create SVA-1",
@@ -20865,8 +20780,6 @@ SVA Done: 1
 {
  "agents": [
   {
-   "budget": "5.00",
-   "cost_week": "1.25",
    "doing": "Drawing the boss",
    "handle": "@artist",
    "last_action": "comment.create SVA-1",
@@ -21325,7 +21238,7 @@ id: 34
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #221>","data":{"changes":{"removed_at":{"from":0,"to":1700000000000}},"id":"<@dee>"},"entity_id":"<@dee>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":34,"type":"member.updated"}
 
 id: 35
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #222>","data":{"row":{"budget":{"cost_micros":5000000,"minutes":600},"created_at":1700000000000,"handle":"artist","kind":"agent","name":"Artist","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete"],"projects":["<project SVA>"]},"updated_seq":35,"user_id":"<@artist>","workspace_id":"<id #153>"}},"entity_id":"<@artist>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":35,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #222>","data":{"row":{"created_at":1700000000000,"handle":"artist","handoff_limit":5,"kind":"agent","name":"Artist","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete"],"projects":["<project SVA>"]},"updated_seq":35,"user_id":"<@artist>","workspace_id":"<id #153>"}},"entity_id":"<@artist>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":35,"type":"member.created"}
 
 id: 36
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #223>","data":{"row":{"created_at":1700000000000,"handle":"ops","kind":"agent","name":"Ops bot","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete"]},"updated_seq":36,"user_id":"<@ops>","workspace_id":"<id #153>"}},"entity_id":"<@ops>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":36,"type":"member.created"}
@@ -21394,7 +21307,7 @@ id: 69
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #256>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<preference gone>"},"entity_id":"<preference gone>","entity_type":"preference","scope_id":"<id #153>","scope_type":"workspace","seq":69,"type":"preference.deleted"}
 
 id: 70
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #257>","data":{"row":{"activity_seq":70,"asked_by":"<@aram>","assignee_id":"<@artist>","budget":{"cost_micros":2000000,"minutes":120},"created_at":1700000000000,"created_by":"<@aram>","created_seq":70,"cycle_id":"<cycle SVA now>","description":"Four phases.\n\nThe last one flies. See OPS-1.","due_on":"<day+5>","epic_id":"<epic Boss fight>","estimate":3,"id":"<task SVA-1>","key":"SVA-1","label_ids":["<label art>","<label bug>"],"milestone_id":"<milestone Alpha>","number":1,"priority":2,"project_id":"<project SVA>","rank":"00000000sg","status_id":"<id #166>","title":"Boss design","updated_at":1700000000000,"updated_seq":70,"waiting_on_id":"<@aram>"}},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":70,"type":"task.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #257>","data":{"row":{"activity_seq":70,"asked_by":"<@aram>","assignee_id":"<@artist>","created_at":1700000000000,"created_by":"<@aram>","created_seq":70,"cycle_id":"<cycle SVA now>","description":"Four phases.\n\nThe last one flies. See OPS-1.","due_on":"<day+5>","epic_id":"<epic Boss fight>","estimate":3,"handoff_limit":2,"id":"<task SVA-1>","key":"SVA-1","label_ids":["<label art>","<label bug>"],"milestone_id":"<milestone Alpha>","number":1,"priority":2,"project_id":"<project SVA>","rank":"00000000sg","status_id":"<id #166>","title":"Boss design","updated_at":1700000000000,"updated_seq":70,"waiting_on_id":"<@aram>"}},"entity_id":"<task SVA-1>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":70,"type":"task.created"}
 
 id: 73
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #259>","data":{"row":{"activity_seq":73,"assignee_id":"<@bea>","created_at":1700000000000,"created_by":"<@aram>","created_seq":73,"epic_id":"<epic Boss fight>","id":"<task SVA-2>","key":"SVA-2","label_ids":["<label art>"],"number":2,"parent_id":"<task SVA-1>","priority":0,"project_id":"<project SVA>","rank":"00000001kw","status_id":"<id #166>","title":"Explosion effect","updated_at":1700000000000,"updated_seq":73}},"entity_id":"<task SVA-2>","entity_type":"task","project_id":"<project SVA>","scope_id":"<task SVA-2>","scope_type":"task","seq":73,"type":"task.created"}
@@ -21685,7 +21598,7 @@ id: 231
 data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #186>","data":{"key":"SVA-1","row":{"agent_id":"<@artist>","id":"<session artist>","instructions":"four phases","started_at":1700000000000,"state":"running","task_id":"<task SVA-1>","title":"Drawing the boss","updated_seq":231}},"entity_id":"<session artist>","entity_type":"session","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":231,"type":"session.created"}
 
 id: 232
-data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #187>","data":{"changes":{"cost_micros":{"from":0,"to":1250000},"steps":{"from":null,"to":[{"text":"sketched phase one"}]},"summary":{"from":null,"to":"two phases drawn"}},"id":"<session artist>"},"entity_id":"<session artist>","entity_type":"session","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":232,"type":"session.updated"}
+data: {"actor_id":"<@artist>","at":1700000000000,"change_id":"<id #187>","data":{"changes":{"steps":{"from":null,"to":[{"text":"sketched phase one"}]},"summary":{"from":null,"to":"two phases drawn"}},"id":"<session artist>"},"entity_id":"<session artist>","entity_type":"session","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":232,"type":"session.updated"}
 
 id: 236
 data: {"actor_id":"<@ops>","at":1700000000000,"change_id":"<id #398>","data":{"key":"","row":{"agent_id":"<@ops>","id":"<session no task>","started_at":1700000000000,"state":"running","title":"Looking around","updated_seq":236}},"entity_id":"<session no task>","entity_type":"session","scope_id":"<id #153>","scope_type":"workspace","seq":236,"type":"session.created"}

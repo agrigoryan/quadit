@@ -11,17 +11,9 @@ interface Scope {
   needs_approval?: string[];
 }
 
-interface Budget {
-  cost_micros?: number;
-  minutes?: number;
-  /** How many times a week it may pass work on to another agent. */
-  handoffs?: number;
-}
-
 /** A member row with the fields only agents use. */
 export interface AgentMember extends Member {
   scope?: Scope;
-  budget?: Budget;
   last_action?: string;
   /** A helper made for one task: the user id of its maker, and the task. It is suspended when the task closes. */
   delegated_by?: string;
@@ -52,18 +44,8 @@ export function memberChoiceLabel(member: Member, listening: boolean | undefined
   return `${base} · ${listening ? t("agents.choice.listening") : t("agents.choice.notListening")}`;
 }
 
-export const dollars = (micros: number | undefined) => (micros ? String(micros / 1_000_000) : "");
-
-/** "12.50" → 12500000; "" → 0 (no limit); anything else → null. */
-export function toMicros(text: string): number | null {
-  const s = text.trim().replace(/^\$/, "");
-  if (s === "") return 0;
-  const n = Number(s);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 1_000_000) : null;
-}
-
-/** A whole number of minutes or hand-offs; "" → 0 (no limit); anything else → null. */
-export function toMinutes(text: string): number | null {
+/** A limit typed in a box: a whole number, zero or more; "" → 0 (no limit); anything else → null. */
+export function toLimit(text: string): number | null {
   const s = text.trim();
   if (s === "") return 0;
   const n = Number(s);

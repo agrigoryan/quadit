@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -58,12 +57,6 @@ func TestGuardRails(t *testing.T) {
 		// A person steps in and the count starts over.
 		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "assignee": "@alpha"})
 		w.do(a, "task.update", M{"id": "SVA-1", "assignee": "@beta"})
-
-		// A task's own budget stops new runs on it.
-		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "budget": M{"cost_micros": 1_000_000}})
-		run := w.do(b, "session.start", M{"task": "SVA-1", "title": "first run"})
-		w.do(b, "session.update", M{"id": run.Ref, "cost_micros": 1_200_000, "state": "done", "add_steps": []M{{"did": "drew the sprite"}}})
-		w.refused(engine.CodeBudget, b, "session.start", M{"task": "SVA-1"})
 
 		// Watching an epic is watching its tasks.
 		epic := w.do(w.owner.ID, "epic.create", M{"project": "SVA", "name": "Boss fight"})
@@ -204,52 +197,54 @@ func TestNewAgentsAskFirst(t *testing.T) {
 	})
 }
 
-// TestBudgets checks the warnings before a limit and the clean stop at it,
-// for a task's own budget and for hand-offs.
-func TestBudgets(t *testing.T) {
+// TestHandoffLimits checks the two limits on passing work from agent to
+// agent: an agent's, counted per week, and a task's own, counted in total.
+// At a limit the hand-off is refused, and handing the task to a person
+// still works.
+func TestHandoffLimits(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		a, b := w.agent("alpha"), w.agent("beta")
-		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Draw the boss", "assignee": "@alpha", "budget": M{"cost_micros": 1_000_000}})
-		inbox := func() string {
-			var ns []core.Notification
-			st.In(w.ws.ID).List(context.Background(), &ns, store.Q{Where: []store.Cond{store.Eq("user_id", w.owner.ID), store.Eq("type", core.NoteBudget)}, Order: "seq"})
-			var out []string
-			for _, n := range ns {
-				out = append(out, n.Title)
-			}
-			return strings.Join(out, " | ")
-		}
-		run := w.do(a, "session.start", M{"task": "SVA-1"}).Ref
-		w.do(a, "session.update", M{"id": run, "cost_micros": 500_000})
-		if got := inbox(); got != "" {
-			t.Fatalf("a warning at half the budget: %s", got)
-		}
-		w.do(a, "session.update", M{"id": run, "cost_micros": 850_000})
-		w.do(a, "session.update", M{"id": run, "cost_micros": 900_000})
-		if got := inbox(); got != "SVA-1 has used 80% of its budget" {
-			t.Fatalf("warnings at 85%% and 90%%: %q", got)
-		}
-		w.do(a, "session.update", M{"id": run, "cost_micros": 1_200_000, "state": "done"})
-		if got := inbox(); !strings.HasSuffix(got, "SVA-1 has used up its budget") {
-			t.Fatalf("the budget ran out: %q", got)
-		}
-		// A clean stop: no new run and no taking it, but it can be said and handed back.
-		w.refused(engine.CodeBudget, a, "session.start", M{"task": "SVA-1"})
-		w.refused(engine.CodeBudget, b, "task.take", M{"id": "SVA-1"})
-		w.do(a, "comment.create", M{"task": "SVA-1", "body": "Out of budget; half done.", "waiting_on": "@aram"})
 
-		// Hand-offs count against an agent's budget.
-		w.do(w.owner.ID, "agent.update", M{"id": "@alpha", "budget": M{"handoffs": 2}})
-		for i := range 2 {
-			w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Pass along", "assignee": "@alpha"})
-			w.do(a, "task.update", M{"id": fmt.Sprintf("SVA-%d", i+2), "assignee": "@beta"})
-		}
-		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "One too many", "assignee": "@alpha"})
-		if e := w.refused(engine.CodeBudget, a, "task.update", M{"id": "SVA-4", "assignee": "@beta"}); !strings.Contains(e.Message, "hand the task to a person") {
-			t.Fatalf("a third hand-off: %v", e)
-		}
-		w.do(a, "task.update", M{"id": "SVA-4", "assignee": "@aram"})
+		t.Run("an agent's in a week", func(t *testing.T) {
+			w.do(w.owner.ID, "agent.update", M{"id": "@alpha", "handoff_limit": 2})
+			var m core.Member
+			if err := w.db().Get(context.Background(), &m, store.Eq("user_id", a)); err != nil || m.HandoffLimit != 2 {
+				t.Fatalf("the agent's hand-off limit reads %d, want 2", m.HandoffLimit)
+			}
+			for range 2 {
+				key := w.task(w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Pass along", "assignee": "@alpha"}).Ref).Key
+				w.do(a, "task.update", M{"id": key, "assignee": "@beta"})
+			}
+			key := w.task(w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "One too many", "assignee": "@alpha"}).Ref).Key
+			if e := w.refused(engine.CodeHandoffLimit, a, "task.update", M{"id": key, "assignee": "@beta"}); !strings.Contains(e.Message, "hand the task to a person") {
+				t.Fatalf("a third hand-off: %v", e)
+			}
+			w.do(a, "task.update", M{"id": key, "assignee": "@aram"})
+
+			// An agent cannot lift its own limit; the person responsible can.
+			w.refused(engine.CodeForbidden, a, "agent.update", M{"id": "@alpha", "handoff_limit": nil})
+			w.do(w.owner.ID, "agent.update", M{"id": "@alpha", "handoff_limit": nil})
+			w.do(w.owner.ID, "task.update", M{"id": key, "assignee": "@alpha"})
+			w.do(a, "task.update", M{"id": key, "assignee": "@beta"})
+		})
+
+		t.Run("a task's in total", func(t *testing.T) {
+			key := w.task(w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Draw the boss", "assignee": "@beta", "handoff_limit": 1}).Ref).Key
+			if task := w.task(key); task.HandoffLimit != 1 {
+				t.Fatalf("the task's hand-off limit reads %d, want 1", task.HandoffLimit)
+			}
+			w.do(b, "task.update", M{"id": key, "assignee": "@alpha"})
+			if e := w.refused(engine.CodeHandoffLimit, a, "task.update", M{"id": key, "assignee": "@beta"}); !strings.Contains(e.Message, "hand it to a person") {
+				t.Fatalf("a second hand-off of the task: %v", e)
+			}
+			w.do(a, "task.update", M{"id": key, "assignee": "@aram"})
+
+			// Raised, the limit lets the work move on.
+			w.do(w.owner.ID, "task.update", M{"id": key, "handoff_limit": 3, "assignee": "@alpha"})
+			w.do(a, "task.update", M{"id": key, "assignee": "@beta"})
+			w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": key, "handoff_limit": -1})
+		})
 	})
 }
