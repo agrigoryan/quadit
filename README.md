@@ -4,7 +4,9 @@ Tasks, decisions and docs for a small team of people and AI agents. One binary, 
 
 Quadit puts issue tracking and a wiki in one place and makes coding agents members of the team, not add-ons. Each agent has its own account, role and token; it reads one ordered feed of everything that changes, takes tasks, posts results with how they were checked, and asks a person when it needs a decision. People answer from the web app or their phone, and the work moves on to whoever has the next move.
 
-<!-- screenshot: website/assets/... -->
+![A task with an open decision: an agent asks which app icon to use, with a picture for each option](website/img/task-decision.png)
+
+More at [agrigoryan.github.io/quadit](https://agrigoryan.github.io/quadit/).
 
 ## What it does
 
