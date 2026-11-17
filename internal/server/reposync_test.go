@@ -252,6 +252,24 @@ func TestRepositorySyncDecides(t *testing.T) {
 				t.Fatalf("the page lost its edit: %q", got)
 			}
 		}},
+		{"a file's HTML, a comment span's look-alike too, is its text both ways", map[string]string{"docs/a.md": "A <span class=\"badge\">new</span> thing.\n\nWrite <span data-comment=\"ID\">words</span> to mark them.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
+			source(r, nil)
+			r.syncAnswering(200)
+			page := s.pageID("a")
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 0 || res.PagesUpdated != 0 {
+				t.Fatalf("an idle sync wrote: %+v", res)
+			}
+			// An agent reads the page with its comment spans and writes it back with an edit.
+			text := s.call(s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil)
+			s.change(s.owner, "", "doc.write", M{"doc": page, "markdown": strings.Replace(text, "thing", "feature", 1)})
+			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 {
+				t.Fatalf("the edit was not written: %+v", res)
+			}
+			want := "A <span class=\"badge\">new</span> feature.\n\nWrite <span data-comment=\"ID\">words</span> to mark them.\n"
+			if got := gitIn(t, r.origin, "show", "main:docs/a.md"); got+"\n" != want {
+				t.Fatalf("the file reads\n%s\nwant\n%s", got, want)
+			}
+		}},
 		{"both changed and the pages have the say: the page is written", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, M{"authority": "pages"})
 			r.syncAnswering(200)

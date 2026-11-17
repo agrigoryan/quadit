@@ -5,9 +5,16 @@ package md
 
 import "strings"
 
-// ParseInline turns one run of Markdown text into inline content.
+// ParseInline turns one run of Markdown text into inline content, as a
+// file holds it: what reads as a comment span is text.
 func ParseInline(s string) []Inline {
-	p := &inlineParser{s: s, styles: map[string]bool{}}
+	return parseInline(s, false)
+}
+
+// parseInline turns one run of Markdown text into inline content, reading
+// comment spans when comments says so.
+func parseInline(s string, comments bool) []Inline {
+	p := &inlineParser{s: s, styles: map[string]bool{}, comments: comments}
 	for p.i < len(s) {
 		p.step()
 	}
@@ -18,16 +25,18 @@ func ParseInline(s string) []Inline {
 	return p.out
 }
 
-// inlineParser is one run of ParseInline: the text, how far it is read,
-// what it has made, the text not yet made into a run, the marks open, and
-// the comment spans open (the threads each names), innermost last.
+// inlineParser is one run of parseInline: the text, how far it is read,
+// what it has made, the text not yet made into a run, the marks open, and,
+// when it reads comment spans (comments), those open (the threads each
+// names), innermost last.
 type inlineParser struct {
-	s      string
-	i      int
-	out    []Inline
-	buf    strings.Builder
-	styles map[string]bool
-	spans  [][]string
+	s        string
+	i        int
+	out      []Inline
+	buf      strings.Builder
+	styles   map[string]bool
+	comments bool
+	spans    [][]string
 }
 
 // spanOpen is how a comment span starts; the thread ids follow, then '">'.
@@ -58,7 +67,7 @@ func (p *inlineParser) step() {
 		p.link()
 	case strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://"):
 		p.address()
-	case strings.HasPrefix(rest, spanOpen) && strings.Contains(rest, `">`):
+	case p.comments && strings.HasPrefix(rest, spanOpen) && strings.Contains(rest, `">`):
 		p.flush()
 		ids, _, _ := strings.Cut(rest[len(spanOpen):], `">`)
 		p.spans = append(p.spans, strings.FieldsFunc(ids, func(r rune) bool { return r == ' ' || r == ',' }))
@@ -170,7 +179,7 @@ func (p *inlineParser) link() {
 		return
 	}
 	p.flush()
-	inner := ParseInline(text)
+	inner := parseInline(text, p.comments)
 	around := p.open()
 	for k := range inner {
 		if len(around) == 0 {

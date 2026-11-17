@@ -24,22 +24,34 @@ var (
 )
 
 // inline is the inline content of a run of Markdown, as JSON.
-func inline(text string) json.RawMessage {
-	raw := plainjson.Marshal(ParseInline(text))
-	return raw
+func (p *parser) inline(text string) json.RawMessage {
+	return plainjson.Marshal(parseInline(text, p.comments))
 }
 
-// Parse turns Markdown into blocks.
+// Parse turns Markdown into blocks, as a file holds a page (Render): what
+// reads as a comment span is text.
 func Parse(src string) []Block {
+	return parse(src, false)
+}
+
+// ParseWithComments turns Markdown into blocks as agents write a page
+// (RenderWithComments): the words in a comment span carry its threads.
+func ParseWithComments(src string) []Block {
+	return parse(src, true)
+}
+
+func parse(src string, comments bool) []Block {
 	lines := strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n")
-	p := &parser{lines: lines}
+	p := &parser{lines: lines, comments: comments}
 	return p.blocks(0)
 }
 
-// parser reads one page of Markdown, a line at a time.
+// parser reads one page of Markdown, a line at a time; comments says
+// whether it reads comment spans.
 type parser struct {
-	lines []string
-	pos   int
+	lines    []string
+	pos      int
+	comments bool
 }
 
 // indentOf is how far a line is indented, a tab counting four spaces.
@@ -84,7 +96,7 @@ func (p *parser) block() Block {
 	}
 	if m := headingRE.FindStringSubmatch(trimmed); m != nil {
 		p.pos++
-		return Block{Type: "heading", Props: map[string]any{"level": len(m[1])}, Content: inline(m[2])}
+		return Block{Type: "heading", Props: map[string]any{"level": len(m[1])}, Content: p.inline(m[2])}
 	}
 	if ruleRE.MatchString(line) && !bulletRE.MatchString(line) {
 		p.pos++
@@ -130,7 +142,7 @@ func (p *parser) quote() Block {
 		parts = append(parts, strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p.lines[p.pos]), ">")))
 		p.pos++
 	}
-	return Block{Type: "quote", Content: inline(strings.Join(parts, "\n"))}
+	return Block{Type: "quote", Content: p.inline(strings.Join(parts, "\n"))}
 }
 
 // tableStarts says whether line is a table's header: it has a | and the
@@ -152,7 +164,7 @@ func (p *parser) paragraph() Block {
 		parts = append(parts, t)
 		p.pos++
 	}
-	return Block{Type: "paragraph", Content: inline(strings.Join(parts, "\n"))}
+	return Block{Type: "paragraph", Content: p.inline(strings.Join(parts, "\n"))}
 }
 
 // startsBlock says whether a line (and its trimmed form) starts a block
@@ -198,7 +210,7 @@ func (p *parser) item(indent int, text, typ string) Block {
 		text += "\n" + strings.TrimSpace(l)
 		p.pos++
 	}
-	b.Content = inline(text)
+	b.Content = p.inline(text)
 	// Skip blank lines only if something more deeply indented follows.
 	save := p.pos
 	for p.pos < len(p.lines) && strings.TrimSpace(p.lines[p.pos]) == "" {
@@ -240,7 +252,7 @@ func (p *parser) table() Block {
 	row := func(line string) {
 		var r TableRow
 		for _, c := range splitRow(line) {
-			r.Cells = append(r.Cells, inline(c))
+			r.Cells = append(r.Cells, p.inline(c))
 		}
 		t.Rows = append(t.Rows, r)
 	}

@@ -80,7 +80,7 @@ func TestInlineEdges(t *testing.T) {
 		"a*b":                     "a\\*b",
 		"~~gone~~ and `code *x*`": "~~gone~~ and `code *x*`",
 	} {
-		if got := renderInlines(ParseInline(in)); got != want {
+		if got := renderInlines(ParseInline(in), false); got != want {
 			t.Errorf("%q -> %q, want %q", in, got, want)
 		}
 	}
@@ -99,7 +99,7 @@ func TestMarksAroundCodeRoundTrip(t *testing.T) {
 		"**[bold `code`](https://x.io)**": "[**bold** **`code`**](https://x.io)",
 	} {
 		parsed := ParseInline(in)
-		got := renderInlines(parsed)
+		got := renderInlines(parsed, false)
 		if got != want {
 			t.Errorf("%q -> %q, want %q", in, got, want)
 		}

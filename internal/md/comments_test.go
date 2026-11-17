@@ -13,7 +13,7 @@ import (
 // reads as.
 func paragraph(t *testing.T, src string) json.RawMessage {
 	t.Helper()
-	blocks := Parse(src)
+	blocks := ParseWithComments(src)
 	if len(blocks) != 1 {
 		t.Fatalf("%q reads as %d blocks, want one", src, len(blocks))
 	}
@@ -63,7 +63,7 @@ func TestCommentSpansRoundTrip(t *testing.T) {
 		`<span data-comment="t1">see </span><span data-comment="t1 t2">[the plan](https://x.io)</span><span data-comment="t2"> now</span>`,
 		"Ask <span data-comment=\"t1\">`code` and *more*</span>.",
 	} {
-		blocks := Parse(src)
+		blocks := ParseWithComments(src)
 		if got := strings.TrimSuffix(RenderWithComments(blocks), "\n"); got != src {
 			t.Errorf("read and written back with comments:\n got %s\nwant %s", got, src)
 		}
@@ -84,12 +84,26 @@ func TestCommentSpansRoundTrip(t *testing.T) {
 	t.Run("text that reads as a span is written so it stays text", func(t *testing.T) {
 		in := Block{Type: "paragraph", Content: plainjson.Marshal([]Inline{{Type: "text", Text: `type <span data-comment="x">here</span> in`}})}
 		md := RenderWithComments([]Block{in})
-		if got := Plain(Parse(md)[0]); got != `type <span data-comment="x">here</span> in` {
+		if got := Plain(ParseWithComments(md)[0]); got != `type <span data-comment="x">here</span> in` {
 			t.Errorf("written as %q, read back as %q", md, got)
 		}
 	})
+	t.Run("a page as a file reads and writes what looks like a span as text", func(t *testing.T) {
+		for _, src := range []string{
+			`Write <span data-comment="ID">words</span> to mark them.`,
+			`A <span class="badge">new</span> thing, and a </span> alone.`,
+		} {
+			blocks := Parse(src)
+			if got := Plain(blocks[0]); got != src {
+				t.Errorf("%s reads as %q", src, got)
+			}
+			if got := strings.TrimSuffix(Render(blocks), "\n"); got != src {
+				t.Errorf("%s is written back as %s", src, got)
+			}
+		}
+	})
 	t.Run("a closing tag with nothing open is text", func(t *testing.T) {
-		if got := Plain(Parse("a </span> b")[0]); got != "a </span> b" {
+		if got := Plain(ParseWithComments("a </span> b")[0]); got != "a </span> b" {
 			t.Errorf("got %q", got)
 		}
 	})
@@ -252,7 +266,7 @@ func TestFindAddedWords(t *testing.T) {
 // other, as the two texts cannot say which went.
 func TestCarryMarksAtTheEdges(t *testing.T) {
 	mentioned := func(src string) json.RawMessage {
-		return Mentions(Parse(src), isMember)[0].Content
+		return Mentions(ParseWithComments(src), isMember)[0].Content
 	}
 	for _, tc := range []struct {
 		name     string

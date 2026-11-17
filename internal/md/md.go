@@ -8,8 +8,9 @@
 //
 // The words a comment thread is on carry the thread in their styles
 // ("comment": "THREAD_ID"), so the marker moves with the text. Agents read
-// and write it as <span data-comment="THREAD_ID">words</span>; a page as a
-// file holds it (Render) leaves it out.
+// and write it as <span data-comment="THREAD_ID">words</span>
+// (RenderWithComments, ParseWithComments); a page as a file holds it
+// (Render, Parse) has no spans, and text that looks like one is text.
 //
 // How the package is laid out:
 //

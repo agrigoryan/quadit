@@ -331,10 +331,16 @@ func lcs(a, b []md.Block) (keepA, keepB []bool) {
 // pageMarkdown is Markdown read into a page's blocks, with each @handle of
 // a member made a mention as the editor makes one (md.Mentions): it then
 // references and tells the member as a typed mention does, and the page
-// writes it back as @handle.
+// writes it back as @handle. Markdown from people and agents has the
+// comment spans they read; a system write's is a file's (a repository's),
+// which holds none: what looks like one there is the file's text.
 func (c *cx) pageMarkdown(src string) ([]md.Block, error) {
+	parse := md.ParseWithComments
+	if c.system {
+		parse = md.Parse
+	}
 	var failed error
-	blocks := md.Mentions(md.Parse(src), func(handle string) bool {
+	blocks := md.Mentions(parse(src), func(handle string) bool {
 		var m core.Member
 		ok, err := store.Find(c.ctx, c.tx, &m, store.Eq("handle", handle), store.Null("removed_at"))
 		failed = cmp.Or(failed, err)

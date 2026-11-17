@@ -170,7 +170,7 @@ func renderContent(content json.RawMessage, comments bool) string {
 		return ""
 	}
 	if !comments {
-		return renderInlines(ins)
+		return renderInlines(ins, false)
 	}
 	return renderSpans(ins, "")
 }
@@ -200,7 +200,7 @@ func renderSpans(ins []Inline, outer string) string {
 			if in.Type == "link" {
 				writeLink(&part, in, renderSpans(in.Content, value[i]))
 			} else {
-				part.WriteString(renderInlines([]Inline{in}))
+				part.WriteString(renderInlines([]Inline{in}, true))
 			}
 		}
 		if value[i] == outer {
@@ -242,12 +242,13 @@ func writeLink(b *strings.Builder, in Inline, inner string) {
 }
 
 // renderInlines writes inline content out: links, marks around the text
-// they cover, and the label of a mention or chip.
-func renderInlines(ins []Inline) string {
+// they cover, and the label of a mention or chip. Text that reads as a
+// comment span is kept text where spans are read (comments).
+func renderInlines(ins []Inline, comments bool) string {
 	var b strings.Builder
 	for _, in := range ins {
 		if in.Type == "link" {
-			writeLink(&b, in, renderInlines(in.Content))
+			writeLink(&b, in, renderInlines(in.Content, comments))
 			continue
 		}
 		if in.Type != "text" && in.Text == "" {
@@ -267,7 +268,7 @@ func renderInlines(ins []Inline) string {
 			b.WriteString(t)
 			continue
 		default:
-			core = escape(core)
+			core = escape(core, comments)
 		}
 		if in.Styles.On("strike") {
 			core = "~~" + core + "~~"
@@ -285,8 +286,9 @@ func renderInlines(ins []Inline) string {
 
 // escape protects the characters that would read as markup, and only where
 // they would: a star between spaces, a bracket that starts no link or a <
-// that starts no comment span is left as it is, so plain text stays plain.
-func escape(s string) string {
+// that starts no comment span (or any, where spans are not read: not
+// comments) is left as it is, so plain text stays plain.
+func escape(s string, comments bool) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
 		c := s[i]
@@ -305,7 +307,7 @@ func escape(s string) string {
 				b.WriteByte('\\')
 			}
 		case '<':
-			if strings.HasPrefix(s[i:], spanOpen) || strings.HasPrefix(s[i:], spanClose) {
+			if comments && (strings.HasPrefix(s[i:], spanOpen) || strings.HasPrefix(s[i:], spanClose)) {
 				b.WriteByte('\\')
 			}
 		}
