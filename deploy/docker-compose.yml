@@ -5,8 +5,8 @@
 
 services:
   quadit:
-    build: ..
-    image: quadit
+    image: ghcr.io/agrigoryan/quadit:latest
+    # Or build it from this checkout: replace the line above with build: ..
     restart: unless-stopped
     ports:
       - "4780:4780"
