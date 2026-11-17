@@ -20,7 +20,7 @@ func TestUpgradePutsInboxEventsInTheProjectOfWhatTheyAreAbout(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
 		t.Run(d.Name, func(t *testing.T) {
 			ctx := context.Background()
-			st := openAtVersion(t, d, 0) // the rows as version 9 left them: see upgradeRows
+			st := openWritableAt(t, d, 9)
 			e := engine.New(st, nil)
 			ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", OwnerHandle: "aram", WorkspaceSlug: "games", WorkspaceName: "Games"})
 			if err != nil {
@@ -45,7 +45,7 @@ func TestUpgradePutsInboxEventsInTheProjectOfWhatTheyAreAbout(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			upgradeRows(t, st, 9)
+			upgrade(t, st)
 			evs, err := db.Events(ctx, store.EventFilter{Types: []string{"notification.created"}, Limit: 10})
 			if err != nil {
 				t.Fatal(err)

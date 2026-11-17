@@ -32,7 +32,7 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
 		t.Run(d.Name, func(t *testing.T) {
 			ctx := context.Background()
-			st := openAtVersion(t, d, 0) // the rows as version 7 left them: see upgradeRows
+			st := openWritableAt(t, d, 7)
 			e := engine.New(st, nil)
 			ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", OwnerHandle: "aram", WorkspaceSlug: "games", WorkspaceName: "Games"})
 			if err != nil {
@@ -62,7 +62,7 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			upgradeRows(t, st, 7)
+			upgrade(t, st)
 			db := st.In(ws.ID)
 			for _, page := range []string{root, child, grand, gone} {
 				var doc core.Doc
@@ -109,19 +109,64 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 	}
 }
 
-// upgradeRows does to the rows of st, a database at the newest schema
-// holding rows as an older version left them, what the upgrades since that
-// version do to rows: it runs each later version's statements that change
-// rows, as a restore of an older archive does (UpgradeLoaded). For an
-// upgrade that only repairs rows that is the whole of it. A test of such an
-// upgrade writes its rows with today's engine, which cannot write into an
-// older schema (its rows have today's columns), and changes by hand what
-// the older version did differently.
-func upgradeRows(t *testing.T, st *sqlstore.Store, from int) {
+// columnsAddedSince are the columns that today's rows carry and an older
+// schema did not have yet, by the version that added them, as "table
+// column type". The upgrade tests write an older version's rows with
+// today's engine: openWritableAt adds these columns for the writing, and
+// upgrade takes them out again before upgrading, so the upgrades meet the
+// schema they were written for. A version that adds a column to a table
+// the engine writes adds it here.
+var columnsAddedSince = map[int][]string{
+	12: {"members handoff_limit INTEGER", "tasks handoff_limit INTEGER"},
+}
+
+// openWritableAt opens an empty database at an older schema version that
+// today's engine can write into (see columnsAddedSince).
+func openWritableAt(t *testing.T, d sqlstore.Dialect, version int) *sqlstore.Store {
 	t.Helper()
-	if err := st.UpgradeLoaded(context.Background(), from); err != nil {
+	st := openAtVersion(t, d, version)
+	for _, col := range laterColumns(t, st) {
+		table, def, _ := strings.Cut(col, " ")
+		if err := st.Exec(context.Background(), "ALTER TABLE "+table+" ADD COLUMN "+def); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return st
+}
+
+// upgrade brings a database opened with openWritableAt to the newest
+// schema, as a newer binary does, once the columns added for the writing
+// are gone.
+func upgrade(t *testing.T, st *sqlstore.Store) {
+	t.Helper()
+	ctx := context.Background()
+	for _, col := range laterColumns(t, st) {
+		table, def, _ := strings.Cut(col, " ")
+		name, _, _ := strings.Cut(def, " ")
+		if err := st.Exec(ctx, "ALTER TABLE "+table+" DROP COLUMN "+name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.MigrateTo(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// laterColumns are the columns of columnsAddedSince that the schema st is
+// at does not have.
+func laterColumns(t *testing.T, st *sqlstore.Store) []string {
+	t.Helper()
+	at, err := st.SchemaVersion(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for version, cols := range columnsAddedSince {
+		if version > at {
+			out = append(out, cols...)
+		}
+	}
+	return out
 }
 
 // openAtVersion opens an empty database of a kind at a schema version,
