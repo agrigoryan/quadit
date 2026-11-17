@@ -63,6 +63,7 @@ api GET /api/v1/w/{workspace}/tasks
 api GET /api/v1/w/{workspace}/tasks/{ref}
 api GET /api/v1/w/{workspace}/tasks/{ref}/context
 api GET /api/v1/w/{workspace}/tokens
+api GET /desktop/finish
 api GET /f/{id}/{name}
 api GET /healthz
 api GET /licenses
@@ -112,6 +113,7 @@ api POST /api/v1/w/{workspace}/sources/{id}/sync
 api POST /api/v1/w/{workspace}/tokens
 api POST /api/v1/w/{workspace}/webhooks/{id}/test
 api POST /api/v1/workspaces
+api POST /desktop/connect
 api POST /hooks/github/{id}
 api POST /mcp
 api POST /oauth/authorize

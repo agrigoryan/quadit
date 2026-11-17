@@ -120,7 +120,7 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 		return back("This account is disabled.")
 	}
 	if state.LinkUser == "" {
-		secondStep, err := s.signIn(x, u, provider)
+		secondStep, err := s.signIn(x, u, provider, false)
 		if err != nil {
 			return err
 		}

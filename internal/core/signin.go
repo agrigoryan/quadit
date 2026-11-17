@@ -15,6 +15,7 @@ const (
 
 // One-time token kinds: what a short-lived secret is for.
 const (
+	OneTimeDesktopCode     = "desktop_code"     // a code the desktop app trades for a session
 	OneTimeOAuth           = "oauth"            // the state of a sign-in with a provider
 	OneTimeOAuthConsent    = "oauth_consent"    // a consent screen of the server's own OAuth
 	OneTimeOAuthCode       = "oauth_code"       // an authorization code of the server's own OAuth

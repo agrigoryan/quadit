@@ -382,6 +382,10 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
 400
 
 
+=== GET /desktop/finish?code=nope&verifier=nope
+400
+
+
 === GET /mcp
 405
 

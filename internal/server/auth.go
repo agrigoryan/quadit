@@ -126,15 +126,16 @@ func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) 
 	return spent, nil
 }
 
-// startSession signs a person in on this browser, after a first step made
-// by method: "password", "passkey" or a provider's id. A passkey is both
-// steps at once. After any other first step the session owes a second
-// (stage mfa, which reaches only the firstStepPassed routes) when the
-// person has one to give (secondStepOwed). A session this browser had is
-// ended: a sign-in takes its place.
-func (s *Server) startSession(x *c, u core.User, method string) error {
+// startSession signs a person in on this browser. twoStep says the sign-in
+// took both steps already: a passkey, or the desktop app's hand-off from a
+// browser session that took two. After one step (a password, a provider's
+// account) the session owes a second (stage mfa, which reaches only the
+// firstStepPassed routes) when the person has one to give
+// (secondStepOwed). A session this browser had is ended: a sign-in takes
+// its place.
+func (s *Server) startSession(x *c, u core.User, twoStep bool) error {
 	ctx := x.ctx()
-	stage, twoStep := core.SessionFull, method == "passkey"
+	stage := core.SessionFull
 	if !twoStep {
 		owed, err := s.secondStepOwed(ctx, u)
 		if err != nil {
@@ -230,7 +231,7 @@ func (s *Server) handleSetUpInstall(x *c) error {
 		return err
 	}
 	s.audit(x.r, ws.ID, owner, "install.setup", "workspace", ws.ID, nil)
-	if err := s.startSession(x, owner, "password"); err != nil {
+	if err := s.startSession(x, owner, false); err != nil {
 		return err
 	}
 	return x.json(201, map[string]any{"user": owner, "workspace": ws})
@@ -302,7 +303,7 @@ func (s *Server) handleSignIn(x *c) error {
 // finishSignIn starts the session after the first step and answers with
 // the person, or with second_step when the session waits for it.
 func (s *Server) finishSignIn(x *c, u core.User, method string) error {
-	secondStep, err := s.signIn(x, u, method)
+	secondStep, err := s.signIn(x, u, method, method == "passkey") // a passkey is both steps at once
 	if err != nil {
 		return err
 	}
@@ -313,11 +314,11 @@ func (s *Server) finishSignIn(x *c, u core.User, method string) error {
 }
 
 // signIn signs a person in on this browser once they have passed the first
-// step by method (password, passkey or a provider's id), and records the
-// sign-in. It reports whether the session still waits for the second step,
-// which startSession decides.
-func (s *Server) signIn(x *c, u core.User, method string) (secondStep bool, err error) {
-	if err := s.startSession(x, u, method); err != nil {
+// step by method (password, passkey, a provider's id, or desktop), and
+// records the sign-in. twoStep says that step was both (startSession). It
+// reports whether the session still waits for the second step.
+func (s *Server) signIn(x *c, u core.User, method string, twoStep bool) (secondStep bool, err error) {
+	if err := s.startSession(x, u, twoStep); err != nil {
 		return false, err
 	}
 	if x.sess.Stage == core.SessionMFA {

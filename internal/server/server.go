@@ -28,6 +28,7 @@
 //	  auth.go, auth_totp.go, auth_reset.go, auth_invites.go,
 //	  auth_passkeys.go, auth_oauth.go, signin_provider.go,
 //	  signin_github.go, signin_oidc.go, tokens.go
+//	  desktop.go     the desktop app signing in through the system browser
 //	Reads
 //	  viewer.go      the viewer: who a read is made for, and what they may
 //	                 see. Every read below is a method of it that takes a
@@ -969,7 +970,7 @@ func (s *Server) Handler() http.Handler {
 			s.fail(rec, r, err)
 			return
 		}
-		if servedByMux(r.URL.Path) {
+		if s.servedByMux(r) {
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				h.Set("Cache-Control", "no-store")
 			}
@@ -984,15 +985,20 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
-// servedByMux reports whether a path is one of the server's routes rather
-// than a page of the web app.
-func servedByMux(path string) bool {
+// servedByMux reports whether a request is the server's rather than a page
+// of the web app: one of its routes takes it, or its path is under a prefix
+// that is the server's alone, where an address no route takes is answered
+// "not found" by the server and never with the app. Elsewhere a path can be
+// both, told apart by the method: the web app shows /desktop/connect, and
+// the server takes what that page posts there.
+func (s *Server) servedByMux(r *http.Request) bool {
 	for _, prefix := range []string{"/api/", "/f/", "/mcp", "/.well-known/", "/oauth/", "/hooks/"} {
-		if strings.HasPrefix(path, prefix) {
+		if strings.HasPrefix(r.URL.Path, prefix) {
 			return true
 		}
 	}
-	return path == "/healthz" || path == "/readyz" || path == "/metrics" || path == "/licenses"
+	_, pattern := s.mux.Handler(r)
+	return pattern != ""
 }
 
 // recorder notes the status of an answer, for the metrics, and whether

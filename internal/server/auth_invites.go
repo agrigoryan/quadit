@@ -103,7 +103,7 @@ func (s *Server) handleRegisterAccount(x *c) error {
 		return err
 	}
 	s.audit(x.r, "", u, "account.registered", "user", u.ID, nil)
-	if err := s.startSession(x, u, "password"); err != nil {
+	if err := s.startSession(x, u, false); err != nil {
 		return err
 	}
 	return x.json(201, map[string]any{"user": u})
@@ -283,7 +283,7 @@ func (s *Server) newInvitedPerson(x *c, inv core.Invite, b registerBody) (core.U
 	if err != nil {
 		return u, err
 	}
-	return u, s.startSession(x, u, "password")
+	return u, s.startSession(x, u, false)
 }
 
 // handleAcceptInvite joins the workspace: as the person signed in, or as a new

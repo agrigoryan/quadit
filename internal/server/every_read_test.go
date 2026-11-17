@@ -619,6 +619,7 @@ func (rw *richWorkspace) reads() []read {
 		read{route: "GET /.well-known/oauth-protected-resource/mcp", path: "/.well-known/oauth-protected-resource/mcp"},
 		read{route: "GET /.well-known/oauth-authorization-server", path: "/.well-known/oauth-authorization-server"},
 		read{route: "GET /oauth/authorize", path: "/oauth/authorize", statusOnly: true},
+		read{route: "GET /desktop/finish", path: "/desktop/finish?code=nope&verifier=nope", statusOnly: true},
 		read{route: "GET /mcp", path: "/mcp", statusOnly: true},
 		read{route: "GET /api/v1/admin/settings", path: "/api/v1/admin/settings", statusOnly: true},
 		read{route: "GET /api/v1/admin/audit", path: "/api/v1/admin/audit", statusOnly: true},

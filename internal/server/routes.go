@@ -61,6 +61,7 @@ func (s *Server) allRoutes() []route {
 		s.eventTypeRoutes(),      // eventtypes.go
 		s.mcpRoutes(),            // mcp.go
 		s.oauthServerRoutes(),    // oauth_server.go
+		s.desktopRoutes(),        // desktop.go
 		s.openAPIRoutes(),        // openapi.go
 	)
 }
