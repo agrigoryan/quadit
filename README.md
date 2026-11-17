@@ -53,6 +53,7 @@ See [docs/agents.md](docs/agents.md), with the setup for each agent. The same su
 | [docs/data-model.md](docs/data-model.md) | How data is stored and why |
 | [docs/store.md](docs/store.md) | The data layer: migrations on goose, restores, and the queries |
 | [docs/code-style.md](docs/code-style.md) | How the code is designed and written |
+| [docs/ideas.md](docs/ideas.md) | Ideas talked through and kept for later, not built |
 
 ## Layout
 
