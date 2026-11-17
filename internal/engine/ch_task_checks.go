@@ -149,6 +149,27 @@ func checkHandoffLimit(n int) error {
 	return nil
 }
 
+// checkTaskHandoffLimit refuses to change a task's hand-off limit from one
+// value to another (0 is none) when the actor may not. The limit holds
+// agents back, so it is an admin's to set, and no agent loosens it: an
+// admin agent may tighten it, never raise it or take it off. Leaving it as
+// it is needs no right.
+func (c *cx) checkTaskHandoffLimit(from, to int) error {
+	if err := checkHandoffLimit(to); err != nil {
+		return err
+	}
+	if to == from || c.system {
+		return nil
+	}
+	if !c.actor.Role.AtLeast(core.RoleAdmin) {
+		return forbidden("a task's hand-off limit is set by an admin; you are a %s", c.actor.Role)
+	}
+	if c.actor.Kind == core.KindAgent && (to == 0 || from != 0 && to > from) {
+		return forbidden("an agent cannot raise or take off a task's hand-off limit; ask a person with the admin role")
+	}
+	return nil
+}
+
 // checkWeeklyHandoffs refuses a hand-off beyond the acting agent's weekly
 // limit of them.
 func (c *cx) checkWeeklyHandoffs() error {

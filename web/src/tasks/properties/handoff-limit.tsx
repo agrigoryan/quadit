@@ -47,7 +47,7 @@ function HandoffLimitField({ task }: { task: Task }) {
   );
 }
 
-/** Admins set a task's hand-off limit; the server takes it from any member who may edit the task. */
+/** Admins set a task's hand-off limit, and the server takes it from no one else. */
 function HandoffLimitRow({ task }: PanelProps) {
   const can = useCan();
   if (!can.administer) return null;

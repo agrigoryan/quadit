@@ -287,8 +287,14 @@ func (u *taskEdit) archived() error {
 }
 
 func (u *taskEdit) handoffLimit() error {
-	if err := checkHandoffLimit(u.a.HandoffLimit.V); err != nil {
-		return err
+	if o := u.a.HandoffLimit; o.Set {
+		to := o.V
+		if o.Null {
+			to = 0
+		}
+		if err := u.c.checkTaskHandoffLimit(u.t.HandoffLimit, to); err != nil {
+			return err
+		}
 	}
 	u.p.setNumber("handoff_limit", u.a.HandoffLimit, &u.t.HandoffLimit)
 	return nil

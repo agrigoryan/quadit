@@ -267,7 +267,7 @@ A page that mirrors a Markdown file in a repository is called by the file's open
 
 Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links` and at the end `state: "done"`. A session is the log of a run (what it was asked, what it did, what it produced, when it started and ended); Quadit keeps no record of what a run cost.
 
-Work passed from agent to agent is counted. An agent can have a hand-off limit (`handoff_limit`, a number of hand-offs a week, set by the person responsible for it; `quadit me` shows it), and so can a task (`handoff_limit` on `task.update`, in all). Past either, a hand-off to another agent is refused with `handoff_limit_reached`: hand the task to a person instead.
+Work passed from agent to agent is counted. An agent can have a hand-off limit (`handoff_limit`, a number of hand-offs a week, set by an admin; `quadit me` shows it), and so can a task (`handoff_limit` on `task.update`, in all, set by an admin). No agent lifts a limit: not its own, and not a task's, which an admin agent may only lower. Past either, a hand-off to another agent is refused with `handoff_limit_reached`: hand the task to a person instead.
 
 ## Secrets
 

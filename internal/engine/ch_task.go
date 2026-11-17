@@ -91,7 +91,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	if err := checkEstimate(a.Estimate); err != nil {
 		return err
 	}
-	if err := checkHandoffLimit(a.HandoffLimit); err != nil {
+	if err := c.checkTaskHandoffLimit(0, a.HandoffLimit); err != nil {
 		return err
 	}
 	var st core.Status

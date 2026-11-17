@@ -246,5 +246,34 @@ func TestHandoffLimits(t *testing.T) {
 			w.do(a, "task.update", M{"id": key, "assignee": "@beta"})
 			w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": key, "handoff_limit": -1})
 		})
+
+		t.Run("a task's is an admin's to set, and no agent lifts it", func(t *testing.T) {
+			ctx := context.Background()
+			mia := core.User{ID: id.New(), Kind: core.KindPerson, Name: "Mia", Email: "mia-" + id.New() + "@example.com", CreatedAt: 1, UpdatedAt: 1}
+			if err := st.Insert(ctx, mia); err != nil {
+				t.Fatal(err)
+			}
+			w.do(w.owner.ID, "member.add", M{"user": mia.ID, "handle": "mia"})
+			lead := w.do(w.owner.ID, "agent.create", M{"name": "Lead", "handle": "lead", "role": "admin"}).Ref
+
+			key := w.task(w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Paint the castle", "assignee": "@alpha", "handoff_limit": 2}).Ref).Key
+			// The agent on the task, a member who may edit it, and an admin
+			// agent: none of them takes the limit off or raises it.
+			w.refused(engine.CodeForbidden, a, "task.update", M{"id": key, "handoff_limit": nil})
+			w.refused(engine.CodeForbidden, a, "task.update", M{"id": key, "handoff_limit": 5})
+			w.refused(engine.CodeForbidden, mia.ID, "task.update", M{"id": key, "handoff_limit": 0})
+			w.refused(engine.CodeForbidden, mia.ID, "task.create", M{"project": "SVA", "title": "Limited", "handoff_limit": 1})
+			w.refused(engine.CodeForbidden, lead, "task.update", M{"id": key, "handoff_limit": nil})
+			w.refused(engine.CodeForbidden, lead, "task.update", M{"id": key, "handoff_limit": 3})
+			if got := w.task(key).HandoffLimit; got != 2 {
+				t.Fatalf("after the refusals the limit is %d, want 2", got)
+			}
+			// An admin agent may tighten one; an admin person sets it as they like.
+			w.do(lead, "task.update", M{"id": key, "handoff_limit": 1})
+			w.do(lead, "task.create", M{"project": "SVA", "title": "Kept short", "handoff_limit": 1})
+			w.do(w.owner.ID, "task.update", M{"id": key, "handoff_limit": nil})
+			// Saying the limit it already has changes nothing, and is no one's to refuse.
+			w.do(mia.ID, "task.update", M{"id": key, "handoff_limit": 0, "title": "Paint the castle walls"})
+		})
 	})
 }
