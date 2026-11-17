@@ -230,6 +230,30 @@ describe("a block the server writes otherwise than it was sent, while the person
     sync.destroy();
   });
 
+  it("leaves the person's undo as it was: an undo takes back what they typed and keeps the marker", async () => {
+    const rows = [row("b1", "a", "The boss has three phases.", 1)];
+    const editor = make(rows);
+    editor.mount(document.createElement("div")); // the editor keeps its undo history once it is on a page
+    const sync = new DocSync(editor, "d1", rows, 1);
+    vi.mocked(mutate).mockImplementationOnce(() => Promise.resolve(answer("b1", 10, marked(". Now"))) as never);
+    editor.setTextCursorPosition("b1", "end");
+    editor.insertInlineContent(" Now");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(editor.getBlock("b1")?.content).toContainEqual({
+      type: "text",
+      text: "three phases",
+      styles: { comment: "t1" },
+    });
+    editor.undo();
+    expect(textOf(editor, "b1")).toBe("The boss has three phases.");
+    expect(editor.getBlock("b1")?.content).toContainEqual({
+      type: "text",
+      text: "three phases",
+      styles: { comment: "t1" },
+    });
+    sync.destroy();
+  });
+
   it("does not take it over someone else's later edit of the block that came while it was on its way", async () => {
     const rows = [row("b1", "a", "The boss has three phases.", 1)];
     const editor = make(rows);
