@@ -314,3 +314,97 @@ func TestMovedWordsTakeTheMarkerWhereTheyWent(t *testing.T) {
 		})
 	})
 }
+
+// TestThreadsThroughSplitsAndMerges: a block split in the middle of a
+// thread's words (Enter) keeps the thread on both halves when the editor
+// keeps the marker on both, as the web editor does; one that sends the
+// halves without it leaves too few of the words in one place, and the
+// thread is detached. Words over two blocks joined into one keep the
+// thread, with or without the marker. Of two threads on the same words,
+// taking out the words only one of them was on detaches that one alone.
+func TestThreadsThroughSplitsAndMerges(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		start := func(t *testing.T) (page, block, next string) {
+			t.Helper()
+			page = w.do(w.owner.ID, "doc.create", M{"title": "Boss", "markdown": "The boss has three phases.\n\nThen it runs.\n"}).Ref
+			return page, w.blocksOf(page)[0].ID, w.blocksOf(page)[1].ID
+		}
+		styled := func(runs ...M) json.RawMessage {
+			raw, _ := json.Marshal(runs)
+			return raw
+		}
+		text := func(s string) M { return M{"type": "text", "text": s} }
+		on := func(s, threads string) M { return M{"type": "text", "text": s, "styles": M{"comment": threads}} }
+
+		t.Run("split with the marker on both halves", func(t *testing.T) {
+			page, block, _ := start(t)
+			thread := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block, "quote": "three phases", "body": "Four?"}).Ref
+			w.do(w.owner.ID, "doc.edit", M{"doc": page, "ops": []M{
+				{"op": "update", "id": block, "content": styled(text("The boss has "), on("three", thread))},
+				{"op": "insert", "after": block, "block": M{"type": "paragraph", "content": styled(on(" phases", thread), text("."))}},
+			}})
+			blocks := w.blocksOf(page)
+			if got := w.markedOn(page, thread); !slices.Equal(got, []string{block + ": three", blocks[1].ID + ":  phases"}) {
+				t.Errorf("marked %v", got)
+			}
+			if cm := w.comment(thread); cm.SubjectID != block || cm.DetachedAt != 0 {
+				t.Errorf("comment %+v, want it on the first half", cm)
+			}
+		})
+		t.Run("split without the marker", func(t *testing.T) {
+			page, block, _ := start(t)
+			thread := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block, "quote": "three phases", "body": "Four?"}).Ref
+			w.do(w.owner.ID, "doc.edit", M{"doc": page, "ops": []M{
+				{"op": "update", "id": block, "content": plainContent("The boss has three")},
+				{"op": "insert", "after": block, "block": M{"type": "paragraph", "content": plainContent(" phases.")}},
+			}})
+			if cm := w.comment(thread); cm.DetachedAt == 0 {
+				t.Errorf("comment %+v, want it detached", cm)
+			}
+		})
+		for _, marker := range []bool{true, false} {
+			name := "joined without the marker"
+			if marker {
+				name = "joined with the marker"
+			}
+			t.Run(name, func(t *testing.T) {
+				page, block, next := start(t)
+				thread := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block, "start": 19, "end_block": next, "end": 4, "quote": "phases.\nThen", "body": "Join?"}).Ref
+				content := plainContent("The boss has three phases. Then it runs.")
+				if marker {
+					content = styled(text("The boss has three "), on("phases. Then", thread), text(" it runs."))
+				}
+				w.do(w.owner.ID, "doc.edit", M{"doc": page, "ops": []M{
+					{"op": "update", "id": block, "content": content},
+					{"op": "delete", "id": next},
+				}})
+				want := []string{block + ": phases. Then"}
+				if !marker {
+					want = []string{block + ": phases.", block + ": Then"} // each part found apart
+				}
+				if got := w.markedOn(page, thread); !slices.Equal(got, want) {
+					t.Errorf("marked %v, want %v", got, want)
+				}
+				if cm := w.comment(thread); cm.SubjectID != block || cm.DetachedAt != 0 {
+					t.Errorf("comment %+v, want it on the joined block", cm)
+				}
+			})
+		}
+		t.Run("two threads on the same words, one's words taken out", func(t *testing.T) {
+			page, block, _ := start(t)
+			wide := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block, "quote": "boss has three", "body": "?"}).Ref
+			narrow := w.do(w.owner.ID, "comment.create", M{"doc": page, "block": block, "quote": "three", "body": "Four?"}).Ref
+			w.do(w.owner.ID, "doc.edit", M{"doc": page, "ops": []M{{"op": "update", "id": block, "content": styled(text("The "), on("boss has", wide), text(" phases."))}}})
+			if got := w.markedOn(page, wide); !slices.Equal(got, []string{block + ": boss has"}) {
+				t.Errorf("the wide thread is on %v", got)
+			}
+			if cm := w.comment(narrow); cm.DetachedAt == 0 {
+				t.Errorf("the narrow thread %+v, want it detached", cm)
+			}
+			if cm := w.comment(wide); cm.DetachedAt != 0 {
+				t.Errorf("the wide thread %+v, want it on its words", cm)
+			}
+		})
+	})
+}
