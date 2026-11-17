@@ -834,9 +834,12 @@ func TestSecondAuditFindings(t *testing.T) {
 		if out := s.call(nil, asker, "POST", "/api/v1/w/-/changes", body, 200, nil); !strings.Contains(out, `"duplicate":true`) || !strings.Contains(out, `"key":"SVA-`) {
 			t.Fatalf("a repeated change does not say what it made: %s", out)
 		}
-		// Guessing tokens is slowed down.
+		// Guessing tokens is slowed down. Counts start again each minute, and
+		// the run may cross into the next one: twice the limit and more puts
+		// one minute over it.
 		limited := false
-		for i := 0; i < 140 && !limited; i++ {
+		tries := 2*120 + 10 // limitBadTokens is 120 a minute
+		for i := 0; i < tries && !limited; i++ {
 			req, _ := http.NewRequest(http.MethodGet, s.url+"/api/v1/w/-/me", nil)
 			req.Header.Set("Authorization", "Bearer qd_not_a_token")
 			resp, err := http.DefaultClient.Do(req)
@@ -847,7 +850,7 @@ func TestSecondAuditFindings(t *testing.T) {
 			resp.Body.Close()
 		}
 		if !limited {
-			t.Fatal("140 wrong tokens in a row were never slowed down")
+			t.Fatalf("%d wrong tokens in a row were never slowed down", tries)
 		}
 	})
 }
