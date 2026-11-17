@@ -15,6 +15,7 @@ JAR=$TMP/jar
 trap 'rm -rf "$TMP"' EXIT
 
 uuid() { python3 -c 'import os,time;t=int(time.time()*1000);b=bytearray(t.to_bytes(6,"big")+os.urandom(10));b[6]=0x70|(b[6]&15);b[8]=0x80|(b[8]&63);h=b.hex();print(f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}")'; }
+day() { date -v"$1"d +%F 2>/dev/null || date -d "$1 days" +%F; }   # today plus or minus some days
 change() { curl -sf -b "$JAR" -X POST "$B/api/v1/w/games/changes" -d "{\"id\":\"$(uuid)\",\"type\":\"$1\",\"args\":$2}" >/dev/null || { echo "failed: $1 $2" >&2; exit 1; }; }
 png() { python3 - "$1" "$2" "$3" "$4" <<'PY'
 import struct, sys, zlib, math
@@ -42,15 +43,15 @@ open(path, "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBB
 PY
 }
 
-curl -sf -c "$JAR" -X POST "$B/api/v1/auth/setup" -d '{"name":"Aram","email":"owner@example.com","password":"correct-horse-battery","workspace_name":"Games"}' >/dev/null \
+curl -sf -c "$JAR" -X POST "$B/api/v1/auth/setup" -d '{"name":"Mia","email":"owner@example.com","password":"correct-horse-battery","workspace_name":"Games"}' >/dev/null \
   || { echo "setup failed: is the server fresh and running at $B?" >&2; exit 1; }
 
 change project.create '{"key":"SVA","name":"Samurai vs Alien","description":"A side-scrolling brawler.","settings":{"cycles":true,"cycle_days":14,"estimates":true}}'
 change project.create '{"key":"OPS","name":"Operations"}'
 for a in '"name":"Coordinator","handle":"coordinator","role":"admin","description":"Plans the work and hands it out"' '"name":"Artist","handle":"artist","description":"Sprites and effects"' '"name":"Coder","handle":"coder","description":"Gameplay code"'; do change agent.create "{$a}"; done
 for l in art:#ec4899 code:#3b82f6 audio:#10b981 bug:#ef4444; do change label.create "{\"name\":\"${l%%:*}\",\"color\":\"${l##*:}\",\"project\":\"SVA\"}"; done
-change epic.create '{"project":"SVA","name":"Boss fight","description":"The first boss: an alien mothership pilot.","state":"active","lead":"@coordinator","start_on":"'$(date -v-10d +%F 2>/dev/null || date -d "-10 days" +%F)'","target_on":"'$(date -v+30d +%F 2>/dev/null || date -d "+30 days" +%F)'"}'
-change epic.create '{"project":"SVA","name":"Level 2: the docks","state":"planned","start_on":"'$(date -v+20d +%F 2>/dev/null || date -d "+20 days" +%F)'","target_on":"'$(date -v+70d +%F 2>/dev/null || date -d "+70 days" +%F)'"}'
+change epic.create '{"project":"SVA","name":"Boss fight","description":"The first boss: an alien mothership pilot.","state":"active","lead":"@coordinator","start_on":"'"$(day -10)"'","target_on":"'"$(day +30)"'"}'
+change epic.create '{"project":"SVA","name":"Level 2: the docks","state":"planned","start_on":"'"$(day +20)"'","target_on":"'"$(day +70)"'"}'
 change template.create '{"name":"Review","project":"SVA","title":"Review: ","preset":{"priority":2,"labels":["art"]}}'
 change preference.create '{"body":"No rings as the main shape of an explosion.","project":"SVA","labels":["art"]}'
 
@@ -62,7 +63,7 @@ change task.create '{"project":"SVA","title":"Boss explosion effect","assignee":
 change task.create '{"project":"SVA","title":"Boss attack patterns","assignee":"@coder","labels":["code"],"epic":"Boss fight","priority":1,"estimate":5,"status":"In Progress"}'
 change task.create '{"project":"SVA","title":"Hit flash is too subtle","labels":["art","bug"],"priority":3}'
 change task.create '{"project":"SVA","title":"Dock crane sprites","labels":["art"],"epic":"Level 2: the docks","status":"Backlog"}'
-change task.create '{"project":"SVA","title":"Jump feels floaty","assignee":"@coder","labels":["code","bug"],"priority":2,"due_on":"'$(date -v+9d +%F 2>/dev/null || date -d "+9 days" +%F)'"}'
+change task.create '{"project":"SVA","title":"Jump feels floaty","assignee":"@coder","labels":["code","bug"],"priority":2,"due_on":"'"$(day +9)"'"}'
 change task.create '{"project":"SVA","title":"Boss music loop","labels":["audio"],"epic":"Boss fight","status":"Backlog","estimate":2}'
 change task.create '{"project":"SVA","parent":"SVA-2","title":"Phase 2: laser sweep","assignee":"@coder","labels":["code"]}'
 change task.create '{"project":"SVA","parent":"SVA-2","title":"Phase 3: summon drones","labels":["code"],"status":"Done"}'
@@ -76,10 +77,10 @@ QUADIT_TOKEN=$TOK $Q ask SVA-1 "Which explosion for the boss?" option="A: ring::
 OPTS=$(QUADIT_TOKEN=$TOK $Q --json show SVA-1 | python3 -c 'import json,sys;print(" ".join(o["id"] for o in json.load(sys.stdin)["decisions"][0]["options"]))')
 i=0; for o in $OPTS; do f=(ring burst smoke); QUADIT_TOKEN=$TOK $Q attach SVA-1 "$TMP/${f[$i]}.png" option="$o" >/dev/null; i=$((i+1)); done
 QUADIT_TOKEN=$CODER $Q take SVA-5 >/dev/null
-QUADIT_TOKEN=$CODER $Q comment SVA-5 "Gravity is 0.35 now; tried 0.5 and it feels right to me. @aram can you try the build?" waiting_on=@aram >/dev/null
+QUADIT_TOKEN=$CODER $Q comment SVA-5 "Gravity is 0.35 now; tried 0.5 and it feels right to me. @mia can you try the build?" waiting_on=@mia >/dev/null
 QUADIT_TOKEN=$CODER $Q approval SVA-5 "Merge the jump fix into main?" action=task.delete >/dev/null || true
-QUADIT_TOKEN=$CODER $Q do resource.acquire '{"resource":"build-box","task":"SVA-5","note":"playtest build"}' >/dev/null
-QUADIT_TOKEN=$TOK $Q do resource.acquire '{"resource":"build-box","note":"render sprites"}' >/dev/null
+QUADIT_TOKEN=$CODER $Q 'do' resource.acquire '{"resource":"build-box","task":"SVA-5","note":"playtest build"}' >/dev/null
+QUADIT_TOKEN=$TOK $Q 'do' resource.acquire '{"resource":"build-box","note":"render sprites"}' >/dev/null
 
 echo "seeded. Open $B and sign in as owner@example.com / correct-horse-battery"
 echo "agent tokens:  artist=$TOK"
