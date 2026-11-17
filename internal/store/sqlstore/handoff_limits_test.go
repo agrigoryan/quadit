@@ -166,6 +166,91 @@ func TestUpgradeKeepsHandoffLimitsAndDropsWhatAgentsSpent(t *testing.T) {
 	}
 }
 
+// TestRestoreOfAnArchiveFromBeforeHandoffLimitsKeepsThem: an archive made
+// before version 12 carries the limits inside each row's budget, which the
+// newest schema has no column for, so its rows load without them. The
+// restore reads them back from the feed the archive carries, which by then
+// says them as the hand-off limit (UpgradeLoaded runs version 12's rewrite
+// of it). The last thing the feed says of a row wins: a limit taken off
+// stays off, and a row the feed says nothing of has none.
+func TestRestoreOfAnArchiveFromBeforeHandoffLimitsKeepsThem(t *testing.T) {
+	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
+		t.Run(d.Name, func(t *testing.T) {
+			ctx := context.Background()
+			st := openAtVersion(t, d, 0)
+			ws, person, artist, coder, project, status := id.New(), id.New(), id.New(), id.New(), id.New(), id.New()
+			boss, sky, sword := id.New(), id.New(), id.New()
+			load := func(table string, rows ...map[string]any) {
+				t.Helper()
+				if err := st.Load(ctx, table, rows); err != nil {
+					t.Fatalf("%s: %v", table, err)
+				}
+			}
+			type M = map[string]any
+			load("workspaces", M{"id": ws, "slug": "games", "name": "Games", "seq": 9, "created_at": 1, "updated_at": 1})
+			load("users", M{"id": person, "kind": "person", "name": "Aram", "email": "aram@example.com", "created_at": 1, "updated_at": 1},
+				M{"id": artist, "kind": "agent", "name": "Artist", "workspace_id": ws, "responsible_id": person, "created_at": 1, "updated_at": 1},
+				M{"id": coder, "kind": "agent", "name": "Coder", "workspace_id": ws, "responsible_id": person, "created_at": 1, "updated_at": 1})
+			member := func(user, handle, kind string, budget M) M {
+				return M{"workspace_id": ws, "user_id": user, "role": "member", "handle": handle, "kind": kind, "name": handle, "budget": budget, "created_at": 1, "updated_seq": 1}
+			}
+			load("members", member(person, "aram", "person", nil), member(artist, "artist", "agent", M{"cost_micros": 5000000, "handoffs": 4}),
+				member(coder, "coder", "agent", M{"handoffs": 2}))
+			load("projects", M{"id": project, "workspace_id": ws, "key": "SVA", "name": "Samurai", "created_by": person, "created_at": 1, "updated_at": 1, "created_seq": 1, "updated_seq": 1})
+			load("statuses", M{"id": status, "workspace_id": ws, "project_id": project, "name": "Todo", "category": "unstarted", "rank": "a", "is_default": true, "created_at": 1, "updated_seq": 1})
+			task := func(id string, n int, budget M) M {
+				return M{"id": id, "workspace_id": ws, "project_id": project, "number": n, "key": fmt.Sprintf("SVA-%d", n), "title": "Task", "status_id": status,
+					"budget": budget, "rank": "a", "created_by": person, "created_at": 1, "updated_at": 1, "created_seq": 1, "updated_seq": 1, "activity_seq": 1}
+			}
+			load("tasks", task(boss, 1, M{"minutes": 60, "handoffs": 3}), task(sky, 2, M{"minutes": 30}), task(sword, 3, nil))
+			seq := 0
+			event := func(typ, entityType, entityID, data string) M {
+				seq++
+				var parsed M
+				if err := json.Unmarshal([]byte(data), &parsed); err != nil {
+					t.Fatal(err)
+				}
+				return M{"workspace_id": ws, "seq": seq, "at": 1, "actor_id": person, "change_id": id.New(), "type": typ, "entity_type": entityType,
+					"entity_id": entityID, "scope_type": "workspace", "scope_id": ws, "data": parsed}
+			}
+			load("events",
+				event("member.created", "member", artist, `{"row":{"user_id":"`+artist+`","handle":"artist","budget":{"cost_micros":5000000,"handoffs":3}}}`),
+				event("member.updated", "member", artist, `{"id":"`+artist+`","changes":{"budget":{"from":{"cost_micros":5000000,"handoffs":3},"to":{"cost_micros":5000000,"handoffs":4}}}}`),
+				event("member.created", "member", coder, `{"row":{"user_id":"`+coder+`","handle":"coder"}}`),
+				event("member.updated", "member", coder, `{"id":"`+coder+`","changes":{"budget":{"from":null,"to":{"handoffs":2}}}}`),
+				event("task.created", "task", boss, `{"row":{"id":"`+boss+`","budget":{"minutes":60,"handoffs":3}}}`),
+				event("task.created", "task", sky, `{"row":{"id":"`+sky+`","budget":{"minutes":30,"handoffs":5}}}`),
+				event("task.updated", "task", sky, `{"id":"`+sky+`","changes":{"budget":{"from":{"minutes":30,"handoffs":5},"to":{"minutes":30}}}}`),
+				event("task.created", "task", sword, `{"row":{"id":"`+sword+`"}}`),
+				event("task.updated", "task", boss, `{"id":"`+boss+`","changes":{"title":{"from":"Boss","to":"Task"}}}`))
+
+			if err := st.UpgradeLoaded(ctx, 11); err != nil {
+				t.Fatal(err)
+			}
+			db := st.In(ws)
+			limits := map[string]int{}
+			var members []core.Member
+			if err := db.List(ctx, &members, store.Q{}); err != nil {
+				t.Fatal(err)
+			}
+			for _, m := range members {
+				limits["@"+m.Handle] = m.HandoffLimit
+			}
+			var tasks []core.Task
+			if err := db.List(ctx, &tasks, store.Q{}); err != nil {
+				t.Fatal(err)
+			}
+			for _, task := range tasks {
+				limits[task.Key] = task.HandoffLimit
+			}
+			want := map[string]int{"@aram": 0, "@artist": 4, "@coder": 2, "SVA-1": 3, "SVA-2": 0, "SVA-3": 0}
+			if fmt.Sprint(limits) != fmt.Sprint(want) {
+				t.Errorf("hand-off limits after the restore %v, want %v", limits, want)
+			}
+		})
+	}
+}
+
 // mustJSON is v as JSON, its keys in order.
 func mustJSON(t *testing.T, v any) []byte {
 	t.Helper()
