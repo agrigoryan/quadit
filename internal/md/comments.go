@@ -144,11 +144,13 @@ func CarryMarks(old, now json.RawMessage, thread string) (json.RawMessage, bool)
 	if !ok {
 		return now, false
 	}
-	moved := charMap([]rune(plainInline(old)), []rune(plainInline(now)))
+	was, is := []rune(plainInline(old)), []rune(plainInline(now))
+	moved := charMap(was, is)
 	carried := false
 	for _, r := range threadRanges(ins, thread) {
 		least := min(3, r[1]-r[0]) // the shortest stretch kept that counts
 		lo, hi, kept := -1, -1, 0
+		first, last := -1, -1 // the words' characters lo and hi are
 		for i := r[0]; i < r[1]; {
 			if moved[i] < 0 {
 				i++
@@ -160,14 +162,24 @@ func CarryMarks(old, now json.RawMessage, thread string) (json.RawMessage, bool)
 			}
 			if end-i >= least {
 				if lo < 0 {
-					lo = moved[i]
+					lo, first = moved[i], i
 				}
-				hi, kept = moved[end-1], kept+end-i
+				hi, last, kept = moved[end-1], end-1, kept+end-i
 			}
 			i = end
 		}
 		if lo < 0 || 2*kept < r[1]-r[0] {
 			continue
+		}
+		// The comparison may pair a letter at an edge of the words with the
+		// same letter beside them in the new text ("a" of "alpha" with the
+		// one ending "delta" before it): the words' own letters next to
+		// what was found are theirs.
+		for ; first > r[0] && lo > 0 && is[lo-1] == was[first-1]; first-- {
+			lo--
+		}
+		for ; last < r[1]-1 && hi < len(is)-1 && is[hi+1] == was[last+1]; last++ {
+			hi++
 		}
 		var done bool
 		if now, done = Mark(now, lo, hi+1, thread); done {

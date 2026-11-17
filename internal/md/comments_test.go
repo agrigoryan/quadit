@@ -242,3 +242,47 @@ func TestFindAddedWords(t *testing.T) {
 		t.Errorf("in a new block: %v, want every place", got)
 	}
 }
+
+// TestCarryMarksAtTheEdges: what CarryMarks does with words that are
+// short, repeated, not Latin, around a mention, or moved within the block.
+// A thread is put back only when most of its words are still there, kept
+// in stretches of three characters or more (all of them, for words shorter
+// than three); words written the same twice are told apart by the text
+// around them, so taking one out of two alike may leave the thread on the
+// other, as the two texts cannot say which went.
+func TestCarryMarksAtTheEdges(t *testing.T) {
+	mentioned := func(src string) json.RawMessage {
+		return Mentions(Parse(src), isMember)[0].Content
+	}
+	for _, tc := range []struct {
+		name     string
+		old, now json.RawMessage
+		want     string // "" for words gone: no marker put back
+	}{
+		{"one letter kept", paragraph(t, `<span data-comment="a">a</span> cat`), paragraph(t, "So a cat"), "So [a:a] cat"},
+		{"one letter changed", paragraph(t, `<span data-comment="a">a</span> cat`), paragraph(t, "A cat"), ""},
+		{"an emoji kept", paragraph(t, `I <span data-comment="a">👍🏽</span> it`), paragraph(t, "Yes, I 👍🏽 it"), "Yes, I [a:👍🏽] it"},
+		{"an emoji changed", paragraph(t, `I <span data-comment="a">👍🏽</span> it`), paragraph(t, "I 👍 it"), ""},
+		{"Japanese kept", paragraph(t, `東京<span data-comment="a">タワーは</span>高い`), paragraph(t, "東京タワーはとても高い"), "東京[a:タワーは]とても高い"},
+		{"two Japanese characters, one gone", paragraph(t, `<span data-comment="a">東京</span>は高い`), paragraph(t, "京は高い"), ""},
+		{"a repeated word taken out", paragraph(t, `I said no, <span data-comment="a">no</span>.`), paragraph(t, "I said no."), ""},
+		{"one of two alike taken out", paragraph(t, `I said <span data-comment="a">never</span>, never.`), paragraph(t, "I said never."), "I said [a:never]."},
+		{"the words taken out, the same later on kept", paragraph(t, `The <span data-comment="a">phases</span> are good. Many phases`), paragraph(t, "The are good! Many phases"), ""},
+		{"a mention among the words", mentioned(`Ask <span data-comment="a">@ann about it</span> now`), mentioned("Please ask @ann about it today"), "Please ask @ann[a: about it] today"},
+		{"moved to the end of the block", paragraph(t, `<span data-comment="a">alpha beta gamma</span> delta`), paragraph(t, "delta alpha beta gamma"), "delta [a:alpha beta gamma]"},
+		{"moved to the start of the block", paragraph(t, `delta <span data-comment="a">alpha beta gamma</span>`), paragraph(t, "alpha beta gamma delta"), "[a:alpha beta gamma] delta"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := CarryMarks(tc.old, tc.now, "a")
+			if tc.want == "" {
+				if ok {
+					t.Errorf("put back as %s, want the words gone", marked(t, got))
+				}
+				return
+			}
+			if !ok || marked(t, got) != tc.want {
+				t.Errorf("got %s (%v), want %s", marked(t, got), ok, tc.want)
+			}
+		})
+	}
+}
