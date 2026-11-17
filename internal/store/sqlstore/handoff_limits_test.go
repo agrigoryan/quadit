@@ -49,6 +49,12 @@ func TestUpgradeKeepsHandoffLimitsAndDropsWhatAgentsSpent(t *testing.T) {
 			exec(task, limited, ws, project, 1, 1, "Draw the boss", status, "NULL", `'{"cost_micros":1000000,"handoffs":2}'`, person)
 			exec(task, costOnly, ws, project, 2, 2, "Paint the sky", status, "NULL", `'{"minutes":60}'`, person)
 			exec(task, child, ws, project, 3, 3, "Forge the sword", status, "'"+limited+"'", "NULL", person)
+			// What hangs on the limited task, which SQLite's upgrade writes again.
+			label := id.New()
+			exec(`INSERT INTO labels (id, workspace_id, project_id, name, created_at, updated_seq) VALUES ('%s', '%s', '%s', 'art', 1, 1)`, label, ws, project)
+			exec(`INSERT INTO task_labels (task_id, label_id, workspace_id) VALUES ('%s', '%s', '%s')`, limited, label, ws)
+			exec(`INSERT INTO task_relations (id, workspace_id, task_id, related_task_id, type, created_by, created_at) VALUES ('%s', '%s', '%s', '%s', 'blocks', '%s', 1)`, id.New(), ws, limited, costOnly, person)
+			exec(`INSERT INTO comments (id, workspace_id, task_id, subject_type, subject_id, author_id, body, created_at, created_seq, updated_seq) VALUES ('%s', '%s', '%s', 'task', '%s', '%s', 'Four phases.', 1, 1, 1)`, id.New(), ws, limited, limited, person)
 			exec(`INSERT INTO agent_sessions (id, workspace_id, agent_id, task_id, title, cost_micros, tokens_in, tokens_out, started_at, updated_seq) VALUES ('%s', '%s', '%s', '%s', 'Drawing', 1250000, 900, 300, 1, 1)`, session, ws, agent, limited)
 			note := `INSERT INTO notifications (id, workspace_id, user_id, seq, type, actor_id, title, created_at) VALUES ('%s', '%s', '%s', %d, '%s', '%s', '%s', 1)`
 			exec(note, warning, ws, person, 1, "budget", agent, "SVA-1 has used 80% of its budget")
@@ -100,6 +106,11 @@ func TestUpgradeKeepsHandoffLimitsAndDropsWhatAgentsSpent(t *testing.T) {
 				want := map[string]int{"@aram": 0, "@artist": 3, "SVA-1": 2, "SVA-2": 0, "SVA-3": 0}
 				if fmt.Sprint(limits) != fmt.Sprint(want) {
 					t.Errorf("hand-off limits %v, want %v", limits, want)
+				}
+				for _, table := range []string{"task_labels", "task_relations", "comments"} {
+					if n, err := db.Count(ctx, table, store.Eq("task_id", limited)); err != nil || n != 1 {
+						t.Errorf("SVA-1 has %d rows in %s after the upgrade (%v), want 1", n, table, err)
+					}
 				}
 			})
 
