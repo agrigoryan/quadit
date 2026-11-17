@@ -46,6 +46,8 @@ Every command takes --json for full data and --dry-run to check a write.
 A write takes --id=UUID (send it again with the same id and it happens once)
 and --for=@WHO (it runs with that member's access).
 Connect with QUADIT_URL and QUADIT_TOKEN, or: quadit login URL TOKEN
+Teach an agent to use this: quadit skill install (puts the skill where Claude Code,
+Codex, Cursor, Gemini CLI, Copilot, opencode and pi look; quadit skill prints it)
 `
 
 // helpTopics are the texts of "quadit help TOPIC".

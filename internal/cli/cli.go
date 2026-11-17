@@ -39,8 +39,11 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	cmd, rest := rest[0], rest[1:]
-	if cmd == "login" {
+	switch cmd {
+	case "login":
 		return login(ctx, rest, stdout, stderr)
+	case "skill":
+		return skill(rest, stdout, stderr)
 	}
 	c, err := NewClient()
 	if err != nil {
