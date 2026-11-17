@@ -71,10 +71,15 @@ test("the API tokens list catches up after the browser was offline, without a re
 }) => {
   const run = currentRun();
   const tokenName = unique("made while away");
+  // The list is on screen before the browser goes away: what is checked is that it catches up, not that a
+  // first read held up by the outage gets through in the end.
+  const listed = page.waitForResponse((r) => r.request().method() === "GET" && r.url().endsWith("/w/e2e/tokens"));
   await page.goto("/e2e/settings/me/tokens");
+  expect((await listed).ok()).toBe(true);
   await expect(page.getByRole("button", { name: "New token" })).toBeVisible();
 
   await context.setOffline(true);
+  await page.waitForFunction(() => !navigator.onLine);
   // Made elsewhere while this browser cannot hear of it. A token is not an event: only asking again shows it.
   const made = await request.post(`${run.url}/api/v1/w/e2e/tokens`, {
     headers: { Authorization: `Bearer ${run.token}` },
