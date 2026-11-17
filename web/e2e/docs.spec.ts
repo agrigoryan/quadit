@@ -120,7 +120,7 @@ test("bold around code and code in a link stay through an edit in the browser", 
 // The toolbar over a selection is the editor's own buttons and Comment. A
 // press on one makes the page draw again (the editor gives the focus up), and
 // the button must still be there for the click to land.
-test("the toolbar over a selection makes text bold and starts a comment on its block", async ({ page, project }) => {
+test("the toolbar over a selection makes text bold and starts a comment on its words", async ({ page, project }) => {
   await page.goto(`/e2e/p/${project.key}/docs`);
   await page.getByRole("main").getByRole("button", { name: "New page" }).click();
   await page.getByRole("textbox", { name: "Page title" }).fill("Launch notes");
@@ -137,7 +137,7 @@ test("the toolbar over a selection makes text bold and starts a comment on its b
   await toolbar.getByRole("button", { name: "Comment", exact: true }).click();
   const comments = page.getByRole("complementary", { name: "Comments" });
   await expect(comments.getByText("Ship on Tuesday after the freeze.")).toBeVisible();
-  const box = comments.getByRole("textbox", { name: "Comment on this block…" });
+  const box = comments.getByRole("textbox", { name: "Comment on these words…" });
   await expect(box).toBeFocused();
   await box.fill("Which freeze, the code one?");
   await comments.getByRole("button", { name: "Comment", exact: true }).click();
