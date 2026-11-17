@@ -501,3 +501,64 @@ func TestAnArchiveOfANewerQuaditIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 		}
 	})
 }
+
+// TestAPageBroughtBackKeepsItsThreadsOnItsWords: a page set back as a
+// backup has it keeps its threads on words where its text now says: a
+// thread whose words are in the text set back is on them, even one
+// detached since; one started since the backup, whose words the text set
+// back does not mark, is detached, on the page with its quote, as when an
+// edit takes the words out.
+func TestAPageBroughtBackKeepsItsThreadsOnItsWords(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		ctx := context.Background()
+		files, _ := blob.NewDisk(t.TempDir())
+		e := engine.New(st, nil)
+		ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", OwnerEmail: "aram@example.com", OwnerHandle: "aram", WorkspaceSlug: "games", WorkspaceName: "Games"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		do := func(typ string, args M) string {
+			t.Helper()
+			raw, _ := json.Marshal(args)
+			res, err := e.Apply(ctx, ws.ID, engine.Actor{UserID: owner.ID}, engine.Change{ID: id.New(), Type: typ, Args: raw})
+			if err != nil {
+				t.Fatalf("%s: %v", typ, err)
+			}
+			return res.Ref
+		}
+		db := st.In(ws.ID)
+		comment := func(id string) core.Comment {
+			t.Helper()
+			var cm core.Comment
+			if err := db.Get(ctx, &cm, store.Eq("id", id)); err != nil {
+				t.Fatal(err)
+			}
+			return cm
+		}
+		page := do("doc.create", M{"title": "Plan", "markdown": "first line\n\nsecond line\n"})
+		var blocks []core.Block
+		if err := db.List(ctx, &blocks, store.Q{Where: []store.Cond{store.Eq("doc_id", page), store.Live}, Order: "rank"}); err != nil {
+			t.Fatal(err)
+		}
+		before := do("comment.create", M{"doc": page, "block": blocks[0].ID, "quote": "first", "body": "Why first?"})
+		var archive bytes.Buffer
+		if _, err := backup.Write(ctx, st, files, "test", &archive); err != nil {
+			t.Fatal(err)
+		}
+		since := do("comment.create", M{"doc": page, "block": blocks[1].ID, "quote": "second", "body": "Why second?"})
+		do("doc.write", M{"doc": page, "markdown": "second line\n"})
+		if cm := comment(before); cm.DetachedAt == 0 {
+			t.Fatalf("the thread on words written out is %+v, want it detached", cm)
+		}
+
+		if _, err := backup.RestoreItem(ctx, e, files, bytes.NewReader(archive.Bytes()), backup.Item{Workspace: "games", Kind: "doc", Ref: page}); err != nil {
+			t.Fatal(err)
+		}
+		if cm := comment(before); cm.DetachedAt != 0 || cm.SubjectType != "doc_block" || cm.SubjectID != blocks[0].ID {
+			t.Errorf("the thread from before the backup is %+v, want it on its words", cm)
+		}
+		if cm := comment(since); cm.DetachedAt == 0 || cm.SubjectType != "doc" || cm.SubjectID != page || cm.Quote != "second" {
+			t.Errorf("the thread started since the backup is %+v, want it detached, on the page", cm)
+		}
+	})
+}

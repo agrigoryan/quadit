@@ -213,21 +213,15 @@ func (c *cx) keepMarks(d core.Doc, ed *editor) error {
 	if !involved {
 		return nil
 	}
-	var roots []core.Comment
-	if err := c.tx.List(c.ctx, &roots, store.Where(store.Eq("doc_id", d.ID), store.Null("parent_id"), store.NotNull("quote"), store.Live)); err != nil {
+	threads, err := c.wordThreads(d)
+	if err != nil {
 		return err
-	}
-	threads := map[string]core.Comment{}
-	for _, cm := range roots {
-		threads[cm.ID] = cm
 	}
 
 	// Markers of threads that are not this page's go.
 	for _, id := range ed.touched {
 		if r := live(id); r != nil {
-			if kept := md.RenameThreads(r.Content, func(t string) string { return keepIf(t, threads) }); string(kept) != string(r.Content) {
-				ed.setMarks(id, kept)
-			}
+			dropStrangers(ed, r, threads)
 		}
 	}
 
@@ -283,11 +277,66 @@ func (c *cx) keepMarks(d core.Doc, ed *editor) error {
 
 	// Each thread the edit touched is on the first block its words are in,
 	// or on the page as a whole when they are nowhere.
+	var placed []core.Comment
 	for _, t := range sortedKeys(touchedThreads) {
-		cm := threads[t]
+		placed = append(placed, threads[t])
+	}
+	return c.placeThreads(d, ed, placed)
+}
+
+// settleMarks makes a page's threads on words agree with its text after
+// the text was set as a whole from elsewhere (a backup), whose markers
+// may name threads deleted since and leave out threads started since:
+// those markers are taken off, and every thread is where its marker is,
+// or detached when the text has none.
+func (c *cx) settleMarks(d core.Doc, ed *editor) error {
+	threads, err := c.wordThreads(d)
+	if err != nil {
+		return err
+	}
+	for _, id := range ed.order() {
+		if r := ed.rows[id]; takesMarks(r) {
+			dropStrangers(ed, r, threads)
+		}
+	}
+	all := make([]core.Comment, 0, len(threads))
+	for _, t := range sortedKeys(threads) {
+		all = append(all, threads[t])
+	}
+	return c.placeThreads(d, ed, all)
+}
+
+// wordThreads is a page's live threads on words, by id.
+func (c *cx) wordThreads(d core.Doc) (map[string]core.Comment, error) {
+	var roots []core.Comment
+	if err := c.tx.List(c.ctx, &roots, store.Where(store.Eq("doc_id", d.ID), store.Null("parent_id"), store.NotNull("quote"), store.Live)); err != nil {
+		return nil, err
+	}
+	threads := map[string]core.Comment{}
+	for _, cm := range roots {
+		threads[cm.ID] = cm
+	}
+	return threads, nil
+}
+
+// dropStrangers takes the markers of threads that are not among threads
+// off a block.
+func dropStrangers(ed *editor, r *core.Block, threads map[string]core.Comment) {
+	if kept := md.RenameThreads(r.Content, func(t string) string { return keepIf(t, threads) }); string(kept) != string(r.Content) {
+		ed.setMarks(r.ID, kept)
+	}
+}
+
+// placeThreads puts each of threads where the page's text (ed) has its
+// marker: on the first block, in reading order, that has it, attached
+// again if it was detached; or, when no block has it, on the page as a
+// whole, detached with its quote, of which the change warns.
+func (c *cx) placeThreads(d core.Doc, ed *editor, threads []core.Comment) error {
+	order := ed.order()
+	for _, cm := range threads {
 		on := ""
 		for _, id := range order {
-			if slices.Contains(md.Threads(ed.rows[id].Content), t) {
+			if slices.Contains(md.Threads(ed.rows[id].Content), cm.ID) {
 				on = id
 				break
 			}

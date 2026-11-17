@@ -360,7 +360,9 @@ func (c *cx) restoredUnderPrivate(doc *core.Doc) error {
 // state, and an open editor gets the page's text as it stands now. A page
 // set back under a page that has been made private since is made private
 // the same way, as a page moved there is, with the pages under it that
-// shared its readers.
+// shared its readers. Its comment threads on words are where the text set
+// back marks them, and those it does not mark (started since) are
+// detached, as when an edit takes their words out.
 func (e *Engine) RestoreFromBackup(ctx context.Context, workspaceID, kind, id string, setBack func(store.Tx) error) error {
 	var owner core.Member
 	if err := e.st.In(workspaceID).Get(ctx, &owner, store.Eq("role", string(core.RoleOwner)), store.Null("removed_at")); err != nil {
@@ -421,11 +423,19 @@ func (e *Engine) RestoreFromBackup(ctx context.Context, workspaceID, kind, id st
 				Changes: map[string]core.FieldChange{"content_seq": {To: next + 1}}}}); err != nil {
 			return err
 		}
-		// What the page mentions is worked out again from its text as it stands.
+		// The threads on words go where the text set back marks them, and
+		// what the page mentions is worked out again from that text.
 		rows, err := LoadBlocks(cxLister{sys.c}, doc.ID)
 		if err != nil {
 			return err
 		}
-		return sys.c.afterDocText(doc, newEditor(sys.c, doc, rows))
+		ed := newEditor(sys.c, doc, rows)
+		if err := sys.c.settleMarks(doc, ed); err != nil {
+			return err
+		}
+		if err := sys.c.writeMarks(doc, ed); err != nil {
+			return err
+		}
+		return sys.c.afterDocText(doc, ed)
 	})
 }
