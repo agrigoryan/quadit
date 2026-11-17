@@ -40,8 +40,9 @@ linters:
     staticcheck:
       checks: ["all", "-ST1003", "-QF1008"]
     errcheck:
-      # docs/code-style.md rule 11: `_ = call() // reason` is how an error is
-      # discarded on purpose, so a blank assignment is not a finding.
+      # An error is returned, logged, or discarded with `_ = call() // reason`:
+      # that is how an error is dropped on purpose, so a blank assignment is
+      # not a finding.
       check-blank: false
       check-type-assertions: false
       exclude-functions:

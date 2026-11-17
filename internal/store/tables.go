@@ -4,8 +4,8 @@
 // Adding a table takes four steps:
 //
 //  1. A migration that creates it: a new file with the next number in
-//     internal/store/sqlstore/migrations (docs/store.md; released files
-//     are never edited).
+//     internal/store/sqlstore/migrations (released files are never
+//     edited: see TestMigrationsAreFrozen).
 //  2. Its row struct in package core, one field per column, tagged
 //     `db:"col"`, `db:"col,null"` or `db:"col,json"` (the rules are in
 //     internal/store/sqlstore/record.go). A table of a workspace has a

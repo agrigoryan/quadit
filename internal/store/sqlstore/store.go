@@ -17,8 +17,10 @@
 //	ledger.go           the record of applied schema versions, goose's and the older one
 //	adopt.go            taking over a database migrated before goose
 //
-// docs/store.md tells how the migrations work, and compares the mapper with
-// the query libraries considered in its place.
+// A released migration file is never edited (TestMigrationsAreFrozen holds
+// their checksums): a change to the schema, or a repair of rows already
+// stored, is a new file with the next number. There is no way down; going
+// back is the copy of the database made before an upgrade.
 package sqlstore
 
 import (

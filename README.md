@@ -50,10 +50,6 @@ See [docs/agents.md](docs/agents.md), with the setup for each agent. The same su
 | --- | --- |
 | [docs/install.md](docs/install.md) | Running it: settings, storage, sign-in, backups, upgrades, monitoring |
 | [docs/agents.md](docs/agents.md) | Connecting agents: tokens, the feed, wake-ups, the CLI, MCP |
-| [docs/data-model.md](docs/data-model.md) | How data is stored and why |
-| [docs/store.md](docs/store.md) | The data layer: migrations on goose, restores, and the queries |
-| [docs/code-style.md](docs/code-style.md) | How the code is designed and written |
-| [docs/ideas.md](docs/ideas.md) | Ideas talked through and kept for later, not built |
 
 ## Layout
 
@@ -92,7 +88,7 @@ Every test that touches data runs on both databases. Dependencies are permissive
 
 ### The web app
 
-`web/src` is in layers, bottom up: `types` (the wire types, the generated `changes.gen.ts` among them) and `i18n`; `lib`; `data` and `hooks`; `nav`; `ui`; the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`); `shell`, `pages` and `palette` on top. Lint keeps each layer to the ones below it; [docs/code-style.md](docs/code-style.md) has the rest of the rules.
+`web/src` is in layers, bottom up: `types` (the wire types, the generated `changes.gen.ts` among them) and `i18n`; `lib`; `data` and `hooks`; `nav`; `ui`; the feature folders (`tasks`, `detail`, `decisions`, `docs`, `insights`, `settings`, `admin`, `auth`); `shell`, `pages` and `palette` on top. Lint keeps each layer to the ones below it.
 
 - The browser holds a copy of the workspace (`data/store.ts`): `data/sync.ts` fills it from `/bootstrap` and keeps it current from the event feed, shared by the tabs. Components read it through `data/selectors.ts`, and ask `useCan()` (`data/access.ts`) what the signed-in member may do.
 - Every write is a named change through `mutate` or `send` (`data/mutate.ts`): it shows at once, waits on the device (`data/outbox.ts`) until the server answers, and is undone if refused. Its name and arguments are typed from `types/changes.gen.ts` (`make generate`).

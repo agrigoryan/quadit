@@ -1,6 +1,6 @@
-// The rules of docs/code-style.md (web) that a tool can check. Run: pnpm lint.
-// A rule set to "warn" has findings today; docs/code-style.md lists them with
-// their counts. Fix one rule's findings, then turn it into "error" here.
+// The web code-style rules (CONTRIBUTING.md) that a tool can check. Run:
+// pnpm lint. A rule set to "warn" has findings still to fix: fix them, then
+// turn it into "error" here.
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "react", "jsx-a11y", "import"],

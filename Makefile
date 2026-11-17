@@ -39,8 +39,8 @@ test-all:
 e2e: build
 	cd web && pnpm e2e
 
-# The rules of docs/code-style.md that a tool can check: .golangci.yml for
-# Go, web/.oxlintrc.json and Prettier for the web app. CI runs this, so the
+# The code-style rules a tool can check (CONTRIBUTING.md has the rest):
+# .golangci.yml for Go, web/.oxlintrc.json and Prettier for the web app. CI runs this, so the
 # version here is the one that gates.
 GOLANGCI ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 lint:
