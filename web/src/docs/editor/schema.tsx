@@ -1,10 +1,12 @@
 // The editor's schema: BlockNote's own blocks, plus four inline things
 // the server knows by other names (see editor/convert.ts): a mention, a task
-// chip, a decision chip and a link to a page; and a code style that other
-// styles and a link may wrap.
+// chip, a decision chip and a link to a page; a code style that other
+// styles and a link may wrap; and the marker of the comment threads on
+// words of the page.
 
 import {
   BlockNoteSchema,
+  createStyleSpec,
   createStyleSpecFromTipTapMark,
   defaultInlineContentSpecs,
   defaultStyleSpecs,
@@ -60,7 +62,33 @@ const code = createStyleSpecFromTipTapMark(
   "boolean",
 );
 
+// The words a comment thread is on carry its id in this style, "comment":
+// "ID ID" for the threads on them (internal/md, comments.go). The server
+// puts it on and keeps it there; nobody formats with it, so it has no
+// button or key. Text typed right after the words is not theirs (not
+// inclusive), and a copy pasted elsewhere does not take the threads with it:
+// the style is never read from pasted HTML. Text cut and pasted into
+// another block gets its threads back from the server, which finds the
+// words there. Each span names the threads (data-value) for the highlight
+// of the open ones (editor/highlights.tsx).
+const commentStyle = createStyleSpec(
+  { type: "comment", propSchema: "string" },
+  {
+    render: () => {
+      const dom = document.createElement("span");
+      return { dom, contentDOM: dom };
+    },
+  },
+);
+const comment = {
+  ...commentStyle,
+  implementation: {
+    ...commentStyle.implementation,
+    mark: commentStyle.implementation.mark.extend({ inclusive: false, parseHTML: () => [] }),
+  },
+};
+
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: { ...defaultInlineContentSpecs, mention, taskChip, decisionChip, pageLink },
-  styleSpecs: { ...defaultStyleSpecs, code },
+  styleSpecs: { ...defaultStyleSpecs, code, comment },
 });
