@@ -155,11 +155,16 @@ change comment.create arg block
 change comment.create arg body
 change comment.create arg decision
 change comment.create arg doc
+change comment.create arg end
+change comment.create arg end_block
 change comment.create arg evidence
 change comment.create arg id
 change comment.create arg kind
+change comment.create arg occurrence
 change comment.create arg option
 change comment.create arg parent
+change comment.create arg quote
+change comment.create arg start
 change comment.create arg task
 change comment.create arg waiting_on
 change comment.create arg waiting_on_note

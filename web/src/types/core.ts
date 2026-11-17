@@ -205,6 +205,10 @@ export type Comment = {
   parent_id?: string;
   author_id: string;
   body: string;
+  /** The words of a page a thread was started on; they carry its marker in the page's text. */
+  quote?: string;
+  /** When an edit took the thread's words out of the page: it is then on the page as a whole. */
+  detached_at?: number;
   created_at: number;
   edited_at?: number;
   /** The feed position at which it was written, and at which it last changed. */

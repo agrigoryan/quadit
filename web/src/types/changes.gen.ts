@@ -58,6 +58,11 @@ export interface Changes {
     option?: string;
     block?: string;
     parent?: string;
+    quote?: string;
+    start?: number | null;
+    end?: number | null;
+    end_block?: string;
+    occurrence?: number;
     kind?: string;
     evidence?: Evidence | null;
     attachments?: AttachArgs[];

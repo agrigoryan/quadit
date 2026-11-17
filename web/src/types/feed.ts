@@ -44,6 +44,8 @@ export interface ChangeResult {
   key?: string;
   duplicate?: boolean;
   events?: FeedEvent[];
+  /** What the change did that its sender may not have meant, such as taking out the words a comment thread was on. */
+  warnings?: string[];
 }
 
 export interface SearchHit {

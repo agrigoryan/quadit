@@ -108,7 +108,7 @@ agent.update (admin): id (required), name, description, avatar, responsible, sco
 attachment.add (member): id, file (required), role, caption, task, comment, decision, option, doc
 attachment.remove (member): id (required)
 attachment.restore (member): id (required)
-comment.create (member): id, task, doc, body (required), decision, option, block, parent, kind, evidence, attachments, waiting_on, waiting_on_note
+comment.create (member): id, task, doc, body (required), decision, option, block, parent, quote, start, end, end_block, occurrence, kind, evidence, attachments, waiting_on, waiting_on_note
 comment.delete (member): id (required)
 comment.update (member): id (required), body, resolved
 cycle.create (member): id, project (required), name, starts_on (required), ends_on (required)

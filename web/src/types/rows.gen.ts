@@ -118,6 +118,8 @@ export interface Comment {
   parent_id?: string;
   author_id: string;
   body: string;
+  quote?: string;
+  detached_at?: number;
   created_at: number;
   edited_at?: number;
   created_seq: number;
@@ -575,6 +577,7 @@ export interface Result {
   ref?: string;
   key?: string;
   events?: Event[];
+  warnings?: string[];
 }
 
 export interface Rule {
