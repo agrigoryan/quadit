@@ -120,8 +120,10 @@ Follow the patterns already in the files you touch. `make lint` and `pnpm check`
 
 Quadit is MIT licensed and stays that way: a new dependency must have a permissive licence (MIT, Apache-2.0, BSD, ISC, MPL-2.0). No GPL, LGPL or AGPL. Prefer the standard library, and check that a new dependency is maintained (recent releases, real use) before adding it.
 
-## Releases
+## Versions and releases
 
-A tag `v*` pushed to GitHub runs GoReleaser (`.goreleaser.yaml`, `.github/workflows/release.yml`): the archives and checksums on a GitHub Release, the Docker images on `ghcr.io/agrigoryan/quadit`, and the Homebrew cask. `make release` makes the same into `dist/` locally, publishing nothing.
+Quadit follows [Semantic Versioning](https://semver.org). A release is a tag `vX.Y.Z` on `main`, and the version comes from that tag alone: GoReleaser sets it in the binary (`-X main.version`), and `quadit version` prints it. A build from a checkout prints `git describe` (`make build`) or `dev` (plain `go build`).
+
+A change people or agents will notice gets a line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md). To release: move those lines under the new version with the date, commit, and push the tag. The tag runs GoReleaser (`.goreleaser.yaml`, `.github/workflows/release.yml`): the archives, `.deb` and `.rpm` packages and checksums on a GitHub Release with notes grouped from the commit messages, the Docker images on `ghcr.io/agrigoryan/quadit` (`X.Y.Z`, `X.Y`, `X`, `latest`), and the Homebrew cask. `make release` makes the same into `dist/` locally, publishing nothing.
 
 By contributing, you agree that your contribution is licensed under the [MIT License](LICENSE).
