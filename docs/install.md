@@ -117,7 +117,7 @@ Quadit follows [Semantic Versioning](https://semver.org): releases are tagged `v
 | Installed with | Upgrade |
 | --- | --- |
 | Homebrew | `brew upgrade quadit` |
-| The install script | Run it again: it replaces the binary in place and says which version it replaced. `QUADIT_VERSION=v0.1.0` installs that version instead of the newest |
+| The install script | Run it again: it replaces the binary in place and says which version it replaced. `curl … \| QUADIT_VERSION=v0.1.0 sh` installs that version instead of the newest, older or newer than the one there |
 | Docker | `docker pull ghcr.io/agrigoryan/quadit:latest` and recreate the container; with Compose, `docker compose pull && docker compose up -d`. Tags: `X.Y.Z`, `X.Y` (newest patch), `X` (newest minor) and `latest`; pin one of the first three to upgrade only that far |
 | `.deb` / `.rpm` | Install the newer package: `sudo apt install ./quadit_X.Y.Z_amd64.deb` or `sudo dnf install ./quadit-X.Y.Z-1.x86_64.rpm`. A running `quadit` service is restarted on the new version |
 | An archive from Releases | Download the new one, replace the binary, restart the server |

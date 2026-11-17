@@ -77,14 +77,14 @@ Quadit does not update itself; update it the way you installed it. Releases foll
 
 | Installed with | Update |
 | --- | --- |
-| Install script | Run it again (`QUADIT_VERSION=v0.1.0` for a given version) |
+| Install script | Run it again; `curl … \| QUADIT_VERSION=v0.1.0 sh` installs a given version |
 | Homebrew | `brew upgrade quadit` |
 | Docker | `docker compose pull && docker compose up -d`, or pull `ghcr.io/agrigoryan/quadit:latest` and recreate the container. Tags `X.Y.Z`, `X.Y`, `X` and `latest` |
 | `.deb` / `.rpm` | Install the newer package; the service restarts on it |
 | Archive | Replace the binary |
 | Source | `git pull && make build` |
 
-Then restart the server. It upgrades the database when it starts, after copying it, and `quadit upgrade --undo` goes back. Take a backup first with `quadit backup`. [docs/install.md](docs/install.md#upgrades) has the details, backups and going back.
+Then restart the server. It upgrades the database when it starts, copying it first when the schema changes, and `quadit upgrade --undo` goes back. Take a backup first with `quadit backup`. [docs/install.md](docs/install.md#upgrades) has the details, backups and going back.
 
 ## Development
 
