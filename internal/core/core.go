@@ -344,11 +344,18 @@ type Comment struct {
 	ParentID    string    `json:"parent_id,omitempty" db:"parent_id,null"`
 	AuthorID    string    `json:"author_id" db:"author_id"`
 	Body        string    `json:"body" db:"body"`
-	CreatedAt   int64     `json:"created_at" db:"created_at"`
-	EditedAt    int64     `json:"edited_at,omitempty" db:"edited_at,null"`
-	CreatedSeq  int64     `json:"created_seq" db:"created_seq"`
-	UpdatedSeq  int64     `json:"updated_seq" db:"updated_seq"`
-	DeletedAt   int64     `json:"deleted_at,omitempty" db:"deleted_at,null"`
+	// Quote is the words of a page a thread was started on, which carry
+	// its marker in the page's text (internal/md, comments.go). DetachedAt
+	// is when an edit took those words out of the page: the thread then
+	// stands for the page as a whole (SubjectType "doc"), and an edit that
+	// brings the marker back (an undo) puts it on its words again.
+	Quote      string `json:"quote,omitempty" db:"quote,null"`
+	DetachedAt int64  `json:"detached_at,omitempty" db:"detached_at,null"`
+	CreatedAt  int64  `json:"created_at" db:"created_at"`
+	EditedAt   int64  `json:"edited_at,omitempty" db:"edited_at,null"`
+	CreatedSeq int64  `json:"created_seq" db:"created_seq"`
+	UpdatedSeq int64  `json:"updated_seq" db:"updated_seq"`
+	DeletedAt  int64  `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
 
 // Decision kinds, states and outcomes.

@@ -118,6 +118,7 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 // the engine writes adds it here.
 var columnsAddedSince = map[int][]string{
 	12: {"members handoff_limit INTEGER", "tasks handoff_limit INTEGER"},
+	13: {"comments quote TEXT", "comments detached_at BIGINT"},
 }
 
 // openWritableAt opens an empty database at an older schema version that
