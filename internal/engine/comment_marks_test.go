@@ -176,6 +176,9 @@ func TestAnEditKeepsTheMarkers(t *testing.T) {
 			if got := w.markedOn(page, thread); !slices.Equal(got, []string{block + ": three phases"}) {
 				t.Errorf("marked %v", got)
 			}
+			if warnings := save(t, page, block, plainContent("The boss is gone.")); len(warnings) != 1 || !strings.Contains(warnings[0], "stays resolved") {
+				t.Errorf("warnings %q, want one saying the thread stays resolved", warnings)
+			}
 		})
 		t.Run("words taken out detach the thread, and an undo puts it back", func(t *testing.T) {
 			page, block, thread := start(t)

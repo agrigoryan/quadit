@@ -303,7 +303,11 @@ func (c *cx) keepMarks(d core.Doc, ed *editor) error {
 			p.put("subject_type", cm.SubjectType, "doc")
 			p.put("subject_id", cm.SubjectID, d.ID)
 			p.put("detached_at", int64(0), c.at)
-			c.warn("thread %s was on words this edit took out of the page (%q): it stays open, on the page as a whole", cm.ID, cm.Quote)
+			stays := "open"
+			if cm.ResolvedAt != 0 {
+				stays = "resolved"
+			}
+			c.warn("thread %s was on words this edit took out of the page (%q): it stays %s, on the page as a whole", cm.ID, cm.Quote, stays)
 		}
 		row, err := c.commentTarget(cm)
 		if err != nil {
