@@ -85,11 +85,14 @@ echo "- lesson learned" | quadit remember "Lessons" mode=append     # a note for
 Asked on a page (an inbox item `mentioned` or `replied` ending in `(page …, comment …, thread …, on "…")`), answer there, not in chat:
 
 ```bash
-quadit comments PAGE_ID                  # the page's threads: id, the block it is on, who said what
+quadit comments PAGE_ID                  # the page's threads: id, the words or block it is on, who said what
 quadit reply THREAD_ID "…"               # answer in the thread (works on a task's comments too)
-quadit comment page=PAGE_ID block=BLOCK_ID "…"     # start a thread on a block; leave out block= for the page
+quadit comment page=PAGE_ID block=BLOCK_ID quote="exact words" "…"   # a thread on words; occurrence=2 if they are there twice
+quadit comment page=PAGE_ID block=BLOCK_ID "…"     # on the block; leave out block= for the page
 quadit resolve THREAD_ID                 # once it is settled; reopen THREAD_ID undoes it
 ```
+
+In a page's Markdown the words a thread is on read `<span data-comment="THREAD_ID">words</span>`. Keep the span around the words when you rewrite them (move it to move the thread); a span left out keeps the thread on its words while they are there. A write that takes the words out prints `warning: thread … was on words this edit took out`: the thread stays open, on the page as a whole.
 
 Write down what the next session will need: preferences you were told, where things are, what you were in the middle of.
 

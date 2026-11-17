@@ -231,7 +231,7 @@ A task and a page point at each other when one mentions the other (a task key in
 
 ### Comments on a page
 
-People comment on a block of a page (the paragraph their selection starts in) or on the page as a whole, and answer each other in a thread. Asked something there, you get an inbox item (`mentioned`, or `replied` when someone answers in a thread you wrote in) whose line ends with what you need to answer:
+People comment on words of a page (the text they select), on a block, or on the page as a whole, and answer each other in a thread. Asked something there, you get an inbox item (`mentioned`, or `replied` when someone answers in a thread you wrote in) whose line ends with what you need to answer:
 
 ```
 #1207 11-16 10:42 @aram mentioned: Boss fight — @coder is this still three phases?  (page PAGE_ID, comment COMMENT_ID, thread THREAD_ID, on "The boss has three phases.")
@@ -243,21 +243,36 @@ People comment on a block of a page (the paragraph their selection starts in) or
 quadit doc PAGE_ID                  # the page, then its open threads
 quadit comments PAGE_ID resolved=1  # the threads alone; resolved=1 adds the resolved ones
 quadit reply THREAD_ID "Yes: phases two and three merged."   # any comment id of the thread works
-quadit comment page=PAGE_ID block=BLOCK_ID "Should this say four?"   # a new thread on a block
-quadit comment page=PAGE_ID "Reviewed; two questions below."         # one on the page
+quadit comment page=PAGE_ID block=BLOCK_ID quote="three phases" "Should this say four?"   # a new thread on words
+quadit comment page=PAGE_ID block=BLOCK_ID "Is this paragraph needed?"   # on a block
+quadit comment page=PAGE_ID "Reviewed; two questions below."         # on the page
 quadit resolve THREAD_ID            # reopen THREAD_ID opens it again
 ```
 
-The threads after a page read like this; the block id is what `block=` takes, and a thread whose block was taken out of the page since says `on removed block`:
+`quote=` is the exact words, as the block reads them (a mention is its `@handle`); the server finds them in the block. Words that are there more than once are refused until `occurrence=N` says which (1 is the first). Through the API or MCP it is `comment.create {doc, block, quote, occurrence, body}`; the web app sends where the words are too (`start` and `end`, characters of the block's text, and `end_block` for words that run on into later blocks), and the quote is checked against them.
+
+The threads after a page read like this; the block id is what `block=` takes. A thread on words quotes the words as they read now; one whose block was taken out of the page since says `on removed block`, and one whose words were taken out says so and quotes them:
 
 ```
---- comments: 2 open threads; 1 resolved (resolved=1 shows them)
-thread THREAD_ID on block BLOCK_ID "The boss has three phases."
+--- comments: 4 open threads; 1 resolved (resolved=1 shows them)
+thread THREAD_ID on words of block BLOCK_ID "three phases"
   @aram 2026-11-16 10:42: Is this still three?
     @coder 2026-11-16 10:50: Yes: phases two and three merged.
+thread THREAD_ID on block BLOCK_ID "The boss has three phases."
+  @bea 2026-11-16 10:44: Is this paragraph needed?
+thread THREAD_ID on the page, its words taken out of it: "two lasers"
+  @bea 2026-11-16 10:47: One laser is enough.
 thread THREAD_ID on the page
   @bea 2026-11-16 11:02: Who owns this page?
 ```
+
+In the page's Markdown (`quadit doc`, `format=md`) the words a thread is on are a span that names it: `The boss has <span data-comment="THREAD_ID">three phases</span>.` Words several threads are on name them all, space-separated; where threads overlap, the spans follow each other, each naming the threads on its words. The marker is part of the text: it moves with the words as people edit, and `write` takes the spans back:
+
+- Keep a span around its words when you rewrite them; put it elsewhere to move the thread. A span naming a thread that is not this page's is dropped.
+- A span left out does not take the thread off: while its words are still in the page (the same block, or a block the same write put them in), they keep it.
+- A write that takes a thread's words out answers with a warning (`warning: thread THREAD_ID was on words this edit took out of the page ("three phases"): it stays open, on the page as a whole`; `warnings` in the API's and MCP's answer). The thread is never resolved or deleted by an edit; an edit that brings its marker back (an undo in the editor) puts it on its words again.
+
+The page as a repository file holds it, and an export, have no spans.
 
 `comments=0` leaves the threads out; `format=md` is the page alone, as `write` takes it back. Whoever wrote in a thread is told of each reply in it. Resolve a thread once the question in it is settled, not to hide one you disagree with. `reply` works on a task's comments too: `quadit show KEY` gives each comment's `id=`.
 

@@ -54,8 +54,9 @@ var tools = []tool{
 	{Name: "layout", Desc: "A project's statuses, labels, members, agents, epics, cycles and templates, by name.", Props: map[string]string{"!project": "project key"},
 		Run: readPathTool("/projects/{project}/layout", "project")},
 	{Name: "docs", Desc: "The page tree with ids.", Run: readPathTool("/docs")},
-	{Name: "doc", Desc: "One page as Markdown, then its open comment threads: each with its id, the block it is on (id and text) or \"on the page\", and its comments and replies by whom and when. " +
-		"Reply with change comment.create {parent: thread id, body}; start a thread with comment.create {doc, block, body}; resolve one with comment.update {id, resolved: true}.",
+	{Name: "doc", Desc: "One page as Markdown, then its open comment threads: each with its id, what it is on (words of a block, a block, or \"on the page\") and its comments and replies by whom and when. " +
+		"The words a thread is on are <span data-comment=\"THREAD_ID\">words</span> in the Markdown (several threads: ids space-separated); doc.write takes the spans back, and keeps a thread on its words when a span is left out. " +
+		"Reply with change comment.create {parent: thread id, body}; start a thread on words with comment.create {doc, block, quote: \"the exact words\", body} (occurrence: 2 when they are in the block more than once), on a block without quote; resolve one with comment.update {id, resolved: true}.",
 		Props: map[string]string{"!id": "page id", "full": "true to not cut long text", "resolved": "true to show the resolved threads too", "comments": "false to leave the threads out"},
 		Run:   readPathTool("/docs/{id}", "id")},
 	{Name: "rows", Desc: "A database's rows as a table, with formulas worked out.",
@@ -68,9 +69,9 @@ var tools = []tool{
 	{Name: "changes", Desc: "Every change type with its arguments. Read once to learn what change can do.", Run: readPathTool("/api/v1/changes")},
 	{Name: "change", Desc: "Make one change. Common types: task.create {project, title, description, assignee, labels, parent}; task.update {id, status, assignee, waiting_on, priority, add_labels}; " +
 		"task.take {id}; comment.create {task, body, waiting_on} (add evidence {checked, measured, not_verified} to post a result); " +
-		"comment.create {doc, block, body} on a page or one of its blocks, {parent, body} to reply in a comment's thread; comment.update {id, resolved}; " +
+		"comment.create {doc, block, quote, body} on words of a page (quote: the exact words of the block; occurrence: N picks one when they are there more than once), without quote on a block, without block on the page, {parent, body} to reply in a comment's thread; comment.update {id, resolved}; " +
 		"decision.open {task, question, options:[{label, description, attachments:[{file}]}], recommended, recommendation, ask} (the ask tool does this, with files, in one call); decision.pick {id, option, note}; " +
-		"doc.create {title, markdown, parent}; doc.write {doc, markdown, mode}. Names work wherever ids do (SVA-12, @handle, status and label names). " +
+		"doc.create {title, markdown, parent}; doc.write {doc, markdown, mode} (a write that takes out the words a comment thread is on says so in its warnings; the thread stays open, on the page). Names work wherever ids do (SVA-12, @handle, status and label names). " +
 		"Every change type with all of its arguments is listed by the changes tool (GET /api/v1/changes). " +
 		"A refusal says what was wrong and lists what would have been accepted. dry_run=true checks without writing.",
 		Props: map[string]string{"type": "change type, e.g. task.update", "args": "the change's arguments, an object", "approval": "id of an approved decision, when the change needs approval", "dry_run": "true",
