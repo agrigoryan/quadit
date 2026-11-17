@@ -170,6 +170,12 @@ func renderContent(content json.RawMessage, comments bool) string {
 		return ""
 	}
 	if !comments {
+		// Runs a thread's marker alone sets apart are one run here: written
+		// apart, a word in code or in italics would read as other markup.
+		ins = rewrite(ins, func(run Inline, _ int) []Inline {
+			run.Styles = withThreads(run.Styles, nil)
+			return []Inline{run}
+		})
 		return renderInlines(ins, false)
 	}
 	return renderSpans(ins, "")

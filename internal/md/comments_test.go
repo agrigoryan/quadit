@@ -102,6 +102,20 @@ func TestCommentSpansRoundTrip(t *testing.T) {
 			}
 		}
 	})
+	t.Run("a page as a file is written as if no thread were on it", func(t *testing.T) {
+		for _, src := range []string{"Run `go test ./...` now", "The **three phases** run", "*Italic* words"} {
+			plain := ParseWithComments(src)[0].Content
+			for _, at := range [][2]int{{7, 11}, {4, 9}, {2, 4}} {
+				content, ok := Mark(plain, at[0], at[1], "a")
+				if !ok {
+					continue
+				}
+				if got := Render([]Block{{Type: "paragraph", Content: content}}); got != src+"\n" {
+					t.Errorf("%s with %s on it is written %q", src, marked(t, content), got)
+				}
+			}
+		}
+	})
 	t.Run("a closing tag with nothing open is text", func(t *testing.T) {
 		if got := Plain(ParseWithComments("a </span> b")[0]); got != "a </span> b" {
 			t.Errorf("got %q", got)
