@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://agrigoryan.github.io/quadit/sitemap.xml
