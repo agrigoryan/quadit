@@ -26,6 +26,16 @@ type commentCreateArgs struct {
 	Option   string `json:"option"`
 	Block    string `json:"block"`
 	Parent   string `json:"parent"` // the comment this replies to
+	// A thread on words of a page: the words (quote) in block, and where
+	// they are: start and end, in characters of the block's text (a
+	// mention counting as its @handle), end in end_block when they run on
+	// past block. With quote alone they are found in the block; occurrence
+	// (1 for the first) says which when they are there more than once.
+	Quote      string   `json:"quote"`
+	Start      Opt[int] `json:"start"`
+	End        Opt[int] `json:"end"`
+	EndBlock   string   `json:"end_block"`
+	Occurrence int      `json:"occurrence"`
 	// Kind "result" is what an agent delivers: the body says what was done
 	// and evidence says how it was checked.
 	Kind        string         `json:"kind"`
@@ -292,8 +302,17 @@ func (c *cx) handOn(cm core.Comment, t core.Task, a commentCreateArgs, note stri
 	return nil
 }
 
-// docComment adds a comment to a doc or one of its blocks, with its files.
+// docComment adds a comment to a doc, one of its blocks or words of it,
+// with its files. A thread on words puts its marker on them in the same
+// change: only commenting is asked of the author, not editing the page.
 func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
+	onWords := a.Quote != "" || a.Start.Set || a.Occurrence != 0
+	if onWords && cm.ParentID != "" {
+		return invalid("quote", "a reply is on its thread's words; start a thread of its own on other words")
+	}
+	if onWords && a.Block == "" {
+		return invalid("block", "give the block the words are in")
+	}
 	if a.Block != "" {
 		b, err := loadLive[core.Block](c, "block", "block", a.Block)
 		if err != nil {
@@ -310,6 +329,22 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	}
 	if cm.SubjectType == "" {
 		cm.SubjectType, cm.SubjectID = "doc", doc.ID
+	}
+	var marks *editor
+	if onWords {
+		rows, err := LoadBlocks(cxLister{c}, doc.ID)
+		if err != nil {
+			return err
+		}
+		marks = newEditor(c, doc, rows)
+		parts, quote, err := c.selection(marks, a)
+		if err != nil {
+			return err
+		}
+		if err := markSelection(marks, parts, cm.ID); err != nil {
+			return err
+		}
+		cm.Quote, cm.SubjectID = quote, parts[0].block
 	}
 	cm.DocID = doc.ID
 	seq := c.tx.NextSeq()
@@ -331,6 +366,11 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	c.ref = cm.ID
 	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inDoc(doc), audience: doc.OwnerID, data: core.EventData{Row: cm, Attachments: atts}}); err != nil {
 		return err
+	}
+	if marks != nil {
+		if err := c.writeMarks(doc, marks); err != nil {
+			return err
+		}
 	}
 	if err := c.watch(c.actor.UserID, "doc", doc.ID); err != nil {
 		return err
@@ -507,11 +547,27 @@ func commentDelete(c *cx, a idArgs) error {
 	if err := c.tx.List(c.ctx, &replies, store.Q{Where: []store.Cond{store.Eq("parent_id", cm.ID), store.Live}, Order: "created_seq"}); err != nil {
 		return err
 	}
+	if cm.Quote != "" {
+		// The thread's words keep its marker under its new head's id, or
+		// lose it with the thread.
+		heir := ""
+		if len(replies) > 0 {
+			heir = replies[0].ID
+		}
+		if err := c.rethread(cm, heir); err != nil {
+			return err
+		}
+	}
 	for i, reply := range replies {
 		p := newPatch()
 		if i == 0 {
+			// The new head carries what the thread is on.
 			p.put("parent_id", reply.ParentID, "")
 			p.put("resolved_at", reply.ResolvedAt, cm.ResolvedAt)
+			p.put("subject_type", reply.SubjectType, cm.SubjectType)
+			p.put("subject_id", reply.SubjectID, cm.SubjectID)
+			p.put("quote", reply.Quote, cm.Quote)
+			p.put("detached_at", reply.DetachedAt, cm.DetachedAt)
 		} else {
 			p.put("parent_id", reply.ParentID, replies[0].ID)
 		}

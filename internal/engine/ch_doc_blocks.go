@@ -109,12 +109,21 @@ type editor struct {
 	rows    map[string]*core.Block
 	state   map[string]string // id -> new, dirty or gone
 	touched []string
+	// was is each live block's content as the edit found it, for the
+	// comment markers the edit may drop (keepMarks).
+	was map[string]json.RawMessage
+	// placed are the comment threads whose markers the edit puts where it
+	// wants them, as Markdown spans do: their old places are not kept.
+	placed []string
 }
 
 func newEditor(c *cx, d core.Doc, rows []core.Block) *editor {
-	e := &editor{c: c, doc: d, rows: map[string]*core.Block{}, state: map[string]string{}}
+	e := &editor{c: c, doc: d, rows: map[string]*core.Block{}, state: map[string]string{}, was: map[string]json.RawMessage{}}
 	for i := range rows {
 		e.rows[rows[i].ID] = &rows[i]
+		if rows[i].DeletedAt == 0 {
+			e.was[rows[i].ID] = rows[i].Content
+		}
 	}
 	return e
 }
@@ -327,6 +336,28 @@ func (e *editor) flush(seq int64) (upserted []core.Block, deleted []string, err 
 		}
 	}
 	return upserted, deleted, nil
+}
+
+// setMarks gives a block content that differs from what it has in its
+// comment markers alone: its text and its last editor stay as they are.
+func (e *editor) setMarks(id string, content json.RawMessage) {
+	e.rows[id].Content = content
+	e.setBlockState(id, "dirty")
+}
+
+// order is the ids of the page's live blocks in reading order, a block
+// before the blocks nested in it.
+func (e *editor) order() []string {
+	var ids []string
+	var walk func([]md.Block)
+	walk = func(list []md.Block) {
+		for _, b := range list {
+			ids = append(ids, b.ID)
+			walk(b.Children)
+		}
+	}
+	walk(BlockTree(e.liveBlocks()))
+	return ids
 }
 
 func (e *editor) liveBlocks() []core.Block {

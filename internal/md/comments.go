@@ -132,9 +132,12 @@ func RenameThreads(content json.RawMessage, rename func(id string) string) json.
 
 // CarryMarks puts a thread back on the words it was on in old, now that
 // the block's content is now. The two texts are compared character by
-// character; the characters of the words that are still there, and what
-// was typed among them, get the thread. It is false, and now unchanged,
-// when none of the words is left.
+// character; when most of the words are still there, the characters left
+// of them, and what was typed among them, get the thread. It is false, and
+// now unchanged, when the words are gone.
+//
+// Characters kept alone or in twos do not count as words still there: a
+// comparison of two texts finds a few letters in common in any two.
 func CarryMarks(old, now json.RawMessage, thread string) (json.RawMessage, bool) {
 	ins, ok := readInlines(old)
 	if !ok {
@@ -143,17 +146,26 @@ func CarryMarks(old, now json.RawMessage, thread string) (json.RawMessage, bool)
 	moved := charMap([]rune(plainInline(old)), []rune(plainInline(now)))
 	carried := false
 	for _, r := range threadRanges(ins, thread) {
-		lo, hi := -1, -1
-		for _, to := range moved[r[0]:r[1]] {
-			if to < 0 {
+		least := min(3, r[1]-r[0]) // the shortest stretch kept that counts
+		lo, hi, kept := -1, -1, 0
+		for i := r[0]; i < r[1]; {
+			if moved[i] < 0 {
+				i++
 				continue
 			}
-			if lo < 0 {
-				lo = to
+			end := i + 1 // the stretch kept together from i
+			for end < r[1] && moved[end] == moved[end-1]+1 {
+				end++
 			}
-			hi = to
+			if end-i >= least {
+				if lo < 0 {
+					lo = moved[i]
+				}
+				hi, kept = moved[end-1], kept+end-i
+			}
+			i = end
 		}
-		if lo < 0 {
+		if lo < 0 || 2*kept < r[1]-r[0] {
 			continue
 		}
 		var done bool

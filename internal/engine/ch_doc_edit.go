@@ -27,6 +27,9 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block) error {
 		c.ref = d.ID
 		return nil
 	}
+	if err := c.keepMarks(d, ed); err != nil {
+		return err
+	}
 	// When this edit changes a block someone else wrote since the last kept
 	// version, the page as they left it is kept first: the last edit wins,
 	// and the other stays in the page's history.
@@ -190,8 +193,17 @@ func docWrite(c *cx, a docWriteArgs) error {
 	if err != nil {
 		return err
 	}
+	// A comment thread whose span the Markdown has is on the words the
+	// spans are around, and on no others; one it leaves out stays where it
+	// is (keepMarks).
+	ed.placed = spanThreads(fresh)
 	switch a.Mode {
 	case "append", "prepend":
+		for _, r := range rows {
+			if content := md.TakeMarks(r.Content, json.RawMessage("[]"), ed.placed); string(content) != string(r.Content) {
+				ed.setMarks(r.ID, content)
+			}
+		}
 		for _, b := range fresh {
 			op := BlockOp{Op: "insert", Block: &b}
 			if a.Mode == "prepend" {
@@ -209,6 +221,28 @@ func docWrite(c *cx, a docWriteArgs) error {
 		for i, b := range old {
 			if !keepOld[i] {
 				ed.remove(b.ID)
+			}
+		}
+		// A block kept takes the spans written in its place.
+		var respan func(was, now md.Block)
+		respan = func(was, now md.Block) {
+			if content := md.TakeMarks(was.Content, now.Content, ed.placed); string(content) != string(was.Content) {
+				ed.setMarks(was.ID, content)
+			}
+			for k := range min(len(was.Children), len(now.Children)) {
+				respan(was.Children[k], now.Children[k])
+			}
+		}
+		for i, j := 0, 0; len(ed.placed) > 0 && i < len(old) && j < len(fresh); {
+			switch {
+			case !keepOld[i]:
+				i++
+			case !keepNew[j]:
+				j++
+			default:
+				respan(old[i], fresh[j])
+				i++
+				j++
 			}
 		}
 		// Walk the new page; blocks kept stay where they are, new ones go
@@ -240,6 +274,18 @@ func docWrite(c *cx, a docWriteArgs) error {
 		return oneOf("mode", "mode", a.Mode, []string{"replace", "append", "prepend"})
 	}
 	return c.commitEdit(d, ed, before)
+}
+
+// spanThreads is the comment threads the spans of blocks read from
+// Markdown name, nested blocks' too.
+func spanThreads(blocks []md.Block) []string {
+	var ids []string
+	for _, b := range blocks {
+		ids = append(ids, md.Threads(b.Content)...)
+		ids = append(ids, spanThreads(b.Children)...)
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids)
 }
 
 // lcs marks the blocks two versions of a page have in common, in order:

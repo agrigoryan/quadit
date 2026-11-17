@@ -59,6 +59,9 @@ type Result struct {
 	Ref    string       `json:"ref,omitempty"`
 	Key    string       `json:"key,omitempty"`
 	Events []core.Event `json:"events,omitempty"`
+	// Warnings say what the change did that the caller may not have meant:
+	// a page's edit that took away the words a comment thread was on.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Apply runs one change.
@@ -268,7 +271,7 @@ func (b *batch) checkFor(ch Change, h handler, scope *core.Scope) (string, error
 // remember records that the change was applied, at the positions of its
 // events, so that sending it again is answered and not applied twice.
 func (b *batch) remember(c *cx, ch Change, hash string) (*Result, error) {
-	res := &Result{ChangeID: ch.ID, Type: ch.Type, Events: c.events, Ref: c.ref, Key: c.key}
+	res := &Result{ChangeID: ch.ID, Type: ch.Type, Events: c.events, Ref: c.ref, Key: c.key, Warnings: c.warnings}
 	applied := core.AppliedChange{WorkspaceID: c.ws, ID: ch.ID, ActorID: b.member.UserID, Type: ch.Type, ArgsHash: hash, CreatedAt: b.now, Ref: c.ref, Key: c.key}
 	if len(c.events) > 0 {
 		applied.FirstSeq = c.events[0].Seq

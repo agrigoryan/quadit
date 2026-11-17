@@ -4,6 +4,7 @@ package engine
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -50,6 +51,15 @@ type cx struct {
 	asker string
 	// askerOK remembers the tasks whose asker was already checked.
 	askerOK map[string]bool
+	// warnings are what the change did that its caller may not have meant
+	// (Result.Warnings).
+	warnings []string
+}
+
+// warn tells the caller, with the change's answer, of something the change
+// did that they may not have meant.
+func (c *cx) warn(format string, a ...any) {
+	c.warnings = append(c.warnings, fmt.Sprintf(format, a...))
 }
 
 // place is where in the workspace an event belongs: its scope (a task, a

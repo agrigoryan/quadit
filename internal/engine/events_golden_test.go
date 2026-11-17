@@ -374,6 +374,22 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 		t.Fatal(err)
 	}
 
+	// A thread on words of a page: the words get its marker, an edit that
+	// takes them out detaches it, an undo puts it back, and deleting it
+	// takes the marker off.
+	notes := do("doc.create", M{"title": "Notes", "markdown": "The boss has three phases.\n"}).Ref
+	var words core.Block
+	if err := st.In(ws.ID).Get(ctx, &words, store.Eq("doc_id", notes)); err != nil {
+		t.Fatal(err)
+	}
+	onWords := do("comment.create", M{"doc": notes, "block": words.ID, "quote": "three phases", "body": "Four?"}).Ref
+	if err := st.In(ws.ID).Get(ctx, &words, store.Eq("id", words.ID)); err != nil {
+		t.Fatal(err)
+	}
+	do("doc.edit", M{"doc": notes, "ops": []M{{"op": "update", "id": words.ID, "content": "The boss is gone."}}})
+	do("doc.edit", M{"doc": notes, "ops": []M{{"op": "update", "id": words.ID, "content": words.Content}}})
+	do("comment.delete", M{"id": onWords})
+
 	do("workspace.delete", M{"confirm": "events"})
 
 	for _, typ := range ChangeTypes() {

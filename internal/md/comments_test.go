@@ -185,11 +185,16 @@ func TestCarryMarksFollowsTheWords(t *testing.T) {
 			}
 		})
 	}
-	t.Run("words gone", func(t *testing.T) {
-		if got, ok := CarryMarks(old, paragraph(t, "The phases."), "a"); ok {
-			t.Errorf("marked %s on text without the words", marked(t, got))
-		}
-	})
+	for name, now := range map[string]string{
+		"words gone":                "The phases.",
+		"other words with a letter": "The boss is gone.",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got, ok := CarryMarks(old, paragraph(t, now), "a"); ok {
+				t.Errorf("marked %s on text without the words", marked(t, got))
+			}
+		})
+	}
 }
 
 // TestTakeMarksPlacesThreadsAsWritten: the threads named take the places

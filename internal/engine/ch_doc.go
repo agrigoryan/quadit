@@ -188,6 +188,9 @@ func (c *cx) insertDoc(d core.Doc, a docCreateArgs) error {
 			return err
 		}
 	}
+	if err := c.keepMarks(d, ed); err != nil {
+		return err
+	}
 	rows, _, err := ed.flush(seq)
 	if err != nil {
 		return err

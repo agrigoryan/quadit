@@ -112,6 +112,9 @@ func docRevert(c *cx, a docRevertArgs) error {
 			return err
 		}
 	}
+	if err := c.keepMarks(d, ed); err != nil {
+		return err
+	}
 	seq := c.tx.NextSeq()
 	upserted, gone, err := ed.flush(seq)
 	if err != nil {
