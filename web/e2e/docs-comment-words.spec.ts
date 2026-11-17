@@ -1,9 +1,11 @@
 // Comment threads on words of a page: started on a selection by a person,
 // by one who may comment but not edit, and by an agent with quote=; the
 // words highlighted while the thread is open, kept as people type in and
-// around them, detached when they are taken out and put back by an undo,
-// kept through an agent's rewrite. Seeding and checking go through the
-// CLI, which reads the threads as an agent does.
+// around them (and while a thread is started on words of the block being
+// typed in), detached when they are taken out and put back by an undo (and
+// out again by a redo), kept through an agent's rewrite, taken along by a
+// cut and a paste. Seeding and checking go through the CLI, which reads the
+// threads as an agent does.
 
 import { execFile } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
@@ -272,4 +274,99 @@ test("on a page mirrored from a read-only file, one who may only comment starts 
   await writeThread(page, "Walking only?");
   await expect(marked(page, "No running in the hall.")).toHaveCSS("border-bottom-width", "2px");
   await expect.poll(() => quadit.cli("comments", id ?? "")).toContain('"No running in the hall."\n  @ann-owner');
+});
+
+test("a thread started on words of the block being typed in: its marker comes in as the typing goes on, and no key is lost", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Boss rush", "The boss has three phases.\n");
+  const block = doc.blocks.get("The boss has three phases.") ?? "";
+  await page.goto(`/e2e/docs/${doc.id}`);
+  const line = pageText(page).locator("p").filter({ hasText: "The boss" });
+  await line.click();
+  await page.keyboard.press("End");
+
+  // An agent starts a thread on words of the block while keys typed in it are not sent yet (typed
+  // faster than the editor waits before it sends): the editor keeps its text, and sends it without
+  // the marker. The server puts the marker back on the words. Then keys typed slower than the
+  // editor waits go out one by one, and the answers come while the next keys are being typed.
+  const fast = page.keyboard.type(" Then it runs away", { delay: 200 });
+  await expect(line).toContainText("The boss has three phases. Then");
+  await quadit.agent("comment", `page=${doc.id}`, `block=${block}`, "quote=three phases", "Four?");
+  await fast;
+  await page.keyboard.type(" fast, and hides.", { delay: 450 });
+  await expect(line).toHaveText("The boss has three phases. Then it runs away fast, and hides.");
+  await expect(marked(page, "three phases")).toHaveCSS("border-bottom-width", "2px");
+  await expect
+    .poll(() => quadit.cli("doc", doc.id, "format=md"))
+    .toMatch(/^The boss has <span data-comment="[^"]+">three phases<\/span>\. Then it runs away fast, and hides\.$/m);
+  expect(await quadit.cli("comments", doc.id)).toContain(`on words of block ${block} "three phases"`);
+});
+
+test("redo takes the words out again and detaches the thread, and undo puts it back once more", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Intro", "The camera pans left slowly.\n");
+  const block = doc.blocks.get("The camera pans left slowly.") ?? "";
+  await quadit.cli("comment", `page=${doc.id}`, `block=${block}`, "quote=pans left", "Right instead?");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await expect(marked(page, "pans left")).toHaveCSS("border-bottom-width", "2px");
+
+  await marked(page, "pans left").selectText();
+  await expect(page.locator(".bn-formatting-toolbar")).toBeVisible();
+  await page.keyboard.press("Backspace");
+  const detached = 'on the page, its words taken out of it: "pans left"';
+  const attached = `on words of block ${block} "pans left"`;
+  await expect.poll(() => quadit.cli("comments", doc.id)).toContain(detached);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(marked(page, "pans left")).toHaveCSS("border-bottom-width", "2px");
+  await expect.poll(() => quadit.cli("comments", doc.id)).toContain(attached);
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(marked(page, "pans left")).toHaveCount(0);
+  await expect.poll(() => quadit.cli("comments", doc.id)).toContain(detached);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(marked(page, "pans left")).toHaveCSS("border-bottom-width", "2px");
+  await expect.poll(() => quadit.cli("comments", doc.id)).toContain(attached);
+});
+
+test("words cut and pasted into a block that has the same words take the thread to the copy pasted", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Mood", "Keep the lights low.\n\nThe lights low here, and:\n");
+  const block = doc.blocks.get("Keep the lights low.") ?? "";
+  const other = doc.blocks.get("The lights low here, and:") ?? "";
+  await quadit.cli("comment", `page=${doc.id}`, `block=${block}`, "quote=lights low", "Why low?");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await expect(marked(page, "lights low")).toHaveCSS("border-bottom-width", "2px");
+
+  await marked(page, "lights low").selectText();
+  await expect(page.locator(".bn-formatting-toolbar")).toBeVisible();
+  // The browser's cut and paste, as the editor hears them, at once: one edit of the page takes the
+  // words out of one block and puts them in the other.
+  await pageText(page).evaluate(async (text) => {
+    const data = new DataTransfer();
+    text.dispatchEvent(new ClipboardEvent("cut", { clipboardData: data, bubbles: true, cancelable: true }));
+    const target = [...text.querySelectorAll("p")].find((p) => p.textContent?.startsWith("The lights low here"));
+    const last = target?.lastChild;
+    if (!last) throw new Error("no block to paste in");
+    const range = document.createRange();
+    range.setStart(last, last.textContent?.length ?? 0);
+    // The editor takes the selection when the browser tells it of the change; it listened first.
+    const told = new Promise((resolve) => document.addEventListener("selectionchange", resolve, { once: true }));
+    document.getSelection()?.removeAllRanges();
+    document.getSelection()?.addRange(range);
+    await told;
+    text.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(pageText(page).getByText("The lights low here, and:lights low")).toBeVisible();
+  await expect
+    .poll(() => quadit.cli("doc", doc.id, "format=md"))
+    .toContain('The lights low here, and:<span data-comment="');
+  expect(await quadit.cli("comments", doc.id)).toContain(`on words of block ${other} "lights low"`);
 });
