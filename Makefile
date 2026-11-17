@@ -58,13 +58,16 @@ seed:
 fmt:
 	gofmt -w cmd internal
 
-# Binaries for Linux and macOS, x86 and ARM, in dist/.
-release: web
-	VERSION=$(VERSION) ./scripts/release.sh
+# A release as GoReleaser makes it (.goreleaser.yaml), into dist/ and
+# published nowhere: archives for Linux and macOS, x86 and ARM, checksums,
+# the Homebrew cask and the Docker images. A tag v* pushed to GitHub makes
+# the real one.
+release:
+	goreleaser release --snapshot --clean
 
 # The Docker image.
 image:
 	docker build --build-arg VERSION=$(VERSION) -t quadit:$(VERSION) .
 
 clean:
-	rm -rf bin web/dist
+	rm -rf bin dist web/dist

@@ -1,0 +1,156 @@
+# A release: the binaries with the web app inside for Linux and macOS, x86
+# and ARM; their archives, .deb and .rpm packages and checksums on a GitHub
+# Release; the Docker images on ghcr.io; the Homebrew cask in
+# agrigoryan/homebrew-tap. The version comes from the tag (vX.Y.Z) alone.
+#
+#   make release      a local snapshot in dist/, nothing published
+#
+# A tag v* pushed to GitHub publishes one (.github/workflows/release.yml).
+version: 2
+
+project_name: quadit
+
+before:
+  hooks:
+    - make web
+
+builds:
+  - id: quadit
+    main: ./cmd/quadit
+    binary: quadit
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    tags:
+      - web
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: quadit
+    formats: [tar.gz]
+    # No version in the name, so the newest release's archive has a fixed
+    # address: releases/latest/download/quadit_linux_amd64.tar.gz
+    # (install.sh relies on it).
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+# Release notes from the Conventional Commits since the last tag. Each entry
+# starts with its commit hash, hence the (?:[0-9a-f]+ )? in front.
+changelog:
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^(?:[0-9a-f]+ )?feat(\(.+\))?!?:'
+      order: 0
+    - title: Fixes
+      regexp: '^(?:[0-9a-f]+ )?fix(\(.+\))?!?:'
+      order: 1
+    - title: Performance
+      regexp: '^(?:[0-9a-f]+ )?perf(\(.+\))?!?:'
+      order: 2
+    - title: Other changes
+      order: 999
+  filters:
+    exclude:
+      - '^(?:[0-9a-f]+ )?(docs|test|style|ci|build|chore)(\(.+\))?:'
+
+release:
+  github:
+    owner: agrigoryan
+    name: quadit
+  prerelease: auto
+
+# .deb and .rpm: /usr/bin/quadit, and a systemd service that is installed
+# but not enabled (packaging/). Upgrading is installing the newer package.
+nfpms:
+  - id: quadit
+    ids: [quadit]
+    package_name: quadit
+    file_name_template: "{{ .ConventionalFileName }}"
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    vendor: Quadit
+    homepage: https://github.com/agrigoryan/quadit
+    maintainer: Quadit maintainers <agrigoryan@users.noreply.github.com>
+    description: Tasks, decisions and docs for people and AI agents, self-hosted.
+    license: MIT
+    section: web
+    suggests: [git, ffmpeg, chromium]
+    contents:
+      - src: packaging/quadit.service
+        dst: /usr/lib/systemd/system/quadit.service
+      - src: packaging/quadit.env
+        dst: /etc/quadit/quadit.env
+        type: config|noreplace
+        file_info:
+          mode: 0600
+      - src: LICENSE
+        dst: /usr/share/doc/quadit/LICENSE
+    scripts:
+      postinstall: packaging/postinstall.sh
+      preremove: packaging/preremove.sh
+
+# The "release" stage of the Dockerfile: the same runtime as an image built
+# from source, with the binary built above.
+dockers_v2:
+  - id: quadit
+    ids: [quadit]
+    dockerfile: Dockerfile
+    flags:
+      - --target=release
+    images:
+      - ghcr.io/agrigoryan/quadit
+    # 1.2.3, and for a release that is not a pre-release 1.2, 1 and latest
+    # too: pinning 1.2 follows its patches, 1 its minor releases.
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}{{ .Major }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: Quadit
+      org.opencontainers.image.description: Tasks, decisions and docs for people and AI agents, self-hosted
+      org.opencontainers.image.source: https://github.com/agrigoryan/quadit
+      org.opencontainers.image.licenses: MIT
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+
+# brew install agrigoryan/tap/quadit. Pushing the cask needs a token that
+# can write to agrigoryan/homebrew-tap (the HOMEBREW_TAP_GITHUB_TOKEN
+# secret); without one the cask is still made in dist/ but not pushed, and
+# the release goes on.
+homebrew_casks:
+  - name: quadit
+    ids: [quadit]
+    repository:
+      owner: agrigoryan
+      name: homebrew-tap
+      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "" }}'
+    skip_upload: '{{ if eq (envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "") "" }}true{{ else }}false{{ end }}'
+    commit_msg_template: "chore: quadit {{ .Tag }}"
+    homepage: https://github.com/agrigoryan/quadit
+    description: Tasks, decisions and docs for people and AI agents, self-hosted
+    license: MIT
+    hooks:
+      post:
+        # The binaries are not signed by Apple: without this, macOS refuses
+        # to run one downloaded by Homebrew.
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/quadit"]
+          end

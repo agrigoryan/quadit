@@ -4,6 +4,10 @@
 #
 #   docker build -t quadit .
 #   docker run -p 4780:4780 -v quadit-data:/data -e QUADIT_BASE_URL=http://localhost:4780 quadit
+#
+# The last stage builds the binary from this checkout. The release images
+# (ghcr.io/agrigoryan/quadit) are the "release" stage instead: GoReleaser
+# hands it the binaries it built, one per platform (.goreleaser.yaml).
 
 FROM node:24-alpine AS web
 WORKDIR /src/web
@@ -22,10 +26,10 @@ COPY --from=web /src/web/dist ./web/dist
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -tags web -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/quadit ./cmd/quadit
 
-FROM alpine:3.22
+# What both images run on: everything but the binary.
+FROM alpine:3.22 AS runtime
 RUN apk add --no-cache ca-certificates tzdata git ffmpeg chromium font-noto font-noto-emoji \
     && adduser -D -u 10001 -h /data quadit
-COPY --from=build /out/quadit /usr/local/bin/quadit
 USER quadit
 ENV QUADIT_DATA=/data QUADIT_LISTEN=:4780 QUADIT_CHROME=/usr/bin/chromium QUADIT_CHROME_ARGS="--no-sandbox --disable-dev-shm-usage"
 VOLUME /data
@@ -34,3 +38,10 @@ EXPOSE 4780
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:4780/healthz || wget -qO- http://127.0.0.1:4781/healthz || exit 1
 ENTRYPOINT ["quadit"]
 CMD ["serve"]
+
+FROM runtime AS release
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/quadit /usr/local/bin/quadit
+
+FROM runtime
+COPY --from=build /out/quadit /usr/local/bin/quadit
