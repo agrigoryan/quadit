@@ -269,10 +269,10 @@ thread THREAD_ID on the page
 In the page's Markdown (`quadit doc`, `format=md`) the words a thread is on are a span that names it: `The boss has <span data-comment="THREAD_ID">three phases</span>.` Words several threads are on name them all, space-separated; where threads overlap, the spans follow each other, each naming the threads on its words. The marker is part of the text: it moves with the words as people edit, and `write` takes the spans back:
 
 - Keep a span around its words when you rewrite them; put it elsewhere to move the thread. A span naming a thread that is not this page's is dropped.
-- A span left out does not take the thread off: while its words are still in the page (the same block, or a block the same write put them in), they keep it.
+- A span left out does not take the thread off: while its words are still in the page (the same block, or a block the same write put them in, not the same words that block had already), they keep it.
 - A write that takes a thread's words out answers with a warning (`warning: thread THREAD_ID was on words this edit took out of the page ("three phases"): it stays open, on the page as a whole`; `warnings` in the API's and MCP's answer). The thread is never resolved or deleted by an edit; an edit that brings its marker back (an undo in the editor) puts it on its words again.
 
-The page as a repository file holds it, and an export, have no spans.
+A page as a repository file holds it, and an export, have no spans: there, and in what a repository sync brings in, text that looks like a span is text.
 
 `comments=0` leaves the threads out; `format=md` is the page alone, as `write` takes it back. Whoever wrote in a thread is told of each reply in it. Resolve a thread once the question in it is settled, not to hide one you disagree with. `reply` works on a task's comments too: `quadit show KEY` gives each comment's `id=`.
 
