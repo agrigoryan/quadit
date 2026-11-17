@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, NetworkError, noteReachable } from "@/data/api";
 import { clearOutbox, mutate, restoreQueue } from "@/data/mutate";
 import { outbox, type OutboxItem } from "@/data/outbox";
-import { applyEvents, clearStore, getState, loadBootstrap } from "@/data/store";
+import { applyEvents, clearStore, getState, loadBootstrap, mergeRows } from "@/data/store";
 import { toast } from "@/lib/toast";
 import type { ChangeResult, FeedEvent, Member, User, Workspace } from "@/types/core";
 
@@ -213,6 +213,21 @@ describe("mutate", () => {
     ]);
     await edit;
     expect(title()).toBe("x");
+  });
+
+  it("keeps showing a waiting edit over the row a fetch brings, read before the edit reached the server", async () => {
+    const title = () => getState().collections.tasks.t1?.title;
+    const edit = mutate({ type: "task.update", args: { id: "t1", title: "x" } }, (tx) =>
+      tx.patch("tasks", "t1", { title: "x" }),
+    ).catch(() => {});
+    await settle();
+    // The task's details arrive, as the server had them before the edit.
+    mergeRows("tasks", [{ id: "t1", title: "a", priority: 1, description: "whole", updated_seq: 9 } as never]);
+    expect(getState().collections.tasks.t1).toMatchObject({ title: "x", description: "whole" });
+    // Refused, the field goes back to what the fetch said the server has.
+    calls[0]?.fail(new ApiError(400, { message: "no" }));
+    await edit;
+    expect(title()).toBe("a");
   });
 
   it("sends a change again with the same change id when the server could not be reached", async () => {

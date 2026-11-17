@@ -35,6 +35,7 @@ import {
   markDrafts,
   mergeRows,
   onEvents,
+  onRowsFetched,
   patchRow,
   removeRow,
   useStore,
@@ -165,22 +166,34 @@ function showWaitingEdits(events: FeedEvent[]) {
     // A whole row (something made, or restored) writes every field, even when the event also names
     // the changes that brought it; a change alone, the fields it names.
     const wrote = !ev.data?.row && ev.data?.changes ? Object.keys(ev.data.changes) : null;
-    for (const id of target.keys) {
-      const now = tableOf(target.collection)[id];
-      if (!now) continue;
-      const fields = wrote ?? Object.keys(now);
-      const again: Row = {};
-      for (const field of fields) {
-        let standsOn: unknown = now[field] ?? null;
-        for (const edit of waitingEditsOf(target.collection, id, field)) {
-          edit.before[field] = standsOn;
-          standsOn = edit.fields[field];
-          again[field] = standsOn;
-        }
-      }
-      if (Object.keys(again).length > 0) patchRow(target.collection, id, again);
+    for (const id of target.keys) showWaitingEditsOver(target.collection, id, wrote);
+  }
+}
+
+/** Rows have just been put in the copy as a fetch brought them (store.onRowsFetched): the same, over every field. */
+function showWaitingEditsOverFetched(collection: CollectionName, ids: string[]) {
+  if (queue.length === 0) return;
+  for (const id of ids) showWaitingEditsOver(collection, id, null);
+}
+
+/**
+ * Shows the waiting edits of a row again over what the server said of
+ * `fields` (all of them when null): the oldest stands on the server's
+ * value, each later one on the edit before it, and the row shows the last.
+ */
+function showWaitingEditsOver(collection: CollectionName, id: string, fields: string[] | null) {
+  const now = tableOf(collection)[id];
+  if (!now) return;
+  const again: Row = {};
+  for (const field of fields ?? Object.keys(now)) {
+    let standsOn: unknown = now[field] ?? null;
+    for (const edit of waitingEditsOf(collection, id, field)) {
+      edit.before[field] = standsOn;
+      standsOn = edit.fields[field];
+      again[field] = standsOn;
     }
   }
+  if (Object.keys(again).length > 0) patchRow(collection, id, again);
 }
 
 interface Job {
@@ -214,10 +227,12 @@ async function pump() {
   pumping = true;
   // While anything waits, what arrives is shown under the waiting edits, not over them.
   const stopShowing = onEvents(showWaitingEdits);
+  const stopShowingFetched = onRowsFetched(showWaitingEditsOverFetched);
   try {
     await sendQueue();
   } finally {
     stopShowing();
+    stopShowingFetched();
     pumping = false;
   }
 }
