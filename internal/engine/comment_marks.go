@@ -9,6 +9,7 @@ package engine
 
 import (
 	"cmp"
+	"maps"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -250,7 +251,9 @@ func (c *cx) keepMarks(d core.Doc, ed *editor) error {
 	// moved them, the words it put in another block (the same words that
 	// block had already are other words).
 	order := ed.order()
-	for _, t := range sortedKeys(lost) {
+	// In the order of the threads' ids, so that what an edit does does not
+	// depend on the order Go walks a map in.
+	for _, t := range slices.Sorted(maps.Keys(lost)) {
 		for _, from := range lost[t] {
 			old := ed.was[from]
 			if r := live(from); r != nil && takesMarks(r) {
@@ -278,7 +281,7 @@ func (c *cx) keepMarks(d core.Doc, ed *editor) error {
 	// Each thread the edit touched is on the first block its words are in,
 	// or on the page as a whole when they are nowhere.
 	var placed []core.Comment
-	for _, t := range sortedKeys(touchedThreads) {
+	for _, t := range slices.Sorted(maps.Keys(touchedThreads)) {
 		placed = append(placed, threads[t])
 	}
 	return c.placeThreads(d, ed, placed)
@@ -300,7 +303,7 @@ func (c *cx) settleMarks(d core.Doc, ed *editor) error {
 		}
 	}
 	all := make([]core.Comment, 0, len(threads))
-	for _, t := range sortedKeys(threads) {
+	for _, t := range slices.Sorted(maps.Keys(threads)) {
 		all = append(all, threads[t])
 	}
 	return c.placeThreads(d, ed, all)
@@ -378,15 +381,4 @@ func keepIf(id string, threads map[string]core.Comment) string {
 		return id
 	}
 	return ""
-}
-
-// sortedKeys is a map's keys in order, so that what an edit does does not
-// depend on the order Go walks a map in.
-func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
 }
