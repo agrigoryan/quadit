@@ -137,6 +137,23 @@ export function onEvents(listener: EventListener): () => void {
 const appliedEarly = new Set<number>();
 
 /**
+ * The events applied lately, oldest first, with when each was applied. A
+ * row fetched while some of them were on their way is older than they are,
+ * and if it was not in the copy when they came they changed nothing:
+ * mergeRows brings such a row up to them. Kept by applyEvents; emptied with
+ * the copy (loadBootstrap, clearStore).
+ */
+let recent: { at: number; ev: FeedEvent }[] = [];
+/** How long an applied event is kept for rows fetched before it: far longer than a fetch takes. */
+const RECENT_MS = 5 * 60_000;
+
+function keepRecent(events: FeedEvent[]) {
+  const now = Date.now();
+  recent = recent.filter((r) => now - r.at < RECENT_MS);
+  for (const ev of events) recent.push({ at: now, ev });
+}
+
+/**
  * Applies feed events. Events from the live stream arrive in order and move
  * `seq`; events returned by a write are applied early and do not, because
  * the stream will deliver them again in their place. When it does, the
@@ -154,6 +171,7 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
   const toApply = fromStream ? fresh.filter((ev) => !appliedEarly.delete(ev.seq)) : fresh;
   if (!fromStream) for (const ev of fresh) appliedEarly.add(ev.seq);
   for (const ev of fresh) last = Math.max(last, ev.seq);
+  keepRecent(toApply);
   for (const ev of toApply) {
     if (ev.entity_type === "workspace" && ev.data?.changes) continue;
     applyEvent(d, ev);
@@ -250,6 +268,7 @@ export interface LoadOptions {
 export function loadBootstrap(slug: string, data: BootstrapData, opts: LoadOptions = {}) {
   const prev = getState();
   appliedEarly.clear();
+  recent = [];
   const keep = prev.slug === slug && !opts.fresh ? prev : null;
   const c = emptyCollections();
   for (const name of Object.keys(c) as CollectionName[]) {
@@ -351,6 +370,13 @@ export function mergeRest(slug: string, data: RestData, meanwhile: FeedEvent[]):
     for (const id of target.keys) if (!next.tasks[id]) missing.add(id);
   }
   useStore.setState({ collections: next, restLoaded: true });
+  for (const name of REST_PARTS) {
+    const prefix = `${name}:`;
+    tellFetched(
+      name,
+      [...added].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length)),
+    );
+  }
   return [...missing];
 }
 
@@ -379,19 +405,52 @@ export function clearDrafts(ids: string[]) {
  * fetch was on its way) keeps what the feed gave it; the fetched copy only
  * fills in what the held one does not carry, like a task's description.
  */
+type FetchedListener = (collection: CollectionName, keys: string[]) => void;
+const fetchedListeners = new Set<FetchedListener>();
+
+/**
+ * Hear rows put in the copy from a fetch as the server had them
+ * (mergeRows, mergeRest): what was shown over them here, such as an edit
+ * still waiting to be sent (data/mutate.ts), is not on them any more.
+ * Returns the function that stops the listening.
+ */
+export function onRowsFetched(listener: FetchedListener): () => void {
+  fetchedListeners.add(listener);
+  return () => fetchedListeners.delete(listener);
+}
+
+function tellFetched(collection: CollectionName, keys: string[]) {
+  if (keys.length === 0) return;
+  for (const listener of fetchedListeners) listener(collection, keys);
+}
+
 export function mergeRows<K extends CollectionName>(name: K, rows: Collections[K][string][]) {
   if (rows.length === 0) return;
   const d = new CopyOnWrite(getState().collections);
+  const taken: string[] = [];
   for (const row of rows) {
     const fetched: AnyRow = row;
-    const held = d.peek(name)[keyOf(name, fetched)];
+    const key = keyOf(name, fetched);
+    const held = d.peek(name)[key];
     const heldIsNewer =
       typeof held?.updated_seq === "number" &&
       typeof fetched.updated_seq === "number" &&
       held.updated_seq > fetched.updated_seq;
-    d.put(name, heldIsNewer ? { ...fetched, ...held } : fetched);
+    if (heldIsNewer) {
+      d.put(name, { ...fetched, ...held });
+      continue;
+    }
+    d.put(name, fetched);
+    taken.push(key);
+    // Events applied since the row was read, which it does not show yet.
+    const readAt = fetched.updated_seq;
+    if (typeof readAt !== "number") continue;
+    for (const { ev } of recent) {
+      if (ev.seq > readAt) applyEvent(d, ev, (n, k) => n === name && k === key);
+    }
   }
   useStore.setState({ collections: d.done() });
+  tellFetched(name, taken);
 }
 
 export function patchRow(name: CollectionName, id: string, fields: AnyRow) {
@@ -413,6 +472,7 @@ export function markOpened(taskId: string) {
 /** Empties the copy: at sign-out, and when the person may no longer see this workspace. */
 export function clearStore() {
   appliedEarly.clear();
+  recent = [];
   useStore.setState({
     slug: "",
     ready: false,

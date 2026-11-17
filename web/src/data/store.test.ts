@@ -289,6 +289,33 @@ describe("mergeRows on a row of any kind", () => {
     mergeRows("dbviews", [{ id: "v1", name: "Table", config: {}, updated_seq: 5 } as never]);
     expect(getState().collections.dbviews.v1).toMatchObject({ config: { widths: { p1: 250 } }, updated_seq: 12 });
   });
+
+  it("brings a row fetched before a feed change up to it, when the change came before the row was here", () => {
+    loadBootstrap("acme", boot());
+    const widen = (seq: number, width: number, own: boolean) =>
+      applyEvents(
+        [
+          event(seq, {
+            type: "dbview.updated",
+            entity_type: "dbview",
+            entity_id: "v1",
+            data: { changes: { config: { from: {}, to: { widths: { p1: width } } } } },
+          }),
+        ],
+        !own,
+      );
+    // The change arrives (from the stream, or as the answer to a change sent here) while the
+    // page is still being fetched: there is no row yet to change.
+    widen(12, 250, false);
+    widen(13, 260, true);
+    // The page's fetch, read before those changes, answers after them.
+    mergeRows("dbviews", [{ id: "v1", name: "Table", config: {}, updated_seq: 5 } as never]);
+    expect(getState().collections.dbviews.v1).toMatchObject({ config: { widths: { p1: 260 } }, updated_seq: 13 });
+
+    // A row read after a change is not taken back to before it.
+    mergeRows("dbviews", [{ id: "v1", name: "Table", config: { widths: { p1: 300 } }, updated_seq: 20 } as never]);
+    expect(getState().collections.dbviews.v1).toMatchObject({ config: { widths: { p1: 300 } }, updated_seq: 20 });
+  });
 });
 
 describe("clearStore", () => {
