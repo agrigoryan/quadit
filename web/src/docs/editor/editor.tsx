@@ -45,6 +45,13 @@ export interface EditorHandle {
   blockText: (id: string) => string | undefined;
   /** Block ids in reading order. */
   order: () => string[];
+  /**
+   * The block the caret is in, as the browser has it this moment; null when
+   * the text does not have the focus. A key pressed right after the caret
+   * moved is about the block the caret is in now, which the editor and the
+   * page hear of only a moment later.
+   */
+  caretBlock: () => string | null;
 }
 
 interface Props {
@@ -174,6 +181,12 @@ export default function Editor({
           return true;
         });
         return out;
+      },
+      caretBlock() {
+        const at = document.getSelection()?.focusNode;
+        const element = at instanceof Element ? at : at?.parentElement;
+        if (!editor.isFocused() || !element || !editor.domElement?.contains(element)) return null;
+        return element.closest<HTMLElement>(".bn-block-outer[data-id]")?.dataset.id ?? null;
       },
     }),
     [editor],

@@ -34,6 +34,7 @@ const editor: { current: EditorHandle } = {
     scrollToBlock: () => {},
     blockText: (id) => ({ b1: "Ship by Friday", b2: "Goals" })[id],
     order: () => ["b2", "b1"],
+    caretBlock: () => null,
   },
 };
 

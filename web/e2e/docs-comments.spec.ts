@@ -209,6 +209,27 @@ test("Ctrl+M starts a comment on the block at the caret, or with no caret on the
   await expect(sheet.getByText("Close the comments")).toBeVisible();
 });
 
+test("Ctrl+M pressed the moment the caret reaches another block comments on that block", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Quick keys", "First line.\n\nSecond line.\n");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await caretIn(page, "First line.");
+  // The caret moves and the key comes in one go, before the page has had a
+  // moment to hear of the move: as a fast typist, or a busy machine, does it.
+  await pageText(page).evaluate((text) => {
+    const line = [...text.querySelectorAll("p")].find((p) => p.textContent === "Second line.");
+    if (!line?.firstChild) throw new Error("no second line");
+    document.getSelection()?.collapse(line.firstChild, "Second line.".length);
+    text.dispatchEvent(new KeyboardEvent("keydown", { key: "m", code: "KeyM", ctrlKey: true, bubbles: true }));
+  });
+  await expect(column(page).getByRole("textbox", { name: "Comment on this block…" })).toBeFocused();
+  await expect(column(page).getByText("Second line.")).toBeVisible();
+  await expect(column(page).getByText("First line.")).toBeHidden();
+});
+
 test("Ctrl+M in a comment box leaves what is being written alone", async ({ page, project, quadit }) => {
   const doc = await newPage(quadit, project.key, "Drafts", "First line.\n\nSecond line.\n");
   await page.goto(`/e2e/docs/${doc.id}`);

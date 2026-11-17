@@ -60,7 +60,10 @@ export function PageBody({ doc, compact }: Props) {
         e.preventDefault();
         // Already writing a comment: a new thread's draft would be thrown away.
         if (e.target instanceof Element && e.target.closest("[data-comments]")) return;
-        if (block && mayEdit && !isDatabase) pageUi.startThread(block);
+        // Asked of the editor, not of `block`: that is the caret as of the last render, and a key pressed
+        // right after the caret moved would comment on the block it left.
+        const at = editor.current?.caretBlock() ?? null;
+        if (at && mayEdit && !isDatabase) pageUi.startThread(at);
         else pageUi.commentOnPage();
       },
     },
