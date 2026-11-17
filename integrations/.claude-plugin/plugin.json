@@ -2,5 +2,6 @@
   "name": "quadit",
   "version": "0.1.0",
   "description": "Work with a Quadit workspace: tasks, decisions and docs shared by people and agents. Adds a skill for the quadit command-line tool and the Quadit MCP server.",
-  "keywords": ["tasks", "decisions", "docs", "agents"]
+  "keywords": ["tasks", "decisions", "docs", "agents"],
+  "license": "MIT"
 }
