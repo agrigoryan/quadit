@@ -112,6 +112,6 @@ Fix the call and send it again. `--dry-run` checks a write without making it. `q
 - Do not work on a task someone else holds; `quadit take` will tell you who has it.
 - Hand a task on explicitly: `quadit comment SVA-12 "…" waiting_on=@who`. A task that waits on nobody is nobody's.
 - If you correct yourself, say so in a new comment; do not rewrite the old one.
-- A shared machine has a queue: `quadit do resource.acquire '{"resource": "minipc"}'` answers holding or waiting; release with `resource.release` when done.
+- A shared machine has a queue: `quadit do resource.acquire '{"resource": "build-box"}'` answers holding or waiting; release with `resource.release` when done.
 - Keys and passwords are in the vault; you can use them, not read them. `quadit secrets` lists yours. To call an API with one: `quadit request NAME https://api.example.com/path method=POST header="Authorization:Bearer {{secret}}" body='…'`. The server fills in the value, sends it only to that secret's hosts, and blanks it out of the answer. Never ask a person to paste a key into a task or a comment.
 - A task a person gave you is worked with that person's access. If you are refused because they no longer have access, say so in a comment and stop; a person has to assign it again.

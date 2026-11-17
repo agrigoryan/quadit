@@ -208,8 +208,8 @@ func TestThirdAuditFindings(t *testing.T) {
 		// What a fourth check found. A claim made for another project's
 		// task does not reach a limited member through the feed.
 		s.change(s.owner, "", "agent.update", M{"id": "@narrow", "scope": M{"projects": []string{"OPS"}}})
-		s.change(s.owner, "", "resource.create", M{"name": "minipc"})
-		s.change(s.owner, "", "resource.acquire", M{"resource": "minipc", "task": "SVA-1", "note": "secret playtest"})
+		s.change(s.owner, "", "resource.create", M{"name": "build-box"})
+		s.change(s.owner, "", "resource.acquire", M{"resource": "build-box", "task": "SVA-1", "note": "secret playtest"})
 		if out := s.call(nil, narrow, "GET", "/api/v1/w/-/events?after=0&limit=2000", nil, 200, nil); strings.Contains(out, "secret playtest") {
 			t.Fatalf("a claim on an SVA task reached an agent limited to OPS: %s", out)
 		}
@@ -241,9 +241,9 @@ func TestThirdAuditFindings(t *testing.T) {
 
 		// What a fifth check found. Someone limited after taking a shared
 		// resource can still let go of it.
-		do(wide, "resource.acquire", M{"resource": "minipc", "task": "SVA-1"}, 200)
+		do(wide, "resource.acquire", M{"resource": "build-box", "task": "SVA-1"}, 200)
 		s.change(s.owner, "", "agent.update", M{"id": "@wide", "scope": M{"projects": []string{"OPS"}}})
-		do(wide, "resource.release", M{"resource": "minipc"}, 200)
+		do(wide, "resource.release", M{"resource": "build-box"}, 200)
 		s.change(s.owner, "", "agent.update", M{"id": "@wide", "scope": nil})
 		// More that a saved view cannot name, and parameters of the wrong kind.
 		for _, q := range []M{{"creator": "@nobody"}, {"parent": "SVA-999"}} {

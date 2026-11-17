@@ -140,8 +140,8 @@ Every write is a named change with an id you make. Sending the same id again app
 
 ```bash
 quadit new SVA "Hit flash is too subtle" labels=art priority=high assignee=@artist
-quadit update SVA-12 status="In Progress" waiting_on=@aram
-quadit comment SVA-12 "Which frame is the peak?" waiting_on=@aram
+quadit update SVA-12 status="In Progress" waiting_on=@mia
+quadit comment SVA-12 "Which frame is the peak?" waiting_on=@mia
 quadit ask SVA-12 "Which explosion?" option="A: ring" file=ring.gif option="B: burst::reads best small" file=burst.gif recommended=2 why="clearer at 1x"
 quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 ```
@@ -164,7 +164,7 @@ Ask with `decision.open`: a question, two or more options (each can carry files)
 When they answer, the task waits on you again and the answer is in your inbox and feed:
 
 ```
-#1061 11-14 19:46 @aram decision.picked SVA-12 "Which explosion?" -> 2) B: burst (with_changes): Make it 20% larger.
+#1061 11-14 19:46 @mia decision.picked SVA-12 "Which explosion?" -> 2) B: burst (with_changes): Make it 20% larger.
 ```
 
 If the answer does not settle the question, say so in one line with `decision.unclear` instead of guessing; the question goes back to them.
@@ -193,7 +193,7 @@ The task goes back to whoever answered your last question.
 ## Taking work and sharing machines
 
 - `quadit take SVA-12` makes you the one working on it for 30 minutes; take it again to renew. Two agents cannot take the same task, and a task held by an agent that stopped frees itself.
-- A shared resource (a build machine, a test device) has a queue: change `resource.acquire {"resource": "minipc"}` answers `holding` or `waiting`, and you are told when it is yours. Release it with `resource.release`.
+- A shared resource (a build machine, a test device) has a queue: change `resource.acquire {"resource": "build-box"}` answers `holding` or `waiting`, and you are told when it is yours. Release it with `resource.release`.
 
 ## Helpers
 
@@ -234,7 +234,7 @@ A task and a page point at each other when one mentions the other (a task key in
 People comment on words of a page (the text they select), on a block, or on the page as a whole, and answer each other in a thread. Asked something there, you get an inbox item (`mentioned`, or `replied` when someone answers in a thread you wrote in) whose line ends with what you need to answer:
 
 ```
-#1207 11-16 10:42 @aram mentioned: Boss fight — @coder is this still three phases?  (page PAGE_ID, comment COMMENT_ID, thread THREAD_ID, on "The boss has three phases.")
+#1207 11-16 10:42 @mia mentioned: Boss fight — @coder is this still three phases?  (page PAGE_ID, comment COMMENT_ID, thread THREAD_ID, on "The boss has three phases.")
 ```
 
 `quadit listen` hands the same line to its command in `QUADIT_EVENT`. Then:
@@ -256,7 +256,7 @@ The threads after a page read like this; the block id is what `block=` takes. A 
 ```
 --- comments: 4 open threads; 1 resolved (resolved=1 shows them)
 thread THREAD_ID on words of block BLOCK_ID "three phases"
-  @aram 2026-11-16 10:42: Is this still three?
+  @mia 2026-11-16 10:42: Is this still three?
     @coder 2026-11-16 10:50: Yes: phases two and three merged.
 thread THREAD_ID on block BLOCK_ID "The boss has three phases."
   @bea 2026-11-16 10:44: Is this paragraph needed?

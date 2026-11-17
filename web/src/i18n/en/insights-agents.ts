@@ -58,7 +58,7 @@ export const agentsStrings = {
   "agents.res.addTitle": "Add a shared resource",
   "agents.res.addLead": "Something only one agent can use at a time. Agents ask for it by name and wait in line.",
   "agents.res.name": "Name",
-  "agents.res.nameHint": "Short and typeable, such as minipc. Agents use it in resource.acquire.",
+  "agents.res.nameHint": "Short and typeable, such as build-box. Agents use it in resource.acquire.",
   "agents.res.description": "What it is",
   "agents.res.empty":
     "No shared resources yet. Add a build machine or a test device here, and agents will queue for it instead of colliding.",

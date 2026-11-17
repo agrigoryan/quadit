@@ -68,7 +68,7 @@ change task.create '{"project":"SVA","parent":"SVA-2","title":"Phase 2: laser sw
 change task.create '{"project":"SVA","parent":"SVA-2","title":"Phase 3: summon drones","labels":["code"],"status":"Done"}'
 change task.create '{"project":"OPS","title":"Set up the build machine","assignee":"@coordinator"}'
 change relation.add '{"task":"SVA-1","type":"blocked_by","other":"SVA-2"}'
-change resource.create '{"name":"minipc","description":"The shared build and test machine"}'
+change resource.create '{"name":"build-box","description":"The shared build and test machine"}'
 
 png "$TMP/ring.png" 960 720 ring; png "$TMP/burst.png" 960 720 burst; png "$TMP/smoke.png" 960 720 smoke
 QUADIT_TOKEN=$TOK $Q take SVA-1 >/dev/null
@@ -78,8 +78,8 @@ i=0; for o in $OPTS; do f=(ring burst smoke); QUADIT_TOKEN=$TOK $Q attach SVA-1 
 QUADIT_TOKEN=$CODER $Q take SVA-5 >/dev/null
 QUADIT_TOKEN=$CODER $Q comment SVA-5 "Gravity is 0.35 now; tried 0.5 and it feels right to me. @aram can you try the build?" waiting_on=@aram >/dev/null
 QUADIT_TOKEN=$CODER $Q approval SVA-5 "Merge the jump fix into main?" action=task.delete >/dev/null || true
-QUADIT_TOKEN=$CODER $Q do resource.acquire '{"resource":"minipc","task":"SVA-5","note":"playtest build"}' >/dev/null
-QUADIT_TOKEN=$TOK $Q do resource.acquire '{"resource":"minipc","note":"render sprites"}' >/dev/null
+QUADIT_TOKEN=$CODER $Q do resource.acquire '{"resource":"build-box","task":"SVA-5","note":"playtest build"}' >/dev/null
+QUADIT_TOKEN=$TOK $Q do resource.acquire '{"resource":"build-box","note":"render sprites"}' >/dev/null
 
 echo "seeded. Open $B and sign in as owner@example.com / correct-horse-battery"
 echo "agent tokens:  artist=$TOK"

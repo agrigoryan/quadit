@@ -526,14 +526,14 @@ func TestLeasesResourcesAndInbox(t *testing.T) {
 		w.do(b, "task.take", M{"id": "SVA-1"})
 
 		// A shared machine has a queue.
-		w.do(w.owner.ID, "resource.create", M{"name": "minipc"})
-		if r := w.do(a, "resource.acquire", M{"resource": "minipc"}); r.Key != "holding" {
+		w.do(w.owner.ID, "resource.create", M{"name": "build-box"})
+		if r := w.do(a, "resource.acquire", M{"resource": "build-box"}); r.Key != "holding" {
 			t.Fatalf("first claim = %q", r.Key)
 		}
-		if r := w.do(b, "resource.acquire", M{"resource": "minipc"}); r.Key != "waiting" {
+		if r := w.do(b, "resource.acquire", M{"resource": "build-box"}); r.Key != "waiting" {
 			t.Fatalf("second claim = %q", r.Key)
 		}
-		w.do(a, "resource.release", M{"resource": "minipc"})
+		w.do(a, "resource.release", M{"resource": "build-box"})
 		var claims []core.ResourceClaim
 		w.db().List(context.Background(), &claims, store.Where(store.Eq("user_id", b), store.Eq("state", "holding")))
 		if len(claims) != 1 {
