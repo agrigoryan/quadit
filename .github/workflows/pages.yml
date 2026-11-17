@@ -23,6 +23,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Pages is turned on once the repository is public; until then there is nothing to deploy to.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
