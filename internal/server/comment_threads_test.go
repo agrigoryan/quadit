@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -360,5 +361,34 @@ func TestAnAgentWorksAThreadOnWords(t *testing.T) {
 				t.Errorf("the threads lack %q:\n%s", want, text)
 			}
 		})
+	})
+}
+
+// TestAnInboxItemQuotesOnlyItsOwnPage: a thread said to be on a block of
+// another page (a row written before such a comment was refused) quotes
+// nothing in an inbox item: the block's text may be of a page the reader
+// cannot see.
+func TestAnInboxItemQuotesOnlyItsOwnPage(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newPageWithThreads(t, st)
+		s := p.s
+		secret := s.change(s.owner, "", "doc.create", M{"title": "Salaries", "markdown": "Bea earns a lot.\n", "private": true})["ref"].(string)
+		var page struct {
+			Blocks []struct{ ID string } `json:"blocks"`
+		}
+		s.call(s.owner, "", "GET", w+"/docs/"+secret, nil, 200, &page)
+		db := st.In(siteWorkspaceID(t, st))
+		if _, err := db.Update(context.Background(), "comments", map[string]any{"subject_type": "doc_block", "subject_id": page.Blocks[0].ID}, store.Eq("id", p.onPage)); err != nil {
+			t.Fatal(err)
+		}
+		s.change(nil, p.agent, "comment.create", M{"parent": p.onPage, "body": "Me?"})
+		s.change(s.owner, "", "comment.create", M{"parent": p.onPage, "body": "You."})
+		inbox := s.call(nil, p.agent, "GET", w+"/inbox?format=text", nil, 200, nil)
+		if !strings.Contains(inbox, "You.") {
+			t.Fatalf("the agent was not told of the answer:\n%s", inbox)
+		}
+		if strings.Contains(inbox, "Bea earns") {
+			t.Errorf("an inbox item quotes a page its reader cannot see:\n%s", inbox)
+		}
 	})
 }

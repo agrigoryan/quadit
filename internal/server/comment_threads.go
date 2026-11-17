@@ -224,11 +224,14 @@ func (who *viewer) refsOf(ctx context.Context, n core.Notification) noteRefs {
 			return refs
 		}
 	}
+	// Only a block of the thread's own page is quoted: one of another page,
+	// which only a row written before such threads were refused can name,
+	// may be of a page the reader cannot see.
 	var b core.Block
 	switch {
 	case first.Quote != "":
 		refs.Quote = oneLine(first.Quote, quoteChars)
-	case first.SubjectType == "doc_block" && who.foundForLine(ctx, &b, store.Eq("id", first.SubjectID)):
+	case first.SubjectType == "doc_block" && who.foundForLine(ctx, &b, store.Eq("id", first.SubjectID), store.Eq("doc_id", first.DocID)):
 		refs.Quote = oneLine(b.Plain, quoteChars)
 	}
 	return refs
