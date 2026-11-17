@@ -14,7 +14,6 @@
   --viz-backlog: #9aa0af;
   --viz-grid: #e2e4ea;
   --viz-axis: #cdd0d9;
-  --viz-warn: #b05a00;
   --viz-over: #d1343b;
   /* Text printed inside a fill. */
   --viz-on: #ffffff;
@@ -29,7 +28,6 @@
   --viz-backlog: #5f6473;
   --viz-grid: #2a2d36;
   --viz-axis: #3a3e4a;
-  --viz-warn: #f0a04b;
   --viz-over: #ff6b70;
   --viz-on: #0f1014;
   --viz-on-backlog: #ffffff;

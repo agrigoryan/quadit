@@ -131,7 +131,7 @@ export function dueLabel(day: string): { text: string; tone: "late" | "soon" | "
 }
 
 /** A length of time in minutes: "45m", "3h 05m", "2d 4h". */
-export function lengthOfMinutes(total: number): string {
+function lengthOfMinutes(total: number): string {
   const m = Math.max(0, Math.round(total));
   if (m < 60) return t("time.length.m", { m });
   const h = Math.floor(m / 60);
