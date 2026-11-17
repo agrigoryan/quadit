@@ -210,6 +210,17 @@ workspace.delete (owner): confirm (required)
 workspace.update (admin): name, icon, settings
 surface: 2.0 (within 2.x nothing is removed or renamed)
 
+=== GET /api/v1/version
+200
+{
+ "desktop": {
+  "handoff": 1
+ },
+ "name": "quadit",
+ "surface": "2.0",
+ "version": "test"
+}
+
 === GET /api/v1/events/types
 200
 {

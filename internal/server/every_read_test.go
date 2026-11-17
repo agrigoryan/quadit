@@ -611,6 +611,7 @@ func (rw *richWorkspace) reads() []read {
 		read{route: "GET /api/v1/auth/oauth/{provider}/callback", path: "/api/v1/auth/oauth/github/callback", statusOnly: true},
 		read{route: "GET /api/v1/auth/render-session", path: "/api/v1/auth/render-session?token=nope", statusOnly: true},
 		read{route: "GET /api/v1/changes", path: "/api/v1/changes?format=text"},
+		read{route: "GET /api/v1/version", path: "/api/v1/version"},
 		read{route: "GET /api/v1/events/types", path: "/api/v1/events/types"},
 		read{route: "GET /api/v1/openapi.json", path: "/api/v1/openapi.json", statusOnly: true},
 		read{route: "GET /api/v1/push/key", path: "/api/v1/push/key", statusOnly: true},
