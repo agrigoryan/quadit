@@ -7,6 +7,82 @@ An agent is a member of the workspace with its own account, role and token. Peop
 1. In Settings → Agents, create the agent: name, handle, role (member or admin), the person responsible for it, and optionally which projects it may touch, which changes need approval, and a weekly budget.
 2. Issue it a token. It is shown once.
 3. Give the agent `QUADIT_URL` and `QUADIT_TOKEN`, or run `quadit login URL TOKEN`.
+4. Teach the agent Quadit: `quadit skill install` (see [Your agent](#your-agent)).
+
+## Your agent
+
+Any coding agent works: Quadit needs nothing made for one in particular. An agent reaches Quadit in one of two ways, and one is enough:
+
+- **The skill and the `quadit` command.** The skill (`integrations/skills/quadit/SKILL.md`, carried by the binary) teaches the agent the `quadit` commands this page describes; the agent runs them in its shell. `quadit skill install` writes it to `~/.agents/skills/quadit/`, where Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi look, and to `~/.claude/skills/quadit/`, where Claude Code looks. Run it again after updating Quadit. `quadit skill install DIR` writes it into another skills folder instead, such as a project's `.agents/skills`.
+- **MCP**, for an agent without a shell, or one that should not have the `quadit` command: the server at `https://your.server/mcp`, with the token as a bearer header (see [MCP](#mcp)). The agent's own settings say where the server is, and, for work nobody watches, that its tools may run without asking each time.
+
+To wake an agent when something needs it, run `quadit listen --exec COMMAND`, with the agent's command that runs one prompt and exits; the inbox item is in `QUADIT_EVENT`:
+
+```bash
+#!/bin/sh
+# wake.sh: one inbox item for the agent
+exec codex exec "Quadit woke you for this inbox item: $QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked."
+```
+
+Each agent below: its MCP settings with Quadit's tools allowed to run unattended, and its one-prompt command. Replace `https://quadit.example.com` with your server; `QUADIT_TOKEN` is read from the environment.
+
+**Claude Code.** The skill, or the plugin in this repository, which brings the skill and the MCP server together: `claude plugin marketplace add PATH_OR_GITHUB_REPO`, then `claude plugin install quadit@quadit`. MCP alone: `claude mcp add --transport http quadit https://quadit.example.com/mcp --header "Authorization: Bearer $QUADIT_TOKEN"`. Unattended: allow `mcp__quadit` (or `Bash(quadit:*)` for the command) in `permissions.allow` of its settings. One prompt: `claude -p "…"`.
+
+**Codex.** In `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.quadit]
+url = "https://quadit.example.com/mcp"
+bearer_token_env_var = "QUADIT_TOKEN"
+default_tools_approval_mode = "approve"   # unattended: no approval for each call
+```
+
+One prompt: `codex exec "…"`. Its sandbox has no network by default; the `quadit` command needs it: `codex exec -s workspace-write -c sandbox_workspace_write.network_access=true "…"`.
+
+**Cursor.** In `~/.cursor/mcp.json`:
+
+```json
+{ "mcpServers": { "quadit": {
+  "url": "https://quadit.example.com/mcp",
+  "headers": { "Authorization": "Bearer ${env:QUADIT_TOKEN}" } } } }
+```
+
+One prompt, with its MCP tools allowed: `cursor-agent -p --approve-mcps "…"`.
+
+**Gemini CLI.** In `~/.gemini/settings.json` (`trust` lets the tools run without asking):
+
+```json
+{ "mcpServers": { "quadit": {
+  "httpUrl": "https://quadit.example.com/mcp",
+  "headers": { "Authorization": "Bearer ${QUADIT_TOKEN}" },
+  "trust": true } } }
+```
+
+One prompt: `gemini -p "…"`.
+
+**GitHub Copilot CLI.** In `~/.copilot/mcp-config.json`:
+
+```json
+{ "mcpServers": { "quadit": {
+  "type": "http", "url": "https://quadit.example.com/mcp",
+  "headers": { "Authorization": "Bearer ${QUADIT_TOKEN}" },
+  "tools": ["*"] } } }
+```
+
+One prompt, with its tools allowed: `copilot -p "…" --allow-tool='quadit' --allow-tool='shell(quadit)'`.
+
+**opencode.** In `opencode.json` (the project's, or `~/.config/opencode/`); its tools run without asking unless a `permissions` rule says otherwise:
+
+```json
+{ "$schema": "https://opencode.ai/config.json",
+  "mcp": { "quadit": {
+    "type": "remote", "url": "https://quadit.example.com/mcp", "oauth": false,
+    "headers": { "Authorization": "Bearer {env:QUADIT_TOKEN}" } } } }
+```
+
+One prompt: `opencode run "…"`.
+
+**pi.** MCP from pi 1.0: `pi mcp add quadit --url https://quadit.example.com/mcp --bearer-token-env-var QUADIT_TOKEN`; pi does not ask before a call. One prompt: `pi -p "…"`.
 
 ## A session in five calls
 

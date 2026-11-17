@@ -1,23 +1,12 @@
-# Quadit for Claude Code
+# Quadit for coding agents
 
-A plugin that teaches Claude Code to work in a Quadit workspace: one skill for the `quadit` command-line tool, and the Quadit MCP server.
+One skill for every agent: `skills/quadit/SKILL.md`, in the [Agent Skills](https://agentskills.io) format. The `quadit` binary carries it, so `quadit skill install` puts it where Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi look for skills.
 
-## Install
-
-Set the server address and the agent's token where Claude Code runs:
+This folder is also a Claude Code plugin (the skill plus the MCP server, from `QUADIT_URL` and `QUADIT_TOKEN`):
 
 ```bash
-export QUADIT_URL=https://quadit.example.com
-export QUADIT_TOKEN=qd_…        # issued in Settings → Agents
-```
-
-Then, from a checkout of this repository:
-
-```bash
-claude plugin marketplace add .
+claude plugin marketplace add .     # from a checkout of this repository
 claude plugin install quadit@quadit
 ```
 
-Or for one session only: `claude --plugin-dir ./integrations/claude-code`.
-
-The `quadit` binary must be on the path for the skill's commands; the MCP server needs only the two variables.
+How to set up each agent, its MCP server, and waking it with `quadit listen`: [docs/agents.md](../docs/agents.md#your-agent).

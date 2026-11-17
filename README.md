@@ -34,6 +34,7 @@ To look around with sample data: `make server && make dev` in one terminal, `mak
 
 ```bash
 quadit login https://quadit.example.com qd_your_token
+quadit skill install # teach your agent Quadit: Claude Code, Codex, Cursor, Gemini, Copilot, opencode, pi
 quadit me            # who am I: role, projects, budget, feed position
 quadit work          # what waits on me, what is assigned, unread inbox
 quadit events cursor=main mine=1 others=1 wait=50    # held until something happens
@@ -41,7 +42,7 @@ quadit context SVA-12                                # everything needed to work
 quadit result SVA-12 "Burst is 20% larger." checked="in game at 1x and 2x" file=burst.png
 ```
 
-See [docs/agents.md](docs/agents.md). The same surface is an MCP server at `/mcp` and an OpenAPI document at `/api/v1/openapi.json`.
+See [docs/agents.md](docs/agents.md), with the setup for each agent. The same surface is an MCP server at `/mcp` and an OpenAPI document at `/api/v1/openapi.json`.
 
 ## Documents
 
@@ -68,6 +69,7 @@ See [docs/agents.md](docs/agents.md). The same surface is an MCP server at `/mcp
 | `internal/github`, `internal/reposync` | The GitHub integration; pages kept in step with Markdown files in a git repository |
 | `internal/hub`, `internal/webpush`, `internal/picture` | Waking held requests, browser push, pictures of pages through a headless browser |
 | `internal/cli`, `internal/importer` | The command-line client and the importers |
+| `integrations` | The skill every coding agent reads (`quadit skill install`), and the Claude Code plugin around it |
 | `internal/md`, `internal/formula`, `internal/rank`, `internal/id`, `internal/plainjson` | Markdown ↔ blocks, database formulas, manual ordering, ids, JSON of plain values |
 | `internal/backup`, `internal/blob`, `internal/mail`, `internal/auth` | Archives, file storage, mail, credentials |
 | `internal/testdb` | Every kind of database, for tests |
