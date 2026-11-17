@@ -216,6 +216,26 @@ func Find(content json.RawMessage, words string) []int {
 	return at
 }
 
+// FindAdded is where words start in now's text, as Find gives them, that
+// an edit from was put there: the places where at least one of their
+// characters is not one now keeps from was. Words was had already, which
+// the edit left in place, are not counted.
+func FindAdded(was, now json.RawMessage, words string) []int {
+	at := Find(now, words)
+	if len(at) == 0 {
+		return nil
+	}
+	text := []rune(plainInline(now))
+	kept := make([]bool, len(text))
+	for _, j := range charMap([]rune(plainInline(was)), text) {
+		if j >= 0 {
+			kept[j] = true
+		}
+	}
+	n := utf8.RuneCountInString(words)
+	return slices.DeleteFunc(at, func(i int) bool { return !slices.Contains(kept[i:i+n], false) })
+}
+
 // readInlines reads inline content; false for content that is not a list
 // of inline things.
 func readInlines(content json.RawMessage) ([]Inline, bool) {

@@ -262,3 +262,55 @@ func TestAnEditKeepsTheMarkers(t *testing.T) {
 		})
 	})
 }
+
+// TestMovedWordsTakeTheMarkerWhereTheyWent: words a thread is on that an
+// edit takes out of their block and puts in another (a cut and a paste
+// sent together) take its marker to where they were put, never to the
+// same words that were in that block already; words that were only taken
+// out detach the thread even when another block the edit changed has them.
+func TestMovedWordsTakeTheMarkerWhereTheyWent(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		start := func(t *testing.T) (page, from, to, thread string) {
+			t.Helper()
+			page = w.do(w.owner.ID, "doc.create", M{"title": "Boss", "markdown": "The boss has three phases.\n\nThen three phases run.\n"}).Ref
+			blocks := w.blocksOf(page)
+			thread = w.do(w.owner.ID, "comment.create", M{"doc": page, "block": blocks[0].ID, "quote": "three phases", "occurrence": 1, "body": "Four?"}).Ref
+			return page, blocks[0].ID, blocks[1].ID, thread
+		}
+		// withSpans is each block of the page as Markdown with its markers.
+		withSpans := func(t *testing.T, page string) []string {
+			t.Helper()
+			var out []string
+			for _, b := range w.blocksOf(page) {
+				out = append(out, strings.TrimSpace(md.RenderWithComments([]md.Block{{Type: b.Type, Content: b.Content}})))
+			}
+			return out
+		}
+
+		t.Run("pasted after the same words", func(t *testing.T) {
+			page, from, to, thread := start(t)
+			w.do(w.owner.ID, "doc.edit", M{"doc": page, "ops": []M{
+				{"op": "update", "id": from, "content": plainContent("The boss has.")},
+				{"op": "update", "id": to, "content": plainContent("Then three phases run. three phases")},
+			}})
+			want := []string{"The boss has.", `Then three phases run. <span data-comment="` + thread + `">three phases</span>`}
+			if got := withSpans(t, page); !slices.Equal(got, want) {
+				t.Errorf("page %q, want %q", got, want)
+			}
+		})
+		t.Run("taken out, while a block that had the words is edited", func(t *testing.T) {
+			page, from, to, thread := start(t)
+			w.do(w.owner.ID, "doc.edit", M{"doc": page, "ops": []M{
+				{"op": "update", "id": from, "content": plainContent("The boss has.")},
+				{"op": "update", "id": to, "content": plainContent("Then three phases run fast.")},
+			}})
+			if got := w.markedOn(page, thread); len(got) != 0 {
+				t.Errorf("marked %v, want the thread detached", got)
+			}
+			if cm := w.comment(thread); cm.DetachedAt == 0 {
+				t.Errorf("comment %+v, want it detached", cm)
+			}
+		})
+	})
+}

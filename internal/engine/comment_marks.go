@@ -253,7 +253,8 @@ func (c *cx) keepMarks(d core.Doc, ed *editor) error {
 	}
 
 	// Put each back on its words: in the same block, or where this edit
-	// moved them.
+	// moved them, the words it put in another block (the same words that
+	// block had already are other words).
 	order := ed.order()
 	for _, t := range sortedKeys(lost) {
 		for _, from := range lost[t] {
@@ -270,7 +271,7 @@ func (c *cx) keepMarks(d core.Doc, ed *editor) error {
 					if id == from || !slices.Contains(ed.touched, id) || !takesMarks(r) {
 						continue
 					}
-					if at := md.Find(r.Content, words); len(at) > 0 {
+					if at := md.FindAdded(ed.was[id], r.Content, words); len(at) > 0 {
 						content, _ := md.Mark(r.Content, at[0], at[0]+utf8.RuneCountInString(words), t)
 						ed.setMarks(id, content)
 						break

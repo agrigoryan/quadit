@@ -221,3 +221,24 @@ func TestFindWords(t *testing.T) {
 		t.Errorf("Find of nothing = %v", got)
 	}
 }
+
+// TestFindAddedWords: of the places words are in a block's new text, only
+// those an edit put there count; words the block had already do not.
+func TestFindAddedWords(t *testing.T) {
+	was := paragraph(t, "Then three phases run.")
+	for _, tc := range []struct {
+		now  string
+		want []int
+	}{
+		{"Then three phases run. three phases", []int{23}},
+		{"Then three phases run fast.", nil},
+		{"three phases: then three phases run.", []int{0}},
+	} {
+		if got := FindAdded(was, paragraph(t, tc.now), "three phases"); !slices.Equal(got, tc.want) {
+			t.Errorf("in %q: %v, want %v", tc.now, got, tc.want)
+		}
+	}
+	if got := FindAdded(nil, was, "three phases"); !slices.Equal(got, []int{5}) {
+		t.Errorf("in a new block: %v, want every place", got)
+	}
+}
