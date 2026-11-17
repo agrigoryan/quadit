@@ -10,7 +10,9 @@
 // editor. A block the person has unsent edits in is left as it is: their
 // edit goes out next and, being later, wins. A block whose edit is on its
 // way keeps the remote version aside until the server answers, then the
-// later of the two stays. Removing a block always wins.
+// later of the two stays. Removing a block always wins. A block the server
+// wrote otherwise than it was sent (it put a comment thread's marker back
+// on its words) is taken from the answer, unless typed in since.
 
 import type { BlockNoteEditor } from "@blocknote/core";
 import { errorMessage } from "@/data/api";
@@ -141,6 +143,8 @@ export class DocSync {
       .then((results) => {
         this.setPending(-1);
         this.ack(touched, results[0]?.seq ?? 0);
+        const written = results[0]?.events?.find((ev) => ev.type === "doc.edited" && ev.entity_id === this.docId);
+        if (!this.dead) this.takeOwn((written?.data.blocks as BlockRow[] | undefined) ?? []);
       })
       .catch((err: unknown) => {
         // Refused: what is on screen is no longer what the server has. Start again from the server's page.
@@ -187,6 +191,26 @@ export class DocSync {
       if (held && held.updated_seq > seq) later.push(held);
     }
     if (later.length && !this.dead) this.remote(later, []);
+  }
+
+  /**
+   * Of the blocks the server wrote for an edit of ours, takes those it wrote
+   * otherwise than they were sent, unless they were typed in since or are
+   * on their way again.
+   */
+  private takeOwn(rows: BlockRow[]) {
+    this.quietly(() => {
+      for (const row of rows) {
+        const k = this.known.get(row.id);
+        const cur = this.editor.getBlock(row.id) as unknown as EdBlock | undefined; // BlockNote types blocks by schema generics
+        if (!k || !cur || row.deleted_at || this.inflight.has(row.id)) continue;
+        const { id: _id, ...server } = toEditor(row, this.schema);
+        const sig = signature(toWire(server, this.schema));
+        if (sig === k.sig || this.sigOf(cur) !== k.sig) continue;
+        keepCursor(this.editor, row.id, () => this.editor.updateBlock(row.id, server as never));
+        k.sig = this.sigOf(this.editor.getBlock(row.id) as unknown as EdBlock); // as the editor now shows it
+      }
+    });
   }
 
   // ---- coming in ----

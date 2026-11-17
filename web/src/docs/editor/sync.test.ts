@@ -83,3 +83,44 @@ describe("a page that stops being editable while open", () => {
     expect(sent()).toEqual([]);
   });
 });
+
+describe("a block the server writes otherwise than it was sent", () => {
+  it("is taken into the editor: a comment thread's marker the server put back on its words", async () => {
+    const rows = [row("b1", "a", "The boss has three phases.", 1)];
+    const editor = make(rows);
+    const sync = new DocSync(editor, "d1", rows, 1);
+    const marked = [
+      { type: "text", text: "The boss has " },
+      { type: "text", text: "three phases", styles: { comment: "t1" } },
+      { type: "text", text: " now." },
+    ];
+    vi.mocked(mutate).mockImplementationOnce(() =>
+      Promise.resolve([
+        {
+          change_id: "c",
+          type: "doc.edit",
+          seq: 10,
+          first_seq: 10,
+          events: [
+            {
+              seq: 10,
+              type: "doc.edited",
+              entity_id: "d1",
+              data: { blocks: [{ ...row("b1", "a", "", 10), content: marked }] },
+            },
+          ],
+        },
+      ] as never),
+    );
+    typeInto(editor, "b1", "The boss has three phases now.");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(editor.getBlock("b1")?.content).toEqual([
+      { type: "text", text: "The boss has ", styles: {} },
+      { type: "text", text: "three phases", styles: { comment: "t1" } },
+      { type: "text", text: " now.", styles: {} },
+    ]);
+    sync.flush();
+    expect(sent()).toHaveLength(1); // taking the server's block sends nothing back
+    sync.destroy();
+  });
+});
