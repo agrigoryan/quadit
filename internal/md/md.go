@@ -6,12 +6,20 @@
 // editor uses. Inline content is a list of {type:"text", text, styles} and
 // {type:"link", href, content}.
 //
+// The words a comment thread is on carry the thread in their styles
+// ("comment": "THREAD_ID"), so the marker moves with the text. Agents read
+// and write it as <span data-comment="THREAD_ID">words</span>; a page as a
+// file holds it (Render) leaves it out.
+//
 // How the package is laid out:
 //
-//	md.go       the types: blocks, inline content, tables; and Plain
-//	parse.go    blocks from Markdown
-//	inline.go   inline content (marks and links) from Markdown
-//	render.go   Markdown from blocks and inline content
+//	md.go        the types: blocks, inline content, styles, tables; and Plain
+//	parse.go     blocks from Markdown
+//	inline.go    inline content (marks, links, comment spans) from Markdown
+//	render.go    Markdown from blocks and inline content
+//	comments.go  the comment markers in inline content: where they are,
+//	             putting them on, moving and taking them off
+//	mention.go   @handle of a member as a mention
 package md
 
 import (
@@ -30,14 +38,25 @@ type Block struct {
 
 // Inline is one run of text or a link.
 type Inline struct {
-	Type    string          `json:"type"`
-	Text    string          `json:"text,omitempty"`
-	Styles  map[string]bool `json:"styles,omitempty"`
-	Href    string          `json:"href,omitempty"`
-	Content []Inline        `json:"content,omitempty"`
+	Type    string   `json:"type"`
+	Text    string   `json:"text,omitempty"`
+	Styles  Styles   `json:"styles,omitempty"`
+	Href    string   `json:"href,omitempty"`
+	Content []Inline `json:"content,omitempty"`
 	// Props belong to inline things that are not text: a mention carries
 	// the member's handle, a task chip its key.
 	Props map[string]any `json:"props,omitempty"`
+}
+
+// Styles are the marks on a run of text, as the editor keeps them: a mark
+// that is on ("bold": true), one with a value ("textColor": "red"), and the
+// comment threads on the text ("comment": "ID ID", see comments.go).
+type Styles map[string]any
+
+// On reports whether a mark is on: "bold", "italic", "strike", "code".
+func (s Styles) On(name string) bool {
+	on, _ := s[name].(bool)
+	return on
 }
 
 // label is the text an inline thing that is not text stands for.

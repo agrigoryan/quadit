@@ -54,7 +54,8 @@ func mentionsIn(content json.RawMessage, isMember func(string) bool) json.RawMes
 	changed := false
 	for _, in := range ins {
 		// A mention has no marks of its own: one inside bold or code is left as text, which writes back as it came.
-		if in.Type != "text" || len(in.Styles) > 0 {
+		// The words a comment thread is on are no mark: a mention among them is one, outside the thread's words.
+		if in.Type != "text" || len(withThreads(in.Styles, nil)) > 0 {
 			out = append(out, in)
 			continue
 		}

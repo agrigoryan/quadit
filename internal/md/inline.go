@@ -1,5 +1,5 @@
-// Reading inline Markdown: bold, italic, strike, code, links and bare
-// addresses.
+// Reading inline Markdown: bold, italic, strike, code, links, bare
+// addresses and the spans that mark the words a comment thread is on.
 
 package md
 
@@ -19,21 +19,30 @@ func ParseInline(s string) []Inline {
 }
 
 // inlineParser is one run of ParseInline: the text, how far it is read,
-// what it has made, the text not yet made into a run, and the marks open.
+// what it has made, the text not yet made into a run, the marks open, and
+// the comment spans open (the threads each names), innermost last.
 type inlineParser struct {
 	s      string
 	i      int
 	out    []Inline
 	buf    strings.Builder
 	styles map[string]bool
+	spans  [][]string
 }
 
+// spanOpen is how a comment span starts; the thread ids follow, then '">'.
+const spanOpen = `<span data-comment="`
+
+// spanClose ends a comment span.
+const spanClose = "</span>"
+
 // step reads what starts at the current position: an escaped character,
-// code, a mark, a link, a bare address, or a plain character.
+// code, a mark, a link, a bare address, a comment span's start or end, or
+// a plain character.
 func (p *inlineParser) step() {
 	s, i, rest := p.s, p.i, p.s[p.i:]
 	switch {
-	case s[i] == '\\' && i+1 < len(s) && strings.ContainsRune("\\`*_{}[]()#+-.!|~>", rune(s[i+1])):
+	case s[i] == '\\' && i+1 < len(s) && strings.ContainsRune("\\`*_{}[]()#+-.!|~><", rune(s[i+1])):
 		p.buf.WriteByte(s[i+1])
 		p.i += 2
 	case s[i] == '`':
@@ -49,6 +58,15 @@ func (p *inlineParser) step() {
 		p.link()
 	case strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://"):
 		p.address()
+	case strings.HasPrefix(rest, spanOpen) && strings.Contains(rest, `">`):
+		p.flush()
+		ids, _, _ := strings.Cut(rest[len(spanOpen):], `">`)
+		p.spans = append(p.spans, strings.FieldsFunc(ids, func(r rune) bool { return r == ' ' || r == ',' }))
+		p.i += len(spanOpen) + len(ids) + 2
+	case strings.HasPrefix(rest, spanClose) && len(p.spans) > 0:
+		p.flush()
+		p.spans = p.spans[:len(p.spans)-1]
+		p.i += len(spanClose)
 	default:
 		p.buf.WriteByte(s[i])
 		p.i++
@@ -60,15 +78,26 @@ func (p *inlineParser) flush() {
 	if p.buf.Len() == 0 {
 		return
 	}
-	in := Inline{Type: "text", Text: p.buf.String()}
-	if len(p.styles) > 0 {
-		in.Styles = map[string]bool{}
-		for k := range p.styles {
-			in.Styles[k] = true
-		}
-	}
-	p.out = append(p.out, in)
+	p.out = append(p.out, Inline{Type: "text", Text: p.buf.String(), Styles: p.open()})
 	p.buf.Reset()
+}
+
+// open is the styles a run read now takes: the marks open and the threads
+// of the comment spans open; nil for none.
+func (p *inlineParser) open() Styles {
+	var threads []string
+	for _, ids := range p.spans {
+		threads = append(threads, ids...)
+	}
+	if len(p.styles) == 0 && len(threads) == 0 {
+		return nil
+	}
+	styles := Styles{}
+	for k := range p.styles {
+		styles[k] = true
+	}
+	styles.setThreads(threads)
+	return styles
 }
 
 // toggle opens a mark, or closes it when it is open.
@@ -92,10 +121,11 @@ func (p *inlineParser) code() {
 		return
 	}
 	p.flush()
-	styles := map[string]bool{"code": true}
-	for k := range p.styles {
-		styles[k] = true
+	styles := p.open()
+	if styles == nil {
+		styles = Styles{}
 	}
+	styles["code"] = true
 	p.out = append(p.out, Inline{Type: "text", Text: rest[1 : 1+end], Styles: styles})
 	p.i += end + 2
 }
@@ -141,12 +171,20 @@ func (p *inlineParser) link() {
 	}
 	p.flush()
 	inner := ParseInline(text)
+	around := p.open()
 	for k := range inner {
-		for st := range p.styles {
-			if inner[k].Styles == nil {
-				inner[k].Styles = map[string]bool{}
+		if len(around) == 0 {
+			break
+		}
+		if inner[k].Styles == nil {
+			inner[k].Styles = Styles{}
+		}
+		for st, v := range around {
+			if st == commentStyle {
+				inner[k].Styles.setThreads(append(inner[k].Styles.threads(), around.threads()...))
+			} else {
+				inner[k].Styles[st] = v
 			}
-			inner[k].Styles[st] = true
 		}
 	}
 	p.out = append(p.out, Inline{Type: "link", Href: href, Content: inner})

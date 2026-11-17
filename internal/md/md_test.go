@@ -125,7 +125,7 @@ func styled(ins []Inline) string {
 			}
 			var marks []string
 			for _, m := range []string{"bold", "italic", "strike", "code"} {
-				if in.Styles[m] {
+				if in.Styles.On(m) {
 					marks = append(marks, m)
 				}
 			}

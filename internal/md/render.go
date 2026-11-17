@@ -8,10 +8,22 @@ import (
 	"strings"
 )
 
-// Render turns blocks back into Markdown.
+// Render turns blocks back into Markdown, as a file holds a page: the
+// words comment threads are on are plain words.
 func Render(blocks []Block) string {
 	var b strings.Builder
-	render(&b, blocks, "")
+	render(&b, blocks, "", false)
+	return strings.TrimRight(b.String(), "\n") + "\n"
+}
+
+// RenderWithComments turns blocks into Markdown as agents read and write a
+// page: the words each comment thread is on are written
+// <span data-comment="THREAD_ID">words</span>, words several threads are
+// on name them all, space-separated, and where threads overlap the spans
+// follow each other, each naming the threads on its words.
+func RenderWithComments(blocks []Block) string {
+	var b strings.Builder
+	render(&b, blocks, "", true)
 	return strings.TrimRight(b.String(), "\n") + "\n"
 }
 
@@ -20,8 +32,9 @@ func isList(t string) bool {
 	return t == "bulletListItem" || t == "numberedListItem" || t == "checkListItem"
 }
 
-// render writes blocks out, each line under indent.
-func render(b *strings.Builder, blocks []Block, indent string) {
+// render writes blocks out, each line under indent, with the comment spans
+// when comments says so.
+func render(b *strings.Builder, blocks []Block, indent string, comments bool) {
 	number := 0
 	for i, bl := range blocks {
 		if bl.Type == "numberedListItem" {
@@ -34,7 +47,7 @@ func render(b *strings.Builder, blocks []Block, indent string) {
 		if i > 0 && !inList {
 			b.WriteString("\n")
 		}
-		renderBlock(b, bl, number, indent)
+		renderBlock(b, bl, number, indent, comments)
 		if len(bl.Children) > 0 {
 			child := indent + "  "
 			if bl.Type == "numberedListItem" {
@@ -43,15 +56,15 @@ func render(b *strings.Builder, blocks []Block, indent string) {
 			if !isList(bl.Type) {
 				b.WriteString("\n")
 			}
-			render(b, bl.Children, child)
+			render(b, bl.Children, child, comments)
 		}
 	}
 }
 
 // renderBlock writes one block out, without its children; number is its
 // place in a numbered list.
-func renderBlock(b *strings.Builder, bl Block, number int, indent string) {
-	text := RenderInline(bl.Content)
+func renderBlock(b *strings.Builder, bl Block, number int, indent string, comments bool) {
+	text := renderContent(bl.Content, comments)
 	cont := strings.ReplaceAll(text, "\n", "\n"+indent+"  ")
 	switch bl.Type {
 	case "heading":
@@ -76,7 +89,7 @@ func renderBlock(b *strings.Builder, bl Block, number int, indent string) {
 	case "image", "video", "file", "audio":
 		b.WriteString(indent + mediaLink(bl) + "\n")
 	case "table":
-		renderTable(b, bl.Content, indent)
+		renderTable(b, bl.Content, indent, comments)
 	default:
 		b.WriteString(indent + strings.ReplaceAll(text, "\n", "\n"+indent) + "\n")
 	}
@@ -110,7 +123,7 @@ func mediaLink(bl Block) string {
 
 // renderTable writes a table out, with a line of dashes under its first
 // row; content that is not a table is left out.
-func renderTable(b *strings.Builder, content json.RawMessage, indent string) {
+func renderTable(b *strings.Builder, content json.RawMessage, indent string, comments bool) {
 	var t Table
 	if json.Unmarshal(content, &t) != nil {
 		return
@@ -118,7 +131,7 @@ func renderTable(b *strings.Builder, content json.RawMessage, indent string) {
 	for i, r := range t.Rows {
 		b.WriteString(indent + "|")
 		for _, c := range r.Cells {
-			b.WriteString(" " + strings.ReplaceAll(strings.ReplaceAll(RenderInline(cellContent(c)), "|", "\\|"), "\n", " ") + " |")
+			b.WriteString(" " + strings.ReplaceAll(strings.ReplaceAll(renderContent(cellContent(c), comments), "|", "\\|"), "\n", " ") + " |")
 		}
 		b.WriteString("\n")
 		if i == 0 {
@@ -139,8 +152,15 @@ func cellContent(c json.RawMessage) json.RawMessage {
 	return c
 }
 
-// RenderInline turns inline content into Markdown text.
+// RenderInline turns inline content into Markdown text, without comment
+// spans.
 func RenderInline(content json.RawMessage) string {
+	return renderContent(content, false)
+}
+
+// renderContent turns inline content into Markdown text, with the comment
+// spans when comments says so.
+func renderContent(content json.RawMessage, comments bool) string {
 	var ins []Inline
 	if len(content) == 0 || json.Unmarshal(content, &ins) != nil {
 		var s string
@@ -149,7 +169,76 @@ func RenderInline(content json.RawMessage) string {
 		}
 		return ""
 	}
-	return renderInlines(ins)
+	if !comments {
+		return renderInlines(ins)
+	}
+	return renderSpans(ins, "")
+}
+
+// renderSpans writes inline content out with a comment span around each
+// stretch of it that is on other threads than outer, the threads a span
+// around it names already. A mention or a chip carries no threads of its
+// own: between two runs on the same threads it is inside their span.
+func renderSpans(ins []Inline, outer string) string {
+	value := make([]string, len(ins))
+	for i, in := range ins {
+		value[i] = threadsOn(in)
+	}
+	for i, in := range ins {
+		if in.Type != "text" && in.Type != "link" && i > 0 && i+1 < len(ins) && value[i-1] == value[i+1] {
+			value[i] = value[i-1]
+		}
+	}
+	var b strings.Builder
+	for i := 0; i < len(ins); {
+		end := i + 1
+		for end < len(ins) && value[end] == value[i] {
+			end++
+		}
+		var part strings.Builder
+		for _, in := range ins[i:end] {
+			if in.Type == "link" {
+				writeLink(&part, in, renderSpans(in.Content, value[i]))
+			} else {
+				part.WriteString(renderInlines([]Inline{in}))
+			}
+		}
+		if value[i] == outer {
+			b.WriteString(part.String())
+		} else {
+			b.WriteString(spanOpen + value[i] + `">` + part.String() + spanClose)
+		}
+		i = end
+	}
+	return b.String()
+}
+
+// threadsOn is the threads a run of text is on, as a span names them; a
+// link's when every run in it is on the same ones. "" for none.
+func threadsOn(in Inline) string {
+	if in.Type != "link" {
+		return strings.Join(in.Styles.threads(), " ")
+	}
+	if len(in.Content) == 0 {
+		return ""
+	}
+	first := threadsOn(in.Content[0])
+	for _, inner := range in.Content[1:] {
+		if threadsOn(inner) != first {
+			return ""
+		}
+	}
+	return first
+}
+
+// writeLink writes a link around its text as Markdown: a link whose text is
+// its address is the bare address.
+func writeLink(b *strings.Builder, in Inline, inner string) {
+	if inner == in.Href {
+		b.WriteString(in.Href)
+	} else {
+		b.WriteString("[" + inner + "](" + in.Href + ")")
+	}
 }
 
 // renderInlines writes inline content out: links, marks around the text
@@ -158,12 +247,7 @@ func renderInlines(ins []Inline) string {
 	var b strings.Builder
 	for _, in := range ins {
 		if in.Type == "link" {
-			inner := renderInlines(in.Content)
-			if inner == in.Href {
-				b.WriteString(in.Href)
-			} else {
-				b.WriteString("[" + inner + "](" + in.Href + ")")
-			}
+			writeLink(&b, in, renderInlines(in.Content))
 			continue
 		}
 		if in.Type != "text" && in.Text == "" {
@@ -177,7 +261,7 @@ func renderInlines(ins []Inline) string {
 		trail := t[len(strings.TrimRight(t, " \n")):]
 		core := strings.TrimSpace(t)
 		switch {
-		case in.Styles["code"]:
+		case in.Styles.On("code"):
 			lead, trail, core = "", "", "`"+t+"`"
 		case core == "":
 			b.WriteString(t)
@@ -185,13 +269,13 @@ func renderInlines(ins []Inline) string {
 		default:
 			core = escape(core)
 		}
-		if in.Styles["strike"] {
+		if in.Styles.On("strike") {
 			core = "~~" + core + "~~"
 		}
-		if in.Styles["italic"] {
+		if in.Styles.On("italic") {
 			core = "*" + core + "*"
 		}
-		if in.Styles["bold"] {
+		if in.Styles.On("bold") {
 			core = "**" + core + "**"
 		}
 		b.WriteString(lead + core + trail)
@@ -200,8 +284,8 @@ func renderInlines(ins []Inline) string {
 }
 
 // escape protects the characters that would read as markup, and only where
-// they would: a star between spaces or a bracket that starts no link is left
-// as it is, so plain text stays plain.
+// they would: a star between spaces, a bracket that starts no link or a <
+// that starts no comment span is left as it is, so plain text stays plain.
 func escape(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -218,6 +302,10 @@ func escape(s string) string {
 			b.WriteByte('\\')
 		case '[':
 			if strings.Contains(s[i:], "](") {
+				b.WriteByte('\\')
+			}
+		case '<':
+			if strings.HasPrefix(s[i:], spanOpen) || strings.HasPrefix(s[i:], spanClose) {
 				b.WriteByte('\\')
 			}
 		}
