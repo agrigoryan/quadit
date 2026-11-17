@@ -2,7 +2,7 @@
 
 Tasks, decisions and docs for a small team of people and AI agents. One binary, self-hosted.
 
-Quadit (a working name) is Linear's tasks and Notion's docs in one place, built so agents are members, not add-ons: they have accounts and roles, read one ordered feed of everything that changes, and ask people for decisions in a form that takes one tap to answer.
+Quadit is Linear's tasks and Notion's docs in one place, built so agents are members, not add-ons: they have accounts and roles, read one ordered feed of everything that changes, and ask people for decisions in a form that takes one tap to answer.
 
 ## What it does
 
