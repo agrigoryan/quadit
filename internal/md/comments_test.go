@@ -95,10 +95,10 @@ func TestCommentSpansRoundTrip(t *testing.T) {
 	})
 }
 
-// TestColouredTextIsText: a run with a colour (a style whose value is not
+// TestColoredTextIsText: a run with a color (a style whose value is not
 // true or false) is read like any other run; it used to make the whole
 // block's text unreadable.
-func TestColouredTextIsText(t *testing.T) {
+func TestColoredTextIsText(t *testing.T) {
 	content := json.RawMessage(`[{"type":"text","text":"red","styles":{"textColor":"red","bold":true}},{"type":"text","text":" plain"}]`)
 	if got := Plain(Block{Type: "paragraph", Content: content}); got != "red plain" {
 		t.Errorf("Plain = %q", got)

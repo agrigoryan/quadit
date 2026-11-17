@@ -12,6 +12,7 @@ package md
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -294,9 +295,7 @@ func withText(run Inline, text []rune) Inline {
 // nothing is left.
 func withThreads(styles Styles, ids []string) Styles {
 	out := Styles{}
-	for k, v := range styles {
-		out[k] = v
-	}
+	maps.Copy(out, styles)
 	out.setThreads(ids)
 	if len(out) == 0 {
 		return nil
@@ -365,9 +364,9 @@ func charMap(a, b []rune) []int {
 	// lengths[i][j] is the longest common subsequence of midA[i:] and midB[j:].
 	w := len(midB) + 1
 	lengths := make([]int32, (len(midA)+1)*w)
-	for i := len(midA) - 1; i >= 0; i-- {
-		for j := len(midB) - 1; j >= 0; j-- {
-			if midA[i] == midB[j] {
+	for i, a := range slices.Backward(midA) {
+		for j, b := range slices.Backward(midB) {
+			if a == b {
 				lengths[i*w+j] = lengths[(i+1)*w+j+1] + 1
 			} else {
 				lengths[i*w+j] = max(lengths[(i+1)*w+j], lengths[i*w+j+1])
