@@ -187,6 +187,9 @@ type Result struct {
 	Ref       string `json:"ref"`
 	Key       string `json:"key"`
 	Duplicate bool   `json:"duplicate"`
+	// Warnings say what the change did that the caller may not have
+	// meant, such as a write that took the words of a comment thread out.
+	Warnings []string `json:"warnings"`
 }
 
 // ChangeOptions are how a change is sent, beside its type and arguments.

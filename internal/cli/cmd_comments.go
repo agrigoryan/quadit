@@ -11,7 +11,9 @@ import (
 // comment writes a comment on a task, or, called as result, the report of
 // what was done: what was checked, measured and left unverified, and the
 // files that show it. Given page=ID instead of a task, it starts a thread
-// on that page, or on one of its blocks with block=ID.
+// on that page, on one of its blocks with block=ID, or on words of the
+// block with quote=WORDS too (the server finds them; occurrence=N says
+// which when they are there more than once).
 func (r *runner) comment(in input) error {
 	a, err := argsFrom(in.f, "checked", "measured", "not_verified", "file", "page")
 	if err != nil {
@@ -21,7 +23,7 @@ func (r *runner) comment(in input) error {
 	if page := in.f["page"]; len(page) > 0 {
 		a["doc"] = page[len(page)-1]
 	} else if len(words) < 2 {
-		return errors.New("usage: quadit " + in.name + " KEY TEXT, or quadit comment page=PAGE_ID [block=BLOCK_ID] TEXT")
+		return errors.New("usage: quadit " + in.name + " KEY TEXT, or quadit comment page=PAGE_ID [block=BLOCK_ID [quote=WORDS [occurrence=N]]] TEXT")
 	} else {
 		a["task"], words = words[0], words[1:]
 	}

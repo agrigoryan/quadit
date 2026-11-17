@@ -213,9 +213,10 @@ func (s *Server) handleShowPage(x *c) error {
 }
 
 // pageText is a page as Markdown, cut at maxChars: alone for format=md,
-// else under a heading that names the page.
+// else under a heading that names the page. The words comment threads are
+// on are spans naming them, which a write of the Markdown takes back.
 func pageText(page core.Doc, blocks []core.Block, format string, maxChars int) string {
-	body := md.Render(engine.BlockTree(blocks))
+	body := md.RenderWithComments(engine.BlockTree(blocks))
 	text, cutOff := truncate(body, maxChars)
 	if cutOff {
 		text += "\n… (cut; add full=1)\n"

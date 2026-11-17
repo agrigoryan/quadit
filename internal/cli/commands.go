@@ -57,7 +57,7 @@ var commands = []command{
 	{names: []string{"restore"}, args: 1, usage: "restore KEY", run: (*runner).changeNamed},
 
 	// comment on tasks and pages (cmd_comments.go)
-	{names: []string{"comment"}, args: 1, usage: "comment KEY TEXT | comment page=PAGE_ID [block=BLOCK_ID] TEXT", run: (*runner).comment},
+	{names: []string{"comment"}, args: 1, usage: "comment KEY TEXT | comment page=PAGE_ID [block=BLOCK_ID [quote=WORDS [occurrence=N]]] TEXT", run: (*runner).comment},
 	{names: []string{"result"}, args: 2, usage: "result KEY TEXT", run: (*runner).comment},
 	{names: []string{"reply"}, args: 2, usage: "reply COMMENT_ID TEXT", run: (*runner).reply},
 	{names: []string{"resolve"}, args: 1, usage: "resolve COMMENT_ID", run: (*runner).resolve},

@@ -75,7 +75,8 @@ var priorities = map[string]int{"none": 0, "urgent": 1, "high": 2, "medium": 3, 
 // list (written a,b,c), a number or a yes or no; any other is sent as text.
 var (
 	listKeys = map[string]bool{"labels": true, "add_labels": true, "remove_labels": true, "event_types": true}
-	intKeys  = map[string]bool{"priority": true, "estimate": true, "base_seq": true, "minutes": true, "recommended": true}
+	intKeys  = map[string]bool{"priority": true, "estimate": true, "base_seq": true, "minutes": true, "recommended": true,
+		"occurrence": true, "start": true, "end": true}
 	boolKeys = map[string]bool{"archived": true, "resolved": true, "active": true, "shared": true}
 )
 

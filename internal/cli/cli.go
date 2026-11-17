@@ -127,6 +127,9 @@ func (r *runner) change(typ string, args map[string]any, approval string) error 
 		line += " id=" + res.Ref
 	}
 	fmt.Fprintf(r.out, "%s seq=%d\n", line, res.Seq)
+	for _, warning := range res.Warnings {
+		fmt.Fprintf(r.out, "warning: %s\n", warning)
+	}
 	return nil
 }
 

@@ -284,3 +284,81 @@ func TestAnAgentAskedOnAPageHasWhatItNeedsToAnswer(t *testing.T) {
 		})
 	})
 }
+
+// TestAnAgentWorksAThreadOnWords: an agent starts a thread on words with
+// the quadit command, finds them in the page's Markdown as a span with the
+// thread's id, keeps them marked when it writes the page back without the
+// span, and is told when a write takes the words out.
+func TestAnAgentWorksAThreadOnWords(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newPageWithThreads(t, st)
+		s := p.s
+		run := func(args ...string) string {
+			t.Helper()
+			out, code := s.quadit(p.agent, args...)
+			if code != 0 {
+				t.Fatalf("quadit %s: exit %d: %s", strings.Join(args, " "), code, out)
+			}
+			return out
+		}
+		markdown := func() string {
+			t.Helper()
+			return s.call(nil, p.agent, "GET", "/api/v1/w/-/docs/"+p.doc+"?format=md", nil, 200, nil)
+		}
+
+		out := run("--json", "comment", "page="+p.doc, "block="+p.ringBlock, "quote=thin", "Thicker?")
+		var made struct {
+			Ref string `json:"ref"`
+		}
+		if err := json.Unmarshal([]byte(out), &made); err != nil || made.Ref == "" {
+			t.Fatalf("quadit comment quote=: %s", out)
+		}
+		span := `The ring is <span data-comment="` + made.Ref + `">thin</span>.`
+
+		t.Run("the page's Markdown has the span", func(t *testing.T) {
+			if md := markdown(); !strings.Contains(md, span) {
+				t.Errorf("no span for the thread:\n%s", md)
+			}
+			text := s.call(nil, p.agent, "GET", "/api/v1/w/-/docs/"+p.doc+"/comments?format=text", nil, 200, nil)
+			if want := "thread " + made.Ref + " on words of block " + p.ringBlock + ` "thin"`; !strings.Contains(text, want) {
+				t.Errorf("the threads lack %q:\n%s", want, text)
+			}
+		})
+		t.Run("words that are there twice need which", func(t *testing.T) {
+			twice := s.change(s.owner, "", "doc.create", M{"title": "Twice", "markdown": "A thin ring, a thin line.\n"})["ref"].(string)
+			var page struct {
+				Blocks []struct {
+					ID string `json:"id"`
+				} `json:"blocks"`
+			}
+			s.call(s.owner, "", "GET", w+"/docs/"+twice, nil, 200, &page)
+			out, code := s.quadit(p.agent, "comment", "page="+twice, "block="+page.Blocks[0].ID, "quote=thin", "Which?")
+			if code == 0 || !strings.Contains(out, "occurrence") {
+				t.Errorf("quote= of words there twice: exit %d: %s", code, out)
+			}
+			run("comment", "page="+twice, "block="+page.Blocks[0].ID, "quote=thin", "occurrence=2", "The line one.")
+			if md := s.call(nil, p.agent, "GET", "/api/v1/w/-/docs/"+twice+"?format=md", nil, 200, nil); !strings.Contains(md, `a <span data-comment="`) || !strings.Contains(md, `">thin</span> line`) {
+				t.Errorf("the second one is not marked:\n%s", md)
+			}
+		})
+		t.Run("written back without the span, the words keep it", func(t *testing.T) {
+			res := s.change(nil, p.agent, "doc.write", M{"doc": p.doc, "markdown": "The ring is thin.\n\nThe smoke is grey and slow.\n"})
+			if res["warnings"] != nil {
+				t.Errorf("warnings for a write that keeps the words: %v", res["warnings"])
+			}
+			if md := markdown(); !strings.Contains(md, span) {
+				t.Errorf("the span is gone:\n%s", md)
+			}
+		})
+		t.Run("a write that takes the words out says so, and the thread stays on the page", func(t *testing.T) {
+			out := run("do", "doc.write", `{"doc":"`+p.doc+`","markdown":"The ring is gone.\n"}`)
+			if !strings.Contains(out, "warning: thread "+made.Ref) || !strings.Contains(out, `"thin"`) {
+				t.Errorf("no warning naming the thread:\n%s", out)
+			}
+			text := s.call(nil, p.agent, "GET", "/api/v1/w/-/docs/"+p.doc+"/comments?format=text", nil, 200, nil)
+			if want := "thread " + made.Ref + ` on the page, its words taken out of it: "thin"`; !strings.Contains(text, want) {
+				t.Errorf("the threads lack %q:\n%s", want, text)
+			}
+		})
+	})
+}

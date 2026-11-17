@@ -4,21 +4,26 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/md"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // threadView is one thread of comments on a page: its first comment and
-// the replies to it, and what it is on. A thread on the page as a whole
-// has no Block.
+// the replies to it, and what it is on: words of the page, a block, or the
+// page as a whole (no Block). A thread on words whose words an edit took
+// out of the page is on the page as a whole, Detached, its words quoted.
 type threadView struct {
 	ID       string `json:"id"` // the first comment's: replies and resolving go through it
 	Block    string `json:"block,omitempty"`
-	Quote    string `json:"quote,omitempty"` // the block's text
+	Quote    string `json:"quote,omitempty"` // the thread's words, or the block's text
+	Words    bool   `json:"on_words,omitempty"`
+	Detached bool   `json:"detached,omitempty"`
 	Removed  bool   `json:"block_removed,omitempty"`
 	Resolved bool   `json:"resolved,omitempty"`
 	// Comments are the first one and then the replies, oldest first.
@@ -74,9 +79,16 @@ func (who *viewer) pageThreads(ctx context.Context, page core.Doc) ([]threadView
 			continue
 		}
 		th := threadView{ID: cm.ID, Resolved: cm.ResolvedAt != 0, Comments: []threadComment{line}}
-		if cm.SubjectType == "doc_block" {
+		switch {
+		case cm.DetachedAt != 0:
+			th.Detached, th.Quote = true, oneLine(cm.Quote, quoteChars)
+		case cm.SubjectType == "doc_block":
 			b, there := blockByID[cm.SubjectID]
 			th.Block, th.Quote, th.Removed = cm.SubjectID, oneLine(b.Plain, quoteChars), !there || b.DeletedAt != 0
+			if cm.Quote != "" {
+				// The words as they read now: what was typed among them since is theirs.
+				th.Words, th.Quote = true, oneLine(cmp.Or(strings.Join(md.Marked(b.Content, cm.ID), " … "), cm.Quote), quoteChars)
+			}
 		}
 		at[cm.ID] = len(threads)
 		threads = append(threads, th)
@@ -121,10 +133,14 @@ func threadsText(threads []threadView, withResolved bool) string {
 			b.WriteString(" (resolved)")
 		}
 		switch {
+		case th.Detached:
+			b.WriteString(" on the page, its words taken out of it:")
 		case th.Block == "":
 			b.WriteString(" on the page")
 		case th.Removed:
 			b.WriteString(" on removed block " + th.Block)
+		case th.Words:
+			b.WriteString(" on words of block " + th.Block)
 		default:
 			b.WriteString(" on block " + th.Block)
 		}
@@ -184,7 +200,7 @@ func (s *Server) handleListPageComments(x *c) error {
 
 // noteRefs are the ids an inbox item gives whoever acts on it: the page it
 // is on, and for a comment, the comment, its thread (the id a reply or a
-// resolve goes through) and the text of the block the thread is on.
+// resolve goes through) and the words or the block the thread is on.
 type noteRefs struct {
 	Page    string `json:"page,omitempty"`
 	Comment string `json:"comment,omitempty"`
@@ -209,7 +225,10 @@ func (who *viewer) refsOf(ctx context.Context, n core.Notification) noteRefs {
 		}
 	}
 	var b core.Block
-	if first.SubjectType == "doc_block" && who.foundForLine(ctx, &b, store.Eq("id", first.SubjectID)) {
+	switch {
+	case first.Quote != "":
+		refs.Quote = oneLine(first.Quote, quoteChars)
+	case first.SubjectType == "doc_block" && who.foundForLine(ctx, &b, store.Eq("id", first.SubjectID)):
 		refs.Quote = oneLine(b.Plain, quoteChars)
 	}
 	return refs
