@@ -112,3 +112,17 @@ test("a refusal comes back in the server's words", async ({ page }) => {
   const outcome = await ask(page, { kind: "revoke-token", token: "no-such-token" });
   expect(outcome).toMatchObject({ ok: false, message: expect.stringContaining("not found") });
 });
+
+test("the browser offers to open the page in the app, and the app's window does not", async ({ page }) => {
+  await page.goto("/e2e/my-work");
+  await page.getByRole("button", { name: "Account" }).click();
+  await expect(page.getByRole("menuitem", { name: "Open in desktop app" })).toBeVisible();
+
+  const app = await page.context().newPage();
+  await inTheApp(app);
+  await app.goto("/e2e/my-work");
+  await app.getByRole("button", { name: "Account" }).click();
+  await expect(app.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
+  await expect(app.getByRole("menuitem", { name: "Open in desktop app" })).toHaveCount(0);
+  await app.close();
+});

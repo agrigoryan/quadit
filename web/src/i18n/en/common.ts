@@ -145,6 +145,7 @@ export const common = {
   "top.theme.dark": "Dark",
   "top.shortcuts": "Keyboard shortcuts",
   "top.signOut": "Sign out",
+  "top.openInApp": "Open in desktop app",
 
   "desktop.markRead": "Mark read",
   "desktop.reply": "Reply",

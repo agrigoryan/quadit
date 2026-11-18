@@ -1,5 +1,5 @@
-import { Keyboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
-import { useNavigate } from "react-router";
+import { AppWindow, Keyboard, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { useLocation, useNavigate } from "react-router";
 import { saveTheme, signOut, useSession } from "@/auth/session";
 import { t } from "@/lib/i18n";
 import { useMe, useSlug } from "@/data/selectors";
@@ -19,12 +19,17 @@ import {
 
 const themes: ThemeChoice[] = ["system", "light", "dark"];
 
+/** The link that opens this page in the Quadit desktop app's window of this server. */
+const appLink = (path: string) =>
+  `quadit://open?server=${encodeURIComponent(window.location.origin)}&path=${encodeURIComponent(path)}`;
+
 export function UserMenu() {
   const me = useMe();
   const slug = useSlug();
   const user = useSession((s) => s.user);
   const navigate = useNavigate();
   const theme = useThemeChoice();
+  const location = useLocation();
   return (
     <Menu>
       <MenuTrigger asChild>
@@ -48,6 +53,12 @@ export function UserMenu() {
         <MenuItem icon={<Keyboard />} hint="?" onSelect={() => ui.setShortcuts(true)}>
           {t("top.shortcuts")}
         </MenuItem>
+        {/* In a browser only: a window of the app is there already. The app refuses a server it was not given. */}
+        {!window.quaditDesktop && (
+          <MenuItem icon={<AppWindow />} onSelect={() => window.location.assign(appLink(location.pathname))}>
+            {t("top.openInApp")}
+          </MenuItem>
+        )}
         {user?.is_admin && (
           <MenuItem icon={<ShieldCheck />} onSelect={() => navigate("/admin")}>
             {t("auth.admin")}
