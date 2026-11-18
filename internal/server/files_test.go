@@ -145,14 +145,12 @@ func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
 		var wg sync.WaitGroup
 		var kept, refused atomic.Int32
 		for i := range 8 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				body := data[1000:2000]
 				if i%2 == 1 {
 					body = data[1000:2500]
 				}
-				req, _ := http.NewRequest("PATCH", s.url+w+"/files/"+f.ID+"?offset=1000", strings.NewReader(string(body)))
+				req, _ := http.NewRequest(http.MethodPatch, s.url+w+"/files/"+f.ID+"?offset=1000", strings.NewReader(string(body)))
 				resp, err := s.owner.Do(req)
 				if err != nil {
 					t.Error(err)
@@ -160,14 +158,14 @@ func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
 				}
 				resp.Body.Close()
 				switch resp.StatusCode {
-				case 200:
+				case http.StatusOK:
 					kept.Add(1)
-				case 409:
+				case http.StatusConflict:
 					refused.Add(1)
 				default:
 					t.Errorf("a part sent at once with others: %d", resp.StatusCode)
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		if kept.Load() != 1 || refused.Load() != 7 {
