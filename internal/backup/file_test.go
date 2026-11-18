@@ -26,8 +26,8 @@ func TestCopiesOfABackup(t *testing.T) {
 		store blob.Store
 		dir   string
 	}{
-		"a folder":                          {&blob.Disk{Root: t.TempDir()}, ""},
-		"a bucket":                          {blob.FromBucket(b, "s3", "quadit/"), ""},
+		"a folder":                         {&blob.Disk{Root: t.TempDir()}, ""},
+		"a bucket":                         {blob.FromBucket(b, "s3", "quadit/"), ""},
 		"a folder inside the file storage": {&blob.Disk{Root: t.TempDir()}, "backups/"},
 	} {
 		t.Run(name, func(t *testing.T) {
