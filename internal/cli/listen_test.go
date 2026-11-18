@@ -31,7 +31,7 @@ func (s *inboxServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	switch {
-	case r.Method == "GET" && strings.HasSuffix(r.URL.Path, "/events"):
+	case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/events"):
 		limit := 200
 		if l := r.URL.Query().Get("limit"); l != "" {
 			limit, _ = strconv.Atoi(l)
@@ -47,13 +47,13 @@ func (s *inboxServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			seq = s.items[len(s.items)-1]
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"events": lines, "seq": seq})
-	case r.Method == "PUT" && strings.Contains(r.URL.Path, "/cursors/"):
+	case r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/cursors/"):
 		var body struct{ Seq int64 }
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		s.acks = append(s.acks, body.Seq)
 		s.cursor = max(s.cursor, body.Seq)
 		_, _ = io.WriteString(w, `{}`)
-	case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/secrets/env"):
+	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/secrets/env"):
 		s.secretAsked++
 		if s.secretAsked == 1 {
 			w.WriteHeader(http.StatusServiceUnavailable)

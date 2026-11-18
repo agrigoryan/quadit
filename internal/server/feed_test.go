@@ -35,7 +35,7 @@ func TestACursorNeverMovesBackUnderConcurrentAcks(t *testing.T) {
 			var wg sync.WaitGroup
 			for seq := int64(1); seq <= top; seq++ {
 				wg.Go(func() {
-					req, _ := http.NewRequest("PUT", s.url+"/api/v1/w/-/cursors/"+name, strings.NewReader(fmt.Sprintf(`{"seq":%d}`, seq)))
+					req, _ := http.NewRequest(http.MethodPut, s.url+"/api/v1/w/-/cursors/"+name, strings.NewReader(fmt.Sprintf(`{"seq":%d}`, seq)))
 					req.Header.Set("Authorization", "Bearer "+token)
 					req.Header.Set("Content-Type", "application/json")
 					resp, err := http.DefaultClient.Do(req)
@@ -44,7 +44,7 @@ func TestACursorNeverMovesBackUnderConcurrentAcks(t *testing.T) {
 						return
 					}
 					resp.Body.Close()
-					if resp.StatusCode != 200 {
+					if resp.StatusCode != http.StatusOK {
 						t.Errorf("ack %d: %s", seq, resp.Status)
 					}
 				})
