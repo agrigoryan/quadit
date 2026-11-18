@@ -80,3 +80,37 @@ func TestASecretInANestedObjectIsSealed(t *testing.T) {
 		}
 	}
 }
+
+// TestASecretSpelledInAnotherCaseIsNeverInTheClear: JSON field names match
+// a setting's shape in any letter case, but secrets are found by their
+// exact names. A value that names a field in another case is refused when
+// stored; set by the environment, it is listed with its secrets masked.
+func TestASecretSpelledInAnotherCaseIsNeverInTheClear(t *testing.T) {
+	ctx := context.Background()
+	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
+	type bucket struct {
+		SecretKey string `json:"secret_key"`
+	}
+	type shape struct {
+		Bucket bucket `json:"bucket"`
+	}
+	table := settings.Table{"copy": {Shape: func() any { return new(shape) }, Secrets: []string{"bucket.secret_key"}}}
+	for _, value := range []string{`{"bucket":{"SECRET_KEY":"hunter2"}}`, `{"Bucket":{"secret_key":"hunter2"}}`} {
+		t.Run("stored "+value, func(t *testing.T) {
+			st := testdb.SQLite(t)
+			if err := settings.New(st, sealer, slog.Default(), table).Set(ctx, "copy", json.RawMessage(value), "test"); err == nil {
+				t.Fatal("a value with a field spelled in another case was stored")
+			}
+		})
+		t.Run("from the environment "+value, func(t *testing.T) {
+			t.Setenv(settings.EnvName("copy"), value)
+			listed, err := settings.New(testdb.SQLite(t), sealer, slog.Default(), table).List(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, _ := json.Marshal(listed["copy"]); strings.Contains(string(got), "hunter2") {
+				t.Fatalf("the secret is listed in the clear: %s", got)
+			}
+		})
+	}
+}

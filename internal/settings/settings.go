@@ -178,6 +178,37 @@ func (s *Settings) load(ctx context.Context, name string) (raw json.RawMessage, 
 	return raw, fromEnv, nil
 }
 
+// misspelled names a field of value spelled other than its shape spells
+// it once decoded into shaped (JSON matches field names in any letter
+// case), or is empty when there is none. A secret is found by its exact
+// name, so one spelled otherwise would be stored and listed in the clear.
+func misspelled(value json.RawMessage, shaped any) string {
+	canonical, err := json.Marshal(shaped)
+	if err != nil {
+		return ""
+	}
+	var given, want any
+	_ = json.Unmarshal(value, &given)    // decoded into shaped already
+	_ = json.Unmarshal(canonical, &want) // just encoded
+	return misspelledIn(given, want, "")
+}
+
+// misspelledIn is misspelled for one object, at the path at.
+func misspelledIn(given, want any, at string) string {
+	obj, _ := given.(map[string]any)
+	shape, _ := want.(map[string]any)
+	for k, v := range obj {
+		w, there := shape[k]
+		if !there {
+			return at + k
+		}
+		if bad := misspelledIn(v, w, at+k+"."); bad != "" {
+			return bad
+		}
+	}
+	return ""
+}
+
 // read reads a setting from the environment or the database, past the
 // cache. A setting that is not set is nil, without an error.
 func (s *Settings) read(ctx context.Context, name string) (json.RawMessage, bool, error) {
@@ -189,6 +220,13 @@ func (s *Settings) read(ctx context.Context, name string) (json.RawMessage, bool
 				return nil, true, err
 			}
 			raw = quoted
+		}
+		// Secrets are found by their exact names; read in the setting's shape
+		// first, a field given in another letter case is named as they are.
+		if shaped := s.table[name].Shape(); json.Unmarshal(raw, shaped) == nil {
+			if canonical, err := json.Marshal(shaped); err == nil {
+				raw = canonical
+			}
 		}
 		return raw, true, nil
 	}
@@ -296,8 +334,12 @@ func (s *Settings) Set(ctx context.Context, name string, value json.RawMessage, 
 	}
 	dec := json.NewDecoder(bytes.NewReader(value))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(kind.Shape()); err != nil {
+	shaped := kind.Shape()
+	if err := dec.Decode(shaped); err != nil {
 		return invalid(name, "this is not what the setting %s holds: %s", name, engine.PlainJSON(err))
+	}
+	if field := misspelled(value, shaped); field != "" {
+		return invalid(name, "the setting %s has no field %q; field names are spelled as documented, in lower case", name, field)
 	}
 	if len(kind.Secrets) > 0 {
 		sealed, err := s.seal(ctx, name, kind.Secrets, value)
