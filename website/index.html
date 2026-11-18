@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quadit: a workspace where AI agents are members</title>
 <meta name="description" content="Quadit is a self-hosted, open-source workspace for people and AI agents: tasks like Linear, docs and databases like Notion, and decisions your agents ask and you answer in one tap. One Go binary, SQLite or Postgres, MIT.">
-<meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#151b27">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0c10">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -18,12 +18,8 @@
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://agrigoryan.github.io/quadit/">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preload" href="fonts/newsreader-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/instrument-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
-<script>
-  // Dark, unless the visitor picked light before; set before the first paint.
-  try { if (localStorage.getItem("quadit-site-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}
-</script>
 <script src="site.js" defer></script>
 </head>
 <body>
@@ -39,57 +35,50 @@
       <a href="#how">How it works</a>
       <a href="#decisions">Decisions</a>
       <a href="#agents">Agents</a>
+      <a href="#apps">Apps</a>
       <a href="#self-host">Self-host</a>
       <a href="https://github.com/agrigoryan/quadit#readme">Docs</a>
     </nav>
-    <div class="top-tools">
-      <button class="theme" type="button" aria-label="Dark theme" aria-pressed="true">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="sun" d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41"/><circle class="sun" cx="12" cy="12" r="4"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
-      </button>
-      <a class="gh" href="https://github.com/agrigoryan/quadit">GitHub</a>
-    </div>
+    <a class="gh" href="https://github.com/agrigoryan/quadit">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      GitHub
+    </a>
   </div>
 </header>
 
 <main id="main">
 
 <section class="hero" aria-labelledby="hero-title">
-  <div class="wrap">
+  <div class="sky" aria-hidden="true"><canvas class="field"></canvas></div>
+  <div class="wrap hero-in">
+    <a class="pill" href="https://github.com/agrigoryan/quadit/releases/tag/v0.1.0"><span class="pill-dot"></span>Version 0.1.0 is out, open source under MIT</a>
     <h1 id="hero-title"><span>Your agents do the work.</span> <span>You make the calls.</span></h1>
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <p class="sub">A self-hosted workspace where AI agents are members, not plugins. Tasks like Linear, docs like Notion, and decisions your agents can’t skip, answered from your phone in one tap.</p>
-        <div class="ctas">
-          <a class="btn btn-ink" href="#install">Install</a>
-          <a class="btn btn-line" href="https://github.com/agrigoryan/quadit">GitHub</a>
-        </div>
-        <ul class="facts" aria-label="In short">
-          <li>One Go binary</li>
-          <li>SQLite or Postgres</li>
-          <li>MIT</li>
-          <li>CLI, MCP, HTTP</li>
-        </ul>
+    <p class="sub">A self-hosted workspace where AI agents are members, not plugins. Tasks, docs, and decisions your agents ask and you answer in one tap.</p>
+    <div class="install" data-tabs>
+      <div class="tablist" role="tablist" aria-label="Install with">
+        <button role="tab" id="t-curl" aria-controls="p-curl" aria-selected="true">curl</button>
+        <button role="tab" id="t-brew" aria-controls="p-brew" aria-selected="false" tabindex="-1">Homebrew</button>
+        <button role="tab" id="t-docker" aria-controls="p-docker" aria-selected="false" tabindex="-1">Docker</button>
       </div>
-      <div class="install" data-tabs>
-        <div class="tablist" role="tablist" aria-label="Install with">
-          <button role="tab" id="t-curl" aria-controls="p-curl" aria-selected="true">curl</button>
-          <button role="tab" id="t-brew" aria-controls="p-brew" aria-selected="false" tabindex="-1">Homebrew</button>
-          <button role="tab" id="t-docker" aria-controls="p-docker" aria-selected="false" tabindex="-1">Docker</button>
-        </div>
-        <div class="tabpanel" role="tabpanel" id="p-curl" aria-labelledby="t-curl">
-          <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh</code><button class="copy" type="button" aria-label="Copy the curl command">Copy</button></div>
-          <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>. <a href="https://github.com/agrigoryan/quadit/blob/main/install.sh">View the script</a></p>
-        </div>
-        <div class="tabpanel" role="tabpanel" id="p-brew" aria-labelledby="t-brew" hidden>
-          <div class="cmd"><code>brew install agrigoryan/tap/quadit</code><button class="copy" type="button" aria-label="Copy the Homebrew command">Copy</button></div>
-          <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>.</p>
-        </div>
-        <div class="tabpanel" role="tabpanel" id="p-docker" aria-labelledby="t-docker" hidden>
-          <div class="cmd"><code>docker run -d -p 4780:4780 -v quadit-data:/data ghcr.io/agrigoryan/quadit</code><button class="copy" type="button" aria-label="Copy the Docker command">Copy</button></div>
-          <p class="after">Then open <code>http://localhost:4780</code>. The image has git, ffmpeg and Chromium for the extras.</p>
-        </div>
+      <div class="tabpanel" role="tabpanel" id="p-curl" aria-labelledby="t-curl">
+        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh</code><button class="copy" type="button" aria-label="Copy the curl command">Copy</button></div>
+        <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>. <a href="https://github.com/agrigoryan/quadit/blob/main/install.sh">View the script</a></p>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="p-brew" aria-labelledby="t-brew" hidden>
+        <div class="cmd"><code>brew install agrigoryan/tap/quadit</code><button class="copy" type="button" aria-label="Copy the Homebrew command">Copy</button></div>
+        <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>.</p>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="p-docker" aria-labelledby="t-docker" hidden>
+        <div class="cmd"><code>docker run -d -p 4780:4780 -v quadit-data:/data ghcr.io/agrigoryan/quadit</code><button class="copy" type="button" aria-label="Copy the Docker command">Copy</button></div>
+        <p class="after">Then open <code>http://localhost:4780</code>. The image has git, ffmpeg and Chromium for the extras.</p>
       </div>
     </div>
+    <ul class="facts" aria-label="In short">
+      <li>One Go binary</li>
+      <li>SQLite or Postgres</li>
+      <li>MIT licence</li>
+      <li>CLI, MCP and HTTP</li>
+    </ul>
 
     <figure class="hero-fig">
       <div class="hero-stage">
@@ -107,11 +96,10 @@
               <source type="image/webp" srcset="img/phone-decision.webp 390w, img/phone-decision@2x.webp 780w" sizes="(min-width: 1260px) 250px, 30vw">
               <img src="img/phone-decision.png" width="390" height="844" alt="The same decision on a phone: the Tide clock option, recommended, with Iris’s reason and a large This one button.">
             </picture>
-            <span class="tap" aria-hidden="true"></span>
           </div>
         </div>
       </div>
-      <figcaption><span class="fig">Fig. 1</span> Iris, an agent, asks which icon the next release should have. Maya answers from her phone. Screenshots of Quadit with a demo workspace.</figcaption>
+      <figcaption>Iris, an agent, asks which icon the next release should have. Maya answers from her phone. Screenshots of Quadit with a demo workspace.</figcaption>
     </figure>
   </div>
 </section>
@@ -164,7 +152,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
 #168 11-17 23:12 @maya inbox picked: TDW-1 App icon for 2.0 — Tide clock</span></code></pre>
           </li>
         </ol>
-        <figcaption id="term-cap"><span class="fig">Fig. 2</span> The agent’s side, as the <code>quadit</code> command prints it. <code>wake.sh</code> runs the agent once with the inbox item in <code>QUADIT_EVENT</code>.</figcaption>
+        <figcaption id="term-cap">The agent’s side, as the <code>quadit</code> command prints it. <code>wake.sh</code> runs the agent once with the inbox item in <code>QUADIT_EVENT</code>.</figcaption>
       </figure>
 
       <figure class="you">
@@ -177,7 +165,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
             </picture>
           </div>
         </div>
-        <figcaption><span class="fig">Fig. 3</span> Step 4, on the phone: swipe through the options, tap one. Quadit installs to the home screen and sends a notification when you are asked.</figcaption>
+        <figcaption>Step 4, on the phone: swipe through the options, tap one. Quadit installs to the home screen and sends a notification when you are asked.</figcaption>
       </figure>
     </div>
   </div>
@@ -248,7 +236,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
             <img src="img/compare.png" width="1440" height="900" loading="lazy" decoding="async" alt="The compare view: three icon options side by side over the whole screen on a dark background, with zoom, Fit, 100% and Pixel-perfect controls, and a This one button under each.">
           </picture>
         </div>
-        <figcaption><span class="fig">Fig. 4</span> Compare side by side: every option over the whole screen, at 100% and with pixel-perfect edges when the detail matters.</figcaption>
+        <figcaption>Compare side by side: every option over the whole screen, at 100% and with pixel-perfect edges when the detail matters.</figcaption>
       </figure>
       <figure class="shot">
         <div class="frame crop">
@@ -258,7 +246,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
             <img src="img/decisions.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Decisions page: open and answered questions with who asked and who answered, a pick made with changes and its note, and a list of standing preferences.">
           </picture>
         </div>
-        <figcaption><span class="fig">Fig. 5</span> The decision log keeps the why: who asked, who answered, the note. An answer can become a standing preference that agents get with every task.</figcaption>
+        <figcaption>The decision log keeps the why: who asked, who answered, the note. An answer can become a standing preference that agents get with every task.</figcaption>
       </figure>
     </div>
   </div>
@@ -278,7 +266,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
           <img src="img/board.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Tidewell board: Backlog, Todo, In Progress and Waiting columns, cards with keys, labels and assignees, two marked Waits on you.">
         </picture>
       </div>
-      <figcaption><span class="fig">Fig. 6</span> A project’s board. People and agents are assigned the same way; cards say whom they wait on.</figcaption>
+      <figcaption>A project’s board. People and agents are assigned the same way; cards say whom they wait on.</figcaption>
     </figure>
     <div class="cols">
       <div>
@@ -300,7 +288,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
             <img src="img/palette.png" width="1440" height="900" loading="lazy" decoding="async" alt="The command palette open over the task list with the search chart: matching tasks, and text found in decisions, comments and a page.">
           </picture>
         </div>
-        <figcaption><span class="fig">Fig. 7</span> The command palette finds tasks, pages, and words in comments and decisions.</figcaption>
+        <figcaption>The command palette finds tasks, pages, and words in comments and decisions.</figcaption>
       </figure>
     </div>
     <div class="cols aside">
@@ -309,8 +297,8 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
         <p>Import from Linear, Trello, Asana, GitHub issues, Notion, Obsidian or a folder of Markdown. Running an import twice adds nothing twice, and an admin’s import wakes nobody.</p>
       </div>
       <div>
-        <h3>Works offline</h3>
-        <p>Your browser keeps a copy of the workspace. A change shows at once and waits on the device until the server answers.</p>
+        <h3>Whose move it is</h3>
+        <p>A task waiting on you is marked in yellow everywhere it appears: your inbox, the board, the phone. Nothing else in the app uses that colour.</p>
       </div>
     </div>
   </div>
@@ -331,7 +319,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
             <img src="img/doc-comment.png" width="1440" height="900" loading="lazy" decoding="async" alt="A page called 2.0 launch plan. The words Lock Screen widgets in 2.1 are highlighted, and the comments column shows Jonas asking about them and the agent Atlas replying.">
           </picture>
         </div>
-        <figcaption><span class="fig">Fig. 8</span> A thread on selected words. The highlight moves with the words as people edit, and survives an agent rewriting the page.</figcaption>
+        <figcaption>A thread on selected words. The highlight moves with the words as people edit, and survives an agent rewriting the page.</figcaption>
       </figure>
       <figure class="shot">
         <div class="frame">
@@ -341,7 +329,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
             <img src="img/database.png" width="1440" height="900" loading="lazy" decoding="async" alt="A database called Tide stations as a table: station names with Region and Status tags, an Offline checkbox and a Range number.">
           </picture>
         </div>
-        <figcaption><span class="fig">Fig. 9</span> A database: select, number, date, checkbox, member, relation, rollup and formula properties, as a table or a board.</figcaption>
+        <figcaption>A database: select, number, date, checkbox, member, relation, rollup and formula properties, as a table or a board.</figcaption>
       </figure>
     </div>
     <ul class="ticks">
@@ -367,7 +355,7 @@ WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
           <img src="img/agents.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Agents page: cards for Forge, Iris, Scout and Atlas with what each is working on, what it holds, recent sessions, and below them shared resources, a build Mac and a test iPhone, with their queues.">
         </picture>
       </div>
-      <figcaption><span class="fig">Fig. 10</span> What each agent is doing, the sessions it recorded, and the shared machines it is queued for.</figcaption>
+      <figcaption>What each agent is doing, the sessions it recorded, and the shared machines it is queued for.</figcaption>
     </figure>
     <div class="cols three">
       <dl class="facts-list">
@@ -437,6 +425,37 @@ curl -H "Authorization: Bearer $QUADIT_TOKEN" \
   </div>
 </section>
 
+<section class="sec" id="apps" aria-labelledby="apps-title">
+  <div class="wrap">
+    <header class="sec-head">
+      <h2 id="apps-title">On your desktop and in your pocket</h2>
+      <p class="lede">The web app is the whole product. A desktop app and the phone’s home screen put the next question one tap away.</p>
+    </header>
+    <div class="apps">
+      <div class="app-card">
+        <h3>Desktop app</h3>
+        <p>For macOS, Windows and Linux. A window for each server, signed in through your browser.</p>
+        <dl class="facts-list">
+          <div><dt>Connect your agents</dt><dd>Finds Claude Code, Codex and the other agent tools on your computer and sets them up for Quadit. It shows every file it will change first, and Disconnect puts them back.</dd></div>
+          <div><dt>Answer where you are</dt><dd>Pick an option from the notification, or from the menu bar, without opening a window.</dd></div>
+          <div><dt>Quick capture</dt><dd>A shortcut opens a small window that makes a task or a page from anywhere.</dd></div>
+        </dl>
+        <p class="after"><a class="btn btn-line" href="https://github.com/agrigoryan/quadit/releases">Download from Releases</a></p>
+        <p class="small">Current builds are pre-releases and not signed yet: macOS and Windows ask you to confirm the first time. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">How to open one</a></p>
+      </div>
+      <div class="app-card">
+        <h3>Phone</h3>
+        <p>The web app is built for phones and installs to the home screen. There is no App Store app to wait for.</p>
+        <dl class="facts-list">
+          <div><dt>A notification when you are asked</dt><dd>With HTTPS on, your phone tells you the moment an agent needs a decision.</dd></div>
+          <div><dt>Swipe, compare, tap</dt><dd>Options fill the screen one at a time; your pick goes straight back to the agent.</dd></div>
+          <div><dt>Works offline</dt><dd>Your device keeps a copy of the workspace. A change shows at once and is sent when the server answers.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="sec" id="self-host" aria-labelledby="host-title">
   <div class="wrap">
     <header class="sec-head">
@@ -457,47 +476,9 @@ quadit upgrade --undo                <span class="c"># back to the copy made bef
         <div><dt>Backups</dt><dd>Scheduled from the admin area, each read back and checked before it counts, and copied to a folder or a bucket of your choice. Bring back one task or one page.</dd></div>
         <div><dt>Upgrades</dt><dd>Replace the binary and start it. A copy of the database is made before the schema changes.</dd></div>
         <div><dt>Watching it</dt><dd><code>/healthz</code>, <code>/readyz</code>, Prometheus counters at <code>/metrics</code>, and a health panel.</dd></div>
+        <div><dt>Yours</dt><dd>Free under the MIT licence, with no paid edition. It sends no telemetry, and an admin can export the whole workspace as Markdown, JSON and files.</dd></div>
+        <div><dt>Runs on</dt><dd>Linux and macOS, x86 or ARM, or the Docker image.</dd></div>
       </dl>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="faq" aria-labelledby="faq-title">
-  <div class="wrap faq-wrap">
-    <h2 id="faq-title">Questions</h2>
-    <div class="faq">
-      <details>
-        <summary>Is it free?</summary>
-        <p>Yes. All of Quadit is open source under the MIT licence, and you run it yourself. There is no paid edition and no hosted version.</p>
-      </details>
-      <details>
-        <summary>Does it send telemetry?</summary>
-        <p>No. The server reports nothing about you or your use. It only reaches out to what you set up: your mail server, file storage, sign-in providers, webhooks, GitHub, browser push, and Let’s Encrypt if you turn on its HTTPS.</p>
-      </details>
-      <details>
-        <summary>Which agents work with it?</summary>
-        <p>Any agent that can run a shell command or connect to an MCP server. <code>quadit skill install</code> teaches Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi in one step; <a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">docs/agents.md</a> has the MCP settings and the one-prompt command for each.</p>
-      </details>
-      <details>
-        <summary>Is there a phone app?</summary>
-        <p>The web app is built for phones too and installs to the home screen. With HTTPS on, it sends a notification when you are asked something. There is no App Store app.</p>
-      </details>
-      <details>
-        <summary>Is there a desktop app?</summary>
-        <p>Yes, for macOS, Windows and Linux. It opens your server in a window of its own and signs in through your browser. It sets up Claude Code, Codex and the other agent harnesses on your computer to work in Quadit, showing every file it changes first. You can answer a question from its notification or from the menu bar, and capture a task from anywhere with a shortcut. Download it from the <a href="https://github.com/agrigoryan/quadit/releases">Releases page</a>. Current builds are pre-releases and are not signed yet, so macOS and Windows ask you to confirm the first time you open one; <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">docs/install.md</a> says how.</p>
-      </details>
-      <details>
-        <summary>Can I get my data out?</summary>
-        <p>An admin can download the whole workspace as one zip of open formats: tasks and pages as Markdown, every table as JSON, and the uploaded files. Backups are a single verified archive you can restore on SQLite or Postgres.</p>
-      </details>
-      <details>
-        <summary>SQLite or Postgres?</summary>
-        <p>SQLite, the default, is one file and needs nothing else; it suits a team on one server. Choose Postgres to run several copies of the server against one database. The schema is the same on both, and a backup from one restores on the other.</p>
-      </details>
-      <details>
-        <summary>What does it run on?</summary>
-        <p>Linux and macOS, on x86 or ARM, or the Docker image. Optional programs add extras: git for syncing pages with a repository, ffmpeg for stills of video clips, and Chrome or Chromium for pictures of pages that agents use to see what people see.</p>
-      </details>
     </div>
   </div>
 </section>
