@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { QuaditCli } from "@/main/quadit-cli";
 
-describe("QuaditCli", () => {
+/** Connect runs only on macOS and Linux (no Windows build of quadit); these tests need a POSIX shell, links and file modes. */
+const posixOnly = describe.skipIf(process.platform === "win32");
+
+posixOnly("QuaditCli", () => {
   it("gives a quadit's own refusal when it exits without reading the token", async () => {
     const quadit = join(mkdtempSync(join(tmpdir(), "quadit-desktop-cli-")), "quadit");
     writeFileSync(quadit, "#!/bin/sh\necho 'usage: quadit login URL TOKEN' >&2\nexit 2\n");

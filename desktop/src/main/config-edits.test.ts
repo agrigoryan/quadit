@@ -25,6 +25,9 @@ import {
   writeEdits,
 } from "@/main/config-edits";
 
+/** Connect runs only on macOS and Linux (no Windows build of quadit); these tests need a POSIX shell, links and file modes. */
+const posixOnly = describe.skipIf(process.platform === "win32");
+
 /** A new folder, as its real path (the plans name files by theirs). */
 function folder() {
   return realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-edits-")));
@@ -48,7 +51,7 @@ function revert(applied: Applied[]): string[] {
   return notes;
 }
 
-describe("JSON edits", () => {
+posixOnly("JSON edits", () => {
   it("keeps a JSONC file's comments and formatting, and takes the key back out", () => {
     const path = join(folder(), "opencode.jsonc");
     const original = `{\n  // my models\n  "model": "x", /* keep */\n  "mcp": {\n    "other": { "type": "local" }\n  }\n}\n`;
@@ -107,7 +110,7 @@ describe("JSON edits", () => {
   });
 });
 
-describe("TOML edits", () => {
+posixOnly("TOML edits", () => {
   const original = `model = "gpt"\n\n[mcp_servers.other]\ncommand = "x"\n`;
 
   it("appends a table, and takes it back out to the file as it was", () => {
@@ -168,7 +171,7 @@ describe("TOML edits", () => {
   });
 });
 
-describe("whole files and links", () => {
+posixOnly("whole files and links", () => {
   it("backs up a file it replaces, puts it back, and leaves alone one changed since", () => {
     const dir = folder();
     const path = join(dir, "skills", "quadit", "SKILL.md");
