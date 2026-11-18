@@ -41,8 +41,20 @@ import { NoticeGate } from "@/main/notices";
 import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
 import { fitOf } from "@/main/probe";
+import type { Requests } from "@/main/requests";
 import type { Server, ServerStore } from "@/main/servers";
-import { BRIDGE_BADGE, BRIDGE_NOTIFY, badgeOf, ORIGIN_SWITCH, VERSION_SWITCH } from "@/shared/bridge";
+import {
+  BRIDGE_BADGE,
+  BRIDGE_LISTENING,
+  BRIDGE_NOTIFY,
+  BRIDGE_OUTCOME,
+  BRIDGE_PUBLISH,
+  badgeOf,
+  type DesktopRequest,
+  ORIGIN_SWITCH,
+  summaryOf,
+  VERSION_SWITCH,
+} from "@/shared/bridge";
 
 /** The path of the web app's sign-in page: where the bar offering the browser sign-in shows. */
 const SIGN_IN_PATH = "/login";
@@ -64,6 +76,8 @@ export interface WindowsSetup {
   reportUnread(serverId: string, reporter: number, workspace: string, count: number): void;
   /** A page went away: what it reported no longer counts. */
   forgetUnread(reporter: number): void;
+  /** Where the pages' summaries and their answers to requests go. */
+  requests: Requests;
   /** A window was shown, hidden or focused: the menus that list them change. */
   changed(): void;
 }
@@ -88,7 +102,19 @@ export class ServerWindows {
   ) {
     ipcMain.on(BRIDGE_NOTIFY, (event, raw: unknown) => {
       const server = this.bridgeSender(event);
-      if (server) this.notify(server, raw);
+      if (server) this.notify(server, event.sender.id, raw);
+    });
+    ipcMain.on(BRIDGE_PUBLISH, (event, raw: unknown) => {
+      const server = this.bridgeSender(event);
+      const summary = raw === null ? null : summaryOf(raw);
+      if (server && (raw === null || summary)) setup.requests.publish(event.sender.id, server.id, summary);
+    });
+    ipcMain.on(BRIDGE_LISTENING, (event, raw: unknown) => {
+      const server = this.bridgeSender(event);
+      if (server) setup.requests.listen(event.sender.id, server.id, raw === true);
+    });
+    ipcMain.on(BRIDGE_OUTCOME, (event, raw: unknown) => {
+      if (this.bridgeSender(event)) setup.requests.answer(event.sender.id, raw);
     });
     this.errors = new ConnectionErrors({
       pagesPreload: setup.pagesPreload,
@@ -313,6 +339,7 @@ export class ServerWindows {
     contents.once("destroyed", () => {
       this.owners.delete(reporter);
       this.setup.forgetUnread(reporter);
+      this.setup.requests.forget(reporter);
     });
     giveContextMenu(contents);
 
@@ -353,8 +380,9 @@ export class ServerWindows {
       if (win?.webContents === contents) this.placeBar(win, serverId);
     };
     contents.on("did-navigate", () => {
-      // A new page: what the last one reported goes with it, and this one reports anew.
+      // A new page: what the last one reported and published goes with it, and this one reports anew.
       this.setup.forgetUnread(reporter);
+      this.setup.requests.forget(reporter);
       pageChanged();
     });
     contents.on("did-navigate-in-page", pageChanged);
@@ -395,20 +423,44 @@ export class ServerWindows {
   }
 
   /**
-   * Shows what a server's page sent as a native notification, when the gate
-   * lets it through (notices.ts) and the person is not looking at that
-   * server's window already, where the web app shows it.
+   * Shows what a server's page (the web contents `page`) sent as a native
+   * notification, when the gate lets it through (notices.ts) and the person
+   * is not looking at that server's window already, where the web app shows
+   * it. On macOS its buttons and reply field are shown too: what the person
+   * does there goes back to that page alone, and when the page cannot do it,
+   * the window opens at the notification's path instead.
    */
-  private notify(server: Server, raw: unknown) {
+  private notify(server: Server, page: number, raw: unknown) {
     const n = this.gate.admit(server.id, raw, Date.now());
     if (!n || !Notification.isSupported() || this.inFront(server.id)) return;
     const key = n.tag ? `${server.id}:${n.tag}` : `${server.id}:${Date.now()}:${Math.random()}`;
     this.notifications.get(key)?.close();
-    const note = new Notification({ title: n.title, body: n.body });
+    const mac = process.platform === "darwin";
+    const actions = mac ? (n.actions ?? []) : [];
+    const reply = mac ? n.reply : undefined;
+    const note = new Notification({
+      title: n.title,
+      body: n.body,
+      actions: actions.map((action) => ({ type: "button", text: action.label })),
+      ...(reply ? { hasReply: true, replyPlaceholder: reply.placeholder } : {}),
+    });
     const path = appPage(server.origin, n.path) ? n.path : "/";
+    const carryOut = (request: DesktopRequest) => {
+      this.notifications.delete(key);
+      void this.setup.requests.toPage(page, server.id, request).then((outcome) => {
+        if (!outcome.ok) this.show(server.id, outcome.path ?? path);
+      });
+    };
     note.on("click", () => {
       this.notifications.delete(key);
       this.show(server.id, path);
+    });
+    note.on("action", ({ actionIndex }) => {
+      const action = actions[actionIndex];
+      if (action) carryOut({ kind: "action", request: action.request });
+    });
+    note.on("reply", ({ reply: text }) => {
+      if (reply) carryOut({ kind: "action", request: reply.request, text });
     });
     note.on("close", () => {
       if (this.notifications.get(key) === note) this.notifications.delete(key);

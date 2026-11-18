@@ -8,10 +8,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, dialog, Menu, net, powerMonitor, shell } from "electron";
+import { app, BrowserWindow, dialog, Menu, net, powerMonitor, shell, webContents } from "electron";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
 import { menuTemplate } from "@/main/menu";
+import { Requests } from "@/main/requests";
 import { ServerChecks } from "@/main/server-checks";
 import { ServerList } from "@/main/server-list";
 import { ServerWindows } from "@/main/server-windows";
@@ -19,6 +20,7 @@ import { ServerStore } from "@/main/servers";
 import { refusedSwitches } from "@/main/switches";
 import { Unread } from "@/main/unread";
 import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
+import { BRIDGE_REQUEST } from "@/shared/bridge";
 
 const WEBSITE = "https://github.com/agrigoryan/quadit";
 
@@ -74,6 +76,16 @@ function start() {
     });
 
   let refreshMenu = () => {};
+  let pagesChanged = () => {};
+  const requests = new Requests(
+    (page, message) => {
+      const contents = webContents.fromId(page);
+      if (!contents || contents.isDestroyed()) return false;
+      contents.send(BRIDGE_REQUEST, message);
+      return true;
+    },
+    () => pagesChanged(),
+  );
   const unread = new Unread(store, {
     trayIcon: join(app.getAppPath(), "assets", "trayTemplate.png"),
     openServer: (id) => windows.show(id),
@@ -88,6 +100,7 @@ function start() {
     signIn,
     reportUnread: (serverId, reporter, workspace, count) => unread.report(serverId, reporter, workspace, count),
     forgetUnread: (reporter) => unread.forget(reporter),
+    requests,
     changed: () => refreshMenu(),
   });
   const list = new ServerList(store, windows, {

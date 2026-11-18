@@ -1,0 +1,125 @@
+import { describe, expect, it } from "vitest";
+import { notificationOf, outcomeOf, summaryOf } from "@/shared/bridge";
+
+const action = (extra: Record<string, unknown> = {}) => ({ label: "Ship it", request: "pick:d1:o1", ...extra });
+
+const summary = (extra: Record<string, unknown> = {}) => ({
+  workspace: { id: "w1", slug: "acme", name: "Acme" },
+  me: { name: "Ann", canCreateAgents: true },
+  waiting: [{ title: "Ship?", detail: "SVA-1", path: "/acme/t/SVA-1", actions: [action()] }],
+  agents: [
+    { id: "u2", handle: "claude", name: "Claude", state: "working", detail: "SVA-2", path: "/acme", usable: true },
+  ],
+  projects: [{ key: "SVA", name: "Service" }],
+  ...extra,
+});
+
+describe("notificationOf with actions and a reply", () => {
+  const note = { title: "Ship?", body: "Bea asks", path: "/acme" };
+
+  it("keeps up to three actions and a reply, labels cut short", () => {
+    expect(
+      notificationOf({
+        ...note,
+        actions: [action({ label: "x".repeat(100) }), action(), action()],
+        reply: { placeholder: "Reply", request: "reply:i1" },
+      }),
+    ).toEqual({
+      ...note,
+      actions: [{ label: "x".repeat(40), request: "pick:d1:o1" }, action(), action()],
+      reply: { placeholder: "Reply", request: "reply:i1" },
+    });
+  });
+
+  it("keeps the first three actions of more", () => {
+    expect(
+      notificationOf({ ...note, actions: [action(), action(), action(), action({ label: "4th" })] })?.actions,
+    ).toEqual([action(), action(), action()]);
+  });
+
+  it("refuses a request too long, or a wrong type", () => {
+    expect(notificationOf({ ...note, actions: [action({ request: "r".repeat(501) })] })).toBeNull();
+    expect(notificationOf({ ...note, actions: [action({ request: 5 })] })).toBeNull();
+    expect(notificationOf({ ...note, actions: "pick" })).toBeNull();
+    expect(notificationOf({ ...note, reply: { placeholder: "p", request: "r".repeat(501) } })).toBeNull();
+    expect(notificationOf({ ...note, reply: { placeholder: 1, request: "r" } })).toBeNull();
+  });
+});
+
+describe("summaryOf", () => {
+  it("keeps a well-formed summary as plain data", () => {
+    expect(summaryOf(summary({ extra: "dropped" }))).toEqual(summary());
+  });
+
+  it("cuts text short and keeps the first items of a long list", () => {
+    const kept = summaryOf(
+      summary({
+        workspace: { id: "w1", slug: "acme", name: "n".repeat(500) },
+        projects: Array.from({ length: 300 }, (_, i) => ({ key: `P${i}`, name: "p" })),
+        waiting: Array.from({ length: 30 }, () => ({
+          title: "t".repeat(500),
+          detail: "d",
+          path: "/acme",
+          actions: Array.from({ length: 9 }, () => action()),
+        })),
+      }),
+    );
+    expect(kept?.workspace.name).toHaveLength(200);
+    expect(kept?.projects).toHaveLength(200);
+    expect(kept?.waiting).toHaveLength(20);
+    expect(kept?.waiting[0]?.title).toHaveLength(200);
+    expect(kept?.waiting[0]?.actions).toHaveLength(6);
+  });
+
+  it("refuses wrong types, an unknown agent state, and an address or a request too long", () => {
+    expect(summaryOf(null)).toBeNull();
+    expect(summaryOf(summary({ workspace: { id: 1, slug: "acme", name: "Acme" } }))).toBeNull();
+    expect(summaryOf(summary({ me: { name: "Ann", canCreateAgents: "yes" } }))).toBeNull();
+    expect(
+      summaryOf(
+        summary({
+          agents: [{ id: "u", handle: "h", name: "n", state: "asleep", detail: "", path: "/", usable: true }],
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      summaryOf(summary({ waiting: [{ title: "t", detail: "d", path: "/" + "p".repeat(3000), actions: [] }] })),
+    ).toBeNull();
+    expect(
+      summaryOf(
+        summary({ waiting: [{ title: "t", detail: "d", path: "/", actions: [action({ request: "r".repeat(501) })] }] }),
+      ),
+    ).toBeNull();
+    expect(summaryOf(summary({ projects: [{ key: "k".repeat(201), name: "p" }] }))).toBeNull();
+  });
+});
+
+describe("outcomeOf", () => {
+  it("keeps a success with its path, agent and token", () => {
+    const ok = {
+      ok: true,
+      path: "/acme/t/SVA-12",
+      agent: { id: "u2", handle: "claude", name: "Claude" },
+      token: { id: "t1", secret: "qd_secret" },
+    };
+    expect(outcomeOf({ ...ok, extra: 1 })).toEqual(ok);
+    expect(outcomeOf({ ok: true })).toEqual({ ok: true });
+  });
+
+  it("keeps a refusal with its message cut short", () => {
+    expect(outcomeOf({ ok: false, message: "m".repeat(900), path: "/acme" })).toEqual({
+      ok: false,
+      message: "m".repeat(500),
+      path: "/acme",
+    });
+  });
+
+  it("refuses what is not an outcome", () => {
+    expect(outcomeOf(undefined)).toBeNull();
+    expect(outcomeOf({ ok: "yes" })).toBeNull();
+    expect(outcomeOf({ ok: false })).toBeNull();
+    expect(outcomeOf({ ok: true, token: { id: "t1" } })).toBeNull();
+    expect(outcomeOf({ ok: true, path: "/" + "p".repeat(3000) })).toBeNull();
+    expect(outcomeOf({ ok: true, agent: { id: "u", handle: 3, name: "n" } })).toBeNull();
+  });
+});
