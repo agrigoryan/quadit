@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'"
+    />
+    <title>Set Up Quadit</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="brand">
+        <img src="icon.png" alt="" width="40" height="40" />
+        <h1>Set up Quadit</h1>
+      </header>
+      <p class="hint">
+        Each step can be skipped, and this page is in the app menu (Set Up Quadit…) whenever you want it.
+      </p>
+
+      <ol class="steps">
+        <li>
+          <h2 id="servers-title">1. Add your server</h2>
+          <ul id="servers" class="list" aria-labelledby="servers-title"></ul>
+          <form id="add" class="add" novalidate>
+            <label>
+              <span>Address</span>
+              <input name="address" type="text" inputmode="url" autocomplete="url" placeholder="quadit.example.com" />
+            </label>
+            <p id="add-error" class="error" role="alert"></p>
+            <button type="submit">Add server</button>
+          </form>
+        </li>
+        <li>
+          <h2 id="sign-in-title">2. Sign in</h2>
+          <p class="hint">Through your browser, where your passkeys and password manager work.</p>
+          <ul id="sign-in" class="list" aria-labelledby="sign-in-title"></ul>
+        </li>
+        <li>
+          <h2>3. Notifications</h2>
+          <p class="hint">
+            The app cannot tell whether your system lets it show notifications. Send a test one: if it does not appear,
+            allow Quadit in the system's notification settings.
+          </p>
+          <div class="actions">
+            <button id="test-notification" type="button">Send a test notification</button>
+            <button id="notification-settings" type="button">Open notification settings</button>
+          </div>
+        </li>
+        <li>
+          <h2>4. Connect your agents</h2>
+          <p class="hint">Let Claude Code, Codex and the other agent tools on this computer work in Quadit.</p>
+          <button id="connect" type="button">Connect agents…</button>
+        </li>
+        <li>
+          <h2>5. Quick capture</h2>
+          <label class="check">
+            <input id="shortcut" type="checkbox" />
+            <span id="shortcut-label">Open quick capture from anywhere with its key</span>
+          </label>
+          <p id="shortcut-error" class="error" role="alert"></p>
+        </li>
+      </ol>
+      <button id="done" type="button" class="primary">Done</button>
+    </main>
+    <script src="setup.js"></script>
+  </body>
+</html>

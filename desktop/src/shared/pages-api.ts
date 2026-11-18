@@ -3,7 +3,7 @@
 // may ask of the app, through the preload src/preload/pages.ts. The server's
 // web pages never see this: they get only the bridge of the contract.
 
-import type { DesktopSummary } from "@/shared/bridge";
+import type { DesktopOutcome, DesktopSummary } from "@/shared/bridge";
 
 export interface ServerView {
   id: string;
@@ -130,6 +130,30 @@ export interface PagesApi {
   /** Loads again the server's page that the connection error it sits over is about. */
   retryServer(): void;
 
+  /** The workspaces the server windows show now. */
+  summaries(): Promise<SummaryView[]>;
+  /** Opens a server's window at `path`, a page of its web app. */
+  openPath(serverId: string, path: string): Promise<void>;
+  /** The panel's button on a decision waiting on the person. */
+  act(serverId: string, workspaceId: string, action: { request: string; text?: string }): Promise<DesktopOutcome>;
+
+  /** Makes a task or a page through the workspace's window, and remembers where. */
+  capture(c: CaptureTarget & { title: string; body: string }): Promise<DesktopOutcome>;
+  lastCapture(): Promise<CaptureTarget | null>;
+
+  setupState(): Promise<SetupState>;
+  saveSetup(s: { setupDone?: boolean; captureShortcut?: boolean }): Promise<SetupState>;
+  testNotification(): Promise<void>;
+  /** Opens the system's notification settings; false where the app knows none to open. */
+  openNotificationSettings(): Promise<boolean>;
+  openConnect(): Promise<void>;
+
+  connectState(): Promise<ConnectView>;
+  planConnect(c: ConnectChoice): Promise<Planned>;
+  applyConnect(planId: string): Promise<{ ok: true; hint: string } | { ok: false; error: string }>;
+  planDisconnect(harness: string): Promise<Planned>;
+  applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | { ok: false; error: string }>;
+  showBackups(): Promise<void>;
 }
 
 /** The IPC channels of this API: "pages:" and the method's name, and the one the app sends changes on. */

@@ -2,6 +2,7 @@
 // and the form that adds one. All work is done by the app (src/main/server-list.ts)
 // through window.quaditPages.
 
+import { element, make } from "@/pages/dom";
 import type { PagesApi, ServerStatus, ServerView } from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
@@ -11,19 +12,6 @@ const form = element<HTMLFormElement>("add");
 const addError = element<HTMLParagraphElement>("add-error");
 const addInsecure = element<HTMLButtonElement>("add-insecure");
 const invitation = element<HTMLParagraphElement>("invitation");
-
-function element<T extends HTMLElement>(id: string): T {
-  const found = document.getElementById(id);
-  if (!found) throw new Error(`the page has no #${id}`);
-  return found as T;
-}
-
-function make<K extends keyof HTMLElementTagNameMap>(tag: K, text = "", className = ""): HTMLElementTagNameMap[K] {
-  const made = document.createElement(tag);
-  if (text) made.textContent = text;
-  if (className) made.className = className;
-  return made;
-}
 
 /** What a person should know about a server's answer, in a line. */
 function describe(status: ServerStatus): { text: string; signIn: boolean; warn: boolean } {

@@ -24,6 +24,10 @@ export interface MenuState {
 
 export interface MenuActions {
   showServerList(): void;
+  showSetup(): void;
+  showConnect(): void;
+  quickCapture(): void;
+  togglePanel(): void;
   openServer(serverId: string): void;
   signInInFront(): void;
   openUpdate(release: Release): void;
@@ -31,8 +35,12 @@ export interface MenuActions {
   reportIssue(): void;
 }
 
+/** What the menu-bar panel is called where it is a menu item. */
+export const PANEL_LABEL = "Decisions and Agents";
+
 export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemConstructorOptions[] {
   const mac = state.platform === "darwin";
+  const setup: MenuItemConstructorOptions = { label: `Set Up ${state.appName}…`, click: () => actions.showSetup() };
   const update: MenuItemConstructorOptions[] = state.update
     ? [
         {
@@ -47,6 +55,8 @@ export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemCo
     submenu: [
       { role: "about" },
       ...(update.length ? [{ type: "separator" as const }, ...update] : []),
+      { type: "separator" },
+      setup,
       { type: "separator" },
       { role: "services" },
       { type: "separator" },
@@ -63,6 +73,11 @@ export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemCo
     submenu: [
       { label: "Servers…", click: () => actions.showServerList() },
       { label: "Add Server…", click: () => actions.showServerList() },
+      { type: "separator" },
+      // The key is the global one quick capture takes itself (capture.ts), so it is not given here.
+      { id: "quick-capture", label: "Quick Capture…", click: () => actions.quickCapture() },
+      { id: "connect", label: "Connect Agents…", click: () => actions.showConnect() },
+      ...(mac ? [] : [setup]),
       { type: "separator" },
       { label: "Sign In with Browser…", enabled: state.serverInFront, click: () => actions.signInInFront() },
       { type: "separator" },
@@ -117,6 +132,7 @@ export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemCo
       })),
       ...(state.servers.length ? [{ type: "separator" as const }] : []),
       { label: "Servers…", click: () => actions.showServerList() },
+      { id: "panel", label: PANEL_LABEL, click: () => actions.togglePanel() },
       ...(mac ? [{ type: "separator" as const }, { role: "front" as const }] : []),
     ],
   };

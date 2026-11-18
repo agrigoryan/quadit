@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'"
+    />
+    <title>Connect Agents</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <main class="page connect">
+      <h1>Connect agents</h1>
+      <p class="hint">
+        Let the agent tools on this computer work in a Quadit workspace: through the quadit command and its skill,
+        through Quadit's MCP server, or both. You see every file that changes before anything is written, and Disconnect
+        takes it back.
+      </p>
+      <p id="unsupported" class="notice" hidden>
+        Connect needs the quadit command, which is not available for Windows yet. Connect an agent by MCP by hand: its
+        address is your server's address followed by /mcp.
+      </p>
+      <p id="cli" class="status"></p>
+      <ul id="notices" class="list"></ul>
+
+      <section aria-labelledby="harnesses-title">
+        <h2 id="harnesses-title">Agent tools</h2>
+        <ul id="harnesses" class="list"></ul>
+        <button id="backups" type="button" class="quiet">Show backups</button>
+      </section>
+
+      <section id="choose" aria-labelledby="choose-title" hidden>
+        <h2 id="choose-title"></h2>
+        <form id="choice" class="add" novalidate>
+          <fieldset class="choice">
+            <legend>How</legend>
+            <label><input type="checkbox" name="cli" checked /> The quadit command and its skill</label>
+            <label id="mcp-option"
+              ><input type="checkbox" name="mcp" /> Quadit's MCP server (signs in through the tool)</label
+            >
+          </fieldset>
+          <label>
+            <span>Workspace</span>
+            <select id="workspace"></select>
+          </label>
+          <label>
+            <span>Work as</span>
+            <select id="agent"></select>
+          </label>
+          <div id="new-agent" class="pair" hidden>
+            <label><span>New agent's name</span><input id="agent-name" type="text" autocomplete="off" /></label>
+            <label><span>Handle</span><input id="agent-handle" type="text" autocomplete="off" /></label>
+          </div>
+          <p id="identity" class="hint"></p>
+          <label class="check">
+            <input type="checkbox" name="unattended" />
+            <span>Let it use Quadit without asking each time, where it has a setting for that</span>
+          </label>
+          <p id="choice-error" class="error" role="alert"></p>
+          <div class="actions">
+            <button type="submit" class="primary">Review changes</button>
+            <button id="cancel-choice" type="button">Cancel</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="plan" aria-labelledby="plan-title" hidden>
+        <h2 id="plan-title">Review the changes</h2>
+        <ul id="warnings" class="list"></ul>
+        <div id="files"></div>
+        <p id="backup-dir" class="hint"></p>
+        <p id="plan-error" class="error" role="alert"></p>
+        <div class="actions">
+          <button id="apply" type="button" class="primary">Apply</button>
+          <button id="cancel-plan" type="button">Cancel</button>
+        </div>
+      </section>
+
+      <p id="result" class="notice" role="status" hidden></p>
+    </main>
+    <script src="connect.js"></script>
+  </body>
+</html>

@@ -22,7 +22,7 @@ function setUp() {
   const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-unread-")), "servers.json"));
   const one = store.add("https://one.example.com", "One", 1);
   const two = store.add("https://two.example.com", "Two", 1);
-  const unread = new Unread(store, { trayIcon: "", openServer() {}, showServerList() {} });
+  const unread = new Unread(store, { trayIcon: "", openServer() {}, showServerList() {}, togglePanel() {} });
   return { store, one: one.id, two: two.id, unread };
 }
 

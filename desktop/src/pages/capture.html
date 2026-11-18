@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'"
+    />
+    <title>Quick Capture</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <main class="page capture">
+      <p id="none" class="hint" hidden>
+        Open a workspace in one of Quadit's windows first: quick capture makes things there.
+      </p>
+      <form id="capture" class="add" novalidate>
+        <label>
+          <span>Workspace</span>
+          <select id="workspace" name="workspace"></select>
+        </label>
+        <fieldset class="choice">
+          <legend>Make a</legend>
+          <label><input type="radio" name="what" value="task" checked /> Task</label>
+          <label><input type="radio" name="what" value="page" /> Page</label>
+        </fieldset>
+        <label>
+          <span>Project</span>
+          <select id="project" name="project"></select>
+        </label>
+        <label>
+          <span>Title</span>
+          <input id="title" name="title" type="text" autocomplete="off" required />
+        </label>
+        <label>
+          <span>Text <small>(optional)</small></span>
+          <textarea id="body" name="body" rows="5"></textarea>
+        </label>
+        <p id="error" class="error" role="alert"></p>
+        <p id="made" class="notice" role="status" hidden></p>
+        <button type="submit" class="primary">Create</button>
+      </form>
+    </main>
+    <script src="capture.js"></script>
+  </body>
+</html>

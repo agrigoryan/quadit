@@ -1,39 +1,24 @@
 // The server list: the app's own bundled page where servers are added,
-// checked, opened, signed in to and removed, and the IPC that answers the
-// bundled pages (the list and the sign-in bar) through src/preload/pages.ts.
-// Only frames loaded from the app's own page files are answered.
+// checked, opened, signed in to and removed; and what the app's pages ask
+// about servers and the workspaces their windows show (the summaries).
 
-import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
+import type { BrowserWindow } from "electron";
+import type { AppPages } from "@/main/app-pages";
 import { serverOrigin, transportOf } from "@/main/origins";
 import { type Fetch, probe } from "@/main/probe";
+import type { Requests } from "@/main/requests";
 import type { ServerChecks } from "@/main/server-checks";
 import type { ServerWindows } from "@/main/server-windows";
 import type { Server, ServerStore } from "@/main/servers";
-import {
-  type AddResult,
-  type Invitation,
-  PAGES_CHANGED,
-  PAGES_CHANNEL,
-  type PagesApi,
-  type ServerStatus,
-  type ServerView,
-} from "@/shared/pages-api";
+import type { AddResult, Invitation, ServerStatus, ServerView, SummaryView } from "@/shared/pages-api";
 
 export interface ServerListSetup {
-  pagesPreload: string;
-  /** The file URL of the folder holding the bundled pages; frames from anywhere else are not answered. */
-  pagesUrl: string;
   /** The network the probes of servers being added go through (Electron's net.fetch). */
   fetcher: Fetch;
   /** What asks added servers what they are and keeps the answer. */
   checks: ServerChecks;
   signIn(serverId: string): void;
 }
-
-/** The pages API as the main process answers it: the same methods, the asking frame's web contents first. */
-type Handlers = {
-  [K in keyof PagesApi]: (sender: Electron.WebContents, ...args: Parameters<PagesApi[K]>) => unknown;
-};
 
 export class ServerList {
   private win: BrowserWindow | undefined;
@@ -44,9 +29,11 @@ export class ServerList {
   constructor(
     private store: ServerStore,
     private windows: ServerWindows,
+    private pages: AppPages,
+    requests: Requests,
     private setup: ServerListSetup,
   ) {
-    const handlers: Omit<Handlers, "onChanged"> = {
+    pages.answer({
       listServers: () => store.list().map(view),
       checkServer: (_sender, id) => this.check(String(id)),
       addServer: (_sender, address, name, allowInsecure) =>
@@ -68,14 +55,14 @@ export class ServerList {
       },
       dismissSignInBar: (sender) => windows.dismissBar(sender),
       retryServer: (sender) => windows.retryFrom(sender),
-    };
-    for (const [name, handle] of Object.entries(handlers)) {
-      ipcMain.handle(PAGES_CHANNEL + name, (event: IpcMainInvokeEvent, ...args: unknown[]) => {
-        if (!event.senderFrame?.url.startsWith(setup.pagesUrl)) throw new Error("not an app page");
-        return (handle as (sender: Electron.WebContents, ...rest: unknown[]) => unknown)(event.sender, ...args);
-      });
-    }
-    store.onChange(() => this.win?.webContents.send(PAGES_CHANGED));
+      summaries: (): SummaryView[] =>
+        requests.summaries().flatMap(({ serverId, summary, listening }) => {
+          const server = store.get(serverId);
+          return server ? [{ serverId, serverName: server.name, summary, listening }] : [];
+        }),
+      openPath: (_sender, serverId, path) => windows.show(String(serverId), String(path)),
+    });
+    store.onChange(() => pages.changed());
   }
 
   /** Shows the list, making its window when there is none. */
@@ -85,7 +72,7 @@ export class ServerList {
       this.win.focus();
       return;
     }
-    this.win = new BrowserWindow({
+    this.win = this.pages.window("servers.html", {
       name: "servers",
       windowStatePersistence: true,
       width: 560,
@@ -93,19 +80,8 @@ export class ServerList {
       minWidth: 420,
       minHeight: 420,
       title: "Quadit Servers",
-      // pages.css's --bg, so the window is not white until its page paints.
-      backgroundColor: "#1b1d22",
-      webPreferences: {
-        preload: this.setup.pagesPreload,
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-      },
     });
-    this.win.webContents.on("will-navigate", (event) => event.preventDefault());
-    this.win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     this.win.on("closed", () => (this.win = undefined));
-    void this.win.loadURL(new URL("servers.html", this.setup.pagesUrl).href);
   }
 
   /** A link asked for `path` on a server that is not added: the list offers to add it, and the page opens once it is. */
@@ -113,7 +89,7 @@ export class ServerList {
     this.invitation = { origin };
     this.destination = { origin, path };
     this.show();
-    this.win?.webContents.send(PAGES_CHANGED);
+    this.pages.changed();
   }
 
   private async add(address: string, name: string, allowInsecure: boolean): Promise<AddResult> {

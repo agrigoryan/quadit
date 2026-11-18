@@ -1,22 +1,32 @@
 // The app's start: no switches that open it to other programs
 // (switches.ts), one running copy, the quadit:// scheme, and the parts
 // put together: the servers (servers.ts), their windows
-// (server-windows.ts), the server list page (server-list.ts), the browser
-// sign-in (handoff.ts), the unread badge (unread.ts), the menu (menu.ts)
-// and the update notice (updates.ts).
+// (server-windows.ts), what the windows' pages publish and are asked
+// (requests.ts), the app's own pages (app-pages.ts: the server list,
+// setup, Connect, the menu-bar panel, quick capture), the browser sign-in
+// (handoff.ts), the unread badge (unread.ts), the menu (menu.ts) and the
+// update notice (updates.ts).
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, Menu, net, powerMonitor, shell, webContents } from "electron";
+import { AppPages } from "@/main/app-pages";
+import { Capture } from "@/main/capture";
+import { ConnectPage } from "@/main/connect-page";
+import { Connections } from "@/main/connections";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
 import { menuTemplate } from "@/main/menu";
+import { Panel } from "@/main/panel";
+import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
 import { Requests } from "@/main/requests";
 import { ServerChecks } from "@/main/server-checks";
 import { ServerList } from "@/main/server-list";
 import { ServerWindows } from "@/main/server-windows";
 import { ServerStore } from "@/main/servers";
+import { Settings, Setup } from "@/main/setup-settings";
 import { refusedSwitches } from "@/main/switches";
 import { Unread } from "@/main/unread";
 import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
@@ -58,7 +68,10 @@ function start() {
   const outDir = __dirname;
   const pagesUrl = pathToFileURL(join(outDir, "pages") + "/").href;
   const version = app.getVersion();
-  const store = new ServerStore(join(app.getPath("userData"), "servers.json"));
+  const dataDir = app.getPath("userData");
+  const store = new ServerStore(join(dataDir, "servers.json"));
+  const settings = new Settings(join(dataDir, "settings.json"));
+  const pages = new AppPages(pagesUrl, join(outDir, "preload-pages.js"));
   const flows = new SignInFlows();
 
   enablePasskeys();
@@ -76,7 +89,6 @@ function start() {
     });
 
   let refreshMenu = () => {};
-  let pagesChanged = () => {};
   const requests = new Requests(
     (page, message) => {
       const contents = webContents.fromId(page);
@@ -84,12 +96,13 @@ function start() {
       contents.send(BRIDGE_REQUEST, message);
       return true;
     },
-    () => pagesChanged(),
+    () => pages.changed(),
   );
   const unread = new Unread(store, {
     trayIcon: join(app.getAppPath(), "assets", "trayTemplate.png"),
     openServer: (id) => windows.show(id),
     showServerList: () => list.show(),
+    togglePanel: (tray) => panel.toggle(tray),
   });
   const windows = new ServerWindows(store, {
     version,
@@ -103,12 +116,29 @@ function start() {
     requests,
     changed: () => refreshMenu(),
   });
-  const list = new ServerList(store, windows, {
-    pagesPreload: join(outDir, "preload-pages.js"),
-    pagesUrl,
-    fetcher,
-    checks,
-    signIn,
+  const list = new ServerList(store, windows, pages, requests, { fetcher, checks, signIn });
+  const panel = new Panel(pages, requests);
+  const capture = new Capture(pages, settings, requests);
+  const connect = new ConnectPage(
+    pages,
+    new Connections({
+      home: homedir(),
+      dataDir,
+      platform: process.platform,
+      hostName: hostname(),
+      cli: new QuaditCli(bundledCli(), loginShellPath),
+      summaries: () => requests.summaries(),
+      server: (id) => store.get(id),
+      ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
+    }),
+  );
+  const setup = new Setup({
+    pages,
+    settings,
+    shortcut: () => capture.shortcut(),
+    applyShortcut: () => capture.applyShortcut(),
+    signedIn: () => [...new Set([...unread.showing(), ...requests.summaries().map((s) => s.serverId)])],
+    openConnect: () => connect.show(),
   });
 
   const updates = new UpdateWatch(
@@ -136,6 +166,10 @@ function start() {
           },
           {
             showServerList: () => list.show(),
+            showSetup: () => setup.show(),
+            showConnect: () => connect.show(),
+            quickCapture: () => capture.toggle(),
+            togglePanel: () => panel.toggle(unread.trayBounds()),
             openServer: (id) => windows.show(id),
             signInInFront: () => front && signIn(front.id),
             openUpdate: (release) => void tellAboutUpdate(release),
@@ -185,7 +219,10 @@ function start() {
   // Asleep, a page's connections died quietly; awake, they are checked at once.
   powerMonitor.on("resume", () => windows.wake());
   unread.start();
-  if (!windows.restore()) list.show();
+  capture.applyShortcut();
+  const shown = windows.restore();
+  if (!settings.get().setupDone) setup.show();
+  else if (!shown) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.
   void checks.checkAll();
   if (app.isPackaged || process.env.QUADIT_DESKTOP_CHECK_UPDATES) updates.start();
@@ -194,6 +231,12 @@ function start() {
   // the server list a second time while the first is still being made.
   handleLink = handleReadyLink;
   for (const link of earlyLinks.splice(0)) handleLink(link);
+}
+
+/** The quadit command packaged in the app's resources (macOS and Linux), or null without one (run from source, Windows). */
+function bundledCli(): string | null {
+  const path = join(process.resourcesPath, "bin", "quadit");
+  return app.isPackaged && existsSync(path) ? path : null;
 }
 
 /** Tells the person something that went wrong or needs them, in a dialog of its own. */

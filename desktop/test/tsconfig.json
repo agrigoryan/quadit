@@ -3,8 +3,7 @@
   "compilerOptions": {
     "lib": ["ES2024", "DOM"],
     "types": ["node"],
-    "paths": {}
+    "paths": { "@/*": ["../src/*"] }
   },
-  "include": [".", "../playwright.config.ts", "../src/shared"],
-  "exclude": ["../src/shared/*.test.ts"]
+  "include": [".", "../playwright.config.ts", "../src/shared"]
 }

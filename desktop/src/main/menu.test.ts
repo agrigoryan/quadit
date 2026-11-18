@@ -39,6 +39,10 @@ const state = (platform: NodeJS.Platform, extra: Partial<MenuState> = {}): MenuS
 const noop = () => {};
 const actions = {
   showServerList: noop,
+  showSetup: noop,
+  showConnect: noop,
+  quickCapture: noop,
+  togglePanel: noop,
   openServer: noop,
   signInInFront: noop,
   openUpdate: noop,

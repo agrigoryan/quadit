@@ -26,13 +26,22 @@ await Promise.all([
   }),
   build({
     ...common,
-    entryPoints: ["src/pages/servers.ts", "src/pages/sign-in-bar.ts", "src/pages/connection-error.ts"],
+    entryPoints: [
+      "src/pages/servers.ts",
+      "src/pages/sign-in-bar.ts",
+      "src/pages/connection-error.ts",
+      "src/pages/setup.ts",
+      "src/pages/connect.ts",
+      "src/pages/panel.ts",
+      "src/pages/capture.ts",
+    ],
     outdir: "out/pages",
     platform: "browser",
     format: "iife",
   }),
 ]);
 
-for (const file of ["servers.html", "sign-in-bar.html", "connection-error.html", "pages.css"])
+const pages = ["servers", "sign-in-bar", "connection-error", "setup", "connect", "panel", "capture"];
+for (const file of [...pages.map((page) => `${page}.html`), "pages.css"])
   cpSync(`src/pages/${file}`, `out/pages/${file}`);
 cpSync("assets/icon.png", "out/pages/icon.png");
