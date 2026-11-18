@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appPage, browserAddress, isHandoffPage, isOwnPage, serverOrigin } from "@/main/origins";
+import { appPage, browserAddress, isHandoffPage, isOwnPage, serverOrigin, transportOf } from "@/main/origins";
 
 describe("serverOrigin", () => {
   it("takes a bare host name as https", () => {
@@ -23,6 +23,52 @@ describe("serverOrigin", () => {
       "http://",
     ]) {
       expect(serverOrigin(text), text).toBeNull();
+    }
+  });
+});
+
+describe("transportOf", () => {
+  it("is secure over https", () => {
+    expect(transportOf("https://quadit.example.com")).toBe("secure");
+    expect(transportOf("https://192.168.1.10")).toBe("secure");
+  });
+
+  it("is local over http to this computer or a network of the person's own", () => {
+    for (const origin of [
+      "http://127.0.0.1:4780",
+      "http://127.8.9.10",
+      "http://localhost:4780",
+      "http://quadit.localhost",
+      "http://[::1]:4780",
+      "http://10.1.2.3",
+      "http://172.16.0.5",
+      "http://172.31.255.255",
+      "http://192.168.1.10:8080",
+      "http://169.254.10.10",
+      "http://100.101.102.103",
+      "http://[fd12:3456::1]",
+      "http://[fe80::1]",
+      "http://nas.local",
+      "http://quadit.home.arpa",
+      "http://quadit.corp.internal",
+      "http://quadit:4780",
+    ]) {
+      expect(transportOf(origin), origin).toBe("local");
+    }
+  });
+
+  it("is insecure over http to anywhere else", () => {
+    for (const origin of [
+      "http://quadit.example.com",
+      "http://8.8.8.8",
+      "http://172.32.0.1",
+      "http://100.128.0.1",
+      "http://11.0.0.1",
+      "http://[2001:db8::1]",
+      "http://localhost.example.com",
+      "http://local.example.com",
+    ]) {
+      expect(transportOf(origin), origin).toBe("insecure");
     }
   });
 });

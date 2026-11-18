@@ -9,6 +9,7 @@ const list = element<HTMLUListElement>("list");
 const empty = element<HTMLParagraphElement>("empty");
 const form = element<HTMLFormElement>("add");
 const addError = element<HTMLParagraphElement>("add-error");
+const addInsecure = element<HTMLButtonElement>("add-insecure");
 const invitation = element<HTMLParagraphElement>("invitation");
 
 function element<T extends HTMLElement>(id: string): T {
@@ -45,10 +46,21 @@ function describe(status: ServerStatus): { text: string; signIn: boolean; warn: 
   return { text: version, signIn: true, warn: false };
 }
 
+/** What a person should know about how the server's address carries their work, or "" when it is encrypted. */
+function transportNote(server: ServerView): string {
+  if (server.transport === "local")
+    return "Not encrypted (http), which is fine on this computer or a network of your own.";
+  if (server.transport === "insecure")
+    return "Not encrypted (http): anyone on the networks between can read and change what you do here.";
+  return "";
+}
+
 function row(server: ServerView): HTMLLIElement {
   const item = make("li", "", "server");
   const about = make("div", "", "about");
   about.append(make("strong", server.name), make("span", server.origin, "origin"));
+  const note = transportNote(server);
+  if (note) about.append(make("span", note, server.transport === "insecure" ? "status warn" : "status"));
   const status = make("span", "Checking…", "status");
   about.append(status);
 
@@ -113,18 +125,20 @@ async function render() {
   }
 }
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
+/** Adds what the form holds; `allowInsecure` is the person's yes to a plain http address. */
+function add(allowInsecure: boolean) {
   const address = (form.elements.namedItem("address") as HTMLInputElement).value;
   const name = (form.elements.namedItem("name") as HTMLInputElement).value;
-  const button = form.querySelector("button");
+  const button = form.querySelector<HTMLButtonElement>("button[type=submit]");
   addError.textContent = "";
+  addInsecure.hidden = true;
   if (button) button.disabled = true;
   void api
-    .addServer(address, name)
+    .addServer(address, name, allowInsecure)
     .then((result) => {
       if (!result.ok) {
         addError.textContent = result.error;
+        addInsecure.hidden = !result.insecure;
         return;
       }
       form.reset();
@@ -133,7 +147,15 @@ form.addEventListener("submit", (event) => {
     .finally(() => {
       if (button) button.disabled = false;
     });
+}
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  add(false);
 });
+addInsecure.addEventListener("click", () => add(true));
+// The yes was for the address shown: another address asks again.
+form.addEventListener("input", () => (addInsecure.hidden = true));
 
 api.onChanged(() => void render());
 void render();

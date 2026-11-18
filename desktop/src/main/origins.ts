@@ -3,6 +3,8 @@
 // window), and what may be handed to the system browser. Every check the
 // app makes on a URL goes through here, so the rules live in one place.
 
+import { isIP } from "node:net";
+
 /**
  * The origin ("https://host:port") of a server from what a person typed or a
  * link carried. A missing scheme means https; only http and https are
@@ -22,6 +24,43 @@ export function serverOrigin(text: string): string | null {
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
   if (!url.hostname || url.username || url.password) return null;
   return url.origin;
+}
+
+/**
+ * How the address of a server carries what the app and the server say,
+ * sign-ins and session cookies included:
+ *   secure    https
+ *   local     http to this computer or to a network the person runs: a
+ *             loopback, private, link-local or carrier-grade NAT address
+ *             (Tailscale's), or a name that cannot be on the internet
+ *             (localhost, a single word, .local, .home.arpa, .internal).
+ *             Not encrypted, so the app says so, but nobody else is on the way.
+ *   insecure  http to anywhere else: anyone on the way can read and change
+ *             it. The app adds such a server only when the person says so.
+ */
+export type Transport = "secure" | "local" | "insecure";
+
+export function transportOf(origin: string): Transport {
+  const url = URL.parse(origin);
+  if (!url || url.protocol !== "http:") return "secure";
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (isIP(host) === 4) {
+    const [a = 0, b = 0] = host.split(".").map(Number);
+    const local =
+      a === 127 ||
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      (a === 100 && b >= 64 && b <= 127);
+    return local ? "local" : "insecure";
+  }
+  if (isIP(host) === 6) {
+    // ::1, unique local fc00::/7, link-local fe80::/10.
+    return host === "::1" || /^f[cd]/.test(host) || /^fe[89ab]/.test(host) ? "local" : "insecure";
+  }
+  const local = !host.includes(".") || /(^|\.)localhost$/.test(host) || /\.(local|home\.arpa|internal)$/.test(host);
+  return local ? "local" : "insecure";
 }
 
 /** Whether `url` is a page of the server at `origin` (exactly that scheme, host and port). */

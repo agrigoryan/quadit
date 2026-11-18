@@ -14,9 +14,10 @@ test("a server added by its address opens in its own window, on its own session,
   await expect(page).toHaveURL(/\/login/);
   await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
 
-  // Listed, with what the server answered.
+  // Listed, with what the server answered, and that a local http server is not encrypted.
   await expect(list.getByText("Work", { exact: true })).toBeVisible();
   await expect(list.getByText(run.server)).toBeVisible();
+  await expect(list.getByText(/Not encrypted \(http\), which is fine on this computer/)).toBeVisible();
   await expect(list.getByRole("button", { name: "Sign in to Work with your browser" })).toBeEnabled();
 
   // Its own persistent partition, and the app's name in its user agent.
@@ -53,6 +54,24 @@ test("an address that is not a Quadit server is refused with the reason", async 
   await list.getByRole("button", { name: "Add server" }).click();
   await expect(list.getByRole("alert")).toHaveText(/Could not reach http:\/\/127\.0\.0\.1:9/);
   await expect(list.getByText("No servers yet.")).toBeVisible();
+});
+
+test("a server over plain http elsewhere is added only when the person says so", async ({ desktop }) => {
+  const list = await desktop.serverList();
+  await list.getByLabel("Address").fill("http://quadit.invalid");
+  await list.getByRole("button", { name: "Add server" }).click();
+  await expect(list.getByRole("alert")).toHaveText(/http:\/\/quadit\.invalid is not encrypted/);
+  await expect(list.getByText("No servers yet.")).toBeVisible();
+
+  // Said so: only now is the server asked what it is (this one is nowhere).
+  await list.getByRole("button", { name: "Add without encryption" }).click();
+  await expect(list.getByRole("alert")).toHaveText(/Could not reach http:\/\/quadit\.invalid/);
+  await expect(list.getByRole("button", { name: "Add without encryption" })).toBeHidden();
+
+  // https needs no word.
+  await list.getByLabel("Address").fill("quadit.invalid");
+  await list.getByRole("button", { name: "Add server" }).click();
+  await expect(list.getByRole("alert")).toHaveText(/Could not reach https:\/\/quadit\.invalid/);
 });
 
 test("an older Quadit without the hand-off is added, and says to sign in with a password", async ({ desktop, run }) => {

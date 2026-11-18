@@ -4,7 +4,7 @@
 // Only frames loaded from the app's own page files are answered.
 
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
-import { serverOrigin } from "@/main/origins";
+import { serverOrigin, transportOf } from "@/main/origins";
 import { type Fetch, probe } from "@/main/probe";
 import type { ServerWindows } from "@/main/server-windows";
 import type { Server, ServerStore } from "@/main/servers";
@@ -44,7 +44,8 @@ export class ServerList {
     const handlers: Omit<Handlers, "onChanged"> = {
       listServers: () => store.list().map(view),
       checkServer: (_sender, id) => this.check(String(id)),
-      addServer: (_sender, address, name) => this.add(String(address), String(name ?? "")),
+      addServer: (_sender, address, name, allowInsecure) =>
+        this.add(String(address), String(name ?? ""), allowInsecure === true),
       removeServer: async (_sender, id) => {
         const server = store.get(String(id));
         if (!server) return;
@@ -106,13 +107,23 @@ export class ServerList {
     this.win?.webContents.send(PAGES_CHANGED);
   }
 
-  private async add(address: string, name: string): Promise<AddResult> {
+  private async add(address: string, name: string, allowInsecure: boolean): Promise<AddResult> {
     const origin = serverOrigin(address);
     if (!origin)
       return {
         ok: false,
         error: "That is not a web address. Type it as quadit.example.com or https://quadit.example.com.",
       };
+    // Asked before anything is sent to it: not even the probe goes out unencrypted unasked.
+    if (transportOf(origin) === "insecure" && !allowInsecure) {
+      return {
+        ok: false,
+        insecure: true,
+        error:
+          `${origin} is not encrypted (http). Anyone on the networks between this computer and the server ` +
+          "could read your sign-in and everything you open, and change it. Use its https address if it has one.",
+      };
+    }
     const answer = await probe(origin, this.setup.fetcher);
     if (!answer.reachable) return { ok: false, error: answer.reason };
     const server = this.store.add(origin, name, answer.handoff);
@@ -131,5 +142,5 @@ export class ServerList {
 }
 
 function view(server: Server): ServerView {
-  return { id: server.id, name: server.name, origin: server.origin };
+  return { id: server.id, name: server.name, origin: server.origin, transport: transportOf(server.origin) };
 }
