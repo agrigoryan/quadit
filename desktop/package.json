@@ -1,0 +1,41 @@
+{
+  "name": "quadit-desktop",
+  "productName": "Quadit",
+  "description": "The Quadit desktop app: your Quadit servers in their own windows.",
+  "private": true,
+  "license": "MIT",
+  "version": "0.1.0",
+  "author": "Quadit",
+  "homepage": "https://github.com/agrigoryan/quadit",
+  "main": "out/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && electron .",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p src/pages && tsc --noEmit -p test",
+    "lint": "oxlint --type-aware",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "e2e": "node scripts/build.mjs && playwright test",
+    "icons": "sh scripts/icons.sh",
+    "dist": "node scripts/build.mjs && electron-builder --config electron-builder.config.cjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "24.19.2",
+    "electron": "45.3.4",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2007",
+    "prettier": "3.10.1",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
