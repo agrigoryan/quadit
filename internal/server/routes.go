@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agrigoryan/quadit"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
@@ -89,6 +90,10 @@ func (s *Server) coreRoutes() []route {
 		{"GET /healthz", func(w http.ResponseWriter, _ *http.Request) { fmt.Fprintln(w, "ok") }, "The process is up.", "", "monitoring"},
 		{"GET /readyz", s.handleCheckReadiness, "The database and the file store answer.", "", "monitoring"},
 		{"GET /metrics", s.handleShowMetrics, "Counters in the Prometheus text format.", "", "monitoring"},
+		{"GET /licenses", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			fmt.Fprint(w, quadit.License+"\n\n"+quadit.ThirdPartyNotices)
+		}, "Quadit's license, then the licenses of the work of others it contains, as text.", "", "describe"},
 
 		// Signing in and the account, outside any workspace.
 		{"GET /api/v1/auth/config", s.public(s.handleShowSignInOptions), "What this install offers for signing in, and whether it has been set up.", "", "account"},

@@ -118,7 +118,12 @@ Follow the patterns already in the files you touch. `make lint` and `pnpm check`
 
 ## Dependencies
 
-Quadit is MIT licensed and stays that way: a new dependency must have a permissive licence (MIT, Apache-2.0, BSD, ISC, MPL-2.0). No GPL, LGPL or AGPL. Prefer the standard library, and check that a new dependency is maintained (recent releases, real use) before adding it.
+Quadit is MIT licensed and stays that way. Prefer the standard library, and check that a new dependency is maintained (recent releases, real use) before adding it. What its licence may be depends on how it reaches a release:
+
+- **Compiled into the binary or bundled into the web app** (Go modules, the web app's npm packages): a permissive licence (MIT, Apache-2.0, BSD, ISC, 0BSD, the Unlicense; OFL-1.1 for a font), or MPL-2.0. The MPL is file-level copyleft: its files are used unmodified, their notice is kept and their source is available (THIRD_PARTY_NOTICES says where); a changed MPL file would have to be published under the MPL itself. Never GPL, LGPL or AGPL: CI fails on one (`go run ./scripts/notices -check`).
+- **Programs Quadit runs as separate processes** (git, FFmpeg, Chromium): any licence that lets them be redistributed, since they are not linked into Quadit and their licence does not reach its code. The archives and the `.deb` and `.rpm` packages contain none of them. The Docker image installs them from Alpine's packages, so it does carry GPL and LGPL programs: git (GPL-2.0) and FFmpeg (LGPL-2.1-or-later, with GPL-2.0-or-later parts as Alpine builds it). The image lists every package it holds with its licence in `/usr/share/doc/quadit/IMAGE_PACKAGES`, and their sources are Alpine's.
+
+After adding or updating a dependency, run `make notices` and commit `THIRD_PARTY_NOTICES`: it holds the licence of every module and package a release contains, ships in every archive, package and image, and is served at `/licenses`.
 
 ## Versions and releases
 

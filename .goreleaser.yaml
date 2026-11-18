@@ -38,6 +38,7 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
+      - THIRD_PARTY_NOTICES
       - README.md
 
 checksum:
@@ -98,6 +99,8 @@ nfpms:
           mode: 0600
       - src: LICENSE
         dst: /usr/share/doc/quadit/LICENSE
+      - src: THIRD_PARTY_NOTICES
+        dst: /usr/share/doc/quadit/THIRD_PARTY_NOTICES
     scripts:
       postinstall: packaging/postinstall.sh
       preremove: packaging/preremove.sh
@@ -108,6 +111,10 @@ dockers_v2:
   - id: quadit
     ids: [quadit]
     dockerfile: Dockerfile
+    # The licence files the image carries (/usr/share/doc/quadit).
+    extra_files:
+      - LICENSE
+      - THIRD_PARTY_NOTICES
     flags:
       - --target=release
     images:

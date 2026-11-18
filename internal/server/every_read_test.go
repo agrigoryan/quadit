@@ -743,6 +743,7 @@ var notRecorded = map[string]string{
 	"GET /api/v1/w/{ws}/render":        "takes a picture with a browser, which a test run does not have; what it may show is decided by taskByRef and docByID, which the task and page reads record",
 	"GET /api/v1/w/{ws}/events/stream": "recorded by its own reader (stream), which stops at the last event instead of waiting",
 	"GET /api/v1/w/{ws}/export":        "recorded by its own reader (export), which unpacks the archive",
+	"GET /licenses":                    "the same text for everyone, signed in or not, and checked by TestTheLicensesAreServed",
 }
 
 // collectionNames are the lists /list/{collection} has, in the order they

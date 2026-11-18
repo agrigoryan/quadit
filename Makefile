@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build server web generate test test-all e2e lint dev seed clean fmt release image
+.PHONY: all build server web generate test test-all e2e lint notices dev seed clean fmt release image
 
 all: build
 
@@ -46,6 +46,13 @@ GOLANGCI ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.
 lint:
 	$(GOLANGCI) run ./...
 	cd web && pnpm install --frozen-lockfile && pnpm lint && pnpm format:check
+
+# THIRD_PARTY_NOTICES from the Go modules and web packages a release holds
+# (scripts/notices). CI checks it is current and that no dependency is under
+# the GPL, the LGPL or the AGPL: go run ./scripts/notices -check.
+notices:
+	cd web && pnpm install --frozen-lockfile
+	go run ./scripts/notices
 
 # A local server on :4780 with data in ./data.
 dev: server

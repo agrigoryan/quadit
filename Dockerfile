@@ -27,9 +27,14 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -tags web -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/quadit ./cmd/quadit
 
 # What both images run on: everything but the binary.
+# The licences: Quadit's, the notices of what the binary holds, and every
+# Alpine package the image holds with its licence (IMAGE_PACKAGES).
 FROM alpine:3.22 AS runtime
 RUN apk add --no-cache ca-certificates tzdata git ffmpeg chromium font-noto font-noto-emoji \
-    && adduser -D -u 10001 -h /data quadit
+    && adduser -D -u 10001 -h /data quadit \
+    && mkdir -p /usr/share/doc/quadit \
+    && apk list --installed | sort > /usr/share/doc/quadit/IMAGE_PACKAGES
+COPY LICENSE THIRD_PARTY_NOTICES /usr/share/doc/quadit/
 USER quadit
 ENV QUADIT_DATA=/data QUADIT_LISTEN=:4780 QUADIT_CHROME=/usr/bin/chromium QUADIT_CHROME_ARGS="--no-sandbox --disable-dev-shm-usage"
 VOLUME /data

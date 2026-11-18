@@ -904,7 +904,7 @@ func servedByMux(path string) bool {
 			return true
 		}
 	}
-	return path == "/healthz" || path == "/readyz" || path == "/metrics"
+	return path == "/healthz" || path == "/readyz" || path == "/metrics" || path == "/licenses"
 }
 
 // recorder notes the status of an answer, for the metrics, and whether

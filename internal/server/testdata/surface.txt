@@ -63,6 +63,7 @@ api GET /api/v1/w/{workspace}/tasks/{ref}/context
 api GET /api/v1/w/{workspace}/tokens
 api GET /f/{id}/{name}
 api GET /healthz
+api GET /licenses
 api GET /mcp
 api GET /metrics
 api GET /oauth/authorize
