@@ -48,7 +48,8 @@ test("a server's pages cannot read the clipboard by themselves, and Paste still 
   await page.goto(`${run.server}/e2e/task/${key}`);
   const title = page.getByRole("textbox", { name: "Title" });
   await title.click();
-  await page.keyboard.press("End");
+  // At the end of the text: End would stop at the end of a wrapped line on a narrow window.
+  await title.evaluate((field: HTMLTextAreaElement) => field.setSelectionRange(field.value.length, field.value.length));
   await paste();
   await expect(title).toHaveValue("Renew the certificate and a copied secret");
 
