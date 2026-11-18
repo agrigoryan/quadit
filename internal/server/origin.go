@@ -33,31 +33,55 @@ func (s *Server) refuseOtherPages(r *http.Request) error {
 	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || r.Header.Get("Authorization") != "" {
 		return nil
 	}
-	refused := errForbidden("a write from another site's page is not accepted; use Quadit at %s", s.cfg.BaseURL)
-	switch r.Header.Get("Sec-Fetch-Site") {
-	case "same-origin", "none":
+	switch s.sentFrom(r) {
+	case fromOwnPage, fromPerson:
 		return nil
-	case "":
-		// A browser too old to say, or not a browser: judged below.
-	default:
-		return refused // same-site and cross-site
-	}
-	if origin := r.Header.Get("Origin"); origin != "" {
-		if s.isOwn(origin) {
-			return nil
-		}
-		return refused
-	}
-	if page := r.Referer(); page != "" {
-		if s.isOwn(page) {
-			return nil
-		}
-		return refused
+	case fromOtherPage:
+		return errForbidden("a write from another site's page is not accepted; use Quadit at %s", s.cfg.BaseURL)
 	}
 	if _, err := r.Cookie(sessionCookie); err == nil {
 		return errForbidden("a write made with the session cookie must say which page it comes from (Origin); a script signs in with a token instead")
 	}
 	return nil
+}
+
+// sender is where a request says it comes from (sentFrom).
+type sender int
+
+const (
+	fromUnsaid    sender = iota // nothing said: a browser too old to say, or not a browser
+	fromOwnPage                 // a page of the server's own origin
+	fromPerson                  // the person's own doing: an address typed, a bookmark
+	fromOtherPage               // any other page, a sibling site's included
+)
+
+// sentFrom tells where a browser's request comes from. A browser that sends
+// Fetch Metadata says so in Sec-Fetch-Site; an older one is judged by the
+// page's origin (Origin, or else Referer, which Referrer-Policy:
+// same-origin sends on the server's own pages) against the server's
+// address.
+func (s *Server) sentFrom(r *http.Request) sender {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin":
+		return fromOwnPage
+	case "none":
+		return fromPerson
+	case "":
+	default:
+		return fromOtherPage // same-site and cross-site
+	}
+	page := r.Header.Get("Origin")
+	if page == "" {
+		page = r.Referer()
+	}
+	switch {
+	case page == "":
+		return fromUnsaid
+	case s.isOwn(page):
+		return fromOwnPage
+	default:
+		return fromOtherPage
+	}
 }
 
 // isOwn reports whether an address (a page, or an origin) is on the
