@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import type { Page } from "@playwright/test";
 import { expect, type Quadit, test } from "./quadit";
-import { WORKSPACE } from "./run";
+import { currentRun, fromOwnPage, WORKSPACE } from "./run";
 
 /** Makes a page in the project from Markdown, and gives its id and its blocks' ids by their text. */
 async function newPage(quadit: Quadit, project: string, title: string, markdown: string) {
@@ -258,7 +258,9 @@ test("on a page mirrored from a read-only file, one who may only comment starts 
       JSON.stringify({ title: `Handbook ${project.key}`, repo: origin, write_mode: "none" }),
     ),
   ) as { ref: string };
-  const synced = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/sources/${source.ref}/sync`);
+  const synced = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/sources/${source.ref}/sync`, {
+    headers: fromOwnPage(currentRun().url),
+  });
   expect(synced.ok()).toBe(true);
   const tree = await quadit.cli("docs");
   const id = /Rules [A-Z]+ {2}\(([^)]+)\)/.exec(

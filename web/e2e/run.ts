@@ -35,6 +35,15 @@ export interface Run {
   dir: string;
 }
 
+/**
+ * The headers a browser adds to a write made from one of the server's own pages. Playwright's request API
+ * carries the page's cookie but no Origin, and the server refuses a write with the cookie that does not say
+ * which page it comes from.
+ */
+export function fromOwnPage(url: string) {
+  return { Origin: url };
+}
+
 /** The run the global set-up started; it is handed down in QUADIT_E2E. */
 export function currentRun(): Run {
   const raw = process.env.QUADIT_E2E;

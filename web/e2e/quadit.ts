@@ -9,7 +9,7 @@
 
 import { createHash } from "node:crypto";
 import { type APIRequestContext, type Browser, expect, test as base } from "@playwright/test";
-import { currentRun, quadit, WORKSPACE } from "./run";
+import { currentRun, fromOwnPage, quadit, WORKSPACE } from "./run";
 
 export { expect } from "@playwright/test";
 
@@ -77,7 +77,10 @@ function projectKey(seed: string) {
  * makes their email too, so it must be new to the run.
  */
 export async function invitedMember(browser: Browser, owner: APIRequestContext, name: string) {
-  const invite = await owner.post(`/api/v1/w/${WORKSPACE.slug}/invites`, { data: { role: "member" } });
+  const invite = await owner.post(`/api/v1/w/${WORKSPACE.slug}/invites`, {
+    data: { role: "member" },
+    headers: fromOwnPage(currentRun().url),
+  });
   expect(invite.ok()).toBe(true);
   const { link } = (await invite.json()) as { link: string };
 

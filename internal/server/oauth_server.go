@@ -213,14 +213,6 @@ func (s *Server) handleShowConsentPage(x *c) error {
 	return consentPage.Execute(x.w, map[string]any{"Client": client.Name, "User": x.user.Name, "Groups": groups, "HasAgent": hasAgent, "Request": token})
 }
 
-func originOf(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
-		return ""
-	}
-	return u.Scheme + "://" + u.Host
-}
-
 // handleAnswerConsentPage takes the person's answer and sends the browser back to the
 // client with a one-time code.
 func (s *Server) handleAnswerConsentPage(x *c) error {

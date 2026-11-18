@@ -12,6 +12,7 @@
 //	  server.go      the Server, the request context c, the route wrappers
 //	                 (public, signedIn, firstStepPassed, workspaceMember),
 //	                 sign-in by token or cookie, errors and the audit log
+//	  origin.go      which pages a browser's write is taken from
 //	  routes.go      the route: one address with its words; allRoutes, the
 //	                 list of them all that the mux and openapi.json are both
 //	                 made from (each feature's routes are declared beside
@@ -116,6 +117,7 @@ type Config struct {
 // caches, which fill as requests come, and the limiter's factor (applyLimits).
 type Server struct {
 	cfg     Config         // as given to New, with Log filled in
+	origin  string         // cfg.BaseURL's origin: the pages a browser's write may come from (origin.go)
 	st      store.Store    // the database
 	eng     *engine.Engine // applies every change
 	hub     *hub.Hub       // wakes the requests waiting for the feed to move
@@ -175,7 +177,7 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 		cfg.Log = slog.Default()
 	}
 	s := &Server{cfg: cfg, st: st, eng: engine.New(st, sealer.Seal), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
-		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{}), outbound: outbound.Client(cfg.PrivateNetworks)}
+		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{}), outbound: outbound.Client(cfg.PrivateNetworks), origin: originOf(cfg.BaseURL)}
 	s.eng.OnCommit = s.hub.Notify
 	s.settings = settings.New(st, sealer, cfg.Log, s.settingKinds())
 	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}
@@ -435,8 +437,13 @@ func (x *c) wantText() bool {
 }
 
 // body decodes the JSON request body into v. A field v does not have, a
-// body over 16 MB, or one that is not JSON is refused as a bad request.
+// body over 16 MB, or one that is not JSON is refused as a bad request. A
+// body sent with the session cookie must also say it is JSON: a page of
+// another site can send a form or plain text without asking first.
 func (x *c) body(v any) error {
+	if x.sess != nil && !saysJSON(x.r) {
+		return errBad("request body: send it as JSON, with Content-Type: application/json")
+	}
 	dec := json.NewDecoder(http.MaxBytesReader(x.w, x.r.Body, 16<<20))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
@@ -684,9 +691,9 @@ func (s *Server) identifyBySession(ctx context.Context, x *c, now int64) error {
 }
 
 // sessionMayAct refuses what a session may not do with this request: a
-// session made for taking pictures may only read, one that owes its second
-// step gets only as far as firstStepPassed routes, and a write another
-// site's page sent with the cookie is refused.
+// session made for taking pictures may only read, and one that owes its
+// second step gets only as far as firstStepPassed routes. (A write another
+// site's page sent with the cookie never gets here: refuseOtherPages.)
 func (x *c) sessionMayAct(sess core.Session) error {
 	switch {
 	case sess.Stage == core.SessionRender:
@@ -696,12 +703,6 @@ func (x *c) sessionMayAct(sess core.Session) error {
 		}
 	case sess.Stage != core.SessionFull && !x.firstStepEnough:
 		return &httpError{Status: 401, Code: "second_step", Message: "finish signing in with your second step"}
-	}
-	// A cookie rides along on requests other sites make; refuse those.
-	if x.r.Method != http.MethodGet && x.r.Method != http.MethodHead {
-		if site := x.r.Header.Get("Sec-Fetch-Site"); site == "cross-site" {
-			return errForbidden("cross-site requests are not accepted")
-		}
 	}
 	return nil
 }
@@ -865,8 +866,9 @@ func (s *Server) audit(r *http.Request, workspaceID string, actor core.User, act
 }
 
 // Handler returns the server's HTTP handler. Around every request it
-// compresses the answer when it can, sets the security headers, turns a
-// panic into a 500, and counts the request for /metrics. The API, files,
+// compresses the answer when it can, sets the security headers, refuses a
+// write a browser sent from another site's page (refuseOtherPages), turns
+// a panic into a 500, and counts the request for /metrics. The API, files,
 // MCP, OAuth, hooks and monitoring go to the routes; any other path is the
 // web app's, or not found when it is not built in.
 func (s *Server) Handler() http.Handler {
@@ -891,6 +893,10 @@ func (s *Server) Handler() http.Handler {
 		if r.TLS != nil || (strings.HasPrefix(s.cfg.BaseURL, "https://") && r.Header.Get("X-Forwarded-Proto") == "https") {
 			// Once reached over HTTPS, a browser keeps to it.
 			h.Set("Strict-Transport-Security", "max-age=31536000")
+		}
+		if err := s.refuseOtherPages(r); err != nil {
+			s.fail(rec, r, err)
+			return
 		}
 		if servedByMux(r.URL.Path) {
 			if strings.HasPrefix(r.URL.Path, "/api/") {

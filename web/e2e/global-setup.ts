@@ -13,7 +13,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, expect, type FullConfig } from "@playwright/test";
-import { AGENT, BINARY, OWNER, quadit, type Run, WORKSPACE } from "./run";
+import { AGENT, BINARY, fromOwnPage, OWNER, quadit, type Run, WORKSPACE } from "./run";
 
 export default async function globalSetup(config: FullConfig) {
   if (!existsSync(BINARY)) {
@@ -89,13 +89,17 @@ async function firstRun(url: string, dir: string, headless: boolean): Promise<Ru
     await expect(page).toHaveURL(new RegExp(`/${WORKSPACE.slug}(/|$)`));
     const storageState = join(dir, "owner.json");
     await page.context().storageState({ path: storageState });
-    const made = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/tokens`, { data: { name: "e2e" } });
+    const made = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/tokens`, {
+      data: { name: "e2e" },
+      headers: fromOwnPage(url),
+    });
     if (!made.ok()) throw new Error(`token: ${made.status()} ${await made.text()}`);
     const { token } = (await made.json()) as { token: string };
     const run = { url, dir: resolve(dir) };
     await quadit(run, token, ["do", "agent.create", JSON.stringify(AGENT)]);
     const agentMade = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/tokens`, {
       data: { name: "e2e", user: `@${AGENT.handle}` },
+      headers: fromOwnPage(url),
     });
     if (!agentMade.ok()) throw new Error(`agent token: ${agentMade.status()} ${await agentMade.text()}`);
     const { token: agentToken } = (await agentMade.json()) as { token: string };

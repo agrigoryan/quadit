@@ -13,7 +13,7 @@ quadit serve --data /var/lib/quadit --url https://quadit.example.com
 | `--listen` | `QUADIT_LISTEN` | `:4780` | Address to listen on |
 | `--data` | `QUADIT_DATA` | `./data` | Database, files, backups, the install secret |
 | `--db` | `QUADIT_DB` | `quadit.sqlite` in the data directory | A SQLite path, or a `postgres://` URL |
-| `--url` | `QUADIT_BASE_URL` | `http://localhost:4780` | The address people use. Links in mail, passkeys and file addresses need it right |
+| `--url` | `QUADIT_BASE_URL` | `http://localhost:4780` | The address people use. Links in mail, passkeys and file addresses need it right, and so does a change made in a browser too old to say which page it comes from: a write sent with the sign-in cookie is taken only from the server's own pages |
 | | `QUADIT_SECRET` | a file made in the data directory | Encrypts stored secrets (mail password, storage keys, integration tokens). Keep it with your backups |
 | `--log-json` | `QUADIT_LOG=json` | text | Structured logs |
 | `--allow-private-networks` | `QUADIT_ALLOW_PRIVATE_NETWORKS` | none | Networks off the public internet the server may call for its users, e.g. `192.168.1.0/24,10.0.0.5` ([below](#addresses-users-give)) |

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"net/http"
-	"net/http/cookiejar"
 	"slices"
 	"strings"
 	"sync"
@@ -210,8 +208,7 @@ func readsSiteWithLog(t *testing.T, st store.Store) (*site, *readsLog) {
 	ctx, stop := context.WithCancel(context.Background())
 	go srv.Run(ctx)
 	t.Cleanup(func() { stop(); hs.Close() })
-	jar, _ := cookiejar.New(nil)
-	s := &site{t: t, url: base, dir: dir, owner: &http.Client{Jar: jar}, srv: srv}
+	s := &site{t: t, url: base, dir: dir, owner: browser(), srv: srv}
 	s.call(s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
 		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
 	return s, logs

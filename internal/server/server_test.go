@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/netip"
 	"strings"
@@ -67,8 +66,7 @@ func newSiteWith(t *testing.T, st store.Store, configure func(*server.Config)) *
 	}()
 	stopRun := func() { stop(); <-ran }
 	t.Cleanup(func() { stopRun(); hs.Close() })
-	jar, _ := cookiejar.New(nil)
-	s := &site{t: t, url: base, dir: dir, owner: &http.Client{Jar: jar}, srv: srv, stopRun: stopRun}
+	s := &site{t: t, url: base, dir: dir, owner: browser(), srv: srv, stopRun: stopRun}
 	s.call(s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
 		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
 	return s
@@ -247,8 +245,7 @@ func TestAPI(t *testing.T) {
 		s.call(nil, ro.Token, "GET", "/api/v1/w/-/me", nil, 401, nil)
 
 		// Signing in: wrong password, then right.
-		jar, _ := cookiejar.New(nil)
-		hc := &http.Client{Jar: jar}
+		hc := browser()
 		s.call(hc, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "wrong"}, 401, nil)
 		s.call(hc, "", "POST", "/api/v1/auth/login", M{"email": "Owner@Example.com", "password": "correct-horse-battery"}, 200, nil)
 		s.call(hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)

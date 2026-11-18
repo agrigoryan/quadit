@@ -1,9 +1,11 @@
 package server_test
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -20,9 +22,35 @@ import (
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
 
+// browser is a client that keeps cookies and sends what the web app does
+// from the server's own pages: the browser says the request comes from
+// there (Sec-Fetch-Site), and a body that is JSON says so (Content-Type),
+// unless a test says otherwise. A file's bytes go with no type.
 func browser() *http.Client {
 	jar, _ := cookiejar.New(nil)
-	return &http.Client{Jar: jar}
+	return &http.Client{Jar: jar, Transport: ownPage{}}
+}
+
+// ownPage stamps a request as the web app's script on one of the server's
+// own pages makes it.
+type ownPage struct{}
+
+func (ownPage) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	if r.Header.Get("Sec-Fetch-Site") == "" {
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+	}
+	if r.Body != nil && r.Body != http.NoBody && r.Header.Get("Content-Type") == "" {
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			return nil, err
+		}
+		r.Body = io.NopCloser(bytes.NewReader(raw))
+		if json.Valid(raw) {
+			r.Header.Set("Content-Type", "application/json")
+		}
+	}
+	return http.DefaultTransport.RoundTrip(r)
 }
 
 func TestSecondStepInvitesAndSettings(t *testing.T) {
