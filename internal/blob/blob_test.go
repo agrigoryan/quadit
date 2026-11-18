@@ -115,6 +115,35 @@ func TestMoveAndLayers(t *testing.T) {
 	}
 }
 
+// movedMeanwhile is an old store whose file is moved to the new one just as
+// it is looked for, between the layered store's two looks.
+type movedMeanwhile struct {
+	Store
+	to Store
+}
+
+func (m movedMeanwhile) Open(ctx context.Context, key string) (io.ReadSeekCloser, time.Time, error) {
+	if _, err := Move(ctx, m.Store, m.to); err != nil {
+		return nil, time.Time{}, err
+	}
+	return m.Store.Open(ctx, key)
+}
+
+func TestALayeredStoreFindsAFileMovedWhileItLooks(t *testing.T) {
+	ctx := context.Background()
+	disk, _ := NewDisk(t.TempDir())
+	b := memblob.OpenBucket(nil)
+	defer b.Close()
+	cloud := FromBucket(b, "s3", "")
+	disk.Put(ctx, "ws/old", strings.NewReader("old file"), "")
+	both := Layered{Primary: cloud, Old: movedMeanwhile{Store: disk, to: cloud}}
+	r, _, err := both.Open(ctx, "ws/old")
+	if err != nil {
+		t.Fatalf("a file moved while it was looked for: %v", err)
+	}
+	r.Close()
+}
+
 // TestRealBuckets runs the same checks against real services. Each is on
 // when its variable holds the store's settings as JSON, as the admin area
 // saves them:

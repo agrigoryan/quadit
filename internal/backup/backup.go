@@ -258,7 +258,7 @@ func (aw *archiveWriter) addFiles(ctx context.Context, st store.Store, files blo
 	}
 	slices.Sort(keys)
 	for _, key := range keys {
-		r, err := openStored(ctx, files, key)
+		r, _, err := files.Open(ctx, key)
 		if errors.Is(err, blob.ErrNotFound) {
 			named, err := st.Count(ctx, "files", store.Either(store.Eq("storage_key", key), store.Eq("preview_key", key)))
 			if err != nil {
@@ -280,17 +280,6 @@ func (aw *archiveWriter) addFiles(ctx context.Context, st store.Store, files blo
 		}
 	}
 	return nil
-}
-
-// openStored opens a stored file, and looks once more when it is not
-// found: an install moving its files from disk to the cloud may have moved
-// it between the two looks a layered store takes.
-func openStored(ctx context.Context, files blob.Store, key string) (io.ReadSeekCloser, error) {
-	r, _, err := files.Open(ctx, key)
-	if errors.Is(err, blob.ErrNotFound) {
-		r, _, err = files.Open(ctx, key)
-	}
-	return r, err
 }
 
 // addStored writes one stored file as a member.

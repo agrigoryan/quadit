@@ -189,11 +189,17 @@ func (l Layered) Put(ctx context.Context, key string, r io.Reader, ct string) er
 }
 
 // Open reads from the primary store, or from the old one when the primary
-// has nothing under key.
+// has nothing under key. A key neither has is looked for once more in the
+// primary: a move (Move) may have taken it there between the two looks, so
+// ErrNotFound means the key is truly gone.
 func (l Layered) Open(ctx context.Context, key string) (io.ReadSeekCloser, time.Time, error) {
 	r, t, err := l.Primary.Open(ctx, key)
+	if !errors.Is(err, ErrNotFound) {
+		return r, t, err
+	}
+	r, t, err = l.Old.Open(ctx, key)
 	if errors.Is(err, ErrNotFound) {
-		return l.Old.Open(ctx, key)
+		return l.Primary.Open(ctx, key)
 	}
 	return r, t, err
 }
