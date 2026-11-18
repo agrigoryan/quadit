@@ -141,9 +141,9 @@ describe("in the desktop app", () => {
     expect(setBadge).toHaveBeenLastCalledWith(1, "w");
     streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty" }));
     expect(setBadge).toHaveBeenLastCalledWith(2, "w");
-    // Leaving the workspace, or signing out, takes this window's count off.
+    // Signing out takes this window's count off: it shows no workspace.
     unmount();
-    expect(setBadge).toHaveBeenLastCalledWith(0, "w");
+    expect(setBadge).toHaveBeenLastCalledWith(0);
   });
 
   it("names each notification by its inbox item, so the app shows it once however many windows hear it", () => {

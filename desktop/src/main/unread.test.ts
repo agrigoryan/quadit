@@ -41,16 +41,26 @@ describe("Unread", () => {
     expect(badge.count).toBe(7);
   });
 
-  it("takes off only the contribution of a window that leaves its workspace or closes", () => {
+  it("takes a report of 0 as the workspace's count, not as a window's word taken back", () => {
+    const { one, unread } = setUp();
+    unread.report(one, 1, "acme", 7);
+    unread.report(one, 2, "acme", 7);
+    // Everything read: the newest report says so, and the older 7 is out of date.
+    unread.report(one, 1, "acme", 0);
+    expect(badge.count).toBe(0);
+  });
+
+  it("takes off a window's count when it leaves its workspace, shows none, or closes", () => {
     const { one, unread } = setUp();
     unread.report(one, 1, "acme", 7);
     unread.report(one, 2, "games", 2);
     unread.report(one, 3, "acme", 7);
-    // Window 2 leaves games: acme stays.
-    unread.report(one, 2, "games", 0);
+    // Window 2 goes over to acme: its games goes with it.
+    unread.report(one, 2, "acme", 7);
     expect(badge.count).toBe(7);
-    // Window 1 closes: window 3 still reports acme.
-    unread.forget(1);
+    // Window 1 shows no workspace (signed out, say), window 2 closes: window 3 still reports acme.
+    unread.report(one, 1, "", 0);
+    unread.forget(2);
     expect(badge.count).toBe(7);
     unread.forget(3);
     expect(badge.count).toBe(0);

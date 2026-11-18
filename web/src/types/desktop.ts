@@ -12,9 +12,10 @@ export interface QuaditDesktop {
    */
   notify(n: { title: string; body: string; path: string; tag?: string; id?: string }): void;
   /**
-   * The unread count of `workspace` (its id) as this window sees it; 0 takes
-   * this window's count off. The app adds up each workspace once, and the
-   * servers, for its dock and tray badge.
+   * The unread count of `workspace` (its id), the one this window shows; 0
+   * is a count like any other. Without a workspace, the window shows none
+   * and its count is taken off. The app counts each workspace once (its
+   * newest report), and adds up the servers, for its dock and tray badge.
    */
   setBadge(count: number, workspace?: string): void;
 }

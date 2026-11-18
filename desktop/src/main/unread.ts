@@ -2,8 +2,10 @@
 // it shows, through the bridge, and the app shows the sum on the dock icon
 // (the taskbar where the system has a badge) and beside the menu-bar icon,
 // whose menu opens a server. A server's count is the sum of its workspaces,
-// each counted once however many windows show it; a window that leaves a
-// workspace or closes takes off only what it reported.
+// each counted once however many windows show it: a workspace's count is the
+// newest report of it, 0 included. A window shows one workspace at a time,
+// so what it reported goes when it reports another, reports none, or its
+// page goes away; another window's report of the same workspace then counts.
 
 import { app, Menu, nativeImage, Tray } from "electron";
 import type { ServerStore } from "@/main/servers";
@@ -16,11 +18,8 @@ export interface UnreadSetup {
 }
 
 export class Unread {
-  /**
-   * Per server, per workspace, what each reporter (a web contents, by id)
-   * said, in the order said: the last is the newest, and the workspace's count.
-   */
-  private counts = new Map<string, Map<string, Map<number, number>>>();
+  /** Each reporter's (a web contents, by id) last report, oldest first: a newer report of a workspace outweighs an older one. */
+  private reports = new Map<number, { serverId: string; workspace: string; count: number }>();
   private tray: Tray | undefined;
 
   constructor(
@@ -28,7 +27,7 @@ export class Unread {
     private setup: UnreadSetup,
   ) {
     store.onChange(() => {
-      for (const id of this.counts.keys()) if (!store.get(id)) this.counts.delete(id);
+      for (const [reporter, { serverId }] of this.reports) if (!store.get(serverId)) this.reports.delete(reporter);
       this.render();
     });
   }
@@ -42,40 +41,36 @@ export class Unread {
     this.render();
   }
 
-  /** What `reporter` says `workspace` of the server has unread now; 0 takes its word back. */
+  /**
+   * `reporter` shows `workspace` of the server, which has `count` unread now
+   * (0 is a count like any other). An empty `workspace` is none: what the
+   * reporter said before is taken back.
+   */
   report(serverId: string, reporter: number, workspace: string, count: number) {
-    let workspaces = this.counts.get(serverId);
-    if (!workspaces) this.counts.set(serverId, (workspaces = new Map()));
-    let reporters = workspaces.get(workspace);
-    if (!reporters) workspaces.set(workspace, (reporters = new Map()));
-    reporters.delete(reporter);
-    if (count > 0) reporters.set(reporter, count);
-    if (reporters.size === 0) workspaces.delete(workspace);
+    this.reports.delete(reporter);
+    if (workspace) this.reports.set(reporter, { serverId, workspace, count });
     this.render();
   }
 
-  /** Takes back everything `reporter` said: its page went away. */
+  /** Takes back what `reporter` said: its page went away. */
   forget(reporter: number) {
-    let changed = false;
-    for (const workspaces of this.counts.values()) {
-      for (const [workspace, reporters] of workspaces) {
-        changed = reporters.delete(reporter) || changed;
-        if (reporters.size === 0) workspaces.delete(workspace);
-      }
-    }
-    if (changed) this.render();
+    if (this.reports.delete(reporter)) this.render();
   }
 
   /** A server's count: each workspace's newest report, added up. */
   of(serverId: string): number {
+    const workspaces = new Map<string, number>();
+    for (const report of this.reports.values()) {
+      if (report.serverId === serverId) workspaces.set(report.workspace, report.count);
+    }
     let sum = 0;
-    for (const reporters of this.counts.get(serverId)?.values() ?? []) sum += [...reporters.values()].at(-1) ?? 0;
+    for (const count of workspaces.values()) sum += count;
     return sum;
   }
 
   get total(): number {
     let sum = 0;
-    for (const serverId of this.counts.keys()) sum += this.of(serverId);
+    for (const server of this.store.list()) sum += this.of(server.id);
     return sum;
   }
 

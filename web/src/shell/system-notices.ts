@@ -36,14 +36,15 @@ export function useSystemNotices() {
     if ("setAppBadge" in navigator) void navigator.setAppBadge(unread).catch(() => {});
   }, [unread, workspace]);
 
-  // Leaving the workspace, or signing out, takes this window's count off the icon.
+  // The shell going (signing out, say) takes this window's count off the icon: it shows no workspace now.
+  // Going to another workspace needs nothing more: the app takes that workspace's report as this window's.
   useEffect(() => {
     const desktop = window.quaditDesktop;
     return () => {
-      desktop?.setBadge(0, workspace);
+      desktop?.setBadge(0);
       if ("clearAppBadge" in navigator) void navigator.clearAppBadge().catch(() => {});
     };
-  }, [workspace]);
+  }, []);
 
   useEffect(() => {
     const desktop = window.quaditDesktop;

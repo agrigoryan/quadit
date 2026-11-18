@@ -81,15 +81,15 @@ test("each server's unread count adds up on the dock badge", async ({ desktop, r
   await desktop.addServer(run.other, "Two");
   const two = await desktop.signedIn(run.other);
 
-  await one.evaluate(() => window.quaditDesktop?.setBadge(3));
-  await two.evaluate(() => window.quaditDesktop?.setBadge(4));
+  await one.evaluate(() => window.quaditDesktop?.setBadge(3, "acme"));
+  await two.evaluate(() => window.quaditDesktop?.setBadge(4, "acme"));
   await expect.poll(() => desktop.badge()).toBe(7);
 
-  // Nonsense is ignored; 0 clears.
-  await two.evaluate(() => window.quaditDesktop?.setBadge(Number.NaN));
-  await two.evaluate(() => window.quaditDesktop?.setBadge("lots" as unknown as number));
+  // Nonsense is ignored; 0 is a count.
+  await two.evaluate(() => window.quaditDesktop?.setBadge(Number.NaN, "acme"));
+  await two.evaluate(() => window.quaditDesktop?.setBadge("lots" as unknown as number, "acme"));
   await expect.poll(() => desktop.badge()).toBe(7);
-  await one.evaluate(() => window.quaditDesktop?.setBadge(0));
+  await one.evaluate(() => window.quaditDesktop?.setBadge(0, "acme"));
   await expect.poll(() => desktop.badge()).toBe(4);
 
   // A removed server's count leaves the sum.
@@ -100,7 +100,7 @@ test("each server's unread count adds up on the dock badge", async ({ desktop, r
   await expect(list.getByText("Two", { exact: true })).toBeHidden();
 });
 
-test("a server's count adds each workspace once, and a window that closes takes off only its own", async ({
+test("a server's count adds each workspace once at its newest report, and a window that goes takes off only its own", async ({
   desktop,
   run,
 }) => {
@@ -114,14 +114,18 @@ test("a server's count adds each workspace once, and a window that closes takes 
   await main.evaluate(() => window.quaditDesktop?.setBadge(7, "acme"));
   await second.evaluate(() => window.quaditDesktop?.setBadge(2, "games"));
   await expect.poll(() => desktop.badge()).toBe(9);
-  // Both windows on acme: counted once.
+  // The second window goes over to acme: acme counted once, and games went with the window.
   await second.evaluate(() => window.quaditDesktop?.setBadge(7, "acme"));
-  await expect.poll(() => desktop.badge()).toBe(9);
-  // The second window closes: its games goes, acme stays with the first.
-  await second.close();
   await expect.poll(() => desktop.badge()).toBe(7);
-  // The first leaves acme: nothing is left.
+  // Everything in acme read, as the first says last: the second's 7 is out of date.
   await main.evaluate(() => window.quaditDesktop?.setBadge(0, "acme"));
+  await expect.poll(() => desktop.badge()).toBe(0);
+  // A new item, and the second window closes: acme stays with the first.
+  await main.evaluate(() => window.quaditDesktop?.setBadge(1, "acme"));
+  await second.close();
+  await expect.poll(() => desktop.badge()).toBe(1);
+  // The first shows no workspace (signed out): nothing is left.
+  await main.evaluate(() => window.quaditDesktop?.setBadge(0));
   await expect.poll(() => desktop.badge()).toBe(0);
 });
 
