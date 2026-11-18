@@ -15,7 +15,8 @@ import { Badge } from "@/ui/badge";
 
 const tokensKey = (slug: string) => [...inWorkspace(slug), "tokens"] as const;
 
-const tokensChanged = (slug: string) => queryClient.invalidateQueries({ queryKey: tokensKey(slug) });
+/** Asks for the token list again, after a token was made or revoked. */
+export const tokensChanged = (slug: string) => queryClient.invalidateQueries({ queryKey: tokensKey(slug) });
 
 /**
  * The tokens issued to one member of this workspace. The server lists them
@@ -44,7 +45,7 @@ export function useRevokeToken() {
 /** What the server answers when a token is made: the token itself, this once, and its row in the list. */
 export interface CreatedToken {
   token: string;
-  info: { name: string };
+  info: Pick<Token, "id" | "name">;
 }
 
 /** What the dialog holds while a token is being described. The page's fields show it and change it. */

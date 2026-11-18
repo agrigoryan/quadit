@@ -15,6 +15,8 @@ import { TrashPage } from "@/pages/trash";
 import { insightPaths } from "@/insights/paths";
 import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
 import { SequenceHint, useSequences } from "@/shell/sequences";
+import { useDesktopRequests } from "@/shell/desktop-requests";
+import { useDesktopSummary } from "@/shell/desktop-summary";
 import { useSystemNotices } from "@/shell/system-notices";
 import { usePageFocus } from "@/shell/page-focus";
 import { NotFoundPage } from "@/ui/not-found";
@@ -90,6 +92,13 @@ function Part({ on, children }: { on: string | boolean; children: ReactNode }) {
  * thing at a time: there the task always covers the screen, with its
  * project's list behind it when it was opened bare.
  */
+/** What only a window of the desktop app does: tell the app about the workspace, and answer what the person asks of it there. */
+function DesktopBridge() {
+  useDesktopSummary();
+  useDesktopRequests();
+  return null;
+}
+
 export function Shell() {
   const slug = useStore((s) => s.slug);
   const location = useLocation();
@@ -183,6 +192,7 @@ export function Shell() {
       <MemberMention value={memberCard}>
         <div className="flex h-dvh overflow-hidden">
           <UndoKeys />
+          {window.quaditDesktop && <DesktopBridge />}
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <TopBar onNewTask={mayCreate ? openNewTask : undefined} />

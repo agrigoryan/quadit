@@ -1,10 +1,12 @@
 // What can be done to inbox items. Each shows at once and is sent as the
-// `notification.read` change (internal/engine/ch_inbox.go).
+// `notification.read` change (internal/engine/ch_inbox.go); a reply is a
+// comment where the item was said.
 
 import { send } from "@/data/mutate";
 import { getState } from "@/data/store";
 import { isKey, t } from "@/lib/i18n";
 import { type Batch, sendUndoable } from "@/data/undo";
+import type { Changes } from "@/types/changes.gen";
 import type { Notification } from "@/types/core";
 
 /** "SVA-5 Jump feels floaty" as its key and its title; a title with no key stays whole. */
@@ -24,12 +26,25 @@ export const anchorOf = (item: Notification): string | undefined =>
   item.entity_type === "decision" && item.entity_id ? `decision-${item.entity_id}` : undefined;
 
 /** The batch that marks items read, or unread again. */
-const reading = (ids: string[], read: boolean): Batch => ({
+export const reading = (ids: string[], read: boolean): Batch => ({
   changes: [{ type: "notification.read", args: read ? { ids } : { ids, unread: true } }],
   show: (tx) => {
     for (const id of ids) tx.patch("notifications", id, { read_at: read ? Date.now() : null });
   },
 });
+
+/**
+ * Where a reply to an item goes: the thread of the comment it is about, else
+ * its task or its page. Undefined for an item that is not something said to
+ * the person, or said nowhere a reply can go.
+ */
+export function replyPlace(item: Notification): Pick<Changes["comment.create"], "parent" | "task" | "doc"> | undefined {
+  if (item.type !== "mentioned" && item.type !== "replied" && item.type !== "comment") return undefined;
+  if (item.entity_type === "comment" && item.entity_id) return { parent: item.entity_id };
+  if (item.task_id) return { task: item.task_id };
+  if (item.doc_id) return { doc: item.doc_id };
+  return undefined;
+}
 
 /** Marks items read or unread; undone, the ones it changed go back. */
 function setRead(ids: string[], read: boolean) {

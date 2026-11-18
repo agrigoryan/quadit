@@ -8,6 +8,7 @@ import { after } from "@/lib/rank";
 import type { FileRole } from "@/decisions/data";
 import { getRows } from "@/data/selectors";
 import { getState } from "@/data/store";
+import type { Batch } from "@/data/undo";
 import type { Decision, FileRow, Outcome } from "@/types/core";
 
 const meId = () => getState().me?.user_id ?? "";
@@ -19,25 +20,33 @@ export interface Answer {
   note?: string;
 }
 
-/** Answers an open decision. The first answer stands; the server refuses a second. */
-export function pick(decision: Decision, answer: Answer) {
+/** The change that answers an open decision, and how the answer shows. The first answer stands; the server refuses a second. */
+export function answering(decision: Decision, answer: Answer): Batch {
   const outcome: Outcome = answer.outcome ?? "as_is";
   const note = answer.note?.trim() ?? "";
   const args: Changes["decision.pick"] = { id: decision.id };
   if (answer.option) args.option = answer.option;
   if (answer.outcome) args.outcome = answer.outcome;
   if (note) args.note = note;
-  send({ type: "decision.pick", args }, (tx) =>
-    tx.patch("decisions", decision.id, {
-      state: outcome === "none" || outcome === "declined" ? "sent_back" : "picked",
-      picked_option_id: answer.option ?? null,
-      outcome,
-      outcome_note: note || null,
-      decided_by: meId(),
-      decided_at: Date.now(),
-      unclear_note: null,
-    }),
-  );
+  return {
+    changes: [{ type: "decision.pick", args }],
+    show: (tx) =>
+      tx.patch("decisions", decision.id, {
+        state: outcome === "none" || outcome === "declined" ? "sent_back" : "picked",
+        picked_option_id: answer.option ?? null,
+        outcome,
+        outcome_note: note || null,
+        decided_by: meId(),
+        decided_at: Date.now(),
+        unclear_note: null,
+      }),
+  };
+}
+
+/** Answers an open decision; a refusal is shown. */
+export function pick(decision: Decision, answer: Answer) {
+  const batch = answering(decision, answer);
+  send(batch.changes, batch.show);
 }
 
 /** The asker says the answer does not settle it: the decision opens again for whoever answered. */

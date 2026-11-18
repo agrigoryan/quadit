@@ -146,6 +146,14 @@ export const common = {
   "top.shortcuts": "Keyboard shortcuts",
   "top.signOut": "Sign out",
 
+  "desktop.markRead": "Mark read",
+  "desktop.reply": "Reply",
+  "desktop.gone": "That is not in this workspace any more.",
+  "desktop.noReply": "Write a reply first.",
+  "desktop.noProject": "There is no such project in this workspace.",
+  "desktop.taskNeedsProject": "A task needs a project.",
+  "desktop.unknown": "This window does not know that button. Reload it, then try again.",
+
   "conn.down": "Reconnecting…",
   "conn.downHint": "Live updates are paused. What you see may be out of date until the connection is back.",
   "conn.unsent": "{n} change waiting to send | {n} changes waiting to send",

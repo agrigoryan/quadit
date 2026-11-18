@@ -59,7 +59,7 @@ beforeEach(() => {
   seq = 10;
   notify = vi.fn();
   setBadge = vi.fn();
-  desktop = { version: "0.1.0", notify, setBadge };
+  desktop = { version: "0.1.0", notify, setBadge, publish: vi.fn(), onRequest: vi.fn() };
   useSession.setState({ status: "in", user: { id: "u1", name: "Ann" } as User });
   loadBootstrap("acme", {
     seq: 10,
@@ -71,6 +71,22 @@ beforeEach(() => {
       { user_id: "u2", name: "Bea", handle: "bea" },
     ] as Member[],
     tasks: [{ id: "t1", key: "SVA-5", title: "Jump feels floaty" }],
+    decisions: [
+      {
+        id: "d1",
+        task_id: "t1",
+        kind: "choice",
+        question: "Which jump?",
+        state: "open",
+        asked_id: "u1",
+        options: ["Higher", "Longer", "Floatier", "Heavier"].map((label, i) => ({
+          id: `o${i}`,
+          decision_id: "d1",
+          label,
+          rank: `${i}`,
+        })),
+      },
+    ],
     notifications: [{ id: "n1", user_id: "u1", seq: 5, type: "comment", actor_id: "u2", created_at: 1 }],
   });
 });
@@ -109,6 +125,7 @@ describe("in the desktop app", () => {
           path: "/acme/task/SVA-5",
           tag: "t1",
           id: "n11",
+          actions: [{ label: "Mark read", request: "read:n11" }],
         },
       ],
       [
@@ -118,6 +135,12 @@ describe("in the desktop app", () => {
           path: "/acme/task/SVA-5#decision-d1",
           tag: "t1",
           id: "n13",
+          // As many of the question's options as there is room for, each answering it.
+          actions: [
+            { label: "Higher", request: "pick:d1:o0" },
+            { label: "Longer", request: "pick:d1:o1" },
+            { label: "Floatier", request: "pick:d1:o2" },
+          ],
         },
       ],
     ]);
@@ -127,6 +150,20 @@ describe("in the desktop app", () => {
     renderHook(() => useSystemNotices());
     streamed(created({ type: "mentioned", doc_id: "p1", title: "Design notes" }), created({ type: "comment" }));
     expect(notify.mock.calls.map(([n]) => n.path)).toEqual(["/acme/docs/p1", "/acme/inbox"]);
+  });
+
+  it("offers a reply where something was said to me, in the thread it was said in", () => {
+    renderHook(() => useSystemNotices());
+    streamed(
+      created({ type: "replied", task_id: "t1", entity_type: "comment", entity_id: "c9" }),
+      created({ type: "mentioned", doc_id: "p1", entity_type: "doc", entity_id: "p1" }),
+      created({ type: "assigned", task_id: "t1" }),
+    );
+    expect(notify.mock.calls.map(([n]) => [n.reply, n.actions])).toEqual([
+      [{ placeholder: "Reply", request: "reply:n11" }, [{ label: "Mark read", request: "read:n11" }]],
+      [{ placeholder: "Reply", request: "reply:n12" }, [{ label: "Mark read", request: "read:n12" }]],
+      [undefined, [{ label: "Mark read", request: "read:n13" }]],
+    ]);
   });
 
   it("tells nothing when the person turned push off", () => {

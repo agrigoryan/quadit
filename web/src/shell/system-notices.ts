@@ -13,15 +13,16 @@
 
 import { useEffect } from "react";
 import { useSession } from "@/auth/session";
-import { getRowEvenIfGone, useUnreadCount, useWorkspaceId } from "@/data/selectors";
+import { getRow, getRowEvenIfGone, useUnreadCount, useWorkspaceId } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { onStreamEvents } from "@/data/sync";
 import { docPath } from "@/docs/area";
 import { isKey, t } from "@/lib/i18n";
 import { taskPath } from "@/nav/task-link";
 import { anchorOf, splitTitle } from "@/pages/inbox-actions";
+import { pickAction, readAction, replyBox } from "@/shell/desktop-requests";
 import type { Notification } from "@/types/core";
-import type { QuaditDesktop } from "@/types/desktop";
+import type { DesktopAction, DesktopNotification } from "@/types/desktop";
 
 /** Keeps the computer told about the workspace open in the shell, for as long as the shell is on screen. */
 export function useSystemNotices() {
@@ -62,8 +63,13 @@ export function useSystemNotices() {
   }, []);
 }
 
-/** What the desktop app shows for an inbox item, and the address a click opens: its task, the page it is about, or the inbox. */
-function noticeOf(item: Notification): Parameters<QuaditDesktop["notify"]>[0] {
+/**
+ * What the desktop app shows for an inbox item, and the address a click
+ * opens: its task, the page it is about, or the inbox. Its buttons answer a
+ * question asked of me with one of its options, and mark the item read; a
+ * mention, a reply or a comment can be answered in place.
+ */
+function noticeOf(item: Notification): DesktopNotification {
   const { slug } = getState();
   // Named even when gone, as push names them: the actor who left, the task in the trash. Nobody known, no name.
   const who = getRowEvenIfGone("members", item.actor_id)?.name ?? "";
@@ -82,5 +88,18 @@ function noticeOf(item: Notification): Parameters<QuaditDesktop["notify"]>[0] {
     tag: (item.task_id ?? "") + (item.doc_id ?? "") || undefined,
     // The app shows an item once, however many of its windows hear it.
     id: item.id,
+    actions: [...optionsOf(item), readAction(item)].slice(0, NOTICE_ACTIONS_MAX),
+    reply: replyBox(item),
   };
+}
+
+/** The app shows at most this many buttons on a notification. */
+const NOTICE_ACTIONS_MAX = 3;
+
+/** A button for each option of the question an item asks me, as far as the notification has room. */
+function optionsOf(item: Notification): DesktopAction[] {
+  if (item.type !== "decision_asked") return [];
+  const decision = getRow("decisions", item.entity_id);
+  if (decision?.state !== "open") return [];
+  return (decision.options ?? []).map((option) => pickAction(decision, option));
 }
