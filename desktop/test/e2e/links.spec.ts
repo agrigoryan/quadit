@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { expect, test } from "./desktop";
+import type { HandoffEvent } from "./handoff-fake";
 import { quadit } from "./run";
 
 test("a link to another site opens in the system browser, and the window stays on the server", async ({
@@ -42,10 +43,10 @@ test("window.open: the server's own pages open in another app window, other site
 });
 
 test("leaving the sign-in page for a sign-in provider starts the browser sign-in instead", async ({ desktop, run }) => {
-  test.skip(run.server !== run.fake, "uses the stand-in's provider redirect");
-  const page = await desktop.addServer(run.server);
+  // The stand-in, for its provider start (/__fake/provider).
+  const page = await desktop.addServer(run.fake);
   await expect(page).toHaveURL(/\/login/);
-  const connect = expect.stringMatching(new RegExp(`^${run.server}/desktop/connect\\?`));
+  const connect = expect.stringMatching(new RegExp(`^${run.fake}/desktop/connect\\?`));
 
   // A link straight to the provider…
   await page.evaluate(() => (location.href = "https://accounts.example.com/o/oauth2/auth?client_id=x"));
@@ -103,34 +104,41 @@ test("a frame in a server's page stays on the server's pages, and away from the 
   desktop,
   run,
 }) => {
-  await desktop.addServer(run.server);
-  await desktop.signedIn(run.server);
-  // The navigations a frame of the page starts, as Electron reports them to the app before they begin.
-  const stopped = await desktop.app.evaluate(
-    ({ BrowserWindow }, { origin, urls }) => {
-      const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().startsWith(origin));
-      return urls.map((url) => {
-        let prevented = false;
-        win?.webContents.emit("will-frame-navigate", {
-          url,
-          isMainFrame: false,
-          preventDefault: () => (prevented = true),
-        });
-        return prevented;
+  // A page of the stand-in's without the server's policy, which would refuse a frame of another site before the
+  // app is asked: here the frames the page makes reach the app's own rule, as on a server with a hole in it.
+  const page = await desktop.addServer(run.fake);
+  await page.goto(`${run.fake}/__fake/blank`);
+  // The app's answer to each frame's navigation, read after its own listener has given it.
+  await desktop.app.evaluate(({ BrowserWindow }, origin) => {
+    const answers: Record<string, string> = {};
+    Object.assign(globalThis, { frameAnswers: answers });
+    BrowserWindow.getAllWindows()
+      .find((w) => w.webContents.getURL().startsWith(origin))
+      ?.webContents.on("will-frame-navigate", (event) => {
+        if (!event.isMainFrame) answers[event.url] = event.defaultPrevented ? "stopped" : "let through";
       });
-    },
-    {
-      origin: run.server,
-      urls: [
-        `${run.server}/desktop/finish?code=Z&verifier=V`,
-        `${run.other}/e2e`,
-        "https://example.com/",
-        `${run.server}/e2e/inbox`,
-        "about:srcdoc",
-      ],
-    },
-  );
-  expect(stopped).toEqual([true, true, true, false, false]);
-  // Nothing was handed to the system browser: a frame opens nothing by itself.
+  }, run.fake);
+  const handoffLog = async () => (await (await fetch(`${run.fake}/__fake/log`)).json()) as HandoffEvent[];
+  const before = (await handoffLog()).length;
+  const finish = `${run.fake}/desktop/finish?code=Z&verifier=V`;
+  const own = `${run.fake}/e2e/inbox`;
+  for (const src of [finish, `${run.direct}/e2e`, "https://example.com/", own]) {
+    await page.evaluate(
+      (url) => document.body.append(Object.assign(document.createElement("iframe"), { src: url })),
+      src,
+    );
+  }
+  await expect
+    .poll(() =>
+      desktop.app.evaluate(() => (globalThis as unknown as { frameAnswers: Record<string, string> }).frameAnswers),
+    )
+    .toEqual({
+      [finish]: "stopped",
+      [`${run.direct}/e2e`]: "stopped",
+      "https://example.com/": "stopped",
+      [own]: "let through",
+    });
+  // The finish was never asked for, and nothing was handed to the system browser: a frame opens nothing by itself.
+  expect((await handoffLog()).slice(before)).toEqual([]);
   expect((await desktop.recorded()).opened).toEqual([]);
 });

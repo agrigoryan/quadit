@@ -19,7 +19,11 @@ const BINARY = join(APP, "Contents/MacOS/Quadit");
 const ON = "1".charCodeAt(0);
 const OFF = "0".charCodeAt(0);
 
-test.skip(process.platform !== "darwin" || !existsSync(BINARY), "no packaged app: run pnpm dist first");
+// On CI (desktop-ci.yml packages the app first) a missing app fails the tests rather than skipping them.
+test.skip(
+  process.platform !== "darwin" || (!existsSync(BINARY) && !process.env.CI),
+  "no packaged app: run pnpm dist first",
+);
 
 /** Starts the packaged app on a data folder of its own (holding `servers` when given), with `args` and `env`. */
 function start(

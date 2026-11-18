@@ -75,13 +75,16 @@ test("a server over plain http elsewhere is added only when the person says so",
 });
 
 test("an older Quadit without the hand-off is added, and says to sign in with a password", async ({ desktop, run }) => {
-  // The real server's own address: until the server side lands, it has no /api/v1/version.
-  const version = await fetch(`${run.direct}/api/v1/version`);
-  test.skip(version.ok, "the server speaks the hand-off already");
-  await desktop.addServer(run.direct, "Old");
-  const list = await desktop.serverList();
-  await expect(list.getByText(/This server is older than the app/)).toBeVisible();
-  await expect(list.getByRole("button", { name: "Sign in to Old with your browser" })).toBeDisabled();
+  // The stand-in as a Quadit from before the desktop app: it has no /api/v1/version.
+  await fetch(`${run.fake}/__fake/handoff?version=0`);
+  try {
+    await desktop.addServer(run.fake, "Old");
+    const list = await desktop.serverList();
+    await expect(list.getByText(/This server is older than the app/)).toBeVisible();
+    await expect(list.getByRole("button", { name: "Sign in to Old with your browser" })).toBeDisabled();
+  } finally {
+    await fetch(`${run.fake}/__fake/handoff?version=1`);
+  }
 });
 
 test("at start the app asks each server again, says when one became too new for it, and starts no sign-in there", async ({

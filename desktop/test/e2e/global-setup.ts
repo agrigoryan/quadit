@@ -5,9 +5,9 @@
 // (handoff-fake.ts). Everything is handed to the tests through
 // QUADIT_DESKTOP_E2E (see desktop.ts); the function returned stops it all.
 //
-// When the real server already speaks the hand-off (GET /api/v1/version
-// answers), the tests can be pointed at it directly with
-// QUADIT_DESKTOP_REAL_HANDOFF=1, and the stand-in is not used for sign-in.
+// The tests sign in through the real server's own hand-off. With
+// QUADIT_DESKTOP_HANDOFF_STANDIN=1 they sign in through the stand-in's
+// instead, which checks the app against the contract alone.
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -25,12 +25,12 @@ export default async function globalSetup() {
   const dir = await mkdtemp(join(tmpdir(), "quadit-desktop-e2e-"));
   const port = await freePort();
   const direct = `http://127.0.0.1:${port}`;
-  const realHandoff = process.env.QUADIT_DESKTOP_REAL_HANDOFF === "1";
+  const standIn = process.env.QUADIT_DESKTOP_HANDOFF_STANDIN === "1";
   // The stand-in's port must be known before the server starts: it is the server's public address.
   const fake = await startHandoffFake(direct, OWNER);
   const server = spawn(
     binary,
-    ["serve", "--listen", `127.0.0.1:${port}`, "--data", join(dir, "data"), "--url", realHandoff ? direct : fake.url],
+    ["serve", "--listen", `127.0.0.1:${port}`, "--data", join(dir, "data"), "--url", standIn ? fake.url : direct],
     {
       stdio: ["ignore", "ignore", "pipe"],
       // Nothing from the shell that started the run may point it elsewhere.
@@ -72,8 +72,8 @@ export default async function globalSetup() {
     const { token } = (await made.json()) as { token: string };
     const run: Run = {
       direct,
-      server: realHandoff ? direct : fake.url,
-      other: realHandoff ? fake.url : direct,
+      server: standIn ? fake.url : direct,
+      other: standIn ? direct : fake.url,
       fake: fake.url,
       token,
       session: { name, value },

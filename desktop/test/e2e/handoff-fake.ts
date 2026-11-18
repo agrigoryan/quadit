@@ -1,8 +1,12 @@
-// A stand-in for the server side of the desktop contract until the server
-// has it: a proxy in front of a real Quadit server that answers
-// /api/v1/version and the sign-in hand-off (/desktop/connect and
-// /desktop/finish) as the contract says, and passes everything else to the
-// real server untouched (the web app, the API, the live feed).
+// A stand-in for the server side of the desktop contract: a proxy in front
+// of a real Quadit server that answers /api/v1/version and the sign-in
+// hand-off (/desktop/connect and /desktop/finish) as the contract says, and
+// passes everything else to the real server untouched (the web app, the
+// API, the live feed). The tests use it as a second server, and for what
+// the real one cannot be made to do: speak another hand-off version, or
+// none, and redirect to a sign-in provider. With
+// QUADIT_DESKTOP_HANDOFF_STANDIN=1 it is the server the tests sign in to
+// (global-setup.ts).
 //
 // Two shortcuts, both where a test stands in for a person anyway: connect
 // does not ask "Sign in to the Quadit app as …?" but answers at once, and
@@ -14,8 +18,10 @@
 //
 // GET /__fake/log gives what happened, for the tests to check,
 // GET /__fake/handoff?version=N changes the hand-off version it says it
-// speaks (an upgraded server), and GET /__fake/provider redirects to
-// another site, as a sign-in provider's start does.
+// speaks (an upgraded server; 0 is a Quadit from before the desktop app,
+// without /api/v1/version), GET /__fake/provider redirects to another site,
+// as a sign-in provider's start does, and GET /__fake/blank is an empty page
+// with no policy of its own.
 
 import { createHash, randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, request, type Server, type ServerResponse } from "node:http";
@@ -48,6 +54,7 @@ export function startHandoffFake(
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", self);
     if (url.pathname === "/api/v1/version") {
+      if (handoff === 0) return answer(res, 404, "404 page not found");
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ name: "quadit", version: "e2e-fake", surface: "fake", desktop: { handoff } }));
       return;
@@ -60,6 +67,9 @@ export function startHandoffFake(
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(log));
       return;
+    }
+    if (url.pathname === "/__fake/blank") {
+      return answer(res, 200, "<!doctype html><title>Blank</title>", { "content-type": "text/html; charset=utf-8" });
     }
     if (url.pathname === "/__fake/provider") {
       return answer(res, 302, "", { location: "https://accounts.example.com/o/oauth2/auth?client_id=x" });
