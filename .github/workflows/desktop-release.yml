@@ -8,8 +8,9 @@ name: desktop-release
 # macOS is signed and notarized when these secrets are set, and unsigned
 # otherwise: CSC_LINK (the Developer ID Application certificate, a base64
 # .p12) with CSC_KEY_PASSWORD, and APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and
-# APPLE_TEAM_ID for notarization. The Homebrew cask is not pushed from here:
-# desktop/packaging/quadit-desktop.rb is its template.
+# APPLE_TEAM_ID for notarization. Windows is signed when WIN_CSC_LINK and
+# WIN_CSC_KEY_PASSWORD are set, and unsigned otherwise. The Homebrew cask is
+# not pushed from here: desktop/packaging/quadit-desktop.rb is its template.
 on:
   push:
     tags: ["desktop-v*"]
@@ -48,7 +49,10 @@ jobs:
         run: test "desktop-v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      - name: Package
+      # Each system gets its own signing secrets and no other's: given the
+      # Apple certificate, the Windows build would try to sign with it.
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
         shell: bash
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -56,6 +60,17 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
         run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
       - uses: actions/upload-artifact@v4
         with:

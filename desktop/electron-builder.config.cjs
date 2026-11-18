@@ -11,6 +11,10 @@
 //   APPLE_API_KEY + APPLE_API_KEY_ID + APPLE_API_ISSUER   notarization through notarytool
 // With APPLE_TEAM_ID and a certificate, the build also gets the keychain group
 // that Touch ID passkeys need (src/main/main.ts, enablePasskeys).
+//
+// Windows is signed only with a certificate of its own, WIN_CSC_LINK +
+// WIN_CSC_KEY_PASSWORD, and not at all without one: electron-builder would
+// otherwise fall back to CSC_LINK, the Apple certificate.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -76,7 +80,13 @@ module.exports = {
   },
   dmg: { title: "Quadit ${version}" },
 
-  win: { icon: "build/icon.ico", target: [{ target: "nsis", arch: ["x64", "arm64"] }] },
+  win: {
+    icon: "build/icon.ico",
+    target: [{ target: "nsis", arch: ["x64", "arm64"] }],
+    // An empty link is "no certificate": it stops the fallback to CSC_LINK.
+    cscLink: env.WIN_CSC_LINK ?? "",
+    cscKeyPassword: env.WIN_CSC_KEY_PASSWORD ?? "",
+  },
   nsis: { oneClick: false, perMachine: false, allowToChangeInstallationDirectory: true },
 
   linux: {
