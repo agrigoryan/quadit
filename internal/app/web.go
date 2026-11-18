@@ -35,16 +35,20 @@ func WebHandler() http.Handler {
 			w.Header().Set("Cache-Control", "no-cache")
 			// The app runs only its own code and talks only to its own
 			// server; pictures in Markdown may come from elsewhere. Its forms
-			// post only to its own server, and one of them, Continue on the
-			// page that signs the desktop app in (/desktop/connect), is
-			// answered with a redirect to the app, quadit://connect: a browser
-			// holds a form's redirect to form-action too. Every page allows
-			// it, because the app moves between its pages without loading
-			// one: coming back from the sign-in page, the policy in force is
-			// the one /login was loaded with.
+			// post only to its own server. One page more: Continue on the
+			// page that signs the desktop app in is answered with a redirect
+			// to the app, quadit://connect, and a browser holds a form's
+			// redirect to form-action too. Only that page, loaded at its own
+			// address, may send it there; the app reloads it when it got
+			// there from another page (web/src/auth/desktop-connect.tsx),
+			// whose policy would still be in force.
+			formAction := "form-action 'self'"
+			if r.URL.Path == "/desktop/connect" {
+				formAction += " quadit:"
+			}
 			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data:; connect-src 'self'; "+
-				"worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' quadit:")
+				"worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; "+formAction)
 			http.ServeFileFS(w, r, dist, "index.html")
 			return
 		}

@@ -101,6 +101,14 @@ test("a page loaded as the sign-in page hands over too", async ({ page }) => {
   expect(refusals).toEqual([]);
 });
 
+test("only the page that signs the desktop app in may send a form to the app", async ({ request }) => {
+  // Every page's forms post to the server alone; the confirm page, loaded at its own address, may also be sent on to quadit:.
+  const policy = async (path: string) => (await request.get(path)).headers()["content-security-policy"] ?? "";
+  expect(await policy("/login")).toMatch(/form-action 'self'(;|$)/);
+  expect(await policy("/e2e/my-work")).toMatch(/form-action 'self'(;|$)/);
+  expect(await policy("/desktop/connect?state=s&challenge=c")).toMatch(/form-action 'self' quadit:(;|$)/);
+});
+
 test("cancel signs nothing in", async ({ page }) => {
   const flow = newFlow();
   await page.goto("/login");

@@ -6,9 +6,12 @@
 // Nothing happens without the person's Continue: a link alone can open this
 // page. Continue is a plain form post, so the server's answer, a redirect to
 // quadit://connect with a one-time code, is a navigation the browser hands
-// to the app.
+// to the app. Only this page's own policy lets a form be sent on to
+// quadit: (internal/app/web.go), so it always runs in a document loaded at
+// its own address: reached from another page of the app (back from the
+// sign-in page), it loads itself again.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { AuthLayout, FormNotice } from "@/auth/auth-layout";
 import { useAuthConfig } from "@/auth/config";
@@ -20,7 +23,17 @@ import { Button } from "@/ui/button";
 const STATE = /^[A-Za-z0-9_-]{16,128}$/;
 const CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 
+/** Whether the document was loaded at another address than this page's, so that its policy is another page's. */
+function loadedElsewhere(): boolean {
+  const [entry] = performance.getEntriesByType("navigation");
+  return !!entry && new URL(entry.name).pathname !== window.location.pathname;
+}
+
 export function DesktopConnectPage() {
+  const [elsewhere] = useState(loadedElsewhere);
+  useEffect(() => {
+    if (elsewhere) window.location.replace(window.location.href);
+  }, [elsewhere]);
   const [params] = useSearchParams();
   const user = useSession((s) => s.user);
   const install = useAuthConfig()?.name || "Quadit";
@@ -28,6 +41,7 @@ export function DesktopConnectPage() {
   const state = params.get("state") ?? "";
   const challenge = params.get("challenge") ?? "";
 
+  if (elsewhere) return null;
   if (!STATE.test(state) || !CHALLENGE.test(challenge)) {
     return (
       <AuthLayout title={t("auth.desktop.invalidTitle")}>
