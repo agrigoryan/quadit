@@ -273,7 +273,7 @@ func (s *Server) handleStartPasskeySignIn(x *c) error {
 // signs its person in.
 func (s *Server) handleFinishPasskeySignIn(x *c) error {
 	ctx := x.ctx()
-	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), signInsPerIP, signInWindow); err != nil {
+	if err := s.throttle(ctx, "login:ip:"+s.clientIP(x.r), signInsPerIP, signInWindow); err != nil {
 		return err
 	}
 	spent, err := s.useOneTime(ctx, core.OneTimePasskeyLogin, x.r.URL.Query().Get("state"), false)

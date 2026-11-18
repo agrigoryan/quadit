@@ -110,6 +110,10 @@ type Config struct {
 	// imports, GitHub integrations): whoever runs it opens them. None means
 	// public addresses only (package outbound).
 	PrivateNetworks []netip.Prefix
+	// TrustedProxies are the reverse proxies in front of the server: only a
+	// connection from one of them may say whom it forwards for
+	// (X-Forwarded-For). None means the caller is who connected.
+	TrustedProxies []netip.Prefix
 }
 
 // Server holds everything a request needs. New sets every field except
@@ -540,7 +544,7 @@ const selfCallAddr = "127.0.0.1:0"
 func (s *Server) public(h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		x := &c{s: s, w: w, r: r}
-		if err := s.limits.check("ip:"+clientIP(r), limitPerAddress); err != nil {
+		if err := s.limits.check("ip:"+s.clientIP(r), limitPerAddress); err != nil {
 			s.fail(w, r, err)
 			return
 		}
@@ -634,7 +638,7 @@ func (s *Server) identifyByToken(ctx context.Context, x *c, header string, now i
 	}
 	if !there {
 		// Guesses are counted by where they come from.
-		if lerr := s.limits.check("bad:"+clientIP(x.r), limitBadTokens); lerr != nil && x.r.RemoteAddr != selfCallAddr {
+		if lerr := s.limits.check("bad:"+s.clientIP(x.r), limitBadTokens); lerr != nil && x.r.RemoteAddr != selfCallAddr {
 			return lerr
 		}
 		return errUnauthorized("this token is not valid, or was revoked")
@@ -826,19 +830,53 @@ func (s *Server) touchPresence(ctx context.Context, x *c, action string) {
 	_, _ = x.db.Update(context.WithoutCancel(ctx), "members", set, store.Eq("user_id", x.member.UserID)) // best effort: presence is written again on the next request
 }
 
-// clientIP returns the caller's address, trusting a proxy's header only
-// when the connection comes from this machine or a private network.
-func clientIP(r *http.Request) string {
+// clientIP is the caller's address, for its sign-in limits and the
+// record: who connected, or, when that is one of cfg.TrustedProxies, whom
+// the proxy says it forwards for. X-Forwarded-For lists the hops, each
+// proxy adding the address it saw at the end, so it is read from the end:
+// the first address no trusted proxy has is the caller's, and what comes
+// before it is whatever the caller wrote there itself.
+func (s *Server) clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		host = r.RemoteAddr
 	}
-	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsPrivate()) {
-		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			return strings.TrimSpace(strings.Split(fwd, ",")[0])
+	if !s.isTrustedProxy(host) {
+		return host
+	}
+	var hops []string
+	for _, header := range r.Header.Values("X-Forwarded-For") {
+		for hop := range strings.SplitSeq(header, ",") {
+			hops = append(hops, strings.TrimSpace(hop))
 		}
 	}
+	for _, hop := range slices.Backward(hops) {
+		if !s.isTrustedProxy(hop) {
+			if _, err := netip.ParseAddr(hop); err != nil {
+				return host // the proxy wrote what is not an address: it is all that is known
+			}
+			return hop
+		}
+	}
+	if len(hops) > 0 {
+		return hops[0] // every hop a proxy of ours: the first is the caller, on the inside
+	}
 	return host
+}
+
+// isTrustedProxy reports whether an address is one of cfg.TrustedProxies.
+func (s *Server) isTrustedProxy(address string) bool {
+	addr, err := netip.ParseAddr(address)
+	if err != nil {
+		return false
+	}
+	addr = addr.WithZone("").Unmap()
+	for _, p := range s.cfg.TrustedProxies {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
 }
 
 // audit writes one line in the audit log. Failures are logged, not returned:
@@ -848,7 +886,7 @@ func (s *Server) audit(r *http.Request, workspaceID string, actor core.User, act
 	e := core.AuditEntry{ID: id.New(), At: time.Now().UnixMilli(), WorkspaceID: workspaceID, ActorID: actor.ID, ActorName: actor.Name,
 		Action: action, TargetType: targetType, TargetID: targetID}
 	if r != nil {
-		e.IP, e.UserAgent = clientIP(r), r.UserAgent()
+		e.IP, e.UserAgent = s.clientIP(r), r.UserAgent()
 		if len(e.UserAgent) > 200 {
 			e.UserAgent = e.UserAgent[:200]
 		}

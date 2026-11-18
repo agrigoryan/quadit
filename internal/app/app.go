@@ -181,13 +181,18 @@ func Serve(args []string, version string) int {
 		log.Error("cannot start", "err", fmt.Errorf("--allow-private-networks: %w", err))
 		return 1
 	}
+	proxies, err := networks(run.flags.trustedProxies)
+	if err != nil {
+		log.Error("cannot start", "err", fmt.Errorf("--trusted-proxies: %w", err))
+		return 1
+	}
 	files, err := blob.NewDisk(filepath.Join(o.Data, "files"))
 	if err != nil {
 		log.Error("file storage", "err", err)
 		return 1
 	}
 	srv := server.New(server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: version, Log: log,
-		PrivateNetworks: privateNets}, st, files, sealer)
+		PrivateNetworks: privateNets, TrustedProxies: proxies}, st, files, sealer)
 	if web := WebHandler(); web != nil {
 		srv.SetWeb(web)
 	}
@@ -251,6 +256,7 @@ type serveFlags struct {
 	acmeHTTP        string // where the plain-HTTP side of ACME listens
 	localListen     string // with HTTPS on: the server's own plain address
 	privateNets     string // the private networks users' addresses may reach, as written
+	trustedProxies  string // the proxies whose X-Forwarded-For is believed, as written
 }
 
 // serveRun is what one quadit serve was told: the Options and its own flags.
@@ -291,6 +297,7 @@ func (run *serveRun) parse(args []string) {
 	fs.StringVar(&f.acmeHTTP, "acme-http-listen", envOr("QUADIT_ACME_HTTP_LISTEN", ":80"), "with --tls-domain: where the plain-HTTP side listens, which answers the authority's checks and sends everyone else to HTTPS (QUADIT_ACME_HTTP_LISTEN)")
 	fs.StringVar(&f.localListen, "local-listen", envOr("QUADIT_LOCAL_LISTEN", "127.0.0.1:4781"), "with HTTPS on: a plain address on this machine only, for the server's own use (QUADIT_LOCAL_LISTEN)")
 	fs.StringVar(&f.privateNets, "allow-private-networks", envOr("QUADIT_ALLOW_PRIVATE_NETWORKS", ""), "networks off the public internet that webhooks, push, the vault, imports and GitHub integrations may reach, e.g. 192.168.1.0/24,10.0.0.5; default none (QUADIT_ALLOW_PRIVATE_NETWORKS)")
+	fs.StringVar(&f.trustedProxies, "trusted-proxies", envOr("QUADIT_TRUSTED_PROXIES", "127.0.0.1,::1"), "the reverse proxies in front of the server, whose X-Forwarded-For says who the caller is: addresses or networks; empty trusts none (QUADIT_TRUSTED_PROXIES)")
 	fs.Parse(args)
 }
 

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -18,6 +19,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 
 	"github.com/agrigoryan/quadit/internal/auth"
+	"github.com/agrigoryan/quadit/internal/server"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -260,6 +262,47 @@ func TestALimitsWindowsAreClearedOnlyWhenOver(t *testing.T) {
 		if got := postFrom127(t, s, "/api/v1/auth/reset/request", reset, ""); got != http.StatusTooManyRequests {
 			t.Fatalf("the 11th reset request in an hour: %d, want 429", got)
 		}
+	})
+}
+
+// TestTheCallersAddressIsTakenFromTrustedProxiesOnly: a request's address
+// decides its sign-in limits and goes on the record. A proxy in front of
+// the server says whom it forwards for in X-Forwarded-For; that is
+// believed only from a proxy whoever runs the server named, and the
+// address is the last one in the list that no such proxy added, so a
+// caller cannot pick its own by writing the header.
+func TestTheCallersAddressIsTakenFromTrustedProxiesOnly(t *testing.T) {
+	// 31 failed sign-ins, each for another account and with its own
+	// X-Forwarded-For: the limit for one address is 30 in 15 minutes.
+	refused := func(t *testing.T, s *site, tag string, forwarded func(i int) string) (n int) {
+		t.Helper()
+		for i := range 31 {
+			login := M{"email": fmt.Sprintf("%s%d@example.com", tag, i), "password": "not-a-password"}
+			if postFrom127(t, s, "/api/v1/auth/login", login, forwarded(i)) == http.StatusTooManyRequests {
+				n++
+			}
+		}
+		return n
+	}
+	t.Run("no proxy is trusted: the header is the caller's own words", func(t *testing.T) {
+		testdb.Each(t, func(t *testing.T, st store.Store) {
+			s := newSiteWith(t, st, func(*server.Config) {})
+			if n := refused(t, s, "a", func(i int) string { return fmt.Sprintf("203.0.113.%d", i) }); n == 0 {
+				t.Fatal("an address written in X-Forwarded-For escaped the limit of the caller's own")
+			}
+		})
+	})
+	t.Run("the loopback is a trusted proxy", func(t *testing.T) {
+		testdb.Each(t, func(t *testing.T, st store.Store) {
+			s := newSiteWith(t, st, func(cfg *server.Config) { cfg.TrustedProxies = loopback })
+			if n := refused(t, s, "b", func(i int) string { return fmt.Sprintf("203.0.113.%d", i) }); n != 0 {
+				t.Fatalf("callers the proxy forwarded for were counted as one: %d refused", n)
+			}
+			// A caller's own X-Forwarded-For comes first; the proxy adds the address it saw last.
+			if n := refused(t, s, "c", func(i int) string { return fmt.Sprintf("198.51.100.%d, 192.0.2.7", i) }); n == 0 {
+				t.Fatal("a caller picked its address by writing X-Forwarded-For before the proxy's")
+			}
+		})
 	})
 }
 

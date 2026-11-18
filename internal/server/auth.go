@@ -133,7 +133,7 @@ func (s *Server) startSession(x *c, u core.User, stage string) error {
 	if len(ua) > 200 {
 		ua = ua[:200]
 	}
-	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: u.ID, Stage: stage, IP: clientIP(x.r), UserAgent: ua,
+	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: u.ID, Stage: stage, IP: s.clientIP(x.r), UserAgent: ua,
 		CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(), ExpiresAt: now.Add(sessionLife).UnixMilli()}
 	if err := s.st.Insert(x.ctx(), sess); err != nil {
 		return err
@@ -253,7 +253,7 @@ func (s *Server) handleSignIn(x *c) error {
 		return errForbidden("signing in with a password is turned off on this install")
 	}
 	email := strings.ToLower(strings.TrimSpace(b.Email))
-	if err := s.throttle(ctx, "login:ip:"+clientIP(x.r), signInsPerIP, signInWindow); err != nil {
+	if err := s.throttle(ctx, "login:ip:"+s.clientIP(x.r), signInsPerIP, signInWindow); err != nil {
 		return err
 	}
 	if err := s.throttle(ctx, "login:email:"+email, signInsPerEmail, signInWindow); err != nil {

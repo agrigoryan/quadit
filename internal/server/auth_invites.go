@@ -91,7 +91,7 @@ func (s *Server) handleRegisterAccount(x *c) error {
 	} else if !allowed {
 		return errForbidden("accounts here are limited to certain email domains")
 	}
-	if err := s.throttle(ctx, "register:ip:"+clientIP(x.r), accountRequestsPerHour, time.Hour); err != nil {
+	if err := s.throttle(ctx, "register:ip:"+s.clientIP(x.r), accountRequestsPerHour, time.Hour); err != nil {
 		return err
 	}
 	if b.Password == "" {

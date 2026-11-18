@@ -16,9 +16,14 @@ quadit serve --data /var/lib/quadit --url https://quadit.example.com
 | `--url` | `QUADIT_BASE_URL` | `http://localhost:4780` | The address people use. Links in mail, passkeys and file addresses need it right, and so does a change made in a browser too old to say which page it comes from: a write sent with the sign-in cookie is taken only from the server's own pages |
 | | `QUADIT_SECRET` | a file made in the data directory | Encrypts stored secrets (mail password, storage keys, integration tokens). Keep it with your backups |
 | `--log-json` | `QUADIT_LOG=json` | text | Structured logs |
+| `--trusted-proxies` | `QUADIT_TRUSTED_PROXIES` | `127.0.0.1,::1` | The reverse proxies in front of the server, addresses or networks: only their `X-Forwarded-For` is believed ([below](#behind-a-proxy)). `--trusted-proxies=` (empty) trusts none |
 | `--allow-private-networks` | `QUADIT_ALLOW_PRIVATE_NETWORKS` | none | Networks off the public internet the server may call for its users, e.g. `192.168.1.0/24,10.0.0.5` ([below](#addresses-users-give)) |
 
 Put it behind a reverse proxy for HTTPS. The proxy must not buffer responses (the live stream and held requests need that): for nginx, `proxy_buffering off`.
+
+### Behind a proxy
+
+The caller's address counts sign-in attempts and goes on the audit log. Behind a proxy, every connection comes from the proxy, which says whom it forwards for in `X-Forwarded-For`. The server believes that header only from the proxies named in `--trusted-proxies`, and takes the last address in it that is not one of them, so a caller cannot write its own. The default trusts this machine (`127.0.0.1,::1`): Caddy, nginx, `tailscale serve` or a tunnel on the same machine. A proxy elsewhere is named by its address: in Docker Compose, the network the proxy's container shares with Quadit's (`QUADIT_TRUSTED_PROXIES=172.16.0.0/12`, or the network's own range). Name only addresses nobody else can connect from: with Docker publishing Quadit's port to the world, a direct visitor may come from the same bridge address as the proxy.
 
 The first person to open the address creates the first account and workspace, and runs the install. Without a browser: `quadit admin setup --name … --email … --password … --workspace …`.
 

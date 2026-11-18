@@ -74,7 +74,7 @@ func (s *Server) handleRegisterOAuthClient(x *c) error {
 			return errBad("redirect URI %q must be https, a local address, or an app's own scheme", u)
 		}
 	}
-	if err := s.throttle(x.ctx(), "oauth-register:"+clientIP(x.r), 30, time.Hour); err != nil {
+	if err := s.throttle(x.ctx(), "oauth-register:"+s.clientIP(x.r), 30, time.Hour); err != nil {
 		return err
 	}
 	client := core.OAuthClient{ID: "qc_" + auth.Random(16), Name: strings.TrimSpace(b.Name), RedirectURIs: b.RedirectURIs, CreatedAt: time.Now().UnixMilli()}

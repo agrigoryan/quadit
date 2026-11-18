@@ -123,7 +123,7 @@ func (s *Server) handleSignInPictureBrowser(x *c) error {
 	}
 	token := auth.Random(32)
 	now := time.Now()
-	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: ot.UserID, Stage: core.SessionRender, IP: clientIP(x.r), UserAgent: "render check",
+	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: ot.UserID, Stage: core.SessionRender, IP: s.clientIP(x.r), UserAgent: "render check",
 		CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(), ExpiresAt: now.Add(2 * time.Minute).UnixMilli()}
 	if err := s.st.Insert(x.ctx(), sess); err != nil {
 		return err

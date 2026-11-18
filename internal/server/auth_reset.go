@@ -25,7 +25,7 @@ func (s *Server) handleRequestPasswordReset(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
-	if err := s.throttle(ctx, "reset:ip:"+clientIP(x.r), accountRequestsPerHour, time.Hour); err != nil {
+	if err := s.throttle(ctx, "reset:ip:"+s.clientIP(x.r), accountRequestsPerHour, time.Hour); err != nil {
 		return err
 	}
 	if !s.mailReady(ctx) {

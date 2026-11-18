@@ -43,7 +43,7 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 		// Calls with no token are counted by where they come from, like
 		// wrong ones: a client asks once to learn where to sign in, not
 		// hundreds of times.
-		if err := s.limits.check("anon:"+clientIP(r), 120); err != nil {
+		if err := s.limits.check("anon:"+s.clientIP(r), 120); err != nil {
 			s.fail(w, r, err)
 			return "", false
 		}
@@ -55,7 +55,7 @@ func (s *Server) mcpSignIn(w http.ResponseWriter, r *http.Request) (string, bool
 	// Guesses are counted by where they come from; a token that cannot be
 	// looked up is counted as one.
 	if n, err := s.st.Count(r.Context(), "api_tokens", store.Eq("token_hash", auth.Hash(token)), store.Null("revoked_at")); err != nil || n == 0 {
-		if err := s.limits.check("bad:"+clientIP(r), 120); err != nil {
+		if err := s.limits.check("bad:"+s.clientIP(r), 120); err != nil {
 			s.fail(w, r, err)
 			return "", false
 		}
