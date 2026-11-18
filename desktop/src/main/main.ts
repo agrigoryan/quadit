@@ -249,10 +249,15 @@ async function offerToAdd(origin: string): Promise<boolean> {
   return response === 0;
 }
 
-/** The quadit command packaged in the app's resources (macOS and Linux), or null without one (run from source, Windows). */
+/**
+ * The quadit command packaged in the app's resources (macOS and Linux), or
+ * null without one: run from source, on Windows, and run as an AppImage,
+ * whose files are mounted only while it runs, so a link to them would
+ * break when the app quits.
+ */
 function bundledCli(): string | null {
   const path = join(process.resourcesPath, "bin", "quadit");
-  return app.isPackaged && existsSync(path) ? path : null;
+  return app.isPackaged && !process.env.APPIMAGE && existsSync(path) ? path : null;
 }
 
 /** Tells the person something that went wrong or needs them, in a dialog of its own. */
