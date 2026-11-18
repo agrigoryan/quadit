@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build server web generate test test-all e2e lint notices dev seed clean fmt release smoke image
+.PHONY: all build server web generate test test-all e2e lint notices dev seed clean fmt release smoke image desktop desktop-e2e
 
 all: build
 
@@ -53,6 +53,17 @@ lint:
 notices:
 	cd web && pnpm install --frozen-lockfile
 	go run ./scripts/notices
+
+# The desktop app (desktop/): its packages for this system, unsigned unless
+# the signing environment is set (desktop/electron-builder.config.cjs), into
+# desktop/dist/.
+desktop:
+	cd desktop && pnpm install --frozen-lockfile && pnpm dist
+
+# The desktop app's end-to-end suite: Playwright drives the app against a
+# server built from this tree, on a port and data directory of its own.
+desktop-e2e: build
+	cd desktop && pnpm install --frozen-lockfile && pnpm e2e
 
 # A local server on :4780 with data in ./data.
 dev: server
