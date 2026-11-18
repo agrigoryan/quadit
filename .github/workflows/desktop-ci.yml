@@ -9,7 +9,8 @@ name: desktop-ci
 # desktop/ first for the packaged checks.
 #
 # Besides the app, it runs for the server's and the web app's side of the
-# desktop contract. The desktop release runs it on the tagged commit before
+# desktop contract, and for the command-line client the app carries
+# (desktop/scripts/cli.mjs) and Connect runs. The desktop release runs it on the tagged commit before
 # it publishes anything.
 on:
   push:
@@ -19,6 +20,7 @@ on:
       - ".github/workflows/desktop-*.yml"
       - "internal/server/desktop*.go"
       - "internal/app/web.go"
+      - "internal/cli/**"
       - "web/src/auth/desktop-*"
       - "web/src/shell/system-notices.ts"
       - "web/src/types/desktop.ts"
@@ -73,6 +75,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm build
+          node scripts/cli.mjs
           pnpm exec electron-builder --config electron-builder.config.cjs --mac --arm64 --dir --publish never
       # The browser that plays the system browser's part in the sign-in hand-off (test/e2e/sign-in.spec.ts).
       - name: Install Chromium

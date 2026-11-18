@@ -22,6 +22,8 @@ name: desktop-release
 # and Gatekeeper's verdict. Windows is signed when WIN_CSC_LINK and
 # WIN_CSC_KEY_PASSWORD are set, and unsigned otherwise. The Homebrew cask is
 # not pushed from here: desktop/packaging/quadit-desktop.rb is its template.
+# The macOS and Linux apps carry the quadit command, built here with Go
+# (desktop/scripts/cli.mjs) and signed with the app on macOS.
 on:
   push:
     tags: ["desktop-v*"]
@@ -64,6 +66,9 @@ jobs:
         working-directory: desktop
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -116,8 +121,8 @@ jobs:
             echo "::error::A release's macOS build must be signed and notarized. Set CSC_LINK and CSC_KEY_PASSWORD, and either APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID or APPLE_API_KEY_P8, APPLE_API_KEY_ID and APPLE_API_ISSUER. Only a pre-release (desktop-v1.2.3-beta.1) may go out unsigned, with the repository variable DESKTOP_ALLOW_UNSIGNED=true."
             exit 1
           fi
-          pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
-      - name: Check the macOS app (link scheme, signature, notarization, Gatekeeper)
+          pnpm build && node scripts/cli.mjs && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+      - name: Check the macOS app (link scheme, the quadit command, signature, notarization, Gatekeeper)
         if: runner.os == 'macOS'
         shell: bash
         env:
@@ -126,6 +131,7 @@ jobs:
           for app in dist/mac*/Quadit.app; do
             echo "$app"
             plutil -extract CFBundleURLTypes json -o - "$app/Contents/Info.plist" | grep -q '"quadit"'
+            test -x "$app/Contents/Resources/bin/quadit"
             if [ "$SIGNED" = true ]; then
               codesign --verify --deep --strict --verbose=2 "$app"
               spctl --assess --type execute --verbose=4 "$app"
@@ -138,11 +144,11 @@ jobs:
         env:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+        run: pnpm build && node scripts/cli.mjs && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
       - name: Package (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+        run: pnpm build && node scripts/cli.mjs && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}

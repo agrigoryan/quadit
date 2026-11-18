@@ -18,7 +18,8 @@
     "test": "vitest run",
     "e2e": "node scripts/build.mjs && playwright test",
     "icons": "sh scripts/icons.sh",
-    "dist": "node scripts/build.mjs && electron-builder --config electron-builder.config.cjs",
+    "cli": "node scripts/cli.mjs",
+    "dist": "node scripts/build.mjs && node scripts/cli.mjs && electron-builder --config electron-builder.config.cjs",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
   },
   "devDependencies": {

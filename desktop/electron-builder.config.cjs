@@ -13,6 +13,10 @@
 // With APPLE_TEAM_ID and a certificate, the build also gets the keychain group
 // that Touch ID passkeys need (src/main/main.ts, enablePasskeys).
 //
+// The quadit command goes into the app's resources as bin/quadit, built for
+// each architecture by scripts/cli.mjs into cli/ (pnpm dist runs it first);
+// macOS signs it with the app. Windows has no build of the command.
+//
 // Windows is signed only with a certificate of its own, WIN_CSC_LINK +
 // WIN_CSC_KEY_PASSWORD, and not at all without one: electron-builder would
 // otherwise fall back to CSC_LINK, the Apple certificate.
@@ -95,6 +99,7 @@ module.exports = {
     notarize: notarizing,
     ...(env.QUADIT_MAC_PROVISIONING_PROFILE ? { provisioningProfile: env.QUADIT_MAC_PROVISIONING_PROFILE } : {}),
     extendInfo: { NSUserNotificationAlertStyle: "alert" },
+    extraResources: [{ from: "cli/darwin-${arch}/quadit", to: "bin/quadit" }],
   },
   dmg: { title: "Quadit ${version}" },
 
@@ -116,5 +121,6 @@ module.exports = {
       { target: "AppImage", arch: ["x64", "arm64"] },
       { target: "deb", arch: ["x64", "arm64"] },
     ],
+    extraResources: [{ from: "cli/linux-${arch}/quadit", to: "bin/quadit" }],
   },
 };

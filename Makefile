@@ -56,7 +56,8 @@ notices:
 
 # The desktop app (desktop/): its packages for this system, unsigned unless
 # the signing environment is set (desktop/electron-builder.config.cjs), into
-# desktop/dist/.
+# desktop/dist/. On macOS and Linux they carry the quadit command, built
+# with Go for each architecture (desktop/scripts/cli.mjs).
 desktop:
 	cd desktop && pnpm install --frozen-lockfile && pnpm dist
 

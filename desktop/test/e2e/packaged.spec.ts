@@ -33,6 +33,7 @@ function start(
 ): { app: ChildProcess; data: string } {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-packaged-"));
   if (servers) writeFileSync(join(data, "servers.json"), JSON.stringify({ servers }));
+  writeFileSync(join(data, "settings.json"), JSON.stringify({ setupDone: true }));
   // Cookies are encrypted with a key in the login keychain, which asks the person before it lets an
   // app with another signature in (each unsigned build has its own): the test keeps to Chromium's stand-in.
   const app = spawn(BINARY, ["--use-mock-keychain", ...args], {
@@ -122,6 +123,12 @@ test("the packaged app carries Quadit's licence and those of Electron and of Chr
   for (const file of ["LICENSE.electron.txt", "LICENSES.chromium.html"]) {
     expect(existsSync(join(APP, "Contents/Resources", file)), file).toBe(true);
   }
+});
+
+test("the packaged app carries the quadit command for its architecture, which Connect links onto the PATH", () => {
+  const cli = join(APP, "Contents/Resources/bin/quadit");
+  expect(execFileSync(cli, ["version"], { encoding: "utf8" })).toMatch(/^quadit \S+ \(agent surface/);
+  expect(execFileSync("file", [cli], { encoding: "utf8" })).toContain(process.arch === "arm64" ? "arm64" : "x86_64");
 });
 
 test("the packaged app starts and opens the server that was open, as the app", async () => {
