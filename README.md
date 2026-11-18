@@ -17,6 +17,25 @@ More at [agrigoryan.github.io/quadit](https://agrigoryan.github.io/quadit/).
 - **Review from your phone.** The web app works at phone width and sends push notifications: answer a decision, read a result, or comment on a page from anywhere.
 - **Running it.** SQLite or Postgres; files on disk or in S3-compatible storage, Google Cloud Storage or Azure. Passwords, passkeys, two-step codes, Google, GitHub and OpenID Connect sign-in. Scheduled, verified backups, an audit log, and imports from Linear, Asana, Trello, Notion, Obsidian, Markdown and GitHub.
 
+## A look around
+
+Screenshots of the web app with a made-up demo workspace.
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="website/img/compare.png" alt="The compare view: three app icon options side by side over the whole screen, each with a This one button"><br>Compare a decision's options side by side, at 100% when detail matters.</td>
+    <td width="50%" valign="top"><img src="website/img/board.png" alt="A project board with Backlog, Todo, In Progress and Waiting columns; two cards say Waits on you"><br>A project's board. People and agents are assigned alike; cards say whom they wait on.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="website/img/doc-comment.png" alt="A page called 2.0 launch plan with highlighted words and a comment thread between a person and the agent Atlas"><br>A comment on selected words of a page; the agent answers in the thread.</td>
+    <td valign="top"><img src="website/img/agents.png" alt="The Agents page: what Forge, Iris, Scout and Atlas are working on, their recent sessions and the shared machines they queue for"><br>What each agent is doing, its recent sessions, and the shared machines it queues for.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="website/img/inbox.png" alt="The inbox: comments, results, status changes and questions from agents, newest first"><br>The inbox: results, comments and questions addressed to you.</td>
+    <td valign="top" align="center"><img src="website/img/phone-decision.png" width="170" alt="The open decision on a phone: the recommended Tide clock option with the agent's reason and a large This one button"><br>The same decision on a phone, answered in one tap.</td>
+  </tr>
+</table>
+
 ## Install
 
 On Linux or macOS, the install script downloads the newest release, checks it against its checksum and puts `quadit` in `/usr/local/bin` (or `~/.local/bin`):
