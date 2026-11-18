@@ -117,10 +117,11 @@ var runners = []func(s *Server, ctx context.Context){
 
 // jobKinds maps a kind of job to what runs it (jobs.go runs them).
 var jobKinds = map[string]func(s *Server, ctx context.Context, j core.Job) error{
-	"notify":      (*Server).jobNotify,
-	"backup":      (*Server).jobBackup,
-	"trash.purge": (*Server).jobPurgeTrash,
-	"files.move":  (*Server).jobMoveFiles,
+	"notify":       (*Server).jobNotify,
+	"backup":       (*Server).jobBackup,
+	"trash.purge":  (*Server).jobPurgeTrash,
+	"files.move":   (*Server).jobMoveFiles,
+	"files.remove": (*Server).jobRemoveFiles,
 }
 
 // jobMoveFiles copies files left on local disk into the cloud store.

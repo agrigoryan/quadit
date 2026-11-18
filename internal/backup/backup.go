@@ -3,11 +3,24 @@
 // made on SQLite and on Postgres, on disk and on cloud storage, and can be
 // restored onto any of them.
 //
+// An archive is the install at one moment: every table is read from one
+// snapshot of the database, and the files are the ones its rows name. A
+// file removed after that moment is still there to copy, as file storage
+// keeps a removed file a day (the server's jobs remove it), and a backup
+// that finds one gone all the same fails rather than leave it out.
+//
 // The archive's first member (schema.json) says the schema version it was
-// made at and the Quadit that made it, so a restore can refuse an archive
-// it cannot read whole before it writes anything; its last (manifest.json)
-// lists every member with its checksum. An archive made before the first
-// member existed has only the last.
+// made at, the Quadit that made it, and a value sealed with the install's
+// secret, so a restore can refuse an archive it cannot read whole, or
+// whose stored secrets the destination could not open, before it writes
+// anything; its last (manifest.json) lists every member with its
+// checksum. An archive made before the first member existed has only the
+// last.
+//
+// A full restore reads the archive twice: once to check all of it, the
+// rows against each other included, then to load it, every row in one
+// transaction. A restore that fails leaves the database empty and takes
+// out the files it had stored, so it can be run again.
 package backup
 
 import (
@@ -23,10 +36,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/blob"
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -44,11 +60,17 @@ type Entry struct {
 const schemaMember = "schema.json"
 
 // madeBy is what the first member says: the schema version the archive
-// was made at, and the version of Quadit that made it.
+// was made at, the version of Quadit that made it, and keyCheck sealed
+// with the install's secret ("" when the archive was made without it).
 type madeBy struct {
-	Schema  int    `json:"schema"`
-	Version string `json:"version"`
+	Schema   int    `json:"schema"`
+	Version  string `json:"version"`
+	KeyCheck string `json:"key_check,omitempty"`
 }
+
+// keyCheck is what an archive seals with the install's secret: a restore
+// opens it to know that the secret it has opens the archive's secrets.
+const keyCheck = "quadit install secret"
 
 // Manifest is the last member of an archive. It lists the others with
 // their checksums, so an archive can be verified without restoring it.
@@ -61,6 +83,9 @@ type Manifest struct {
 	// from; 0 in an archive made before it was recorded.
 	Schema  int     `json:"schema,omitempty"`
 	Entries []Entry `json:"entries"`
+	// Missing are the stored files the rows name that file storage did not
+	// have when the archive was made: lost before it, not by it.
+	Missing []string `json:"missing,omitempty"`
 }
 
 // ErrNewerArchive is the refusal of an archive made by a newer Quadit, whose
@@ -72,33 +97,52 @@ var ErrNewerArchive = errors.New("the archive is newer than this Quadit")
 // archive. The error says what is wrong with it.
 var ErrDamaged = errors.New("the archive is damaged")
 
+// ErrOtherSecret is a full restore's refusal of an archive whose stored
+// secrets (sign-in codes, the vault, tokens of integrations, passwords of
+// mail and storage) were sealed with another install secret than the one
+// given: restored, none of them could be opened.
+var ErrOtherSecret = errors.New("the archive's stored secrets were sealed with another install secret")
+
 // ErrNotInArchive is RestoreItem's answer when the archive has no such
 // workspace, or no such task or page in it.
 var ErrNotInArchive = errors.New("not in the archive")
 
-// skipPrefixes are stored objects that are not users' files.
-var skipPrefixes = []string{"backups/", "probe/"}
-
-// Write makes an archive of everything.
-func Write(ctx context.Context, st store.Store, files blob.Store, version string, w io.Writer) (Manifest, error) {
+// Write makes an archive of everything: every table read from one
+// snapshot of the database, then the stored files its rows name. sealer
+// is the install's secret, which seals the archive's key check; nil
+// leaves it out.
+func Write(ctx context.Context, st store.Store, files blob.Store, sealer *auth.Sealer, version string, w io.Writer) (Manifest, error) {
 	schema, err := st.SchemaVersion(ctx)
 	if err != nil {
 		return Manifest{}, err
 	}
-	aw := &archiveWriter{m: Manifest{Format: 1, CreatedAt: time.Now().UnixMilli(), Version: version, Database: st.Dialect(), Schema: schema}}
+	made := madeBy{Schema: schema, Version: version}
+	if sealer != nil {
+		if made.KeyCheck, err = sealer.Seal(keyCheck); err != nil {
+			return Manifest{}, err
+		}
+	}
+	aw := &archiveWriter{m: Manifest{Format: 1, CreatedAt: time.Now().UnixMilli(), Version: version, Database: st.Dialect(), Schema: schema}, named: map[string]bool{}}
 	gz := gzip.NewWriter(w)
 	aw.tw = tar.NewWriter(gz)
-	head, _ := json.Marshal(madeBy{Schema: schema, Version: version})
+	head, _ := json.Marshal(made)
 	if err := aw.add(schemaMember, int64(len(head)), bytes.NewReader(head), 0); err != nil {
 		return aw.m, err
 	}
-	// Tables next, in an order that can be loaded back.
-	for _, t := range store.Tables() {
-		if err := aw.addTable(ctx, st, t.Name); err != nil {
-			return aw.m, fmt.Errorf("table %s: %w", t.Name, err)
+	// Tables next, in an order that can be loaded back, all as they stood
+	// at one moment.
+	err = st.Snapshot(ctx, func(snap store.Snapshot) error {
+		for _, t := range store.Tables() {
+			if err := aw.addTable(ctx, snap, t.Name); err != nil {
+				return fmt.Errorf("table %s: %w", t.Name, err)
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return aw.m, err
 	}
-	if err := aw.addFiles(ctx, files); err != nil {
+	if err := aw.addFiles(ctx, st, files); err != nil {
 		return aw.m, err
 	}
 	if err := aw.addManifest(); err != nil {
@@ -110,11 +154,12 @@ func Write(ctx context.Context, st store.Store, files blob.Store, version string
 	return aw.m, gz.Close()
 }
 
-// archiveWriter is one run of Write: the archive being written and the
-// manifest of what is in it so far.
+// archiveWriter is one run of Write: the archive being written, the
+// manifest of what is in it so far, and the stored files its rows name.
 type archiveWriter struct {
-	tw *tar.Writer
-	m  Manifest
+	tw    *tar.Writer
+	m     Manifest
+	named map[string]bool // storage keys
 }
 
 // add writes one member of size bytes, read from r, and lists it in the
@@ -135,9 +180,10 @@ func (aw *archiveWriter) add(name string, size int64, r io.Reader, rows int) err
 	return nil
 }
 
-// addTable writes every row of a table as JSON lines. They go to a
-// temporary file first, as a member's size is written before it.
-func (aw *archiveWriter) addTable(ctx context.Context, st store.Store, table string) error {
+// addTable writes every row of a table as JSON lines, and notes the stored
+// files its rows name. The rows go to a temporary file first, as a
+// member's size is written before it.
+func (aw *archiveWriter) addTable(ctx context.Context, snap store.Snapshot, table string) error {
 	tmp, err := os.CreateTemp("", "quadit-backup-*.jsonl")
 	if err != nil {
 		return err
@@ -146,10 +192,15 @@ func (aw *archiveWriter) addTable(ctx context.Context, st store.Store, table str
 	defer tmp.Close()
 	bw := bufio.NewWriter(tmp)
 	rows := 0
-	err = st.Dump(ctx, table, func(row map[string]any) error {
+	err = snap.Dump(ctx, table, func(row map[string]any) error {
 		raw, err := json.Marshal(row)
 		if err != nil {
 			return err
+		}
+		if table == "files" {
+			for _, key := range storedFiles(row) {
+				aw.named[key] = true
+			}
 		}
 		rows++
 		bw.Write(raw) // a failed write is kept by bw and returned by the next one
@@ -171,41 +222,77 @@ func (aw *archiveWriter) addTable(ctx context.Context, st store.Store, table str
 	return aw.add("db/"+table+".jsonl", size, tmp, rows)
 }
 
-// addFiles writes every stored file but the ones that are not users'
-// (skipPrefixes). A file deleted while the backup runs is left out.
-func (aw *archiveWriter) addFiles(ctx context.Context, files blob.Store) error {
-	type object struct {
-		key  string
-		size int64
-	}
-	var objects []object
-	err := files.List(ctx, "", func(k string, n int64) error {
-		for _, p := range skipPrefixes {
-			if strings.HasPrefix(k, p) {
-				return nil
-			}
-		}
-		objects = append(objects, object{k, n})
+// storedFiles are the keys in file storage a row of the files table
+// names: a ready file's bytes, and its reduced copy. An upload still
+// arriving names nothing yet: its parts are not kept in an archive.
+func storedFiles(row map[string]any) []string {
+	if str(row, "state") != core.FileReady {
 		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("listing files: %w", err)
 	}
-	for _, o := range objects {
-		r, _, err := files.Open(ctx, o.key)
+	keys := []string{str(row, "storage_key")}
+	if pk := str(row, "preview_key"); pk != "" {
+		keys = append(keys, pk)
+	}
+	return keys
+}
+
+// addFiles writes the stored files the rows name. One file storage does
+// not have is a file lost before the backup, when the database still
+// names it, and is listed as missing; one removed since the rows were read
+// (kept a day by the server, so only in a backup that took longer) fails
+// the backup, which would otherwise be no longer one moment.
+func (aw *archiveWriter) addFiles(ctx context.Context, st store.Store, files blob.Store) error {
+	keys := make([]string, 0, len(aw.named))
+	for k := range aw.named {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		r, err := openStored(ctx, files, key)
 		if errors.Is(err, blob.ErrNotFound) {
-			continue // deleted while the backup ran
+			named, err := st.Count(ctx, "files", store.Either(store.Eq("storage_key", key), store.Eq("preview_key", key)))
+			if err != nil {
+				return err
+			}
+			if named == 0 {
+				return fmt.Errorf("the stored file %s was removed while the backup ran; run it again", key)
+			}
+			aw.m.Missing = append(aw.m.Missing, key)
+			continue
 		}
 		if err != nil {
 			return err
 		}
-		err = aw.add("files/"+o.key, o.size, r, 0)
+		err = aw.addStored(key, r)
 		r.Close()
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// openStored opens a stored file, and looks once more when it is not
+// found: an install moving its files from disk to the cloud may have moved
+// it between the two looks a layered store takes.
+func openStored(ctx context.Context, files blob.Store, key string) (io.ReadSeekCloser, error) {
+	r, _, err := files.Open(ctx, key)
+	if errors.Is(err, blob.ErrNotFound) {
+		r, _, err = files.Open(ctx, key)
+	}
+	return r, err
+}
+
+// addStored writes one stored file as a member.
+func (aw *archiveWriter) addStored(key string, r io.ReadSeeker) error {
+	size, err := r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+	if _, err := r.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	return aw.add("files/"+key, size, r, 0)
 }
 
 // addManifest writes the manifest, the archive's last member.
@@ -253,17 +340,41 @@ func read(r io.Reader, each func(name string, body io.Reader) error) (Manifest, 
 	return m, nil
 }
 
-// Verify reads a whole archive and checks every member against the
-// manifest's checksums.
+// Verify reads a whole archive and checks it: every member against the
+// manifest's checksums, and the rows against each other where a restore
+// depends on it (a workspace's feed is not ahead of its sequence; every
+// stored file a row names is in it, or was missing when it was made).
 func Verify(r io.Reader) (Manifest, error) {
+	return check(r, nil)
+}
+
+// check is Verify, handing what the first member says to first, when the
+// archive has one, before it reads further.
+func check(r io.Reader, first func(madeBy) error) (Manifest, error) {
 	sums := map[string]Entry{}
+	rows := &consistency{seq: map[string]int64{}, lastEvent: map[string]int64{}, named: map[string]bool{}}
 	m, err := read(r, func(name string, body io.Reader) error {
 		h := sha256.New()
-		n, err := io.Copy(h, body)
-		if err != nil {
-			return err
+		counted := &countingWriter{w: h}
+		body = io.TeeReader(body, counted)
+		if name == schemaMember && first != nil {
+			var made madeBy
+			if err := json.NewDecoder(body).Decode(&made); err != nil {
+				return fmt.Errorf("%w: its %s does not read: %w", ErrDamaged, schemaMember, err)
+			}
+			if err := first(made); err != nil {
+				return err
+			}
 		}
-		sums[name] = Entry{Name: name, Size: n, SHA256: hex.EncodeToString(h.Sum(nil))}
+		if table, ok := tableOf(name); ok {
+			if err := rows.read(table, body); err != nil {
+				return err
+			}
+		}
+		if _, err := io.Copy(io.Discard, body); err != nil {
+			return fmt.Errorf("%w: %w", ErrDamaged, err)
+		}
+		sums[name] = Entry{Name: name, Size: counted.n, SHA256: hex.EncodeToString(h.Sum(nil))}
 		return nil
 	})
 	if err != nil {
@@ -281,7 +392,75 @@ func Verify(r io.Reader) (Manifest, error) {
 	if len(sums) != len(m.Entries) {
 		return m, fmt.Errorf("%w: it holds members its manifest does not list", ErrDamaged)
 	}
-	return m, nil
+	return m, rows.check(sums, m.Missing)
+}
+
+// countingWriter counts what is written through it.
+type countingWriter struct {
+	w io.Writer
+	n int64
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// consistency is what check learns of the rows of an archive that must
+// agree with each other: each workspace's sequence and the last event of
+// its feed, and the stored files the rows name.
+type consistency struct {
+	seq       map[string]int64 // workspace id -> its sequence
+	lastEvent map[string]int64 // workspace id -> the number of its last event
+	named     map[string]bool  // storage keys
+}
+
+// read takes in the rows of one table, when they are of a table it checks.
+func (c *consistency) read(table string, body io.Reader) error {
+	number := func(row map[string]any, col string) int64 { n, _ := row[col].(float64); return int64(n) }
+	var take func(row map[string]any)
+	switch table {
+	case "workspaces":
+		take = func(row map[string]any) { c.seq[str(row, "id")] = number(row, "seq") }
+	case "events":
+		take = func(row map[string]any) {
+			ws := str(row, "workspace_id")
+			c.lastEvent[ws] = max(c.lastEvent[ws], number(row, "seq"))
+		}
+	case "files":
+		take = func(row map[string]any) {
+			for _, key := range storedFiles(row) {
+				c.named[key] = true
+			}
+		}
+	default:
+		return nil
+	}
+	return lines(body, 1000, func(rows []map[string]any) error {
+		for _, row := range rows {
+			take(row)
+		}
+		return nil
+	})
+}
+
+// check says how the rows disagree, if they do: a workspace whose feed is
+// ahead of its sequence (a restored install would number its next event
+// as one it has), or a stored file named but neither in the archive
+// (members) nor missing when it was made.
+func (c *consistency) check(members map[string]Entry, missing []string) error {
+	for ws, last := range c.lastEvent {
+		if seq, ok := c.seq[ws]; ok && last > seq {
+			return fmt.Errorf("%w: workspace %s has events up to %d and its sequence says %d", ErrDamaged, ws, last, seq)
+		}
+	}
+	for key := range c.named {
+		if _, ok := members["files/"+key]; !ok && !slices.Contains(missing, key) {
+			return fmt.Errorf("%w: it does not hold the stored file %s, which its rows name", ErrDamaged, key)
+		}
+	}
+	return nil
 }
 
 // selfRefs are the columns that point at another row of the same table.
@@ -357,17 +536,9 @@ func lines(body io.Reader, batch int, flush func([]map[string]any) error) error 
 	return flush(rows)
 }
 
-// readable refuses, from its first member, an archive made at a schema
-// version newer than the database's: this Quadit would drop what it does
-// not know. Every other member is not this one's to judge.
-func readable(ctx context.Context, st store.Store, name string, body io.Reader) error {
-	if name != schemaMember {
-		return nil
-	}
-	var made madeBy
-	if err := json.NewDecoder(body).Decode(&made); err != nil {
-		return fmt.Errorf("%w: its %s does not read: %w", ErrDamaged, schemaMember, err)
-	}
+// readable refuses an archive made at a schema version newer than the
+// database's: this Quadit would drop what it does not know.
+func readable(ctx context.Context, st store.Store, made madeBy) error {
 	ours, err := st.SchemaVersion(ctx)
 	if err != nil {
 		return err
@@ -379,52 +550,96 @@ func readable(ctx context.Context, st store.Store, name string, body io.Reader) 
 	return nil
 }
 
-// Restore loads an archive into an empty database and file store. The rows
-// of an archive made at an older schema version are then changed as the
-// upgrades since would have changed them in a database of that version
-// (store.UpgradeLoaded): a repair an upgrade made is not undone by a
-// restore.
-func Restore(ctx context.Context, st store.Store, files blob.Store, r io.Reader) (Manifest, error) {
+// Restore loads an archive into an empty database and file store. It
+// first reads the whole archive and checks it (Verify, a schema this
+// Quadit knows, and the install secret), so a damaged or unreadable one is
+// refused before anything is written; it then loads every row in one
+// transaction and stores the files meanwhile. When anything fails, the
+// database is left empty and the files stored are taken out again, so the
+// restore can be run again. The rows of an archive made at an older schema
+// version are changed, in the same transaction, as the upgrades since
+// would have changed them (store.Loader's UpgradeLoaded): a repair an
+// upgrade made is not undone by a restore.
+//
+// sealer is the install secret the restored install will run with: an
+// archive that says its stored secrets were sealed with another is
+// refused (ErrOtherSecret). nil is for an install whose secret is lost:
+// the archive is restored, and what it sealed stays sealed for good.
+func Restore(ctx context.Context, st store.Store, files blob.Store, sealer *auth.Sealer, archive io.ReadSeeker) (Manifest, error) {
 	if n, err := st.Count(ctx, "users"); err != nil {
 		return Manifest{}, err
 	} else if n > 0 {
 		return Manifest{}, errors.New("this database already has data; a full restore goes into an empty one (to bring back one task or page, name it)")
 	}
-	m, err := read(r, func(name string, body io.Reader) error {
-		if err := readable(ctx, st, name, body); err != nil {
+	m, err := check(archive, func(made madeBy) error {
+		if err := readable(ctx, st, made); err != nil {
 			return err
 		}
-		if key, ok := strings.CutPrefix(name, "files/"); ok {
-			return files.Put(ctx, key, body, "")
-		}
-		table, ok := tableOf(name)
-		if !ok {
+		if sealer == nil || made.KeyCheck == "" {
 			return nil
 		}
-		if _, known := store.TableNamed(table); !known {
-			return nil // a table from a newer version: skip what this one cannot hold
+		if opened, err := sealer.Open(made.KeyCheck); err != nil || opened != keyCheck {
+			return ErrOtherSecret
 		}
-		batch := 500
-		if _, self := selfRefs[table]; self {
-			batch = 0 // all at once, to order parents first
-		}
-		return lines(body, batch, func(rows []map[string]any) error {
-			if len(rows) == 0 {
-				return nil
-			}
-			if cols, self := selfRefs[table]; self {
-				rows = parentsFirst(rows, cols)
-			}
-			return st.Load(ctx, table, rows)
-		})
+		return nil
 	})
 	if err != nil {
 		return m, err
 	}
-	if err := st.UpgradeLoaded(ctx, m.Schema); err != nil {
-		return m, fmt.Errorf("bringing the archive's rows up to this version: %w", err)
+	if _, err := archive.Seek(0, io.SeekStart); err != nil {
+		return m, err
+	}
+	var stored []string
+	err = st.Restore(ctx, func(l store.Loader) error {
+		if _, err := read(archive, func(name string, body io.Reader) error {
+			if key, ok := strings.CutPrefix(name, "files/"); ok {
+				stored = append(stored, key)
+				return files.Put(ctx, key, body, "")
+			}
+			return load(ctx, l, name, body)
+		}); err != nil {
+			return err
+		}
+		if err := l.UpgradeLoaded(ctx, m.Schema); err != nil {
+			return fmt.Errorf("bringing the archive's rows up to this version: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		// The rows are gone with the transaction; the files go too, even when
+		// the restore was cut off.
+		for _, key := range stored {
+			if derr := files.Delete(context.WithoutCancel(ctx), key); derr != nil {
+				err = errors.Join(err, fmt.Errorf("the stored file %s is left behind: %w", key, derr))
+			}
+		}
+		return m, err
 	}
 	return m, nil
+}
+
+// load loads one member of an archive that holds a table's rows.
+func load(ctx context.Context, l store.Loader, name string, body io.Reader) error {
+	table, ok := tableOf(name)
+	if !ok {
+		return nil
+	}
+	if _, known := store.TableNamed(table); !known {
+		return nil // a table from a newer version: skip what this one cannot hold
+	}
+	batch := 500
+	if _, self := selfRefs[table]; self {
+		batch = 0 // all at once, to order parents first
+	}
+	return lines(body, batch, func(rows []map[string]any) error {
+		if len(rows) == 0 {
+			return nil
+		}
+		if cols, self := selfRefs[table]; self {
+			rows = parentsFirst(rows, cols)
+		}
+		return l.Load(ctx, table, rows)
+	})
 }
 
 // Item names one task or page to bring back from an archive.
@@ -513,8 +728,12 @@ func str(row map[string]any, k string) string { s, _ := row[k].(string); return 
 // member reads one member of the archive: a stored file, brought back if
 // it is one of the item's, or a table's rows.
 func (ir *itemRestore) member(name string, body io.Reader) error {
-	if err := readable(ir.ctx, ir.st, name, body); err != nil {
-		return err
+	if name == schemaMember {
+		var made madeBy
+		if err := json.NewDecoder(body).Decode(&made); err != nil {
+			return fmt.Errorf("%w: its %s does not read: %w", ErrDamaged, schemaMember, err)
+		}
+		return readable(ir.ctx, ir.st, made)
 	}
 	if key, ok := strings.CutPrefix(name, "files/"); ok {
 		if ir.keys[key] {

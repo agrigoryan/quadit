@@ -5,9 +5,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -68,7 +71,7 @@ func TestBackupMovesBetweenDatabases(t *testing.T) {
 		srcFiles, _ := blob.NewDisk(t.TempDir())
 		ws, owner, _ := fill(t, src, srcFiles)
 		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, src, srcFiles, "test", &archive); err != nil {
+		if _, err := backup.Write(ctx, src, srcFiles, nil, "test", &archive); err != nil {
 			t.Fatal(err)
 		}
 		m, err := backup.Verify(bytes.NewReader(archive.Bytes()))
@@ -85,7 +88,7 @@ func TestBackupMovesBetweenDatabases(t *testing.T) {
 		// Restore onto every kind of database, whatever kind made the archive.
 		testdb.Each(t, func(t *testing.T, dst store.Store) {
 			dstFiles, _ := blob.NewDisk(t.TempDir())
-			if _, err := backup.Restore(ctx, dst, dstFiles, bytes.NewReader(archive.Bytes())); err != nil {
+			if _, err := backup.Restore(ctx, dst, dstFiles, nil, bytes.NewReader(archive.Bytes())); err != nil {
 				t.Fatalf("restore %s -> %s: %v", src.Dialect(), dst.Dialect(), err)
 			}
 			for _, tb := range store.Tables() {
@@ -126,7 +129,7 @@ func TestBackupMovesBetweenDatabases(t *testing.T) {
 				t.Fatal("search is empty after reindex")
 			}
 			// A second restore into the same database is refused.
-			if _, err := backup.Restore(ctx, dst, dstFiles, bytes.NewReader(archive.Bytes())); err == nil {
+			if _, err := backup.Restore(ctx, dst, dstFiles, nil, bytes.NewReader(archive.Bytes())); err == nil {
 				t.Fatal("restore over existing data was accepted")
 			}
 		})
@@ -139,7 +142,7 @@ func TestRestoreOneTask(t *testing.T) {
 		files, _ := blob.NewDisk(t.TempDir())
 		ws, owner, e := fill(t, st, files)
 		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, st, files, "test", &archive); err != nil {
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
 			t.Fatal(err)
 		}
 		// The task is deleted and, a month later, purged for good.
@@ -212,7 +215,7 @@ func TestRestoreOneTask(t *testing.T) {
 			t.Fatal(err)
 		}
 		var archive2 bytes.Buffer
-		if _, err := backup.Write(ctx, st, files, "test", &archive2); err != nil {
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive2); err != nil {
 			t.Fatal(err)
 		}
 		raw, _ = json.Marshal(M{"doc": res.Ref, "markdown": "first line, rewritten\n\nsecond line\n\na third line\n"})
@@ -272,7 +275,7 @@ func TestRestoreKeepsWhatTheUpgradesRepaired(t *testing.T) {
 		t.Helper()
 		testdb.Each(t, func(t *testing.T, dst store.Store) {
 			files, _ := blob.NewDisk(t.TempDir())
-			if _, err := backup.Restore(ctx, dst, files, bytes.NewReader(archive)); err != nil {
+			if _, err := backup.Restore(ctx, dst, files, nil, bytes.NewReader(archive)); err != nil {
 				t.Fatal(err)
 			}
 			if err := engine.New(dst, nil).Reindex(ctx, ws.ID); err != nil {
@@ -305,7 +308,7 @@ func TestRestoreKeepsWhatTheUpgradesRepaired(t *testing.T) {
 			}
 			files, _ := blob.NewDisk(t.TempDir())
 			var archive bytes.Buffer
-			if _, err := backup.Write(ctx, src, files, "test", &archive); err != nil {
+			if _, err := backup.Write(ctx, src, files, nil, "test", &archive); err != nil {
 				t.Fatal(err)
 			}
 			restored(t, withSchema(t, archive.Bytes(), 7, "test"), ws, func(t *testing.T, db store.DB) {
@@ -327,7 +330,7 @@ func TestRestoreKeepsWhatTheUpgradesRepaired(t *testing.T) {
 			apply(t, e, ws, owner.ID, "doc.update", M{"id": child, "private": false})
 			files, _ := blob.NewDisk(t.TempDir())
 			var archive bytes.Buffer
-			if _, err := backup.Write(ctx, src, files, "test", &archive); err != nil {
+			if _, err := backup.Write(ctx, src, files, nil, "test", &archive); err != nil {
 				t.Fatal(err)
 			}
 			restored(t, archive.Bytes(), ws, func(t *testing.T, db store.DB) {
@@ -366,7 +369,7 @@ func TestAPageBroughtBackUnderAPrivatePageIsPrivateTheSameWay(t *testing.T) {
 		root := do("doc.create", M{"title": "Plans"})
 		child := do("doc.create", M{"parent": root, "title": "Quarter one", "markdown": "quokka\n"})
 		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, st, files, "test", &archive); err != nil {
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
 			t.Fatal(err)
 		}
 		do("doc.update", M{"id": root, "private": true})
@@ -406,6 +409,7 @@ func withSchema(t *testing.T, archive []byte, schema int, version string) []byte
 	var out bytes.Buffer
 	gw := gzip.NewWriter(&out)
 	tw := tar.NewWriter(gw)
+	var head []byte // the first member, as written
 	for {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -424,15 +428,19 @@ func withSchema(t *testing.T, archive []byte, schema int, version string) []byte
 		if h.Name == "schema.json" {
 			body, _ = json.Marshal(M{"schema": schema, "version": version})
 			h.Size = int64(len(body))
+			head = body
 		}
 		if h.Name == "manifest.json" {
-			var m M
+			var m backup.Manifest
 			if err := json.Unmarshal(body, &m); err != nil {
 				t.Fatal(err)
 			}
-			m["schema"] = schema
-			if schema < 0 {
-				delete(m, "schema")
+			m.Schema = max(schema, 0)
+			// The first member's entry says it as it is now, or goes with it.
+			m.Entries = slices.DeleteFunc(m.Entries, func(e backup.Entry) bool { return e.Name == "schema.json" })
+			if schema >= 0 {
+				sum := sha256.Sum256(head)
+				m.Entries = append(m.Entries, backup.Entry{Name: "schema.json", Size: int64(len(head)), SHA256: hex.EncodeToString(sum[:])})
 			}
 			body, _ = json.Marshal(m)
 			h.Size = int64(len(body))
@@ -465,7 +473,7 @@ func TestAnArchiveOfANewerQuaditIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 		srcFiles, _ := blob.NewDisk(t.TempDir())
 		fill(t, src, srcFiles)
 		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, src, srcFiles, "test", &archive); err != nil {
+		if _, err := backup.Write(ctx, src, srcFiles, nil, "test", &archive); err != nil {
 			t.Fatal(err)
 		}
 		now, err := st.SchemaVersion(ctx)
@@ -475,7 +483,7 @@ func TestAnArchiveOfANewerQuaditIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 		newer := withSchema(t, archive.Bytes(), now+1, "9.9.9")
 
 		files, _ := blob.NewDisk(t.TempDir())
-		_, err = backup.Restore(ctx, st, files, bytes.NewReader(newer))
+		_, err = backup.Restore(ctx, st, files, nil, bytes.NewReader(newer))
 		if !errors.Is(err, backup.ErrNewerArchive) || !strings.Contains(err.Error(), "Quadit 9.9.9") {
 			t.Fatalf("a full restore of a newer archive: %v", err)
 		}
@@ -487,7 +495,7 @@ func TestAnArchiveOfANewerQuaditIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 			t.Fatalf("the refused restore stored %d files (%v)", stored, err)
 		}
 
-		if _, err := backup.Restore(ctx, st, files, bytes.NewReader(withSchema(t, archive.Bytes(), now, "test"))); err != nil {
+		if _, err := backup.Restore(ctx, st, files, nil, bytes.NewReader(withSchema(t, archive.Bytes(), now, "test"))); err != nil {
 			t.Fatalf("an archive of this version: %v", err)
 		}
 		before := withSchema(t, archive.Bytes(), -1, "")
@@ -542,7 +550,7 @@ func TestAPageBroughtBackKeepsItsThreadsOnItsWords(t *testing.T) {
 		}
 		before := do("comment.create", M{"doc": page, "block": blocks[0].ID, "quote": "first", "body": "Why first?"})
 		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, st, files, "test", &archive); err != nil {
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
 			t.Fatal(err)
 		}
 		since := do("comment.create", M{"doc": page, "block": blocks[1].ID, "quote": "second", "body": "Why second?"})

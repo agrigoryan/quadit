@@ -35,39 +35,50 @@ func Each(t *testing.T, fn func(t *testing.T, st store.Store)) {
 func EachAt(t *testing.T, version int, fn func(t *testing.T, st store.Store)) {
 	t.Helper()
 	t.Run("sqlite", func(t *testing.T) { fn(t, sqliteAt(t, version)) })
-	t.Run("postgres", func(t *testing.T) {
-		url := os.Getenv("QUADIT_TEST_POSTGRES")
-		if url == "" {
-			t.Skip("QUADIT_TEST_POSTGRES is not set")
+	t.Run("postgres", func(t *testing.T) { fn(t, postgresAt(t, version)) })
+}
+
+// Postgres opens a fresh Postgres database (a schema of its own), and
+// skips the test when QUADIT_TEST_POSTGRES is not set.
+func Postgres(t *testing.T) store.Store {
+	t.Helper()
+	return postgresAt(t, 0)
+}
+
+// postgresAt is Postgres with the schema at a version (0 = the newest).
+func postgresAt(t *testing.T, version int) store.Store {
+	t.Helper()
+	url := os.Getenv("QUADIT_TEST_POSTGRES")
+	if url == "" {
+		t.Skip("QUADIT_TEST_POSTGRES is not set")
+	}
+	schema := fmt.Sprintf("t%d", time.Now().UnixNano())
+	ctx := context.Background()
+	admin, err := sql.Open("pgx", url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.ExecContext(ctx, `CREATE SCHEMA `+schema); err != nil {
+		t.Fatal(err)
+	}
+	sep := "?"
+	if strings.Contains(url, "?") {
+		sep = "&"
+	}
+	st, err := postgres.OpenAt(ctx, url+sep+"search_path="+schema, version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := st.Close(); err != nil {
+			t.Logf("closing the test database: %v", err)
 		}
-		schema := fmt.Sprintf("t%d", time.Now().UnixNano())
-		ctx := context.Background()
-		admin, err := sql.Open("pgx", url)
-		if err != nil {
-			t.Fatal(err)
+		if _, err := admin.ExecContext(ctx, `DROP SCHEMA `+schema+` CASCADE`); err != nil {
+			t.Logf("schema %s is left behind: %v", schema, err)
 		}
-		if _, err := admin.ExecContext(ctx, `CREATE SCHEMA `+schema); err != nil {
-			t.Fatal(err)
-		}
-		sep := "?"
-		if strings.Contains(url, "?") {
-			sep = "&"
-		}
-		st, err := postgres.OpenAt(ctx, url+sep+"search_path="+schema, version)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			if err := st.Close(); err != nil {
-				t.Logf("closing the test database: %v", err)
-			}
-			if _, err := admin.ExecContext(ctx, `DROP SCHEMA `+schema+` CASCADE`); err != nil {
-				t.Logf("schema %s is left behind: %v", schema, err)
-			}
-			admin.Close()
-		})
-		fn(t, st)
+		admin.Close()
 	})
+	return st
 }
 
 // SQLite opens a fresh SQLite database in a temporary directory.

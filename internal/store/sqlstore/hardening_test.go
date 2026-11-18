@@ -296,16 +296,18 @@ func TestNamesOutsideTheSchemaAreRefused(t *testing.T) {
 				_, err := db.Update(ctx, "tasks", map[string]any{"title": "x"}, store.Gt(bad, 1))
 				return err
 			},
-			"Delete table":  func() error { _, err := db.Delete(ctx, bad); return err },
-			"Delete where":  func() error { _, err := db.Delete(ctx, "tasks", store.In(bad, []string{"x"})); return err },
-			"Incr table":    func() error { _, err := db.Incr(ctx, bad, "number", 1); return err },
-			"Incr column":   func() error { _, err := db.Incr(ctx, "tasks", bad, 1, store.Eq("id", some.ID)); return err },
-			"Tally table":   func() error { _, err := db.Tally(ctx, bad, nil); return err },
-			"Tally group":   func() error { _, err := db.Tally(ctx, "tasks", []string{"priority", bad}); return err },
-			"Tally where":   func() error { _, err := db.Tally(ctx, "tasks", nil, store.NotNull(bad)); return err },
-			"Upsert key":    func() error { return db.Upsert(ctx, some, bad) },
-			"Upsert key 2":  func() error { return db.Upsert(ctx, some, "id", bad) },
-			"Dump table":    func() error { return s.Dump(ctx, bad, func(map[string]any) error { return nil }) },
+			"Delete table": func() error { _, err := db.Delete(ctx, bad); return err },
+			"Delete where": func() error { _, err := db.Delete(ctx, "tasks", store.In(bad, []string{"x"})); return err },
+			"Incr table":   func() error { _, err := db.Incr(ctx, bad, "number", 1); return err },
+			"Incr column":  func() error { _, err := db.Incr(ctx, "tasks", bad, 1, store.Eq("id", some.ID)); return err },
+			"Tally table":  func() error { _, err := db.Tally(ctx, bad, nil); return err },
+			"Tally group":  func() error { _, err := db.Tally(ctx, "tasks", []string{"priority", bad}); return err },
+			"Tally where":  func() error { _, err := db.Tally(ctx, "tasks", nil, store.NotNull(bad)); return err },
+			"Upsert key":   func() error { return db.Upsert(ctx, some, bad) },
+			"Upsert key 2": func() error { return db.Upsert(ctx, some, "id", bad) },
+			"Dump table": func() error {
+				return s.Snapshot(ctx, func(snap store.Snapshot) error { return snap.Dump(ctx, bad, func(map[string]any) error { return nil }) })
+			},
 			"Load table":    func() error { return s.Load(ctx, bad, []map[string]any{{"id": "x"}}) },
 			"Overwrite tbl": func() error { return s.Overwrite(ctx, bad, map[string]any{}, nil) },
 			"Overwrite at":  func() error { return s.Overwrite(ctx, "tasks", map[string]any{}, nil, store.Eq(bad, "x")) },

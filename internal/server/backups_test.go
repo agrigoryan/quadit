@@ -7,8 +7,11 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -151,4 +154,65 @@ func TestTwoBackupsInOneSecondAreTwoFiles(t *testing.T) {
 			t.Errorf("a backup's file is not there: %v", err)
 		}
 	}
+}
+
+// TestAPurgedFileStaysInStorageADay: emptying the trash takes a file's
+// rows out at once and its bytes a day later, so a backup that read the
+// rows before they went still finds the bytes to copy.
+func TestAPurgedFileStaysInStorageADay(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		ctx := context.Background()
+		disk, err := blob.NewDisk(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		newSiteWithFiles(t, st, disk)
+		var ws core.Workspace
+		if err := st.Get(ctx, &ws, store.Eq("slug", "games")); err != nil {
+			t.Fatal(err)
+		}
+		var owner core.Member
+		if err := st.In(ws.ID).Get(ctx, &owner, store.Eq("role", "owner")); err != nil {
+			t.Fatal(err)
+		}
+		long := time.Now().Add(-31 * 24 * time.Hour).UnixMilli()
+		f := core.File{ID: id.New(), WorkspaceID: ws.ID, Name: "old.png", ContentType: "image/png", Size: 3, State: core.FileReady,
+			UploadedBy: owner.UserID, CreatedAt: long, DeletedAt: long}
+		f.StorageKey = ws.ID + "/" + f.ID
+		if err := disk.Put(ctx, f.StorageKey, strings.NewReader("PNG"), ""); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.In(ws.ID).Insert(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		stored := func() bool {
+			r, _, err := disk.Open(ctx, f.StorageKey)
+			if err == nil {
+				r.Close()
+			}
+			return err == nil
+		}
+		if err := st.Insert(ctx, core.Job{ID: id.New(), Kind: "trash.purge", RunAt: time.Now().UnixMilli(), CreatedAt: time.Now().UnixMilli()}); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "the trash to be emptied of the file's row", func() bool {
+			n, err := st.Count(ctx, "files", store.Eq("id", f.ID))
+			return err == nil && n == 0
+		})
+		if !stored() {
+			t.Fatal("the file's bytes went with its row")
+		}
+		var removal []core.Job
+		if err := st.List(ctx, &removal, store.Where(store.Eq("kind", "files.remove"))); err != nil || len(removal) != 1 {
+			t.Fatalf("the removal of the bytes is queued as %+v (%v)", removal, err)
+		}
+		if wait := time.Until(time.UnixMilli(removal[0].RunAt)); wait < 23*time.Hour {
+			t.Fatalf("the bytes are to be removed in %s, want a day", wait)
+		}
+		// A day later.
+		if _, err := st.Update(ctx, "jobs", map[string]any{"run_at": time.Now().UnixMilli()}, store.Eq("id", removal[0].ID)); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "the bytes to be removed a day later", func() bool { return !stored() })
+	})
 }

@@ -40,13 +40,6 @@ func (s *failing) Count(ctx context.Context, table string, where ...store.Cond) 
 	return s.Store.Count(ctx, table, where...)
 }
 
-func (s *failing) Load(ctx context.Context, table string, rows []map[string]any) error {
-	if s.op == "write" && table == s.table {
-		return errFault
-	}
-	return s.Store.Load(ctx, table, rows)
-}
-
 func (s *failing) Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...store.Cond) error {
 	if s.op == "write" && table == s.table {
 		return errFault
@@ -94,7 +87,7 @@ func TestRestoreItemStopsWhenItsParentCannotBeLookedUp(t *testing.T) {
 			t.Fatal(err)
 		}
 		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, st, files, "test", &archive); err != nil {
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
 			t.Fatal(err)
 		}
 		for name, c := range map[string]struct {
@@ -141,7 +134,7 @@ func TestRestoreItemIsAllOrNothing(t *testing.T) {
 		}
 		page := docID(t, st, ws.ID, "Design")
 		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, st, files, "test", &archive); err != nil {
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
 			t.Fatal(err)
 		}
 		// Both change after the backup, so a restore has something to set back.
@@ -174,15 +167,21 @@ func TestRestoreItemIsAllOrNothing(t *testing.T) {
 func snapshot(t *testing.T, st store.Store) string {
 	t.Helper()
 	var lines []string
-	for _, tb := range store.Tables() {
-		err := st.Dump(context.Background(), tb.Name, func(row map[string]any) error {
-			line, err := json.Marshal(row)
-			lines = append(lines, tb.Name+" "+string(line))
-			return err
-		})
-		if err != nil {
-			t.Fatal(err)
+	err := st.Snapshot(context.Background(), func(snap store.Snapshot) error {
+		for _, tb := range store.Tables() {
+			err := snap.Dump(context.Background(), tb.Name, func(row map[string]any) error {
+				line, err := json.Marshal(row)
+				lines = append(lines, tb.Name+" "+string(line))
+				return err
+			})
+			if err != nil {
+				return err
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 	slices.Sort(lines)
 	return strings.Join(lines, "\n")

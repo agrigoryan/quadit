@@ -1,11 +1,14 @@
 // Whole tables out and back in, as column -> value maps, for
-// backups that work across databases.
+// backups that work across databases: out from one moment of the
+// database (Snapshot), in all at once (Restore).
 
 package sqlstore
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -14,14 +17,33 @@ import (
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
+// Snapshot calls fn with the database as it stood at one moment: a
+// transaction that only reads, at repeatable read. On Postgres that is a
+// snapshot taken at its first statement; on SQLite in WAL mode a read
+// transaction sees the database as it was at its first read, and does not
+// stop writers (a read-only transaction begins deferred, not immediate).
+func (s *Store) Snapshot(ctx context.Context, fn func(store.Snapshot) error) error {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	err = fn(conn{runner: runner{handle: tx, dialect: s.d}})
+	// Nothing was written: ending the transaction only lets go of the
+	// moment it held.
+	if rbErr := tx.Rollback(); err == nil && !errors.Is(rbErr, sql.ErrTxDone) {
+		err = rbErr
+	}
+	return err
+}
+
 // Dump calls each with every row of a table as column -> value. Columns
 // holding their zero value are left out.
-func (s *Store) Dump(ctx context.Context, table string, each func(row map[string]any) error) error {
+func (c conn) Dump(ctx context.Context, table string, each func(row map[string]any) error) error {
 	m, err := metaNamed(table)
 	if err != nil {
 		return err
 	}
-	rows, err := s.query(ctx, "SELECT "+m.cols+" FROM "+m.name)
+	rows, err := c.query(ctx, "SELECT "+m.cols+" FROM "+m.name)
 	if err != nil {
 		return err
 	}
@@ -86,10 +108,16 @@ func jsonArg(val any) any {
 	return string(b)
 }
 
+// Restore runs fn in one transaction whose Loader loads an archive's rows
+// and brings them up to this schema: all of it is stored, or none.
+func (s *Store) Restore(ctx context.Context, fn func(store.Loader) error) error {
+	return s.inTx(ctx, func(r runner) error { return fn(conn{runner: r}) })
+}
+
 // Load inserts rows produced by Dump (after a trip through JSON), all in one
 // transaction.
 func (s *Store) Load(ctx context.Context, table string, rows []map[string]any) error {
-	return s.inTx(ctx, func(r runner) error { return conn{runner: r}.Load(ctx, table, rows) })
+	return s.Restore(ctx, func(l store.Loader) error { return l.Load(ctx, table, rows) })
 }
 
 // Load inserts rows produced by Dump. In a conn bound to a workspace, a

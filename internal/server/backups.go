@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -37,9 +38,13 @@ func (s *Server) backupRoutes() []route {
 
 // How long what is thrown away is kept.
 const (
-	trashKeep          = 30 * 24 * time.Hour // the trash, and deleted workspaces
-	oneTimeTokenKeep   = 24 * time.Hour      // one-time secrets, after they expire
-	endedSessionKeep   = 7 * 24 * time.Hour  // sessions, after they end
+	trashKeep        = 30 * 24 * time.Hour // the trash, and deleted workspaces
+	oneTimeTokenKeep = 24 * time.Hour      // one-time secrets, after they expire
+	endedSessionKeep = 7 * 24 * time.Hour  // sessions, after they end
+	// removedFileKeep is how long file storage keeps a file once no row
+	// names it: longer than a backup takes, so one that read the rows
+	// before they went still finds the file to copy (package backup).
+	removedFileKeep    = 24 * time.Hour
 	defaultBackupsKept = 14
 )
 
@@ -50,29 +55,25 @@ func (s *Server) jobBackup(ctx context.Context, _ core.Job) error {
 }
 
 // jobPurgeTrash empties the trash of what is over 30 days old, removes the
-// workspaces deleted that long ago with their files, and drops old
-// one-time secrets and ended sessions. The rows are gone before their files
-// are removed, so a file that cannot be removed is logged: nothing would
-// find it again.
+// workspaces deleted that long ago, and drops old one-time secrets and
+// ended sessions. The rows go now and their stored files a day later
+// (removedFileKeep, jobRemoveFiles); a removal that cannot be queued is
+// logged, as nothing would find those files again.
 func (s *Server) jobPurgeTrash(ctx context.Context, _ core.Job) error {
 	n, keys, err := s.eng.PurgeTrash(ctx, trashKeep)
-	for _, k := range keys {
-		s.removeStoredFile(ctx, k)
-	}
 	if n > 0 {
 		s.log.Info("emptied the trash", "items", n)
 	}
 	// Workspaces deleted a month ago go for good, with their files.
 	prefixes, werr := s.eng.PurgeWorkspaces(ctx, trashKeep)
-	for _, prefix := range prefixes {
-		var keys []string
-		if lerr := s.fileStore().List(ctx, prefix, func(key string, _ int64) error { keys = append(keys, key); return nil }); lerr != nil {
-			s.log.Error("listing the files of a deleted workspace; they are left behind", "prefix", prefix, "err", lerr)
+	if len(prefixes) > 0 {
+		s.log.Info("removed deleted workspaces for good", "workspaces", len(prefixes))
+	}
+	if len(keys) > 0 || len(prefixes) > 0 {
+		removal := filesRemoval{Keys: keys, Prefixes: prefixes}
+		if qerr := s.enqueue(ctx, "files.remove", "", "", removal, time.Now().Add(removedFileKeep)); qerr != nil {
+			s.log.Error("queueing the removal of purged files; they are left behind", "files", len(keys), "workspaces", len(prefixes), "err", qerr)
 		}
-		for _, k := range keys {
-			s.removeStoredFile(ctx, k)
-		}
-		s.log.Info("removed a deleted workspace for good", "files", len(keys))
 	}
 	if err == nil {
 		err = werr
@@ -88,11 +89,34 @@ func (s *Server) jobPurgeTrash(ctx context.Context, _ core.Job) error {
 	return err
 }
 
-// removeStoredFile removes a file whose row is gone, logging a failure.
-func (s *Server) removeStoredFile(ctx context.Context, key string) {
-	if err := s.fileStore().Delete(ctx, key); err != nil {
-		s.log.Error("removing a file that was purged; it is left behind", "key", key, "err", err)
+// filesRemoval is a files.remove job: stored files no row names any more,
+// by key, and every file under a prefix (a workspace purged).
+type filesRemoval struct {
+	Keys     []string `json:"keys,omitempty"`
+	Prefixes []string `json:"prefixes,omitempty"`
+}
+
+// jobRemoveFiles removes the stored files a purge left a day before. A
+// file that cannot be removed fails the job, which is tried again; one
+// already gone is removed.
+func (s *Server) jobRemoveFiles(ctx context.Context, j core.Job) error {
+	var removal filesRemoval
+	if err := json.Unmarshal(j.Payload, &removal); err != nil {
+		return fmt.Errorf("the job's payload: %w", err)
 	}
+	keys := removal.Keys
+	for _, prefix := range removal.Prefixes {
+		if err := s.fileStore().List(ctx, prefix, func(key string, _ int64) error { keys = append(keys, key); return nil }); err != nil {
+			return fmt.Errorf("listing the files of a purged workspace: %w", err)
+		}
+	}
+	var failed []error
+	for _, key := range keys {
+		if err := s.fileStore().Delete(ctx, key); err != nil {
+			failed = append(failed, fmt.Errorf("%s: %w", key, err))
+		}
+	}
+	return errors.Join(failed...)
 }
 
 // backupSetting is the "backup" setting of the admin area.
@@ -178,12 +202,15 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 
 	// Write the archive, noting its size and checksum.
 	h := sha256.New()
-	_, err = backup.Write(ctx, s.st, s.fileStore(), s.cfg.Version, io.MultiWriter(out, h))
+	m, err := backup.Write(ctx, s.st, s.fileStore(), s.sealer, s.cfg.Version, io.MultiWriter(out, h))
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
 		return finish(err)
+	}
+	if len(m.Missing) > 0 {
+		s.log.Warn("backup: stored files the database names are not in file storage, so they are not in the archive", "files", m.Missing)
 	}
 	info, err := os.Stat(path)
 	if err != nil {

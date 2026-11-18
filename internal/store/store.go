@@ -11,8 +11,8 @@
 //	       hands out the workspace's event numbers and stores events, and
 //	       can set rows back from an archive (Load, Overwrite).
 //	Store  one database: a DB that sees every row, plus Write and Atomic
-//	       (transactions), Dump, Load, Overwrite, SchemaVersion and
-//	       UpgradeLoaded (backups), and In.
+//	       (transactions), Snapshot, Restore, Overwrite and SchemaVersion
+//	       (backups), and In.
 //
 // In(workspaceID) returns a DB bound to that workspace, and that is the
 // guarantee the rest of the code relies on: every statement it runs on a
@@ -234,17 +234,35 @@ type Store interface {
 	// for sign-in, settings and other install-level writes.
 	Atomic(ctx context.Context, fn func(DB) error) error
 
-	// Dump and Load move every row of a table, for backups that work across
-	// databases.
-	Dump(ctx context.Context, table string, each func(row map[string]any) error) error
-	Load(ctx context.Context, table string, rows []map[string]any) error
+	// Snapshot calls fn with the database as it stood at one moment: every
+	// read through the Snapshot sees the same writes, whatever is written
+	// meanwhile. A backup reads every table through one, so the archive is
+	// the database at one moment.
+	Snapshot(ctx context.Context, fn func(Snapshot) error) error
+	// Restore runs fn in one transaction that loads an archive's rows:
+	// when fn returns nil all of it is stored, and when it fails, none.
+	Restore(ctx context.Context, fn func(Loader) error) error
 	// Overwrite sets the matching rows to what an archive row says, leaving
 	// the columns named in keep as they are.
 	Overwrite(ctx context.Context, table string, row map[string]any, keep []string, where ...Cond) error
 	// SchemaVersion is the schema version the database is at, which an
 	// archive records.
 	SchemaVersion(ctx context.Context) (int, error)
-	// UpgradeLoaded does to rows loaded from an archive made at schema
+}
+
+// Snapshot is a database read at one moment, inside Store.Snapshot.
+type Snapshot interface {
+	// Dump calls each with every row of a table as column -> value, for
+	// backups that work across databases. Columns holding their zero
+	// value are left out.
+	Dump(ctx context.Context, table string, each func(row map[string]any) error) error
+}
+
+// Loader loads an archive's rows, inside Store.Restore.
+type Loader interface {
+	// Load inserts rows produced by Dump, after a trip through JSON.
+	Load(ctx context.Context, table string, rows []map[string]any) error
+	// UpgradeLoaded does to the rows loaded from an archive made at schema
 	// version from what the upgrades since did to stored rows, so they read
 	// as an upgrade would have left them. From 0 does all of it.
 	UpgradeLoaded(ctx context.Context, from int) error

@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/pressly/goose/v3"
+
+	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // Migrate brings the schema up to date. goose runs each version in its own
@@ -98,24 +100,28 @@ func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
 // transaction. From 0, for an archive that does not say its version, runs
 // every one.
 func (s *Store) UpgradeLoaded(ctx context.Context, from int) error {
-	versions, err := schemaVersions(s.d)
+	return s.Restore(ctx, func(l store.Loader) error { return l.UpgradeLoaded(ctx, from) })
+}
+
+// UpgradeLoaded is Store.UpgradeLoaded inside a transaction of Restore,
+// with the rows it loaded.
+func (c conn) UpgradeLoaded(ctx context.Context, from int) error {
+	versions, err := schemaVersions(c.dialect)
 	if err != nil {
 		return err
 	}
-	return s.inTx(ctx, func(r runner) error {
-		for _, v := range versions[min(from, len(versions)):] {
-			for _, stmt := range statements(v.sql) {
-				if !changesRows(stmt) {
-					continue
-				}
-				// The file's SQL as goose runs it: there are no placeholders to rebind.
-				if _, err := r.handle.ExecContext(ctx, stmt); err != nil {
-					return fmt.Errorf("version %d: %w", v.number, err)
-				}
+	for _, v := range versions[min(from, len(versions)):] {
+		for _, stmt := range statements(v.sql) {
+			if !changesRows(stmt) {
+				continue
+			}
+			// The file's SQL as goose runs it: there are no placeholders to rebind.
+			if _, err := c.handle.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("version %d: %w", v.number, err)
 			}
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // statements cuts a version's SQL where goose does: at a semicolon that
