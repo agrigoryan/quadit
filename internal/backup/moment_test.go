@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -505,109 +504,32 @@ func TestARestoreNeedsTheSecretThatSealedTheArchive(t *testing.T) {
 	})
 }
 
-// TestARestoreOfAnArchiveWithoutAKeyCheckTriesWhatItSealed: an archive
-// made before archives carried a key check (or made without the install's
-// secret) is held to the same rule by what it holds where Quadit seals
-// values: a restore with a secret that opens none of its stored secrets is
-// refused before anything is written, one with the secret that sealed them
-// goes ahead, and so does one that says the secret is lost. An archive
-// that holds no stored secret has nothing a wrong secret could lose. What
-// people wrote is not a stored secret, whatever it looks like: it neither
-// refuses an archive nor vouches for one.
-func TestARestoreOfAnArchiveWithoutAKeyCheckTriesWhatItSealed(t *testing.T) {
+// TestARestoreOfAnArchiveWithoutAKeyCheckIsRefused: an archive that does
+// not say which install secret sealed its stored secrets cannot be checked,
+// so a full restore given a secret refuses it before anything is written;
+// one that says the secret is lost restores it.
+func TestARestoreOfAnArchiveWithoutAKeyCheckIsRefused(t *testing.T) {
 	ctx := context.Background()
-	original, _ := auth.NewSealer([]byte("the original install secret"))
-	other, _ := auth.NewSealer([]byte("a secret made by a new install"))
-	sealed := func(t *testing.T, by *auth.Sealer, plain string) string {
-		t.Helper()
-		v, err := by.Seal(plain)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return v
-	}
-	// archiveOf is an archive with no key check, of an install that add
-	// put its stored secrets, and anything else, into.
-	archiveOf := func(t *testing.T, add func(st store.Store, ws core.Workspace, e *engine.Engine, owner core.User)) []byte {
-		t.Helper()
-		st := testdb.SQLite(t)
-		files, _ := blob.NewDisk(t.TempDir())
-		ws, owner, e := fill(t, st, files)
-		add(st, ws, e, owner)
-		var archive bytes.Buffer
-		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
-			t.Fatal(err)
-		}
-		return archive.Bytes()
-	}
-	// A mail password, sealed inside the setting's JSON as the admin area
-	// keeps it.
-	mailPassword := func(t *testing.T, st store.Store, value string) {
-		t.Helper()
-		mail := core.Setting{Name: "mail", Value: json.RawMessage(`{"host":"smtp.example.com","password":"` + value + `"}`), UpdatedAt: 1}
-		if err := st.Insert(ctx, mail); err != nil {
-			t.Fatal(err)
-		}
-	}
-	withSecrets := archiveOf(t, func(st store.Store, _ core.Workspace, _ *engine.Engine, _ core.User) {
-		mailPassword(t, st, sealed(t, original, "a mail password"))
-	})
-	restore := func(t *testing.T, sealer *auth.Sealer, archive []byte) error {
-		t.Helper()
-		dst, dstFiles := fresh(t, testdb.SQLite(t))
-		_, err := backup.Restore(ctx, dst, dstFiles, sealer, bytes.NewReader(archive))
-		if errors.Is(err, backup.ErrOtherSecret) {
-			emptyAfterwards(t, dst, dstFiles)
-		}
-		return err
+	st := testdb.SQLite(t)
+	files, _ := blob.NewDisk(t.TempDir())
+	fill(t, st, files)
+	var archive bytes.Buffer
+	if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
+		t.Fatal(err)
 	}
 
-	t.Run("another secret is refused", func(t *testing.T) {
-		if err := restore(t, other, withSecrets); !errors.Is(err, backup.ErrOtherSecret) {
-			t.Fatalf("restoring with another secret = %v", err)
+	t.Run("given a secret", func(t *testing.T) {
+		dst, dstFiles := fresh(t, st)
+		secret, _ := auth.NewSealer([]byte("the original install secret"))
+		if _, err := backup.Restore(ctx, dst, dstFiles, secret, bytes.NewReader(archive.Bytes())); !errors.Is(err, backup.ErrNoKeyCheck) {
+			t.Fatalf("restoring an archive without a key check = %v", err)
 		}
-	})
-	t.Run("a vault secret sealed with another secret", func(t *testing.T) {
-		archive := archiveOf(t, func(st store.Store, ws core.Workspace, _ *engine.Engine, owner core.User) {
-			sec := core.Secret{ID: id.New(), WorkspaceID: ws.ID, Name: "DEPLOY_KEY", Value: sealed(t, original, "sk-1234"), CreatedBy: owner.ID, CreatedAt: 1, UpdatedAt: 1}
-			if err := st.In(ws.ID).Insert(ctx, sec); err != nil {
-				t.Fatal(err)
-			}
-		})
-		if err := restore(t, other, archive); !errors.Is(err, backup.ErrOtherSecret) {
-			t.Fatalf("restoring with another secret = %v", err)
-		}
-	})
-	t.Run("the secret that sealed it", func(t *testing.T) {
-		if err := restore(t, original, withSecrets); err != nil {
-			t.Fatal(err)
-		}
+		emptyAfterwards(t, dst, dstFiles)
 	})
 	t.Run("a secret said to be lost", func(t *testing.T) {
-		if err := restore(t, nil, withSecrets); err != nil {
+		dst, dstFiles := fresh(t, st)
+		if _, err := backup.Restore(ctx, dst, dstFiles, nil, bytes.NewReader(archive.Bytes())); err != nil {
 			t.Fatal(err)
-		}
-	})
-	t.Run("nothing sealed", func(t *testing.T) {
-		if err := restore(t, other, archiveOf(t, func(store.Store, core.Workspace, *engine.Engine, core.User) {})); err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("a description that looks sealed", func(t *testing.T) {
-		archive := archiveOf(t, func(_ store.Store, ws core.Workspace, e *engine.Engine, owner core.User) {
-			change(t, e, ws, owner, "task.update", M{"id": "SVA-1", "description": "v1:" + base64.RawStdEncoding.EncodeToString(make([]byte, 29))})
-		})
-		if err := restore(t, other, archive); err != nil {
-			t.Fatalf("an archive with nothing sealed but a description that looks it: %v", err)
-		}
-	})
-	t.Run("a description sealed with the secret given", func(t *testing.T) {
-		archive := archiveOf(t, func(st store.Store, ws core.Workspace, e *engine.Engine, owner core.User) {
-			mailPassword(t, st, sealed(t, original, "a mail password"))
-			change(t, e, ws, owner, "task.update", M{"id": "SVA-1", "description": sealed(t, other, "pasted")})
-		})
-		if err := restore(t, other, archive); !errors.Is(err, backup.ErrOtherSecret) {
-			t.Fatalf("an archive whose stored secrets do not open, vouched for by a description: %v", err)
 		}
 	})
 }

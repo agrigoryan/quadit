@@ -272,7 +272,8 @@ func restoreAll(ctx context.Context, st store.Store, files blob.Store, own *auth
 		return 2
 	}
 	m, err := backup.Restore(ctx, st, files, sealer, archive)
-	if errors.Is(err, backup.ErrOtherSecret) {
+	switch {
+	case errors.Is(err, backup.ErrOtherSecret):
 		fmt.Fprintf(os.Stderr, `restore failed: %v; nothing was restored.
 Give the original install's secret: --secret-key /path/to/its/data/secret.key
 (or set QUADIT_SECRET as it was set there). If it is lost for good,
@@ -281,8 +282,16 @@ sign-in), vault secrets, integration tokens and the mail and storage
 passwords must then be set again.
 `, err)
 		return 1
-	}
-	if err != nil {
+	case errors.Is(err, backup.ErrNoKeyCheck):
+		fmt.Fprintf(os.Stderr, `restore failed: %v, so the install secret cannot be checked; nothing was restored.
+--without-secret-key restores it unchecked: sign-in codes (two-step sign-in),
+vault secrets, integration tokens and the mail and storage passwords open
+only if this install's secret is the one that sealed them (put the original
+secret.key in the data directory, or set QUADIT_SECRET as it was set there);
+otherwise they must be set again.
+`, err)
+		return 1
+	case err != nil:
 		fmt.Fprintln(os.Stderr, "restore failed:", err)
 		return 1
 	}

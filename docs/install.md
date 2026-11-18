@@ -118,7 +118,7 @@ An archive is the install at one moment, taken while it runs: every table as it 
 - Without the flag, the restore uses the install's own secret, and refuses, changing nothing, when that is not the one the archive was made with.
 - `--without-secret-key` is for a secret that is lost for good: everything else is restored, and two-step sign-in, vault secrets, integrations, mail and file storage settings must be set up again.
 
-An archive made before archives carried their own check of the secret (by Quadit before 0.1.0) is checked on what it holds: the restore tries the secret on the secrets it stored encrypted (sign-in codes for two-step sign-in, vault secrets, integration tokens, and the passwords and keys in its settings), and refuses as above when it opens none of them. What people wrote in tasks and pages is not tried, whatever it looks like. An archive with no encrypted value in it has nothing a wrong secret could lose, and is restored.
+An archive that does not say which secret it was made with cannot be checked, and a full restore refuses it. `--without-secret-key` restores it unchecked: its encrypted values open only if this install's secret (its `secret.key`, or `QUADIT_SECRET`) is the one they were sealed with, and must be set up again otherwise.
 
 A full restore goes into an empty install. It reads the whole archive first and refuses a damaged one before writing anything; then it loads every row in one transaction. When it fails, the database is left empty and the files it stored are taken out again, so it can simply be run again. An archive holds no part of an upload that was still arriving: after a restore, such an upload is sent again from the start.
 
