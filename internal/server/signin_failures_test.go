@@ -80,10 +80,10 @@ func secondServer(t *testing.T, st store.Store) *site {
 	}
 	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
 	hs, base := localhostServer(t)
-	srv := server.New(server.Config{DataDir: dir, BaseURL: base, Version: "test"}, st, files, sealer)
+	ctx, stop := context.WithCancel(context.Background())
+	srv := server.New(ctx, server.Config{DataDir: dir, BaseURL: base, Version: "test"}, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()
-	ctx, stop := context.WithCancel(context.Background())
 	go srv.Run(ctx)
 	t.Cleanup(func() { stop(); hs.Close() })
 	return &site{t: t, url: base, dir: dir, srv: srv}

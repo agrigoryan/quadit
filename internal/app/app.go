@@ -191,7 +191,7 @@ func Serve(args []string, version string) int {
 		log.Error("file storage", "err", err)
 		return 1
 	}
-	srv := server.New(server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: version, Log: log,
+	srv := server.New(ctx, server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: version, Log: log,
 		PrivateNetworks: privateNets, TrustedProxies: proxies}, st, files, sealer)
 	if web := WebHandler(); web != nil {
 		srv.SetWeb(web)

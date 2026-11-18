@@ -73,10 +73,10 @@ func newSiteOf(t *testing.T, st store.Store, files blob.Store, configure func(*s
 	if configure != nil {
 		configure(&cfg)
 	}
-	srv := server.New(cfg, st, files, sealer)
+	ctx, stop := context.WithCancel(context.Background())
+	srv := server.New(ctx, cfg, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()
-	ctx, stop := context.WithCancel(context.Background())
 	ran := make(chan struct{})
 	go func() {
 		defer close(ran)

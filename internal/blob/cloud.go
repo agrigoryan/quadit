@@ -217,16 +217,21 @@ func (l Layered) List(ctx context.Context, prefix string, each func(string, int6
 	})
 }
 
+// ErrUnusable is what every call of an Unusable store returns, with why:
+// the store that is set cannot be used now, and may be later.
+var ErrUnusable = errors.New("file storage cannot be used")
+
 // Unusable stands in for a file store that is set but cannot be used: it
-// could not be opened, or refused a test write. Every call answers why, so
-// that meanwhile nothing is written to, or looked for in, another store.
+// is still being opened, could not be opened, or refused a test write.
+// Every call answers why, so that meanwhile nothing is written to, or
+// looked for in, another store.
 type Unusable struct {
 	Set string // the kind of store that is set: s3, gcs or azure
 	Err error  // why it cannot be used
 }
 
 func (u Unusable) why() error {
-	return fmt.Errorf("the %s store cannot be used: %w", u.Set, u.Err)
+	return fmt.Errorf("%w: the %s store: %w", ErrUnusable, u.Set, u.Err)
 }
 
 // Kind is the kind of store that is set.

@@ -227,10 +227,10 @@ func TestTwoServersOneDatabase(t *testing.T) {
 		files, _ := blob.NewDisk(a.dir + "/files")
 		sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
 		hs := httptest.NewUnstartedServer(nil)
-		srvB := server.New(server.Config{DataDir: t.TempDir(), BaseURL: a.url, Version: "test"}, st, files, sealer)
+		ctx, stop := context.WithCancel(context.Background())
+		srvB := server.New(ctx, server.Config{DataDir: t.TempDir(), BaseURL: a.url, Version: "test"}, st, files, sealer)
 		hs.Config.Handler = srvB.Handler()
 		hs.Start()
-		ctx, stop := context.WithCancel(context.Background())
 		go srvB.Run(ctx)
 		t.Cleanup(func() { stop(); hs.Close() })
 		b := &site{t: t, url: hs.URL, owner: a.owner, srv: srvB}
