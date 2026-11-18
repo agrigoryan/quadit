@@ -1,11 +1,7 @@
 // The `test` every desktop spec imports: Playwright's, with the app started
 // fresh for each test (its own empty data folder) and three things of the
-// main process stood in for, so nothing leaves the test and what the app
-// did can be read back:
-//
-//   shell.openExternal          records the address instead of opening the system browser
-//   Notification.prototype.show records the notification instead of showing it
-//   dialog.showMessageBox       records the message and answers "Later"
+// main process stood in for from its start (stand-ins.cjs), so nothing
+// leaves the test and what the app did can be read back.
 
 import { createHash, randomBytes } from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
@@ -32,33 +28,14 @@ export class Desktop {
   ) {}
 
   /**
-   * Starts the app (from out/, or `executable` when given) on the data
-   * folder `data`, with the stand-ins in place. `args` are given to it as a
-   * system gives a link that starts the app (Windows and Linux; macOS reads
-   * the same argument at start).
+   * Starts the app from out/ on the data folder `data`, with the stand-ins
+   * in place. `args` are given to it as a system gives a link that starts
+   * the app (Windows and Linux; macOS reads the same argument at start).
    */
-  static async launch(
-    data: string,
-    run: Run,
-    options: { args?: string[]; executable?: string } = {},
-  ): Promise<Desktop> {
-    const args = options.args ?? [];
+  static async launch(data: string, run: Run, args: string[] = []): Promise<Desktop> {
     const app = await electron.launch({
-      ...(options.executable ? { executablePath: options.executable, args } : { args: [APP_DIR, ...args] }),
+      args: ["-r", join(__dirname, "stand-ins.cjs"), APP_DIR, ...args],
       env: { ...process.env, QUADIT_DESKTOP_DATA: data },
-    });
-    await app.evaluate(({ dialog, Notification, shell }) => {
-      const recorded = { opened: [] as string[], notes: [] as Electron.Notification[], dialogs: [] as string[] };
-      Object.assign(globalThis, { e2e: recorded });
-      shell.openExternal = async (url: string) => void recorded.opened.push(url);
-      Notification.prototype.show = function show(this: Electron.Notification) {
-        recorded.notes.push(this);
-      };
-      dialog.showMessageBox = async (...args: unknown[]) => {
-        const options = args.at(-1) as Electron.MessageBoxOptions;
-        recorded.dialogs.push(`${options.message} ${options.detail ?? ""}`.trim());
-        return { response: 1, checkboxChecked: false };
-      };
     });
     return new Desktop(app, data, run);
   }

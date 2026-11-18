@@ -136,7 +136,7 @@ test("a quadit://open link to the sign-in finish does not sign in the app that i
 
   // The attacker's link starts the app: its window is still loading when the link is read.
   const { code, verifier } = await attackersCode(run);
-  desktop = await Desktop.launch(data, run, { args: [finishLink(run, code, verifier)] });
+  desktop = await Desktop.launch(data, run, [finishLink(run, code, verifier)]);
   try {
     const page = await desktop.pageOf(run.server);
     await expect(page).toHaveURL(/\/login/);
