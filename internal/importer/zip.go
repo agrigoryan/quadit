@@ -11,14 +11,15 @@ import (
 	"strings"
 )
 
-// unzipLimits bound what one export unpacks to, the files of the zips
-// nested in it included; a nested zip itself is held to the limit of one
-// file, and is gone once unpacked. An export over any limit is refused
-// whole: a file is never cut short to fit.
+// unzipLimits bound what one export unpacks to. Every entry of every zip
+// in it counts: a folder and a nested zip are each one of the files, and a
+// nested zip's own bytes count toward the total as well as what it holds,
+// since both are on disk while it is unpacked. An export over any limit is
+// refused whole: a file is never cut short to fit.
 type unzipLimits struct {
 	fileBytes  int64 // one file
 	totalBytes int64 // every file
-	files      int   // how many files
+	files      int   // how many entries: files, folders and zips
 	depth      int   // how many zips deep: 1 is the export alone
 }
 
@@ -59,31 +60,27 @@ func (u *unzipping) unzip(src, dst string, depth int) (err error) {
 		if !strings.HasPrefix(p, filepath.Clean(dst)+string(os.PathSeparator)) {
 			return fmt.Errorf("the zip holds a path that climbs out of it: %s", f.Name)
 		}
+		if u.filesLeft--; u.filesLeft < 0 {
+			return fmt.Errorf("the export holds more than %d files", u.limits.files)
+		}
 		if f.FileInfo().IsDir() {
 			if err := os.MkdirAll(p, 0o750); err != nil {
 				return err
 			}
 			continue
 		}
-		// A Notion export nests one zip inside another.
-		if strings.HasSuffix(strings.ToLower(p), ".zip") {
-			if _, err := u.unzipOne(f, p, u.limits.fileBytes); err != nil {
-				return err
-			}
-			if err := u.unzip(p, strings.TrimSuffix(p, filepath.Ext(p)), depth+1); err != nil {
-				return err
-			}
-			os.Remove(p)
-			continue
-		}
-		if u.filesLeft--; u.filesLeft < 0 {
-			return fmt.Errorf("the export holds more than %d files", u.limits.files)
-		}
 		n, err := u.unzipOne(f, p, min(u.limits.fileBytes, u.bytesLeft))
 		if err != nil {
 			return err
 		}
 		u.bytesLeft -= n
+		// A Notion export nests one zip inside another.
+		if strings.HasSuffix(strings.ToLower(p), ".zip") {
+			if err := u.unzip(p, strings.TrimSuffix(p, filepath.Ext(p)), depth+1); err != nil {
+				return err
+			}
+			os.Remove(p)
+		}
 	}
 	return nil
 }

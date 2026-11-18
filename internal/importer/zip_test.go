@@ -112,9 +112,11 @@ func TestUnzip(t *testing.T) {
 // zips nested too deep) is refused whole, never cut short.
 func TestUnzipStaysWithinItsLimits(t *testing.T) {
 	small := unzipLimits{fileBytes: 1000, totalBytes: 25, files: 4, depth: 2}
-	refused := func(t *testing.T, entries map[string][]byte, want string) {
+	// roomy has room in bytes for a few small zips, and holds to the rest.
+	roomy := unzipLimits{fileBytes: 1000, totalBytes: 5000, files: 4, depth: 2}
+	refused := func(t *testing.T, limits unzipLimits, entries map[string][]byte, want string) {
 		t.Helper()
-		err := unzip(writeZip(t, entries), t.TempDir(), small)
+		err := unzip(writeZip(t, entries), t.TempDir(), limits)
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Fatalf("err = %v, want one that says %q", err, want)
 		}
@@ -122,7 +124,8 @@ func TestUnzipStaysWithinItsLimits(t *testing.T) {
 	t.Run("within them, everything is unpacked", func(t *testing.T) {
 		dst := t.TempDir()
 		inner := zipOf(t, map[string][]byte{"c.md": []byte("0123456789")})
-		if err := unzip(writeZip(t, map[string][]byte{"a.md": []byte("0123456789"), "b.zip": inner}), dst, small); err != nil {
+		exact := unzipLimits{fileBytes: 1000, totalBytes: 20 + int64(len(inner)), files: 3, depth: 2}
+		if err := unzip(writeZip(t, map[string][]byte{"a.md": []byte("0123456789"), "b.zip": inner}), dst, exact); err != nil {
 			t.Fatal(err)
 		}
 		if got, err := os.ReadFile(filepath.Join(dst, "b", "c.md")); err != nil || string(got) != "0123456789" {
@@ -137,19 +140,40 @@ func TestUnzipStaysWithinItsLimits(t *testing.T) {
 		}
 	})
 	t.Run("files over the limit in all are refused", func(t *testing.T) {
-		refused(t, map[string][]byte{"a.md": []byte("0123456789"), "b.md": []byte("0123456789"), "c.md": []byte("0123456789")}, "more than")
+		refused(t, small, map[string][]byte{"a.md": []byte("0123456789"), "b.md": []byte("0123456789"), "c.md": []byte("0123456789")}, "more than")
 	})
 	t.Run("the zips inside count toward the limit in all", func(t *testing.T) {
 		inner := zipOf(t, map[string][]byte{"c.md": []byte("0123456789"), "d.md": []byte("0123456789")})
-		refused(t, map[string][]byte{"a.md": []byte("0123456789"), "b.zip": inner}, "more than")
+		refused(t, small, map[string][]byte{"a.md": []byte("0123456789"), "b.zip": inner}, "more than")
 	})
 	t.Run("too many files are refused", func(t *testing.T) {
-		refused(t, map[string][]byte{"a": nil, "b": nil, "c": nil, "d": nil, "e": nil}, "files")
+		refused(t, small, map[string][]byte{"a": nil, "b": nil, "c": nil, "d": nil, "e": nil}, "files")
+	})
+	t.Run("folders count as files", func(t *testing.T) {
+		refused(t, small, map[string][]byte{"a/": nil, "b/": nil, "c/": nil, "d/": nil, "e/": nil}, "files")
+	})
+	t.Run("the zips inside count as files", func(t *testing.T) {
+		inner := zipOf(t, map[string][]byte{"c": nil, "d": nil, "e": nil}) // five with the zip and a
+		refused(t, roomy, map[string][]byte{"a": nil, "b.zip": inner}, "files")
+	})
+	t.Run("the zips inside count toward the limit in all themselves", func(t *testing.T) {
+		var buf bytes.Buffer
+		w := zip.NewWriter(&buf)
+		if _, err := w.Create("c.md"); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.SetComment(strings.Repeat("padding ", 100)); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		refused(t, unzipLimits{fileBytes: 1000, totalBytes: 400, files: 4, depth: 2}, map[string][]byte{"b.zip": buf.Bytes()}, "more than")
 	})
 	t.Run("zips nested too deep are refused", func(t *testing.T) {
 		deepest := zipOf(t, map[string][]byte{"x.md": []byte("x")})
 		middle := zipOf(t, map[string][]byte{"c.zip": deepest})
-		refused(t, map[string][]byte{"b.zip": middle}, "nested")
+		refused(t, roomy, map[string][]byte{"b.zip": middle}, "nested")
 	})
 }
 
