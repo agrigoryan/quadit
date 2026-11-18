@@ -39,7 +39,7 @@ func TestAFileIsCheckedAgainEachTimeItIsShown(t *testing.T) {
 		s.call(s.owner, "", "POST", w+"/files?name=c.txt", []byte("private words"), 201, &f)
 		get := func(etag string) *http.Response {
 			t.Helper()
-			req, _ := http.NewRequest("GET", f.URL, nil)
+			req, _ := http.NewRequest(http.MethodGet, f.URL, nil)
 			if etag != "" {
 				req.Header.Set("If-None-Match", etag)
 			}
@@ -52,7 +52,7 @@ func TestAFileIsCheckedAgainEachTimeItIsShown(t *testing.T) {
 		}
 		first := get("")
 		cache := first.Header.Get("Cache-Control")
-		if first.StatusCode != 200 || strings.Contains(cache, "immutable") || !strings.Contains(cache, "no-cache") || !strings.Contains(cache, "private") {
+		if first.StatusCode != http.StatusOK || strings.Contains(cache, "immutable") || !strings.Contains(cache, "no-cache") || !strings.Contains(cache, "private") {
 			t.Fatalf("a file is sent with %d, Cache-Control %q", first.StatusCode, cache)
 		}
 		etag := first.Header.Get("ETag")
