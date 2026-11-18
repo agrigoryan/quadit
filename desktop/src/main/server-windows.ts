@@ -31,8 +31,10 @@ import {
   shell,
   type WebContents,
   WebContentsView,
+  webContents,
   type WebPreferences,
 } from "electron";
+import { ConnectionErrors } from "@/main/connection-error";
 import { giveContextMenu } from "@/main/context-menu";
 import { NoticeGate } from "@/main/notices";
 import { HANDOFF_HEADER } from "@/main/handoff";
@@ -53,6 +55,8 @@ export interface WindowsSetup {
   pagesPreload: string;
   /** The bundled sign-in bar page for a server. */
   signInBarUrl(serverId: string): string;
+  /** The bundled page saying a server's page could not be loaded, with what it says. */
+  connectionErrorUrl(words: { name: string; origin: string; reason: string }): string;
   /** Starts the browser sign-in for a server. */
   signIn(serverId: string): void;
   /** A page of a server (the web contents `reporter`) reported the unread count of one of its workspaces. */
@@ -73,6 +77,7 @@ export class ServerWindows {
   /** Shown notifications, held so their click still arrives (macOS forgets the handlers of collected ones). */
   private notifications = new Map<string, Notification>();
   private gate = new NoticeGate();
+  private errors: ConnectionErrors;
   private sessions = new WeakSet<Session>();
   private quitting = false;
 
@@ -83,6 +88,10 @@ export class ServerWindows {
     ipcMain.on(BRIDGE_NOTIFY, (event, raw: unknown) => {
       const server = this.bridgeSender(event);
       if (server) this.notify(server, raw);
+    });
+    this.errors = new ConnectionErrors({
+      pagesPreload: setup.pagesPreload,
+      pageUrl: (words) => setup.connectionErrorUrl(words),
     });
     // A server's answer changed (its hand-off at start, say): the sign-in bar may come or go.
     store.onChange(() => {
@@ -185,6 +194,27 @@ export class ServerWindows {
     this.quitting = true;
   }
 
+  /**
+   * The computer woke: a window whose page could not be loaded tries again,
+   * and every loaded page is told the network may be back ("online"), which
+   * the web app answers by making sure its live stream is (web/src/data/sync.ts).
+   */
+  wake() {
+    this.errors.retryAll();
+    for (const contents of webContents.getAllWebContents()) {
+      const serverId = this.owners.get(contents.id);
+      const server = serverId && this.store.get(serverId);
+      if (server && isOwnPage(contents.getURL(), server.origin)) {
+        void contents.executeJavaScript('dispatchEvent(new Event("online"))').catch(() => {});
+      }
+    }
+  }
+
+  /** Tries again the window a connection error page sits over (its Try again). */
+  retryFrom(contents: WebContents) {
+    this.errors.retryFrom(contents);
+  }
+
   /** Hides the sign-in bar a bundled page sits in (the bar's own close button). */
   dismissBar(contents: WebContents) {
     for (const [serverId, bar] of this.bars) {
@@ -212,6 +242,7 @@ export class ServerWindows {
     });
     this.windows.set(server.id, win);
     this.guard(win.webContents, server.id);
+    this.errors.watch(win, () => this.store.get(server.id));
     if (shown) this.store.change(server.id, { open: true });
 
     win.on("close", (event) => {

@@ -26,6 +26,9 @@ const api: PagesApi = {
   dismissSignInBar() {
     void ipcRenderer.invoke(PAGES_CHANNEL + "dismissSignInBar");
   },
+  retryServer() {
+    void ipcRenderer.invoke(PAGES_CHANNEL + "retryServer");
+  },
 };
 
 contextBridge.exposeInMainWorld("quaditPages", api);

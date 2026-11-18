@@ -67,6 +67,7 @@ export class ServerList {
         return invitation;
       },
       dismissSignInBar: (sender) => windows.dismissBar(sender),
+      retryServer: (sender) => windows.retryFrom(sender),
     };
     for (const [name, handle] of Object.entries(handlers)) {
       ipcMain.handle(PAGES_CHANNEL + name, (event: IpcMainInvokeEvent, ...args: unknown[]) => {

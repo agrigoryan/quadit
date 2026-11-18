@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, dialog, Menu, net, shell } from "electron";
+import { app, BrowserWindow, dialog, Menu, net, powerMonitor, shell } from "electron";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
 import { menuTemplate } from "@/main/menu";
@@ -84,6 +84,7 @@ function start() {
     bridgePreload: join(outDir, "preload-bridge.js"),
     pagesPreload: join(outDir, "preload-pages.js"),
     signInBarUrl: (serverId) => `${pagesUrl}sign-in-bar.html?server=${encodeURIComponent(serverId)}`,
+    connectionErrorUrl: (words) => `${pagesUrl}connection-error.html?${new URLSearchParams(words)}`,
     signIn,
     reportUnread: (serverId, reporter, workspace, count) => unread.report(serverId, reporter, workspace, count),
     forgetUnread: (reporter) => unread.forget(reporter),
@@ -168,6 +169,8 @@ function start() {
     if (process.platform !== "darwin") app.quit();
   });
 
+  // Asleep, a page's connections died quietly; awake, they are checked at once.
+  powerMonitor.on("resume", () => windows.wake());
   unread.start();
   if (!windows.restore()) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.

@@ -1,4 +1,4 @@
-// What the app's own bundled pages (the server list and the sign-in bar)
+// What the app's own bundled pages (the server list, the sign-in bar, the connection error)
 // may ask of the app, through the preload src/preload/pages.ts. The server's
 // web pages never see this: they get only the bridge of the contract.
 
@@ -37,6 +37,8 @@ export interface PagesApi {
   onChanged(listener: () => void): void;
   /** Hides the sign-in bar of the window it sits in. */
   dismissSignInBar(): void;
+  /** Loads again the server's page that the connection error it sits over is about. */
+  retryServer(): void;
 }
 
 /** The IPC channels of this API: "pages:" and the method's name, and the one the app sends changes on. */

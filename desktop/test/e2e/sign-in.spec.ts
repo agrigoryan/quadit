@@ -60,7 +60,7 @@ test("signing in through the browser: the bar on the sign-in page starts it, the
 
   // The bar over the sign-in page is the app's own page, in the same window.
   const bar = await desktop.signInBar();
-  await expect.poll(() => desktop.barShown(run.server)).toBe(true);
+  await expect.poll(() => desktop.overlayShown(run.server)).toBe(true);
   await bar.getByRole("button", { name: "Sign in with your browser" }).click();
 
   // The system browser is sent to the server's connect page with a state and an S256 challenge.
@@ -79,7 +79,7 @@ test("signing in through the browser: the bar on the sign-in page starts it, the
   await expect(page).toHaveURL(/\/e2e(\/|$)/);
   await expect(page.getByRole("navigation").first()).toBeVisible();
   // The bar is gone with the sign-in page.
-  await expect.poll(() => desktop.barShown(run.server)).toBe(false);
+  await expect.poll(() => desktop.overlayShown(run.server)).toBe(false);
   if (run.server !== run.fake) return;
   // The stand-in checked the verifier against the challenge for this state.
   const finished = async () =>
@@ -192,7 +192,7 @@ test("a link to a server not added yet still opens its page once the server is a
   await expect(page).toHaveURL(`${run.server}/login?next=%2Fe2e%2Finbox`);
 
   // Signed in through the browser, the window goes on to it.
-  await expect.poll(() => desktop.barShown(run.server)).toBe(true);
+  await expect.poll(() => desktop.overlayShown(run.server)).toBe(true);
   await (await desktop.signInBar()).getByRole("button", { name: "Sign in with your browser" }).click();
   await expect.poll(async () => (await desktop.recorded()).opened.length).toBe(1);
   await desktop.openLink(await browserApproves(run, (await desktop.recorded()).opened[0] ?? ""));

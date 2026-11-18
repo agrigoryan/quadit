@@ -127,8 +127,8 @@ export class Desktop {
     );
   }
 
-  /** Whether the sign-in bar shows over the window of the server at `origin`. */
-  async barShown(origin: string): Promise<boolean> {
+  /** Whether one of the app's own pages (the sign-in bar, the connection error) shows over the window of the server at `origin`. */
+  async overlayShown(origin: string): Promise<boolean> {
     return this.app.evaluate(({ BrowserWindow }, wanted) => {
       const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().startsWith(wanted));
       return !!win?.contentView.children.some((view) => view.getVisible());
