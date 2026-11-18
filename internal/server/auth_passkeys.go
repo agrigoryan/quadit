@@ -82,6 +82,19 @@ func (s *Server) webauthn(r *http.Request) (*webauthn.WebAuthn, error) {
 		AuthenticatorSelection: protocol.AuthenticatorSelection{UserVerification: protocol.VerificationRequired}})
 }
 
+// ceremony is the state a passkey ceremony was begun with, held to the
+// check every ceremony needs now (webauthn): the library checks the
+// device's answer against what the state says, and a ceremony begun
+// before every one asked for the check says less.
+func ceremony(spent core.OneTimeToken) (webauthn.SessionData, error) {
+	var session webauthn.SessionData
+	if err := json.Unmarshal(spent.Data, &session); err != nil {
+		return session, err
+	}
+	session.UserVerification = protocol.VerificationRequired
+	return session, nil
+}
+
 func (s *Server) passkeyUser(ctx context.Context, u core.User) (webAuthnUser, error) {
 	var rows []core.Passkey
 	if err := s.st.List(ctx, &rows, store.Where(store.Eq("user_id", u.ID))); err != nil {
@@ -159,8 +172,8 @@ func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	if err != nil || spent.UserID != x.user.ID {
 		return errBad("this passkey setup has expired; start again")
 	}
-	var session webauthn.SessionData
-	if err := json.Unmarshal(spent.Data, &session); err != nil {
+	session, err := ceremony(spent)
+	if err != nil {
 		return err
 	}
 	wa, err := s.webauthn(x.r)
@@ -301,8 +314,8 @@ func (s *Server) handleFinishPasskeySignIn(x *c) error {
 	if err != nil {
 		return errBad("this sign-in has expired; try again")
 	}
-	var session webauthn.SessionData
-	if err := json.Unmarshal(spent.Data, &session); err != nil {
+	session, err := ceremony(spent)
+	if err != nil {
 		return err
 	}
 	wa, err := s.webauthn(x.r)
