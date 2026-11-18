@@ -79,7 +79,8 @@ export function useSummary(): DesktopSummary | null {
         const member = members[state.user_id];
         return {
           id: state.user_id,
-          handle: state.handle,
+          // The member's handle: /agents says it with its "@", the app's pages and requests without.
+          handle: member?.handle ?? state.handle.replace(/^@/, ""),
           name: member?.name ?? state.handle,
           state: state.state,
           detail: detailOf(state),
