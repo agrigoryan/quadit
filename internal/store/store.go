@@ -359,8 +359,10 @@ type SearchDoc struct {
 }
 
 // SearchQuery asks the full-text index for the entries that hold every word
-// of Text, of the Kinds and in the ProjectIDs when they are set, that Viewer
-// may see; at most Limit of them.
+// of Text, of the Kinds when they are set, that Viewer may see: of the
+// ProjectIDs, when they are set, or of no project; and not of a private
+// page that is not Viewer's own or shared with Viewer. At most Limit of
+// them.
 type SearchQuery struct {
 	Text       string
 	Kinds      []string

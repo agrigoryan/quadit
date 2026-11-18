@@ -54,8 +54,7 @@ func (tsvSearch) match(w *clause, terms []string, ws string) string {
 
 // rank orders by how well each entry matches; it passes the tsquery again
 // for the ORDER BY.
-func (tsvSearch) rank(w *clause, viewer string) string {
-	w.add(`(audience_id IS NULL OR audience_id = ?)`, idOrNone(viewer))
+func (tsvSearch) rank(w *clause) string {
 	w.args = append(w.args, w.args[0])
 	return ` ORDER BY ts_rank(tsv, to_tsquery('simple', ?)) DESC`
 }

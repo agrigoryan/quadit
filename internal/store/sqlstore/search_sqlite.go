@@ -61,9 +61,5 @@ func (ftsSearch) match(w *clause, terms []string, ws string) string {
 			snippet(search_index, 1, '**', '**', '…', 18) FROM search_index WHERE `
 }
 
-// rank orders by FTS5's own rank. An entry for everyone has the audience
-// "" here, where Postgres has NULL: index writes the SearchDoc as it is.
-func (ftsSearch) rank(w *clause, viewer string) string {
-	w.add(`(audience_id = '' OR audience_id = ?)`, viewer)
-	return ` ORDER BY rank`
-}
+// rank orders by FTS5's own rank.
+func (ftsSearch) rank(*clause) string { return ` ORDER BY rank` }

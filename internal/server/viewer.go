@@ -193,8 +193,9 @@ func (who *viewer) asSeen(ctx context.Context, evs []core.Event) []core.Event {
 	return evs
 }
 
-// search finds what the viewer may read by its words: in its projects, and
-// not in someone else's private pages. kinds narrows it to some kinds of
+// search finds what the viewer may read by its words: what is of its
+// projects or of none, and of no private page that is not the viewer's or
+// shared with it; exactly what canProject and canSeeDoc let it open. kinds narrows it to some kinds of
 // thing; none means all.
 func (who *viewer) search(ctx context.Context, text string, kinds []string, limit int) ([]store.SearchHit, error) {
 	return who.db.Search(ctx, store.SearchQuery{Text: text, Kinds: kinds, ProjectIDs: who.projects, Viewer: who.member.UserID, Limit: limit})
