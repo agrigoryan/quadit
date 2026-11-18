@@ -139,7 +139,9 @@ test("a server's count adds each workspace once at its newest report, and a wind
   await desktop.addServer(run.server);
   const main = await desktop.signedIn(run.server);
   const opened = desktop.app.waitForEvent("window");
-  await main.evaluate(() => window.open("/e2e/inbox", "_blank"));
+  // A page of the server without the web app, which would report its own workspace's count
+  // whenever it came to it, over what this test reports for the window.
+  await main.evaluate(() => window.open("/licenses", "_blank"));
   const second = await opened;
   await second.waitForLoadState();
 
