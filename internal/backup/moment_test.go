@@ -247,6 +247,55 @@ func TestAnArchiveHoldsTheFilesItsRowsName(t *testing.T) {
 	})
 }
 
+// TestARestoredUploadStartsAgain: an archive keeps no part of an upload
+// still arriving, so a restore sets each such upload back to its start,
+// whether the version that made the archive listed its parts or not: what
+// it had received is not there to go on from.
+func TestARestoredUploadStartsAgain(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		ctx := context.Background()
+		files, _ := blob.NewDisk(t.TempDir())
+		ws, owner, _ := fill(t, st, files)
+		// listed: the upload's row lists its parts, as from version 14 on.
+		uploading := func(listed bool) string {
+			f := core.File{ID: id.New(), WorkspaceID: ws.ID, Name: "clip.bin", ContentType: "application/octet-stream", Size: 10, Received: 5,
+				State: core.FileUploading, UploadedBy: owner.ID, CreatedAt: 1}
+			f.StorageKey = ws.ID + "/" + f.ID
+			key := f.StorageKey + ".parts/00000000000000000000"
+			if listed {
+				f.Parts = []string{key}
+			}
+			if err := files.Put(ctx, key, strings.NewReader("hello"), ""); err != nil {
+				t.Fatal(err)
+			}
+			if err := st.In(ws.ID).Insert(ctx, f); err != nil {
+				t.Fatal(err)
+			}
+			return f.ID
+		}
+		listed, unlisted := uploading(true), uploading(false)
+		var archive bytes.Buffer
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
+			t.Fatal(err)
+		}
+		testdb.Each(t, func(t *testing.T, dst store.Store) {
+			dstFiles, _ := blob.NewDisk(t.TempDir())
+			if _, err := backup.Restore(ctx, dst, dstFiles, nil, bytes.NewReader(archive.Bytes())); err != nil {
+				t.Fatal(err)
+			}
+			for _, fid := range []string{listed, unlisted} {
+				var f core.File
+				if err := dst.In(ws.ID).Get(ctx, &f, store.Eq("id", fid)); err != nil {
+					t.Fatal(err)
+				}
+				if f.State != core.FileUploading || f.Received != 0 || f.Parts == nil || len(f.Parts) != 0 {
+					t.Fatalf("a restored upload is %s with %d bytes and the parts %#v, want uploading from 0 with none", f.State, f.Received, f.Parts)
+				}
+			}
+		})
+	})
+}
+
 // rewrite remakes an archive with each member's body as change gives it
 // (nil leaves the member out), and a manifest that agrees, as one written
 // that way would have.

@@ -237,6 +237,15 @@ func storedFiles(row map[string]any) []string {
 	return keys
 }
 
+// startOver sets a row of the files table that is an upload still
+// arriving back to its start: its parts are not in the archive
+// (storedFiles), so what it had received is not there to go on from.
+func startOver(row map[string]any) {
+	if str(row, "state") != core.FileReady {
+		row["received"], row["parts"] = 0, []any{}
+	}
+}
+
 // addFiles writes the stored files the rows name. One file storage does
 // not have is a file lost before the backup, when the database still
 // names it, and is listed as missing; one removed since the rows were read
@@ -612,7 +621,8 @@ func readable(ctx context.Context, st store.Store, made madeBy) error {
 // restore can be run again. The rows of an archive made at an older schema
 // version are changed, in the same transaction, as the upgrades since
 // would have changed them (store.Loader's UpgradeLoaded): a repair an
-// upgrade made is not undone by a restore.
+// upgrade made is not undone by a restore. An upload still arriving starts
+// again from nothing, as its parts are not in an archive.
 //
 // sealer is the install secret the restored install will run with: an
 // archive whose stored secrets were sealed with another is refused
@@ -732,6 +742,11 @@ func load(ctx context.Context, l store.Loader, name string, body io.Reader) erro
 		}
 		if cols, self := selfRefs[table]; self {
 			rows = parentsFirst(rows, cols)
+		}
+		if table == "files" {
+			for _, row := range rows {
+				startOver(row)
+			}
 		}
 		return l.Load(ctx, table, rows)
 	})
