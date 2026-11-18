@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -43,7 +44,7 @@ import (
 func (s *Server) secretRoutes() []route {
 	return []route{
 		{"GET /api/v1/w/{ws}/secrets", s.workspaceMember(s.handleListSecrets), "The secrets the caller may use: names, hosts and what they are for. Values are never returned.", "", "secrets"},
-		{"POST /api/v1/w/{ws}/secrets/{name}/request", s.workspaceMember(s.handleSendRequestWithSecret), "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; every form of the value sent is blanked out of the answer, and an answer that is not text is not passed on (body_omitted).", "", "secrets"},
+		{"POST /api/v1/w/{ws}/secrets/{name}/request", s.workspaceMember(s.handleSendRequestWithSecret), "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body, approval}; write {{secret}} where the value belongs. A method other than GET is held as the change secret.send is, whose args are the whole request as written. Only to the secret's hosts; redirects are not followed; every form of the value sent is blanked out of the answer, and an answer that is not text is not passed on (body_omitted).", "", "secrets"},
 		{"POST /api/v1/w/{ws}/secrets/env", s.workspaceMember(s.handleListEnvSecrets), "For a companion's token made for secrets: the values of secrets marked env. Body: {names}.", "", "secrets"},
 	}
 }
@@ -212,15 +213,30 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 
 // permitSending holds a request that can change something at the far end
 // (any method but GET, HEAD and OPTIONS) as a change is held: it is applied
-// as secret.send, {"name", "method", "url"} with the URL as the caller
-// wrote it, so a member who may only read cannot send it and an agent that
-// must ask first needs an approval of exactly that.
+// as secret.send, whose arguments are the whole request as the caller
+// wrote it, {{secret}} and all (everything it sent but the approval), so a
+// member who may only read cannot send it and an agent that must ask first
+// needs an approval of exactly that request. A refusal for want of one says
+// what to ask for.
 func (s *Server) permitSending(x *c, sec core.Secret, method string, b secretRequest) error {
 	if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
 		return nil
 	}
-	args := plainjson.Marshal(map[string]string{"name": sec.Name, "method": method, "url": b.URL})
+	request := map[string]any{"name": sec.Name, "method": method, "url": b.URL}
+	if len(b.Headers) > 0 {
+		request["headers"] = b.Headers
+	}
+	if b.Body != "" {
+		request["body"] = b.Body
+	}
+	if b.BodyBase64 != "" {
+		request["body_base64"] = b.BodyBase64
+	}
+	args := plainjson.Marshal(request)
 	_, err := s.eng.Apply(x.ctx(), x.ws.ID, x.actor, engine.Change{ID: id.New(), Type: "secret.send", Args: args, Approval: b.Approval})
+	if refusal, ok := errors.AsType[*engine.Error](err); ok && refusal.Code == engine.CodeNeedsApproval {
+		refusal.Message += ". The arguments of this request, to ask with: " + string(args)
+	}
 	return err
 }
 

@@ -58,12 +58,16 @@ var helpTopics = map[string]string{
 	"secrets": `secrets: keys and passwords an agent can use but not read
   An admin sets one:   quadit do secret.set '{"name":"DEPLOY_KEY","value":"…","hosts":["api.example.com"],"agents":["@coder"]}'
   secrets                      the secrets I may use, with the hosts each may go to
-  request NAME URL [method=POST] [header="Authorization:Bearer {{secret}}"] [body=TEXT|-]
+  request NAME URL [method=POST] [header="Authorization:Bearer {{secret}}"] [body=TEXT|-] [approval=ID]
                                the server makes the request and writes the value where
                                {{secret}} stands ({{basic:USER}} = base64 of USER:secret).
                                It goes only to the secret's hosts, redirects are not followed,
                                and the value is blanked out of the answer; an answer that is
-                               not text comes back without its body.
+                               not text comes back without its body. A method other than GET,
+                               when I must ask first, needs approval=ID: an approved decision
+                               for secret.send whose args are the whole request as I write it
+                               ({"name","method","url","headers","body"}, {{secret}} and all);
+                               the refusal gives them. Another body or header needs another.
   run --secret NAME [--secret NAME ...] -- COMMAND [ARG ...]
                                for tools on this machine: runs COMMAND with each secret in its
                                environment under its name, and blanks the values out of what it

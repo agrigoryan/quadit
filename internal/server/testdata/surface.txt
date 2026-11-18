@@ -490,6 +490,9 @@ change rule.update arg name
 change secret.delete
 change secret.delete arg id
 change secret.send
+change secret.send arg body
+change secret.send arg body_base64
+change secret.send arg headers
 change secret.send arg method
 change secret.send arg name
 change secret.send arg url

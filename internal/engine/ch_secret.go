@@ -151,13 +151,20 @@ func secretDelete(c *cx, a idArgs) error {
 	return c.trash(target{table: "secrets", entity: "secret", id: s.ID, place: inWorkspace(c.ws), extra: core.EventData{Name: s.Name}})
 }
 
+// secretSendArgs are the whole request as the caller writes it, with
+// {{secret}} where the value goes and never the value: an approval of
+// secret.send covers that request and no other, so a request that differs
+// in anything (another body, a header that changes what the service does)
+// needs its own.
 type secretSendArgs struct {
 	// Name is the secret's name.
-	Name string `json:"name" quadit:"required,handler"`
-	// Method and URL are the request's as the caller writes them: the URL
-	// with {{secret}} where the value goes, never the value.
-	Method string `json:"method"`
-	URL    string `json:"url"`
+	Name    string            `json:"name" quadit:"required,handler"`
+	Method  string            `json:"method"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers,omitempty"`
+	// Body is the body as text; BodyBase64 the body when it is not text.
+	Body       string `json:"body,omitempty"`
+	BodyBase64 string `json:"body_base64,omitempty"`
 }
 
 // secretSend stands for a request the server sends with a secret that can

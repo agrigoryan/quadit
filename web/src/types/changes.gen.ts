@@ -452,6 +452,9 @@ export interface Changes {
     name: string;
     method?: string;
     url?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    body_base64?: string;
   };
   "secret.set": {
     id?: string;

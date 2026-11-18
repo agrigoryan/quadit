@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1008,13 +1009,19 @@ func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
 			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &out)
 			return out.Token
 		}
-		send := func(token, method string, approval string, want int) string {
+		deploy := `{"ref":"main"}`
+		sendAs := func(token string, request M, approval string, want int) string {
 			t.Helper()
-			body := M{"method": method, "url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}}
+			body := M{"url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}, "body": deploy}
+			maps.Copy(body, request)
 			if approval != "" {
 				body["approval"] = approval
 			}
 			return s.call(nil, token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", body, want, nil)
+		}
+		send := func(token, method string, approval string, want int) string {
+			t.Helper()
+			return sendAs(token, M{"method": method}, approval, want)
 		}
 
 		t.Run("not by a member who may only read", func(t *testing.T) {
@@ -1026,16 +1033,22 @@ func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
 			asker := agent("asker", nil) // a new agent asks before what reaches outside
 			before := len(calls)
 			send(asker, "GET", "", 200)
-			if out := send(asker, "POST", "", 403); !strings.Contains(out, "needs_approval") {
-				t.Fatalf("a POST with a secret went without the approval it needs: %s", out)
+			if out := send(asker, "POST", "", 403); !strings.Contains(out, "needs_approval") || !strings.Contains(out, `to ask with: {\"body\"`) {
+				t.Fatalf("a POST with a secret went without the approval it needs, or the refusal does not say what to ask for: %s", out)
 			}
 			if len(calls) != before+1 {
 				t.Fatalf("calls made: %v", calls[before:])
 			}
 			ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "secret.send",
-				"args": M{"name": "DEPLOY_KEY", "method": "POST", "url": api.URL + "/deploy"}, "question": "Deploy?"})["ref"].(string)
+				"args": M{"name": "DEPLOY_KEY", "method": "POST", "url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}, "body": deploy},
+				"question": "Deploy?"})["ref"].(string)
 			s.change(s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
+			// The approval is of the whole request as written: any other
+			// method, header or body is another request, which needs its own.
 			send(asker, "DELETE", ask, 403)
+			sendAs(asker, M{"method": "POST", "body": `{"ref":"evil"}`}, ask, 403)
+			sendAs(asker, M{"method": "POST", "body": "", "body_base64": base64.StdEncoding.EncodeToString([]byte(`{"ref":"evil"}`))}, ask, 403)
+			sendAs(asker, M{"method": "POST", "headers": M{"Authorization": "Bearer {{secret}}", "X-HTTP-Method-Override": "DELETE"}}, ask, 403)
 			send(asker, "POST", ask, 200)
 			send(asker, "POST", ask, 403)
 			if got := calls[len(calls)-1]; got != "POST /deploy" || len(calls) != before+2 {
