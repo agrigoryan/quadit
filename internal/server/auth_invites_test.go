@@ -23,7 +23,8 @@ func TestAnInvitationIsAllowedAsAddingTheMemberWouldBe(t *testing.T) {
 		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
 		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
-		admin := func(handle string, scope M) string {
+		admin := func(t *testing.T, handle string, scope M) string {
+			t.Helper()
 			s.change(t, s.owner, "", "agent.create", M{"name": handle, "handle": handle, "role": "admin", "scope": scope})
 			var out struct{ Token string }
 			s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &out)
@@ -37,11 +38,11 @@ func TestAnInvitationIsAllowedAsAddingTheMemberWouldBe(t *testing.T) {
 			s.call(t, nil, ro.Token, "POST", invites, M{"email": "ro@example.com"}, 403, nil)
 		})
 		t.Run("not with a read-only membership", func(t *testing.T) {
-			reader := admin("reader", M{"read_only": true, "needs_approval": []string{}})
+			reader := admin(t, "reader", M{"read_only": true, "needs_approval": []string{}})
 			s.call(t, nil, reader, "POST", invites, M{"email": "reader@example.com"}, 403, nil)
 		})
 		t.Run("with an approval when adding people needs one", func(t *testing.T) {
-			asker := admin("asker", nil) // a new agent asks before adding people
+			asker := admin(t, "asker", nil) // a new agent asks before adding people
 			if out := s.call(t, nil, asker, "POST", invites, M{"email": "new@example.com"}, 403, nil); !strings.Contains(out, "needs_approval") {
 				t.Fatalf("an invitation went out without the approval adding a member needs: %s", out)
 			}
@@ -53,7 +54,7 @@ func TestAnInvitationIsAllowedAsAddingTheMemberWouldBe(t *testing.T) {
 			s.call(t, nil, asker, "POST", invites, M{"email": "new@example.com", "approval": ask}, 403, nil) // an approval is used once
 		})
 		t.Run("an approval outlives an invitation that could not be made", func(t *testing.T) {
-			asker := admin("retrier", nil)
+			asker := admin(t, "retrier", nil)
 			ask := s.change(t, nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "member.add",
 				"args": M{"user": "late@example.com", "role": "member"}, "question": "Invite late@example.com?"})["ref"].(string)
 			s.change(t, s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
