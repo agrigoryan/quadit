@@ -99,6 +99,9 @@ function run(
       if (err) reject(new Error(`quadit ${args[0]}: ${(stderr || stdout || err.message).trim()}`));
       else resolve(stdout);
     });
+    // A quadit that stops before reading its input (a usage error, an older
+    // one) breaks the pipe: its exit code and its words say what happened.
+    child.stdin?.on("error", () => {});
     child.stdin?.end(stdin ?? "");
   });
 }
