@@ -18,7 +18,7 @@ import { ServerWindows } from "@/main/server-windows";
 import { ServerStore } from "@/main/servers";
 import { refusedSwitches } from "@/main/switches";
 import { Unread } from "@/main/unread";
-import { type Release, UpdateWatch } from "@/main/updates";
+import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
 
 const WEBSITE = "https://github.com/agrigoryan/quadit";
 
@@ -196,7 +196,7 @@ async function tellAboutUpdate(release: Release) {
     defaultId: 0,
     cancelId: 1,
   });
-  if (response === 0) void shell.openExternal(release.url);
+  if (response === 0 && isReleasePage(release.url)) void shell.openExternal(release.url);
 }
 
 /**

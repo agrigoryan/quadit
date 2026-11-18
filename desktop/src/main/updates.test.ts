@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -7,7 +7,7 @@ import { compareVersions, newerRelease, RELEASES_API, UpdateWatch } from "@/main
 
 const release = (tag: string, extra: object = {}) => ({
   tag_name: tag,
-  html_url: `https://github.com/r/${tag}`,
+  html_url: `https://github.com/agrigoryan/quadit/releases/tag/${tag}`,
   ...extra,
 });
 
@@ -19,7 +19,7 @@ describe("newerRelease", () => {
       release("desktop-v0.10.1"),
       release("desktop-v0.3.0"),
     ];
-    expect(newerRelease(releases, "0.1.0")).toEqual({ version: "0.10.1", url: "https://github.com/r/desktop-v0.10.1" });
+    expect(newerRelease(releases, "0.1.0")).toEqual({ version: "0.10.1", url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.10.1" });
   });
 
   it("skips drafts, pre-releases, the server's tags and what is not newer", () => {
@@ -31,6 +31,32 @@ describe("newerRelease", () => {
       release("desktop-v0.1.0"),
     ];
     expect(newerRelease(releases, "0.1.0")).toBeNull();
+  });
+});
+
+describe("release pages", () => {
+  it("are only the project's own release pages on GitHub", () => {
+    for (const url of [
+      "https://github.com/agrigoryan/quadit-evil/releases/tag/desktop-v9.0.0",
+      "https://github.com/agrigoryan/quadit/../evil/releases/tag/desktop-v9.0.0",
+      "http://github.com/agrigoryan/quadit/releases/tag/desktop-v9.0.0",
+      "https://github.com.evil.com/agrigoryan/quadit/releases/tag/desktop-v9.0.0",
+      "https://evil.com/agrigoryan/quadit/releases/tag/desktop-v9.0.0",
+      "file:///Applications/Calculator.app",
+      "smb://evil/share",
+    ]) {
+      expect(newerRelease([release("desktop-v9.0.0", { html_url: url })], "0.1.0"), url).toBeNull();
+    }
+  });
+
+  it("are checked again when read back from the last check", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "quadit-desktop-updates-")), "update-check.json");
+    writeFileSync(
+      file,
+      JSON.stringify({ checkedAt: Date.now(), told: "9.0.0", latest: { version: "9.0.0", url: "file:///etc/passwd" } }),
+    );
+    const fetcher: Fetch = async () => Response.json([]);
+    expect(new UpdateWatch(file, "0.1.0", fetcher, vi.fn(), vi.fn()).available).toBeNull();
   });
 });
 
@@ -63,8 +89,8 @@ describe("UpdateWatch", () => {
     await vi.waitFor(() => expect(tell).toHaveBeenCalledTimes(1));
     first.stop();
     expect(asked).toEqual([RELEASES_API]);
-    expect(first.available).toEqual({ version: "0.2.0", url: "https://github.com/r/desktop-v0.2.0" });
-    expect(news).toHaveBeenLastCalledWith({ version: "0.2.0", url: "https://github.com/r/desktop-v0.2.0" });
+    expect(first.available).toEqual({ version: "0.2.0", url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.2.0" });
+    expect(news).toHaveBeenLastCalledWith({ version: "0.2.0", url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.2.0" });
 
     // A restart within the day: no new request, no second notice, the menu item stays.
     const second = new UpdateWatch(file, "0.1.0", fetcher, news, tell);

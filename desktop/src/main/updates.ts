@@ -9,12 +9,24 @@ import type { Fetch } from "@/main/probe";
 
 export const RELEASES_API = "https://api.github.com/repos/agrigoryan/quadit/releases?per_page=30";
 const TAG_PREFIX = "desktop-v";
+/** Where the project's releases are: the only pages the update notice opens. */
+const RELEASES_PAGE = "https://github.com/agrigoryan/quadit/releases/";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface Release {
   version: string;
-  /** The release's page, where its downloads are. */
+  /** The release's page, where its downloads are: always one of the project's own (isReleasePage). */
   url: string;
+}
+
+/**
+ * Whether `url` is a page of the project's releases on GitHub. The notice
+ * opens what GitHub's answer, or the file of the last check, says: neither
+ * may send the system browser, or the system, anywhere else.
+ */
+export function isReleasePage(url: string): boolean {
+  const parsed = URL.parse(url);
+  return !!parsed && parsed.href.startsWith(RELEASES_PAGE) && parsed.href === url;
 }
 
 interface GitHubRelease {
@@ -31,7 +43,7 @@ export function newerRelease(releases: readonly GitHubRelease[], current: string
     if (release.draft === true || release.prerelease === true) continue;
     if (typeof release.tag_name !== "string" || !release.tag_name.startsWith(TAG_PREFIX)) continue;
     const version = release.tag_name.slice(TAG_PREFIX.length);
-    if (!parseVersion(version) || typeof release.html_url !== "string") continue;
+    if (!parseVersion(version) || typeof release.html_url !== "string" || !isReleasePage(release.html_url)) continue;
     if (compareVersions(version, best?.version ?? current) > 0) best = { version, url: release.html_url };
   }
   return best;
@@ -128,7 +140,10 @@ export class UpdateWatch {
 function readRemembered(file: string): Remembered {
   try {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<Remembered>;
-    return { checkedAt: Number(parsed.checkedAt) || 0, latest: parsed.latest ?? null, told: String(parsed.told ?? "") };
+    const latest = parsed.latest;
+    const valid =
+      !!latest && typeof latest.version === "string" && typeof latest.url === "string" && isReleasePage(latest.url);
+    return { checkedAt: Number(parsed.checkedAt) || 0, latest: valid ? latest : null, told: String(parsed.told ?? "") };
   } catch {
     return { checkedAt: 0, latest: null, told: "" };
   }
