@@ -23,9 +23,12 @@ type File struct {
 	Height      int    `json:"height,omitempty" db:"height,null"`
 	DurationMS  int64  `json:"duration_ms,omitempty" db:"duration_ms,null"`
 	PreviewKey  string `json:"-" db:"preview_key"`
-	UploadedBy  string `json:"uploaded_by" db:"uploaded_by"`
-	CreatedAt   int64  `json:"created_at" db:"created_at"`
-	DeletedAt   int64  `json:"deleted_at,omitempty" db:"deleted_at,null"`
+	// Parts are the keys in file storage of the parts of an upload in
+	// several requests kept so far, in order; gone once the file is stored.
+	Parts      []string `json:"-" db:"parts,json"`
+	UploadedBy string   `json:"uploaded_by" db:"uploaded_by"`
+	CreatedAt  int64    `json:"created_at" db:"created_at"`
+	DeletedAt  int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`
 	// Filled when read: where to fetch it.
 	URL        string `json:"url,omitempty"`
 	PreviewURL string `json:"preview_url,omitempty"`

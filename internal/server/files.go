@@ -12,12 +12,13 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"io/fs"
 	"mime"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,15 +49,19 @@ func (s *Server) maxUpload(ctx context.Context) int64 {
 	return defaultMaxUpload
 }
 
-// partPath is where an upload is put together on this machine.
+// partPath is where the bytes of an upload sent in one request wait on
+// this machine until the file is stored: kept there when storing it
+// fails, so that asking again finishes it.
 func (s *Server) partPath(fileID string) string {
 	return filepath.Join(s.cfg.DataDir, "uploads", fileID+".part")
 }
 
-// partKey is where one part of an upload that comes in several requests
-// waits, in file storage, so the next part can reach any server.
+// partKey is a new key for one part of an upload that comes in several
+// requests, which waits in file storage so the next part can reach any
+// server. Each part sent gets a key of its own, so one sent at the same
+// time as another for the same place never writes over the one kept.
 func partKey(f core.File, offset int64) string {
-	return fmt.Sprintf("%s.parts/%020d", f.StorageKey, offset)
+	return fmt.Sprintf("%s.parts/%020d-%s", f.StorageKey, offset, id.New())
 }
 
 // counter counts what is read through it.
@@ -70,57 +75,6 @@ func (c *counter) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	c.n += int64(n)
 	return n, err
-}
-
-// joinUploadParts puts the parts of an upload together into one local file, in
-// order, and removes them from file storage once the file is complete.
-func (s *Server) joinUploadParts(ctx context.Context, f core.File) error {
-	var keys []string
-	if err := s.fileStore().List(ctx, f.StorageKey+".parts/", func(key string, _ int64) error { keys = append(keys, key); return nil }); err != nil {
-		return err
-	}
-	if len(keys) == 0 {
-		return nil
-	}
-	sort.Strings(keys)
-	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
-		return err
-	}
-	out, err := os.Create(s.partPath(f.ID))
-	if err != nil {
-		return err
-	}
-	if err := s.appendParts(ctx, out, keys); err != nil {
-		out.Close()
-		return err
-	}
-	// A write that fails only when the file is closed leaves it short: the
-	// parts are kept until it is whole.
-	if err := out.Close(); err != nil {
-		return err
-	}
-	for _, key := range keys {
-		if err := s.fileStore().Delete(ctx, key); err != nil {
-			s.log.Warn("upload: removing a part that was put together", "key", key, "err", err)
-		}
-	}
-	return nil
-}
-
-// appendParts copies the parts named by keys, in order, to out.
-func (s *Server) appendParts(ctx context.Context, out io.Writer, keys []string) error {
-	for _, key := range keys {
-		in, _, err := s.fileStore().Open(ctx, key)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(out, in)
-		in.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // uploadStart is the first request of an upload: the file's bytes, or the
@@ -180,7 +134,8 @@ func (s *Server) handleUploadFile(x *c) error {
 	}
 	// The caller may name the file's id itself (?id=): if the answer to this
 	// first request is lost, asking for that file says how far it got, and
-	// starting again with the same id does not make a second one.
+	// starting again with the same id does not make a second one. An upload
+	// whose bytes all came but could not be stored is finished now.
 	fid := x.r.URL.Query().Get("id")
 	if fid == "" {
 		fid = id.New()
@@ -190,6 +145,11 @@ func (s *Server) handleUploadFile(x *c) error {
 			return err
 		}
 		if there {
+			if had.State == core.FileUploading && had.Received == had.Size {
+				if err := s.finishUpload(ctx, x, &had); err != nil {
+					return err
+				}
+			}
 			return x.ok(s.fileOut(x, had))
 		}
 	}
@@ -200,6 +160,7 @@ func (s *Server) handleUploadFile(x *c) error {
 		return err
 	}
 	if err := x.db.Insert(ctx, f); err != nil {
+		s.dropReceived(ctx, f)
 		return err
 	}
 	if f.Received >= f.Size {
@@ -228,9 +189,10 @@ func (s *Server) startedUpload(x *c, fid string) (core.File, bool, error) {
 	return had, true, nil
 }
 
-// receiveFirstPart writes what the first request of an upload carries to
-// this machine and sets how much arrived. When more is to come, perhaps to
-// another server, the part waits in file storage instead.
+// receiveFirstPart takes in what the first request of an upload carries
+// and sets how much arrived. The whole file waits on this machine
+// (partPath); the first of several parts waits in file storage instead,
+// where the next part may be sent from any server.
 func (s *Server) receiveFirstPart(ctx context.Context, f *core.File, src io.Reader, maxSize int64) error {
 	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
 		return err
@@ -265,18 +227,21 @@ func (s *Server) receiveFirstPart(ctx context.Context, f *core.File, src io.Read
 	if err != nil {
 		return err
 	}
-	err = s.fileStore().Put(ctx, partKey(*f, 0), in, "application/octet-stream")
+	key := partKey(*f, 0)
+	err = s.fileStore().Put(ctx, key, in, "application/octet-stream")
 	in.Close()
 	os.Remove(s.partPath(f.ID))
 	if err != nil {
 		return fmt.Errorf("file storage: %w", err)
 	}
+	f.Parts = []string{key}
 	return nil
 }
 
 // handleUploadFilePart appends the next part of a file. offset must be where the
 // last part ended; the answer says how much has arrived, so a broken upload
-// resumes from there.
+// resumes from there. An upload whose bytes all came but could not be
+// stored is finished by sending nothing from its end.
 func (s *Server) handleUploadFilePart(x *c) error {
 	ctx := x.ctx()
 	var f core.File
@@ -291,24 +256,42 @@ func (s *Server) handleUploadFilePart(x *c) error {
 	}
 	offset := int64(x.intParam("offset", -1))
 	if offset != f.Received {
-		return &httpError{Status: 409, Code: "conflict", Message: fmt.Sprintf("offset %d does not match the %d bytes received; continue from %d", offset, f.Received, f.Received)}
+		return offsetConflict(offset, f.Received)
 	}
-	body := &counter{r: io.LimitReader(x.r.Body, f.Size-f.Received+1)}
-	err := s.fileStore().Put(ctx, partKey(f, offset), body, "application/octet-stream")
-	n := body.n
-	if err != nil {
-		// A part cut short is not kept: the caller sends it again from the
-		// same place, which is what the answer tells it.
-		s.dropPart(ctx, f, offset)
-		return errBad("upload interrupted after %d bytes; continue from %d: %v", f.Received, f.Received, err)
-	}
-	if f.Received+n > f.Size {
-		s.dropPart(ctx, f, offset)
-		return errBad("more bytes than the size given when the upload started")
-	}
-	f.Received += n
-	if _, uerr := x.db.Update(ctx, "files", map[string]any{"received": f.Received}, store.Eq("id", f.ID)); uerr != nil {
-		return uerr
+	if f.Received < f.Size {
+		// The part is written under a key of its own, then kept only if no
+		// other part was kept for the same place meanwhile: the count of
+		// bytes and the list of parts change together, and only from where
+		// this part began.
+		key := partKey(f, offset)
+		body := &counter{r: io.LimitReader(x.r.Body, f.Size-f.Received+1)}
+		err := s.fileStore().Put(ctx, key, body, "application/octet-stream")
+		if err != nil {
+			// A part cut short is not kept: the caller sends it again from the
+			// same place, which is what the answer tells it.
+			s.dropParts(ctx, key)
+			return errBad("upload interrupted after %d bytes; continue from %d: %v", f.Received, f.Received, err)
+		}
+		if f.Received+body.n > f.Size {
+			s.dropParts(ctx, key)
+			return errBad("more bytes than the size given when the upload started")
+		}
+		parts := append(slices.Clip(f.Parts), key)
+		n, err := x.db.Update(ctx, "files", map[string]any{"received": f.Received + body.n, "parts": parts},
+			store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("received", f.Received))
+		if err != nil || n == 0 {
+			s.dropParts(ctx, key)
+		}
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			if err := x.db.Get(ctx, &f, store.Eq("id", f.ID)); err != nil {
+				return err
+			}
+			return offsetConflict(offset, f.Received)
+		}
+		f.Received, f.Parts = f.Received+body.n, parts
 	}
 	if f.Received == f.Size {
 		if err := s.finishUpload(ctx, x, &f); err != nil {
@@ -318,11 +301,28 @@ func (s *Server) handleUploadFilePart(x *c) error {
 	return x.ok(s.fileOut(x, f))
 }
 
-// dropPart removes a part that is not kept. One left behind is written over
-// when the part is sent again.
-func (s *Server) dropPart(ctx context.Context, f core.File, offset int64) {
-	if err := s.fileStore().Delete(ctx, partKey(f, offset)); err != nil {
-		s.log.Warn("upload: removing a part that is not kept", "file", f.ID, "err", err)
+// offsetConflict is the refusal of a part sent for another place than
+// where the upload has got to.
+func offsetConflict(offset, received int64) error {
+	return &httpError{Status: 409, Code: "conflict", Message: fmt.Sprintf("offset %d does not match the %d bytes received; continue from %d", offset, received, received)}
+}
+
+// dropParts removes parts from file storage that are not, or no longer,
+// needed. One left behind is never read: only the parts a file lists are.
+func (s *Server) dropParts(ctx context.Context, keys ...string) {
+	for _, key := range keys {
+		if err := s.fileStore().Delete(ctx, key); err != nil {
+			s.log.Warn("upload: removing a part that is not needed", "key", key, "err", err)
+		}
+	}
+}
+
+// dropReceived removes what an upload received, once it is stored or
+// will not be.
+func (s *Server) dropReceived(ctx context.Context, f core.File) {
+	s.dropParts(ctx, f.Parts...)
+	if err := os.Remove(s.partPath(f.ID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		s.log.Warn("upload: removing what was received", "file", f.ID, "err", err)
 	}
 }
 
@@ -334,15 +334,25 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 	return f
 }
 
-// finishUpload moves a complete upload into file storage, with its
-// checksum, real type, size on screen and a reduced copy.
+// finishUpload stores a complete upload whole in file storage, with its
+// checksum, real type, size on screen and a reduced copy, and marks it
+// ready. What was received (the parts, or the file on this machine) is
+// removed only once the file is stored and marked: until then a failure
+// leaves it all, and finishing again starts from it.
 func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	path := s.partPath(f.ID)
-	defer os.Remove(path)
-	if err := s.joinUploadParts(ctx, *f); err != nil {
-		return fmt.Errorf("file storage: %w", err)
+	if len(f.Parts) > 0 {
+		joined, err := s.joinUploadParts(ctx, *f)
+		if err != nil {
+			return fmt.Errorf("file storage: %w", err)
+		}
+		defer os.Remove(joined)
+		path = joined
 	}
 	in, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return &httpError{Status: 409, Code: "conflict", Message: "this upload's bytes were received by another server: send it again from there, or start it again"}
+	}
 	if err != nil {
 		return err
 	}
@@ -359,10 +369,60 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	if err := s.fileStore().Put(ctx, f.StorageKey, io.TeeReader(in, h), f.ContentType); err != nil {
 		return fmt.Errorf("file storage: %w", err)
 	}
-	f.SHA256, f.State = hex.EncodeToString(h.Sum(nil)), "ready"
-	set := map[string]any{"state": core.FileReady, "sha256": f.SHA256, "content_type": f.ContentType, "size": f.Size, "received": f.Size}
-	s.addPreview(ctx, f, path, set)
-	_, err = x.db.Update(ctx, "files", set, store.Eq("id", f.ID))
+	ready := *f
+	ready.SHA256, ready.State, ready.Parts = hex.EncodeToString(h.Sum(nil)), core.FileReady, nil
+	set := map[string]any{"state": core.FileReady, "sha256": ready.SHA256, "content_type": ready.ContentType, "size": ready.Size, "received": ready.Size, "parts": nil}
+	s.addPreview(ctx, &ready, path, set)
+	// Two requests may finish the same upload at once; the file is the same
+	// bytes either way, and the first to mark it ready is the one that counts.
+	n, err := x.db.Update(ctx, "files", set, store.Eq("id", f.ID), store.Eq("state", core.FileUploading))
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return x.db.Get(ctx, f, store.Eq("id", f.ID))
+	}
+	in.Close()
+	s.dropReceived(ctx, *f)
+	*f = ready
+	return nil
+}
+
+// joinUploadParts puts the parts an upload lists together, in order, into
+// a new file on this machine, and gives its path. The parts stay where
+// they are.
+func (s *Server) joinUploadParts(ctx context.Context, f core.File) (string, error) {
+	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
+		return "", err
+	}
+	out, err := os.CreateTemp(filepath.Dir(s.partPath(f.ID)), f.ID+".join-*")
+	if err != nil {
+		return "", err
+	}
+	for _, key := range f.Parts {
+		if err = s.appendPart(ctx, out, key); err != nil {
+			break
+		}
+	}
+	// A write that fails only when the file is closed leaves it short.
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(out.Name())
+		return "", err
+	}
+	return out.Name(), nil
+}
+
+// appendPart copies one part from file storage to out.
+func (s *Server) appendPart(ctx context.Context, out io.Writer, key string) error {
+	in, _, err := s.fileStore().Open(ctx, key)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	_, err = io.Copy(out, in)
 	return err
 }
 

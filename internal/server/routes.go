@@ -132,7 +132,7 @@ func (s *Server) coreRoutes() []route {
 		{"POST " + w + "/tokens", s.workspaceMember(s.handleCreateToken), "Issue a token: {user, name, read_only, projects, expires_days}. The token is in the answer once.", "", "admin"},
 		{"DELETE " + w + "/tokens/{id}", s.workspaceMember(s.handleRevokeToken), "Revoke a token at once.", "", "admin"},
 		{"POST " + w + "/files", s.workspaceMember(s.handleUploadFile), "Upload a file: the body is the file, or a multipart form with a file field. With size= a large file continues with PATCH.", "name: file name; size: full size in bytes, for an upload in parts", "files"},
-		{"PATCH " + w + "/files/{id}", s.workspaceMember(s.handleUploadFilePart), "Send the next part of an upload.", "offset: bytes already received", "files"},
+		{"PATCH " + w + "/files/{id}", s.workspaceMember(s.handleUploadFilePart), "Send the next part of an upload. An upload whose bytes all came but could not be stored is finished by sending nothing at its end.", "offset: bytes already received", "files"},
 		{"GET " + w + "/files/{id}", s.workspaceMember(s.handleShowFile), "A file's details and addresses.", "", "files"},
 		{"GET /f/{id}/{name...}", s.signedIn(s.handleServeFile), "A file's bytes. The name is for the reader; the id decides. /f/{id}/preview is its small preview. Takes a session or a token, and byte ranges.", "", "files"},
 	}

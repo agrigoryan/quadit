@@ -43,13 +43,29 @@ func newSite(t *testing.T, st store.Store) *site {
 // loopback is this machine's addresses, in IPv4 and IPv6.
 var loopback = []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128")}
 
+// newSiteWithFiles is newSite keeping its files in files.
+func newSiteWithFiles(t *testing.T, st store.Store, files blob.Store) *site {
+	t.Helper()
+	return newSiteOf(t, st, files, func(cfg *server.Config) { cfg.PrivateNetworks = loopback })
+}
+
 // newSiteWith starts a server with what configure sets on its Config.
 func newSiteWith(t *testing.T, st store.Store, configure func(*server.Config)) *site {
 	t.Helper()
+	return newSiteOf(t, st, nil, configure)
+}
+
+// newSiteOf starts a server keeping its files in files, or on disk in the
+// site's folder when that is nil, with what configure sets on its Config.
+func newSiteOf(t *testing.T, st store.Store, files blob.Store, configure func(*server.Config)) *site {
+	t.Helper()
 	dir := t.TempDir()
-	files, err := blob.NewDisk(dir + "/files")
-	if err != nil {
-		t.Fatal(err)
+	if files == nil {
+		disk, err := blob.NewDisk(dir + "/files")
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = disk
 	}
 	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
 	hs, base := localhostServer(t)
