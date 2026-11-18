@@ -4,6 +4,7 @@
 // for by a bridge put on the page before it loads, which keeps what the
 // page tells it and asks the page as the app would.
 
+import { randomUUID } from "node:crypto";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import type { DesktopNotification, DesktopOutcome, DesktopRequest, DesktopSummary } from "../src/types/desktop";
 import { expect, invitedMember, test } from "./quadit";
@@ -128,6 +129,35 @@ test("quick capture creates a task, and says where it is", async ({ page, projec
   });
   expect(outcome).toEqual({ ok: true, path: `/e2e/task/${project.key}-1` });
   expect(await quadit.task(`${project.key}-1`)).toMatchObject({ title: "Captured from the app" });
+});
+
+test("a member connects an agent they answer for, and disconnecting revokes its token", async ({
+  browser,
+  page: owner,
+  project,
+  quadit,
+}) => {
+  const { page, userID } = await membersWindow(browser, owner, `Connect ${project.key}`);
+  const agent = randomUUID();
+  await quadit.cli(
+    "do",
+    "agent.create",
+    JSON.stringify({
+      id: agent,
+      name: `Helper ${project.key}`,
+      handle: `helper-${project.key.toLowerCase()}`,
+      responsible: userID,
+    }),
+  );
+  let made: DesktopOutcome | undefined;
+  await expect
+    .poll(async () => {
+      made = await ask(page, { kind: "agent-token", agent, label: "Claude Code" });
+      return made.ok;
+    })
+    .toBe(true);
+  const token = made?.ok && made.token ? made.token.id : "";
+  expect(await ask(page, { kind: "revoke-token", token })).toEqual({ ok: true });
 });
 
 test("a refusal comes back in the server's words", async ({ page }) => {

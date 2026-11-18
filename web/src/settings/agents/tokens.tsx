@@ -23,7 +23,7 @@ const EXPIRY = [0, 7, 30, 90, 365];
 
 /** The tokens issued to one agent: make one (shown once), see when each was used, revoke. */
 export function AgentTokens({ agent, canEdit }: { agent: AgentMember; canEdit: boolean }) {
-  // The server lists an agent's tokens for admins only; anyone else is told so rather than shown an empty list.
+  // The server lists an agent's tokens only to admins and the person who answers for it; anyone else is told so rather than shown an empty list.
   const tokens = useTokens(agent.user_id, canEdit);
   const revoking = useRevokeToken();
   const [creating, setCreating] = useState(false);

@@ -45,6 +45,13 @@ describe("can", () => {
     ]).toEqual(want);
   });
 
+  it("an agent's tokens are an admin's, and the person's who answers for it", () => {
+    expect(can(who.admin).agentTokens({ responsible_id: "someone-else" })).toBe(true);
+    expect(can(who.member).agentTokens({ responsible_id: "me" })).toBe(true);
+    expect(can(who.member).agentTokens({ responsible_id: "someone-else" })).toBe(false);
+    expect(can(who.readOnly).agentTokens({ responsible_id: "me" })).toBe(false);
+  });
+
   it("nobody may change a task in the trash, or one in a project outside their reach", () => {
     expect(can(who.owner).editTask({ project_id: "p1", deleted_at: 5 })).toBe(false);
     expect(can(who.limited).editTask({ project_id: "p2" })).toBe(false);

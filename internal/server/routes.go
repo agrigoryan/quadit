@@ -131,9 +131,9 @@ func (s *Server) coreRoutes() []route {
 		{"GET " + w + "/projects/{key}/layout", s.workspaceMember(s.handleShowProjectLayout), "A project's statuses, labels, members, epics, cycles and templates, by name.", "", "orient"},
 		{"GET " + w + "/list/{collection}", s.workspaceMember(s.handleListCollection), "Rows of one kind as stored: members, projects, statuses, labels, epics, milestones, cycles, views, templates, preferences, resources, secrets, claims, sessions, relations, attachments, links, webhooks, deliveries, rules, integrations.", "project; task; trash: true; limit; offset", "sync"},
 		// Tokens and files.
-		{"GET " + w + "/tokens", s.workspaceMember(s.handleListTokens), "API tokens (one's own; all of them for admins).", "", "admin"},
+		{"GET " + w + "/tokens", s.workspaceMember(s.handleListTokens), "API tokens one may revoke: one's own, those one made for an agent one answers for; all of them for admins.", "", "admin"},
 		{"POST " + w + "/tokens", s.workspaceMember(s.handleCreateToken), "Issue a token: {user, name, read_only, projects, expires_days}. The token is in the answer once.", "", "admin"},
-		{"DELETE " + w + "/tokens/{id}", s.workspaceMember(s.handleRevokeToken), "Revoke a token at once.", "", "admin"},
+		{"DELETE " + w + "/tokens/{id}", s.workspaceMember(s.handleRevokeToken), "Revoke a token at once: one listed for the caller.", "", "admin"},
 		{"POST " + w + "/files", s.workspaceMember(s.handleUploadFile), "Upload a file: the body is the file, or a multipart form with a file field. With size= a large file continues with PATCH.", "name: file name; size: full size in bytes, for an upload in parts; id: a UUID of the caller's making, so that asking again goes on from where the upload stopped (needs size); sha256: the file's checksum in hex, checked before it is ready", "files"},
 		{"PATCH " + w + "/files/{id}", s.workspaceMember(s.handleUploadFilePart), "Send the next part of an upload. An upload whose bytes all came but could not be stored is finished by sending nothing at its end.", "offset: bytes already received", "files"},
 		{"GET " + w + "/files/{id}", s.workspaceMember(s.handleShowFile), "A file's details and addresses.", "", "files"},

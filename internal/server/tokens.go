@@ -167,16 +167,18 @@ func tokenScopes(x *c, resolver *engine.Resolver, b tokenBody) ([]string, error)
 	return scopes, nil
 }
 
+// handleListTokens lists the live tokens the caller may revoke
+// (tokenKeeper).
 func (s *Server) handleListTokens(x *c) error {
-	conds := []store.Cond{store.Null("revoked_at")}
-	if !x.member.Role.AtLeast(core.RoleAdmin) {
-		conds = append(conds, store.Eq("user_id", x.member.UserID))
-	}
-	var ts []core.APIToken
-	if err := x.db.List(x.ctx(), &ts, store.Q{Where: conds, Order: "-created_at,id"}); err != nil {
+	keeps, err := tokenKeeper(x)
+	if err != nil {
 		return err
 	}
-	return x.ok(map[string]any{"tokens": ts})
+	var ts []core.APIToken
+	if err := x.db.List(x.ctx(), &ts, store.Q{Where: []store.Cond{store.Null("revoked_at")}, Order: "-created_at,id"}); err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"tokens": slices.DeleteFunc(ts, func(t core.APIToken) bool { return !keeps(t) })})
 }
 
 // handleRevokeToken ends a token at once.
@@ -185,10 +187,12 @@ func (s *Server) handleRevokeToken(x *c) error {
 	if err := x.db.Get(x.ctx(), &token, store.Eq("id", x.r.PathValue("id")), store.Null("revoked_at")); err != nil {
 		return err
 	}
-	if token.UserID != x.member.UserID {
-		if err := x.admin(); err != nil {
-			return err
-		}
+	keeps, err := tokenKeeper(x)
+	if err != nil {
+		return err
+	}
+	if !keeps(token) {
+		return errForbidden("a token is revoked by its member, by whoever made it for an agent they answer for, or by an admin")
 	}
 	if _, err := x.db.Update(x.ctx(), "api_tokens", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("id", token.ID)); err != nil {
 		return err
@@ -196,4 +200,26 @@ func (s *Server) handleRevokeToken(x *c) error {
 	s.accessChanged()
 	s.audit(x.r, x.ws.ID, x.user, "token.revoked", "token", token.ID, nil)
 	return x.ok(map[string]any{"ok": true})
+}
+
+// tokenKeeper says which tokens of the workspace the caller sees and may
+// revoke: every one for an admin; otherwise their own, and those they made
+// for an agent they answer for, so that whoever connected an agent can
+// disconnect it.
+func tokenKeeper(x *c) (func(core.APIToken) bool, error) {
+	me := x.member.UserID
+	if x.member.Role.AtLeast(core.RoleAdmin) {
+		return func(core.APIToken) bool { return true }, nil
+	}
+	var agents []core.User
+	if err := x.s.st.List(x.ctx(), &agents, store.Q{Where: []store.Cond{store.Eq("responsible_id", me)}}); err != nil {
+		return nil, err
+	}
+	answersFor := map[string]bool{}
+	for _, a := range agents {
+		answersFor[a.ID] = true
+	}
+	return func(t core.APIToken) bool {
+		return t.UserID == me || (t.CreatedBy == me && answersFor[t.UserID])
+	}, nil
 }

@@ -95,7 +95,7 @@ export const agentStrings = {
   "tokens.title": "Tokens",
   "tokens.lead": "A token lets a program act as this agent. It is shown once, when it is made.",
   "tokens.new": "New token",
-  "tokens.adminsOnly": "Only owners and admins of the workspace can see and manage an agent's tokens.",
+  "tokens.adminsOnly": "Only admins and the person who answers for this agent can see and manage its tokens.",
   "tokens.none": "No tokens. The agent cannot connect until it has one.",
   "tokens.name": "Name",
   "tokens.nameHint": "Where the token will be used, so you can tell them apart later.",

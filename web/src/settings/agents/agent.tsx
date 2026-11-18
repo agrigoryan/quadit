@@ -52,7 +52,8 @@ export function AgentPage() {
 
 function AgentBody({ agent }: { agent: AgentMember }) {
   const base = useSettingsBase();
-  const admin = useCan().administer;
+  const can = useCan();
+  const admin = can.administer;
   const navigate = useNavigate();
   const states = useAgentStates();
   const knownResponsible = agent.responsible_id ?? "";
@@ -130,7 +131,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
         </Card>
       </Section>
 
-      <AgentTokens agent={agent} canEdit={admin} />
+      <AgentTokens agent={agent} canEdit={can.agentTokens(agent)} />
 
       <form onSubmit={save} className="flex flex-col gap-8">
         <Section title={t("agent.profile")}>

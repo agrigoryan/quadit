@@ -28,6 +28,11 @@ export interface Access {
   editMadeBy(userId: string | undefined, projectId?: string): boolean;
   /** May run the workspace: projects, statuses, labels, people, agents, automation, secrets. */
   administer: boolean;
+  /**
+   * May make this agent tokens, and see and revoke them: an admin, all of
+   * them; the person who answers for it, those they made (internal/server/tokens.go).
+   */
+  agentTokens(agent: Pick<Member, "responsible_id">): boolean;
   /** May do what only an owner may: delete the workspace, make someone an owner. */
   own: boolean;
 }
@@ -38,6 +43,7 @@ const NOTHING: Access = {
   editTask: () => false,
   editMadeBy: () => false,
   administer: false,
+  agentTokens: () => false,
   own: false,
 };
 
@@ -65,6 +71,7 @@ export function can(me: Member | null | undefined): Access {
     editTask: (task) => !task.deleted_at && edit(task.project_id),
     editMadeBy: (userId, projectId) => edit(projectId) && (admin || (!!userId && userId === me.user_id)),
     administer: admin,
+    agentTokens: (agent) => admin || (write && agent.responsible_id === me.user_id),
     own: write && me.role === "owner",
   };
 }
