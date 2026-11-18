@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"gocloud.dev/blob/memblob"
+
 	"github.com/agrigoryan/quadit/internal/backup"
 	"github.com/agrigoryan/quadit/internal/blob"
-	"gocloud.dev/blob/memblob"
 )
 
 // TestCopiesOfABackup: a backup's file is copied to a folder or a bucket
