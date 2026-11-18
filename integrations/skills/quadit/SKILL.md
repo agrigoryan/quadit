@@ -7,7 +7,7 @@ description: Work in a Quadit workspace with the quadit command-line tool - find
 
 Quadit holds the team's tasks, decisions and docs. You are a member of the workspace with your own account. People assign you tasks and answer your questions there; nothing important should live only in this conversation.
 
-The `quadit` command reads `QUADIT_URL` and `QUADIT_TOKEN`. Output is short on purpose; add `--json` for full data. Names work wherever ids do: `SVA-12`, `@handle`, a status or label by its name, `me`.
+The `quadit` command is connected for you: by `QUADIT_URL` and `QUADIT_TOKEN` when they are set, otherwise by a saved login (`quadit login`; `QUADIT_CONFIG` can name its file). `quadit me` says who you are; if it says you are not connected, ask the person to connect you. Output is short on purpose; add `--json` for full data. Names work wherever ids do: `SVA-12`, `@handle`, a status or label by its name, `me`.
 
 ## Start of a session
 

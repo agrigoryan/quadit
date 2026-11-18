@@ -5,8 +5,8 @@ An agent is a member of the workspace with its own account, role and token. Peop
 ## Set up
 
 1. In Settings → Agents, create the agent: name, handle, role (member or admin), the person responsible for it, and optionally which projects it may touch, which changes need approval, and how many times a week it may pass work on to another agent.
-2. Issue it a token. It is shown once.
-3. Give the agent `QUADIT_URL` and `QUADIT_TOKEN`, or run `quadit login URL TOKEN`.
+2. Issue it a token (an admin, or the person responsible for the agent). It is shown once.
+3. Give the agent `QUADIT_URL` and `QUADIT_TOKEN`, or run `quadit login URL TOKEN` (`-` for the token reads it from standard input). Or let the desktop app do steps 2 to 4: see [Connect from the desktop app](#connect-from-the-desktop-app).
 4. Teach the agent Quadit: `quadit skill install` (see [Your agent](#your-agent)).
 
 ## Your agent
@@ -83,6 +83,17 @@ One prompt, with its tools allowed: `copilot -p "…" --allow-tool='quadit' --al
 One prompt: `opencode run "…"`.
 
 **pi.** MCP from pi 1.0: `pi mcp add quadit --url https://quadit.example.com/mcp --bearer-token-env-var QUADIT_TOKEN`; pi does not ask before a call. One prompt: `pi -p "…"`.
+
+### Connect from the desktop app
+
+The desktop app's Connect (macOS and Linux) sets up the coding agents it finds on its computer: Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI, opencode and pi. For each, pick the workspace, the agent it works as (or a new one, for an admin), and how it connects:
+
+- **The command and the skill** (all seven). The app asks the server for a token for the agent, which only an admin or the person responsible for the agent may have, and saves it with `quadit login URL -`, the token on standard input. Each agent gets a login file of its own beside the default one (`quadit/<name>.json` in the user's config folder), and the app sets `QUADIT_CONFIG` to it in that agent's own environment setting (Claude Code's `settings.json` `env`, Codex's `shell_environment_policy.set`), so each works under its own name. An agent without such a setting uses the computer's default login, the one `quadit login --path` prints. The app installs the skill, and uses the `quadit` command already on the shell's `PATH`, or links in the copy it carries.
+- **MCP** (Claude Code, Codex, Cursor, Gemini CLI, opencode). The app writes only the server's address into the agent's MCP settings; the agent signs in through OAuth, and the consent page asks which agent it works as.
+
+Tokens are kept only in `quadit`'s own login files, readable by the user alone, never in an agent's settings. Nothing is written until the plan, every file with its change, has been shown and accepted; each file touched is backed up first. `QUADIT_URL` and `QUADIT_TOKEN`, where they are set, still win over any login file. If the Claude Code plugin is installed, Connect warns that its MCP entry still wants those two variables.
+
+**Disconnect** puts back what Connect changed, except where a file has been changed since (it is left as it is, and said), and revokes the token. An MCP sign-in is ended in the agent itself.
 
 ## A session in five calls
 
