@@ -146,6 +146,17 @@ describe("TOML edits", () => {
     ).toThrow(/already has shell_environment_policy.set/);
   });
 
+  it("leaves alone a table that gained an entry, which taking the block out would hand to the table before it", () => {
+    const path = join(folder(), "config.toml");
+    writeFileSync(path, original);
+    const applied = apply([
+      { kind: "toml", path, table: ["mcp_servers", "quadit"], entries: { url: "https://a/mcp" } },
+    ]);
+    writeFileSync(path, `${readFileSync(path, "utf8")}startup_timeout_sec = 30\n`);
+    expect(revert(applied)).toEqual([`${path}: the table the app added changed since; left as it is.`]);
+    expect(readFileSync(path, "utf8")).toContain("[mcp_servers.quadit]");
+  });
+
   it("leaves a table changed since alone", () => {
     const path = join(folder(), "config.toml");
     writeFileSync(path, original);
@@ -188,6 +199,54 @@ describe("whole files and links", () => {
     expect(() => lstatSync(path)).toThrow();
     writeFileSync(path, "#!/bin/sh\n");
     expect(() => planChanges([{ kind: "link", path, target: "/x" }])).toThrow(EditRefused);
+  });
+
+  it("never replaces a quadit on the PATH it did not make, a link (broken or not) or a file", () => {
+    const dir = folder();
+    symlinkSync(join(dir, "gone"), join(dir, "quadit"));
+    expect(() => planChanges([{ kind: "link", path: join(dir, "quadit"), target: "/app/quadit" }])).toThrow(
+      new EditRefused(
+        `${join(dir, "quadit")} is already there and the app did not make it: take it away, or put quadit on your PATH yourself.`,
+      ),
+    );
+    symlinkSync("/app/quadit", join(dir, "ours"));
+    expect(planChanges([{ kind: "link", path: join(dir, "ours"), target: "/app/quadit" }]).edits).toEqual([]);
+  });
+
+  it("refuses to write through a link to nothing, which would put the file where the plan does not show", () => {
+    const dir = folder();
+    symlinkSync(join(dir, "elsewhere", "config.json"), join(dir, "config.json"));
+    expect(() => planChanges([{ kind: "written-by", path: join(dir, "config.json"), shown: "{}" }])).toThrow(
+      new EditRefused(
+        `${join(dir, "config.json")} is a link to ${join(dir, "elsewhere", "config.json")}, which is not there: the app does not write through it.`,
+      ),
+    );
+  });
+
+  it("writes through a scratch file of its own, never one already there", () => {
+    const dir = folder();
+    const path = join(dir, "settings.json");
+    writeFileSync(path, "{}");
+    // A link where a predictable scratch name would be: writing must not follow it.
+    writeFileSync(join(dir, "victim"), "untouched");
+    symlinkSync(join(dir, "victim"), `${path}.quadit-next`);
+    apply([{ kind: "json", path, keyPath: ["a"], value: 1 }], dir);
+    expect(readFileSync(join(dir, "victim"), "utf8")).toBe("untouched");
+    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ a: 1 });
+  });
+
+  it("masks tokens on both sides of a diff", () => {
+    const path = join(folder(), "config.json");
+    const token = "qd_AbCdEf12_" + "x".repeat(40);
+    writeFileSync(path, JSON.stringify({ url: "https://q", token }, null, 2));
+    const { edits } = planReverts([{ kind: "file", path, sha256: sha256(readFileSync(path, "utf8")), backup: null }]);
+    const diff = diffOf(edits[0] as (typeof edits)[0]);
+    expect(diff).not.toContain(token);
+    expect(diff).toContain('-  "token": "qd_…"');
+    const settings = join(folder(), "settings.json");
+    writeFileSync(settings, JSON.stringify({ headers: { Authorization: `Bearer ${token}` } }));
+    const replaced = planChanges([{ kind: "json", path: settings, keyPath: ["headers"], value: {} }]).edits[0];
+    expect(diffOf(replaced as NonNullable<typeof replaced>)).not.toContain(token);
   });
 
   it("edits the file a symbolic link leads to, and keeps the link", () => {

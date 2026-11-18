@@ -14,7 +14,7 @@
 // it (dotfiles kept in a repository and linked home, say), the plan shows
 // and edits the file the link leads to, and the link stays a link.
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   chmodSync,
   copyFileSync,
@@ -91,6 +91,7 @@ export function planChanges(changes: Change[]): { edits: FileEdit[]; applied: Ap
   const edits = new Map<string, FileEdit>();
   const applied: Applied[] = [];
   for (const asked of changes) {
+    if (asked.kind !== "link") refuseDanglingLink(asked.path);
     const change = { ...asked, path: changedPath(asked) };
     let edit = edits.get(change.path);
     if (!edit) {
@@ -157,8 +158,11 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
       edit.writtenBy = true;
       return { kind: "file", path, sha256: "", backup: null };
     case "link":
-      if (edit.before !== null && edit.before !== change.target && !isLink(path)) {
-        throw new EditRefused(`${path} is already there and is not the app's link.`);
+      // Whatever is there (a file, another link, a broken one) is the person's: never replaced.
+      if (edit.before !== null && edit.before !== change.target) {
+        throw new EditRefused(
+          `${path} is already there and the app did not make it: take it away, or put quadit on your PATH yourself.`,
+        );
       }
       if (edit.after === change.target) return null;
       edit.after = change.target;
@@ -209,11 +213,17 @@ function revertOne(edit: FileEdit, record: Applied): string | null {
       edit.after = prune(after, record, record.keyPath.length);
       return null;
     }
-    case "toml":
+    case "toml": {
       if (!text.includes(record.block))
         return text.includes(TOML_MARK) ? "the table the app added changed since" : null;
+      // An entry added below the block belongs to its table: taking the block out would give it to the table before.
+      const now = lookUp(readToml(text, record.path), record.table).value;
+      if (!same(now, lookUp(readToml(record.block, record.path), record.table).value)) {
+        return "the table the app added changed since";
+      }
       edit.after = text.replace(record.block, "");
       return null;
+    }
     case "file":
       if (sha256(text) !== record.sha256) return "it changed since the app wrote it";
       edit.after = record.backup ? readFileSync(record.backup, "utf8") : null;
@@ -284,19 +294,25 @@ function writeText(path: string, text: string) {
   } catch {
     // A new file.
   }
-  const next = `${path}.quadit-next`;
-  writeFileSync(next, text, { mode });
+  // A name of its own, made here and nowhere else ("wx"): a file or link already there is never written through.
+  const next = `${path}.quadit-${randomBytes(6).toString("hex")}`;
+  writeFileSync(next, text, { mode, flag: "wx" });
   chmodSync(next, mode);
   renameSync(next, path);
 }
 
-/** The unified diff of an edit, as the plan shows it. */
+/** The unified diff of an edit, as the plan shows it, with every token masked on both sides. */
 export function diffOf(edit: FileEdit): string {
-  const show = (side: string | null) => (side === null ? "" : edit.link ? `→ ${side}\n` : side);
+  const show = (side: string | null) => (side === null ? "" : edit.link ? `→ ${side}\n` : masked(side));
   return createTwoFilesPatch(edit.path, edit.path, show(edit.before), show(edit.after), "", "", { context: 3 })
     .split("\n")
     .slice(2)
     .join("\n");
+}
+
+/** `text` with Quadit's tokens (qd_…) and the value of every "token" key masked. */
+function masked(text: string): string {
+  return text.replace(/qd_[A-Za-z0-9_-]+/g, "qd_…").replace(/("token"\s*:\s*")(?!qd_…")[^"]*"/g, '$1…"');
 }
 
 export function sha256(text: string): string {
@@ -360,11 +376,16 @@ function readLink(path: string): string | null {
   }
 }
 
-function isLink(path: string): boolean {
+/** Refuses `path` when it is a link to nothing: written through, the file would appear where no plan shows it. */
+function refuseDanglingLink(path: string) {
   try {
-    return lstatSync(path).isSymbolicLink();
-  } catch {
-    return false;
+    if (!lstatSync(path).isSymbolicLink()) return;
+    realpathSync(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT" || !lstatSync(path, { throwIfNoEntry: false })) return;
+    throw new EditRefused(
+      `${path} is a link to ${readlinkSync(path)}, which is not there: the app does not write through it.`,
+    );
   }
 }
 
