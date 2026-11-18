@@ -42,8 +42,11 @@ func (t *loadedDatabase) row(rowID any) (core.Doc, bool) {
 	return r, ok
 }
 
-// loadTable reads a database's properties and rows, and each row's stored
-// values.
+// loadTable reads a database's properties and the rows the viewer may see
+// (a row can be someone's private page under a database everyone sees),
+// and each row's stored values. Every read of rows, the database's own and
+// a related one's, goes through here, so no title or value of a hidden row
+// reaches a cell, a formula or a rollup.
 func (who *viewer) loadTable(ctx context.Context, database core.Doc) (*loadedDatabase, error) {
 	t := &loadedDatabase{doc: database, values: map[string]map[string]any{}}
 	if err := who.db.List(ctx, &t.props, store.Q{Where: []store.Cond{store.Eq("database_id", database.ID), store.Live}, Order: "rank"}); err != nil {
@@ -52,6 +55,7 @@ func (who *viewer) loadTable(ctx context.Context, database core.Doc) (*loadedDat
 	if err := who.db.List(ctx, &t.rows, store.Q{Where: []store.Cond{store.Eq("parent_id", database.ID), store.Eq("kind", core.DocRow), store.Live}, Order: "rank"}); err != nil {
 		return nil, err
 	}
+	t.rows = keep(t.rows, who.canSeeDoc)
 	for _, row := range t.rows {
 		vals := map[string]any{}
 		if len(row.Props) > 0 {
