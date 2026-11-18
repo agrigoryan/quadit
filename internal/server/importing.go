@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -28,7 +29,7 @@ import (
 // importRoutes is the route of importing work.
 func (s *Server) importRoutes() []route {
 	return []route{
-		{"POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork), "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace, session}, dry_run}. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
+		{"POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork), "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace, session, origin}, dry_run}. origin names an import of a folder (obsidian, markdown): importing again under the same name adds only what is new. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
 	}
 }
 
@@ -42,7 +43,7 @@ type importBody struct {
 	// the kinds that are read from a service (github: owner/repo; orbit: its URL).
 	File    string            `json:"file"`
 	Source  string            `json:"source"`
-	Options map[string]string `json:"options"` // project, token, workspace, session, api
+	Options map[string]string `json:"options"` // project, token, workspace, session, api, origin
 	DryRun  bool              `json:"dry_run"`
 }
 
@@ -65,6 +66,9 @@ func (s *Server) handleImportWork(x *c) error {
 	}
 	defer cleanup()
 	plan, err := importer.Read(b.Kind, source, b.Options, s.outbound)
+	if errors.Is(err, importer.ErrUnnamed) {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "origin", Message: err.Error()}
+	}
 	if err != nil {
 		plan.Close() // a source that failed may have unpacked files first
 		field, what := "file", "this could not be read as a "+b.Kind+" export: "

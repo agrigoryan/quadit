@@ -150,6 +150,8 @@ Then restart the server, if the upgrade did not. Take a backup first (`quadit ba
 
 An upload in parts that the older version had started goes on after the upgrade from the parts it kept; a part it had lost is asked for again, and a file is made ready only when its bytes add up to its size.
 
+An import of a folder (Obsidian, Markdown) is given a name when it is made from a zip, and importing again under the same name adds only what is new; a different name makes pages of its own. A folder imported before imports had names keeps its pages: importing it again, under any name, goes on with that import and adds only what it lacks, and says so in its log.
+
 A release that does not change the schema makes no copy. Copies are not removed by Quadit: delete old ones once the new version has proved itself. Uploaded files are not copied; an upgrade does not change them.
 
 **Going back.** A binary refuses a database that a newer version has upgraded ("database is at version 9, this binary knows 8: use a newer binary"), so an older version cannot simply be started again. To go back: stop the server, run `quadit upgrade --undo` with the newer binary (it puts the copy in its place and keeps the upgraded database beside it as `….after-vN` or `<name>_after_vN`), then install and start the older version. Anything written after the upgrade is in the upgraded database only, not in the copy. A release that did not change the schema can be undone by installing the older version again.

@@ -49,6 +49,10 @@ export const importStrings = {
   "import.orbitSession": "Sign-in session (optional)",
   "import.orbitSessionHint":
     "Orbit hands attached files only to a signed-in session, not to an API token. With one, the files come too; without, pictures keep pointing at Orbit.",
+  "import.origin": "Name of this import",
+  "import.originHint":
+    "Importing again under the same name adds only what is new; another name makes pages of their own, even for files of the same name.",
+  "import.originMissing": "Name this import",
   "import.project": "Project for the tasks",
   "import.projectHint": "Where the tasks go. A key that is not a project yet makes one.",
   "import.projectNew": "A new project…",

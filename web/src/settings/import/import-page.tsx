@@ -86,11 +86,12 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
   const [token, setToken] = useState("");
   const [orbitWs, setOrbitWs] = useState("");
   const [orbitSession, setOrbitSession] = useState("");
+  const [origin, setOrigin] = useState("");
   const [project, setProject] = useState("");
   const [newKey, setNewKey] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [found, setFound] = useState<Found | null>(null);
-  const errors = useFieldErrors(["file", "source", "project", "token", "workspace", "kind"]);
+  const errors = useFieldErrors(["file", "origin", "source", "project", "token", "workspace", "kind"]);
   const source = SOURCES.find((s) => s.kind === kind);
   const busy = phase === "checking" || phase === "running";
   // On a phone the form opens below the list of tools: bring it into view once one is picked.
@@ -110,6 +111,7 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
     if (next === kind) return;
     setKind(next);
     setFile(null);
+    setOrigin("");
     setAddress("");
     setToken("");
     touched();
@@ -127,6 +129,13 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
         return null;
       }
       req.file = file.id;
+      if (source.named) {
+        if (!origin.trim()) {
+          errors.set("origin", t("import.originMissing"));
+          return null;
+        }
+        options.origin = origin.trim();
+      }
     } else if (source.kind === "github") {
       const repo = githubRepo(address);
       if (!repo) {
@@ -206,6 +215,24 @@ function ImportFlow({ onDone }: { onDone: (result: ImportResult, project: string
                   onBusy={setUploading}
                   error={errors.fields.file}
                 />
+              )}
+              {source.named && (
+                <FormField
+                  label={t("import.origin")}
+                  htmlFor="imp-origin"
+                  hint={t("import.originHint")}
+                  error={errors.fields.origin}
+                >
+                  <Input
+                    id="imp-origin"
+                    spellCheck={false}
+                    value={origin}
+                    onChange={(e) => {
+                      setOrigin(e.target.value);
+                      touched();
+                    }}
+                  />
+                </FormField>
               )}
               {source.kind === "github" && (
                 <div className="grid gap-3.5 sm:grid-cols-2">

@@ -96,6 +96,9 @@ var helpTopics = map[string]string{
   import linear FILE.csv project=KEY       import trello BOARD.json project=KEY
   import asana FILE.csv project=KEY        import github OWNER/REPO project=KEY [token=…]
   import notion EXPORT.zip                 import obsidian FOLDER     import markdown FOLDER
+  import obsidian|markdown EXPORT.zip origin=NAME
+                                           a zipped folder is named: importing again under the
+                                           same name adds only what is new (a folder: its path)
   import orbit https://orbit.example workspace=ID token=ORBIT_TOKEN [session=ORBIT_SESSION]
                                            with a signed-in session, attached files come too
 `,

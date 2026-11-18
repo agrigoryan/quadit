@@ -15,6 +15,12 @@ export interface Source {
   accept?: string;
   /** Its tasks go into a project the person chooses. */
   project: boolean;
+  /**
+   * A folder export (Obsidian, Markdown) says nothing about where it came
+   * from, so the person names the import: the same name again adds only
+   * what is new, another name makes pages of their own.
+   */
+  named?: boolean;
 }
 
 export const SOURCES: Source[] = [
@@ -23,8 +29,8 @@ export const SOURCES: Source[] = [
   { kind: "trello", from: "file", accept: ".json,application/json", project: true },
   { kind: "github", from: "address", project: true },
   { kind: "notion", from: "file", accept: ".zip,application/zip", project: false },
-  { kind: "obsidian", from: "file", accept: ".zip,application/zip", project: false },
-  { kind: "markdown", from: "file", accept: ".zip,application/zip", project: false },
+  { kind: "obsidian", from: "file", accept: ".zip,application/zip", project: false, named: true },
+  { kind: "markdown", from: "file", accept: ".zip,application/zip", project: false, named: true },
   { kind: "orbit", from: "address", project: false },
 ];
 

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { currentRun, OWNER, quadit } from "./run";
 import { expect, test } from "./quadit";
 
@@ -117,6 +118,29 @@ test("the import source is picked from the keyboard", async ({ page }) => {
   await expect(source("Linear")).toBeFocused();
   await expect(source("Linear")).toBeChecked();
   await expect(source("Asana")).not.toBeChecked();
+});
+
+// A zip of a folder says nothing about where it came from, so its import is
+// named: the name, not the zip's file name, is what an import made again goes on.
+test("a folder's import is named before it runs", async ({ page }) => {
+  await page.goto("/e2e/settings/import");
+  await page
+    .getByRole("radiogroup", { name: "Where from" })
+    .getByRole("radio", { name: /^Markdown files/ })
+    .click();
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose file" }).click();
+  await (await chooser).setFiles(fileURLToPath(new URL("files/handbook.zip", import.meta.url)));
+  await expect(page.getByText("Uploaded")).toBeVisible();
+
+  const name = page.getByRole("textbox", { name: "Name of this import" });
+  await page.getByRole("button", { name: "Check" }).click();
+  await expect(page.getByText("Name this import")).toBeVisible();
+  await name.fill(unique("handbook"));
+  await page.getByRole("button", { name: "Check" }).click();
+  await expect(page.getByText("Found 1 page.")).toBeVisible();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(page.getByText("Imported 1 page.")).toBeVisible();
 });
 
 // A field's message is about what was in the field: editing the field takes it

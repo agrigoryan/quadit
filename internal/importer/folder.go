@@ -4,6 +4,7 @@
 package importer
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -20,17 +21,26 @@ type folder struct{ kind string }
 // Kind is "markdown" or "obsidian".
 func (f folder) Kind() string { return f.kind }
 
+// ErrUnnamed refuses a zip of a folder imported with no origin option.
+var ErrUnnamed = errors.New("name this import (origin): importing again under the same name adds only what is new, and another name makes pages of its own")
+
 // Read reads the folder, or the zip of it, at source. A file's path names
-// it only within its folder, so the plan's origin is the folder: its full
-// path, or the zip's name, which stays the same each time the zip is
-// uploaded again.
-func (f folder) Read(source string, _ Options, _ *http.Client) (Plan, error) {
+// it only within its folder, so the plan's origin names the folder: the
+// origin option, the name the person gives the import and gives again to
+// import the folder again; or, for a folder on this machine given none,
+// its full path. A zip says nothing about where it came from, so it must
+// be given a name (ErrUnnamed).
+func (f folder) Read(source string, opts Options, _ *http.Client) (Plan, error) {
 	dir, tmp, err := unpacked(source, f.kind, zipByName)
 	if err != nil {
 		return Plan{}, err
 	}
-	origin := filepath.Base(source)
-	if tmp == "" {
+	origin := strings.TrimSpace(opts["origin"])
+	if origin == "" && tmp != "" {
+		os.RemoveAll(tmp)
+		return Plan{}, ErrUnnamed
+	}
+	if origin == "" {
 		if origin, err = filepath.Abs(source); err != nil {
 			return Plan{}, err
 		}
