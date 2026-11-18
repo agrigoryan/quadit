@@ -185,7 +185,9 @@ export class Connections {
   private async makeConnectPlan(choice: ConnectChoice): Promise<Plan> {
     const { home, cli } = this.parts;
     if (this.parts.platform === "win32")
-      throw new EditRefused("Connect needs the quadit command, which has no Windows build yet.");
+      throw new EditRefused(
+        "Connecting agent tools is not available on Windows yet: it needs the quadit command, which has no Windows build.",
+      );
     const harness = HARNESSES.find((h) => h.id === choice.harness);
     if (!harness) throw new EditRefused("There is no such harness.");
     const ledger = this.ledger();

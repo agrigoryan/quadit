@@ -65,6 +65,8 @@ async function render() {
   const view = await api.connectState();
   defaultLogin = view.defaultLogin;
   element("unsupported").hidden = view.supported;
+  // Nothing to connect, nor anything to look back at, where Connect does not run.
+  element("tools").hidden = !view.supported;
   cli.textContent = view.supported ? describeCli(view) : "";
   notices.replaceChildren(
     ...(view.defaultLogin

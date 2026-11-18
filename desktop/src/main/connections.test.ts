@@ -22,6 +22,9 @@ import { QuaditCli } from "@/main/quadit-cli";
 import type { DesktopRequest } from "@/shared/bridge";
 import type { ConnectChoice } from "@/shared/pages-api";
 
+/** Connect runs only on macOS and Linux (no Windows build of quadit); these tests need a POSIX shell, links and file modes. */
+const posixOnly = describe.skipIf(process.platform === "win32");
+
 const ORIGIN = "https://q.example";
 
 /**
@@ -57,7 +60,11 @@ esac
   chmodSync(path, 0o755);
 }
 
-function setUp({ quaditOnPath = true, bundled = true } = {}) {
+function setUp({
+  quaditOnPath = true,
+  bundled = true,
+  platform = "darwin",
+}: { quaditOnPath?: boolean; bundled?: boolean; platform?: NodeJS.Platform } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
   const bin = join(root, "bin");
@@ -72,7 +79,7 @@ function setUp({ quaditOnPath = true, bundled = true } = {}) {
   const connections = new Connections({
     home,
     dataDir: join(root, "data"),
-    platform: "darwin",
+    platform,
     hostName: "mac",
     cli: new QuaditCli(quaditOnPath || !bundled ? null : script, async () => `relative-folder:${bin}`),
     summaries: () => [
@@ -131,7 +138,7 @@ function setUp({ quaditOnPath = true, bundled = true } = {}) {
   return { root, home, bin, configDir, connections, asked, choice, connect, disconnect, read, json, ledger };
 }
 
-describe("Connect plans", () => {
+posixOnly("Connect plans", () => {
   const cases: [string, ConnectChoice["methods"], string[]][] = [
     [
       "claude",
@@ -237,7 +244,7 @@ describe("Connect plans", () => {
   });
 });
 
-describe("Connect and Disconnect", () => {
+posixOnly("Connect and Disconnect", () => {
   it("connects Claude Code with its own login and MCP, and takes it all back", async () => {
     const { connect, disconnect, asked, read, json, home, configDir, ledger } = setUp();
     mkdirSync(join(home, ".claude"));
@@ -355,7 +362,7 @@ describe("Connect and Disconnect", () => {
   });
 });
 
-describe("an older quadit", () => {
+posixOnly("an older quadit", () => {
   it("is refused with a word to update it", async () => {
     const { connections, choice, bin } = setUp();
     writeFileSync(
@@ -369,7 +376,7 @@ describe("an older quadit", () => {
   });
 });
 
-describe("the default login", () => {
+posixOnly("the default login", () => {
   it("says whom a harness without a login of its own will work as, and records that agent, not another", async () => {
     const { connections, connect, choice, ledger } = setUp();
     await connect(choice("gemini"));
@@ -407,7 +414,7 @@ describe("the default login", () => {
   });
 });
 
-describe("plans", () => {
+posixOnly("plans", () => {
   it("keeps one outstanding: a new one, or dropping, takes the last away", async () => {
     const { connections, choice } = setUp();
     const first = await connections.planConnect(choice("cursor", { methods: ["mcp"] }));
@@ -426,5 +433,18 @@ describe("plans", () => {
       error: expect.stringContaining("install.sh | sh"),
     });
     expect(existsSync(join(bin, "quadit"))).toBe(false);
+  });
+});
+
+describe("on Windows", () => {
+  it("says Connect is not available, and plans nothing", async () => {
+    const { connections, choice, home } = setUp({ platform: "win32" });
+    expect(await connections.state()).toMatchObject({ supported: false, defaultLogin: null });
+    expect(await connections.planConnect(choice("claude"))).toEqual({
+      ok: false,
+      error:
+        "Connecting agent tools is not available on Windows yet: it needs the quadit command, which has no Windows build.",
+    });
+    expect(existsSync(join(home, ".claude"))).toBe(false);
   });
 });
