@@ -50,6 +50,23 @@ describe("Unread", () => {
     expect(badge.count).toBe(0);
   });
 
+  it("keeps a workspace's newest count when the window that reported it leaves and another still shows it", () => {
+    const { one, unread } = setUp();
+    // Window 1 says 7 and then hears nothing more (it lost its server); window 2 says 0 afterwards.
+    unread.report(one, 1, "acme", 7);
+    unread.report(one, 2, "acme", 0);
+    unread.forget(2);
+    expect(badge.count).toBe(0);
+    unread.report(one, 3, "acme", 0);
+    unread.report(one, 3, "games", 0);
+    expect(badge.count).toBe(0);
+    // And the other way round: the newer 7 stays when the window that said 0 leaves.
+    unread.report(one, 4, "games", 0);
+    unread.report(one, 5, "games", 7);
+    unread.report(one, 4, "", 0);
+    expect(badge.count).toBe(7);
+  });
+
   it("takes off a window's count when it leaves its workspace, shows none, or closes", () => {
     const { one, unread } = setUp();
     unread.report(one, 1, "acme", 7);
