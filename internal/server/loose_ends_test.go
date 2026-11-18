@@ -24,16 +24,16 @@ import (
 func TestDecisionLogHasTheFiles(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss exit"})
-		agent := s.agentToken("coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss exit"})
+		agent := s.agentToken(t, "coder")
 		f := someFiles(t, "context.png", "a.gif", "b.gif", "exit.png")
-		if out, code := s.quadit(agent, "ask", "SVA-1", "Which arrival?", "file="+f["context.png"],
+		if out, code := s.quadit(t, agent, "ask", "SVA-1", "Which arrival?", "file="+f["context.png"],
 			"option=A", "file="+f["a.gif"], "option=B", "file="+f["b.gif"]); code != 0 {
 			t.Fatalf("ask: %d %s", code, out)
 		}
-		if out, code := s.quadit(agent, "ask", "SVA-2", "Which exit?", "option=Left", "file="+f["exit.png"], "option=Right"); code != 0 {
+		if out, code := s.quadit(t, agent, "ask", "SVA-2", "Which exit?", "option=Left", "file="+f["exit.png"], "option=Right"); code != 0 {
 			t.Fatalf("ask: %d %s", code, out)
 		}
 
@@ -46,7 +46,7 @@ func TestDecisionLogHasTheFiles(t *testing.T) {
 				}
 			}
 		}
-		s.call(nil, agent, "GET", "/api/v1/w/-/decisions?state=all", nil, 200, &log)
+		s.call(t, nil, agent, "GET", "/api/v1/w/-/decisions?state=all", nil, 200, &log)
 		got := map[string]string{}
 		for _, d := range log.Decisions {
 			files := []string{fileNames(d.Attachments)}
@@ -59,7 +59,7 @@ func TestDecisionLogHasTheFiles(t *testing.T) {
 			t.Fatalf("files in the log (question|option 1|option 2): %q", got)
 		}
 
-		text := s.call(nil, agent, "GET", "/api/v1/w/-/decisions?state=all&format=text", nil, 200, nil)
+		text := s.call(t, nil, agent, "GET", "/api/v1/w/-/decisions?state=all&format=text", nil, 200, nil)
 		for _, want := range []string{"file: context.png " + s.url + "/f/", "option 1 file: a.gif " + s.url + "/f/",
 			"option 2 file: b.gif ", "option 1 file: exit.png "} {
 			if !strings.Contains(text, want) {
@@ -162,7 +162,7 @@ func TestSignInGivesUpOnASilentProvider(t *testing.T) {
 				setting = M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
 					"auth_url": p.URL + "/login/oauth/authorize", "token_url": p.URL + "/login/oauth/access_token", "api_url": p.URL}
 			}
-			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth."+c.provider, setting, 200, nil)
+			s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth."+c.provider, setting, 200, nil)
 			b := browser()
 			b.Timeout = 10 * time.Second
 			start := time.Now()
@@ -199,18 +199,18 @@ func TestSyncKeepsFrontMatter(t *testing.T) {
 	}
 	s := newSite(t, testdb.SQLite(t))
 	r := newSyncedRepo(t, s, files)
-	r.src = s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": r.origin, "subdir": "docs"})["ref"].(string)
+	r.src = s.change(t, s.owner, "", "source.create", M{"title": "Game docs", "repo": r.origin, "subdir": "docs"})["ref"].(string)
 	if res := r.sync(); res.PagesCreated != 3 {
 		t.Fatalf("first sync: %+v", res)
 	}
 	r.idle("after the first sync")
 	for _, title := range []string{"Plain", "quoted", "Listed"} {
-		page := s.pageID(title)
-		text := s.call(s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil)
+		page := s.pageID(t, title)
+		text := s.call(t, s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil)
 		if !strings.Contains(text, "Text.") {
 			t.Fatalf("page %s: %q", title, text)
 		}
-		s.change(s.owner, "", "doc.write", M{"doc": page, "markdown": strings.Replace(text, "Text.", "Text two.", 1)})
+		s.change(t, s.owner, "", "doc.write", M{"doc": page, "markdown": strings.Replace(text, "Text.", "Text two.", 1)})
 	}
 	if res := r.sync(); res.FilesWritten != 3 {
 		t.Fatalf("page edits: %+v", res)
@@ -228,21 +228,21 @@ func TestSyncKeepsFrontMatter(t *testing.T) {
 // last action, only from that project.
 func TestDashboardOfOneProjectShowsAgentsThere(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
-	s.change(s.owner, "", "agent.create", M{"name": "Clerk", "handle": "clerk"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
-	s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+	s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	s.change(t, s.owner, "", "agent.create", M{"name": "Clerk", "handle": "clerk"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
 	token := func(handle string) string {
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &tok)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &tok)
 		return tok.Token
 	}
 	artist, clerk := token("artist"), token("clerk")
-	s.change(nil, artist, "session.start", M{"task": "SVA-1", "title": "Drawing the boss"})
-	s.change(nil, artist, "comment.create", M{"task": "SVA-1", "body": "Sketched."})
-	s.change(nil, clerk, "session.start", M{"title": "Tidying up"})
+	s.change(t, nil, artist, "session.start", M{"task": "SVA-1", "title": "Drawing the boss"})
+	s.change(t, nil, artist, "comment.create", M{"task": "SVA-1", "body": "Sketched."})
+	s.change(t, nil, clerk, "session.start", M{"title": "Tidying up"})
 
 	type agent struct {
 		Handle, State, Task, Doing string
@@ -250,7 +250,7 @@ func TestDashboardOfOneProjectShowsAgentsThere(t *testing.T) {
 	}
 	agents := func(query string) map[string]agent {
 		var out struct{ Agents []agent }
-		s.call(s.owner, "", "GET", w+"/dashboard"+query, nil, 200, &out)
+		s.call(t, s.owner, "", "GET", w+"/dashboard"+query, nil, 200, &out)
 		by := map[string]agent{}
 		for _, a := range out.Agents {
 			by[a.Handle] = a

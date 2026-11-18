@@ -22,8 +22,8 @@ import (
 func TestMCPWithOAuth(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion effect"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion effect"})
 
 		// With no token the server says where to sign in.
 		resp, _ := http.Post(s.url+"/mcp", "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
@@ -36,15 +36,15 @@ func TestMCPWithOAuth(t *testing.T) {
 			Token string `json:"token_endpoint"`
 			Reg   string `json:"registration_endpoint"`
 		}
-		s.call(nil, "", "GET", "/.well-known/oauth-authorization-server", nil, 200, &meta)
+		s.call(t, nil, "", "GET", "/.well-known/oauth-authorization-server", nil, 200, &meta)
 
 		// The client registers, the person approves, the client gets a token.
 		var cl struct {
 			ID string `json:"client_id"`
 		}
 		redirect := "http://localhost:9999/callback"
-		s.call(nil, "", "POST", "/oauth/register", M{"client_name": "Test Client", "redirect_uris": []string{redirect}}, 201, &cl)
-		s.call(nil, "", "POST", "/oauth/register", M{"client_name": "Evil", "redirect_uris": []string{"http://evil.example.com/cb"}}, 400, nil)
+		s.call(t, nil, "", "POST", "/oauth/register", M{"client_name": "Test Client", "redirect_uris": []string{redirect}}, 201, &cl)
+		s.call(t, nil, "", "POST", "/oauth/register", M{"client_name": "Evil", "redirect_uris": []string{"http://evil.example.com/cb"}}, 400, nil)
 		verifier := "a-long-random-verifier-string-for-pkce-0123456789"
 		sum := sha256.Sum256([]byte(verifier))
 		authURL := meta.Auth + "?" + url.Values{"response_type": {"code"}, "client_id": {cl.ID}, "redirect_uri": {redirect}, "state": {"xyz"},
@@ -187,14 +187,14 @@ func TestMCPWithOAuth(t *testing.T) {
 		}
 
 		// The same client let in as an agent works under the agent's name.
-		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
 		var list struct {
 			Members []struct {
 				Handle string
 				UserID string `json:"user_id"`
 			}
 		}
-		s.call(s.owner, "", "GET", w+"/list/members", nil, 200, &list)
+		s.call(t, s.owner, "", "GET", w+"/list/members", nil, 200, &list)
 		agentID := ""
 		for _, m := range list.Members {
 			if m.Handle == "coder" {
@@ -300,7 +300,7 @@ func (d feedReadsDB) Events(ctx context.Context, f store.EventFilter) ([]core.Ev
 func TestAToolCallEndsWhenItsClientGoesAway(t *testing.T) {
 	reads := &feedReads{Store: testdb.SQLite(t)}
 	s := newSite(t, reads)
-	token := s.agentToken("artist")
+	token := s.agentToken(t, "artist")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	reads.armed.Store(true)

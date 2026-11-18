@@ -27,12 +27,12 @@ type siteSink struct {
 // Change counts every change as made: it does not read the answer.
 func (k siteSink) Change(changeID, typ string, args any) (bool, error) {
 	k.t.Helper()
-	k.s.call(k.s.owner, "", "POST", w+"/changes", M{"id": changeID, "type": typ, "args": args}, 200, nil)
+	k.s.call(k.t, k.s.owner, "", "POST", w+"/changes", M{"id": changeID, "type": typ, "args": args}, 200, nil)
 	return true, nil
 }
 
 func (k siteSink) Get(path string, q url.Values) ([]byte, error) {
-	return []byte(k.s.call(k.s.owner, "", "GET", w+path, nil, 200, nil)), nil
+	return []byte(k.s.call(k.t, k.s.owner, "", "GET", w+path, nil, 200, nil)), nil
 }
 
 // Upload stores every file anew, under an id the server makes.
@@ -42,7 +42,7 @@ func (k siteSink) Upload(_, path string) (string, bool, error) {
 		return "", false, err
 	}
 	var f struct{ URL string }
-	k.s.call(k.s.owner, "", "POST", w+"/files?name="+url.QueryEscape(filepath.Base(path)), raw, 201, &f)
+	k.s.call(k.t, k.s.owner, "", "POST", w+"/files?name="+url.QueryEscape(filepath.Base(path)), raw, 201, &f)
 	return f.URL, true, nil
 }
 
@@ -74,7 +74,7 @@ func TestImports(t *testing.T) {
 			return sum
 		}
 		tasks := func(q string) string {
-			return s.call(s.owner, "", "GET", w+"/tasks?format=text&sort=key&limit=500&"+q, nil, 200, nil)
+			return s.call(t, s.owner, "", "GET", w+"/tasks?format=text&sort=key&limit=500&"+q, nil, 200, nil)
 		}
 
 		// Linear: a CSV with statuses, priorities, labels, a project and a sub-issue.
@@ -93,7 +93,7 @@ func TestImports(t *testing.T) {
 		var d struct {
 			Task struct{ Epic, Description string }
 		}
-		s.call(s.owner, "", "GET", w+"/tasks/ENG-2", nil, 200, &d)
+		s.call(t, s.owner, "", "GET", w+"/tasks/ENG-2", nil, 200, &d)
 		if d.Task.Epic != "Onboarding" || !strings.Contains(d.Task.Description, "Assigned there to someone.else@example.com") {
 			t.Fatalf("linear task detail: %+v", d.Task)
 		}
@@ -112,7 +112,7 @@ func TestImports(t *testing.T) {
 		if sum = run("trello", trello, "ART", nil); sum.Tasks != 2 || sum.Comments != 1 {
 			t.Fatalf("trello: %+v", sum)
 		}
-		card := s.call(s.owner, "", "GET", w+"/tasks/ART-1?format=text", nil, 200, nil)
+		card := s.call(t, s.owner, "", "GET", w+"/tasks/ART-1?format=text", nil, 200, nil)
 		for _, want := range []string{"status: Doing", "labels: art", "- [x] idle", "- [ ] attack", "**Bea**, 2026-10-02", "Looks good", "Imported from https://trello.example/c/1"} {
 			if !strings.Contains(card, want) {
 				t.Errorf("trello card misses %q:\n%s", want, card)
@@ -154,7 +154,7 @@ func TestImports(t *testing.T) {
 		if sum = run("obsidian", filepath.Join(dir, "vault"), "", nil); sum.Docs != 4 || sum.Files != 1 {
 			t.Fatalf("obsidian: %+v", sum)
 		}
-		tree := s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
+		tree := s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
 		if !strings.Contains(tree, "Ideas  (") || !strings.Contains(tree, "  Bosses  (") {
 			t.Fatalf("vault tree:\n%s", tree)
 		}
@@ -164,7 +164,7 @@ func TestImports(t *testing.T) {
 				home = line[strings.Index(line, "(")+1 : len(line)-1]
 			}
 		}
-		page := s.call(s.owner, "", "GET", w+"/docs/"+home+"?format=md", nil, 200, nil)
+		page := s.call(t, s.owner, "", "GET", w+"/docs/"+home+"?format=md", nil, 200, nil)
 		if !strings.Contains(page, "[Design](doc:") || !strings.Contains(page, "[the bosses](doc:") || !strings.Contains(page, "/f/") {
 			t.Fatalf("vault home page:\n%s", page)
 		}
@@ -186,7 +186,7 @@ func TestImports(t *testing.T) {
 		if sum = run("notion", zpath, "", nil); sum.Docs != 3 || sum.Rows != 2 {
 			t.Fatalf("notion: %+v", sum)
 		}
-		tree = s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
+		tree = s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
 		if !strings.Contains(tree, "Wiki  (") || !strings.Contains(tree, "  Roadmap  (") || !strings.Contains(tree, "  Bugs [database]  (") || strings.Contains(tree, "0123456789abcdef") {
 			t.Fatalf("notion tree:\n%s", tree)
 		}
@@ -196,7 +196,7 @@ func TestImports(t *testing.T) {
 				bugs = line[strings.Index(line, "(")+1 : len(line)-1]
 			}
 		}
-		rows := s.call(s.owner, "", "GET", w+"/docs/"+bugs+"/rows?format=text", nil, 200, nil)
+		rows := s.call(t, s.owner, "", "GET", w+"/docs/"+bugs+"/rows?format=text", nil, 200, nil)
 		if !strings.Contains(rows, "| Crash | High | Bea |") {
 			t.Fatalf("notion database:\n%s", rows)
 		}
@@ -245,7 +245,7 @@ func TestImports(t *testing.T) {
 			t.Fatalf("orbit tasks (each keeps the number it had there):\n%s", got)
 		}
 		// Its milestone came along as an epic, and what it blocks as a relation.
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-9?format=text", nil, 200, nil); !strings.Contains(out, "Vertical slice") || !strings.Contains(out, "blocks SVA-2") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-9?format=text", nil, 200, nil); !strings.Contains(out, "Vertical slice") || !strings.Contains(out, "blocks SVA-2") {
 			t.Fatalf("an Orbit task's epic and relations:\n%s", out)
 		}
 	})
@@ -268,7 +268,7 @@ func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 			f.Write([]byte(readme))
 			zw.Close()
 			var up struct{ ID string }
-			s.call(s.owner, "", "POST", w+"/files?name=export.zip", []byte(buf.String()), 201, &up)
+			s.call(t, s.owner, "", "POST", w+"/files?name=export.zip", []byte(buf.String()), 201, &up)
 			return up.ID
 		}
 		type made struct {
@@ -278,11 +278,11 @@ func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 		run := func(file, origin string) made {
 			t.Helper()
 			var out made
-			s.call(s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": file, "options": M{"origin": origin}}, 200, &out)
+			s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": file, "options": M{"origin": origin}}, 200, &out)
 			return out
 		}
 		pages := func() string {
-			return s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
+			return s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
 		}
 
 		if got := run(upload("Team A's readme."), "team-a"); got.Made.Pages != 1 {
@@ -297,12 +297,12 @@ func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 		if n := strings.Count(pages(), "README"); n != 2 {
 			t.Fatalf("%d README pages, want 2:\n%s", n, pages())
 		}
-		if out := s.call(s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": upload("Unnamed.")}, 400, nil); !strings.Contains(out, "origin") {
+		if out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": upload("Unnamed.")}, 400, nil); !strings.Contains(out, "origin") {
 			t.Fatalf("an uploaded folder with no name: %s", out)
 		}
 
 		t.Run("an import made before imports had names", func(t *testing.T) {
-			s.change(s.owner, "", "doc.create", M{"id": id.From("import", "obsidian", "doc", "README"), "title": "README"})
+			s.change(t, s.owner, "", "doc.create", M{"id": id.From("import", "obsidian", "doc", "README"), "title": "README"})
 			var out made
 			var buf strings.Builder
 			zw := zip.NewWriter(&buf)
@@ -310,8 +310,8 @@ func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 			f.Write([]byte("The vault's readme."))
 			zw.Close()
 			var up struct{ ID string }
-			s.call(s.owner, "", "POST", w+"/files?name=vault.zip", []byte(buf.String()), 201, &up)
-			s.call(s.owner, "", "POST", w+"/import", M{"kind": "obsidian", "file": up.ID, "options": M{"origin": "my-vault"}}, 200, &out)
+			s.call(t, s.owner, "", "POST", w+"/files?name=vault.zip", []byte(buf.String()), 201, &up)
+			s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "obsidian", "file": up.ID, "options": M{"origin": "my-vault"}}, 200, &out)
 			if out.Made.Pages != 0 || out.AlreadyThere != 1 {
 				t.Fatalf("imported again under a name, an import from before names made %d pages and found %d there", out.Made.Pages, out.AlreadyThere)
 			}

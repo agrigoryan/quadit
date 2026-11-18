@@ -79,12 +79,12 @@ func TestADeliveryOutlivesABriefOutage(t *testing.T) {
 		logs := captureLogs(t)
 		st := newFaultyStore(testdb.SQLite(t))
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		rcv := newReceiver(t, "")
-		hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
+		hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
 		fired := st.faults.arm(fault{op: "get", table: "webhooks", times: 1,
 			match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "id", hook) }})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
 		eventually(t, "the delivery to fail on its webhook, and to be given up or kept", func() bool {
 			return fired() == 1 && (deliveryOf(t, st.Store, hook).State == "dead" || logs.has("webhook delivery: reading its webhook"))
 		})
@@ -95,12 +95,12 @@ func TestADeliveryOutlivesABriefOutage(t *testing.T) {
 	t.Run("a sent delivery is recorded though the first write fails", func(t *testing.T) {
 		st := newFaultyStore(testdb.SQLite(t))
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		rcv := newReceiver(t, "")
-		hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
+		hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
 		fired := st.faults.arm(fault{op: "update", table: "webhook_deliveries", times: 1,
 			match: func(set map[string]any, _ []store.Cond) bool { return set["state"] == "ok" }})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
 		eventually(t, "the delivery to be recorded as done", func() bool { return deliveryOf(t, st.Store, hook).State == "ok" })
 		if fired() != 1 || rcv.types() != "task.created" {
 			t.Fatalf("fault fired %d times; receiver got %q", fired(), rcv.types())
@@ -170,10 +170,10 @@ func TestAWakeUpOutlivesABriefOutage(t *testing.T) {
 	// The daily jobs are queued when the server starts; wait for them, so
 	// the fault meets the wake-up.
 	eventually(t, "the daily jobs to be queued", func() bool { return jobs("trash.purge") > 0 })
-	_, bea := s.invitedPerson()
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	_, bea := s.invitedPerson(t)
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 	fired := st.faults.arm(fault{op: "insert", table: "jobs", times: 1})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane", "assignee": bea})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane", "assignee": bea})
 	eventually(t, "the wake-up for the inbox item to be queued on a later pass", func() bool { return jobs("notify") == 1 })
 	if fired() != 1 {
 		t.Fatalf("fault fired %d times", fired())
@@ -184,15 +184,15 @@ func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
 	logs := captureLogs(t)
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 	var ready, started struct{ ID string }
-	s.call(s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, &ready)
-	s.call(s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("1234"), 201, &started)
+	s.call(t, s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, &ready)
+	s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("1234"), 201, &started)
 	var made struct{ ID string }
-	s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
+	s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
 	rcv := newReceiver(t, "")
-	hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"never.matches"}})["ref"].(string)
+	hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"never.matches"}})["ref"].(string)
 	repeat := id.New()
 
 	cases := []struct {
@@ -224,8 +224,7 @@ func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.storeFault.times = 1
 			fired := st.faults.arm(tc.storeFault)
-			s.t = t
-			s.call(s.owner, "", tc.method, tc.path, tc.body, 500, nil)
+			s.call(t, s.owner, "", tc.method, tc.path, tc.body, 500, nil)
 			if fired() != 1 {
 				t.Fatalf("the fault fired %d times", fired())
 			}
@@ -234,8 +233,7 @@ func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
 
 	t.Run("a restored item whose reindex fails is still restored, and the failure is logged", func(t *testing.T) {
 		st.faults.arm(fault{op: "list", table: "tasks", times: 1})
-		s.t = t
-		s.call(s.owner, "", "POST", "/api/v1/admin/backups/"+made.ID+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 200, nil)
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups/"+made.ID+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 200, nil)
 		if !logs.has("restore from backup: reindexing") {
 			t.Fatal("the failed reindex was not logged")
 		}
@@ -246,16 +244,16 @@ func TestAFileOnAPageThatCannotBeReadIsNotShown(t *testing.T) {
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	var file struct{ ID string }
-	s.call(s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, &file)
-	page := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "How we work."})["ref"].(string)
-	s.change(s.owner, "", "attachment.add", M{"file": file.ID, "doc": page})
-	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	s.call(t, s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, &file)
+	page := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "How we work."})["ref"].(string)
+	s.change(t, s.owner, "", "attachment.add", M{"file": file.ID, "doc": page})
+	s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
-	s.call(nil, tok.Token, "GET", w+"/files/"+file.ID, nil, 200, nil)
+	s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+	s.call(t, nil, tok.Token, "GET", w+"/files/"+file.ID, nil, 200, nil)
 
 	fired := st.faults.arm(fault{op: "get", table: "docs", times: 1, match: idIs(page)})
-	s.call(nil, tok.Token, "GET", w+"/files/"+file.ID, nil, 404, nil)
+	s.call(t, nil, tok.Token, "GET", w+"/files/"+file.ID, nil, 404, nil)
 	if fired() != 1 {
 		t.Fatalf("the fault fired %d times", fired())
 	}
@@ -304,10 +302,10 @@ func (g *pullsGitHub) said() []string {
 func TestAGitHubSyncOutlivesABriefOutage(t *testing.T) {
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Jump feels floaty"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Jump feels floaty"})
 	gh := newPullsGitHub(t)
-	in := s.change(s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_secret",
+	in := s.change(t, s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_secret",
 		"config": M{"repo": "acme/game", "api_url": gh.srv.URL, "comment_back": true}})["ref"].(string)
 	integration := func() core.Integration {
 		var row core.Integration
@@ -318,36 +316,31 @@ func TestAGitHubSyncOutlivesABriefOutage(t *testing.T) {
 	}
 
 	t.Run("a comment back waits for a workspace that cannot be read", func(t *testing.T) {
-		s.t = t
 		st.faults.arm(fault{op: "get", table: "workspaces", times: 1, match: idIs(siteWorkspaceID(t, st.Store))})
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 409, nil)
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 409, nil)
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
 		said := gh.said()
 		if len(said) != 1 || !strings.Contains(said[0], "/games/task/SVA-1") {
 			t.Fatalf("comments on the pull request: %q", said)
 		}
 	})
 	t.Run("what a sync did is remembered though the first write fails", func(t *testing.T) {
-		s.t = t
 		if _, err := st.Store.Update(context.Background(), "integrations", map[string]any{"last_sync_at": 0}, store.Eq("id", in)); err != nil {
 			t.Fatal(err)
 		}
 		fired := st.faults.arm(fault{op: "update", table: "integrations", times: 1, match: idIs(in)})
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
 		if fired() != 1 || integration().LastSyncAt == 0 {
 			t.Fatalf("fault fired %d times; the sync was not remembered", fired())
 		}
 	})
 	t.Run("a call from GitHub", func(t *testing.T) {
-		s.t = t
 		t.Run("for an integration that cannot be read is not answered as unknown", func(t *testing.T) {
-			s.t = t
 			st.faults.arm(fault{op: "get", table: "integrations", times: 1, match: idIs(in)})
-			s.call(nil, "", "POST", "/hooks/github/"+in, []byte("{}"), 500, nil)
+			s.call(t, nil, "", "POST", "/hooks/github/"+in, []byte("{}"), 500, nil)
 		})
 		t.Run("too large to read is refused as such", func(t *testing.T) {
-			s.t = t
-			s.call(nil, "", "POST", "/hooks/github/"+in, bytes.Repeat([]byte("x"), 6<<20), 400, nil)
+			s.call(t, nil, "", "POST", "/hooks/github/"+in, bytes.Repeat([]byte("x"), 6<<20), 400, nil)
 		})
 	})
 }
@@ -371,19 +364,19 @@ func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
 	gitIn(t, work, "add", "--all")
 	gitIn(t, work, "commit", "--quiet", "-m", "first")
 	gitIn(t, work, "push", "--quiet", "origin", "HEAD:main")
-	src := s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": origin, "subdir": "docs"})["ref"].(string)
-	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil)
+	src := s.change(t, s.owner, "", "source.create", M{"title": "Game docs", "repo": origin, "subdir": "docs"})["ref"].(string)
+	s.call(t, s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil)
 	var pages []core.Doc
 	if err := st.Store.List(context.Background(), &pages, store.Where(store.Eq("source_path", "design.md"))); err != nil || len(pages) != 1 {
 		t.Fatalf("the page of design.md: %v %v", pages, err)
 	}
-	s.change(s.owner, "", "doc.write", M{"doc": pages[0].ID, "markdown": "# Design\n\nThe boss has four phases.\n"})
+	s.change(t, s.owner, "", "doc.write", M{"doc": pages[0].ID, "markdown": "# Design\n\nThe boss has four phases.\n"})
 
 	fired := st.faults.arm(fault{op: "update", table: "docs", times: 1,
 		match: func(set map[string]any, _ []store.Cond) bool {
 			return set["source_hash"] != nil && set["source_hash"] != ""
 		}})
-	s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 500, nil) // the database's failure, not the source's
+	s.call(t, s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 500, nil) // the database's failure, not the source's
 	if fired() != 1 {
 		t.Fatalf("the fault fired %d times", fired())
 	}
@@ -391,16 +384,16 @@ func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
 
 func TestAToolCallWhoseParamsDoNotReadIsToldSo(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
-	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+	s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
 	var answer struct {
 		Error struct {
 			Code    int
 			Message string
 		}
 	}
-	s.call(nil, tok.Token, "POST", "/mcp", []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":["whoami"]}`), 200, &answer)
+	s.call(t, nil, tok.Token, "POST", "/mcp", []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":["whoami"]}`), 200, &answer)
 	if answer.Error.Code != -32602 || !strings.Contains(answer.Error.Message, "the params do not read") {
 		t.Fatalf("the answer's error: %+v", answer.Error)
 	}
@@ -409,7 +402,7 @@ func TestAToolCallWhoseParamsDoNotReadIsToldSo(t *testing.T) {
 func TestADeliveryInFlightAtShutdownIsKeptForTheNextStart(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		// A receiver that takes the request and does not answer until the test ends.
 		arrived, ended := make(chan struct{}, 1), make(chan struct{})
 		slow := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
@@ -424,8 +417,8 @@ func TestADeliveryInFlightAtShutdownIsKeptForTheNextStart(t *testing.T) {
 		}))
 		t.Cleanup(slow.Close)
 		t.Cleanup(func() { close(ended) })
-		hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": slow.URL, "event_types": []string{"task.*"}})["ref"].(string)
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
+		hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": slow.URL, "event_types": []string{"task.*"}})["ref"].(string)
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
 		select {
 		case <-arrived:
 		case <-time.After(12 * time.Second):
@@ -459,7 +452,7 @@ func TestAQueueThatCannotBeReadIsLogged(t *testing.T) {
 			logs := captureLogs(t)
 			st := newFaultyStore(testdb.SQLite(t))
 			s := newSite(t, st)
-			s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})
+			s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})
 			op, table, _ := strings.Cut(c.fails, " ")
 			// The read fails for as long as the test runs, not once: the
 			// dispatcher reads the same tables, and a single failure could
@@ -476,12 +469,12 @@ func TestAQueueThatCannotBeReadIsLogged(t *testing.T) {
 func TestADeliveryWhoseWorkspaceIsGoneIsEnded(t *testing.T) {
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	hook := s.change(s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
 	wsID := siteWorkspaceID(t, st.Store)
 	gone := st.faults.arm(fault{op: "get", table: "workspaces", err: &store.NotFoundError{What: "workspace"},
 		match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "id", wsID) }})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
 	eventually(t, "the delivery to be ended", func() bool { return deliveryOf(t, st.Store, hook).State == core.DeliveryDead })
 	if d := deliveryOf(t, st.Store, hook); d.Error != "the workspace is gone" || gone() != 1 {
 		t.Fatalf("the delivery ended with %q after %d reads of its workspace; want it ended at the first, saying the workspace is gone", d.Error, gone())

@@ -18,8 +18,8 @@ import (
 func TestGitHub(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Jump feels floaty"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Jump feels floaty"})
 
 		// A stand-in for GitHub with one pull request whose branch names the task.
 		var mu sync.Mutex
@@ -58,13 +58,13 @@ func TestGitHub(t *testing.T) {
 		}))
 		t.Cleanup(gh.Close)
 
-		in := s.change(s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_secret",
+		in := s.change(t, s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_secret",
 			"config": M{"repo": "acme/game", "api_url": gh.URL, "on_open": "started", "on_merge": "done", "comment_back": true}})["ref"].(string)
 		// The token is never sent back.
-		if out := s.call(s.owner, "", "GET", w+"/list/integrations", nil, 200, nil); strings.Contains(out, "ghp_secret") || !strings.Contains(out, `"has_secret":true`) {
+		if out := s.call(t, s.owner, "", "GET", w+"/list/integrations", nil, 200, nil); strings.Contains(out, "ghp_secret") || !strings.Contains(out, `"has_secret":true`) {
 			t.Fatalf("integration list: %s", out)
 		}
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
 
 		type link struct{ Kind, Ref, State, Checks, URL string }
 		read := func() (string, link) {
@@ -72,7 +72,7 @@ func TestGitHub(t *testing.T) {
 				Task  struct{ Status string }
 				Links []link
 			}
-			s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &d)
+			s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &d)
 			if len(d.Links) != 1 {
 				t.Fatalf("links = %+v", d.Links)
 			}
@@ -89,7 +89,7 @@ func TestGitHub(t *testing.T) {
 		// The checks finish without the pull request itself changing.
 		checks = []M{{"status": "completed", "conclusion": "success"}}
 		mu.Unlock()
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
 		if _, l = read(); l.Checks != "passing" {
 			t.Fatalf("checks did not update: %+v", l)
 		}
@@ -99,7 +99,7 @@ func TestGitHub(t *testing.T) {
 		pull["state"], pull["merged_at"], pull["updated_at"] = "closed", "2026-11-14T11:00:00Z", "2026-11-14T11:00:00Z"
 		mu.Unlock()
 		var hook struct{ URL, Secret string }
-		s.call(s.owner, "", "GET", w+"/integrations/"+in+"/webhook", nil, 200, &hook)
+		s.call(t, s.owner, "", "GET", w+"/integrations/"+in+"/webhook", nil, 200, &hook)
 		body := `{"action":"closed"}`
 		post := func(sig string) int {
 			req, _ := http.NewRequest(http.MethodPost, hook.URL, strings.NewReader(body))
@@ -131,7 +131,7 @@ func TestGitHub(t *testing.T) {
 		}
 
 		// Issues with the label become tasks, and stay in step with the issue.
-		s.change(s.owner, "", "integration.update", M{"id": in, "config": M{"repo": "acme/game", "api_url": gh.URL, "on_open": "started", "on_merge": "done",
+		s.change(t, s.owner, "", "integration.update", M{"id": in, "config": M{"repo": "acme/game", "api_url": gh.URL, "on_open": "started", "on_merge": "done",
 			"issues_label": "quadit", "issues_project": "SVA"}})
 		mu.Lock()
 		issues = []M{
@@ -139,22 +139,22 @@ func TestGitHub(t *testing.T) {
 			{"number": 13, "title": "A pull request, not an issue", "state": "open", "html_url": "x", "updated_at": "2026-11-14T12:00:01Z", "pull_request": M{"url": "x"}},
 		}
 		mu.Unlock()
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil) // twice: still one task
-		list := s.call(s.owner, "", "GET", w+"/tasks?q=Crash&format=text", nil, 200, nil)
-		if strings.Count(list, "Crash on the title screen") != 1 || strings.Contains(s.call(s.owner, "", "GET", w+"/tasks?format=text", nil, 200, nil), "A pull request") {
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil) // twice: still one task
+		list := s.call(t, s.owner, "", "GET", w+"/tasks?q=Crash&format=text", nil, 200, nil)
+		if strings.Count(list, "Crash on the title screen") != 1 || strings.Contains(s.call(t, s.owner, "", "GET", w+"/tasks?format=text", nil, 200, nil), "A pull request") {
 			t.Fatalf("tasks from issues: %s", list)
 		}
 		key := strings.Fields(list)[0]
-		if out := s.call(s.owner, "", "GET", w+"/tasks/"+key+"?format=text", nil, 200, nil); !strings.Contains(out, "Steps: start, wait.") || !strings.Contains(out, "acme/game#12") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/"+key+"?format=text", nil, 200, nil); !strings.Contains(out, "Steps: start, wait.") || !strings.Contains(out, "acme/game#12") {
 			t.Fatalf("the task made from an issue: %s", out)
 		}
 		// The issue is renamed and closed there: the task follows.
 		mu.Lock()
 		issues[0]["title"], issues[0]["state"], issues[0]["updated_at"] = "Crash on the title screen (fixed)", "closed", "2026-11-14T13:00:00Z"
 		mu.Unlock()
-		s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
-		if out := s.call(s.owner, "", "GET", w+"/tasks/"+key+"?format=text", nil, 200, nil); !strings.Contains(out, "(fixed)") || !strings.Contains(out, "status: Done") {
+		s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 200, nil)
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/"+key+"?format=text", nil, 200, nil); !strings.Contains(out, "(fixed)") || !strings.Contains(out, "status: Done") {
 			t.Fatalf("the task after the issue closed: %s", out)
 		}
 	})

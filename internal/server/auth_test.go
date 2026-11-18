@@ -64,15 +64,15 @@ func TestSecondStepInvitesAndSettings(t *testing.T) {
 
 		// Two-step codes: set up, sign in again, and the session waits.
 		var setup struct{ Secret, URL string }
-		s.call(s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
+		s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
 		if !strings.HasPrefix(setup.URL, "otpauth://totp/") {
 			t.Fatalf("setup = %+v", setup)
 		}
-		s.call(s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": "000000"}, 400, nil)
+		s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": "000000"}, 400, nil)
 		var enabled struct {
 			Codes []string `json:"recovery_codes"`
 		}
-		s.call(s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, &enabled)
+		s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, &enabled)
 		if len(enabled.Codes) != 10 {
 			t.Fatalf("recovery codes = %v", enabled.Codes)
 		}
@@ -80,82 +80,82 @@ func TestSecondStepInvitesAndSettings(t *testing.T) {
 		var first struct {
 			SecondStep bool `json:"second_step"`
 		}
-		s.call(b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, &first)
+		s.call(t, b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, &first)
 		if !first.SecondStep {
 			t.Fatal("sign-in did not ask for the second step")
 		}
-		if out := s.call(b, "", "GET", "/api/v1/auth/me", nil, 401, nil); !strings.Contains(out, "second_step") {
+		if out := s.call(t, b, "", "GET", "/api/v1/auth/me", nil, 401, nil); !strings.Contains(out, "second_step") {
 			t.Fatalf("half-signed-in session got in: %s", out)
 		}
-		s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": "123456"}, 401, nil)
+		s.call(t, b, "", "POST", "/api/v1/auth/second-step", M{"code": "123456"}, 401, nil)
 		// A recovery code works, once.
-		s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": enabled.Codes[0]}, 200, nil)
-		s.call(b, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+		s.call(t, b, "", "POST", "/api/v1/auth/second-step", M{"code": enabled.Codes[0]}, 200, nil)
+		s.call(t, b, "", "GET", "/api/v1/auth/me", nil, 200, nil)
 		b2 := browser()
-		s.call(b2, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, nil)
-		s.call(b2, "", "POST", "/api/v1/auth/second-step", M{"code": enabled.Codes[0]}, 401, nil)
+		s.call(t, b2, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, nil)
+		s.call(t, b2, "", "POST", "/api/v1/auth/second-step", M{"code": enabled.Codes[0]}, 401, nil)
 
 		// Settings: secrets go in, never come back, and members cannot look.
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"host": "smtp.example.com", "from": "q@example.com", "password": "hunter2"}, 200, nil)
-		if out := s.call(s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, nil); strings.Contains(out, "hunter2") || !strings.Contains(out, "smtp.example.com") {
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"host": "smtp.example.com", "from": "q@example.com", "password": "hunter2"}, 200, nil)
+		if out := s.call(t, s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, nil); strings.Contains(out, "hunter2") || !strings.Contains(out, "smtp.example.com") {
 			t.Fatalf("settings leak or lose values: %s", out)
 		}
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/nope", M{}, 400, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/nope", M{}, 400, nil)
 
 		// An invitation: a stranger opens the link and joins with a role.
 		var inv struct{ Link string }
-		s.call(s.owner, "", "POST", w+"/invites", M{"role": "admin"}, 201, &inv)
+		s.call(t, s.owner, "", "POST", w+"/invites", M{"role": "admin"}, 201, &inv)
 		token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
 		guest := browser()
-		if out := s.call(guest, "", "GET", "/api/v1/auth/invite/"+token, nil, 200, nil); !strings.Contains(out, `"name":"Games"`) {
+		if out := s.call(t, guest, "", "GET", "/api/v1/auth/invite/"+token, nil, 200, nil); !strings.Contains(out, `"name":"Games"`) {
 			t.Fatalf("invite = %s", out)
 		}
-		s.call(guest, "", "POST", "/api/v1/auth/invite/"+token, M{"name": "Bea", "email": "bea@example.com", "password": "another-long-password"}, 200, nil)
+		s.call(t, guest, "", "POST", "/api/v1/auth/invite/"+token, M{"name": "Bea", "email": "bea@example.com", "password": "another-long-password"}, 200, nil)
 		var me struct{ Role, Handle string }
-		s.call(guest, "", "GET", w+"/me", nil, 200, &me)
+		s.call(t, guest, "", "GET", w+"/me", nil, 200, &me)
 		if me.Role != "admin" || me.Handle != "@bea" {
 			t.Fatalf("joined as %+v", me)
 		}
 		// The link was for one person.
-		s.call(browser(), "", "POST", "/api/v1/auth/invite/"+token, M{"name": "Cy", "email": "cy@example.com", "password": "another-long-password"}, 404, nil)
+		s.call(t, browser(), "", "POST", "/api/v1/auth/invite/"+token, M{"name": "Cy", "email": "cy@example.com", "password": "another-long-password"}, 404, nil)
 		// Bea is a workspace admin, not an install admin.
-		s.call(guest, "", "GET", "/api/v1/admin/settings", nil, 403, nil)
-		s.call(guest, "", "GET", w+"/audit", nil, 200, nil)
+		s.call(t, guest, "", "GET", "/api/v1/admin/settings", nil, 403, nil)
+		s.call(t, guest, "", "GET", w+"/audit", nil, 200, nil)
 
 		// Registration is closed until the switch is on, then limited by domain.
 		reg := M{"name": "Dee", "email": "dee@elsewhere.org", "password": "another-long-password"}
-		s.call(nil, "", "POST", "/api/v1/auth/register", reg, 403, nil)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.allowed_domains", []string{"example.com"}, 200, nil)
-		s.call(nil, "", "POST", "/api/v1/auth/register", reg, 403, nil)
+		s.call(t, nil, "", "POST", "/api/v1/auth/register", reg, 403, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.allowed_domains", []string{"example.com"}, 200, nil)
+		s.call(t, nil, "", "POST", "/api/v1/auth/register", reg, 403, nil)
 		reg["email"] = "dee@example.com"
-		s.call(browser(), "", "POST", "/api/v1/auth/register", reg, 201, nil)
+		s.call(t, browser(), "", "POST", "/api/v1/auth/register", reg, 201, nil)
 
 		// Requiring the second step locks out those without one.
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
-		if out := s.call(guest, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
+		if out := s.call(t, guest, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
 			t.Fatalf("require_2fa not enforced: %s", out)
 		}
-		s.call(s.owner, "", "GET", w+"/me", nil, 200, nil)
+		s.call(t, s.owner, "", "GET", w+"/me", nil, 200, nil)
 
 		// The audit log saw it all, and exports.
-		out := s.call(s.owner, "", "GET", "/api/v1/admin/audit?limit=500", nil, 200, nil)
+		out := s.call(t, s.owner, "", "GET", "/api/v1/admin/audit?limit=500", nil, 200, nil)
 		for _, want := range []string{"install.setup", "second_step.enabled", "invite.accepted", "setting.changed", "signin"} {
 			if !strings.Contains(out, want) {
 				t.Errorf("audit log misses %s", want)
 			}
 		}
-		if csv := s.call(s.owner, "", "GET", "/api/v1/admin/audit?format=csv", nil, 200, nil); !strings.HasPrefix(csv, "time,actor,action") {
+		if csv := s.call(t, s.owner, "", "GET", "/api/v1/admin/audit?format=csv", nil, 200, nil); !strings.HasPrefix(csv, "time,actor,action") {
 			t.Fatalf("csv export = %.80s", csv)
 		}
 		// Passkey sign-in starts without knowing who is asking, and asks the
 		// device to check who holds it.
-		if out := s.call(nil, "", "POST", "/api/v1/auth/passkeys/login/start", M{}, 200, nil); !strings.Contains(out, "challenge") || !strings.Contains(out, `"userVerification":"required"`) {
+		if out := s.call(t, nil, "", "POST", "/api/v1/auth/passkeys/login/start", M{}, 200, nil); !strings.Contains(out, "challenge") || !strings.Contains(out, `"userVerification":"required"`) {
 			t.Fatalf("passkey start = %s", out)
 		}
 		// No mail server: a reset says how to get one done by hand.
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{}, 200, nil)
-		if out := s.call(nil, "", "POST", "/api/v1/auth/reset/request", M{"email": "owner@example.com"}, 409, nil); !strings.Contains(out, "reset-password") {
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{}, 200, nil)
+		if out := s.call(t, nil, "", "POST", "/api/v1/auth/reset/request", M{"email": "owner@example.com"}, 409, nil); !strings.Contains(out, "reset-password") {
 			t.Fatalf("reset without mail = %s", out)
 		}
 	})
@@ -200,9 +200,9 @@ func TestSingleSignOn(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		idp := fakeOIDC(t, "eve@example.com")
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", M{"enabled": true, "name": "Company SSO", "issuer": idp.URL,
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", M{"enabled": true, "name": "Company SSO", "issuer": idp.URL,
 			"client_id": "quadit-client", "client_secret": "s3cret"}, 200, nil)
-		if out := s.call(nil, "", "GET", "/api/v1/auth/config", nil, 200, nil); !strings.Contains(out, "Company SSO") {
+		if out := s.call(t, nil, "", "GET", "/api/v1/auth/config", nil, 200, nil); !strings.Contains(out, "Company SSO") {
 			t.Fatalf("provider not offered: %s", out)
 		}
 		// A stranger with no invitation is turned away.
@@ -218,7 +218,7 @@ func TestSingleSignOn(t *testing.T) {
 		// With an invitation the same sign-in makes the account and comes back
 		// to the invitation.
 		var inv struct{ Link string }
-		s.call(s.owner, "", "POST", w+"/invites", M{"email": "eve@example.com"}, 201, &inv)
+		s.call(t, s.owner, "", "POST", w+"/invites", M{"email": "eve@example.com"}, 201, &inv)
 		token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
 		resp, err = b.Get(s.url + "/api/v1/auth/oauth/oidc/start?invite=" + token)
 		if err != nil {
@@ -228,9 +228,9 @@ func TestSingleSignOn(t *testing.T) {
 		if !strings.HasSuffix(resp.Request.URL.Path, "/invite/"+token) {
 			t.Fatalf("invited sign-in ended at %s", resp.Request.URL)
 		}
-		s.call(b, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
+		s.call(t, b, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
 		var me struct{ Name, Role string }
-		s.call(b, "", "GET", w+"/me", nil, 200, &me)
+		s.call(t, b, "", "GET", w+"/me", nil, 200, &me)
 		if me.Name != "Eve Example" || me.Role != "member" {
 			t.Fatalf("signed in as %+v", me)
 		}
@@ -238,13 +238,13 @@ func TestSingleSignOn(t *testing.T) {
 		b2 := browser()
 		resp, _ = b2.Get(s.url + "/api/v1/auth/oauth/oidc/start")
 		resp.Body.Close()
-		s.call(b2, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+		s.call(t, b2, "", "GET", "/api/v1/auth/me", nil, 200, nil)
 		// It is her only way in, so it cannot be removed.
 		var ids struct {
 			Identities []struct{ ID string }
 		}
-		s.call(b2, "", "GET", "/api/v1/auth/identities", nil, 200, &ids)
-		s.call(b2, "", "DELETE", "/api/v1/auth/identities/"+ids.Identities[0].ID, nil, 409, nil)
+		s.call(t, b2, "", "GET", "/api/v1/auth/identities", nil, 200, &ids)
+		s.call(t, b2, "", "DELETE", "/api/v1/auth/identities/"+ids.Identities[0].ID, nil, 409, nil)
 	})
 }
 
@@ -346,10 +346,10 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 		ctx := context.Background()
 		var gh []string
 		fake := fakeGitHub(t, &gh)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
 			"auth_url": fake.URL + "/login/oauth/authorize", "token_url": fake.URL + "/login/oauth/access_token", "api_url": fake.URL}, 200, nil)
 		var inv struct{ Link string }
-		s.call(s.owner, "", "POST", w+"/invites", M{"email": "octo@example.com"}, 201, &inv)
+		s.call(t, s.owner, "", "POST", w+"/invites", M{"email": "octo@example.com"}, 201, &inv)
 		token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
 		octo := browser()
 		resp, err := octo.Get(s.url + "/api/v1/auth/oauth/github/start?invite=" + token)
@@ -357,10 +357,10 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 			t.Fatal(err)
 		}
 		resp.Body.Close()
-		s.call(octo, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
+		s.call(t, octo, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
 		var octoMe struct{ User struct{ ID string } }
-		s.call(octo, "", "GET", "/api/v1/auth/me", nil, 200, &octoMe)
-		s.call(s.owner, "", "PATCH", "/api/v1/admin/users/"+octoMe.User.ID, M{"is_admin": true}, 200, nil)
+		s.call(t, octo, "", "GET", "/api/v1/auth/me", nil, 200, &octoMe)
+		s.call(t, s.owner, "", "PATCH", "/api/v1/admin/users/"+octoMe.User.ID, M{"is_admin": true}, 200, nil)
 
 		// The owner has a passkey, and no authenticator app, and signed in
 		// with it: two steps. (A passkey's ceremony needs a browser; the
@@ -373,18 +373,18 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 			}
 			return pk.ID
 		}
-		laptop := passkey(s.ownerID())
-		if _, err := st.Update(ctx, "sessions", map[string]any{"two_step": true}, store.Eq("user_id", s.ownerID())); err != nil {
+		laptop := passkey(s.ownerID(t))
+		if _, err := st.Update(ctx, "sessions", map[string]any{"two_step": true}, store.Eq("user_id", s.ownerID(t))); err != nil {
 			t.Fatal(err)
 		}
 		login := M{"email": "owner@example.com", "password": ownerPassword}
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
 		// A browser with a session of the owner's of one step, as one from
 		// before two steps were required, or from before steps were counted.
 		before := func() *http.Client {
 			t.Helper()
 			token, now := auth.Random(32), time.Now()
-			sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: s.ownerID(), Stage: core.SessionFull,
+			sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: s.ownerID(t), Stage: core.SessionFull,
 				CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(), ExpiresAt: now.Add(time.Hour).UnixMilli()}
 			if err := st.Insert(ctx, sess); err != nil {
 				t.Fatal(err)
@@ -396,37 +396,34 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 		}
 
 		t.Run("a passkey is no second step where passkeys are off", func(t *testing.T) {
-			s := s.in(t)
-			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", false, 200, nil)
-			defer s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", true, 200, nil)
+			s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", false, 200, nil)
+			defer s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", true, 200, nil)
 			b := browser()
-			s.call(b, "", "POST", "/api/v1/auth/login", login, 200, nil)
-			if out := s.call(b, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
+			s.call(t, b, "", "POST", "/api/v1/auth/login", login, 200, nil)
+			if out := s.call(t, b, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
 				t.Fatalf("a person whose only second step is turned off is not sent to set one up: %s", out)
 			}
 		})
 		t.Run("a password is one step: the passkey is asked for next", func(t *testing.T) {
-			s := s.in(t)
 			b := browser()
 			var first struct {
 				SecondStep bool `json:"second_step"`
 			}
-			s.call(b, "", "POST", "/api/v1/auth/login", login, 200, &first)
+			s.call(t, b, "", "POST", "/api/v1/auth/login", login, 200, &first)
 			if !first.SecondStep {
 				t.Fatal("a password let a person with a passkey in where two steps are required")
 			}
-			s.call(b, "", "GET", w+"/me", nil, 401, nil)
+			s.call(t, b, "", "GET", w+"/me", nil, 401, nil)
 			var ways struct{ Code, Passkey bool }
-			s.call(b, "", "GET", "/api/v1/auth/second-step", nil, 200, &ways)
+			s.call(t, b, "", "GET", "/api/v1/auth/second-step", nil, 200, &ways)
 			if ways.Code || !ways.Passkey {
 				t.Fatalf("the second step offered: %+v", ways)
 			}
-			s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": "123456"}, 401, nil)
+			s.call(t, b, "", "POST", "/api/v1/auth/second-step", M{"code": "123456"}, 401, nil)
 		})
 		t.Run("a session of one step from before is asked again, whatever it asks for", func(t *testing.T) {
-			s := s.in(t)
 			var link struct{ Link string }
-			s.call(s.owner, "", "POST", w+"/invites", M{}, 201, &link)
+			s.call(t, s.owner, "", "POST", w+"/invites", M{}, 201, &link)
 			for _, call := range []struct {
 				method, path string
 				body         any
@@ -441,22 +438,21 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 				{"POST", "/api/v1/auth/invite/" + link.Link[strings.LastIndex(link.Link, "/")+1:], nil},
 			} {
 				b := before()
-				if out := s.call(b, "", call.method, call.path, call.body, 401, nil); !strings.Contains(out, "second_step") {
+				if out := s.call(t, b, "", call.method, call.path, call.body, 401, nil); !strings.Contains(out, "second_step") {
 					t.Fatalf("%s %s: a one-step session was not asked for its second step: %s", call.method, call.path, out)
 				}
-				s.call(b, "", "GET", "/api/v1/auth/me", nil, 401, nil)
+				s.call(t, b, "", "GET", "/api/v1/auth/me", nil, 401, nil)
 			}
 			var settings struct {
 				Settings map[string]struct{ Value any }
 			}
-			s.call(s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, &settings)
+			s.call(t, s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, &settings)
 			if settings.Settings["auth.require_2fa"].Value != true {
 				t.Fatalf("a one-step session changed the rule: %v", settings.Settings["auth.require_2fa"].Value)
 			}
 		})
 		t.Run("an outside account is one step too", func(t *testing.T) {
-			s := s.in(t)
-			if out := s.call(octo, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
+			if out := s.call(t, octo, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
 				t.Fatalf("a person with no second step got in: %s", out)
 			}
 			// An install admin with no second step reaches none of the
@@ -473,7 +469,7 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 				{"POST", "/api/v1/auth/password", M{"current": "", "new": "a-new-long-password"}},
 				{"GET", "/api/v1/auth/sessions", nil},
 			} {
-				if out := s.call(octo, "", call.method, call.path, call.body, 403, nil); !strings.Contains(out, "second_step_required") {
+				if out := s.call(t, octo, "", call.method, call.path, call.body, 403, nil); !strings.Contains(out, "second_step_required") {
 					t.Fatalf("%s %s: a person with no second step was not sent to set one up: %s", call.method, call.path, out)
 				}
 			}
@@ -481,7 +477,7 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 			var client struct {
 				ID string `json:"client_id"`
 			}
-			s.call(nil, "", "POST", "/oauth/register", M{"client_name": "Test Client", "redirect_uris": []string{"http://localhost:9999/callback"}}, 201, &client)
+			s.call(t, nil, "", "POST", "/oauth/register", M{"client_name": "Test Client", "redirect_uris": []string{"http://localhost:9999/callback"}}, 201, &client)
 			consent := s.url + "/oauth/authorize?" + url.Values{"response_type": {"code"}, "client_id": {client.ID}, "redirect_uri": {"http://localhost:9999/callback"},
 				"code_challenge": {"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGW3Sj4o4Q"}, "code_challenge_method": {"S256"}}.Encode()
 			resp, err := octo.Get(consent)
@@ -495,22 +491,22 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 			}
 			// What sets one up is open to them, and the desktop app is
 			// handed what this browser has: a session to set it up in.
-			s.call(octo, "", "GET", "/api/v1/auth/me", nil, 200, nil)
-			s.call(octo, "", "GET", "/api/v1/auth/passkeys", nil, 200, nil)
-			s.call(octo, "", "POST", "/api/v1/auth/passkeys/register/start", M{}, 200, nil)
+			s.call(t, octo, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+			s.call(t, octo, "", "GET", "/api/v1/auth/passkeys", nil, 200, nil)
+			s.call(t, octo, "", "POST", "/api/v1/auth/passkeys/register/start", M{}, 200, nil)
 			flow := newDesktopFlow()
 			app := desktopApp{hc: noRedirects()}
 			if resp, _ := app.get(t, finishURL(s, approve(t, s, octo, flow, octoMe.User.ID), flow.verifier)); resp.StatusCode != http.StatusFound {
 				t.Fatalf("finish: status %d", resp.StatusCode)
 			}
-			s.call(app.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
-			s.call(app.hc, "", "GET", w+"/me", nil, 403, nil)
+			s.call(t, app.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+			s.call(t, app.hc, "", "GET", w+"/me", nil, 403, nil)
 			// Setting one up is the second step of this sign-in.
 			var setup struct{ Secret string }
-			s.call(octo, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
-			s.call(octo, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
-			s.call(octo, "", "GET", w+"/me", nil, 200, nil)
-			s.call(octo, "", "GET", "/api/v1/admin/settings", nil, 200, nil)
+			s.call(t, octo, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
+			s.call(t, octo, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
+			s.call(t, octo, "", "GET", w+"/me", nil, 200, nil)
+			s.call(t, octo, "", "GET", "/api/v1/admin/settings", nil, 200, nil)
 			// A session of one step from before is sent to sign in for a
 			// client, and gives its second step on the way.
 			stops := &http.Client{Jar: before().Jar, Transport: ownPage{}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -524,8 +520,8 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 				t.Fatal(err)
 			}
 			resp.Body.Close()
-			s.call(again, "", "GET", w+"/me", nil, 401, nil)
-			s.call(again, "", "POST", "/api/v1/auth/totp/start", M{}, 401, nil)
+			s.call(t, again, "", "GET", w+"/me", nil, 401, nil)
+			s.call(t, again, "", "POST", "/api/v1/auth/totp/start", M{}, 401, nil)
 		})
 	})
 }

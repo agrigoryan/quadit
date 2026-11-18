@@ -111,7 +111,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		orbit := orbitAsItAnswers(t, &fetched)
 		// The owner is "Aram" here as there; the agent has a longer name
 		// here than the "Claude" it had there.
-		s.change(s.owner, "", "agent.create", M{"name": "Claude Helper", "handle": "helper"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Claude Helper", "handle": "helper"})
 		type answer struct {
 			Made            map[string]int `json:"made"`
 			AlreadyThere    int            `json:"already_there"`
@@ -120,15 +120,15 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		}
 		opts := M{"workspace": "ws1", "token": "orbit-token", "session": "orbit-session"}
 		var res answer
-		s.call(s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": opts}, 200, &res)
+		s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": opts}, 200, &res)
 		if res.Made["tasks"] != 2 || res.Made["comments"] != 2 || res.Made["pages"] != 2 || res.Made["files"] != 2 || len(res.UnmatchedPeople) != 0 {
 			t.Fatalf("first run: %+v", res)
 		}
 
 		// People are found by the only name Orbit gives, and a comment says
 		// who wrote it by name.
-		one := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil)
-		two := s.call(s.owner, "", "GET", w+"/tasks/SVA-2?format=text", nil, 200, nil)
+		one := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil)
+		two := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-2?format=text", nil, 200, nil)
 		if !strings.Contains(one, "@aram") || !strings.Contains(two, "@helper") {
 			t.Fatalf("assignees:\n%s\n%s", one, two)
 		}
@@ -155,8 +155,8 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 			}
 			Labels []struct{ Name, Color string }
 		}
-		s.call(s.owner, "", "GET", w+"/list/statuses", nil, 200, &lay)
-		s.call(s.owner, "", "GET", w+"/list/labels", nil, 200, &lay)
+		s.call(t, s.owner, "", "GET", w+"/list/statuses", nil, 200, &lay)
+		s.call(t, s.owner, "", "GET", w+"/list/labels", nil, 200, &lay)
 		sort.Slice(lay.Statuses, func(i, j int) bool { return lay.Statuses[i].Rank < lay.Statuses[j].Rank })
 		all, starts := "", ""
 		for _, st := range lay.Statuses {
@@ -191,7 +191,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 				Attachments []shown
 			}
 		}
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &got)
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &got)
 		desc := got.Task.Description
 		if strings.Contains(desc, "/api/v1/workspaces/") || strings.Count(desc, "](/f/") != 2 || strings.Contains(desc, orbit.URL) {
 			t.Fatalf("description still points at Orbit, or at this server by name:\n%s", desc)
@@ -205,7 +205,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		if !strings.HasSuffix(addr, "/before.gif") {
 			t.Fatalf("picture address: %s", addr)
 		}
-		if bytes := s.call(s.owner, "", "GET", addr, nil, 200, nil); !strings.HasPrefix(bytes, "GIF89a") || !strings.HasSuffix(bytes, "/a1/download") {
+		if bytes := s.call(t, s.owner, "", "GET", addr, nil, 200, nil); !strings.HasPrefix(bytes, "GIF89a") || !strings.HasSuffix(bytes, "/a1/download") {
 			t.Fatalf("the picture's bytes: %q", bytes)
 		}
 		if len(got.Attachments) != 1 || got.Attachments[0].Name != "before.gif" {
@@ -223,7 +223,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		if withFile != 1 {
 			t.Fatalf("the comment's file: %+v", got.Comments)
 		}
-		tree := s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
+		tree := s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
 		if !strings.Contains(tree, "Project docs  (") || !strings.Contains(tree, "  Bosses  (") {
 			t.Fatalf("pages:\n%s", tree)
 		}
@@ -238,7 +238,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		}
 		before := count()
 		var again answer
-		s.call(s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": opts}, 200, &again)
+		s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": opts}, 200, &again)
 		if again.Made["tasks"] != 0 || again.Made["comments"] != 0 || again.Made["pages"] != 0 || again.Made["files"] != 0 || count() != before {
 			t.Fatalf("second run: %+v, files %d -> %d", again, before, count())
 		}
@@ -247,19 +247,19 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		// that means.
 		fetched = 0
 		var dry answer
-		s.call(s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": M{"workspace": "ws1", "token": "orbit-token"}}, 200, &dry)
+		s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": M{"workspace": "ws1", "token": "orbit-token"}}, 200, &dry)
 		if fetched != 0 || !strings.Contains(strings.Join(dry.Log, "\n"), "session=TOKEN") {
 			t.Fatalf("without a session: fetched %d, log %v", fetched, dry.Log)
 		}
 		// That run read descriptions that differ from the ones first brought
 		// over (they point at Orbit). What is here stays as it was.
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &got)
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &got)
 		if dry.Made["tasks"] != 0 || got.Task.Description != desc {
 			t.Fatalf("a run after the source changed: %+v\n%s", dry, got.Task.Description)
 		}
 		// An API token in place of the session is refused by Orbit, and the
 		// import says which of the two was wrong.
-		out := s.call(s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": M{"workspace": "ws1", "token": "orbit-token", "session": "orbit-token"}}, 400, nil)
+		out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": M{"workspace": "ws1", "token": "orbit-token", "session": "orbit-token"}}, 400, nil)
 		if !strings.Contains(out, "signed-in Orbit session") {
 			t.Fatalf("a wrong session: %s", out)
 		}
@@ -278,30 +278,30 @@ func TestImportIsHistoryNotNews(t *testing.T) {
 			s := newSite(t, st)
 			var fetched int
 			orbit := orbitAsItAnswers(t, &fetched)
-			s.change(s.owner, "", "agent.create", M{"name": "Claude Helper", "handle": "helper"})
+			s.change(t, s.owner, "", "agent.create", M{"name": "Claude Helper", "handle": "helper"})
 			var helper struct{ Token string }
-			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@helper"}, 201, &helper)
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@helper"}, 201, &helper)
 			// Bea, a second person, follows the whole project.
 			var inv struct{ Link string }
-			s.call(s.owner, "", "POST", w+"/invites", M{"role": "member"}, 201, &inv)
+			s.call(t, s.owner, "", "POST", w+"/invites", M{"role": "member"}, 201, &inv)
 			bea := browser()
-			s.call(bea, "", "POST", "/api/v1/auth/invite/"+inv.Link[strings.LastIndex(inv.Link, "/")+1:],
+			s.call(t, bea, "", "POST", "/api/v1/auth/invite/"+inv.Link[strings.LastIndex(inv.Link, "/")+1:],
 				M{"name": "Bea", "email": "bea@example.com", "password": "another-long-password"}, 200, nil)
-			s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Aliens"})
-			s.change(bea, "", "watch.set", M{"type": "project", "subject": "SVA"})
+			s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Aliens"})
+			s.change(t, bea, "", "watch.set", M{"type": "project", "subject": "SVA"})
 
 			opts := M{"workspace": "ws1", "token": "orbit-token", "session": "orbit-session"}
 			if from == "server" {
-				s.call(s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": opts}, 200, nil)
+				s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": orbit.URL, "options": opts}, 200, nil)
 			} else {
 				var own struct{ Token string }
-				s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &own)
-				if out, code := s.quadit(own.Token, "import", "orbit", orbit.URL, "workspace=ws1", "token=orbit-token", "session=orbit-session"); code != 0 {
+				s.call(t, s.owner, "", "POST", w+"/tokens", M{}, 201, &own)
+				if out, code := s.quadit(t, own.Token, "import", "orbit", orbit.URL, "workspace=ws1", "token=orbit-token", "session=orbit-session"); code != 0 {
 					t.Fatalf("quadit import: %d %s", code, out)
 				}
 			}
 			inbox := func(hc *http.Client, token string) string {
-				return s.call(hc, token, "GET", w+"/inbox?format=text&all=1", nil, 200, nil)
+				return s.call(t, hc, token, "GET", w+"/inbox?format=text&all=1", nil, 200, nil)
 			}
 			if a, b := inbox(nil, helper.Token), inbox(bea, ""); strings.Contains(a, "SVA-") || strings.Contains(b, "SVA-") {
 				t.Fatalf("the import reached inboxes:\nhelper: %s\nbea: %s", a, b)
@@ -314,7 +314,7 @@ func TestImportIsHistoryNotNews(t *testing.T) {
 			}
 			// The feed has it all, marked as brought in; the assignment and
 			// the comment writer's watch are set.
-			feed := s.call(s.owner, "", "GET", w+"/events?task=SVA-1&limit=500", nil, 200, nil)
+			feed := s.call(t, s.owner, "", "GET", w+"/events?task=SVA-1&limit=500", nil, 200, nil)
 			if !strings.Contains(feed, `"task.created"`) || !strings.Contains(feed, `"comment.created"`) || !strings.Contains(feed, `"quiet":true`) {
 				t.Fatalf("the feed: %s", feed)
 			}
@@ -322,22 +322,22 @@ func TestImportIsHistoryNotNews(t *testing.T) {
 				Task     struct{ Assignee string }
 				Watchers []string
 			}
-			s.call(s.owner, "", "GET", w+"/tasks/SVA-2", nil, 200, &two)
-			s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &one)
+			s.call(t, s.owner, "", "GET", w+"/tasks/SVA-2", nil, 200, &two)
+			s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, &one)
 			if two.Task.Assignee != "@helper" || !strings.Contains(strings.Join(one.Watchers, ","), "@helper") {
 				t.Fatalf("assignee %q, watchers of SVA-1 %v", two.Task.Assignee, one.Watchers)
 			}
 
 			// News after the import is news again.
-			s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "the walk-in stays"})
+			s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "the walk-in stays"})
 			if a, b := inbox(nil, helper.Token), inbox(bea, ""); !strings.Contains(a, "SVA-1") || !strings.Contains(b, "SVA-1") {
 				t.Fatalf("a comment after the import told nobody:\nhelper: %s\nbea: %s", a, b)
 			}
 
 			// A member or an agent may not send a change quiet.
 			quiet := M{"changes": []M{{"id": id.New(), "type": "comment.create", "args": M{"task": "SVA-1", "body": "psst"}, "quiet": true}}}
-			s.call(bea, "", "POST", w+"/changes", quiet, 403, nil)
-			s.call(nil, helper.Token, "POST", w+"/changes", quiet, 403, nil)
+			s.call(t, bea, "", "POST", w+"/changes", quiet, 403, nil)
+			s.call(t, nil, helper.Token, "POST", w+"/changes", quiet, 403, nil)
 		})
 	}
 }

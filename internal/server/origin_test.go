@@ -25,7 +25,7 @@ func TestWritesWithTheCookieComeOnlyFromTheServersOwnPages(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"name": "script"}, 201, &tok)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"name": "script"}, 201, &tok)
 		elsewhere := strings.Replace(s.url, "localhost", "evil.localhost", 1)
 		bare := &http.Client{Jar: s.owner.Jar} // the owner's cookie, and no header a browser would add
 		send := func(t *testing.T, hc *http.Client, path string, body any, headers map[string]string) (int, string) {

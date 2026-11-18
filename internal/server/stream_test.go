@@ -73,18 +73,18 @@ func (s *site) stream(t *testing.T, token string) *stream {
 func TestStreamsEndWithAccess(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 		for _, h := range []string{"artist", "coder", "writer"} {
-			s.change(s.owner, "", "agent.create", M{"name": h, "handle": h})
+			s.change(t, s.owner, "", "agent.create", M{"name": h, "handle": h})
 		}
 		token := func(h string) (tok string, id string) {
 			var out struct {
 				Token string
 				Info  struct{ ID string }
 			}
-			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + h}, 201, &out)
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@" + h}, 201, &out)
 			return out.Token, out.Info.ID
 		}
 		artist, _ := token("artist")
@@ -93,14 +93,14 @@ func TestStreamsEndWithAccess(t *testing.T) {
 
 		// All three follow along and see a comment.
 		streams := map[string]*stream{"artist": s.stream(t, artist), "coder": s.stream(t, coder), "writer": s.stream(t, writer)}
-		s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "first words"})
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "first words"})
 		for name, sm := range streams {
 			eventually(t, name+" to see the first comment", func() bool { return strings.Contains(sm.all(), "first words") })
 		}
 		// A request held open on the feed, by the one about to be suspended.
 		held := make(chan string, 1)
 		var at struct{ Seq int64 }
-		s.call(nil, coder, "GET", "/api/v1/w/-/me", nil, 200, &at)
+		s.call(t, nil, coder, "GET", "/api/v1/w/-/me", nil, 200, &at)
 		heldFrom := at.Seq
 		go func() {
 			// From where the feed stands now, so the request is really held.
@@ -120,10 +120,10 @@ func TestStreamsEndWithAccess(t *testing.T) {
 
 		// The artist is narrowed to another project, the coder is suspended,
 		// the writer's token is revoked. Then more is said on the task.
-		s.change(s.owner, "", "agent.update", M{"id": "@artist", "scope": M{"projects": []string{"OPS"}}})
-		s.change(s.owner, "", "member.update", M{"id": "@coder", "suspended": true})
-		s.call(s.owner, "", "DELETE", w+"/tokens/"+writerID, nil, 200, nil)
-		s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "second words, not for them"})
+		s.change(t, s.owner, "", "agent.update", M{"id": "@artist", "scope": M{"projects": []string{"OPS"}}})
+		s.change(t, s.owner, "", "member.update", M{"id": "@coder", "suspended": true})
+		s.call(t, s.owner, "", "DELETE", w+"/tokens/"+writerID, nil, 200, nil)
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "second words, not for them"})
 
 		for name, sm := range streams {
 			eventually(t, name+"'s stream to end", sm.ended)
@@ -149,7 +149,7 @@ func TestStreamsEndWithAccess(t *testing.T) {
 		}
 		// Starting over, the artist no longer sees the task's project at all.
 		again := s.stream(t, artist)
-		s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "third words"})
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "third words"})
 		time.Sleep(700 * time.Millisecond)
 		if strings.Contains(again.all(), "third words") {
 			t.Fatalf("a narrowed agent sees a project it was taken off: %s", again.all())
@@ -162,12 +162,12 @@ func TestStreamsEndWithAccess(t *testing.T) {
 func TestCompression(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		for i := range 40 {
-			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "A task about the boss fight, number " + strings.Repeat("x", i)})
+			s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "A task about the boss fight, number " + strings.Repeat("x", i)})
 		}
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
 		get := func(path string, gz bool, hdr ...string) (*http.Response, int) {
 			req, _ := http.NewRequest(http.MethodGet, s.url+path, nil)
 			req.Header.Set("Authorization", "Bearer "+tok.Token)
@@ -200,14 +200,14 @@ func TestCompression(t *testing.T) {
 		}
 		// A file is sent as it is, and in ranges.
 		var f struct{ ID, URL string }
-		s.call(nil, tok.Token, "POST", "/api/v1/w/-/files?name=notes.txt", []byte(strings.Repeat("plain words ", 2000)), 201, &f)
+		s.call(t, nil, tok.Token, "POST", "/api/v1/w/-/files?name=notes.txt", []byte(strings.Repeat("plain words ", 2000)), 201, &f)
 		file, _ := get(strings.TrimPrefix(f.URL, s.url), true)
 		part, n := get(strings.TrimPrefix(f.URL, s.url), true, "Range", "bytes=100-199")
 		if file.Header.Get("Content-Encoding") != "" || part.StatusCode != http.StatusPartialContent || n != 100 {
 			t.Fatalf("file: encoding %q; range: %d, %d bytes", file.Header.Get("Content-Encoding"), part.StatusCode, n)
 		}
 		// A short answer is not worth it; a compressed one still decodes for a normal client.
-		if out := s.call(nil, tok.Token, "GET", "/api/v1/w/-/tasks?format=text", nil, 200, nil); !strings.Contains(out, "SVA-40") {
+		if out := s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/tasks?format=text", nil, 200, nil); !strings.Contains(out, "SVA-40") {
 			t.Fatalf("a normal client could not read a compressed answer: %.80s", out)
 		}
 	})
@@ -233,13 +233,13 @@ func TestTwoServersOneDatabase(t *testing.T) {
 		hs.Start()
 		go srvB.Run(ctx)
 		t.Cleanup(func() { stop(); hs.Close() })
-		b := &site{t: t, url: hs.URL, owner: a.owner, srv: srvB}
+		b := &site{url: hs.URL, owner: a.owner, srv: srvB}
 
-		a.change(a.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		a.change(a.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
-		a.change(a.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		a.change(t, a.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		a.change(t, a.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		a.change(t, a.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		var tok struct{ Token string }
-		a.call(a.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+		a.call(t, a.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
 		time.Sleep(500 * time.Millisecond) // let the second server start listening
 
 		// A stream held by B hears a write taken by A well inside the 25
@@ -247,16 +247,16 @@ func TestTwoServersOneDatabase(t *testing.T) {
 		sm := b.stream(t, tok.Token)
 		time.Sleep(300 * time.Millisecond)
 		start := time.Now()
-		a.change(a.owner, "", "comment.create", M{"task": "SVA-1", "body": "said through the other server"})
+		a.change(t, a.owner, "", "comment.create", M{"task": "SVA-1", "body": "said through the other server"})
 		eventually(t, "the other server's stream to carry the comment", func() bool { return strings.Contains(sm.all(), "said through the other server") })
 		if took := time.Since(start); took > 3*time.Second {
 			t.Fatalf("the other server heard of the write after %s", took)
 		}
 
 		// Presence: one on A, one on B, on the same page.
-		page := a.change(a.owner, "", "doc.create", M{"title": "Plan", "markdown": "one\n"})["ref"].(string)
-		a.call(a.owner, "", "POST", w+"/docs/"+page+"/presence", M{"block": "b1"}, 200, nil)
-		if out := b.call(nil, tok.Token, "POST", "/api/v1/w/-/docs/"+page+"/presence", M{"block": "b2"}, 200, nil); !strings.Contains(out, `"block":"b1"`) {
+		page := a.change(t, a.owner, "", "doc.create", M{"title": "Plan", "markdown": "one\n"})["ref"].(string)
+		a.call(t, a.owner, "", "POST", w+"/docs/"+page+"/presence", M{"block": "b1"}, 200, nil)
+		if out := b.call(t, nil, tok.Token, "POST", "/api/v1/w/-/docs/"+page+"/presence", M{"block": "b2"}, 200, nil); !strings.Contains(out, `"block":"b1"`) {
 			t.Fatalf("someone on the other server is not seen on the page: %s", out)
 		}
 
@@ -266,9 +266,9 @@ func TestTwoServersOneDatabase(t *testing.T) {
 			ID, State, SHA256 string
 			Received          int
 		}
-		a.call(nil, tok.Token, "POST", fmt.Sprintf("/api/v1/w/-/files?name=clip.bin&size=%d", len(data)), data[:3000], 201, &f)
-		b.call(nil, tok.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=3000", data[3000:6000], 200, &f)
-		a.call(nil, tok.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=6000", data[6000:], 200, &f)
+		a.call(t, nil, tok.Token, "POST", fmt.Sprintf("/api/v1/w/-/files?name=clip.bin&size=%d", len(data)), data[:3000], 201, &f)
+		b.call(t, nil, tok.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=3000", data[3000:6000], 200, &f)
+		a.call(t, nil, tok.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=6000", data[6000:], 200, &f)
 		sum := sha256.Sum256(data)
 		if f.State != "ready" || f.SHA256 != hex.EncodeToString(sum[:]) {
 			t.Fatalf("an upload sent to two servers: %+v", f)
@@ -281,15 +281,15 @@ func TestTwoServersOneDatabase(t *testing.T) {
 func TestBootstrapInParts(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		for i := range 6 {
-			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i+1)})
+			s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i+1)})
 		}
-		s.change(s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"})
-		s.change(s.owner, "", "task.update", M{"id": "SVA-3", "status": "canceled"})
-		s.change(s.owner, "", "task.update", M{"id": "SVA-4", "archived": true})
-		s.change(s.owner, "", "decision.open", M{"task": "SVA-2", "question": "Closed question?", "options": []M{{"label": "A"}, {"label": "B"}}})
-		s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Open question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"})
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-3", "status": "canceled"})
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-4", "archived": true})
+		s.change(t, s.owner, "", "decision.open", M{"task": "SVA-2", "question": "Closed question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(t, s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Open question?", "options": []M{{"label": "A"}, {"label": "B"}}})
 		type boot struct {
 			Rest      int
 			Tasks     []struct{ Key string }
@@ -297,9 +297,9 @@ func TestBootstrapInParts(t *testing.T) {
 			Projects  []struct{ Key string }
 		}
 		var all, open, rest boot
-		s.call(s.owner, "", "GET", w+"/bootstrap", nil, 200, &all)
-		s.call(s.owner, "", "GET", w+"/bootstrap?part=open", nil, 200, &open)
-		s.call(s.owner, "", "GET", w+"/bootstrap?part=rest", nil, 200, &rest)
+		s.call(t, s.owner, "", "GET", w+"/bootstrap", nil, 200, &all)
+		s.call(t, s.owner, "", "GET", w+"/bootstrap?part=open", nil, 200, &open)
+		s.call(t, s.owner, "", "GET", w+"/bootstrap?part=rest", nil, 200, &rest)
 		keys := func(b boot) string {
 			var out []string
 			for _, t := range b.Tasks {
@@ -313,6 +313,6 @@ func TestBootstrapInParts(t *testing.T) {
 		if len(open.Decisions) != 1 || open.Decisions[0].Question != "Open question?" || len(rest.Decisions) != 1 || len(open.Projects) != 1 || len(rest.Projects) != 0 {
 			t.Fatalf("decisions and the rest of the copy: open %+v, rest %+v", open, rest)
 		}
-		s.call(s.owner, "", "GET", w+"/bootstrap?part=nope", nil, 400, nil)
+		s.call(t, s.owner, "", "GET", w+"/bootstrap?part=nope", nil, 400, nil)
 	})
 }

@@ -75,15 +75,15 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 
 		t.Run("in parts", func(t *testing.T) {
 			var f uploaded
-			s.call(s.owner, "", "POST", fmt.Sprintf(w+"/files?name=clip.bin&size=%d", len(data)), data[:2000], 201, &f)
+			s.call(t, s.owner, "", "POST", fmt.Sprintf(w+"/files?name=clip.bin&size=%d", len(data)), data[:2000], 201, &f)
 			files.failing.Store(true)
-			s.call(s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=2000", data[2000:], 500, nil)
+			s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=2000", data[2000:], 500, nil)
 			files.failing.Store(false)
-			s.call(s.owner, "", "GET", w+"/files/"+f.ID, nil, 200, &f)
+			s.call(t, s.owner, "", "GET", w+"/files/"+f.ID, nil, 200, &f)
 			if f.State != "uploading" || f.Received != int64(len(data)) {
 				t.Fatalf("after storing failed the file is %+v", f)
 			}
-			s.call(s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", f.ID, len(data)), nil, 200, &f)
+			s.call(t, s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", f.ID, len(data)), nil, 200, &f)
 			if f.State != "ready" || f.SHA256 != sumOf(data) {
 				t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
 			}
@@ -96,10 +96,10 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 			fid := id.New()
 			files.failing.Store(true)
 			path := fmt.Sprintf(w+"/files?name=notes.txt&size=%d&id=%s", len(data), fid)
-			s.call(s.owner, "", "POST", path, data, 500, nil)
+			s.call(t, s.owner, "", "POST", path, data, 500, nil)
 			files.failing.Store(false)
 			var f uploaded
-			s.call(s.owner, "", "POST", path, data, 200, &f)
+			s.call(t, s.owner, "", "POST", path, data, 200, &f)
 			if f.State != "ready" || f.SHA256 != sumOf(data) {
 				t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
 			}
@@ -143,7 +143,7 @@ func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
 		s := newSiteWithFiles(t, st, &meetingFiles{Store: disk, together: 8, all: make(chan struct{})})
 		data := []byte(strings.Repeat("abcdefghij", 300))
 		var f uploaded
-		s.call(s.owner, "", "POST", fmt.Sprintf(w+"/files?name=clip.bin&size=%d", len(data)), data[:1000], 201, &f)
+		s.call(t, s.owner, "", "POST", fmt.Sprintf(w+"/files?name=clip.bin&size=%d", len(data)), data[:1000], 201, &f)
 		// Some send the next thousand bytes, some the next fifteen hundred;
 		// none of them the last.
 		var wg sync.WaitGroup
@@ -175,11 +175,11 @@ func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
 		if kept.Load() != 1 || refused.Load() != 7 {
 			t.Fatalf("%d parts kept and %d refused, want 1 and 7", kept.Load(), refused.Load())
 		}
-		s.call(s.owner, "", "GET", w+"/files/"+f.ID, nil, 200, &f)
+		s.call(t, s.owner, "", "GET", w+"/files/"+f.ID, nil, 200, &f)
 		if f.Received != 2000 && f.Received != 2500 {
 			t.Fatalf("received %d, which is no part's end", f.Received)
 		}
-		s.call(s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", f.ID, f.Received), data[f.Received:], 200, &f)
+		s.call(t, s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", f.ID, f.Received), data[f.Received:], 200, &f)
 		if f.State != "ready" || f.SHA256 != sumOf(data) {
 			t.Fatalf("the file ended as %+v, want the sum %s", f, sumOf(data))
 		}
@@ -198,7 +198,7 @@ func legacyUpload(t *testing.T, s *site, st store.Store, files blob.Store, size,
 		t.Fatal(err)
 	}
 	f := core.File{ID: id.New(), WorkspaceID: ws.ID, Name: "clip.bin", ContentType: "application/octet-stream", Size: size, Received: received,
-		State: core.FileUploading, UploadedBy: s.ownerID(), CreatedAt: time.Now().UnixMilli()}
+		State: core.FileUploading, UploadedBy: s.ownerID(t), CreatedAt: time.Now().UnixMilli()}
 	f.StorageKey = ws.ID + "/" + f.ID
 	for offset, data := range parts {
 		if err := files.Put(ctx, fmt.Sprintf("%s.parts/%020d", f.StorageKey, offset), strings.NewReader(data), "application/octet-stream"); err != nil {
@@ -226,7 +226,7 @@ func TestAnUploadFromBeforeTheUpgradeGoesOn(t *testing.T) {
 		finish := func(t *testing.T, fid string, from int64, rest, whole string) {
 			t.Helper()
 			var f uploaded
-			s.call(s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", fid, from), []byte(rest), 200, &f)
+			s.call(t, s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", fid, from), []byte(rest), 200, &f)
 			if f.State != "ready" || f.SHA256 != sumOf([]byte(whole)) {
 				t.Fatalf("the file ended as %+v, want the sum of %q", f, whole)
 			}
@@ -243,7 +243,7 @@ func TestAnUploadFromBeforeTheUpgradeGoesOn(t *testing.T) {
 		t.Run("started again under its id, it says how far it got", func(t *testing.T) {
 			fid := legacyUpload(t, s, st, files, 6, 4, map[int64]string{0: "ab", 2: "cd"})
 			var f uploaded
-			s.call(s.owner, "", "POST", w+"/files?name=clip.bin&size=6&id="+fid, []byte("abcdef"), 200, &f)
+			s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=6&id="+fid, []byte("abcdef"), 200, &f)
 			if f.State != "uploading" || f.Received != 4 {
 				t.Fatalf("started again: %+v, want 4 bytes received", f)
 			}
@@ -257,7 +257,7 @@ func TestAnUploadFromBeforeTheUpgradeGoesOn(t *testing.T) {
 
 		t.Run("what is not there is asked for again", func(t *testing.T) {
 			fid := legacyUpload(t, s, st, files, 15, 10, map[int64]string{0: "hello"})
-			out := s.call(s.owner, "", "PATCH", w+"/files/"+fid+"?offset=10", []byte("again"), 409, nil)
+			out := s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=10", []byte("again"), 409, nil)
 			if !strings.Contains(out, "continue from 5") {
 				t.Fatalf("a part sent after one that is lost: %s", out)
 			}
@@ -281,7 +281,7 @@ func TestAnUploadIsCheckedBeforeItIsReady(t *testing.T) {
 
 		t.Run("a part cut short in storage", func(t *testing.T) {
 			var f uploaded
-			s.call(s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("hello"), 201, &f)
+			s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("hello"), 201, &f)
 			for _, key := range files.keys(t, "") {
 				if strings.Contains(key, f.ID+".parts/") {
 					if err := files.Put(context.Background(), key, strings.NewReader("hel"), ""); err != nil {
@@ -289,15 +289,15 @@ func TestAnUploadIsCheckedBeforeItIsReady(t *testing.T) {
 					}
 				}
 			}
-			if out := s.call(s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=5", []byte("world"), 409, nil); !strings.Contains(out, "continue from 0") {
+			if out := s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=5", []byte("world"), 409, nil); !strings.Contains(out, "continue from 0") {
 				t.Fatalf("finishing with a part short: %s", out)
 			}
 			var after uploaded // received is left out of the answer when it is 0
-			s.call(s.owner, "", "GET", w+"/files/"+f.ID, nil, 200, &after)
+			s.call(t, s.owner, "", "GET", w+"/files/"+f.ID, nil, 200, &after)
 			if after.State != "uploading" || after.Received != 0 {
 				t.Fatalf("after the check failed the file is %+v", after)
 			}
-			s.call(s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=0", []byte("helloworld"), 200, &f)
+			s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=0", []byte("helloworld"), 200, &f)
 			if f.State != "ready" || f.SHA256 != sumOf([]byte("helloworld")) {
 				t.Fatalf("sent again, the file is %+v", f)
 			}
@@ -306,19 +306,19 @@ func TestAnUploadIsCheckedBeforeItIsReady(t *testing.T) {
 		t.Run("a checksum given", func(t *testing.T) {
 			fid := id.New()
 			sum := sumOf([]byte("hello"))
-			if out := s.call(s.owner, "", "POST", w+"/files?name=a.txt&size=5&sha256="+sum+"&id="+fid, []byte("hellO"), 409, nil); !strings.Contains(out, "continue from 0") {
+			if out := s.call(t, s.owner, "", "POST", w+"/files?name=a.txt&size=5&sha256="+sum+"&id="+fid, []byte("hellO"), 409, nil); !strings.Contains(out, "continue from 0") {
 				t.Fatalf("bytes that do not match the checksum: %s", out)
 			}
 			var f uploaded
-			s.call(s.owner, "", "PATCH", w+"/files/"+fid+"?offset=0", []byte("hello"), 200, &f)
+			s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=0", []byte("hello"), 200, &f)
 			if f.State != "ready" || f.SHA256 != sum {
 				t.Fatalf("sent again, the file is %+v", f)
 			}
-			s.call(s.owner, "", "POST", w+"/files?name=b.txt&sha256="+sum, []byte("hello"), 201, &f)
+			s.call(t, s.owner, "", "POST", w+"/files?name=b.txt&sha256="+sum, []byte("hello"), 201, &f)
 			if f.State != "ready" {
 				t.Fatalf("bytes that match the checksum: %+v", f)
 			}
-			s.call(s.owner, "", "POST", w+"/files?name=c.txt&sha256=nope", []byte("hello"), 400, nil)
+			s.call(t, s.owner, "", "POST", w+"/files?name=c.txt&sha256=nope", []byte("hello"), 400, nil)
 		})
 	})
 }
@@ -374,7 +374,7 @@ func TestFirstRequestsUnderOneIDDoNotShareWhatTheyReceive(t *testing.T) {
 			}
 		}
 		var other uploaded
-		s.call(s.owner, "", "POST", path, data, 200, &other)
+		s.call(t, s.owner, "", "POST", path, data, 200, &other)
 		if other.State != "uploading" || other.Received != 0 {
 			t.Fatalf("the second first request, while the first is arriving: %+v", other)
 		}
@@ -388,7 +388,7 @@ func TestFirstRequestsUnderOneIDDoNotShareWhatTheyReceive(t *testing.T) {
 
 		files.failing.Store(false)
 		var f uploaded
-		s.call(s.owner, "", "POST", path, data, 200, &f)
+		s.call(t, s.owner, "", "POST", path, data, 200, &f)
 		if f.State != "ready" || f.SHA256 != sumOf(data) {
 			t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
 		}

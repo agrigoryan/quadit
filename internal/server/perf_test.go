@@ -23,9 +23,9 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 	}
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
-		s.change(s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		s.change(t, s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
 		statuses := []string{"Backlog", "Todo", "In Progress", "Waiting", "Done"}
 		start := time.Now()
 		for batch := range 20 {
@@ -40,12 +40,12 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 				}
 				changes = append(changes, M{"id": id.New(), "type": "task.create", "args": args})
 			}
-			s.call(s.owner, "", "POST", w+"/changes", M{"changes": changes}, 200, nil)
+			s.call(t, s.owner, "", "POST", w+"/changes", M{"changes": changes}, 200, nil)
 		}
 		t.Logf("%s: made 10,000 tasks in %s", st.Dialect(), time.Since(start).Round(time.Millisecond))
 
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
 		timed := func(what string, limit time.Duration, fn func()) {
 			t.Helper()
 			fn() // once to warm up
@@ -63,7 +63,7 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 			}
 		}
 		get := func(path string) func() {
-			return func() { s.call(nil, tok.Token, "GET", "/api/v1/w/-"+path, nil, 200, nil) }
+			return func() { s.call(t, nil, tok.Token, "GET", "/api/v1/w/-"+path, nil, 200, nil) }
 		}
 		const fast = 100 * time.Millisecond
 		timed("my work", fast, get("/my-work?format=text"))
@@ -75,12 +75,12 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 		timed("feed from a position", fast, get("/events?after=9000&limit=100&format=text"))
 		timed("feed for my tasks", fast, get("/events?after=9000&mine=1&limit=100&format=text"))
 		timed("one change", fast, func() {
-			s.change(nil, tok.Token, "comment.create", M{"task": "SVA-5000", "body": "a comment"})
+			s.change(t, nil, tok.Token, "comment.create", M{"task": "SVA-5000", "body": "a comment"})
 		})
 		timed("dashboard", 500*time.Millisecond, get("/dashboard"))
 		// The web app's starting copy is everything at once; it is read once
 		// per session, so it may take longer than a single answer.
-		timed("bootstrap (whole workspace)", 1500*time.Millisecond, func() { s.call(s.owner, "", "GET", w+"/bootstrap", nil, 200, nil) })
+		timed("bootstrap (whole workspace)", 1500*time.Millisecond, func() { s.call(t, s.owner, "", "GET", w+"/bootstrap", nil, 200, nil) })
 	})
 }
 
@@ -97,8 +97,8 @@ func TestSpeedOfADatabaseWhoseRowsLinkManyRows(t *testing.T) {
 	}
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		do := func(typ string, args M) string { return s.change(s.owner, "", typ, args)["ref"].(string) }
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		do := func(typ string, args M) string { return s.change(t, s.owner, "", typ, args)["ref"].(string) }
 		const n = 400
 		servers := do("doc.create", M{"title": "Servers", "kind": "database", "project": "SVA"})
 		do("property.create", M{"database": servers, "name": "Load", "type": "number"})
@@ -111,7 +111,7 @@ func TestSpeedOfADatabaseWhoseRowsLinkManyRows(t *testing.T) {
 				ids = append(ids, a["id"].(string))
 				changes = append(changes, M{"id": id.New(), "type": "doc.create", "args": a})
 			}
-			s.call(s.owner, "", "POST", w+"/changes", M{"changes": changes}, 200, nil)
+			s.call(t, s.owner, "", "POST", w+"/changes", M{"changes": changes}, 200, nil)
 			return ids
 		}
 		linked := create(func(i int) M {
@@ -125,9 +125,9 @@ func TestSpeedOfADatabaseWhoseRowsLinkManyRows(t *testing.T) {
 			return M{"parent": sprites, "title": fmt.Sprintf("sprite-%d", i), "props": M{"Server": linked}}
 		})
 
-		s.call(s.owner, "", "GET", w+"/docs/"+sprites+"/rows", nil, 200, nil) // once to warm up
+		s.call(t, s.owner, "", "GET", w+"/docs/"+sprites+"/rows", nil, 200, nil) // once to warm up
 		at := time.Now()
-		out := s.call(s.owner, "", "GET", w+"/docs/"+sprites+"/rows", nil, 200, nil)
+		out := s.call(t, s.owner, "", "GET", w+"/docs/"+sprites+"/rows", nil, 200, nil)
 		took := time.Since(at)
 		t.Logf("%s: %d rows linking %d rows each: %s", st.Dialect(), n, n, took.Round(time.Millisecond))
 		if !strings.Contains(out, fmt.Sprint(n*(n-1)/2)) {

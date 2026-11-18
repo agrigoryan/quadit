@@ -103,7 +103,7 @@ func TestNoFileIsTakenWhileTheStoreThatIsSetIsBeingOpened(t *testing.T) {
 		if resp.StatusCode != http.StatusServiceUnavailable {
 			t.Errorf("/readyz while the file store is being opened: %d, want 503", resp.StatusCode)
 		}
-		out := s.call(s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), http.StatusServiceUnavailable, nil)
+		out := s.call(t, s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), http.StatusServiceUnavailable, nil)
 		if !strings.Contains(out, "file") {
 			t.Errorf("the refused upload does not say why: %s", out)
 		}

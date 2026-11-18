@@ -66,17 +66,17 @@ func TestSignInWithGitHub(t *testing.T) {
 		s := newSite(t, st)
 		var seen []string
 		gh := fakeGitHub(t, &seen)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
 			"auth_url": gh.URL + "/login/oauth/authorize", "token_url": gh.URL + "/login/oauth/access_token", "api_url": gh.URL}, 200, nil)
-		if out := s.call(nil, "", "GET", "/api/v1/auth/config", nil, 200, nil); !strings.Contains(out, "GitHub") {
+		if out := s.call(t, nil, "", "GET", "/api/v1/auth/config", nil, 200, nil); !strings.Contains(out, "GitHub") {
 			t.Fatalf("GitHub is not offered: %s", out)
 		}
-		if out := s.call(s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, nil); strings.Contains(out, "s3cret") {
+		if out := s.call(t, s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, nil); strings.Contains(out, "s3cret") {
 			t.Fatalf("the client secret is shown: %s", out)
 		}
 		// Someone invited by the address GitHub vouches for.
 		var inv struct{ Link string }
-		s.call(s.owner, "", "POST", w+"/invites", M{"email": "octo@example.com"}, 201, &inv)
+		s.call(t, s.owner, "", "POST", w+"/invites", M{"email": "octo@example.com"}, 201, &inv)
 		token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
 		b := browser()
 		resp, err := b.Get(s.url + "/api/v1/auth/oauth/github/start?invite=" + token)
@@ -87,9 +87,9 @@ func TestSignInWithGitHub(t *testing.T) {
 		if !strings.HasSuffix(resp.Request.URL.Path, "/invite/"+token) {
 			t.Fatalf("sign-in with GitHub ended at %s", resp.Request.URL)
 		}
-		s.call(b, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
+		s.call(t, b, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
 		var me struct{ Name, Role string }
-		s.call(b, "", "GET", w+"/me", nil, 200, &me)
+		s.call(t, b, "", "GET", w+"/me", nil, 200, &me)
 		if me.Name != "octocat" || me.Role != "member" {
 			t.Fatalf("signed in as %+v (a person with no name on GitHub goes by their login)", me)
 		}
@@ -100,7 +100,7 @@ func TestSignInWithGitHub(t *testing.T) {
 		b2 := browser()
 		resp, _ = b2.Get(s.url + "/api/v1/auth/oauth/github/start")
 		resp.Body.Close()
-		s.call(b2, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+		s.call(t, b2, "", "GET", "/api/v1/auth/me", nil, 200, nil)
 	})
 }
 

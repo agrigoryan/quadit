@@ -24,8 +24,8 @@ func TestAViewIsSavedOnlyWithAQueryThatReads(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		rw := newRichWorkspace(t, s, st)
-		s.change(s.owner, "", "label.create", M{"name": "twice", "project": "SVA"})
-		s.change(s.owner, "", "label.create", M{"name": "twice", "project": "OPS"})
+		s.change(t, s.owner, "", "label.create", M{"name": "twice", "project": "SVA"})
+		s.change(t, s.owner, "", "label.create", M{"name": "twice", "project": "OPS"})
 		bea := rw.callers[1].hc
 		var out strings.Builder
 		n := 0

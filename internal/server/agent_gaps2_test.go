@@ -25,11 +25,11 @@ func fileNames(files []struct{ Name, URL string }) string {
 func TestQuestionFilesShowWithTheDecision(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
-		agent := s.agentToken("coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
+		agent := s.agentToken(t, "coder")
 		f := someFiles(t, "context.png", "a.gif", "b.gif")
-		if out, code := s.quadit(agent, "ask", "SVA-1", "Which arrival?", "file="+f["context.png"],
+		if out, code := s.quadit(t, agent, "ask", "SVA-1", "Which arrival?", "file="+f["context.png"],
 			"option=A", "file="+f["a.gif"], "option=B", "file="+f["b.gif"]); code != 0 {
 			t.Fatalf("ask: %d %s", code, out)
 		}
@@ -54,17 +54,17 @@ func TestQuestionFilesShowWithTheDecision(t *testing.T) {
 			}
 		}
 		var detail struct{ Decisions []decision }
-		s.call(nil, agent, "GET", "/api/v1/w/-/tasks/SVA-1", nil, 200, &detail)
+		s.call(t, nil, agent, "GET", "/api/v1/w/-/tasks/SVA-1", nil, 200, &detail)
 		check("task", detail.Decisions)
 		var pack struct {
 			Task struct{ Decisions []decision }
 		}
-		s.call(nil, agent, "GET", "/api/v1/w/-/tasks/SVA-1/context", nil, 200, &pack)
+		s.call(t, nil, agent, "GET", "/api/v1/w/-/tasks/SVA-1/context", nil, 200, &pack)
 		check("context pack", pack.Task.Decisions)
 
 		// In text, the question's file is listed under the question with its address.
 		for _, path := range []string{"/api/v1/w/-/tasks/SVA-1?format=text", "/api/v1/w/-/tasks/SVA-1/context?format=text"} {
-			text := s.call(nil, agent, "GET", path, nil, 200, nil)
+			text := s.call(t, nil, agent, "GET", path, nil, 200, nil)
 			q := strings.Index(text, "Which arrival?")
 			file := strings.Index(text, "file: context.png "+s.url+"/f/")
 			opt := strings.Index(text, "1) A")
@@ -100,9 +100,9 @@ func mcpTool(t *testing.T, s *site, token, name string, args M) (string, bool) {
 func TestMCPAsk(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
-		token := mcpAgentToken(s)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
+		token := mcpAgentToken(t, s)
 		fileID := regexp.MustCompile(`file id=(\S+)`)
 		upload := func(name string) string {
 			out, failed := mcpTool(t, s, token, "upload", M{"name": name, "text": "picture " + name})
@@ -140,7 +140,7 @@ func TestMCPAsk(t *testing.T) {
 				}
 			}
 		}
-		s.call(nil, token, "GET", "/api/v1/w/-/tasks/SVA-1", nil, 200, &detail)
+		s.call(t, nil, token, "GET", "/api/v1/w/-/tasks/SVA-1", nil, 200, &detail)
 		if len(detail.Decisions) != 1 {
 			t.Fatalf("decisions = %+v", detail.Decisions)
 		}
@@ -153,12 +153,12 @@ func TestMCPAsk(t *testing.T) {
 		}
 
 		// An approval of an exact change, with a file on the question.
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Cut the intro"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Cut the intro"})
 		out, failed = mcpTool(t, s, token, "ask", M{"task": "SVA-2", "question": "Delete it?", "action": "task.delete", "files": []string{ctx}})
 		if failed || !strings.HasPrefix(out, "ok decision.open SVA-2") {
 			t.Fatalf("approval: %s", out)
 		}
-		text := s.call(nil, token, "GET", "/api/v1/w/-/tasks/SVA-2?format=text", nil, 200, nil)
+		text := s.call(t, nil, token, "GET", "/api/v1/w/-/tasks/SVA-2?format=text", nil, 200, nil)
 		if !strings.Contains(text, "approval for: task.delete") || !strings.Contains(text, "file: context.png") {
 			t.Fatalf("approval as read back:\n%s", text)
 		}
@@ -170,9 +170,9 @@ func TestMCPAsk(t *testing.T) {
 func TestQuietInBothForms(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
-		member := s.agentToken("coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
+		member := s.agentToken(t, "coder")
 		bare := func(body string) M {
 			return M{"id": id.New(), "type": "comment.create", "args": M{"task": "SVA-1", "body": body}, "quiet": true}
 		}
@@ -181,18 +181,18 @@ func TestQuietInBothForms(t *testing.T) {
 			"batch": func(body string) M { return M{"changes": []M{bare(body)}} },
 		}
 		for name, form := range forms {
-			s.call(nil, member, "POST", w+"/changes", form("psst from a member "+name), 403, nil)
-			s.call(s.owner, "", "POST", w+"/changes", form("history "+name), 200, nil)
+			s.call(t, nil, member, "POST", w+"/changes", form("psst from a member "+name), 403, nil)
+			s.call(t, s.owner, "", "POST", w+"/changes", form("history "+name), 200, nil)
 			var page struct {
 				Events []struct{ Data map[string]any }
 			}
-			s.call(s.owner, "", "GET", w+"/events?task=SVA-1&types=comment.created&limit=500", nil, 200, &page)
+			s.call(t, s.owner, "", "GET", w+"/events?task=SVA-1&types=comment.created&limit=500", nil, 200, &page)
 			last := page.Events[len(page.Events)-1].Data
 			if last["quiet"] != true {
 				t.Fatalf("%s: an admin's quiet comment is not marked quiet: %v", name, last)
 			}
 		}
-		if text := s.call(nil, member, "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); strings.Contains(text, "psst") {
+		if text := s.call(t, nil, member, "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); strings.Contains(text, "psst") {
 			t.Fatalf("a member's quiet change went in:\n%s", text)
 		}
 	})
@@ -205,23 +205,23 @@ func TestQuietInBothForms(t *testing.T) {
 func TestQuietHistorySetsNothingOff(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
-		coordinator := s.agentToken("coordinator")
-		artist := s.agentToken("artist")
-		s.change(s.owner, "", "rule.create", M{"name": "a new task to plan", "match": M{"event_types": []string{"task.created"}},
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
+		coordinator := s.agentToken(t, "coordinator")
+		artist := s.agentToken(t, "artist")
+		s.change(t, s.owner, "", "rule.create", M{"name": "a new task to plan", "match": M{"event_types": []string{"task.created"}},
 			"action": M{"kind": "notify", "user_id": "@coordinator"}})
-		view := s.change(nil, artist, "view.create", M{"name": "Art", "query": M{"label": []string{"art"}}})
-		s.change(nil, artist, "watch.set", M{"type": "view", "subject": view["ref"]})
+		view := s.change(t, nil, artist, "view.create", M{"name": "Art", "query": M{"label": []string{"art"}}})
+		s.change(t, nil, artist, "watch.set", M{"type": "view", "subject": view["ref"]})
 		hook := newReceiver(t, "")
-		s.change(s.owner, "", "webhook.create", M{"name": "mirror", "url": hook.srv.URL, "event_types": []string{"task.created"}})
+		s.change(t, s.owner, "", "webhook.create", M{"name": "mirror", "url": hook.srv.URL, "event_types": []string{"task.created"}})
 
 		quiet := M{"changes": []M{{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": "Imported sprites", "labels": []string{"art"}}, "quiet": true}}}
-		s.call(s.owner, "", "POST", w+"/changes", quiet, 200, nil)
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "New sprites", "labels": []string{"art"}})
+		s.call(t, s.owner, "", "POST", w+"/changes", quiet, 200, nil)
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "New sprites", "labels": []string{"art"}})
 
 		inbox := func(token string) string {
-			return s.call(nil, token, "GET", "/api/v1/w/-/inbox?format=text&all=1", nil, 200, nil)
+			return s.call(t, nil, token, "GET", "/api/v1/w/-/inbox?format=text&all=1", nil, 200, nil)
 		}
 		// The task made afterwards is news: rule, view alert and webhook.
 		eventually(t, "the rule and the view alert for the new task", func() bool {
@@ -239,7 +239,7 @@ func TestQuietHistorySetsNothingOff(t *testing.T) {
 			t.Fatalf("the webhook's quiet marks: imported %v, new %v", first["quiet"], second["quiet"])
 		}
 		// History is still in the search.
-		if out := s.call(nil, artist, "GET", "/api/v1/w/-/search?q=Imported&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+		if out := s.call(t, nil, artist, "GET", "/api/v1/w/-/search?q=Imported&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
 			t.Fatalf("search: %s", out)
 		}
 	})

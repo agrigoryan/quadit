@@ -19,7 +19,7 @@ func TestSignInDoesNotTakeAnOutageForARefusal(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
-		token := s.agentToken("bot")
+		token := s.agentToken(t, "bot")
 
 		// Each case makes one kind of row unreadable and calls the API.
 		cases := []struct {
@@ -37,11 +37,8 @@ func TestSignInDoesNotTakeAnOutageForARefusal(t *testing.T) {
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				parent := s.t
-				s.t = t // call reports to this case
-				defer func() { s.t = parent }()
 				tc.fail(t)
-				body := s.call(tc.client, tc.token, "GET", w+"/me", nil, 500, nil)
+				body := s.call(t, tc.client, tc.token, "GET", w+"/me", nil, 500, nil)
 				if !strings.Contains(body, `"code":"internal"`) {
 					t.Fatalf("the answer is not the server's own failure: %s", body)
 				}

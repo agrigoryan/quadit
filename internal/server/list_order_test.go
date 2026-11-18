@@ -20,11 +20,11 @@ func TestRowsMadeInTheSameMillisecondComeInOneOrder(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		ctx := context.Background()
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		task := s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})["ref"].(string)
-		target := s.change(s.owner, "", "doc.create", M{"title": "Target"})["ref"].(string)
-		from := s.change(s.owner, "", "doc.create", M{"title": "From"})["ref"].(string)
-		wsID, owner := siteWorkspaceID(t, st), s.ownerID()
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		task := s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})["ref"].(string)
+		target := s.change(t, s.owner, "", "doc.create", M{"title": "Target"})["ref"].(string)
+		from := s.change(t, s.owner, "", "doc.create", M{"title": "From"})["ref"].(string)
+		wsID, owner := siteWorkspaceID(t, st), s.ownerID(t)
 		db := st.In(wsID)
 		// Ids that sort the other way from the order the rows are written in.
 		ids := []string{"01a1e100-0000-7000-8000-000000000003", "01a1e100-0000-7000-8000-000000000002", "01a1e100-0000-7000-8000-000000000001"}
@@ -45,7 +45,7 @@ func TestRowsMadeInTheSameMillisecondComeInOneOrder(t *testing.T) {
 		listed := func(path, field, key string) []string {
 			t.Helper()
 			var out map[string]json.RawMessage
-			s.call(s.owner, "", "GET", w+path, nil, 200, &out)
+			s.call(t, s.owner, "", "GET", w+path, nil, 200, &out)
 			var rows []map[string]any
 			if err := json.Unmarshal(out[field], &rows); err != nil {
 				t.Fatal(err)

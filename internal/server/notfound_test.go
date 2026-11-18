@@ -16,11 +16,11 @@ import (
 func TestNotFoundAnswersKeepTheirWords(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		bea, _ := s.invitedPerson()
+		bea, _ := s.invitedPerson(t)
 		var other struct{ Slug string }
-		s.call(s.owner, "", "POST", "/api/v1/workspaces", M{"name": "Elsewhere"}, 201, &other)
+		s.call(t, s.owner, "", "POST", "/api/v1/workspaces", M{"name": "Elsewhere"}, 201, &other)
 
-		page := s.change(s.owner, "", "doc.create", M{"title": "Notes", "markdown": "Words."})["ref"].(string)
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Notes", "markdown": "Words."})["ref"].(string)
 
 		const none = "00000000-0000-4000-8000-000000000000"
 		cases := []struct {
@@ -68,12 +68,11 @@ func TestNotFoundAnswersKeepTheirWords(t *testing.T) {
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				s := s.in(t)
 				hc := s.owner
 				if tc.who != nil {
 					hc = tc.who
 				}
-				got := strings.TrimSpace(s.call(hc, "", tc.method, tc.path, tc.body, 404, nil))
+				got := strings.TrimSpace(s.call(t, hc, "", tc.method, tc.path, tc.body, 404, nil))
 				if got != tc.want {
 					t.Fatalf("the answer is\n%s\nwant\n%s", got, tc.want)
 				}

@@ -130,7 +130,7 @@ func finishURL(s *site, code, verifier string) string {
 func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		ownerID := s.ownerID()
+		ownerID := s.ownerID(t)
 		app := func() desktopApp { return desktopApp{hc: noRedirects()} }
 
 		t.Run("a browser signed out signs in first and comes back", func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			if back.Path != "/login" || !strings.HasPrefix(next, "/desktop/connect?") || !strings.Contains(next, "challenge="+f.challenge) || !strings.Contains(next, "state="+f.state) {
 				t.Fatalf("signed out: sent to %q", resp.Header.Get("Location"))
 			}
-			s.call(hc, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, nil)
+			s.call(t, hc, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, nil)
 			code := approve(t, s, hc, f, ownerID)
 
 			a := app()
@@ -155,7 +155,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			}
 			// The window is signed in, as a password sign-in signs a browser in.
 			var me struct{ User struct{ ID string } }
-			s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 200, &me)
+			s.call(t, a.hc, "", "GET", "/api/v1/auth/me", nil, 200, &me)
 			if me.User.ID != ownerID {
 				t.Fatalf("the app is signed in as %q", me.User.ID)
 			}
@@ -165,7 +165,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 					Current   bool
 				}
 			}
-			s.call(a.hc, "", "GET", "/api/v1/auth/sessions", nil, 200, &sessions)
+			s.call(t, a.hc, "", "GET", "/api/v1/auth/sessions", nil, 200, &sessions)
 			found := false
 			for _, se := range sessions.Sessions {
 				found = found || (se.Current && strings.HasSuffix(se.UserAgent, "QuaditDesktop/0.1.0"))
@@ -173,7 +173,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			if !found {
 				t.Fatalf("the app's session is not listed with the app's user agent: %+v", sessions.Sessions)
 			}
-			if out := s.call(s.owner, "", "GET", "/api/v1/admin/audit?action=signin", nil, 200, nil); !strings.Contains(out, `"method":"desktop"`) {
+			if out := s.call(t, s.owner, "", "GET", "/api/v1/admin/audit?action=signin", nil, 200, nil); !strings.Contains(out, `"method":"desktop"`) {
 				t.Fatalf("the sign-in is not in the audit log: %s", out)
 			}
 		})
@@ -323,7 +323,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 
 		t.Run("a token cannot get a session", func(t *testing.T) {
 			var tok struct{ Token string }
-			s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
 			f := newDesktopFlow()
 			resp, _ := post(t, noRedirects(), s.url+"/desktop/connect", f.form(ownerID), map[string]string{"Authorization": "Bearer " + tok.Token, "Sec-Fetch-Site": "same-origin"})
 			if resp.StatusCode != http.StatusForbidden {
@@ -363,15 +363,15 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 
 		t.Run("two-step codes were given in the browser already", func(t *testing.T) {
 			var setup struct{ Secret string }
-			s.call(s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
-			s.call(s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
+			s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
+			s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
 			f := newDesktopFlow()
 			code := approve(t, s, s.owner, f, ownerID)
 			a := app()
 			if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
 				t.Fatalf("finish: status %d", resp.StatusCode)
 			}
-			s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+			s.call(t, a.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
 		})
 	})
 }
@@ -384,11 +384,11 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 func TestTheDesktopAppsSessionTookTheBrowsersSteps(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		ownerID := s.ownerID()
+		ownerID := s.ownerID(t)
 		app := func() desktopApp { return desktopApp{hc: noRedirects()} }
 		var setup struct{ Secret string }
-		s.call(s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
-		s.call(s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
+		s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
+		s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
 		twoStep := func(hc *http.Client) bool {
 			t.Helper()
 			u, _ := url.Parse(s.url)
@@ -408,12 +408,12 @@ func TestTheDesktopAppsSessionTookTheBrowsersSteps(t *testing.T) {
 		var first struct {
 			SecondStep bool `json:"second_step"`
 		}
-		s.call(b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, &first)
+		s.call(t, b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, &first)
 		if !first.SecondStep {
 			t.Fatal("the password let a person with codes in")
 		}
 		// The next step's code: the one that turned codes on is spent.
-		s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": auth.TOTPCode(setup.Secret, time.Now().Add(30*time.Second))}, 200, nil)
+		s.call(t, b, "", "POST", "/api/v1/auth/second-step", M{"code": auth.TOTPCode(setup.Secret, time.Now().Add(30*time.Second))}, 200, nil)
 
 		// The browser took two steps: so does the app.
 		f := newDesktopFlow()
@@ -422,7 +422,7 @@ func TestTheDesktopAppsSessionTookTheBrowsersSteps(t *testing.T) {
 		if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
 			t.Fatalf("finish: status %d", resp.StatusCode)
 		}
-		s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+		s.call(t, a.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
 		if !twoStep(a.hc) {
 			t.Fatal("the app's session from a browser of two steps is of one")
 		}
@@ -443,7 +443,7 @@ func TestTheDesktopAppsSessionTookTheBrowsersSteps(t *testing.T) {
 		if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
 			t.Fatalf("finish: status %d", resp.StatusCode)
 		}
-		if out := s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 401, nil); !strings.Contains(out, "second_step") {
+		if out := s.call(t, a.hc, "", "GET", "/api/v1/auth/me", nil, 401, nil); !strings.Contains(out, "second_step") {
 			t.Fatalf("the app's session from a browser of one step skipped the second: %s", out)
 		}
 		if twoStep(a.hc) {

@@ -52,19 +52,19 @@ func TestAddressesUsersGiveAreReachedOnlyWhenPublic(t *testing.T) {
 			_, _ = rand.Read(secret)
 			keys := M{"p256dh": base64.RawURLEncoding.EncodeToString(browserKey.PublicKey().Bytes()), "auth": base64.RawURLEncoding.EncodeToString(secret)}
 			for _, endpoint := range []string{inside.URL + "/push/1", byName + "/push/2"} {
-				s.call(s.owner, "", "POST", "/api/v1/push/subscriptions", M{"endpoint": endpoint, "keys": keys}, 201, nil)
+				s.call(t, s.owner, "", "POST", "/api/v1/push/subscriptions", M{"endpoint": endpoint, "keys": keys}, 201, nil)
 			}
-			s.call(s.owner, "", "POST", "/api/v1/push/subscriptions", M{"endpoint": "http://push.example.com/plain", "keys": keys}, 400, nil)
-			s.call(s.owner, "", "POST", "/api/v1/push/test", nil, 502, nil)
+			s.call(t, s.owner, "", "POST", "/api/v1/push/subscriptions", M{"endpoint": "http://push.example.com/plain", "keys": keys}, 400, nil)
+			s.call(t, s.owner, "", "POST", "/api/v1/push/test", nil, 502, nil)
 		})
 		t.Run("webhook", func(t *testing.T) {
 			for _, u := range []string{inside.URL + "/hook", byName + "/hook"} {
-				hook := s.change(s.owner, "", "webhook.create", M{"url": u})["ref"].(string)
+				hook := s.change(t, s.owner, "", "webhook.create", M{"url": u})["ref"].(string)
 				var res struct {
 					OK    bool
 					Error string
 				}
-				s.call(s.owner, "", "POST", w+"/webhooks/"+hook+"/test", nil, 200, &res)
+				s.call(t, s.owner, "", "POST", w+"/webhooks/"+hook+"/test", nil, 200, &res)
 				if res.OK {
 					t.Fatalf("a webhook to %s was delivered", u)
 				}
@@ -72,26 +72,26 @@ func TestAddressesUsersGiveAreReachedOnlyWhenPublic(t *testing.T) {
 			}
 		})
 		t.Run("vault", func(t *testing.T) {
-			s.change(s.owner, "", "secret.set", M{"name": "INSIDE_KEY", "value": "inside-value-123", "hosts": []string{strings.TrimPrefix(byName, "https://")}})
+			s.change(t, s.owner, "", "secret.set", M{"name": "INSIDE_KEY", "value": "inside-value-123", "hosts": []string{strings.TrimPrefix(byName, "https://")}})
 			var res struct {
 				OK    bool
 				Error string
 			}
-			s.call(s.owner, "", "POST", w+"/secrets/INSIDE_KEY/request", M{"url": byName + "/x", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, &res)
+			s.call(t, s.owner, "", "POST", w+"/secrets/INSIDE_KEY/request", M{"url": byName + "/x", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, &res)
 			if res.OK {
 				t.Fatal("the vault called a host on this machine")
 			}
 			refusedWith(t, res.Error)
 		})
 		t.Run("import", func(t *testing.T) {
-			out := s.call(s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": byName, "options": M{"workspace": "ws1", "token": "t"}, "dry_run": true}, 400, nil)
+			out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "orbit", "source": byName, "options": M{"workspace": "ws1", "token": "t"}, "dry_run": true}, 400, nil)
 			refusedWith(t, out)
-			out = s.call(s.owner, "", "POST", w+"/import", M{"kind": "github", "source": "acme/game", "options": M{"api": byName}, "dry_run": true}, 400, nil)
+			out = s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "github", "source": "acme/game", "options": M{"api": byName}, "dry_run": true}, 400, nil)
 			refusedWith(t, out)
 		})
 		t.Run("github integration", func(t *testing.T) {
-			in := s.change(s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_x", "config": M{"repo": "acme/game", "api_url": byName}})["ref"].(string)
-			out := s.call(s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 409, nil)
+			in := s.change(t, s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_x", "config": M{"repo": "acme/game", "api_url": byName}})["ref"].(string)
+			out := s.call(t, s.owner, "", "POST", w+"/integrations/"+in+"/sync", nil, 409, nil)
 			refusedWith(t, out)
 		})
 		if n := reached.Load(); n != 0 {

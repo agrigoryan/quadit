@@ -29,43 +29,36 @@ import (
 
 const ownerPassword = "correct-horse-battery"
 
-// in is the site as seen from a subtest, so that a failed call fails it.
-func (s *site) in(t *testing.T) *site {
-	sub := *s
-	sub.t = t
-	return &sub
-}
-
 // signIn signs the owner in on a new browser.
-func (s *site) signIn() *http.Client {
-	s.t.Helper()
+func (s *site) signIn(t *testing.T) *http.Client {
+	t.Helper()
 	b := browser()
-	s.call(b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": ownerPassword}, 200, nil)
+	s.call(t, b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": ownerPassword}, 200, nil)
 	return b
 }
 
 // invitedPerson makes a member of the workspace who does not run the
 // install, signed in on a browser of their own, and returns their id.
-func (s *site) invitedPerson() (*http.Client, string) {
-	s.t.Helper()
+func (s *site) invitedPerson(t *testing.T) (*http.Client, string) {
+	t.Helper()
 	var inv struct{ Link string }
-	s.call(s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
+	s.call(t, s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
 	token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
 	b := browser()
 	var joined struct {
 		User struct{ ID string } `json:"user"`
 	}
-	s.call(b, "", "POST", "/api/v1/auth/invite/"+token, M{"name": "Bea", "email": "bea@example.com", "password": "another-long-password"}, 200, &joined)
+	s.call(t, b, "", "POST", "/api/v1/auth/invite/"+token, M{"name": "Bea", "email": "bea@example.com", "password": "another-long-password"}, 200, &joined)
 	return b, joined.User.ID
 }
 
 // ownerID is the id of the person who set the install up.
-func (s *site) ownerID() string {
-	s.t.Helper()
+func (s *site) ownerID(t *testing.T) string {
+	t.Helper()
 	var me struct {
 		User struct{ ID string } `json:"user"`
 	}
-	s.call(s.owner, "", "GET", "/api/v1/auth/me", nil, 200, &me)
+	s.call(t, s.owner, "", "GET", "/api/v1/auth/me", nil, 200, &me)
 	return me.User.ID
 }
 
@@ -86,7 +79,7 @@ func secondServer(t *testing.T, st store.Store) *site {
 	hs.Start()
 	go srv.Run(ctx)
 	t.Cleanup(func() { stop(); hs.Close() })
-	return &site{t: t, url: base, dir: dir, srv: srv}
+	return &site{url: base, dir: dir, srv: srv}
 }
 
 func TestSignInIsRefusedWhenAttemptsCannotBeCounted(t *testing.T) {
@@ -95,24 +88,21 @@ func TestSignInIsRefusedWhenAttemptsCannotBeCounted(t *testing.T) {
 		s := newSite(t, fs)
 		login := M{"email": "owner@example.com", "password": ownerPassword}
 		t.Run("the count cannot be read", func(t *testing.T) {
-			s := s.in(t)
 			fs.faults.set("incr rate_counters") // the count is read as the attempt is added
 			defer fs.faults.clear()
-			s.call(browser(), "", "POST", "/api/v1/auth/login", login, 429, nil)
+			s.call(t, browser(), "", "POST", "/api/v1/auth/login", login, 429, nil)
 		})
 		t.Run("a first attempt cannot be stored", func(t *testing.T) {
-			s := s.in(t)
 			fs.faults.set("incr rate_counters")
 			defer fs.faults.clear()
-			s.call(browser(), "", "POST", "/api/v1/auth/register", M{"name": "Cy", "email": "cy@example.com", "password": "another-long-password"}, 403, nil)
-			s.call(browser(), "", "POST", "/oauth/register", M{"client_name": "C", "redirect_uris": []string{"http://localhost:9/cb"}}, 429, nil)
+			s.call(t, browser(), "", "POST", "/api/v1/auth/register", M{"name": "Cy", "email": "cy@example.com", "password": "another-long-password"}, 403, nil)
+			s.call(t, browser(), "", "POST", "/oauth/register", M{"client_name": "C", "redirect_uris": []string{"http://localhost:9/cb"}}, 429, nil)
 		})
 		t.Run("a later attempt cannot be added", func(t *testing.T) {
-			s := s.in(t)
-			s.call(browser(), "", "POST", "/api/v1/auth/login", login, 200, nil)
+			s.call(t, browser(), "", "POST", "/api/v1/auth/login", login, 200, nil)
 			fs.faults.set("incr rate_counters")
 			defer fs.faults.clear()
-			s.call(browser(), "", "POST", "/api/v1/auth/login", login, 429, nil)
+			s.call(t, browser(), "", "POST", "/api/v1/auth/login", login, 429, nil)
 		})
 	})
 }
@@ -121,13 +111,13 @@ func TestRequiredSecondStepHoldsWhenSettingsCannotBeRead(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
 		// A server that has not read the setting yet takes it as on.
 		again := secondServer(t, fs)
-		again.owner = again.signIn()
+		again.owner = again.signIn(t)
 		fs.faults.set("get settings")
 		defer fs.faults.clear()
-		again.call(again.owner, "", "GET", w+"/me", nil, 403, nil)
+		again.call(t, again.owner, "", "GET", w+"/me", nil, 403, nil)
 	})
 }
 
@@ -135,18 +125,18 @@ func TestAccessSettingsFailClosedWhenTheyCannotBeRead(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
-		bea, _ := s.invitedPerson()
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/workspaces.anyone_can_create", false, 200, nil)
+		bea, _ := s.invitedPerson(t)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/workspaces.anyone_can_create", false, 200, nil)
 		again := secondServer(t, fs)
 		beaAgain := browser()
-		again.call(beaAgain, "", "POST", "/api/v1/auth/login", M{"email": "bea@example.com", "password": "another-long-password"}, 200, nil)
+		again.call(t, beaAgain, "", "POST", "/api/v1/auth/login", M{"email": "bea@example.com", "password": "another-long-password"}, 200, nil)
 		fs.faults.set("get settings")
 		defer fs.faults.clear()
-		s.call(bea, "", "POST", "/api/v1/workspaces", M{"name": "Side"}, 403, nil)
-		again.call(beaAgain, "", "POST", "/api/v1/workspaces", M{"name": "Side"}, 500, nil)
+		s.call(t, bea, "", "POST", "/api/v1/workspaces", M{"name": "Side"}, 403, nil)
+		again.call(t, beaAgain, "", "POST", "/api/v1/workspaces", M{"name": "Side"}, 500, nil)
 		// Whether passwords are on cannot be read either.
 		third := secondServer(t, fs)
-		third.call(browser(), "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": ownerPassword}, 500, nil)
+		third.call(t, browser(), "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": ownerPassword}, 500, nil)
 	})
 }
 
@@ -154,12 +144,12 @@ func TestMetricsAreClosedWhenTheirTokenCannotBeRead(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/metrics.token", "scrape-secret", 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/metrics.token", "scrape-secret", 200, nil)
 		// A server that has not read the token yet does not know there is one.
 		again := secondServer(t, fs)
 		fs.faults.set("get settings")
 		defer fs.faults.clear()
-		again.call(nil, "", "GET", "/metrics", nil, 500, nil)
+		again.call(t, nil, "", "GET", "/metrics", nil, 500, nil)
 	})
 }
 
@@ -168,39 +158,36 @@ func TestPasswordChangesFailWhenOtherSessionsCannotBeEnded(t *testing.T) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
 		t.Run("signing out", func(t *testing.T) {
-			s := s.in(t)
-			b := s.signIn()
+			b := s.signIn(t)
 			fs.faults.set("update sessions")
 			defer fs.faults.clear()
-			s.call(b, "", "POST", "/api/v1/auth/logout", nil, 500, nil)
+			s.call(t, b, "", "POST", "/api/v1/auth/logout", nil, 500, nil)
 			fs.faults.clear()
 		})
 		t.Run("a change", func(t *testing.T) {
-			s := s.in(t)
-			other := s.signIn()
+			other := s.signIn(t)
 			fs.faults.set("update sessions")
 			defer fs.faults.clear()
-			s.call(s.owner, "", "POST", "/api/v1/auth/password", M{"current": ownerPassword, "new": "a-brand-new-password"}, 500, nil)
+			s.call(t, s.owner, "", "POST", "/api/v1/auth/password", M{"current": ownerPassword, "new": "a-brand-new-password"}, 500, nil)
 			fs.faults.clear()
 			// Nothing changed: the old password still works.
-			s.call(other, "", "GET", "/api/v1/auth/me", nil, 200, nil)
-			s.signIn()
+			s.call(t, other, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+			s.signIn(t)
 		})
 		t.Run("a reset", func(t *testing.T) {
-			s := s.in(t)
 			other := s.owner
 			token := auth.Random(32)
 			now := time.Now()
-			if err := st.Insert(context.Background(), core.OneTimeToken{ID: id.New(), Kind: "reset", TokenHash: auth.Hash(token), UserID: s.ownerID(),
+			if err := st.Insert(context.Background(), core.OneTimeToken{ID: id.New(), Kind: "reset", TokenHash: auth.Hash(token), UserID: s.ownerID(t),
 				CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(time.Hour).UnixMilli()}); err != nil {
 				t.Fatal(err)
 			}
 			fs.faults.set("update sessions")
 			defer fs.faults.clear()
-			s.call(browser(), "", "POST", "/api/v1/auth/reset/confirm", M{"token": token, "password": "a-brand-new-password"}, 500, nil)
+			s.call(t, browser(), "", "POST", "/api/v1/auth/reset/confirm", M{"token": token, "password": "a-brand-new-password"}, 500, nil)
 			fs.faults.clear()
-			s.call(other, "", "GET", "/api/v1/auth/me", nil, 200, nil)
-			s.signIn()
+			s.call(t, other, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+			s.signIn(t)
 		})
 	})
 }
@@ -209,16 +196,16 @@ func TestDisablingAPersonFailsWhenTheirAccessCannotBeEnded(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
-		bea, beaID := s.invitedPerson()
+		bea, beaID := s.invitedPerson(t)
 		for _, table := range []string{"sessions", "api_tokens"} {
 			fs.faults.set("update " + table)
-			s.call(s.owner, "", "PATCH", "/api/v1/admin/users/"+beaID, M{"disabled": true}, 500, nil)
+			s.call(t, s.owner, "", "PATCH", "/api/v1/admin/users/"+beaID, M{"disabled": true}, 500, nil)
 			fs.faults.clear()
 		}
 		// Nothing was half done: Bea is not disabled and still signed in.
-		s.call(bea, "", "GET", "/api/v1/auth/me", nil, 200, nil)
-		s.call(s.owner, "", "PATCH", "/api/v1/admin/users/"+beaID, M{"disabled": true}, 200, nil)
-		s.call(bea, "", "GET", "/api/v1/auth/me", nil, 401, nil)
+		s.call(t, bea, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+		s.call(t, s.owner, "", "PATCH", "/api/v1/admin/users/"+beaID, M{"disabled": true}, 200, nil)
+		s.call(t, bea, "", "GET", "/api/v1/auth/me", nil, 401, nil)
 	})
 }
 
@@ -227,18 +214,18 @@ func TestSavingASettingKeepsItsSecretsWhenTheOldValueCannotBeRead(t *testing.T) 
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
 		mail := M{"host": "smtp.example.com", "from": "q@example.com", "password": "hunter2"}
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", mail, 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/mail", mail, 200, nil)
 		mail["password"] = "********"
 		fs.faults.set("get settings")
 		defer fs.faults.clear()
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", mail, 500, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/mail", mail, 500, nil)
 		fs.faults.clear()
 		var out struct {
 			Settings map[string]struct {
 				Value map[string]any `json:"value"`
 			} `json:"settings"`
 		}
-		s.call(s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, &out)
+		s.call(t, s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, &out)
 		if got := out.Settings["mail"].Value["password"]; got != "********" {
 			t.Fatalf("the mail password is %v after a failed save; want it kept (masked)", got)
 		}
@@ -253,7 +240,7 @@ func (s *site) oauthTokens(t *testing.T) (refresh, clientID string) {
 		ID string `json:"client_id"`
 	}
 	redirect := "http://localhost:9999/callback"
-	s.call(nil, "", "POST", "/oauth/register", M{"client_name": "Test Client", "redirect_uris": []string{redirect}}, 201, &cl)
+	s.call(t, nil, "", "POST", "/oauth/register", M{"client_name": "Test Client", "redirect_uris": []string{redirect}}, 201, &cl)
 	verifier := "a-long-random-verifier-string-for-pkce-0123456789"
 	sum := sha256.Sum256([]byte(verifier))
 	page, err := s.owner.Get(s.url + "/oauth/authorize?" + url.Values{"response_type": {"code"}, "client_id": {cl.ID}, "redirect_uri": {redirect},
@@ -324,7 +311,7 @@ func TestAccountChecksFailWhenTheyCannotCount(t *testing.T) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
 		var inv struct{ Link string }
-		s.call(s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
+		s.call(t, s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
 		cases := []struct {
 			name, fault, method, path string
 			body                      any
@@ -333,7 +320,7 @@ func TestAccountChecksFailWhenTheyCannotCount(t *testing.T) {
 			{"a new address in use", "count users", "PATCH", "/api/v1/auth/me", M{"email": "new@example.com", "password": ownerPassword}},
 			{"the last passkey", "count passkeys", "DELETE", "/api/v1/auth/passkeys/x", nil},
 			{"the last connected account", "count identities", "DELETE", "/api/v1/auth/identities/x", nil},
-			{"the last admin", "count users", "PATCH", "/api/v1/admin/users/" + s.ownerID(), M{"is_admin": false}},
+			{"the last admin", "count users", "PATCH", "/api/v1/admin/users/" + s.ownerID(t), M{"is_admin": false}},
 			{"turning passwords off", "count passkeys", "PUT", "/api/v1/admin/settings/auth.password", false},
 			{"an invitation to a member", "count members", "POST", "/api/v1/auth/invite/" + inv.Link[strings.LastIndex(inv.Link, "/")+1:], nil},
 			{"an admin joining", "count members", "POST", "/api/v1/admin/workspaces/games/join", nil},
@@ -343,24 +330,22 @@ func TestAccountChecksFailWhenTheyCannotCount(t *testing.T) {
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				s := s.in(t)
 				fs.faults.set(tc.fault)
 				defer fs.faults.clear()
-				s.call(s.owner, "", tc.method, tc.path, tc.body, 500, nil)
+				s.call(t, s.owner, "", tc.method, tc.path, tc.body, 500, nil)
 			})
 		}
 		t.Run("turning codes off where two steps are required", func(t *testing.T) {
-			s := s.in(t)
 			// The owner's session took two steps, as one must to change the
 			// account's security where two are required.
-			if _, err := st.Update(context.Background(), "sessions", map[string]any{"two_step": true}, store.Eq("user_id", s.ownerID())); err != nil {
+			if _, err := st.Update(context.Background(), "sessions", map[string]any{"two_step": true}, store.Eq("user_id", s.ownerID(t))); err != nil {
 				t.Fatal(err)
 			}
-			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
-			defer s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", []byte("null"), 200, nil)
+			s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
+			defer s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", []byte("null"), 200, nil)
 			fs.faults.set("count passkeys")
 			defer fs.faults.clear()
-			s.call(s.owner, "", "POST", "/api/v1/auth/totp/disable", M{"password": ownerPassword}, 500, nil)
+			s.call(t, s.owner, "", "POST", "/api/v1/auth/totp/disable", M{"password": ownerPassword}, 500, nil)
 		})
 	})
 }
@@ -369,18 +354,18 @@ func TestAnInvitationDoesNotSayNoAccountWhenItCannotLook(t *testing.T) {
 	fs := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, fs)
 	var inv struct{ Link string }
-	s.call(s.owner, "", "POST", w+"/invites", M{"email": "eve@example.com"}, 201, &inv)
+	s.call(t, s.owner, "", "POST", w+"/invites", M{"email": "eve@example.com"}, 201, &inv)
 	path := "/api/v1/auth/invite/" + inv.Link[strings.LastIndex(inv.Link, "/")+1:]
 	var shown struct {
 		HasAccount *bool `json:"has_account"`
 	}
-	s.call(&http.Client{}, "", "GET", path, nil, 200, &shown)
+	s.call(t, &http.Client{}, "", "GET", path, nil, 200, &shown)
 	if shown.HasAccount == nil || *shown.HasAccount {
 		t.Fatalf("has_account = %v; want false for an address with no account", shown.HasAccount)
 	}
 	fs.faults.arm(fault{op: "get", table: "users", match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "email", "eve@example.com") }})
 	defer fs.faults.clear()
-	s.call(&http.Client{}, "", "GET", path, nil, 500, nil)
+	s.call(t, &http.Client{}, "", "GET", path, nil, 500, nil)
 }
 
 func TestASecretRequestWhoseAnswerBreaksOffIsNotOK(t *testing.T) {
@@ -398,12 +383,12 @@ func TestASecretRequestWhoseAnswerBreaksOffIsNotOK(t *testing.T) {
 			conn.Close()
 		}))
 		defer api.Close()
-		s.change(s.owner, "", "secret.set", M{"name": "KEY", "value": "sk-1", "hosts": []string{"http://" + strings.TrimPrefix(api.URL, "http://")}})
+		s.change(t, s.owner, "", "secret.set", M{"name": "KEY", "value": "sk-1", "hosts": []string{"http://" + strings.TrimPrefix(api.URL, "http://")}})
 		var out struct {
 			OK    bool   `json:"ok"`
 			Error string `json:"error"`
 		}
-		s.call(s.owner, "", "POST", w+"/secrets/KEY/request", M{"url": api.URL + "/x"}, 200, &out)
+		s.call(t, s.owner, "", "POST", w+"/secrets/KEY/request", M{"url": api.URL + "/x"}, 200, &out)
 		if out.OK || out.Error == "" {
 			t.Fatalf("an answer cut short reads as %+v; want ok false with the error", out)
 		}
@@ -442,7 +427,7 @@ func TestSignInReadsDoNotTakeAnOutageForAbsence(t *testing.T) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
 		var inv struct{ Link string }
-		s.call(s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
+		s.call(t, s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
 		someone := id.New()
 		cases := []struct {
 			name, method, path string
@@ -461,14 +446,13 @@ func TestSignInReadsDoNotTakeAnOutageForAbsence(t *testing.T) {
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				s := s.in(t)
 				fs.faults.arm(tc.fault)
 				defer fs.faults.clear()
 				hc := s.owner
 				if tc.signedOut {
 					hc = browser()
 				}
-				s.call(hc, "", tc.method, tc.path, tc.body, 500, nil)
+				s.call(t, hc, "", tc.method, tc.path, tc.body, 500, nil)
 			})
 		}
 		t.Run("an OAuth client trading", func(t *testing.T) {

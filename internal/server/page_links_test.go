@@ -19,13 +19,13 @@ func TestAPageLinkedToATaskIsSeenFromBothSides(t *testing.T) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
 		var shown struct{ Task struct{ ID string } }
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &shown)
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &shown)
 		sva := shown.Task.ID
-		handbook := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "how we work\n"})["ref"].(string)
-		runbook := s.change(s.owner, "", "doc.create", M{"title": "Vault runbook", "project": "OPS", "markdown": "rotate\n"})["ref"].(string)
-		salaries := s.change(s.owner, "", "doc.create", M{"title": "Salaries", "private": true, "markdown": "who earns what\n"})["ref"].(string)
+		handbook := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "how we work\n"})["ref"].(string)
+		runbook := s.change(t, s.owner, "", "doc.create", M{"title": "Vault runbook", "project": "OPS", "markdown": "rotate\n"})["ref"].(string)
+		salaries := s.change(t, s.owner, "", "doc.create", M{"title": "Salaries", "private": true, "markdown": "who earns what\n"})["ref"].(string)
 		for _, page := range []string{handbook, runbook, salaries} {
-			s.change(s.owner, "", "link.set", M{"task": "SVA-1", "kind": "doc", "ref": page})
+			s.change(t, s.owner, "", "link.set", M{"task": "SVA-1", "kind": "doc", "ref": page})
 		}
 
 		type ref struct {
@@ -35,12 +35,12 @@ func TestAPageLinkedToATaskIsSeenFromBothSides(t *testing.T) {
 		var page struct {
 			MentionedIn []ref `json:"mentioned_in"`
 		}
-		s.call(s.owner, "", "GET", w+"/docs/"+handbook, nil, 200, &page)
+		s.call(t, s.owner, "", "GET", w+"/docs/"+handbook, nil, 200, &page)
 		if len(page.MentionedIn) != 1 || page.MentionedIn[0].FromScopeID != sva {
 			t.Fatalf("the page does not list the task it is linked to: %+v", page.MentionedIn)
 		}
 		page.MentionedIn = nil
-		s.call(nil, narrow, "GET", w+"/docs/"+handbook, nil, 200, &page)
+		s.call(t, nil, narrow, "GET", w+"/docs/"+handbook, nil, 200, &page)
 		if len(page.MentionedIn) != 1 || page.MentionedIn[0].FromScopeID != sva {
 			t.Fatalf("a reader of SVA is not told the page is linked to SVA-1: %+v", page.MentionedIn)
 		}
@@ -66,33 +66,33 @@ func TestAPageLinkedToATaskIsSeenFromBothSides(t *testing.T) {
 			}
 			return strings.Join(l, " "), strings.Join(m, " ")
 		}
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &rows)
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &rows)
 		linked, mentioned := pages(rows)
 		for _, id := range []string{handbook, runbook, salaries} {
 			if !strings.Contains(linked, "doc:"+id) || !strings.Contains(mentioned, id) {
 				t.Fatalf("the owner is not told of every page linked to the task: links %s, mentions %s", linked, mentioned)
 			}
 		}
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "page Handbook  (doc "+handbook+")") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "page Handbook  (doc "+handbook+")") {
 			t.Fatalf("the task as text does not name the linked page: %s", out)
 		}
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1/context", nil, 200, nil); !strings.Contains(out, "Vault runbook") || !strings.Contains(out, "Handbook") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1/context", nil, 200, nil); !strings.Contains(out, "Vault runbook") || !strings.Contains(out, "Handbook") {
 			t.Fatalf("the context pack does not name the linked pages: %s", out)
 		}
 
 		rows.Links, rows.Mentions = nil, nil
-		s.call(nil, narrow, "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &rows)
+		s.call(t, nil, narrow, "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &rows)
 		linked, mentioned = pages(rows)
 		if !strings.Contains(linked, handbook) || !strings.Contains(mentioned, handbook) {
 			t.Fatalf("a reader of SVA is not told of the page it may see: links %s, mentions %s", linked, mentioned)
 		}
 		reads := map[string]string{
 			"the task's rows":    linked + " " + mentioned,
-			"the task":           s.call(nil, narrow, "GET", w+"/tasks/SVA-1", nil, 200, nil),
-			"the task as text":   s.call(nil, narrow, "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil),
-			"the list of links":  s.call(nil, narrow, "GET", w+"/list/links?task=SVA-1", nil, 200, nil),
-			"the task's history": s.call(nil, narrow, "GET", w+"/events?task=SVA-1", nil, 200, nil),
-			"the context pack":   s.call(nil, narrow, "GET", w+"/tasks/SVA-1/context", nil, 200, nil),
+			"the task":           s.call(t, nil, narrow, "GET", w+"/tasks/SVA-1", nil, 200, nil),
+			"the task as text":   s.call(t, nil, narrow, "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil),
+			"the list of links":  s.call(t, nil, narrow, "GET", w+"/list/links?task=SVA-1", nil, 200, nil),
+			"the task's history": s.call(t, nil, narrow, "GET", w+"/events?task=SVA-1", nil, 200, nil),
+			"the context pack":   s.call(t, nil, narrow, "GET", w+"/tasks/SVA-1/context", nil, 200, nil),
 		}
 		for read, out := range reads {
 			for name, id := range map[string]string{"a page of OPS": runbook, "a private page": salaries} {
@@ -111,22 +111,22 @@ func TestAnAgentLinksAPageFromTheCommandLine(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
-		handbook := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "how we work\n"})["ref"].(string)
-		if out, code := s.quadit(narrow, "link", "SVA-1", "page="+handbook); code != 0 {
+		handbook := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "how we work\n"})["ref"].(string)
+		if out, code := s.quadit(t, narrow, "link", "SVA-1", "page="+handbook); code != 0 {
 			t.Fatalf("quadit link SVA-1 page=ID failed (%d): %s", code, out)
 		}
-		if out, _ := s.quadit(narrow, "show", "SVA-1"); !strings.Contains(out, "page Handbook") {
+		if out, _ := s.quadit(t, narrow, "show", "SVA-1"); !strings.Contains(out, "page Handbook") {
 			t.Fatalf("the task does not show the page linked to it: %s", out)
 		}
-		if out, _ := s.quadit(narrow, "context", "SVA-1"); !strings.Contains(out, "Handbook") {
+		if out, _ := s.quadit(t, narrow, "context", "SVA-1"); !strings.Contains(out, "Handbook") {
 			t.Fatalf("the context pack does not name the page linked to the task: %s", out)
 		}
 		// The same link written from the page's side is the same change.
-		runbook := s.change(s.owner, "", "doc.create", M{"title": "Runbook", "markdown": "rotate\n"})["ref"].(string)
-		if out, code := s.quadit(narrow, "link", "page="+runbook, "task=SVA-1"); code != 0 {
+		runbook := s.change(t, s.owner, "", "doc.create", M{"title": "Runbook", "markdown": "rotate\n"})["ref"].(string)
+		if out, code := s.quadit(t, narrow, "link", "page="+runbook, "task=SVA-1"); code != 0 {
 			t.Fatalf("quadit link page=ID task=KEY failed (%d): %s", code, out)
 		}
-		if out, _ := s.quadit(narrow, "show", "SVA-1"); !strings.Contains(out, "page Runbook") {
+		if out, _ := s.quadit(t, narrow, "show", "SVA-1"); !strings.Contains(out, "page Runbook") {
 			t.Fatalf("the task does not show the page linked from the page's side: %s", out)
 		}
 	})

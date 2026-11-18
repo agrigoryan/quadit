@@ -17,14 +17,14 @@ import (
 func TestACursorNeverMovesBackUnderConcurrentAcks(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		token := s.agentToken("acker")
+		token := s.agentToken(t, "acker")
 		for i := range 30 {
-			s.change(s.owner, "", "label.create", M{"name": fmt.Sprintf("l%d", i)})
+			s.change(t, s.owner, "", "label.create", M{"name": fmt.Sprintf("l%d", i)})
 		}
 		var me struct {
 			Seq int64 `json:"seq"`
 		}
-		s.call(s.owner, "", "GET", w+"/events?limit=2000", nil, 200, &me)
+		s.call(t, s.owner, "", "GET", w+"/events?limit=2000", nil, 200, &me)
 		top := me.Seq
 		if top < 30 {
 			t.Fatalf("the feed stands at %d, want 30 or more", top)
@@ -53,7 +53,7 @@ func TestACursorNeverMovesBackUnderConcurrentAcks(t *testing.T) {
 			var cursor struct {
 				Seq int64 `json:"seq"`
 			}
-			s.call(nil, token, "GET", "/api/v1/w/-/cursors/"+name, nil, 200, &cursor)
+			s.call(t, nil, token, "GET", "/api/v1/w/-/cursors/"+name, nil, 200, &cursor)
 			if cursor.Seq != top {
 				t.Fatalf("after acks of 1 to %d at once the cursor stands at %d", top, cursor.Seq)
 			}

@@ -85,7 +85,7 @@ func TestOIDCUnsaidVerificationIsNotTrusted(t *testing.T) {
 				if tc.trust {
 					setting["trust_email"] = true
 				}
-				s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", setting, 200, nil)
+				s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", setting, 200, nil)
 				b := browser()
 				resp, err := b.Get(s.url + "/api/v1/auth/oauth/oidc/start")
 				if err != nil {
@@ -93,13 +93,13 @@ func TestOIDCUnsaidVerificationIsNotTrusted(t *testing.T) {
 				}
 				resp.Body.Close()
 				if tc.signedIn {
-					s.call(b, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+					s.call(t, b, "", "GET", "/api/v1/auth/me", nil, 200, nil)
 					return
 				}
 				if got := resp.Request.URL.RequestURI(); got != refused {
 					t.Fatalf("sign-in ended at %s, want %s", got, refused)
 				}
-				s.call(b, "", "GET", "/api/v1/auth/me", nil, 401, nil)
+				s.call(t, b, "", "GET", "/api/v1/auth/me", nil, 401, nil)
 			})
 		})
 	}
@@ -112,7 +112,7 @@ func TestOIDCConnectedAccountNeedsNoVerifiedAddress(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		idp := fakeOIDCSaying(t, "subject-owner", "someone@elsewhere.org", nil)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", M{"enabled": true, "name": "Company SSO", "issuer": idp.URL,
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.oidc", M{"enabled": true, "name": "Company SSO", "issuer": idp.URL,
 			"client_id": "quadit-client", "client_secret": "s3cret"}, 200, nil)
 		// The owner, signed in, connects the provider to the account.
 		resp, err := s.owner.Get(s.url + "/api/v1/auth/oauth/oidc/start?link=1")
@@ -123,7 +123,7 @@ func TestOIDCConnectedAccountNeedsNoVerifiedAddress(t *testing.T) {
 		var ids struct {
 			Identities []struct{ Provider string }
 		}
-		s.call(s.owner, "", "GET", "/api/v1/auth/identities", nil, 200, &ids)
+		s.call(t, s.owner, "", "GET", "/api/v1/auth/identities", nil, 200, &ids)
 		if len(ids.Identities) != 1 || ids.Identities[0].Provider != "oidc" {
 			t.Fatalf("connected accounts: %+v", ids)
 		}
@@ -132,7 +132,7 @@ func TestOIDCConnectedAccountNeedsNoVerifiedAddress(t *testing.T) {
 		resp, _ = b.Get(s.url + "/api/v1/auth/oauth/oidc/start")
 		resp.Body.Close()
 		var me struct{ Email string }
-		s.call(b, "", "GET", "/api/v1/auth/me", nil, 200, &me)
+		s.call(t, b, "", "GET", "/api/v1/auth/me", nil, 200, &me)
 	})
 }
 
@@ -164,7 +164,7 @@ func TestGitHubSignInGivesUp(t *testing.T) {
 		})
 		gh := httptest.NewServer(mux)
 		t.Cleanup(gh.Close)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
 			"auth_url": gh.URL + "/login/oauth/authorize", "token_url": gh.URL + "/login/oauth/access_token", "api_url": gh.URL}, 200, nil)
 		start := time.Now()
 		resp, err := browser().Get(s.url + "/api/v1/auth/oauth/github/start")
@@ -198,10 +198,11 @@ func mcpPost(t *testing.T, s *site, token, body string) (*http.Response, string)
 }
 
 // mcpAgentToken is a token of an agent of the test site.
-func mcpAgentToken(s *site) string {
-	s.change(s.owner, "", "agent.create", M{"name": "Writer", "handle": "writer"})
+func mcpAgentToken(t *testing.T, s *site) string {
+	t.Helper()
+	s.change(t, s.owner, "", "agent.create", M{"name": "Writer", "handle": "writer"})
 	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@writer"}, 201, &tok)
+	s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@writer"}, 201, &tok)
 	return tok.Token
 }
 
@@ -209,7 +210,7 @@ func mcpAgentToken(s *site) string {
 // every time it is asked, so a client can tell nothing changed.
 func TestMCPToolListIsStable(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
-	token := mcpAgentToken(s)
+	token := mcpAgentToken(t, s)
 	_, first := mcpPost(t, s, token, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 	if !strings.Contains(first, `"secret_request"`) {
 		t.Fatalf("tools/list = %.200s", first)
@@ -225,7 +226,7 @@ func TestMCPToolListIsStable(t *testing.T) {
 // parse error, as JSON.
 func TestMCPParseErrorIsJSON(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
-	resp, body := mcpPost(t, s, mcpAgentToken(s), `this is not json`)
+	resp, body := mcpPost(t, s, mcpAgentToken(t, s), `this is not json`)
 	if !strings.Contains(body, "-32700") {
 		t.Fatalf("answer = %s", body)
 	}

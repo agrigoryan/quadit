@@ -15,17 +15,17 @@ import (
 func TestUploadsNeedACallerWhoMayWrite(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "agent.create", M{"name": "Reader", "handle": "reader", "scope": M{"read_only": true}})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Reader", "handle": "reader", "scope": M{"read_only": true}})
 		var reader, readOnly struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@reader"}, 201, &reader)
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "me", "read_only": true}, 201, &readOnly)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@reader"}, 201, &reader)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "me", "read_only": true}, 201, &readOnly)
 
-		s.call(nil, reader.Token, "POST", "/api/v1/w/-/files?name=a.txt", []byte("hello"), 403, nil)
-		s.call(nil, readOnly.Token, "POST", "/api/v1/w/-/files?name=a.txt", []byte("hello"), 403, nil)
+		s.call(t, nil, reader.Token, "POST", "/api/v1/w/-/files?name=a.txt", []byte("hello"), 403, nil)
+		s.call(t, nil, readOnly.Token, "POST", "/api/v1/w/-/files?name=a.txt", []byte("hello"), 403, nil)
 		var f struct{ ID string }
-		s.call(s.owner, "", "POST", w+"/files?name=b.txt&size=10", []byte("hello"), 201, &f)
-		s.call(nil, readOnly.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=5", []byte("world"), 403, nil)
-		s.call(s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=5", []byte("world"), 200, nil)
+		s.call(t, s.owner, "", "POST", w+"/files?name=b.txt&size=10", []byte("hello"), 201, &f)
+		s.call(t, nil, readOnly.Token, "PATCH", "/api/v1/w/-/files/"+f.ID+"?offset=5", []byte("world"), 403, nil)
+		s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=5", []byte("world"), 200, nil)
 	})
 }
 
@@ -36,7 +36,7 @@ func TestAFileIsCheckedAgainEachTimeItIsShown(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		var f struct{ URL string }
-		s.call(s.owner, "", "POST", w+"/files?name=c.txt", []byte("private words"), 201, &f)
+		s.call(t, s.owner, "", "POST", w+"/files?name=c.txt", []byte("private words"), 201, &f)
 		get := func(etag string) *http.Response {
 			t.Helper()
 			req, _ := http.NewRequest(http.MethodGet, f.URL, nil)
@@ -62,7 +62,7 @@ func TestAFileIsCheckedAgainEachTimeItIsShown(t *testing.T) {
 		if again := get(etag); again.StatusCode != http.StatusNotModified {
 			t.Fatalf("checking a kept file again answered %d, want 304", again.StatusCode)
 		}
-		s.call(s.owner, "", "POST", "/api/v1/auth/logout", nil, 200, nil)
+		s.call(t, s.owner, "", "POST", "/api/v1/auth/logout", nil, 200, nil)
 		if out := get(etag); out.StatusCode != http.StatusUnauthorized {
 			t.Fatalf("a signed-out browser checking a kept file got %d", out.StatusCode)
 		}

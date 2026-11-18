@@ -22,13 +22,13 @@ import (
 // returns the token of an agent that may read SVA alone.
 func oneProjectOnly(t *testing.T, s *site) (narrow string) {
 	t.Helper()
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
-	s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
-	s.change(s.owner, "", "agent.create", M{"name": "Narrow", "handle": "narrow", "scope": M{"projects": []string{"SVA"}}})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+	s.change(t, s.owner, "", "agent.create", M{"name": "Narrow", "handle": "narrow", "scope": M{"projects": []string{"SVA"}}})
 	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@narrow"}, 201, &tok)
+	s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@narrow"}, 201, &tok)
 	return tok.Token
 }
 
@@ -39,7 +39,7 @@ func limitedToSVA(t *testing.T, s *site) map[string]string {
 	t.Helper()
 	member := oneProjectOnly(t, s)
 	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{"name": "SVA only", "projects": []string{"SVA"}}, 201, &tok)
+	s.call(t, s.owner, "", "POST", w+"/tokens", M{"name": "SVA only", "projects": []string{"SVA"}}, 201, &tok)
 	return map[string]string{"a member limited to SVA": member, "an admin's token limited to SVA": tok.Token}
 }
 
@@ -50,12 +50,12 @@ func TestContextPackLeavesOutPagesOfOtherProjects(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
-		s.change(s.owner, "", "doc.create", M{"title": "Vault runbook", "project": "OPS", "markdown": "As in SVA-1."})
+		s.change(t, s.owner, "", "doc.create", M{"title": "Vault runbook", "project": "OPS", "markdown": "As in SVA-1."})
 		for _, form := range []string{"", "?format=text"} {
-			if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1/context"+form, nil, 200, nil); !strings.Contains(out, "Vault runbook") {
+			if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1/context"+form, nil, 200, nil); !strings.Contains(out, "Vault runbook") {
 				t.Fatalf("the pack does not name the page to someone who may read it: %s", out)
 			}
-			if out := s.call(nil, narrow, "GET", w+"/tasks/SVA-1/context"+form, nil, 200, nil); strings.Contains(out, "Vault runbook") {
+			if out := s.call(t, nil, narrow, "GET", w+"/tasks/SVA-1/context"+form, nil, 200, nil); strings.Contains(out, "Vault runbook") {
 				t.Fatalf("the pack names a page of a project the caller may not read: %s", out)
 			}
 		}
@@ -69,16 +69,16 @@ func TestAViewOfAnotherProjectIsNotThere(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
-		ops := s.change(s.owner, "", "view.create", M{"name": "Ops work", "project": "OPS", "query": M{"open": true}})["ref"].(string)
-		s.change(s.owner, "", "view.create", M{"name": "Art work", "project": "SVA", "query": M{"open": true}})
-		s.call(s.owner, "", "GET", w+"/tasks?view=ops-work", nil, 200, nil)
-		s.call(nil, narrow, "GET", w+"/tasks?view=art-work", nil, 200, nil)
+		ops := s.change(t, s.owner, "", "view.create", M{"name": "Ops work", "project": "OPS", "query": M{"open": true}})["ref"].(string)
+		s.change(t, s.owner, "", "view.create", M{"name": "Art work", "project": "SVA", "query": M{"open": true}})
+		s.call(t, s.owner, "", "GET", w+"/tasks?view=ops-work", nil, 200, nil)
+		s.call(t, nil, narrow, "GET", w+"/tasks?view=art-work", nil, 200, nil)
 		for _, ref := range []string{"ops-work", ops, "Ops+work"} {
-			if out := s.call(nil, narrow, "GET", w+"/tasks?view="+ref, nil, 404, nil); strings.Contains(out, "ops-work") && ref != "ops-work" || strings.Contains(out, "OPS") {
+			if out := s.call(t, nil, narrow, "GET", w+"/tasks?view="+ref, nil, 404, nil); strings.Contains(out, "ops-work") && ref != "ops-work" || strings.Contains(out, "OPS") {
 				t.Fatalf("view=%s tells of a view the caller may not see: %s", ref, out)
 			}
 		}
-		if out := s.call(nil, narrow, "GET", w+"/tasks?view=nope", nil, 404, nil); strings.Contains(out, "ops-work") || !strings.Contains(out, "art-work") {
+		if out := s.call(t, nil, narrow, "GET", w+"/tasks?view=nope", nil, 404, nil); strings.Contains(out, "ops-work") || !strings.Contains(out, "art-work") {
 			t.Fatalf("the views a wrong name is answered with: %s", out)
 		}
 	})
@@ -94,22 +94,22 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
 		task := func(project, title string) string {
-			return s.change(s.owner, "", "task.create", M{"project": project, "title": title})["ref"].(string)
+			return s.change(t, s.owner, "", "task.create", M{"project": project, "title": title})["ref"].(string)
 		}
 		relate := func(task, typ, other string) string {
-			return s.change(s.owner, "", "relation.add", M{"task": task, "type": typ, "other": other})["ref"].(string)
+			return s.change(t, s.owner, "", "relation.add", M{"task": task, "type": typ, "other": other})["ref"].(string)
 		}
 		var sva1, ops1 struct{ Task struct{ ID string } }
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
-		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
+		s.call(t, s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
 		task("SVA", "Boss music")
 		ops2 := task("OPS", "Back up nightly")
 		inside := relate("SVA-1", "blocks", "SVA-2")
 		across := []string{relate("SVA-1", "duplicates", "OPS-1"), relate("OPS-1", "blocks", "SVA-1"), relate("SVA-1", "relates", "OPS-1")}
 		outside := relate("OPS-1", "blocks", "OPS-2")
 		removed := relate("OPS-2", "relates", "SVA-1")
-		s.change(s.owner, "", "relation.remove", M{"id": removed})
-		s.change(s.owner, "", "label.create", M{"name": "last"})
+		s.change(t, s.owner, "", "relation.remove", M{"id": removed})
+		s.change(t, s.owner, "", "label.create", M{"name": "last"})
 
 		type relation struct {
 			ID      string `json:"id"`
@@ -119,7 +119,7 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 		lists := []string{"/list/relations", "/bootstrap", "/bootstrap?part=open", "/tasks/SVA-1?raw=1"}
 		for _, path := range lists {
 			var got struct{ Relations []relation }
-			s.call(s.owner, "", "GET", w+path, nil, 200, &got)
+			s.call(t, s.owner, "", "GET", w+path, nil, 200, &got)
 			want := 5
 			if strings.Contains(path, "SVA-1") {
 				want = 4 // not the one between two tasks of OPS
@@ -136,7 +136,7 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 		for who, token := range callers {
 			for _, path := range lists {
 				var got struct{ Relations json.RawMessage }
-				s.call(nil, token, "GET", w+path, nil, 200, &got)
+				s.call(t, nil, token, "GET", w+path, nil, 200, &got)
 				if out := string(got.Relations); strings.Contains(out, ops1.Task.ID) || strings.Contains(out, ops2) || strings.Contains(out, outside) {
 					t.Errorf("%s gives %s the id of a task of OPS, or a relation between two of them: %s", path, who, out)
 				}
@@ -160,7 +160,7 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 			feeds := []string{"/events?after=0&limit=2000", "/events?after=0&limit=2000&compact=1", "/events?after=0&limit=2000&format=text", "/tasks/SVA-1?since=0",
 				"/list/relations?format=text", "/list/relations?task=SVA-1"}
 			for _, path := range feeds {
-				out := s.call(nil, token, "GET", w+path, nil, 200, nil)
+				out := s.call(t, nil, token, "GET", w+path, nil, 200, nil)
 				for what, hidden := range map[string]string{"id": ops1.Task.ID, "key": "OPS-", "other id": ops2} {
 					if strings.Contains(out, hidden) {
 						t.Errorf("%s gives %s the %s of a task of OPS: %s", path, who, what, out)
@@ -181,7 +181,7 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 			}
 		}
 		// Someone who may read both projects is still told both ends.
-		if out := s.call(s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, nil); !strings.Contains(out, `"other_key":"OPS-1"`) || !strings.Contains(out, ops1.Task.ID) {
+		if out := s.call(t, s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, nil); !strings.Contains(out, `"other_key":"OPS-1"`) || !strings.Contains(out, ops1.Task.ID) {
 			t.Errorf("the feed does not tell the owner the other end of a relation: %s", out)
 		}
 	})
@@ -197,10 +197,10 @@ func TestAReaderOfOneEndIsToldOfTheRelationWithTheFarEndBlank(t *testing.T) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
 		var sva1, ops1 struct{ Task struct{ ID string } }
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
-		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
-		rid := s.change(s.owner, "", "relation.add", M{"task": "OPS-1", "type": "blocks", "other": "SVA-1"})["ref"].(string)
-		s.change(s.owner, "", "relation.remove", M{"id": rid})
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
+		s.call(t, s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		rid := s.change(t, s.owner, "", "relation.add", M{"task": "OPS-1", "type": "blocks", "other": "SVA-1"})["ref"].(string)
+		s.change(t, s.owner, "", "relation.remove", M{"id": rid})
 
 		type related struct {
 			ID       string  `json:"id"`
@@ -218,7 +218,7 @@ func TestAReaderOfOneEndIsToldOfTheRelationWithTheFarEndBlank(t *testing.T) {
 					Data related
 				}
 			}
-			s.call(as, token, "GET", w+"/events?after=0&limit=2000", nil, 200, &feed)
+			s.call(t, as, token, "GET", w+"/events?after=0&limit=2000", nil, 200, &feed)
 			var out []related
 			for _, ev := range feed.Events {
 				if ev.Type == "task.related" && ev.Data.Relation == rid {
@@ -255,15 +255,15 @@ func TestARestoreFromTheTrashCarriesTheRowsEachReaderMaySee(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
-		page := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "project": "SVA"})["ref"].(string)
-		other := s.change(s.owner, "", "doc.create", M{"title": "Vault runbook", "parent": page, "project": "OPS"})["ref"].(string)
-		mine := s.change(s.owner, "", "doc.create", M{"title": "My notes", "parent": page, "private": true})["ref"].(string)
-		s.change(s.owner, "", "task.delete", M{"id": "SVA-1"})
-		s.change(s.owner, "", "doc.delete", M{"id": page})
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "project": "SVA"})["ref"].(string)
+		other := s.change(t, s.owner, "", "doc.create", M{"title": "Vault runbook", "parent": page, "project": "OPS"})["ref"].(string)
+		mine := s.change(t, s.owner, "", "doc.create", M{"title": "My notes", "parent": page, "private": true})["ref"].(string)
+		s.change(t, s.owner, "", "task.delete", M{"id": "SVA-1"})
+		s.change(t, s.owner, "", "doc.delete", M{"id": page})
 		var before struct{ Seq int64 }
-		s.call(s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, &before)
-		s.change(s.owner, "", "task.restore", M{"id": "SVA-1"})
-		s.change(s.owner, "", "doc.restore", M{"id": page})
+		s.call(t, s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, &before)
+		s.change(t, s.owner, "", "task.restore", M{"id": "SVA-1"})
+		s.change(t, s.owner, "", "doc.restore", M{"id": page})
 
 		type event struct {
 			Type string
@@ -274,7 +274,7 @@ func TestARestoreFromTheTrashCarriesTheRowsEachReaderMaySee(t *testing.T) {
 		restored := func(as *http.Client, token string) (task map[string]any, pages []string, raw string) {
 			t.Helper()
 			var feed struct{ Events []event }
-			raw = s.call(as, token, "GET", w+"/events?after="+strconv.FormatInt(before.Seq, 10)+"&limit=2000", nil, 200, &feed)
+			raw = s.call(t, as, token, "GET", w+"/events?after="+strconv.FormatInt(before.Seq, 10)+"&limit=2000", nil, 200, &feed)
 			for _, ev := range feed.Events {
 				switch ev.Type {
 				case "task.updated":
@@ -323,19 +323,19 @@ func TestTrashingAPageTellsEachReaderOfThePagesTheyMaySee(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
-		page := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "project": "SVA"})["ref"].(string)
-		other := s.change(s.owner, "", "doc.create", M{"title": "Vault runbook", "parent": page, "project": "OPS"})["ref"].(string)
-		mine := s.change(s.owner, "", "doc.create", M{"title": "My notes", "parent": page, "private": true})["ref"].(string)
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "project": "SVA"})["ref"].(string)
+		other := s.change(t, s.owner, "", "doc.create", M{"title": "Vault runbook", "parent": page, "project": "OPS"})["ref"].(string)
+		mine := s.change(t, s.owner, "", "doc.create", M{"title": "My notes", "parent": page, "private": true})["ref"].(string)
 		var before struct{ Seq int64 }
-		s.call(s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, &before)
+		s.call(t, s.owner, "", "GET", w+"/events?after=0&limit=2000", nil, 200, &before)
 		streams := map[string]*stream{}
 		for who, token := range callers {
 			streams[who] = s.stream(t, token)
 		}
-		s.change(s.owner, "", "doc.delete", M{"id": page})
+		s.change(t, s.owner, "", "doc.delete", M{"id": page})
 		// Something every caller is told of after, so a stream that has it
 		// has had all the trashing.
-		s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the trashing"})
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the trashing"})
 
 		type event struct {
 			Type     string
@@ -345,7 +345,7 @@ func TestTrashingAPageTellsEachReaderOfThePagesTheyMaySee(t *testing.T) {
 		trashed := func(as *http.Client, token string) (pages []string, raw string) {
 			t.Helper()
 			var feed struct{ Events []event }
-			raw = s.call(as, token, "GET", w+"/events?after="+strconv.FormatInt(before.Seq, 10)+"&limit=2000", nil, 200, &feed)
+			raw = s.call(t, as, token, "GET", w+"/events?after="+strconv.FormatInt(before.Seq, 10)+"&limit=2000", nil, 200, &feed)
 			for _, ev := range feed.Events {
 				if ev.Type == "doc.deleted" {
 					pages = append(pages, ev.EntityID)
@@ -396,13 +396,13 @@ func TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee(t *testing.
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music"})
 		for _, r := range []M{{"task": "SVA-1", "type": "blocks", "other": "SVA-2"}, {"task": "SVA-1", "type": "duplicates", "other": "OPS-1"},
 			{"task": "OPS-1", "type": "blocks", "other": "SVA-1"}, {"task": "SVA-1", "type": "relates", "other": "OPS-1"}} {
-			s.change(s.owner, "", "relation.add", r)
+			s.change(t, s.owner, "", "relation.add", r)
 		}
 		var ops1 struct{ Task struct{ ID string } }
-		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		s.call(t, s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
 		type related struct {
 			ID, Type, Task, Title, Status string
 			Hidden                        bool
@@ -410,10 +410,10 @@ func TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee(t *testing.
 		hidden := func(r related) bool { return r == related{Type: r.Type, Hidden: true} }
 
 		for _, path := range []string{"/tasks/SVA-1", "/tasks/SVA-1/context"} {
-			if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); strings.Contains(out, "hidden") || strings.Count(out, `"task":"OPS-1","title":"Rotate keys"`) != 3 {
+			if out := s.call(t, s.owner, "", "GET", w+path, nil, 200, nil); strings.Contains(out, "hidden") || strings.Count(out, `"task":"OPS-1","title":"Rotate keys"`) != 3 {
 				t.Errorf("%s does not name the three related tasks of OPS to the owner: %s", path, out)
 			}
-			if out := s.call(s.owner, "", "GET", w+path+"?format=text", nil, 200, nil); strings.Contains(out, "can't see") || strings.Count(out, "OPS-1 [Todo] Rotate keys") != 3 {
+			if out := s.call(t, s.owner, "", "GET", w+path+"?format=text", nil, 200, nil); strings.Contains(out, "can't see") || strings.Count(out, "OPS-1 [Todo] Rotate keys") != 3 {
 				t.Errorf("%s as text does not name the three related tasks of OPS to the owner: %s", path, out)
 			}
 			for who, token := range callers {
@@ -421,12 +421,12 @@ func TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee(t *testing.
 					Relations []related
 					Task      struct{ Relations []related }
 				}
-				out := s.call(nil, token, "GET", w+path, nil, 200, &detail)
+				out := s.call(t, nil, token, "GET", w+path, nil, 200, &detail)
 				if strings.Contains(path, "context") {
-					s.call(nil, token, "GET", w+path, nil, 200, &pack)
+					s.call(t, nil, token, "GET", w+path, nil, 200, &pack)
 					detail.Relations = pack.Task.Relations
 				}
-				text := s.call(nil, token, "GET", w+path+"?format=text", nil, 200, nil)
+				text := s.call(t, nil, token, "GET", w+path+"?format=text", nil, 200, nil)
 				for _, answer := range []string{out, text} {
 					for what, secret := range map[string]string{"key": "OPS-1", "title": "Rotate keys", "id": ops1.Task.ID} {
 						if strings.Contains(answer, secret) {
@@ -465,7 +465,7 @@ func TestARelationColumnDoesNotShowRowsOfADatabaseTheCallerMayNotSee(t *testing.
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
-		do := func(typ string, args M) string { return s.change(s.owner, "", typ, args)["ref"].(string) }
+		do := func(typ string, args M) string { return s.change(t, s.owner, "", typ, args)["ref"].(string) }
 		servers := do("doc.create", M{"title": "Servers", "kind": "database", "project": "OPS"})
 		do("property.create", M{"database": servers, "name": "Rack", "type": "text"})
 		cellar := do("doc.create", M{"parent": servers, "title": "cellar-one", "props": M{"Rack": "rack-zebra"}})
@@ -478,11 +478,11 @@ func TestARelationColumnDoesNotShowRowsOfADatabaseTheCallerMayNotSee(t *testing.
 
 		for _, form := range []string{"", "?format=text", "?raw=1"} {
 			path := "/docs/" + sprites + "/rows" + form
-			if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); strings.Count(out, "cellar-one") != 2 || !strings.Contains(out, "rack-zebra") {
+			if out := s.call(t, s.owner, "", "GET", w+path, nil, 200, nil); strings.Count(out, "cellar-one") != 2 || !strings.Contains(out, "rack-zebra") {
 				t.Fatalf("%s does not give the owner the linked row's title, by the formula and by the rollup, and its value: %s", path, out)
 			}
 			for who, token := range callers {
-				out := s.call(nil, token, "GET", w+path, nil, 200, nil)
+				out := s.call(t, nil, token, "GET", w+path, nil, 200, nil)
 				if strings.Contains(out, "cellar-one") || strings.Contains(out, "rack-zebra") {
 					t.Errorf("%s gives %s the title or a value of a row of a database of OPS: %s", path, who, out)
 				}
@@ -503,12 +503,12 @@ func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
-		do := func(typ string, args M) string { return s.change(s.owner, "", typ, args)["ref"].(string) }
+		do := func(typ string, args M) string { return s.change(t, s.owner, "", typ, args)["ref"].(string) }
 		// Someone else asks, so that the owner may answer.
 		do("agent.create", M{"name": "Asker", "handle": "asker"})
 		var asker struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@asker"}, 201, &asker)
-		ask := func(args M) string { return s.change(nil, asker.Token, "decision.open", args)["ref"].(string) }
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@asker"}, 201, &asker)
+		ask := func(args M) string { return s.change(t, nil, asker.Token, "decision.open", args)["ref"].(string) }
 		for _, key := range []string{"SVA-1", "OPS-1"} {
 			picked := ask(M{"task": key, "question": "Which zebra for " + key + "?", "options": []M{{"label": "Plains"}, {"label": "Mountain"}}})
 			do("decision.pick", M{"id": picked, "option": 1})
@@ -523,16 +523,16 @@ func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
 		}
 		// The feed's head: where it stands now, as /me reports it.
 		var before struct{ Seq int64 }
-		s.call(s.owner, "", "GET", w+"/me", nil, 200, &before)
+		s.call(t, s.owner, "", "GET", w+"/me", nil, 200, &before)
 
 		for page, says := range pages {
 			for _, form := range []string{"", "?format=md", "?format=text"} {
 				path := "/docs/" + page + form
-				if out := s.call(s.owner, "", "GET", w+path, nil, 200, nil); !strings.Contains(out, says+"SVA") || !strings.Contains(out, says+"OPS") {
+				if out := s.call(t, s.owner, "", "GET", w+path, nil, 200, nil); !strings.Contains(out, says+"SVA") || !strings.Contains(out, says+"OPS") {
 					t.Fatalf("%s does not show the owner both projects: %s", path, out)
 				}
 				for who, token := range callers {
-					if out := s.call(nil, token, "GET", w+path, nil, 200, nil); !strings.Contains(out, says+"SVA") || strings.Contains(out, "OPS") {
+					if out := s.call(t, nil, token, "GET", w+path, nil, 200, nil); !strings.Contains(out, says+"SVA") || strings.Contains(out, "OPS") {
 						t.Errorf("%s shows %s something of OPS, or not what is of SVA: %s", path, who, out)
 					}
 				}
@@ -546,13 +546,13 @@ func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
 		}
 		for who, token := range callers {
 			for _, path := range paths {
-				if out := s.call(nil, token, "GET", w+path, nil, 200, nil); strings.Contains(out, "for OPS-1") || strings.Contains(out, "work in OPS") {
+				if out := s.call(t, nil, token, "GET", w+path, nil, 200, nil); strings.Contains(out, "for OPS-1") || strings.Contains(out, "work in OPS") {
 					t.Errorf("%s gives %s what a page built from data said of OPS: %s", path, who, out)
 				}
 			}
 		}
 		var after struct{ Seq int64 }
-		s.call(s.owner, "", "GET", w+"/me", nil, 200, &after)
+		s.call(t, s.owner, "", "GET", w+"/me", nil, 200, &after)
 		if after.Seq != before.Seq {
 			t.Errorf("reading the pages moved the feed from %d to %d: a read wrote", before.Seq, after.Seq)
 		}
@@ -567,21 +567,21 @@ func TestTheDashboardTellsOnlyAdminsOfTheWholeWorkspaceItsHealth(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
-		s.change(s.owner, "", "agent.create", M{"name": "Plain", "handle": "plain"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Plain", "handle": "plain"})
 		var plain struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@plain"}, 201, &plain)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@plain"}, 201, &plain)
 		callers["a member who is no admin"] = plain.Token
 
 		for _, path := range []string{"/dashboard", "/dashboard?project=SVA"} {
 			var board map[string]json.RawMessage
-			s.call(s.owner, "", "GET", w+path, nil, 200, &board)
-			if text := s.call(s.owner, "", "GET", w+textForm(path), nil, 200, nil); !strings.Contains(string(board["health"]), "webhooks_failing") || !strings.Contains(text, "== health\n{") {
+			s.call(t, s.owner, "", "GET", w+path, nil, 200, &board)
+			if text := s.call(t, s.owner, "", "GET", w+textForm(path), nil, 200, nil); !strings.Contains(string(board["health"]), "webhooks_failing") || !strings.Contains(text, "== health\n{") {
 				t.Fatalf("%s does not tell the owner the health: %s\n%s", path, board["health"], text)
 			}
 			for who, token := range callers {
 				board = nil
-				s.call(nil, token, "GET", w+path, nil, 200, &board)
-				text := s.call(nil, token, "GET", w+textForm(path), nil, 200, nil)
+				s.call(t, nil, token, "GET", w+path, nil, 200, &board)
+				text := s.call(t, nil, token, "GET", w+textForm(path), nil, 200, nil)
 				if _, there := board["health"]; there || strings.Contains(text, "health") || strings.Contains(text, "webhooks_failing") {
 					t.Errorf("%s tells %s the health: %s\n%s", path, who, board["health"], text)
 				}
@@ -610,11 +610,11 @@ func TestListedAttachmentsFollowTheirPage(t *testing.T) {
 		narrow := oneProjectOnly(t, s)
 		attach := func(name string, to M) {
 			var f struct{ ID string }
-			s.call(s.owner, "", "POST", w+"/files?name="+name, []byte("x"), 201, &f)
+			s.call(t, s.owner, "", "POST", w+"/files?name="+name, []byte("x"), 201, &f)
 			to["file"] = f.ID
-			s.change(s.owner, "", "attachment.add", to)
+			s.change(t, s.owner, "", "attachment.add", to)
 		}
-		page := func(args M) string { return s.change(s.owner, "", "doc.create", args)["ref"].(string) }
+		page := func(args M) string { return s.change(t, s.owner, "", "doc.create", args)["ref"].(string) }
 		attach("handbook.txt", M{"doc": page(M{"title": "Handbook"})})
 		attach("design.txt", M{"doc": page(M{"title": "Design", "project": "SVA"})})
 		attach("salaries.txt", M{"doc": page(M{"title": "Salaries", "private": true})})
@@ -622,13 +622,13 @@ func TestListedAttachmentsFollowTheirPage(t *testing.T) {
 		attach("boss.txt", M{"task": "SVA-1"})
 		attach("keys.txt", M{"task": "OPS-1"})
 
-		all := s.call(s.owner, "", "GET", w+"/list/attachments", nil, 200, nil)
+		all := s.call(t, s.owner, "", "GET", w+"/list/attachments", nil, 200, nil)
 		for _, name := range []string{"handbook.txt", "design.txt", "salaries.txt", "runbook.txt", "boss.txt", "keys.txt"} {
 			if !strings.Contains(all, name) {
 				t.Fatalf("the owner's list leaves out %s: %s", name, all)
 			}
 		}
-		out := s.call(nil, narrow, "GET", w+"/list/attachments", nil, 200, nil)
+		out := s.call(t, nil, narrow, "GET", w+"/list/attachments", nil, 200, nil)
 		for name, listed := range map[string]bool{"handbook.txt": true, "design.txt": true, "boss.txt": true, "salaries.txt": false, "runbook.txt": false, "keys.txt": false} {
 			if strings.Contains(out, name) != listed {
 				t.Errorf("%s listed for a caller limited to SVA: %v, want %v", name, !listed, listed)
@@ -648,16 +648,16 @@ func TestAFileOnACommentOnAPageFollowsThePage(t *testing.T) {
 		callers := limitedToSVA(t, s)
 		// Another admin writes the comments and uploads the files, so that
 		// nobody asked below sees a file because it is their own.
-		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
 		var other struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
 		files := map[string]string{}
 		commentWithFile := func(name string, page M) {
-			doc := s.change(nil, other.Token, "doc.create", page)["ref"].(string)
-			comment := s.change(nil, other.Token, "comment.create", M{"doc": doc, "body": "see the file"})["ref"].(string)
+			doc := s.change(t, nil, other.Token, "doc.create", page)["ref"].(string)
+			comment := s.change(t, nil, other.Token, "comment.create", M{"doc": doc, "body": "see the file"})["ref"].(string)
 			var f struct{ ID string }
-			s.call(nil, other.Token, "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
-			s.change(nil, other.Token, "attachment.add", M{"comment": comment, "file": f.ID})
+			s.call(t, nil, other.Token, "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			s.change(t, nil, other.Token, "attachment.add", M{"comment": comment, "file": f.ID})
 			files[name] = f.ID
 		}
 		commentWithFile("handbook.txt", M{"title": "Handbook"})
@@ -667,8 +667,8 @@ func TestAFileOnACommentOnAPageFollowsThePage(t *testing.T) {
 
 		sees := func(who string, hc *http.Client, token string, want map[string]bool) {
 			t.Helper()
-			listed := s.call(hc, token, "GET", w+"/list/attachments", nil, 200, nil)
-			feed := s.call(hc, token, "GET", w+"/events?after=0&limit=2000", nil, 200, nil)
+			listed := s.call(t, hc, token, "GET", w+"/list/attachments", nil, 200, nil)
+			feed := s.call(t, hc, token, "GET", w+"/events?after=0&limit=2000", nil, 200, nil)
 			for name, seen := range want {
 				status := 404
 				if seen {
@@ -680,8 +680,8 @@ func TestAFileOnACommentOnAPageFollowsThePage(t *testing.T) {
 				if strings.Contains(feed, name) != seen {
 					t.Errorf("the feed tells %s of %s: %v, want %v", who, name, !seen, seen)
 				}
-				s.call(hc, token, "GET", w+"/files/"+files[name], nil, status, nil)
-				if body := s.call(hc, token, "GET", "/f/"+files[name]+"/"+name, nil, status, nil); seen && body != "the bytes of "+name {
+				s.call(t, hc, token, "GET", w+"/files/"+files[name], nil, status, nil)
+				if body := s.call(t, hc, token, "GET", "/f/"+files[name]+"/"+name, nil, status, nil); seen && body != "the bytes of "+name {
 					t.Errorf("%s is served to %s as %q", name, who, body)
 				}
 			}
@@ -703,26 +703,26 @@ func TestAFileIsServedWithinBothTheMembersAndTheTokensProjects(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		oneProjectOnly(t, s) // SVA and OPS, a task in each
-		s.change(s.owner, "", "project.create", M{"key": "ART", "name": "Art"})
-		s.change(s.owner, "", "task.create", M{"project": "ART", "title": "Draw"})
-		s.change(s.owner, "", "agent.create", M{"name": "Two", "handle": "two", "scope": M{"projects": []string{"SVA", "OPS"}}})
+		s.change(t, s.owner, "", "project.create", M{"key": "ART", "name": "Art"})
+		s.change(t, s.owner, "", "task.create", M{"project": "ART", "title": "Draw"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Two", "handle": "two", "scope": M{"projects": []string{"SVA", "OPS"}}})
 		token := func(body M) string {
 			var tok struct{ Token string }
-			s.call(s.owner, "", "POST", w+"/tokens", body, 201, &tok)
+			s.call(t, s.owner, "", "POST", w+"/tokens", body, 201, &tok)
 			return tok.Token
 		}
 		type file struct{ id, name, project string }
 		var files []file
 		attach := func(project, name string, to M) {
 			var f struct{ ID string }
-			s.call(s.owner, "", "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			s.call(t, s.owner, "", "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
 			to["file"] = f.ID
-			s.change(s.owner, "", "attachment.add", to)
+			s.change(t, s.owner, "", "attachment.add", to)
 			files = append(files, file{f.ID, name, project})
 		}
 		for _, project := range []string{"SVA", "OPS", "ART"} {
 			attach(project, "task-"+project+".txt", M{"task": project + "-1"})
-			attach(project, "page-"+project+".txt", M{"doc": s.change(s.owner, "", "doc.create", M{"title": "Page of " + project, "project": project})["ref"]})
+			attach(project, "page-"+project+".txt", M{"doc": s.change(t, s.owner, "", "doc.create", M{"title": "Page of " + project, "project": project})["ref"]})
 		}
 		for _, caller := range []struct {
 			name, token string
@@ -738,8 +738,8 @@ func TestAFileIsServedWithinBothTheMembersAndTheTokensProjects(t *testing.T) {
 				if slices.Contains(caller.projects, f.project) {
 					status = 200
 				}
-				s.call(nil, caller.token, "GET", w+"/files/"+f.id, nil, status, nil)
-				if body := s.call(nil, caller.token, "GET", "/f/"+f.id+"/"+f.name, nil, status, nil); status == 200 && body != "the bytes of "+f.name {
+				s.call(t, nil, caller.token, "GET", w+"/files/"+f.id, nil, status, nil)
+				if body := s.call(t, nil, caller.token, "GET", "/f/"+f.id+"/"+f.name, nil, status, nil); status == 200 && body != "the bytes of "+f.name {
 					t.Errorf("%s is served to %s as %q", f.name, caller.name, body)
 				}
 			}
@@ -755,14 +755,14 @@ func TestAFileGivenWithACommentOnAPageIsAttachedAndFollowsThePage(t *testing.T) 
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
-		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
 		var other struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
 		commentWithFile := func(name string, page M) {
-			doc := s.change(nil, other.Token, "doc.create", page)["ref"].(string)
+			doc := s.change(t, nil, other.Token, "doc.create", page)["ref"].(string)
 			var f struct{ ID string }
-			s.call(nil, other.Token, "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
-			s.change(nil, other.Token, "comment.create", M{"doc": doc, "body": "see the file", "attachments": []M{{"file": f.ID, "caption": "the " + name}}})
+			s.call(t, nil, other.Token, "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			s.change(t, nil, other.Token, "comment.create", M{"doc": doc, "body": "see the file", "attachments": []M{{"file": f.ID, "caption": "the " + name}}})
 		}
 		commentWithFile("handbook.txt", M{"title": "Handbook"})
 		commentWithFile("runbook.txt", M{"title": "Runbook", "project": "OPS"})
@@ -770,8 +770,8 @@ func TestAFileGivenWithACommentOnAPageIsAttachedAndFollowsThePage(t *testing.T) 
 
 		sees := func(who string, hc *http.Client, token string, want map[string]bool) {
 			t.Helper()
-			listed := s.call(hc, token, "GET", w+"/list/attachments", nil, 200, nil)
-			feed := s.call(hc, token, "GET", w+"/events?after=0&limit=2000", nil, 200, nil)
+			listed := s.call(t, hc, token, "GET", w+"/list/attachments", nil, 200, nil)
+			feed := s.call(t, hc, token, "GET", w+"/events?after=0&limit=2000", nil, 200, nil)
 			for name, seen := range want {
 				if strings.Contains(listed, "the "+name) != seen {
 					t.Errorf("/list/attachments lists %s for %s: %v, want %v", name, who, !seen, seen)
@@ -797,11 +797,11 @@ func TestAnExportIsNotForATokenLimitedToSomeProjects(t *testing.T) {
 		s := newSite(t, st)
 		oneProjectOnly(t, s)
 		var whole, part struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"name": "every project"}, 201, &whole)
-		s.call(s.owner, "", "POST", w+"/tokens", M{"name": "SVA only", "projects": []string{"SVA"}}, 201, &part)
-		s.call(s.owner, "", "GET", w+"/export", nil, 200, nil)
-		s.call(nil, whole.Token, "GET", w+"/export", nil, 200, nil)
-		if out := s.call(nil, part.Token, "GET", w+"/export", nil, 403, nil); strings.Contains(out, "Rotate keys") || !strings.Contains(out, "every project") {
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"name": "every project"}, 201, &whole)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"name": "SVA only", "projects": []string{"SVA"}}, 201, &part)
+		s.call(t, s.owner, "", "GET", w+"/export", nil, 200, nil)
+		s.call(t, nil, whole.Token, "GET", w+"/export", nil, 200, nil)
+		if out := s.call(t, nil, part.Token, "GET", w+"/export", nil, 403, nil); strings.Contains(out, "Rotate keys") || !strings.Contains(out, "every project") {
 			t.Fatalf("the refusal: %s", out)
 		}
 	})
@@ -814,16 +814,16 @@ func TestAnExportIsNotForATokenLimitedToSomeProjects(t *testing.T) {
 func TestAnAdminsExportHoldsEveryMembersPrivatePages(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Other", "handle": "other"})
 		var other struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
-		s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "for everyone\n"})
-		diary := s.change(nil, other.Token, "doc.create", M{"title": "Diary", "private": true, "markdown": "quokka\n"})["ref"].(string)
-		s.change(nil, other.Token, "doc.create", M{"parent": diary, "title": "Monday", "markdown": "wombat\n"})
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &other)
+		s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "for everyone\n"})
+		diary := s.change(t, nil, other.Token, "doc.create", M{"title": "Diary", "private": true, "markdown": "quokka\n"})["ref"].(string)
+		s.change(t, nil, other.Token, "doc.create", M{"parent": diary, "title": "Monday", "markdown": "wombat\n"})
 		// The owner, an admin, may not open the page.
-		s.call(s.owner, "", "GET", w+"/docs/"+diary, nil, 404, nil)
+		s.call(t, s.owner, "", "GET", w+"/docs/"+diary, nil, 404, nil)
 
-		archive := s.call(s.owner, "", "GET", w+"/export", nil, 200, nil)
+		archive := s.call(t, s.owner, "", "GET", w+"/export", nil, 200, nil)
 		pages := unzipped(t, archive, "docs/")
 		for _, want := range []string{"=== docs/Handbook.md\nfor everyone", "=== docs/Diary.md\nquokka", "=== docs/Diary/Monday.md\nwombat"} {
 			if !strings.Contains(pages, want) {
@@ -852,26 +852,26 @@ func TestAnAdminsExportHoldsEveryMembersPrivatePages(t *testing.T) {
 func TestAPrivatePagesSubPagesAreNotSeenByOthers(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
-		s.change(s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Other", "handle": "other", "role": "admin"})
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &tok)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@other"}, 201, &tok)
 		other := tok.Token
-		page := func(args M) string { return s.change(s.owner, "", "doc.create", args)["ref"].(string) }
+		page := func(args M) string { return s.change(t, s.owner, "", "doc.create", args)["ref"].(string) }
 		handbook := page(M{"title": "Handbook"})
 		plans := page(M{"title": "Plans"})
 		q1 := page(M{"parent": plans, "title": "Quarter one", "markdown": "quokka\n"})
 		week := page(M{"parent": q1, "title": "Week one", "markdown": "quokka, see SVA-1 and [[Handbook]]\n"})
-		s.change(s.owner, "", "comment.create", M{"doc": week, "body": "wombat"})
+		s.change(t, s.owner, "", "comment.create", M{"doc": week, "body": "wombat"})
 		var f struct{ ID string }
-		s.call(s.owner, "", "POST", w+"/files?name=week.txt", []byte("x"), 201, &f)
-		s.change(s.owner, "", "attachment.add", M{"doc": week, "file": f.ID})
+		s.call(t, s.owner, "", "POST", w+"/files?name=week.txt", []byte("x"), 201, &f)
+		s.change(t, s.owner, "", "attachment.add", M{"doc": week, "file": f.ID})
 
-		s.change(s.owner, "", "doc.update", M{"id": plans, "private": true})
+		s.change(t, s.owner, "", "doc.update", M{"id": plans, "private": true})
 		var at struct{ Seq int64 }
-		s.call(nil, other, "GET", w+"/events?after=0&limit=2000", nil, 200, &at)
-		s.change(s.owner, "", "doc.write", M{"doc": week, "markdown": "quokka, rewritten; see SVA-1 and [[Handbook]]\n"})
+		s.call(t, nil, other, "GET", w+"/events?after=0&limit=2000", nil, 200, &at)
+		s.change(t, s.owner, "", "doc.write", M{"doc": week, "markdown": "quokka, rewritten; see SVA-1 and [[Handbook]]\n"})
 
 		hidden := []string{plans, q1, week}
 		leaks := func(what, answer string) {
@@ -882,31 +882,31 @@ func TestAPrivatePagesSubPagesAreNotSeenByOthers(t *testing.T) {
 				}
 			}
 		}
-		leaks("the page list", s.call(nil, other, "GET", w+"/docs", nil, 200, nil))
+		leaks("the page list", s.call(t, nil, other, "GET", w+"/docs", nil, 200, nil))
 		for _, id := range hidden {
-			s.call(nil, other, "GET", w+"/docs/"+id, nil, 404, nil)
+			s.call(t, nil, other, "GET", w+"/docs/"+id, nil, 404, nil)
 		}
-		leaks("search", s.call(nil, other, "GET", w+"/search?q=quokka", nil, 200, nil))
-		leaks("search of comments", s.call(nil, other, "GET", w+"/search?q=wombat", nil, 200, nil))
-		leaks("the feed after the page went private", s.call(nil, other, "GET", w+"/events?after="+strconv.FormatInt(at.Seq, 10), nil, 200, nil))
-		leaks("the starting copy", s.call(nil, other, "GET", w+"/bootstrap", nil, 200, nil))
-		if out := s.call(nil, other, "GET", w+"/list/attachments", nil, 200, nil); strings.Contains(out, f.ID) {
+		leaks("search", s.call(t, nil, other, "GET", w+"/search?q=quokka", nil, 200, nil))
+		leaks("search of comments", s.call(t, nil, other, "GET", w+"/search?q=wombat", nil, 200, nil))
+		leaks("the feed after the page went private", s.call(t, nil, other, "GET", w+"/events?after="+strconv.FormatInt(at.Seq, 10), nil, 200, nil))
+		leaks("the starting copy", s.call(t, nil, other, "GET", w+"/bootstrap", nil, 200, nil))
+		if out := s.call(t, nil, other, "GET", w+"/list/attachments", nil, 200, nil); strings.Contains(out, f.ID) {
 			t.Errorf("the list of files shows the file on a private sub-page: %s", out)
 		}
-		leaks("what mentions a task", s.call(nil, other, "GET", w+"/tasks/SVA-1", nil, 200, nil))
-		leaks("what mentions a page", s.call(nil, other, "GET", w+"/docs/"+handbook, nil, 200, nil))
+		leaks("what mentions a task", s.call(t, nil, other, "GET", w+"/tasks/SVA-1", nil, 200, nil))
+		leaks("what mentions a page", s.call(t, nil, other, "GET", w+"/docs/"+handbook, nil, 200, nil))
 
 		// A sub-page someone keeps private under a page others see is not
 		// among that page's sub-pages for them.
 		open := page(M{"title": "Open"})
 		mine := page(M{"parent": open, "title": "Mine", "private": true})
-		if out := s.call(nil, other, "GET", w+"/docs/"+open, nil, 200, nil); strings.Contains(out, mine) {
+		if out := s.call(t, nil, other, "GET", w+"/docs/"+open, nil, 200, nil); strings.Contains(out, mine) {
 			t.Errorf("a page's sub-pages show another member a private one: %s", out)
 		}
 
 		// The owner still has all of it.
 		for _, id := range hidden {
-			s.call(s.owner, "", "GET", w+"/docs/"+id, nil, 200, nil)
+			s.call(t, s.owner, "", "GET", w+"/docs/"+id, nil, 200, nil)
 		}
 	})
 }
@@ -947,16 +947,16 @@ func TestTheStartingCopyFillsItsLatestWithWhatTheCallerMaySee(t *testing.T) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
 		var sva1, ops1 struct{ Task core.Task }
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
-		s.call(s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva1)
+		s.call(t, s.owner, "", "GET", w+"/tasks/OPS-1?raw=1", nil, 200, &ops1)
 		var me struct {
 			Workspace core.Workspace
 			Me        core.Member
 		}
-		s.call(s.owner, "", "GET", w+"/bootstrap", nil, 200, &me)
+		s.call(t, s.owner, "", "GET", w+"/bootstrap", nil, 200, &me)
 		ctx := context.Background()
 		db := st.In(me.Workspace.ID)
-		agent := s.change(s.owner, "", "agent.create", M{"name": "Busy", "handle": "busy"})["ref"].(string)
+		agent := s.change(t, s.owner, "", "agent.create", M{"name": "Busy", "handle": "busy"})["ref"].(string)
 		// One of SVA, then more of OPS than the copy brings, each newer.
 		for i, taskID := range append([]string{sva1.Task.ID}, slices.Repeat([]string{ops1.Task.ID}, 301)...) {
 			at := time.Now().UnixMilli() + int64(i)
@@ -974,7 +974,7 @@ func TestTheStartingCopyFillsItsLatestWithWhatTheCallerMaySee(t *testing.T) {
 				Notifications []core.Notification
 				Sessions      []core.AgentSession
 			}
-			s.call(nil, token, "GET", w+"/bootstrap", nil, 200, &got)
+			s.call(t, nil, token, "GET", w+"/bootstrap", nil, 200, &got)
 			if who == "an admin's token limited to SVA" && !slices.ContainsFunc(got.Notifications, func(n core.Notification) bool { return n.TaskID == sva1.Task.ID }) {
 				t.Errorf("%s is not given its inbox item of SVA among the latest it may see (%d given)", who, len(got.Notifications))
 			}

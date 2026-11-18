@@ -55,41 +55,41 @@ func TestVault(t *testing.T) {
 
 		// Coder is trusted to send with secrets without asking first (a new
 		// agent asks before a request that changes something).
-		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder", "scope": M{"needs_approval": []string{}}})
-		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder", "scope": M{"needs_approval": []string{}}})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		var ct, at struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coder"}, 201, &ct)
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &at)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@coder"}, 201, &ct)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &at)
 
 		// Only an admin sets a secret; an agent cannot.
-		s.call(nil, ct.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": "secret.set", "args": M{"name": "DEPLOY_KEY", "value": "x"}}, 403, nil)
-		s.change(s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": key, "description": "Deploys to staging", "hosts": []string{host}, "agents": []string{"@coder"}})
+		s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": "secret.set", "args": M{"name": "DEPLOY_KEY", "value": "x"}}, 403, nil)
+		s.change(t, s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": key, "description": "Deploys to staging", "hosts": []string{host}, "agents": []string{"@coder"}})
 
-		if out := s.call(s.owner, "", "GET", w+"/audit?action=secret.set", nil, 200, nil); !strings.Contains(out, "DEPLOY_KEY") || !strings.Contains(out, "•••") {
+		if out := s.call(t, s.owner, "", "GET", w+"/audit?action=secret.set", nil, 200, nil); !strings.Contains(out, "DEPLOY_KEY") || !strings.Contains(out, "•••") {
 			t.Fatalf("setting a secret is not on the record: %s", out)
 		}
 		// Other secrets given in a change are blanked on the record too.
-		s.change(s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_integration_secret", "config": M{"repo": "a/b"}})
-		s.change(s.owner, "", "webhook.create", M{"name": "hook", "url": api.URL + "/hook", "secret": "whsec_signing_secret"})
+		s.change(t, s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_integration_secret", "config": M{"repo": "a/b"}})
+		s.change(t, s.owner, "", "webhook.create", M{"name": "hook", "url": api.URL + "/hook", "secret": "whsec_signing_secret"})
 		for _, path := range []string{w + "/audit", "/api/v1/admin/audit", "/api/v1/admin/audit?format=csv"} {
-			if out := s.call(s.owner, "", "GET", path, nil, 200, nil); strings.Contains(out, "ghp_integration_secret") || strings.Contains(out, "whsec_signing_secret") {
+			if out := s.call(t, s.owner, "", "GET", path, nil, 200, nil); strings.Contains(out, "ghp_integration_secret") || strings.Contains(out, "whsec_signing_secret") {
 				t.Fatalf("%s holds a secret in plain text", path)
 			}
 		}
 		// The value is nowhere: not in the list, the feed, the event, the bootstrap or the audit log.
 		for _, path := range []string{w + "/secrets", w + "/list/secrets", w + "/events?limit=500", w + "/bootstrap", w + "/audit", "/api/v1/admin/audit"} {
-			if out := s.call(s.owner, "", "GET", path, nil, 200, nil); strings.Contains(out, key) {
+			if out := s.call(t, s.owner, "", "GET", path, nil, 200, nil); strings.Contains(out, key) {
 				t.Fatalf("%s shows the secret's value", path)
 			}
 		}
-		if out := s.call(nil, ct.Token, "GET", "/api/v1/w/-/secrets?format=text", nil, 200, nil); !strings.Contains(out, "DEPLOY_KEY") || !strings.Contains(out, "Deploys to staging") {
+		if out := s.call(t, nil, ct.Token, "GET", "/api/v1/w/-/secrets?format=text", nil, 200, nil); !strings.Contains(out, "DEPLOY_KEY") || !strings.Contains(out, "Deploys to staging") {
 			t.Fatalf("the agent's list of secrets: %s", out)
 		}
 		// An agent it is not for does not see it and cannot use it.
-		if out := s.call(nil, at.Token, "GET", "/api/v1/w/-/secrets", nil, 200, nil); strings.Contains(out, "DEPLOY_KEY") {
+		if out := s.call(t, nil, at.Token, "GET", "/api/v1/w/-/secrets", nil, 200, nil); strings.Contains(out, "DEPLOY_KEY") {
 			t.Fatalf("a secret shown to an agent it is not for: %s", out)
 		}
-		s.call(nil, at.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/deploy"}, 403, nil)
+		s.call(t, nil, at.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/deploy"}, 403, nil)
 
 		// The agent uses it: the service gets the real key, the agent never does.
 		var res struct {
@@ -98,22 +98,22 @@ func TestVault(t *testing.T) {
 			Body    string
 			Headers map[string]string
 		}
-		s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"method": "POST", "url": api.URL + "/deploy",
+		s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"method": "POST", "url": api.URL + "/deploy",
 			"headers": M{"Authorization": "Bearer {{secret}}"}, "body": `{"ref":"main"}`}, 200, &res)
 		if !res.OK || res.Status != 200 || len(seen) != 1 || !strings.Contains(seen[0], "auth=Bearer "+key) || !strings.Contains(seen[0], `body={"ref":"main"}`) {
 			t.Fatalf("request with the secret: %+v, service saw %v", res, seen)
 		}
 		// A service that echoes the key: it is blanked in the body and the headers.
-		raw := s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/echo", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, nil)
+		raw := s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/echo", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, nil)
 		if strings.Contains(raw, key) || !strings.Contains(raw, "Bearer •••") {
 			t.Fatalf("an echoed secret came back: %s", raw)
 		}
 		// Not to another host, whatever the agent writes.
 		for _, u := range []string{other.URL + "/x", "https://evil.example.com/?k={{secret}}", strings.Replace(api.URL, "127.0.0.1", "localhost", 1) + "/deploy"} {
-			s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": u, "headers": M{"Authorization": "Bearer {{secret}}"}}, 403, nil)
+			s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": u, "headers": M{"Authorization": "Bearer {{secret}}"}}, 403, nil)
 		}
 		// A redirect is not followed: the key stays with the host it was sent to.
-		s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/away", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, &res)
+		s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/away", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, &res)
 		if res.Status != 302 {
 			t.Fatalf("a redirect was followed: %+v", res)
 		}
@@ -125,33 +125,33 @@ func TestVault(t *testing.T) {
 			t.Fatalf("a header named twice: %s; the service saw %v", out, seen[before:])
 		}
 		// Every use is on the record, without the value.
-		if out := s.call(s.owner, "", "GET", w+"/audit?action=secret.used", nil, 200, nil); strings.Count(out, "secret.used") < 3 || strings.Contains(out, key) || !strings.Contains(out, "/deploy") {
+		if out := s.call(t, s.owner, "", "GET", w+"/audit?action=secret.used", nil, 200, nil); strings.Count(out, "secret.used") < 3 || strings.Contains(out, key) || !strings.Contains(out, "/deploy") {
 			t.Fatalf("audit of secret use: %s", out)
 		}
 
 		// The environment hand-off: only for secrets marked for it, and only
 		// to a token an admin made for a companion.
-		s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/env", M{"names": []string{"DEPLOY_KEY"}}, 403, nil)
-		s.call(nil, ct.Token, "POST", "/api/v1/w/-/tokens", M{"secrets": true}, 403, nil)
+		s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/env", M{"names": []string{"DEPLOY_KEY"}}, 403, nil)
+		s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/tokens", M{"secrets": true}, 403, nil)
 		var comp struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coder", "name": "companion", "secrets": true}, 201, &comp)
-		s.call(nil, comp.Token, "POST", "/api/v1/w/-/secrets/env", M{"names": []string{"DEPLOY_KEY"}}, 403, nil) // not marked env
-		s.change(s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "env": true})
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@coder", "name": "companion", "secrets": true}, 201, &comp)
+		s.call(t, nil, comp.Token, "POST", "/api/v1/w/-/secrets/env", M{"names": []string{"DEPLOY_KEY"}}, 403, nil) // not marked env
+		s.change(t, s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "env": true})
 		var env struct{ Env map[string]string }
-		s.call(nil, comp.Token, "POST", "/api/v1/w/-/secrets/env", M{"names": []string{"DEPLOY_KEY"}}, 200, &env)
+		s.call(t, nil, comp.Token, "POST", "/api/v1/w/-/secrets/env", M{"names": []string{"DEPLOY_KEY"}}, 200, &env)
 		if env.Env["DEPLOY_KEY"] != key {
 			t.Fatalf("the companion's environment: %v", env.Env)
 		}
 
 		// Changing the value keeps the rest; deleting wipes it.
-		s.change(s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": "sk-live-rotated-77"})
+		s.change(t, s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": "sk-live-rotated-77"})
 		seen = nil
-		s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, nil)
+		s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, nil)
 		if len(seen) != 1 || !strings.Contains(seen[0], "sk-live-rotated-77") {
 			t.Fatalf("after rotating: %v", seen)
 		}
-		s.change(s.owner, "", "secret.delete", M{"id": "DEPLOY_KEY"})
-		s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/deploy"}, 404, nil)
+		s.change(t, s.owner, "", "secret.delete", M{"id": "DEPLOY_KEY"})
+		s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", M{"url": api.URL + "/deploy"}, 404, nil)
 	})
 }
 
@@ -160,23 +160,23 @@ func TestVault(t *testing.T) {
 func TestAgentsCannotWidenThemselves(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
-		s.change(s.owner, "", "agent.create", M{"name": "Lead", "handle": "lead", "role": "admin", "scope": M{"projects": []string{"SVA"}, "needs_approval": []string{"project.delete"}}})
-		s.change(s.owner, "", "agent.create", M{"name": "Wide", "handle": "wide", "role": "admin"})
-		s.change(s.owner, "", "agent.create", M{"name": "Narrow", "handle": "narrow", "scope": M{"projects": []string{"SVA"}}})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Lead", "handle": "lead", "role": "admin", "scope": M{"projects": []string{"SVA"}, "needs_approval": []string{"project.delete"}}})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Wide", "handle": "wide", "role": "admin"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Narrow", "handle": "narrow", "scope": M{"projects": []string{"SVA"}}})
 		var lead struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@lead"}, 201, &lead)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@lead"}, 201, &lead)
 		try := func(typ string, args M, want int) string {
-			return s.call(nil, lead.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
+			return s.call(t, nil, lead.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
 		}
 		// It cannot lift its own limits, by either door.
 		try("agent.update", M{"id": "@lead", "scope": nil}, 403)
 		try("agent.update", M{"id": "@lead", "scope": M{"projects": []string{"SVA", "OPS"}}}, 403)
 		try("agent.update", M{"id": "@lead", "handoff_limit": 0}, 403)
 		try("member.update", M{"id": "@lead", "role": "owner"}, 403)
-		s.call(nil, lead.Token, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
+		s.call(t, nil, lead.Token, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
 		// What it gives another agent is held to its own: asking for every
 		// project gives its one project, with its approvals.
 		try("agent.update", M{"id": "@narrow", "scope": nil}, 200)
@@ -189,31 +189,31 @@ func TestAgentsCannotWidenThemselves(t *testing.T) {
 				}
 			}
 		}
-		s.call(s.owner, "", "GET", w+"/list/members", nil, 200, &list)
+		s.call(t, s.owner, "", "GET", w+"/list/members", nil, 200, &list)
 		for _, m := range list.Members {
 			if m.Handle == "narrow" && (m.Scope == nil || len(m.Scope.Projects) != 1 || len(m.Scope.NeedsApproval) != 1) {
 				t.Fatalf("a limited agent lifted another agent's limits: %+v", m.Scope)
 			}
 		}
 		// It cannot borrow a wider agent's access with a token.
-		s.call(nil, lead.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@wide"}, 403, nil)
-		s.call(nil, lead.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@narrow"}, 201, nil)
+		s.call(t, nil, lead.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@wide"}, 403, nil)
+		s.call(t, nil, lead.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@narrow"}, 201, nil)
 		// A cursor cannot be put past the end of the feed.
-		s.call(nil, lead.Token, "PUT", "/api/v1/w/-/cursors/main", M{"seq": 999999}, 400, nil)
-		s.call(nil, lead.Token, "PUT", "/api/v1/w/-/cursors/main", M{"seq": 3}, 200, nil)
+		s.call(t, nil, lead.Token, "PUT", "/api/v1/w/-/cursors/main", M{"seq": 999999}, 400, nil)
+		s.call(t, nil, lead.Token, "PUT", "/api/v1/w/-/cursors/main", M{"seq": 3}, 200, nil)
 
 		// A person can be limited to some projects too.
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
 		mia := browser()
-		s.call(mia, "", "POST", "/api/v1/auth/register", M{"name": "Mia", "email": "mia@example.com", "password": "another-long-password"}, 201, nil)
-		s.change(s.owner, "", "member.add", M{"user": "mia@example.com", "scope": M{"projects": []string{"SVA"}}})
-		s.call(mia, "", "GET", w+"/tasks/OPS-1", nil, 404, nil)
-		if out := s.call(mia, "", "GET", w+"/bootstrap", nil, 200, nil); strings.Contains(out, "Rotate the keys") || strings.Contains(out, `"key":"OPS"`) {
+		s.call(t, mia, "", "POST", "/api/v1/auth/register", M{"name": "Mia", "email": "mia@example.com", "password": "another-long-password"}, 201, nil)
+		s.change(t, s.owner, "", "member.add", M{"user": "mia@example.com", "scope": M{"projects": []string{"SVA"}}})
+		s.call(t, mia, "", "GET", w+"/tasks/OPS-1", nil, 404, nil)
+		if out := s.call(t, mia, "", "GET", w+"/bootstrap", nil, 200, nil); strings.Contains(out, "Rotate the keys") || strings.Contains(out, `"key":"OPS"`) {
 			t.Fatal("a person limited to one project was sent another's")
 		}
-		s.call(mia, "", "POST", w+"/changes", M{"id": id.New(), "type": "task.create", "args": M{"project": "OPS", "title": "no"}}, 403, nil)
-		s.change(s.owner, "", "member.update", M{"id": "@mia", "scope": nil})
-		s.call(mia, "", "GET", w+"/tasks/OPS-1", nil, 200, nil)
+		s.call(t, mia, "", "POST", w+"/changes", M{"id": id.New(), "type": "task.create", "args": M{"project": "OPS", "title": "no"}}, 403, nil)
+		s.change(t, s.owner, "", "member.update", M{"id": "@mia", "scope": nil})
+		s.call(t, mia, "", "GET", w+"/tasks/OPS-1", nil, 200, nil)
 	})
 }
 
@@ -222,49 +222,49 @@ func TestAgentsCannotWidenThemselves(t *testing.T) {
 func TestSmallGuards(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
 		// A view is saved only with a filter that can be read.
-		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "view.create", "args": M{"name": "Art", "query": M{"label": "art"}}}, 400, nil); !strings.Contains(out, "lists") {
+		if out := s.call(t, s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "view.create", "args": M{"name": "Art", "query": M{"label": "art"}}}, 400, nil); !strings.Contains(out, "lists") {
 			t.Fatalf("a view with a broken filter: %s", out)
 		}
-		s.change(s.owner, "", "label.create", M{"project": "SVA", "name": "art"})
-		s.change(s.owner, "", "view.create", M{"name": "Art", "query": M{"label": []string{"art"}}})
+		s.change(t, s.owner, "", "label.create", M{"project": "SVA", "name": "art"})
+		s.change(t, s.owner, "", "view.create", M{"name": "Art", "query": M{"label": []string{"art"}}})
 		// Turning passwords off with no other way in is refused.
-		if out := s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.password", false, 409, nil); !strings.Contains(out, "no way to sign in") {
+		if out := s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.password", false, 409, nil); !strings.Contains(out, "no way to sign in") {
 			t.Fatalf("locking oneself out: %s", out)
 		}
 		// The record says what a setting was changed to.
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
-		if out := s.call(s.owner, "", "GET", "/api/v1/admin/audit?action=setting.changed", nil, 200, nil); !strings.Contains(out, `"value":true`) {
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/auth.registration", true, 200, nil)
+		if out := s.call(t, s.owner, "", "GET", "/api/v1/admin/audit?action=setting.changed", nil, 200, nil); !strings.Contains(out, `"value":true`) {
 			t.Fatalf("audit of a setting: %s", out)
 		}
 		// A token's first use is on the record.
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coder", "name": "ci"}, 201, &tok)
-		s.call(nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 200, nil)
-		s.call(nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 200, nil)
-		if out := s.call(s.owner, "", "GET", w+"/audit?action=token.used", nil, 200, nil); strings.Count(out, `"token.used"`) != 1 {
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@coder", "name": "ci"}, 201, &tok)
+		s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 200, nil)
+		s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 200, nil)
+		if out := s.call(t, s.owner, "", "GET", w+"/audit?action=token.used", nil, 200, nil); strings.Count(out, `"token.used"`) != 1 {
 			t.Fatalf("audit of token use: %s", out)
 		}
 		// A page built from the data mentions nobody.
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Fix the jump", "assignee": "@coder"})
-		s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "@coder please look"})
-		before := s.call(nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil)
-		page := s.change(s.owner, "", "doc.create", M{"title": "Open questions", "generated": "open_questions"})["ref"].(string)
-		s.call(nil, tok.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 200, nil)
-		if after := s.call(nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil); after != before {
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Fix the jump", "assignee": "@coder"})
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "@coder please look"})
+		before := s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil)
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Open questions", "generated": "open_questions"})["ref"].(string)
+		s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/docs/"+page, nil, 200, nil)
+		if after := s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil); after != before {
 			t.Fatalf("a generated page wrote to someone's inbox:\n%s\n---\n%s", before, after)
 		}
 		// The metrics page is valid: one TYPE line per name.
-		m := s.call(s.owner, "", "GET", "/metrics", nil, 200, nil)
+		m := s.call(t, s.owner, "", "GET", "/metrics", nil, 200, nil)
 		if strings.Count(m, "# TYPE quadit_rows ") != 1 {
 			t.Fatalf("metrics: %s", m)
 		}
 		// With a token set, the page takes that token and no other.
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/metrics.token", "scrape-secret", 200, nil)
-		s.call(&http.Client{}, "scrape-secre", "GET", "/metrics", nil, 401, nil)
-		s.call(&http.Client{}, "scrape-secret", "GET", "/metrics", nil, 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/metrics.token", "scrape-secret", 200, nil)
+		s.call(t, &http.Client{}, "scrape-secre", "GET", "/metrics", nil, 401, nil)
+		s.call(t, &http.Client{}, "scrape-secret", "GET", "/metrics", nil, 200, nil)
 	})
 }
 
@@ -273,14 +273,14 @@ func TestSmallGuards(t *testing.T) {
 func TestDeleteWorkspace(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Stays"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Stays"})
 		var made struct{ ID, Slug string }
-		s.call(s.owner, "", "POST", "/api/v1/workspaces", M{"name": "Side project", "slug": "side"}, 201, &made)
+		s.call(t, s.owner, "", "POST", "/api/v1/workspaces", M{"name": "Side project", "slug": "side"}, 201, &made)
 		side := "/api/v1/w/side"
 		do := func(typ string, args M) map[string]any {
 			var out map[string]any
-			s.call(s.owner, "", "POST", side+"/changes", M{"id": id.New(), "type": typ, "args": args}, 200, &out)
+			s.call(t, s.owner, "", "POST", side+"/changes", M{"id": id.New(), "type": typ, "args": args}, 200, &out)
 			return out
 		}
 		do("project.create", M{"key": "SP", "name": "Side"})
@@ -292,22 +292,22 @@ func TestDeleteWorkspace(t *testing.T) {
 		do("webhook.create", M{"name": "hook", "url": "http://127.0.0.1:1/x"})
 		do("secret.set", M{"name": "KEY", "value": "v-123456", "hosts": []string{"example.com"}})
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", side+"/tokens", M{"user": "@helper"}, 201, &tok)
+		s.call(t, s.owner, "", "POST", side+"/tokens", M{"user": "@helper"}, 201, &tok)
 		var f struct{ ID string }
-		s.call(nil, tok.Token, "POST", "/api/v1/w/-/files?name=a.txt", []byte("file body"), 201, &f)
+		s.call(t, nil, tok.Token, "POST", "/api/v1/w/-/files?name=a.txt", []byte("file body"), 201, &f)
 
 		// Only with its name, only by its owner.
-		s.call(s.owner, "", "POST", side+"/changes", M{"id": id.New(), "type": "workspace.delete", "args": M{"confirm": "nope"}}, 400, nil)
-		s.call(nil, tok.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": "workspace.delete", "args": M{"confirm": "side"}}, 403, nil)
+		s.call(t, s.owner, "", "POST", side+"/changes", M{"id": id.New(), "type": "workspace.delete", "args": M{"confirm": "nope"}}, 400, nil)
+		s.call(t, nil, tok.Token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": "workspace.delete", "args": M{"confirm": "side"}}, 403, nil)
 		do("workspace.delete", M{"confirm": "side"})
-		s.call(s.owner, "", "GET", side+"/me", nil, 404, nil)
-		s.call(nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 404, nil)
-		if out := s.call(s.owner, "", "GET", "/api/v1/admin/workspaces", nil, 200, nil); !strings.Contains(out, `"deleted_at"`) {
+		s.call(t, s.owner, "", "GET", side+"/me", nil, 404, nil)
+		s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/me", nil, 404, nil)
+		if out := s.call(t, s.owner, "", "GET", "/api/v1/admin/workspaces", nil, 200, nil); !strings.Contains(out, `"deleted_at"`) {
 			t.Fatalf("a deleted workspace is not listed for the install admin: %s", out)
 		}
 		// It can come back.
-		s.call(s.owner, "", "POST", "/api/v1/admin/workspaces/"+made.ID+"/restore", nil, 200, nil)
-		if out := s.call(s.owner, "", "GET", side+"/tasks/SP-1", nil, 200, nil); !strings.Contains(out, "Goes away") {
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/workspaces/"+made.ID+"/restore", nil, 200, nil)
+		if out := s.call(t, s.owner, "", "GET", side+"/tasks/SP-1", nil, 200, nil); !strings.Contains(out, "Goes away") {
 			t.Fatalf("a restored workspace: %s", out)
 		}
 		// Deleted again and a month on, nothing of it is left; the other is whole.
@@ -324,7 +324,7 @@ func TestDeleteWorkspace(t *testing.T) {
 		if n, _ := st.Count(context.Background(), "workspaces", store.Eq("id", made.ID)); n != 0 {
 			t.Error("the workspace row is still there")
 		}
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "Stays") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "Stays") {
 			t.Fatalf("the other workspace: %s", out)
 		}
 	})
@@ -335,16 +335,16 @@ func TestDeleteWorkspace(t *testing.T) {
 func TestCheapReads(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss"})
-		s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Old question?", "options": []M{{"label": "A"}, {"label": "B"}}})
-		s.change(s.owner, "", "doc.create", M{"title": "Old page", "markdown": "x\n"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss"})
+		s.change(t, s.owner, "", "decision.open", M{"task": "SVA-1", "question": "Old question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(t, s.owner, "", "doc.create", M{"title": "Old page", "markdown": "x\n"})
 		var me struct{ Seq int64 }
-		s.call(s.owner, "", "GET", w+"/me", nil, 200, &me)
+		s.call(t, s.owner, "", "GET", w+"/me", nil, 200, &me)
 		mark := fmt.Sprint(me.Seq)
-		s.change(s.owner, "", "decision.open", M{"task": "SVA-1", "question": "New question?", "options": []M{{"label": "A"}, {"label": "B"}}})
-		s.change(s.owner, "", "doc.create", M{"title": "New page", "markdown": "y\n"})
-		s.change(s.owner, "", "label.create", M{"project": "SVA", "name": "fresh"})
+		s.change(t, s.owner, "", "decision.open", M{"task": "SVA-1", "question": "New question?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(t, s.owner, "", "doc.create", M{"title": "New page", "markdown": "y\n"})
+		s.change(t, s.owner, "", "label.create", M{"project": "SVA", "name": "fresh"})
 		for path, want := range map[string][2]string{
 			w + "/decisions?state=all&since=" + mark:             {"New question?", "Old question?"},
 			w + "/decisions?state=all&format=text&since=" + mark: {"New question?", "Old question?"},
@@ -352,20 +352,20 @@ func TestCheapReads(t *testing.T) {
 			w + "/docs?format=text&since=" + mark:                {"New page", "Old page"},
 			w + "/list/labels?since=" + mark:                     {"fresh", "bug"},
 		} {
-			if out := s.call(s.owner, "", "GET", path, nil, 200, nil); !strings.Contains(out, want[0]) || strings.Contains(out, want[1]) {
+			if out := s.call(t, s.owner, "", "GET", path, nil, 200, nil); !strings.Contains(out, want[0]) || strings.Contains(out, want[1]) {
 				t.Errorf("%s: %.300s", path, out)
 			}
 		}
 		// Only the fields asked for, and the id.
-		out := s.call(s.owner, "", "GET", w+"/docs?fields=title", nil, 200, nil)
+		out := s.call(t, s.owner, "", "GET", w+"/docs?fields=title", nil, 200, nil)
 		if !strings.Contains(out, `"title":"New page"`) || !strings.Contains(out, `"id"`) || strings.Contains(out, "updated_seq") || strings.Contains(out, "created_by") {
 			t.Errorf("fields on docs: %.300s", out)
 		}
-		if out := s.call(s.owner, "", "GET", w+"/decisions?state=all&fields=question,state", nil, 200, nil); !strings.Contains(out, `"question"`) || strings.Contains(out, `"options"`) {
+		if out := s.call(t, s.owner, "", "GET", w+"/decisions?state=all&fields=question,state", nil, 200, nil); !strings.Contains(out, `"question"`) || strings.Contains(out, `"options"`) {
 			t.Errorf("fields on decisions: %.300s", out)
 		}
 		// Plain lists have a text form.
-		if out := s.call(s.owner, "", "GET", w+"/list/statuses?format=text", nil, 200, nil); !strings.Contains(out, "Todo") || !strings.Contains(out, "id=") || strings.Contains(out, "{") {
+		if out := s.call(t, s.owner, "", "GET", w+"/list/statuses?format=text", nil, 200, nil); !strings.Contains(out, "Todo") || !strings.Contains(out, "id=") || strings.Contains(out, "{") {
 			t.Errorf("statuses as text: %.300s", out)
 		}
 	})
@@ -375,40 +375,40 @@ func TestCheapReads(t *testing.T) {
 func TestNamesNotIDs(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "epic.create", M{"project": "SVA", "name": "Boss fight"})
-		s.change(s.owner, "", "milestone.create", M{"epic": "Boss fight", "name": "Alpha"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design", "epic": "Boss fight", "milestone": "Alpha", "priority": "high"})
-		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "milestone": "alpha", "priority": "urgent"})
-		if out := s.call(s.owner, "", "GET", w+"/tasks?priority=urgent&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "epic.create", M{"project": "SVA", "name": "Boss fight"})
+		s.change(t, s.owner, "", "milestone.create", M{"epic": "Boss fight", "name": "Alpha"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design", "epic": "Boss fight", "milestone": "Alpha", "priority": "high"})
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-1", "milestone": "alpha", "priority": "urgent"})
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks?priority=urgent&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
 			t.Fatalf("tasks by priority name: %s", out)
 		}
-		out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "task.update", "args": M{"id": "SVA-1", "priority": "hihg"}}, 400, nil)
+		out := s.call(t, s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "task.update", "args": M{"id": "SVA-1", "priority": "hihg"}}, 400, nil)
 		if !strings.Contains(out, `"nearest":"high"`) || !strings.Contains(out, "urgent") {
 			t.Fatalf("a misspelled priority: %s", out)
 		}
-		s.call(s.owner, "", "GET", w+"/tasks?priority=hihg", nil, 400, nil)
+		s.call(t, s.owner, "", "GET", w+"/tasks?priority=hihg", nil, 400, nil)
 		// A decision by its task; with two, by its number. An agent asks, the owner answers.
-		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		var art struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &art)
-		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "options": []M{{"label": "Ring"}, {"label": "Burst"}}})
-		s.change(s.owner, "", "decision.pick", M{"id": "SVA-1", "option": "2"})
-		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which color?", "options": []M{{"label": "Red"}, {"label": "Blue"}}})
-		s.change(nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which sound?", "options": []M{{"label": "Boom"}, {"label": "Zap"}}})
-		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "decision.pick", "args": M{"id": "SVA-1", "option": "1"}}, 400, nil); !strings.Contains(out, "SVA-1#") {
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &art)
+		s.change(t, nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "options": []M{{"label": "Ring"}, {"label": "Burst"}}})
+		s.change(t, s.owner, "", "decision.pick", M{"id": "SVA-1", "option": "2"})
+		s.change(t, nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which color?", "options": []M{{"label": "Red"}, {"label": "Blue"}}})
+		s.change(t, nil, art.Token, "decision.open", M{"task": "SVA-1", "question": "Which sound?", "options": []M{{"label": "Boom"}, {"label": "Zap"}}})
+		if out := s.call(t, s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "decision.pick", "args": M{"id": "SVA-1", "option": "1"}}, 400, nil); !strings.Contains(out, "SVA-1#") {
 			t.Fatalf("two open decisions and no number: %s", out)
 		}
-		s.change(s.owner, "", "decision.pick", M{"id": "SVA-1#3", "option": "Zap"})
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "Burst") || !strings.Contains(out, "Zap") {
+		s.change(t, s.owner, "", "decision.pick", M{"id": "SVA-1#3", "option": "Zap"})
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "Burst") || !strings.Contains(out, "Zap") {
 			t.Fatalf("picks made by task key: %s", out)
 		}
 		// Watching an epic and a view by name.
-		s.change(s.owner, "", "view.create", M{"name": "Urgent things", "query": M{"priority": []int{1}}})
-		s.change(s.owner, "", "watch.set", M{"type": "epic", "subject": "Boss fight"})
-		s.change(s.owner, "", "watch.set", M{"type": "view", "subject": "Urgent things"})
+		s.change(t, s.owner, "", "view.create", M{"name": "Urgent things", "query": M{"priority": []int{1}}})
+		s.change(t, s.owner, "", "watch.set", M{"type": "epic", "subject": "Boss fight"})
+		s.change(t, s.owner, "", "watch.set", M{"type": "view", "subject": "Urgent things"})
 		// A name nothing has says which names there are.
-		if out := s.call(s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "watch.set", "args": M{"type": "epic", "subject": "Bos fight"}}, 404, nil); !strings.Contains(out, `"nearest":"Boss fight"`) {
+		if out := s.call(t, s.owner, "", "POST", w+"/changes", M{"id": id.New(), "type": "watch.set", "args": M{"type": "epic", "subject": "Bos fight"}}, 404, nil); !strings.Contains(out, `"nearest":"Boss fight"`) {
 			t.Fatalf("a misspelled epic: %s", out)
 		}
 	})
@@ -418,22 +418,22 @@ func TestNamesNotIDs(t *testing.T) {
 func TestRestoreAFile(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 		var f struct{ ID, URL string }
-		s.call(s.owner, "", "POST", w+"/files?name=sketch.txt", []byte("a sketch"), 201, &f)
-		att := s.change(s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})["ref"].(string)
+		s.call(t, s.owner, "", "POST", w+"/files?name=sketch.txt", []byte("a sketch"), 201, &f)
+		att := s.change(t, s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})["ref"].(string)
 		path := strings.TrimPrefix(f.URL, s.url)
-		s.change(s.owner, "", "attachment.remove", M{"id": att})
-		s.call(s.owner, "", "GET", path, nil, 404, nil)
-		if out := s.call(s.owner, "", "GET", w+"/list/attachments?trash=1", nil, 200, nil); !strings.Contains(out, "sketch.txt") {
+		s.change(t, s.owner, "", "attachment.remove", M{"id": att})
+		s.call(t, s.owner, "", "GET", path, nil, 404, nil)
+		if out := s.call(t, s.owner, "", "GET", w+"/list/attachments?trash=1", nil, 200, nil); !strings.Contains(out, "sketch.txt") {
 			t.Fatalf("removed files are not listed: %s", out)
 		}
-		s.change(s.owner, "", "attachment.restore", M{"id": att})
-		if out := s.call(s.owner, "", "GET", path, nil, 200, nil); out != "a sketch" {
+		s.change(t, s.owner, "", "attachment.restore", M{"id": att})
+		if out := s.call(t, s.owner, "", "GET", path, nil, 200, nil); out != "a sketch" {
 			t.Fatalf("a restored file reads %q", out)
 		}
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "sketch.txt") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil); !strings.Contains(out, "sketch.txt") {
 			t.Fatalf("a restored file is not back on its task: %s", out)
 		}
 	})
@@ -444,15 +444,15 @@ func TestRestoreAFile(t *testing.T) {
 func TestSubAgents(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Draw the boss"})
-		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
-		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Draw the boss"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		var art struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &art)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &art)
 		do := func(token, typ string, args M, want int) string {
-			return s.call(nil, token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
+			return s.call(t, nil, token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
 		}
 		// A member agent cannot make a standing agent, but can make a helper for a task.
 		if out := do(art.Token, "agent.create", M{"name": "Standing", "handle": "standing"}, 403); !strings.Contains(out, "sub-agent") {
@@ -461,20 +461,20 @@ func TestSubAgents(t *testing.T) {
 		do(art.Token, "agent.create", M{"name": "Inker", "handle": "inker", "task": "SVA-1", "role": "admin"}, 403)
 		do(art.Token, "agent.create", M{"name": "Inker", "handle": "inker", "task": "SVA-1", "description": "Inks the boss frames"}, 200)
 		var ink struct{ Token string }
-		s.call(nil, art.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@inker"}, 201, &ink)
+		s.call(t, nil, art.Token, "POST", "/api/v1/w/-/tokens", M{"user": "@inker"}, 201, &ink)
 		// The helper works on its task's project and nowhere else.
 		do(ink.Token, "comment.create", M{"task": "SVA-1", "body": "Frames inked."}, 200)
-		s.call(nil, ink.Token, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
-		if out := s.call(nil, ink.Token, "GET", "/api/v1/w/-/me?format=text", nil, 200, nil); !strings.Contains(out, "@inker") {
+		s.call(t, nil, ink.Token, "GET", "/api/v1/w/-/tasks/OPS-1", nil, 404, nil)
+		if out := s.call(t, nil, ink.Token, "GET", "/api/v1/w/-/me?format=text", nil, 200, nil); !strings.Contains(out, "@inker") {
 			t.Fatalf("the helper is: %s", out)
 		}
 		// It has its own name on what it does, and the same person answers for it.
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "@inker") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "@inker") {
 			t.Fatalf("the helper's comment: %s", out)
 		}
 		// The task is done: the helper is finished, and its token with it.
-		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "status": "done"})
-		s.call(nil, ink.Token, "GET", "/api/v1/w/-/me", nil, 401, nil)
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-1", "status": "done"})
+		s.call(t, nil, ink.Token, "GET", "/api/v1/w/-/me", nil, 401, nil)
 		var list struct {
 			Members []struct {
 				Handle      string
@@ -482,7 +482,7 @@ func TestSubAgents(t *testing.T) {
 				Delegated   string `json:"delegated_by"`
 			}
 		}
-		s.call(s.owner, "", "GET", w+"/list/members", nil, 200, &list)
+		s.call(t, s.owner, "", "GET", w+"/list/members", nil, 200, &list)
 		for _, m := range list.Members {
 			if m.Handle == "inker" && (m.SuspendedAt == 0 || m.Delegated == "") {
 				t.Fatalf("the helper after its task closed: %+v", m)
@@ -511,7 +511,7 @@ func TestSurfaceOnlyGrows(t *testing.T) {
 	var spec struct {
 		Paths map[string]map[string]any
 	}
-	s.call(nil, "", "GET", "/api/v1/openapi.json", nil, 200, &spec)
+	s.call(t, nil, "", "GET", "/api/v1/openapi.json", nil, 200, &spec)
 	for path, methods := range spec.Paths {
 		for method := range methods {
 			now = append(now, "api "+strings.ToUpper(method)+" "+path)
@@ -537,7 +537,7 @@ func TestSurfaceOnlyGrows(t *testing.T) {
 	if len(tools.Result.Tools) == 0 {
 		// The list needs a token; ask with one.
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
 		req, _ := http.NewRequest(http.MethodPost, s.url+"/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
 		req.Header.Set("Authorization", "Bearer "+tok.Token)
 		req.Header.Set("Content-Type", "application/json")
@@ -616,43 +616,43 @@ func TestImportThroughTheAPI(t *testing.T) {
 			"ENG-1,Eng,Login page,\"Build the **login** page\",In Review,3,High,Onboarding,aram,\"bug, frontend\",2026-12-01,,,\n" +
 			"ENG-2,Eng,Password field,,Done,1,No priority,Onboarding,someone.else@example.com,,,ENG-1,2026-11-01,\n"
 		var f struct{ ID string }
-		s.call(s.owner, "", "POST", w+"/files?name=linear.csv", []byte(csv), 201, &f)
+		s.call(t, s.owner, "", "POST", w+"/files?name=linear.csv", []byte(csv), 201, &f)
 		var res struct {
 			Found, Made     map[string]int
 			UnmatchedPeople []string `json:"unmatched_people"`
 			DryRun          bool     `json:"dry_run"`
 		}
 		// A look first: what is in it, with nothing written.
-		s.call(s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}, "dry_run": true}, 200, &res)
+		s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}, "dry_run": true}, 200, &res)
 		if res.Found["tasks"] != 2 || !res.DryRun {
 			t.Fatalf("a look at the export: %+v", res)
 		}
-		s.call(s.owner, "", "GET", w+"/tasks/ENG-1", nil, 404, nil)
-		s.call(s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}}, 200, &res)
+		s.call(t, s.owner, "", "GET", w+"/tasks/ENG-1", nil, 404, nil)
+		s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}}, 200, &res)
 		if res.Made["tasks"] != 2 || len(res.UnmatchedPeople) != 1 {
 			t.Fatalf("the import: %+v", res)
 		}
-		if out := s.call(s.owner, "", "GET", w+"/tasks?project=ENG&format=text", nil, 200, nil); !strings.Contains(out, "Login page") || !strings.Contains(out, "Password field") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks?project=ENG&format=text", nil, 200, nil); !strings.Contains(out, "Login page") || !strings.Contains(out, "Password field") {
 			t.Fatalf("imported tasks: %s", out)
 		}
 		// Again: nothing twice, and the answer says so.
 		res.Made = nil
-		s.call(s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}}, 200, &res)
+		s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "linear", "file": f.ID, "options": M{"project": "eng"}}, 200, &res)
 		if res.Made["tasks"] != 0 {
 			t.Fatalf("a second run says it made %d tasks", res.Made["tasks"])
 		}
 		var n struct{ Count int }
-		s.call(s.owner, "", "GET", w+"/tasks?project=ENG&count=1", nil, 200, &n)
+		s.call(t, s.owner, "", "GET", w+"/tasks?project=ENG&count=1", nil, 200, &n)
 		if n.Count != 2 {
 			t.Fatalf("a second run made %d tasks in all", n.Count)
 		}
 		// Not for members, and not with a file that is something else.
-		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coder"}, 201, &tok)
-		s.call(nil, tok.Token, "POST", "/api/v1/w/-/import", M{"kind": "linear", "file": f.ID}, 403, nil)
-		s.call(s.owner, "", "POST", w+"/files?name=notes.json", []byte("not a board"), 201, &f)
-		s.call(s.owner, "", "POST", w+"/import", M{"kind": "trello", "file": f.ID, "options": M{"project": "T"}}, 400, nil)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@coder"}, 201, &tok)
+		s.call(t, nil, tok.Token, "POST", "/api/v1/w/-/import", M{"kind": "linear", "file": f.ID}, 403, nil)
+		s.call(t, s.owner, "", "POST", w+"/files?name=notes.json", []byte("not a board"), 201, &f)
+		s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "trello", "file": f.ID, "options": M{"project": "T"}}, 400, nil)
 	})
 }
 
@@ -661,9 +661,9 @@ func TestImportThroughTheAPI(t *testing.T) {
 func TestPagesDoNotShift(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		for i := 1; i <= 7; i++ {
-			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i)})
+			s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": fmt.Sprintf("Task %d", i)})
 		}
 		type page struct {
 			Tasks      []struct{ Key string }
@@ -671,7 +671,7 @@ func TestPagesDoNotShift(t *testing.T) {
 		}
 		seen := map[string]int{}
 		var p page
-		s.call(s.owner, "", "GET", w+"/tasks?sort=-created&limit=3", nil, 200, &p)
+		s.call(t, s.owner, "", "GET", w+"/tasks?sort=-created&limit=3", nil, 200, &p)
 		for round := 0; ; round++ {
 			for _, tk := range p.Tasks {
 				seen[tk.Key]++
@@ -680,10 +680,10 @@ func TestPagesDoNotShift(t *testing.T) {
 				break
 			}
 			// Someone adds a task while the list is being read.
-			s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Added meanwhile"})
+			s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Added meanwhile"})
 			next := p.NextCursor
 			p = page{}
-			s.call(s.owner, "", "GET", w+"/tasks?sort=-created&limit=3&cursor="+next, nil, 200, &p)
+			s.call(t, s.owner, "", "GET", w+"/tasks?sort=-created&limit=3&cursor="+next, nil, 200, &p)
 			if round > 10 {
 				t.Fatal("paging never ends")
 			}
@@ -701,7 +701,7 @@ func TestPagesDoNotShift(t *testing.T) {
 		read := func(query string, between func()) map[string]int {
 			got := map[string]int{}
 			var p page
-			s.call(s.owner, "", "GET", w+"/tasks?"+query, nil, 200, &p)
+			s.call(t, s.owner, "", "GET", w+"/tasks?"+query, nil, 200, &p)
 			for round := range 20 {
 				for _, tk := range p.Tasks {
 					got[tk.Key]++
@@ -714,18 +714,18 @@ func TestPagesDoNotShift(t *testing.T) {
 				}
 				next := p.NextCursor
 				p = page{}
-				s.call(s.owner, "", "GET", w+"/tasks?"+query+"&cursor="+next, nil, 200, &p)
+				s.call(t, s.owner, "", "GET", w+"/tasks?"+query+"&cursor="+next, nil, 200, &p)
 			}
 			return got
 		}
-		got := read("project=SVA&open=1&limit=4", func() { s.change(s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"}) })
+		got := read("project=SVA&open=1&limit=4", func() { s.change(t, s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"}) })
 		for i := 1; i <= 7; i++ {
 			if key := fmt.Sprintf("SVA-%d", i); got[key] != 1 {
 				t.Fatalf("after one closed between pages, %s came %d times: %v", key, got[key], got)
 			}
 		}
 		// A task further down jumps to the top between pages: nothing repeats.
-		got = read("project=SVA&sort=priority&limit=3", func() { s.change(s.owner, "", "task.update", M{"id": "SVA-6", "priority": "urgent"}) })
+		got = read("project=SVA&sort=priority&limit=3", func() { s.change(t, s.owner, "", "task.update", M{"id": "SVA-6", "priority": "urgent"}) })
 		for key, n := range got {
 			if n != 1 {
 				t.Fatalf("after a reorder between pages, %s came %d times: %v", key, n, got)
@@ -733,12 +733,12 @@ func TestPagesDoNotShift(t *testing.T) {
 		}
 		// A cursor belongs to its list.
 		var first page
-		s.call(s.owner, "", "GET", w+"/tasks?sort=priority&limit=2", nil, 200, &first)
-		s.call(s.owner, "", "GET", w+"/tasks?sort=-created&limit=2&cursor="+first.NextCursor, nil, 400, nil)
-		if out := s.call(s.owner, "", "GET", w+"/tasks?limit=3&format=text", nil, 200, nil); !strings.Contains(out, "more: add cursor=") {
+		s.call(t, s.owner, "", "GET", w+"/tasks?sort=priority&limit=2", nil, 200, &first)
+		s.call(t, s.owner, "", "GET", w+"/tasks?sort=-created&limit=2&cursor="+first.NextCursor, nil, 400, nil)
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks?limit=3&format=text", nil, 200, nil); !strings.Contains(out, "more: add cursor=") {
 			t.Fatalf("the text form does not say how to go on: %s", out)
 		}
-		s.call(s.owner, "", "GET", w+"/tasks?cursor=nonsense", nil, 400, nil)
+		s.call(t, s.owner, "", "GET", w+"/tasks?cursor=nonsense", nil, 400, nil)
 	})
 }
 
@@ -747,24 +747,24 @@ func TestPagesDoNotShift(t *testing.T) {
 func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 		var made struct {
 			Backup struct{ ID string }
 			ID     string
 		}
-		s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
 		bid := made.Backup.ID
 		if bid == "" {
 			bid = made.ID
 		}
-		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "title": "Changed since the backup"})
-		s.call(s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 200, nil)
-		if out := s.call(s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "Boss design") {
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-1", "title": "Changed since the backup"})
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 200, nil)
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil); !strings.Contains(out, "Boss design") {
 			t.Fatalf("the task after restoring it from the backup: %s", out)
 		}
-		s.call(s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-99"}, 404, nil)
-		if out := s.call(s.owner, "", "GET", w+"/audit?action=task.restored_from_backup", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-99"}, 404, nil)
+		if out := s.call(t, s.owner, "", "GET", w+"/audit?action=task.restored_from_backup", nil, 200, nil); !strings.Contains(out, "SVA-1") {
 			t.Fatalf("the restore is not on the record: %s", out)
 		}
 	})
@@ -774,43 +774,43 @@ func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
 func TestSecondAuditFindings(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
-		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate the keys"})
 		for _, h := range []string{"asker", "judge", "narrow"} {
-			s.change(s.owner, "", "agent.create", M{"name": h, "handle": h, "role": "admin"})
+			s.change(t, s.owner, "", "agent.create", M{"name": h, "handle": h, "role": "admin"})
 		}
 		tok := func(h string) string {
 			var out struct{ Token string }
-			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + h}, 201, &out)
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@" + h}, 201, &out)
 			return out.Token
 		}
 		asker, judge := tok("asker"), tok("judge")
 		do := func(token, typ string, args M, want int) string {
-			return s.call(nil, token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
+			return s.call(t, nil, token, "POST", "/api/v1/w/-/changes", M{"id": id.New(), "type": typ, "args": args}, want, nil)
 		}
 		// An approval for a change is asked of a person and given by one.
 		hook := M{"name": "out", "url": "https://example.com/hook"}
 		do(asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "webhook.create", "args": hook, "question": "Add the hook?", "ask": "@judge"}, 400)
-		ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "webhook.create", "args": hook, "question": "Add the hook?"})["ref"].(string)
+		ask := s.change(t, nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "webhook.create", "args": hook, "question": "Add the hook?"})["ref"].(string)
 		do(judge, "decision.pick", M{"id": ask, "outcome": "approved"}, 403)
-		s.change(s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
+		s.change(t, s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
 
 		// Narrowing an agent's projects keeps what it must ask for.
-		s.change(s.owner, "", "agent.update", M{"id": "@narrow", "scope": M{"projects": []string{"OPS"}}})
+		s.change(t, s.owner, "", "agent.update", M{"id": "@narrow", "scope": M{"projects": []string{"OPS"}}})
 		narrow := tok("narrow")
 		if out := do(narrow, "webhook.create", hook, 403); !strings.Contains(out, "needs_approval") {
 			t.Fatalf("a narrowed agent lost its approvals: %s", out)
 		}
 		// A file on another project's task is not for a member limited to one.
 		var f struct{ ID, URL string }
-		s.call(s.owner, "", "POST", w+"/files?name=secret.txt", []byte("for SVA eyes"), 201, &f)
-		s.change(s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})
+		s.call(t, s.owner, "", "POST", w+"/files?name=secret.txt", []byte("for SVA eyes"), 201, &f)
+		s.change(t, s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})
 		path := strings.TrimPrefix(f.URL, s.url)
-		s.call(nil, narrow, "GET", path, nil, 404, nil)
-		s.call(nil, asker, "GET", path, nil, 200, nil)
-		if out := s.call(nil, narrow, "GET", "/api/v1/w/-/list/projects", nil, 200, nil); strings.Contains(out, "Samurai") {
+		s.call(t, nil, narrow, "GET", path, nil, 404, nil)
+		s.call(t, nil, asker, "GET", path, nil, 200, nil)
+		if out := s.call(t, nil, narrow, "GET", "/api/v1/w/-/list/projects", nil, 200, nil); strings.Contains(out, "Samurai") {
 			t.Fatalf("a limited agent is shown the other project: %s", out)
 		}
 		// Helpers: at most three at work on a task, and gone with a deleted task.
@@ -818,24 +818,24 @@ func TestSecondAuditFindings(t *testing.T) {
 			do(asker, "agent.create", M{"name": fmt.Sprintf("Helper %d", i), "handle": fmt.Sprintf("helper%d", i), "task": "OPS-1"}, 200)
 		}
 		do(asker, "agent.create", M{"name": "One more", "handle": "helper9", "task": "OPS-1"}, 409)
-		s.change(s.owner, "", "task.delete", M{"id": "OPS-1"})
-		if out := s.call(s.owner, "", "GET", w+"/list/members", nil, 200, nil); strings.Count(out, `"suspended_at"`) < 3 {
+		s.change(t, s.owner, "", "task.delete", M{"id": "OPS-1"})
+		if out := s.call(t, s.owner, "", "GET", w+"/list/members", nil, 200, nil); strings.Count(out, `"suspended_at"`) < 3 {
 			t.Fatalf("helpers of a deleted task are still at work: %s", out)
 		}
 		// Waiting on an outside event from a comment, and letting go of it.
 		do(asker, "comment.create", M{"task": "SVA-1", "body": "Sent for review.", "waiting_on": "outside", "waiting_on_note": "the store's review"}, 200)
-		if out := s.call(s.owner, "", "GET", w+"/tasks?waiting_on=outside&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks?waiting_on=outside&format=text", nil, 200, nil); !strings.Contains(out, "SVA-1") {
 			t.Fatalf("waiting on the outside after a comment: %s", out)
 		}
-		s.change(s.owner, "", "task.update", M{"id": "SVA-1", "waiting_on": nil})
-		if out := s.call(s.owner, "", "GET", w+"/tasks?waiting_on=outside&format=text", nil, 200, nil); strings.Contains(out, "SVA-1") {
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-1", "waiting_on": nil})
+		if out := s.call(t, s.owner, "", "GET", w+"/tasks?waiting_on=outside&format=text", nil, 200, nil); strings.Contains(out, "SVA-1") {
 			t.Fatalf("an outside wait could not be cleared: %s", out)
 		}
 		// Settings: a value of another shape is refused; null resets.
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"value": M{"host": "x", "password": "p-123456"}}, 400, nil)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"host": "smtp.example.com", "from": "q@example.com", "password": "p-123456"}, 200, nil)
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/mail", json.RawMessage("null"), 200, nil)
-		if out := s.call(s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, nil); strings.Contains(out, "smtp.example.com") || strings.Contains(out, "p-123456") {
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"value": M{"host": "x", "password": "p-123456"}}, 400, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/mail", M{"host": "smtp.example.com", "from": "q@example.com", "password": "p-123456"}, 200, nil)
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/mail", json.RawMessage("null"), 200, nil)
+		if out := s.call(t, s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, nil); strings.Contains(out, "smtp.example.com") || strings.Contains(out, "p-123456") {
 			t.Fatalf("a setting reset with null is still there: %s", out)
 		}
 		// A wrong kind of value is explained.
@@ -844,8 +844,8 @@ func TestSecondAuditFindings(t *testing.T) {
 		}
 		// The same change sent again says what it made.
 		body := M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": "Made once"}}
-		s.call(nil, asker, "POST", "/api/v1/w/-/changes", body, 200, nil)
-		if out := s.call(nil, asker, "POST", "/api/v1/w/-/changes", body, 200, nil); !strings.Contains(out, `"duplicate":true`) || !strings.Contains(out, `"key":"SVA-`) {
+		s.call(t, nil, asker, "POST", "/api/v1/w/-/changes", body, 200, nil)
+		if out := s.call(t, nil, asker, "POST", "/api/v1/w/-/changes", body, 200, nil); !strings.Contains(out, `"duplicate":true`) || !strings.Contains(out, `"key":"SVA-`) {
 			t.Fatalf("a repeated change does not say what it made: %s", out)
 		}
 		// Guessing tokens is slowed down. Counts start again each minute, and
@@ -910,7 +910,7 @@ func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
 			}
 		}))
 		defer api.Close()
-		s.change(s.owner, "", "secret.set", M{"name": "ODD_KEY", "value": key, "hosts": []string{"http://" + strings.TrimPrefix(api.URL, "http://")}})
+		s.change(t, s.owner, "", "secret.set", M{"name": "ODD_KEY", "value": key, "hosts": []string{"http://" + strings.TrimPrefix(api.URL, "http://")}})
 		forms := map[string]string{
 			"as written": key, "base64": base64.StdEncoding.EncodeToString([]byte(key)), "basic": base64.StdEncoding.EncodeToString([]byte("bot:" + key)),
 			"query-escaped": url.QueryEscape(key), "path-escaped": url.PathEscape(key), "JSON-escaped": strings.Trim(string(must(json.Marshal(key))), `"`),
@@ -925,7 +925,7 @@ func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
 		}
 		ask := func(t *testing.T, path string, headers M, body string) string {
 			t.Helper()
-			return s.call(s.owner, "", "POST", w+"/secrets/ODD_KEY/request", M{"method": "POST", "url": api.URL + path, "headers": headers, "body": body}, 200, nil)
+			return s.call(t, s.owner, "", "POST", w+"/secrets/ODD_KEY/request", M{"method": "POST", "url": api.URL + path, "headers": headers, "body": body}, 200, nil)
 		}
 
 		t.Run("echoed", func(t *testing.T) {
@@ -958,7 +958,7 @@ func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
 				if !res.OK || res.Body != nil || res.BodyBase64 != nil || res.Omitted == "" || res.Size == 0 {
 					t.Fatalf("%s: %s", path, out)
 				}
-				leaks(t, s.call(s.owner, "", "POST", w+"/secrets/ODD_KEY/request?format=text",
+				leaks(t, s.call(t, s.owner, "", "POST", w+"/secrets/ODD_KEY/request?format=text",
 					M{"method": "POST", "url": api.URL + path, "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, nil))
 			}
 		})
@@ -976,7 +976,7 @@ func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
 			}
 		})
 		t.Run("on the record", func(t *testing.T) {
-			if out := s.call(s.owner, "", "GET", w+"/audit?action=secret.used", nil, 200, nil); !strings.Contains(out, "/echo/{{secret}}") {
+			if out := s.call(t, s.owner, "", "GET", w+"/audit?action=secret.used", nil, 200, nil); !strings.Contains(out, "/echo/{{secret}}") {
 				leaks(t, out)
 				t.Fatalf("the audit log does not have the address as written: %s", out)
 			}
@@ -999,8 +999,8 @@ func must[T any](v T, err error) T {
 func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Deploy"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Deploy"})
 		var calls []string
 		api := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			calls = append(calls, r.Method+" "+r.URL.Path)
@@ -1009,11 +1009,11 @@ func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
 		}))
 		defer api.Close()
 		host := "http://" + strings.TrimPrefix(api.URL, "http://")
-		s.change(s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": "sk-held-1234", "hosts": []string{host}})
+		s.change(t, s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": "sk-held-1234", "hosts": []string{host}})
 		agent := func(handle string, scope M) string {
-			s.change(s.owner, "", "agent.create", M{"name": handle, "handle": handle, "scope": scope})
+			s.change(t, s.owner, "", "agent.create", M{"name": handle, "handle": handle, "scope": scope})
 			var out struct{ Token string }
-			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &out)
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &out)
 			return out.Token
 		}
 		deploy := `{"ref":"main"}`
@@ -1024,7 +1024,7 @@ func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
 			if approval != "" {
 				body["approval"] = approval
 			}
-			return s.call(nil, token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", body, want, nil)
+			return s.call(t, nil, token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", body, want, nil)
 		}
 		send := func(token, method string, approval string, want int) string {
 			t.Helper()
@@ -1047,8 +1047,8 @@ func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
 				t.Fatalf("calls made: %v", calls[before:])
 			}
 			request := M{"name": "DEPLOY_KEY", "method": "POST", "url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}, "body": deploy}
-			ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "secret.send", "args": request, "question": "Deploy?"})["ref"].(string)
-			s.change(s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
+			ask := s.change(t, nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "secret.send", "args": request, "question": "Deploy?"})["ref"].(string)
+			s.change(t, s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
 			// The approval is of the whole request as written: any other
 			// method, header or body is another request, which needs its own.
 			send(asker, "DELETE", ask, 403)

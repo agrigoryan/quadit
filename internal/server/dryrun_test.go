@@ -19,18 +19,18 @@ import (
 func TestDryRunWritesNothingOnAnyPath(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion effect"})
-		agent := s.agentToken("dry")
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion effect"})
+		agent := s.agentToken(t, "dry")
 		feed := func() int64 {
 			var page struct{ Seq int64 }
-			s.call(s.owner, "", "GET", w+"/events?limit=2000", nil, 200, &page)
+			s.call(t, s.owner, "", "GET", w+"/events?limit=2000", nil, 200, &page)
 			return page.Seq
 		}
-		memory := func() string { return s.call(nil, agent, "GET", "/api/v1/w/-/memory?format=text", nil, 200, nil) }
+		memory := func() string { return s.call(t, nil, agent, "GET", "/api/v1/w/-/memory?format=text", nil, 200, nil) }
 		cursor := func(name string) int64 {
 			var c struct{ Seq int64 }
-			s.call(nil, agent, "GET", "/api/v1/w/-/cursors/"+name, nil, 200, &c)
+			s.call(t, nil, agent, "GET", "/api/v1/w/-/cursors/"+name, nil, 200, &c)
 			return c.Seq
 		}
 		files := func() int {
@@ -54,25 +54,25 @@ func TestDryRunWritesNothingOnAnyPath(t *testing.T) {
 			}
 			was := os.Stdin
 			os.Stdin = f
-			out, code := s.quadit(agent, "--dry-run", "remember", "Preferences")
+			out, code := s.quadit(t, agent, "--dry-run", "remember", "Preferences")
 			os.Stdin = was
 			f.Close()
 			if code != 0 || !strings.Contains(out, "would be accepted") {
 				t.Fatalf("a dry remember: %d %s", code, out)
 			}
-			if out, code := s.quadit(agent, "--dry-run", "ack", "2", "main"); code != 0 || !strings.Contains(out, "would be accepted") {
+			if out, code := s.quadit(t, agent, "--dry-run", "ack", "2", "main"); code != 0 || !strings.Contains(out, "would be accepted") {
 				t.Fatalf("a dry ack: %d %s", code, out)
 			}
-			if out, code := s.quadit(agent, "--dry-run", "ack", "99999", "main"); code == 0 {
+			if out, code := s.quadit(t, agent, "--dry-run", "ack", "99999", "main"); code == 0 {
 				t.Fatalf("a dry ack past the end of the feed was accepted: %s", out)
 			}
 			for _, args := range [][]string{{"upload", picture}, {"attach", "SVA-1", picture}, {"comment", "SVA-1", "file=" + picture, "Looks right"}} {
-				if out, code := s.quadit(agent, append([]string{"--dry-run"}, args...)...); code != 0 || !strings.Contains(out, "would") {
+				if out, code := s.quadit(t, agent, append([]string{"--dry-run"}, args...)...); code != 0 || !strings.Contains(out, "would") {
 					t.Fatalf("a dry %s: %d %s", args[0], code, out)
 				}
 			}
 			for _, args := range [][]string{{"request", "KEY", "https://example.com"}, {"run", "--secret", "KEY", "--", "true"}, {"listen", "--exec", "true"}} {
-				if out, code := s.quadit(agent, append([]string{"--dry-run"}, args...)...); code == 0 || !strings.Contains(out, "no dry run") {
+				if out, code := s.quadit(t, agent, append([]string{"--dry-run"}, args...)...); code == 0 || !strings.Contains(out, "no dry run") {
 					t.Fatalf("a dry %s was not refused: %d %s", args[0], code, out)
 				}
 			}

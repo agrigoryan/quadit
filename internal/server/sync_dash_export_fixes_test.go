@@ -47,20 +47,20 @@ func TestSyncKeepsEveryNote(t *testing.T) {
 	git(work, "remote", "add", "origin", bare)
 	git(work, "push", "-q", "origin", "main")
 
-	src := s.change(s.owner, "", "source.create", M{"title": "Handbook", "repo": bare, "subdir": "docs"})["ref"].(string)
-	sync := func() string { return s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil) }
+	src := s.change(t, s.owner, "", "source.create", M{"title": "Handbook", "repo": bare, "subdir": "docs"})["ref"].(string)
+	sync := func() string { return s.call(t, s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil) }
 	if out := sync(); !strings.Contains(out, "no folder docs") {
 		t.Fatalf("the first sync does not say the folder is missing: %s", out)
 	}
 	var docs struct{ Docs []struct{ ID, Title string } }
-	s.call(s.owner, "", "GET", w+"/docs", nil, 200, &docs)
+	s.call(t, s.owner, "", "GET", w+"/docs", nil, 200, &docs)
 	root := ""
 	for _, d := range docs.Docs {
 		if d.Title == "Handbook" {
 			root = d.ID
 		}
 	}
-	s.change(s.owner, "", "doc.create", M{"title": "held", "parent": root, "markdown": "Cannot land.\n"})
+	s.change(t, s.owner, "", "doc.create", M{"title": "held", "parent": root, "markdown": "Cannot land.\n"})
 
 	// The working copy may not be written to: the folder cannot be made, so
 	// the page is held back, and the folder is still missing.
@@ -84,20 +84,20 @@ func TestSyncKeepsEveryNote(t *testing.T) {
 // project lists only the questions asked on that project's tasks.
 func TestDashboardOfOneProjectAsksOnlyItsQuestions(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
-	s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+	s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
 	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
-	s.change(nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "How many phases?", "options": []M{{"label": "Three"}, {"label": "Four"}}, "ask": "@aram"})
+	s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+	s.change(t, nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "How many phases?", "options": []M{{"label": "Three"}, {"label": "Four"}}, "ask": "@aram"})
 
 	asked := func(query string) []struct{ Task, Question string } {
 		var out struct {
 			Asked []struct{ Task, Question string } `json:"asked_of_me"`
 		}
-		s.call(s.owner, "", "GET", w+"/dashboard"+query, nil, 200, &out)
+		s.call(t, s.owner, "", "GET", w+"/dashboard"+query, nil, 200, &out)
 		return out.Asked
 	}
 	if got := asked(""); len(got) != 1 || got[0].Task != "SVA-1" {
@@ -115,14 +115,14 @@ func TestDashboardOfOneProjectAsksOnlyItsQuestions(t *testing.T) {
 // (the same name, the same rank) come in the same order on every call.
 func TestDashboardSameEveryTime(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
 	for _, p := range []string{"SVA", "OPS", "SVA", "OPS"} {
-		s.change(s.owner, "", "epic.create", M{"project": p, "name": "Same"})
-		s.change(s.owner, "", "epic.create", M{"project": p, "name": "Dated", "target_on": "2030-01-01"})
+		s.change(t, s.owner, "", "epic.create", M{"project": p, "name": "Same"})
+		s.change(t, s.owner, "", "epic.create", M{"project": p, "name": "Dated", "target_on": "2030-01-01"})
 	}
 	for _, name := range []string{"Polish", "Review", "Check"} {
-		s.change(s.owner, "", "status.create", M{"project": "SVA", "name": name, "category": "started", "rank": "m"})
+		s.change(t, s.owner, "", "status.create", M{"project": "SVA", "name": name, "category": "started", "rank": "m"})
 	}
 	order := func() string {
 		var out struct {
@@ -131,7 +131,7 @@ func TestDashboardSameEveryTime(t *testing.T) {
 				ByStatus json.RawMessage `json:"by_status"`
 			} `json:"flow"`
 		}
-		s.call(s.owner, "", "GET", w+"/dashboard", nil, 200, &out)
+		s.call(t, s.owner, "", "GET", w+"/dashboard", nil, 200, &out)
 		return string(out.Epics) + "\n" + string(out.Flow.ByStatus)
 	}
 	first := order()
@@ -149,7 +149,7 @@ func TestExportNamesWhatItLeftOut(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
 	upload := func(name, body string) string {
 		var f struct{ ID, State string }
-		s.call(s.owner, "", "POST", fmt.Sprintf(w+"/files?name=%s&size=%d", name, len(body)), []byte(body), 201, &f)
+		s.call(t, s.owner, "", "POST", fmt.Sprintf(w+"/files?name=%s&size=%d", name, len(body)), []byte(body), 201, &f)
 		if f.State != "ready" {
 			t.Fatalf("upload = %+v", f)
 		}

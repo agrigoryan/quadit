@@ -13,13 +13,13 @@ import (
 func TestContextPackListsLinkedPagesByTitle(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 		for _, title := range []string{"Delta", "Alpha", "Echo", "Charlie", "Bravo"} {
-			s.change(s.owner, "", "doc.create", M{"title": title, "markdown": "About SVA-1.\n"})
+			s.change(t, s.owner, "", "doc.create", M{"title": title, "markdown": "About SVA-1.\n"})
 		}
 		for range 5 {
-			text := s.call(s.owner, "", "GET", w+"/tasks/SVA-1/context?format=text", nil, 200, nil)
+			text := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1/context?format=text", nil, 200, nil)
 			_, linked, _ := strings.Cut(text, "=== linked docs\n")
 			var titles []string
 			for line := range strings.Lines(linked) {

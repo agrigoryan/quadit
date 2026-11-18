@@ -53,7 +53,7 @@ func TestRepositorySync(t *testing.T) {
 		write("README.md", "not under docs\n")
 		push("first")
 
-		src := s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": origin, "subdir": "docs"})["ref"].(string)
+		src := s.change(t, s.owner, "", "source.create", M{"title": "Game docs", "repo": origin, "subdir": "docs"})["ref"].(string)
 		var res struct {
 			PagesCreated int    `json:"pages_created"`
 			PagesUpdated int    `json:"pages_updated"`
@@ -64,18 +64,18 @@ func TestRepositorySync(t *testing.T) {
 		sync := func() {
 			t.Helper()
 			res.PagesCreated, res.PagesUpdated, res.PagesTrashed, res.FilesWritten, res.Pushed = 0, 0, 0, 0, ""
-			s.call(s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, &res)
+			s.call(t, s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, &res)
 		}
 		sync()
 		if res.PagesCreated != 2 || res.FilesWritten != 0 {
 			t.Fatalf("first sync = %+v", res)
 		}
-		tree := s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
+		tree := s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
 		if !strings.Contains(tree, "Game docs") || !strings.Contains(tree, "\n  Design  (") || !strings.Contains(tree, "\n  art  (") || !strings.Contains(tree, "\n    sprites  (") || strings.Contains(tree, "README") {
 			t.Fatalf("page tree:\n%s", tree)
 		}
 		idOf := func(title string) string {
-			for line := range strings.SplitSeq(s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil), "\n") {
+			for line := range strings.SplitSeq(s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil), "\n") {
 				if strings.HasPrefix(strings.TrimSpace(line), title+"  (") {
 					return line[strings.LastIndex(line, "(")+1 : len(line)-1]
 				}
@@ -92,7 +92,7 @@ func TestRepositorySync(t *testing.T) {
 
 		// A page edited here becomes a commit there.
 		design := idOf("Design") // called by its heading
-		s.change(s.owner, "", "doc.write", M{"doc": design, "markdown": "# Design\n\nThe boss has four phases.\n"})
+		s.change(t, s.owner, "", "doc.write", M{"doc": design, "markdown": "# Design\n\nThe boss has four phases.\n"})
 		sync()
 		if res.FilesWritten != 1 || res.Pushed != "main" {
 			t.Fatalf("page edit sync = %+v", res)
@@ -119,28 +119,28 @@ func TestRepositorySync(t *testing.T) {
 		if res.PagesUpdated != 1 || res.PagesCreated != 1 || res.PagesTrashed != 1 {
 			t.Fatalf("file edit sync = %+v", res)
 		}
-		if got := s.call(s.owner, "", "GET", w+"/docs/"+design+"?format=md", nil, 200, nil); !strings.Contains(got, "five phases") {
+		if got := s.call(t, s.owner, "", "GET", w+"/docs/"+design+"?format=md", nil, 200, nil); !strings.Contains(got, "five phases") {
 			t.Fatalf("the page did not get the file's edit:\n%s", got)
 		}
 
 		// Both sides change the same page: the repository has the say by default.
-		s.change(s.owner, "", "doc.write", M{"doc": design, "markdown": "page says six\n"})
+		s.change(t, s.owner, "", "doc.write", M{"doc": design, "markdown": "page says six\n"})
 		write("docs/design.md", "file says seven\n")
 		push("conflict")
 		sync()
-		if got := s.call(s.owner, "", "GET", w+"/docs/"+design+"?format=md", nil, 200, nil); !strings.Contains(got, "file says seven") {
+		if got := s.call(t, s.owner, "", "GET", w+"/docs/"+design+"?format=md", nil, 200, nil); !strings.Contains(got, "file says seven") {
 			t.Fatalf("conflict was not settled for the repository:\n%s", got)
 		}
 		// The page's own version is not lost: it is in the page's history.
 		var vs struct{ Versions []struct{ ID string } }
-		s.call(s.owner, "", "GET", w+"/docs/"+design+"/versions", nil, 200, &vs)
+		s.call(t, s.owner, "", "GET", w+"/docs/"+design+"/versions", nil, 200, &vs)
 		if len(vs.Versions) == 0 {
 			t.Fatal("the overwritten page left no version behind")
 		}
 
 		// A page made here inside the folder becomes a new file.
 		root := idOf("Game docs")
-		s.change(s.owner, "", "doc.create", M{"parent": root, "title": "Release Notes", "markdown": "v0.1\n"})
+		s.change(t, s.owner, "", "doc.create", M{"parent": root, "title": "Release Notes", "markdown": "v0.1\n"})
 		sync()
 		gitIn(t, work, "pull", "--quiet", "origin", "main")
 		if raw, err := os.ReadFile(filepath.Join(work, "docs/release-notes.md")); err != nil || !strings.Contains(string(raw), "v0.1") {
@@ -166,7 +166,7 @@ type syncOutcome struct {
 func (r *syncedRepo) syncAnswering(want int) (syncOutcome, string) {
 	r.t.Helper()
 	var res syncOutcome
-	raw := r.s.call(r.s.owner, "", "POST", w+"/sources/"+r.src+"/sync", nil, want, nil)
+	raw := r.s.call(r.t, r.s.owner, "", "POST", w+"/sources/"+r.src+"/sync", nil, want, nil)
 	if want == 200 {
 		if err := json.Unmarshal([]byte(raw), &res); err != nil {
 			r.t.Fatalf("the answer %q: %v", raw, err)
@@ -186,7 +186,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 	source := func(r *syncedRepo, args M) {
 		a := M{"title": "Game docs", "repo": r.origin, "subdir": "docs"}
 		maps.Copy(a, args)
-		r.src = r.s.change(r.s.owner, "", "source.create", a)["ref"].(string)
+		r.src = r.s.change(r.t, r.s.owner, "", "source.create", a)["ref"].(string)
 	}
 	cases := []struct {
 		name  string
@@ -225,11 +225,11 @@ func TestRepositorySyncDecides(t *testing.T) {
 			source(r, nil)
 			r.syncAnswering(200)
 			other := newSyncedRepo(t, s, map[string]string{"docs/b.md": "B.\n"})
-			s.change(s.owner, "", "source.update", M{"id": r.src, "repo": other.origin})
+			s.change(t, s.owner, "", "source.update", M{"id": r.src, "repo": other.origin})
 			if res, _ := r.syncAnswering(200); res.PagesCreated != 1 || res.PagesTrashed != 1 {
 				t.Fatalf("%+v", res)
 			}
-			s.pageID("b")
+			s.pageID(t, "b")
 		}},
 		{"a push to a working copy with the branch checked out is refused and explained", nil, func(t *testing.T, s *site, r *syncedRepo) {
 			checkedOut := t.TempDir()
@@ -241,27 +241,27 @@ func TestRepositorySyncDecides(t *testing.T) {
 			r.origin = checkedOut
 			source(r, nil)
 			r.syncAnswering(200)
-			page := s.pageID("a")
-			s.change(s.owner, "", "doc.write", M{"doc": page, "markdown": "A, edited.\n"})
+			page := s.pageID(t, "a")
+			s.change(t, s.owner, "", "doc.write", M{"doc": page, "markdown": "A, edited.\n"})
 			for range 2 {
 				if _, raw := r.syncAnswering(409); !strings.Contains(raw, "the repository is a working copy with main checked out, and git lets nobody push to that") {
 					t.Fatal(raw)
 				}
 			}
-			if got := s.call(s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil); !strings.Contains(got, "A, edited.") {
+			if got := s.call(t, s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil); !strings.Contains(got, "A, edited.") {
 				t.Fatalf("the page lost its edit: %q", got)
 			}
 		}},
 		{"a file's HTML, a comment span's look-alike too, is its text both ways", map[string]string{"docs/a.md": "A <span class=\"badge\">new</span> thing.\n\nWrite <span data-comment=\"ID\">words</span> to mark them.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, nil)
 			r.syncAnswering(200)
-			page := s.pageID("a")
+			page := s.pageID(t, "a")
 			if res, _ := r.syncAnswering(200); res.FilesWritten != 0 || res.PagesUpdated != 0 {
 				t.Fatalf("an idle sync wrote: %+v", res)
 			}
 			// An agent reads the page with its comment spans and writes it back with an edit.
-			text := s.call(s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil)
-			s.change(s.owner, "", "doc.write", M{"doc": page, "markdown": strings.Replace(text, "thing", "feature", 1)})
+			text := s.call(t, s.owner, "", "GET", w+"/docs/"+page+"?format=md", nil, 200, nil)
+			s.change(t, s.owner, "", "doc.write", M{"doc": page, "markdown": strings.Replace(text, "thing", "feature", 1)})
 			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 {
 				t.Fatalf("the edit was not written: %+v", res)
 			}
@@ -273,7 +273,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 		{"both changed and the pages have the say: the page is written", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, M{"authority": "pages"})
 			r.syncAnswering(200)
-			s.change(s.owner, "", "doc.write", M{"doc": s.pageID("a"), "markdown": "A, from the page.\n"})
+			s.change(t, s.owner, "", "doc.write", M{"doc": s.pageID(t, "a"), "markdown": "A, from the page.\n"})
 			r.write("docs/a.md", "A, from the file.\n")
 			r.push("there")
 			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 || res.PagesUpdated != 0 {
@@ -287,7 +287,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 		{"a page trashed here takes its unchanged file with it", map[string]string{"docs/a.md": "A.\n", "docs/b.md": "B.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, nil)
 			r.syncAnswering(200)
-			s.change(s.owner, "", "doc.delete", M{"id": s.pageID("a")})
+			s.change(t, s.owner, "", "doc.delete", M{"id": s.pageID(t, "a")})
 			if res, _ := r.syncAnswering(200); res.FilesRemoved != 1 || res.FilesWritten != 0 || res.Pushed != "main" {
 				t.Fatalf("%+v", res)
 			}
@@ -301,7 +301,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 		{"a page trashed here while its file changed there, pages having the say: the file goes", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, M{"authority": "pages"})
 			r.syncAnswering(200)
-			s.change(s.owner, "", "doc.delete", M{"id": s.pageID("a")})
+			s.change(t, s.owner, "", "doc.delete", M{"id": s.pageID(t, "a")})
 			r.write("docs/a.md", "A, changed there.\n")
 			r.push("there")
 			if res, _ := r.syncAnswering(200); res.FilesRemoved != 1 || res.Note != "" {
@@ -314,7 +314,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 		{"a source that is never written to takes file edits and writes nothing", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, M{"write_mode": "none"})
 			r.syncAnswering(200)
-			s.change(s.owner, "", "doc.create", M{"parent": s.pageID("Game docs"), "title": "New", "markdown": "New.\n"})
+			s.change(t, s.owner, "", "doc.create", M{"parent": s.pageID(t, "Game docs"), "title": "New", "markdown": "New.\n"})
 			r.write("docs/a.md", "A, edited there.\n")
 			r.push("there")
 			if res, _ := r.syncAnswering(200); res.FilesWritten != 0 || res.Pushed != "" || res.PagesUpdated != 1 || res.Commit == "" {
@@ -330,7 +330,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 		{"a proposal is pushed once, and the branch is left as it was", map[string]string{"docs/a.md": "A.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, M{"write_mode": "propose"})
 			r.syncAnswering(200)
-			s.change(s.owner, "", "doc.write", M{"doc": s.pageID("a"), "markdown": "A, proposed.\n"})
+			s.change(t, s.owner, "", "doc.write", M{"doc": s.pageID(t, "a"), "markdown": "A, proposed.\n"})
 			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 || res.Pushed != "quadit/docs" {
 				t.Fatalf("%+v", res)
 			}
@@ -349,13 +349,13 @@ func TestRepositorySyncDecides(t *testing.T) {
 			if res, _ := r.syncAnswering(200); res.PagesCreated != 2 {
 				t.Fatalf("%+v", res)
 			}
-			s.pageID("a")
-			s.pageID("UPPER")
+			s.pageID(t, "a")
+			s.pageID(t, "UPPER")
 		}},
 		{"a file with a second opening heading keeps both and is called by its name", map[string]string{"docs/two.md": "# One\n\n# Two\n\nText.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, nil)
 			r.syncAnswering(200)
-			if got := s.call(s.owner, "", "GET", w+"/docs/"+s.pageID("two")+"?format=md", nil, 200, nil); !strings.Contains(got, "# One") {
+			if got := s.call(t, s.owner, "", "GET", w+"/docs/"+s.pageID(t, "two")+"?format=md", nil, 200, nil); !strings.Contains(got, "# One") {
 				t.Fatalf("%q", got)
 			}
 			r.idle("after the first sync")
@@ -365,11 +365,11 @@ func TestRepositorySyncDecides(t *testing.T) {
 			if res, _ := r.syncAnswering(200); res.PagesCreated != 1 {
 				t.Fatalf("%+v", res)
 			}
-			tree := s.call(s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
+			tree := s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
 			if !strings.Contains(tree, "\n  a  (") || !strings.Contains(tree, "\n    b  (") || !strings.Contains(tree, "\n      c  (") {
 				t.Fatal(tree)
 			}
-			s.change(s.owner, "", "doc.create", M{"parent": s.pageID("b"), "title": "New Page", "markdown": "New.\n"})
+			s.change(t, s.owner, "", "doc.create", M{"parent": s.pageID(t, "b"), "title": "New Page", "markdown": "New.\n"})
 			if res, _ := r.syncAnswering(200); res.FilesWritten != 1 {
 				t.Fatalf("%+v", res)
 			}
@@ -381,7 +381,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 		{"a page moved here keeps its file", map[string]string{"docs/a.md": "A.\n", "docs/f/b.md": "B.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, nil)
 			r.syncAnswering(200)
-			s.change(s.owner, "", "doc.update", M{"id": s.pageID("a"), "parent": s.pageID("f")})
+			s.change(t, s.owner, "", "doc.update", M{"id": s.pageID(t, "a"), "parent": s.pageID(t, "f")})
 			r.idle("after a move")
 			if got := r.files("main"); !strings.Contains(got, "docs/a.md") || strings.Contains(got, "docs/f/a.md") {
 				t.Fatal(got)
@@ -390,11 +390,11 @@ func TestRepositorySyncDecides(t *testing.T) {
 		{"the commit is the last editor's and names the others", map[string]string{"docs/a.md": "A.\n", "docs/b.md": "B.\n"}, func(t *testing.T, s *site, r *syncedRepo) {
 			source(r, nil)
 			r.syncAnswering(200)
-			s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+			s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 			var tok struct{ Token string }
-			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
-			s.change(s.owner, "", "doc.write", M{"doc": s.pageID("a"), "markdown": "A, by Aram.\n"})
-			s.change(nil, tok.Token, "doc.write", M{"doc": s.pageID("b"), "markdown": "B, by the artist.\n"})
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+			s.change(t, s.owner, "", "doc.write", M{"doc": s.pageID(t, "a"), "markdown": "A, by Aram.\n"})
+			s.change(t, nil, tok.Token, "doc.write", M{"doc": s.pageID(t, "b"), "markdown": "B, by the artist.\n"})
 			if res, _ := r.syncAnswering(200); res.FilesWritten != 2 {
 				t.Fatalf("%+v", res)
 			}
@@ -414,7 +414,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 			}
 			t.Cleanup(func() { os.Chmod(sub, 0o755) })
 			r.syncAnswering(500) // the server's own disk, not the source's setup
-			s.pageID("b")
+			s.pageID(t, "b")
 		}},
 	}
 	for _, c := range cases {
@@ -434,14 +434,14 @@ func TestARepositorySyncFailsWhenItCannotReadWhoEditedThePages(t *testing.T) {
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	r := newSyncedRepo(t, s, map[string]string{"docs/design.md": "# Design\n\nThe boss has three phases.\n"})
-	r.src = s.change(s.owner, "", "source.create", M{"title": "Game docs", "repo": r.origin, "subdir": "docs"})["ref"].(string)
+	r.src = s.change(t, s.owner, "", "source.create", M{"title": "Game docs", "repo": r.origin, "subdir": "docs"})["ref"].(string)
 	r.sync()
-	s.change(s.owner, "", "doc.write", M{"doc": s.pageID("Design"), "markdown": "# Design\n\nThe boss has four phases.\n"})
+	s.change(t, s.owner, "", "doc.write", M{"doc": s.pageID(t, "Design"), "markdown": "# Design\n\nThe boss has four phases.\n"})
 	before := gitIn(t, r.origin, "rev-parse", "main")
 
 	// The commit's author is read by id alone; signing in reads the same row
 	// as a live one, and is let through.
-	owner := s.ownerID()
+	owner := s.ownerID(t)
 	fired := st.faults.arm(fault{op: "get", table: "users", times: 1,
 		match: func(_ map[string]any, where []store.Cond) bool {
 			return len(where) == 1 && whereHas(where, "id", owner)

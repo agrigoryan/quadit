@@ -22,13 +22,13 @@ import (
 func TestABackupOfANewerQuaditIsRefusedInWords(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 		var made struct {
 			Backup struct{ ID string }
 			ID     string
 		}
-		s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
 		bid := made.Backup.ID
 		if bid == "" {
 			bid = made.ID
@@ -56,7 +56,7 @@ func TestABackupOfANewerQuaditIsRefusedInWords(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		out := s.call(s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 409, nil)
+		out := s.call(t, s.owner, "", "POST", "/api/v1/admin/backups/"+bid+"/restore-item", M{"workspace": "games", "task": "SVA-1"}, 409, nil)
 		if !strings.Contains(out, "Quadit 9.9.9") {
 			t.Fatalf("the refusal does not say which Quadit can read the backup: %s", out)
 		}
@@ -71,15 +71,15 @@ func TestABackupOfANewerQuaditIsRefusedInWords(t *testing.T) {
 func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
 	backupOf := func() (id, location string) {
 		t.Helper()
 		var made struct {
 			Backup struct{ ID string }
 			ID     string
 		}
-		s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &made)
 		id = made.Backup.ID
 		if id == "" {
 			id = made.ID
@@ -92,7 +92,7 @@ func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 	}
 	restore := func(t *testing.T, id string, body M, want int) {
 		t.Helper()
-		s.in(t).call(s.owner, "", "POST", "/api/v1/admin/backups/"+id+"/restore-item", body, want, nil)
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups/"+id+"/restore-item", body, want, nil)
 	}
 	good, _ := backupOf()
 
@@ -107,7 +107,7 @@ func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 		restore(t, good, M{"workspace": "games", "task": "SVA-1"}, 500)
 	})
 	t.Run("a failure part way leaves the task as it was", func(t *testing.T) {
-		s.in(t).change(s.owner, "", "task.update", M{"id": "SVA-1", "title": "Renamed after the backup"})
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-1", "title": "Renamed after the backup"})
 		ctx := context.Background()
 		var ws core.Workspace
 		if err := st.Get(ctx, &ws, store.Eq("slug", "games")); err != nil {
@@ -144,8 +144,8 @@ func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 func TestTwoBackupsInOneSecondAreTwoFiles(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
 	var first, second struct{ Location string }
-	s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &first)
-	s.call(s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &second)
+	s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &first)
+	s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &second)
 	if first.Location == "" || first.Location == second.Location {
 		t.Fatalf("the two backups are at %q and %q; want two files", first.Location, second.Location)
 	}

@@ -22,7 +22,7 @@ func TestGoogleStorageRefusesAnOAuthClientFile(t *testing.T) {
 		"a key of an unknown kind":  {`{"type":"api_key"}`, "api_key"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			out := s.in(t).call(s.owner, "", "PUT", "/api/v1/admin/settings/files", M{"kind": "gcs", "bucket": "quadit-files", "credentials": c.key}, 400, nil)
+			out := s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/files", M{"kind": "gcs", "bucket": "quadit-files", "credentials": c.key}, 400, nil)
 			if !strings.Contains(out, c.says) || !strings.Contains(out, "service_account") {
 				t.Fatalf("the refusal says %s; want it to name what was given (%s) and what is needed (a service account key)", out, c.says)
 			}

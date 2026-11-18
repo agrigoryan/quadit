@@ -88,28 +88,28 @@ func eventually(t *testing.T, what string, ok func() bool) {
 func TestWakeUps(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		artist := s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})["ref"].(string)
-		s.change(s.owner, "", "agent.create", M{"name": "Coordinator", "handle": "coordinator"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		artist := s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})["ref"].(string)
+		s.change(t, s.owner, "", "agent.create", M{"name": "Coordinator", "handle": "coordinator"})
 
 		all := newReceiver(t, "s3cret")
 		mine := newReceiver(t, "")
 		woken := newReceiver(t, "")
 		all.fail = 1 // the first try fails; the delivery is retried
-		s.change(s.owner, "", "webhook.create", M{"name": "everything about tasks", "url": all.srv.URL, "secret": "s3cret", "event_types": []string{"task.*", "decision.*"}})
-		s.change(s.owner, "", "webhook.create", M{"name": "artist inbox", "url": mine.srv.URL, "for": "@artist"})
-		hook := s.change(s.owner, "", "webhook.create", M{"name": "wake coordinator", "url": woken.srv.URL, "event_types": []string{"never.matches"}})["ref"].(string)
+		s.change(t, s.owner, "", "webhook.create", M{"name": "everything about tasks", "url": all.srv.URL, "secret": "s3cret", "event_types": []string{"task.*", "decision.*"}})
+		s.change(t, s.owner, "", "webhook.create", M{"name": "artist inbox", "url": mine.srv.URL, "for": "@artist"})
+		hook := s.change(t, s.owner, "", "webhook.create", M{"name": "wake coordinator", "url": woken.srv.URL, "event_types": []string{"never.matches"}})["ref"].(string)
 		// "When the owner picks, wake the coordinator": a webhook and an inbox item.
-		s.change(s.owner, "", "rule.create", M{"name": "pick wakes coordinator", "match": M{"event_types": []string{"decision.picked"}, "actor_kind": "person"},
+		s.change(t, s.owner, "", "rule.create", M{"name": "pick wakes coordinator", "match": M{"event_types": []string{"decision.picked"}, "actor_kind": "person"},
 			"action": M{"kind": "webhook", "webhook_id": hook}})
-		s.change(s.owner, "", "rule.create", M{"name": "The owner picked: plan the next step", "match": M{"event_types": []string{"decision.picked"}},
+		s.change(t, s.owner, "", "rule.create", M{"name": "The owner picked: plan the next step", "match": M{"event_types": []string{"decision.picked"}},
 			"action": M{"kind": "notify", "user_id": "@coordinator"}})
 
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion", "assignee": "@artist"})
-		d := s.change(nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "Which?", "options": []M{{"label": "A"}, {"label": "B"}}})
-		s.change(s.owner, "", "decision.pick", M{"id": d["ref"], "option": 2})
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion", "assignee": "@artist"})
+		d := s.change(t, nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "Which?", "options": []M{{"label": "A"}, {"label": "B"}}})
+		s.change(t, s.owner, "", "decision.pick", M{"id": d["ref"], "option": 2})
 
 		eventually(t, "the task webhook to get the pick", func() bool { return strings.Contains(all.types(), "decision.picked") })
 		if got := all.types(); !strings.HasPrefix(got, "task.created") || strings.Contains(got, "notification") || strings.Contains(got, "project.created") {
@@ -134,8 +134,8 @@ func TestWakeUps(t *testing.T) {
 		// And the rule's inbox item reached the coordinator, once.
 		eventually(t, "the coordinator's inbox item", func() bool {
 			var ctok struct{ Token string }
-			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coordinator"}, 201, &ctok)
-			out := s.call(nil, ctok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil)
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@coordinator"}, 201, &ctok)
+			out := s.call(t, nil, ctok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil)
 			return strings.Count(out, "plan the next step") == 1
 		})
 		// The delivery log shows the failed first try, and health sees nothing dead.
@@ -145,7 +145,7 @@ func TestWakeUps(t *testing.T) {
 				Attempts int
 			}
 		}
-		s.call(s.owner, "", "GET", w+"/list/deliveries", nil, 200, &log)
+		s.call(t, s.owner, "", "GET", w+"/list/deliveries", nil, 200, &log)
 		retried := false
 		for _, dl := range log.Deliveries {
 			if dl.State != "ok" {
@@ -163,18 +163,18 @@ func TestWakeUps(t *testing.T) {
 func TestWatchedView(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
-		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		var tok struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
 		// The agent saves a view of unassigned art tasks and watches it.
-		view := s.change(nil, tok.Token, "view.create", M{"name": "Art nobody has", "query": M{"label": []string{"art"}, "assignee": []string{"none"}, "open": true}})
-		s.change(nil, tok.Token, "watch.set", M{"type": "view", "subject": view["ref"]})
-		inbox := func() string { return s.call(nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil) }
+		view := s.change(t, nil, tok.Token, "view.create", M{"name": "Art nobody has", "query": M{"label": []string{"art"}, "assignee": []string{"none"}, "open": true}})
+		s.change(t, nil, tok.Token, "watch.set", M{"type": "view", "subject": view["ref"]})
+		inbox := func() string { return s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil) }
 
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Not art"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane sprites", "labels": []string{"art"}})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Not art"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane sprites", "labels": []string{"art"}})
 		eventually(t, "the view's watcher to hear of the new art task", func() bool {
 			return strings.Contains(inbox(), `SVA-2 Dock crane sprites — in your view "Art nobody has"`)
 		})
@@ -182,7 +182,7 @@ func TestWatchedView(t *testing.T) {
 			t.Fatalf("a task outside the view was announced:\n%s", inbox())
 		}
 		// The saved view can be run by its slug.
-		if out := s.call(nil, tok.Token, "GET", "/api/v1/w/-/tasks?view=art-nobody-has&format=text", nil, 200, nil); !strings.Contains(out, "SVA-2") || strings.Contains(out, "SVA-1") {
+		if out := s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/tasks?view=art-nobody-has&format=text", nil, 200, nil); !strings.Contains(out, "SVA-2") || strings.Contains(out, "SVA-1") {
 			t.Fatalf("view query:\n%s", out)
 		}
 	})
@@ -192,19 +192,19 @@ func TestWatchedView(t *testing.T) {
 // reached, with a backlog of thousands, takes nothing from another's queue.
 func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Talked about"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Talked about"})
 	fine := newReceiver(t, "")
-	s.change(s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x", "event_types": []string{"task.*"}})
-	s.change(s.owner, "", "webhook.create", M{"name": "fine", "url": fine.srv.URL, "event_types": []string{"comment.created"}})
+	s.change(t, s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x", "event_types": []string{"task.*"}})
+	s.change(t, s.owner, "", "webhook.create", M{"name": "fine", "url": fine.srv.URL, "event_types": []string{"comment.created"}})
 	for b := range 7 {
 		batch := make([]M, 300)
 		for i := range batch {
 			batch[i] = M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": fmt.Sprintf("Backlog %d-%d", b, i)}}
 		}
-		s.call(s.owner, "", "POST", w+"/changes", M{"changes": batch}, 200, nil)
+		s.call(t, s.owner, "", "POST", w+"/changes", M{"changes": batch}, 200, nil)
 	}
-	s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the backlog"})
+	s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the backlog"})
 	eventually(t, "the working webhook to hear the comment", func() bool { return strings.Contains(fine.types(), "comment.created") })
 }
 
@@ -215,17 +215,17 @@ func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
 func TestAProjectsWebhookIsNotToldOfTasksOfOtherProjects(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
-		s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
 		var sva struct{ Task struct{ ID string } }
-		s.call(s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva)
+		s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?raw=1", nil, 200, &sva)
 		ops, all := newReceiver(t, ""), newReceiver(t, "")
-		s.change(s.owner, "", "webhook.create", M{"name": "ops", "url": ops.srv.URL, "project": "OPS", "event_types": []string{"relation.*", "task.related"}})
-		s.change(s.owner, "", "webhook.create", M{"name": "all", "url": all.srv.URL, "event_types": []string{"relation.*", "task.related"}})
-		s.change(s.owner, "", "relation.add", M{"task": "OPS-1", "type": "blocks", "other": "SVA-1"})
-		s.change(s.owner, "", "relation.add", M{"task": "SVA-1", "type": "relates", "other": "OPS-1"})
+		s.change(t, s.owner, "", "webhook.create", M{"name": "ops", "url": ops.srv.URL, "project": "OPS", "event_types": []string{"relation.*", "task.related"}})
+		s.change(t, s.owner, "", "webhook.create", M{"name": "all", "url": all.srv.URL, "event_types": []string{"relation.*", "task.related"}})
+		s.change(t, s.owner, "", "relation.add", M{"task": "OPS-1", "type": "blocks", "other": "SVA-1"})
+		s.change(t, s.owner, "", "relation.add", M{"task": "SVA-1", "type": "relates", "other": "OPS-1"})
 
 		eventually(t, "both webhooks to hear of both relations", func() bool {
 			return strings.Count(ops.types(), "relation.created")+strings.Count(ops.types(), "task.related") >= 2 &&

@@ -15,17 +15,17 @@ import (
 func TestSearchFindsWhatTheReaderMayOpen(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-		bea, other := s.agentToken("bea"), s.agentToken("other")
-		shared := s.change(s.owner, "", "doc.create", M{"title": "Salaries", "markdown": "wombat figures\n", "private": true, "shared_with": []string{"@bea"}})["ref"].(string)
-		s.change(s.owner, "", "comment.create", M{"doc": shared, "body": "numbat remark"})
-		open := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "platypus rules\n"})["ref"].(string)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		bea, other := s.agentToken(t, "bea"), s.agentToken(t, "other")
+		shared := s.change(t, s.owner, "", "doc.create", M{"title": "Salaries", "markdown": "wombat figures\n", "private": true, "shared_with": []string{"@bea"}})["ref"].(string)
+		s.change(t, s.owner, "", "comment.create", M{"doc": shared, "body": "numbat remark"})
+		open := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "platypus rules\n"})["ref"].(string)
 		var limited struct{ Token string }
-		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "me", "projects": []string{"SVA"}}, 201, &limited)
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "me", "projects": []string{"SVA"}}, 201, &limited)
 
 		finds := func(token, words, docID string) bool {
 			t.Helper()
-			return strings.Contains(s.call(nil, token, "GET", "/api/v1/w/-/search?q="+words, nil, 200, nil), docID)
+			return strings.Contains(s.call(t, nil, token, "GET", "/api/v1/w/-/search?q="+words, nil, 200, nil), docID)
 		}
 		t.Run("a private page shared with the reader", func(t *testing.T) {
 			for _, words := range []string{"salaries", "wombat", "numbat"} {
@@ -38,7 +38,7 @@ func TestSearchFindsWhatTheReaderMayOpen(t *testing.T) {
 			}
 		})
 		t.Run("a page of no project, with a credential limited to projects", func(t *testing.T) {
-			s.call(nil, limited.Token, "GET", "/api/v1/w/-/docs/"+open, nil, 200, nil)
+			s.call(t, nil, limited.Token, "GET", "/api/v1/w/-/docs/"+open, nil, 200, nil)
 			if !finds(limited.Token, "platypus", open) {
 				t.Fatal("a page the credential opens is not found by it")
 			}

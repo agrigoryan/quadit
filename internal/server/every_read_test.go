@@ -199,7 +199,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	change := func(hc *http.Client, token, typ string, args any) map[string]any {
 		t.Helper()
 		time.Sleep(2 * time.Millisecond)
-		return s.change(hc, token, typ, args)
+		return s.change(t, hc, token, typ, args)
 	}
 	made := func(name string, res map[string]any) string {
 		t.Helper()
@@ -219,7 +219,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	day := func(offset int) string { return time.Now().UTC().AddDate(0, 0, offset).Format("2006-01-02") }
 
 	// People, agents and projects.
-	rw.n.name(s.ownerID(), "@aram")
+	rw.n.name(s.ownerID(t), "@aram")
 	do("project SVA", "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "description": "The game."})
 	do("project OPS", "project.create", M{"key": "OPS", "name": "Operations"})
 	do("project ARC", "project.create", M{"key": "ARC", "name": "Archived project"})
@@ -239,7 +239,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 		t.Helper()
 		var tok struct{ Token string }
 		time.Sleep(2 * time.Millisecond)
-		s.call(owner, "", "POST", w+"/tokens", body, 201, &tok)
+		s.call(t, owner, "", "POST", w+"/tokens", body, 201, &tok)
 		return tok.Token
 	}
 	rw.artist = token(M{"user": "@artist", "name": "artist"})
@@ -337,7 +337,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 		t.Helper()
 		var f struct{ ID, State string }
 		time.Sleep(2 * time.Millisecond)
-		s.call(owner, "", "POST", w+"/files?name="+name, []byte(body), 201, &f)
+		s.call(t, owner, "", "POST", w+"/files?name="+name, []byte(body), 201, &f)
 		if f.State != "ready" {
 			t.Fatalf("upload of %s = %+v", name, f)
 		}
@@ -355,7 +355,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 				Options []struct{ ID string }
 			}
 		}
-		s.call(owner, "", "GET", w+"/tasks/"+task, nil, 200, &detail)
+		s.call(t, owner, "", "GET", w+"/tasks/"+task, nil, 200, &detail)
 		for _, d := range detail.Decisions {
 			if d.ID == rw.id(decision) {
 				return d.Options[n-1].ID
@@ -428,7 +428,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	change(owner, "", "doc.delete", M{"id": rw.id("doc OPS removed")})
 	change(owner, "", "doc.snapshot", M{"doc": rw.id("doc Handbook"), "label": "first"})
 	var saved struct{ Versions []struct{ ID string } }
-	s.call(owner, "", "GET", w+"/docs/"+rw.id("doc Handbook")+"/versions", nil, 200, &saved)
+	s.call(t, owner, "", "GET", w+"/docs/"+rw.id("doc Handbook")+"/versions", nil, 200, &saved)
 	rw.ids["version Handbook"] = saved.Versions[0].ID
 	rw.n.name(saved.Versions[0].ID, "version Handbook")
 	change(owner, "", "doc.write", M{"doc": rw.id("doc Handbook"), "markdown": "# Handbook\n\nHow we work now. See OPS-5.\n"})
@@ -437,8 +437,8 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	do("attachment Salary", "attachment.add", M{"doc": rw.id("doc Salary notes"), "file": file("salaries.txt", "who earns what")})
 	do("comment Handbook", "comment.create", M{"doc": rw.id("doc Handbook"), "body": "Is this still how we work?"})
 	do("comment OPS runbook", "comment.create", M{"doc": rw.id("doc OPS runbook"), "body": "The cellar floods."})
-	s.call(nil, rw.artist, "POST", w+"/memory", M{"title": "Palette", "markdown": "Reds and golds."}, 201, nil)
-	s.call(nil, rw.ops, "POST", w+"/memory", M{"title": "Vault", "markdown": "Third shelf."}, 201, nil)
+	s.call(t, nil, rw.artist, "POST", w+"/memory", M{"title": "Palette", "markdown": "Reds and golds."}, 201, nil)
+	s.call(t, nil, rw.ops, "POST", w+"/memory", M{"title": "Vault", "markdown": "Third shelf."}, 201, nil)
 	// A page made private after it had a sub-page, and one under that: they
 	// are private with it.
 	do("doc Plans", "doc.create", M{"title": "Plans", "markdown": "Where we go next.\n"})
@@ -455,7 +455,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	if res := repo.sync(); res.PagesCreated != 1 {
 		t.Fatalf("the first sync: %+v", res)
 	}
-	rw.ids["doc mirrored"] = s.pageID("Style guide")
+	rw.ids["doc mirrored"] = s.pageID(t, "Style guide")
 	rw.n.name(rw.ids["doc mirrored"], "doc mirrored")
 
 	// Saved views: shared, the owner's own, another member's own, tied to
@@ -493,8 +493,8 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	rw.hook = newReceiver(t, "")
 	rw.n.replace(rw.hook.srv.URL, "http://receiver.test")
 	do("rule notify", "rule.create", M{"name": "tell the owner", "active": false, "match": M{"event_types": []string{"task.created"}, "project_id": rw.id("project OPS")},
-		"action": M{"kind": "notify", "user_id": s.ownerID()}})
-	do("rule gone", "rule.create", M{"name": "gone", "active": false, "match": M{"event_types": []string{"task.created"}}, "action": M{"kind": "notify", "user_id": s.ownerID()}})
+		"action": M{"kind": "notify", "user_id": s.ownerID(t)}})
+	do("rule gone", "rule.create", M{"name": "gone", "active": false, "match": M{"event_types": []string{"task.created"}}, "action": M{"kind": "notify", "user_id": s.ownerID(t)}})
 	change(owner, "", "rule.delete", M{"id": rw.id("rule gone")})
 	do("webhook OPS", "webhook.create", M{"name": "ops events", "url": rw.hook.srv.URL + "/ops", "event_types": []string{"never.matches"}, "project": "OPS"})
 	do("webhook gone", "webhook.create", M{"name": "gone", "url": rw.hook.srv.URL + "/gone", "event_types": []string{"never.matches"}})
@@ -511,7 +511,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	change(bea, "", "watch.set", M{"type": "view", "subject": rw.id("view Art bugs")})
 	// A view of a project Bea may not read is not hers to follow; a page
 	// of hers is.
-	s.call(bea, "", "POST", w+"/changes", M{"id": id.New(), "type": "watch.set", "args": M{"type": "view", "subject": rw.id("view Ops infra")}}, 403, nil)
+	s.call(t, bea, "", "POST", w+"/changes", M{"id": id.New(), "type": "watch.set", "args": M{"type": "view", "subject": rw.id("view Ops infra")}}, 403, nil)
 	change(bea, "", "watch.set", M{"type": "doc", "subject": rw.id("doc SVA design")})
 	change(owner, "", "watch.set", M{"type": "view", "subject": rw.id("view Ops infra"), "user": "@cy"})
 	rw.settle()
@@ -525,7 +525,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	rw.settle()
 	rw.waitFor("the webhook's delivery", func() bool {
 		var out struct{ Deliveries []core.WebhookDelivery }
-		s.call(owner, "", "GET", w+"/list/deliveries", nil, 200, &out)
+		s.call(t, owner, "", "GET", w+"/list/deliveries", nil, 200, &out)
 		return len(out.Deliveries) == 1 && out.Deliveries[0].State == core.DeliveryOK
 	})
 	// The last event: one every caller may see, so a reader of the live
@@ -539,12 +539,12 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 func (rw *richWorkspace) invited(name, email string) (*http.Client, string) {
 	rw.t.Helper()
 	var inv struct{ Link string }
-	rw.s.call(rw.s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
+	rw.s.call(rw.t, rw.s.owner, "", "POST", w+"/invites", M{}, 201, &inv)
 	b := browser()
 	var joined struct {
 		User struct{ ID string } `json:"user"`
 	}
-	rw.s.call(b, "", "POST", "/api/v1/auth/invite/"+inv.Link[strings.LastIndex(inv.Link, "/")+1:], M{"name": name, "email": email, "password": "another-long-password"}, 200, &joined)
+	rw.s.call(rw.t, b, "", "POST", "/api/v1/auth/invite/"+inv.Link[strings.LastIndex(inv.Link, "/")+1:], M{"name": name, "email": email, "password": "another-long-password"}, 200, &joined)
 	return b, joined.User.ID
 }
 
@@ -777,7 +777,7 @@ func (rw *richWorkspace) everyGetRouteWasCalled() {
 	var refusal struct {
 		Error struct{ Allowed []string }
 	}
-	rw.s.call(rw.s.owner, "", "GET", w+"/list/nope", nil, 404, &refusal)
+	rw.s.call(rw.t, rw.s.owner, "", "GET", w+"/list/nope", nil, 404, &refusal)
 	asked := append([]string(nil), collectionNames...)
 	sort.Strings(asked)
 	if has := refusal.Error.Allowed; strings.Join(has, " ") != strings.Join(asked, " ") {

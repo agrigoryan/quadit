@@ -56,64 +56,64 @@ func TestDashboardAndExportShape(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
 	const owner = "@aram"
 
-	s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
-	s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
-	s.change(s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
-	s.change(s.owner, "", "epic.create", M{"project": "SVA", "name": "Boss fight", "target_on": "2020-01-01", "lead": owner})
-	s.change(s.owner, "", "epic.create", M{"project": "SVA", "name": "Polish"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+	s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+	s.change(t, s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
+	s.change(t, s.owner, "", "epic.create", M{"project": "SVA", "name": "Boss fight", "target_on": "2020-01-01", "lead": owner})
+	s.change(t, s.owner, "", "epic.create", M{"project": "SVA", "name": "Polish"})
 
 	// Tasks of the two projects are made in turn, so the order they were
 	// made in is not the order of their keys.
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design", "description": "Four phases.\n\nThe last one flies.",
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design", "description": "Four phases.\n\nThe last one flies.",
 		"epic": "Boss fight", "assignee": "@artist", "waiting_on": owner, "priority": 2, "labels": []string{"art"}, "estimate": 3, "due_on": "2020-02-01"})
-	s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music", "epic": "Boss fight", "estimate": 2})
-	s.change(s.owner, "", "task.create", M{"project": "OPS", "title": "Back up: nightly/weekly?", "assignee": "@artist", "waiting_on": "@artist"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion effect", "epic": "Boss fight", "parent": "SVA-1", "assignee": "@artist"})
-	s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Old idea", "epic": "Polish"})
-	s.change(s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"})
-	s.change(s.owner, "", "task.update", M{"id": "SVA-3", "status": "in progress"})
-	s.change(s.owner, "", "task.update", M{"id": "SVA-4", "status": "canceled"})
+	s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music", "epic": "Boss fight", "estimate": 2})
+	s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Back up: nightly/weekly?", "assignee": "@artist", "waiting_on": "@artist"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Explosion effect", "epic": "Boss fight", "parent": "SVA-1", "assignee": "@artist"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Old idea", "epic": "Polish"})
+	s.change(t, s.owner, "", "task.update", M{"id": "SVA-2", "status": "done"})
+	s.change(t, s.owner, "", "task.update", M{"id": "SVA-3", "status": "in progress"})
+	s.change(t, s.owner, "", "task.update", M{"id": "SVA-4", "status": "canceled"})
 
 	// Two decisions on one task, asked by the agent: one answered, one
 	// still asked of the owner.
 	var tok struct{ Token string }
-	s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
-	d := s.change(nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "details": "It is seen from far away.",
+	s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+	d := s.change(t, nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "Which explosion?", "details": "It is seen from far away.",
 		"options": []M{{"label": "Ring", "description": "one clean ring"}, {"label": "Burst"}}, "recommended": 1})["ref"].(string)
-	s.change(s.owner, "", "decision.pick", M{"id": d, "option": 2, "note": "reads better small"})
-	s.change(nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "How many phases?", "options": []M{{"label": "Three"}, {"label": "Four"}}, "ask": owner})
-	s.change(s.owner, "", "comment.create", M{"task": "SVA-1", "body": "No rings please."})
-	s.change(nil, tok.Token, "comment.create", M{"task": "SVA-1", "body": "Drew the burst.", "kind": "result",
+	s.change(t, s.owner, "", "decision.pick", M{"id": d, "option": 2, "note": "reads better small"})
+	s.change(t, nil, tok.Token, "decision.open", M{"task": "SVA-1", "question": "How many phases?", "options": []M{{"label": "Three"}, {"label": "Four"}}, "ask": owner})
+	s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "No rings please."})
+	s.change(t, nil, tok.Token, "comment.create", M{"task": "SVA-1", "body": "Drew the burst.", "kind": "result",
 		"evidence": M{"checked": "at 1x and 2x", "measured": "12 frames", "not_verified": "on a phone"}})
-	s.change(s.owner, "", "preference.create", M{"body": "Explosions are always ring-shaped"})
+	s.change(t, s.owner, "", "preference.create", M{"body": "Explosions are always ring-shaped"})
 
 	// Pages: a tree, two of one name, and a database with its rows.
-	book := s.change(s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "# Handbook\n\nHow we work.\n"})["ref"].(string)
-	s.change(s.owner, "", "doc.create", M{"parent": book, "title": "Release Notes", "markdown": "v0.1\n\n- a boss\n- a song\n"})
-	s.change(s.owner, "", "doc.create", M{"title": "Notes", "markdown": "The first.\n"})
-	s.change(s.owner, "", "doc.create", M{"title": "Notes", "markdown": "The second.\n"})
-	db := s.change(s.owner, "", "doc.create", M{"title": "Sprites", "kind": "database"})["ref"].(string)
-	s.change(s.owner, "", "property.create", M{"database": db, "name": "State", "type": "select"})
-	s.change(s.owner, "", "property.create", M{"database": db, "name": "Frames", "type": "number"})
-	s.change(s.owner, "", "doc.create", M{"parent": db, "title": "Boss idle", "props": M{"State": "drawn", "Frames": 8}})
-	s.change(s.owner, "", "doc.create", M{"parent": db, "title": "Boss attack", "props": M{"State": "todo", "Frames": 12}, "markdown": "Wind up, then strike.\n"})
+	book := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "# Handbook\n\nHow we work.\n"})["ref"].(string)
+	s.change(t, s.owner, "", "doc.create", M{"parent": book, "title": "Release Notes", "markdown": "v0.1\n\n- a boss\n- a song\n"})
+	s.change(t, s.owner, "", "doc.create", M{"title": "Notes", "markdown": "The first.\n"})
+	s.change(t, s.owner, "", "doc.create", M{"title": "Notes", "markdown": "The second.\n"})
+	db := s.change(t, s.owner, "", "doc.create", M{"title": "Sprites", "kind": "database"})["ref"].(string)
+	s.change(t, s.owner, "", "property.create", M{"database": db, "name": "State", "type": "select"})
+	s.change(t, s.owner, "", "property.create", M{"database": db, "name": "Frames", "type": "number"})
+	s.change(t, s.owner, "", "doc.create", M{"parent": db, "title": "Boss idle", "props": M{"State": "drawn", "Frames": 8}})
+	s.change(t, s.owner, "", "doc.create", M{"parent": db, "title": "Boss attack", "props": M{"State": "todo", "Frames": 12}, "markdown": "Wind up, then strike.\n"})
 
 	// A file, uploaded whole and put on a task.
 	data := bytes.Repeat([]byte("quadit "), 1000)
 	var f struct{ ID, State string }
-	s.call(s.owner, "", "POST", fmt.Sprintf(w+"/files?name=notes.txt&size=%d", len(data)), data, 201, &f)
+	s.call(t, s.owner, "", "POST", fmt.Sprintf(w+"/files?name=notes.txt&size=%d", len(data)), data, 201, &f)
 	if f.State != "ready" {
 		t.Fatalf("upload = %+v", f)
 	}
-	s.change(s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})
+	s.change(t, s.owner, "", "attachment.add", M{"task": "SVA-1", "file": f.ID})
 
 	for _, c := range []struct{ name, got, want string }{
-		{"dashboard as JSON", shapeJSON(t, s.call(s.owner, "", "GET", w+"/dashboard", nil, 200, nil)), shapeDashboardJSON},
-		{"dashboard as text", shapeOf(s.call(s.owner, "", "GET", w+"/dashboard?format=text", nil, 200, nil)), shapeDashboardText},
-		{"dashboard of one project as JSON", shapeJSON(t, s.call(s.owner, "", "GET", w+"/dashboard?project=OPS", nil, 200, nil)), shapeDashboardOPS},
-		{"dashboard of one project as text", shapeOf(s.call(s.owner, "", "GET", w+"/dashboard?project=OPS&format=text", nil, 200, nil)), shapeDashboardOPSText},
+		{"dashboard as JSON", shapeJSON(t, s.call(t, s.owner, "", "GET", w+"/dashboard", nil, 200, nil)), shapeDashboardJSON},
+		{"dashboard as text", shapeOf(s.call(t, s.owner, "", "GET", w+"/dashboard?format=text", nil, 200, nil)), shapeDashboardText},
+		{"dashboard of one project as JSON", shapeJSON(t, s.call(t, s.owner, "", "GET", w+"/dashboard?project=OPS", nil, 200, nil)), shapeDashboardOPS},
+		{"dashboard of one project as text", shapeOf(s.call(t, s.owner, "", "GET", w+"/dashboard?project=OPS&format=text", nil, 200, nil)), shapeDashboardOPSText},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s changed:\n%s", c.name, c.got)
