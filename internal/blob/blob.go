@@ -2,7 +2,7 @@
 // stores implement the same interface.
 //
 //	blob.go          the Store interface, and Disk
-//	cloud.go         the Config, the cloud stores, Layered and Move
+//	cloud.go         the Config, the cloud stores, Layered, Unusable and Move
 //	cloud_<kind>.go  opening each cloud: s3, gcs, azure
 package blob
 
@@ -30,6 +30,10 @@ type Store interface {
 	List(ctx context.Context, prefix string, each func(key string, size int64) error) error
 	// Kind names the store for the admin area: "disk", "s3", ...
 	Kind() string
+	// Check says whether the store can be used now: nil, or why not. It
+	// is cheap (a cloud store answers it with one request), so readiness
+	// checks can ask it each time.
+	Check(ctx context.Context) error
 }
 
 // Disk stores files under a directory.
@@ -45,6 +49,18 @@ func NewDisk(dir string) (*Disk, error) {
 
 // Kind names the store for the admin area: "disk".
 func (d *Disk) Kind() string { return "disk" }
+
+// Check says whether the store's folder is there.
+func (d *Disk) Check(_ context.Context) error {
+	info, err := os.Stat(d.Root)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return errors.New("blob: " + d.Root + " is not a folder")
+	}
+	return nil
+}
 
 // path is where key is kept; a key that climbs out of the root is refused.
 func (d *Disk) path(key string) (string, error) {

@@ -20,22 +20,31 @@ import (
 // itself rolls cycles over every hour and expires quiet holds on shared
 // resources every minute.
 //
+// A file store that is set but cannot be used yet (a bucket another
+// container is still making) is never replaced by the local disk: until it
+// can be used, files are neither stored nor read, /readyz says the server
+// is not ready, and Run tries it again in the background.
+//
 // When ctx ends Run returns once every loop it started has returned, so
 // the caller may then close the store. A loop in the middle of a piece of
 // work (a job, a webhook delivery, a repository sync) ends it at its next
 // look at ctx, and records what became of it first; outbound requests see
 // ctx end and are cut off.
 func (s *Server) Run(ctx context.Context) {
-	var fc blob.Config
-	if s.settings.Get(ctx, "files", &fc) {
-		if err := s.useFiles(ctx, fc); err != nil {
-			s.log.Error("file storage is not usable as set; files stay on local disk until it is fixed", "err", err)
-		}
-	}
-	s.applyLimits(ctx)
 	defer s.waitForDetached()
 	var loops sync.WaitGroup
 	defer loops.Wait()
+	var fc blob.Config
+	if s.settings.Get(ctx, "files", &fc) {
+		if err := s.useFiles(ctx, fc); err != nil {
+			s.log.Error("file storage cannot be used as set; no file is stored or read, and the server is not ready, until it can; trying again", "err", err)
+			s.filesMu.Lock()
+			s.files = blob.Unusable{Set: fc.Kind, Err: err}
+			s.filesMu.Unlock()
+			loops.Go(func() { s.reachFiles(ctx) })
+		}
+	}
+	s.applyLimits(ctx)
 	for _, r := range runners {
 		loops.Go(func() { r(s, ctx) })
 	}
@@ -61,6 +70,35 @@ func (s *Server) Run(ctx context.Context) {
 				}
 			}
 		}
+	}
+}
+
+// reachFiles tries the file store that is set again, with a pause that
+// grows, until it can be used, the setting is changed to one that can, or
+// ctx ends.
+func (s *Server) reachFiles(ctx context.Context) {
+	pause := 2 * time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(pause):
+		}
+		if _, unusable := s.fileStore().(blob.Unusable); !unusable {
+			return // an admin set a store that works meanwhile
+		}
+		var fc blob.Config
+		s.settings.Get(ctx, "files", &fc)
+		err := s.useFiles(ctx, fc)
+		if err == nil {
+			s.log.Info("file storage can be used now", "kind", fc.Kind)
+			return
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		pause = min(pause*2, time.Minute)
+		s.log.Error("file storage still cannot be used; trying again", "in", pause, "err", err)
 	}
 }
 

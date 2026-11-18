@@ -147,6 +147,10 @@ func (s *Server) handleCheckReadiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "database: "+err.Error(), http.StatusServiceUnavailable)
 		return
 	}
+	if err := s.fileStore().Check(ctx); err != nil {
+		http.Error(w, "file store: "+err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	fmt.Fprintln(w, "ready")
 }
 

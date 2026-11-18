@@ -101,6 +101,19 @@ func FromBucket(b *gcblob.Bucket, kind, prefix string) Store {
 // Kind names the cloud: s3, gcs or azure.
 func (c *cloud) Kind() string { return c.kind }
 
+// Check lists one key of the bucket: the bucket is there and the
+// credentials may read it.
+func (c *cloud) Check(ctx context.Context) error {
+	there, err := c.b.IsAccessible(ctx)
+	if err != nil {
+		return err
+	}
+	if !there {
+		return fmt.Errorf("blob: the %s bucket is not there", c.kind)
+	}
+	return nil
+}
+
 // Put writes everything read from r under key.
 func (c *cloud) Put(ctx context.Context, key string, r io.Reader, contentType string) error {
 	w, err := c.b.NewWriter(ctx, c.prefix+key, &gcblob.WriterOptions{ContentType: contentType})
@@ -167,6 +180,9 @@ type Layered struct {
 // Kind is the kind of the store written to.
 func (l Layered) Kind() string { return l.Primary.Kind() }
 
+// Check checks the store written to; the old one is only read from.
+func (l Layered) Check(ctx context.Context) error { return l.Primary.Check(ctx) }
+
 // Put writes to the primary store.
 func (l Layered) Put(ctx context.Context, key string, r io.Reader, ct string) error {
 	return l.Primary.Put(ctx, key, r, ct)
@@ -199,6 +215,40 @@ func (l Layered) List(ctx context.Context, prefix string, each func(string, int6
 		}
 		return each(k, n)
 	})
+}
+
+// Unusable stands in for a file store that is set but cannot be used: it
+// could not be opened, or refused a test write. Every call answers why, so
+// that meanwhile nothing is written to, or looked for in, another store.
+type Unusable struct {
+	Set string // the kind of store that is set: s3, gcs or azure
+	Err error  // why it cannot be used
+}
+
+func (u Unusable) why() error {
+	return fmt.Errorf("the %s store cannot be used: %w", u.Set, u.Err)
+}
+
+// Kind is the kind of store that is set.
+func (u Unusable) Kind() string { return u.Set }
+
+// Check says why the store cannot be used.
+func (u Unusable) Check(context.Context) error { return u.why() }
+
+// Put stores nothing, and says why.
+func (u Unusable) Put(context.Context, string, io.Reader, string) error { return u.why() }
+
+// Delete removes nothing, and says why.
+func (u Unusable) Delete(context.Context, string) error { return u.why() }
+
+// List lists nothing, and says why.
+func (u Unusable) List(context.Context, string, func(string, int64) error) error {
+	return u.why()
+}
+
+// Open reads nothing, and says why.
+func (u Unusable) Open(context.Context, string) (io.ReadSeekCloser, time.Time, error) {
+	return nil, time.Time{}, u.why()
 }
 
 // Move copies everything from one store to another and removes it from the

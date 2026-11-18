@@ -1,6 +1,7 @@
 # A bigger install: Postgres for the database, and S3-compatible storage
-# (MinIO here) for files. File storage is set in the admin area, or with
-# QUADIT_SETTING_FILES as below.
+# (RustFS here) for files. File storage is set in the admin area, or with
+# QUADIT_SETTING_FILES as below. Any S3-compatible store works the same way:
+# AWS S3, Cloudflare R2, or one of your own.
 #
 #   docker compose -f deploy/docker-compose.postgres.yml up -d
 
@@ -9,11 +10,14 @@ services:
     image: ghcr.io/agrigoryan/quadit:latest
     # Or build it from this checkout: replace the line above with build: ..
     restart: unless-stopped
+    # Quadit starts once the database answers and the bucket is made. It
+    # never stores files on its own disk instead: until the bucket can be
+    # used, /readyz (and so the container's health) says it is not ready.
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
+      bucket:
+        condition: service_completed_successfully
     ports:
       - "4780:4780"
     environment:
@@ -22,7 +26,7 @@ services:
       # Keep this the same across restarts and copies: it encrypts stored secrets.
       QUADIT_SECRET: change-me-to-a-long-random-string
       QUADIT_SETTING_FILES: >-
-        {"kind":"s3","bucket":"quadit","endpoint":"http://minio:9000","access_key":"quadit","secret_key":"change-me-too","region":"us-east-1"}
+        {"kind":"s3","bucket":"quadit","endpoint":"http://s3:9000","access_key":"quadit","secret_key":"change-me-too","region":"us-east-1"}
     volumes:
       - quadit-data:/data
 
@@ -40,24 +44,35 @@ services:
       interval: 5s
       retries: 10
 
-  minio:
-    image: minio/minio
+  s3:
+    image: rustfs/rustfs:1.0.6
     restart: unless-stopped
-    command: server /data
     environment:
-      MINIO_ROOT_USER: quadit
-      MINIO_ROOT_PASSWORD: change-me-too
+      RUSTFS_ACCESS_KEY: quadit
+      RUSTFS_SECRET_KEY: change-me-too
     volumes:
-      - minio-data:/data
+      - s3-data:/data
 
-  # Makes the bucket once, then exits.
-  minio-setup:
-    image: minio/mc
-    depends_on: [minio]
-    entrypoint: >
-      sh -c "until mc alias set local http://minio:9000 quadit change-me-too; do sleep 1; done; mc mb --ignore-existing local/quadit"
+  # Makes the bucket once, waiting for the store to answer, then exits.
+  bucket:
+    image: amazon/aws-cli:2.41.0
+    depends_on: [s3]
+    environment:
+      AWS_ACCESS_KEY_ID: quadit
+      AWS_SECRET_ACCESS_KEY: change-me-too
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for try in $$(seq 60); do
+          aws --endpoint-url http://s3:9000 s3api head-bucket --bucket quadit 2>/dev/null && exit 0
+          aws --endpoint-url http://s3:9000 s3 mb s3://quadit && exit 0
+          sleep 2
+        done
+        echo "the bucket could not be made" >&2
+        exit 1
 
 volumes:
   quadit-data:
   postgres-data:
-  minio-data:
+  s3-data:

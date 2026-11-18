@@ -36,7 +36,7 @@ Every setting below can be given as an environment variable (`-e`). The `deploy/
 | --- | --- |
 | [`docker-compose.yml`](../deploy/docker-compose.yml) | One container, SQLite, files on disk |
 | [`docker-compose.https.yml`](../deploy/docker-compose.https.yml) | The same over HTTPS, with a certificate from Let's Encrypt |
-| [`docker-compose.postgres.yml`](../deploy/docker-compose.postgres.yml) | Postgres for the database and S3-compatible storage (MinIO) for files |
+| [`docker-compose.postgres.yml`](../deploy/docker-compose.postgres.yml) | Postgres for the database and S3-compatible storage (RustFS) for files. Quadit waits for the bucket to be made |
 
 The command-line client is in the image too: `docker exec quadit quadit admin …`, `docker exec quadit quadit backup --out /data/backup.tar.gz`.
 
@@ -78,11 +78,13 @@ Everything else is set in the admin area of the web app. Each setting can also c
 | `kind` | Other fields |
 | --- | --- |
 | `disk` (default) | none: files live in the data directory |
-| `s3` | `bucket`, `region`, `access_key`, `secret_key`; `endpoint` for Cloudflare R2, MinIO and other S3-compatible stores |
+| `s3` | `bucket`, `region`, `access_key`, `secret_key`; `endpoint` for Cloudflare R2, RustFS, MinIO and other S3-compatible stores |
 | `gcs` | `bucket`, and `credentials` (a service account key as JSON) or the machine's own identity |
 | `azure` | `bucket` (the container), `account`, `account_key` |
 
 Switching from disk to a cloud store needs no downtime: new files go to the cloud at once, old ones are still served from disk, and a background job copies them over.
+
+A cloud store set in the admin area is tried before it is kept, and refused if it does not take a test write. A cloud store that cannot be used when the server starts (its bucket not made yet, the store not up, a wrong key in `QUADIT_SETTING_FILES`) is never replaced by the local disk: no file is stored or read and `/readyz` fails until it can be used, which the server tries again every minute at most, and says so in its log.
 
 ## Postgres
 
@@ -162,7 +164,7 @@ quadit admin token games @coordinator               # an API token for a member,
 | Address | What |
 | --- | --- |
 | `/healthz` | The process is up |
-| `/readyz` | The database answers |
+| `/readyz` | The database and the file store answer. A cloud file store that is set but cannot be used makes it fail: the server then keeps no file on its own disk instead, and takes the store as soon as it answers. The Docker image's health check is this address |
 | `/metrics` | Prometheus counters: requests, rows per table, waiting jobs, dead webhook deliveries |
 
 The admin area's health panel shows failing webhooks, undelivered wake-ups, repository syncs with errors and the last backup. The dashboard shows the same health part to workspace admins whose sign-in or token is not limited to some projects, since its numbers are the whole workspace's; anyone else's dashboard has none.
