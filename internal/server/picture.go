@@ -115,12 +115,16 @@ func picturePath(x *c) (string, error) {
 	task, doc := q.Get("task"), q.Get("doc")
 	query := ""
 	if p := q.Get("path"); p != "" {
+		notAPage := errBad("path is a page of the workspace, like tasks or docs/ID, with no .. or // in it")
 		u, err := url.Parse(p)
+		if err != nil {
+			return "", notAPage
+		}
 		segments := strings.Split(u.Path, "/")
-		if err != nil || u.Scheme != "" || u.Host != "" || u.Opaque != "" || strings.Contains(u.Path, "\\") || slices.ContainsFunc(segments, func(seg string) bool {
+		if u.Scheme != "" || u.Host != "" || u.Opaque != "" || strings.Contains(u.Path, "\\") || slices.ContainsFunc(segments, func(seg string) bool {
 			return seg == "" || seg == "." || seg == ".."
 		}) {
-			return "", errBad("path is a page of the workspace, like tasks or docs/ID, with no .. or // in it")
+			return "", notAPage
 		}
 		switch {
 		case len(segments) == 2 && segments[0] == "task":

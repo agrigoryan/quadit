@@ -51,7 +51,7 @@ func TestAPictureShowsOnlyWhatTheCallerMayRead(t *testing.T) {
 			before := len(targets)
 			s.call(nil, limited.Token, "GET", "/api/v1/w/-/render?task=OPS-1", nil, 404, nil)
 			s.call(nil, limited.Token, "GET", "/api/v1/w/-/render?path=task/OPS-1", nil, 404, nil)
-			for _, path := range []string{"../elsewhere", "..%2F..%2Fapi%2Fv1%2Fauth%2Fme", "//evil.example/x", "task/../../elsewhere"} {
+			for _, path := range []string{"../elsewhere", "..%2F..%2Fapi%2Fv1%2Fauth%2Fme", "//evil.example/x", "task/../../elsewhere", "%25"} {
 				s.call(nil, limited.Token, "GET", "/api/v1/w/-/render?path="+path, nil, 400, nil)
 			}
 			if len(targets) != before {
