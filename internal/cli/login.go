@@ -5,8 +5,10 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,6 +49,12 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr i
 	}
 	path := configPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	// WriteFile sets the mode only on a file it creates: a login file that
+	// is already there is made private before the token goes into it.
+	if err := os.Chmod(path, 0o600); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
