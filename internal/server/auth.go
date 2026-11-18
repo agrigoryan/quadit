@@ -35,7 +35,7 @@ func (s *Server) authRoutes() []route {
 		{"GET /api/v1/auth/invite/{token}", s.public(s.handleShowInvite), "What an invitation is for.", "", "account"},
 		{"POST /api/v1/auth/invite/{token}", s.public(s.handleAcceptInvite), "Accept an invitation, making an account if needed. Body: {name, email, password}.", "", "account"},
 		{"GET " + w + "/invites", s.workspaceMember(s.handleListInvites), "Open invitations.", "", "admin"},
-		{"POST " + w + "/invites", s.workspaceMember(s.handleCreateInvite), "Invite by link or email: {email, role, expires_days, max_uses}.", "", "admin"},
+		{"POST " + w + "/invites", s.workspaceMember(s.handleCreateInvite), "Invite by link or email: {email, role, expires_days, max_uses, approval}. Allowed as member.add is; an approval for it has the args {user: email, role}.", "", "admin"},
 		{"DELETE " + w + "/invites/{id}", s.workspaceMember(s.handleRevokeInvite), "Withdraw an invitation. Admins.", "", "admin"},
 	}
 }
