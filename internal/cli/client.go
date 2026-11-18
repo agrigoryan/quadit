@@ -5,6 +5,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -292,7 +294,16 @@ func (c *Client) UploadAs(ctx context.Context, id, path string) (fileID, fileURL
 	if err != nil {
 		return "", "", err
 	}
-	q := url.Values{"name": {filepath.Base(path)}, "size": {fmt.Sprint(st.Size())}}
+	// The server makes the file ready only if what it put together has
+	// this checksum: a part lost or cut short on the way is sent again.
+	sum := sha256.New()
+	if _, err := io.Copy(sum, f); err != nil {
+		return "", "", err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return "", "", err
+	}
+	q := url.Values{"name": {filepath.Base(path)}, "size": {fmt.Sprint(st.Size())}, "sha256": {hex.EncodeToString(sum.Sum(nil))}}
 	if id != "" {
 		q.Set("id", id)
 	}

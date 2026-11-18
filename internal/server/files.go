@@ -117,7 +117,9 @@ func readUploadStart(x *c) (uploadStart, error) {
 
 // handleUploadFile stores a file. The body is the file itself (name it with ?name=),
 // or a multipart form with a "file" field. A large file can come in parts:
-// give its full size with ?size= and send the rest with PATCH.
+// give its full size with ?size= and send the rest with PATCH. Given its
+// checksum (?sha256=, in hex), the file is made ready only if its bytes
+// match it.
 func (s *Server) handleUploadFile(x *c) error {
 	if err := x.mayWrite(); err != nil {
 		return err
@@ -138,6 +140,10 @@ func (s *Server) handleUploadFile(x *c) error {
 	}
 	if size > maxSize {
 		return errBad("files can be up to %d MB; this one is %d MB", maxSize>>20, size>>20)
+	}
+	sum := strings.ToLower(q.Get("sha256"))
+	if raw, err := hex.DecodeString(sum); sum != "" && (err != nil || len(raw) != sha256.Size) {
+		return errBad("sha256 must be the file's SHA-256 checksum, in hex")
 	}
 	// The caller may name the file's id itself (?id=): if the answer to this
 	// first request is lost, asking for that file says how far it got, and
@@ -164,7 +170,7 @@ func (s *Server) handleUploadFile(x *c) error {
 	// request the one that receives the upload's first part: another first
 	// request under the same id that comes meanwhile finds the row and is
 	// told how far the upload has got, as a retry would be.
-	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, State: core.FileUploading,
+	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, SHA256: sum, State: core.FileUploading,
 		Parts: []string{}, UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
 	f.StorageKey = x.ws.ID + "/" + f.ID
 	if err := x.db.Insert(ctx, f); err != nil {
@@ -217,6 +223,9 @@ func (s *Server) ownUpload(x *c, fid string) (core.File, bool, error) {
 // now.
 func (s *Server) startedAgain(x *c, f core.File) error {
 	if f.State == core.FileUploading {
+		if err := s.adoptLegacyParts(x.ctx(), x.db, &f); err != nil {
+			return err
+		}
 		if f.Received == f.Size {
 			if err := s.finishUpload(x.ctx(), x, &f); err != nil {
 				return err
@@ -312,6 +321,58 @@ func (s *Server) putLocal(ctx context.Context, key, path string) error {
 	return s.fileStore().Put(ctx, key, in, "application/octet-stream")
 }
 
+// adoptLegacyParts lists the parts of an upload that a server before
+// schema version 14 started, which listed none: it kept each part under a
+// key made from the part's offset alone and found them by those keys. The
+// parts that follow each other from the start, within the bytes counted,
+// become the upload's parts, and the count is where they end: what is not
+// there (a part lost, or one stored but never counted) is asked for again.
+// A whole file waiting on this machine is left as it is.
+func (s *Server) adoptLegacyParts(ctx context.Context, db store.DB, f *core.File) error {
+	if f.State != core.FileUploading || f.Parts != nil {
+		return nil
+	}
+	if _, err := os.Stat(s.partPath(f.ID)); err == nil && f.Received == f.Size {
+		return nil
+	}
+	type part struct {
+		key  string
+		size int64
+	}
+	at := map[int64]part{}
+	prefix := f.StorageKey + ".parts/"
+	err := s.fileStore().List(ctx, prefix, func(key string, size int64) error {
+		name := strings.TrimPrefix(key, prefix)
+		if offset, err := strconv.ParseInt(name, 10, 64); err == nil && len(name) == 20 {
+			at[offset] = part{key, size}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("file storage: %w", err)
+	}
+	parts := []string{}
+	var end int64
+	for p, ok := at[end]; ok && p.size > 0 && end+p.size <= f.Received; p, ok = at[end] {
+		parts = append(parts, p.key)
+		delete(at, end)
+		end += p.size
+	}
+	changed, err := db.Update(ctx, "files", map[string]any{"parts": parts, "received": end},
+		store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("received", f.Received), store.Null("parts"))
+	if err != nil {
+		return err
+	}
+	if changed == 0 {
+		return db.Get(ctx, f, store.Eq("id", f.ID))
+	}
+	f.Parts, f.Received = parts, end
+	for _, p := range at {
+		s.dropParts(ctx, p.key)
+	}
+	return nil
+}
+
 // handleUploadFilePart appends the next part of a file. offset must be where the
 // last part ended; the answer says how much has arrived, so a broken upload
 // resumes from there. An upload whose bytes all came but could not be
@@ -330,6 +391,9 @@ func (s *Server) handleUploadFilePart(x *c) error {
 	}
 	if f.UploadedBy != x.member.UserID {
 		return errForbidden("only the one who started an upload can continue it")
+	}
+	if err := s.adoptLegacyParts(ctx, x.db, &f); err != nil {
+		return err
 	}
 	offset := int64(x.intParam("offset", -1))
 	if offset != f.Received {
@@ -419,9 +483,13 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 
 // finishUpload stores a complete upload whole in file storage, with its
 // checksum, real type, size on screen and a reduced copy, and marks it
-// ready. What was received (the parts, or the file on this machine) is
-// removed only once the file is stored and marked: until then a failure
-// leaves it all, and finishing again starts from it.
+// ready. The bytes put together must be the file the upload was started
+// as: as many as its size, and matching the checksum given, if one was;
+// when they are not, what was received is let go and the caller is told
+// to send the file again from the start. What was received (the parts,
+// or the file on this machine) is removed only once the file is stored
+// and marked: until then a failure leaves it all, and finishing again
+// starts from it.
 func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	path := s.partPath(f.ID)
 	if len(f.Parts) > 0 {
@@ -440,7 +508,19 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 		return err
 	}
 	defer in.Close()
-	sniffed, err := sniffType(in)
+	h := sha256.New()
+	n, err := io.Copy(h, in)
+	if err != nil {
+		return err
+	}
+	sum := hex.EncodeToString(h.Sum(nil))
+	switch {
+	case n != f.Size:
+		return s.startUploadOver(ctx, x.db, *f, fmt.Sprintf("the bytes kept add up to %d, not the %d the upload was started with", n, f.Size))
+	case f.SHA256 != "" && sum != f.SHA256:
+		return s.startUploadOver(ctx, x.db, *f, "the bytes received do not match the sha256 the upload was started with")
+	}
+	sniffed, err := sniffType(io.NewSectionReader(in, 0, sniffSize))
 	if err != nil {
 		return err
 	}
@@ -448,27 +528,41 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	if _, err := in.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	h := sha256.New()
-	if err := s.fileStore().Put(ctx, f.StorageKey, io.TeeReader(in, h), f.ContentType); err != nil {
+	if err := s.fileStore().Put(ctx, f.StorageKey, in, f.ContentType); err != nil {
 		return fmt.Errorf("file storage: %w", err)
 	}
 	ready := *f
-	ready.SHA256, ready.State, ready.Parts = hex.EncodeToString(h.Sum(nil)), core.FileReady, nil
+	ready.SHA256, ready.State, ready.Parts = sum, core.FileReady, nil
 	set := map[string]any{"state": core.FileReady, "sha256": ready.SHA256, "content_type": ready.ContentType, "size": ready.Size, "received": ready.Size, "parts": nil}
 	s.addPreview(ctx, &ready, path, set)
 	// Two requests may finish the same upload at once; the file is the same
 	// bytes either way, and the first to mark it ready is the one that counts.
-	n, err := x.db.Update(ctx, "files", set, store.Eq("id", f.ID), store.Eq("state", core.FileUploading))
+	changed, err := x.db.Update(ctx, "files", set, store.Eq("id", f.ID), store.Eq("state", core.FileUploading))
 	if err != nil {
 		return err
 	}
-	if n == 0 {
+	if changed == 0 {
 		return x.db.Get(ctx, f, store.Eq("id", f.ID))
 	}
 	in.Close()
 	s.dropReceived(ctx, *f)
 	*f = ready
 	return nil
+}
+
+// startUploadOver lets go of what an upload received when it is not the
+// file the upload was started as (why says how), and refuses the request
+// with where to continue from: the start.
+func (s *Server) startUploadOver(ctx context.Context, db store.DB, f core.File, why string) error {
+	changed, err := db.Update(ctx, "files", map[string]any{"received": 0, "parts": []string{}},
+		store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("received", f.Received))
+	if err != nil {
+		return err
+	}
+	if changed > 0 {
+		s.dropReceived(ctx, f)
+	}
+	return &httpError{Status: 409, Code: "conflict", Message: why + "; send the file again: continue from 0"}
 }
 
 // joinUploadParts puts the parts an upload lists together, in order, into
