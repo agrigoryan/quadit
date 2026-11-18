@@ -17,8 +17,9 @@ import {
   SlidersHorizontal,
   Users,
 } from "lucide-react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import { useSession } from "@/auth/session";
+import { ApiError } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
 import { Avatar } from "@/ui/avatar";
@@ -118,6 +119,9 @@ export function AdminFrame({ children }: { children: ReactNode }) {
   const settings = useSettings(isAdmin);
 
   if (!isAdmin) return <NotForYou />;
+  // An install that requires a second step opens no admin page without one: go and set it up.
+  if (settings.error instanceof ApiError && settings.error.code === "second_step_required")
+    return <Navigate to="/account/security" replace />;
   const name = settings.data?.["install.name"]?.value;
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-surface">
