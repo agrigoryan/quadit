@@ -15,6 +15,7 @@ export default defineConfig({
   reporter: ci ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     ...devices["Desktop Chrome"],
+    colorScheme: "dark",
     trace: "on-first-retry",
     // The app's service worker would answer from its cache; the tests want the server.
     serviceWorkers: "block",

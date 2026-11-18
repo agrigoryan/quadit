@@ -15,7 +15,10 @@
 //
 // What was recorded is globalThis.e2e, which the tests read back.
 
-const { app, dialog, Notification, shell } = require("electron");
+const { app, dialog, nativeTheme, Notification, shell } = require("electron");
+
+// The windows a run opens on the screen are dark, whatever the system's setting.
+nativeTheme.themeSource = "dark";
 
 const recorded = { opened: [], notes: [], dialogs: [], badge: 0, errors: [] };
 globalThis.e2e = recorded;
