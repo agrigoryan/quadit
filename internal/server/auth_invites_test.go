@@ -13,9 +13,11 @@ import (
 // a membership that may only read invites nobody; an agent that must ask
 // before adding people asks before inviting them; and an invitation made
 // with a credential limited to some projects admits the new member to
-// those projects only, never as an owner.
+// those projects only, never as an owner. An approval is spent only on an
+// invitation made.
 func TestAnInvitationIsAllowedAsAddingTheMemberWouldBe(t *testing.T) {
-	testdb.Each(t, func(t *testing.T, st store.Store) {
+	testdb.Each(t, func(t *testing.T, plain store.Store) {
+		st := newFaultyStore(plain)
 		s := newSite(t, st)
 		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		s.change(s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
@@ -52,6 +54,19 @@ func TestAnInvitationIsAllowedAsAddingTheMemberWouldBe(t *testing.T) {
 			s.call(nil, asker, "POST", invites, M{"email": "other@example.com", "approval": ask}, 403, nil)
 			s.call(nil, asker, "POST", invites, M{"email": "new@example.com", "approval": ask}, 201, nil)
 			s.call(nil, asker, "POST", invites, M{"email": "new@example.com", "approval": ask}, 403, nil) // an approval is used once
+		})
+		t.Run("an approval outlives an invitation that could not be made", func(t *testing.T) {
+			s := s.in(t)
+			asker := admin("retrier", nil)
+			ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "member.add",
+				"args": M{"user": "late@example.com", "role": "member"}, "question": "Invite late@example.com?"})["ref"].(string)
+			s.change(s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
+			fired := st.faults.arm(fault{op: "insert", table: "invites", times: 1})
+			s.call(nil, asker, "POST", invites, M{"email": "late@example.com", "approval": ask}, 500, nil)
+			if fired() != 1 {
+				t.Fatalf("the fault fired %d times", fired())
+			}
+			s.call(nil, asker, "POST", invites, M{"email": "late@example.com", "approval": ask}, 201, nil)
 		})
 		t.Run("limited to the projects of the credential", func(t *testing.T) {
 			s := s.in(t)

@@ -156,22 +156,21 @@ func (s *Server) handleCreateInvite(x *c) error {
 	if email != "" {
 		adds["user"] = email
 	}
-	reach, err := s.eng.Permit(ctx, x.ws.ID, x.actor, engine.Change{Type: "member.add", Args: plainjson.Marshal(adds), Approval: b.Approval})
-	if err != nil {
-		return err
-	}
-	var limit *core.Scope
-	if len(reach.Projects) > 0 {
-		if role == core.RoleOwner {
-			return errForbidden("you reach only some projects here, so you cannot invite an owner, who reaches them all")
-		}
-		limit = &core.Scope{Projects: reach.Projects}
-	}
 	token := auth.Random(24)
 	now := time.Now()
-	inv := core.Invite{ID: id.New(), WorkspaceID: x.ws.ID, Email: email, Role: role, Scope: limit, TokenHash: auth.Hash(token), CreatedBy: x.member.UserID,
+	inv := core.Invite{ID: id.New(), WorkspaceID: x.ws.ID, Email: email, Role: role, TokenHash: auth.Hash(token), CreatedBy: x.member.UserID,
 		CreatedAt: now.UnixMilli(), ExpiresAt: now.AddDate(0, 0, b.ExpiresDays).UnixMilli(), MaxUses: b.MaxUses}
-	if err := s.st.Insert(ctx, inv); err != nil {
+	err := s.eng.Permit(ctx, x.ws.ID, x.actor, engine.Change{Type: "member.add", Args: plainjson.Marshal(adds), Approval: b.Approval},
+		func(tx store.Tx, reach core.Scope) error {
+			if len(reach.Projects) > 0 {
+				if role == core.RoleOwner {
+					return errForbidden("you reach only some projects here, so you cannot invite an owner, who reaches them all")
+				}
+				inv.Scope = &core.Scope{Projects: reach.Projects}
+			}
+			return tx.Insert(ctx, inv)
+		})
+	if err != nil {
 		return err
 	}
 	link := s.cfg.BaseURL + "/invite/" + token

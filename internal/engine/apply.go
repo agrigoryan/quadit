@@ -199,23 +199,23 @@ func Effective(m core.Member, a Actor) core.Scope {
 	return scope
 }
 
-// Permit checks that actor may make the change ch, exactly as Batch checks
-// a change before running it: a member, not suspended, with the role the
-// change needs, not read-only, and with an approval when the actor must
-// get one for this kind of change, which is used up here. No handler runs.
-// It is for a write the server makes outside the engine that stands for a
-// change (an invitation stands for member.add) and must be allowed as that
-// change would be. It returns how far the actor reaches (Effective, and
-// narrowed by an approver's reach), which what is written must stay within.
-func (e *Engine) Permit(ctx context.Context, workspaceID string, actor Actor, ch Change) (core.Scope, error) {
+// Permit makes a write the server makes outside the engine that stands for
+// a change (an invitation stands for member.add), allowed exactly as Batch
+// allows that change: a member, not suspended, with the role the change
+// needs, not read-only, and with an approval when the actor must get one
+// for this kind of change. No handler runs; write runs in its place, in the
+// same transaction as the approval is used up in, so an approval is spent
+// only on a write made, and a write that fails undoes all of it. write is
+// given how far the actor reaches (Effective, narrowed by an approver's
+// reach), which what it writes must stay within.
+func (e *Engine) Permit(ctx context.Context, workspaceID string, actor Actor, ch Change, write func(tx store.Tx, reach core.Scope) error) error {
 	h, ok := handlers[ch.Type]
 	if !ok {
-		return core.Scope{}, oneOf("type", "change type", ch.Type, ChangeTypes())
+		return oneOf("type", "change type", ch.Type, ChangeTypes())
 	}
 	if ch.ID == "" {
 		ch.ID = id.New()
 	}
-	var scope core.Scope
 	var seq int64
 	err := e.st.Write(ctx, workspaceID, func(raw store.Tx) error {
 		run, err := e.startBatch(ctx, newMemoTx(raw), actor)
@@ -226,16 +226,19 @@ func (e *Engine) Permit(ctx context.Context, workspaceID string, actor Actor, ch
 		if err != nil {
 			return err
 		}
-		scope, seq = c.scope, run.tx.Seq()
+		if err := write(run.tx, c.scope); err != nil {
+			return err
+		}
+		seq = run.tx.Seq()
 		return nil
 	})
 	if err != nil {
-		return core.Scope{}, err
+		return err
 	}
 	if e.OnCommit != nil {
 		e.OnCommit(workspaceID, seq)
 	}
-	return scope, nil
+	return nil
 }
 
 // apply runs one change of the batch, or answers it from the first time
