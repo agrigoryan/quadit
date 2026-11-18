@@ -196,3 +196,32 @@ func TestRealBuckets(t *testing.T) {
 		})
 	}
 }
+
+// TestWritable: a store that can be used and takes a write is writable,
+// and the test write leaves nothing behind; a folder that is not there is
+// not, and is not made by asking.
+func TestWritable(t *testing.T) {
+	ctx := context.Background()
+	b := memblob.OpenBucket(nil)
+	defer b.Close()
+	there := t.TempDir()
+	for name, s := range map[string]Store{"a folder": &Disk{Root: there}, "a bucket": FromBucket(b, "s3", "")} {
+		t.Run(name, func(t *testing.T) {
+			if err := Writable(ctx, s); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.List(ctx, "", func(k string, _ int64) error { return fmt.Errorf("the test write left %s", k) }); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	t.Run("a folder that is not there", func(t *testing.T) {
+		gone := there + "/gone"
+		if err := Writable(ctx, &Disk{Root: gone}); err == nil {
+			t.Fatal("a folder that is not there is writable")
+		}
+		if _, err := os.Stat(gone); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("asking made the folder: %v", err)
+		}
+	})
+}

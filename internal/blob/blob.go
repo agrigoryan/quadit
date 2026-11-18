@@ -9,11 +9,14 @@ package blob
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/agrigoryan/quadit/internal/id"
 )
 
 // ErrNotFound is returned for a key that holds nothing.
@@ -34,6 +37,21 @@ type Store interface {
 	// is cheap (a cloud store answers it with one request), so readiness
 	// checks can ask it each time.
 	Check(ctx context.Context) error
+}
+
+// Writable says whether a store can be used now and takes a write: it
+// checks the store, then writes a small file and removes it. Asking does
+// not make a folder that is not there.
+func Writable(ctx context.Context, s Store) error {
+	if err := s.Check(ctx); err != nil {
+		return err
+	}
+	probe := ".probe-" + id.New()
+	if err := s.Put(ctx, probe, strings.NewReader("ok"), "text/plain"); err != nil {
+		return fmt.Errorf("the store refused a test write: %w", err)
+	}
+	_ = s.Delete(ctx, probe) // best effort: a leftover probe is a two-byte file and harms nothing
+	return nil
 }
 
 // Disk stores files under a directory.

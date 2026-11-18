@@ -231,11 +231,9 @@ func (s *Server) useFiles(ctx context.Context, c blob.Config) error {
 			return err
 		}
 		// Prove the store takes a write before trusting uploads to it.
-		probe := "probe/" + id.New()
-		if err := cloud.Put(ctx, probe, strings.NewReader("ok"), "text/plain"); err != nil {
-			return fmt.Errorf("file storage: the store refused a test write: %w", err)
+		if err := blob.Writable(ctx, cloud); err != nil {
+			return fmt.Errorf("file storage: %w", err)
 		}
-		_ = cloud.Delete(ctx, probe) // best effort: a leftover probe is a two-byte file and harms nothing
 		next = blob.Layered{Primary: cloud, Old: s.disk}
 		if err := s.enqueue(ctx, "files.move", "", "files.move", nil, time.Now().Add(5*time.Second)); err != nil {
 			s.log.Error("copying local files to the cloud store; queued again when the server next starts", "err", err)
