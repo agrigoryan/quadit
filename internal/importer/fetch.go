@@ -20,8 +20,9 @@ const (
 	jsonLimit   = 64 << 20
 )
 
-// get asks a service for u with a bearer token (none when empty).
-func get(u, token, accept string, timeout time.Duration) (*http.Response, error) {
+// get asks a service for u through hc with a bearer token (none when
+// empty), within timeout.
+func get(hc *http.Client, u, token, accept string, timeout time.Duration) (*http.Response, error) {
 	req, err := http.NewRequest(http.MethodGet, u, nil) //nolint:noctx // Read takes no context for a source to pass on; the client's timeout bounds the request
 	if err != nil {
 		return nil, err
@@ -33,13 +34,14 @@ func get(u, token, accept string, timeout time.Duration) (*http.Response, error)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	hc := http.Client{Timeout: timeout}
-	return hc.Do(req)
+	timed := *hc
+	timed.Timeout = timeout
+	return timed.Do(req)
 }
 
 // getJSON reads a JSON answer into dst.
-func getJSON(u, token string, dst any) error {
-	resp, err := get(u, token, "application/json", jsonTimeout)
+func getJSON(hc *http.Client, u, token string, dst any) error {
+	resp, err := get(hc, u, token, "application/json", jsonTimeout)
 	if err != nil {
 		return err
 	}
@@ -55,8 +57,8 @@ func getJSON(u, token string, dst any) error {
 }
 
 // getFile fetches a file to path, making its folder.
-func getFile(u, token, path string) error {
-	resp, err := get(u, token, "", fileTimeout)
+func getFile(hc *http.Client, u, token, path string) error {
+	resp, err := get(hc, u, token, "", fileTimeout)
 	if err != nil {
 		return err
 	}

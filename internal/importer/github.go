@@ -4,6 +4,7 @@ package importer
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -33,13 +34,13 @@ type githubIssue struct {
 
 // Read reads every issue of the repository named owner/repo, with its
 // comments, leaving pull requests out. token=TOKEN reads a private one.
-func (github) Read(repo string, opts Options) (Plan, error) {
+func (github) Read(repo string, opts Options, hc *http.Client) (Plan, error) {
 	plan := Plan{Source: "github"}
 	token := opts["token"]
 	api := strings.TrimRight(orStr(opts["api"], "https://api.github.com"), "/")
 	for page := 1; page < 200; page++ {
 		var issues []githubIssue
-		if err := getJSON(fmt.Sprintf("%s/repos/%s/issues?state=all&per_page=100&direction=asc&page=%d", api, repo, page), token, &issues); err != nil {
+		if err := getJSON(hc, fmt.Sprintf("%s/repos/%s/issues?state=all&per_page=100&direction=asc&page=%d", api, repo, page), token, &issues); err != nil {
 			return plan, err
 		}
 		for _, is := range issues {
@@ -49,7 +50,7 @@ func (github) Read(repo string, opts Options) (Plan, error) {
 			t := is.task(repo)
 			if is.Comments > 0 {
 				var err error
-				if t.Comments, err = githubComments(api, repo, token, is.Number); err != nil {
+				if t.Comments, err = githubComments(hc, api, repo, token, is.Number); err != nil {
 					return plan, err
 				}
 			}
@@ -82,13 +83,13 @@ func (is githubIssue) task(repo string) Task {
 	return t
 }
 
-func githubComments(api, repo, token string, issue int) ([]Comment, error) {
+func githubComments(hc *http.Client, api, repo, token string, issue int) ([]Comment, error) {
 	var cs []struct {
 		Body      string
 		CreatedAt string `json:"created_at"`
 		User      struct{ Login string }
 	}
-	if err := getJSON(fmt.Sprintf("%s/repos/%s/issues/%d/comments?per_page=100", api, repo, issue), token, &cs); err != nil {
+	if err := getJSON(hc, fmt.Sprintf("%s/repos/%s/issues/%d/comments?per_page=100", api, repo, issue), token, &cs); err != nil {
 		return nil, err
 	}
 	var out []Comment

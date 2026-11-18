@@ -84,16 +84,19 @@ func (k Keys) Sender() (*ecdsa.PrivateKey, error) {
 }
 
 // Send encrypts payload for one browser's subscription and posts it to the
-// browser's push service, signed with key. subject is the sender's contact
-// (an https address or mailto:; a stand-in is used for anything else). It
-// returns the push service's status: 404 or 410 means the browser has
-// unsubscribed.
-func Send(ctx context.Context, key *ecdsa.PrivateKey, subject string, sub core.PushSubscription, payload []byte) (int, error) {
-	body, err := encrypt(sub.P256dh, sub.Auth, payload)
+// browser's push service with hc, signed with key. subject is the sender's
+// contact (an https address or mailto:; a stand-in is used for anything
+// else). It returns the push service's status: 404 or 410 means the
+// browser has unsubscribed. A push service is reached over HTTPS only.
+func Send(ctx context.Context, hc *http.Client, key *ecdsa.PrivateKey, subject string, sub core.PushSubscription, payload []byte) (int, error) {
+	ep, err := url.Parse(sub.Endpoint)
 	if err != nil {
 		return 0, err
 	}
-	ep, err := url.Parse(sub.Endpoint)
+	if ep.Scheme != "https" {
+		return 0, fmt.Errorf("a push service is reached over https, not at %s", ep.Redacted())
+	}
+	body, err := encrypt(sub.P256dh, sub.Auth, payload)
 	if err != nil {
 		return 0, err
 	}
@@ -105,6 +108,8 @@ func Send(ctx context.Context, key *ecdsa.PrivateKey, subject string, sub core.P
 	if err != nil {
 		return 0, err
 	}
+	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sub.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return 0, err
@@ -114,7 +119,6 @@ func Send(ctx context.Context, key *ecdsa.PrivateKey, subject string, sub core.P
 	req.Header.Set("TTL", "86400")
 	req.Header.Set("Urgency", "high")
 	req.Header.Set("Authorization", "vapid t="+token+", k="+b64.EncodeToString(ek.PublicKey().Bytes()))
-	hc := http.Client{Timeout: sendTimeout}
 	resp, err := hc.Do(req)
 	if err != nil {
 		return 0, err

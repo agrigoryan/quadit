@@ -20,6 +20,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"os/user"
@@ -27,6 +28,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/blob"
@@ -174,12 +176,18 @@ func Serve(args []string, version string) int {
 	defer st.Close()
 
 	o.BaseURL = strings.TrimRight(run.baseURL(), "/")
+	privateNets, err := networks(run.flags.privateNets)
+	if err != nil {
+		log.Error("cannot start", "err", fmt.Errorf("--allow-private-networks: %w", err))
+		return 1
+	}
 	files, err := blob.NewDisk(filepath.Join(o.Data, "files"))
 	if err != nil {
 		log.Error("file storage", "err", err)
 		return 1
 	}
-	srv := server.New(server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: version, Log: log}, st, files, sealer)
+	srv := server.New(server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: version, Log: log,
+		PrivateNetworks: privateNets}, st, files, sealer)
 	if web := WebHandler(); web != nil {
 		srv.SetWeb(web)
 	}
@@ -242,6 +250,7 @@ type serveFlags struct {
 	acmeDir, acmeCA string
 	acmeHTTP        string // where the plain-HTTP side of ACME listens
 	localListen     string // with HTTPS on: the server's own plain address
+	privateNets     string // the private networks users' addresses may reach, as written
 }
 
 // serveRun is what one quadit serve was told: the Options and its own flags.
@@ -281,7 +290,28 @@ func (run *serveRun) parse(args []string) {
 	fs.StringVar(&f.acmeCA, "acme-ca", envOr("QUADIT_ACME_CA", ""), "a PEM file to trust when talking to that authority, when its own certificate is not publicly trusted (QUADIT_ACME_CA)")
 	fs.StringVar(&f.acmeHTTP, "acme-http-listen", envOr("QUADIT_ACME_HTTP_LISTEN", ":80"), "with --tls-domain: where the plain-HTTP side listens, which answers the authority's checks and sends everyone else to HTTPS (QUADIT_ACME_HTTP_LISTEN)")
 	fs.StringVar(&f.localListen, "local-listen", envOr("QUADIT_LOCAL_LISTEN", "127.0.0.1:4781"), "with HTTPS on: a plain address on this machine only, for the server's own use (QUADIT_LOCAL_LISTEN)")
+	fs.StringVar(&f.privateNets, "allow-private-networks", envOr("QUADIT_ALLOW_PRIVATE_NETWORKS", ""), "networks off the public internet that webhooks, push, the vault, imports and GitHub integrations may reach, e.g. 192.168.1.0/24,10.0.0.5; default none (QUADIT_ALLOW_PRIVATE_NETWORKS)")
 	fs.Parse(args)
+}
+
+// networks reads a list of networks (10.0.0.0/8) and single addresses
+// (192.168.1.20, ::1), split by commas or spaces, as a flag gives it. Any
+// item that does not read is an error: a network left out quietly would be
+// a setting that does not do what it says.
+func networks(list string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, item := range strings.FieldsFunc(list, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
+		if p, err := netip.ParsePrefix(item); err == nil {
+			out = append(out, p.Masked())
+			continue
+		}
+		addr, err := netip.ParseAddr(item)
+		if err != nil {
+			return nil, fmt.Errorf("%q is neither a network (10.0.0.0/8) nor an address (10.0.0.5)", item)
+		}
+		out = append(out, netip.PrefixFrom(addr, addr.BitLen()))
+	}
+	return out, nil
 }
 
 // baseURL is the address people reach the server at: the one it was

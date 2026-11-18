@@ -16,6 +16,7 @@ quadit serve --data /var/lib/quadit --url https://quadit.example.com
 | `--url` | `QUADIT_BASE_URL` | `http://localhost:4780` | The address people use. Links in mail, passkeys and file addresses need it right |
 | | `QUADIT_SECRET` | a file made in the data directory | Encrypts stored secrets (mail password, storage keys, integration tokens). Keep it with your backups |
 | `--log-json` | `QUADIT_LOG=json` | text | Structured logs |
+| `--allow-private-networks` | `QUADIT_ALLOW_PRIVATE_NETWORKS` | none | Networks off the public internet the server may call for its users, e.g. `192.168.1.0/24,10.0.0.5` ([below](#addresses-users-give)) |
 
 Put it behind a reverse proxy for HTTPS. The proxy must not buffer responses (the live stream and held requests need that): for nginx, `proxy_buffering off`.
 
@@ -146,6 +147,12 @@ Passkeys and phone notifications need HTTPS. Three ways:
   Another authority that speaks the same protocol (a company's own, for one) is named with `--acme-directory <url>`, with `--acme-ca <pem file>` when its own certificate is not publicly trusted; `--acme-http-listen` moves the plain-HTTP side off port 80.
 - `quadit serve --tls-cert cert.pem --tls-key key.pem` uses a certificate of your own.
 - or keep plain HTTP on `:4780` behind a proxy that terminates HTTPS (Caddy, nginx, a tunnel), and set `--url https://…`.
+
+## Addresses users give
+
+Some addresses the server calls are written by its users: a browser's push service, webhooks, the hosts a vault secret is bound to, a service to import from, a GitHub Enterprise. The server calls them only when they are on the public internet. An address on the server's own machine (`localhost`, `127.0.0.1`), on a private network (`10.x`, `172.16–31.x`, `192.168.x`, `fd00::/8`), link-local (the cloud metadata service at `169.254.169.254`), shared (`100.64.0.0/10`, Tailscale's) or reserved is refused, whatever name leads to it: the check is made on each connection as it opens, so a name that changes what it points to gains nothing. Redirects are not followed; a push service is reached over HTTPS only.
+
+A webhook to an agent on the same machine or network, or a secret for a service inside it, needs that network opened: `--allow-private-networks 192.168.1.0/24,::1` (or `QUADIT_ALLOW_PRIVATE_NETWORKS`), networks or single addresses, split by commas. Open no more than is needed: anyone who may make a webhook can make the server call what is there. These calls use no proxy from the environment (`HTTPS_PROXY`).
 
 ## Several servers
 

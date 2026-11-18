@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +33,19 @@ type site struct {
 	stopRun func()
 }
 
+// newSite starts a server that may reach this machine: the servers tests
+// stand up for it to call (webhooks, the vault's services, an Orbit to
+// import from) listen on the loopback.
 func newSite(t *testing.T, st store.Store) *site {
+	t.Helper()
+	return newSiteWith(t, st, func(cfg *server.Config) { cfg.PrivateNetworks = loopback })
+}
+
+// loopback is this machine's addresses, in IPv4 and IPv6.
+var loopback = []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128")}
+
+// newSiteWith starts a server with what configure sets on its Config.
+func newSiteWith(t *testing.T, st store.Store, configure func(*server.Config)) *site {
 	t.Helper()
 	dir := t.TempDir()
 	files, err := blob.NewDisk(dir + "/files")
@@ -41,7 +54,9 @@ func newSite(t *testing.T, st store.Store) *site {
 	}
 	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
 	hs, base := localhostServer(t)
-	srv := server.New(server.Config{DataDir: dir, BaseURL: base, Version: "test"}, st, files, sealer)
+	cfg := server.Config{DataDir: dir, BaseURL: base, Version: "test"}
+	configure(&cfg)
+	srv := server.New(cfg, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()
 	ctx, stop := context.WithCancel(context.Background())

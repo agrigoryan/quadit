@@ -3,6 +3,7 @@
 package importer
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -14,7 +15,7 @@ type asana struct{}
 func (asana) Kind() string { return "asana" }
 
 // Read reads the CSV file at path.
-func (asana) Read(path string, _ Options) (Plan, error) {
+func (asana) Read(path string, _ Options, _ *http.Client) (Plan, error) {
 	return readCSV(path, "asana", asanaRow)
 }
 

@@ -62,7 +62,7 @@ func TestImports(t *testing.T) {
 		}
 		run := func(kind, source, project string, opts map[string]string) importer.Summary {
 			t.Helper()
-			plan, err := importer.Read(kind, source, opts)
+			plan, err := importer.Read(kind, source, opts, http.DefaultClient)
 			if err != nil {
 				t.Fatalf("read %s: %v", kind, err)
 			}

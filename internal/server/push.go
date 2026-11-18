@@ -144,7 +144,7 @@ func (s *Server) pushTo(ctx context.Context, userID string, msg pushMessage) (in
 	payload := plainjson.Marshal(msg)
 	sent := 0
 	for _, sub := range subs {
-		status, err := webpush.Send(ctx, key, s.cfg.BaseURL, sub, payload)
+		status, err := webpush.Send(ctx, s.outbound, key, s.cfg.BaseURL, sub, payload)
 		switch {
 		case err != nil:
 			s.log.Warn("push", "err", err)

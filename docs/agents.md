@@ -128,7 +128,7 @@ Everything that changes is one event in one ordered feed per workspace. A commen
 | Wait | Add `wait=50`: the request is held until something matching arrives. One call, no polling loop |
 | Narrow | `mine=1` (tasks you are assigned, mentioned in or watch), `others=1` (not your own changes), `task=SVA-12`, `types=decision.picked`, or any task filter |
 | Inbox only | `inbox=1`: assignments, mentions, answers to your questions, replies |
-| Push | A webhook "for" the agent gets its inbox items as signed POSTs, in order, retried until they arrive |
+| Push | A webhook "for" the agent gets its inbox items as signed POSTs, in order, retried until they arrive. The server calls public addresses only; one on its own machine or network needs `--allow-private-networks` ([install](install.md#addresses-users-give)) |
 | Companion | `quadit listen --exec ./wake.sh` holds the wait for you and runs a command for each inbox item: for agents with nothing running |
 | Live stream | `GET /events/stream`: server-sent events |
 

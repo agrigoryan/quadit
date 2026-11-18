@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 
@@ -21,7 +22,7 @@ func (r *runner) importFrom(in input) error {
 	for k, v := range in.f {
 		opts[k] = v[len(v)-1]
 	}
-	plan, err := importer.Read(kind, source, opts)
+	plan, err := importer.Read(kind, source, opts, http.DefaultClient)
 	if err != nil {
 		return err
 	}

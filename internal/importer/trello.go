@@ -5,6 +5,7 @@ package importer
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -41,7 +42,7 @@ type trelloBoard struct {
 }
 
 // Read reads the board's JSON export at path.
-func (trello) Read(path string, _ Options) (Plan, error) {
+func (trello) Read(path string, _ Options, _ *http.Client) (Plan, error) {
 	plan := Plan{Source: "trello"}
 	raw, err := os.ReadFile(path)
 	if err != nil {

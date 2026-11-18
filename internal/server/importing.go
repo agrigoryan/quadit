@@ -63,7 +63,7 @@ func (s *Server) handleImportWork(x *c) error {
 		return err
 	}
 	defer cleanup()
-	plan, err := importer.Read(b.Kind, source, b.Options)
+	plan, err := importer.Read(b.Kind, source, b.Options, s.outbound)
 	if err != nil {
 		plan.Close() // a source that failed may have unpacked files first
 		field, what := "file", "this could not be read as a "+b.Kind+" export: "

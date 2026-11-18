@@ -55,7 +55,7 @@ func (r *orbitReader) files(ot orbitTask, t *Task, commentAt map[string]int) err
 // and with one wrapped in "items"; both are read.
 func (r *orbitReader) attachments(inner string) ([]orbitAttachment, error) {
 	var raw json.RawMessage
-	if err := getJSON(r.origin+inner, r.session, &raw); err != nil {
+	if err := getJSON(r.hc, r.origin+inner, r.session, &raw); err != nil {
 		return nil, err
 	}
 	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("[")) {
@@ -83,5 +83,5 @@ func (r *orbitReader) fetch(a orbitAttachment, link string) (string, error) {
 		name = "file"
 	}
 	path := filepath.Join(r.plan.Tmp, a.ID, name)
-	return path, getFile(r.origin+link, r.session, path)
+	return path, getFile(r.hc, r.origin+link, r.session, path)
 }

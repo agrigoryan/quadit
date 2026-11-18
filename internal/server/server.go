@@ -71,6 +71,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"reflect"
 	"runtime/debug"
 	"slices"
@@ -87,6 +88,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/hub"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/mcp"
+	"github.com/agrigoryan/quadit/internal/outbound"
 	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/reposync"
 	"github.com/agrigoryan/quadit/internal/settings"
@@ -102,6 +104,11 @@ type Config struct {
 	LocalURL string
 	Version  string       // shown in /me, openapi.json and the metrics
 	Log      *slog.Logger // nil means slog.Default()
+	// PrivateNetworks are the networks off the public internet the server
+	// may reach for its users (webhooks, push, the vault's requests,
+	// imports, GitHub integrations): whoever runs it opens them. None means
+	// public addresses only (package outbound).
+	PrivateNetworks []netip.Prefix
 }
 
 // Server holds everything a request needs. New sets every field except
@@ -138,6 +145,10 @@ type Server struct {
 	github *github.Syncer
 	// detached is the work requests leave running after their answer (detached.go).
 	detached detached
+	// outbound makes the requests that go where a user said: push, webhooks,
+	// the vault, imports, GitHub integrations. It reaches public addresses
+	// and cfg.PrivateNetworks only, and follows no redirect.
+	outbound *http.Client
 }
 
 // Stop ends the connections the server holds open for its callers, so a
@@ -164,12 +175,12 @@ func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Ser
 		cfg.Log = slog.Default()
 	}
 	s := &Server{cfg: cfg, st: st, eng: engine.New(st, sealer.Seal), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
-		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{})}
+		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{}), outbound: outbound.Client(cfg.PrivateNetworks)}
 	s.eng.OnCommit = s.hub.Notify
 	s.settings = settings.New(st, sealer, cfg.Log, s.settingKinds())
 	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}
 	s.mcp = mcp.New(s.callAsToken, cfg.Version)
-	s.github = &github.Syncer{Store: st, Engine: s.eng, Sealer: sealer, BaseURL: cfg.BaseURL, Version: cfg.Version}
+	s.github = &github.Syncer{Store: st, Engine: s.eng, Sealer: sealer, HTTP: s.outbound, BaseURL: cfg.BaseURL, Version: cfg.Version}
 	s.routes()
 	return s
 }

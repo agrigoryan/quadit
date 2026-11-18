@@ -17,6 +17,7 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/outbound"
 	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
@@ -301,7 +302,7 @@ func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Web
 		req.Header.Set("X-Quadit-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
 	}
 	start := time.Now()
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.outbound.Do(req)
 	took = time.Since(start)
 	if err != nil {
 		return 0, plainNetError(err), took
@@ -317,6 +318,9 @@ func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Web
 // plainNetError says why a request did not get through, without the
 // library's own framing ("Post \"url\": dial tcp …").
 func plainNetError(err error) string {
+	if blocked, ok := errors.AsType[*outbound.BlockedError](err); ok {
+		return "not sent: " + blocked.Error()
+	}
 	said := err.Error()
 	switch {
 	case errors.Is(err, context.DeadlineExceeded) || strings.Contains(said, "Client.Timeout"):

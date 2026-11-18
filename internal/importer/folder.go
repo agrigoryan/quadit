@@ -5,6 +5,7 @@ package importer
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,7 +21,7 @@ type folder struct{ kind string }
 func (f folder) Kind() string { return f.kind }
 
 // Read reads the folder, or the zip of it, at source.
-func (f folder) Read(source string, _ Options) (Plan, error) {
+func (f folder) Read(source string, _ Options, _ *http.Client) (Plan, error) {
 	dir, tmp, err := unpacked(source, f.kind, zipByName)
 	if err != nil {
 		return Plan{}, err

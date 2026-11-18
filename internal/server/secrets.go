@@ -15,6 +15,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -40,12 +41,10 @@ func (s *Server) secretRoutes() []route {
 	}
 }
 
-// secretRequestClient makes the vault's outbound requests. It never follows
-// a redirect: a secret goes to the host it was sent to and no further.
-var secretRequestClient = &http.Client{
-	Timeout:       30 * time.Second,
-	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-}
+// secretRequestTimeout is how long a request made with a secret may take.
+// It goes out through s.outbound, which never follows a redirect: a secret
+// goes to the host it was sent to and no further.
+const secretRequestTimeout = 30 * time.Second
 
 const secretMask = "•••"
 
@@ -158,7 +157,9 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 		return err
 	}
 	started := time.Now()
-	resp, err := secretRequestClient.Do(req)
+	ctx, cancel := context.WithTimeout(x.ctx(), secretRequestTimeout)
+	defer cancel()
+	resp, err := s.outbound.Do(req.WithContext(ctx))
 	s.markSecretUsed(x, sec, started)
 	s.audit(x.r, x.ws.ID, x.user, "secret.used", "secret", sec.ID, map[string]string{"name": sec.Name, "method": req.Method, "host": target.Host, "path": target.Path})
 	mask := secretMasker(value)

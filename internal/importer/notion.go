@@ -3,6 +3,7 @@
 package importer
 
 import (
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -17,7 +18,7 @@ type notion struct{}
 func (notion) Kind() string { return "notion" }
 
 // Read reads the export at source: the zip, or a folder it was unpacked into.
-func (notion) Read(source string, _ Options) (Plan, error) {
+func (notion) Read(source string, _ Options, _ *http.Client) (Plan, error) {
 	dir, tmp, err := unpacked(source, "notion", zipAnyFile)
 	if err != nil {
 		return Plan{}, err

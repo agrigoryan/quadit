@@ -4,6 +4,7 @@ package importer
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -13,8 +14,9 @@ import (
 type Source interface {
 	// Kind is the name the source is asked for by: "linear", "orbit".
 	Kind() string
-	// Read turns what is at source (a file, a folder, an address) into a plan.
-	Read(source string, opts Options) (Plan, error)
+	// Read turns what is at source (a file, a folder, an address) into a
+	// plan. A source read from a service asks it through hc.
+	Read(source string, opts Options, hc *http.Client) (Plan, error)
 }
 
 // Options carries what a source needs beyond its path or address: a token,
@@ -43,11 +45,13 @@ var Kinds = func() []string {
 
 // Read turns a source into a plan. A read that fails leaves nothing behind:
 // what it had copied to this machine is removed, so only a plan read
-// without an error needs closing.
-func Read(kind, source string, opts map[string]string) (Plan, error) {
+// without an error needs closing. hc makes the requests of the sources
+// read from a service (github, orbit): on the server, one that keeps to
+// the addresses it may reach for its users.
+func Read(kind, source string, opts map[string]string, hc *http.Client) (Plan, error) {
 	for _, s := range sources {
 		if s.Kind() == kind {
-			plan, err := s.Read(source, opts)
+			plan, err := s.Read(source, opts, hc)
 			if err != nil {
 				plan.Close()
 				return Plan{}, err

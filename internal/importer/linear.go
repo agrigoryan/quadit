@@ -3,6 +3,7 @@
 package importer
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -15,7 +16,7 @@ type linear struct{}
 func (linear) Kind() string { return "linear" }
 
 // Read reads the CSV file at path.
-func (linear) Read(path string, _ Options) (Plan, error) {
+func (linear) Read(path string, _ Options, _ *http.Client) (Plan, error) {
 	return readCSV(path, "linear", linearRow)
 }
 

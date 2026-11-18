@@ -30,17 +30,20 @@ import (
 
 // Syncer runs passes over GitHub integrations' repositories.
 type Syncer struct {
-	Store   store.Store
-	Engine  *engine.Engine // every task and link is written as a change
-	Sealer  *auth.Sealer   // opens the integration's token
-	BaseURL string         // where people reach Quadit: links posted on GitHub
-	Version string         // this Quadit's version, said to GitHub
+	Store  store.Store
+	Engine *engine.Engine // every task and link is written as a change
+	Sealer *auth.Sealer   // opens the integration's token
+	// HTTP makes the requests to the API, at the address an admin gave: one
+	// that keeps to the addresses the server may reach for its users.
+	HTTP    *http.Client
+	BaseURL string // where people reach Quadit: links posted on GitHub
+	Version string // this Quadit's version, said to GitHub
 }
 
 // client is the client of a GitHub integration: it carries the token an
 // admin gave the integration.
 func (sy *Syncer) client(api, token string) *Client {
-	g := NewClient(http.DefaultClient, api, sy.Version)
+	g := NewClient(sy.HTTP, api, sy.Version)
 	if token != "" {
 		g.header["Authorization"] = "Bearer " + token
 	}
